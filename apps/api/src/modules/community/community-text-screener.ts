@@ -9,9 +9,10 @@
 // Three rules shape everything below.
 //
 // EVERY LANGUAGE RUNS AGAINST EVERY SUBMISSION. `locale` arrives from the
-// client on the publish request, so treating it as a routing key would make it a
-// one-field opt-out of the other six dictionaries. It selects nothing; it is
-// only reported back as provenance, and it is checked for a language this
+// client on the publish request, so treating it as a dictionary routing key would
+// make it a one-field opt-out. It scopes ordinary low/medium grammatical contexts;
+// every dictionary still runs, and reviewed high-term constructions depend only
+// on their exact occurrence grammar. It is also checked for a language this
 // screener holds no list for. A policy that set `allDictionariesAlwaysRun` to
 // false would be asking for exactly that bypass, so construction refuses it.
 //
@@ -33,6 +34,7 @@ import path from 'node:path'
 import { Filter } from 'bad-words'
 import { z } from 'zod'
 import { supportedLocales } from '@couture/api-client/contracts/http'
+import reviewedOccurrenceBank from '../../../policies/community-screening/reviewed-occurrence-constructions-v1.json'
 
 export const SCREENING_LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr'] as const
 
@@ -268,11 +270,38 @@ const termsFileSchema = z.object({
 })
 
 const literalContextSchema = z.object({
-  terms: z.array(z.string().regex(/^\p{L}+$/u)).min(1),
+  terms: z.array(z.string().regex(/^\p{Script=Latin}+$/u)).min(1),
   objects: z.array(z.string().regex(/^\p{L}+$/u)).min(1),
   connectors: z.array(z.string().regex(/^\p{L}+$/u)),
   maxDistance: z.number().int().min(1).max(6),
 })
+
+// Coordinator-reviewed native-sense constructions. Each marks only its exact
+// target occurrence in raw contiguous words, independently of declared locale.
+const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
+  .object({
+    version: z.literal(1),
+    provenance: z.string().min(20),
+    constructions: z
+      .array(
+        z
+          .object({
+            language: z.enum(SCREENING_LANGUAGES),
+            nativeLanguages: z.array(z.enum(SCREENING_LANGUAGES)).min(1),
+            target: z.string().regex(/^[a-z]+$/),
+            phrases: z.array(z.string()).min(1),
+            reason: z.string().min(20),
+          })
+          .strict()
+      )
+      .min(1),
+  })
+  .strict()
+  .parse(reviewedOccurrenceBank).constructions
+
+const occurrenceConstructionSchema = z
+  .object({ target: z.enum(['retard', 'tapete']), phrases: z.array(z.string()) })
+  .strict()
 
 const allowFileSchema = z.object({
   language: z.enum(SCREENING_LANGUAGES),
@@ -281,6 +310,7 @@ const allowFileSchema = z.object({
   provenance: provenanceSchema,
   entries: z.array(z.string().trim().min(1)),
   literalContexts: z.array(literalContextSchema).default([]),
+  occurrenceConstructions: z.array(occurrenceConstructionSchema).default([]),
 })
 
 /**
@@ -534,7 +564,35 @@ function connectedLiteralTokens(
   const right = spans[Math.max(at, neighbor)]
   if (!left || !right) return false
   const gap = literal.slice((left.index ?? 0) + left[0].length, right.index)
-  return /^[\p{Zs}\t,'’-]*$/u.test(gap)
+  return /^[\p{Zs}\t]+$/u.test(gap)
+}
+
+function reviewedOccurrencePhrases(
+  lists: readonly {
+    language: ScreeningLanguage
+    occurrenceConstructions?: z.infer<typeof occurrenceConstructionSchema>[]
+  }[]
+): { target: string; phrase: string }[] {
+  const phrases: { target: string; phrase: string }[] = []
+  const targets = new Set<string>()
+  for (const list of lists) {
+    for (const rule of list.occurrenceConstructions ?? []) {
+      const reviewed = REVIEWED_OCCURRENCE_CONSTRUCTIONS.find(
+        (entry) => entry.target === rule.target && entry.language === list.language
+      )
+      if (
+        !reviewed ||
+        rule.phrases.length !== reviewed.phrases.length ||
+        !reviewed.phrases.every((phrase) => rule.phrases.includes(phrase))
+      )
+        throw new CommunityTextScreenerConfigError('unreviewed occurrence construction')
+      if (targets.has(rule.target))
+        throw new CommunityTextScreenerConfigError('duplicate occurrence construction')
+      targets.add(rule.target)
+      phrases.push(...rule.phrases.map((phrase) => ({ target: rule.target, phrase })))
+    }
+  }
+  return phrases
 }
 
 function observeScripts(literal: string): string[] {
@@ -551,43 +609,17 @@ interface TermMeta {
   readonly severity: TextScreeningSeverity
 }
 
-interface TermVariant {
-  readonly form: string
-  readonly meta: TermMeta
-}
+type RunIndex = ReadonlyMap<string, TermMeta>
 
-type RunIndex = ReadonlyMap<string, readonly TermVariant[]>
-
-/** Repetition can lengthen a canonical run; it cannot supply a missing letter. */
-function isRunExpansion(candidate: string, canonical: string): boolean {
-  const candidateRuns = candidate.match(/(.)\1*/gu) ?? []
-  const canonicalRuns = canonical.match(/(.)\1*/gu) ?? []
-  return (
-    candidateRuns.length === canonicalRuns.length &&
-    canonicalRuns.every((run, index) => {
-      const actual = candidateRuns[index] as string
-      return actual[0] === run[0] && actual.length >= run.length
-    })
-  )
-}
-
-function indexRun(index: Map<string, TermVariant[]>, form: string, meta: TermMeta): void {
+function indexRun(index: Map<string, TermMeta>, form: string, meta: TermMeta): void {
   const key = collapseRepeats(form)
-  const variants = index.get(key) ?? []
-  variants.push({ form, meta })
-  index.set(key, variants)
+  const previous = index.get(key)
+  if (!previous || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[previous.severity])
+    index.set(key, meta)
 }
 
 function matchRun(index: RunIndex, candidate: string): TermMeta | undefined {
-  let worst: TermMeta | undefined
-  for (const variant of index.get(collapseRepeats(candidate)) ?? []) {
-    if (
-      isRunExpansion(candidate, variant.form) &&
-      (!worst || SEVERITY_RANK[variant.meta.severity] > SEVERITY_RANK[worst.severity])
-    )
-      worst = variant.meta
-  }
-  return worst
+  return index.get(collapseRepeats(candidate))
 }
 
 interface PhraseEntry {
@@ -705,8 +737,8 @@ function indexSingleTerm(
   language: ScreeningLanguage,
   allowSingles: ReadonlySet<string>,
   single: Map<string, TermMeta>,
-  singleCollapsed: Map<string, TermVariant[]>,
-  singleLeet: Map<string, TermVariant[]>
+  singleCollapsed: Map<string, TermMeta>,
+  singleLeet: Map<string, TermMeta>
 ): void {
   single.set(term, meta)
   const collapsed = collapseRepeats(term)
@@ -729,11 +761,11 @@ function buildLanguageIndex(
   allowSingles: ReadonlySet<string>
 ): LanguageIndex {
   const single = new Map<string, TermMeta>()
-  const singleCollapsed = new Map<string, TermVariant[]>()
-  const singleLeet = new Map<string, TermVariant[]>()
+  const singleCollapsed = new Map<string, TermMeta>()
+  const singleLeet = new Map<string, TermMeta>()
   const phrases: PhraseEntry[] = []
-  const phraseConcatenations = new Map<string, TermVariant[]>()
-  const phraseLeetConcatenations = new Map<string, TermVariant[]>()
+  const phraseConcatenations = new Map<string, TermMeta>()
+  const phraseLeetConcatenations = new Map<string, TermMeta>()
   const phraseForms = new Set<string>()
 
   for (const entry of list.entries) {
@@ -834,19 +866,8 @@ function matchPhraseWindow(
   for (let offset = 0; offset < phrase.collapsed.length; offset += 1) {
     const at = start + offset
     if (forms.allowed[at]) return null
-    if (
-      forms.collapsedTokens[at] !== phrase.collapsed[offset] ||
-      !isRunExpansion(forms.foldedTokens[at] as string, phrase.tokens[offset] as string)
-    )
-      collapsedHit = false
-    if (
-      forms.leetTokens[at] !== phrase.leet[offset] ||
-      !isRunExpansion(
-        toLeetRunForm(forms.foldedTokens[at] as string),
-        toLeetRunForm(phrase.tokens[offset] as string)
-      )
-    )
-      leetHit = false
+    if (forms.collapsedTokens[at] !== phrase.collapsed[offset]) collapsedHit = false
+    if (forms.leetTokens[at] !== phrase.leet[offset]) leetHit = false
     if (forms.foldedTokens[at] !== phrase.tokens[offset]) exact = false
     if (forms.carriesLeet[at]) leetPresent = true
   }
@@ -933,7 +954,14 @@ export class CommunityTextScreener {
   private readonly indexes: readonly LanguageIndex[]
   private readonly allowSingles: ReadonlySet<string>
   private readonly allowPhrases: readonly string[][]
-  private readonly literalContexts: readonly z.infer<typeof literalContextSchema>[]
+  private readonly literalContexts: readonly (z.infer<typeof literalContextSchema> & {
+    language: ScreeningLanguage
+  })[]
+  private readonly occurrenceConstructions: readonly {
+    words: readonly string[]
+    target: string
+    pattern: RegExp
+  }[]
   private readonly listVersions: Readonly<Record<string, string>>
   private readonly loadedLanguages: readonly ScreeningLanguage[]
   private readonly englishFilter: Filter
@@ -1009,12 +1037,42 @@ export class CommunityTextScreener {
     }
     this.allowSingles = allowSingles
     this.allowPhrases = allowPhrases
-    this.literalContexts = allowLists.flatMap((list) => list.literalContexts ?? [])
+    if (
+      allowLists.some((list) =>
+        list.entries.some((entry) =>
+          tokenize(toLeetRunForm(toFoldedForm(toLiteralForm(entry)))).some((token) =>
+            REVIEWED_OCCURRENCE_CONSTRUCTIONS.some(
+              (entry) => collapseRepeats(token) === entry.target
+            )
+          )
+        )
+      )
+    )
+      throw new CommunityTextScreenerConfigError(
+        'reviewed occurrence target cannot be globally allow-listed'
+      )
+    this.literalContexts = allowLists.flatMap((list) =>
+      (list.literalContexts ?? []).map((context) => ({
+        ...context,
+        language: list.language,
+      }))
+    )
+    this.occurrenceConstructions = reviewedOccurrencePhrases(allowLists).map(
+      ({ target, phrase }) => ({
+        target,
+        words: phrase.split(' '),
+        pattern: new RegExp(
+          `(?<![\\p{L}\\p{N}])${phrase.replace(' ', ' +')}(?![\\p{L}\\p{N}])`,
+          'gu'
+        ),
+      })
+    )
 
     this.indexes = termLists.map((list) =>
       buildLanguageIndex(list, this.policy, allowSingles)
     )
     this.assertDeliberateReviewTerms()
+    this.assertContextTargets()
     this.longestTerm = Math.max(
       MIN_SINGLE_TERM_LENGTH,
       ...this.indexes.map((index) => index.longestSingleTerm)
@@ -1056,6 +1114,21 @@ export class CommunityTextScreener {
     }
   }
 
+  private assertContextTargets(): void {
+    for (const context of this.literalContexts) {
+      for (const term of context.terms) {
+        const folded = toFoldedForm(toLiteralForm(term))
+        if (
+          this.worstAcross((index) => matchRun(index.singleCollapsed, folded))
+            ?.severity === 'high'
+        )
+          throw new CommunityTextScreenerConfigError(
+            'generic context targets a high-severity term'
+          )
+      }
+    }
+  }
+
   /** Every language whose list is loaded, which is every language that runs. */
   get screenedLanguages(): readonly ScreeningLanguage[] {
     return this.loadedLanguages
@@ -1072,7 +1145,8 @@ export class CommunityTextScreener {
     const limit = this.fieldLimits[input.field]
     const raw = input.text ?? ''
     const overLength = raw.length > limit
-    const literal = toLiteralForm(overLength ? trimToLimit(raw, limit) : raw)
+    const boundedRaw = overLength ? trimToLimit(raw, limit) : raw
+    const literal = toLiteralForm(boundedRaw)
 
     const observedScripts = observeScripts(literal)
     this.applyScriptPolicy(observedScripts, verdict)
@@ -1089,9 +1163,11 @@ export class CommunityTextScreener {
     const allowed = literalTokens.map(
       (token, index) => this.allowSingles.has(token) || (phraseAllowed[index] as boolean)
     )
-    this.markLiteralContexts(literal, literalTokens, allowed)
+    this.markLiteralContexts(literal, literalTokens, allowed, declaredLocale)
+    this.markOccurrenceConstructions(boundedRaw, literalTokens, allowed)
 
     for (const outcome of this.collectMatches(
+      literal,
       literalTokens,
       foldedTokens,
       { allowed, phraseAllowed },
@@ -1192,11 +1268,15 @@ export class CommunityTextScreener {
   private markLiteralContexts(
     literal: string,
     tokens: readonly string[],
-    allowed: boolean[]
+    allowed: boolean[],
+    declaredLocale: string | null
   ): void {
+    const language = this.resolveLanguage(declaredLocale)
+    if (!language) return
     const spans = [...literal.matchAll(/[\p{L}\p{N}]+/gu)]
     for (let position = 0; position < tokens.length; position++) {
       for (const context of this.literalContexts) {
+        if (context.language !== language) continue
         if (!context.terms.includes(tokens[position] as string)) continue
         for (const direction of [-1, 1]) {
           for (let distance = 1; distance <= context.maxDistance; distance++) {
@@ -1217,7 +1297,24 @@ export class CommunityTextScreener {
     }
   }
 
+  private markOccurrenceConstructions(
+    raw: string,
+    tokens: readonly string[],
+    allowed: boolean[]
+  ): void {
+    const exact = raw.toLowerCase()
+    for (const construction of this.occurrenceConstructions) {
+      for (const match of exact.matchAll(construction.pattern)) {
+        const at = tokenize(toLiteralForm(exact.slice(0, match.index))).length
+        if (!construction.words.every((word, index) => tokens[at + index] === word))
+          continue
+        allowed[at + construction.words.indexOf(construction.target)] = true
+      }
+    }
+  }
+
   private collectMatches(
+    literal: string,
     literalTokens: readonly string[],
     foldedTokens: readonly string[],
     allowances: { allowed: readonly boolean[]; phraseAllowed: readonly boolean[] },
@@ -1257,7 +1354,7 @@ export class CommunityTextScreener {
       ...this.collectResplitPhraseMatches(foldedTokens, phraseAllowed, literalTokens)
     )
 
-    for (const candidate of this.buildJoinCandidates(literalTokens, budget)) {
+    for (const candidate of this.buildJoinCandidates(literal, literalTokens, budget)) {
       const outcome = this.matchCandidate(
         toFoldedForm(candidate),
         LEET_TRIGGER_PATTERN.test(candidate),
@@ -1371,10 +1468,12 @@ export class CommunityTextScreener {
    * what keeps `off the shoulder` and `a line` out of this path.
    */
   private buildJoinCandidates(
+    literal: string,
     literalTokens: readonly string[],
     budget: ExpansionBudget
   ): string[] {
     const candidates: string[] = []
+    const spans = [...literal.matchAll(/[\p{L}\p{N}]+/gu)]
     let runStart = 0
 
     const flush = (endExclusive: number): void => {
@@ -1383,6 +1482,8 @@ export class CommunityTextScreener {
         const maxSize = Math.min(endExclusive - start, JOIN_WINDOW_CEILING)
         for (let size = 2; size <= maxSize; size += 1) {
           const joined = literalTokens.slice(start, start + size).join('')
+          if (this.isAllowedJoinedPhrase(literal, spans, literalTokens, start, size))
+            continue
           const folded = toFoldedForm(joined)
           if (collapseRepeats(folded).length > this.longestTerm) break
           // The length floor keeps three-character candidates out, because
@@ -1412,6 +1513,25 @@ export class CommunityTextScreener {
     }
 
     return candidates
+  }
+
+  private isAllowedJoinedPhrase(
+    literal: string,
+    spans: readonly RegExpMatchArray[],
+    tokens: readonly string[],
+    start: number,
+    size: number
+  ): boolean {
+    return (
+      this.allowPhrases.some(
+        (phrase) =>
+          phrase.length === size &&
+          phrase.every((word, offset) => tokens[start + offset] === word)
+      ) &&
+      Array.from({ length: size - 1 }, (_, offset) =>
+        connectedLiteralTokens(literal, spans, start + offset, start + offset + 1)
+      ).every(Boolean)
+    )
   }
 
   private matchCandidate(

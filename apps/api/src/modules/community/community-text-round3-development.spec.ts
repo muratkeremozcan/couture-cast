@@ -20,6 +20,7 @@ interface CorpusRow {
   text: string
   field: TextScreeningField
   expected?: string
+  family?: string
 }
 interface Corpus {
   entries: CorpusRow[]
@@ -38,7 +39,7 @@ const clean = (text: string, locale: string, field: TextScreeningField = 'captio
 
 describe('round 3 development data, including released v4', () => {
   it.each(Object.entries(locales))(
-    '%s keeps the unchanged clean and disguised limits',
+    '%s keeps the unchanged released-v4 development limit',
     (language, locale) => {
       const development = read<Corpus>(`holdout-v4/${language}.json`).entries
       const withheld = development
@@ -57,19 +58,35 @@ describe('round 3 development data, including released v4', () => {
         wilsonInterval(withheld.length, development.length)[1],
         JSON.stringify(withheld)
       ).toBeLessThanOrEqual(0.01)
-      const corpus = read<{ clean: Corpus; disallowed: Corpus }>(`${language}.json`)
+    }
+  )
+  it.each(Object.entries(locales))(
+    '%s preserves in-sample clean copy',
+    (language, locale) => {
+      const corpus = read<{ clean: Corpus }>(`${language}.json`)
       expect(
         corpus.clean.entries.filter(
           (row: { text: string; field: TextScreeningField; expected?: string }) =>
             row.expected !== 'review' && clean(row.text, locale, row.field) !== 'pass'
         )
       ).toEqual([])
-      expect(
-        corpus.disallowed.entries.filter(
-          (row: { text: string; field: TextScreeningField }) =>
-            clean(row.text, locale, row.field) === 'pass'
-        )
-      ).toEqual([])
+    }
+  )
+  describe.each(Object.entries(locales))(
+    '%s disguised training families',
+    (language, locale) => {
+      const corpus = read<{ disallowed: Corpus & { families: string[] } }>(
+        `${language}.json`
+      )
+      it.each(corpus.disallowed.families)('withholds every %s input', (family) => {
+        const rows = corpus.disallowed.entries.filter((row) => row.family === family)
+        expect(rows.length).toBeGreaterThan(0)
+        expect(
+          rows
+            .filter((row) => clean(row.text, locale, row.field) === 'pass')
+            .map((row) => row.id)
+        ).toEqual([])
+      })
     }
   )
 
@@ -125,8 +142,8 @@ describe('round 3 development data, including released v4', () => {
     }
   )
 
-  it.each(['cone', 'pipa', 'lo fa', 'coneee', 'piiipa'])(
-    'does not reconstruct deleted canonical letters in %s',
+  it.each(['cone', 'pipa', 'lo fa'])(
+    'clears the reviewed literal ordinary collision %s',
     (text) => {
       expect(clean(text, 'pt-BR')).toBe('pass')
     }
@@ -145,6 +162,12 @@ describe('round 3 development data, including released v4', () => {
     'möse',
     'möööse',
     'm0sse',
+    'coneee',
+    'piiipa',
+    'lofa',
+    'l o f a',
+    'lo-fa',
+    'lo,fa',
   ])('continues withholding the actual or disguised term %s', (text) => {
     expect(clean(text, 'en-US')).not.toBe('pass')
   })
@@ -173,20 +196,22 @@ describe('round 3 development data, including released v4', () => {
       const isolated = new CommunityTextScreener({ listsDirectory: directory })
       for (const text of ['qazzef', 'qazzzefff', 'q4zzzefff', 'qa zz ze ff f'])
         expect(isolated.screen({ text, field: 'caption' }).severity, text).toBe('high')
-      for (const text of ['qazeff', 'qazefff', 'q4zefff', 'qa ze ff'])
+      for (const text of ['qazeff', 'qa ze ff'])
         expect(isolated.screen({ text, field: 'caption' }).severity, text).toBe('low')
-      for (const text of ['qazef', 'q4zef', 'qa ze f'])
-        expect(isolated.screen({ text, field: 'caption' }).disposition, text).toBe('pass')
+      for (const text of ['qazef', 'q4zef', 'qa ze f', 'qazefff', 'q4zefff'])
+        expect(isolated.screen({ text, field: 'caption' }).severity, text).toBe('high')
       // The production backstop's penas/mofo entries have no leet index.
       // Supplying indexed terms proves contextual grammar never clears a
       // disguised target when such an index is present.
       for (const text of ['p3nas de casaco', 'm0fo da roupa'])
-        expect(isolated.screen({ text, field: 'caption' }).disposition, text).not.toBe(
-          'pass'
-        )
+        expect(
+          isolated.screen({ text, field: 'caption', locale: 'pt-BR' }).disposition,
+          text
+        ).not.toBe('pass')
       // A contextually ordinary target must still participate in unsafe phrases.
       expect(
-        isolated.screen({ text: 'montare la fibbia', field: 'caption' }).severity
+        isolated.screen({ text: 'montare la fibbia', field: 'caption', locale: 'it-IT' })
+          .severity
       ).toBe('high')
     } finally {
       fs.rmSync(directory, { recursive: true, force: true })
@@ -256,8 +281,11 @@ describe('round 3 development data, including released v4', () => {
   it.each(supportedLocales)(
     'keeps bounded storage/material/transport/care senses under %s',
     (locale) => {
-      for (const text of ordinaryHomographs) {
-        expect(clean(text, locale), text).toBe('pass')
+      for (const [index, text] of ordinaryHomographs.entries()) {
+        const native = index < 2 ? 'es' : index < 4 ? 'fr' : index < 6 ? 'it' : 'pt'
+        if (native === 'fr' || locale.startsWith(native))
+          expect(clean(text, locale), text).toBe('pass')
+        else expect(clean(text, locale), text).not.toBe('pass')
         expect(clean(text + ' fuck', locale), text).not.toBe('pass')
       }
       for (const text of [
@@ -277,8 +305,10 @@ describe('round 3 development data, including released v4', () => {
     }
   )
   it.each(supportedLocales)('recognizes bounded assembly syntax under %s', (locale) => {
-    for (const text of assembly) {
-      expect(clean(text, locale), text).toBe('pass')
+    for (const [index, text] of assembly.entries()) {
+      if (locale.startsWith(index < 4 ? 'it' : 'pt'))
+        expect(clean(text, locale), text).toBe('pass')
+      else expect(clean(text, locale), text).not.toBe('pass')
       expect(clean(text + ' fuck', locale)).not.toBe('pass')
       expect(clean(text + ' monta', locale)).not.toBe('pass')
     }

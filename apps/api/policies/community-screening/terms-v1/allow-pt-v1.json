@@ -12,7 +12,8 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "9bf8429c154834130ec24a2946c646532b6309cd50b514c08e764bb5bacc4cc0"
+    "allowListSha256": "9d3a747e3df02719d7b4e9577b296d86249c805cafb3d7f1491268b4841917a1",
+    "reviewedOccurrenceSha256": "a8002f2c43d830bde37c6e22980e156f6e0b201cbf50c8ece1082cd344b554ff"
   },
   "entries": [
     "aranha",
@@ -22,6 +23,7 @@
     "bissexual",
     "camisinha",
     "cerveja",
+    "cone",
     "fica",
     "heterosexual",
     "homem gay",
@@ -37,7 +39,8 @@
     "pinto a camisa",
     "pinto as botas",
     "pinto o cabelo",
-    "pinto o tecido"
+    "pinto o tecido",
+    "pipa"
   ],
   "literalContexts": [
     {
@@ -157,6 +160,20 @@
         "sem"
       ],
       "maxDistance": 5
+    }
+  ],
+  "occurrenceConstructions": [
+    {
+      "target": "tapete",
+      "phrases": [
+        "um tapete",
+        "o tapete",
+        "do tapete",
+        "no tapete",
+        "sobre o tapete",
+        "un tapete",
+        "el tapete"
+      ]
     }
   ]
 }

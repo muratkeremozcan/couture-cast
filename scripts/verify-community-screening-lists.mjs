@@ -44,6 +44,57 @@ const allowListPath = path.join(policyRoot, 'allow-list-v1.json')
 const policyPath = path.join(policyRoot, 'policy-v2.json')
 
 export const LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr']
+const reviewedOccurrencePath = path.join(
+  policyRoot,
+  'reviewed-occurrence-constructions-v1.json'
+)
+const REVIEWED_OCCURRENCE_CONSTRUCTIONS = readJson(reviewedOccurrencePath).constructions
+
+export function occurrenceConstructionProblems(rules) {
+  if (!Array.isArray(rules) || rules.length > REVIEWED_OCCURRENCE_CONSTRUCTIONS.length)
+    return ['unreviewed occurrence construction bank']
+  const targets = new Set()
+  return rules.every((rule) => {
+    if (!rule || targets.has(rule.target)) return false
+    targets.add(rule.target)
+    const reviewed = REVIEWED_OCCURRENCE_CONSTRUCTIONS.find(
+      (entry) => entry.language === rule.language && entry.target === rule.target
+    )
+    return (
+      reviewed &&
+      typeof rule.reason === 'string' &&
+      rule.reason.length >= 20 &&
+      Array.isArray(rule.phrases) &&
+      rule.phrases.length === reviewed.phrases.length &&
+      reviewed.phrases.every((phrase) => rule.phrases.includes(phrase))
+    )
+  })
+    ? []
+    : ['unreviewed occurrence construction bank']
+}
+
+function contextTargetProblems(terms, deliberateTerms, highKeys) {
+  if (!Array.isArray(terms)) return []
+  const problems = []
+  if (
+    terms.some((term) => typeof term !== 'string' || !/^\p{Script=Latin}+$/u.test(term))
+  )
+    problems.push('literal context targets must use literal Latin letters')
+  if (
+    terms.some(
+      (term) => typeof term === 'string' && deliberateTerms.includes(toLiteral(term))
+    )
+  )
+    problems.push('a literal context clears a deliberate review term')
+  if (
+    terms.some(
+      (term) =>
+        typeof term === 'string' && highKeys.has(collapse(toFolded(toLiteral(term))))
+    )
+  )
+    problems.push('generic context targets a high-severity term')
+  return problems
+}
 
 /**
  * Mirrors the screener's own floor and reviewed exceptions in
@@ -169,8 +220,11 @@ function validLiteralTokens(values, required) {
   )
 }
 
-export function literalContextProblems(contexts, deliberateTerms = []) {
+export function literalContextProblems(contexts, deliberateTerms = [], highTerms = []) {
   const problems = []
+  const highKeys = new Set(
+    highTerms.map((term) => collapse(tokenize(toFolded(toLiteral(term))).join('')))
+  )
   if (!Array.isArray(contexts)) return ['literal contexts must be an array']
   for (const context of contexts) {
     if (!context || typeof context !== 'object') {
@@ -188,13 +242,7 @@ export function literalContextProblems(contexts, deliberateTerms = []) {
       if (!validLiteralTokens(values, key !== 'connectors'))
         problems.push(`a literal context has invalid ${key}`)
     }
-    if (
-      Array.isArray(context.terms) &&
-      context.terms.some(
-        (term) => typeof term === 'string' && deliberateTerms.includes(toLiteral(term))
-      )
-    )
-      problems.push('a literal context clears a deliberate review term')
+    problems.push(...contextTargetProblems(context.terms, deliberateTerms, highKeys))
     if (
       !Number.isInteger(context.maxDistance) ||
       context.maxDistance < 1 ||
@@ -203,6 +251,16 @@ export function literalContextProblems(contexts, deliberateTerms = []) {
       problems.push('a literal context must bound distance to 1..6 tokens')
   }
   return problems
+}
+
+export function globallyAllowsOccurrenceTarget(value) {
+  const folded = toFolded(toLiteral(value))
+    .replace(/[4@]/g, 'a')
+    .replace(/3/g, 'e')
+    .replace(/[7+]/g, 't')
+  return tokenize(folded).some((token) =>
+    REVIEWED_OCCURRENCE_CONSTRUCTIONS.some((entry) => collapse(token) === entry.target)
+  )
 }
 
 function loadAllowList() {
@@ -223,6 +281,8 @@ function loadAllowList() {
     if (seen.has(literal))
       problems.push(`allow-list entry "${entry.entry}" is listed twice`)
     seen.add(literal)
+    if (globallyAllowsOccurrenceTarget(literal))
+      problems.push('reviewed occurrence target cannot be globally allow-listed')
   }
   problems.push(
     ...literalContextProblems(
@@ -232,6 +292,9 @@ function loadAllowList() {
       )
     )
   )
+  if ('occurrenceConstructions' in allow)
+    problems.push('reviewed constructions must use the authoritative bank')
+  problems.push(...occurrenceConstructionProblems(REVIEWED_OCCURRENCE_CONSTRUCTIONS))
   const singles = new Set(
     [...seen]
       .map((literal) => tokenize(literal))
@@ -337,6 +400,7 @@ function buildTermsFile(language, allowState, hashes) {
       upstreamFileSha256: hashes.vendor[language],
       overlaySha256: sha256(fs.readFileSync(path.join(overlayDir, `${language}.json`))),
       allowListSha256: hashes.allowList,
+      reviewedOccurrenceSha256: hashes.reviewedOccurrence,
       counts: {
         upstreamLines: upstream.length,
         overlayEntries: overlay.entries.length,
@@ -366,6 +430,7 @@ function buildAllowFile(language, allowState, hashes) {
     generated: {
       generator: 'scripts/verify-community-screening-lists.mjs',
       allowListSha256: hashes.allowList,
+      reviewedOccurrenceSha256: hashes.reviewedOccurrence,
     },
     entries: allowState.allow.entries
       .filter((entry) => entry.language === language)
@@ -379,6 +444,9 @@ function buildAllowFile(language, allowState, hashes) {
         connectors,
         maxDistance,
       })),
+    occurrenceConstructions: REVIEWED_OCCURRENCE_CONSTRUCTIONS.filter(
+      (rule) => rule.language === language
+    ).map(({ target, phrases }) => ({ target, phrases })),
   }
 }
 
@@ -561,11 +629,23 @@ async function main() {
     upstreamSource: source.source,
     vendor,
     allowList: sha256(fs.readFileSync(allowListPath)),
+    reviewedOccurrence: sha256(fs.readFileSync(reviewedOccurrencePath)),
     terms: {},
     allowFiles: {},
   }
 
   const languages = {}
+  const highTerms = LANGUAGES.flatMap(
+    (language) => buildTermsFile(language, allowState, hashes).entries
+  )
+    .filter((entry) => entry.severity === 'high')
+    .map((entry) => entry.term)
+  const highProblems = literalContextProblems(
+    allowState.allow.literalContexts ?? [],
+    [],
+    highTerms
+  )
+  if (highProblems.length) throw new Error(highProblems.join('; '))
   for (const language of LANGUAGES) {
     languages[language] = await processLanguage(language, {
       allowState,

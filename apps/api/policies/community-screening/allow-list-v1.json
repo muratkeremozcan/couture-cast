@@ -569,6 +569,21 @@
       "entry": "mosse",
       "language": "it",
       "reason": "Italian feminine plural of mosso, meaning wavy or moving, used for hair, folds, lines and fabric. This literal inflection differs from German möse; only the ordinary literal word is cleared, preserving the accented German term and disguised forms."
+    },
+    {
+      "entry": "cone",
+      "language": "pt",
+      "reason": "Portuguese and English geometric cone, including cone-shaped heels and printed motifs. This exact literal ordinary spelling is reviewed; French conne and disguised or repeated variants continue screening through general collapsed matching."
+    },
+    {
+      "entry": "pipa",
+      "language": "pt",
+      "reason": "Portuguese kite, a common printed, embroidered or illustrated motif. Clear this exact literal ordinary noun; Italian pippa and disguised or stretched variants continue screening through general collapsed matching."
+    },
+    {
+      "entry": "lo fa",
+      "language": "it",
+      "reason": "Italian object pronoun plus third-person fare, meaning does it or makes it. Clear this exact complete contiguous phrase when reconstructing a joined candidate; raw lofa, letter-spaced forms and punctuation-separated fragments remain screened."
     }
   ],
   "literalContexts": [
@@ -724,42 +739,6 @@
       "connectors": ["de", "del", "la", "las", "los", "para", "con", "en"],
       "maxDistance": 5,
       "reason": "Spanish clothing racks are called burro de ropa. Clear the literal noun only within bounded garment-storage grammar; its bare insult, disguised spellings and unrelated unsafe terms remain screened."
-    },
-    {
-      "language": "fr",
-      "terms": ["retard"],
-      "objects": [
-        "tram",
-        "train",
-        "bus",
-        "métro",
-        "metro",
-        "vol",
-        "avion",
-        "arrivée",
-        "depart",
-        "départ"
-      ],
-      "connectors": [
-        "a",
-        "au",
-        "ce",
-        "de",
-        "des",
-        "du",
-        "en",
-        "est",
-        "la",
-        "le",
-        "mon",
-        "sera",
-        "son",
-        "ton",
-        "à",
-        "était"
-      ],
-      "maxDistance": 5,
-      "reason": "French retard means lateness in transport and arrival clauses. Clear the literal word only with bounded transport grammar; bare English slur usage, disguises and independent unsafe words remain screened."
     },
     {
       "language": "it",

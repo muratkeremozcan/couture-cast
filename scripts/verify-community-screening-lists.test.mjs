@@ -1,6 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { literalContextProblems } from './verify-community-screening-lists.mjs'
+import fs from 'node:fs'
+const reviewedBank = JSON.parse(
+  fs.readFileSync(
+    new URL(
+      '../apps/api/policies/community-screening/reviewed-occurrence-constructions-v1.json',
+      import.meta.url
+    ),
+    'utf8'
+  )
+).constructions
+import {
+  literalContextProblems,
+  globallyAllowsOccurrenceTarget,
+  occurrenceConstructionProblems,
+} from './verify-community-screening-lists.mjs'
 
 const context = {
   language: 'it',
@@ -53,4 +67,64 @@ test('literal context generation rejects every deliberate review term', () => {
     )
   }
   assert.deepEqual(literalContextProblems([context], ['lolita', 'baiser']), [])
+})
+
+test('generic context generation rejects high literal, folded and deleted aliases', () => {
+  for (const term of ['retard', 'niga', 'nïga', 'krüpel'])
+    assert.ok(
+      literalContextProblems(
+        [{ ...context, terms: [term] }],
+        [],
+        ['retard', 'nigga', 'krüppel']
+      ).includes('generic context targets a high-severity term')
+    )
+  for (const term of ['n1ga', 'nіga'])
+    assert.ok(
+      literalContextProblems([{ ...context, terms: [term] }], [], ['nigga']).length
+    )
+})
+
+test('only the complete reviewed occurrence bank is generated', () => {
+  const bank = reviewedBank.find((rule) => rule.target === 'retard')
+  assert.deepEqual(occurrenceConstructionProblems([bank]), [])
+  for (const changed of [
+    { ...bank, language: 'en' },
+    { ...bank, target: 'nigga' },
+    { ...bank, phrases: ['you retard', ...bank.phrases.slice(1)] },
+    { ...bank, phrases: bank.phrases.slice(1) },
+    { ...bank, phrases: bank.phrases.map(() => bank.phrases[0]) },
+  ])
+    assert.ok(occurrenceConstructionProblems([changed]).length)
+  for (const input of [null, {}, [bank, bank], [null]])
+    assert.ok(occurrenceConstructionProblems(input).length)
+})
+
+test('global allowances cannot exempt a folded or disguised reviewed occurrence target', () => {
+  for (const entry of [
+    'retard',
+    'rétard',
+    'rettard',
+    'r3tard',
+    'en r3tard',
+    'ret@rd',
+    'tapete',
+    't4pete',
+    'um tapete',
+    'tapéte',
+  ])
+    assert.equal(globallyAllowsOccurrenceTarget(entry), true, entry)
+  for (const entry of ['retarder', 'retardation', 'train', 'cone'])
+    assert.equal(globallyAllowsOccurrenceTarget(entry), false, entry)
+})
+
+test('the reviewed carpet bank is complete and cannot introduce another exemption', () => {
+  const bank = reviewedBank.find((rule) => rule.target === 'tapete')
+  assert.deepEqual(occurrenceConstructionProblems([bank]), [])
+  for (const mutation of [
+    { language: 'en' },
+    { target: 'tapette' },
+    { phrases: bank.phrases.slice(1) },
+    { phrases: ['you tapete', ...bank.phrases.slice(1)] },
+  ])
+    assert.ok(occurrenceConstructionProblems([{ ...bank, ...mutation }]).length)
 })
