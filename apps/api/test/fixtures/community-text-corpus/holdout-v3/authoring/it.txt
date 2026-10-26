@@ -1,0 +1,155 @@
+[outfits]
+Porto una tunica prugna con pantaloni color avena.|Tunica prugna sopra pantaloni color avena.
+Abbino una sovracamicia a quadri e culotte indaco.|Sovracamicia a quadri con culotte indaco.
+Ho scelto una blusa ramata e una gonna antracite.|Blusa ramata sopra gonna antracite.
+La giacca verde copre un vestito a righe.|Giacca verde sopra vestito a righe.
+Provo una polo crema con pantaloni larghi di velluto.|Polo crema con pantaloni larghi di velluto.
+Un maglione senza maniche copre il mio camicione bianco.|Maglione senza maniche sopra camicione bianco.
+Abbino una mantella senape e leggings marroni.|Mantella senape con leggings marroni.
+Oggi porto una camicia lampone con jeans grigi.|Camicia lampone infilata nei jeans grigi.
+Metto un cardigan turchese sopra una tuta a pois.|Cardigan turchese sopra tuta a pois.
+Ho scelto un blazer sabbia e una gonna blu a portafoglio.|Blazer sabbia sopra gonna blu a portafoglio.
+Porto un gilet ruggine con pantaloni avorio.|Gilet ruggine con pantaloni avorio.
+La tunica a righe accompagna pantaloni di flanella.|Tunica a righe sopra pantaloni di flanella.
+Scelgo una blusa pesca e culotte di jeans.|Blusa pesca con culotte di jeans.
+Un bolero viola accompagna il mio vestito di lino.|Bolero viola sopra vestito di lino.
+Provo un maglione muschio con una gonna scozzese.|Maglione muschio sopra gonna scozzese.
+La sovracamicia cammello accompagna una salopette crema.|Sovracamicia cammello sopra salopette crema.
+Ho scelto una canotta a righe e pantaloni viola.|Canotta a righe con pantaloni viola.
+Porto una giacca cacao sopra un vestito zafferano.|Giacca cacao sopra vestito zafferano.
+Abbino una felpa blu e pantaloncini con pieghe.|Felpa blu sopra pantaloncini con pieghe.
+Ho scelto una camicia giada e una gonna grigio pietra.|Camicia giada sopra gonna grigio pietra.
+Metto una giacca trapuntata con pantaloni di cotone.|Giacca trapuntata con pantaloni di cotone.
+Porto un poncho tessuto sopra un vestito a coste.|Poncho tessuto sopra vestito a coste.
+Ho scelto una blusa bordeaux e jeans chiari.|Blusa bordeaux con jeans chiari.
+Un gilet corto accompagna la mia tunica floreale.|Gilet corto sopra tunica floreale.
+Il maglione avena accompagna pantaloni terracotta.|Maglione avena sopra pantaloni terracotta.
+Porto un camicione di jeans e una gonna di lino scuro.|Camicione di jeans sopra gonna di lino scuro.
+Metto una canotta lavorata sopra un abito chemisier.|Canotta lavorata sopra abito chemisier.
+La giacca a vento corallo accompagna pantaloni blu.|Giacca a vento corallo con pantaloni blu.
+Provo una giacca chiara con pantaloncini verde bottiglia.|Giacca chiara con pantaloncini verde bottiglia.
+Scelgo una camicia lilla e culotte di tweed.|Camicia lilla sopra culotte di tweed.
+La mantella a quadri copre una tuta grigia.|Mantella a quadri sopra tuta grigia.
+Porto una blusa salvia e leggings cannella.|Blusa salvia sopra leggings cannella.
+Abbino una tunica blu e pantaloni a righe.|Tunica blu sopra pantaloni a righe.
+Metto un cappotto crema sopra uno scamiciato prugna.|Cappotto crema sopra scamiciato prugna.
+Il maglione giallo accompagna pantaloni marroni a coste.|Maglione giallo sopra pantaloni marroni a coste.
+Abbino una sovracamicia giada e una gonna crema.|Sovracamicia giada sopra gonna crema.
+Scelgo una blusa malva e culotte ardesia.|Blusa malva con culotte ardesia.
+Provo un gilet caramello sopra un vestito indaco.|Gilet caramello sopra vestito indaco.
+Porto una polo a quadri con pantaloncini semplici.|Polo a quadri con pantaloncini di cotone.
+Un cardigan mattone accompagna la mia tuta beige.|Cardigan mattone sopra tuta beige.
+Metto una camicia di seta con una gonna midi di lana.|Camicia di seta sopra gonna midi di lana.
+Porto una giacca di jeans slavato e pantaloni oliva.|Giacca di jeans slavato con pantaloni oliva.
+Ho scelto un top a coste e una gonna ramata a portafoglio.|Top a coste sopra gonna ramata a portafoglio.
+Il camicione stampato accompagna leggings blu scuro.|Camicione stampato sopra leggings blu scuro.
+Scelgo un poncho corto e uno scamiciato grigio.|Poncho corto sopra scamiciato grigio.
+Abbino una camicia corallo e una gonna marrone plissettata.|Camicia corallo con gonna marrone plissettata.
+Porto un gilet tessuto sopra una tuta blu.|Gilet tessuto sopra tuta blu.
+Provo un cappotto salvia con un vestito di jeans nero.|Cappotto salvia sopra vestito di jeans nero.
+Ho scelto una felpa crema e pantaloncini prugna.|Felpa crema sopra pantaloncini prugna.
+Abbino una blusa marrone morbida e pantaloni a righe.|Blusa marrone sopra pantaloni a righe.
+[moments]
+Mi preparo per lo scambio di giochi da tavolo.
+Vado allo studio della radio di quartiere.
+Stamattina aiuto nella biblioteca dei semi.
+Esco per ascoltare una prova di musica da camera.
+Incontro mia cugina all'osservatorio.
+Il programma comprende una piccola fiera di incisione.
+Sistemo le sedie per il circolo di poesia.
+Visito la sala d'attesa restaurata della stazione.
+Cammino verso il primo corso di calligrafia.
+Vado all'archivio botanico della città.
+Oggi seguo una conferenza di storia locale.
+Passo il pomeriggio al teatro dei burattini.
+Vado a prendere i nostri vecchi album di famiglia.
+Passo al caffè delle riparazioni del quartiere.
+Ci aspetta una serata di musica acustica.
+Incontro un'amica accanto alla serra comunale.
+Aiuto allo scambio scolastico dei costumi.
+Mi preparo per una mostra di ceramica.
+Porto il quaderno al gruppo di lettura.
+Visitiamo il faro con una guida.
+Questo fine settimana inizia il corso di legatoria.
+Vado a vedere una dimostrazione di tessitura.
+L'uscita comprende una conferenza di astronomia.
+Attraverso la passerella verso il cinecircolo.
+Visito una vendita di piante da appartamento.
+Oggi il coro organizza un picnic.
+Prepariamo la serata familiare dei racconti.
+Vado allo scambio di mobili della cooperativa.
+Incontro i nuovi volontari della biblioteca.
+Prendo il treno locale verso l'archivio del design.
+[captionEndings]
+Le proporzioni mi sembrano equilibrate oggi.
+Posso sedermi e muovermi comodamente.
+Mantengo gli accessori piuttosto semplici.
+La trama si vede meglio alla luce naturale.
+Questo abbinamento entra nel mio piccolo guardaroba.
+Mi piace il contrasto tra i tessuti.
+Gli strati si muovono facilmente insieme.
+I colori mi ricordano un dipinto.
+Ho preso anche una borsa di stoffa.
+Un abbinamento pratico per un lungo pomeriggio.
+Le chiavi occupano già le tasche.
+Provo questa linea per la prima volta.
+Il tessuto è morbido sui polsi.
+Mi piace come il colletto incornicia la scollatura.
+Tengo uno strato in più nella borsa.
+È abbastanza comodo per il tragitto.
+Ho raccolto i capelli sopra il colletto.
+L'intero completo era facile da mettere in valigia.
+Rimane spazio per una sciarpa.
+Il taglio ampio va bene anche da seduta.
+[backgrounds]
+Dietro si trova un arco di pietra chiara.
+Un paravento di legno è sullo sfondo.
+Lo sfondo è un muro terracotta.
+Una recinzione bassa attraversa lo sfondo.
+A sinistra appare una porta stretta.
+Una tenda semplice è appesa dietro.
+Il terreno è coperto di ghiaia chiara.
+Le fioriere sono allineate lungo il muro.
+Un cancello blu si trova vicino.
+Il pavimento ha piccole piastrelle quadrate.
+A destra appare un pilastro di mattoni.
+Un muretto da giardino forma lo sfondo.
+Una panca di legno è dietro la figura.
+La scena mostra un passaggio coperto.
+Una scala di pietra è visibile dietro.
+Lo sfondo comprende un ingresso vetrato.
+Una porta scura contrasta con gli abiti.
+Una ringhiera semplice attraversa l'immagine.
+Un divisorio intrecciato si trova dietro.
+Il luogo ha un pavimento di cemento liscio.
+Un cancello bianco da giardino è in lontananza.
+Una finestra ampia occupa lo sfondo.
+Dietro si trova una parete di legno naturale.
+Un bordo di pietra passa dietro la figura.
+Una porta gialla è visibile di lato.
+La scena comprende una ringhiera metallica curva.
+Un cortile verde è visibile dietro.
+Una finestra alta smerigliata si trova vicino.
+La pavimentazione ha pietre rettangolari strette.
+Uno sfondo grigio semplice riempie l'immagine.
+[light]
+Entrambe le maniche sono visibili.
+Gli orli inferiori sono nell'inquadratura.
+Il tessuto riceve luce laterale.
+Il completo è mostrato di fronte.
+I colori sono illuminati dolcemente.
+Si vede l'intera sagoma.
+Piccole pieghe compaiono ai gomiti.
+La luce entra da una finestra vicina.
+Gli abiti occupano quasi tutta l'immagine.
+La fotocamera è all'altezza della vita.
+Un'ombra morbida cade sul terreno.
+Le cuciture si vedono alla luce del giorno.
+La figura è leggermente di lato.
+La scollatura è ben visibile.
+Il tessuto cade in pieghe morbide.
+Le spalle sono mostrate di profilo.
+La luce diurna illumina il lato sinistro.
+Gli abiti hanno una finitura opaca.
+La vista comprende vita e gambe.
+Sono visibili i bordi degli strati.

@@ -1,0 +1,155 @@
+[outfits]
+Je porte une tunique prune avec un pantalon avoine.|Tunique prune sur pantalon avoine.
+J'associe une surchemise à carreaux et une jupe-culotte indigo.|Surchemise à carreaux et jupe-culotte indigo.
+J'ai choisi une blouse cuivrée et une jupe anthracite.|Blouse cuivrée sur jupe anthracite.
+Ma veste verte couvre une robe rayée.|Veste verte sur robe rayée.
+J'essaie un polo crème avec un pantalon large en velours.|Polo crème et pantalon large en velours.
+Un pull sans manches couvre ma blouse blanche longue.|Pull sans manches sur blouse blanche longue.
+J'associe une cape moutarde et un legging brun.|Cape moutarde et legging brun.
+Aujourd'hui, chemise framboise et jean gris ardoise.|Chemise framboise rentrée dans un jean ardoise.
+Je mets un cardigan turquoise sur une combinaison à pois.|Cardigan turquoise sur combinaison à pois.
+J'ai choisi un blazer sable et une jupe portefeuille bleue.|Blazer sable sur jupe portefeuille bleue.
+Je porte un gilet rouille avec un pantalon ivoire.|Gilet rouille et pantalon ivoire.
+Ma tunique rayée accompagne un pantalon de flanelle.|Tunique rayée sur pantalon de flanelle.
+Je choisis une blouse pêche et une jupe-culotte en jean.|Blouse pêche et jupe-culotte en jean.
+Un boléro violet accompagne ma robe de lin.|Boléro violet sur robe de lin.
+J'essaie un pull mousse avec une jupe écossaise.|Pull vert mousse sur jupe écossaise.
+Ma surchemise camel accompagne une salopette crème.|Surchemise camel sur salopette crème.
+J'ai choisi un débardeur rayé et un pantalon violet.|Débardeur rayé et pantalon violet.
+Je porte une veste cacao sur une robe safran.|Veste cacao sur robe safran.
+J'associe un sweat marine et un short plissé.|Sweat marine sur short plissé.
+J'ai choisi une chemise jade et une jupe grège.|Chemise jade sur jupe grège.
+Je mets une veste matelassée avec un pantalon de coton.|Veste matelassée et pantalon de coton.
+Je porte un poncho tissé sur une robe côtelée.|Poncho tissé sur robe côtelée.
+J'ai choisi une blouse bordeaux et un jean clair.|Blouse bordeaux et jean clair.
+Un gilet court accompagne ma tunique fleurie.|Gilet court sur tunique fleurie.
+Mon pull avoine accompagne un pantalon terre cuite.|Pull avoine sur pantalon terre cuite.
+Je porte une blouse en jean et une jupe de lin sombre.|Blouse en jean sur jupe de lin sombre.
+Je mets un débardeur tricoté sur une robe chemise.|Débardeur tricoté sur robe chemise.
+Mon coupe-vent corail accompagne un pantalon marine.|Coupe-vent corail et pantalon marine.
+J'essaie une veste claire avec un short vert bouteille.|Veste claire et short vert bouteille.
+Je choisis une chemise lilas et une jupe-culotte de tweed.|Chemise lilas sur jupe-culotte de tweed.
+Ma cape à carreaux couvre une combinaison grise.|Cape à carreaux sur combinaison grise.
+Je porte une blouse sauge et un legging cannelle.|Blouse sauge sur legging cannelle.
+J'associe une tunique marine et un pantalon rayé.|Tunique marine sur pantalon rayé.
+Je mets un manteau crème sur une robe chasuble prune.|Manteau crème sur robe chasuble prune.
+Mon pull jaune accompagne un pantalon brun côtelé.|Pull jaune sur pantalon brun côtelé.
+J'associe une surchemise jade et une jupe crème.|Surchemise jade sur jupe crème.
+Je choisis une blouse mauve et une jupe-culotte ardoise.|Blouse mauve et jupe-culotte ardoise.
+J'essaie un gilet caramel sur une robe indigo.|Gilet caramel sur robe indigo.
+Je porte un polo à carreaux avec un short uni.|Polo à carreaux et short de coton.
+Un cardigan brique accompagne ma combinaison beige.|Cardigan brique sur combinaison beige.
+Je mets une chemise de soie avec une jupe midi en laine.|Chemise de soie sur jupe midi en laine.
+Je porte une veste en jean délavé et un pantalon olive.|Veste en jean délavé et pantalon olive.
+J'ai choisi un haut côtelé et une jupe portefeuille cuivrée.|Haut côtelé sur jupe portefeuille cuivrée.
+Ma blouse imprimée accompagne un legging bleu foncé.|Blouse imprimée sur legging bleu foncé.
+Je choisis un poncho court et une robe chasuble grise.|Poncho court sur robe chasuble grise.
+J'associe une chemise corail et une jupe brune plissée.|Chemise corail et jupe brune plissée.
+Je porte un gilet tissé sur une combinaison bleue.|Gilet tissé sur combinaison bleue.
+J'essaie un manteau sauge avec une robe en jean noir.|Manteau sauge sur robe en jean noir.
+J'ai choisi un sweat crème et un short prune.|Sweat crème sur short prune.
+J'associe une blouse brune souple et un pantalon rayé.|Blouse brune sur pantalon rayé.
+[moments]
+Je me prépare pour une bourse aux jeux de société.
+Je vais au studio de la radio associative.
+Ce matin, j'aide à la grainothèque.
+Je pars écouter une répétition de musique de chambre.
+Je retrouve ma cousine à l'observatoire.
+Au programme, un petit salon de gravure.
+J'installe les chaises pour le cercle de poésie.
+Je visite la salle d'attente restaurée de la gare.
+Je marche vers mon premier cours de calligraphie.
+Je vais aux archives botaniques de la ville.
+Aujourd'hui, une conférence sur l'histoire locale.
+Je passe l'après-midi au théâtre de marionnettes.
+Je vais chercher nos vieux albums de famille.
+Je passe au café de réparation du quartier.
+Une soirée de musique acoustique nous attend.
+Je retrouve une amie près de la serre municipale.
+J'aide à l'échange de costumes de l'école.
+Je me prépare pour une exposition de céramique.
+J'emporte mon carnet au cercle de lecture.
+Nous visitons le phare avec un guide.
+L'atelier de reliure commence ce week-end.
+Je vais voir une démonstration de tissage.
+La sortie comprend une conférence d'astronomie.
+Je traverse la passerelle vers le cinéclub.
+Je visite une vente de plantes d'intérieur.
+La chorale organise un pique-nique aujourd'hui.
+Nous préparons la soirée familiale de récits.
+Je vais au troc de meubles de la coopérative.
+Je rencontre les nouveaux bénévoles de la bibliothèque.
+Je prends le train local vers les archives du design.
+[captionEndings]
+Les proportions me semblent équilibrées aujourd'hui.
+Je peux m'asseoir et bouger confortablement.
+Je garde des accessoires assez simples.
+La texture se voit mieux au jour.
+Cet ensemble tient dans ma petite garde-robe.
+J'aime le contraste entre les tissus.
+Les couches bougent facilement ensemble.
+Les couleurs me rappellent un tableau.
+J'ai aussi pris un sac en tissu.
+Un ensemble pratique pour un long après-midi.
+Mes clés occupent déjà les poches.
+J'essaie cette silhouette pour la première fois.
+Le tissu est doux aux poignets.
+J'aime la manière dont le col encadre l'encolure.
+Je garde une couche supplémentaire dans mon sac.
+C'est assez confortable pour le trajet.
+J'ai relevé mes cheveux au-dessus du col.
+Toute la tenue était facile à emporter.
+Il reste de la place pour une écharpe.
+La coupe ample convient aussi en position assise.
+[backgrounds]
+Une arche de pierre claire se trouve derrière.
+Un paravent de bois est au fond.
+Le fond est un mur terre cuite.
+Une clôture basse traverse le fond.
+Une porte étroite apparaît à gauche.
+Un rideau uni est suspendu derrière.
+Le sol est couvert de gravier clair.
+Des jardinières sont alignées le long du mur.
+Un portail bleu se trouve à proximité.
+Le sol comporte de petits carreaux carrés.
+Un pilier de brique apparaît à droite.
+Un muret de jardin forme le fond.
+Un banc de bois se trouve derrière la personne.
+La scène montre une allée couverte.
+Un escalier de pierre est visible derrière.
+Le fond comprend une entrée vitrée.
+Une porte sombre contraste avec les vêtements.
+Une rampe simple traverse l'image.
+Une cloison tressée se trouve derrière.
+Le lieu possède un sol en béton lisse.
+Un portail blanc de jardin se voit au loin.
+Une large fenêtre occupe le fond.
+Un mur de bois naturel se trouve derrière.
+Un rebord de pierre passe derrière la personne.
+Une porte jaune est visible sur le côté.
+La scène comprend une rampe métallique courbe.
+Une cour verdoyante est visible derrière.
+Une haute fenêtre dépolie se trouve à proximité.
+Le pavement comporte des pierres rectangulaires étroites.
+Un fond gris uni remplit l'image.
+[light]
+Les deux manches sont visibles.
+Les ourlets inférieurs sont dans le cadre.
+Le tissu reçoit une lumière latérale.
+La tenue est montrée de face.
+Les couleurs sont doucement éclairées.
+Toute la silhouette est visible.
+De petits plis apparaissent aux coudes.
+La lumière entre par une fenêtre proche.
+Les vêtements occupent presque toute l'image.
+La caméra est à hauteur de taille.
+Une ombre douce tombe au sol.
+Les coutures se voient à la lumière du jour.
+La personne se tient légèrement de biais.
+L'encolure est nettement visible.
+Le tissu forme des plis souples.
+Les épaules sont montrées de profil.
+Le jour éclaire le côté gauche.
+Les vêtements ont une finition mate.
+La vue comprend la taille et les jambes.
+Les bords des couches sont visibles.

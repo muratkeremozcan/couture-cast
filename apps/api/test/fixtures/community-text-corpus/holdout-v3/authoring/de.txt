@@ -1,0 +1,155 @@
+[outfits]
+Ich trage eine pflaumenfarbene Tunika mit heller Hose.|Pflaumenfarbene Tunika über heller Hose.
+Das karierte Hemd passt zur indigoblauen Culotte.|Kariertes Hemd mit indigoblauer Culotte.
+Heute kombiniere ich eine Kupferbluse mit dunklem Rock.|Kupferfarbene Bluse über dunklem Rock.
+Die grüne Jacke liegt über einem Streifenkleid.|Grüne Jacke über einem gestreiften Kleid.
+Zum cremefarbenen Polo trage ich eine weite Cordhose.|Cremefarbenes Polo mit weiter Cordhose.
+Ein ärmelloser Pullover liegt über meinem weißen Kittelkleid.|Ärmelloser Pullover über weißem Kittelkleid.
+Ich kombiniere das senffarbene Cape mit braunen Leggings.|Senffarbenes Cape mit braunen Leggings.
+Heute trage ich ein Himbeerhemd zur grauen Jeans.|Himbeerfarbenes Hemd in grauer Jeans.
+Die petrolfarbene Strickjacke begleitet meinen gepunkteten Overall.|Petrolfarbene Strickjacke über gepunktetem Overall.
+Ein sandfarbener Blazer passt zum blauen Wickelrock.|Sandfarbener Blazer über blauem Wickelrock.
+Ich wähle eine rostrote Weste mit elfenbeinfarbener Chino.|Rostrote Weste mit elfenbeinfarbener Chino.
+Die gestreifte Tunika trage ich zur Flanellhose.|Gestreifte Tunika über einer Flanellhose.
+Meine pfirsichfarbene Bluse passt zur Jeansculotte.|Pfirsichfarbene Bluse mit Jeansculotte.
+Zum Leinenkleid kommt ein violetter Bolero.|Violetter Bolero über einem Leinenkleid.
+Ich trage den moosgrünen Pullover zum Schottenrock.|Moosgrüner Pullover über kariertem Rock.
+Das kamelfarbene Hemd begleitet meine helle Latzhose.|Kamelfarbenes Hemd über heller Latzhose.
+Heute gibt es ein Streifentop zur violetten Hose.|Gestreiftes Top mit violetter Hose.
+Meine kakaobraune Jacke passt zum safranfarbenen Kleid.|Kakaobraune Jacke über safranfarbenem Kleid.
+Zum dunkelblauen Sweatshirt trage ich gefaltete Shorts.|Dunkelblaues Sweatshirt mit Faltenshorts.
+Ich kombiniere ein jadegrünes Hemd mit grauem Rock.|Jadegrünes Hemd über grauem Rock.
+Meine Steppjacke liegt über einer lockeren Baumwollhose.|Steppjacke mit lockerer Baumwollhose.
+Der gewebte Poncho passt über mein Rippkleid.|Gewebter Poncho über einem Rippkleid.
+Ich wähle eine weinrote Bluse zur hellen Jeans.|Weinrote Bluse mit heller Jeans.
+Zur Blumentunika kommt eine kurze Weste.|Kurze Weste über einer Blumentunika.
+Mein heller Pullover begleitet die terrakottafarbene Chino.|Heller Pullover über terrakottafarbener Chino.
+Heute trage ich einen Jeanskittel zum dunklen Leinenrock.|Jeanskittel über dunklem Leinenrock.
+Ein gestricktes Top liegt über meinem Hemdkleid.|Gestricktes Top über einem Hemdkleid.
+Die korallfarbene Windjacke passt zur marineblauen Hose.|Korallfarbene Windjacke mit marineblauer Hose.
+Ich kombiniere eine helle Jacke mit flaschengrünen Shorts.|Helle Jacke mit flaschengrünen Shorts.
+Mein fliederfarbenes Hemd begleitet die Tweedculotte.|Fliederfarbenes Hemd über einer Tweedculotte.
+Das karierte Cape liegt über einem dunklen Overall.|Kariertes Cape über dunklem Overall.
+Zur salbeigrünen Bluse trage ich zimtfarbene Leggings.|Salbeigrüne Bluse mit zimtfarbenen Leggings.
+Ich wähle eine marineblaue Tunika zur Streifenhose.|Marineblaue Tunika über einer Streifenhose.
+Ein cremefarbener Mantel liegt über meinem violetten Trägerkleid.|Cremefarbener Mantel über violettem Trägerkleid.
+Mein gelber Pullover passt zur braunen Cordhose.|Gelber Pullover über brauner Cordhose.
+Das jadegrüne Überhemd begleitet einen cremefarbenen Rock.|Jadegrünes Überhemd über cremefarbenem Rock.
+Ich kombiniere eine malvenfarbene Bluse mit grauer Culotte.|Malvenfarbene Bluse mit grauer Culotte.
+Meine karamellfarbene Weste passt über ein indigoblaues Kleid.|Karamellfarbene Weste über indigoblauem Kleid.
+Zum karierten Polo trage ich schlichte Baumwollshorts.|Kariertes Polo mit schlichten Baumwollshorts.
+Die ziegelrote Strickjacke liegt über einem beigen Overall.|Ziegelrote Strickjacke über beigem Overall.
+Ich trage ein Seidenhemd zum mittellangen Wollrock.|Seidenhemd über mittellangem Wollrock.
+Meine verwaschene Jeansjacke passt zur olivgrünen Chino.|Verwaschene Jeansjacke mit olivgrüner Chino.
+Das Rippentop begleitet einen kupferfarbenen Wickelrock.|Rippentop über kupferfarbenem Wickelrock.
+Zum gemusterten Kittel trage ich dunkelblaue Leggings.|Gemusterter Kittel über dunkelblauen Leggings.
+Ein kurzer Poncho passt über mein graues Trägerkleid.|Kurzer Poncho über grauem Trägerkleid.
+Ich wähle ein Korallenhemd zum braunen Faltenrock.|Korallenfarbenes Hemd mit braunem Faltenrock.
+Die gewebte Weste liegt über einem blauen Arbeitsanzug.|Gewebte Weste über blauem Arbeitsanzug.
+Mein salbeigrüner Mantel passt zum schwarzen Jeanskleid.|Salbeigrüner Mantel über schwarzem Jeanskleid.
+Heute trage ich ein helles Sweatshirt mit violetten Shorts.|Helles Sweatshirt über violetten Shorts.
+Die weiche braune Bluse begleitet meine gestreifte Chino.|Braune Bluse über gestreifter Chino.
+[moments]
+Ich bereite mich auf die Brettspielbörse vor.
+Gleich geht es ins Bürgerradio.
+Heute helfe ich in der Saatgutbibliothek.
+Ich besuche eine öffentliche Orchesterprobe.
+Wir treffen uns an der Sternwarte.
+Heute steht eine kleine Druckgrafikmesse an.
+Ich stelle Stühle für den Lyrikkreis auf.
+Ich besichtige den restaurierten Wartesaal.
+Es geht zum Kalligrafiekurs für Anfänger.
+Ich besuche das botanische Archiv.
+Gleich beginnt der Vortrag zur Stadtgeschichte.
+Den Nachmittag verbringe ich im Figurentheater.
+Ich hole unsere alten Familienalben ab.
+Ich schaue im Reparaturcafé vorbei.
+Heute Abend gibt es akustische Musik.
+Wir treffen uns am städtischen Gewächshaus.
+Ich helfe beim Kostümtausch der Schule.
+Gleich öffnet die Keramikausstellung.
+Mein Notizbuch kommt mit zum Lesekreis.
+Ich nehme an einer Leuchtturmführung teil.
+Heute beginnt der Buchbindekurs.
+Ich schaue bei einer Webvorführung zu.
+Der heutige Ausflug führt zum Astronomievortrag.
+Über die Fußbrücke geht es zum Filmclub.
+Ich besuche den Zimmerpflanzenmarkt.
+Heute trifft sich der Chor zum Picknick.
+Wir bereiten den familiären Erzählabend vor.
+Ich gehe zur Möbeltauschbörse.
+Heute treffe ich die neuen Bibliothekshelfer.
+Mit dem Regionalzug geht es ins Designarchiv.
+[captionEndings]
+Die Proportionen wirken heute stimmig.
+Ich kann bequem sitzen und gehen.
+Die Accessoires bleiben schlicht.
+Die Struktur zeigt sich im Tageslicht.
+Diese Kombination passt in meinen kleinen Schrank.
+Mir gefällt der Kontrast der Stoffe.
+Die Schichten bewegen sich leicht zusammen.
+Die Farben erinnern mich an ein Gemälde.
+Eine Stofftasche habe ich auch eingepackt.
+Eine praktische Kombination für lange Nachmittage.
+In den Taschen liegen schon meine Schlüssel.
+Diese Silhouette probiere ich zum ersten Mal.
+Der Stoff fühlt sich am Handgelenk weich an.
+Der Kragen fasst den Ausschnitt schön ein.
+Eine zusätzliche Schicht bleibt in der Tasche.
+Für die Fahrt ist das bequem genug.
+Meine Haare habe ich vom Kragen weggesteckt.
+Das ganze Outfit ließ sich leicht einpacken.
+Für einen Schal bleibt noch Platz.
+Der lockere Schnitt passt auch im Sitzen.
+[backgrounds]
+Dahinter steht ein heller Steinbogen.
+Im Hintergrund steht ein Holzschirm.
+Eine Terrakottawand bildet den Hintergrund.
+Ein niedriger Zaun verläuft dahinter.
+Links ist eine schmale Tür zu sehen.
+Ein schlichter Vorhang hängt dahinter.
+Auf dem Boden liegt heller Kies.
+Pflanzkübel stehen entlang der Wand.
+Daneben steht ein blaues Tor.
+Der Boden hat kleine quadratische Fliesen.
+Rechts ist ein Ziegelpfeiler zu sehen.
+Eine niedrige Gartenmauer steht dahinter.
+Hinter der Person steht eine Holzbank.
+Die Szene zeigt einen überdachten Gang.
+Dahinter ist eine Steintreppe sichtbar.
+Im Hintergrund liegt ein Glaseingang.
+Eine dunkle Tür rahmt die Kleidung.
+Ein schlichtes Geländer verläuft im Bild.
+Eine geflochtene Trennwand steht dahinter.
+Der Boden besteht aus glattem Beton.
+In der Ferne steht ein weißes Gartentor.
+Ein breites Fenster füllt den Hintergrund.
+Dahinter steht eine unbehandelte Holzwand.
+Ein Steinsims verläuft hinter der Person.
+Seitlich ist eine gelbe Tür sichtbar.
+Ein gebogenes Metallgeländer ist zu sehen.
+Dahinter liegt ein begrünter Innenhof.
+Daneben steht ein hohes Milchglasfenster.
+Der Weg besteht aus länglichen Steinen.
+Eine graue Fläche füllt den Hintergrund.
+[light]
+Beide Ärmel sind sichtbar.
+Die unteren Säume sind im Bild.
+Seitenlicht fällt auf den Stoff.
+Das Outfit ist von vorne zu sehen.
+Die Farben sind weich beleuchtet.
+Die ganze Silhouette ist im Bild.
+An den Ellenbogen zeigen sich Falten.
+Licht fällt durch ein nahes Fenster.
+Die Kleidung füllt fast das ganze Bild.
+Die Kamera ist auf Taillenhöhe.
+Ein weicher Schatten liegt am Boden.
+Die Nähte sind im Tageslicht sichtbar.
+Die Person steht leicht seitlich.
+Der Ausschnitt ist deutlich zu sehen.
+Der Stoff fällt in lockeren Falten.
+Die Schultern sind im Profil zu sehen.
+Tageslicht beleuchtet die linke Seite.
+Die Kleidungsstücke haben eine matte Oberfläche.
+Taille und Beine sind im Bild.
+Die Kanten der Schichten sind sichtbar.

@@ -1,0 +1,155 @@
+[outfits]
+Wearing a plum tunic with oatmeal trousers.|A plum tunic over oatmeal trousers.
+Paired a checked overshirt with indigo culottes.|A checked overshirt and indigo culottes.
+Went for a copper blouse and charcoal skirt.|A copper blouse above a charcoal skirt.
+My fern jacket sits over a striped dress.|A fern jacket over a striped dress.
+Tried a cream polo with wide cord trousers.|A cream polo and wide cord trousers.
+Chose a sleeveless jumper over a white smock.|A sleeveless jumper over a white smock.
+Matched a mustard cape with brown leggings.|A mustard cape and brown leggings.
+Wearing a raspberry shirt with slate jeans.|A raspberry shirt tucked into slate jeans.
+Put a teal cardigan over a dotted jumpsuit.|A teal cardigan over a dotted jumpsuit.
+Picked a sand blazer and a blue wrap skirt.|A sand blazer above a blue wrap skirt.
+I chose a rust waistcoat and ivory chinos.|A rust waistcoat and ivory chinos.
+Wore a striped tunic with soft flannel trousers.|A striped tunic over flannel trousers.
+Today calls for a peach blouse and denim culottes.|A peach blouse and denim culottes.
+Added a grape bolero to a simple linen dress.|A grape bolero over a linen dress.
+Trying a moss jumper with a tartan skirt.|A moss jumper above a tartan skirt.
+My camel overshirt goes with cream dungarees.|A camel overshirt over cream dungarees.
+I put on a striped vest and purple trousers.|A striped vest and purple trousers.
+Wearing a cocoa jacket with a saffron dress.|A cocoa jacket over a saffron dress.
+Matched a navy sweatshirt with pleated shorts.|A navy sweatshirt above pleated shorts.
+I chose a jade shirt and a stone skirt.|A jade shirt above a stone skirt.
+Teamed a quilted shell with loose cotton trousers.|A quilted shell and loose cotton trousers.
+Wearing a woven poncho over a ribbed dress.|A woven poncho over a ribbed dress.
+Chose a burgundy blouse and pale denim jeans.|A burgundy blouse and pale denim jeans.
+Added a cropped vest to a floral tunic.|A cropped vest over a floral tunic.
+My oatmeal jumper goes with terracotta chinos.|An oatmeal jumper above terracotta chinos.
+Picked a denim smock and a dark linen skirt.|A denim smock over a dark linen skirt.
+Put a knitted tank over a collared dress.|A knitted tank over a collared dress.
+Wearing a coral windbreaker with navy trousers.|A coral windbreaker and navy trousers.
+Tried a chalk jacket with bottle-green shorts.|A chalk jacket and bottle-green shorts.
+I chose a lilac shirt and tweed culottes.|A lilac shirt above tweed culottes.
+Wore a check cape over a charcoal jumpsuit.|A check cape over a charcoal jumpsuit.
+Picked a sage blouse and cinnamon leggings.|A sage blouse above cinnamon leggings.
+Wearing a navy tunic with striped trousers.|A navy tunic over striped trousers.
+Put a cream coat over a plum pinafore.|A cream coat over a plum pinafore.
+My yellow pullover goes with brown cords.|A yellow pullover above brown cords.
+Matched a jade overshirt with a cream skirt.|A jade overshirt above a cream skirt.
+I chose a mauve blouse and slate culottes.|A mauve blouse and slate culottes.
+Tried a caramel vest over an indigo dress.|A caramel vest over an indigo dress.
+Wearing a checked polo with plain cotton shorts.|A checked polo and cotton shorts.
+Paired a brick cardigan with a beige jumpsuit.|A brick cardigan over a beige jumpsuit.
+I put a silk shirt with a wool midi skirt.|A silk shirt above a wool midi skirt.
+Wearing a washed denim jacket and olive chinos.|A washed denim jacket and olive chinos.
+Picked a ribbed top and a copper wrap skirt.|A ribbed top above a copper wrap skirt.
+My patterned smock goes with dark blue leggings.|A patterned smock over blue leggings.
+Chose a cropped poncho and a grey pinafore.|A cropped poncho over a grey pinafore.
+Put a coral shirt with a brown pleated skirt.|A coral shirt and a brown pleated skirt.
+Wearing a woven vest over a blue boiler suit.|A woven vest over a blue boiler suit.
+Tried a sage coat with a black denim dress.|A sage coat over a black denim dress.
+I chose a cream sweatshirt and plum shorts.|A cream sweatshirt above plum shorts.
+Matched a soft brown blouse with striped chinos.|A brown blouse above striped chinos.
+[moments]
+Getting ready for a neighbourhood board-game swap.
+Heading to the community radio studio.
+An early start at the seed library.
+Off to hear a chamber orchestra rehearse.
+Meeting my cousin at the observatory.
+Today's plan includes a small print fair.
+Helping set out chairs for the poetry club.
+Visiting the restored railway waiting room.
+Walking to a beginners' calligraphy class.
+Taking a short trip to the botanical archive.
+I'm on my way to a local history talk.
+Spending the afternoon at the puppet theatre.
+Going to collect the family's old photo albums.
+Stopping by the neighbourhood repair café.
+An evening of acoustic music awaits.
+Meeting a friend at the city greenhouse.
+Helping with a school costume exchange.
+Getting ready for a ceramics exhibition.
+Taking my notebook to the riverside reading group.
+Joining a guided tour of the lighthouse.
+Setting off for the weekend bookbinding workshop.
+Going to a small weaving demonstration.
+Today's outing is a public astronomy lecture.
+Taking the footbridge to the film society.
+Visiting an indoor plant sale this afternoon.
+On my way to a community choir picnic.
+Preparing for the annual family storytelling evening.
+Going to the cooperative's furniture swap.
+Meeting the new library volunteers today.
+Taking the local train to a design archive.
+[captionEndings]
+The proportions feel balanced today.
+I can sit and move comfortably.
+Keeping the accessories fairly simple.
+The texture shows best in daylight.
+This combination fits into my small wardrobe.
+I'm enjoying the contrast between the fabrics.
+The layers move easily together.
+The colours remind me of a painting.
+I packed a fabric tote as well.
+A useful combination for a long afternoon.
+The pockets are already carrying my keys.
+Trying this silhouette for the first time.
+The fabric feels gentle against my wrists.
+I like how the collar frames the neckline.
+Keeping a spare layer in my bag.
+This is comfortable enough for the journey.
+I pinned my hair clear of the collar.
+The whole outfit was easy to pack.
+Leaving room for a scarf later.
+The loose fit works well while seated.
+[backgrounds]
+A pale stone arch stands behind.
+A wooden screen is in the background.
+The backdrop is a terracotta wall.
+A low fence crosses the background.
+A narrow doorway appears to the left.
+A plain curtain hangs behind the outfit.
+The ground is covered in light gravel.
+A row of planters sits along the wall.
+A painted blue gate stands nearby.
+The floor has a small square tile pattern.
+A brick pillar appears on the right.
+A low garden wall forms the backdrop.
+There is a wooden bench behind the figure.
+The setting is a covered walkway.
+A stone staircase is visible behind.
+The background contains a glass entrance.
+A dark door contrasts with the clothing.
+A simple handrail runs across the frame.
+A woven room divider stands behind.
+The setting has a smooth concrete floor.
+A white garden gate is in the distance.
+A broad window fills the background.
+The backdrop is an unpainted timber wall.
+A stone ledge runs behind the figure.
+A yellow door is visible to the side.
+The scene includes a curved metal railing.
+A leafy courtyard is visible behind.
+A tall frosted window stands nearby.
+The pavement has narrow rectangular stones.
+A plain grey backdrop fills the frame.
+[light]
+Both sleeves are visible.
+The lower hems are in view.
+The fabric catches side light.
+The view shows the outfit from the front.
+The colours are softly lit.
+The frame includes the full silhouette.
+Small folds show at the elbows.
+Light falls from a nearby window.
+The clothing fills most of the frame.
+The camera is at waist height.
+A soft shadow falls on the ground.
+The seams are visible in daylight.
+The figure stands at a slight angle.
+The neckline is clearly visible.
+The fabric hangs in loose folds.
+The shoulders are shown in profile.
+Daylight lights the left side.
+The garments have a matte finish.
+The view includes the waist and legs.
+The edges of the layers are visible.

@@ -1,0 +1,155 @@
+[outfits]
+Erik rengi tuniğimi açık renk pantolonla giyiyorum.|Açık renk pantolon üzerinde erik rengi tunik.
+Kareli üst gömleğimi çivit rengi etek pantolonla eşledim.|Çivit rengi etek pantolonla kareli üst gömlek.
+Bakır bluzla antrasit etek seçtim.|Antrasit etek üzerinde bakır bluz.
+Yeşil ceketim çizgili elbisemin üzerinde duruyor.|Çizgili elbise üzerinde yeşil ceket.
+Krem poloyu geniş kadife pantolonla deniyorum.|Geniş kadife pantolonla krem polo.
+Kolsuz kazağımı beyaz önlük elbisemin üzerine giydim.|Beyaz önlük elbise üzerinde kolsuz kazak.
+Hardal pelerinimi kahverengi taytla eşledim.|Kahverengi taytla hardal pelerin.
+Bugün ahududu gömlekle gri kot giyiyorum.|Gri kotun içine sokulmuş ahududu gömlek.
+Turkuaz hırkamı puantiyeli tulumun üzerine aldım.|Puantiyeli tulum üzerinde turkuaz hırka.
+Kum rengi blazerle mavi anvelop etek seçtim.|Mavi anvelop etek üzerinde kum rengi blazer.
+Pas rengi yeleği fildişi pantolonla giyiyorum.|Fildişi pantolonla pas rengi yelek.
+Çizgili tuniğim pazen pantolonuma eşlik ediyor.|Pazen pantolon üzerinde çizgili tunik.
+Şeftali bluzla kot etek pantolon seçtim.|Kot etek pantolonla şeftali bluz.
+Mor bolerom keten elbiseme eşlik ediyor.|Keten elbise üzerinde mor bolero.
+Yosun kazağı ekose etekle deniyorum.|Ekose etek üzerinde yosun rengi kazak.
+Deve tüyü gömleğimi krem salopetle giyiyorum.|Krem salopet üzerinde deve tüyü gömlek.
+Çizgili atletle mor pantolon seçtim.|Mor pantolonla çizgili atlet.
+Kakao ceketimi safran elbisenin üzerine giyiyorum.|Safran elbise üzerinde kakao ceket.
+Lacivert sweatshirt ile pileli şortumu eşledim.|Pileli şort üzerinde lacivert sweatshirt.
+Yeşim gömlekle taş rengi etek seçtim.|Taş rengi etek üzerinde yeşim gömlek.
+Kapitone ceketi pamuklu bol pantolonla giydim.|Pamuklu bol pantolonla kapitone ceket.
+Dokuma pançoyu fitilli elbisemin üzerine giyiyorum.|Fitilli elbise üzerinde dokuma panço.
+Bordo bluzla açık renk kot seçtim.|Açık renk kotla bordo bluz.
+Kısa yeleğim çiçekli tuniğime eşlik ediyor.|Çiçekli tunik üzerinde kısa yelek.
+Açık renk kazağımı kiremit pantolonla giyiyorum.|Kiremit pantolon üzerinde açık renk kazak.
+Kot önlüğümü koyu keten etekle giydim.|Koyu keten etek üzerinde kot önlük.
+Örgü atleti gömlek elbisemin üzerine aldım.|Gömlek elbise üzerinde örgü atlet.
+Mercan rüzgârlığım lacivert pantolona eşlik ediyor.|Lacivert pantolonla mercan rüzgârlık.
+Açık renk ceketi şişe yeşili şortla deniyorum.|Şişe yeşili şortla açık renk ceket.
+Leylak gömlekle tüvit etek pantolon seçtim.|Tüvit etek pantolon üzerinde leylak gömlek.
+Kareli pelerinim gri tulumu örtüyor.|Gri tulum üzerinde kareli pelerin.
+Adaçayı bluzla tarçın tayt giyiyorum.|Tarçın tayt üzerinde adaçayı bluz.
+Lacivert tuniğimi çizgili pantolonla eşledim.|Çizgili pantolon üzerinde lacivert tunik.
+Krem paltomu erik rengi askılı elbiseme aldım.|Erik rengi askılı elbise üzerinde krem palto.
+Sarı kazağım kahverengi kadife pantolona eşlik ediyor.|Kahverengi kadife pantolon üzerinde sarı kazak.
+Yeşim üst gömleğini krem etekle eşledim.|Krem etek üzerinde yeşim üst gömlek.
+Ebegümeci bluzla arduvaz etek pantolon seçtim.|Arduvaz etek pantolonla ebegümeci bluz.
+Karamel yeleği çivit elbisenin üzerine deniyorum.|Çivit elbise üzerinde karamel yelek.
+Kareli poloyu sade pamuklu şortla giyiyorum.|Sade pamuklu şortla kareli polo.
+Tuğla rengi hırkam bej tuluma eşlik ediyor.|Bej tulum üzerinde tuğla rengi hırka.
+İpek gömleği yün midi etekle giydim.|Yün midi etek üzerinde ipek gömlek.
+Soluk kot ceketle zeytin pantolon giyiyorum.|Zeytin rengi pantolonla soluk kot ceket.
+Fitilli üstle bakır anvelop etek seçtim.|Bakır anvelop etek üzerinde fitilli üst.
+Desenli önlüğüm koyu mavi tayta eşlik ediyor.|Koyu mavi tayt üzerinde desenli önlük.
+Kısa pançoyla gri askılı elbise seçtim.|Gri askılı elbise üzerinde kısa panço.
+Mercan gömleği kahverengi pileli etekle eşledim.|Kahverengi pileli etekle mercan gömlek.
+Dokuma yeleği mavi iş tulumumun üzerine giyiyorum.|Mavi iş tulumu üzerinde dokuma yelek.
+Adaçayı paltoyu siyah kot elbiseyle deniyorum.|Siyah kot elbise üzerinde adaçayı palto.
+Krem sweatshirt ile erik rengi şort seçtim.|Erik rengi şort üzerinde krem sweatshirt.
+Yumuşak kahverengi bluzu çizgili pantolonla eşledim.|Çizgili pantolon üzerinde kahverengi bluz.
+[moments]
+Masa oyunu takasına hazırlanıyorum.
+Mahalle radyosunun stüdyosuna gidiyorum.
+Bugün tohum kütüphanesinde yardım ediyorum.
+Oda müziği provasını dinlemeye çıkıyorum.
+Kuzenimle gözlemevinde buluşuyorum.
+Programda küçük bir baskı fuarı var.
+Şiir topluluğu için sandalyeleri diziyorum.
+İstasyonun yenilenmiş bekleme salonunu geziyorum.
+İlk kaligrafi dersime yürüyorum.
+Şehrin botanik arşivine gidiyorum.
+Bugün yerel tarih söyleşisine katılıyorum.
+Öğleden sonramı kukla tiyatrosunda geçiriyorum.
+Eski aile albümlerimizi almaya gidiyorum.
+Mahallenin onarım kafesine uğruyorum.
+Bizi akustik müzik dolu bir akşam bekliyor.
+Arkadaşımla belediye serasının yanında buluşuyorum.
+Okulun kostüm takasına yardım ediyorum.
+Bir seramik sergisine hazırlanıyorum.
+Defterimi okuma grubuna götürüyorum.
+Bugün deniz fenerini rehberle geziyoruz.
+Hafta sonu cilt atölyesi başlıyor.
+Dokuma gösterisini izlemeye gidiyorum.
+Gezide bir astronomi söyleşisi de var.
+Yaya köprüsünden film kulübüne geçiyorum.
+Ev bitkileri satışını ziyaret ediyorum.
+Koro bugün piknik düzenliyor.
+Ailemizin hikâye akşamını hazırlıyoruz.
+Kooperatifin mobilya takasına gidiyorum.
+Kütüphanenin yeni gönüllüleriyle tanışıyorum.
+Tasarım arşivine banliyö treniyle gidiyorum.
+[captionEndings]
+Oranlar bugün dengeli görünüyor.
+Rahatça oturup hareket edebiliyorum.
+Aksesuarları oldukça sade tutuyorum.
+Doku gün ışığında daha iyi görünüyor.
+Bu eşleşme küçük gardırobuma uyuyor.
+Kumaşların arasındaki karşıtlığı seviyorum.
+Katlar birlikte kolayca hareket ediyor.
+Renkler bana bir tabloyu hatırlatıyor.
+Bir bez çanta da aldım.
+Uzun bir öğleden sonra için kullanışlı oldu.
+Anahtarlarım ceplerde yerini aldı.
+Bu silueti ilk kez deniyorum.
+Kumaş bileklerimde yumuşak duruyor.
+Yakanın boyun çizgisini çerçevelemesini seviyorum.
+Çantamda fazladan bir kat tutuyorum.
+Yolculuk için yeterince rahat.
+Saçımı yakadan uzaklaştırıp topladım.
+Bütün kıyafeti bavula kolayca yerleştirdim.
+Daha sonra atkı eklemek için yer var.
+Bol kesim otururken de rahat duruyor.
+[backgrounds]
+Arkada açık renk taş bir kemer var.
+Arka planda ahşap bir paravan duruyor.
+Arka plan kiremit rengi bir duvar.
+Arkada alçak bir çit uzanıyor.
+Solda dar bir kapı görünüyor.
+Arkada düz bir perde asılı.
+Zemin açık renk çakılla kaplı.
+Duvar boyunca saksılar sıralanmış.
+Yakında mavi bir bahçe kapısı var.
+Zeminde küçük kare fayanslar var.
+Sağda tuğla bir sütun görünüyor.
+Alçak bahçe duvarı arka planı oluşturuyor.
+Kişinin arkasında ahşap bir bank var.
+Mekân üstü kapalı bir geçit.
+Arkada taş bir merdiven görünüyor.
+Arka planda cam bir giriş var.
+Koyu kapı kıyafetin renklerini belirginleştiriyor.
+Sade bir korkuluk kadrajdan geçiyor.
+Arkada örgü bir bölme duruyor.
+Mekânın zemini düz beton.
+Uzakta beyaz bir bahçe kapısı var.
+Geniş bir pencere arka planı dolduruyor.
+Arkada doğal ahşap bir duvar var.
+Kişinin arkasından taş bir çıkıntı geçiyor.
+Yanda sarı bir kapı görünüyor.
+Sahnede kıvrımlı metal bir korkuluk var.
+Arkada yeşil bir avlu görünüyor.
+Yakında yüksek bir buzlu cam pencere var.
+Yolda dar dikdörtgen taşlar var.
+Düz gri arka plan kadrajı dolduruyor.
+[light]
+İki kol da görünüyor.
+Alt etek uçları kadrajda.
+Kumaşa yandan ışık vuruyor.
+Kıyafet önden gösteriliyor.
+Renkler yumuşak ışıkla aydınlanıyor.
+Siluetin tamamı görünüyor.
+Dirseklerde küçük kırışıklıklar var.
+Yakındaki pencereden ışık geliyor.
+Kıyafet kadrajın çoğunu kaplıyor.
+Kamera bel hizasında.
+Zemine yumuşak bir gölge düşüyor.
+Dikişler gün ışığında görünüyor.
+Kişi hafifçe yandan duruyor.
+Yaka açıklığı net görünüyor.
+Kumaş bol kıvrımlarla dökülüyor.
+Omuzlar profilden gösteriliyor.
+Gün ışığı sol tarafı aydınlatıyor.
+Giysilerin yüzeyi mat.
+Bel ve bacaklar kadrajda.
+Katların kenarları görünüyor.
