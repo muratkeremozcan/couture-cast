@@ -955,6 +955,57 @@ reach the public artifact while raw logs and reports stay private. All 37 affect
 pass. Evidence: `ci-2dfb82ff-api32/actual-job.log`, downloaded `share-card-android-32`, and
 `runs/ci2dfb-bridge-*`. Product sources and the frozen Round6 inputs are unchanged.
 
+### Coordinator-approved instrumented web startup investigation
+
+Published `ffa33f67` API36 passed browser provisioning in 72 seconds, the 90-state bridge,
+Worklets controls and the Android build. The browser-matrix step stopped before Playwright:
+a successful root probe was followed by curl exit22 on the separate verification request.
+The exact HTTP error status, response and `/tmp/cc68-web.log` were omitted from the artifacts.
+A current-head cold worktree reproduction using the same web wrapper, dependency build,
+empty Next output and request sequence returns 200 then 200 with unchanged source. This is
+a non-reproduction; the original CI failure remains unexplained.
+
+The coordinator explicitly approved a diagnostics-only startup wrapper as an instrumented CI
+run. If that run passes, retain the unexplained failure and captured facts. The wrapper keeps
+the original 90-attempt, one-second-delay loop, first-success break and separate final request.
+It preserves the final curl exit status. A real controlled HTTP200-then500 fixture fails after
+exactly two requests; it never retries the final error to success. Private logs, headers and
+response bodies are retained locally on the runner. Public evidence uses a closed schema with
+HTTP/exit/timing facts, known error categories, reviewed Next framework file positions and
+numeric memory, disk and load observations. It records unavailable logs explicitly. Unknown
+fields, private strings and forged passing results fail validation before artifact copying.
+
+Forty-one affected controls pass, including failing-first artifact-export and mandatory CI
+registration checks, actual curl requests and public projection controls. Current CLI startup
+passes against the owned local web runtime. This change repairs missing diagnostics. It makes
+no product change and does not close the original CI failure. Evidence:
+`ci-ffa33f67-api36/actual-job.log`, downloaded `share-card-android-36`,
+`runs/ciffa-web-cold-repro-1` and `runs/ciffa-web-startup-*`.
+
+### Independent amd64 Supabase image prewarm for iOS
+
+The same published run's iOS job `121853154897` passed the Intel host setup and then missed
+the new macOS-X64 image cache. Its cold GHCR pull exhausted the 600-second budget before any
+container started. One 650.8 MB layer downloaded from 21:35:26 to 21:44:39, about 553 seconds,
+and extraction began just before the deadline. The coordinator required image-cache population
+to survive later native failures and required evidence before relying on a faster fallback.
+The uncommitted 240-second attempt-cap experiment was withdrawn; its red controls remain in
+the private evidence. The startup deadline stays 600 seconds.
+
+A Linux-X64 prewarm job now completes before native jobs start. It publishes the complete
+compressed Docker image archive, its registry and a closed amd64/SHA-256 integrity envelope.
+The macOS job downloads that exact workflow artifact, validates its envelope and byte digest,
+loads it into the owned VM, then selects the recorded registry for Supabase startup. Android
+keeps its existing image-cache path. Cache publication uses `always()` with the existing
+successful archive-written guard, and the prewarm artifact is independent of later native
+job results. The artifact contains base image bytes, never container filesystem snapshots or
+runtime credentials, and expires after one day. Empty files, symlinks, changed bytes, foreign
+architecture, unknown registry and extra metadata fail before Docker loading. Actual cache,
+archive and native execution remain required in the instrumented CI run.
+
+Evidence: `ci-ffa33f67-ios/actual-job.log`, downloaded `share-card-ios-0` and
+`runs/ciffa-ios-prewarm-controls-*`. No product or frozen Round6 source changed.
+
 ## Spec Change Log
 
 - 2026-10-25, iteration 2 in progress, Astra round 1: accepted A1 and A2. iOS now imports the

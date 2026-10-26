@@ -523,7 +523,7 @@ runs:
       # the key or a cache service error must not fail the job.
       continue-on-error: true
       if: >-
-        inputs.image-cache == 'true' && inputs.save-image-cache == 'true' &&
+        always() && inputs.image-cache == 'true' && inputs.save-image-cache == 'true' &&
         steps.cache-restore.outputs.cache-hit != 'true' && steps.start.outputs.cache_written == 'true'
       uses: actions/cache/save@v4
       with:

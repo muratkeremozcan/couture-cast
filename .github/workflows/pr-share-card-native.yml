@@ -10,7 +10,32 @@ concurrency:
   group: share-card-native-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  supabase-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/install
+      - name: Verify startup deadline controls
+        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/share-card-supabase-artifact.test.mjs
+      - uses: ./.github/actions/start-local-supabase
+      - name: Pin the complete amd64 image archive
+        run: node scripts/ci/share-card-supabase-artifact.mjs pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cc68-supabase-amd64
+          path: |
+            ${{ runner.temp }}/supabase-image-cache/images.tar.zst
+            ${{ runner.temp }}/supabase-image-cache/registry
+            ${{ runner.temp }}/supabase-image-cache/image-artifact.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Stop the owned image-prewarm stack
+        if: always()
+        run: npx supabase stop --no-backup
   original-resource:
+    needs: supabase-images
     strategy:
       fail-fast: false
       matrix:
@@ -63,8 +88,21 @@ jobs:
         run: |
           bash scripts/ci/share-card-ios-host.sh
       - name: Verify startup deadline controls
-        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/share-card-ios-host.test.mjs
+        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/share-card-ios-host.test.mjs scripts/ci/share-card-supabase-artifact.test.mjs
+      - name: Download the independently prewarmed amd64 images
+        if: runner.os == 'macOS'
+        uses: actions/download-artifact@v4
+        with:
+          name: cc68-supabase-amd64
+          path: ${{ runner.temp }}/supabase-image-cache
+      - name: Verify and load the exact Supabase image archive
+        id: supabase-artifact
+        if: runner.os == 'macOS'
+        timeout-minutes: 12
+        run: node scripts/ci/share-card-supabase-artifact.mjs load
       - uses: ./.github/actions/start-local-supabase
+        with:
+          image-registry: ${{ steps.supabase-artifact.outputs.registry || 'ghcr.io' }}
       - name: Prepare isolated UUID runtime and built renderer
         run: |
           npm run db:generate
@@ -81,7 +119,7 @@ jobs:
           node scripts/e2e-share-card/bridge-a11y.mjs
           node --test apps/mobile/plugins/with-share-card-permissions.test.js apps/mobile/plugins/with-story68-release-network.test.js
           node --test scripts/lib/story68-rapid-watermark.test.mjs scripts/lib/story68-rapid-watermark-control.test.mjs scripts/lib/story68-rapid-watermark-flow.test.mjs scripts/lib/story68-native-build-env.test.mjs scripts/lib/story68-fallback-post.test.mjs scripts/lib/story68-fallback-focus.test.mjs scripts/lib/story68-cold-font-scale.test.mjs scripts/lib/story68-release-live-font.test.mjs scripts/lib/story68-ios-focus-observation.test.mjs scripts/lib/story68-browser-watermark.test.mjs
-          node --test scripts/ci/share-card-native-failure.spec.mjs scripts/ci/share-card-android.test.mjs scripts/lib/share-card-native-diagnostics.test.mjs scripts/lib/story68-bridge-unit-result.test.mjs
+          node --test scripts/ci/share-card-native-failure.spec.mjs scripts/ci/share-card-android.test.mjs scripts/lib/share-card-native-diagnostics.test.mjs scripts/lib/story68-bridge-unit-result.test.mjs scripts/e2e-share-card/wait-web.test.mjs
       - name: Verify native paragraph heading semantics
         if: runner.os == 'macOS'
         run: bash scripts/ci/share-card-header-semantics.sh
@@ -95,13 +133,8 @@ jobs:
       - name: Genuine browser share-card acceptance matrix
         if: matrix.platform == 'android' && matrix.api == 36
         run: |
-          node scripts/e2e-share-card/web.mjs > /tmp/cc68-web.log 2>&1 &
-          for attempt in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:3088 > /dev/null; then break; fi
-            echo "Waiting for owned web runtime ($attempt/90)"
-            sleep 1
-          done
-          curl --fail --silent http://127.0.0.1:3088 > /dev/null
+          node scripts/e2e-share-card/web.mjs > "$CC68_HARNESS_DIR/web-startup-private.log" 2>&1 &
+          node scripts/e2e-share-card/wait-web.mjs
           npx playwright test --config playwright/share-card.config.ts
           node scripts/e2e-share-card/assert-web-matrix.mjs
       - name: Enable and verify Android hardware acceleration

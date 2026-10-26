@@ -9,6 +9,7 @@ import {
   assertBrowserWatermarkEvidence,
   browserWatermarkChecks,
 } from '../lib/story68-browser-watermark.mjs'
+import { assertWebStartupEvidence } from './wait-web.mjs'
 const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
@@ -66,6 +67,17 @@ for (const platform of ['android', 'ios']) {
 // Only primitive proof facts cross the native evidence boundary. Private logs and
 // resource identities are deliberately absent from the public projection.
 const proofs = new Map()
+const webStartupName = 'web-startup.json'
+if (fs.existsSync(path.join(directory, webStartupName))) {
+  let value
+  try {
+    value = JSON.parse(fs.readFileSync(path.join(directory, webStartupName)))
+  } catch {
+    throw new Error('invalid_web_startup_evidence')
+  }
+  assertWebStartupEvidence(value)
+  proofs.set(webStartupName, value)
+}
 const releaseName = 'native-release-live-font-android.json'
 const releaseFile = path.join(directory, releaseName)
 if (fs.existsSync(releaseFile)) {
