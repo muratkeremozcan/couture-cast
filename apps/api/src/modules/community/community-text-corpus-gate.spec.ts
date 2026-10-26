@@ -25,6 +25,8 @@ describe('pre-registered clean holdout gate', () => {
     { withheld: 0, total: 400, pass: true },
     { withheld: 1, total: 400, pass: false },
     { withheld: 0, total: 200, pass: false },
+    { withheld: 11, total: 2000, pass: true },
+    { withheld: 12, total: 2000, pass: false },
   ])('$withheld of $total has gate result $pass', ({ withheld, total, pass }) => {
     expect(passesCleanHoldoutGate(withheld, total)).toBe(pass)
   })
@@ -33,6 +35,8 @@ describe('pre-registered clean holdout gate', () => {
     expect(wilsonInterval(3, 1000)[1]).toBeCloseTo(0.008783014053503173, 14)
     expect(wilsonInterval(4, 1000)[1]).toBeCloseTo(0.010239556277262253, 14)
     expect(wilsonInterval(1, 400)[1]).toBeCloseTo(0.014023285075823391, 14)
+    expect(wilsonInterval(11, 2000)[1]).toBeCloseTo(0.009822062751615334, 14)
+    expect(wilsonInterval(12, 2000)[1]).toBeCloseTo(0.010458448336941664, 14)
   })
 
   it.each([

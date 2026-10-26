@@ -131,3 +131,44 @@ The Wilson arithmetic and regression requirements remain unchanged.
 The active v4 selector intentionally fails until a fresh sealed and unretired
 version is committed under coordinator release. V5 will evaluate the frozen
 round-4 repair after the coordinator supplies its manifest and releases the run.
+
+## V5 retirement and v6 power preregistration
+
+The released v5 evaluation against frozen round 4 failed Italian at 4/1000:
+Wilson 95% upper bound 1.023956%. English and Turkish each had 3/1000 and passed
+at 0.878301%; the other four locales had zero. All 9982 disguised cases were
+withheld with zero bypasses, and all in-sample clean halves had zero withholds.
+The coordinator retired v5 to development. Its sealed bytes and failed run stay
+immutable. This retirement is committed in the machine ledger and v5 report
+before the full English, Italian and Turkish false-positive cases or reasons
+are handed to the builder. The active v5 selector must now fail eligibility.
+
+V6 requires 2000 individually written items in each of de, en, es, fr, it, pt and
+tr: 1000 captions and 1000 alt texts. Keep the existing no-bank, no-template and
+no-generator rules. Complete items must be exact and NFKC/casefold unique and
+disjoint from the in-sample clean corpus and every frozen v1 through v5 locale.
+That is 42 historical locale files. Each locale changes author from v5; retain
+exact source ranges and the assignment record before authoring. Five-word
+affected items and each underlying content-concept group remain capped at 1%,
+which is 20 items among 2000. Keep all existing field lengths and count minimums.
+
+The two-sided Wilson 95% upper-bound gate remains at most 1%. At n=2000, zero
+through 11 withheld items pass: 11 gives 0.9822062752%; 12 gives 1.0458448337% and
+fails. At n=1000, only zero through 3 pass. Pure arithmetic tests register both
+new boundary values before any v6 result; the formula and threshold are unchanged.
+In-sample zero withholds and disguised zero passes stay unchanged.
+
+Under an independent binomial model with a true 0.3% withheld rate, the probability
+of passing is 98.007692% per locale at n=2000, versus 64.723206% at n=1000.
+At a true 0.5% it is 69.706180%, versus 26.432240%. If the seven locale samples
+are also independent and all have a true 0.3% rate, the probability that all seven
+pass is 86.860263%, versus 4.757953% at n=1000. These are operating characteristics
+of the unchanged rule. An authored synthetic corpus and its diversity caps do
+not establish statistical independence or representative production sampling.
+
+Author v6 in a fresh private worktree before any round 5 repair inspection.
+Seal all seven locale files and the complete authorship/diversity evidence,
+send the aggregate SHA-256 and per-locale counts to the coordinator, then wait
+for explicit release before inspecting the round 5 freeze, committing v6,
+switching the active selector or evaluating it. This preregistration authorizes
+no v6 evaluation. The release gate remains closed.

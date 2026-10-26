@@ -25,7 +25,7 @@ function sealed(version: string): HoldoutSealIdentity {
 }
 
 describe('active text holdout eligibility', () => {
-  it.each(['holdout-v3', 'holdout-v4'])(
+  it.each(['holdout-v3', 'holdout-v4', 'holdout-v5'])(
     'rejects retired %s even when its historical seal is valid',
     (version) => {
       expect(retirements.schemaVersion).toBe(1)
@@ -37,7 +37,7 @@ describe('active text holdout eligibility', () => {
 
   it('accepts a sealed unretired version without reading its text or screening inputs', () => {
     expect(() =>
-      assertActiveHoldoutEligible('holdout-v5', sealed('holdout-v5'), retirements.retired)
+      assertActiveHoldoutEligible('holdout-v6', sealed('holdout-v6'), retirements.retired)
     ).not.toThrow()
   })
 
@@ -51,14 +51,14 @@ describe('active text holdout eligibility', () => {
   })
 
   it.each([
-    { ...sealed('holdout-v5'), corpusVersion: 'holdout-v4' },
-    { ...sealed('holdout-v5'), sealedAt: '' },
-    { ...sealed('holdout-v5'), sealedAt: 'unsealed' },
-    { ...sealed('holdout-v5'), corpusSha256: '' },
-    { ...sealed('holdout-v5'), corpusSha256: 'g'.repeat(64) },
+    { ...sealed('holdout-v6'), corpusVersion: 'holdout-v4' },
+    { ...sealed('holdout-v6'), sealedAt: '' },
+    { ...sealed('holdout-v6'), sealedAt: 'unsealed' },
+    { ...sealed('holdout-v6'), corpusSha256: '' },
+    { ...sealed('holdout-v6'), corpusSha256: 'g'.repeat(64) },
   ])('rejects an absent or mismatched seal identity: %j', (seal) => {
     expect(() =>
-      assertActiveHoldoutEligible('holdout-v5', seal, retirements.retired)
+      assertActiveHoldoutEligible('holdout-v6', seal, retirements.retired)
     ).toThrow(/seal/)
   })
 
