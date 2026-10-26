@@ -88,3 +88,26 @@ at most 1% per language. At n=1,000, zero through three errors pass and four fai
 In-sample zero withholds, disguised zero passes and all existing count minimums remain
 unchanged. A corpus that fails either independence measure cannot support release,
 regardless of its numerical Wilson result. This amendment authorizes no evaluation.
+
+## V4 retirement and v5 authoring
+
+After the sealed v4 evaluation failed in German (6/1,000), Italian (4/1,000) and
+Portuguese (5/1,000), the coordinator retired v4 from holdout duty. V4 is development
+data from this decision onward. Its committed corpus, seal, authorship evidence and
+failed run remain immutable history. The full false-positive cases and reason codes
+may now be supplied to cc68-impl for development. V4 cannot support a later release
+claim after the builder has seen it.
+
+V5 must be freshly authored in a new private worktree, before any round-3 repair
+inspection. Keep the v4 independence requirements unchanged: each of seven languages
+has 1,000 individually written items, 500 captions and 500 alt texts; no fragment
+banks, templates or text generator; at most 1% of items sharing a five-word sequence;
+and at most 1% in any underlying content-concept group. V5 must also be exact and
+NFKC/casefold disjoint from the in-sample corpus and v1, v2, v3 and v4.
+
+Each locale must have a different author from v4. Record each author's exact item
+ranges. Seal v5 and send its aggregate hash and counts to the coordinator before
+inspecting the round-3 repair, committing the corpus or evaluating it. A separate
+explicit coordinator release remains required. The Wilson gate and its arithmetic,
+in-sample zero withholds, disguised zero passes and all count minimums are unchanged.
+The release gate stays closed while a fresh eligible holdout is pending.
