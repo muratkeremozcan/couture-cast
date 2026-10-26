@@ -172,3 +172,64 @@ send the aggregate SHA-256 and per-locale counts to the coordinator, then wait
 for explicit release before inspecting the round 5 freeze, committing v6,
 switching the active selector or evaluating it. This preregistration authorizes
 no v6 evaluation. The release gate remains closed.
+
+## V6 primary-scenario cluster preregistration
+
+The coordinator rejected the private draft design of 500 scenarios with four
+sentences each. A screening error can affect all variants of one scenario;
+counting those variants as 2000 independent observations would overstate the
+sample supporting the Wilson calculation. Preserve those unsealed drafts and
+their provenance as superseded private authoring history. They have supplied
+no release measurement.
+
+Before sealing v6, require 2000 distinct primary scenarios per language, with
+exactly one item per scenario: 1000 captions and 1000 alt texts. An existing
+draft scenario may contribute at most one complete sentence. Merge genuine
+duplicate scenarios across old labels before selecting representatives, record
+the old source hash and physical row for every retained sentence, and write
+fresh scenarios for every remaining slot. Existing author rotation and exact
+authorship records still apply. No fragment banks, templates, combinatorial
+assembly or wording generator may supply these new items.
+
+A primary scenario is the same specific core outfit event, observation or
+composition. Caption versus alt-text wording, viewpoint, colour, material,
+incidental setting, background props and simple carrier substitutions do not
+create additional primary scenarios. A changed action, purpose, construction
+or object relationship must be substantive to justify a separate scenario.
+Two lemon-earring demonstrations or two wearable magnets retaining a needle
+share a primary scenario. Generic detachable-component demonstrations also
+share one unless the changed component has a substantively different role.
+Keep one representative conservatively when the distinction is doubtful.
+
+Secondary motifs can recur across genuinely different primary scenarios. A
+thread-storage coil, a decorative wrist coil and a coiled tail in a climbing
+animal depiction have different roles while sharing the coil motif. Broad
+categories such as wearing trousers or sewing do not identify a primary
+scenario. Each underlying secondary concept remains capped at 20 of 2000
+items, and at most 20 items may share a five-word sequence. Semantic review
+must assess the complete wording and consolidate paraphrases; unique labels
+alone cannot establish scenario independence.
+
+Report the primary-scenario inventory, all scenario memberships, the number of
+items per scenario, its full count distribution and the maximum for each
+language. Assert exactly 2000 scenarios and a maximum of one item per scenario.
+Bind every inventory record to the corpus item ID and SHA-256 of its exact
+UTF-8 text. The pure scenario gate rejects missing or extra inventory entries,
+duplicate item IDs, invalid scenario identities, mismatched text hashes,
+incorrect field counts and every repeated primary scenario. Its unit suite
+accepts the complete singleton design and rejects caption/alt pairs and
+four-item variant clusters, independently of screening or repair inputs.
+
+Run that gate against all seven sealed locale files and their scenario
+inventories before any v6 screening result can count as release evidence.
+Publish its reports with the independent semantic review and existing
+five-word, concept, authorship, uniqueness and historical-disjointness checks.
+An item-level Wilson calculation requires this singleton design. These checks
+remain necessary evidence, with statistical independence and production
+representativeness subject to the stated synthetic-corpus limitations.
+
+The Wilson threshold, preregistered arithmetic and power calculations remain
+unchanged and conditional on the independent-item model. In-sample zero
+withholds, disguised zero passes and all count minimums remain unchanged.
+Seal, send the hash and counts, and wait for coordinator release before any
+round 5 inspection, corpus commit, active switch or screening evaluation.
