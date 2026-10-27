@@ -85,113 +85,162 @@ test('Docker load failure remains a failed load', async (t) => {
     /load failed/
   )
 })
-test('the compressed archive crosses into the Colima VM once and its dockerd loads it there', (t) => {
+function savedImages(t) {
+  // A docker-save layout: manifest.json naming each image's config and layer files.
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-colima-load-'))
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const tree = path.join(directory, 'tree')
+  fs.mkdirSync(path.join(tree, 'blobs'), { recursive: true })
+  const files = {
+    'blobs/big': 'x'.repeat(4000),
+    'blobs/small': 'y',
+    'blobs/cfg-a': '{}',
+    'blobs/cfg-b': '{}',
+  }
+  for (const [name, body] of Object.entries(files))
+    fs.writeFileSync(path.join(tree, name), body)
+  fs.writeFileSync(
+    path.join(tree, 'manifest.json'),
+    JSON.stringify([
+      {
+        Config: 'blobs/cfg-a',
+        RepoTags: ['ghcr.io/supabase/postgres:17.6.1.054'],
+        Layers: ['blobs/big'],
+      },
+      {
+        Config: 'blobs/cfg-b',
+        RepoTags: ['ghcr.io/supabase/gotrue:v2.183.0'],
+        Layers: ['blobs/small'],
+      },
+    ])
+  )
+  const archive = path.join(directory, 'images.tar.zst')
+  const packed = spawnSync('/bin/bash', [
+    '-c',
+    'tar -c -f - -C "$1" . | zstd -q -o "$2"',
+    'pack',
+    tree,
+    archive,
+  ])
+  assert.equal(packed.status, 0, String(packed.stderr))
   const bin = path.join(directory, 'bin')
   fs.mkdirSync(bin)
-  // Fake colima runs the guest command locally; fake docker records what it decompressed.
+  // Fake colima accepts the disk probe and hands docker load its stdin; fake docker lists it.
   fs.writeFileSync(
     path.join(bin, 'colima'),
-    '#!/bin/sh\n[ "$1" = ssh ] && [ "$2" = -- ] || exit 64\nshift 2\nexec "$@"\n',
+    '#!/bin/bash\n[ "$1" = ssh ] && [ "$2" = -- ] || exit 64\n[ "$3" = sh ] && exit 0\nshift 2\nexec "$@"\n',
     { mode: 0o755 }
   )
   fs.writeFileSync(
     path.join(bin, 'docker'),
-    '#!/bin/sh\n[ "$1 $2" = "load -i" ] || exit 64\nzstd -dc "$3" > "$CC68_FAKE_LOADED"\n',
+    '#!/bin/bash\n[ "$1" = load ] || exit 64\n{ zstd -dc | tar -t -f - | sort | tr "\\n" " "; echo; } >> "$CC68_FAKE_LOADED"\n',
     { mode: 0o755 }
   )
-  const archive = path.join(directory, 'images.tar.zst')
-  const compressed = spawnSync('zstd', ['-q', '-c'], { input: 'owned image layers' })
-  assert.equal(compressed.status, 0)
-  fs.writeFileSync(archive, compressed.stdout)
-  const loaded = path.join(directory, 'loaded')
-  const vmArchive = path.join(directory, 'guest.tar.zst')
+  return { directory, archive, bin, loaded: path.join(directory, 'loaded') }
+}
+test('each image loads alone, smallest first, with its bytes and duration after a VM disk probe', (t) => {
+  const f = savedImages(t)
   const lines = []
   const commands = []
-  loadIntoColima(archive, {
-    vmArchive,
+  loadIntoColima(f.archive, {
+    workRoot: f.directory,
     log: (line) => lines.push(line),
     run: (command, args, options) => {
-      commands.push(command)
+      commands.push(
+        command === '/bin/bash' ? args[2] : `${command} ${args[2] ?? ''}`.trim()
+      )
       return spawnSync(command, args, {
         ...options,
         env: {
           ...process.env,
-          PATH: `${bin}:${process.env.PATH}`,
-          CC68_FAKE_LOADED: loaded,
+          PATH: `${f.bin}:${process.env.PATH}`,
+          CC68_FAKE_LOADED: f.loaded,
         },
       })
     },
   })
-  assert.deepEqual(commands, ['ps', 'colima', 'colima'])
-  assert.equal(fs.readFileSync(loaded, 'utf8'), 'owned image layers')
-  assert.equal(fs.existsSync(vmArchive), false)
+  assert.deepEqual(commands, [
+    'ps',
+    'colima sh',
+    'cc68-image-unpack',
+    'cc68-image-load',
+    'cc68-image-load',
+  ])
+  assert.deepEqual(
+    fs
+      .readFileSync(f.loaded, 'utf8')
+      .trim()
+      .split('\n')
+      .map((row) => row.trim()),
+    ['blobs/cfg-b blobs/small manifest.json', 'blobs/big blobs/cfg-a manifest.json']
+  )
   const facts = JSON.parse(lines.at(-1).replace('Supabase image load: ', ''))
-  assert.equal(facts.archiveBytes, compressed.stdout.length)
   assert.deepEqual(
     facts.stages.map(({ name, outcome }) => [name, outcome]),
     [
-      ['transfer', 'passed'],
-      ['load', 'passed'],
+      ['disk', 'passed'],
+      ['unpack', 'passed'],
+      ['image-0', 'passed'],
+      ['image-1', 'passed'],
     ]
   )
+  assert.deepEqual(
+    facts.images.map(({ ref, bytes, stage }) => [ref, bytes, stage]),
+    [
+      ['ghcr.io/supabase/gotrue:v2.183.0', 3, 'image-0'],
+      ['ghcr.io/supabase/postgres:17.6.1.054', 4002, 'image-1'],
+    ]
+  )
+  assert.equal(
+    fs.readdirSync(f.directory).some((name) => name.startsWith('cc68-images-')),
+    false
+  )
 })
-test('a short guest copy and each stage timeout fail with the stage that used the budget', () => {
-  const archive = path.join(os.tmpdir(), `cc68-colima-short-${process.pid}`)
-  fs.writeFileSync(archive, 'twelve bytes')
-  try {
-    let clock = 0
-    const results = {
-      ps: { status: 0, stdout: 'qemu-system-x86_64 -machine q35 -accel hvf -m 3072' },
-      transfer: { status: 1 },
-    }
-    const lines = []
-    let stage = 0
-    assert.throws(
-      () =>
-        loadIntoColima(archive, {
-          log: (line) => lines.push(line),
-          now: () => clock,
-          run: (command) => (command === 'ps' ? results.ps : (stage++, results.transfer)),
-        }),
-      /supabase_image_artifact_load_failed/
-    )
-    assert.equal(stage, 1)
-    assert.match(lines.at(-1), /"accelerator":"hvf"/)
-    assert.match(lines.at(-1), /"name":"transfer","outcome":"failed"/)
-    let budget
-    assert.throws(
-      () =>
-        loadIntoColima(archive, {
-          log: (line) => lines.push(line),
-          now: () => clock,
-          run: (command, _args, options) => {
-            if (command === 'ps') return { status: 1 }
-            budget ??= options.timeout
-            clock += 590000
-            return budget === options.timeout
-              ? { status: 0 }
-              : { error: Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' }) }
-          },
-        }),
-      /supabase_image_artifact_load_timeout/
-    )
-    assert.equal(budget, 600000)
-    clock = 0
-    assert.throws(
-      () =>
-        loadIntoColima(archive, {
-          log: (line) => lines.push(line),
-          budgetMs: 500,
-          now: () => clock,
-          run: () => ({ status: 0 }),
-        }),
-      /supabase_image_artifact_transfer_timeout/
-    )
-  } finally {
-    fs.rmSync(archive, { force: true })
-  }
+test('an image that exhausts the budget is reported with its timeout and the work tree is removed', (t) => {
+  const f = savedImages(t)
+  let clock = 0
+  const lines = []
+  assert.throws(
+    () =>
+      loadIntoColima(f.archive, {
+        workRoot: f.directory,
+        log: (line) => lines.push(line),
+        now: () => clock,
+        run: (command, args, options) => {
+          if (command === 'ps')
+            return { status: 0, stdout: 'qemu-system-x86_64 -accel hvf' }
+          if (args[2] === 'cc68-image-load' && args.includes('blobs/big')) {
+            clock += 600000
+            return { error: Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' }) }
+          }
+          return spawnSync(command, args, {
+            ...options,
+            env: {
+              ...process.env,
+              PATH: `${f.bin}:${process.env.PATH}`,
+              CC68_FAKE_LOADED: f.loaded,
+            },
+          })
+        },
+      }),
+    /supabase_image_artifact_image-1_timeout/
+  )
+  const facts = JSON.parse(lines.at(-1).replace('Supabase image load: ', ''))
+  assert.equal(facts.accelerator, 'hvf')
+  assert.deepEqual(facts.images.at(-1), {
+    ref: 'ghcr.io/supabase/postgres:17.6.1.054',
+    bytes: 4002,
+    stage: 'image-1',
+  })
+  assert.deepEqual(facts.stages.at(-1), {
+    name: 'image-1',
+    outcome: 'timeout',
+    durationMs: 600000,
+  })
+  assert.equal(
+    fs.readdirSync(f.directory).some((name) => name.startsWith('cc68-images-')),
+    false
+  )
 })
 test('the reported accelerator is read from the QEMU command line', () => {
   assert.equal(

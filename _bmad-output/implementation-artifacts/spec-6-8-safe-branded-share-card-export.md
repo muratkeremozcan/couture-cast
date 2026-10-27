@@ -1290,3 +1290,10 @@ Subsequent build logs and staging reports are copied into their individual evide
   records each owned resolve status and a timeout names them. Root cause pending that CI evidence;
   the product's own resolve retry backs off from 500 ms up to 15 s, so a chain of non-200 answers
   can outlast the helper's 20 s wait.
+- iOS image load measurement: at 300dfe07 the VM used hvf, the compressed transfer took 133 s and the
+  single in-VM `docker load` was still running when the 600 s budget ended. The loader now probes VM
+  disk write throughput (512 MiB with fsync), unpacks the verified archive on the host, and loads each
+  image alone, smallest first, streaming a zstd per-image tar into the VM's `docker load`. The closed
+  report names each image, its uncompressed bytes and its stage duration, so the next run shows
+  whether Postgres (about 70 percent of the bytes by local measurement) owns the budget. The 600 s
+  total is unchanged.

@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
@@ -63,7 +64,7 @@ export function loadIntoColima(
     log = (line) => console.log(line),
     budgetMs = 600000,
     bytes = fs.statSync(archive).size,
-    vmArchive = '/var/tmp/cc68-supabase-images.tar.zst',
+    workRoot = process.env.RUNNER_TEMP ?? os.tmpdir(),
   } = {}
 ) {
   const started = now()
@@ -102,32 +103,74 @@ export function loadIntoColima(
     }
     return result
   }
-  const descriptor = fs.openSync(archive, 'r')
-  try {
-    stage(
-      'transfer',
-      'colima',
-      [
-        'ssh',
-        '--',
-        'sh',
-        '-c',
-        `cat > ${vmArchive} && test "$(wc -c < ${vmArchive})" -eq ${bytes}`,
-      ],
-      { stdio: [descriptor, 'inherit', 'inherit'] }
-    )
-  } finally {
-    fs.closeSync(descriptor)
-  }
-  stage('load', 'colima', [
+  // VM disk write throughput bounds how fast any docker load can extract layers.
+  stage('disk', 'colima', [
     'ssh',
     '--',
     'sh',
     '-c',
-    `docker load -i ${vmArchive}; status=$?; rm -f ${vmArchive}; exit $status`,
+    'dd if=/dev/zero of=/var/tmp/cc68-disk bs=1M count=512 conv=fsync 2>/dev/null; status=$?; rm -f /var/tmp/cc68-disk; exit $status',
   ])
+  const work = fs.mkdtempSync(path.join(workRoot, 'cc68-images-'))
+  try {
+    stage('unpack', '/bin/bash', [
+      '-c',
+      'set -o pipefail; zstd -dc "$1" | tar -x -f - -C "$2"',
+      'cc68-image-unpack',
+      archive,
+      work,
+    ])
+    const entries = JSON.parse(fs.readFileSync(path.join(work, 'manifest.json'), 'utf8'))
+    const images = entries
+      .map((entry) => {
+        const files = [entry.Config, ...entry.Layers]
+        if (
+          files.some(
+            (file) =>
+              typeof file !== 'string' || file.startsWith('/') || file.includes('..')
+          )
+        )
+          throw new Error('invalid_supabase_image_artifact')
+        const imageBytes = files.reduce(
+          (sum, file) => sum + fs.statSync(path.join(work, file)).size,
+          0
+        )
+        const ref = entry.RepoTags?.[0]
+        return {
+          entry,
+          files,
+          imageBytes,
+          ref: typeof ref === 'string' && imageRef.test(ref) ? ref : 'unnamed',
+        }
+      })
+      .sort((left, right) => left.imageBytes - right.imageBytes)
+    facts.images = []
+    // Smallest first: per-image durations show whether one image owns the budget.
+    for (const [index, image] of images.entries()) {
+      const single = path.join(work, `.single-${index}`)
+      fs.mkdirSync(single)
+      fs.writeFileSync(path.join(single, 'manifest.json'), JSON.stringify([image.entry]))
+      // Each image names its stage; the stage holds its outcome and duration.
+      facts.images.push({
+        ref: image.ref,
+        bytes: image.imageBytes,
+        stage: `image-${index}`,
+      })
+      stage(`image-${index}`, '/bin/bash', [
+        '-c',
+        'set -o pipefail; single="$1"; base="$2"; shift 2; tar -c -f - -C "$single" manifest.json -C "$base" "$@" | zstd -1 -T0 -q | colima ssh -- docker load',
+        'cc68-image-load',
+        single,
+        work,
+        ...image.files,
+      ])
+    }
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true })
+  }
   report()
 }
+const imageRef = /^[a-z0-9.-]+(?::[0-9]+)?(?:\/[a-z0-9._-]+)+:[A-Za-z0-9._-]+$/
 export async function loadSupabaseArtifact(directory, load = loadIntoColima) {
   const target = path.join(directory, 'image-artifact.json')
   regular(target, 1024)
