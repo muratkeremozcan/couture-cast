@@ -66,6 +66,12 @@ const post = (body: object | string, actor = member) =>
     .set('Authorization', `Bearer ${actor}`)
     .send(body)
 const digest = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
+/** Fifteen years before the live clock the age rule reads, so the member stays a teen. */
+function teenBirthdate() {
+  const birthdate = new Date()
+  birthdate.setUTCFullYear(birthdate.getUTCFullYear() - 15)
+  return birthdate
+}
 async function user(birthdate = new Date('1990-01-01')) {
   return (
     await prisma.user.create({
@@ -275,7 +281,7 @@ describe('share-card actual API and isolated database', () => {
       if (change === 'consent') {
         await prisma.userProfile.update({
           where: { user_id: member },
-          data: { birthdate: new Date('2012-01-01') },
+          data: { birthdate: teenBirthdate() },
         })
         consentId = (
           await prisma.guardianConsent.create({
@@ -535,7 +541,7 @@ describe('share-card actual API and isolated database', () => {
   it('I-ACCESS: live revoked guardian consent blocks both source kinds', async () => {
     await prisma.userProfile.update({
       where: { user_id: member },
-      data: { birthdate: new Date('2012-01-01') },
+      data: { birthdate: teenBirthdate() },
     })
     const consent = await prisma.guardianConsent.create({
       data: { guardian_id: other, teen_id: member, status: 'granted' },
@@ -679,7 +685,7 @@ describe('share-card actual API and isolated database', () => {
       if (mutation === 'consent') {
         await prisma.userProfile.update({
           where: { user_id: member },
-          data: { birthdate: new Date('2012-01-01') },
+          data: { birthdate: teenBirthdate() },
         })
         consentId = (
           await prisma.guardianConsent.create({
