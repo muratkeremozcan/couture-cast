@@ -14,6 +14,7 @@ import {
   readStartupLog,
 } from './wait-web.mjs'
 import { summarizeStartupFailure } from './web-startup-failure.mjs'
+import { runGatesTestFile } from '../ci/node-test-gate.mjs'
 
 const facts = () => ({
   freeMemoryBytes: 10,
@@ -399,7 +400,9 @@ describe('web startup CI wiring', () => {
     assert.equal(step.run.includes('for attempt'), false)
     assert.ok(step.run.indexOf('wait-web.mjs') < step.run.indexOf('npx playwright test'))
     assert.ok(
-      steps.some((row) => row.run?.includes('scripts/e2e-share-card/wait-web.test.mjs'))
+      steps.some((row) =>
+        runGatesTestFile(row.run, 'scripts/e2e-share-card/wait-web.test.mjs')
+      )
     )
   })
 })

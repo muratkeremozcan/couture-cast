@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process'
 import vm from 'node:vm'
 import test from 'node:test'
 import { parse } from 'yaml'
+import { runGatesTestFile } from './node-test-gate.mjs'
 
 async function host(t, architecture, hvf, hvfStatus = 0) {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'cc68-ios-host-'))
@@ -52,7 +53,10 @@ test('iOS native CI selects an Intel runner and the verified Docker host', async
   const controls = job.steps.find(
     (step) => step.name === 'Verify startup deadline controls'
   )
-  assert.match(controls.run, /scripts\/ci\/share-card-ios-host\.test\.mjs/)
+  assert.equal(
+    runGatesTestFile(controls.run, 'scripts/ci/share-card-ios-host.test.mjs'),
+    true
+  )
 })
 
 for (const [name, arch, hvf, status] of [

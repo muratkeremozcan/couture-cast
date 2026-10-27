@@ -18,7 +18,7 @@ jobs:
       - uses: ./.github/actions/reserve-supabase-ports
       - uses: ./.github/actions/install
       - name: Verify startup deadline controls
-        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/share-card-supabase-artifact.test.mjs
+        run: node scripts/ci/node-test-gate.mjs startup-deadline
       - uses: ./.github/actions/start-local-supabase
       - name: Pin the complete amd64 image archive
         run: node scripts/ci/share-card-supabase-artifact.mjs pack
@@ -69,7 +69,7 @@ jobs:
         if: matrix.platform == 'android'
         timeout-minutes: 12
         run: |
-          node --test scripts/ci/share-card-browser-deps.test.mjs
+          node scripts/ci/node-test-gate.mjs browser-deps
           if [ '${{ matrix.api }}' = '32' ]; then
             node scripts/ci/share-card-browser-deps.mjs --chromium-only
           else
@@ -88,7 +88,7 @@ jobs:
         run: |
           bash scripts/ci/share-card-ios-host.sh
       - name: Verify startup deadline controls
-        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/share-card-ios-host.test.mjs scripts/ci/share-card-supabase-artifact.test.mjs
+        run: node scripts/ci/node-test-gate.mjs startup-deadline
       - name: Download the independently prewarmed amd64 images
         if: runner.os == 'macOS'
         uses: actions/download-artifact@v4
@@ -117,12 +117,21 @@ jobs:
           node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1 &
           node scripts/run-story68-native.mjs metro > /tmp/cc68-metro.log 2>&1 &
           node scripts/maestro-install.mjs
+      - name: Verify the owned API database entry guard
+        run: |
+          npx vitest run scripts/lib/story68-api-entry.test.mjs --reporter=default --reporter=json --outputFile="$RUNNER_TEMP/story68-api-entry.json"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          const report = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/story68-api-entry.json`, 'utf8'))
+          if (report.numTotalTests < 2 || report.numPassedTests !== report.numTotalTests ||
+              report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
+            throw new Error('Incomplete API entry guard execution')
+          JS
       - name: Verify localized native accessibility announcements and focus bridge
         run: |
           node scripts/e2e-share-card/bridge-a11y.mjs
-          node --test apps/mobile/plugins/with-share-card-permissions.test.js apps/mobile/plugins/with-story68-release-network.test.js
-          node --test scripts/lib/story68-rapid-watermark.test.mjs scripts/lib/story68-rapid-watermark-control.test.mjs scripts/lib/story68-rapid-watermark-flow.test.mjs scripts/lib/story68-native-build-env.test.mjs scripts/lib/story68-fallback-post.test.mjs scripts/lib/story68-fallback-focus.test.mjs scripts/lib/story68-cold-font-scale.test.mjs scripts/lib/story68-release-live-font.test.mjs scripts/lib/story68-ios-focus-observation.test.mjs scripts/lib/story68-browser-watermark.test.mjs
-          node --test scripts/ci/share-card-native-failure.spec.mjs scripts/ci/share-card-android.test.mjs scripts/lib/share-card-native-diagnostics.test.mjs scripts/lib/story68-bridge-unit-result.test.mjs scripts/e2e-share-card/wait-web.test.mjs
+          node scripts/ci/node-test-gate.mjs share-card-plugins
+          node scripts/ci/node-test-gate.mjs native-harness
       - name: Verify native paragraph heading semantics
         if: runner.os == 'macOS'
         run: bash scripts/ci/share-card-header-semantics.sh
@@ -130,7 +139,7 @@ jobs:
         run: node scripts/run-story68-native.mjs prebuild --platform ${{ matrix.platform }}
       - name: Verify fresh Worklets variant and ABI staging
         if: matrix.platform == 'android'
-        run: node --test scripts/lib/story68-worklets-staging.test.mjs
+        run: node scripts/ci/node-test-gate.mjs worklets-staging
       - name: Build native development client
         run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
       - name: Genuine browser share-card acceptance matrix

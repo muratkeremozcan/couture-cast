@@ -1,47 +1,127 @@
 #!/usr/bin/env node
-// Runs `node --test` on explicit files and fails unless every file registered a test,
-// at least the expected number passed, and nothing failed, skipped or stayed todo.
-// A bare `node --test` exits 0 for a skipped test, a todo test or an empty file.
+// Runs one node:test suite from node-test-suites.json and fails unless every file in it
+// reported at least one passing test and nothing failed, skipped or stayed todo. A bare
+// `node --test` exits 0 for a skipped test, a todo test or an empty file.
+//
+// The default suite discovers every *.test.mjs and *.spec.mjs under scripts/ that no
+// pinned suite claims, so a new or split test file runs without a workflow edit.
+// Before running, the gate checks that the manifest and the workflow cover every
+// discovered file and every suite.
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { parse } from 'yaml'
 
 export const GATE_SCRIPT = 'scripts/ci/node-test-gate.mjs'
+const repository = fileURLToPath(new URL('../../', import.meta.url))
 const reporter = pathToFileURL(
   fileURLToPath(new URL('./node-test-gate-reporter.mjs', import.meta.url))
 ).href
 
-export function parseGateArgs(argv) {
-  const files = []
-  let minPass
-  for (let index = 0; index < argv.length; index++) {
-    const value = argv[index]
-    if (value === '--min-pass') {
-      minPass = Number(argv[++index])
-      continue
-    }
-    if (value.startsWith('--')) throw new Error(`node_test_gate_unknown_option: ${value}`)
-    files.push(value)
-  }
-  if (!Number.isInteger(minPass) || minPass < 1)
-    throw new Error('node_test_gate_min_pass_required')
-  if (!files.length) throw new Error('node_test_gate_files_required')
-  if (new Set(files).size !== files.length)
-    throw new Error('node_test_gate_duplicate_file')
-  return { minPass, files }
+export function loadManifest(root = repository) {
+  return JSON.parse(
+    fs.readFileSync(path.join(root, 'scripts/ci/node-test-suites.json'), 'utf8')
+  )
 }
 
-/** The test files a workflow `run:` line hands to the gate, or null for any other line. */
-export function gatedTestFiles(line) {
-  const tokens = line.trim().split(/\s+/)
-  if (tokens[0] !== 'node' || tokens[1] !== GATE_SCRIPT) return null
-  try {
-    return parseGateArgs(tokens.slice(2)).files
-  } catch {
-    return null
+/** Every test file under the discovery root, repo-relative with forward slashes. */
+export function discoverTestFiles(root, manifest) {
+  const pattern = new RegExp(manifest.discoverPattern)
+  const found = []
+  const visit = (relative) => {
+    for (const entry of fs.readdirSync(path.join(root, relative), {
+      withFileTypes: true,
+    })) {
+      const child = `${relative}/${entry.name}`
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules') visit(child)
+      } else if (entry.isFile() && pattern.test(entry.name)) found.push(child)
+    }
   }
+  visit(manifest.discoverRoot)
+  return found.sort()
+}
+
+function pinnedFiles(manifest) {
+  return Object.values(manifest.suites).flatMap((files) =>
+    Array.isArray(files) ? files : []
+  )
+}
+
+export function resolveSuite(
+  name,
+  { root = repository, manifest = loadManifest(root) } = {}
+) {
+  const files = manifest.suites[name]
+  if (files === undefined) throw new Error(`node_test_gate_unknown_suite: ${name}`)
+  if (Array.isArray(files)) return [...files]
+  const claimed = new Set([...pinnedFiles(manifest), ...manifest.vitest])
+  return discoverTestFiles(root, manifest).filter((file) => !claimed.has(file))
+}
+
+/** The suite a workflow `run:` line hands to the gate, or null for any other line. */
+export function gatedSuite(line) {
+  const tokens = line.trim().split(/\s+/)
+  return tokens[0] === 'node' && tokens[1] === GATE_SCRIPT && tokens.length === 3
+    ? tokens[2]
+    : null
+}
+
+/** True when a workflow step's `run:` text gates a suite that contains the file. */
+export function runGatesTestFile(run, file, options) {
+  return (run ?? '')
+    .split(/\r?\n/)
+    .map(gatedSuite)
+    .some((name) => name !== null && resolveSuite(name, options).includes(file))
+}
+
+function manifestProblems(root, manifest) {
+  const problems = []
+  const names = Object.keys(manifest.suites)
+  const discovering = names.filter((name) => manifest.suites[name] === 'discover')
+  if (discovering.length !== 1)
+    problems.push(`exactly one discovering suite required, found ${discovering.length}`)
+  const listed = [...pinnedFiles(manifest), ...manifest.vitest]
+  for (const file of new Set(listed)) {
+    if (listed.indexOf(file) !== listed.lastIndexOf(file))
+      problems.push(`${file} is listed more than once`)
+    if (!fs.existsSync(path.join(root, file))) problems.push(`${file} is missing`)
+  }
+  for (const name of names)
+    if (manifest.suites[name] !== 'discover' && !manifest.suites[name].length)
+      problems.push(`suite ${name} lists no file`)
+  return problems
+}
+
+function workflowProblems(manifest, workflow) {
+  const problems = []
+  const names = Object.keys(manifest.suites)
+  const lines = Object.values(parse(workflow).jobs ?? {})
+    .flatMap((job) => job.steps ?? [])
+    .flatMap((step) => (step.run ?? '').split(/\r?\n/))
+    .map((line) => line.trim())
+  const invoked = new Set(lines.map(gatedSuite).filter(Boolean))
+  for (const name of invoked)
+    if (!names.includes(name)) problems.push(`workflow runs unknown suite ${name}`)
+  for (const name of names)
+    if (!invoked.has(name)) problems.push(`suite ${name} runs in no workflow step`)
+  for (const line of lines)
+    if (/^node\s+--test\b/.test(line)) problems.push(`ungated node --test step: ${line}`)
+  for (const file of manifest.vitest)
+    if (!lines.some((line) => /^npx vitest run\b/.test(line) && line.includes(file)))
+      problems.push(`${file} runs in no vitest step`)
+  return problems
+}
+
+/** Ways the manifest and workflow fail to run every test file exactly once. */
+export function coverageProblems({
+  root = repository,
+  manifest = loadManifest(root),
+  workflow = fs.readFileSync(path.join(root, manifest.workflow), 'utf8'),
+} = {}) {
+  return [...manifestProblems(root, manifest), ...workflowProblems(manifest, workflow)]
 }
 
 function canonical(cwd, file) {
@@ -54,44 +134,43 @@ function canonical(cwd, file) {
 }
 
 export function summarizeNodeTestEvents(events, files, cwd = process.cwd()) {
-  const summary = { passed: 0, failed: 0, skipped: 0, todo: 0, filesWithoutTests: [] }
-  const registered = new Set()
+  const summary = { passed: 0, failed: 0, skipped: 0, todo: 0, perFile: {} }
+  const byPath = new Map(files.map((file) => [canonical(cwd, file), file]))
+  for (const file of files) summary.perFile[file] = 0
   for (const event of events) {
     if (event.outcome === 'fail' && !event.todo) summary.failed++
     if (event.skip) summary.skipped++
     if (event.todo) summary.todo++
+    // Child-process events carry entryFile; the runner's per-file wrapper does not.
     if (event.kind !== 'test' || event.entryFile === null) continue
-    registered.add(canonical(cwd, event.file))
-    if (event.outcome === 'pass' && !event.skip && !event.todo) summary.passed++
+    if (event.outcome !== 'pass' || event.skip || event.todo) continue
+    summary.passed++
+    const file = byPath.get(canonical(cwd, event.file))
+    if (file !== undefined) summary.perFile[file]++
   }
-  summary.filesWithoutTests = files.filter(
-    (file) => !registered.has(canonical(cwd, file))
-  )
   return summary
 }
 
-export function assertNodeTestGate(summary, { minPass, status }) {
+export function assertNodeTestGate(summary, { status }) {
   const problems = []
   if (status !== 0) problems.push(`node --test exited ${status}`)
   if (summary.failed) problems.push(`${summary.failed} failed`)
   if (summary.skipped) problems.push(`${summary.skipped} skipped`)
   if (summary.todo) problems.push(`${summary.todo} todo`)
-  if (summary.passed < minPass)
-    problems.push(`${summary.passed} passed, expected at least ${minPass}`)
-  for (const file of summary.filesWithoutTests)
-    problems.push(`${file} registered no test`)
+  for (const [file, passed] of Object.entries(summary.perFile))
+    if (!passed) problems.push(`${file} reported no passing test`)
   if (problems.length) throw new Error(`node_test_gate_failed: ${problems.join('; ')}`)
   return summary
 }
 
 export function runNodeTestGate({
-  minPass,
   files,
   cwd = process.cwd(),
   env = process.env,
   stdio = 'inherit',
   spawn = spawnSync,
 }) {
+  if (!files.length) throw new Error('node_test_gate_failed: the suite has no file')
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'node-test-gate-'))
   const events = path.join(directory, 'events.jsonl')
   try {
@@ -117,7 +196,7 @@ export function runNodeTestGate({
       files,
       cwd
     )
-    return assertNodeTestGate(summary, { minPass, status: result.status })
+    return assertNodeTestGate(summary, { status: result.status })
   } finally {
     fs.rmSync(directory, { recursive: true, force: true })
   }
@@ -125,8 +204,17 @@ export function runNodeTestGate({
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const summary = runNodeTestGate(parseGateArgs(process.argv.slice(2)))
-    console.log(`node-test-gate: ${summary.passed} passed, 0 failed, 0 skipped, 0 todo`)
+    const [name, ...extra] = process.argv.slice(2)
+    if (!name || extra.length) throw new Error('usage: node-test-gate.mjs <suite>')
+    const problems = coverageProblems()
+    if (problems.length)
+      throw new Error(`node_test_gate_coverage: ${problems.join('; ')}`)
+    const summary = runNodeTestGate({ files: resolveSuite(name), cwd: repository })
+    for (const [file, passed] of Object.entries(summary.perFile))
+      console.log(`node-test-gate: ${passed} passed  ${file}`)
+    console.log(
+      `node-test-gate: suite ${name} passed ${summary.passed} tests in ${Object.keys(summary.perFile).length} files; 0 failed, 0 skipped, 0 todo`
+    )
   } catch (error) {
     console.error(error.message)
     process.exitCode = 1

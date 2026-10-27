@@ -5,8 +5,11 @@ import path from 'node:path'
 import { describe, test } from 'node:test'
 import {
   assertNodeTestGate,
-  gatedTestFiles,
-  parseGateArgs,
+  coverageProblems,
+  discoverTestFiles,
+  gatedSuite,
+  loadManifest,
+  resolveSuite,
   runNodeTestGate,
   summarizeNodeTestEvents,
 } from './node-test-gate.mjs'
@@ -39,52 +42,55 @@ test('broken', () => { throw new Error('broken') })
   'crashing.test.mjs': "throw new Error('load failure')\n",
 }
 
-function withFixtures(run) {
+function temporary(run) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'node-test-gate-fixture-'))
   try {
-    for (const [name, source] of Object.entries(sources))
-      fs.writeFileSync(path.join(directory, name), source)
     return run(directory)
   } finally {
     fs.rmSync(directory, { recursive: true, force: true })
   }
 }
 
-const gate = (directory, files, minPass) =>
-  runNodeTestGate({ cwd: directory, files, minPass, stdio: 'ignore' })
+function write(directory, files) {
+  for (const [name, source] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(directory, name)), { recursive: true })
+    fs.writeFileSync(path.join(directory, name), source)
+  }
+}
+
+const withFixtures = (run) =>
+  temporary((directory) => {
+    write(directory, sources)
+    return run(directory)
+  })
+
+const gate = (directory, files) =>
+  runNodeTestGate({ cwd: directory, files, stdio: 'ignore' })
 
 describe('node-test-gate run', () => {
-  test('passes when every file registers tests and the pass count meets the minimum', () =>
+  test('passes when every file reports a passing test, with per-file counts', () =>
     withFixtures((directory) => {
-      assert.deepEqual(gate(directory, ['passing.test.mjs', 'grouped.test.mjs'], 3), {
+      assert.deepEqual(gate(directory, ['passing.test.mjs', 'grouped.test.mjs']), {
         passed: 3,
         failed: 0,
         skipped: 0,
         todo: 0,
-        filesWithoutTests: [],
+        perFile: { 'passing.test.mjs': 2, 'grouped.test.mjs': 1 },
       })
     }))
 
-  test('a pass count below the minimum fails', () =>
+  test('a file that registers zero tests fails beside a passing file', () =>
     withFixtures((directory) => {
       assert.throws(
-        () => gate(directory, ['passing.test.mjs'], 3),
-        /node_test_gate_failed: 2 passed, expected at least 3$/
-      )
-    }))
-
-  test('a listed file that registers zero tests fails even when the count is met', () =>
-    withFixtures((directory) => {
-      assert.throws(
-        () => gate(directory, ['passing.test.mjs', 'empty.test.mjs'], 2),
-        /node_test_gate_failed: empty\.test\.mjs registered no test$/
+        () => gate(directory, ['passing.test.mjs', 'empty.test.mjs']),
+        /node_test_gate_failed: empty\.test\.mjs reported no passing test$/
       )
     }))
 
   test('a skipped test fails although node --test exits 0', () =>
     withFixtures((directory) => {
       assert.throws(
-        () => gate(directory, ['skipped.test.mjs'], 1),
+        () => gate(directory, ['skipped.test.mjs']),
         /node_test_gate_failed: 1 skipped$/
       )
     }))
@@ -92,7 +98,7 @@ describe('node-test-gate run', () => {
   test('a skipped suite fails', () =>
     withFixtures((directory) => {
       assert.throws(
-        () => gate(directory, ['skipped-suite.test.mjs'], 1),
+        () => gate(directory, ['skipped-suite.test.mjs']),
         /node_test_gate_failed: .*skipped/
       )
     }))
@@ -100,7 +106,7 @@ describe('node-test-gate run', () => {
   test('a todo test fails although node --test exits 0', () =>
     withFixtures((directory) => {
       assert.throws(
-        () => gate(directory, ['todo.test.mjs'], 1),
+        () => gate(directory, ['todo.test.mjs']),
         /node_test_gate_failed: 1 todo$/
       )
     }))
@@ -108,46 +114,24 @@ describe('node-test-gate run', () => {
   test('a failing test fails with the runner status and the failure count', () =>
     withFixtures((directory) => {
       assert.throws(
-        () => gate(directory, ['failing.test.mjs'], 1),
+        () => gate(directory, ['failing.test.mjs']),
         /node_test_gate_failed: node --test exited 1; 1 failed$/
       )
     }))
 
-  test('a file that throws while loading fails and registers no test', () =>
+  test('a file that throws while loading fails and reports no passing test', () =>
     withFixtures((directory) => {
       assert.throws(
-        () => gate(directory, ['passing.test.mjs', 'crashing.test.mjs'], 2),
-        /node --test exited 1; 1 failed; crashing\.test\.mjs registered no test$/
+        () => gate(directory, ['passing.test.mjs', 'crashing.test.mjs']),
+        /node --test exited 1; 1 failed; crashing\.test\.mjs reported no passing test$/
       )
     }))
-})
 
-describe('node-test-gate arguments', () => {
-  test('requires a positive minimum and at least one distinct file', () => {
-    assert.deepEqual(parseGateArgs(['--min-pass', '4', 'a.test.mjs', 'b.test.mjs']), {
-      minPass: 4,
-      files: ['a.test.mjs', 'b.test.mjs'],
-    })
-    for (const [argv, code] of [
-      [['a.test.mjs'], /node_test_gate_min_pass_required/],
-      [['--min-pass', '0', 'a.test.mjs'], /node_test_gate_min_pass_required/],
-      [['--min-pass', 'many', 'a.test.mjs'], /node_test_gate_min_pass_required/],
-      [['--min-pass', '1'], /node_test_gate_files_required/],
-      [['--min-pass', '1', 'a.test.mjs', 'a.test.mjs'], /node_test_gate_duplicate_file/],
-      [['--min-pass', '1', '--watch', 'a.test.mjs'], /node_test_gate_unknown_option/],
-    ])
-      assert.throws(() => parseGateArgs(argv), code)
-  })
-
-  test('workflow lines expose their gated files only for a valid gate invocation', () => {
-    assert.deepEqual(
-      gatedTestFiles(
-        '  node scripts/ci/node-test-gate.mjs --min-pass 2 a.test.mjs b.test.mjs'
-      ),
-      ['a.test.mjs', 'b.test.mjs']
+  test('an empty suite fails before running node --test', () => {
+    assert.throws(
+      () => runNodeTestGate({ files: [], spawn: () => assert.fail('must not run') }),
+      /node_test_gate_failed: the suite has no file/
     )
-    assert.equal(gatedTestFiles('node --test a.test.mjs'), null)
-    assert.equal(gatedTestFiles('node scripts/ci/node-test-gate.mjs a.test.mjs'), null)
   })
 })
 
@@ -174,7 +158,13 @@ describe('node-test-gate summary', () => {
         ['a.test.mjs', 'b.test.mjs'],
         '/repo'
       ),
-      { passed: 1, failed: 0, skipped: 0, todo: 0, filesWithoutTests: ['b.test.mjs'] }
+      {
+        passed: 1,
+        failed: 0,
+        skipped: 0,
+        todo: 0,
+        perFile: { 'a.test.mjs': 1, 'b.test.mjs': 0 },
+      }
     )
   })
 
@@ -189,11 +179,167 @@ describe('node-test-gate summary', () => {
       failed: 0,
       skipped: 0,
       todo: 1,
-      filesWithoutTests: [],
+      perFile: { 'a.test.mjs': 0 },
     })
     assert.throws(
-      () => assertNodeTestGate(summary, { minPass: 1, status: 0 }),
-      /node_test_gate_failed: 1 todo; 0 passed, expected at least 1$/
+      () => assertNodeTestGate(summary, { status: 0 }),
+      /node_test_gate_failed: 1 todo; a\.test\.mjs reported no passing test$/
     )
+  })
+})
+
+const fixtureManifest = {
+  discoverRoot: 'scripts',
+  discoverPattern: '\\.(test|spec)\\.mjs$',
+  workflow: 'workflow.yml',
+  vitest: ['scripts/lib/vitest-only.test.mjs'],
+  suites: {
+    pinned: ['scripts/ci/early.test.mjs'],
+    outside: ['apps/plugin.test.js'],
+    default: 'discover',
+  },
+}
+const fixtureTree = {
+  'scripts/ci/early.test.mjs': '',
+  'scripts/lib/a.test.mjs': '',
+  'scripts/lib/b.spec.mjs': '',
+  'scripts/lib/vitest-only.test.mjs': '',
+  'scripts/lib/helper.mjs': '',
+  'scripts/deep/nested/c.test.mjs': '',
+  'scripts/lib/node_modules/vendored.test.mjs': '',
+  'apps/plugin.test.js': '',
+}
+const fixtureWorkflow = [
+  'jobs:',
+  '  first:',
+  '    steps:',
+  '      - run: node scripts/ci/node-test-gate.mjs pinned',
+  '      - run: |',
+  '          node scripts/ci/node-test-gate.mjs outside',
+  '          node scripts/ci/node-test-gate.mjs default',
+  '  second:',
+  '    steps:',
+  '      - run: npx vitest run scripts/lib/vitest-only.test.mjs --reporter=json',
+].join('\n')
+
+describe('node-test-gate discovery and coverage', () => {
+  test('the default suite discovers every unclaimed test file, nested ones included', () =>
+    temporary((root) => {
+      write(root, fixtureTree)
+      assert.deepEqual(discoverTestFiles(root, fixtureManifest), [
+        'scripts/ci/early.test.mjs',
+        'scripts/deep/nested/c.test.mjs',
+        'scripts/lib/a.test.mjs',
+        'scripts/lib/b.spec.mjs',
+        'scripts/lib/vitest-only.test.mjs',
+      ])
+      assert.deepEqual(resolveSuite('default', { root, manifest: fixtureManifest }), [
+        'scripts/deep/nested/c.test.mjs',
+        'scripts/lib/a.test.mjs',
+        'scripts/lib/b.spec.mjs',
+      ])
+      assert.deepEqual(resolveSuite('pinned', { root, manifest: fixtureManifest }), [
+        'scripts/ci/early.test.mjs',
+      ])
+      assert.throws(
+        () => resolveSuite('absent', { root, manifest: fixtureManifest }),
+        /node_test_gate_unknown_suite: absent/
+      )
+    }))
+
+  test('a newly added or split test file joins the default suite with no manifest or workflow edit', () =>
+    temporary((root) => {
+      write(root, fixtureTree)
+      const before = resolveSuite('default', { root, manifest: fixtureManifest })
+      write(root, { 'scripts/lib/a-split.test.mjs': '' })
+      assert.deepEqual(resolveSuite('default', { root, manifest: fixtureManifest }), [
+        ...before.slice(0, 1),
+        'scripts/lib/a-split.test.mjs',
+        ...before.slice(1),
+      ])
+      assert.deepEqual(
+        coverageProblems({ root, manifest: fixtureManifest, workflow: fixtureWorkflow }),
+        []
+      )
+    }))
+
+  test('coverage fails for a missing listed file, a duplicate claim or an empty pinned suite', () =>
+    temporary((root) => {
+      write(root, fixtureTree)
+      const check = (manifest) =>
+        coverageProblems({ root, manifest, workflow: fixtureWorkflow })
+      assert.deepEqual(
+        check({
+          ...fixtureManifest,
+          suites: { ...fixtureManifest.suites, pinned: ['scripts/ci/gone.test.mjs'] },
+        }),
+        ['scripts/ci/gone.test.mjs is missing']
+      )
+      assert.deepEqual(
+        check({
+          ...fixtureManifest,
+          vitest: [...fixtureManifest.vitest, 'scripts/ci/early.test.mjs'],
+        }),
+        [
+          'scripts/ci/early.test.mjs is listed more than once',
+          'scripts/ci/early.test.mjs runs in no vitest step',
+        ]
+      )
+      assert.deepEqual(
+        check({ ...fixtureManifest, suites: { ...fixtureManifest.suites, pinned: [] } }),
+        ['suite pinned lists no file']
+      )
+      assert.deepEqual(
+        check({
+          ...fixtureManifest,
+          suites: { ...fixtureManifest.suites, second: 'discover' },
+        }),
+        [
+          'exactly one discovering suite required, found 2',
+          'suite second runs in no workflow step',
+        ]
+      )
+    }))
+
+  test('coverage fails when a suite or vitest file leaves the workflow or a bare node --test returns', () =>
+    temporary((root) => {
+      write(root, fixtureTree)
+      const check = (workflow) =>
+        coverageProblems({ root, manifest: fixtureManifest, workflow })
+      assert.deepEqual(
+        check(fixtureWorkflow.replace('node-test-gate.mjs pinned', 'node-test-gate.mjs')),
+        ['suite pinned runs in no workflow step']
+      )
+      assert.deepEqual(
+        check(
+          `${fixtureWorkflow}\n      - run: node scripts/ci/node-test-gate.mjs renamed`
+        ),
+        ['workflow runs unknown suite renamed']
+      )
+      assert.deepEqual(
+        check(`${fixtureWorkflow}\n      - run: node --test scripts/lib/a.test.mjs`),
+        ['ungated node --test step: node --test scripts/lib/a.test.mjs']
+      )
+      assert.deepEqual(
+        check(fixtureWorkflow.replace('scripts/lib/vitest-only.test.mjs', 'other')),
+        ['scripts/lib/vitest-only.test.mjs runs in no vitest step']
+      )
+    }))
+
+  test('workflow lines name a suite only for a single-argument gate invocation', () => {
+    assert.equal(
+      gatedSuite('  node scripts/ci/node-test-gate.mjs native-harness'),
+      'native-harness'
+    )
+    assert.equal(gatedSuite('node --test a.test.mjs'), null)
+    assert.equal(gatedSuite('node scripts/ci/node-test-gate.mjs a b'), null)
+  })
+
+  test('the repository manifest and share-card workflow run every test file exactly once', () => {
+    assert.deepEqual(coverageProblems(), [])
+    const manifest = loadManifest()
+    const assigned = Object.keys(manifest.suites).flatMap((name) => resolveSuite(name))
+    assert.equal(new Set(assigned).size, assigned.length)
+    assert.ok(assigned.includes('scripts/ci/node-test-gate.test.mjs'))
   })
 })

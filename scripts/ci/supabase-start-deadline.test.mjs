@@ -5,6 +5,7 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
+import { runGatesTestFile } from './node-test-gate.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const action = await readFile(
@@ -87,14 +88,7 @@ test('mandatory native CI executes startup deadline controls before starting Sup
       (step) => step.uses === './.github/actions/start-local-supabase'
     )
     const controls = job.steps.findIndex((step) =>
-      step.run?.split(/\r?\n/).some((line) => {
-        const args = line.trim().split(/\s+/)
-        return (
-          args[0] === 'node' &&
-          args[1] === '--test' &&
-          args.includes('scripts/ci/supabase-start-deadline.test.mjs')
-        )
-      })
+      runGatesTestFile(step.run, 'scripts/ci/supabase-start-deadline.test.mjs')
     )
     assert.ok(controls >= 0 && controls < startup)
     assert.equal(job.steps[controls].if, undefined)

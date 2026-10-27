@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { parse } from 'yaml'
+import { runGatesTestFile } from './node-test-gate.mjs'
 
 const helper = () => import('./share-card-browser-deps.mjs')
 const legacy = 'deb http://azure.archive.ubuntu.com/ubuntu noble main universe\n'
@@ -309,8 +310,10 @@ test('every browser-mode mobile bridge has bounded pinned Chromium provisioning 
   assert.equal(step.if, "matrix.platform == 'android'")
   assert.equal(step['timeout-minutes'], 12)
   assert.equal(step['continue-on-error'], undefined)
-  const controls = step.run.indexOf(
-    'node --test scripts/ci/share-card-browser-deps.test.mjs'
+  const controls = step.run.indexOf('node scripts/ci/node-test-gate.mjs browser-deps')
+  assert.equal(
+    runGatesTestFile(step.run, 'scripts/ci/share-card-browser-deps.test.mjs'),
+    true
   )
   assert.ok(
     controls >= 0 &&

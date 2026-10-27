@@ -684,21 +684,33 @@ describe('native flow public evidence', () => {
 
 describe('native flow diagnostics CI registration', () => {
   // Registration is part of the capture contract: both native lanes inherit this step.
-  test('mandatory native CI executes diagnostic boundary controls before native generation and rejects registration removal', () => {
+  test('mandatory native CI executes diagnostic boundary controls before native generation and rejects registration removal', async () => {
+    const { parse } = await import('yaml')
+    const { coverageProblems, loadManifest, runGatesTestFile } = await import(
+      '../ci/node-test-gate.mjs'
+    )
     const workflow = fs.readFileSync(
       path.join(root, '.github/workflows/pr-share-card-native.yml'),
       'utf8'
     )
+    const steps = parse(workflow).jobs['original-resource'].steps
     const required = 'scripts/lib/share-card-native-diagnostics.test.mjs'
-    const registered = (source) =>
-      source.split('\n').some((line) => {
-        const tokens = line.trim().split(/\s+/)
-        return tokens[0] === 'node' && tokens[1] === '--test' && tokens.includes(required)
-      })
-    assert.equal(registered(workflow), true)
-    assert.equal(registered(workflow.replaceAll(required, '')), false)
+    const registered = (manifest) =>
+      steps.findIndex((step) => runGatesTestFile(step.run, required, { root, manifest }))
+    const controls = registered(loadManifest(root))
+    assert.ok(controls >= 0)
     assert.ok(
-      workflow.indexOf(required) < workflow.indexOf('Generate native development client')
+      controls <
+        steps.findIndex((step) => step.name === 'Generate native development client')
+    )
+    // Moving the file into a suite no step runs drops it from the step and fails coverage.
+    const moved = loadManifest(root)
+    moved.suites.unscheduled = [required]
+    assert.equal(registered(moved), -1)
+    assert.ok(
+      coverageProblems({ root, manifest: moved, workflow }).includes(
+        'suite unscheduled runs in no workflow step'
+      )
     )
   })
 })
