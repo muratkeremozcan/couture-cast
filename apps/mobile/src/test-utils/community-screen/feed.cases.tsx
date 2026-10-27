@@ -47,9 +47,14 @@ function distinctNodeHandles() {
 }
 
 export function registerCommunityFeedCases() {
-  it.each(['pending_review', 'flagged', 'withdrawn'] as const)(
-    'M2: an own %s notification detail keeps export unavailable',
-    async (status) => {
+  it.each([
+    ['published', true],
+    ['pending_review', false],
+    ['flagged', false],
+    ['withdrawn', false],
+  ] as const)(
+    'M2: an own %s notification detail offers export=%s',
+    async (status, exportable) => {
       setMockParams({ source: 'notification', type: 'community', cardId: 'own-private' })
       serveFeed(() => feedJson({ items: [] }))
       server.use(
@@ -58,7 +63,7 @@ export function registerCommunityFeedCases() {
             data: item({
               id: 'own-private',
               status,
-              publishedAt: null,
+              publishedAt: status === 'published' ? '2026-01-01T12:00:00.000Z' : null,
               author: { displayName: 'Me', isSelf: true },
             }),
           })
@@ -67,9 +72,16 @@ export function registerCommunityFeedCases() {
       await render(<CommunityScreen />)
       const detail = await screen.findByTestId('highlighted-community-card-own-private')
       expect(within(detail).getByTestId('community-post-card-own-private')).toBeVisible()
-      expect(
-        within(detail).queryByTestId('community-share-card-open-own-private')
-      ).toBeNull()
+      // The published row proves the detail renders the opener in the same pass, so the
+      // other rows check its absence at the moment it would exist.
+      if (exportable)
+        expect(
+          within(detail).getByTestId('community-share-card-open-own-private')
+        ).toBeVisible()
+      else
+        expect(
+          within(detail).queryByTestId('community-share-card-open-own-private')
+        ).toBeNull()
     }
   )
 
