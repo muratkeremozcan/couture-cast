@@ -34,6 +34,10 @@ const rows = [
 )
 
 describe('released v4 development copy through actual guarded HTTP and screening', () => {
+  it('selects every one of the 15 named regression rows', () => {
+    expect(failures.size).toBe(15)
+    expect(rows).toHaveLength(15)
+  })
   it.each(rows)('$id remains visible after screening', async (row) => {
     const member = await fixture()
     const { app, authorized } = await bootApp({ userId: member.userId })
