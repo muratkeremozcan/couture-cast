@@ -12,10 +12,7 @@ import test from 'node:test'
 
 for (const platform of ['android', 'ios']) {
   test(`actual ${platform} original-resource proof returns a tab-ready app for the matrix`, async () => {
-    const source = fs.readFileSync(
-      process.env.CC68_NATIVE_PROOF_CONTROL_SOURCE ?? 'scripts/run-story68-native.mjs',
-      'utf8'
-    )
+    const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
     const marker = "} else if (command === 'proof') {"
     const start = source.indexOf(marker) + marker.length
     const end = source.indexOf("} else if (command === 'matrix')", start)
