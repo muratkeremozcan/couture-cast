@@ -207,13 +207,15 @@ describe('isolated native fixtures and browser boundaries', () => {
       expect(environment.listener).toBeNull()
     }
   )
-  it('browser fallback never activates native saving and portable digest validates exact bytes', async () => {
+  it('browser save fallback never activates native saving', async () => {
     expect(fallback.nativeShareCardSaveAvailable()).toBe(false)
     expect(await fallback.shareCardSavePermission(true)).toMatchObject({ granted: false })
     await fallback.cleanOrphanShareCards()
     await expect(
       fallback.saveShareCard(card, new AbortController().signal, () => true)
     ).rejects.toThrow('nativeSaveUnavailable')
+  })
+  it('browser fixture module stays in real mode and passes the adapter through', async () => {
     expect(browserFixture.shareCardFixtureMode()).toBe('real')
     browserFixture.startShareCardNativeFixture()()
     expect(browserFixture.shareCardPreviewTestId(false, '')).toBe('share-card-preview')
@@ -223,6 +225,8 @@ describe('isolated native fixtures and browser boundaries', () => {
     const save = vi.fn(() => Promise.resolve())
     await browserFixture.runShareCardNativeAdapter('', save)
     expect(save).toHaveBeenCalledOnce()
+  })
+  it('portable digest matches the fixture sha256 for the exact decoded bytes', async () => {
     expect(await sha256Hex(decodeShareCardBase64(card.pngBase64))).toBe(card.sha256)
   })
 })
