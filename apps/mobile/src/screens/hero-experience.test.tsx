@@ -13,7 +13,7 @@ import { userEvent } from 'vitest/browser'
 import { server } from '@/src/test-utils/msw/server'
 import { http, HttpResponse } from 'msw'
 import TabOneScreen from '@/app/(tabs)/index'
-import { AccessibilityInfo, NativeModules, Platform } from 'react-native'
+import { AccessibilityInfo, NativeModules, Platform, findNodeHandle } from 'react-native'
 import { registerShareCardHeading } from '@/src/lib/share-card-focus'
 import { AndroidShareCardPresentation } from '@/components/android-share-card-presentation'
 import {
@@ -151,9 +151,11 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       await waitFor(() =>
         expect(screen.queryByTestId('share-card-title')).not.toBeInTheDocument()
       )
-      // No heading is registered, so a focus call proves the Cancel restore resolved the
-      // opener's own tag through the unmocked safeFindNodeHandle.
-      await waitFor(() => expect(setFocus).toHaveBeenCalledWith(expect.any(Number)))
+      // No heading is registered, so focus on the opener's tag proves the Cancel restore
+      // resolved it through the unmocked safeFindNodeHandle.
+      const openerTag = findNodeHandle(opener)
+      expect(openerTag).toEqual(expect.any(Number))
+      await waitFor(() => expect(setFocus).toHaveBeenLastCalledWith(openerTag))
       await waitFor(() => expect(setWidgetData).toHaveBeenCalledOnce())
     } finally {
       delete NativeModules.WidgetSharedModule
