@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw'
 import { preparedShareCardFixture } from '@couture/api-client/testing/share-card-fixture'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { currentI18n } from '../../i18n'
+import enUS from '../../i18n/locales/en-US.json'
 import { ShareCardControl } from './share-card-dialog'
 const identity = vi.hoisted(() => ({ member: 'member-one' as string | null }))
 vi.mock('../../lib/web-session', () => ({ webSessionIdentity: () => identity.member }))
@@ -28,8 +29,8 @@ beforeEach(async () => {
   await currentI18n().changeLanguage('en-US')
   useMswHandlers(handler())
 })
-async function open() {
-  render(<ShareCardControl source={source} />)
+async function open(target: Parameters<typeof ShareCardControl>[0]['source'] = source) {
+  render(<ShareCardControl source={target} />)
   await userEvent.click(screen.getByTestId('share-card-open'))
   const image = await screen.findByTestId('share-card-preview')
   return image
@@ -149,6 +150,43 @@ describe('exact-byte share-card dialog', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
     expect(requests).toHaveLength(1)
   })
+  it('U-OFFLINE P-OFFLINE: the same member retries an offline Save and downloads the retained preview', async () => {
+    const image = await open()
+    fireEvent.load(image)
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    await userEvent.click(screen.getByTestId('share-card-save'))
+    expect(await screen.findByRole('alert')).toHaveTextContent(enUS.shareCard.offline)
+    expect(requests).toHaveLength(1)
+    expect(handoff).not.toHaveBeenCalled()
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    await userEvent.click(screen.getByRole('button', { name: enUS.shareCard.retry }))
+    await waitFor(() => expect(handoff).toHaveBeenCalledOnce())
+    expect(requests).toEqual([
+      expect.objectContaining({ purpose: 'preview' }),
+      expect.objectContaining({
+        purpose: 'save',
+        expectedSha256: preparedShareCardFixture.sha256,
+      }),
+    ])
+    expect(screen.getByTestId('share-card-preview')).toBe(image)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent('Download started')
+  })
+  it('P-PHOTO-PREVIEW: own-photo export explains that photo content stays visible before the watermark control', async () => {
+    await open({ kind: 'community_post', postId: 'own-post' })
+    const help = screen.getByText(enUS.shareCard.photoPrivacyHelp, { exact: true })
+    const control = screen.getByRole('checkbox', { name: enUS.shareCard.watermark })
+    expect(screen.getByRole('dialog')).toContainElement(help)
+    expect(
+      help.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+  it('P-PHOTO-PREVIEW: an outfit card carries no photo privacy help', async () => {
+    await open()
+    expect(
+      screen.queryByText(enUS.shareCard.photoPrivacyHelp, { exact: true })
+    ).not.toBeInTheDocument()
+  })
   it('U-WEB-SAVE U-A11Y: image load gates explicit fresh authorization and truthful download handoff', async () => {
     const image = await open()
     const save = screen.getByTestId('share-card-save')
@@ -208,14 +246,48 @@ describe('exact-byte share-card dialog', () => {
       document.body.removeAttribute('tabindex')
     }
   })
-  it('reloads the final cached image after rapid ON/OFF/ON and equal-byte responses', async () => {
+  it('U-OPTIONS: rapid ON/OFF/ON drops the held OFF response and reloads the original approved image', async () => {
     const image = await open()
     fireEvent.load(image)
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let offSignal: AbortSignal | undefined
+    useMswHandlers(
+      http.post(endpoint, async ({ request }) => {
+        const body = (await request.json()) as { watermark: boolean }
+        requests.push(body)
+        if (!body.watermark) {
+          offSignal = request.signal
+          await held
+        }
+        return HttpResponse.json({
+          data: { ...preparedShareCardFixture, accessibilityLabel: 'Stale OFF card' },
+        })
+      })
+    )
     const toggle = screen.getByRole('checkbox', { name: 'Show watermark' })
-    fireEvent.click(toggle)
-    fireEvent.click(toggle)
+    try {
+      await userEvent.click(toggle)
+      await waitFor(() => expect(offSignal).toBeDefined())
+      await userEvent.click(toggle)
+      await waitFor(() => expect(offSignal?.aborted).toBe(true))
+    } finally {
+      release()
+    }
+    await act(async () => {
+      await held
+    })
     const restored = screen.getByTestId('share-card-preview')
     expect(restored).not.toBe(image)
+    expect(restored).toHaveAttribute('alt', preparedShareCardFixture.accessibilityLabel)
+    expect(screen.queryByRole('img', { name: 'Stale OFF card' })).not.toBeInTheDocument()
+    // ON reuses the approved bytes it already holds; only the OFF request was sent.
+    expect(requests).toEqual([
+      expect.objectContaining({ purpose: 'preview', watermark: true }),
+      expect.objectContaining({ purpose: 'preview', watermark: false }),
+    ])
     expect(screen.getByTestId('share-card-save')).toBeDisabled()
     fireEvent.load(restored)
     await waitFor(() => expect(screen.getByTestId('share-card-save')).toBeEnabled())
@@ -231,13 +303,102 @@ describe('exact-byte share-card dialog', () => {
     await waitFor(() => expect(requests).toHaveLength(3))
     expect(requests[2]).toMatchObject({ locale: 'tr-TR' })
   })
-  it('U-IDENTITY: identity change removes old visible PNG and late member completion', async () => {
-    await open()
-    act(() => {
-      identity.member = null
-      window.dispatchEvent(new Event('couture:session'))
+  it('U-LOCALES P-LOCALE: a preview held across a locale change drops its stale-locale bytes and keeps Save gated', async () => {
+    let release!: () => void
+    let entered!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const started = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    let staleSignal: AbortSignal | undefined
+    useMswHandlers(
+      http.post(endpoint, async ({ request }) => {
+        const body = (await request.json()) as { locale: string }
+        requests.push(body)
+        if (body.locale === 'en-US') {
+          staleSignal = request.signal
+          entered()
+          await held
+        }
+        return HttpResponse.json({
+          data: {
+            ...preparedShareCardFixture,
+            accessibilityLabel: `${body.locale} card`,
+          },
+        })
+      })
+    )
+    render(<ShareCardControl source={source} />)
+    await userEvent.click(screen.getByTestId('share-card-open'))
+    await started
+    let fresh: HTMLElement
+    try {
+      await act(() => currentI18n().changeLanguage('tr-TR'))
+      fresh = await screen.findByRole('img', { name: 'tr-TR card' })
+      await waitFor(() => expect(staleSignal?.aborted).toBe(true))
+      expect(screen.getByTestId('share-card-save')).toBeDisabled()
+    } finally {
+      release()
+    }
+    await act(async () => {
+      await held
+    })
+    expect(screen.queryByRole('img', { name: 'en-US card' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('share-card-preview')).toBe(fresh)
+    expect(screen.getByTestId('share-card-save')).toBeDisabled()
+    expect(requests).toEqual([
+      expect.objectContaining({ locale: 'en-US' }),
+      expect.objectContaining({ locale: 'tr-TR' }),
+    ])
+    fireEvent.load(fresh)
+    await waitFor(() => expect(screen.getByTestId('share-card-save')).toBeEnabled())
+    expect(handoff).not.toHaveBeenCalled()
+  })
+  it('U-IDENTITY: identity change removes the old visible PNG and drops a late former-member completion', async () => {
+    const image = await open()
+    fireEvent.load(image)
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let formerSignal: AbortSignal | undefined
+    useMswHandlers(
+      http.post(endpoint, async ({ request }) => {
+        requests.push(await request.json())
+        if (!formerSignal) {
+          formerSignal = request.signal
+          await held
+          return HttpResponse.json({
+            data: { ...preparedShareCardFixture, accessibilityLabel: 'Late former card' },
+          })
+        }
+        return HttpResponse.json({ code: 'unauthorized' }, { status: 401 })
+      })
+    )
+    try {
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Show watermark' }))
+      await waitFor(() => expect(formerSignal).toBeDefined())
+      act(() => {
+        identity.member = null
+        window.dispatchEvent(new Event('couture:session'))
+      })
+      expect(screen.queryByTestId('share-card-preview')).not.toBeInTheDocument()
+      await waitFor(() => expect(formerSignal?.aborted).toBe(true))
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        enUS.shareCard.sourceUnavailable
+      )
+    } finally {
+      release()
+    }
+    await act(async () => {
+      await held
     })
     expect(screen.queryByTestId('share-card-preview')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('img', { name: 'Late former card' })
+    ).not.toBeInTheDocument()
     expect(handoff).not.toHaveBeenCalled()
   })
   it('R2-M2: a mounted outfit dialog aborts its former member request and admits only the new member preview', async () => {
