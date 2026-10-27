@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import pg from 'pg'
 import { createClient } from '@supabase/supabase-js'
+import { ownedRedisContainer } from './runtime-sources.mjs'
 
 async function resolveOwnedAuthId(admin, identity) {
   if (identity.authUserId) return identity.authUserId
@@ -57,11 +58,10 @@ export async function cleanup(directory) {
     }
     await removeOwnedIdentities(admin, directory)
   }
-  if (resources.redisContainer) {
-    if (!/^cc68-runtime-redis-[a-f0-9]{8}$/.test(resources.redisContainer))
-      throw new Error('owned_redis_required')
-    execFileSync('docker', ['rm', '-f', resources.redisContainer], { stdio: 'ignore' })
-  }
+  // A lane that provided REDIS_URL left no container recorded: nothing to remove.
+  const redisContainer = ownedRedisContainer(resources)
+  if (redisContainer)
+    execFileSync('docker', ['rm', '-f', redisContainer], { stdio: 'ignore' })
   const db = new pg.Client({
     connectionString: 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
   })

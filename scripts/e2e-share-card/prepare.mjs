@@ -8,6 +8,7 @@ import pg from 'pg'
 import { PrismaClient } from '@prisma/client'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
+import { planRedis, resolveSupabase } from './runtime-sources.mjs'
 
 const root = process.cwd()
 const directory = path.resolve(
@@ -40,22 +41,20 @@ const privateJson = (name, value) =>
   })
 const local = {}
 loadEnv({ path: '.env.local', processEnv: local, quiet: true })
-const status = JSON.parse(
-  execFileSync(path.join(root, 'node_modules/.bin/supabase'), ['status', '-o', 'json'], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore'],
-  })
+const { credentials: supabase } = resolveSupabase(process.env, () =>
+  JSON.parse(
+    execFileSync(
+      path.join(root, 'node_modules/.bin/supabase'),
+      ['status', '-o', 'json'],
+      {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }
+    )
+  )
 )
-const supabaseUrl = status.API_URL
-if (new URL(supabaseUrl).hostname !== '127.0.0.1')
-  throw new Error('Runtime requires loopback Supabase.')
-const supabase = {
-  SUPABASE_URL: supabaseUrl,
-  SUPABASE_ANON_KEY: status.ANON_KEY,
-  SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
-}
-if (Object.values(supabase).some((value) => !value))
-  throw new Error('Local Supabase credentials unavailable.')
+const supabaseUrl = supabase.SUPABASE_URL
+const redis = planRedis(process.env)
 const name = `tea_community_${randomUUID().replaceAll('-', '')}`
 const adminUrl = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 const databaseUrl = new URL(adminUrl)
@@ -91,22 +90,24 @@ await db.query(`CREATE SCHEMA auth;
   GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;`)
 await db.end()
-const redisName = `cc68-runtime-redis-${randomUUID().slice(0, 8)}`
-resources.redisContainer = redisName
-privateJson('resources.json', resources)
-execFileSync(
-  'docker',
-  ['run', '-d', '--name', redisName, '-p', '127.0.0.1::6379', 'redis:7-alpine'],
-  { stdio: ['ignore', 'ignore', 'pipe'] }
-)
-resources.redisContainer = redisName
-privateJson('resources.json', resources)
-const redisPort = execFileSync('docker', ['port', redisName, '6379/tcp'], {
-  encoding: 'utf8',
-})
-  .trim()
-  .split(':')
-  .at(-1)
+let redisUrl
+if (redis.owned) {
+  // Recorded before the start, so cleanup removes a half-started container too.
+  resources.redisContainer = redis.container
+  privateJson('resources.json', resources)
+  execFileSync(
+    'docker',
+    ['run', '-d', '--name', redis.container, '-p', '127.0.0.1::6379', 'redis:7-alpine'],
+    { stdio: ['ignore', 'ignore', 'pipe'] }
+  )
+  const redisPort = execFileSync('docker', ['port', redis.container, '6379/tcp'], {
+    encoding: 'utf8',
+  })
+    .trim()
+    .split(':')
+    .at(-1)
+  redisUrl = `redis://127.0.0.1:${redisPort}`
+} else redisUrl = redis.url
 const owned = {
   ...local,
   ...supabase,
@@ -114,7 +115,7 @@ const owned = {
   TEST_ENV: 'local',
   DATABASE_URL: databaseUrl.toString(),
   LOCAL_DATABASE_URL: databaseUrl.toString(),
-  REDIS_URL: `redis://127.0.0.1:${redisPort}`,
+  REDIS_URL: redisUrl,
   PORT: '4088',
   API_BASE_URL: 'http://127.0.0.1:4088',
   API_LISTEN_HOST: '127.0.0.1',
@@ -141,7 +142,7 @@ privateJson('public-build-env.json', {
   TEST_ENV: 'local',
   EXPO_PUBLIC_API_BASE_URL: 'http://127.0.0.1:4088',
   EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:53068',
-  EXPO_PUBLIC_SUPABASE_ANON_KEY: status.ANON_KEY,
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: supabase.SUPABASE_ANON_KEY,
   POSTHOG_API_KEY: '',
 })
 function run(label, cmd, args) {
@@ -165,7 +166,7 @@ run('seed', path.join(root, 'node_modules/.bin/tsx'), [
   'packages/db/prisma/seeds/index.ts',
 ])
 const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl.toString() } } })
-const authAdmin = createClient(supabaseUrl, status.SERVICE_ROLE_KEY, {
+const authAdmin = createClient(supabaseUrl, supabase.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 const identities = []
@@ -278,7 +279,7 @@ console.log(
   JSON.stringify({
     runtime: directory,
     database: name,
-    redisContainer: redisName,
+    redisContainer: resources.redisContainer,
     authAccounts: identities.length,
     ownedPost: postId,
     status: 'ready',
