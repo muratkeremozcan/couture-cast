@@ -174,7 +174,7 @@ export default defineConfig({
       provider: playwright(),
       headless: !isWatchMode,
     },
-    setupFiles: ['./vitest.setup.ts'],
+    setupFiles: ['./vitest.expo-env.setup.ts', './vitest.setup.ts'],
     include: ['components/**/*.{test,spec}.{ts,tsx}', 'src/**/*.{test,spec}.{ts,tsx}'],
     restoreMocks: true,
     clearMocks: true,
