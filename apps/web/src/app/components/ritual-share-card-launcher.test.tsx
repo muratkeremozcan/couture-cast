@@ -1,5 +1,7 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as ApiClient from '@couture/api-client'
 import { currentI18n } from '../../i18n'
 import { RitualShareCardLauncher } from './ritual-share-card-launcher'
 
@@ -18,7 +20,20 @@ vi.mock('../../lib/web-session', () => ({
   resolveWebSessionToken: auth.resolve,
   webSessionIdentity: () => auth.member,
 }))
+const deadlines = vi.hoisted(() => [] as Promise<unknown>[])
 vi.mock('../../lib/api-client', () => ({ createWebApiClient: api.factory }))
+vi.mock('@couture/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof ApiClient>()
+  return {
+    ...actual,
+    // Record the exact promise the launcher awaits so a test can wait for its settlement.
+    withRequestDeadline: ((...args: Parameters<typeof actual.withRequestDeadline>) => {
+      const result = actual.withRequestDeadline(...args)
+      deadlines.push(result)
+      return result
+    }) as typeof actual.withRequestDeadline,
+  }
+})
 vi.mock('./share-card-dialog', () => ({
   ShareCardControl: ({ source }: { source: { recommendationId: string } }) => (
     <button>{source.recommendationId}</button>
@@ -75,9 +90,10 @@ function publish(member: string | null) {
   })
 }
 function activate() {
-  fireEvent.click(screen.getByRole('button', { name: 'Create my outfit card' }))
+  return userEvent.click(screen.getByRole('button', { name: 'Create my outfit card' }))
 }
 beforeEach(async () => {
+  deadlines.length = 0
   auth.member = null
   auth.resolve.mockReset().mockResolvedValue('verified-bearer')
   api.factory.mockReset().mockReturnValue({ apiV1RitualGet: api.ritual })
@@ -90,7 +106,7 @@ describe('ritual share launcher verified-session boundary', () => {
     const token = deferred<string | undefined>()
     auth.resolve.mockReturnValue(token.promise)
     render(<RitualShareCardLauncher />)
-    activate()
+    await activate()
     expect(auth.resolve).toHaveBeenCalledTimes(1)
     expect(api.factory).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Preparing card' })).toBeDisabled()
@@ -108,7 +124,7 @@ describe('ritual share launcher verified-session boundary', () => {
     expect(api.ritual.mock.calls[0]?.[0]).toEqual({ locale: 'en-US' })
     expect(api.ritual.mock.calls[0]?.[1].signal).toBeInstanceOf(AbortSignal)
     expect(screen.getByRole('button', { name: 'owned-morning' })).toBeInTheDocument()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'evening' } })
+    await userEvent.selectOptions(screen.getByRole('combobox'), 'evening')
     expect(screen.getByRole('button', { name: 'owned-evening' })).toBeInTheDocument()
   })
   it('cancels a known member departure during token verification without issuing a request or stale error', async () => {
@@ -116,7 +132,7 @@ describe('ritual share launcher verified-session boundary', () => {
     const token = deferred<string | undefined>()
     auth.resolve.mockReturnValue(token.promise)
     render(<RitualShareCardLauncher />)
-    activate()
+    await activate()
     publish(null)
     publish('second-member')
     await act(async () => {
@@ -133,16 +149,19 @@ describe('ritual share launcher verified-session boundary', () => {
     const former = deferred<typeof response>()
     api.ritual.mockReturnValueOnce(former.promise)
     render(<RitualShareCardLauncher />)
-    activate()
+    await activate()
     await waitFor(() => expect(api.ritual).toHaveBeenCalledTimes(1))
     const formerSignal = api.ritual.mock.calls[0]?.[1].signal
     publish('second-member')
     expect(formerSignal?.aborted).toBe(true)
-    activate()
+    await activate()
     expect(await screen.findByRole('combobox')).toBeInTheDocument()
+    expect(deadlines).toHaveLength(2)
     await act(async () => {
       former.reject(new Error('former request failed'))
-      await Promise.resolve()
+      // The launcher awaited this same promise first, so its catch and finally have
+      // run by the time this later handler resumes.
+      await deadlines[0]!.catch(() => undefined)
     })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     publish('second-member')
@@ -154,7 +173,7 @@ describe('ritual share launcher verified-session boundary', () => {
     const token = deferred<string | undefined>()
     auth.resolve.mockReturnValue(token.promise)
     const view = render(<RitualShareCardLauncher />)
-    activate()
+    await activate()
     view.unmount()
     await act(async () => {
       token.resolve('verified-bearer')
@@ -169,7 +188,7 @@ describe('ritual share launcher verified-session boundary', () => {
         auth.resolve.mockRejectedValue(new Error('profile unavailable'))
       else auth.resolve.mockResolvedValue(undefined)
       render(<RitualShareCardLauncher />)
-      activate()
+      await activate()
       expect(await screen.findByRole('alert')).toHaveTextContent(
         'This source is unavailable.'
       )
@@ -179,11 +198,11 @@ describe('ritual share launcher verified-session boundary', () => {
   it('fails offline before session resolution and lets the member retry', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
     render(<RitualShareCardLauncher />)
-    activate()
+    await activate()
     expect(await screen.findByRole('alert')).toBeInTheDocument()
     expect(auth.resolve).not.toHaveBeenCalled()
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
-    activate()
+    await activate()
     expect(await screen.findByRole('combobox')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
