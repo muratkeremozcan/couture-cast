@@ -153,7 +153,8 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       )
       // No heading is registered, so focus on the opener's tag proves the Cancel restore
       // resolved it through the unmocked safeFindNodeHandle.
-      const openerTag = findNodeHandle(opener)
+      // react-native-web hands host refs out as DOM nodes, so the opener is its own host.
+      const openerTag = findNodeHandle(opener as never)
       expect(openerTag).toEqual(expect.any(Number))
       await waitFor(() => expect(setFocus).toHaveBeenLastCalledWith(openerTag))
       await waitFor(() => expect(setWidgetData).toHaveBeenCalledOnce())
