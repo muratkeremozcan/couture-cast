@@ -578,6 +578,34 @@ describe('share-card actual API and isolated database', () => {
     await post(input).expect(403)
     expect(reads).toBe(0)
   })
+  it('U-CONTRACT I-MEDIA: injected and extra-field bodies get 400 from the real route before any source read', async () => {
+    const row = await photoPost()
+    const input = preview({ kind: 'community_post', postId: row.id })
+    const prepare = vi.spyOn(service, 'prepare')
+    try {
+      for (const body of [
+        { ...input, url: 'https://private.invalid/photo.png' },
+        { ...input, source: { ...input.source, path: row.image_object_path } },
+        {
+          ...input,
+          source: { kind: 'community_post', postId: 'https://private.invalid' },
+        },
+        { ...input, source: { kind: 'community_post', postId: `../${row.id}` } },
+        { ...input, expectedSha256: 'a'.repeat(64) },
+        { ...input, purpose: 'save' },
+      ]) {
+        const refused = await post(body).expect(400)
+        expect(refused.body).toMatchObject({ statusCode: 400 })
+        expect(refused.body).not.toHaveProperty('data')
+      }
+      expect(prepare).not.toHaveBeenCalled()
+      expect(reads).toBe(0)
+      await post(input).expect(200)
+      expect(prepare).toHaveBeenCalledOnce()
+    } finally {
+      prepare.mockRestore()
+    }
+  })
   it('I-MEDIA: stored byte declaration mismatch fails without partial PNG', async () => {
     const row = await photoPost()
     await prisma.lookbookPost.update({
