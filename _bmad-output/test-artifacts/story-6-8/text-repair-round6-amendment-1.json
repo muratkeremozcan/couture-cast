@@ -1,0 +1,9 @@
+{
+  "amends": "text-repair-round6-frozen-files.json",
+  "manifestSha256": "7b33f73895622ce85b6900cb965406ebba04de2533d1cb94997727218ce57201",
+  "path": "scripts/verify-community-screening-lists.test.mjs",
+  "oldSha256": "747a06adff8a656a4d3e554a2718c7742caf2c318105ef70114f5b61441383a0",
+  "newSha256": "2d4bb806ec0f663723477aaff497e7b5cfa7fa7be9c2516ca22a2b40b7a20793",
+  "reason": "Coordinator-granted test-review exception: the Round5 occurrence-bank test now asserts its policy filter selects exactly balls, toppa, bale and pişen before looping (H3), and the suite is grouped into describe blocks (M4). Only the test file changed; the verifier, policies, terms and corpus files are untouched.",
+  "commit": "7ebcbd5d66c995a22db2e902a3cd6918d090ff3a"
+}
