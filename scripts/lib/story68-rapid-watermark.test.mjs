@@ -54,38 +54,68 @@ function clients({ mismatch = false, blocked = true } = {}) {
 }
 test('pins the UUID database, recorded ownership, isolated build and effective API before any mutation', () => {
   assert.equal(assertRapidWatermarkRuntime(valid()), connectionString)
-  for (const mutate of [
-    (v) => {
-      v.environment.DATABASE_URL = 'postgresql://x@remote.example/postgres'
-    },
-    (v) => {
-      v.environment.DATABASE_URL = 'postgresql://x@127.0.0.1/postgres'
-    },
-    (v) => {
-      v.environment.API_BASE_URL = 'http://127.0.0.1:4000'
-    },
-    (v) => {
-      v.build.EXPO_PUBLIC_API_BASE_URL = 'http://localhost:4088'
-    },
-    (v) => {
-      v.build.STORY68_NATIVE_TEST_BUILD = '0'
-    },
-    (v) => {
-      v.resources.database = 'postgres'
-    },
-    (v) => {
-      v.resources.createdDatabase = false
-    },
-    (v) => {
-      v.resources.owner = 'another-task'
-    },
-    (v) => {
-      v.apiLog = JSON.stringify({ code: 'owned_database_verified', database: 'postgres' })
-    },
+  for (const [mutate, code] of [
+    [
+      (v) => {
+        v.environment.DATABASE_URL = 'postgresql://x@remote.example/postgres'
+      },
+      /owned_uuid_loopback_database_required/,
+    ],
+    [
+      (v) => {
+        v.environment.DATABASE_URL = 'postgresql://x@127.0.0.1/postgres'
+      },
+      /owned_uuid_loopback_database_required/,
+    ],
+    [
+      (v) => {
+        v.environment.API_BASE_URL = 'http://127.0.0.1:4000'
+      },
+      /pinned_owned_native_runtime_required/,
+    ],
+    [
+      (v) => {
+        v.build.EXPO_PUBLIC_API_BASE_URL = 'http://localhost:4088'
+      },
+      /pinned_owned_native_runtime_required/,
+    ],
+    [
+      (v) => {
+        v.build.STORY68_NATIVE_TEST_BUILD = '0'
+      },
+      /pinned_owned_native_runtime_required/,
+    ],
+    [
+      (v) => {
+        v.resources.database = 'postgres'
+      },
+      /pinned_owned_native_runtime_required/,
+    ],
+    [
+      (v) => {
+        v.resources.createdDatabase = false
+      },
+      /pinned_owned_native_runtime_required/,
+    ],
+    [
+      (v) => {
+        v.resources.owner = 'another-task'
+      },
+      /pinned_owned_native_runtime_required/,
+    ],
+    [
+      (v) => {
+        v.apiLog = JSON.stringify({
+          code: 'owned_database_verified',
+          database: 'postgres',
+        })
+      },
+      /effective_owned_api_database_proof_required/,
+    ],
   ]) {
     const input = valid()
     mutate(input)
-    assert.throws(() => assertRapidWatermarkRuntime(input))
+    assert.throws(() => assertRapidWatermarkRuntime(input), code)
   }
 })
 test('checks both effective databases before BEGIN and closes both on misroute', async () => {

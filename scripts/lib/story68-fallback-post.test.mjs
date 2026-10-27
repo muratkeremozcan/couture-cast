@@ -109,13 +109,19 @@ test('only the declared owned primary post can be hidden and its exact row is re
   assert.equal(f.ended(), true)
 })
 test('misrouted runtime or undeclared owner fails before constructing a database client', async () => {
-  for (const corrupt of [
-    (r) => {
-      r.environment.DATABASE_URL = 'postgresql://x@127.0.0.1/postgres'
-    },
-    (r) => {
-      r.resources.createdIdentities = []
-    },
+  for (const [corrupt, code] of [
+    [
+      (r) => {
+        r.environment.DATABASE_URL = 'postgresql://x@127.0.0.1/postgres'
+      },
+      /owned_uuid_loopback_database_required/,
+    ],
+    [
+      (r) => {
+        r.resources.createdIdentities = []
+      },
+      /owned_fallback_post_identity_required/,
+    ],
   ]) {
     const r = runtime()
     corrupt(r)
@@ -130,7 +136,7 @@ test('misrouted runtime or undeclared owner fails before constructing a database
         },
         whileUnavailable: async () => assert.fail('must guard before UI'),
       }),
-      /owned_uuid_loopback_database_required|owned_fallback_post_identity_required/
+      code
     )
     assert.equal(constructed, 0)
   }

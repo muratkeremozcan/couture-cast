@@ -50,37 +50,89 @@ test('rejects four sentence variants of one scenario even with 2000 total items'
   )
 })
 
-for (const [name, mutate] of [
-  ['missing inventory record', ({ inventory }) => inventory.pop()],
-  ['extra inventory record', ({ inventory }) => inventory.push({ ...inventory[0] })],
+for (const [name, mutate, message] of [
+  [
+    'missing inventory record',
+    ({ inventory }) => inventory.pop(),
+    /V6 requires 2000 items and one inventory record per item/,
+  ],
+  [
+    'extra inventory record',
+    ({ inventory }) => inventory.push({ ...inventory[0] }),
+    /V6 requires 2000 items and one inventory record per item/,
+  ],
   [
     'duplicate inventory ID',
     ({ inventory }) => (inventory[1].itemId = inventory[0].itemId),
+    /Scenario inventory must cover every corpus item exactly once/,
   ],
-  ['foreign inventory ID', ({ inventory }) => (inventory[0].itemId = 'foreign')],
-  ['missing primary scenario', ({ inventory }) => delete inventory[0].primaryScenario],
+  [
+    'foreign inventory ID',
+    ({ inventory }) => (inventory[0].itemId = 'foreign'),
+    /Scenario inventory must cover every corpus item exactly once/,
+  ],
+  [
+    'missing primary scenario',
+    ({ inventory }) => delete inventory[0].primaryScenario,
+    /Invalid primary scenario for unit-0/,
+  ],
   [
     'noncanonical primary scenario',
     ({ inventory }) => (inventory[0].primaryScenario = 'Case A'),
+    /Invalid primary scenario for unit-0/,
   ],
-  ['mismatched text hash', ({ inventory }) => (inventory[0].textSha256 = '0'.repeat(64))],
+  [
+    'mismatched text hash',
+    ({ inventory }) => (inventory[0].textSha256 = '0'.repeat(64)),
+    /Scenario text hash does not match unit-0/,
+  ],
   [
     'changed corpus text',
     ({ entries }) => (entries[0].text = 'Changed after annotation.'),
+    /Scenario text hash does not match unit-0/,
   ],
-  ['duplicate corpus ID', ({ entries }) => (entries[1].id = entries[0].id)],
-  ['empty corpus ID', ({ entries }) => (entries[0].id = '')],
-  ['noncanonical corpus ID', ({ entries }) => (entries[0].id = ' padded ')],
-  ['empty corpus text', ({ entries }) => (entries[0].text = ' ')],
-  ['invalid field', ({ entries }) => (entries[0].field = 'comment')],
-  ['unbalanced fields', ({ entries }) => (entries[0].field = 'altText')],
-  ['incomplete corpus', ({ entries }) => entries.pop()],
+  [
+    'duplicate corpus ID',
+    ({ entries }) => (entries[1].id = entries[0].id),
+    /Corpus item IDs must be nonempty, unique and canonical/,
+  ],
+  [
+    'empty corpus ID',
+    ({ entries }) => (entries[0].id = ''),
+    /Corpus item IDs must be nonempty, unique and canonical/,
+  ],
+  [
+    'noncanonical corpus ID',
+    ({ entries }) => (entries[0].id = ' padded '),
+    /Corpus item IDs must be nonempty, unique and canonical/,
+  ],
+  [
+    'empty corpus text',
+    ({ entries }) => (entries[0].text = ' '),
+    /Missing text for unit-0/,
+  ],
+  [
+    'invalid field',
+    ({ entries }) => (entries[0].field = 'comment'),
+    /Invalid field for unit-0/,
+  ],
+  [
+    'unbalanced fields',
+    ({ entries }) => (entries[0].field = 'altText'),
+    /V6 requires 1000 captions and 1000 alt texts/,
+  ],
+  [
+    'incomplete corpus',
+    ({ entries }) => entries.pop(),
+    /V6 requires 2000 items and one inventory record per item/,
+  ],
 ]) {
   test(`rejects ${name}`, () => {
     const fixture = singletonMetadata()
     mutate(fixture)
-    assert.throws(() =>
-      assertIndependentHoldoutLocale(fixture.entries, fixture.inventory)
+    assert.throws(
+      () => assertIndependentHoldoutLocale(fixture.entries, fixture.inventory),
+      message
     )
   })
 }

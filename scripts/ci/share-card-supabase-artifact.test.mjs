@@ -332,11 +332,13 @@ test('a Mac cache miss writes a reusable cache without changing the verified dow
   fs.writeFileSync(archive, compressed.stdout)
   fs.writeFileSync(path.join(directory, 'registry'), 'ghcr.io')
   await packSupabaseArtifact(directory)
+  // The loader records what it decompressed; asserting afterwards proves it ran.
+  const loads = []
   await loadSupabaseArtifact(directory, (file) => {
     const loaded = spawnSync('zstd', ['-dc', file], { encoding: 'utf8' })
-    assert.equal(loaded.status, 0)
-    assert.equal(loaded.stdout, 'prewarmed image fixture')
+    loads.push({ status: loaded.status, stdout: loaded.stdout })
   })
+  assert.deepEqual(loads, [{ status: 0, stdout: 'prewarmed image fixture' }])
   const action = parse(
     fs.readFileSync('.github/actions/start-local-supabase/action.yml', 'utf8')
   )

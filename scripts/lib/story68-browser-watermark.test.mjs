@@ -414,12 +414,15 @@ function communityReadiness({ available = true, resyncRequired = false } = {}) {
 test('community readiness requires genuine owned target resolution and subsequent cursor replay before lock acquisition', async () => {
   const f = communityReadiness()
   assert.equal(f.navigated(), 1)
+  // A full macrotask turn lets the helper's await chain settle, so a still-false
+  // ready() means it is waiting for the replay, not merely mid-chain.
+  const settle = () => new Promise(setImmediate)
   f.early()
   f.foreign()
-  await Promise.resolve()
+  await settle()
   assert.equal(f.ready(), false)
   f.initial()
-  await Promise.resolve()
+  await settle()
   assert.equal(f.ready(), false)
   f.replay()
   await f.promise
