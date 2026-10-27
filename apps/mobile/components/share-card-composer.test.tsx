@@ -118,6 +118,7 @@ vi.mock('react-native', async (original) => {
     },
   }
 })
+import { Platform } from 'react-native'
 import { ShareCardComposer } from './share-card-composer'
 import {
   commitShareCardSave,
@@ -191,6 +192,11 @@ afterEach(async () => {
   expect(liveShareCardFiles().size).toBe(0)
 })
 describe('share-card composer lifecycle', () => {
+  it('simulates iOS for Expo packages as well as react-native', () => {
+    // Expo packages read process.env.EXPO_OS when they load; the suite default is 'web'.
+    expect(process.env.EXPO_OS).toBe('ios')
+    expect(Platform.OS).toBe('ios')
+  })
   it('U-SAVE U-A11Y: loaded image and explicit permission precede final save authorization; native resolution owns success', async () => {
     const native = deferred<void>()
     boundary.save.mockReturnValue(native.promise)
