@@ -1,7 +1,7 @@
 import type * as ReactNativeModule from 'react-native'
 import React, { createElement, useEffect, useState } from 'react'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { ResponseError, type PrepareShareCardInput } from '@couture/api-client'
 import { supportedLocales } from '@couture/api-client/contracts/http'
@@ -125,11 +125,15 @@ import {
   liveShareCardFiles,
 } from '@/src/lib/share-card-save-operations'
 const source = { kind: 'outfit', recommendationId: 'owned-outfit' } as const
+// The save manager's pending guard is process-wide, so a test that fails while a native
+// save is held would make every later save in this file fail with finishingSave.
+const unsettled = new Set<() => void>()
 function deferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((yes) => {
     resolve = yes
   })
+  unsettled.add(() => resolve(undefined as T))
   return { promise, resolve }
 }
 function Harness({ restore = vi.fn() }: { restore?: () => void }) {
@@ -175,6 +179,16 @@ beforeEach(async () => {
   boundary.announce.mockClear()
   boundary.settings.mockClear()
   boundary.imageLoads.length = 0
+})
+afterEach(async () => {
+  cleanup()
+  await act(async () => {
+    unsettled.forEach((settle) => settle())
+    unsettled.clear()
+    await Promise.resolve()
+  })
+  await waitFor(() => expect(nativeShareCardSavePending()).toBe(false))
+  expect(liveShareCardFiles().size).toBe(0)
 })
 describe('share-card composer lifecycle', () => {
   it('U-SAVE U-A11Y: loaded image and explicit permission precede final save authorization; native resolution owns success', async () => {
