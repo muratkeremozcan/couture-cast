@@ -19,7 +19,8 @@ describe('bounded share-card replacement admission', () => {
     void pending.then(() => {
       entered = true
     })
-    await Promise.resolve()
+    // Drain every queued microtask, so an entry that takes several ticks is still seen.
+    await new Promise((resolve) => setImmediate(resolve))
     expect(entered).toBe(false)
     expect(() => admission.acquire('other', new AbortController().signal)).toThrow()
     release()
