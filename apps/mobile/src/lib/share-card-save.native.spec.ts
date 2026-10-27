@@ -1,11 +1,15 @@
+/// <reference types="vite/client" />
 import { Platform } from 'react-native'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
+import swiftModuleSource from '../../modules/share-card-photo-save/ios/ShareCardPhotoSaveModule.swift?raw'
 const mocks = vi.hoisted(() => ({
   files: new Map<string, string>(),
   getPermission: vi.fn(),
   requestPermission: vi.fn(),
   nativeSave: vi.fn(),
+  originalSave: vi.fn(),
+  photoSaveName: '',
   write: vi.fn(),
   remove: vi.fn(),
   readDirectory: vi.fn(),
@@ -15,13 +19,18 @@ const mocks = vi.hoisted(() => ({
   originalAvailable: false,
 }))
 vi.mock('expo-modules-core', () => ({
-  requireOptionalNativeModule: (name: string) =>
-    name === 'ExpoMediaLibrary' && mocks.mediaAvailable ? {} : null,
+  requireOptionalNativeModule: (name: string) => {
+    if (name === 'ExpoMediaLibrary') return mocks.mediaAvailable ? {} : null
+    return name === mocks.photoSaveName && mocks.originalAvailable
+      ? { saveOriginalPng: mocks.originalSave }
+      : null
+  },
 }))
-vi.mock('../../modules/share-card-photo-save', () => ({
-  shareCardPhotoSaveModule: () =>
-    mocks.originalAvailable ? { saveOriginalPng: mocks.nativeSave } : null,
-}))
+// Vite resolves the browser index; native code loads index.native, which requests the module by name.
+vi.mock(
+  '../../modules/share-card-photo-save',
+  () => import('../../modules/share-card-photo-save/index.native')
+)
 vi.mock('./share-card-native-fixture', () => ({
   shareCardFixtureMode: () => mocks.fixture,
   runShareCardNativeAdapter: (_uri: string, save: () => Promise<void>) => save(),
@@ -57,6 +66,7 @@ import {
   liveShareCardFiles,
   nativeShareCardSavePending,
 } from './share-card-save-operations'
+mocks.photoSaveName = /\bName\("([^"]+)"\)/.exec(swiftModuleSource)?.[1] ?? ''
 const originalOS = Platform.OS
 const originalVersion = Platform.Version
 function platform(os: string, version: number) {
@@ -87,6 +97,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ granted: true, canAskAgain: true })
   mocks.nativeSave.mockReset().mockResolvedValue(undefined)
+  mocks.originalSave.mockReset().mockResolvedValue(undefined)
   mocks.write.mockReset().mockImplementation((uri: string, bytes: string) => {
     mocks.files.set(uri, bytes)
     return Promise.resolve()
@@ -115,8 +126,15 @@ describe('native immutable file and permission adapter', () => {
       expect(mocks.getPermission).not.toHaveBeenCalled()
       expect(mocks.requestPermission).not.toHaveBeenCalled()
       expect(mocks.nativeSave).not.toHaveBeenCalled()
+      expect(mocks.originalSave).not.toHaveBeenCalled()
     }
   )
+  it('requests the iOS original-resource module by its Swift module name', () => {
+    expect(mocks.photoSaveName).toBe('ShareCardPhotoSave')
+    platform('ios', 26)
+    mocks.originalAvailable = true
+    expect(nativeShareCardSaveAvailable()).toBe(true)
+  })
   it.each(['precommit', 'committed'])(
     'U-PENDING-FILE: orphan listing cannot delete a newly %s owned file',
     async (phase) => {
@@ -286,6 +304,7 @@ describe('native immutable file and permission adapter', () => {
       expect(mocks.getPermission).not.toHaveBeenCalled()
       expect(mocks.requestPermission).not.toHaveBeenCalled()
       expect(mocks.nativeSave).not.toHaveBeenCalled()
+      expect(mocks.originalSave).not.toHaveBeenCalled()
       expect(mocks.write).not.toHaveBeenCalled()
     }
   )
