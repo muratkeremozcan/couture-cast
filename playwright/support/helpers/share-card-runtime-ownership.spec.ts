@@ -17,11 +17,17 @@ it('6.8-HARNESS existing-runtime refusal cannot invoke cleanup or mutate preexis
       path.join(directory, 'existing-sentinel'),
       'preserve exact owned bytes'
     )
-    const result = spawnSync(process.execPath, ['scripts/e2e-share-card/prepare.mjs'], {
-      cwd: process.cwd(),
-      env: { ...process.env, CC68_HARNESS_DIR: directory },
-      encoding: 'utf8',
-    })
+    // A regressed refusal still cannot provision: the empty working directory has no
+    // .env.local or Supabase CLI, and no inherited database or service credentials.
+    const result = spawnSync(
+      process.execPath,
+      [path.resolve('scripts/e2e-share-card/prepare.mjs')],
+      {
+        cwd: directory,
+        env: { PATH: process.env.PATH, CC68_HARNESS_DIR: directory },
+        encoding: 'utf8',
+      }
+    )
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('Runtime already provisioned')
     expect(fs.readFileSync(path.join(directory, 'resources.json'), 'utf8')).toBe(
