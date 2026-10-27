@@ -1,7 +1,7 @@
 import React from 'react'
 import type * as ReactNative from 'react-native'
 import { render, screen } from '@testing-library/react'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 const captured = vi.hoisted(() => ({ props: [] as ReactNative.TextProps[] }))
 vi.mock('react-native', async (original) => {
   const actual = await original<typeof ReactNative>()
@@ -28,67 +28,72 @@ import { StyleSheet } from 'react-native'
 import { Text as ThemedText } from './themed'
 import { shareCardHeadingNode } from '@/src/lib/share-card-focus'
 
-beforeEach(() => {
-  captured.props = []
-})
+describe('ShareCardTabHeading', () => {
+  beforeEach(() => {
+    captured.props = []
+  })
 
-it('L8: the existing tab title supplies an attached fallback and unregisters after unmount', () => {
-  const view = render(
-    <ShareCardTabHeading scope="community" tintColor="#292724">
-      Community
-    </ShareCardTabHeading>
-  )
-  expect(screen.getAllByRole('heading', { name: 'Community' })).toHaveLength(1)
-  expect(shareCardHeadingNode('community')).toBe(71)
-  view.unmount()
-  expect(shareCardHeadingNode('community')).toBeNull()
-})
-it('L8: replacing a tab title keeps the newer heading registered', () => {
-  const old = render(<ShareCardTabHeading scope="outfit">Home</ShareCardTabHeading>)
-  const current = render(<ShareCardTabHeading scope="outfit">Home</ShareCardTabHeading>)
-  old.unmount()
-  expect(shareCardHeadingNode('outfit')).toBe(71)
-  current.unmount()
-  expect(shareCardHeadingNode('outfit')).toBeNull()
-})
+  it('L8: the existing tab title supplies an attached fallback and unregisters after unmount', () => {
+    const view = render(
+      <ShareCardTabHeading scope="community" tintColor="#292724">
+        Community
+      </ShareCardTabHeading>
+    )
+    expect(screen.getAllByRole('heading', { name: 'Community' })).toHaveLength(1)
+    expect(shareCardHeadingNode('community')).toBe(71)
+    view.unmount()
+    expect(shareCardHeadingNode('community')).toBeNull()
+  })
+  it('L8: replacing a tab title keeps the newer heading registered', () => {
+    const old = render(<ShareCardTabHeading scope="outfit">Home</ShareCardTabHeading>)
+    const current = render(<ShareCardTabHeading scope="outfit">Home</ShareCardTabHeading>)
+    old.unmount()
+    expect(shareCardHeadingNode('outfit')).toBe(71)
+    current.unmount()
+    expect(shareCardHeadingNode('outfit')).toBeNull()
+  })
 
-it('L8: native heading keeps default scaling, exact label and the attached native focus ref', () => {
-  render(
-    <ShareCardTabHeading scope="outfit" tintColor="#292724">
-      Home
-    </ShareCardTabHeading>
-  )
-  const heading = screen.getByRole('heading', { name: 'Home' })
-  const props = captured.props.find((props) => props.children === 'Home')!
-  expect(props.allowFontScaling).toBeUndefined()
-  expect(props.maxFontSizeMultiplier).toBeUndefined()
-  expect(props.numberOfLines).toBe(1)
-  expect(StyleSheet.flatten(props.style)?.fontSize).toBe(20)
-  expect(shareCardHeadingNode('outfit')).toBe(71)
-  expect(vi.mocked(safeFindNodeHandle).mock.calls.at(-1)?.[0]).toBe(heading)
-})
+  it('L8: native heading keeps default scaling, exact label and the attached native focus ref', () => {
+    render(
+      <ShareCardTabHeading scope="outfit" tintColor="#292724">
+        Home
+      </ShareCardTabHeading>
+    )
+    const heading = screen.getByRole('heading', { name: 'Home' })
+    const props = captured.props.find((props) => props.children === 'Home')!
+    expect(props.allowFontScaling).toBeUndefined()
+    expect(props.maxFontSizeMultiplier).toBeUndefined()
+    expect(props.numberOfLines).toBe(1)
+    expect(StyleSheet.flatten(props.style)?.fontSize).toBe(20)
+    expect(shareCardHeadingNode('outfit')).toBe(71)
+    expect(vi.mocked(safeFindNodeHandle).mock.calls.at(-1)?.[0]).toBe(heading)
+  })
 
-it('ordinary themed text forwards native scaling limits, metrics and accessibility props unchanged', () => {
-  render(
-    <ThemedText
-      testID="native-text-contract"
-      maxFontSizeMultiplier={1.7}
-      accessibilityRole="header"
-      accessibilityLabel="Exact native label"
-      accessibilityHint="Details"
-      selectable
-      style={{ fontSize: 16, lineHeight: 22 }}
-    >
-      Visible copy
-    </ThemedText>
-  )
-  const props = captured.props.find((props) => props.testID === 'native-text-contract')!
-  expect(props.allowFontScaling).toBeUndefined()
-  expect(props.maxFontSizeMultiplier).toBe(1.7)
-  expect(props.accessibilityHint).toBe('Details')
-  expect(props.selectable).toBe(true)
-  expect(StyleSheet.flatten(props.style)).toMatchObject({ fontSize: 16, lineHeight: 22 })
-  expect(screen.getByRole('heading', { name: 'Exact native label' })).toHaveTextContent(
-    'Visible copy'
-  )
+  it('ordinary themed text forwards native scaling limits, metrics and accessibility props unchanged', () => {
+    render(
+      <ThemedText
+        testID="native-text-contract"
+        maxFontSizeMultiplier={1.7}
+        accessibilityRole="header"
+        accessibilityLabel="Exact native label"
+        accessibilityHint="Details"
+        selectable
+        style={{ fontSize: 16, lineHeight: 22 }}
+      >
+        Visible copy
+      </ThemedText>
+    )
+    const props = captured.props.find((props) => props.testID === 'native-text-contract')!
+    expect(props.allowFontScaling).toBeUndefined()
+    expect(props.maxFontSizeMultiplier).toBe(1.7)
+    expect(props.accessibilityHint).toBe('Details')
+    expect(props.selectable).toBe(true)
+    expect(StyleSheet.flatten(props.style)).toMatchObject({
+      fontSize: 16,
+      lineHeight: 22,
+    })
+    expect(screen.getByRole('heading', { name: 'Exact native label' })).toHaveTextContent(
+      'Visible copy'
+    )
+  })
 })
