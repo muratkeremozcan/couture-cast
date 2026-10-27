@@ -136,6 +136,9 @@ describe('process-lifetime native save ownership', () => {
     }
   })
   it('retries cleanup in-session without reimport and stops after bounded persistent failures', async () => {
+    // Mirrors the private retryDelays schedule in share-card-save-operations.ts.
+    const automaticRetryDelaysMs = [1000, 5000, 30000]
+    const oneDayMs = 86_400_000
     vi.useFakeTimers()
     const save = vi.fn(() => Promise.resolve())
     const cleanup = vi
@@ -144,10 +147,12 @@ describe('process-lifetime native save ownership', () => {
     try {
       await commitShareCardSave({ fileUri: 'cache/cc68-retry-timer.png', save, cleanup })
       expect(cleanup).toHaveBeenCalledTimes(1)
-      await vi.advanceTimersByTimeAsync(1000 + 5000 + 30000)
-      expect(cleanup).toHaveBeenCalledTimes(4)
-      await vi.advanceTimersByTimeAsync(86400000)
-      expect(cleanup).toHaveBeenCalledTimes(4)
+      for (const [retry, delay] of automaticRetryDelaysMs.entries()) {
+        await vi.advanceTimersByTimeAsync(delay)
+        expect(cleanup).toHaveBeenCalledTimes(retry + 2)
+      }
+      await vi.advanceTimersByTimeAsync(oneDayMs)
+      expect(cleanup).toHaveBeenCalledTimes(automaticRetryDelaysMs.length + 1)
       expect(save).toHaveBeenCalledOnce()
       expect(liveShareCardFiles().has('cache/cc68-retry-timer.png')).toBe(true)
       cleanup.mockResolvedValue(undefined)
