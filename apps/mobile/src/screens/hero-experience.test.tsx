@@ -12,7 +12,8 @@ import { userEvent } from 'vitest/browser'
 import { server } from '@/src/test-utils/msw/server'
 import { http, HttpResponse } from 'msw'
 import TabOneScreen from '@/app/(tabs)/index'
-import { Platform } from 'react-native'
+import { AccessibilityInfo, Platform } from 'react-native'
+import { registerShareCardHeading } from '@/src/lib/share-card-focus'
 import { AndroidShareCardPresentation } from '@/components/android-share-card-presentation'
 import {
   setMobileAccessTokenResolver,
@@ -60,12 +61,28 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
 }))
 
 describe('Mobile Hero Experience (TabOneScreen)', () => {
-  it('L8: the hero content keeps its existing navigation heading as the fallback', async () => {
+  it('L8: the hero content adds no share-card heading of its own', async () => {
     await render(<TabOneScreen />)
     await screen.findByTestId('weather-header')
     expect(
       screen.queryByRole('heading', { name: i18n.t('shareCard.sourceOutfit') })
     ).toBeNull()
+  })
+
+  it('L8: closing the composer without an invoker node focuses the registered navigation heading', async () => {
+    const setFocus = vi.spyOn(AccessibilityInfo, 'setAccessibilityFocus')
+    // The tab layout registers its title this way; 77 stands in for its native tag.
+    const unregister = registerShareCardHeading('outfit', () => 77)
+    try {
+      await render(<TabOneScreen />)
+      await userEvent.click(await screen.findByTestId('outfit-share-card-open'))
+      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      setFocus.mockClear()
+      await userEvent.click(screen.getByTestId('share-card-cancel'))
+      await waitFor(() => expect(setFocus).toHaveBeenCalledWith(77))
+    } finally {
+      unregister()
+    }
   })
 
   beforeAll(async () => {
