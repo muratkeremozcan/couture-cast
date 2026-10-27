@@ -82,6 +82,17 @@ jobs:
         with:
           packages: platform-tools
 
+      # The release build below consumes this project. Generating it in its own step
+      # lets that build run when the Robolectric tests fail. The test script repeats
+      # the prebuild, which leaves an already generated project unchanged.
+      - name: Generate the Android project
+        id: android_project
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npx expo prebuild --platform android --no-install
+
       - name: Robolectric tests for the focus observer
         working-directory: apps/mobile
         env:
@@ -92,14 +103,15 @@ jobs:
       # The release app must keep React Native's native libraries, which the
       # module's build.gradle leaves out of its own androidTest APK only.
       - name: Build the release app and the module's test APK
-        if: ${{ !cancelled() }}
+        id: apk_build
+        if: ${{ !cancelled() && steps.android_project.outcome == 'success' }}
         working-directory: apps/mobile/android
         env:
           NODE_ENV: production
         run: ./gradlew :app:assembleRelease :accessibility-focus:assembleDebugAndroidTest -PreactNativeArchitectures=x86_64 --console=plain
 
       - name: Check what each APK carries
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.apk_build.outcome == 'success' }}
         run: |
           bash scripts/ci/check-accessibility-focus-builds.sh android-app apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           bash scripts/ci/check-accessibility-focus-builds.sh android-test apps/mobile/modules/accessibility-focus/android/build/outputs/apk/androidTest/debug/accessibility-focus-debug-androidTest.apk
@@ -110,6 +122,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        id: checkout
 
       - name: XCTest for the focus target decisions
         working-directory: apps/mobile/modules/accessibility-focus/ios
@@ -119,20 +132,23 @@ jobs:
           xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device"
 
       - name: Setup Node
-        if: ${{ !cancelled() }}
+        id: node
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: npm
 
       - name: Install dependencies
-        if: ${{ !cancelled() }}
+        id: deps
+        if: ${{ !cancelled() && steps.node.outcome == 'success' }}
         run: npm ci
 
       # The SwiftPM target above leaves out AccessibilityFocusModule.swift, which
       # needs ExpoModulesCore; the app build compiles it with its Expo dependency.
       - name: Generate the iOS project
-        if: ${{ !cancelled() }}
+        id: ios_project
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         working-directory: apps/mobile
         env:
           CI: '1'
@@ -140,7 +156,8 @@ jobs:
         run: npx expo prebuild --platform ios
 
       - name: Build the release simulator app
-        if: ${{ !cancelled() }}
+        id: app_build
+        if: ${{ !cancelled() && steps.ios_project.outcome == 'success' }}
         working-directory: apps/mobile/ios
         env:
           NODE_ENV: production
@@ -154,7 +171,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO build
 
       - name: Check the app links and registers the module
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.app_build.outcome == 'success' }}
         run: |
           bash scripts/ci/check-accessibility-focus-builds.sh ios-app \
             "apps/mobile/ios/build/Build/Products/Release-iphonesimulator/$scheme.app/$scheme" apps/mobile/ios

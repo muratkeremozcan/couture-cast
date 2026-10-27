@@ -17,12 +17,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/reserve-supabase-ports
       - uses: ./.github/actions/install
+        id: install
       - name: Verify startup deadline controls
+        id: deadline_controls
         run: node scripts/ci/node-test-gate.mjs startup-deadline
       - uses: ./.github/actions/start-local-supabase
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.deadline_controls.outcome == 'success' }}
+        id: supabase
       - name: Pin the complete amd64 image archive
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        id: pack
         run: node scripts/ci/share-card-supabase-artifact.mjs pack
       - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' }}
         with:
           name: cc68-supabase-amd64
           path: |
@@ -58,14 +65,18 @@ jobs:
       MAESTRO_CLI_NO_ANALYTICS: '1'
     steps:
       - uses: actions/checkout@v4
+        id: checkout
       - uses: ./.github/actions/reserve-supabase-ports
         if: runner.os == 'Linux'
       - uses: ./.github/actions/install
+        id: install
       - name: Provision pinned iOS accessibility browser
+        id: ios_browser
         if: matrix.platform == 'ios'
         timeout-minutes: 6
         run: npx --no-install playwright install chromium
       - name: Provision pinned share-card browser dependencies
+        id: browser_deps
         if: matrix.platform == 'android'
         timeout-minutes: 12
         run: |
@@ -76,37 +87,48 @@ jobs:
             node scripts/ci/share-card-browser-deps.mjs
           fi
       - uses: actions/setup-java@v4
+        if: ${{ !cancelled() }}
+        id: java
         with:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
-        if: matrix.platform == 'android'
+        id: android_sdk
+        if: ${{ !cancelled() && matrix.platform == 'android' }}
         with:
           packages: platform-tools
       - name: Start owned Docker VM for local Auth on macOS
-        if: runner.os == 'macOS'
+        id: docker_vm
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.checkout.outcome == 'success' }}
         run: |
           bash scripts/ci/share-card-ios-host.sh
       - name: Verify startup deadline controls
+        id: deadline_controls
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: node scripts/ci/node-test-gate.mjs startup-deadline
       - name: Download the independently prewarmed amd64 images
-        if: runner.os == 'macOS'
+        id: images
+        if: ${{ !cancelled() && runner.os == 'macOS' }}
         uses: actions/download-artifact@v4
         with:
           name: cc68-supabase-amd64
           path: ${{ runner.temp }}/share-card-supabase-artifact
       - name: Verify and load the exact Supabase image archive
         id: supabase-artifact
-        if: runner.os == 'macOS'
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.install.outcome == 'success' && steps.images.outcome == 'success' && steps.docker_vm.outcome == 'success' }}
         timeout-minutes: 12
         run: node scripts/ci/share-card-supabase-artifact.mjs load
       - uses: ./.github/actions/start-local-supabase
+        if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' && (runner.os != 'macOS' || steps.supabase-artifact.outcome == 'success') }}
+        id: supabase
         with:
           image-registry: ${{ steps.supabase-artifact.outputs.registry || 'ghcr.io' }}
           # The Mac loads the prewarmed artifact; its own Actions cache would add a
           # second full docker save through the SSH-forwarded Colima socket.
           image-cache: ${{ runner.os != 'macOS' }}
       - name: Prepare isolated UUID runtime and built renderer
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        id: runtime
         run: |
           npm run db:generate
           npm run build:packages
@@ -120,6 +142,7 @@ jobs:
           (node scripts/run-story68-native.mjs metro > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
       - name: Verify the owned API database entry guard
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
         run: |
           npx vitest run scripts/lib/story68-api-entry.test.mjs --reporter=default --reporter=json --outputFile="$RUNNER_TEMP/story68-api-entry.json"
           node --input-type=module <<'JS'
@@ -130,31 +153,35 @@ jobs:
             throw new Error('Incomplete API entry guard execution')
           JS
       - name: Verify localized native accessibility announcements and focus bridge
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && ((matrix.platform == 'android' && steps.browser_deps.outcome == 'success') || (matrix.platform == 'ios' && steps.ios_browser.outcome == 'success')) }}
         run: |
           node scripts/e2e-share-card/bridge-a11y.mjs
           node scripts/ci/node-test-gate.mjs share-card-plugins
           node scripts/ci/node-test-gate.mjs native-harness
       - name: Verify native paragraph heading semantics
-        if: runner.os == 'macOS'
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.checkout.outcome == 'success' }}
         run: bash scripts/ci/share-card-header-semantics.sh
       - name: Generate native development client
-        if: ${{ !cancelled() }}
+        id: prebuild
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
         run: node scripts/run-story68-native.mjs prebuild --platform ${{ matrix.platform }}
       - name: Verify fresh Worklets variant and ABI staging
-        if: matrix.platform == 'android'
+        if: ${{ !cancelled() && matrix.platform == 'android' && steps.prebuild.outcome == 'success' }}
         run: node scripts/ci/node-test-gate.mjs worklets-staging
       - name: Build native development client
-        if: ${{ !cancelled() }}
+        id: native_build
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && (matrix.platform != 'android' || (steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success')) }}
         run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
       - name: Genuine browser share-card acceptance matrix
-        if: ${{ !cancelled() && matrix.platform == 'android' && matrix.api == 36 }}
+        if: ${{ !cancelled() && matrix.platform == 'android' && matrix.api == 36 && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
         run: |
           node scripts/e2e-share-card/web.mjs > "$CC68_HARNESS_DIR/web-startup-private.log" 2>&1 &
           node scripts/e2e-share-card/wait-web.mjs
           npx playwright test --config playwright/share-card.config.ts
           node scripts/e2e-share-card/assert-web-matrix.mjs
       - name: Enable and verify Android hardware acceleration
-        if: matrix.platform == 'android'
+        id: kvm
+        if: ${{ !cancelled() && matrix.platform == 'android' }}
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -164,7 +191,7 @@ jobs:
           ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
       - name: Android real original and API32 denied/permanent permission proof
-        if: ${{ !cancelled() && matrix.platform == 'android' }}
+        if: ${{ !cancelled() && matrix.platform == 'android' && steps.native_build.outcome == 'success' && steps.kvm.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CC68_ANDROID_API: ${{ matrix.api }}
@@ -179,7 +206,7 @@ jobs:
           disable-animations: true
           script: bash scripts/ci/share-card-android.sh
       - name: iOS original Photos resource and add-only save
-        if: ${{ !cancelled() && matrix.platform == 'ios' }}
+        if: ${{ !cancelled() && matrix.platform == 'ios' && steps.native_build.outcome == 'success' }}
         run: |
           device=$(xcrun simctl create cc68-ci 'iPhone 16 Pro')
           echo "$device" > /tmp/cc68-simulator

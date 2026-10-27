@@ -77,6 +77,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node environment
+        id: setup
         uses: ./.github/actions/setup-node-env
         with:
           use-npm-ci: 'false'
@@ -86,7 +87,8 @@ jobs:
         run: npm run check:web:aliased-runtime-deps
 
       - name: Generate Prisma Client
-        if: ${{ !cancelled() }}
+        id: prisma
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: npm run db:generate
 
       # The migrations assume a Supabase database. A stock PostgreSQL image
@@ -102,6 +104,7 @@ jobs:
       # suite drives it by setting `request.jwt.claims` with `set_config`, which
       # is exactly the path this reads.
       - name: Provision Supabase-compatible roles and auth schema
+        id: roles
         if: ${{ !cancelled() }}
         run: |
           psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 <<'SQL'
@@ -155,29 +158,32 @@ jobs:
           SQL
 
       - name: Apply migrations to the test database
-        if: ${{ !cancelled() }}
+        id: migrations
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.roles.outcome == 'success' }}
         run: node scripts/prisma-migrate-deploy.mjs
 
       - name: Typecheck workspaces
         id: typecheck
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.prisma.outcome == 'success' }}
         run: npm run typecheck
 
       - name: Lint sources
         id: lint
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.prisma.outcome == 'success' }}
         run: npm run lint
 
       - name: Build packages
-        if: ${{ !cancelled() }}
+        id: build
+        if: ${{ !cancelled() && steps.prisma.outcome == 'success' }}
         run: npm run build
 
       - name: Install Playwright Chromium
-        if: ${{ !cancelled() }}
+        id: chromium
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: npx playwright install --with-deps chromium
 
       - name: Run Lighthouse accessibility gate
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.chromium.outcome == 'success' }}
         id: lighthouse
         continue-on-error: true
         run: npm run test:a11y:lighthouse
@@ -190,13 +196,13 @@ jobs:
           path: playwright/artifacts/lighthouse/
 
       - name: Run tests with coverage
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.migrations.outcome == 'success' && steps.chromium.outcome == 'success' }}
         id: tests
         continue-on-error: true
         run: npm run test:coverage
 
       - name: Coverage report and PR comment
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
         uses: ./.github/actions/unit-test-coverage-comment
         with:
           coverage-path: ./coverage
@@ -210,7 +216,7 @@ jobs:
           badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
 
       - name: Require later checks to run after an earlier check fails
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: node --test scripts/ci/workflow-step-shadowing.test.mjs
 
       # `always()` so this runs even when the coverage-comment step above has
@@ -223,9 +229,11 @@ jobs:
       # always runs and names the real one. It still exits 0 when the tests
       # passed, so a comment step that fails for its own reasons is not masked.
       #
-      # The checks before the tests run with `!cancelled()`, so a failed lint or
-      # typecheck no longer skips the tests and hides their result. Those checks
-      # already fail the job themselves; the gate names them alongside the tests.
+      # Every step after the first check runs with `!cancelled()` plus the
+      # outcomes of the steps it consumes. A failed lint or typecheck no longer
+      # skips the tests and hides their result, while a failed build or migration
+      # still does. Those checks already fail the job themselves; the gate names
+      # them alongside the tests.
       - name: Fail if tests failed
         if: >-
           always() && (steps.tests.outcome == 'failure' ||
@@ -284,6 +292,7 @@ jobs:
       # One test worker, its own runner and services, no concurrent builds or suites.
       # The product keeps its 1950 ms deadline, five-connection pool and 100 cold members.
       - name: Require five independent cold-start budget proofs
+        id: proofs
         working-directory: apps/api
         run: |
           set -euo pipefail
@@ -292,7 +301,7 @@ jobs:
             npx vitest run --config vitest.realtime-budget.config.ts --reporter=default --reporter=json --outputFile=".cache/realtime-budget/run-$attempt.json" 2>&1 | tee ".cache/realtime-budget/run-$attempt.log"
           done
       - name: Require execution of every budget proof
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.proofs.outcome == 'success' || steps.proofs.outcome == 'failure') }}
         working-directory: apps/api
         run: |
           node --input-type=module <<'JS'
@@ -363,6 +372,7 @@ jobs:
             GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
           SQL
       - name: Verify cached pinned model and compile the production worker
+        id: compile
         run: |
           node scripts/verify-community-screening-model.mjs
           npm run build --workspace api
@@ -370,11 +380,11 @@ jobs:
         working-directory: apps/api
         run: npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
       - name: Mandatory compiled mixed workload and resource budgets
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
         working-directory: apps/api
         run: npx vitest run integration/community-comments-measurement.integration.spec.ts --maxWorkers=1 --reporter=default --reporter=json --outputFile=.cache/community-screening/mixed-ci-tests.json
       - name: Require complete execution with every opt-in case enabled
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
         run: |
           node --input-type=module <<'JS'
           import fs from 'node:fs'

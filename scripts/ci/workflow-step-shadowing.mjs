@@ -4,9 +4,11 @@
 // lint failure hid a red deployment-workflows spec for six runs this way.
 //
 // The rule: once a job has a check that can fail (no continue-on-error), every later
-// step up to the job's last check carries `!cancelled()` or `always()`. Setup steps in
-// that range need it too, because the checks after them depend on them. `!cancelled()`
-// still lets a cancelled run stop.
+// step states its condition. An independent check uses `!cancelled()`, which still lets
+// a cancelled run stop. A step that consumes an earlier step's output adds
+// `steps.<id>.outcome == 'success'` for each such step, so a failed prerequisite still
+// skips it. Reporting steps keep `always()`. Every `steps.<id>` a condition names must be
+// an earlier step of the same job.
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { parse } from 'yaml'
@@ -22,25 +24,15 @@ const CHECK_COMMAND = new RegExp(
     String.raw`\bscripts/ci/check-[\w-]+\.sh\b`,
     String.raw`\bscripts/ci/share-card-header-semantics\.sh\b`,
     String.raw`\brun-story68-native\.mjs (proof|matrix)\b`,
+    String.raw`\bnode --test\b`,
+    String.raw`\bnode scripts/ci/node-test-gate\.mjs\b`,
   ].join('|')
 )
 const CHECK_NAME =
   /^(fail (if|when)|require|check|run playwright|run burn-in)\b|\b(tests|suite|acceptance|proofs?|evaluation|budgets?|smoke|comment)\b/i
 const CHECK_ACTION = /^\.\/\.github\/actions\/[\w-]+-comment$/
 
-/**
- * Steps this rule does not own. `node --test` steps are gated by their own change, and
- * the KVM step keeps its existing condition.
- */
-export function exempt(step) {
-  return (
-    /\bnode --test\b/.test(step.run ?? '') ||
-    /^Enable and verify Android hardware acceleration\b/.test(step.name ?? '')
-  )
-}
-
 export function isCheck(step) {
-  if (exempt(step)) return false
   return (
     CHECK_COMMAND.test(step.run ?? '') ||
     CHECK_NAME.test(step.name ?? '') ||
@@ -48,27 +40,31 @@ export function isCheck(step) {
   )
 }
 
-export function runsAfterFailure(step) {
-  return /!\s*cancelled\(\)|\balways\(\)/.test(String(step.if ?? ''))
-}
-
+const STATUS = /!\s*cancelled\(\)|\balways\(\)/
 const label = (step, index) => step.name ?? step.uses ?? `step ${index + 1}`
 
-/** Every step a preceding failed check would silently skip, as `job: step`. */
-export function shadowedSteps(workflow) {
-  const shadowed = []
+/** Every condition that breaks the rule, as `job: step: reason`. */
+export function conditionViolations(workflow) {
+  const violations = []
   for (const [job, definition] of Object.entries(workflow?.jobs ?? {})) {
     const steps = definition?.steps ?? []
     const first = steps.findIndex((step) => isCheck(step) && !step['continue-on-error'])
-    if (first === -1) continue
-    const last = steps.findLastIndex((step) => isCheck(step))
-    for (let index = first + 1; index <= last; index++) {
-      const step = steps[index]
-      if (exempt(step) || runsAfterFailure(step)) continue
-      shadowed.push(`${job}: ${label(step, index)}`)
+    const earlier = new Set()
+    for (const [index, step] of steps.entries()) {
+      const condition = String(step.if ?? '')
+      if (first !== -1 && index > first && !STATUS.test(condition))
+        violations.push(
+          `${job}: ${label(step, index)}: implicit success() after a check that can fail`
+        )
+      for (const [, id] of condition.matchAll(/\bsteps\.([A-Za-z0-9_-]+)\./g))
+        if (!earlier.has(id))
+          violations.push(
+            `${job}: ${label(step, index)}: names steps.${id}, which is not an earlier step`
+          )
+      if (step.id) earlier.add(step.id)
     }
   }
-  return shadowed
+  return violations
 }
 
 /** Workflows that run on pull requests directly or are called by one. */
