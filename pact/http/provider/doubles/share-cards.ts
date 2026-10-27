@@ -1,19 +1,30 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { preparedShareCardFixture } from '@couture/api-client/testing/share-card-fixture'
-import type { PrepareShareCardInput } from '@couture/api-client/contracts/http'
+
+/** The outcome each share-card provider state configures for the next interaction. */
+export type ShareCardOutcome =
+  | 'prepared'
+  | 'denied'
+  | 'source_unavailable'
+  | 'preview_changed'
+let outcome: ShareCardOutcome = 'prepared'
+export function configureShareCardOutcome(next: ShareCardOutcome) {
+  outcome = next
+}
+export function resetShareCardOutcome() {
+  outcome = 'prepared'
+}
 export const shareCardServiceDouble = {
-  prepare: (_member: string, input: PrepareShareCardInput) => {
-    const id =
-      input.source.kind === 'outfit' ? input.source.recommendationId : input.source.postId
-    if (id === 'denied')
+  prepare: () => {
+    if (outcome === 'denied')
       throw new ForbiddenException({ statusCode: 403, code: 'denied', message: 'denied' })
-    if (id === 'missing')
+    if (outcome === 'source_unavailable')
       throw new NotFoundException({
         statusCode: 404,
         code: 'source_unavailable',
         message: 'source_unavailable',
       })
-    if (id === 'changed')
+    if (outcome === 'preview_changed')
       throw new ConflictException({
         statusCode: 409,
         code: 'preview_changed',

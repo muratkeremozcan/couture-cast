@@ -5,6 +5,7 @@ import {
   type ProviderLocationScenario,
 } from './state'
 import type { VerifierOptions } from '@pact-foundation/pact'
+import { configureShareCardOutcome, type ShareCardOutcome } from './doubles/share-cards'
 import type {
   EntitlementStore,
   PremiumThemeKey,
@@ -103,9 +104,28 @@ const locationState =
     return Promise.resolve({ description, ...injected })
   }
 
+const shareCardState = (outcome: ShareCardOutcome, description: string) => () => {
+  configureShareCardOutcome(outcome)
+  return Promise.resolve({ description })
+}
+
 export const stateHandlers: StateHandlers = {
-  'An eligible member prepares a share card': () =>
-    Promise.resolve({ description: 'An eligible member prepares a share card' }),
+  'An eligible member prepares a share card': shareCardState(
+    'prepared',
+    'An eligible member prepares a share card'
+  ),
+  'The share-card member is denied': shareCardState(
+    'denied',
+    'Configured a live access denial for the share-card member'
+  ),
+  'The share-card source is unavailable': shareCardState(
+    'source_unavailable',
+    'Configured an unavailable share-card source'
+  ),
+  'The share-card preview changed': shareCardState(
+    'preview_changed',
+    'Configured a composition that changed after its preview'
+  ),
 
   /* ----------------------------------------------------------------------- *
    * Story 1.2b client location capture.

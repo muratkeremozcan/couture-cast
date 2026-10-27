@@ -1,6 +1,6 @@
 import { ShareCardsController } from '../../../apps/api/src/modules/share-cards/share-cards.controller'
 import { ShareCardsService } from '../../../apps/api/src/modules/share-cards/share-cards.service'
-import { shareCardServiceDouble } from './doubles/share-cards'
+import { resetShareCardOutcome, shareCardServiceDouble } from './doubles/share-cards'
 import { CommunitySyncController } from '../../../apps/api/src/modules/community/community-sync.controller.js'
 import { CommunityPreferencesService } from '../../../apps/api/src/modules/community/community-preferences.service.js'
 import { CommunitySyncService } from '../../../apps/api/src/modules/community/community-sync.service.js'
@@ -166,6 +166,7 @@ export function resetProviderState() {
   resetProviderCommunityState()
   resetProviderEngagementState()
   resetProviderLocationState()
+  resetShareCardOutcome()
 }
 
 export function parsePactEvent(event: PactEvent | string) {

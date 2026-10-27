@@ -5,14 +5,52 @@ import { ResponseError, shareCardsClient } from '@couture/api-client'
 import { preparedShareCardFixture } from '@couture/api-client/testing/share-card-fixture'
 import { pactEventHeaders, type CreateClient } from './shared'
 
+const prepared = 'An eligible member prepares a share card'
+// Each refusal names its own provider state; the request ids are labels only.
 export const shareCardInteractions = [
-  { kind: 'outfit', purpose: 'preview', id: 'owned-outfit', status: 200 },
-  { kind: 'community_post', purpose: 'preview', id: 'owned-post', status: 200 },
-  { kind: 'outfit', purpose: 'save', id: 'owned-outfit', status: 200 },
-  { kind: 'community_post', purpose: 'save', id: 'owned-post', status: 200 },
-  { kind: 'outfit', purpose: 'preview', id: 'denied', status: 403 },
-  { kind: 'community_post', purpose: 'preview', id: 'missing', status: 404 },
-  { kind: 'community_post', purpose: 'save', id: 'changed', status: 409 },
+  {
+    kind: 'outfit',
+    purpose: 'preview',
+    id: 'owned-outfit',
+    status: 200,
+    state: prepared,
+  },
+  {
+    kind: 'community_post',
+    purpose: 'preview',
+    id: 'owned-post',
+    status: 200,
+    state: prepared,
+  },
+  { kind: 'outfit', purpose: 'save', id: 'owned-outfit', status: 200, state: prepared },
+  {
+    kind: 'community_post',
+    purpose: 'save',
+    id: 'owned-post',
+    status: 200,
+    state: prepared,
+  },
+  {
+    kind: 'outfit',
+    purpose: 'preview',
+    id: 'denied',
+    status: 403,
+    state: 'The share-card member is denied',
+  },
+  {
+    kind: 'community_post',
+    purpose: 'preview',
+    id: 'missing',
+    status: 404,
+    state: 'The share-card source is unavailable',
+  },
+  {
+    kind: 'community_post',
+    purpose: 'save',
+    id: 'changed',
+    status: 409,
+    state: 'The share-card preview changed',
+  },
 ] as const
 export async function verifyShareCardInteraction(
   pact: PactV4,
@@ -42,7 +80,7 @@ export async function verifyShareCardInteraction(
     .addInteraction()
     .given(
       ...createProviderState({
-        name: 'An eligible member prepares a share card',
+        name: scenario.state,
         params: {},
       })
     )
