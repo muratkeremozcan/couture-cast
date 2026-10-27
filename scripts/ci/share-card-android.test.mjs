@@ -104,3 +104,19 @@ test('Android CI stops before install unless the running emulator reports usable
   assert.ok(check > 0 && check < script.indexOf('adb -s "$ANDROID_SERIAL" install'))
   assert.match(script, /grep -q 'KVM .* is installed and usable'/)
 })
+test('Android CI settles the KVM udev rule after the trigger and before the device test', async () => {
+  const workflow = parse(
+    await readFile('.github/workflows/pr-share-card-native.yml', 'utf8')
+  )
+  const step = workflow.jobs['original-resource'].steps.find(
+    (row) => row.name === 'Enable and verify Android hardware acceleration'
+  )
+  const lines = step.run.split('\n').map((line) => line.trim())
+  const trigger = lines.indexOf('sudo udevadm trigger --name-match=kvm')
+  const settle = lines.findIndex((line) =>
+    /^sudo udevadm settle --timeout=\d+$/.test(line)
+  )
+  const device = lines.indexOf('test -r /dev/kvm && test -w /dev/kvm')
+  // trigger only queues the uevent, so the 0666 rule can land after an unsettled test.
+  assert.ok(trigger >= 0 && settle > trigger && device > settle, step.run)
+})
