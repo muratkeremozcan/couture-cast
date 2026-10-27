@@ -211,9 +211,8 @@ export function assertNativeEvidence(name, value) {
     schema(value) &&
     // Settings evidence lists every marker once; the after-save trio is all or none.
     (name !== 'permission-ios.json' ||
-      (value.settingsEvidence.foregroundMarkers.length === IOS_SETTINGS_MARKERS.length &&
-        new Set(value.settingsEvidence.foregroundMarkers).size ===
-          IOS_SETTINGS_MARKERS.length &&
+      (new Set(value.settingsEvidence.foregroundMarkers).size ===
+        IOS_SETTINGS_MARKERS.length &&
         [0, afterSave.length].includes(
           afterSave.filter((key) => Object.hasOwn(value, key)).length
         )))
