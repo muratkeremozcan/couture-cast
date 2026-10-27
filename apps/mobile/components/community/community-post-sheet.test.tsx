@@ -9,6 +9,7 @@ import React, { createElement, useState } from 'react'
 import { run as runAxe } from 'axe-core'
 import { page as browserPage } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
+import type * as CommunityModule from '@/src/lib/community'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { delay, http, HttpResponse } from 'msw'
 import {
@@ -40,6 +41,14 @@ const imagePicker = vi.hoisted(() => ({
   launchImageLibraryAsync: vi.fn(),
 }))
 vi.mock('expo-image-picker', () => imagePicker)
+// Counts allocation where the sheet calls it, before any network hop.
+vi.mock('@/src/lib/community', async (importOriginal) => {
+  const actual = await importOriginal<typeof CommunityModule>()
+  return {
+    ...actual,
+    allocateCommunityLookFromMobile: vi.fn(actual.allocateCommunityLookFromMobile),
+  }
+})
 
 const imageManipulator = vi.hoisted(() => ({ manipulateAsync: vi.fn() }))
 vi.mock('expo-image-manipulator', () => ({
@@ -119,7 +128,10 @@ import {
 } from '@couture/api-client/contracts/http'
 import enUS from '@/assets/locales/en-US.json'
 import i18n, { initI18n } from '@/src/lib/i18n'
-import { CommunityRequestError } from '@/src/lib/community'
+import {
+  CommunityRequestError,
+  allocateCommunityLookFromMobile,
+} from '@/src/lib/community'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { press } from '@/src/test-utils/press'
 import { server } from '@/src/test-utils/msw/server'
@@ -281,7 +293,7 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     await i18n.changeLanguage('en-US')
   })
 
-  it.each(['verified', 'denied', 'close', 'identity'] as const)(
+  it.each(['verified', 'hidden', 'close', 'identity'] as const)(
     'retains a deferred PHPicker selection during foreground suspension and resumes only for %s',
     async (outcome) => {
       Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
@@ -322,6 +334,7 @@ describe('CommunityPostSheet (Story 6.1)', () => {
       if (outcome === 'verified') {
         view.rerender(<CommunityPostSheet visible suspended={false} {...callbacks} />)
         await waitFor(() => expect(allocations).toBe(1))
+        expect(allocateCommunityLookFromMobile).toHaveBeenCalledOnce()
         await waitFor(() =>
           expect(
             screen.getByTestId<HTMLTextAreaElement>('community-alt-text-input').value
@@ -339,9 +352,12 @@ describe('CommunityPostSheet (Story 6.1)', () => {
             {...callbacks}
           />
         )
+        // Cancelling the suspended wait and any resume both run as microtasks, so one
+        // macrotask is enough for a regression to reach the allocate call.
         await act(async () => {
-          await Promise.resolve()
+          await new Promise((resolve) => setTimeout(resolve, 0))
         })
+        expect(allocateCommunityLookFromMobile).not.toHaveBeenCalled()
         expect(allocations).toBe(0)
         expect(
           screen.queryByTestId('community-post-preview-image')
