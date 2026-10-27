@@ -29,6 +29,8 @@ it.each(['request', 'response'] as const)(
       request as never,
       response as never
     )
+    // The aborted-signal assertion lives in the double; it ran only if prepare did.
+    expect(prepare).toHaveBeenCalledOnce()
     expect(request.listenerCount('aborted')).toBe(0)
     expect(response.listenerCount('close')).toBe(0)
   }
@@ -54,6 +56,7 @@ describe('completed HTTP request', () => {
         response as never
       )
     ).resolves.toEqual({ data: preparedShareCardFixture })
+    expect(prepare).toHaveBeenCalledOnce()
     expect(response.listenerCount('close')).toBe(0)
   })
 })
