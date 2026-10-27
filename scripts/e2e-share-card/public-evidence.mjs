@@ -10,6 +10,10 @@ import {
   browserWatermarkChecks,
 } from '../lib/story68-browser-watermark.mjs'
 import { assertWebStartupEvidence } from './wait-web.mjs'
+import {
+  assertNativeEvidence,
+  nativeEvidenceFamilies,
+} from '../lib/story68-native-evidence-schema.mjs'
 const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
@@ -84,6 +88,20 @@ if (fs.existsSync(path.join(directory, webStartupName))) {
   }
   assertWebStartupEvidence(value)
   proofs.set(webStartupName, value)
+}
+// Matrix, accessibility and permission records publish whole, so each must match its
+// closed schema before anything is copied.
+const nativeEvidence = new Map()
+for (const name of nativeEvidenceFamilies) {
+  const file = path.join(directory, name)
+  if (!fs.existsSync(file)) continue
+  let value
+  try {
+    value = JSON.parse(fs.readFileSync(file))
+  } catch {
+    throw new Error('invalid_native_evidence')
+  }
+  nativeEvidence.set(name, assertNativeEvidence(name, value))
 }
 const releaseName = 'native-release-live-font-android.json'
 const releaseFile = path.join(directory, releaseName)
@@ -290,12 +308,7 @@ for (const name of fs.readdirSync(directory)) {
       featureCacheEmpty: proof.featureCacheEmpty,
     })
   }
-  if (
-    /^(native-matrix-(android|ios)|accessibility-(android|ios|bridge)|expo-go-unavailable|permission-ios)\.json$/.test(
-      name
-    )
-  )
-    closedJSON(name, JSON.parse(fs.readFileSync(path.join(directory, name))))
+  if (nativeEvidence.has(name)) closedJSON(name, nativeEvidence.get(name))
 }
 for (const name of fs.readdirSync(staging))
   fs.renameSync(path.join(staging, name), path.join(output, name))
