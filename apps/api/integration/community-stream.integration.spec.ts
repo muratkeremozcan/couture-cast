@@ -232,9 +232,16 @@ describe('Story 6.5 committed stream append', () => {
     )
   }, 20000)
 
-  it.each([0, 20])(
+  // 100 events at a 25-event ready limit is four batches. With 20 ms per candidate the
+  // 150 ms preparation window admits about six, so about 17 batches; 34 still requires
+  // three or more candidates per batch, and a slower candidate would already break the
+  // 5 s burst bound below.
+  it.each([
+    [0, 8],
+    [20, 34],
+  ])(
     'A03 routine head contention preserves capacity and commits 100 contiguous events with %ims real candidate latency',
-    async (delayMs) => {
+    async (delayMs, maxBatches) => {
       const { post, user } = await fixture()
       const priorTelemetry = await prisma.communityEngagementTelemetry.findMany({
         select: { id: true },
@@ -287,7 +294,7 @@ describe('Story 6.5 committed stream append', () => {
           expect(performance.now() - start).toBeLessThan(5000)
         }
         expect(batches[0]).toBeGreaterThan(1)
-        if (delayMs === 0) expect(batches.length).toBeLessThanOrEqual(8)
+        expect(batches.length).toBeLessThanOrEqual(maxBatches)
         expect(capacities).toEqual(batches.map(() => 25))
         const events = await prisma.communityStreamEvent.findMany({
           where: { stream_id: 'public' },
