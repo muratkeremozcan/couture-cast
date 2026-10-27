@@ -189,7 +189,8 @@ describe('deployment workflows', () => {
         expect(reserve, `${file} ${job}`).toBeLessThan(start)
       }
     }
-    expect(startingJobs).toBe(7)
+    // pr-share-card-native.yml starts it twice: the image prewarm job and the native lane.
+    expect(startingJobs).toBe(8)
   })
 
   it('local Supabase starts from the image cache with its host ports guarded', () => {
