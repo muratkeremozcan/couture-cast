@@ -1,5 +1,6 @@
 import { act } from '@testing-library/react'
 import { expect, vi } from 'vitest'
+import { drainMacrotask } from './drain-macrotask'
 
 /**
  * Records every JSON body the app reads from a URL containing `urlPart`, so a test can
@@ -23,7 +24,7 @@ export function trackJsonBodies(urlPart: string) {
       await vi.waitFor(() => expect(bodies).toHaveLength(count))
       await act(async () => {
         await Promise.allSettled(bodies)
-        await new Promise((resolve) => setTimeout(resolve, 0))
+        await drainMacrotask()
       })
     },
   }

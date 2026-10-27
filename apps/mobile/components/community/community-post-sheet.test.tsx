@@ -134,6 +134,7 @@ import {
 } from '@/src/lib/community'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { press } from '@/src/test-utils/press'
+import { drainMacrotask } from '@/src/test-utils/drain-macrotask'
 import { server } from '@/src/test-utils/msw/server'
 import {
   CommunityPostSheet,
@@ -355,7 +356,7 @@ describe('CommunityPostSheet (Story 6.1)', () => {
         // Cancelling the suspended wait and any resume both run as microtasks, so one
         // macrotask is enough for a regression to reach the allocate call.
         await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 0))
+          await drainMacrotask()
         })
         expect(allocateCommunityLookFromMobile).not.toHaveBeenCalled()
         expect(allocations).toBe(0)

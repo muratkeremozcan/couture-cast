@@ -7,9 +7,8 @@ vi.mock('../../modules/accessibility-focus', () => ({
   focusAccessibilityElement: bridge.focus,
 }))
 import { focusShareCardElement } from './share-card-focus'
-// The fallback runs in a promise chain on the bridge result; one macrotask drains it,
-// however many hops the chain has.
-const drainBridgeChain = () => new Promise((resolve) => setTimeout(resolve, 0))
+// The fallback runs in a promise chain on the bridge result; drainMacrotask settles it.
+import { drainMacrotask } from '@/src/test-utils/drain-macrotask'
 beforeEach(() => {
   bridge.focus.mockReset()
   bridge.fallback.mockReset()
@@ -21,11 +20,11 @@ it('uses the real native bridge and falls back only for an attached current targ
   bridge.fallback.mockClear()
   bridge.focus.mockResolvedValue(true)
   focusShareCardElement(42)
-  await drainBridgeChain()
+  await drainMacrotask()
   expect(bridge.fallback).not.toHaveBeenCalled()
   bridge.focus.mockRejectedValue(new Error('unavailable'))
   focusShareCardElement(43)
-  await drainBridgeChain()
+  await drainMacrotask()
   expect(bridge.fallback).toHaveBeenCalledExactlyOnceWith(43)
 })
 it('drops a delayed fallback after close or identity replacement, including a return to the same member', async () => {
@@ -40,7 +39,7 @@ it('drops a delayed fallback after close or identity replacement, including a re
   focusShareCardElement(41, () => generation === 1)
   generation = 3
   complete(false)
-  await drainBridgeChain()
+  await drainMacrotask()
   expect(bridge.fallback).not.toHaveBeenCalled()
   bridge.focus.mockClear()
   focusShareCardElement(null)

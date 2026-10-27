@@ -1,6 +1,7 @@
 // Story 6.5: native SDK/storage boundaries are controlled; canonical HTTP profile remains real.
 import { http, HttpResponse } from 'msw'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+import { drainMacrotask } from '@/src/test-utils/drain-macrotask'
 import { server } from '../test-utils/msw/server'
 import { mobileApplicationUserId, resolveMobileAccessToken } from './mobile-auth'
 const sdk = vi.hoisted(() => ({
@@ -620,7 +621,7 @@ it('contains background SDK failures, retains verified scope, and recovers beare
     expect(await resolveMobileAccessToken()).toBe('local-session-a')
     cleanup()
     cleanup = undefined
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await drainMacrotask()
     expect(sdk.stopRefresh).toHaveBeenCalledTimes(2)
     expect(sdk.unsubscribe).toHaveBeenCalledTimes(1)
     expect(sdk.removeLifecycle).toHaveBeenCalledTimes(1)
