@@ -1106,6 +1106,14 @@ failure is inferred from its pending state.
 - 2026-10-27 6fb23c4d: iOS loader probes VM disk throughput and loads each image alone with its
   bytes and duration.
 
+- 2026-10-27 TEA phase 2: 97c7a1fc removed `killStaleIosDrivers()` from `scripts/run-maestro.mjs`
+  because its `pkill -f` on the iOS driver patterns killed other sessions' drivers on the shared
+  Mac. That left a stale driver from a crashed run free to hold host port 7001 and fail the next
+  first flow. `scripts/lib/maestro-ios-driver-ownership.mjs` replaces it: the runner records the
+  driver PIDs it spawns in a per-checkout pidfile, kills only those PIDs on the next start after
+  confirming each command line still matches, and fails fast naming the PID when a process it
+  does not own holds port 7001.
+
 ## Review Triage Log
 
 - Astra round 1 on `cfed026c7709c31a1d80970ff3ed074174358ecdd50a135c8dce96a5b248c02b`:
