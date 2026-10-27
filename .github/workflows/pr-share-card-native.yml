@@ -179,6 +179,15 @@ jobs:
         id: native_build
         if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && (matrix.platform != 'android' || (steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success')) }}
         run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
+      - name: Verify modal status-bar styling on both Android SDK branches
+        if: matrix.platform == 'android'
+        working-directory: apps/mobile/android
+        run: ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
+      - name: Verify the iOS original PNG and cache-file guards
+        if: matrix.platform == 'ios'
+        run: |
+          swift test --package-path apps/mobile/modules/share-card-photo-save/ios 2>&1 | tee /tmp/cc68-png-file-tests.log
+          grep -q 'Executed 4 tests, with 0 failures' /tmp/cc68-png-file-tests.log
       - name: Genuine browser share-card acceptance matrix
         if: ${{ !cancelled() && matrix.platform == 'android' && matrix.api == 36 && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
         run: |
