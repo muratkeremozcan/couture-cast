@@ -17,6 +17,7 @@ import { androidNavigationSnapshot } from '@/src/lib/android-navigation-restorat
 import { server } from '@/src/test-utils/msw/server'
 import { item, serveFeed, feedJson } from './harness'
 import { press } from '@/src/test-utils/press'
+import { trackJsonBodies } from '@/src/test-utils/late-response'
 function Home({ navigate }: { navigate: () => void }) {
   const intent = useAndroidNavigationIntent()
   return (
@@ -227,10 +228,9 @@ export function registerCommunityRootRestorationCases() {
     try {
       await waitFor(() => expect(entered).toBe(true))
       act(() => setMobileApplicationUserId(null))
-      await act(async () => {
-        held.resolve()
-        await held.promise
-      })
+      const late = trackJsonBodies('/api/v1/community/spotlight')
+      held.resolve()
+      await late.settled()
       expect(
         screen.queryByTestId('community-spotlight-detail-title')
       ).not.toBeInTheDocument()
