@@ -16,7 +16,7 @@ final class ShareCardFallbackUITests: XCTestCase {
     app.activate()
     XCTAssertTrue(element("share-card-title").waitForExistence(timeout: 20))
     XCTAssertEqual(element("share-card-title").label, fixture["title"]!)
-    XCTAssertTrue(app.images.matching(NSPredicate(format: "identifier BEGINSWITH %@", "share-card-preview-loaded-")).firstMatch.exists)
+    XCTAssertTrue(app.images.matching(NSPredicate(format: "identifier BEGINSWITH %@", "share-card-preview-loaded-")).firstMatch.waitForExistence(timeout: 20))
     let cancel = element("share-card-cancel")
     XCTAssertEqual(cancel.label, fixture["cancel"]!)
     for _ in 0..<8 where !cancel.isHittable { app.swipeUp() }

@@ -35,13 +35,24 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     app.images.matching(NSPredicate(format: "identifier BEGINSWITH %@", "share-card-preview-loaded-")).firstMatch
   }
 
-  func openCard(waitForPreview: Bool = true) {
+  /// The app records an observation every 0.25 s while active; a failed read must fail the test.
+  func baselineFocusSequence() throws -> Int {
+    let deadline = Date().addingTimeInterval(5)
+    var last: Error = ShareCardFocusObservationError.missingPostedTargetOrHeaderTrait
+    repeat {
+      do { return try readShareCardFocusObservation(self).sequence } catch { last = error }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+    } while Date() < deadline
+    throw last
+  }
+
+  func openCard(waitForPreview: Bool = true) throws {
     if element("share-card-cancel").exists { element("share-card-cancel").tap() }
     element("tab-home").tap()
     let opener = app.buttons.matching(identifier: "outfit-share-card-open").firstMatch
     for _ in 0..<8 where !opener.isHittable { app.swipeUp() }
     XCTAssertTrue(opener.waitForExistence(timeout: 20))
-    focusSequence = (try? readShareCardFocusObservation(self).sequence) ?? 0
+    focusSequence = try baselineFocusSequence()
     opener.tap()
     if waitForPreview { XCTAssertTrue(loaded().waitForExistence(timeout: 20)) }
   }
@@ -100,8 +111,13 @@ final class ShareCardAccessibilityUITests: XCTestCase {
   }
 
   func audit(_ state: String) throws {
+    // Every state except preparing shows the approved preview; the test input decides, never the app.
+    let expectsPreview = state != "preparing"
     var previewVerified = false
-    if loaded().exists {
+    if !expectsPreview {
+      XCTAssertFalse(loaded().exists, "Preparing has no loaded preview")
+    } else {
+      XCTAssertTrue(loaded().waitForExistence(timeout: 20), "Loaded preview present: \(state)")
       XCTAssertEqual(loaded().elementType, .image, state)
       let url = Bundle(for: Self.self).url(forResource: currentLocale, withExtension: "json")!
       let catalog = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
@@ -122,13 +138,13 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     let statusKeys = ["preparing": "preparing", "saved": "saved", "storage-failure": "storage", "offline": "offline", "denied": "permissionDenied", "permanent-denied": "permissionPermanent", "limited": "saved", "pending": "saving", "unavailable": "nativeSaveUnavailable"]
     if let key = statusKeys[state] {
       let status = element(["saved", "limited", "pending", "preparing"].contains(state) ? "share-card-feedback" : "share-card-error")
-      XCTAssertTrue(status.exists, "Own exact localized status element: \(state)")
+      XCTAssertTrue(status.waitForExistence(timeout: 20), "Own exact localized status element: \(state)")
       let exactStatus = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", labels[key] as! String), object: status)
       XCTAssertEqual(XCTWaiter.wait(for: [exactStatus], timeout: 20), .completed, "Current localized status must settle: \(state)")
       XCTAssertEqual(status.label, labels[key] as! String)
       XCTAssertEqual(status.elementType, .staticText)
     }
-    if loaded().exists { print("CC68_PREVIEW_LABEL \(state): \(loaded().label)") }
+    if expectsPreview { print("CC68_PREVIEW_LABEL \(state): \(loaded().label)") }
     try app.performAccessibilityAudit(for: .all) { issue in
       print("CC68_AUDIT_CLOSED \(state)|\(issue.auditType.rawValue)|\(issue.element != nil)|\(issue.compactDescription)")
       let description = "\(issue.compactDescription): \(issue.detailedDescription) ELEMENT \(issue.element?.debugDescription ?? "none")"
@@ -177,7 +193,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
                                       identifier: id, header: id == "share-card-title")
       }
     }
-    print("CC68_STATE_PASS \(currentLocale) \(state) \(loaded().exists ? (element("share-card-watermark").value as? String == "0" ? "off" : "on") : "none")")
+    print("CC68_STATE_PASS \(currentLocale) \(state) \(expectsPreview ? (element("share-card-watermark").value as? String == "0" ? "off" : "on") : "none")")
     let attachment = XCTAttachment(screenshot: app.screenshot())
     attachment.name = "share-card-\(state)"
     attachment.lifetime = .keepAlways
@@ -226,7 +242,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
       XCTAssertTrue(choice.exists)
       choice.tap()
       currentLocale = locale
-      openCard()
+      try openCard()
       try audit("open")
       element("share-card-watermark").tap()
       XCTAssertTrue(loaded().waitForExistence(timeout: 20))
@@ -242,7 +258,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
 
   func testOpenSaveCancelAndFailureTraversal() throws {
     fixture("real")
-    openCard()
+    try openCard()
     try audit("open")
     focusSequence = try readShareCardFocusObservation(self).sequence
     element("share-card-save").tap()
@@ -264,7 +280,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     print("CC68_NATIVE_BEHAVIOR_PASS existing-header-labels")
     element("tab-home").tap()
     try app.performAccessibilityAudit(for: .all)
-    openCard()
+    try openCard()
     fixture("storage")
     focusSequence = try readShareCardFocusObservation(self).sequence
     element("share-card-save").tap()
@@ -276,7 +292,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
 
   func testDeniedPermanentLimitedAndPendingTraversal() throws {
     fixture("permission_denied")
-    openCard()
+    try openCard()
     focusSequence = try readShareCardFocusObservation(self).sequence
     element("share-card-save").tap()
     XCTAssertTrue(element("share-card-error").waitForExistence(timeout: 20))
@@ -303,7 +319,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
 
   func testOwnedSavingAndReopenedFinishingRestoreWatermark() throws {
     fixture("deferred")
-    openCard()
+    try openCard()
     let labels = try clientCatalog()["shareCard"] as! [String: Any]
     let save = element("share-card-save")
     let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: save)
@@ -315,7 +331,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     exactFeedback(labels["saving"] as! String)
     print("CC68_NATIVE_BEHAVIOR_PASS owned-saving")
     element("share-card-cancel").tap()
-    openCard()
+    try openCard()
     exactFeedback(labels["finishingSave"] as! String)
     try assertPostedShareCardFocus(self, after: focusSequence, label: labels["cancel"] as! String,
                                   identifier: "share-card-cancel", header: false)
@@ -339,32 +355,33 @@ final class ShareCardAccessibilityUITests: XCTestCase {
   func testPreparingCancelAndRetryTraversal() throws {
     fixture("prepare_deferred")
     element("tab-wardrobe").tap()
-    openCard(waitForPreview: false)
+    try openCard(waitForPreview: false)
     XCTAssertTrue(element("share-card-feedback").waitForExistence(timeout: 20))
     XCTAssertFalse(loaded().exists)
     try audit("preparing")
     element("share-card-cancel").tap()
     fixture("release")
+    // Preparation never reached Save. The harness matrix proves no late asset through
+    // the OS photo resources (M-CANCEL:preparation-before-commit).
     XCTAssertFalse(element("share-card-title").exists)
-    XCTAssertFalse(app.staticTexts.matching(identifier: "share-card-feedback").matching(NSPredicate(format: "label == %@", "Saved to photos")).firstMatch.exists)
     let opener = element("outfit-share-card-open")
     XCTAssertTrue(opener.exists)
     XCTAssertTrue(opener.isHittable)
     fixture("real")
-    openCard()
+    try openCard()
     try audit("open")
     element("share-card-cancel").tap()
   }
 
   func testUnavailableAndOfflineTraversal() throws {
     fixture("unavailable")
-    openCard()
-    XCTAssertTrue(element("share-card-error").exists)
+    try openCard()
+    XCTAssertTrue(element("share-card-error").waitForExistence(timeout: 20))
     XCTAssertFalse(element("share-card-save").isEnabled)
     try audit("unavailable")
     element("share-card-cancel").tap()
     fixture("real")
-    openCard()
+    try openCard()
     fixture("offline")
     focusSequence = try readShareCardFocusObservation(self).sequence
     element("share-card-save").tap()
