@@ -1085,6 +1085,27 @@ failure is inferred from its pending state.
   refusal, late identity, Cancel, navigation and fresh-heading controls pass with the complete
   affected 360-test suite. Genuine rebuilt Release acceptance remains the next required check.
 
+- 2026-10-26 AppText revert (51d29f19): the coordinator approved removing the shared AppText
+  font-scale repair, its 27 import migrations and its navigation text changes. Unchanged main
+  1d7b9848 kept 43/43/43 visible text nodes across a live 1.0 to 1.5 font change in Release,
+  while the repair kept only 5 of 44, an added regression. Composer, route and detail restoration
+  across Activity recreation and the secure-session auth-gap repair stay.
+- 2026-10-27 CC-6.15 split: live font-scale clipping is fixed upstream in React Native 0.87.0
+  (commit 45904c8, enabled by default in 0.87 and 0.88) and needs Expo SDK 58. A source backport to
+  0.81.5 needs rebuilt renderer artifacts for every Fabric consumer and ABI and does not address the
+  repair's blank-text regression, so the upgrade moves to Story CC-6.15 (backlog) and this story
+  keeps the stock renderer with measured heights and no claim that clipping is fixed.
+- 2026-10-27 300dfe07: App Router startup error capture, iOS VM-side image load with stage report,
+  Mac Actions image cache off, Android KVM check.
+- 2026-10-27 4638eeee: Android open outcome reported; Home and Community open their own composer
+  visibly when the root dialog declines; test-build dialog trace; Maestro step diagnostics;
+  control-character-safe startup summary; garment focus wait sized to its 400 ms timer.
+- 2026-10-27 a3a3e635: KVM check moved into the emulator journey script after the runner installs
+  the emulator.
+- 2026-10-27 01973458: community readiness names every owned target resolve status on timeout.
+- 2026-10-27 6fb23c4d: iOS loader probes VM disk throughput and loads each image alone with its
+  bytes and duration.
+
 ## Review Triage Log
 
 - Astra round 1 on `cfed026c7709c31a1d80970ff3ed074174358ecdd50a135c8dce96a5b248c02b`:
@@ -1297,3 +1318,42 @@ Subsequent build logs and staging reports are copied into their individual evide
   report names each image, its uncompressed bytes and its stage duration, so the next run shows
   whether Postgres (about 70 percent of the bytes by local measurement) owns the budget. The 600 s
   total is unchanged.
+
+## Dev Agent Record
+
+- Builders: `cc68-impl` (Codex) through 28b614fe; `cc68c-impl` (Claude) from 2026-10-27 after the
+  Codex weekly limit, resuming from `implementation-checkpoint.md`.
+- Published head 6fb23c4d on PR #162; status stays in-review. Native CI lanes (API36 web, API32
+  open-outfit, iOS image load) are under diagnosis with evidence under
+  `_bmad-output/test-artifacts/story-6-8/runs/` and `ci-*` directories.
+- Blind holdout v6: pending. TEA owns its authoring, seal, evaluation and release gate; the builder
+  has accessed no v6 content or results.
+- Follow-up: Story CC-6.15 (Expo SDK 58 upgrade for live font-scale layout), backlog.
+
+## File List
+
+546 paths changed from main 1d7b9848 through 6fb23c4d (`git diff --name-only 1d7b9848 6fb23c4d`
+is authoritative): apps/api 241, apps/mobile 118, scripts 79, maestro 37, apps/web 25,
+packages/api-client 16, playwright 12, pact 9, .github 4, \_bmad-output 4, package-lock.json 1.
+
+Changed after 28b614fe:
+
+- `.github/workflows/pr-share-card-native.yml`
+- `_bmad-output/implementation-artifacts/spec-6-8-safe-branded-share-card-export.md`
+- `apps/mobile/components/android-share-card-presentation.tsx`
+- `apps/mobile/components/share-card-presentation.test.tsx`
+- `apps/mobile/src/lib/share-card-native-fixture.native.ts`
+- `apps/mobile/src/lib/share-card-presentation-trace.ts`
+- `apps/mobile/src/lib/share-card-presentation.ts`
+- `apps/mobile/src/screens/hero-experience.test.tsx`
+- `scripts/ci/share-card-android.sh`
+- `scripts/ci/share-card-android.test.mjs`
+- `scripts/ci/share-card-supabase-artifact.mjs`
+- `scripts/ci/share-card-supabase-artifact.test.mjs`
+- `scripts/e2e-share-card/wait-web.mjs`
+- `scripts/e2e-share-card/wait-web.test.mjs`
+- `scripts/e2e-share-card/web-startup-failure.mjs`
+- `scripts/lib/share-card-native-diagnostics.mjs`
+- `scripts/lib/share-card-native-diagnostics.test.mjs`
+- `scripts/lib/story68-browser-watermark.mjs`
+- `scripts/lib/story68-browser-watermark.test.mjs`

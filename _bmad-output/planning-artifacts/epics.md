@@ -700,6 +700,31 @@ family testers can use premium and community features in production.
    identity on the established schedule.
    **Prerequisites:** CC-5.2, CC-6.5, CC-1.2b.
 
+**Story CC-6.15: Expo SDK 58 upgrade for live font-scale layout**
+As a member who changes the system text size while the app is open, I want every screen to relayout
+at the new size so that enlarged text is never clipped or blanked until the next cold launch.
+**Acceptance Criteria**
+
+1. Upgrade the mobile app from Expo SDK 54 and React Native 0.81.5 to Expo SDK 58 with the React
+   Native version that SDK pins (0.88.x), including every Expo module, config plugin, Worklets and
+   Reanimated build, dev client and Release build, with native artifacts rebuilt for every shipped
+   ABI. React Native 0.87.0 is the first stable release containing the upstream font-scale layout
+   fix (commit 45904c8), and stable 0.87 and 0.88 enable `enableFontScaleChangesUpdatingLayout` by
+   default; SDK 57 pins 0.86.3 without it.
+2. Remove the Story 6.8 font workarounds that the upgrade makes unnecessary and keep any that
+   remain required, recording the reason for each.
+3. Prove on Android and iOS, Debug and non-debuggable Release, that changing the system font scale
+   from 1.0 to 1.5 while the app runs relayouts Home, Community, Settings and the share-card
+   composer without clipped or missing text: the same visible text nodes before, immediately after
+   and after settling, heights that grow with the scale, and no process restart. Main at
+   1d7b9848 is the failing baseline (43 nodes kept, temperature height fixed at 169 px, clipped
+   screenshots).
+4. Keep every existing unit, integration, Playwright and Maestro suite green, with the native
+   share-card journeys, accessibility focus bridge and large-text matrix rerun on the upgraded
+   build.
+   **Prerequisites:** CC-6.8.
+   **Facts:** `_bmad-output/test-artifacts/story-6-8/review-font-three-facts.md`.
+
 ### Epic 6 refinement decision
 
 The product brief requires follow and unfollow behavior from feed and profile views. FR4 and the
