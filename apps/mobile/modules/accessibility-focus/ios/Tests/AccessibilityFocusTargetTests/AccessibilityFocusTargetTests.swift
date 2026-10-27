@@ -90,7 +90,6 @@ final class AccessibilityFocusTargetTests: XCTestCase {
     leaf.accessibilityTraits.insert(.header)
     paragraph.addSubview(leaf)
     window.addSubview(paragraph)
-    print("CC68_UIKIT_SURROGATE rawAX=\(leaf.accessibilityFrame) converted=\(leaf.convert(leaf.bounds, to: nil)) windowHasWindow=\(window.window != nil) windowAX=\(window.isAccessibilityElement)")
     // The RN provider supplies its screen frame explicitly. A hostless UILabel
     // surrogate must supply that same geometry without relying on an AX service.
     leaf.accessibilityFrame = leaf.convert(leaf.bounds, to: nil)
@@ -117,7 +116,6 @@ final class AccessibilityFocusTargetTests: XCTestCase {
     element.accessibilityTraits = [.header, .staticText]
     element.accessibilityFrame = paragraph.convert(paragraph.bounds, to: nil)
     paragraph.accessibilityElements = [element, element, paragraph]
-    print("CC68_UIKIT_PROVIDER windowHasWindow=\(window.window != nil) windowAX=\(window.isAccessibilityElement) windowFrame=\(window.convert(window.bounds, to: nil)) providerFrame=\(element.accessibilityFrame)")
     let actual = try XCTUnwrap(AccessibilityFocusTarget.semanticTarget(paragraph))
     XCTAssertTrue(actual === element)
     XCTAssertEqual(AccessibilityFocusTarget.visibleSemanticElements(in: window).count, 1)
@@ -165,20 +163,11 @@ final class AccessibilityFocusTargetTests: XCTestCase {
     let view = UIView()
     view.accessibilityIdentifier = "requested-title"
     let element = UIAccessibilityElement(accessibilityContainer: view)
-    func report(_ stage: String) {
-      let erasedView: NSObject = view
-      let erasedProvider: NSObject = element
-      print("CC68_IDENTIFIER_DIAGNOSTIC \(stage) viewID=\(String(describing: view.accessibilityIdentifier)) providerID=\(String(describing: element.accessibilityIdentifier)) viewProtocol=\((erasedView as? UIAccessibilityIdentification) != nil) providerProtocol=\((erasedProvider as? UIAccessibilityIdentification) != nil) viewType=\(type(of: view))")
-    }
-    report("initial")
     element.accessibilityIdentifier = "semantic-title"
-    report("provider-assigned")
     XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: element, requestedView: view), "semantic-title")
     element.accessibilityIdentifier = nil
-    report("provider-nil")
     XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: element, requestedView: view), "requested-title")
     element.accessibilityIdentifier = ""
-    report("provider-empty")
     XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: element, requestedView: view), "requested-title")
     XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: element, requestedView: nil), "")
     XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: view, requestedView: nil), "requested-title")
