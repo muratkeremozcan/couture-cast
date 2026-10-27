@@ -678,9 +678,10 @@ describe('share-card actual API and isolated database', () => {
     }
   )
   it.each(['withdrawal', 'consent', 'flag', 'source'] as const)(
-    'I-RACE: synchronized %s during rendering blocks final authorization',
+    'I-RACE: synchronized %s during save rendering blocks final authorization and audit',
     async (mutation) => {
       const row = await photoPost()
+      const input = preview({ kind: 'community_post', postId: row.id })
       let consentId: string | undefined
       if (mutation === 'consent') {
         await prisma.userProfile.update({
@@ -693,6 +694,9 @@ describe('share-card actual API and isolated database', () => {
           })
         ).id
       }
+      const card = prepareShareCardResponseSchema.parse(
+        (await post(input).expect(200)).body
+      ).data
       let release!: () => void
       let entered!: () => void
       const gate = new Promise<void>((resolve) => {
@@ -707,9 +711,11 @@ describe('share-card actual API and isolated database', () => {
         await gate
         return real(...args)
       })
-      const response = post(preview({ kind: 'community_post', postId: row.id })).then(
-        (result) => result
-      )
+      const response = post({
+        ...input,
+        purpose: 'save',
+        expectedSha256: card.sha256,
+      }).then((result) => result)
       await started
       try {
         if (mutation === 'withdrawal')
