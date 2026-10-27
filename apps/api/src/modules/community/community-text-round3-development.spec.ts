@@ -64,6 +64,7 @@ describe('round 3 development data, including released v4', () => {
     '%s preserves in-sample clean copy',
     (language, locale) => {
       const corpus = read<{ clean: Corpus }>(`${language}.json`)
+      expect(corpus.clean.entries).toHaveLength(420)
       expect(
         corpus.clean.entries.filter(
           (row: { text: string; field: TextScreeningField; expected?: string }) =>
@@ -90,21 +91,26 @@ describe('round 3 development data, including released v4', () => {
     }
   )
 
-  it.each(['development-v2.json', 'development-v3.json'])(
-    'preserves every earlier %s case',
-    (file) => {
-      for (const row of read<{ entries: { text: string; locale: string }[] }>(file)
-        .entries)
-        expect(clean(row.text, row.locale), row.text).toBe('pass')
-    }
-  )
+  it.each([
+    ['development-v2.json', 6],
+    ['development-v3.json', 24],
+  ] as const)('preserves every earlier %s case', (file, size) => {
+    const entries = read<{ entries: { text: string; locale: string }[] }>(file).entries
+    expect(entries).toHaveLength(size)
+    for (const row of entries) expect(clean(row.text, row.locale), row.text).toBe('pass')
+  })
 
   it.each(Object.entries(locales))(
     '%s preserves all retired development corpora',
     (language, locale) => {
       const allFailures: string[] = []
-      for (const version of [1, 2, 3]) {
+      for (const [version, size] of [
+        [1, 420],
+        [2, 400],
+        [3, 1000],
+      ] as const) {
         const entries = read<Corpus>(`holdout-v${version}/${language}.json`).entries
+        expect(entries, `holdout-v${version}/${language}`).toHaveLength(size)
         const failures = entries
           .filter(
             (row) =>
