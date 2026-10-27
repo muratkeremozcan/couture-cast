@@ -7,7 +7,8 @@
 //
 // The wrapper stays installed for the whole file, because an Expo package often loads
 // from a lazy import that settles after its test ended. Output that lands between tests is
-// reported by the next test's afterEach, or by afterAll after the last one.
+// reported by the next test's afterEach, or by afterAll after the last one. Output after
+// afterAll is thrown as an uncaught error, which Vitest reports and fails the run on.
 import { afterAll, afterEach, expect } from 'vitest'
 
 export const unwantedConsolePatterns = [
@@ -25,13 +26,19 @@ function render(args: unknown[]) {
 
 export function failOnUnwantedConsoleOutput() {
   const seen: string[] = []
+  let finished = false
   for (const channel of ['warn', 'error'] as const) {
     const forward = console[channel].bind(console)
     console[channel] = (...args: unknown[]) => {
-      const text = render(args)
-      if (unwantedConsolePatterns.some((pattern) => pattern.test(text)))
-        seen.push(`${channel}: ${text}`)
       forward(...args)
+      const text = render(args)
+      if (!unwantedConsolePatterns.some((pattern) => pattern.test(text))) return
+      const entry = `${channel}: ${text}`
+      if (!finished) seen.push(entry)
+      else
+        setTimeout(() => {
+          throw new Error(`Unwanted console output after the last test: ${entry}`)
+        }, 0)
     }
   }
   const check = () => {
@@ -39,5 +46,8 @@ export function failOnUnwantedConsoleOutput() {
     expect(found, 'unwanted console output from the test environment').toEqual([])
   }
   afterEach(check)
-  afterAll(check)
+  afterAll(() => {
+    finished = true
+    check()
+  })
 }
