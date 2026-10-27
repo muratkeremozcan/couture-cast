@@ -589,7 +589,8 @@ describe('share-card composer lifecycle', () => {
   )
   it.each(
     supportedLocales.flatMap((locale) =>
-      // focus: 41 title, 42 Save, 43 recovery action, 44 Cancel. Unavailable keeps the title.
+      // The modal show focuses the title (41); the result then moves focus to Save (42),
+      // the recovery action (43) or Cancel (44). Unavailable moves nothing past the title.
       (
         [
           ['saved', true, 42],
@@ -599,7 +600,7 @@ describe('share-card composer lifecycle', () => {
           ['permissionPermanent', false, 43],
           ['limited', true, 42],
           ['finishingSave', true, 44],
-          ['nativeSaveUnavailable', false, 41],
+          ['nativeSaveUnavailable', false, null],
         ] as const
       ).map(([state, polite, focus]) => ({ locale, state, polite, focus }))
     )
@@ -651,7 +652,9 @@ describe('share-card composer lifecycle', () => {
             boundary.announce.mock.calls.filter(([message]) => message === text)
           ).toEqual([[text, { queue: polite }]])
         )
-        expect(boundary.focus).toHaveBeenLastCalledWith(focus)
+        expect(boundary.focus.mock.calls).toEqual(
+          focus === null ? [[41]] : [[41], [focus]]
+        )
       } finally {
         pending?.resolve()
         await committed
