@@ -267,6 +267,24 @@ test('a failed App Router shell template supplies the decoded digest and message
   assert.equal(value.nextDigest, 'NEXT_SHELL_1')
   assert.deepEqual(value.errors, [{ name: 'Error', message: 'Can\'t render "Home"' }])
 })
+test('control characters inside secrets cannot rejoin them after redaction or lose the summary', () => {
+  const jwt = 'eyJ\u0001hdr.payload.signature'
+  const url = 'https\u0002://private.test/signed?token=1'
+  const secret = 'owned\u0003-secret-value'
+  const value = summarizeStartupFailure({
+    body: `<script>self.__next_f.push([1,${JSON.stringify(
+      `2c:E${JSON.stringify({ digest: '77', name: 'TypeError', message: `bad ${jwt} ${url}` })}\n`
+    )}])</script>`,
+    log: ` ⨯ TypeError: bad ${jwt} ${url} ${secret}\n    at Home (src/app/page.tsx:1:2)`,
+    secrets: [secret],
+  })
+  const serialized = JSON.stringify(value)
+  for (const leaked of ['eyJhdr', 'payload.signature', 'private.test', 'owned-secret'])
+    assert.equal(serialized.includes(leaked), false)
+  assert.equal(value.nextDigest, '77')
+  assert.equal(value.errors[0].name, 'TypeError')
+  assert.ok(value.logTail.includes('    at Home (src/app/page.tsx:1:2)'))
+})
 test('evidence rejects unknown fields, private strings, invalid positions and invented passing results', async () => {
   const value = await waitForOwnedWeb(fixture([200, 500]).options)
   for (const mutate of [

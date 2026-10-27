@@ -1260,3 +1260,24 @@ Subsequent build logs and staging reports are copied into their individual evide
   its source, and the cache save was a second full `docker save` through the same socket.
 - Android emulator: the KVM step now runs `emulator -accel-check` and stops before the emulator
   unless KVM is reported usable, since device-node permissions alone do not prove acceleration.
+
+### 2026-10-27 Android open outcome, dialog trace and step diagnostics
+
+- Product defect: `openShareCardPresentation` returned silently when no member was signed in or
+  when its stored root differed from the caller's root, while the opener hook still reported the
+  press as handled, so Home and Community skipped their own composer and nothing appeared. It now
+  returns `opened`, `root_mismatch` or `signed_out`; the hook reports handled only for `opened`, and
+  the screen composer renders under an Android root once the screen opens it, so a declined press
+  opens the screen composer visibly (signed-out shows that composer's own error state).
+- The isolated Story 6.8 native test build logs closed dialog events (`open`, `drop:root`,
+  `drop:signed-out`, `render`, `close`, `retire`) to logcat. Failed-flow diagnostics publish those
+  events and Maestro's scroll attempts, element bounds and tap points normalized to the device,
+  plus each settle verdict. Production builds install no trace sink.
+- The CI API32 open-outfit failure itself is still unexplained: a local API32 run passed the same
+  step, where the launcher was visible without scrolling, while CI needed a 3.7 s scroll. The new
+  facts decide between a dropped open and an open followed by dismissal on the next failure.
+- Startup failure summaries strip control characters before secret patterns run, so a stripped
+  character can never rejoin a token, and any entry that still fails the published-text check is
+  dropped instead of discarding the summary.
+- The garment swap focus test waited 1 s for focus that returns on a 400 ms timer; under coverage
+  on a loaded host that headroom ran out. Its budget now covers the timer.

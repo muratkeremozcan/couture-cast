@@ -23,19 +23,24 @@ const secretPatterns = [
 // restart lines show whether the failing request followed a recompilation.
 const allowedLine =
   /^\s*(?:[⨯×✖⚠]\s|\w*Error:|at\s|GET (?:\/|\[redacted\])|[✓○]\s|(?:digest|code|cause):|Module not found:|Reload env:|Found a change in )/
-function redact(value, secrets) {
-  let text = stripVTControlCharacters(value)
-  for (const secret of secrets)
-    if (typeof secret === 'string' && secret.length >= 4)
-      text = text.replaceAll(secret, '[redacted]')
-  for (const pattern of secretPatterns) text = text.replace(pattern, '[redacted]')
-  return Array.from(text)
+const printable = (value) =>
+  Array.from(value)
     .filter((character) => {
       const code = character.codePointAt(0)
       return (code >= 32 && code !== 127) || ['\t', '\n', '\r'].includes(character)
     })
     .join('')
-    .slice(0, 1024)
+// Known secrets match raw first; control characters go before the patterns run, so a
+// stripped character can never rejoin a token the patterns would have caught.
+function redact(value, secrets) {
+  let text = stripVTControlCharacters(value)
+  for (const secret of secrets)
+    if (typeof secret === 'string' && secret.length >= 4)
+      for (const form of new Set([secret, printable(stripVTControlCharacters(secret))]))
+        if (form.length >= 4) text = text.replaceAll(form, '[redacted]')
+  text = printable(text)
+  for (const pattern of secretPatterns) text = text.replace(pattern, '[redacted]')
+  return text.slice(0, 1024)
 }
 function pagesError(body) {
   const script = body.match(
@@ -104,10 +109,12 @@ export function summarizeStartupFailure({ body, log, secrets = [] }) {
     .filter((line) => allowedLine.test(line))
     .slice(-40)
     .map((line) => redact(line, secrets))
+    .filter((line) => safeText(line) && allowedLine.test(line))
   const errors = []
   const add = (name, message) => {
     if (names.includes(name) && typeof message === 'string' && errors.length < 8) {
       const value = { name, message: redact(message, secrets) }
+      if (!safeText(value.message)) return
       if (!errors.some((prior) => prior.name === name && prior.message === value.message))
         errors.push(value)
     }

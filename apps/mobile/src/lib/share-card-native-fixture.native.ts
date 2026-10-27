@@ -9,6 +9,7 @@ import * as Application from 'expo-application'
 import Constants from 'expo-constants'
 import * as Linking from 'expo-linking'
 import * as FileSystem from 'expo-file-system/legacy'
+import { installShareCardPresentationTrace } from './share-card-presentation-trace'
 
 const fixtureBuild = () =>
   isShareCardNativeFixtureBuild(
@@ -46,6 +47,10 @@ export function startShareCardNativeFixture(): () => void {
   if (!fixtureBuild()) return () => undefined
   // The module also checks Debug and the exact owned bundle before recording.
   void enableStory68FocusObservation()?.catch(() => undefined)
+  // CI diagnostics read these closed lifecycle names from logcat after a failed flow.
+  installShareCardPresentationTrace((event) =>
+    console.info(`[cc68-presentation] ${event}`)
+  )
   const subscription = Linking.addEventListener('url', ({ url }) => {
     if (!isShareCardNativeFixtureUrl(url)) return
     const parsed = new URL(url)
@@ -60,6 +65,7 @@ export function startShareCardNativeFixture(): () => void {
   })
   return () => {
     subscription.remove()
+    installShareCardPresentationTrace(null)
     void enableStory68FocusObservation(false)?.catch(() => undefined)
   }
 }

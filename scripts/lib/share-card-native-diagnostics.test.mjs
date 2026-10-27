@@ -601,3 +601,41 @@ test('mandatory native CI executes diagnostic boundary controls before native ge
     workflow.indexOf(required) < workflow.indexOf('Generate native development client')
   )
 })
+test('a failed flow reports Maestro scroll, tap and settle facts plus the closed dialog trace', async () => {
+  const { projectNativeFlowDiagnostics, assertNativeFlowDiagnostics } = await helper()
+  const log = [
+    '15:35:55.545 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Scrolling try count: 0, DeviceWidth: 1080, DeviceWidth: 2400',
+    '15:35:55.545 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Element bounds: Bounds(x=42, y=1331, width=996, height=126)',
+    `15:35:56.584 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (540, 1394) using hierarchy based logic for wait ${personal}`,
+    '15:35:59.603 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.',
+    '15:36:00.100 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Nothing changed in the UI.',
+  ].join('\n')
+  const logcat = [
+    '10-27 15:35:57.000  8565  8601 I ReactNativeJS: [cc68-presentation] open',
+    '10-27 15:35:57.100  8565  8601 I ReactNativeJS: [cc68-presentation] render',
+    `10-27 15:35:57.200  8565  8601 I ReactNativeJS: [cc68-presentation] retire ${personal}`,
+    '10-27 15:35:57.300  8565  8601 I ReactNativeJS: [cc68-presentation] invented',
+  ].join('\n')
+  const result = projectNativeFlowDiagnostics({
+    ...context,
+    root,
+    commands: [command('tapOnElement', 'outfit-share-card-open')],
+    hierarchy,
+    log,
+    logcat,
+  })
+  assert.deepEqual(result.interactions, [
+    { kind: 'scroll', attempt: 0, element: [0.038889, 0.554583, 0.922222, 0.0525] },
+    { kind: 'tap', point: [0.5, 0.580833] },
+    { kind: 'settle', changed: true },
+    { kind: 'settle', changed: false },
+  ])
+  assert.deepEqual(result.presentationTrace, ['open', 'render', 'retire'])
+  assert.equal(JSON.stringify(result).includes('Private Person'), false)
+  for (const poison of [
+    { ...result, interactions: [{ kind: 'tap', point: [2, 0.5] }] },
+    { ...result, interactions: [{ kind: 'note', text: 'private' }] },
+    { ...result, presentationTrace: ['open', 'private'] },
+  ])
+    assert.throws(() => assertNativeFlowDiagnostics(poison, { root }))
+})

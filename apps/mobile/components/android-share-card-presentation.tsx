@@ -39,12 +39,14 @@ import {
 } from '@/src/lib/android-navigation-restoration'
 import { isNativeNotificationFixtureUrl } from '@/src/lib/native-notification-fixture'
 import { isShareCardNativeFixtureUrl } from '@/src/lib/share-card-native-fixture-url'
+import { traceShareCardPresentation } from '@/src/lib/share-card-presentation-trace'
 import { ShareCardComposer } from './share-card-composer'
 
-// Other platforms retain their existing screen-owned composer lifecycle.
+// Other platforms retain their existing screen-owned composer lifecycle. On Android the
+// screen composer opens only when the root presentation declined the press.
 export function ScreenShareCardComposer(props: ComponentProps<typeof ShareCardComposer>) {
   const root = useAndroidPresentationRoot()
-  return root ? null : <ShareCardComposer {...props} />
+  return root && !props.open ? null : <ShareCardComposer {...props} />
 }
 
 const PresentationRoot = createContext<object | null>(null)
@@ -73,9 +75,9 @@ export function useShareCardPresentationOpener() {
     scope: ShareCardHeadingScope,
     node?: () => number | null
   ) => {
+    // false sends the press to the screen's own composer, which opens visibly.
     if (!root) return false
-    openShareCardPresentation(root, source, scope, node)
-    return true
+    return openShareCardPresentation(root, source, scope, node) === 'opened'
   }
 }
 
@@ -143,6 +145,10 @@ export function AndroidShareCardPresentation({
     android && onRoute && snapshot.root === root && draft?.member === member
       ? draft
       : null
+  const renderedSerial = current?.open ? current.serial : null
+  useEffect(() => {
+    if (renderedSerial !== null) traceShareCardPresentation('render')
+  }, [renderedSerial])
   return (
     <PresentationRoot.Provider value={android && member ? root : null}>
       {children}

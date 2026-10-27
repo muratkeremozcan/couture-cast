@@ -327,6 +327,87 @@ function projectScreen(input, nodes, labels) {
 function matchedSignatures(log) {
   return [...signatures].filter(([, pattern]) => pattern.test(log)).map(([name]) => name)
 }
+const presentationEvents = new Set([
+  'open',
+  'drop:root',
+  'drop:signed-out',
+  'render',
+  'close',
+  'retire',
+])
+const ratio = (value, basis) => Math.round((value / basis) * 1e6) / 1e6
+/** Maestro's own scroll, tap and settle lines, as numbers normalized to the device. */
+function projectInteractions(log, screen) {
+  if (typeof log !== 'string') return []
+  const device = log.match(/DeviceWidth: (\d+), DeviceWidth: (\d+)/)
+  const width = device ? Number(device[1]) : screen.width
+  const height = device ? Number(device[2]) : screen.height
+  if (!width || !height) return []
+  const rows = []
+  for (const line of log.split('\n')) {
+    const scroll = line.match(/Scrolling try count: (\d+),/)
+    const element = line.match(
+      /Element bounds: Bounds\(x=(-?\d+), y=(-?\d+), width=(\d+), height=(\d+)\)/
+    )
+    const tap = line.match(/Tapping at \((\d+), (\d+)\)/)
+    if (scroll) rows.push({ kind: 'scroll', attempt: Number(scroll[1]), element: null })
+    else if (element && rows.at(-1)?.kind === 'scroll' && rows.at(-1).element === null)
+      rows.at(-1).element = [
+        ratio(Number(element[1]), width),
+        ratio(Number(element[2]), height),
+        ratio(Number(element[3]), width),
+        ratio(Number(element[4]), height),
+      ]
+    else if (tap)
+      rows.push({
+        kind: 'tap',
+        point: [ratio(Number(tap[1]), width), ratio(Number(tap[2]), height)],
+      })
+    else if (/Something has changed in the UI/.test(line))
+      rows.push({ kind: 'settle', changed: true })
+    else if (/Nothing changed in the UI/.test(line))
+      rows.push({ kind: 'settle', changed: false })
+  }
+  return rows.slice(-24)
+}
+function projectPresentationTrace(logcat) {
+  if (typeof logcat !== 'string') return []
+  return [...logcat.matchAll(/\[cc68-presentation\] ([a-z:-]+)/g)]
+    .map((match) => match[1])
+    .filter((event) => presentationEvents.has(event))
+    .slice(-24)
+}
+const unit = (value) => typeof value === 'number' && value >= -1 && value <= 2
+const interactionChecks = {
+  scroll: (row) =>
+    exact(row, ['kind', 'attempt', 'element']) &&
+    integer(row.attempt) &&
+    (row.element === null ||
+      (Array.isArray(row.element) &&
+        row.element.length === 4 &&
+        row.element.every(unit))),
+  tap: (row) =>
+    exact(row, ['kind', 'point']) &&
+    Array.isArray(row.point) &&
+    row.point.length === 2 &&
+    row.point.every((value) => unit(value) && value >= 0 && value <= 1),
+  settle: (row) => exact(row, ['kind', 'changed']) && typeof row.changed === 'boolean',
+}
+function checkInteractionFacts(value) {
+  if (
+    !Array.isArray(value.interactions) ||
+    value.interactions.length > 24 ||
+    !value.interactions.every((row) =>
+      Object.hasOwn(interactionChecks, row?.kind)
+        ? interactionChecks[row.kind](row)
+        : false
+    ) ||
+    !Array.isArray(value.presentationTrace) ||
+    value.presentationTrace.length > 24 ||
+    value.presentationTrace.some((event) => !presentationEvents.has(event))
+  )
+    invalid()
+}
 export function projectNativeFlowDiagnostics(input) {
   const labels = bundledLabels(input.root ?? repository)
   const rows = Array.isArray(input.commands) ? input.commands : []
@@ -359,6 +440,8 @@ export function projectNativeFlowDiagnostics(input) {
       : null,
     failedCommand: failed ? commandRecord(failed, labels) : null,
     recentCommands: rows.slice(-12).map((row) => commandRecord(row, labels)),
+    interactions: projectInteractions(input.log, screen),
+    presentationTrace: projectPresentationTrace(input.logcat),
     signatures: [...signatures]
       .filter(([, pattern]) => pattern.test(log))
       .map(([name]) => name),
@@ -504,6 +587,8 @@ export function assertNativeFlowDiagnostics(value, { root = repository } = {}) {
       'signal',
       'failedCommand',
       'recentCommands',
+      'interactions',
+      'presentationTrace',
       'signatures',
       'screen',
       'resources',
@@ -538,6 +623,7 @@ export function assertNativeFlowDiagnostics(value, { root = repository } = {}) {
     value.signatures.some((name) => !signatures.has(name))
   )
     invalid()
+  checkInteractionFacts(value)
   checkScreen(value.screen, labels)
   checkResources(value.resources)
   checkCaptures(value.captures, value.screen, value.recentCommands)

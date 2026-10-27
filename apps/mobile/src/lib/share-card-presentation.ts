@@ -1,6 +1,7 @@
 import type { ShareCardSource } from '@couture/api-client'
 import { mobileApplicationUserId, subscribeMobileApplicationUser } from './mobile-auth'
 import type { ShareCardHeadingScope } from './share-card-focus'
+import { traceShareCardPresentation } from './share-card-presentation-trace'
 
 type Draft = Readonly<{
   serial: number
@@ -64,9 +65,16 @@ export function openShareCardPresentation(
   source: ShareCardSource,
   scope: ShareCardHeadingScope,
   node?: () => number | null
-) {
+): 'opened' | 'root_mismatch' | 'signed_out' {
   const member = mobileApplicationUserId()
-  if (!member || snapshot.root !== root) return
+  if (!member) {
+    traceShareCardPresentation('drop:signed-out')
+    return 'signed_out'
+  }
+  if (snapshot.root !== root) {
+    traceShareCardPresentation('drop:root')
+    return 'root_mismatch'
+  }
   watchIdentity()
   const previous = snapshot.draft
   const same =
@@ -84,6 +92,8 @@ export function openShareCardPresentation(
   invoker =
     snapshot.root && node ? { root: snapshot.root, serial: draft.serial, node } : null
   publish({ root: snapshot.root, draft })
+  traceShareCardPresentation('open')
+  return 'opened'
 }
 export function changeShareCardWatermark(
   root: object,
@@ -103,11 +113,13 @@ export function changeShareCardWatermark(
 export function closeShareCardPresentation(root: object, draftSerial: number) {
   if (!snapshot.draft || !owns(root, draftSerial)) return
   publish({ root, draft: { ...snapshot.draft, open: false } })
+  traceShareCardPresentation('close')
 }
 /** Actual navigation retires the visit. Root teardown itself retains the draft. */
 export function retireShareCardPresentation(root: object) {
   if (snapshot.root !== root) return
   invoker = null
+  if (snapshot.draft) traceShareCardPresentation('retire')
   publish({ root, draft: null })
 }
 export function shareCardPresentationFocus(root: object, draftSerial: number) {

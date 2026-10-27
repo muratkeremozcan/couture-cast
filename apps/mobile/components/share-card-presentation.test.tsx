@@ -144,6 +144,7 @@ vi.mock('../modules/modal-system-bars', () => ({
 }))
 import {
   AndroidShareCardPresentation,
+  ScreenShareCardComposer,
   useShareCardPresentationOpener,
   useAndroidNavigationIntent,
 } from './android-share-card-presentation'
@@ -292,6 +293,60 @@ beforeEach(async () => {
   boundary.routes.length = 0
   boundary.dismissals.length = 0
   boundary.closeRequests.length = 0
+})
+describe('Android presentation open outcome', () => {
+  it('reports an open it published so the screen keeps its own composer closed', async () => {
+    let open!: ReturnType<typeof useShareCardPresentationOpener>
+    render(<Host capture={(callback) => (open = callback)} />)
+    let handled: boolean | undefined
+    act(() => {
+      handled = open(sources[0], 'outfit', opener)
+    })
+    expect(handled).toBe(true)
+    expect(shareCardPresentationSnapshot().draft).toMatchObject({ open: true })
+    await ready()
+  })
+  it('reports a root-mismatch drop so the screen falls back instead of silently ignoring the press', () => {
+    let oldOpen!: ReturnType<typeof useShareCardPresentationOpener>
+    render(<Host capture={(callback) => (oldOpen = callback)} />)
+    render(<Host />)
+    let handled: boolean | undefined
+    act(() => {
+      handled = oldOpen(sources[0], 'outfit', opener)
+    })
+    expect(handled).toBe(false)
+    expect(shareCardPresentationSnapshot().draft).toBeNull()
+  })
+  it('reports a signed-out drop so the screen falls back instead of silently ignoring the press', () => {
+    let open!: ReturnType<typeof useShareCardPresentationOpener>
+    render(<Host capture={(callback) => (open = callback)} />)
+    // Sign-out lands between the render that offered the opener and the press.
+    boundary.member = null
+    let handled: boolean | undefined
+    act(() => {
+      handled = open(sources[0], 'outfit', opener)
+    })
+    expect(handled).toBe(false)
+    expect(shareCardPresentationSnapshot().draft).toBeNull()
+  })
+  it('a screen fallback composer renders under an Android root once the screen opens it', async () => {
+    const { rerender } = render(
+      <AndroidShareCardPresentation pathname="/">
+        <ScreenShareCardComposer
+          source={sources[0]}
+          open={false}
+          onClose={() => undefined}
+        />
+      </AndroidShareCardPresentation>
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
+    rerender(
+      <AndroidShareCardPresentation pathname="/">
+        <ScreenShareCardComposer source={sources[0]} open onClose={() => undefined} />
+      </AndroidShareCardPresentation>
+    )
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
 })
 describe('Android Activity root replacement', () => {
   it.each(['/community', '/settings'])(

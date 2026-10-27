@@ -241,9 +241,14 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
     expect(screen.queryByText('Classic Trench Coat')).toBeNull()
     expect(screen.getByText('Leather Jacket')).toBeTruthy()
-    await waitFor(() => {
-      expect(screen.getByTestId('garment-tile-leather-jacket')).toHaveFocus()
-    })
+    // Focus returns on a 400 ms timer after the modal closes; the default 1 s budget left
+    // too little headroom under coverage instrumentation on a loaded host.
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('garment-tile-leather-jacket')).toHaveFocus()
+      },
+      { timeout: 5000 }
+    )
 
     expect(mockCapture).toHaveBeenLastCalledWith('hero_interaction', {
       interactionType: 'garment_swap',
