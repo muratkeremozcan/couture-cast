@@ -820,4 +820,44 @@ describe('share-card composer lifecycle', () => {
     expect(boundary.save).toHaveBeenCalledOnce()
     expect(boundary.save.mock.calls[0]?.[0]).toBe(offCard)
   })
+  it('U-SINGLE-WRITE: a double Save tap writes once and shows Saving, never finishingSave', async () => {
+    const native = deferred<void>()
+    boundary.save.mockImplementation((_card, _signal, _isCurrent, owner) =>
+      commitShareCardSave({
+        fileUri: 'cc68-double-save.png',
+        owner,
+        save: () => native.promise,
+        cleanup: () => Promise.resolve(),
+      })
+    )
+    render(<Harness />)
+    await ready()
+    await userEvent.dblClick(screen.getByTestId('share-card-save'))
+    await waitFor(() => expect(nativeShareCardSavePending()).toBe(true))
+    expect(screen.getByText(i18n.t('shareCard.saving'))).toBeInTheDocument()
+    expect(screen.queryByText(i18n.t('shareCard.finishingSave'))).not.toBeInTheDocument()
+    expect(screen.queryByTestId('share-card-error')).not.toBeInTheDocument()
+    await act(async () => {
+      native.resolve()
+      await native.promise
+    })
+    expect(await screen.findByText(i18n.t('shareCard.saved'))).toBeInTheDocument()
+    expect(boundary.permission).toHaveBeenCalledOnce()
+    expect(boundary.prepare).toHaveBeenCalledTimes(2)
+    expect(boundary.save).toHaveBeenCalledOnce()
+  })
+  it('U-SINGLE-WRITE: two Save activations in one task pass the composer guard once', async () => {
+    render(<Harness />)
+    await ready()
+    const save = screen.getByTestId('share-card-save')
+    // Both presses run before React re-renders, so only the save guard can stop the second.
+    act(() => {
+      save.click()
+      save.click()
+    })
+    expect(await screen.findByText(i18n.t('shareCard.saved'))).toBeInTheDocument()
+    expect(boundary.permission).toHaveBeenCalledOnce()
+    expect(boundary.prepare).toHaveBeenCalledTimes(2)
+    expect(boundary.save).toHaveBeenCalledOnce()
+  })
 })
