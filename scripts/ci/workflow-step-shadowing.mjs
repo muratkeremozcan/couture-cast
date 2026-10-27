@@ -85,3 +85,79 @@ export function requiredWorkflows(directory) {
       )
     })
 }
+
+const PREREQUISITE = /^steps\.[A-Za-z0-9_-]+\.outcome == 'success'$/
+const PLATFORM = /^matrix\.platform == '[a-z]+'$/
+const NOT_CANCELLED = /^!\s*cancelled\(\)$/
+
+/** The expression inside `${{ }}` and any parentheses that enclose all of it. */
+function bare(expression) {
+  let text = String(expression)
+    .trim()
+    .replace(/^\$\{\{([\s\S]*)\}\}$/, '$1')
+    .trim()
+  while (text.startsWith('(') && closingParen(text) === text.length - 1)
+    text = text.slice(1, -1).trim()
+  return text
+}
+function closingParen(text) {
+  let depth = 0
+  for (const [index, character] of [...text].entries()) {
+    depth += character === '(' ? 1 : character === ')' ? -1 : 0
+    if (depth === 0) return index
+  }
+  return -1
+}
+
+/** Splits on a top-level `&&` or `||`, outside parentheses and quoted strings. */
+export function splitTopLevel(expression, operator) {
+  if (!operator) return [expression]
+  const parts = []
+  let depth = 0
+  let quoted = false
+  let start = 0
+  for (let index = 0; index < expression.length; index++) {
+    const character = expression[index]
+    if (character === "'") quoted = !quoted
+    if (quoted) continue
+    if (character === '(') depth++
+    if (character === ')') depth--
+    if (depth === 0 && expression.startsWith(operator, index)) {
+      parts.push(expression.slice(start, index).trim())
+      start = index + operator.length
+      index += operator.length - 1
+    }
+  }
+  parts.push(expression.slice(start).trim())
+  return parts
+}
+
+function approvedClause(clause) {
+  const text = bare(clause)
+  if (NOT_CANCELLED.test(text) || PREREQUISITE.test(text) || PLATFORM.test(text))
+    return true
+  const branches = splitTopLevel(text, '||')
+  // A per-platform choice of prerequisites: each branch names its platform and
+  // otherwise only earlier steps that must have succeeded.
+  return (
+    branches.length > 1 &&
+    branches.every((branch) => {
+      const terms = splitTopLevel(bare(branch), '&&').map(bare)
+      return (
+        terms.some((term) => PLATFORM.test(term)) &&
+        terms.every((term) => PLATFORM.test(term) || PREREQUISITE.test(term))
+      )
+    })
+  )
+}
+
+/**
+ * True when a step condition can only skip the step because the run was cancelled,
+ * a named earlier prerequisite failed, or the matrix row is another platform. No
+ * condition at all is the implicit success() that follows an earlier failure.
+ */
+export function isExplicitPrerequisiteCondition(condition) {
+  if (condition === undefined || condition === null) return true
+  if (typeof condition !== 'string' || !condition.trim()) return false
+  return splitTopLevel(bare(condition), '&&').every(approvedClause)
+}

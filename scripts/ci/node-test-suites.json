@@ -17,6 +17,10 @@
     ],
     "native-harness": "discover"
   },
+  "runElsewhere": {
+    "apps/mobile/plugins/with-watchos.test.js": "apps/mobile npm test (test:watchos-prebuild) and watchos-native.yml",
+    "apps/mobile/plugins/with-widgets.test.js": "apps/mobile npm test (test:widget-prebuild)"
+  },
   "pinnedReasons": {
     "startup-deadline": "Must pass before the job starts local Supabase.",
     "browser-deps": "Must pass before the Android lane provisions pinned browsers.",

@@ -13,6 +13,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
+import { isExplicitPrerequisiteCondition } from './workflow-step-shadowing.mjs'
 
 export const GATE_SCRIPT = 'scripts/ci/node-test-gate.mjs'
 const repository = fileURLToPath(new URL('../../', import.meta.url))
@@ -77,8 +78,51 @@ export function runGatesTestFile(run, file, options) {
     .some((name) => name !== null && resolveSuite(name, options).includes(file))
 }
 
+const IMPORTS_NODE_TEST =
+  /\bfrom\s+['"]node:test['"]|\bimport\s*\(\s*['"]node:test['"]\s*\)|\brequire\s*\(\s*['"]node:test['"]\s*\)/
+
+/** Files that import node:test under the discovery root and the pinned suites' folders. */
+export function nodeTestImporters(root, manifest) {
+  const found = []
+  const visit = (relative, recursive, pattern) => {
+    for (const entry of fs.readdirSync(path.join(root, relative), {
+      withFileTypes: true,
+    })) {
+      const child = `${relative}/${entry.name}`
+      if (entry.isDirectory()) {
+        if (recursive && entry.name !== 'node_modules') visit(child, recursive, pattern)
+      } else if (
+        entry.isFile() &&
+        pattern.test(entry.name) &&
+        IMPORTS_NODE_TEST.test(fs.readFileSync(path.join(root, child), 'utf8'))
+      )
+        found.push(child)
+    }
+  }
+  visit(manifest.discoverRoot, true, /\.mjs$/)
+  const folders = new Set(
+    pinnedFiles(manifest)
+      .map((file) => path.posix.dirname(file))
+      .filter((folder) => !`${folder}/`.startsWith(`${manifest.discoverRoot}/`))
+  )
+  for (const folder of folders) visit(folder, false, /\.(m?js|cjs)$/)
+  return found.sort()
+}
+
 function manifestProblems(root, manifest) {
   const problems = []
+  // A node:test file renamed out of the discovery pattern would otherwise drop out.
+  const known = new Set([
+    ...discoverTestFiles(root, manifest),
+    ...pinnedFiles(manifest),
+    ...manifest.vitest,
+    ...Object.keys(manifest.runElsewhere ?? {}),
+  ])
+  for (const file of nodeTestImporters(root, manifest))
+    if (!known.has(file))
+      problems.push(`${file} imports node:test but is neither discovered nor listed`)
+  for (const file of Object.keys(manifest.runElsewhere ?? {}))
+    if (!fs.existsSync(path.join(root, file))) problems.push(`${file} is missing`)
   const names = Object.keys(manifest.suites)
   const discovering = names.filter((name) => manifest.suites[name] === 'discover')
   if (discovering.length !== 1)
@@ -98,10 +142,24 @@ function manifestProblems(root, manifest) {
 function workflowProblems(manifest, workflow) {
   const problems = []
   const names = Object.keys(manifest.suites)
-  const lines = Object.values(parse(workflow).jobs ?? {})
-    .flatMap((job) => job.steps ?? [])
-    .flatMap((step) => (step.run ?? '').split(/\r?\n/))
-    .map((line) => line.trim())
+  const steps = Object.values(parse(workflow).jobs ?? {}).flatMap(
+    (job) => job.steps ?? []
+  )
+  const stepLines = (step) => (step.run ?? '').split(/\r?\n/).map((line) => line.trim())
+  const lines = steps.flatMap(stepLines)
+  // A condition that can skip a gate step silences its suite on a green run.
+  for (const step of steps) {
+    const runsTests = stepLines(step).some(
+      (line) =>
+        gatedSuite(line) !== null ||
+        (/^npx vitest run\b/.test(line) &&
+          manifest.vitest.some((file) => line.includes(file)))
+    )
+    if (runsTests && !isExplicitPrerequisiteCondition(step.if))
+      problems.push(
+        `step ${step.name ?? step.id ?? 'unnamed'} can be skipped by its condition: ${JSON.stringify(step.if)}`
+      )
+  }
   const invoked = new Set(lines.map(gatedSuite).filter(Boolean))
   for (const name of invoked)
     if (!names.includes(name)) problems.push(`workflow runs unknown suite ${name}`)

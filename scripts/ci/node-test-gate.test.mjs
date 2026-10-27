@@ -326,6 +326,81 @@ describe('node-test-gate discovery and coverage', () => {
       )
     }))
 
+  test('a gate or vitest step whose condition can skip it fails coverage', () =>
+    temporary((root) => {
+      write(root, fixtureTree)
+      const conditioned = (
+        condition,
+        run = 'node scripts/ci/node-test-gate.mjs default'
+      ) =>
+        fixtureWorkflow.replace(
+          '      - run: |\n          node scripts/ci/node-test-gate.mjs outside\n          node scripts/ci/node-test-gate.mjs default',
+          [
+            '      - run: node scripts/ci/node-test-gate.mjs outside',
+            '      - id: setup',
+            '        run: echo setup',
+            '      - name: default suite',
+            `        if: ${condition}`,
+            `        run: ${run}`,
+          ].join('\n')
+        )
+      const check = (workflow) =>
+        coverageProblems({ root, manifest: fixtureManifest, workflow })
+      for (const condition of ['false', "github.event_name == 'push'", 'always()'])
+        assert.deepEqual(check(conditioned(condition)), [
+          `step default suite can be skipped by its condition: ${JSON.stringify(
+            condition === 'false' ? false : condition
+          )}`,
+        ])
+      for (const condition of [
+        '${{ !cancelled() }}',
+        "${{ !cancelled() && steps.setup.outcome == 'success' }}",
+        "${{ !cancelled() && matrix.platform == 'android' && steps.setup.outcome == 'success' }}",
+        "${{ !cancelled() && ((matrix.platform == 'android' && steps.setup.outcome == 'success') || (matrix.platform == 'ios' && steps.setup.outcome == 'success')) }}",
+        "matrix.platform == 'android'",
+      ])
+        assert.deepEqual(check(conditioned(`"${condition}"`)), [], condition)
+      const vitest = fixtureWorkflow.replace(
+        '      - run: npx vitest run',
+        "      - if: github.ref == 'refs/heads/main'\n        run: npx vitest run"
+      )
+      assert.equal(check(vitest).length, 1)
+    }))
+
+  test('a node:test file outside the discovery pattern or the lists fails coverage', () =>
+    temporary((root) => {
+      write(root, fixtureTree)
+      const check = () =>
+        coverageProblems({ root, manifest: fixtureManifest, workflow: fixtureWorkflow })
+      const nodeTest = "import { test } from 'node:test'\ntest('kept', () => {})\n"
+      write(root, {
+        'scripts/lib/helper.mjs': "export const helper = 'mentions node:test only'\n",
+      })
+      assert.deepEqual(check(), [])
+      write(root, { 'scripts/lib/a-checks.mjs': nodeTest })
+      assert.deepEqual(check(), [
+        'scripts/lib/a-checks.mjs imports node:test but is neither discovered nor listed',
+      ])
+      fs.rmSync(path.join(root, 'scripts/lib/a-checks.mjs'))
+      write(root, {
+        'apps/other-plugin.test.js': "const { test } = require('node:test')\n",
+      })
+      assert.deepEqual(check(), [
+        'apps/other-plugin.test.js imports node:test but is neither discovered nor listed',
+      ])
+      assert.deepEqual(
+        coverageProblems({
+          root,
+          manifest: {
+            ...fixtureManifest,
+            runElsewhere: { 'apps/other-plugin.test.js': 'another workflow' },
+          },
+          workflow: fixtureWorkflow,
+        }),
+        []
+      )
+    }))
+
   test('workflow lines name a suite only for a single-argument gate invocation', () => {
     assert.equal(
       gatedSuite('  node scripts/ci/node-test-gate.mjs native-harness'),
