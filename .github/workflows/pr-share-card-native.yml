@@ -86,6 +86,15 @@ jobs:
           else
             node scripts/ci/share-card-browser-deps.mjs
           fi
+      # These suites need only the installed dependencies, so a browser, Supabase or
+      # runtime failure cannot hide them. They follow the browser steps only so those
+      # keep their plain platform conditions.
+      - name: Verify share-card harness and plugin suites
+        id: harness_suites
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          node scripts/ci/node-test-gate.mjs share-card-plugins
+          node scripts/ci/node-test-gate.mjs native-harness
       - uses: actions/setup-java@v4
         if: ${{ !cancelled() }}
         id: java
@@ -156,8 +165,6 @@ jobs:
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && ((matrix.platform == 'android' && steps.browser_deps.outcome == 'success') || (matrix.platform == 'ios' && steps.ios_browser.outcome == 'success')) }}
         run: |
           node scripts/e2e-share-card/bridge-a11y.mjs
-          node scripts/ci/node-test-gate.mjs share-card-plugins
-          node scripts/ci/node-test-gate.mjs native-harness
       - name: Verify native paragraph heading semantics
         if: ${{ !cancelled() && runner.os == 'macOS' && steps.checkout.outcome == 'success' }}
         run: bash scripts/ci/share-card-header-semantics.sh

@@ -86,19 +86,15 @@ export function requiredWorkflows(directory) {
     })
 }
 
-const PREREQUISITE = /^steps\.[A-Za-z0-9_-]+\.outcome == 'success'$/
-const PLATFORM = /^matrix\.platform == '[a-z]+'$/
+const PREREQUISITE = /^steps\.([A-Za-z0-9_-]+)\.outcome == 'success'$/
+const PLATFORM = /^matrix\.platform == '([a-z]+)'$/
 const NOT_CANCELLED = /^!\s*cancelled\(\)$/
 
-/** The expression inside `${{ }}` and any parentheses that enclose all of it. */
-function bare(expression) {
-  let text = String(expression)
+function unwrapExpression(expression) {
+  return String(expression)
     .trim()
     .replace(/^\$\{\{([\s\S]*)\}\}$/, '$1')
     .trim()
-  while (text.startsWith('(') && closingParen(text) === text.length - 1)
-    text = text.slice(1, -1).trim()
-  return text
 }
 function closingParen(text) {
   let depth = 0
@@ -108,10 +104,15 @@ function closingParen(text) {
   }
   return -1
 }
+const enclosed = (text) => text.startsWith('(') && closingParen(text) === text.length - 1
+function bare(text) {
+  let value = text.trim()
+  while (enclosed(value)) value = value.slice(1, -1).trim()
+  return value
+}
 
 /** Splits on a top-level `&&` or `||`, outside parentheses and quoted strings. */
 export function splitTopLevel(expression, operator) {
-  if (!operator) return [expression]
   const parts = []
   let depth = 0
   let quoted = false
@@ -132,23 +133,58 @@ export function splitTopLevel(expression, operator) {
   return parts
 }
 
-function approvedClause(clause) {
-  const text = bare(clause)
-  if (NOT_CANCELLED.test(text) || PREREQUISITE.test(text) || PLATFORM.test(text))
-    return true
-  const branches = splitTopLevel(text, '||')
-  // A per-platform choice of prerequisites: each branch names its platform and
-  // otherwise only earlier steps that must have succeeded.
-  return (
-    branches.length > 1 &&
-    branches.every((branch) => {
-      const terms = splitTopLevel(bare(branch), '&&').map(bare)
-      return (
-        terms.some((term) => PLATFORM.test(term)) &&
-        terms.every((term) => PLATFORM.test(term) || PREREQUISITE.test(term))
-      )
-    })
-  )
+function atom(text) {
+  const value = bare(text)
+  if (NOT_CANCELLED.test(value)) return { kind: 'notCancelled' }
+  const outcome = PREREQUISITE.exec(value)
+  if (outcome) return { kind: 'outcome', id: outcome[1] }
+  const platform = PLATFORM.exec(value)
+  if (platform) return { kind: 'platform', value: platform[1] }
+  return null
+}
+
+// One branch of a per-platform choice: exactly one platform and only prerequisites.
+function branch(text) {
+  const terms = splitTopLevel(bare(text), '&&').map(atom)
+  const platforms = terms.filter((term) => term?.kind === 'platform')
+  if (terms.some((term) => term?.kind !== 'platform' && term?.kind !== 'outcome'))
+    return null
+  if (platforms.length !== 1) return null
+  return {
+    platform: platforms[0].value,
+    outcomes: terms.filter((term) => term.kind === 'outcome').map((term) => term.id),
+  }
+}
+
+function term(text) {
+  const simple = atom(text)
+  if (simple) return simple
+  // A choice must be written as its own parenthesized term.
+  if (!enclosed(text.trim())) return null
+  const branches = splitTopLevel(bare(text), '||')
+  if (branches.length < 2) return null
+  const parsed = branches.map(branch)
+  if (parsed.some((item) => item === null)) return null
+  if (new Set(parsed.map((item) => item.platform)).size !== parsed.length) return null
+  return { kind: 'choice', branches: parsed }
+}
+
+/**
+ * The approved explicit-prerequisite grammar, or null for anything else:
+ *   condition := term ('&&' term)*
+ *   term      := '!cancelled()' | prerequisite | platform | '(' choice ')'
+ *   choice    := branch ('||' branch)+, each branch one distinct platform and
+ *                otherwise only prerequisites
+ * where prerequisite is `steps.<id>.outcome == 'success'` and platform is
+ * `matrix.platform == '<name>'`. `&&` binds tighter than `||`, so any top-level `||`
+ * (`|| always()`, `|| true`) is outside the grammar.
+ */
+export function parseApprovedCondition(condition) {
+  if (typeof condition !== 'string' || !condition.trim()) return null
+  const text = unwrapExpression(condition)
+  if (splitTopLevel(text, '||').length !== 1) return null
+  const terms = splitTopLevel(text, '&&').map(term)
+  return terms.some((item) => item === null) ? null : terms
 }
 
 /**
@@ -157,7 +193,27 @@ function approvedClause(clause) {
  * condition at all is the implicit success() that follows an earlier failure.
  */
 export function isExplicitPrerequisiteCondition(condition) {
-  if (condition === undefined || condition === null) return true
-  if (typeof condition !== 'string' || !condition.trim()) return false
-  return splitTopLevel(bare(condition), '&&').every(approvedClause)
+  return condition === undefined || condition === null
+    ? true
+    : parseApprovedCondition(condition) !== null
+}
+
+/** Evaluates an approved condition against step outcomes and the matrix platform. */
+export function evaluateApprovedCondition(
+  condition,
+  { cancelled = false, outcomes = {}, platform, previousSucceeded = true }
+) {
+  if (condition === undefined || condition === null)
+    return !cancelled && previousSucceeded
+  const terms = parseApprovedCondition(condition)
+  if (!terms) throw new Error(`condition outside the approved grammar: ${condition}`)
+  const succeeded = (id) => outcomes[id] === 'success'
+  return terms.every((item) => {
+    if (item.kind === 'notCancelled') return !cancelled
+    if (item.kind === 'outcome') return succeeded(item.id)
+    if (item.kind === 'platform') return item.value === platform
+    return item.branches.some(
+      (choice) => choice.platform === platform && choice.outcomes.every(succeeded)
+    )
+  })
 }
