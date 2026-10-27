@@ -15,11 +15,13 @@ describe('actual Sharp cancellation ownership', () => {
       settled = true
       return bytes
     })
-    const refused = expect(operation).rejects.toThrow()
+    const refused = expect(operation).rejects.toThrow('image_cancelled')
     controller.abort()
     expect(destroy).toHaveBeenCalledOnce()
     await refused
-    expect(settled || pipeline.destroyed).toBe(true)
+    // destroy() cannot stop the native encode: its result still arrives, and is refused.
+    expect(settled).toBe(true)
+    expect(pipeline.destroyed).toBe(true)
     expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
   })
   it('an already cancelled stage never starts work', async () => {
