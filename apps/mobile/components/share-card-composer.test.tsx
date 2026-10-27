@@ -2,6 +2,7 @@ import type * as ReactNativeModule from 'react-native'
 import React, { createElement, useEffect, useState } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import { ResponseError, type PrepareShareCardInput } from '@couture/api-client'
 import { supportedLocales } from '@couture/api-client/contracts/http'
 import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
@@ -182,7 +183,7 @@ describe('share-card composer lifecycle', () => {
     render(<Harness />)
     expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     await waitFor(() => expect(boundary.save).toHaveBeenCalledOnce())
     expect(boundary.permission).toHaveBeenCalledWith(true)
     expect(screen.getByTestId('share-card-watermark')).toHaveAttribute(
@@ -221,7 +222,7 @@ describe('share-card composer lifecycle', () => {
     )
     render(<Harness />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     await waitFor(() => expect(nativeShareCardSavePending()).toBe(true))
     try {
       expect(screen.getByText(i18n.t('shareCard.saving'))).toBeInTheDocument()
@@ -248,12 +249,12 @@ describe('share-card composer lifecycle', () => {
     )
     render(<Harness />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     await waitFor(() => expect(nativeShareCardSavePending()).toBe(true))
     try {
-      fireEvent.click(screen.getByTestId('share-card-cancel'))
+      await userEvent.click(screen.getByTestId('share-card-cancel'))
       boundary.focus.mockClear()
-      fireEvent.click(screen.getByText('Reopen'))
+      await userEvent.click(screen.getByText('Reopen'))
       expect(
         await screen.findByText(i18n.t('shareCard.finishingSave'))
       ).toBeInTheDocument()
@@ -277,10 +278,10 @@ describe('share-card composer lifecycle', () => {
     )
     render(<Harness />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     await waitFor(() => expect(nativeShareCardSavePending()).toBe(true))
-    fireEvent.click(screen.getByTestId('share-card-cancel'))
-    fireEvent.click(screen.getByText('Reopen'))
+    await userEvent.click(screen.getByTestId('share-card-cancel'))
+    await userEvent.click(screen.getByText('Reopen'))
     await act(async () => {
       native.resolve()
       await native.promise
@@ -290,7 +291,7 @@ describe('share-card composer lifecycle', () => {
       'aria-disabled',
       'true'
     )
-    fireEvent.click(screen.getByTestId('share-card-watermark'))
+    await userEvent.click(screen.getByTestId('share-card-watermark'))
     expect(screen.getByTestId('share-card-watermark')).toHaveAttribute(
       'aria-checked',
       'false'
@@ -304,7 +305,7 @@ describe('share-card composer lifecycle', () => {
     boundary.save.mockRejectedValueOnce(new Error(failure))
     render(<Harness />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     expect(await screen.findByText(i18n.t(`shareCard.${key}`))).toBeInTheDocument()
     expect(screen.queryByText(i18n.t('shareCard.storage'))).not.toBeInTheDocument()
   })
@@ -314,7 +315,7 @@ describe('share-card composer lifecycle', () => {
     )
     render(<Harness />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     expect(await screen.findByText(i18n.t('shareCard.render'))).toBeInTheDocument()
   })
   it.each([true, false])(
@@ -330,7 +331,7 @@ describe('share-card composer lifecycle', () => {
       )
       render(<Harness />)
       await ready()
-      fireEvent.click(screen.getByTestId('share-card-save'))
+      await userEvent.click(screen.getByTestId('share-card-save'))
       expect(
         await screen.findByText(
           i18n.t(`shareCard.${canAskAgain ? 'permissionDenied' : 'permissionPermanent'}`)
@@ -345,7 +346,7 @@ describe('share-card composer lifecycle', () => {
     )
     render(<Harness />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     expect(await screen.findByText(i18n.t('shareCard.storage'))).toBeInTheDocument()
     expect(boundary.permission).toHaveBeenCalledTimes(1)
   })
@@ -358,7 +359,7 @@ describe('share-card composer lifecycle', () => {
       boundary.save.mockRejectedValueOnce(new Error('permission_denied'))
       render(<Harness />)
       await ready()
-      fireEvent.click(screen.getByTestId('share-card-save'))
+      await userEvent.click(screen.getByTestId('share-card-save'))
       expect(
         await screen.findByText(
           i18n.t(`shareCard.${canAskAgain ? 'permissionDenied' : 'permissionPermanent'}`)
@@ -379,7 +380,7 @@ describe('share-card composer lifecycle', () => {
     const restore = vi.fn()
     render(<Harness restore={restore} />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-cancel'))
+    await userEvent.click(screen.getByTestId('share-card-cancel'))
     await waitFor(() => expect(restore).toHaveBeenCalledOnce())
     expect(screen.queryByTestId('share-card-title')).not.toBeInTheDocument()
     await act(async () => {
@@ -391,7 +392,7 @@ describe('share-card composer lifecycle', () => {
     boundary.permission.mockResolvedValue({ granted: false, canAskAgain: true })
     render(<Harness />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     expect(
       await screen.findByText(i18n.t('shareCard.permissionDenied'))
     ).toBeInTheDocument()
@@ -404,12 +405,12 @@ describe('share-card composer lifecycle', () => {
       )
     )
     boundary.permission.mockResolvedValue({ granted: false, canAskAgain: false })
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     expect(
       await screen.findByText(i18n.t('shareCard.permissionPermanent'))
     ).toBeInTheDocument()
     await waitFor(() => expect(boundary.appState.size).toBe(1))
-    fireEvent.click(screen.getByText(i18n.t('shareCard.openSettings')))
+    await userEvent.click(screen.getByText(i18n.t('shareCard.openSettings')))
     expect(boundary.settings).toHaveBeenCalledOnce()
     boundary.permission.mockResolvedValue({ granted: true, canAskAgain: true })
     await act(async () => {
@@ -425,7 +426,7 @@ describe('share-card composer lifecycle', () => {
     boundary.permission.mockReturnValue(permission.promise)
     render(<Harness />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     expect(boundary.prepare).toHaveBeenCalledOnce()
     boundary.prepare.mockRejectedValueOnce(
       new ResponseError(new Response('{}', { status: 403 }))
@@ -449,11 +450,11 @@ describe('share-card composer lifecycle', () => {
       )
       render(<Harness />)
       await ready()
-      fireEvent.click(screen.getByTestId('share-card-save'))
+      await userEvent.click(screen.getByTestId('share-card-save'))
       await waitFor(() => expect(boundary.save).toHaveBeenCalledOnce())
       if (reason === 'close') {
-        fireEvent.click(screen.getByTestId('share-card-cancel'))
-        fireEvent.click(screen.getByText('Reopen'))
+        await userEvent.click(screen.getByTestId('share-card-cancel'))
+        await userEvent.click(screen.getByText('Reopen'))
       } else {
         changeIdentity('member-b')
         changeIdentity('member-a')
@@ -483,7 +484,7 @@ describe('share-card composer lifecycle', () => {
       boundary.prepare.mockRejectedValueOnce(
         new ResponseError(new Response('{}', { status }))
       )
-      fireEvent.click(screen.getByTestId('share-card-save'))
+      await userEvent.click(screen.getByTestId('share-card-save'))
       expect(
         await screen.findByText(
           i18n.t(
@@ -492,7 +493,7 @@ describe('share-card composer lifecycle', () => {
         )
       ).toBeInTheDocument()
       expect(boundary.save).not.toHaveBeenCalled()
-      fireEvent.click(
+      await userEvent.click(
         screen.getByText(i18n.t(`shareCard.${status === 409 ? 'refresh' : 'retry'}`))
       )
       await waitFor(() => expect(boundary.prepare).toHaveBeenCalledTimes(3))
@@ -506,7 +507,9 @@ describe('share-card composer lifecycle', () => {
     expect(
       screen.getByText(i18n.t('shareCard.nativeSaveUnavailable'))
     ).toBeInTheDocument()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')
+    // Playwright refuses to click an aria-disabled control; force models the user's tap anyway.
+    await userEvent.click(screen.getByTestId('share-card-save'), { force: true })
     expect(boundary.permission).not.toHaveBeenCalled()
     expect(boundary.save).not.toHaveBeenCalled()
   })
@@ -514,7 +517,7 @@ describe('share-card composer lifecycle', () => {
     boundary.permission.mockResolvedValue({ granted: false, canAskAgain: false })
     render(<Harness />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     const text = i18n.t('shareCard.permissionPermanent')
     expect(await screen.findByText(text)).toBeInTheDocument()
     await waitFor(() =>
@@ -522,7 +525,7 @@ describe('share-card composer lifecycle', () => {
         boundary.announce.mock.calls.filter(([message]) => message === text)
       ).toEqual([[text, { queue: false }]])
     )
-    fireEvent.click(screen.getByText(i18n.t('shareCard.openSettings')))
+    await userEvent.click(screen.getByText(i18n.t('shareCard.openSettings')))
     expect(
       boundary.announce.mock.calls.filter(([message]) => message === text)
     ).toHaveLength(1)
@@ -539,7 +542,7 @@ describe('share-card composer lifecycle', () => {
     expect(await screen.findByText(preparing)).toBeInTheDocument()
     expect(boundary.prepare).toHaveBeenCalledTimes(1)
     for (const checked of ['false', 'true']) {
-      fireEvent.click(screen.getByTestId('share-card-watermark'))
+      await userEvent.click(screen.getByTestId('share-card-watermark'))
       expect(screen.getByTestId('share-card-watermark')).toHaveAttribute(
         'aria-checked',
         checked
@@ -620,7 +623,7 @@ describe('share-card composer lifecycle', () => {
             'true'
           )
         )
-        fireEvent.click(screen.getByTestId('share-card-save'))
+        await userEvent.click(screen.getByTestId('share-card-save'))
       }
       const key = state === 'limited' ? 'saved' : state
       const text = i18n.t(`shareCard.${key}`)
@@ -650,7 +653,7 @@ describe('share-card composer lifecycle', () => {
     render(<Harness />)
     await ready()
     const oldLoad = boundary.imageLoads.at(-1)!
-    fireEvent.click(screen.getByRole('switch'))
+    await userEvent.click(screen.getByRole('switch'))
     await waitFor(() => expect(boundary.prepare).toHaveBeenCalledTimes(2))
     await waitFor(() =>
       expect(screen.getByTestId('share-card-preview')).toBeInTheDocument()
@@ -668,12 +671,12 @@ describe('share-card composer lifecycle', () => {
   it('U-OPTIONS U-CANCEL: cached ON/OFF/ON remounts image and close/reopen requires fresh image load', async () => {
     render(<Harness />)
     const image = await ready()
-    fireEvent.click(screen.getByRole('switch'))
-    fireEvent.click(screen.getByRole('switch'))
+    await userEvent.click(screen.getByRole('switch'))
+    await userEvent.click(screen.getByRole('switch'))
     expect(screen.getByTestId('share-card-preview')).not.toBe(image)
     fireEvent.load(screen.getByTestId('share-card-preview'))
-    fireEvent.click(screen.getByTestId('share-card-cancel'))
-    fireEvent.click(screen.getByText('Reopen'))
+    await userEvent.click(screen.getByTestId('share-card-cancel'))
+    await userEvent.click(screen.getByText('Reopen'))
     expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')
     expect(boundary.save).not.toHaveBeenCalled()
   })
@@ -681,11 +684,11 @@ describe('share-card composer lifecycle', () => {
     const held = deferred<typeof card>()
     const view = render(<Harness />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-cancel'))
-    fireEvent.click(screen.getByText('Reopen'))
+    await userEvent.click(screen.getByTestId('share-card-cancel'))
+    await userEvent.click(screen.getByText('Reopen'))
     await ready()
     boundary.prepare.mockReturnValueOnce(held.promise)
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     await waitFor(() => expect(boundary.prepare).toHaveBeenCalledTimes(2))
     const signal = boundary.prepare.mock.calls[1]?.[1] as AbortSignal
     view.unmount()
@@ -707,7 +710,7 @@ describe('share-card composer lifecycle', () => {
     )
     const view = render(<Harness />)
     await ready()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     await waitFor(() => expect(boundary.save).toHaveBeenCalledOnce())
     view.unmount()
     expect(nativeShareCardSavePending()).toBe(true)
