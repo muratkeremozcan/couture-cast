@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  SHARE_CARD_MAX_BYTES,
   prepareShareCardInputSchema,
   preparedShareCardSchema,
 } from '../src/contracts/http/share-cards'
 import { generateHttpOpenApiDocument } from '../src/contracts/http/openapi'
+import { preparedShareCardFixture } from '../src/testing/share-card-fixture'
 const preview = {
   source: { kind: 'outfit', recommendationId: 'own-id' },
   locale: 'en-US',
@@ -42,29 +44,22 @@ describe('share-card contract', () => {
     expect(doc.paths?.['/api/v1/share-cards/prepare']?.post?.operationId).toBe(
       'prepareShareCard'
     )
+    expect(preparedShareCardSchema.safeParse(preparedShareCardFixture).success).toBe(true)
+    const limit = 4 * Math.ceil(SHARE_CARD_MAX_BYTES / 3)
     expect(
       preparedShareCardSchema.safeParse({
-        pngBase64: 'AAAA',
-        accessibilityLabel: 'Outfit. Morning. Top. CoutureCast. Watermark: CoutureCast',
-        sha256: 'a'.repeat(64),
-        width: 1080,
-        height: 1350,
-        mimeType: 'image/png',
-        filename: 'couturecast-card.png',
-        templateVersion: 1,
+        ...preparedShareCardFixture,
+        pngBase64: 'A'.repeat(limit),
       }).success
     ).toBe(true)
+    for (const pngBase64 of ['', 'A'.repeat(limit + 4), 'AAA', 'AA=A', 'AA\nAA'])
+      expect(
+        preparedShareCardSchema.safeParse({ ...preparedShareCardFixture, pngBase64 })
+          .success
+      ).toBe(false)
   })
   it('U-CONTRACT bounds the full accessibility label and rejects absent or control-bearing text', () => {
-    const response = {
-      pngBase64: 'AAAA',
-      sha256: 'a'.repeat(64),
-      width: 1080,
-      height: 1350,
-      mimeType: 'image/png',
-      filename: 'couturecast-card.png',
-      templateVersion: 1,
-    }
+    const response = preparedShareCardFixture
     for (const accessibilityLabel of [
       undefined,
       '',
