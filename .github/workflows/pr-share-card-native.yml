@@ -146,6 +146,9 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+          # trigger only queues the uevent; wait until the rule has applied before testing.
+          sudo udevadm settle --timeout=30
+          ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
       - name: Android real original and API32 denied/permanent permission proof
         if: matrix.platform == 'android'
