@@ -29,28 +29,28 @@ Every imported field and text matches its complete authored source literally.
 All 7,000 imported entries are gated clean; none is excluded as deliberate review.
 
 | Locale | Captions | Alt texts | Gated clean | Five-word affected / n | Share | Largest concept / n | Share | Distinct concepts |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| de | 500 | 500 | 1000 | 0/1000 | 0% | 10/1000 | 1% | 189 |
-| en | 500 | 500 | 1000 | 6/1000 | 0.6% | 10/1000 | 1% | 698 |
-| es | 500 | 500 | 1000 | 0/1000 | 0% | 10/1000 | 1% | 191 |
-| fr | 500 | 500 | 1000 | 0/1000 | 0% | 8/1000 | 0.8% | 242 |
-| it | 500 | 500 | 1000 | 0/1000 | 0% | 8/1000 | 0.8% | 243 |
-| pt | 500 | 500 | 1000 | 0/1000 | 0% | 10/1000 | 1% | 200 |
-| tr | 500 | 500 | 1000 | 0/1000 | 0% | 10/1000 | 1% | 185 |
+| ------ | -------: | --------: | ----------: | ---------------------: | ----: | ------------------: | ----: | ----------------: |
+| de     |      500 |       500 |        1000 |                 0/1000 |    0% |             10/1000 |    1% |               189 |
+| en     |      500 |       500 |        1000 |                 6/1000 |  0.6% |             10/1000 |    1% |               698 |
+| es     |      500 |       500 |        1000 |                 0/1000 |    0% |             10/1000 |    1% |               191 |
+| fr     |      500 |       500 |        1000 |                 0/1000 |    0% |              8/1000 |  0.8% |               242 |
+| it     |      500 |       500 |        1000 |                 0/1000 |    0% |              8/1000 |  0.8% |               243 |
+| pt     |      500 |       500 |        1000 |                 0/1000 |    0% |             10/1000 |    1% |               200 |
+| tr     |      500 |       500 |        1000 |                 0/1000 |    0% |             10/1000 |    1% |               185 |
 
 Both preregistered diversity measures pass for every locale. Concept groups can
 overlap when an item expresses multiple substantive motifs. Counts use the full
 1,000-item denominator. Semantic acceptance remains reviewable by the code reviewers.
 
-| Locale | Most repeated concept, with an example where tied | Count | Tied maximum groups |
-| --- | --- | ---: | ---: |
-| de | `florale-handstickerei`: small hand-embroidered flowers or leaves | 10 | 11 |
-| en | `clothing-or-bag-on-chair`: clothing or a bag set aside on a chair | 10 | 1 |
-| es | `capas-blusa-transparentes`: transparent blouse above an opaque inner top | 10 | 9 |
-| fr | `bord-retourne-visible`: turned edge revealing a cuff or inner layer | 8 | 8 |
-| it | `bande-riflettenti-indossate`: reflective bands worn at torso or ankle | 8 | 7 |
-| pt | `painel-acolchoado-costurado`: stitched padded quilting panels | 10 | 1 |
-| tr | `acik-sirt-baglama`: open garment back panels joined by ties | 10 | 15 |
+| Locale | Most repeated concept, with an example where tied                         | Count | Tied maximum groups |
+| ------ | ------------------------------------------------------------------------- | ----: | ------------------: |
+| de     | `florale-handstickerei`: small hand-embroidered flowers or leaves         |    10 |                  11 |
+| en     | `clothing-or-bag-on-chair`: clothing or a bag set aside on a chair        |    10 |                   1 |
+| es     | `capas-blusa-transparentes`: transparent blouse above an opaque inner top |    10 |                   9 |
+| fr     | `bord-retourne-visible`: turned edge revealing a cuff or inner layer      |     8 |                   8 |
+| it     | `bande-riflettenti-indossate`: reflective bands worn at torso or ankle    |     8 |                   7 |
+| pt     | `painel-acolchoado-costurado`: stitched padded quilting panels            |    10 |                   1 |
+| tr     | `acik-sirt-baglama`: open garment back panels joined by ties              |    10 |                  15 |
 
 All tied names, English glosses and exact row/field memberships are retained in
 the author manifests. `diversity.json` retains every concept and imported-row membership.
@@ -85,11 +85,11 @@ concept group must be at most 10/1,000, or 1%.
 
 The coordinator explicitly authorized the two existing independent authors.
 
-| Author | Assigned locales | Authored source rows per locale | Imported ID range |
-| --- | --- | --- | --- |
-| cc68-tea, `/root` | en | 1 through 1000 | en-holdout-v4-001 through en-holdout-v4-1000 |
-| cc68-tea independent author, `/root/edge_paths` | de, es, tr | 1 through 1000 | locale-holdout-v4-001 through locale-holdout-v4-1000 |
-| cc68-tea independent author, `/root/general_review` | fr, it, pt | 1 through 1000 | locale-holdout-v4-001 through locale-holdout-v4-1000 |
+| Author                                              | Assigned locales | Authored source rows per locale | Imported ID range                                    |
+| --------------------------------------------------- | ---------------- | ------------------------------- | ---------------------------------------------------- |
+| cc68-tea, `/root`                                   | en               | 1 through 1000                  | en-holdout-v4-001 through en-holdout-v4-1000         |
+| cc68-tea independent author, `/root/edge_paths`     | de, es, tr       | 1 through 1000                  | locale-holdout-v4-001 through locale-holdout-v4-1000 |
+| cc68-tea independent author, `/root/general_review` | fr, it, pt       | 1 through 1000                  | locale-holdout-v4-001 through locale-holdout-v4-1000 |
 
 Authors persist each complete item literally in a locale TSV file, with editorial
 concept labels and its field. Each sentence is composed individually.
@@ -178,14 +178,14 @@ Evidence is under
 ## Evaluation result
 
 | Locale | Withheld / gated | Wilson 95% upper bound | Verdict |
-| --- | ---: | ---: | --- |
-| de | 6/1000 | 1.302817% | FAIL |
-| en | 0/1000 | 0.382676% | PASS |
-| es | 0/1000 | 0.382676% | PASS |
-| fr | 0/1000 | 0.382676% | PASS |
-| it | 4/1000 | 1.023956% | FAIL |
-| pt | 5/1000 | 1.165096% | FAIL |
-| tr | 0/1000 | 0.382676% | PASS |
+| ------ | ---------------: | ---------------------: | ------- |
+| de     |           6/1000 |              1.302817% | FAIL    |
+| en     |           0/1000 |              0.382676% | PASS    |
+| es     |           0/1000 |              0.382676% | PASS    |
+| fr     |           0/1000 |              0.382676% | PASS    |
+| it     |           4/1000 |              1.023956% | FAIL    |
+| pt     |           5/1000 |              1.165096% | FAIL    |
+| tr     |           0/1000 |              0.382676% | PASS    |
 
 The command exited 1: **49/52 tests passed, three Wilson gate assertions failed**.
 All in-sample clean checks withheld zero. All 700 disguised cases were withheld,
@@ -209,11 +209,11 @@ relabeled or rewritten after sealing, and the repair received no tuning from the
 results. Raw corpus wording was not sent to cc68-impl during the blind holdout phase.
 The subsequent retirement decision releases these cases for development.
 
-| Locale | Withheld case suffixes | Reason |
-| --- | --- | --- |
-| de | 041, 170, 713, 808, 907, 953 | text_policy_match |
-| it | 241, 453, 549, 865 | text_policy_match |
-| pt | 272, 306, 307, 413, 877 | text_policy_match |
+| Locale | Withheld case suffixes       | Reason            |
+| ------ | ---------------------------- | ----------------- |
+| de     | 041, 170, 713, 808, 907, 953 | text_policy_match |
+| it     | 241, 453, 549, 865           | text_policy_match |
+| pt     | 272, 306, 307, 413, 877      | text_policy_match |
 
 Full case IDs, dispositions and reasons are in the run product and review summary.
 The run directory also retains the command log, Vitest JSON, source manifests,
