@@ -5,7 +5,7 @@
 /* eslint-disable @typescript-eslint/await-thenable */
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
-import { screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, screen, fireEvent, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
@@ -259,18 +259,29 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     })
 
     const leatherJacketOption = screen.getByTestId('swap-option-leather-jacket')
-    fireEvent.click(leatherJacketOption)
+    // Focus returns on a 400 ms timer after the modal closes; fake time removes the race.
+    const focusReturnDelayMs = 400
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      fireEvent.click(leatherJacketOption)
 
-    expect(screen.queryByText('Classic Trench Coat')).toBeNull()
-    expect(screen.getByText('Leather Jacket')).toBeTruthy()
-    // Focus returns on a 400 ms timer after the modal closes; the default 1 s budget left
-    // too little headroom under coverage instrumentation on a loaded host.
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('garment-tile-leather-jacket')).toHaveFocus()
-      },
-      { timeout: 5000 }
-    )
+      expect(screen.queryByText('Classic Trench Coat')).toBeNull()
+      expect(screen.getByText('Leather Jacket')).toBeTruthy()
+      // The modal leaves on its real exit animation; only the app's focus timer is faked.
+      await expect
+        .poll(() => screen.queryByTestId('garment-swap-modal'), { timeout: 5000 })
+        .toBeNull()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(focusReturnDelayMs - 1)
+      })
+      expect(screen.getByTestId('garment-tile-leather-jacket')).not.toHaveFocus()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1)
+      })
+      expect(screen.getByTestId('garment-tile-leather-jacket')).toHaveFocus()
+    } finally {
+      vi.useRealTimers()
+    }
 
     expect(mockCapture).toHaveBeenLastCalledWith('hero_interaction', {
       interactionType: 'garment_swap',
