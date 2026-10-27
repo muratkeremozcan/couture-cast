@@ -3,6 +3,7 @@ import { ConflictException, ForbiddenException } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { preparedShareCardFixture } from '@couture/api-client/testing/share-card-fixture'
 import { SHARE_CARD_GLOBAL_LIMIT, ShareCardsService } from './share-cards.service.js'
+import { ShareCardAdmission } from './share-card-admission.js'
 const projected = { kind: 'outfit', scenario: 'morning', categories: ['top'] }
 const sources = { resolve: vi.fn(), resolveGuarded: vi.fn() }
 const renderer = {
@@ -22,12 +23,7 @@ const prisma = {
   auditLog: { create: vi.fn() },
   $transaction: vi.fn(async (work: (tx: unknown) => Promise<unknown>) => work(prisma)),
 }
-const service = new ShareCardsService(
-  prisma as never,
-  sources as never,
-  renderer as never,
-  storage as never
-)
+let service: ShareCardsService
 const input = {
   source: { kind: 'outfit', recommendationId: 'owned' },
   locale: 'en-US',
@@ -35,6 +31,12 @@ const input = {
   purpose: 'preview',
 } as const
 beforeEach(() => {
+  service = new ShareCardsService(
+    prisma as never,
+    sources as never,
+    renderer as never,
+    storage as never
+  )
   sources.resolve.mockReset().mockResolvedValue(projected)
   sources.resolveGuarded.mockReset().mockResolvedValue(projected)
   renderer.prepare.mockReset().mockResolvedValue({
@@ -44,13 +46,44 @@ beforeEach(() => {
   prisma.auditLog.create.mockReset().mockResolvedValue({})
   storage.downloadBounded.mockReset()
 })
-afterEach(() => vi.useRealTimers())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 function deferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((yes) => {
     resolve = yes
   })
   return { promise, resolve }
+}
+/** Resolves once `count` admitted operations have released their slots. */
+function admissionReleases(count: number) {
+  const acquire = Object.getOwnPropertyDescriptor(
+    ShareCardAdmission.prototype,
+    'acquire'
+  )!.value as (
+    this: ShareCardAdmission,
+    member: string,
+    signal: AbortSignal
+  ) => Promise<() => void>
+  let released = 0
+  let settle!: () => void
+  const settled = new Promise<void>((resolve) => {
+    settle = resolve
+  })
+  vi.spyOn(ShareCardAdmission.prototype, 'acquire').mockImplementation(async function (
+    this: ShareCardAdmission,
+    member: string,
+    signal: AbortSignal
+  ) {
+    const release = await (acquire.call(this, member, signal) as Promise<() => void>)
+    return () => {
+      release()
+      if (++released === count) settle()
+    }
+  })
+  return settled
 }
 const rendered = {
   bytes: Buffer.from(preparedShareCardFixture.pngBase64, 'base64'),
@@ -158,6 +191,7 @@ describe('share-card preparation boundaries', () => {
     )
   })
   it('U-ADMISSION: bounded global/member capacity stays owned after cancellation until actual settlement, then releases on failure', async () => {
+    const released = admissionReleases(SHARE_CARD_GLOBAL_LIMIT)
     const holds = Array.from({ length: SHARE_CARD_GLOBAL_LIMIT }, () =>
       deferred<typeof rendered>()
     )
@@ -186,9 +220,7 @@ describe('share-card preparation boundaries', () => {
       status: 503,
     })
     holds.forEach((hold) => hold.resolve(rendered))
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
+    await released
     renderer.prepare.mockRejectedValueOnce(new Error('native failure'))
     await expect(service.prepare('extra-member', input)).rejects.toMatchObject({
       status: 503,
