@@ -12,7 +12,7 @@ import { userEvent } from 'vitest/browser'
 import { server } from '@/src/test-utils/msw/server'
 import { http, HttpResponse } from 'msw'
 import TabOneScreen from '@/app/(tabs)/index'
-import { AccessibilityInfo, Platform } from 'react-native'
+import { AccessibilityInfo, NativeModules, Platform } from 'react-native'
 import { registerShareCardHeading } from '@/src/lib/share-card-focus'
 import { AndroidShareCardPresentation } from '@/components/android-share-card-presentation'
 import {
@@ -26,6 +26,7 @@ import {
 } from '@/src/lib/ritual-cache'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 import i18n, { initI18n } from '@/src/lib/i18n'
+import { failOnConsoleWarnOrError } from '@/src/test-utils/console-guard'
 
 const mockRouter = { setParams: vi.fn() }
 
@@ -45,6 +46,13 @@ vi.mock('expo-router', async () => ({
 // native tags, so every case resolves none, as safeFindNodeHandle does for Platform web.
 vi.mock('@/src/lib/accessibility-focus', () => ({ safeFindNodeHandle: () => null }))
 
+// The Android case sends the ritual cache down its native file path. The real module
+// needs Expo's native globals, which a browser run lacks, so it is replaced here.
+vi.mock('expo-file-system/legacy', async () => {
+  const { nativeStorageMocks } = await import('../test-utils/persisted-writes.js')
+  return nativeStorageMocks.legacyFileSystem
+})
+
 vi.mock('@/src/lib/use-share-card-status-bar', () => ({
   useShareCardStatusBar: () => true,
 }))
@@ -61,6 +69,8 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
 }))
 
 describe('Mobile Hero Experience (TabOneScreen)', () => {
+  failOnConsoleWarnOrError()
+
   it('L8: the hero content adds no share-card heading of its own', async () => {
     await render(<TabOneScreen />)
     await screen.findByTestId('weather-header')
@@ -108,6 +118,9 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
   it('Android null-member token session opens the outfit share-card composer', async () => {
     const previousPlatform = Platform.OS
     Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+    // A real Android build ships the widget bridge the ritual cache publishes through.
+    const setWidgetData = vi.fn((_payload: string) => Promise.resolve())
+    NativeModules.WidgetSharedModule = { setWidgetData }
     setMobileApplicationUserId(null)
     try {
       await render(
@@ -122,7 +135,9 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       await waitFor(() =>
         expect(screen.queryByTestId('share-card-title')).not.toBeInTheDocument()
       )
+      await waitFor(() => expect(setWidgetData).toHaveBeenCalledOnce())
     } finally {
+      delete NativeModules.WidgetSharedModule
       Object.defineProperty(Platform, 'OS', {
         value: previousPlatform,
         configurable: true,
