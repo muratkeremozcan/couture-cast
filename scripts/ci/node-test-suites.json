@@ -17,6 +17,14 @@
     ],
     "native-harness": "discover"
   },
+  "conditionNeeds": {
+    "startup-deadline": ["install"],
+    "browser-deps": [],
+    "share-card-plugins": ["install"],
+    "native-harness": ["install"],
+    "worklets-staging": ["prebuild"],
+    "vitest": ["runtime"]
+  },
   "runElsewhere": {
     "apps/mobile/plugins/with-watchos.test.js": "apps/mobile npm test (test:watchos-prebuild) and watchos-native.yml",
     "apps/mobile/plugins/with-widgets.test.js": "apps/mobile npm test (test:widget-prebuild)"

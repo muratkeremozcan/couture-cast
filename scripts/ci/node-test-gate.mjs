@@ -6,7 +6,10 @@
 // The default suite discovers every *.test.mjs and *.spec.mjs under scripts/ that no
 // pinned suite claims, so a new or split test file runs without a workflow edit.
 // Before running, the gate checks that the manifest and the workflow cover every
-// discovered file and every suite.
+// discovered file and every suite, that no gate step has a condition outside the
+// explicit-prerequisite grammar, and that each gate step waits only on the steps its
+// suites declare in conditionNeeds, so a suite with no database or browser need cannot
+// hide behind a failed runtime.
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -139,27 +142,55 @@ function manifestProblems(root, manifest) {
   return problems
 }
 
+// A suite runs as early as its declared needs allow: a step may wait only on the
+// steps its suites need, so a later Supabase or browser failure cannot hide them.
+function needsProblems(manifest, step, lines) {
+  const needs = manifest.conditionNeeds ?? {}
+  const suites = lines.map(gatedSuite).filter(Boolean)
+  if (lines.some((line) => /^npx vitest run\b/.test(line))) suites.push('vitest')
+  const allowed = new Set(suites.flatMap((suite) => needs[suite] ?? []))
+  const problems = suites
+    .filter((suite) => suite === 'vitest' || manifest.suites[suite] !== undefined)
+    .filter((suite) => !Array.isArray(needs[suite]))
+    .map((suite) => `suite ${suite} declares no conditionNeeds`)
+  for (const [, id] of String(step.if ?? '').matchAll(/\bsteps\.([A-Za-z0-9_-]+)\./g))
+    if (!allowed.has(id))
+      problems.push(
+        `step ${step.name ?? step.id ?? 'unnamed'} waits on steps.${id}, which ${suites.join(' and ')} does not need`
+      )
+  return [...new Set(problems)]
+}
+
+const stepLines = (step) => (step.run ?? '').split(/\r?\n/).map((line) => line.trim())
+
+// A condition that can skip a gate step silences its suite on a green run.
+function gateStepProblems(manifest, step) {
+  const lines = stepLines(step)
+  const runsTests = lines.some(
+    (line) =>
+      gatedSuite(line) !== null ||
+      (/^npx vitest run\b/.test(line) &&
+        manifest.vitest.some((file) => line.includes(file)))
+  )
+  if (!runsTests) return []
+  return [
+    ...(isExplicitPrerequisiteCondition(step.if)
+      ? []
+      : [
+          `step ${step.name ?? step.id ?? 'unnamed'} can be skipped by its condition: ${JSON.stringify(step.if)}`,
+        ]),
+    ...needsProblems(manifest, step, lines),
+  ]
+}
+
 function workflowProblems(manifest, workflow) {
   const problems = []
   const names = Object.keys(manifest.suites)
   const steps = Object.values(parse(workflow).jobs ?? {}).flatMap(
     (job) => job.steps ?? []
   )
-  const stepLines = (step) => (step.run ?? '').split(/\r?\n/).map((line) => line.trim())
   const lines = steps.flatMap(stepLines)
-  // A condition that can skip a gate step silences its suite on a green run.
-  for (const step of steps) {
-    const runsTests = stepLines(step).some(
-      (line) =>
-        gatedSuite(line) !== null ||
-        (/^npx vitest run\b/.test(line) &&
-          manifest.vitest.some((file) => line.includes(file)))
-    )
-    if (runsTests && !isExplicitPrerequisiteCondition(step.if))
-      problems.push(
-        `step ${step.name ?? step.id ?? 'unnamed'} can be skipped by its condition: ${JSON.stringify(step.if)}`
-      )
-  }
+  for (const step of steps) problems.push(...gateStepProblems(manifest, step))
   const invoked = new Set(lines.map(gatedSuite).filter(Boolean))
   for (const name of invoked)
     if (!names.includes(name)) problems.push(`workflow runs unknown suite ${name}`)

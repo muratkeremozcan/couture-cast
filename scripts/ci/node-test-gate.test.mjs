@@ -198,6 +198,7 @@ const fixtureManifest = {
     outside: ['apps/plugin.test.js'],
     default: 'discover',
   },
+  conditionNeeds: { pinned: [], outside: [], default: ['setup'], vitest: [] },
 }
 const fixtureTree = {
   'scripts/ci/early.test.mjs': '',
@@ -365,6 +366,80 @@ describe('node-test-gate discovery and coverage', () => {
         "      - if: github.ref == 'refs/heads/main'\n        run: npx vitest run"
       )
       assert.equal(check(vitest).length, 1)
+    }))
+
+  test('an extra or-clause or a choice branch with no platform is outside the grammar', () =>
+    temporary((root) => {
+      write(root, fixtureTree)
+      const choice =
+        "((matrix.platform == 'android' && steps.setup.outcome == 'success') || (matrix.platform == 'ios' && steps.setup.outcome == 'success'))"
+      const workflow = (condition) =>
+        fixtureWorkflow.replace(
+          '          node scripts/ci/node-test-gate.mjs default',
+          ''
+        ) +
+        [
+          '',
+          '  third:',
+          '    steps:',
+          '      - id: setup',
+          '        run: echo setup',
+          '      - name: default suite',
+          `        if: "${condition}"`,
+          '        run: node scripts/ci/node-test-gate.mjs default',
+        ].join('\n')
+      const check = (condition) =>
+        coverageProblems({
+          root,
+          manifest: fixtureManifest,
+          workflow: workflow(condition),
+        })
+      assert.deepEqual(check(`\${{ !cancelled() && ${choice} }}`), [])
+      for (const condition of [
+        `\${{ !cancelled() && ${choice} || always() }}`,
+        "${{ !cancelled() && steps.setup.outcome == 'success' || true }}",
+        "${{ !cancelled() && ((matrix.platform == 'android' && steps.setup.outcome == 'success') || (steps.setup.outcome == 'success')) }}",
+        "${{ !cancelled() && ((matrix.platform == 'android') || always()) }}",
+        "${{ !cancelled() && matrix.platform == 'android' || matrix.platform == 'ios' }}",
+      ])
+        assert.deepEqual(
+          check(condition),
+          [
+            `step default suite can be skipped by its condition: ${JSON.stringify(condition)}`,
+          ],
+          condition
+        )
+    }))
+
+  test('a gate step may wait only on the steps its suites declare they need', () =>
+    temporary((root) => {
+      write(root, fixtureTree)
+      const workflow = fixtureWorkflow.replace(
+        '      - run: |\n          node scripts/ci/node-test-gate.mjs outside\n          node scripts/ci/node-test-gate.mjs default',
+        [
+          '      - id: setup',
+          '        run: echo setup',
+          '      - id: runtime',
+          '        run: echo runtime',
+          '      - name: bundled suites',
+          "        if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.runtime.outcome == 'success' }}",
+          '        run: |',
+          '          node scripts/ci/node-test-gate.mjs outside',
+          '          node scripts/ci/node-test-gate.mjs default',
+        ].join('\n')
+      )
+      assert.deepEqual(coverageProblems({ root, manifest: fixtureManifest, workflow }), [
+        'step bundled suites waits on steps.runtime, which outside and default does not need',
+      ])
+      const { conditionNeeds, ...undeclared } = fixtureManifest
+      void conditionNeeds
+      assert.ok(
+        coverageProblems({
+          root,
+          manifest: undeclared,
+          workflow: fixtureWorkflow,
+        }).includes('suite default declares no conditionNeeds')
+      )
     }))
 
   test('a node:test file outside the discovery pattern or the lists fails coverage', () =>
