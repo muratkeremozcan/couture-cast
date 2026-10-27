@@ -14,8 +14,15 @@ const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
 const output = path.join(directory, 'public-evidence')
-fs.rmSync(output, { recursive: true, force: true })
-fs.mkdirSync(output, { recursive: true })
+// Everything is written to a private staging directory first and moved into the
+// uploaded directory only after every file validated, so a later refusal can never
+// leave a partial public set behind.
+const staging = path.join(directory, '.public-evidence-staging')
+for (const target of [output, staging]) {
+  fs.rmSync(target, { recursive: true, force: true })
+  fs.mkdirSync(target, { recursive: true })
+}
+process.on('exit', () => fs.rmSync(staging, { recursive: true, force: true }))
 let ciStatus
 if (process.env.CC68_CI_PLATFORM !== undefined) {
   const platform = process.env.CC68_CI_PLATFORM
@@ -249,7 +256,7 @@ const closedJSON = (name, value) => {
     )
   )
     throw new Error('private_data_in_public_evidence')
-  fs.writeFileSync(path.join(output, name), text)
+  fs.writeFileSync(path.join(staging, name), text)
 }
 // Startup can fail before a native flow exists. Preserve that outcome without
 // fabricating a flow result or publishing provisioning logs.
@@ -260,7 +267,7 @@ for (const [name, value] of diagnostics) {
   // Re-render from validated primitives. Never trust or copy a claimed redacted PNG.
   await writeRedactedNativeFailureImage(
     value,
-    path.join(output, name.replace('.json', '-redacted.png'))
+    path.join(staging, name.replace('.json', '-redacted.png'))
   )
 }
 
@@ -272,7 +279,7 @@ for (const name of fs.readdirSync(directory)) {
       name
     )
   )
-    fs.copyFileSync(path.join(directory, name), path.join(output, name))
+    fs.copyFileSync(path.join(directory, name), path.join(staging, name))
   if (/^original-proof-(android|ios)(-[a-z-]+)?\.json$/.test(name)) {
     const proof = JSON.parse(fs.readFileSync(path.join(directory, name)))
     closedJSON(name, {
@@ -290,4 +297,6 @@ for (const name of fs.readdirSync(directory)) {
   )
     closedJSON(name, JSON.parse(fs.readFileSync(path.join(directory, name))))
 }
+for (const name of fs.readdirSync(staging))
+  fs.renameSync(path.join(staging, name), path.join(output, name))
 console.log('Closed share-card evidence selected and secret-scanned.')

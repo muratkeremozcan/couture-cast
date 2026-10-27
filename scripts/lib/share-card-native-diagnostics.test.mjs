@@ -680,6 +680,41 @@ describe('native flow public evidence', () => {
     assert.match(forged.stderr, /Error: invalid_browser_watermark_evidence\b/)
     assert.deepEqual(fs.readdirSync(path.join(directory, 'public-evidence')), [])
   })
+  test('a refusal after earlier files rendered publishes nothing, not a partial set', async (t) => {
+    const { projectNativeFlowDiagnostics } = await helper()
+    const directory = fixture(t)
+    // The diagnostics JSON and its redacted render are produced before the proof loop
+    // reaches the poisoned matrix summary.
+    fs.writeFileSync(
+      path.join(directory, 'native-flow-diagnostics-android.json'),
+      JSON.stringify(
+        projectNativeFlowDiagnostics({
+          ...context,
+          root,
+          commands: [command('tapOnElement', 'tab-home')],
+          hierarchy,
+          screenshot: { width: 1080, height: 2400, source: 'maestro-failed-step' },
+        })
+      )
+    )
+    fs.writeFileSync(
+      path.join(directory, 'native-matrix-android.json'),
+      JSON.stringify({ platform: 'android', note: 'access_token=leaked' })
+    )
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/e2e-share-card/public-evidence.mjs'],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        env: { ...process.env, CC68_HARNESS_DIR: directory },
+      }
+    )
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /Error: private_data_in_public_evidence\b/)
+    assert.deepEqual(fs.readdirSync(path.join(directory, 'public-evidence')), [])
+    assert.equal(fs.existsSync(path.join(directory, '.public-evidence-staging')), false)
+  })
 })
 
 describe('native flow diagnostics CI registration', () => {
