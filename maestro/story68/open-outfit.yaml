@@ -13,9 +13,12 @@ appId: ${MAESTRO_APP_ID}
       platform: iOS
     commands:
       - waitForAnimationToEnd
+# Home renders one primary outfit card. Fail if a second opener ever appears.
+- assertNotVisible:
+    id: outfit-share-card-open
+    index: 1
 - tapOn:
     id: outfit-share-card-open
-    index: 0
 - extendedWaitUntil:
     visible:
       id: share-card-preview-loaded-.*

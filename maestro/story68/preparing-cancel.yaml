@@ -10,9 +10,12 @@ appId: ${MAESTRO_APP_ID}
     direction: DOWN
     timeout: 30000
     centerElement: true
+# Home renders one primary outfit card. Fail if a second opener ever appears.
+- assertNotVisible:
+    id: outfit-share-card-open
+    index: 1
 - tapOn:
     id: outfit-share-card-open
-    index: 0
 - extendedWaitUntil:
     visible: ${MAESTRO_PREPARING}
     timeout: 10000
