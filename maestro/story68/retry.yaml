@@ -1,0 +1,21 @@
+appId: ${MAESTRO_APP_ID}
+---
+# From a storage or offline failure: Retry prepares a fresh preview and clears the error.
+- assertVisible:
+    id: share-card-retry
+- assertVisible: ${MAESTRO_RETRY}
+- tapOn:
+    id: share-card-retry
+- extendedWaitUntil:
+    notVisible:
+      id: share-card-error
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: share-card-preview-loaded-.*
+    timeout: 20000
+- assertNotVisible:
+    id: share-card-retry
+- assertVisible:
+    id: share-card-save
+    enabled: true

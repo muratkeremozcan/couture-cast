@@ -14,8 +14,7 @@ appId: ${MAESTRO_APP_ID}
 - assertVisible:
     id: share-card-watermark
     enabled: true
-- runFlow: toggle-once.yaml
-- runFlow: toggle-once.yaml
+- runFlow: watermark.yaml
 - assertVisible:
     id: share-card-save
     enabled: true

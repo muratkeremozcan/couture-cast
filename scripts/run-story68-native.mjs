@@ -25,6 +25,10 @@ import {
 import { assertStory68DiskSpace } from './lib/test-disk-space.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
 import {
+  IOS_RETRYABLE_DENIAL_EVIDENCE,
+  IOS_SETTINGS_MARKERS,
+} from './lib/story68-native-evidence-schema.mjs'
+import {
   prepareWorkletsStaging,
   verifyWorkletsStaging,
 } from './lib/story68-worklets-staging.mjs'
@@ -191,6 +195,33 @@ function captureApproved() {
     priorResources: nativeOriginalPaths(),
   })
   console.log(JSON.stringify({ platform, approvedPreviewLoaded: true }))
+}
+function previewDigest() {
+  requireDevice()
+  const digest = run(maestroBinary, ['--device', device, 'hierarchy']).match(
+    /share-card-preview-loaded-([a-f0-9]{64})/
+  )?.[1]
+  if (!digest) throw new Error('loaded_approved_preview_required')
+  return digest
+}
+// settings.yaml asserts the destination in Maestro; this reads it again from the OS.
+function openOsSettings() {
+  maestro('maestro/story68/settings.yaml')
+  requireDevice()
+  if (platform === 'android') {
+    const resumed = run(adb, ['-s', device, 'shell', 'dumpsys', 'activity', 'activities'])
+      .split('\n')
+      .find((line) =>
+        /^\s*(topResumedActivity|mResumedActivity|ResumedActivity)/.test(line)
+      )
+      ?.match(/ActivityRecord\{\S+ \S+ ([\w.]+)\//)?.[1]
+    if (resumed !== 'com.android.settings') throw new Error('os_settings_not_opened')
+    return { foregroundPackage: resumed }
+  }
+  const hierarchy = run(maestroBinary, ['--device', device, 'hierarchy'])
+  if (!IOS_SETTINGS_MARKERS.every((marker) => hierarchy.includes(marker)))
+    throw new Error('os_settings_not_opened')
+  return { foregroundMarkers: IOS_SETTINGS_MARKERS }
 }
 function openUrl(url) {
   requireDevice()
@@ -1148,7 +1179,7 @@ if (command === 'prebuild') {
     await signin()
   }
   maestro('maestro/story68/open-outfit.yaml')
-  maestro('maestro/story68/watermark.yaml')
+  maestro('maestro/story68/watermark.yaml', { MAESTRO_ON_PREVIEW: previewDigest() })
   captureApproved()
   if (
     platform === 'android' &&
@@ -1160,7 +1191,7 @@ if (command === 'prebuild') {
     maestro('maestro/story68/permanent.yaml')
     if (JSON.stringify(nativeOriginalPaths()) !== JSON.stringify(before))
       throw new Error('denial_created_asset')
-    maestro('maestro/story68/settings.yaml')
+    openOsSettings()
     run(adb, [
       '-s',
       device,
@@ -1182,7 +1213,7 @@ if (command === 'prebuild') {
     maestro('maestro/story68/permanent.yaml')
     if (JSON.stringify(nativeOriginalPaths()) !== before)
       throw new Error('denial_created_asset')
-    maestro('maestro/story68/settings.yaml')
+    const settingsEvidence = openOsSettings()
     run('xcrun', ['simctl', 'privacy', device, 'grant', 'photos-add', appId])
     openUrl(
       `couturecast-story68://expo-development-client/?url=${encodeURIComponent('http://127.0.0.1:8089')}`
@@ -1198,9 +1229,9 @@ if (command === 'prebuild') {
       readPermissionBeforeSave: iosPhotoPermissions(),
       canAskAgain: false,
       actualSettingsOpened: true,
+      settingsEvidence,
       settingsGrantReturnedWithoutImport: true,
-      retryableDenialEvidence:
-        'restricted adapter response; iOS denies further runtime prompts after its first real denial',
+      retryableDenialEvidence: IOS_RETRYABLE_DENIAL_EVIDENCE,
     })
   }
   maestro('maestro/story68/save.yaml')
@@ -1294,7 +1325,7 @@ if (command === 'prebuild') {
     mark('M-A11Y:community-draft-native-host-foreground')
   }
   open('outfit')
-  maestro('maestro/story68/watermark.yaml')
+  maestro('maestro/story68/watermark.yaml', { MAESTRO_ON_PREVIEW: previewDigest() })
   captureApproved()
   const retained = read(`approved-${platform}.json`).sha256
   let before = originals()
@@ -1313,6 +1344,14 @@ if (command === 'prebuild') {
     })
     assertUnchanged(before)
     mark(mode === 'offline' ? 'M-OFFLINE' : `M-STORAGE:${mode}`)
+    // Retry prepares a fresh preview; the next Save takes a new final authorization.
+    fixture('real')
+    maestro('maestro/story68/retry.yaml')
+    captureApproved()
+    maestro('maestro/story68/save.yaml')
+    extract(`retry-${mode}`)
+    mark(`${mode === 'offline' ? 'M-OFFLINE' : `M-STORAGE:${mode}`}:retry-recovers`)
+    before = originals()
   }
   fixture('real')
   close()
@@ -1374,9 +1413,13 @@ if (command === 'prebuild') {
       throw new Error('localized_full_preview_label_mismatch')
     }
     await waitLabel(`${body}. ${catalog.watermarkRole}: CoutureCast`)
-    maestro('maestro/story68/toggle-once.yaml')
+    maestro('maestro/story68/toggle-once.yaml', {
+      MAESTRO_PREVIOUS_PREVIEW: previewDigest(),
+    })
     await waitLabel(body)
-    maestro('maestro/story68/toggle-once.yaml')
+    maestro('maestro/story68/toggle-once.yaml', {
+      MAESTRO_PREVIOUS_PREVIEW: previewDigest(),
+    })
     await waitLabel(`${body}. ${catalog.watermarkRole}: CoutureCast`)
     if (platform === 'android') {
       assertShareCardDialogStatusBar(
@@ -1464,7 +1507,9 @@ if (command === 'prebuild') {
       await new Promise((resolve) => setTimeout(resolve, 100))
 
     if (lifecycle === 'close') {
-      maestro('maestro/story68/pending-settled.yaml')
+      maestro('maestro/story68/pending-settled.yaml', {
+        MAESTRO_ON_PREVIEW: read(`approved-${platform}.json`).sha256,
+      })
       mark('M-WATERMARK:reopen-after-settlement')
       close()
     }
@@ -1497,6 +1542,10 @@ if (command === 'prebuild') {
   )
     throw new Error('fixture_mode_required')
   openUrl(`couturecast-story68://__story68__/share-card?mode=${mode}`)
+} else if (command === 'settings') {
+  console.log(
+    JSON.stringify({ platform, actualSettingsOpened: true, ...openOsSettings() })
+  )
 } else if (command === 'snapshot') {
   captureApproved()
 } else if (command === 'extract') {

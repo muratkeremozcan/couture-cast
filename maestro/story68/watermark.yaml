@@ -1,12 +1,35 @@
 appId: ${MAESTRO_APP_ID}
 ---
+# ON/OFF/ON from the default ON preview, whose digest the harness passes as MAESTRO_ON_PREVIEW.
+- assertVisible:
+    id: share-card-preview-loaded-${MAESTRO_ON_PREVIEW}
+- assertVisible:
+    id: share-card-watermark
+    checked: true
 - tapOn:
     id: share-card-watermark
-- tapOn:
+- assertVisible:
     id: share-card-watermark
+    checked: false
+- extendedWaitUntil:
+    notVisible:
+      id: share-card-preview-loaded-${MAESTRO_ON_PREVIEW}
+    timeout: 20000
 - extendedWaitUntil:
     visible:
       id: share-card-preview-loaded-.*
+    timeout: 20000
+- assertNotVisible:
+    id: share-card-preview-loaded-${MAESTRO_ON_PREVIEW}
+- tapOn:
+    id: share-card-watermark
+- assertVisible:
+    id: share-card-watermark
+    checked: true
+# ON returns the exact original composition.
+- extendedWaitUntil:
+    visible:
+      id: share-card-preview-loaded-${MAESTRO_ON_PREVIEW}
     timeout: 20000
 - assertVisible:
     id: share-card-save
