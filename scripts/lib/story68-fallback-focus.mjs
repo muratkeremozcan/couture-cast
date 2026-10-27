@@ -91,7 +91,7 @@ function freshRuntime(ctx) {
   )
   ctx.maestro('maestro/story65/open-app.yaml')
 }
-async function revalidated(file, offset, owner) {
+export async function revalidated(file, offset, owner) {
   const deadline = Date.now() + 8000
   while (Date.now() < deadline) {
     const observed = fs
@@ -117,7 +117,7 @@ async function revalidated(file, offset, owner) {
   }
   throw new Error('actual_owned_foreground_revalidation_required')
 }
-function iosAssertion(ctx, fixtures) {
+export function iosAssertion(ctx, fixtures) {
   const generated = path.join(ctx.directory, 'fallback-accessibility-project')
   fs.mkdirSync(generated, { recursive: true, mode: 0o700 })
   for (const [source, target] of [
@@ -289,7 +289,7 @@ async function withTalkBack(ctx, work) {
     ])
   }
 }
-function androidAssertion(ctx, fixtures) {
+export function androidAssertion(ctx, fixtures) {
   return () => {
     const log = recorded(
       ctx,
