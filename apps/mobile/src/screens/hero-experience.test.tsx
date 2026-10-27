@@ -8,6 +8,7 @@ import React from 'react'
 import { screen, fireEvent, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import { server } from '@/src/test-utils/msw/server'
 import { http, HttpResponse } from 'msw'
 import TabOneScreen from '@/app/(tabs)/index'
@@ -38,6 +39,10 @@ vi.mock('expo-router', async () => ({
     await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
   ).useFocusEffect,
 }))
+
+// The Android case runs on react-native-web, where findNodeHandle throws. Web has no
+// native tags, so every case resolves none, as safeFindNodeHandle does for Platform web.
+vi.mock('@/src/lib/accessibility-focus', () => ({ safeFindNodeHandle: () => null }))
 
 vi.mock('@/src/lib/use-share-card-status-bar', () => ({
   useShareCardStatusBar: () => true,
@@ -94,9 +99,9 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
         </AndroidShareCardPresentation>
       )
       const opener = await screen.findByTestId('outfit-share-card-open')
-      fireEvent.click(opener)
+      await userEvent.click(opener)
       expect(await screen.findByTestId('share-card-title')).toBeVisible()
-      fireEvent.click(screen.getByTestId('share-card-cancel'))
+      await userEvent.click(screen.getByTestId('share-card-cancel'))
       await waitFor(() =>
         expect(screen.queryByTestId('share-card-title')).not.toBeInTheDocument()
       )
