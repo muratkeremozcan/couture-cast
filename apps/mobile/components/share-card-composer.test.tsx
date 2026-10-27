@@ -589,20 +589,23 @@ describe('share-card composer lifecycle', () => {
   )
   it.each(
     supportedLocales.flatMap((locale) =>
-      [
-        'saved',
-        'storage',
-        'offline',
-        'permissionDenied',
-        'permissionPermanent',
-        'limited',
-        'finishingSave',
-        'nativeSaveUnavailable',
-      ].map((state) => ({ locale, state }))
+      // focus: 41 title, 42 Save, 43 recovery action, 44 Cancel. Unavailable keeps the title.
+      (
+        [
+          ['saved', true, 42],
+          ['storage', false, 43],
+          ['offline', false, 43],
+          ['permissionDenied', false, 43],
+          ['permissionPermanent', false, 43],
+          ['limited', true, 42],
+          ['finishingSave', true, 44],
+          ['nativeSaveUnavailable', false, 41],
+        ] as const
+      ).map(([state, polite, focus]) => ({ locale, state, polite, focus }))
     )
   )(
     'U-A11Y: $locale $state posts its exact localized announcement with the correct queue',
-    async ({ locale, state }) => {
+    async ({ locale, state, polite, focus }) => {
       await i18n.changeLanguage(locale)
       if (state === 'nativeSaveUnavailable') boundary.available = false
       render(<Harness />)
@@ -641,7 +644,6 @@ describe('share-card composer lifecycle', () => {
       }
       const key = state === 'limited' ? 'saved' : state
       const text = i18n.t(`shareCard.${key}`)
-      const polite = ['saved', 'limited', 'finishingSave'].includes(state)
       try {
         expect(await screen.findByText(text)).toBeInTheDocument()
         await waitFor(() =>
@@ -649,14 +651,7 @@ describe('share-card composer lifecycle', () => {
             boundary.announce.mock.calls.filter(([message]) => message === text)
           ).toEqual([[text, { queue: polite }]])
         )
-        if (state !== 'nativeSaveUnavailable')
-          expect(boundary.focus).toHaveBeenLastCalledWith(
-            state === 'saved' || state === 'limited'
-              ? 42
-              : state === 'finishingSave'
-                ? 44
-                : 43
-          )
+        expect(boundary.focus).toHaveBeenLastCalledWith(focus)
       } finally {
         pending?.resolve()
         await committed
