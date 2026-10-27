@@ -731,4 +731,54 @@ describe('share-card composer lifecycle', () => {
     await waitFor(() => expect(nativeShareCardSavePending()).toBe(false))
     expect(liveShareCardFiles().has('cc68-unmounted-committed.png')).toBe(false)
   })
+  it('U-STORAGE: a storage rejection keeps the preview, reports once, and Retry needs a fresh save authorization', async () => {
+    boundary.save.mockRejectedValueOnce(new Error('storage'))
+    render(<Harness />)
+    await ready()
+    await userEvent.click(screen.getByTestId('share-card-save'))
+    expect(await screen.findByText(i18n.t('shareCard.storage'))).toBeInTheDocument()
+    expect(screen.getAllByText(i18n.t('shareCard.storage'))).toHaveLength(1)
+    expect(screen.getByTestId('share-card-preview-loaded')).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('share-card-retry'))
+    await ready()
+    await userEvent.click(screen.getByTestId('share-card-save'))
+    expect(await screen.findByText(i18n.t('shareCard.saved'))).toBeInTheDocument()
+    const calls = boundary.prepare.mock.calls as [PrepareShareCardInput, AbortSignal][]
+    expect(calls.map(([input]) => input.purpose)).toEqual([
+      'preview',
+      'save',
+      'preview',
+      'save',
+    ])
+    expect(calls[3]![0]).toMatchObject({ expectedSha256: card.sha256 })
+    expect(boundary.permission).toHaveBeenCalledTimes(2)
+    expect(boundary.save).toHaveBeenCalledTimes(2)
+  })
+  it.each(['preview', 'save'] as const)(
+    'U-OFFLINE: an offline %s request recovers to a loaded preview for the same member',
+    async (stage) => {
+      if (stage === 'preview')
+        boundary.prepare.mockRejectedValueOnce(new Error('offline'))
+      render(<Harness />)
+      if (stage === 'save') {
+        await ready()
+        boundary.prepare.mockRejectedValueOnce(new Error('offline'))
+        await userEvent.click(screen.getByTestId('share-card-save'))
+      }
+      expect(await screen.findByText(i18n.t('shareCard.offline'))).toBeInTheDocument()
+      expect(boundary.save).not.toHaveBeenCalled()
+      await userEvent.click(screen.getByTestId('share-card-retry'))
+      await ready()
+      expect(screen.getByTestId('share-card-preview-loaded')).toBeInTheDocument()
+      expect(screen.queryByText(i18n.t('shareCard.offline'))).not.toBeInTheDocument()
+      await userEvent.click(screen.getByTestId('share-card-save'))
+      expect(await screen.findByText(i18n.t('shareCard.saved'))).toBeInTheDocument()
+      expect(boundary.save).toHaveBeenCalledExactlyOnceWith(
+        card,
+        expect.any(AbortSignal),
+        expect.any(Function),
+        expect.any(Object)
+      )
+    }
+  )
 })
