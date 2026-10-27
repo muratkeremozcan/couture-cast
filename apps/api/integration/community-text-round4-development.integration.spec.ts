@@ -32,6 +32,7 @@ describe('round4 disguised and cross-clause text through guarded HTTP', () => {
         'get',
         `/api/v1/community/posts/${member.postId}/comments`
       )
+      expect(visible.status).toBe(200)
       expect(JSON.stringify(visible.body)).not.toContain(id)
     } finally {
       await app.close()
