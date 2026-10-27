@@ -5,9 +5,9 @@ appId: ${MAESTRO_APP_ID}
 - extendedWaitUntil:
     visible: ${MAESTRO_SAVING}
     timeout: 20000
+# The second Save lands while the first is still saving; the harness proves one write.
 - tapOn:
     id: share-card-save
-    optional: true
 - assertVisible: ${MAESTRO_SAVING}
 - assertNotVisible: ${MAESTRO_PENDING}
 - runFlow:
