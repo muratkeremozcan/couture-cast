@@ -370,6 +370,14 @@ describe('real native session and share composer root replacement', () => {
     sdk.current = { access_token: 'later-token', user: { id: 'secure-principal-a' } }
     const held = deferred<void>()
     let entered = false
+    const profileBodies: Promise<unknown>[] = []
+    const readJson = Object.getOwnPropertyDescriptor(Response.prototype, 'json')!
+      .value as (this: Response) => Promise<unknown>
+    vi.spyOn(Response.prototype, 'json').mockImplementation(function (this: Response) {
+      const body = readJson.call(this)
+      if (this.url.includes('/api/v1/user/profile')) profileBodies.push(body)
+      return body
+    })
     server.use(
       http.get('*/api/v1/user/profile', async () => {
         entered = true
@@ -384,9 +392,13 @@ describe('real native session and share composer root replacement', () => {
         await signOutNativeSession()
       })
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      held.resolve()
+      // Settle on the late profile body itself, then one macrotask so every microtask
+      // chained to it (parse, generation and sign-out checks) has run.
+      await vi.waitFor(() => expect(profileBodies).toHaveLength(1))
       await act(async () => {
-        held.resolve()
-        await held.promise
+        await profileBodies[0]
+        await new Promise((resolve) => setTimeout(resolve, 0))
       })
       expect(mobileApplicationUserId()).toBeNull()
       expect(screen.queryByTestId('share-card-preview-loaded')).not.toBeInTheDocument()
