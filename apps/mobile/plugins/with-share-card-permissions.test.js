@@ -8,6 +8,7 @@ const {
   createExpoPrebuildFixture,
   runExpoPrebuild,
 } = require('./prebuild-test-helpers')
+const supportedLocaleConfig = require('../../../packages/api-client/src/contracts/http/supported-locales.json')
 
 test(
   'generated iOS permissions preserve image-picker read access and share-card add-only purposes in every locale',
@@ -29,7 +30,15 @@ test(
       info.NSPhotoLibraryAddUsageDescription,
       'Allow CoutureCast to save the card you approve to your photos.'
     )
-    for (const name of fs.readdirSync(path.join(root, 'locales'))) {
+    const catalogs = fs.readdirSync(path.join(root, 'locales')).sort()
+    assert.deepEqual(
+      catalogs,
+      Object.keys(supportedLocaleConfig)
+        .sort()
+        .map((locale) => `${locale}.json`)
+    )
+    assert.equal(catalogs.length, 10)
+    for (const name of catalogs) {
       const expected = JSON.parse(
         fs.readFileSync(path.join(root, 'locales', name), 'utf8')
       ).ios
