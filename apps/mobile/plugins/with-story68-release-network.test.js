@@ -183,18 +183,27 @@ describe('story68 release network plugin', () => {
     'proof input requires the isolated flag and existing loopback API and Auth guards',
     { timeout: 90000 },
     (t) => {
-      for (const override of [
-        { STORY68_NATIVE_TEST_BUILD: '0' },
-        { EXPO_PUBLIC_API_BASE_URL: 'https://api.example.test' },
-        { EXPO_PUBLIC_SUPABASE_URL: 'https://auth.example.test' },
-        { EXPO_PUBLIC_API_BASE_URL: 'ftp://127.0.0.1:4088' },
+      for (const [override, message] of [
+        [
+          { STORY68_NATIVE_TEST_BUILD: '0' },
+          /Release loopback requires an isolated local proof build/,
+        ],
+        [
+          { EXPO_PUBLIC_API_BASE_URL: 'https://api.example.test' },
+          /explicit local API and Auth origins/,
+        ],
+        [
+          { EXPO_PUBLIC_SUPABASE_URL: 'https://auth.example.test' },
+          /explicit local API and Auth origins/,
+        ],
+        [
+          { EXPO_PUBLIC_API_BASE_URL: 'ftp://127.0.0.1:4088' },
+          /story68_release_network_local_origins_required/,
+        ],
       ]) {
         const { result } = generate(t, { ...proofEnv, ...override })
         assert.notEqual(result.status, 0)
-        assert.match(
-          result.stderr,
-          /isolated local proof build|explicit local API and Auth origins|story68_release_network_local_origins_required/
-        )
+        assert.match(result.stderr, message, JSON.stringify(override))
       }
     }
   )
