@@ -4,6 +4,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 /* eslint-disable @typescript-eslint/await-thenable */
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
+import type * as ReactNativeModule from 'react-native'
 import React from 'react'
 import { act, screen, fireEvent, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
@@ -42,9 +43,22 @@ vi.mock('expo-router', async () => ({
   ).useFocusEffect,
 }))
 
-// The Android case runs on react-native-web, where findNodeHandle throws. Web has no
-// native tags, so every case resolves none, as safeFindNodeHandle does for Platform web.
-vi.mock('@/src/lib/accessibility-focus', () => ({ safeFindNodeHandle: () => null }))
+// The Android case runs on react-native-web, whose findNodeHandle always throws. React
+// Native's Fabric renderer returns the native tag of a host instance instead, so the
+// simulated platform gets that behavior and safeFindNodeHandle runs unmocked.
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReactNativeModule>()
+  const tags = new WeakMap<object, number>()
+  let nextTag = 900
+  return {
+    ...actual,
+    findNodeHandle: (node: unknown) => {
+      if (!node || typeof node !== 'object') return null
+      if (!tags.has(node)) tags.set(node, nextTag++)
+      return tags.get(node) ?? null
+    },
+  }
+})
 
 // The Android case sends the ritual cache down its native file path. The real module
 // needs Expo's native globals, which a browser run lacks, so it is replaced here.
@@ -121,6 +135,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     // A real Android build ships the widget bridge the ritual cache publishes through.
     const setWidgetData = vi.fn((_payload: string) => Promise.resolve())
     NativeModules.WidgetSharedModule = { setWidgetData }
+    const setFocus = vi.spyOn(AccessibilityInfo, 'setAccessibilityFocus')
     setMobileApplicationUserId(null)
     try {
       await render(
@@ -131,10 +146,14 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       const opener = await screen.findByTestId('outfit-share-card-open')
       await userEvent.click(opener)
       expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      setFocus.mockClear()
       await userEvent.click(screen.getByTestId('share-card-cancel'))
       await waitFor(() =>
         expect(screen.queryByTestId('share-card-title')).not.toBeInTheDocument()
       )
+      // No heading is registered, so a focus call proves the Cancel restore resolved the
+      // opener's own tag through the unmocked safeFindNodeHandle.
+      await waitFor(() => expect(setFocus).toHaveBeenCalledWith(expect.any(Number)))
       await waitFor(() => expect(setWidgetData).toHaveBeenCalledOnce())
     } finally {
       delete NativeModules.WidgetSharedModule
