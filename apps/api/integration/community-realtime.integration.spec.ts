@@ -124,17 +124,27 @@ describe('Story 6.5 real local websocket-only transport with isolated fixture au
         if (gated) await new Promise<void>((resolve) => releases.push(resolve))
         return {
           value: true,
-          expiresAt: new Date(Date.now() + 60_000),
-          validUntil: performance.now() + 60_000,
+          expiresAt: new Date('2099-01-01'),
+          validUntil: Number.MAX_SAFE_INTEGER,
         }
       } finally {
         active--
       }
     })
+    // A resolved identity is the last step before a handshake takes an authorization slot.
+    const verified = new AccessTokenIdentityService(prisma)
+    let identified = 0
+    const identity = {
+      resolveIdentity: async (token: string) => {
+        const resolved = await verified.resolveIdentity(token)
+        identified++
+        return resolved
+      },
+    } as AccessTokenIdentityService
     const runtime = createCommunityRealtimeServer(() =>
       Promise.resolve({
         prisma,
-        identity: new AccessTokenIdentityService(prisma),
+        identity,
         access: { assert: () => Promise.resolve(), authorize },
         streams,
         origins: ['https://story65.synthetic.test'],
@@ -148,6 +158,8 @@ describe('Story 6.5 real local websocket-only transport with isolated fixture au
     )
     try {
       await vi.waitFor(() => expect(releases).toHaveLength(5), { timeout: 1000 })
+      // The sixth handshake has reached the server and is queued behind the five slots.
+      await vi.waitFor(() => expect(identified).toBe(6), { timeout: 1000 })
       expect(authorize).toHaveBeenCalledTimes(5)
       expect(maximum).toBe(5)
       gated = false
