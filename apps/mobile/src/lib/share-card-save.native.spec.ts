@@ -135,6 +135,25 @@ describe('native immutable file and permission adapter', () => {
     mocks.originalAvailable = true
     expect(nativeShareCardSaveAvailable()).toBe(true)
   })
+  it('U-SAVE N-IOS-ORIGINAL: iOS imports the validated file through the original-resource adapter only', async () => {
+    platform('ios', 26)
+    mocks.originalAvailable = true
+    mocks.originalSave.mockImplementation((uri: string) => {
+      expect(mocks.files.get(uri)).toBe(card.pngBase64)
+      return Promise.resolve()
+    })
+    await saveShareCard(card, new AbortController().signal, () => true)
+    expect(mocks.originalSave).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(/^file:\/\/\/cache\/share-cards\/cc68-[a-f0-9-]+\.png$/),
+      card.sha256
+    )
+    expect(mocks.nativeSave).not.toHaveBeenCalled()
+    expect(mocks.remove).toHaveBeenCalledExactlyOnceWith(
+      mocks.originalSave.mock.calls[0][0],
+      { idempotent: true }
+    )
+    expect(mocks.files.size).toBe(0)
+  })
   it.each(['precommit', 'committed'])(
     'U-PENDING-FILE: orphan listing cannot delete a newly %s owned file',
     async (phase) => {
