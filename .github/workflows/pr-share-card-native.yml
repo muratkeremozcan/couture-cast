@@ -113,9 +113,11 @@ jobs:
           npm run build --workspace api
           node scripts/e2e-share-card/prepare.mjs
           node scripts/lib/story68-built-render.mjs
-          node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1 &
-          node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1 &
-          node scripts/run-story68-native.mjs metro > /tmp/cc68-metro.log 2>&1 &
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (node scripts/run-story68-native.mjs metro > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
       - name: Verify the owned API database entry guard
         run: |
@@ -190,6 +192,18 @@ jobs:
           node scripts/run-story68-native.mjs a11y --platform ios --device "$device"
           node scripts/run-story68-native.mjs fallback-focus --platform ios --device "$device"
           node scripts/run-story68-native.mjs expo-go-proof --platform ios --device "$device"
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api metro; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
       - name: Select and scan closed evidence
         if: always()
         env:
