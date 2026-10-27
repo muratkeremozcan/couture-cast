@@ -44,6 +44,8 @@ describe('FeatureFlagsService', () => {
     vi.stubEnv('TEST_ENV', 'local')
     vi.stubEnv('COMMUNITY_FLAG_FIXTURE_MODE', 'true')
     vi.stubEnv('DATABASE_URL', 'postgresql://localhost/isolated_fixture')
+    // The budget reads performance.now() and arms setTimeout; both run on the fake clock.
+    vi.useFakeTimers({ toFake: ['performance', 'setTimeout', 'clearTimeout'] })
     let release!: (value: { value: boolean }) => void
     const held = new Promise<{ value: boolean }>((resolve) => {
       release = resolve
@@ -68,6 +70,7 @@ describe('FeatureFlagsService', () => {
       const live = Array.from({ length: 100 }, (_, index) =>
         service.communityReadEvaluation(`live-${index}`)
       )
+      await vi.advanceTimersByTimeAsync(15)
       await refused
       release({ value: false })
       expect((await Promise.all(live)).every((grant) => grant.value === false)).toBe(true)
@@ -75,6 +78,7 @@ describe('FeatureFlagsService', () => {
       expect($transaction).not.toHaveBeenCalled()
     } finally {
       release({ value: false })
+      vi.useRealTimers()
       vi.unstubAllEnvs()
     }
   })
