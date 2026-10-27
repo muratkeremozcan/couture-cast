@@ -69,3 +69,18 @@ test('mandatory Android CI passes its matrix API to the fail-closed journey', as
   )
   assert.equal(android.env.CC68_ANDROID_API, '${{ matrix.api }}')
 })
+test('Android CI stops before the emulator unless the emulator itself reports usable KVM', async () => {
+  const workflow = parse(
+    await readFile('.github/workflows/pr-share-card-native.yml', 'utf8')
+  )
+  const steps = workflow.jobs['original-resource'].steps
+  const accel = steps.findIndex((step) =>
+    step.run?.includes('emulator/emulator" -accel-check')
+  )
+  const emulator = steps.findIndex(
+    (step) => step.uses === 'reactivecircus/android-emulator-runner@v2'
+  )
+  assert.ok(accel >= 0 && accel < emulator)
+  assert.equal(steps[accel].if, "matrix.platform == 'android'")
+  assert.match(steps[accel].run, /grep -q 'KVM .* is installed and usable'/)
+})

@@ -4,6 +4,7 @@ import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
+import { assertStartupFailure, summarizeStartupFailure } from './web-startup-failure.mjs'
 
 const execute = promisify(execFile)
 const signatures = {
@@ -95,9 +96,12 @@ export function assertWebStartupEvidence(value) {
       'logSignals',
       'frameworkFrames',
       'resources',
+      'failureDetails',
     ])
   )
   requireFact(value.version === 1 && typeof value.passed === 'boolean')
+  if (value.failureDetails !== null) assertStartupFailure(value.failureDetails)
+  if (value.passed) requireFact(value.failureDetails === null)
   assertLogFacts(value)
   assertResources(value.resources)
   requireFact(
@@ -108,7 +112,14 @@ export function assertWebStartupEvidence(value) {
 }
 
 /** Preserve the CI loop's first-success break and its separate final curl. */
-export async function waitForOwnedWeb({ probe, delay, readLog, resources }) {
+export async function waitForOwnedWeb({
+  probe,
+  delay,
+  readLog,
+  resources,
+  readBody = () => null,
+  secrets = [],
+}) {
   const before = resources()
   const probes = []
   for (let attempt = 0; attempt < 90; attempt++) {
@@ -119,7 +130,7 @@ export async function waitForOwnedWeb({ probe, delay, readLog, resources }) {
   }
   const final = await probe('verify', probes.length)
   probes.push({ phase: 'verify', ...final })
-  const rawLog = readLog()
+  const rawLog = await readLog({ failed: final.exitCode !== 0 })
   const logCaptured = typeof rawLog === 'string'
   const log = logCaptured ? rawLog : ''
   const frameworkFrames = []
@@ -143,6 +154,10 @@ export async function waitForOwnedWeb({ probe, delay, readLog, resources }) {
       .map(([name]) => name),
     frameworkFrames,
     resources: { before, after: resources() },
+    failureDetails:
+      final.exitCode === 0
+        ? null
+        : summarizeStartupFailure({ body: readBody(probes.length - 1), log, secrets }),
   }
   assertWebStartupEvidence(value)
   return value
@@ -208,6 +223,38 @@ function resources(directory) {
   }
 }
 
+export async function readStartupLog(directory, { failed }) {
+  // Next can finish its response before flushing the corresponding error to stderr.
+  if (failed) await new Promise((resolve) => setTimeout(resolve, 250))
+  try {
+    return fs.readFileSync(path.join(directory, 'web-startup-private.log'), 'utf8')
+  } catch {
+    return null
+  }
+}
+function startupSecrets(directory) {
+  const secrets = []
+  const visit = (value) => {
+    for (const [key, item] of Object.entries(value ?? {})) {
+      if (
+        typeof item === 'string' &&
+        /key|secret|token|password|authorization/i.test(key)
+      )
+        secrets.push(item)
+      else if (item && typeof item === 'object') visit(item)
+    }
+  }
+  visit(process.env)
+  for (const name of ['owned-env.json', 'public-build-env.json', 'auth-harness.json']) {
+    try {
+      visit(JSON.parse(fs.readFileSync(path.join(directory, name), 'utf8')))
+    } catch {
+      // Startup evidence also runs when provisioning did not produce these files.
+    }
+  }
+  return secrets
+}
+
 async function main() {
   const directory = path.resolve(
     process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
@@ -221,13 +268,22 @@ async function main() {
         `${phase}-${index}`
       ),
     delay: () => new Promise((resolve) => setTimeout(resolve, 1000)),
-    readLog: () => {
+    readLog: (options) => readStartupLog(directory, options),
+    readBody: (index) => {
       try {
-        return fs.readFileSync(path.join(directory, 'web-startup-private.log'), 'utf8')
+        const file = path.join(
+          directory,
+          'web-startup-private',
+          `verify-${index}-body.html`
+        )
+        return fs.statSync(file).size <= 4 * 1024 ** 2
+          ? fs.readFileSync(file, 'utf8')
+          : null
       } catch {
         return null
       }
     },
+    secrets: startupSecrets(directory),
     resources: () => resources(directory),
   })
   fs.writeFileSync(

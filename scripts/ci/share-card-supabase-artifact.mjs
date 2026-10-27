@@ -42,18 +42,93 @@ export async function packSupabaseArtifact(directory) {
   fs.writeFileSync(target, JSON.stringify(metadata, null, 2) + '\n', { mode: 0o600 })
   return metadata
 }
-export async function loadSupabaseArtifact(
-  directory,
-  load = (archive) => {
-    const result = spawnSync(
-      '/bin/bash',
-      ['-c', 'set -o pipefail; zstd -dc "$1" | docker load', 'cc68-image-load', archive],
-      { stdio: 'inherit', timeout: 600000, killSignal: 'SIGTERM' }
-    )
-    if (result.error || result.status !== 0)
-      throw new Error('supabase_image_artifact_load_failed')
-  }
+/** QEMU names its accelerator on the command line; Lima picks hvf or falls back to tcg. */
+export function qemuAccelerator(processes) {
+  if (typeof processes !== 'string') return 'unavailable'
+  const qemu = processes.split('\n').find((line) => /qemu-system-x86_64\b/.test(line))
+  if (!qemu) return 'unavailable'
+  return qemu.match(/(?:-accel\s+|accel=)(hvf|tcg)\b/)?.[1] ?? 'unreported'
+}
+/**
+ * The Colima docker socket is forwarded over SSH, so streaming the decompressed
+ * images through it moves every uncompressed byte through that tunnel. Move the
+ * compressed archive into the VM once and let its local dockerd decompress it.
+ * Each stage reports its own duration so a timeout names the stage that used it.
+ */
+export function loadIntoColima(
+  archive,
+  {
+    run = spawnSync,
+    now = () => performance.now(),
+    log = (line) => console.log(line),
+    budgetMs = 600000,
+    bytes = fs.statSync(archive).size,
+    vmArchive = '/var/tmp/cc68-supabase-images.tar.zst',
+  } = {}
 ) {
+  const started = now()
+  const facts = { archiveBytes: bytes, accelerator: 'unavailable', stages: [] }
+  const report = () => log(`Supabase image load: ${JSON.stringify(facts)}`)
+  const ps = run('ps', ['-axo', 'command'], { encoding: 'utf8', timeout: 10000 })
+  if (!ps.error && ps.status === 0) facts.accelerator = qemuAccelerator(ps.stdout)
+  const stage = (name, command, args, options = {}) => {
+    const remaining = Math.floor(budgetMs - (now() - started))
+    if (remaining < 1000) {
+      facts.stages.push({ name, outcome: 'not_started', durationMs: 0 })
+      report()
+      throw new Error(`supabase_image_artifact_${name}_timeout`)
+    }
+    const begin = now()
+    const result = run(command, args, {
+      stdio: ['ignore', 'inherit', 'inherit'],
+      ...options,
+      timeout: remaining,
+      killSignal: 'SIGTERM',
+    })
+    const timedOut = result.error?.code === 'ETIMEDOUT'
+    const outcome = timedOut
+      ? 'timeout'
+      : result.error || result.status !== 0
+        ? 'failed'
+        : 'passed'
+    facts.stages.push({ name, outcome, durationMs: Math.round(now() - begin) })
+    if (outcome !== 'passed') {
+      report()
+      throw new Error(
+        timedOut
+          ? `supabase_image_artifact_${name}_timeout`
+          : 'supabase_image_artifact_load_failed'
+      )
+    }
+    return result
+  }
+  const descriptor = fs.openSync(archive, 'r')
+  try {
+    stage(
+      'transfer',
+      'colima',
+      [
+        'ssh',
+        '--',
+        'sh',
+        '-c',
+        `cat > ${vmArchive} && test "$(wc -c < ${vmArchive})" -eq ${bytes}`,
+      ],
+      { stdio: [descriptor, 'inherit', 'inherit'] }
+    )
+  } finally {
+    fs.closeSync(descriptor)
+  }
+  stage('load', 'colima', [
+    'ssh',
+    '--',
+    'sh',
+    '-c',
+    `docker load -i ${vmArchive}; status=$?; rm -f ${vmArchive}; exit $status`,
+  ])
+  report()
+}
+export async function loadSupabaseArtifact(directory, load = loadIntoColima) {
   const target = path.join(directory, 'image-artifact.json')
   regular(target, 1024)
   let metadata

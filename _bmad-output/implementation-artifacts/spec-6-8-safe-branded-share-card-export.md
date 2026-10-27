@@ -1239,3 +1239,24 @@ approved retaining 4 GiB in CI. Native timing budgets remain unchanged.
 The original pipeline12 Gradle log was read through the tool transcript before retry; its runtime
 path was then reused. Its command failure and deterministic hard-link RED remain preserved.
 Subsequent build logs and staging reports are copied into their individual evidence directories.
+
+### 2026-10-27 native CI lanes (Claude builder takeover)
+
+- Web startup diagnostics: a controlled Next 15.5 dev 500 on the real web app (second render throws)
+  showed the App Router body carries its error as a Flight `<id>:E{digest,name,message}` row; it
+  has no `__NEXT_DATA__`, so the earlier parser would have published no digest or message. The
+  parser now reads Flight rows and the shell-fallback error template as well. The allowed log tail
+  adds Next failure and warning markers, compile lines, env reloads and config restarts, so the
+  artifact shows whether the failing request followed a recompilation. Absolute paths stay
+  redacted; repository-relative frames stay readable. API36 web startup passed at 11dda576,
+  7499a450 and 2cebc506 and failed at ffa33f67 and 28b614fe with an identical inline curl step and
+  no change to the Home route's sources, so the cause is environmental or a dev-server race and
+  needs the captured error.
+- iOS image import: the Colima docker socket is forwarded over SSH, so `zstd -dc | docker load`
+  on the host moved every decompressed byte through that tunnel. The loader now copies the
+  compressed archive into the VM once and runs `docker load -i` there, with a stage-timed closed
+  report (archive bytes, QEMU accelerator, transfer and load durations) inside the unchanged 600 s
+  budget. The Mac no longer restores or saves the Actions image cache: the prewarmed artifact is
+  its source, and the cache save was a second full `docker save` through the same socket.
+- Android emulator: the KVM step now runs `emulator -accel-check` and stops before the emulator
+  unless KVM is reported usable, since device-node permissions alone do not prove acceleration.

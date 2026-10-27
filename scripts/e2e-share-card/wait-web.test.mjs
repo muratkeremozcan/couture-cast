@@ -11,7 +11,9 @@ import {
   waitForOwnedWeb,
   probeOwnedWebRoot,
   assertWebStartupEvidence,
+  readStartupLog,
 } from './wait-web.mjs'
+import { summarizeStartupFailure } from './web-startup-failure.mjs'
 
 const facts = () => ({
   freeMemoryBytes: 10,
@@ -135,6 +137,135 @@ test('an unavailable startup log remains explicitly unavailable', async () => {
   assert.equal(value.logCaptured, false)
   assert.deepEqual(value.logSignals, [])
   assert.deepEqual(value.frameworkFrames, [])
+})
+test('a 500 exposes the Next error digest, class and message with a redacted log tail', async () => {
+  const secret = 'private-token-value-0123456789'
+  const log = `TypeError: controlled render failure ${secret}\n    at render (/owned/node_modules/next/dist/server/base-server.js:9:2)`
+  const f = fixture([200, 500], log)
+  const value = await waitForOwnedWeb({
+    ...f.options,
+    readBody: () =>
+      `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+        err: {
+          name: 'TypeError',
+          message: `controlled render failure ${secret}`,
+          digest: '123456789',
+        },
+      })}</script>`,
+    secrets: [secret],
+  })
+  assert.equal(value.failureDetails?.nextDigest, '123456789')
+  assert.deepEqual(value.failureDetails.errors, [
+    { name: 'TypeError', message: 'controlled render failure [redacted]' },
+  ])
+  assert.ok(value.failureDetails.logTail.some((line) => line.includes('[redacted]')))
+  assert.equal(JSON.stringify(value).includes(secret), false)
+})
+test('failed response capture waits for the corresponding delayed Next stderr tail', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-web-log-flush-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const log = path.join(directory, 'web-startup-private.log')
+  fs.writeFileSync(log, 'GET / 200\n')
+  const f = fixture([200, 500])
+  let wrote = false
+  const timer = setTimeout(() => {
+    fs.appendFileSync(log, 'TypeError: controlled delayed render error\n')
+    wrote = true
+  }, 20)
+  t.after(() => clearTimeout(timer))
+  const value = await waitForOwnedWeb({
+    ...f.options,
+    readLog: (options) => readStartupLog(directory, options),
+  })
+  assert.equal(wrote, true)
+  assert.ok(
+    value.failureDetails.logTail.includes('TypeError: controlled delayed render error')
+  )
+  assert.equal(f.calls(), 2)
+  assert.equal(value.probes.at(-1).exitCode, 22)
+})
+test('error details allow only diagnostic fields and remove credentials, URLs, email and paths', async () => {
+  const token = 'private-key-value-0123456789'
+  const value = summarizeStartupFailure({
+    body: `<script id="__NEXT_DATA__">${JSON.stringify({
+      err: {
+        name: 'ReferenceError',
+        message: `missing render value ${token} https://private.test/?signature=secret user@example.test`,
+        digest: '987654321',
+        props: { private: token },
+      },
+      props: { private: token },
+    })}</script>`,
+    log: `unreviewed private line ${token}\nTypeError: failure token=hidden /home/private/file.js\n    at render (/home/private/file.js:2:3)`,
+    secrets: [token],
+  })
+  const serialized = JSON.stringify(value)
+  for (const secret of [
+    token,
+    'private.test',
+    'signature=secret',
+    'user@example.test',
+    '/home/private',
+    'token=hidden',
+  ])
+    assert.equal(serialized.includes(secret), false)
+  assert.equal(value.nextDigest, '987654321')
+  assert.equal(value.logTail.length, 2)
+  assert.equal(value.errors[0].name, 'ReferenceError')
+  const f = await waitForOwnedWeb(fixture([200, 500]).options)
+  for (const details of [
+    { ...value, body: 'raw private response' },
+    { ...value, logTail: ['unreviewed line'] },
+    { ...value, errors: [{ name: 'Error', message: 'user@example.test' }] },
+    { ...value, errors: [{ name: 'Error', message: token, secret: token }] },
+  ])
+    assert.throws(() => assertWebStartupEvidence({ ...f, failureDetails: details }))
+})
+test('an App Router 500 exposes the Flight error row and the recompilation timeline', () => {
+  const token = 'private-flight-value-0123456789'
+  // Shape copied from a controlled Next 15.5 dev 500: the error row spans two pushes.
+  const row = `2c:E${JSON.stringify({
+    digest: '3303912371',
+    name: 'TypeError',
+    message: `controlled second render failure ${token}`,
+    stack: [['Home', 'webpack-internal:///(rsc)/./src/app/page.tsx', 16, 35]],
+  })}\n`
+  const push = (text) =>
+    `<script>self.__next_f.push([1,${JSON.stringify(text)}])</script>`
+  const value = summarizeStartupFailure({
+    body: `<html>${push('1:"$Sreact.fragment"\n' + row.slice(0, 40))}${push(row.slice(40))}</html>`,
+    log: [
+      ' ✓ Compiled / in 2.3s (1233 modules)',
+      ' GET / 200 in 2560ms',
+      ' ○ Compiling / ...',
+      ` ⨯ TypeError: controlled second render failure ${token}`,
+      '    at Home (src/app/page.tsx:16:35)',
+      "> 16 |   if (renders > 1) throw new TypeError('private source line')",
+      "  digest: '3303912371'",
+      ' GET / 500 in 3965ms',
+    ].join('\n'),
+    secrets: [token],
+  })
+  assert.equal(value.nextDigest, '3303912371')
+  assert.deepEqual(value.errors, [
+    { name: 'TypeError', message: 'controlled second render failure [redacted]' },
+  ])
+  assert.ok(value.logTail.includes(' ○ Compiling / ...'))
+  assert.ok(value.logTail.includes('    at Home (src/app/page.tsx:16:35)'))
+  assert.equal(
+    value.logTail.some((line) => line.includes('private source line')),
+    false
+  )
+  assert.equal(JSON.stringify(value).includes('webpack-internal'), false)
+  assert.equal(JSON.stringify(value).includes(token), false)
+})
+test('a failed App Router shell template supplies the decoded digest and message', () => {
+  const value = summarizeStartupFailure({
+    body: '<template data-next-error-message="Can&#x27;t render &quot;Home&quot;" data-next-error-digest="NEXT_SHELL_1" data-next-error-stack=""></template>',
+    log: '',
+  })
+  assert.equal(value.nextDigest, 'NEXT_SHELL_1')
+  assert.deepEqual(value.errors, [{ name: 'Error', message: 'Can\'t render "Home"' }])
 })
 test('evidence rejects unknown fields, private strings, invalid positions and invented passing results', async () => {
   const value = await waitForOwnedWeb(fixture([200, 500]).options)

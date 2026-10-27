@@ -103,6 +103,9 @@ jobs:
       - uses: ./.github/actions/start-local-supabase
         with:
           image-registry: ${{ steps.supabase-artifact.outputs.registry || 'ghcr.io' }}
+          # The Mac loads the prewarmed artifact; its own Actions cache would add a
+          # second full docker save through the SSH-forwarded Colima socket.
+          image-cache: ${{ runner.os != 'macOS' }}
       - name: Prepare isolated UUID runtime and built renderer
         run: |
           npm run db:generate
@@ -144,6 +147,9 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           test -r /dev/kvm && test -w /dev/kvm
+          # Device permissions alone do not prove the emulator can use KVM.
+          "$ANDROID_HOME/emulator/emulator" -accel-check 2>&1 | tee "$RUNNER_TEMP/cc68-accel-check.txt"
+          grep -q 'KVM .* is installed and usable' "$RUNNER_TEMP/cc68-accel-check.txt"
       - name: Android real original and API32 denied/permanent permission proof
         if: matrix.platform == 'android'
         uses: reactivecircus/android-emulator-runner@v2
