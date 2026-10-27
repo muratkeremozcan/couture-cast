@@ -259,8 +259,10 @@ export async function withBrowserWatermarkLock({
 }
 
 function ownTargetResolution(response, postId) {
+  return response.status() === 200 && ownResolveRequest(response, postId)
+}
+function ownResolveRequest(response, postId) {
   if (!response.url().endsWith('/api/v1/community/targets/resolve')) return false
-  if (response.status() !== 200) return false
   const input = response.request().postDataJSON()
   return (
     Array.isArray(input?.targets) &&
@@ -277,7 +279,10 @@ function cursorRequest(request) {
 export async function afterInitialCommunityVerification({ page, postId, navigate }) {
   let resolutionSeen = false
   const replays = new Set()
+  // Every owned resolve status, so a timeout names what the product actually answered.
+  const statuses = []
   const onResponse = (response) => {
+    if (ownResolveRequest(response, postId)) statuses.push(response.status())
     if (ownTargetResolution(response, postId)) resolutionSeen = true
   }
   const onRequest = (request) => {
@@ -297,7 +302,13 @@ export async function afterInitialCommunityVerification({ page, postId, navigate
   void replayed.catch(() => undefined)
   try {
     await navigate()
-    const body = await (await resolved).json()
+    const owned = await resolved.catch((error) => {
+      throw new Error(
+        `browser_watermark_community_resolution_timeout: owned resolve statuses ${JSON.stringify(statuses.slice(-12))}`,
+        { cause: error }
+      )
+    })
+    const body = await owned.json()
     if (
       !body?.data?.targets?.some(
         (target) => target.key === postId && target.status === 'available'

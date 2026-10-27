@@ -1285,3 +1285,8 @@ Subsequent build logs and staging reports are copied into their individual evide
   binary does not exist before android-emulator-runner installs it, so the workflow-step check
   failed API32 before boot. The journey now runs `emulator -accel-check` before install and stops
   unless KVM is reported usable.
+- WebKit first case: the community readiness helper accepted only a 200 `targets/resolve` and
+  discarded every other status, so the 300dfe07 failure surfaced as a bare 20 s timeout. It now
+  records each owned resolve status and a timeout names them. Root cause pending that CI evidence;
+  the product's own resolve retry backs off from 500 ms up to 15 s, so a chain of non-200 answers
+  can outlast the helper's 20 s wait.

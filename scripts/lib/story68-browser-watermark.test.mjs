@@ -354,7 +354,7 @@ function communityReadiness({ available = true, resyncRequired = false } = {}) {
   const waits = []
   page.waitForResponse = (predicate, options) => {
     assert.equal(options.timeout, 20_000)
-    return new Promise((resolve) => waits.push({ predicate, resolve }))
+    return new Promise((resolve, reject) => waits.push({ predicate, resolve, reject }))
   }
   const request = (url, targets) => ({
     url: () => `http://127.0.0.1:4088/api/v1/community/${url}`,
@@ -401,6 +401,10 @@ function communityReadiness({ available = true, resyncRequired = false } = {}) {
       }),
     early: () => emit(early, { data: { resyncRequired: false } }),
     replay: () => emit(cursor, { data: { resyncRequired } }),
+    expire: () => {
+      for (const wait of waits)
+        wait.reject(new Error('page.waitForResponse: Timeout 20000ms exceeded'))
+    },
     foreign: () =>
       emit(request('targets/resolve', [{ postId: 'another-post' }]), {
         data: { targets: [{ key: 'another-post', status: 'available' }] },
@@ -433,3 +437,26 @@ for (const options of [{ available: false }, { resyncRequired: true }])
     assert.equal(f.page.listenerCount('request'), 0)
     assert.equal(f.page.listenerCount('response'), 0)
   })
+test('a resolution that never succeeds names every owned resolve status instead of a bare timeout', async () => {
+  const f = communityReadiness()
+  const unavailable = {
+    url: () => 'http://127.0.0.1:4088/api/v1/community/targets/resolve',
+    method: () => 'POST',
+    postDataJSON: () => ({ targets: [{ key: 'owned-post', postId: 'owned-post' }] }),
+  }
+  for (const status of [503, 503]) {
+    f.page.emit('request', unavailable)
+    f.page.emit('response', {
+      url: unavailable.url,
+      request: () => unavailable,
+      status: () => status,
+      json: async () => ({}),
+    })
+  }
+  f.expire()
+  await assert.rejects(
+    f.promise,
+    /browser_watermark_community_resolution_timeout: owned resolve statuses \[503,503\]/
+  )
+  assert.equal(f.page.listenerCount('response'), 0)
+})
