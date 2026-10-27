@@ -37,6 +37,8 @@ description: |
 #       with:
 #         test-outcome: ${{ steps.tests.outcome }}
 #         workspace-dirs: '["apps/api/coverage","apps/web/coverage"]'
+#         # Which workspaces failed and why, from scripts/run-workspace-test-coverage.mjs.
+#         failures: ${{ steps.tests.outputs.failures }}
 #         badge-gist-id: ${{ env.COVERAGE_GIST_ID }}
 #         badge-filename-prefix: my-monorepo
 #         badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
@@ -57,6 +59,13 @@ inputs:
     description: 'Artifact retention in days'
     required: false
     default: '7'
+  failures:
+    description: |
+      JSON array of failed workspaces, as written by scripts/run-workspace-test-coverage.mjs:
+      [{"workspace":"apps/api","reason":"tests"|"coverage"|"error","line":"FAIL ..."}].
+      The comment and step summary name the cause and the first failure line.
+    required: false
+    default: '[]'
   test-outcome:
     description: 'Test step outcome (success/failure)'
     required: true
@@ -188,6 +197,7 @@ runs:
       env:
         WORKSPACE_DIRS: ${{ inputs.workspace-dirs }}
         COVERAGE_PATH: ${{ inputs.coverage-path }}
+        TEST_OUTCOME: ${{ inputs.test-outcome }}
       run: |
         set -euo pipefail
         mkdir -p "$COVERAGE_PATH"
@@ -207,17 +217,24 @@ runs:
           }
         }
 
-        if (missing.length > 0) {
+        // Vitest writes no coverage for a workspace whose tests failed. Failing here
+        // used to stop the PR comment and leave the last green one in place, so a
+        // failed run merges what it has and the comment names the failure.
+        if (missing.length > 0 && process.env.TEST_OUTCOME === 'success') {
           for (const item of missing) {
             console.error('::error::Expected lcov.info for workspace coverage dir ' + item.dir + ' was not found at ' + item.file);
           }
           process.exit(1);
+        }
+        for (const item of missing) {
+          console.log('::warning::No lcov.info for ' + item.dir + ' after a failed test run; merging the rest.');
         }
 
         const merged = path.join(process.env.COVERAGE_PATH, 'lcov.info');
 
         for (const dir of dirs) {
           const file = path.join(dir, 'lcov.info');
+          if (!fs.existsSync(file)) continue;
 
           // workspace root = parent of the coverage dir (e.g. 'apps/api/coverage' → 'apps/api')
           const workspaceRoot = path.dirname(dir);
@@ -557,15 +574,22 @@ runs:
         DIFF_THRESHOLD_FAILED: ${{ steps.diff-coverage.outputs.diff_threshold_failed }}
         DIFF_THRESHOLD: ${{ inputs.diff-coverage-threshold }}
         DIFF_THRESHOLD_VALID: ${{ steps.diff-coverage.outputs.diff_threshold_valid }}
+        FAILURES: ${{ inputs.failures }}
+        JOB_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/job/${{ job.check_run_id }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
         set -euo pipefail
         echo "## 🧪 ${LABEL} Coverage" >> "$GITHUB_STEP_SUMMARY"
         echo "" >> "$GITHUB_STEP_SUMMARY"
-        if [ "$TEST_OUTCOME" == "success" ]; then
+        if [ "$TEST_OUTCOME" == "success" ] && [ "${DIFF_THRESHOLD_FAILED:-false}" != "true" ]; then
           echo "✅ **Tests: PASSED**" >> "$GITHUB_STEP_SUMMARY"
+        elif [ "$TEST_OUTCOME" == "success" ]; then
+          echo "❌ **New/changed code coverage: FAILED**" >> "$GITHUB_STEP_SUMMARY"
         else
           echo "❌ **Tests: FAILED**" >> "$GITHUB_STEP_SUMMARY"
         fi
+        # Same cause line and job link as the PR comment.
+        node "${ACTION_PATH:-.}/test-failures.mjs" summary || echo "::warning::Skipped the test failure lines in the step summary."
         echo "" >> "$GITHUB_STEP_SUMMARY"
         if [ -n "$THRESHOLDS" ]; then
           T_STMTS=$(echo "$THRESHOLDS" | jq -r '.statements // "-"')
@@ -622,6 +646,9 @@ runs:
         INPUT_DIFF_THRESHOLD: ${{ inputs.diff-coverage-threshold }}
         INPUT_DIFF_THRESHOLD_VALID: ${{ steps.diff-coverage.outputs.diff_threshold_valid }}
         INPUT_DIFF_DETAIL_PATH: ${{ steps.diff-coverage.outputs.detail_path }}
+        INPUT_FAILURES: ${{ inputs.failures }}
+        INPUT_JOB_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/job/${{ job.check_run_id }}
+        INPUT_ACTION_PATH: ${{ github.action_path }}
       with:
         script: |
           const fs = require('fs');
@@ -638,7 +665,21 @@ runs:
           const functions = process.env.INPUT_FUNCTIONS;
           const lines = process.env.INPUT_LINES;
           const thresholdsRaw = process.env.INPUT_THRESHOLDS;
-          const statusEmoji = testResult === 'success' ? '✅' : '❌';
+          const diffFailed = process.env.INPUT_DIFF_THRESHOLD_FAILED === 'true';
+          const statusEmoji = testResult === 'success' && !diffFailed ? '✅' : '❌';
+          // Names the cause and links this job, so a red comment says what to fix.
+          // Shared with the step summary; a load failure keeps the plain banner.
+          let statusLabel = testResult === 'success' && !diffFailed ? 'SUCCESS' : 'FAILURE';
+          let failureLines = [];
+          try {
+            const failures = await import(`${process.env.INPUT_ACTION_PATH}/test-failures.mjs`);
+            const parsed = failures.parseFailures(process.env.INPUT_FAILURES);
+            const result = failures.verdict({ testOutcome: testResult, diffThresholdFailed: diffFailed, failures: parsed });
+            statusLabel = result.label;
+            failureLines = failures.failureLines(result.lead, parsed, process.env.INPUT_JOB_URL);
+          } catch (e) {
+            core.warning(`Skipping test failure detail, non-fatal: ${e.message}`);
+          }
           const marker = `<!-- unit-test-coverage-comment: ${label} -->`;
           let hasThresholds = false;
           let stmtThreshold = '';
@@ -679,8 +720,9 @@ runs:
           }
           const bodyParts = [
             marker,
-            `## 🧪 ${label} Coverage: ${statusEmoji} **${testResult.toUpperCase()}**`,
+            `## 🧪 ${label} Coverage: ${statusEmoji} **${statusLabel}**`,
             '',
+            ...(failureLines.length > 0 ? [...failureLines, ''] : []),
             ...tableRows,
           ];
           const diffPct = process.env.INPUT_DIFF_LINES_PCT;
