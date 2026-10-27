@@ -27,9 +27,8 @@ vi.mock('expo-modules-core', () => ({
   },
 }))
 // Vite resolves the browser index; native code loads index.native, which requests the module by name.
-vi.mock(
-  '../../modules/share-card-photo-save',
-  () => import('../../modules/share-card-photo-save/index.native')
+vi.mock('../../modules/share-card-photo-save', () =>
+  vi.importActual('../../modules/share-card-photo-save/index.native')
 )
 vi.mock('./share-card-native-fixture', () => ({
   shareCardFixtureMode: () => mocks.fixture,
@@ -149,7 +148,7 @@ describe('native immutable file and permission adapter', () => {
     )
     expect(mocks.nativeSave).not.toHaveBeenCalled()
     expect(mocks.remove).toHaveBeenCalledExactlyOnceWith(
-      mocks.originalSave.mock.calls[0][0],
+      mocks.originalSave.mock.calls[0]![0],
       { idempotent: true }
     )
     expect(mocks.files.size).toBe(0)
