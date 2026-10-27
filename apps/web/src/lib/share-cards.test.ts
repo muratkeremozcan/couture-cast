@@ -10,6 +10,7 @@ import {
   shareCardErrorKey,
   validateWebShareCard,
 } from './share-cards'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 const createObjectURL = vi.fn(() => 'blob:approved')
 const revokeObjectURL = vi.fn()
 const input = {
@@ -18,7 +19,10 @@ const input = {
   locale: 'en-US',
   watermark: true,
 } as const
+const authorizations: (string | null)[] = []
 beforeEach(() => {
+  authorizations.length = 0
+  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'member-bearer')
   vi.stubGlobal('crypto', webcrypto)
   vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', 'http://localhost:3001')
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
@@ -31,9 +35,10 @@ beforeEach(() => {
     value: revokeObjectURL.mockReset(),
   })
   useMswHandlers(
-    http.post('http://localhost:3001/api/v1/share-cards/prepare', () =>
-      HttpResponse.json({ data: card })
-    )
+    http.post('http://localhost:3001/api/v1/share-cards/prepare', ({ request }) => {
+      authorizations.push(request.headers.get('authorization'))
+      return HttpResponse.json({ data: card })
+    })
   )
 })
 describe('web share-card immutable download boundary', () => {
@@ -41,6 +46,7 @@ describe('web share-card immutable download boundary', () => {
     expect(await prepareShareCardFromWeb(input, new AbortController().signal)).toEqual(
       card
     )
+    expect(authorizations).toEqual(['Bearer member-bearer'])
     await expect(
       validateWebShareCard({ ...card, sha256: 'f'.repeat(64) })
     ).rejects.toThrow('invalid_png')
@@ -50,12 +56,14 @@ describe('web share-card immutable download boundary', () => {
     await expect(
       prepareShareCardFromWeb(input, new AbortController().signal)
     ).rejects.toThrow('offline')
+    expect(authorizations).toEqual([])
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     const abort = new AbortController()
     abort.abort()
     await expect(prepareShareCardFromWeb(input, abort.signal)).rejects.toMatchObject({
       name: 'AbortError',
     })
+    expect(authorizations).toEqual([])
   })
   it.each([
     [409, 'previewChanged'],
@@ -115,5 +123,28 @@ describe('web share-card immutable download boundary', () => {
       name: 'AbortError',
     })
     expect(click).not.toHaveBeenCalled()
+  })
+  it('U-WEB-SAVE P-CANCEL: cancellation after the Blob URL exists still revokes it within the bound', async () => {
+    vi.useFakeTimers()
+    try {
+      const click = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined)
+      const during = new AbortController()
+      createObjectURL.mockImplementation(() => {
+        during.abort()
+        return 'blob:cancelled'
+      })
+      await expect(downloadShareCard(card, during.signal)).rejects.toMatchObject({
+        name: 'AbortError',
+      })
+      expect(click).not.toHaveBeenCalled()
+      expect(document.querySelector('a[download]')).toBeNull()
+      expect(revokeObjectURL).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:cancelled')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
