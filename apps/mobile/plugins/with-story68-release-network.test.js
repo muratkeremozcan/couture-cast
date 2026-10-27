@@ -245,6 +245,7 @@ test('Release fixture gate stays disabled and EAS profiles never set the proof i
   )
   assert.match(nativeSource, /isShareCardNativeFixtureBuild\(\s*__DEV__,/)
   const eas = JSON.parse(fs.readFileSync(path.join(__dirname, '../eas.json')))
+  assert.deepEqual(Object.keys(eas.build).sort(), ['development', 'production'])
   for (const profile of Object.values(eas.build)) {
     assert.notEqual(profile.env?.CC68_RELEASE_PROOF_LOOPBACK, '1')
     assert.notEqual(profile.env?.STORY68_NATIVE_TEST_BUILD, '1')
