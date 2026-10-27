@@ -13,7 +13,13 @@ func reject(_ name: String, _ nodes: [ShareCardHeaderCandidate]) {
     _ = try selectShareCardHeader(nodes, expected: "Home", screen: screen)
     print("FAIL unexpected success: \(name)")
     exit(1)
-  } catch { print("PASS rejects \(name)") }
+  } catch is ShareCardHeaderSelectionError {
+    print("PASS rejects \(name)")
+  } catch {
+    // Only the selector's own refusal counts; an unrelated failure is not a rejection.
+    print("FAIL \(name) threw an unrelated error: \(error)")
+    exit(1)
+  }
 }
 do {
 let selected = try selectShareCardHeader([node([frame]), node()], expected: "Home", screen: screen)
@@ -50,7 +56,12 @@ for mutant in [
     try requirePostedShareCardFocus(mutant, after: 1, label: "Home", identifier: "heading", header: true)
     print("FAIL accepts removed request, header role, notification or attachment")
     exit(1)
-  } catch { print("PASS rejects native focus/trait mutant") }
+  } catch ShareCardFocusObservationError.missingPostedTargetOrHeaderTrait {
+    print("PASS rejects native focus/trait mutant")
+  } catch {
+    print("FAIL unrelated error: \(error)")
+    exit(1)
+  }
 }
 var headers = request
 headers.headings = ["Home"]
@@ -61,11 +72,21 @@ for labels in [[], ["Community"], ["Home", "Home"]] {
     try requireNativeShareCardHeader(headers, label: "Home")
     print("FAIL accepts missing or duplicated actual UIKit header trait")
     exit(1)
-  } catch { print("PASS rejects native header-trait removal/duplication") }
+  } catch ShareCardFocusObservationError.missingPostedTargetOrHeaderTrait {
+    print("PASS rejects native header-trait removal/duplication")
+  } catch {
+    print("FAIL unrelated error: \(error)")
+    exit(1)
+  }
 }
 try requireNoNewShareCardFocus(request, after: 2)
 do {
   try requireNoNewShareCardFocus(request, after: 1)
   print("FAIL current-owned Saving accepts a new focus jump")
   exit(1)
-} catch { print("PASS current-owned Saving rejects a new focus request") }
+} catch ShareCardFocusObservationError.missingPostedTargetOrHeaderTrait {
+  print("PASS current-owned Saving rejects a new focus request")
+} catch {
+  print("FAIL unrelated error: \(error)")
+  exit(1)
+}
