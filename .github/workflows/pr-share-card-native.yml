@@ -138,14 +138,16 @@ jobs:
         if: runner.os == 'macOS'
         run: bash scripts/ci/share-card-header-semantics.sh
       - name: Generate native development client
+        if: ${{ !cancelled() }}
         run: node scripts/run-story68-native.mjs prebuild --platform ${{ matrix.platform }}
       - name: Verify fresh Worklets variant and ABI staging
         if: matrix.platform == 'android'
         run: node scripts/ci/node-test-gate.mjs worklets-staging
       - name: Build native development client
+        if: ${{ !cancelled() }}
         run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
       - name: Genuine browser share-card acceptance matrix
-        if: matrix.platform == 'android' && matrix.api == 36
+        if: ${{ !cancelled() && matrix.platform == 'android' && matrix.api == 36 }}
         run: |
           node scripts/e2e-share-card/web.mjs > "$CC68_HARNESS_DIR/web-startup-private.log" 2>&1 &
           node scripts/e2e-share-card/wait-web.mjs
@@ -162,7 +164,7 @@ jobs:
           ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
       - name: Android real original and API32 denied/permanent permission proof
-        if: matrix.platform == 'android'
+        if: ${{ !cancelled() && matrix.platform == 'android' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CC68_ANDROID_API: ${{ matrix.api }}
@@ -177,7 +179,7 @@ jobs:
           disable-animations: true
           script: bash scripts/ci/share-card-android.sh
       - name: iOS original Photos resource and add-only save
-        if: matrix.platform == 'ios'
+        if: ${{ !cancelled() && matrix.platform == 'ios' }}
         run: |
           device=$(xcrun simctl create cc68-ci 'iPhone 16 Pro')
           echo "$device" > /tmp/cc68-simulator

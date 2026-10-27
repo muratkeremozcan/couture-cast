@@ -82,9 +82,11 @@ jobs:
           use-npm-ci: 'false'
 
       - name: Verify web aliased runtime dependencies
+        id: runtime_deps
         run: npm run check:web:aliased-runtime-deps
 
       - name: Generate Prisma Client
+        if: ${{ !cancelled() }}
         run: npm run db:generate
 
       # The migrations assume a Supabase database. A stock PostgreSQL image
@@ -100,6 +102,7 @@ jobs:
       # suite drives it by setting `request.jwt.claims` with `set_config`, which
       # is exactly the path this reads.
       - name: Provision Supabase-compatible roles and auth schema
+        if: ${{ !cancelled() }}
         run: |
           psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
@@ -152,21 +155,29 @@ jobs:
           SQL
 
       - name: Apply migrations to the test database
+        if: ${{ !cancelled() }}
         run: node scripts/prisma-migrate-deploy.mjs
 
       - name: Typecheck workspaces
+        id: typecheck
+        if: ${{ !cancelled() }}
         run: npm run typecheck
 
       - name: Lint sources
+        id: lint
+        if: ${{ !cancelled() }}
         run: npm run lint
 
       - name: Build packages
+        if: ${{ !cancelled() }}
         run: npm run build
 
       - name: Install Playwright Chromium
+        if: ${{ !cancelled() }}
         run: npx playwright install --with-deps chromium
 
       - name: Run Lighthouse accessibility gate
+        if: ${{ !cancelled() }}
         id: lighthouse
         continue-on-error: true
         run: npm run test:a11y:lighthouse
@@ -179,11 +190,13 @@ jobs:
           path: playwright/artifacts/lighthouse/
 
       - name: Run tests with coverage
+        if: ${{ !cancelled() }}
         id: tests
         continue-on-error: true
         run: npm run test:coverage
 
       - name: Coverage report and PR comment
+        if: ${{ !cancelled() }}
         uses: ./.github/actions/unit-test-coverage-comment
         with:
           coverage-path: ./coverage
@@ -196,6 +209,10 @@ jobs:
           badge-filename-prefix: couture-cast
           badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
 
+      - name: Require later checks to run after an earlier check fails
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ci/workflow-step-shadowing.test.mjs
+
       # `always()` so this runs even when the coverage-comment step above has
       # already failed. `continue-on-error` on the test step is deliberate and
       # should stay: it is what lets the coverage comment post on a red run,
@@ -205,10 +222,17 @@ jobs:
       # The gate held either way; the reported cause was wrong. This step now
       # always runs and names the real one. It still exits 0 when the tests
       # passed, so a comment step that fails for its own reasons is not masked.
+      #
+      # The checks before the tests run with `!cancelled()`, so a failed lint or
+      # typecheck no longer skips the tests and hides their result. Those checks
+      # already fail the job themselves; the gate names them alongside the tests.
       - name: Fail if tests failed
-        if: always() && (steps.tests.outcome == 'failure' || steps.lighthouse.outcome == 'failure')
+        if: >-
+          always() && (steps.tests.outcome == 'failure' ||
+          steps.lighthouse.outcome == 'failure' || steps.lint.outcome == 'failure' ||
+          steps.typecheck.outcome == 'failure' || steps.runtime_deps.outcome == 'failure')
         run: |
-          echo "::error::Quality gate failed: tests=${{ steps.tests.outcome }} lighthouse=${{ steps.lighthouse.outcome }}"
+          echo "::error::Quality gate failed: tests=${{ steps.tests.outcome }} lighthouse=${{ steps.lighthouse.outcome }} lint=${{ steps.lint.outcome }} typecheck=${{ steps.typecheck.outcome }} runtime-deps=${{ steps.runtime_deps.outcome }}"
           exit 1
 
   community-realtime-budget:
@@ -268,6 +292,7 @@ jobs:
             npx vitest run --config vitest.realtime-budget.config.ts --reporter=default --reporter=json --outputFile=".cache/realtime-budget/run-$attempt.json" 2>&1 | tee ".cache/realtime-budget/run-$attempt.log"
           done
       - name: Require execution of every budget proof
+        if: ${{ !cancelled() }}
         working-directory: apps/api
         run: |
           node --input-type=module <<'JS'
@@ -345,9 +370,11 @@ jobs:
         working-directory: apps/api
         run: npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
       - name: Mandatory compiled mixed workload and resource budgets
+        if: ${{ !cancelled() }}
         working-directory: apps/api
         run: npx vitest run integration/community-comments-measurement.integration.spec.ts --maxWorkers=1 --reporter=default --reporter=json --outputFile=.cache/community-screening/mixed-ci-tests.json
       - name: Require complete execution with every opt-in case enabled
+        if: ${{ !cancelled() }}
         run: |
           node --input-type=module <<'JS'
           import fs from 'node:fs'

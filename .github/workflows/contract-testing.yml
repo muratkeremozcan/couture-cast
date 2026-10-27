@@ -43,5 +43,5 @@ jobs:
           check-label: 'Local schema, consumer, and provider contracts'
 
       - name: Fail if Pact workflow failed
-        if: steps.pact.outcome == 'failure'
+        if: ${{ !cancelled() && steps.pact.outcome == 'failure' }}
         run: exit 1

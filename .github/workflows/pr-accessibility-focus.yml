@@ -92,12 +92,14 @@ jobs:
       # The release app must keep React Native's native libraries, which the
       # module's build.gradle leaves out of its own androidTest APK only.
       - name: Build the release app and the module's test APK
+        if: ${{ !cancelled() }}
         working-directory: apps/mobile/android
         env:
           NODE_ENV: production
         run: ./gradlew :app:assembleRelease :accessibility-focus:assembleDebugAndroidTest -PreactNativeArchitectures=x86_64 --console=plain
 
       - name: Check what each APK carries
+        if: ${{ !cancelled() }}
         run: |
           bash scripts/ci/check-accessibility-focus-builds.sh android-app apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           bash scripts/ci/check-accessibility-focus-builds.sh android-test apps/mobile/modules/accessibility-focus/android/build/outputs/apk/androidTest/debug/accessibility-focus-debug-androidTest.apk
@@ -117,17 +119,20 @@ jobs:
           xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device"
 
       - name: Setup Node
+        if: ${{ !cancelled() }}
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: npm
 
       - name: Install dependencies
+        if: ${{ !cancelled() }}
         run: npm ci
 
       # The SwiftPM target above leaves out AccessibilityFocusModule.swift, which
       # needs ExpoModulesCore; the app build compiles it with its Expo dependency.
       - name: Generate the iOS project
+        if: ${{ !cancelled() }}
         working-directory: apps/mobile
         env:
           CI: '1'
@@ -135,6 +140,7 @@ jobs:
         run: npx expo prebuild --platform ios
 
       - name: Build the release simulator app
+        if: ${{ !cancelled() }}
         working-directory: apps/mobile/ios
         env:
           NODE_ENV: production
@@ -148,6 +154,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO build
 
       - name: Check the app links and registers the module
+        if: ${{ !cancelled() }}
         run: |
           bash scripts/ci/check-accessibility-focus-builds.sh ios-app \
             "apps/mobile/ios/build/Build/Products/Release-iphonesimulator/$scheme.app/$scheme" apps/mobile/ios
