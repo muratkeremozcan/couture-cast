@@ -115,7 +115,7 @@ describe('share-card preparation boundaries', () => {
       })
     ).rejects.toMatchObject({ status: 503 })
   })
-  it('U-IDENTITY U-CANCEL U-OFFLINE: cancelled and freshly denied requests produce no image', async () => {
+  it('U-CANCEL: cancelled and freshly denied requests produce no image', async () => {
     const abort = new AbortController()
     abort.abort()
     await expect(service.prepare('member', input, abort.signal)).rejects.toMatchObject({
