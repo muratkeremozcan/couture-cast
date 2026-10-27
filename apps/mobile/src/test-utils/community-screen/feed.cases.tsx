@@ -30,6 +30,7 @@ import { server } from '@/src/test-utils/msw/server'
 import { getCommunityPostFromMobile } from '@/src/lib/community'
 import { saveLocationFromSearchFromMobile } from '@/src/lib/locations'
 import { savedLocation } from '@/src/test-utils/locations'
+import { registerShareCardHeading } from '@/src/lib/share-card-focus'
 import {
   setMobileAccessTokenResolver,
   setMobileApplicationUserId,
@@ -85,10 +86,31 @@ export function registerCommunityFeedCases() {
     }
   )
 
-  it('L8: the community content keeps its existing navigation heading as the fallback', async () => {
+  it('L8: the community content adds no share-card heading of its own', async () => {
     await render(<CommunityScreen />)
     await screen.findByTestId('community-screen')
     expect(screen.queryByRole('heading', { name: enUS.community.heading })).toBeNull()
+  })
+
+  it('L8: closing the composer without an invoker node focuses the registered navigation heading', async () => {
+    serveFeed(() =>
+      feedJson({ items: [item({ author: { displayName: 'Own look', isSelf: true } })] })
+    )
+    const setFocus = vi.spyOn(AccessibilityInfo, 'setAccessibilityFocus')
+    // The tab layout registers its title this way; 88 stands in for its native tag.
+    const unregister = registerShareCardHeading('community', () => 88)
+    try {
+      await render(<CommunityScreen />)
+      await browserUser.click(
+        await screen.findByTestId('community-share-card-open-post-a')
+      )
+      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      setFocus.mockClear()
+      await browserUser.click(screen.getByTestId('share-card-cancel'))
+      await waitFor(() => expect(setFocus).toHaveBeenCalledWith(88))
+    } finally {
+      unregister()
+    }
   })
 
   it('R12 keeps a visible late detail card while stripping revoked reaction capability', async () => {
