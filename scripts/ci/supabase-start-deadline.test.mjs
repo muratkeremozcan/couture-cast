@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { test } from 'node:test'
+import { describe, test } from 'node:test'
 import { runGatesTestFile } from './node-test-gate.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
@@ -33,65 +33,73 @@ async function shellFixture(t, commands) {
   return { directory, capture, result }
 }
 
-test('Supabase Linux startup preserves GNU timeout deadline and child exit status', async (t) => {
-  const { directory, capture, result } = await shellFixture(t, {
-    timeout: 42,
-    gtimeout: 43,
-    npx: 0,
+describe('run_start deadline', () => {
+  test('Supabase Linux startup preserves GNU timeout deadline and child exit status', async (t) => {
+    const { directory, capture, result } = await shellFixture(t, {
+      timeout: 42,
+      gtimeout: 43,
+      npx: 0,
+    })
+    assert.equal(result.status, 42)
+    assert.deepEqual((await readFile(capture, 'utf8')).trim().split('\n'), [
+      path.join(directory, 'timeout'),
+      '--kill-after=15',
+      '7',
+      'npx',
+      'supabase',
+      'start',
+      '--exclude',
+      'realtime,studio',
+    ])
   })
-  assert.equal(result.status, 42)
-  assert.deepEqual((await readFile(capture, 'utf8')).trim().split('\n'), [
-    path.join(directory, 'timeout'),
-    '--kill-after=15',
-    '7',
-    'npx',
-    'supabase',
-    'start',
-    '--exclude',
-    'realtime,studio',
-  ])
-})
 
-test('Supabase macOS startup uses gtimeout when timeout is absent', async (t) => {
-  const { directory, capture, result } = await shellFixture(t, { gtimeout: 124, npx: 0 })
-  assert.equal(result.status, 124)
-  assert.deepEqual((await readFile(capture, 'utf8')).trim().split('\n'), [
-    path.join(directory, 'gtimeout'),
-    '--kill-after=15',
-    '7',
-    'npx',
-    'supabase',
-    'start',
-    '--exclude',
-    'realtime,studio',
-  ])
-})
+  test('Supabase macOS startup uses gtimeout when timeout is absent', async (t) => {
+    const { directory, capture, result } = await shellFixture(t, {
+      gtimeout: 124,
+      npx: 0,
+    })
+    assert.equal(result.status, 124)
+    assert.deepEqual((await readFile(capture, 'utf8')).trim().split('\n'), [
+      path.join(directory, 'gtimeout'),
+      '--kill-after=15',
+      '7',
+      'npx',
+      'supabase',
+      'start',
+      '--exclude',
+      'realtime,studio',
+    ])
+  })
 
-test('Supabase startup fails closed before npx when no deadline tool exists', async (t) => {
-  const { capture, result } = await shellFixture(t, { npx: 0 })
-  assert.equal(result.status, 2)
-  assert.match(result.stdout + result.stderr, /GNU timeout or gtimeout/)
-  await assert.rejects(readFile(capture), { code: 'ENOENT' })
-})
+  test('Supabase startup fails closed before npx when no deadline tool exists', async (t) => {
+    const { capture, result } = await shellFixture(t, { npx: 0 })
+    assert.equal(result.status, 2)
+    assert.match(result.stdout + result.stderr, /GNU timeout or gtimeout/)
+    await assert.rejects(readFile(capture), { code: 'ENOENT' })
+  })
 
-test('mandatory native CI executes startup deadline controls before starting Supabase', async () => {
-  const { parse } = await import('yaml')
-  const workflow = parse(
-    await readFile(path.join(root, '.github/workflows/pr-share-card-native.yml'), 'utf8')
-  )
-  const jobs = Object.values(workflow.jobs).filter((job) =>
-    job.steps?.some((step) => step.uses === './.github/actions/start-local-supabase')
-  )
-  assert.ok(jobs.length)
-  for (const job of jobs) {
-    const startup = job.steps.findIndex(
-      (step) => step.uses === './.github/actions/start-local-supabase'
+  test('mandatory native CI executes startup deadline controls before starting Supabase', async () => {
+    const { parse } = await import('yaml')
+    const workflow = parse(
+      await readFile(
+        path.join(root, '.github/workflows/pr-share-card-native.yml'),
+        'utf8'
+      )
     )
-    const controls = job.steps.findIndex((step) =>
-      runGatesTestFile(step.run, 'scripts/ci/supabase-start-deadline.test.mjs')
+    const jobs = Object.values(workflow.jobs).filter((job) =>
+      job.steps?.some((step) => step.uses === './.github/actions/start-local-supabase')
     )
-    assert.ok(controls >= 0 && controls < startup)
-    assert.equal(job.steps[controls].if, undefined)
-    assert.equal(job.steps[controls]['continue-on-error'], undefined)
-  }
+    assert.ok(jobs.length)
+    for (const job of jobs) {
+      const startup = job.steps.findIndex(
+        (step) => step.uses === './.github/actions/start-local-supabase'
+      )
+      const controls = job.steps.findIndex((step) =>
+        runGatesTestFile(step.run, 'scripts/ci/supabase-start-deadline.test.mjs')
+      )
+      assert.ok(controls >= 0 && controls < startup)
+      assert.equal(job.steps[controls].if, undefined)
+      assert.equal(job.steps[controls]['continue-on-error'], undefined)
+    }
+  })
 })

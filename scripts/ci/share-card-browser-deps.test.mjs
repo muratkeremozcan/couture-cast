@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import test from 'node:test'
+import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import { runGatesTestFile } from './node-test-gate.mjs'
 
@@ -32,326 +32,348 @@ function fixture(extra = {}) {
   }
   return { options, sources, writes }
 }
-test('rewrites only exact Azure Ubuntu archive URLs in active legacy and deb822 source lines', async () => {
-  const { officialUbuntuSource } = await helper()
-  const untouched = [
-    '# deb http://azure.archive.ubuntu.com/ubuntu noble main',
-    'URIs: http://security.ubuntu.com/ubuntu',
-    'deb https://packages.microsoft.com/repos/code stable main',
-    'URIs: https://azure.archive.ubuntu.com.evil/ubuntu',
-    'URIs: http://azure.archive.ubuntu.com/ubuntuevil',
-    'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg',
-  ].join('\n')
-  assert.equal(
-    officialUbuntuSource(legacy + deb822 + untouched),
-    official(legacy + deb822) + untouched
-  )
-})
-test('restores every source after pinned browser dependency installation succeeds', async () => {
-  const { provisionShareCardBrowsers } = await helper()
-  const f = fixture()
-  let installed = 0
-  f.options.install = async () => {
-    installed++
-    assert.equal(f.sources.get(f.options.files[0]), official(legacy))
-    assert.equal(f.sources.get(f.options.files[1]), official(deb822))
-  }
-  await provisionShareCardBrowsers(f.options)
-  assert.equal(installed, 1)
-  assert.equal(f.sources.get(f.options.files[0]), legacy)
-  assert.equal(f.sources.get(f.options.files[1]), deb822)
-})
-test('install failure preserves its original error and restores sources', async () => {
-  const { provisionShareCardBrowsers } = await helper()
-  const original = new Error('stub_install_failed')
-  const f = fixture({
-    install: async () => {
-      throw original
-    },
-  })
-  await assert.rejects(
-    provisionShareCardBrowsers(f.options),
-    (error) => error === original
-  )
-  assert.deepEqual([...f.sources.values()], [legacy, deb822])
-})
-test('a partial mirror write failure restores both touched sources before returning', async () => {
-  const { provisionShareCardBrowsers } = await helper()
-  const f = fixture()
-  const write = f.options.writeSource
-  let failed = false
-  f.options.writeSource = async (file, value) => {
-    await write(file, value)
-    if (!failed && file.endsWith('ubuntu.sources')) {
-      failed = true
-      throw new Error('stub_write_failed')
-    }
-  }
-  await assert.rejects(provisionShareCardBrowsers(f.options), /stub_write_failed/)
-  assert.deepEqual([...f.sources.values()], [legacy, deb822])
-})
-test('cleanup failure fails closed and retains an earlier install failure', async () => {
-  const { provisionShareCardBrowsers } = await helper()
-  const original = new Error('stub_install_failed')
-  const f = fixture({
-    install: async () => {
-      throw original
-    },
-  })
-  const write = f.options.writeSource
-  f.options.writeSource = async (file, value) => {
-    if (value === legacy) throw new Error('stub_restore_failed')
-    await write(file, value)
-  }
-  await assert.rejects(provisionShareCardBrowsers(f.options), (error) => {
-    assert.equal(error.message, 'browser_dependency_source_restore_failed')
-    assert.ok(error.errors.includes(original))
-    return true
-  })
-})
-test('an already official mirror requires no source mutation', async () => {
-  const { provisionShareCardBrowsers } = await helper()
-  const f = fixture()
-  for (const file of f.options.files) f.sources.set(file, official(f.sources.get(file)))
-  await provisionShareCardBrowsers(f.options)
-  assert.equal(f.writes.length, 0)
-})
-test('recognizes the exact hosted Ubuntu mirror-list URI and preserves other file sources', async () => {
-  const { officialUbuntuSource } = await helper()
-  // Runner image ubuntu24/20261012.334 configure-apt-sources.sh generates this URI.
-  const uri = 'mirror+file:/etc/apt/apt-mirrors.txt'
-  const source = `${legacy.replace('http://azure.archive.ubuntu.com/ubuntu', uri)}${deb822.replace('http://azure.archive.ubuntu.com/ubuntu/', uri)}`
-  const untouched = [
-    `# URIs: ${uri}`,
-    `URIs: ${uri}.other`,
-    `URIs: ${uri}/other`,
-    'URIs: mirror+file:/tmp/apt-mirrors.txt',
-    'URIs: https://security.ubuntu.com/ubuntu/',
-  ].join('\n')
-  assert.equal(
-    officialUbuntuSource(source + untouched),
-    source.replaceAll(uri, 'https://archive.ubuntu.com/ubuntu') + untouched
-  )
-})
-test('provisions and restores hosted-image mirror-list sources with the original keyring and suites', async () => {
-  const { provisionShareCardBrowsers } = await helper()
-  const uri = 'mirror+file:/etc/apt/apt-mirrors.txt'
-  const source = deb822.replace('http://azure.archive.ubuntu.com/ubuntu/', uri)
-  const f = fixture()
-  f.options.files = ['/etc/apt/sources.list.d/ubuntu.sources']
-  f.sources.set(f.options.files[0], source)
-  let installed = false
-  f.options.install = async () => {
-    installed = true
+
+describe('apt source rewrite', () => {
+  test('rewrites only exact Azure Ubuntu archive URLs in active legacy and deb822 source lines', async () => {
+    const { officialUbuntuSource } = await helper()
+    const untouched = [
+      '# deb http://azure.archive.ubuntu.com/ubuntu noble main',
+      'URIs: http://security.ubuntu.com/ubuntu',
+      'deb https://packages.microsoft.com/repos/code stable main',
+      'URIs: https://azure.archive.ubuntu.com.evil/ubuntu',
+      'URIs: http://azure.archive.ubuntu.com/ubuntuevil',
+      'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg',
+    ].join('\n')
     assert.equal(
-      f.sources.get(f.options.files[0]),
-      source.replace(uri, 'https://archive.ubuntu.com/ubuntu')
+      officialUbuntuSource(legacy + deb822 + untouched),
+      official(legacy + deb822) + untouched
     )
-  }
-  await provisionShareCardBrowsers(f.options)
-  assert.equal(installed, true)
-  assert.equal(f.sources.get(f.options.files[0]), source)
-  assert.deepEqual(f.writes, [f.options.files[0], f.options.files[0]])
-})
-test('unexpected host, architecture or runner fails before reads, writes or install', async () => {
-  const { provisionShareCardBrowsers } = await helper()
-  for (const invalid of [
-    { platform: 'darwin' },
-    { architecture: 'arm64' },
-    { githubActions: undefined },
-    { osRelease: 'ID=debian\n' },
-  ]) {
-    let touched = false
-    const touch = async () => {
-      touched = true
+  })
+
+  test('restores every source after pinned browser dependency installation succeeds', async () => {
+    const { provisionShareCardBrowsers } = await helper()
+    const f = fixture()
+    let installed = 0
+    f.options.install = async () => {
+      installed++
+      assert.equal(f.sources.get(f.options.files[0]), official(legacy))
+      assert.equal(f.sources.get(f.options.files[1]), official(deb822))
     }
+    await provisionShareCardBrowsers(f.options)
+    assert.equal(installed, 1)
+    assert.equal(f.sources.get(f.options.files[0]), legacy)
+    assert.equal(f.sources.get(f.options.files[1]), deb822)
+  })
+
+  test('install failure preserves its original error and restores sources', async () => {
+    const { provisionShareCardBrowsers } = await helper()
+    const original = new Error('stub_install_failed')
     const f = fixture({
-      ...invalid,
-      readSource: touch,
-      writeSource: touch,
-      install: touch,
+      install: async () => {
+        throw original
+      },
     })
     await assert.rejects(
       provisionShareCardBrowsers(f.options),
-      /owned_ubuntu_browser_runner_required/
+      (error) => error === original
     )
-    assert.equal(touched, false)
-  }
-})
-test('unrecognized archive configuration fails before any source mutation or installation', async () => {
-  const { provisionShareCardBrowsers } = await helper()
-  let installed = false
-  const f = fixture({
-    readSource: async () => 'URIs: https://unknown.invalid/ubuntu\n',
-    install: async () => {
+    assert.deepEqual([...f.sources.values()], [legacy, deb822])
+  })
+
+  test('a partial mirror write failure restores both touched sources before returning', async () => {
+    const { provisionShareCardBrowsers } = await helper()
+    const f = fixture()
+    const write = f.options.writeSource
+    let failed = false
+    f.options.writeSource = async (file, value) => {
+      await write(file, value)
+      if (!failed && file.endsWith('ubuntu.sources')) {
+        failed = true
+        throw new Error('stub_write_failed')
+      }
+    }
+    await assert.rejects(provisionShareCardBrowsers(f.options), /stub_write_failed/)
+    assert.deepEqual([...f.sources.values()], [legacy, deb822])
+  })
+
+  test('cleanup failure fails closed and retains an earlier install failure', async () => {
+    const { provisionShareCardBrowsers } = await helper()
+    const original = new Error('stub_install_failed')
+    const f = fixture({
+      install: async () => {
+        throw original
+      },
+    })
+    const write = f.options.writeSource
+    f.options.writeSource = async (file, value) => {
+      if (value === legacy) throw new Error('stub_restore_failed')
+      await write(file, value)
+    }
+    await assert.rejects(provisionShareCardBrowsers(f.options), (error) => {
+      assert.equal(error.message, 'browser_dependency_source_restore_failed')
+      assert.ok(error.errors.includes(original))
+      return true
+    })
+  })
+
+  test('an already official mirror requires no source mutation', async () => {
+    const { provisionShareCardBrowsers } = await helper()
+    const f = fixture()
+    for (const file of f.options.files) f.sources.set(file, official(f.sources.get(file)))
+    await provisionShareCardBrowsers(f.options)
+    assert.equal(f.writes.length, 0)
+  })
+
+  test('recognizes the exact hosted Ubuntu mirror-list URI and preserves other file sources', async () => {
+    const { officialUbuntuSource } = await helper()
+    // Runner image ubuntu24/20261012.334 configure-apt-sources.sh generates this URI.
+    const uri = 'mirror+file:/etc/apt/apt-mirrors.txt'
+    const source = `${legacy.replace('http://azure.archive.ubuntu.com/ubuntu', uri)}${deb822.replace('http://azure.archive.ubuntu.com/ubuntu/', uri)}`
+    const untouched = [
+      `# URIs: ${uri}`,
+      `URIs: ${uri}.other`,
+      `URIs: ${uri}/other`,
+      'URIs: mirror+file:/tmp/apt-mirrors.txt',
+      'URIs: https://security.ubuntu.com/ubuntu/',
+    ].join('\n')
+    assert.equal(
+      officialUbuntuSource(source + untouched),
+      source.replaceAll(uri, 'https://archive.ubuntu.com/ubuntu') + untouched
+    )
+  })
+
+  test('provisions and restores hosted-image mirror-list sources with the original keyring and suites', async () => {
+    const { provisionShareCardBrowsers } = await helper()
+    const uri = 'mirror+file:/etc/apt/apt-mirrors.txt'
+    const source = deb822.replace('http://azure.archive.ubuntu.com/ubuntu/', uri)
+    const f = fixture()
+    f.options.files = ['/etc/apt/sources.list.d/ubuntu.sources']
+    f.sources.set(f.options.files[0], source)
+    let installed = false
+    f.options.install = async () => {
       installed = true
-    },
-  })
-  await assert.rejects(
-    provisionShareCardBrowsers(f.options),
-    /official_ubuntu_archive_required/
-  )
-  assert.equal(f.writes.length, 0)
-  assert.equal(installed, false)
-})
-test('browser installer uses the pinned CLI and a GNU deadline with TERM, kill grace and outer bound', async () => {
-  const { installPinnedPlaywrightBrowsers } = await helper()
-  const calls = []
-  installPinnedPlaywrightBrowsers({
-    node: '/owned/node',
-    cli: '/pinned/playwright/cli.js',
-    run: (...args) => {
-      calls.push(args)
-      return { status: 0 }
-    },
-  })
-  assert.deepEqual(calls, [
-    [
-      'timeout',
-      [
-        '--signal=TERM',
-        '--kill-after=15s',
-        '600s',
-        '/owned/node',
-        '/pinned/playwright/cli.js',
-        'install',
-        '--with-deps',
-        'chromium',
-        'firefox',
-        'webkit',
-      ],
-      { stdio: 'inherit', timeout: 620000, killSignal: 'SIGKILL' },
-    ],
-  ])
-})
-test('API32 provisions only the Chromium engine required by the browser-mode accessibility bridge', async () => {
-  const { installPinnedPlaywrightBrowsers } = await helper()
-  let observed
-  installPinnedPlaywrightBrowsers({
-    node: '/owned/node',
-    cli: '/pinned/cli.js',
-    browsers: ['chromium'],
-    run: (...args) => {
-      observed = args
-      return { status: 0 }
-    },
-  })
-  assert.deepEqual(observed[1], [
-    '--signal=TERM',
-    '--kill-after=15s',
-    '600s',
-    '/owned/node',
-    '/pinned/cli.js',
-    'install',
-    '--with-deps',
-    'chromium',
-  ])
-})
-test('the installer accepts only the two required engine sets', async () => {
-  const { installPinnedPlaywrightBrowsers } = await helper()
-  for (const browsers of [[], ['firefox'], ['chromium', 'firefox'], 'chromium']) {
-    let called = false
-    assert.throws(
-      () =>
-        installPinnedPlaywrightBrowsers({
-          browsers,
-          run: () => {
-            called = true
-            return { status: 0 }
-          },
-        }),
-      /browser_dependency_engine_selection_required/
-    )
-    assert.equal(called, false)
-  }
-})
-test('CLI engine selection is explicit and rejects unknown or duplicate arguments', async () => {
-  const { shareCardBrowserEngines } = await helper()
-  assert.deepEqual(shareCardBrowserEngines([]), ['chromium', 'firefox', 'webkit'])
-  assert.deepEqual(shareCardBrowserEngines(['--chromium-only']), ['chromium'])
-  for (const args of [['chromium'], ['--chromium-only', '--chromium-only']])
-    assert.throws(
-      () => shareCardBrowserEngines(args),
-      /browser_dependency_engine_selection_required/
-    )
-})
-test('missing deadline, timeout and installer failure all fail closed', async () => {
-  const { installPinnedPlaywrightBrowsers } = await helper()
-  for (const result of [
-    { error: Object.assign(new Error('missing'), { code: 'ENOENT' }) },
-    { status: 124 },
-    { status: 137 },
-    { status: 7 },
-  ]) {
-    assert.throws(
-      () =>
-        installPinnedPlaywrightBrowsers({
-          node: '/owned/node',
-          cli: '/pinned/cli.js',
-          run: () => result,
-        }),
-      /browser_dependency_(deadline_required|install_timeout|install_failed)/
-    )
-  }
-})
-test('every browser-mode mobile bridge has bounded pinned Chromium provisioning and API36 retains all three engines', async () => {
-  const workflow = parse(
-    await readFile(
-      new URL('../../.github/workflows/pr-share-card-native.yml', import.meta.url),
-      'utf8'
-    )
-  )
-  const steps = workflow.jobs['original-resource'].steps
-  const provisioning = steps.filter((step) =>
-    step.run?.includes('node scripts/ci/share-card-browser-deps.mjs')
-  )
-  assert.equal(provisioning.length, 1)
-  const step = provisioning[0]
-  assert.equal(step.if, "matrix.platform == 'android'")
-  assert.equal(step['timeout-minutes'], 12)
-  assert.equal(step['continue-on-error'], undefined)
-  const controls = step.run.indexOf('node scripts/ci/node-test-gate.mjs browser-deps')
-  assert.equal(
-    runGatesTestFile(step.run, 'scripts/ci/share-card-browser-deps.test.mjs'),
-    true
-  )
-  assert.ok(
-    controls >= 0 &&
-      controls < step.run.indexOf('node scripts/ci/share-card-browser-deps.mjs')
-  )
-  assert.ok(step.run.includes("if [ '${{ matrix.api }}' = '32' ]; then"))
-  assert.ok(
-    step.run.includes('node scripts/ci/share-card-browser-deps.mjs --chromium-only')
-  )
-  assert.ok(
-    step.run
-      .split('\n')
-      .some((line) => line.trim() === 'node scripts/ci/share-card-browser-deps.mjs')
-  )
-  const mac = steps.find((item) =>
-    item.run?.includes('npx --no-install playwright install chromium')
-  )
-  assert.ok(mac)
-  assert.equal(mac.if, "matrix.platform == 'ios'")
-  assert.equal(mac['timeout-minutes'], 6)
-  assert.equal(mac['continue-on-error'], undefined)
-  const bridge = steps.findIndex((item) =>
-    item.run?.includes('node scripts/e2e-share-card/bridge-a11y.mjs')
-  )
-  assert.ok(steps.indexOf(step) < bridge && steps.indexOf(mac) < bridge)
-  assert.equal(
-    steps.some((item) => item.run?.includes('npx playwright install --with-deps')),
-    false
-  )
-  assert.ok(
-    steps.findIndex((item) => item === step) <
-      steps.findIndex(
-        (item) => item.name === 'Genuine browser share-card acceptance matrix'
+      assert.equal(
+        f.sources.get(f.options.files[0]),
+        source.replace(uri, 'https://archive.ubuntu.com/ubuntu')
       )
-  )
-  assert.ok(
-    steps.some((item) =>
+    }
+    await provisionShareCardBrowsers(f.options)
+    assert.equal(installed, true)
+    assert.equal(f.sources.get(f.options.files[0]), source)
+    assert.deepEqual(f.writes, [f.options.files[0], f.options.files[0]])
+  })
+
+  test('unexpected host, architecture or runner fails before reads, writes or install', async () => {
+    const { provisionShareCardBrowsers } = await helper()
+    for (const invalid of [
+      { platform: 'darwin' },
+      { architecture: 'arm64' },
+      { githubActions: undefined },
+      { osRelease: 'ID=debian\n' },
+    ]) {
+      let touched = false
+      const touch = async () => {
+        touched = true
+      }
+      const f = fixture({
+        ...invalid,
+        readSource: touch,
+        writeSource: touch,
+        install: touch,
+      })
+      await assert.rejects(
+        provisionShareCardBrowsers(f.options),
+        /owned_ubuntu_browser_runner_required/
+      )
+      assert.equal(touched, false)
+    }
+  })
+
+  test('unrecognized archive configuration fails before any source mutation or installation', async () => {
+    const { provisionShareCardBrowsers } = await helper()
+    let installed = false
+    const f = fixture({
+      readSource: async () => 'URIs: https://unknown.invalid/ubuntu\n',
+      install: async () => {
+        installed = true
+      },
+    })
+    await assert.rejects(
+      provisionShareCardBrowsers(f.options),
+      /official_ubuntu_archive_required/
+    )
+    assert.equal(f.writes.length, 0)
+    assert.equal(installed, false)
+  })
+})
+
+describe('pinned browser installer', () => {
+  test('browser installer uses the pinned CLI and a GNU deadline with TERM, kill grace and outer bound', async () => {
+    const { installPinnedPlaywrightBrowsers } = await helper()
+    const calls = []
+    installPinnedPlaywrightBrowsers({
+      node: '/owned/node',
+      cli: '/pinned/playwright/cli.js',
+      run: (...args) => {
+        calls.push(args)
+        return { status: 0 }
+      },
+    })
+    assert.deepEqual(calls, [
+      [
+        'timeout',
+        [
+          '--signal=TERM',
+          '--kill-after=15s',
+          '600s',
+          '/owned/node',
+          '/pinned/playwright/cli.js',
+          'install',
+          '--with-deps',
+          'chromium',
+          'firefox',
+          'webkit',
+        ],
+        { stdio: 'inherit', timeout: 620000, killSignal: 'SIGKILL' },
+      ],
+    ])
+  })
+
+  test('API32 provisions only the Chromium engine required by the browser-mode accessibility bridge', async () => {
+    const { installPinnedPlaywrightBrowsers } = await helper()
+    let observed
+    installPinnedPlaywrightBrowsers({
+      node: '/owned/node',
+      cli: '/pinned/cli.js',
+      browsers: ['chromium'],
+      run: (...args) => {
+        observed = args
+        return { status: 0 }
+      },
+    })
+    assert.deepEqual(observed[1], [
+      '--signal=TERM',
+      '--kill-after=15s',
+      '600s',
+      '/owned/node',
+      '/pinned/cli.js',
+      'install',
+      '--with-deps',
+      'chromium',
+    ])
+  })
+
+  test('the installer accepts only the two required engine sets', async () => {
+    const { installPinnedPlaywrightBrowsers } = await helper()
+    for (const browsers of [[], ['firefox'], ['chromium', 'firefox'], 'chromium']) {
+      let called = false
+      assert.throws(
+        () =>
+          installPinnedPlaywrightBrowsers({
+            browsers,
+            run: () => {
+              called = true
+              return { status: 0 }
+            },
+          }),
+        /browser_dependency_engine_selection_required/
+      )
+      assert.equal(called, false)
+    }
+  })
+
+  test('CLI engine selection is explicit and rejects unknown or duplicate arguments', async () => {
+    const { shareCardBrowserEngines } = await helper()
+    assert.deepEqual(shareCardBrowserEngines([]), ['chromium', 'firefox', 'webkit'])
+    assert.deepEqual(shareCardBrowserEngines(['--chromium-only']), ['chromium'])
+    for (const args of [['chromium'], ['--chromium-only', '--chromium-only']])
+      assert.throws(
+        () => shareCardBrowserEngines(args),
+        /browser_dependency_engine_selection_required/
+      )
+  })
+
+  test('missing deadline, timeout and installer failure all fail closed', async () => {
+    const { installPinnedPlaywrightBrowsers } = await helper()
+    for (const result of [
+      { error: Object.assign(new Error('missing'), { code: 'ENOENT' }) },
+      { status: 124 },
+      { status: 137 },
+      { status: 7 },
+    ]) {
+      assert.throws(
+        () =>
+          installPinnedPlaywrightBrowsers({
+            node: '/owned/node',
+            cli: '/pinned/cli.js',
+            run: () => result,
+          }),
+        /browser_dependency_(deadline_required|install_timeout|install_failed)/
+      )
+    }
+  })
+})
+
+describe('browser dependency workflow', () => {
+  test('every browser-mode mobile bridge has bounded pinned Chromium provisioning and API36 retains all three engines', async () => {
+    const workflow = parse(
+      await readFile(
+        new URL('../../.github/workflows/pr-share-card-native.yml', import.meta.url),
+        'utf8'
+      )
+    )
+    const steps = workflow.jobs['original-resource'].steps
+    const provisioning = steps.filter((step) =>
+      step.run?.includes('node scripts/ci/share-card-browser-deps.mjs')
+    )
+    assert.equal(provisioning.length, 1)
+    const step = provisioning[0]
+    assert.equal(step.if, "matrix.platform == 'android'")
+    assert.equal(step['timeout-minutes'], 12)
+    assert.equal(step['continue-on-error'], undefined)
+    const controls = step.run.indexOf('node scripts/ci/node-test-gate.mjs browser-deps')
+    assert.equal(
+      runGatesTestFile(step.run, 'scripts/ci/share-card-browser-deps.test.mjs'),
+      true
+    )
+    assert.ok(
+      controls >= 0 &&
+        controls < step.run.indexOf('node scripts/ci/share-card-browser-deps.mjs')
+    )
+    assert.ok(step.run.includes("if [ '${{ matrix.api }}' = '32' ]; then"))
+    assert.ok(
+      step.run.includes('node scripts/ci/share-card-browser-deps.mjs --chromium-only')
+    )
+    assert.ok(
+      step.run
+        .split('\n')
+        .some((line) => line.trim() === 'node scripts/ci/share-card-browser-deps.mjs')
+    )
+    const mac = steps.find((item) =>
+      item.run?.includes('npx --no-install playwright install chromium')
+    )
+    assert.ok(mac)
+    assert.equal(mac.if, "matrix.platform == 'ios'")
+    assert.equal(mac['timeout-minutes'], 6)
+    assert.equal(mac['continue-on-error'], undefined)
+    const bridge = steps.findIndex((item) =>
       item.run?.includes('node scripts/e2e-share-card/bridge-a11y.mjs')
     )
-  )
+    assert.ok(steps.indexOf(step) < bridge && steps.indexOf(mac) < bridge)
+    assert.equal(
+      steps.some((item) => item.run?.includes('npx playwright install --with-deps')),
+      false
+    )
+    assert.ok(
+      steps.findIndex((item) => item === step) <
+        steps.findIndex(
+          (item) => item.name === 'Genuine browser share-card acceptance matrix'
+        )
+    )
+    assert.ok(
+      steps.some((item) =>
+        item.run?.includes('node scripts/e2e-share-card/bridge-a11y.mjs')
+      )
+    )
+  })
 })

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
-import test from 'node:test'
+import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
   assertActiveHoldoutEligible,
@@ -76,91 +76,96 @@ function startup(version, fixtureLedger = ledger, seal = approvedSeal) {
   })
 }
 
-for (const number of [1, 2, 3, 4, 5]) {
-  test(`readiness CLI refuses retired holdout-v${number} before external work`, () => {
-    const result = startup(`holdout-v${number}`)
-    assert.equal(result.status, 1, result.stderr)
-    assert.match(result.stderr, /retired|not eligible/i)
-    assert.doesNotMatch(result.stderr, /TEA_STARTUP_EXTERNAL_COMMAND_BOUNDARY/)
-  })
-}
-
-test('readiness CLI admits a sealed, explicitly eligible synthetic version', () => {
-  const result = startup(approvedVersion)
-  assert.equal(result.status, 93, result.stderr)
-  assert.match(result.stderr, /TEA_STARTUP_EXTERNAL_COMMAND_BOUNDARY/)
-})
-
-test('readiness CLI refuses an unclassified version despite a valid seal', () => {
-  const result = startup('holdout-v100', ledger, {
-    ...approvedSeal,
-    corpusVersion: 'holdout-v100',
-  })
-  assert.equal(result.status, 1, result.stderr)
-  assert.match(result.stderr, /not eligible/i)
-  assert.doesNotMatch(result.stderr, /TEA_STARTUP_EXTERNAL_COMMAND_BOUNDARY/)
-})
-
-for (const [name, change] of [
-  ['changed SHA', { corpusSha256: 'b'.repeat(64) }],
-  ['changed time', { sealedAt: '2026-10-27T00:00:00Z' }],
-  ['wrong version', { corpusVersion: 'holdout-v100' }],
-  ['missing seal', null],
-]) {
-  test(`readiness CLI refuses ${name} before external work`, () => {
-    const result = startup(
-      approvedVersion,
-      ledger,
-      change === null ? null : { ...approvedSeal, ...change }
-    )
-    assert.equal(result.status, 1, result.stderr)
-    assert.match(result.stderr, /seal/i)
-    assert.doesNotMatch(result.stderr, /TEA_STARTUP_EXTERNAL_COMMAND_BOUNDARY/)
-  })
-}
-
-for (const invalidLedger of [
-  null,
-  { schemaVersion: 1, retired: {} },
-  { ...ledger, eligible: [] },
-  { ...ledger, retired: [] },
-  { ...ledger, retired: { 'holdout-v1': '' } },
-  { ...ledger, eligible: { '../holdout-v99': approvedSeal } },
-  { ...ledger, eligible: { [approvedVersion]: { ...approvedSeal, corpusSha256: '' } } },
-  { ...ledger, retired: { [approvedVersion]: 'Retired after disclosure.' } },
-]) {
-  test(`rejects malformed or contradictory ledger ${JSON.stringify(invalidLedger)}`, () => {
-    assert.throws(
-      () => requireEligibleHoldout(approvedVersion, invalidLedger),
-      /ledger is invalid/
-    )
-  })
-}
-
-test('registered seal must be an own allowlist entry', () => {
-  const inherited = {
-    ...ledger,
-    eligible: Object.create({ [approvedVersion]: approvedSeal }),
-  }
-  assert.throws(
-    () => assertActiveHoldoutEligible(approvedVersion, approvedSeal, inherited),
-    /not eligible/
-  )
-})
-
-test('the checked-in ledger retires every historical version and approves none before sealing', () => {
-  const current = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        projectRoot,
-        'apps/api/test/fixtures/community-text-corpus/holdout-retirements.json'
-      ),
-      'utf8'
-    )
-  )
+describe('community text holdout eligibility', () => {
   for (const number of [1, 2, 3, 4, 5]) {
-    assert.throws(() => requireEligibleHoldout(`holdout-v${number}`, current), /retired/)
+    test(`readiness CLI refuses retired holdout-v${number} before external work`, () => {
+      const result = startup(`holdout-v${number}`)
+      assert.equal(result.status, 1, result.stderr)
+      assert.match(result.stderr, /retired|not eligible/i)
+      assert.doesNotMatch(result.stderr, /TEA_STARTUP_EXTERNAL_COMMAND_BOUNDARY/)
+    })
   }
-  assert.equal(current.schemaVersion, 2)
-  assert.throws(() => requireEligibleHoldout('holdout-v100', current), /not eligible/)
+
+  test('readiness CLI admits a sealed, explicitly eligible synthetic version', () => {
+    const result = startup(approvedVersion)
+    assert.equal(result.status, 93, result.stderr)
+    assert.match(result.stderr, /TEA_STARTUP_EXTERNAL_COMMAND_BOUNDARY/)
+  })
+
+  test('readiness CLI refuses an unclassified version despite a valid seal', () => {
+    const result = startup('holdout-v100', ledger, {
+      ...approvedSeal,
+      corpusVersion: 'holdout-v100',
+    })
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(result.stderr, /not eligible/i)
+    assert.doesNotMatch(result.stderr, /TEA_STARTUP_EXTERNAL_COMMAND_BOUNDARY/)
+  })
+
+  for (const [name, change] of [
+    ['changed SHA', { corpusSha256: 'b'.repeat(64) }],
+    ['changed time', { sealedAt: '2026-10-27T00:00:00Z' }],
+    ['wrong version', { corpusVersion: 'holdout-v100' }],
+    ['missing seal', null],
+  ]) {
+    test(`readiness CLI refuses ${name} before external work`, () => {
+      const result = startup(
+        approvedVersion,
+        ledger,
+        change === null ? null : { ...approvedSeal, ...change }
+      )
+      assert.equal(result.status, 1, result.stderr)
+      assert.match(result.stderr, /seal/i)
+      assert.doesNotMatch(result.stderr, /TEA_STARTUP_EXTERNAL_COMMAND_BOUNDARY/)
+    })
+  }
+
+  for (const invalidLedger of [
+    null,
+    { schemaVersion: 1, retired: {} },
+    { ...ledger, eligible: [] },
+    { ...ledger, retired: [] },
+    { ...ledger, retired: { 'holdout-v1': '' } },
+    { ...ledger, eligible: { '../holdout-v99': approvedSeal } },
+    { ...ledger, eligible: { [approvedVersion]: { ...approvedSeal, corpusSha256: '' } } },
+    { ...ledger, retired: { [approvedVersion]: 'Retired after disclosure.' } },
+  ]) {
+    test(`rejects malformed or contradictory ledger ${JSON.stringify(invalidLedger)}`, () => {
+      assert.throws(
+        () => requireEligibleHoldout(approvedVersion, invalidLedger),
+        /ledger is invalid/
+      )
+    })
+  }
+
+  test('registered seal must be an own allowlist entry', () => {
+    const inherited = {
+      ...ledger,
+      eligible: Object.create({ [approvedVersion]: approvedSeal }),
+    }
+    assert.throws(
+      () => assertActiveHoldoutEligible(approvedVersion, approvedSeal, inherited),
+      /not eligible/
+    )
+  })
+
+  test('the checked-in ledger retires every historical version and approves none before sealing', () => {
+    const current = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          projectRoot,
+          'apps/api/test/fixtures/community-text-corpus/holdout-retirements.json'
+        ),
+        'utf8'
+      )
+    )
+    for (const number of [1, 2, 3, 4, 5]) {
+      assert.throws(
+        () => requireEligibleHoldout(`holdout-v${number}`, current),
+        /retired/
+      )
+    }
+    assert.equal(current.schemaVersion, 2)
+    assert.throws(() => requireEligibleHoldout('holdout-v100', current), /not eligible/)
+  })
 })

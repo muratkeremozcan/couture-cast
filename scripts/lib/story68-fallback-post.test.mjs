@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { describe, test } from 'node:test'
 import { withUnavailableOwnedFallbackPost } from './story68-fallback-post.mjs'
 
 const owner = 'cc68-native-11111111-1111-4111-8111-111111111111'
@@ -86,153 +86,107 @@ function fixture({ loseCommit = false } = {}) {
   }
   return { row, writes, queries, client, ended: () => ended }
 }
-test('only the declared owned primary post can be hidden and its exact row is restored', async () => {
-  const f = fixture()
-  const before = { ...f.row }
-  const result = await withUnavailableOwnedFallbackPost({
-    runtime: runtime(),
-    fixtures: fixtures(),
-    createClient: () => f.client,
-    whileUnavailable: async () => {
-      assert.equal(f.row.status, 'withdrawn')
-      return 'actual-native-proof'
-    },
-  })
-  assert.deepEqual(f.row, {
-    ...before,
-    community_revision: String(BigInt(before.community_revision) + 2n),
-    reaction_generation: before.reaction_generation + 2,
-  })
-  assert.deepEqual(f.writes, ['withdrawn', 'published'])
-  assert.equal(result.contentRestored, true)
-  assert.equal(result.value, 'actual-native-proof')
-  assert.equal(f.ended(), true)
-})
-test('misrouted runtime or undeclared owner fails before constructing a database client', async () => {
-  for (const [corrupt, code] of [
-    [
-      (r) => {
-        r.environment.DATABASE_URL = 'postgresql://x@127.0.0.1/postgres'
-      },
-      /owned_uuid_loopback_database_required/,
-    ],
-    [
-      (r) => {
-        r.resources.createdIdentities = []
-      },
-      /owned_fallback_post_identity_required/,
-    ],
-  ]) {
-    const r = runtime()
-    corrupt(r)
-    let constructed = 0
-    await assert.rejects(
-      withUnavailableOwnedFallbackPost({
-        runtime: r,
-        fixtures: fixtures(),
-        createClient: () => {
-          constructed++
-          return fixture().client
-        },
-        whileUnavailable: async () => assert.fail('must guard before UI'),
-      }),
-      code
-    )
-    assert.equal(constructed, 0)
-  }
-})
-test('a non-public or wrong-owner row is rejected before any write', async () => {
-  for (const change of [
-    { status: 'flagged' },
-    { user_id: 'another-user' },
-    { published_at: null },
-  ]) {
+
+describe('withUnavailableOwnedFallbackPost', () => {
+  test('only the declared owned primary post can be hidden and its exact row is restored', async () => {
     const f = fixture()
-    Object.assign(f.row, change)
+    const before = { ...f.row }
+    const result = await withUnavailableOwnedFallbackPost({
+      runtime: runtime(),
+      fixtures: fixtures(),
+      createClient: () => f.client,
+      whileUnavailable: async () => {
+        assert.equal(f.row.status, 'withdrawn')
+        return 'actual-native-proof'
+      },
+    })
+    assert.deepEqual(f.row, {
+      ...before,
+      community_revision: String(BigInt(before.community_revision) + 2n),
+      reaction_generation: before.reaction_generation + 2,
+    })
+    assert.deepEqual(f.writes, ['withdrawn', 'published'])
+    assert.equal(result.contentRestored, true)
+    assert.equal(result.value, 'actual-native-proof')
+    assert.equal(f.ended(), true)
+  })
+
+  test('misrouted runtime or undeclared owner fails before constructing a database client', async () => {
+    for (const [corrupt, code] of [
+      [
+        (r) => {
+          r.environment.DATABASE_URL = 'postgresql://x@127.0.0.1/postgres'
+        },
+        /owned_uuid_loopback_database_required/,
+      ],
+      [
+        (r) => {
+          r.resources.createdIdentities = []
+        },
+        /owned_fallback_post_identity_required/,
+      ],
+    ]) {
+      const r = runtime()
+      corrupt(r)
+      let constructed = 0
+      await assert.rejects(
+        withUnavailableOwnedFallbackPost({
+          runtime: r,
+          fixtures: fixtures(),
+          createClient: () => {
+            constructed++
+            return fixture().client
+          },
+          whileUnavailable: async () => assert.fail('must guard before UI'),
+        }),
+        code
+      )
+      assert.equal(constructed, 0)
+    }
+  })
+
+  test('a non-public or wrong-owner row is rejected before any write', async () => {
+    for (const change of [
+      { status: 'flagged' },
+      { user_id: 'another-user' },
+      { published_at: null },
+    ]) {
+      const f = fixture()
+      Object.assign(f.row, change)
+      await assert.rejects(
+        withUnavailableOwnedFallbackPost({
+          runtime: runtime(),
+          fixtures: fixtures(),
+          createClient: () => f.client,
+          whileUnavailable: async () => assert.fail('must validate before UI'),
+        }),
+        /owned_fallback_post/
+      )
+      assert.deepEqual(f.writes, [])
+      assert.ok(f.queries.includes('ROLLBACK'))
+      assert.equal(f.ended(), true)
+    }
+  })
+
+  test('a native proof failure still restores the exact original row and preserves its error', async () => {
+    const f = fixture()
+    const original = new Error('native_cursor_assertion_failed')
     await assert.rejects(
       withUnavailableOwnedFallbackPost({
         runtime: runtime(),
         fixtures: fixtures(),
         createClient: () => f.client,
-        whileUnavailable: async () => assert.fail('must validate before UI'),
+        whileUnavailable: async () => {
+          throw original
+        },
       }),
-      /owned_fallback_post/
+      (error) => error === original
     )
-    assert.deepEqual(f.writes, [])
-    assert.ok(f.queries.includes('ROLLBACK'))
-    assert.equal(f.ended(), true)
-  }
-})
-test('a native proof failure still restores the exact original row and preserves its error', async () => {
-  const f = fixture()
-  const original = new Error('native_cursor_assertion_failed')
-  await assert.rejects(
-    withUnavailableOwnedFallbackPost({
-      runtime: runtime(),
-      fixtures: fixtures(),
-      createClient: () => f.client,
-      whileUnavailable: async () => {
-        throw original
-      },
-    }),
-    (error) => error === original
-  )
-  assert.equal(f.row.status, 'published')
-  assert.deepEqual(f.writes, ['withdrawn', 'published'])
-})
-test('a concurrent row change fails restoration before overwriting it', async () => {
-  const f = fixture()
-  await assert.rejects(
-    withUnavailableOwnedFallbackPost({
-      runtime: runtime(),
-      fixtures: fixtures(),
-      createClient: () => f.client,
-      whileUnavailable: async () => {
-        f.row.fingerprint = 'c'.repeat(32)
-      },
-    }),
-    /owned_fallback_restore_failed/
-  )
-  assert.deepEqual(f.writes, ['withdrawn'])
-  assert.equal(f.row.fingerprint, 'c'.repeat(32))
-  assert.equal(f.ended(), true)
-})
-test('a lost first commit acknowledgement still restores the status before returning failure', async () => {
-  const f = fixture({ loseCommit: true })
-  await assert.rejects(
-    withUnavailableOwnedFallbackPost({
-      runtime: runtime(),
-      fixtures: fixtures(),
-      createClient: () => f.client,
-      whileUnavailable: async () => assert.fail('uncertain commit must not start UI'),
-    }),
-    /commit_acknowledgement_lost/
-  )
-  assert.equal(f.row.status, 'published')
-  assert.deepEqual(f.writes, ['withdrawn', 'published'])
-})
-test('the effective database is checked before any transaction or write', async () => {
-  const f = fixture()
-  const query = f.client.query.bind(f.client)
-  f.client.query = async (sql, parameters) =>
-    sql.includes('current_database() AS name')
-      ? { rows: [{ name: 'postgres' }] }
-      : query(sql, parameters)
-  await assert.rejects(
-    withUnavailableOwnedFallbackPost({
-      runtime: runtime(),
-      fixtures: fixtures(),
-      createClient: () => f.client,
-      whileUnavailable: async () => assert.fail('misroute must not reach UI'),
-    }),
-    /effective_owned_database_mismatch/
-  )
-  assert.equal(f.queries.includes('BEGIN'), false)
-  assert.deepEqual(f.writes, [])
-})
+    assert.equal(f.row.status, 'published')
+    assert.deepEqual(f.writes, ['withdrawn', 'published'])
+  })
 
-test('concurrent generation changes prevent restoration without overwriting them', async () => {
-  for (const field of ['community_revision', 'reaction_generation']) {
+  test('a concurrent row change fails restoration before overwriting it', async () => {
     const f = fixture()
     await assert.rejects(
       withUnavailableOwnedFallbackPost({
@@ -240,34 +194,90 @@ test('concurrent generation changes prevent restoration without overwriting them
         fixtures: fixtures(),
         createClient: () => f.client,
         whileUnavailable: async () => {
-          f.row[field] = field === 'community_revision' ? '99' : 99
+          f.row.fingerprint = 'c'.repeat(32)
         },
       }),
       /owned_fallback_restore_failed/
     )
     assert.deepEqual(f.writes, ['withdrawn'])
-    assert.equal(f.row[field], field === 'community_revision' ? '99' : 99)
-  }
-})
-test('unexpected trigger deltas roll back before UI and leave the original content intact', async () => {
-  const f = fixture()
-  const before = { ...f.row }
-  const query = f.client.query.bind(f.client)
-  f.client.query = async (sql, parameters) => {
-    const result = await query(sql, parameters)
-    if (sql.startsWith('UPDATE'))
-      f.row.community_revision = String(BigInt(f.row.community_revision) + 1n)
-    return result
-  }
-  await assert.rejects(
-    withUnavailableOwnedFallbackPost({
-      runtime: runtime(),
-      fixtures: fixtures(),
-      createClient: () => f.client,
-      whileUnavailable: async () =>
-        assert.fail('unexpected database writes must not reach UI'),
-    }),
-    /owned_fallback_post_write_mismatch/
-  )
-  assert.deepEqual(f.row, before)
+    assert.equal(f.row.fingerprint, 'c'.repeat(32))
+    assert.equal(f.ended(), true)
+  })
+
+  test('a lost first commit acknowledgement still restores the status before returning failure', async () => {
+    const f = fixture({ loseCommit: true })
+    await assert.rejects(
+      withUnavailableOwnedFallbackPost({
+        runtime: runtime(),
+        fixtures: fixtures(),
+        createClient: () => f.client,
+        whileUnavailable: async () => assert.fail('uncertain commit must not start UI'),
+      }),
+      /commit_acknowledgement_lost/
+    )
+    assert.equal(f.row.status, 'published')
+    assert.deepEqual(f.writes, ['withdrawn', 'published'])
+  })
+
+  test('the effective database is checked before any transaction or write', async () => {
+    const f = fixture()
+    const query = f.client.query.bind(f.client)
+    f.client.query = async (sql, parameters) =>
+      sql.includes('current_database() AS name')
+        ? { rows: [{ name: 'postgres' }] }
+        : query(sql, parameters)
+    await assert.rejects(
+      withUnavailableOwnedFallbackPost({
+        runtime: runtime(),
+        fixtures: fixtures(),
+        createClient: () => f.client,
+        whileUnavailable: async () => assert.fail('misroute must not reach UI'),
+      }),
+      /effective_owned_database_mismatch/
+    )
+    assert.equal(f.queries.includes('BEGIN'), false)
+    assert.deepEqual(f.writes, [])
+  })
+
+  test('concurrent generation changes prevent restoration without overwriting them', async () => {
+    for (const field of ['community_revision', 'reaction_generation']) {
+      const f = fixture()
+      await assert.rejects(
+        withUnavailableOwnedFallbackPost({
+          runtime: runtime(),
+          fixtures: fixtures(),
+          createClient: () => f.client,
+          whileUnavailable: async () => {
+            f.row[field] = field === 'community_revision' ? '99' : 99
+          },
+        }),
+        /owned_fallback_restore_failed/
+      )
+      assert.deepEqual(f.writes, ['withdrawn'])
+      assert.equal(f.row[field], field === 'community_revision' ? '99' : 99)
+    }
+  })
+
+  test('unexpected trigger deltas roll back before UI and leave the original content intact', async () => {
+    const f = fixture()
+    const before = { ...f.row }
+    const query = f.client.query.bind(f.client)
+    f.client.query = async (sql, parameters) => {
+      const result = await query(sql, parameters)
+      if (sql.startsWith('UPDATE'))
+        f.row.community_revision = String(BigInt(f.row.community_revision) + 1n)
+      return result
+    }
+    await assert.rejects(
+      withUnavailableOwnedFallbackPost({
+        runtime: runtime(),
+        fixtures: fixtures(),
+        createClient: () => f.client,
+        whileUnavailable: async () =>
+          assert.fail('unexpected database writes must not reach UI'),
+      }),
+      /owned_fallback_post_write_mismatch/
+    )
+    assert.deepEqual(f.row, before)
+  })
 })
