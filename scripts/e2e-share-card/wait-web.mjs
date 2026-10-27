@@ -223,9 +223,14 @@ function resources(directory) {
   }
 }
 
-export async function readStartupLog(directory, { failed }) {
-  // Next can finish its response before flushing the corresponding error to stderr.
-  if (failed) await new Promise((resolve) => setTimeout(resolve, 250))
+// Next can finish its response before flushing the corresponding error to stderr, and
+// the separately piped log exposes no flush signal, so a failed capture waits this long.
+const STDERR_FLUSH_MS = 250
+const waitForStderrFlush = () =>
+  new Promise((resolve) => setTimeout(resolve, STDERR_FLUSH_MS))
+
+export async function readStartupLog(directory, { failed, flush = waitForStderrFlush }) {
+  if (failed) await flush()
   try {
     return fs.readFileSync(path.join(directory, 'web-startup-private.log'), 'utf8')
   } catch {
