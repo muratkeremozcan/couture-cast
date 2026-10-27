@@ -98,8 +98,24 @@ describe('run_start deadline', () => {
         runGatesTestFile(step.run, 'scripts/ci/supabase-start-deadline.test.mjs')
       )
       assert.ok(controls >= 0 && controls < startup)
-      assert.equal(job.steps[controls].if, undefined)
+      // The controls run on every platform whenever the run is not cancelled, and a
+      // failure blocks the start: an explicit start condition must name their success.
+      const condition = job.steps[controls].if
+      assert.ok(
+        condition === undefined ||
+          /^\$\{\{ !cancelled\(\)( && steps\.[\w-]+\.outcome == 'success')* \}\}$/.test(
+            condition
+          ),
+        condition
+      )
       assert.equal(job.steps[controls]['continue-on-error'], undefined)
+      if (job.steps[startup].if !== undefined)
+        assert.ok(
+          job.steps[startup].if.includes(
+            `steps.${job.steps[controls].id}.outcome == 'success'`
+          ),
+          job.steps[startup].if
+        )
     }
   })
 })

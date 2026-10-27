@@ -308,8 +308,9 @@ describe('artifact workflow wiring', () => {
       (row) => row.uses === './.github/actions/start-local-supabase'
     )
     assert.ok(download >= 0 && download < load && load < start)
-    assert.equal(steps[download].if, "runner.os == 'macOS'")
-    assert.equal(steps[load].if, "runner.os == 'macOS'")
+    // Both run only on the Mac; their conditions also name the steps they consume.
+    assert.match(steps[download].if, /\brunner\.os == 'macOS'/)
+    assert.match(steps[load].if, /\brunner\.os == 'macOS'/)
     assert.equal(steps[download].with.name, 'cc68-supabase-amd64')
     assert.ok(
       steps[start].with['image-registry'].includes(
