@@ -781,4 +781,43 @@ describe('share-card composer lifecycle', () => {
       )
     }
   )
+  it('U-OPTIONS: a superseded ON preview that resolves after the newer OFF preview is dropped', async () => {
+    const on = deferred<typeof card>()
+    const off = deferred<typeof card>()
+    const offCard = {
+      ...card,
+      sha256: 'f'.repeat(64),
+      accessibilityLabel: 'Share card without watermark',
+    }
+    boundary.prepare
+      .mockReturnValueOnce(on.promise)
+      .mockReturnValueOnce(off.promise)
+      .mockResolvedValueOnce(offCard)
+    render(<Harness />)
+    await waitFor(() => expect(boundary.prepare).toHaveBeenCalledOnce())
+    await userEvent.click(screen.getByTestId('share-card-watermark'))
+    await waitFor(() => expect(boundary.prepare).toHaveBeenCalledTimes(2))
+    await act(async () => {
+      off.resolve(offCard)
+      await off.promise
+    })
+    expect(await screen.findByAltText(offCard.accessibilityLabel)).toBeInTheDocument()
+    // The mock ignores the abort signal, so the superseded ON response really arrives.
+    await act(async () => {
+      on.resolve(card)
+      await on.promise
+    })
+    expect(screen.getByAltText(offCard.accessibilityLabel)).toBeInTheDocument()
+    expect(screen.queryByAltText(card.accessibilityLabel)).not.toBeInTheDocument()
+    await ready()
+    await userEvent.click(screen.getByTestId('share-card-save'))
+    expect(await screen.findByText(i18n.t('shareCard.saved'))).toBeInTheDocument()
+    expect(boundary.prepare.mock.calls[2]?.[0]).toMatchObject({
+      purpose: 'save',
+      watermark: false,
+      expectedSha256: offCard.sha256,
+    })
+    expect(boundary.save).toHaveBeenCalledOnce()
+    expect(boundary.save.mock.calls[0]?.[0]).toBe(offCard)
+  })
 })
