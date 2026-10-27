@@ -28,7 +28,10 @@ import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
-import { NATIVE_MAESTRO_FLOWS } from './lib/native-maestro-flows.mjs'
+import {
+  assertGenericMaestroFlows,
+  discoverRunnableMaestroFlows,
+} from './lib/native-maestro-flows.mjs'
 import {
   iosDriverPidfile,
   reclaimIosDriverPort,
@@ -139,21 +142,10 @@ for (let index = 0; index < cliArgs.length; index += 1) {
  * that bites) is responsible for restoring it before it ends; nothing here may
  * depend on running before or after a particular sibling.
  */
-const discoverFlows = () => {
-  const flowDir = path.join(projectRoot, 'maestro')
-  return fs
-    .readdirSync(flowDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
-    .filter((entry) => !NATIVE_MAESTRO_FLOWS.has(entry.name))
-    .map((entry) => `maestro/${entry.name}`)
-    .sort()
-}
+const discoverFlows = () => discoverRunnableMaestroFlows(projectRoot)
 
 const flowsToRun = FLOW_PATHS.length > 0 ? FLOW_PATHS : discoverFlows()
-if (flowsToRun.some((flow) => NATIVE_MAESTRO_FLOWS.has(path.basename(flow))))
-  throw new Error(
-    'Use scripts/run-story68-native.mjs for share-card-export.yaml. It requires a rebuilt client and actual OS resource inspection.'
-  )
+assertGenericMaestroFlows(flowsToRun)
 const WRITE_ARTIFACTS =
   process.argv.includes('--ci') ||
   process.argv.includes('--artifacts') ||
