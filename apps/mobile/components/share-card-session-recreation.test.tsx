@@ -2,6 +2,7 @@ import type * as ReactNativeModule from 'react-native'
 import React, { createElement, useEffect } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import type { ShareCardSource } from '@couture/api-client'
 import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
 import i18n, { initI18n } from '@/src/lib/i18n'
@@ -263,9 +264,9 @@ describe('real native session and share composer root replacement', () => {
     async (source) => {
       const retire = await startNativeSession()
       const old = render(<Host source={source} />)
-      fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Export' }))
       await ready()
-      fireEvent.click(screen.getByTestId('share-card-watermark'))
+      await userEvent.click(screen.getByTestId('share-card-watermark'))
       await ready()
       old.unmount()
       retire()
@@ -296,7 +297,7 @@ describe('real native session and share composer root replacement', () => {
   it('revalidation waits for the secure token and profile while old root teardown cannot invalidate the successor', async () => {
     const retire = await startNativeSession()
     const old = render(<Host source={sources[0]} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
     await ready()
     sdk.current = {
       access_token: 'verified-token-refreshed',
@@ -340,7 +341,7 @@ describe('real native session and share composer root replacement', () => {
   it('a different secure principal during the root gap cannot adopt the former source', async () => {
     const retire = await startNativeSession()
     const old = render(<Host source={sources[1]} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
     await ready()
     old.unmount()
     retire()
@@ -362,7 +363,7 @@ describe('real native session and share composer root replacement', () => {
   it('signout while restored verification waits clears the presentation and rejects late bytes', async () => {
     const retire = await startNativeSession()
     const old = render(<Host source={sources[1]} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
     await ready()
     old.unmount()
     retire()

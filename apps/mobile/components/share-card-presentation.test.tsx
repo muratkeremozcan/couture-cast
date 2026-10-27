@@ -2,6 +2,7 @@ import type * as ReactNativeModule from 'react-native'
 import React, { createElement, useEffect, useState } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import {
   ResponseError,
   type PrepareShareCardInput,
@@ -263,12 +264,12 @@ async function ready() {
 }
 async function open(source: ShareCardSource = sources[0]) {
   const view = render(<Host source={source} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Export' }))
   await ready()
   return view
 }
 async function watermarkOff() {
-  fireEvent.click(screen.getByTestId('share-card-watermark'))
+  await userEvent.click(screen.getByTestId('share-card-watermark'))
   await waitFor(() =>
     expect(screen.getByTestId('share-card-watermark')).toHaveAttribute(
       'aria-checked',
@@ -363,7 +364,7 @@ describe('Android Activity root replacement', () => {
   )
   it('gates a restored Community composer until navigation is ready on Community', async () => {
     const old = render(<NavigationHarness initialPath="/community" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
     await ready()
     await watermarkOff()
     old.unmount()
@@ -381,18 +382,18 @@ describe('Android Activity root replacement', () => {
 
   it('explicit Home before navigation readiness retires the retained composer without a restore', async () => {
     const old = render(<NavigationHarness initialPath="/community" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
     await ready()
     old.unmount()
     const fresh = render(<NavigationHarness ready={false} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Home intent' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Home intent' }))
     fresh.rerender(<NavigationHarness ready />)
     expect(boundary.routes).toEqual([])
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
   it('a real external intent during readiness wins while isolated fixture control links retain restoration', async () => {
     const old = render(<NavigationHarness initialPath="/community" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
     await ready()
     old.unmount()
     const fresh = render(<NavigationHarness ready={false} />)
@@ -413,13 +414,13 @@ describe('Android Activity root replacement', () => {
   })
   it('Cancel after restored Community uses its new mounted heading', async () => {
     const old = render(<NavigationHarness initialPath="/community" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
     await ready()
     old.unmount()
     render(<NavigationHarness />)
     await ready()
     boundary.focus.mockClear()
-    fireEvent.click(screen.getByTestId('share-card-cancel'))
+    await userEvent.click(screen.getByTestId('share-card-cancel'))
     await waitFor(() => expect(boundary.focus).toHaveBeenCalledWith(840))
     expect(screen.getByTestId('current-route')).toHaveTextContent('/community')
   })
@@ -475,7 +476,7 @@ describe('Android Activity root replacement', () => {
         }}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
     await ready()
     await watermarkOff()
     const oldClose = boundary.closeRequests.at(-1)!
@@ -511,7 +512,7 @@ describe('Android Activity root replacement', () => {
       render(<Host />)
       await ready()
       boundary.focus.mockClear()
-      fireEvent.click(screen.getByTestId('share-card-cancel'))
+      await userEvent.click(screen.getByTestId('share-card-cancel'))
       await waitFor(() => expect(boundary.focus).toHaveBeenCalledWith(340))
       expect(boundary.focus).not.toHaveBeenCalledWith(140)
       expect(boundary.focus).not.toHaveBeenCalledWith(240)
@@ -538,7 +539,7 @@ describe('Android Activity root replacement', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     changeIdentity('member-a')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
     await ready()
     expect(screen.getByTestId('share-card-watermark')).toHaveAttribute(
       'aria-checked',
@@ -548,11 +549,11 @@ describe('Android Activity root replacement', () => {
   it('Cancel remains closed across replacement and explicit reopen retains composition', async () => {
     const old = await open()
     await watermarkOff()
-    fireEvent.click(screen.getByTestId('share-card-cancel'))
+    await userEvent.click(screen.getByTestId('share-card-cancel'))
     old.unmount()
     render(<Host />)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
     await ready()
     expect(screen.getByTestId('share-card-watermark')).toHaveAttribute(
       'aria-checked',
@@ -593,7 +594,7 @@ describe('Android Activity root replacement', () => {
     boundary.prepare.mockImplementation((input: PrepareShareCardInput) =>
       input.purpose === 'save' ? held.promise : Promise.resolve(card)
     )
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     await waitFor(() =>
       expect(boundary.prepare.mock.calls.at(-1)?.[0].purpose).toBe('save')
     )
@@ -627,7 +628,7 @@ describe('Android Activity root replacement', () => {
     )
     const old = await open()
     await watermarkOff()
-    fireEvent.click(screen.getByTestId('share-card-save'))
+    await userEvent.click(screen.getByTestId('share-card-save'))
     await waitFor(() => expect(nativeShareCardSavePending()).toBe(true))
     try {
       old.unmount()
