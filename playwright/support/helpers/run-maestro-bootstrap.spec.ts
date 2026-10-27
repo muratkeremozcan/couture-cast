@@ -5,24 +5,6 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-const runnerFiles = [
-  'scripts/run-maestro.mjs',
-  'scripts/maestro-version.mjs',
-  'scripts/lib/test-disk-space.mjs',
-  'scripts/lib/native-maestro-flows.mjs',
-  'scripts/lib/expo-go-link-endpoint.mjs',
-  'scripts/lib/maestro-android-driver-session.mjs',
-  'scripts/lib/maestro-android-permissions.mjs',
-  'scripts/lib/maestro-android-shards.mjs',
-  'scripts/lib/maestro-driver-reuse.mjs',
-  'scripts/lib/maestro-flow-outcome.mjs',
-  'scripts/lib/maestro-launch-watchdog.mjs',
-  'scripts/lib/mobile-e2e-flow-state.mjs',
-  'scripts/lib/mobile-e2e-flow-retry.mjs',
-  'scripts/lib/mobile-e2e-token.mjs',
-  'scripts/lib/package-manager-readiness.mjs',
-  'scripts/lib/weather-provider-double-data.mjs',
-]
 const prepareArgs = ['run', 'prepare:shared-deps', '--workspace', 'packages/db']
 let directory: string
 
@@ -32,9 +14,25 @@ function write(relative: string, content: string, executable = false) {
   fs.writeFileSync(file, content, executable ? { mode: 0o755 } : undefined)
 }
 
+/** Copies a runner and every relative module it imports, so a new import cannot be missed. */
+function copyImportClosure(relative: string, seen = new Set<string>()) {
+  if (seen.has(relative)) return
+  seen.add(relative)
+  const source = fs.readFileSync(relative, 'utf8')
+  write(relative, source)
+  for (const match of source.matchAll(
+    /(?:from\s+|import\s*\(?\s*)['"](\.{1,2}\/[^'"]+)['"]/g
+  )) {
+    const dependency = path.normalize(path.join(path.dirname(relative), match[1]!))
+    if (path.isAbsolute(dependency) || dependency.startsWith('..'))
+      throw new Error('Bootstrap dependency must remain in the repository')
+    copyImportClosure(dependency, seen)
+  }
+}
+
 beforeEach(() => {
   directory = fs.mkdtempSync(path.join(os.tmpdir(), 'maestro-bootstrap-'))
-  for (const file of runnerFiles) write(file, fs.readFileSync(file, 'utf8'))
+  copyImportClosure('scripts/run-maestro.mjs')
   write('apps/mobile/package.json', JSON.stringify({ dependencies: { expo: '54.0.0' } }))
   write('maestro/probe.yaml', 'appId: test.bootstrap\n---\n- assertVisible: unused\n')
   write('node_modules/@prisma/client/package.json', JSON.stringify({ main: 'index.js' }))
@@ -68,9 +66,11 @@ for (const [file, content] of outputs) {
 `,
     true
   )
-  // The real runner cleans stale iOS drivers before platform validation. Keep
-  // that side effect inside the fixture, including on developer macOS hosts.
-  write('bin/pkill', '#!/usr/bin/env node\nprocess.exit(1)\n', true)
+  // On macOS the runner reclaims its own iOS driver port before platform
+  // validation. Report no listener and no process so a driver another session
+  // holds on the developer host cannot decide this fixture's outcome.
+  write('bin/lsof', '#!/usr/bin/env node\nprocess.exit(1)\n', true)
+  write('bin/ps', '#!/usr/bin/env node\nprocess.exit(0)\n', true)
   // Bootstrap stops at platform validation and allocates no device/build output.
   // Its synthetic workspace volume must not depend on the developer host's free space.
   write(
@@ -159,6 +159,15 @@ describe('Maestro shared dependency bootstrap', () => {
     }
   )
 
+  it('detects a missing iOS driver ownership import in the actual copied runner', async () => {
+    fs.unlinkSync(path.join(directory, 'scripts/lib/maestro-ios-driver-ownership.mjs'))
+    const result = await run()
+    expect(result.code).toBe(1)
+    expect(result.output).toContain('ERR_MODULE_NOT_FOUND')
+    expect(result.output).toContain('maestro-ios-driver-ownership.mjs')
+    expect(events()).toEqual([])
+  })
+
   it('fails closed when shared preparation fails before importing stale outputs', async () => {
     const result = await run(true)
     expect(result.code).toBe(1)
@@ -170,24 +179,9 @@ describe('Maestro shared dependency bootstrap', () => {
   })
 })
 
-function copyNativeImportClosure(relative: string, seen = new Set<string>()) {
-  if (seen.has(relative)) return
-  seen.add(relative)
-  const source = fs.readFileSync(relative, 'utf8')
-  write(relative, source)
-  for (const match of source.matchAll(
-    /(?:from\s+|import\s*)['"](\.{1,2}\/[^'"]+)['"]/g
-  )) {
-    const dependency = path.normalize(path.join(path.dirname(relative), match[1]!))
-    if (path.isAbsolute(dependency) || dependency.startsWith('..'))
-      throw new Error('Native bootstrap dependency must remain in the repository')
-    copyNativeImportClosure(dependency, seen)
-  }
-}
-
 describe('native runner static dependency bootstrap', () => {
   it('loads the actual native CLI import closure before its command boundary', async () => {
-    copyNativeImportClosure('scripts/run-story68-native.mjs')
+    copyImportClosure('scripts/run-story68-native.mjs')
     fs.mkdirSync(path.join(directory, 'maestro/story65'), { recursive: true })
     fs.mkdirSync(path.join(directory, 'maestro/story68'), { recursive: true })
     const result = await run(false, true)
@@ -204,7 +198,7 @@ describe('native runner static dependency bootstrap', () => {
   })
 
   it('detects a missing cold-font import in the actual copied native CLI', async () => {
-    copyNativeImportClosure('scripts/run-story68-native.mjs')
+    copyImportClosure('scripts/run-story68-native.mjs')
     fs.mkdirSync(path.join(directory, 'maestro/story65'), { recursive: true })
     fs.mkdirSync(path.join(directory, 'maestro/story68'), { recursive: true })
     fs.unlinkSync(path.join(directory, 'scripts/lib/story68-cold-font-scale.mjs'))
