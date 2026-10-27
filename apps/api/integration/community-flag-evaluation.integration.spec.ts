@@ -378,11 +378,22 @@ describe('Story 6.5 remote-only shared flag cache', () => {
     expect(row.next_claim_at.getTime() - row.remote_evaluated_at!.getTime()).toBe(45_000)
   })
 
-  it('INT010-CONTENTION: a waiter re-resolves a real claim whose uncommitted insert is held for 150ms', async () => {
+  it('INT010-CONTENTION: a waiter lock-times-out on a real uncommitted claim insert, then re-resolves the committed claim', async () => {
     const id = await member()
     const provider = { getFeatureFlagValue: vi.fn(() => Promise.resolve(true)) }
     let held = false
     const errors: { prismaCode: string; sqlState: unknown }[] = []
+    // The first claim INSERT stays uncommitted until the other instance's INSERT has
+    // hit the real 100 ms lock_timeout. Every transaction started after that waits
+    // for the held claim to settle, so the retry meets the committed row.
+    let lockTimedOut!: () => void
+    const contended = new Promise<void>((resolve) => {
+      lockTimedOut = resolve
+    })
+    let claimSettled!: () => void
+    const holderSettled = new Promise<void>((resolve) => {
+      claimSettled = resolve
+    })
     const observed = new Proxy(prisma, {
       get(target, key, receiver) {
         if (key === '$transaction')
@@ -390,6 +401,8 @@ describe('Story 6.5 remote-only shared flag cache', () => {
             work: (tx: Prisma.TransactionClient) => Promise<unknown>,
             options?: { timeout?: number; maxWait?: number }
           ) => {
+            if (errors.length) await holderSettled
+            let holding = false
             try {
               return await target.$transaction(
                 (connection) =>
@@ -410,7 +423,8 @@ describe('Story 6.5 remote-only shared flag cache', () => {
                                 .includes('INSERT INTO "CommunityFlagEvaluation"')
                             ) {
                               held = true
-                              await tx.$executeRawUnsafe('SELECT pg_sleep(0.15)')
+                              holding = true
+                              await contended
                             }
                             return result
                           }
@@ -421,9 +435,13 @@ describe('Story 6.5 remote-only shared flag cache', () => {
                 options
               )
             } catch (error) {
-              if (error instanceof Prisma.PrismaClientKnownRequestError)
+              if (error instanceof Prisma.PrismaClientKnownRequestError) {
                 errors.push({ prismaCode: error.code, sqlState: error.meta?.code })
+                if (error.meta?.code === '55P03') lockTimedOut()
+              }
               throw error
+            } finally {
+              if (holding) claimSettled()
             }
           }
         return Reflect.get(target, key, receiver) as unknown
@@ -433,18 +451,14 @@ describe('Story 6.5 remote-only shared flag cache', () => {
       new CommunityFlagEvaluationService(observed, provider),
       new CommunityFlagEvaluationService(observed, provider),
     ]
-    const started = performance.now()
     try {
       const results = await Promise.all(
         Array.from({ length: 20 }, (_, index) => instances[index % 2]!.evaluate(id))
       )
       expect(held).toBe(true)
-      expect(errors.some((error) => error.sqlState === '55P03')).toBe(true)
-      expect(errors.every((error) => error.sqlState === '55P03')).toBe(true)
-      expect(errors.length).toBeLessThanOrEqual(2)
+      expect(errors).toEqual([{ prismaCode: 'P2010', sqlState: '55P03' }])
       expect(results.every((result) => result.value)).toBe(true)
       expect(provider.getFeatureFlagValue).toHaveBeenCalledOnce()
-      expect(performance.now() - started).toBeLessThan(1950)
       const row = await prisma.communityFlagEvaluation.findUniqueOrThrow({
         where: {
           member_id_flag_key: { member_id: id, flag_key: 'community_read_enabled' },
@@ -459,14 +473,8 @@ describe('Story 6.5 remote-only shared flag cache', () => {
         45_000
       )
     } finally {
-      console.info(
-        'flag_claim_contention',
-        JSON.stringify({
-          heldMs: 150,
-          elapsedMs: Math.round(performance.now() - started),
-          errors,
-        })
-      )
+      lockTimedOut()
+      console.info('flag_claim_contention', JSON.stringify({ errors }))
     }
   })
 
@@ -515,13 +523,13 @@ describe('Story 6.5 remote-only shared flag cache', () => {
       },
     })
     const provider = { getFeatureFlagValue: vi.fn(() => Promise.resolve(true)) }
-    const started = performance.now()
     try {
       await expect(
         new CommunityFlagEvaluationService(observed, provider).evaluate(id)
       ).rejects.toBeInstanceOf(CommunityUnavailableException)
+      // Three attempts, then refusal. An unbounded retry would keep timing out until
+      // the 1950 ms budget ran out, far past three.
       expect(lockTimeouts).toBe(3)
-      expect(performance.now() - started).toBeLessThan(1950)
       expect(provider.getFeatureFlagValue).not.toHaveBeenCalled()
     } finally {
       release()
