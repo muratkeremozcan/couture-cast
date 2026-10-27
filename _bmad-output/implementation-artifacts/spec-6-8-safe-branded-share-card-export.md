@@ -1281,3 +1281,7 @@ Subsequent build logs and staging reports are copied into their individual evide
   dropped instead of discarding the summary.
 - The garment swap focus test waited 1 s for focus that returns on a 400 ms timer; under coverage
   on a loaded host that headroom ran out. Its budget now covers the timer.
+- The KVM check moved into the emulator journey script: the CI run at 300dfe07 showed the emulator
+  binary does not exist before android-emulator-runner installs it, so the workflow-step check
+  failed API32 before boot. The journey now runs `emulator -accel-check` before install and stops
+  unless KVM is reported usable.

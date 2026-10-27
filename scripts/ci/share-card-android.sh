@@ -8,6 +8,9 @@ if [[ ! "$sdk" =~ ^[1-9][0-9]*$ ]] || [[ ! "${CC68_ANDROID_API:-}" =~ ^[1-9][0-9
   echo 'Owned emulator SDK must equal the explicit native CI matrix API' >&2
   exit 2
 fi
+# Device permissions alone do not prove the emulator can use KVM.
+"$ANDROID_HOME/emulator/emulator" -accel-check 2>&1 | tee /tmp/cc68-accel-check.txt
+grep -q 'KVM .* is installed and usable' /tmp/cc68-accel-check.txt
 adb -s "$ANDROID_SERIAL" install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 node scripts/run-story68-native.mjs open --platform android --device "$ANDROID_SERIAL"
 node scripts/run-story68-native.mjs signin --platform android --device "$ANDROID_SERIAL"

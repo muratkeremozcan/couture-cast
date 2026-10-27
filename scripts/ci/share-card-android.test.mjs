@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 import { parse } from 'yaml'
 
-async function journey(t, sdk, expected = '36', status = 0) {
+async function journey(
+  t,
+  sdk,
+  expected = '36',
+  status = 0,
+  accel = 'KVM (version 12) is installed and usable.'
+) {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'cc68-sdk-guard-'))
   t.after(() => rm(directory, { recursive: true, force: true }))
   const capture = path.join(directory, 'commands')
@@ -17,6 +23,12 @@ async function journey(t, sdk, expected = '36', status = 0) {
       { mode: 0o700 }
     )
   }
+  await mkdir(path.join(directory, 'emulator'))
+  await writeFile(
+    path.join(directory, 'emulator', 'emulator'),
+    '#!/bin/bash\nprintf \'emulator %s\\n\' "$*" >> "$CAPTURE"\nprintf \'accel:\\n0\\n%s\\naccel\\n\' "$ACCEL"\n',
+    { mode: 0o700 }
+  )
   const result = spawnSync('/bin/bash', ['scripts/ci/share-card-android.sh'], {
     encoding: 'utf8',
     env: {
@@ -26,6 +38,8 @@ async function journey(t, sdk, expected = '36', status = 0) {
       SDK: sdk,
       SDK_STATUS: String(status),
       CC68_ANDROID_API: expected,
+      ANDROID_HOME: directory,
+      ACCEL: accel,
     },
   })
   return { result, commands: await readFile(capture, 'utf8').catch(() => '') }
@@ -69,18 +83,24 @@ test('mandatory Android CI passes its matrix API to the fail-closed journey', as
   )
   assert.equal(android.env.CC68_ANDROID_API, '${{ matrix.api }}')
 })
-test('Android CI stops before the emulator unless the emulator itself reports usable KVM', async () => {
-  const workflow = parse(
-    await readFile('.github/workflows/pr-share-card-native.yml', 'utf8')
+test('an emulator without usable KVM stops the journey before install', async (t) => {
+  const { result, commands } = await journey(
+    t,
+    '32',
+    '32',
+    0,
+    'KVM requires a CPU that supports vmx or svm'
   )
-  const steps = workflow.jobs['original-resource'].steps
-  const accel = steps.findIndex((step) =>
-    step.run?.includes('emulator/emulator" -accel-check')
-  )
-  const emulator = steps.findIndex(
-    (step) => step.uses === 'reactivecircus/android-emulator-runner@v2'
-  )
-  assert.ok(accel >= 0 && accel < emulator)
-  assert.equal(steps[accel].if, "matrix.platform == 'android'")
-  assert.match(steps[accel].run, /grep -q 'KVM .* is installed and usable'/)
+  assert.notEqual(result.status, 0)
+  assert.match(commands, /emulator -accel-check/)
+  assert.doesNotMatch(commands, /install |node |bash /)
+})
+test('Android CI stops before install unless the running emulator reports usable KVM', async () => {
+  // The emulator binary exists only once android-emulator-runner has installed it.
+  const workflow = await readFile('.github/workflows/pr-share-card-native.yml', 'utf8')
+  assert.equal(workflow.includes('-accel-check'), false)
+  const script = await readFile('scripts/ci/share-card-android.sh', 'utf8')
+  const check = script.indexOf('"$ANDROID_HOME/emulator/emulator" -accel-check')
+  assert.ok(check > 0 && check < script.indexOf('adb -s "$ANDROID_SERIAL" install'))
+  assert.match(script, /grep -q 'KVM .* is installed and usable'/)
 })
