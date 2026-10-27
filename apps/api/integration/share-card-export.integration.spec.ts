@@ -46,6 +46,7 @@ const renderer = new ShareCardRenderer()
 const service = new ShareCardsService(prisma, sources, renderer, storage)
 const objects = new Map<string, Buffer>()
 const delivery = new Map<string, 'slow' | 'oversized'>()
+const cutShort = new Set<string>()
 let reads = 0
 let app: INestApplication
 let url: string
@@ -134,7 +135,10 @@ beforeAll(async () => {
       res.writeHead(200)
       res.write(bytes.subarray(0, 1))
       const timeout = setTimeout(() => res.end(bytes.subarray(1)), 7000)
-      res.once('close', () => clearTimeout(timeout))
+      res.once('close', () => {
+        clearTimeout(timeout)
+        if (!res.writableFinished) cutShort.add(req.url ?? '')
+      })
       return
     }
     res.writeHead(200, { 'Content-Length': bytes.length })
@@ -621,16 +625,15 @@ describe('share-card actual API and isolated database', () => {
     'I-BOUNDS: actual %s HTTP media stream is bounded outside authorization transaction',
     async (mode) => {
       const row = await photoPost()
-      delivery.set(
-        `/storage/v1/object/authenticated/community-images/${row.image_object_path}`,
-        mode
-      )
-      const started = Date.now()
+      const object = `/storage/v1/object/authenticated/community-images/${row.image_object_path}`
+      delivery.set(object, mode)
       const failed = await post(
         preview({ kind: 'community_post', postId: row.id })
       ).expect(503)
-      expect(Date.now() - started).toBeLessThan(6500)
       expect(failed.body).not.toHaveProperty('data')
+      // The slow object completes at 7 s. The download bound closed it before then.
+      if (mode === 'slow')
+        await vi.waitFor(() => expect(cutShort.has(object)).toBe(true), { timeout: 1000 })
     },
     10000
   )
