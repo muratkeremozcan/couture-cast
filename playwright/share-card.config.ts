@@ -7,6 +7,8 @@ export default defineConfig({
   testMatch: 'share-card-export.spec.ts',
   workers: 1,
   fullyParallel: false,
+  // A committed test.only would otherwise skip every other acceptance case on CI.
+  forbidOnly: !!process.env.CI,
   timeout: 60000,
   expect: { timeout: 20000 },
   use: {
