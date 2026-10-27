@@ -1,6 +1,7 @@
 import React from 'react'
 import { renderToString } from 'react-dom/server'
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AccessibleModal } from './accessible-modal'
 
@@ -269,11 +270,11 @@ describe('AccessibleModal', () => {
     expect(onClose).toHaveBeenCalledTimes(2)
   })
 
-  it('closes the active dialog when browser focus temporarily falls to the body', () => {
+  it('closes the active dialog when browser focus temporarily falls to the body', async () => {
     const { onClose } = renderModal()
     ;(document.activeElement as HTMLElement).blur()
     expect(document.activeElement).toBe(document.body)
-    fireEvent.keyDown(document.body, { key: 'Escape' })
+    await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()
   })
 
@@ -535,9 +536,10 @@ describe('AccessibleModal', () => {
         render(<Harness />)
         element.focus()
         expect(element).toHaveFocus()
+        // fireEvent: Safari does not focus a clicked button, so focus stays where it was.
         fireEvent.click(screen.getByRole('button', { name: 'Share card' }))
-        fireEvent.click(screen.getByRole('button', { name: 'Remove opener' }))
-        fireEvent.click(screen.getByLabelText('Close modal'))
+        await userEvent.click(screen.getByRole('button', { name: 'Remove opener' }))
+        await userEvent.click(screen.getByLabelText('Close modal'))
         await act(async () => {
           await Promise.resolve()
         })
@@ -581,9 +583,10 @@ describe('AccessibleModal', () => {
     render(<Harness />)
     const article = screen.getByRole('article')
     article.focus()
+    // fireEvent: Safari does not focus a clicked button, so the article keeps focus.
     fireEvent.click(screen.getByRole('button', { name: 'Share card' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove child opener' }))
-    fireEvent.click(screen.getByLabelText('Close modal'))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove child opener' }))
+    await userEvent.click(screen.getByLabelText('Close modal'))
     await act(async () => {
       await Promise.resolve()
     })
@@ -621,8 +624,8 @@ describe('AccessibleModal', () => {
       render(<Harness />)
       const previous = screen.getByRole('button', { name: 'Previous anchor' })
       previous.focus()
-      fireEvent.click(previous)
-      fireEvent.click(screen.getByLabelText('Close modal'))
+      await userEvent.click(previous)
+      await userEvent.click(screen.getByLabelText('Close modal'))
       await act(async () => {
         await Promise.resolve()
       })
@@ -670,9 +673,10 @@ describe('AccessibleModal', () => {
     render(<Harness />)
     const previous = screen.getByRole('button', { name: 'Parent anchor' })
     previous.focus()
+    // fireEvent: Safari does not focus a clicked button, so Parent anchor keeps focus.
     fireEvent.click(screen.getByRole('button', { name: 'Open child' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove child invoker' }))
-    fireEvent.click(screen.getByLabelText('Close child'))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove child invoker' }))
+    await userEvent.click(screen.getByLabelText('Close child'))
     await act(async () => {
       await Promise.resolve()
     })
@@ -713,8 +717,8 @@ describe('AccessibleModal', () => {
       )
     }
     render(<Harness />)
-    fireEvent.click(screen.getByRole('button', { name: 'Owned card' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove owned card' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Owned card' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove owned card' }))
     await act(async () => {
       await Promise.resolve()
     })
