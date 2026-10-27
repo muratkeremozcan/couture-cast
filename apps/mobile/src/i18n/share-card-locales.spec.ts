@@ -32,60 +32,70 @@ import other9 from '../../../web/src/i18n/locales/tr-TR.json'
 const catalogs = [
   {
     locale: 'de-DE',
+    sharesEnUsTitle: false,
     client: client0.shareCard,
     render: render0,
     other: other0.shareCard,
   },
   {
     locale: 'en-CA',
+    sharesEnUsTitle: true,
     client: client1.shareCard,
     render: render1,
     other: other1.shareCard,
   },
   {
     locale: 'en-US',
+    sharesEnUsTitle: true,
     client: client2.shareCard,
     render: render2,
     other: other2.shareCard,
   },
   {
     locale: 'es-419',
+    sharesEnUsTitle: false,
     client: client3.shareCard,
     render: render3,
     other: other3.shareCard,
   },
   {
     locale: 'fr-CA',
+    sharesEnUsTitle: false,
     client: client4.shareCard,
     render: render4,
     other: other4.shareCard,
   },
   {
     locale: 'fr-FR',
+    sharesEnUsTitle: false,
     client: client5.shareCard,
     render: render5,
     other: other5.shareCard,
   },
   {
     locale: 'it-IT',
+    sharesEnUsTitle: false,
     client: client6.shareCard,
     render: render6,
     other: other6.shareCard,
   },
   {
     locale: 'pt-BR',
+    sharesEnUsTitle: false,
     client: client7.shareCard,
     render: render7,
     other: other7.shareCard,
   },
   {
     locale: 'pt-PT',
+    sharesEnUsTitle: false,
     client: client8.shareCard,
     render: render8,
     other: other8.shareCard,
   },
   {
     locale: 'tr-TR',
+    sharesEnUsTitle: false,
     client: client9.shareCard,
     render: render9,
     other: other9.shareCard,
@@ -103,7 +113,7 @@ function flatten(value: unknown, prefix = ''): Record<string, string> {
 describe('share-card catalog parity', () => {
   it.each(catalogs)(
     'U-LOCALES: $locale has matching keys, placeholders, render words and surface wording',
-    ({ locale, client, render, other }) => {
+    ({ client, render, other, sharesEnUsTitle }) => {
       const values = flatten(client)
       const baseline = flatten(catalogs.find((item) => item.locale === 'en-US')!.client)
       expect(Object.keys(values).sort()).toEqual(Object.keys(baseline).sort())
@@ -119,10 +129,9 @@ describe('share-card catalog parity', () => {
           baseline[key]!.match(/{{[^}]+}}/g) ?? []
         )
       }
-      if (!locale.startsWith('en'))
-        expect(client.title).not.toBe(
-          catalogs.find((item) => item.locale === 'en-US')!.client.title
-        )
+      expect(
+        client.title === catalogs.find((item) => item.locale === 'en-US')!.client.title
+      ).toBe(sharesEnUsTitle)
     }
   )
 })
