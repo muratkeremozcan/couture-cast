@@ -9,6 +9,7 @@ import {
   simulatorJobs,
   simulatorManager,
   extractionService,
+  ownedService,
 } from './native-ios-command-evidence.mjs'
 import { simulatorCollectors } from './native-ios-collectors.mjs'
 import { crashReportCollector } from './native-ios-crashes.mjs'
@@ -278,12 +279,44 @@ export function assertNativeQuiesceEvidence(value) {
     throw new Error('invalid_native_quiesce_evidence')
 }
 
-export function probeSimulatorTuning(device, execute) {
+/** Run 8: apsd produced about 82 percent of sampled log entries while diagnosticd stayed busy. */
+export const EMITTER_ESCALATION_SECONDS = 90
+export const EMITTER = Object.freeze({ process: 'apsd', label: 'com.apple.apsd' })
+
+export const shouldEscalateEmitter = (tuning, elapsedMs, cpu) =>
+  Boolean(
+    tuning.levelApplied &&
+      !tuning.bootedOut &&
+      !tuning.escalated &&
+      elapsedMs >= EMITTER_ESCALATION_SECONDS * 1000 &&
+      cpu.diagnosticd > QUIESCE_POLICY.thresholdPercent
+  )
+
+/** Stop the owned apsd job; each form is recorded, nonfatal, and the first success ends the chain. */
+export function bootoutOwnedEmitter(device, manager, emitter, execute) {
+  const simctl = (operation, args) =>
+    execute(operation, 'xcrun', ['simctl', 'spawn', device, 'launchctl', ...args], {
+      fatal: false,
+    })
+  for (const [operation, args] of [
+    ['bootout-apsd-system', ['bootout', `system/${emitter.label}`]],
+    ['bootout-apsd-pid', ['bootout', `pid/${manager}/${emitter.label}`]],
+    ['remove-apsd', ['remove', emitter.label]],
+  ])
+    if (simctl(operation, args).exitCode === 0) {
+      simctl('list-services-after-apsd-stop', ['list'])
+      return true
+    }
+  return false
+}
+
+/**
+ * `tuning` receives the owned emitter and whether a scoped log level change was accepted;
+ * the system-wide level change is rejected by the simulator (exit 64).
+ */
+export function probeSimulatorTuning(device, execute, tuning = {}) {
   const simctl = (operation, args, options) =>
     execute(operation, 'xcrun', ['simctl', ...args], options)
-  simctl('log-level-off', ['spawn', device, 'log', 'config', '--mode', 'level:off'], {
-    fatal: false,
-  })
   const reported = simctl('manager-pid', ['spawn', device, 'launchctl', 'managerpid'], {
     fatal: false,
   })
@@ -297,6 +330,28 @@ export function probeSimulatorTuning(device, execute) {
     jobs,
     reported.exitCode === 0 ? Number(reported.stdout.trim()) : null
   )
+  const emitter = ownedService(ps.stdout, jobs, manager, EMITTER.process)
+  if (emitter?.label === EMITTER.label) {
+    tuning.emitter = emitter
+    // Process scope accepts level and persist; the PID is the verified owned job.
+    tuning.levelApplied =
+      simctl(
+        'apsd-log-level',
+        [
+          'spawn',
+          device,
+          'log',
+          'config',
+          '--process',
+          String(emitter.pid),
+          '--mode',
+          'level:off,persist:off',
+        ],
+        { fatal: false }
+      ).exitCode === 0
+    if (!tuning.levelApplied)
+      tuning.bootedOut = bootoutOwnedEmitter(device, manager, emitter, execute)
+  } else console.log(JSON.stringify({ emitterTuning: 'no_matching_owned_label' }))
   const service = extractionService(ps.stdout, jobs, manager)
   if (service) {
     // The PID domain is the verified simulator bootstrap namespace, with the exact listed label.
@@ -326,7 +381,7 @@ export async function quiesceOwnedSimulator(device, command) {
   const failures = { version: 1, failures: [] }
   const began = performance.now()
   let manager = null
-  let logTuning = null
+  const tuning = {}
   const failure = (error) => {
     if (error.message === 'owned_simulator_manager_missing') manager = null
     const diagnostic = error.diagnostic ?? diagnosticError(error)
@@ -345,18 +400,14 @@ export async function quiesceOwnedSimulator(device, command) {
   }
   const result = await waitForSimulatorCpu({
     sample: (remaining) => {
+      const bounded = (operation, binary, args) => {
+        const remainingMs = QUIESCE_POLICY.maxSeconds * 1000 - (performance.now() - began)
+        return execute(operation, binary, args, {
+          fatal: false,
+          timeout: Math.max(1, Math.floor(Math.min(10000, remainingMs))),
+        })
+      }
       if (manager === null) {
-        const bounded = (operation, binary, args) => {
-          if (operation === 'log-level-off' && logTuning) return logTuning
-          const remainingMs =
-            QUIESCE_POLICY.maxSeconds * 1000 - (performance.now() - began)
-          const r = execute(operation, binary, args, {
-            fatal: false,
-            timeout: Math.max(1, Math.floor(Math.min(10000, remainingMs))),
-          })
-          if (operation === 'log-level-off') logTuning = r
-          return r
-        }
         const devices = Object.values(
           JSON.parse(
             bounded('list-devices', 'xcrun', ['simctl', 'list', 'devices', '--json'])
@@ -370,10 +421,10 @@ export async function quiesceOwnedSimulator(device, command) {
           selected.state !== 'Booted'
         )
           throw new Error('owned_booted_simulator_required')
-        manager = probeSimulatorTuning(device, bounded)
+        manager = probeSimulatorTuning(device, bounded, tuning)
         collectors.managerPid = manager
       }
-      return sampleSimulatorCpu(
+      const values = sampleSimulatorCpu(
         manager,
         Math.max(
           1,
@@ -399,6 +450,14 @@ export async function quiesceOwnedSimulator(device, command) {
           },
         }
       )
+      // The scoped level change was accepted but diagnosticd is still busy: stop apsd itself.
+      if (shouldEscalateEmitter(tuning, performance.now() - began, values)) {
+        tuning.escalated = true
+        tuning.bootedOut = safely(() =>
+          bootoutOwnedEmitter(device, manager, tuning.emitter, bounded)
+        )
+      }
+      return values
     },
     onSampleFailure: failure,
     record: (value) => {

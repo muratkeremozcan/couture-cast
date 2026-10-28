@@ -86,10 +86,10 @@ export function simulatorManager(text, jobs, reported) {
   throw new Error('owned_simulator_manager_required')
 }
 
-export function extractionService(text, jobs, manager) {
+export function ownedService(text, jobs, manager, name) {
   const owned = text.split('\n').flatMap((line) => {
     const m = line.trim().match(/^(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(.+)$/)
-    return m && Number(m[2]) === manager && path.basename(m[4]) === 'STExtractionService'
+    return m && Number(m[2]) === manager && path.basename(m[4]) === name
       ? [Number(m[1])]
       : []
   })
@@ -97,3 +97,6 @@ export function extractionService(text, jobs, manager) {
     (job) => owned.includes(job.pid) && /^[A-Za-z0-9._:-]+$/.test(job.label)
   )
 }
+
+export const extractionService = (text, jobs, manager) =>
+  ownedService(text, jobs, manager, 'STExtractionService')

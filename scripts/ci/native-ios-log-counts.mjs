@@ -80,6 +80,8 @@ export async function collectSimulatorLogCounts(
     ],
     timeoutMs = 30000,
     maxBytes = 64 * 1024 * 1024,
+    killGraceMs = 2000,
+    signalProcess = process.kill,
     gateOutcome = null,
   } = {}
 ) {
@@ -87,32 +89,77 @@ export async function collectSimulatorLogCounts(
   const startedAt = new Date().toISOString()
   const counter = logCounter(),
     decoder = new StringDecoder('utf8')
+  const events = [],
+    killAttempts = []
+  const mark = (event) =>
+    events.push({ event, atMs: Math.round(performance.now() - began) })
   let pending = '',
     stderr = '',
     bytes = 0,
+    countedBytes = 0,
+    stopped = false,
     timedOut = false,
     outputCapped = false,
-    launchError = null
+    launchError = null,
+    settledBy = null
   const child = spawn(binary, args, { detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
+  // The group kill can be refused (EPERM was observed on hosted macOS), so the direct
+  // child is always signalled too; both outcomes are recorded and neither is fatal.
   const kill = () => {
     if (!child.pid) return
-    try {
-      process.kill(-child.pid, 'SIGKILL')
-    } catch (error) {
-      if (error.code !== 'ESRCH') launchError ??= error
+    for (const [target, signalTarget] of [
+      ['group', -child.pid],
+      ['child', child.pid],
+    ]) {
+      try {
+        signalProcess(signalTarget, 'SIGKILL')
+        killAttempts.push({ target, atMs: Math.round(performance.now() - began) })
+      } catch (error) {
+        killAttempts.push({
+          target,
+          atMs: Math.round(performance.now() - began),
+          errorCode: error.code ?? null,
+        })
+      }
     }
   }
+  // Nothing after the first bound violation is counted; late data is only measured.
+  const stop = (event) => {
+    if (stopped) return
+    stopped = true
+    mark(event)
+    kill()
+    pending = ''
+  }
+  let finish
+  const settled = new Promise((resolve) => {
+    finish = (by, exitCode, signal) => {
+      if (settledBy) return
+      settledBy = by
+      mark('settled:' + by)
+      resolve({ exitCode, signal })
+    }
+  })
+  let graceTimer = null
   const timer = setTimeout(() => {
     timedOut = true
-    kill()
+    stop('deadline')
+    // A killed grandchild can keep the pipes open, so settling never waits on 'close'.
+    graceTimer = setTimeout(() => {
+      child.stdout.destroy()
+      child.stderr.destroy()
+      finish('grace_deadline', null, null)
+    }, killGraceMs)
   }, timeoutMs)
   child.stdout.on('data', (chunk) => {
     bytes += chunk.length
+    if (stopped) return
     if (bytes > maxBytes) {
       outputCapped = true
-      kill()
+      stop('output_cap')
       return
     }
+    countedBytes += chunk.length
     pending += decoder.write(chunk)
     let newline
     while ((newline = pending.indexOf('\n')) !== -1) {
@@ -121,21 +168,31 @@ export async function collectSimulatorLogCounts(
     }
     if (pending.length > 1024 * 1024) {
       outputCapped = true
-      kill()
-      pending = ''
+      stop('line_cap')
     }
   })
+  child.stdout.on('close', () => mark('stdout_closed'))
   child.stderr.on('data', (chunk) => {
     stderr = (stderr + chunk.toString()).slice(0, 65536)
   })
-  const result = await new Promise((resolve) => {
-    child.once('error', (error) => {
-      launchError = error
-    })
-    child.once('close', (exitCode, signal) => resolve({ exitCode, signal }))
+  child.once('error', (error) => {
+    launchError = error
+    mark('error')
   })
+  child.once('exit', (exitCode, signal) => {
+    mark('exit')
+    // After a bound violation the child's exit settles the query; pipes are cut at once.
+    if (stopped) {
+      child.stdout.destroy()
+      child.stderr.destroy()
+      finish('exit_after_stop', exitCode, signal)
+    }
+  })
+  child.once('close', (exitCode, signal) => finish('close', exitCode, signal))
+  const result = await settled
   clearTimeout(timer)
-  if (!outputCapped) counter.line(pending + decoder.end())
+  clearTimeout(graceTimer)
+  if (!stopped) counter.line(pending + decoder.end())
   const record = {
     version: 1,
     device,
@@ -149,6 +206,11 @@ export async function collectSimulatorLogCounts(
     timedOut,
     outputCapped,
     bytes,
+    countedBytes,
+    settledBy,
+    boundHeld: Math.round(performance.now() - began) <= timeoutMs + killGraceMs + 500,
+    killAttempts,
+    events,
     errorCode: launchError?.code ?? null,
     errorMessage: launchError?.message ?? null,
     stderr,
@@ -178,6 +240,8 @@ export async function collectSimulatorLogCounts(
         exitCode: record.exitCode,
         timedOut,
         outputCapped,
+        settledBy,
+        boundHeld: record.boundHeld,
       },
     })
   )

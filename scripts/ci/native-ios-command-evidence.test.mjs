@@ -9,7 +9,13 @@ import {
   simulatorManager,
   extractionService,
 } from './native-ios-command-evidence.mjs'
-import { probeSimulatorTuning } from './native-ios-quiesce.mjs'
+import {
+  probeSimulatorTuning,
+  bootoutOwnedEmitter,
+  shouldEscalateEmitter,
+  EMITTER_ESCALATION_SECONDS,
+  EMITTER,
+} from './native-ios-quiesce.mjs'
 
 const ps =
   '100 1 0 /s/launchd_sim\n101 100 0 /s/SpringBoard\n102 100 70 /s/STExtractionService\n200 1 90 /host/STExtractionService'
@@ -67,9 +73,11 @@ test('log-level and bootout failures remain nonfatal and the returned manager ca
     return { exitCode: 1, stdout: '', stderr: 'unsupported form' }
   }
   assert.equal(probeSimulatorTuning('owned-uuid', execute), 100)
-  const log = calls.find((c) => c.operation === 'log-level-off')
+  assert.equal(
+    calls.some((c) => c.operation === 'log-level-off'),
+    false
+  )
   const bootout = calls.find((c) => c.operation === 'bootout-extraction-service')
-  assert.equal(log.options.fatal, false)
   assert.equal(bootout.options.fatal, false)
   assert.deepEqual(bootout.args, [
     'simctl',
@@ -79,4 +87,102 @@ test('log-level and bootout failures remain nonfatal and the returned manager ca
     'bootout',
     'pid/100/com.apple.STExtractionService',
   ])
+})
+
+const apsdPs = ps + '\n103 100 80 /s/apsd\n300 1 80 /host/apsd'
+const apsdJobs = jobsText + '\n103 0 com.apple.apsd\n300 0 com.apple.apsd'
+const probe = (answer) => {
+  const calls = []
+  const execute = (operation, binary, args, options) => {
+    calls.push({ operation, binary, args, options })
+    if (operation === 'list-services') return { exitCode: 0, stdout: apsdJobs }
+    if (operation === 'simulator-processes') return { exitCode: 0, stdout: apsdPs }
+    if (operation === 'manager-pid') return { exitCode: 0, stdout: '100' }
+    return { exitCode: answer(operation), stdout: '', stderr: 'recorded' }
+  }
+  const tuning = {}
+  probeSimulatorTuning('owned-uuid', execute, tuning)
+  return { calls, tuning }
+}
+
+test('an accepted process-scoped apsd log level change leaves the job running', () => {
+  const { calls, tuning } = probe(() => 0)
+  const level = calls.find((c) => c.operation === 'apsd-log-level')
+  assert.deepEqual(level.args, [
+    'simctl',
+    'spawn',
+    'owned-uuid',
+    'log',
+    'config',
+    '--process',
+    '103',
+    '--mode',
+    'level:off,persist:off',
+  ])
+  assert.equal(level.options.fatal, false)
+  assert.equal(tuning.levelApplied, true)
+  assert.equal(tuning.bootedOut, undefined)
+  assert.deepEqual(tuning.emitter, { pid: 103, label: EMITTER.label })
+  assert.equal(
+    calls.some((c) => /apsd/.test(c.operation) && /bootout|remove/.test(c.operation)),
+    false
+  )
+})
+
+test('a rejected level change boots out the exact owned apsd label and stops at the first success', () => {
+  const { calls, tuning } = probe((op) => (op === 'bootout-apsd-pid' ? 0 : 1))
+  const names = calls.map((c) => c.operation).filter((o) => /apsd/.test(o))
+  assert.deepEqual(names, [
+    'apsd-log-level',
+    'bootout-apsd-system',
+    'bootout-apsd-pid',
+    'list-services-after-apsd-stop',
+  ])
+  assert.equal(tuning.levelApplied, false)
+  assert.equal(tuning.bootedOut, true)
+  const pid = calls.find((c) => c.operation === 'bootout-apsd-pid')
+  assert.equal(pid.args.at(-1), 'pid/100/com.apple.apsd')
+  assert.equal(pid.options.fatal, false)
+})
+
+test('every bootout form is attempted and recorded before giving up', () => {
+  const calls = []
+  const ok = bootoutOwnedEmitter(
+    'owned-uuid',
+    100,
+    { pid: 103, label: EMITTER.label },
+    (operation) => {
+      calls.push(operation)
+      return { exitCode: 1 }
+    }
+  )
+  assert.equal(ok, false)
+  assert.deepEqual(calls, ['bootout-apsd-system', 'bootout-apsd-pid', 'remove-apsd'])
+})
+
+test('a host apsd outside the owned simulator is never targeted', () => {
+  const { calls, tuning } = probe(() => 0)
+  assert.equal(tuning.emitter.pid, 103)
+  assert.equal(
+    calls.some((c) => c.args.includes('300')),
+    false
+  )
+})
+
+test('apsd is stopped only after the accepted level change fails to quiet diagnosticd', () => {
+  const late = EMITTER_ESCALATION_SECONDS * 1000
+  const busy = { diagnosticd: 40 }
+  const applied = { levelApplied: true }
+  assert.equal(shouldEscalateEmitter(applied, late, busy), true)
+  assert.equal(shouldEscalateEmitter(applied, late - 1, busy), false)
+  assert.equal(shouldEscalateEmitter(applied, late, { diagnosticd: 5 }), false)
+  assert.equal(shouldEscalateEmitter({}, late, busy), false)
+  assert.equal(
+    shouldEscalateEmitter({ levelApplied: true, bootedOut: true }, late, busy),
+    false
+  )
+  assert.equal(
+    shouldEscalateEmitter({ levelApplied: true, escalated: true }, late, busy),
+    false
+  )
 })

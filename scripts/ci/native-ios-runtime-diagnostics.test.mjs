@@ -85,6 +85,100 @@ test('a stuck or oversized log query is bounded and returns partial evidence wit
   assert.equal(capped.entries, 0)
 })
 
+test('a grandchild that keeps the pipes open cannot hold the query past its deadline', async (t) => {
+  const directory = directoryFor(t)
+  const pidFile = path.join(directory, 'grandchild.pid')
+  t.after(() => {
+    try {
+      process.kill(Number(fs.readFileSync(pidFile, 'utf8')), 'SIGKILL')
+    } catch {
+      // already gone
+    }
+  })
+  const r = await collectSimulatorLogCounts(device, directory, {
+    binary: process.execPath,
+    args: [
+      '-e',
+      `const {spawn}=require('node:child_process');
+       const g=spawn(process.execPath,['-e','setInterval(()=>process.stdout.write("x".repeat(1000)+"\\n"),20)'],{detached:true,stdio:['ignore','inherit','inherit']});
+       require('node:fs').writeFileSync(${JSON.stringify(pidFile)},String(g.pid));
+       setInterval(()=>{},1000)`,
+    ],
+    timeoutMs: 400,
+    killGraceMs: 300,
+  })
+  assert.equal(r.timedOut, true)
+  assert.equal(r.settledBy, 'exit_after_stop')
+  assert.equal(r.boundHeld, true)
+  assert.ok(r.durationMs < 1500, String(r.durationMs))
+  const kinds = r.killAttempts.map((k) => k.target)
+  assert.deepEqual(kinds, ['group', 'child'])
+  for (const name of ['deadline', 'exit', 'settled:exit_after_stop'])
+    assert.ok(
+      r.events.some((e) => e.event === name),
+      name
+    )
+  // Data produced after the deadline is measured but never counted.
+  assert.ok(r.bytes >= r.countedBytes)
+  assert.equal(r.entries, 0)
+})
+
+test('refused kills (EPERM) still end the query at the grace bound with every attempt recorded', async (t) => {
+  const directory = directoryFor(t)
+  let pid = null
+  t.after(() => {
+    try {
+      process.kill(pid, 'SIGKILL')
+    } catch {
+      // already gone
+    }
+  })
+  const r = await collectSimulatorLogCounts(device, directory, {
+    binary: process.execPath,
+    args: ['-e', 'setInterval(()=>process.stdout.write("x".repeat(1000)+"\\n"),20)'],
+    timeoutMs: 300,
+    killGraceMs: 300,
+    signalProcess: (target) => {
+      pid = Math.abs(target)
+      throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' })
+    },
+  })
+  assert.equal(r.settledBy, 'grace_deadline')
+  assert.equal(r.boundHeld, true)
+  assert.ok(r.durationMs < 1500, String(r.durationMs))
+  assert.deepEqual(
+    r.killAttempts.map((k) => [k.target, k.errorCode]),
+    [
+      ['group', 'EPERM'],
+      ['child', 'EPERM'],
+    ]
+  )
+  assert.equal(r.entries, 0)
+  assert.ok(r.events.some((e) => e.event === 'settled:grace_deadline'))
+})
+
+test('output past the byte cap stops counting at the cap and settles on exit', async (t) => {
+  const directory = directoryFor(t)
+  const line = JSON.stringify({ processImagePath: '/sim/Emitter', subsystem: 's' }) + '\n'
+  const r = await collectSimulatorLogCounts(device, directory, {
+    binary: process.execPath,
+    args: [
+      '-e',
+      `const l=${JSON.stringify(line)};setInterval(()=>process.stdout.write(l.repeat(50)),10)`,
+    ],
+    timeoutMs: 5000,
+    maxBytes: line.length * 100,
+  })
+  assert.equal(r.outputCapped, true)
+  assert.equal(r.timedOut, false)
+  assert.ok(r.countedBytes <= line.length * 100)
+  assert.ok(r.entries <= 100)
+  assert.ok(r.durationMs < 3000, String(r.durationMs))
+  assert.ok(r.events.some((e) => e.event === 'output_cap'))
+  assert.ok(r.events.some((e) => e.event === 'exit'))
+  assert.ok(r.killAttempts.length >= 2)
+})
+
 test('a failed log-query launch publishes its exact error without throwing', async (t) => {
   const directory = directoryFor(t)
   const r = await collectSimulatorLogCounts(device, directory, {
