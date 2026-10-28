@@ -92,6 +92,16 @@ describe('AccessibleModal stack', () => {
     expect(document.body.style.overflow).toBe('hidden')
   })
 
+  it('dims the page once: only the top dialog keeps its scrim, and a covered one regains it on top', () => {
+    const { controls } = mountSurface()
+    expect(dialog('Share')).toHaveClass('bg-black/60')
+    expect(dialog('Detail')).toHaveClass('bg-transparent')
+    expect(dialog('Detail')).not.toHaveClass('bg-black/60')
+    act(() => controls.current!.set({ share: false }))
+    expect(dialog('Detail')).toHaveClass('bg-black/60')
+    expect(dialog('Detail')).not.toHaveClass('bg-transparent')
+  })
+
   it('closes only the top dialog on Escape after resuming together', () => {
     const { controls } = mountSurface()
     act(() => controls.current!.set({ detailSuspended: true, share: false }))

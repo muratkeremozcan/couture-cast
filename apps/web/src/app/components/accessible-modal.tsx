@@ -171,7 +171,9 @@ export function AccessibleModal({
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
       onKeyDown={handleKeyDown}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4"
+      // Only the top dialog dims the page; a covered one keeps its place without
+      // stacking a second scrim over the first.
+      className={`fixed inset-0 z-[60] flex items-center justify-center p-4 ${covered ? 'bg-transparent' : 'bg-black/60'}`}
     >
       <div
         ref={dialogRef}
