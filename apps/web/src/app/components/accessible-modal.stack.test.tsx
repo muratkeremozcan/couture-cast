@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react'
-import { act, fireEvent, render } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import { AccessibleModal } from './accessible-modal'
 import { acquireScrollLock } from './modal-stack'
 
@@ -233,5 +234,59 @@ describe('AccessibleModal stack', () => {
     } finally {
       document.body.style.overflow = ''
     }
+  })
+
+  it('returns focus to the share opener inside the detail, then to the detail invoker', async () => {
+    function Openers() {
+      const [detail, setDetail] = useState(false)
+      const [share, setShare] = useState(false)
+      const detailInvoker = useRef<HTMLButtonElement>(null)
+      const shareOpener = useRef<HTMLButtonElement>(null)
+      return (
+        <>
+          <button ref={detailInvoker} type="button" onClick={() => setDetail(true)}>
+            Open detail
+          </button>
+          <AccessibleModal
+            isOpen={detail}
+            onClose={() => setDetail(false)}
+            invokingElementRef={detailInvoker}
+            titleId="detail-title"
+            title="Detail"
+          >
+            <button ref={shareOpener} type="button" onClick={() => setShare(true)}>
+              Share this
+            </button>
+          </AccessibleModal>
+          <AccessibleModal
+            isOpen={share}
+            onClose={() => setShare(false)}
+            invokingElementRef={shareOpener}
+            titleId="share-title"
+            title="Share"
+          >
+            <button type="button">Share action</button>
+          </AccessibleModal>
+        </>
+      )
+    }
+    render(<Openers />)
+    await userEvent.click(screen.getByRole('button', { name: 'Open detail' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Share this' }))
+    expect(dialog('Share')).toBeTruthy()
+
+    await userEvent.keyboard('{Escape}')
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(dialog('Share')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Share this' })).toHaveFocus()
+
+    await userEvent.keyboard('{Escape}')
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(dialog('Detail')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Open detail' })).toHaveFocus()
   })
 })

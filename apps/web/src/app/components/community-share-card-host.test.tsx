@@ -330,6 +330,10 @@ describe('community share host above an open detail dialog', () => {
     await screen.findByRole('dialog', { name: 'Your share card' })
     await cancel()
     expect(reachable(detailDialog())).toBe(true)
+    // Focus returns to the share control inside the detail that opened the dialog.
+    expect(
+      within(detailDialog() as HTMLElement).getByTestId('share-card-open')
+    ).toHaveFocus()
     await userEvent.click(
       within(detailDialog() as HTMLElement).getAllByRole('button', {
         name: 'Close this look',
@@ -337,6 +341,36 @@ describe('community share host above an open detail dialog', () => {
     )
     expect(detailDialog()).toBeNull()
     expect(pageIsInteractive()).toBe(true)
+    // ... and after the detail closes, to the card control that opened the detail.
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(
+      document.querySelector('[data-share-card-focus-fallback="community"]')
+    ).toHaveFocus()
+  })
+
+  it('returns focus to the share control, then to the card control that opened the detail', async () => {
+    useTransport(true)
+    renderGrid()
+    await open('detail')
+    await cancel()
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(
+      within(detailDialog() as HTMLElement).getByTestId('share-card-open')
+    ).toHaveFocus()
+    await userEvent.click(
+      within(detailDialog() as HTMLElement).getAllByRole('button', {
+        name: 'Close this look',
+      })[0]!
+    )
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(detailDialog()).toBeNull()
+    expect(screen.getByTestId('lookbook-open-spot-self')).toHaveFocus()
   })
 
   it('releases the page when access is denied during re-verification', async () => {
