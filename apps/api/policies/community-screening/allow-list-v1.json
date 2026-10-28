@@ -3,7 +3,7 @@
   "version": "v1",
   "updated": "2026-10-26",
   "summary": "Ordinary words that the vendored LDNOOBW lists, the graded overlay or the bad-words backstop would otherwise flag. Allow lists apply across all seven languages, because every language's list runs against every submission. Lookup runs on the literal case-folded token, before diacritic, confusable and leet folding, so an accented, stretched or disguised spelling of a flagged word still screens. Literal context rules clear only their exact target token within bounded grammatical object context; neighboring tokens and unsafe multi-word phrases continue screening.",
-  "rules": "Every entry names the language it is ordinary in and why it is here. An entry that clears an upstream term outright says what it costs. Remove an entry rather than leave one whose reason no longer holds.",
+  "rules": "Every entry names the language it is ordinary in and why it is here. An entry that clears an upstream term outright says what it costs. Remove an entry rather than leave one whose reason no longer holds. ordinarySplitWords lists words that are ordinary in the named language and may stand alone as one half of a two-word cut of a high-severity term; a cut is withheld unless both halves are on this list.",
   "entries": [
     {
       "entry": "boob",
@@ -1227,6 +1227,400 @@
       "entry": "pede",
       "language": "pt",
       "reason": "Portuguese verb for asks, as in o tempo pede casaco. The exact token folds onto the French slur pédé, as do its split and spaced spellings. It clears only as the single exact token and only when the declared locale is Portuguese; 'pe de', 'p e d e', stretched spellings and every other locale keep screening. Residual: a client can declare pt, so the exact token passes there because it is the ordinary verb."
+    }
+  ],
+  "ordinarySplitWords": [
+    {
+      "entry": "are",
+      "language": "en"
+    },
+    {
+      "entry": "ate",
+      "language": "en"
+    },
+    {
+      "entry": "back",
+      "language": "en"
+    },
+    {
+      "entry": "bang",
+      "language": "en"
+    },
+    {
+      "entry": "blow",
+      "language": "en"
+    },
+    {
+      "entry": "boll",
+      "language": "en"
+    },
+    {
+      "entry": "chin",
+      "language": "en"
+    },
+    {
+      "entry": "chine",
+      "language": "en"
+    },
+    {
+      "entry": "cum",
+      "language": "en"
+    },
+    {
+      "entry": "cums",
+      "language": "en"
+    },
+    {
+      "entry": "date",
+      "language": "en"
+    },
+    {
+      "entry": "deep",
+      "language": "en"
+    },
+    {
+      "entry": "dan",
+      "language": "en"
+    },
+    {
+      "entry": "fag",
+      "language": "en"
+    },
+    {
+      "entry": "gang",
+      "language": "en"
+    },
+    {
+      "entry": "got",
+      "language": "en"
+    },
+    {
+      "entry": "hand",
+      "language": "en"
+    },
+    {
+      "entry": "head",
+      "language": "en"
+    },
+    {
+      "entry": "her",
+      "language": "en"
+    },
+    {
+      "entry": "hot",
+      "language": "en"
+    },
+    {
+      "entry": "icon",
+      "language": "en"
+    },
+    {
+      "entry": "job",
+      "language": "en"
+    },
+    {
+      "entry": "lee",
+      "language": "en"
+    },
+    {
+      "entry": "mar",
+      "language": "en"
+    },
+    {
+      "entry": "mat",
+      "language": "en"
+    },
+    {
+      "entry": "normal",
+      "language": "en"
+    },
+    {
+      "entry": "one",
+      "language": "en"
+    },
+    {
+      "entry": "pan",
+      "language": "en"
+    },
+    {
+      "entry": "pin",
+      "language": "en"
+    },
+    {
+      "entry": "pom",
+      "language": "en"
+    },
+    {
+      "entry": "pomp",
+      "language": "en"
+    },
+    {
+      "entry": "pro",
+      "language": "en"
+    },
+    {
+      "entry": "put",
+      "language": "en"
+    },
+    {
+      "entry": "putt",
+      "language": "en"
+    },
+    {
+      "entry": "rare",
+      "language": "en"
+    },
+    {
+      "entry": "rim",
+      "language": "en"
+    },
+    {
+      "entry": "shot",
+      "language": "en"
+    },
+    {
+      "entry": "shots",
+      "language": "en"
+    },
+    {
+      "entry": "sub",
+      "language": "en"
+    },
+    {
+      "entry": "tan",
+      "language": "en"
+    },
+    {
+      "entry": "tape",
+      "language": "en"
+    },
+    {
+      "entry": "throat",
+      "language": "en"
+    },
+    {
+      "entry": "tone",
+      "language": "en"
+    },
+    {
+      "entry": "toque",
+      "language": "en"
+    },
+    {
+      "entry": "towel",
+      "language": "en"
+    },
+    {
+      "entry": "wet",
+      "language": "en"
+    },
+    {
+      "entry": "you",
+      "language": "en"
+    },
+    {
+      "entry": "zig",
+      "language": "en"
+    },
+    {
+      "entry": "zing",
+      "language": "en"
+    },
+    {
+      "entry": "aca",
+      "language": "es"
+    },
+    {
+      "entry": "ana",
+      "language": "es"
+    },
+    {
+      "entry": "aro",
+      "language": "es"
+    },
+    {
+      "entry": "bol",
+      "language": "es"
+    },
+    {
+      "entry": "con",
+      "language": "es"
+    },
+    {
+      "entry": "dado",
+      "language": "es"
+    },
+    {
+      "entry": "den",
+      "language": "es"
+    },
+    {
+      "entry": "era",
+      "language": "es"
+    },
+    {
+      "entry": "las",
+      "language": "es"
+    },
+    {
+      "entry": "mal",
+      "language": "es"
+    },
+    {
+      "entry": "mon",
+      "language": "es"
+    },
+    {
+      "entry": "oro",
+      "language": "es"
+    },
+    {
+      "entry": "pino",
+      "language": "es"
+    },
+    {
+      "entry": "rata",
+      "language": "es"
+    },
+    {
+      "entry": "sal",
+      "language": "es"
+    },
+    {
+      "entry": "sur",
+      "language": "es"
+    },
+    {
+      "entry": "ver",
+      "language": "es"
+    },
+    {
+      "entry": "reta",
+      "language": "es"
+    },
+    {
+      "entry": "que",
+      "language": "es"
+    },
+    {
+      "entry": "tel",
+      "language": "es"
+    },
+    {
+      "entry": "ali",
+      "language": "pt"
+    },
+    {
+      "entry": "ata",
+      "language": "pt"
+    },
+    {
+      "entry": "bunda",
+      "language": "pt"
+    },
+    {
+      "entry": "cola",
+      "language": "pt"
+    },
+    {
+      "entry": "ler",
+      "language": "pt"
+    },
+    {
+      "entry": "rende",
+      "language": "pt"
+    },
+    {
+      "entry": "ola",
+      "language": "pt"
+    },
+    {
+      "entry": "cher",
+      "language": "fr"
+    },
+    {
+      "entry": "est",
+      "language": "fr"
+    },
+    {
+      "entry": "leur",
+      "language": "fr"
+    },
+    {
+      "entry": "leurs",
+      "language": "fr"
+    },
+    {
+      "entry": "ter",
+      "language": "fr"
+    },
+    {
+      "entry": "verre",
+      "language": "fr"
+    },
+    {
+      "entry": "pane",
+      "language": "it"
+    },
+    {
+      "entry": "panel",
+      "language": "it"
+    },
+    {
+      "entry": "sta",
+      "language": "it"
+    },
+    {
+      "entry": "sui",
+      "language": "it"
+    },
+    {
+      "entry": "tana",
+      "language": "it"
+    },
+    {
+      "entry": "tra",
+      "language": "it"
+    },
+    {
+      "entry": "ende",
+      "language": "de"
+    },
+    {
+      "entry": "gebe",
+      "language": "de"
+    },
+    {
+      "entry": "kalt",
+      "language": "de"
+    },
+    {
+      "entry": "lampe",
+      "language": "de"
+    },
+    {
+      "entry": "nun",
+      "language": "de"
+    },
+    {
+      "entry": "unter",
+      "language": "de"
+    },
+    {
+      "entry": "unterm",
+      "language": "de"
+    },
+    {
+      "entry": "kan",
+      "language": "tr"
+    },
+    {
+      "entry": "kal",
+      "language": "tr"
+    },
+    {
+      "entry": "icona",
+      "language": "it"
     }
   ]
 }

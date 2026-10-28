@@ -12,8 +12,8 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "a52005f601becaba53148dee918df523405c5f69c0269462ed3a9390b5caa96c",
-    "reviewedOccurrenceSha256": "9b75c00c13c3e2eab6280b56a25da33194aae672b27009649e70f43ef44988c9"
+    "allowListSha256": "12f08633cc3a748305811514c5c32043348bad1fbf19cfb8aad3388b28330497",
+    "reviewedOccurrenceSha256": "83fe75e92d170b239df98aca9c39a349d8d96306a995fad9e4e30d105d3649cd"
   },
   "entries": [
     "chatte brodée",
@@ -26,6 +26,7 @@
     "tete",
     "tête"
   ],
+  "ordinaryWords": ["cher", "est", "leur", "leurs", "ter", "verre"],
   "scopedWords": [],
   "scopedPhrases": [],
   "literalContexts": [],

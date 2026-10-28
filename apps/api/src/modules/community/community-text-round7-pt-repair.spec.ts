@@ -426,6 +426,115 @@ describe('round 7b pinto and bumbum never launder sexual use', () => {
   })
 })
 
+describe('round 7b leering tails never ride on a fit or painting frame', () => {
+  const leering = [
+    'calça que valoriza o bumbum dela nu',
+    'legging que levanta o bumbum de criança',
+    'calça que valoriza o bumbum da minha filha',
+    'jeans que empina o bumbum pra mim',
+    'jeans que levanta o bumbum chupa',
+    'calça que valoriza o bumbum gostoso',
+    'calça valoriza o bumbum e a calcinha',
+    'a calça valoriza o bumbum da menina',
+    'dela calça que valoriza o bumbum',
+    'a gostosa com jeans que valoriza o bumbum',
+    'biquíni e calça que valoriza o bumbum',
+    'Pinto a mão chupa',
+    'Pinto a mão dela',
+    'Pinto as unhas dela',
+    'pinto a parede gostosa',
+    'Pinto a mão e chupa',
+  ]
+  it.each(leering)('keeps %s withheld in pt-BR and pt-PT', (text) => {
+    for (const locale of ['pt-BR', 'pt-PT', 'fr-FR', 'en-US', null])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('still clears the bounded fit and painting copy, with closed tails', () => {
+    for (const text of [
+      'Jeans de cintura alta que valoriza o bumbum.',
+      'Legging que modela o bumbum sem marcar.',
+      'Calça que valoriza o bumbum com conforto e as coxas também.',
+      'Short com bolsos no bumbum',
+      'Pinto as botas de azul para renovar o conjunto.',
+      'Pinto o tecido com tinta azul.',
+      'Eu pinto à mão cada peça da coleção.',
+      'Pinto a mão.',
+    ])
+      for (const locale of ['pt-BR', 'pt-PT'])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+})
+
+describe('round 7b fashion and sewing copy never trips the whole-word cut rule', () => {
+  const sewing = [
+    // English
+    'You pin the pattern to the fabric before you cut.',
+    'First you pin the hem then you sew it.',
+    'Tack the seam in place, then baste the lining by hand.',
+    'Wipe the wet back of the jacket with a soft cloth.',
+    'A towel head wrap keeps hair dry after a swim.',
+    'Sub-normal temperatures in winter call for a lined coat.',
+    'Pin tuck blouse with a cum laude print on the cuff.',
+    'Hand embroidered mar icon patch on the sleeve.',
+    // Portuguese
+    'Prenda o molde com alfinetes e alinhave a bainha antes de costurar.',
+    'Primeiro você prende a barra e depois costura.',
+    // Spanish
+    'Sujeta el patrón con alfileres y hilvana el forro antes de coser.',
+    'Primero marcas el dobladillo y luego lo coses a mano.',
+    // French
+    'Epinglez le patron sur le tissu puis faufilez la doublure.',
+    "Piquez l'ourlet avant de coudre la manche.",
+    // Italian
+    'Fissa il modello con gli spilli e imbastisci la fodera prima di cucire.',
+    'Prima appunta l’orlo e poi cuci la manica.',
+    // German
+    'Stecke das Schnittmuster mit Nadeln fest und hefte das Futter an.',
+    'Erst den Saum feststecken, dann die Naht nähen.',
+    // Turkish
+    'Kalıbı iğnelerle kumaşa tutturun ve astarı elle teyelleyin.',
+    'Önce etek ucunu iğneleyin, sonra dikin.',
+  ]
+  it.each(sewing)('passes in every locale: %s', (text) => {
+    for (const locale of everyLocale)
+      expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+
+  it('keeps two ordinary words from different languages clean and cuts with a non-word half withheld', () => {
+    for (const text of [
+      'you pin',
+      'wet back',
+      'towel head',
+      'sub normal',
+      'mar icon',
+      'mar icona',
+      'cum shot',
+      'fag got',
+      'boll era',
+      'put tana',
+      'putt ana',
+      'pom pino',
+      'zing aro',
+      'chine toque',
+    ])
+      expect(screen(text, null).disposition, text).toBe('pass')
+    for (const text of [
+      'tap ete',
+      'nazi sta',
+      'estu pro',
+      'nig ger',
+      'pomp ino',
+      'ter rone',
+      'fro cio',
+      'sal ope',
+      'kan ake',
+    ])
+      for (const locale of everyLocale)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+})
+
 describe('round 7b a high-severity term cut in two whole words', () => {
   it('withholds tap ete and other two-way cuts with both parts of three letters or more', () => {
     for (const text of [

@@ -58,7 +58,9 @@ function sameBankScope(rule, reviewed) {
     same('rejectedPrefixFrames', []) &&
     same('phraseRequiredDeclaredLanguages', {}) &&
     same('precedingWords', []) &&
-    same('sentenceInitial', false)
+    same('sentenceInitial', false) &&
+    same('closedTails', []) &&
+    same('sentenceForbidden', [])
   )
 }
 
@@ -503,6 +505,9 @@ function buildAllowFile(language, allowState, hashes) {
       .filter((entry) => entry.language === language)
       .map((entry) => toLiteral(entry.entry))
       .toSorted(),
+    ordinaryWords: (allowState.allow.ordinarySplitWords ?? [])
+      .filter((entry) => entry.language === language)
+      .map((entry) => toLiteral(entry.entry)),
     scopedWords: (allowState.allow.scopedWords ?? [])
       .filter((entry) => entry.language === language)
       .map((entry) => toLiteral(entry.entry)),
