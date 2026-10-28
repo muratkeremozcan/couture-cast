@@ -1,6 +1,7 @@
 // Story 6.5 owner: commit-serialized append counters and snapshot-bounded replay.
 import { communityBuildIdentity } from './community-operational-telemetry.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
+import { postgresError } from '../../prisma/postgres-error.js'
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient, type LookbookPost } from '@prisma/client'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
@@ -31,15 +32,36 @@ function subjectIdentity(subjects: Subject[]): string {
 }
 
 export class AppendBudgetExceeded extends Error {}
+// SQLSTATE 25P04 is PostgreSQL 17's transaction_timeout, raised as a FATAL with this text.
+const TRANSACTION_TIMEOUT = 'terminating connection due to transaction timeout'
+/** A lock miss or one of the append's own SQL timeouts, in either Prisma error form. */
+function sqlDeferral(error: unknown) {
+  const sql = postgresError(error)
+  if (sql?.code === '55P03') return 'head_contention'
+  if (sql?.code === '57014') return 'budget_pressure'
+  if (sql?.code === '25P04' && sql.message === TRANSACTION_TIMEOUT)
+    return 'budget_pressure'
+  return null
+}
 export function appendFailure(error: unknown) {
   if (error instanceof AppendBudgetExceeded) return 'budget_pressure'
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    const sql = String(error.meta?.code)
-    if (sql === '55P03') return 'head_contention'
-    if (['57014', '25P04'].includes(sql) || error.code === 'P2028')
-      return 'budget_pressure'
-  }
-  return 'dependency_unavailable'
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2028')
+    return 'budget_pressure'
+  return sqlDeferral(error) ?? 'dependency_unavailable'
+}
+/**
+ * Why preparation stopped: the 150 ms window closed, the ready limit filled, or the
+ * backlog ran out. Only the batch that drains the backlog stops for the last reason.
+ */
+export type AppendStop = 'window' | 'limit' | 'drained'
+export type AppendReport = {
+  count: number
+  stop: AppendStop
+  /** Candidates prepared, and the ready limit this batch ran under. */
+  ready: number
+  limit: number
+  /** Preparation time when the loop stopped, the figure the window is measured on. */
+  preparedMs: number
 }
 /** Head contention and budget pressure defer a batch; the append loop retries it. */
 export function isAppendDeferral(error: unknown): boolean {
@@ -66,21 +88,27 @@ export class CommunityStreamRepository {
     try {
       return await this.append()
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        ['55P03', '57014', '25P04'].includes(String(error.meta?.code))
-      )
-        return 0
+      if (sqlDeferral(error)) return 0
       throw error
     }
   }
 
   async append(): Promise<number> {
+    return (await this.appendWithReport()).count
+  }
+
+  /**
+   * Appends one batch and reports why its preparation stopped. An aborted signal stops
+   * the append before its next write and rolls the batch back; an aborted append
+   * records no retry either, so nothing is written after the abort.
+   */
+  async appendWithReport(signal?: AbortSignal): Promise<AppendReport> {
     try {
-      const count = await this.appendBatch()
-      if (count) this.readyLimit = Math.min(25, this.readyLimit + 2)
-      return count
+      const report = await this.appendBatch(signal)
+      if (report.count) this.readyLimit = Math.min(25, this.readyLimit + 2)
+      return report
     } catch (error) {
+      if (signal?.aborted) throw error
       const reason = appendFailure(error)
       if (reason === 'budget_pressure')
         this.readyLimit = Math.max(1, Math.floor(this.readyLimit / 2))
@@ -112,7 +140,7 @@ export class CommunityStreamRepository {
     }
   }
 
-  private async appendBatch(): Promise<number> {
+  private async appendBatch(signal?: AbortSignal): Promise<AppendReport> {
     return interactiveTransaction(
       this.prisma,
       async (tx) => {
@@ -126,14 +154,27 @@ export class CommunityStreamRepository {
           take: 100,
         })
         const ready: Candidate[] = []
+        const limit = this.readyLimit
         let busy = 0
+        let stop: AppendStop = 'drained'
         for (const candidate of candidates) {
+          signal?.throwIfAborted()
           // Reserve the remaining server budget for head allocation, events and commit.
-          if (performance.now() - started >= 150 || ready.length >= this.readyLimit) break
+          if (performance.now() - started >= 150) {
+            stop = 'window'
+            break
+          }
+          if (ready.length >= limit) {
+            stop = 'limit'
+            break
+          }
           const row = await this.prepareCandidate(tx, candidate)
           if (row) ready.push(row)
           else busy++
         }
+        const preparedMs = performance.now() - started
+        const report = { stop, ready: ready.length, limit, preparedMs }
+        signal?.throwIfAborted()
         if (busy)
           await tx.communityEngagementTelemetry.create({
             data: {
@@ -158,14 +199,17 @@ export class CommunityStreamRepository {
           0,
           Math.max(1, Math.floor(remaining / this.writeCostMs))
         )
-        if (!selected.length) return 0
+        if (!selected.length) return { ...report, count: 0 }
+        signal?.throwIfAborted()
         const writeStarted = performance.now()
         await this.writeBatch(tx, selected)
         this.writeCostMs = Math.max(
           1,
           (this.writeCostMs + (performance.now() - writeStarted) / selected.length) / 2
         )
-        return selected.length
+        // An abort that lands during the write still rolls the batch back here.
+        signal?.throwIfAborted()
+        return { ...report, count: selected.length }
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
