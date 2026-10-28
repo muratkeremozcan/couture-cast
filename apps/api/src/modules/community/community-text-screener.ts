@@ -301,7 +301,7 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
                   .max(120)
               )
               .min(1)
-              .max(64),
+              .max(4096),
             reason: z.string().min(20),
             requiredDeclaredLanguages: z
               .array(z.enum(SCREENING_LANGUAGES))

@@ -146,7 +146,6 @@ describe('round 7 bare and disguised shapes stay blocked in every locale', () =>
     'em cima do tapete',
     'Sapatos azuis sobre o tapete.',
     'tapete de',
-    'tapete da sala',
     'tapette',
     'tapeete',
     'tappette',
@@ -299,5 +298,70 @@ describe('round 7 the pede verb is Portuguese-scoped and exact', () => {
       for (const text of shapes.slice(1))
         expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
     }
+  })
+})
+
+describe('round 7b floor play, posture, fit and print copy', () => {
+  const cleanCopy = [
+    'Criança sentada no tapete com blocos de montar.',
+    'Menino deitado sobre o tapete lendo um livro.',
+    'Duas meninas brincando no tapete da sala.',
+    'Bebê engatinhando no tapete macio e colorido.',
+    'Sapatos alinhados em cima do tapete bege.',
+    'Menina descalça perto do tapete do quarto.',
+    'Tênis branco e meias soquete ao lado do tapete de feltro.',
+    'Bebê brinca num tapete de atividades.',
+    'Jeans de cintura alta que valoriza o bumbum.',
+    'Short de linho com bolsos no bumbum e cós elástico.',
+    'Legging que modela o bumbum sem marcar.',
+    'Calça de alfaiataria que levanta o bumbum.',
+    'Estampa de penas de pavão em tons de azul.',
+    'Vestido com print de penas e bordado manual.',
+    'Eu pinto à mão cada peça da coleção.',
+    'Pinto as botas de couro com tinta própria.',
+    'Calça pé de elefante com cós alto e short no pé do cano.',
+  ]
+  it.each(cleanCopy)('passes under declared Portuguese: %s', (text) => {
+    for (const locale of ['pt-BR', 'pt-PT'])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+
+  it('keeps the rug frames withheld when Portuguese is not declared', () => {
+    for (const text of cleanCopy.slice(0, 8))
+      for (const locale of nonPortuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('keeps bare, article-only and disguised forms withheld in every locale', () => {
+    for (const text of [
+      'tapete',
+      'o tapete',
+      'no tapete',
+      'sentada no tapette',
+      'sentada no tapeete',
+      'sentada no t4pete',
+      'sentada n o tapete',
+      'sentada, no tapete',
+      'sentada - no - tapete',
+      'bumbum',
+      'o bumbum',
+      'bumbuum',
+      'pinto',
+      'o pinto',
+      'pinto!',
+    ])
+      for (const locale of ['pt-BR', 'fr-FR', 'en-US', 'es-ES', null])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('does not let a frame launder a neighbouring term', () => {
+    for (const text of [
+      'sentada no tapete puta',
+      'viado brincando no tapete',
+      'sentada no tapete e tapette',
+      'bumbum valoriza o caralho',
+      'pinto à mão filho da puta',
+    ])
+      expect(screen(text, 'pt-BR').disposition, text).not.toBe('pass')
   })
 })

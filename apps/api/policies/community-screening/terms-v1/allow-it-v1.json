@@ -12,8 +12,8 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "f21a63d89b31f8246a9563bdfa4f115edf34b2d1ab5145ca5234d890978359fa",
-    "reviewedOccurrenceSha256": "f6daa1a2142d9a69f230771000ad17594a384af04e18d27b40e4c30f36459e2f"
+    "allowListSha256": "8fbb68ccc765515cb8fcfb5187c7f8af8018eb9e6ceb4c239fd8dcbaced90f15",
+    "reviewedOccurrenceSha256": "a61513f86a7eed34052511b3cb7d73546e0e443ddf2baa9a8bedd965770c7fd5"
   },
   "entries": [
     "battere",

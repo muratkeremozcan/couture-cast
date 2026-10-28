@@ -129,9 +129,11 @@ describe('round4 deletion and occurrence-bound context development regressions',
   // round 6 phrase to enumerated Portuguese noun phrases, each bound to declared
   // Portuguese through phraseRequiredDeclaredLanguages. Spanish keeps only um tapete and
   // the bare, article and contraction forms stay blocked everywhere.
-  it('pins the round7 two-target authoritative surface', () => {
+  // Round 7b extends the same Portuguese-only bound with enumerated posture, play and footwear
+  // heads before a preposition frame and the rug noun, and room or finish complements after it.
+  it('pins the round7b two-target authoritative surface', () => {
     expect(historicalRules.map((rule) => rule.target)).toEqual(['retard', 'tapete'])
-    expect(historicalRules.map((rule) => rule.phrases.length)).toEqual([1, 34])
+    expect(historicalRules.map((rule) => rule.phrases.length)).toEqual([1, 1010])
     expect(historicalRules.map((rule) => rule.nativeLanguages)).toEqual([
       ['fr'],
       ['pt', 'es'],
@@ -142,7 +144,7 @@ describe('round4 deletion and occurrence-bound context development regressions',
       createHash('sha256')
         .update(historicalRules.flatMap((rule) => rule.phrases).join('\n'))
         .digest('hex')
-    ).toBe('bdfd65fca144efeacb8aa191e9f495995312d49386666d9e30d27748c1da1b99')
+    ).toBe('b191180549784255193cdb8f5136f29a18abf3f7a54c50610e7ff61e07089ad5')
   })
   describe.each(historicalRules)(
     'reviewed occurrence surface $target',
