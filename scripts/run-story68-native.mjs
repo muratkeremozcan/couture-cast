@@ -24,6 +24,7 @@ import {
 } from './lib/story68-native-safety.mjs'
 import { assertStory68DiskSpace } from './lib/test-disk-space.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
+import { flowTimeoutMs } from './lib/story68-flow-timeouts.mjs'
 import {
   IOS_RETRYABLE_DENIAL_EVIDENCE,
   IOS_SETTINGS_MARKERS,
@@ -318,7 +319,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
         encoding: 'utf8',
         maxBuffer: 30 * 1024 * 1024,
         detached: true,
-        timeout: 120_000,
+        timeout: flowTimeoutMs(flow),
         killSignal: 'SIGTERM',
       }
     )
