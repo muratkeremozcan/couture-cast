@@ -10,6 +10,10 @@ export const android36Lanes = Object.freeze({
   'android36-original': 'original',
   'android36-interaction': 'interaction',
 })
+// pr-gate.yml publishes the required ruleset context gate as a commit status; no job or
+// check run may take that name.
+export const gateJobName = 'share-card-lanes-gate'
+const reservedContext = 'gate'
 const emulatorAction = 'reactivecircus/android-emulator-runner@v2'
 const nativeSdkActions = ['actions/setup-java@v4', 'android-actions/setup-android@v3']
 const maxMinutes = 90
@@ -18,7 +22,14 @@ const stepIsAlways = (steps, run) =>
   steps.some((step) => step.if === 'always()' && step.run === run)
 
 function gateProblems(jobs, check) {
-  const gate = jobs.gate ?? {}
+  check(
+    Object.entries(jobs).every(
+      ([id, job]) => id !== reservedContext && job?.name !== reservedContext
+    ),
+    `no job id or name may be ${reservedContext}: it is the required ruleset context`
+  )
+  const gate = jobs[gateJobName] ?? {}
+  check(gate.name === gateJobName, `${gateJobName}: explicit job name required`)
   check(gate.if === 'always()', 'gate must run after failure and cancellation')
   check(
     JSON.stringify([...(gate.needs ?? [])].sort()) ===
@@ -45,6 +56,15 @@ function legacyProblems(jobs, check) {
   check(
     rows.length === 2 && has('android', 32) && has('ios', 0),
     'legacy API32 and iOS journeys must remain complete'
+  )
+  // Run 40686881166 measured the API32 emulator step at 62m19s, so a 65 minute bound is a
+  // flake; its behavior stays exactly as it was, bounded only by the job limit.
+  check(
+    rows.every((row) => row.journey_timeout === undefined) &&
+      (legacy?.steps ?? []).every(
+        (step) => step.uses !== emulatorAction || step['timeout-minutes'] === undefined
+      ),
+    'legacy API32 journey must not gain a step timeout'
   )
   check(
     legacy?.['timeout-minutes'] === maxMinutes,

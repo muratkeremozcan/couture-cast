@@ -52,12 +52,10 @@ jobs:
             api: 32
             target: google_apis
             suite: all
-            journey_timeout: 65
           - os: macos-15-intel
             platform: ios
             api: 0
             suite: all
-            journey_timeout: 65
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env: &runtime_env
@@ -205,7 +203,6 @@ jobs:
           ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
       - name: Android isolated native journey
-        timeout-minutes: ${{ matrix.journey_timeout }}
         if: ${{ !cancelled() && matrix.platform == 'android' && steps.native_build.outcome == 'success' && steps.kvm.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -562,7 +559,10 @@ jobs:
       - name: Clean exact owned runtime
         if: always()
         run: node scripts/e2e-share-card/cleanup.mjs
-  gate:
+  # Not named gate: the required ruleset context gate is a commit status from pr-gate.yml,
+  # and a check run with that name could satisfy or fail it independently.
+  share-card-lanes-gate:
+    name: share-card-lanes-gate
     if: always()
     needs:
       - original-resource

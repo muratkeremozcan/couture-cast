@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
-import { android36Lanes, shareCardLaneProblems } from './share-card-lanes.mjs'
+import {
+  android36Lanes,
+  gateJobName,
+  shareCardLaneProblems,
+} from './share-card-lanes.mjs'
 
 const source = parse(
   fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
@@ -171,52 +175,96 @@ describe('share-card parallel lane validator', () => {
   })
 
   describe('aggregate gate', () => {
+    test('uses a name distinct from the required ruleset context gate', () => {
+      assert.equal(gateJobName, 'share-card-lanes-gate')
+      assert.equal(source.jobs.gate, undefined)
+      assert.equal(source.jobs[gateJobName].name, gateJobName)
+      assert.equal(
+        Object.values(source.jobs).some((job) => job.name === 'gate'),
+        false
+      )
+    })
+
+    for (const [title, change] of [
+      [
+        'a job id named gate',
+        (jobs) => (jobs.gate = { 'runs-on': 'ubuntu-latest', steps: [] }),
+      ],
+      [
+        'renaming the aggregate job back to gate by id',
+        (jobs) => {
+          jobs.gate = jobs[gateJobName]
+          delete jobs[gateJobName]
+        },
+      ],
+      ['a job whose display name is gate', (jobs) => (jobs[gateJobName].name = 'gate')],
+      [
+        'any other job whose display name is gate',
+        (jobs) => (jobs['android36-original'].name = 'gate'),
+      ],
+    ])
+      test(`${title} is rejected`, () => {
+        const problems = mutate(change)
+        assert.ok(
+          problems.some((problem) => /required ruleset context/.test(problem)),
+          problems.join('\n') || 'no problem raised'
+        )
+      })
+
+    test('a missing aggregate job is rejected', () => {
+      const problems = mutate((jobs) => delete jobs[gateJobName])
+      assert.ok(problems.some((problem) => /run after failure/.test(problem)))
+    })
+
     for (const [title, expected, change] of [
       [
         'dropping a lane from needs',
         /require every browser and native partition/,
-        (jobs) => (jobs.gate.needs = jobs.gate.needs.slice(1)),
+        (jobs) => (jobs[gateJobName].needs = jobs[gateJobName].needs.slice(1)),
       ],
       [
         'dropping the legacy lane from needs',
         /require every browser and native partition/,
         (jobs) =>
-          (jobs.gate.needs = jobs.gate.needs.filter((n) => n !== 'original-resource')),
+          (jobs[gateJobName].needs = jobs[gateJobName].needs.filter(
+            (n) => n !== 'original-resource'
+          )),
       ],
       [
         'adding an unknown dependency',
         /require every browser and native partition/,
-        (jobs) => jobs.gate.needs.push('supabase-images'),
+        (jobs) => jobs[gateJobName].needs.push('supabase-images'),
       ],
       [
         'running only on success',
         /run after failure and cancellation/,
-        (jobs) => delete jobs.gate.if,
+        (jobs) => delete jobs[gateJobName].if,
       ],
       [
         'continuing on error',
         /cannot hide failure/,
-        (jobs) => (jobs.gate['continue-on-error'] = true),
+        (jobs) => (jobs[gateJobName]['continue-on-error'] = true),
       ],
       [
         'skipping the results script',
         /actual dependency results/,
-        (jobs) => (jobs.gate.steps = jobs.gate.steps.filter((row) => !row.run)),
+        (jobs) =>
+          (jobs[gateJobName].steps = jobs[gateJobName].steps.filter((row) => !row.run)),
       ],
       [
         'feeding the script a constant',
         /actual dependency results/,
-        (jobs) => (jobs.gate.steps.at(-1).env.CC68_JOB_RESULTS = '{}'),
+        (jobs) => (jobs[gateJobName].steps.at(-1).env.CC68_JOB_RESULTS = '{}'),
       ],
       [
         'bypassing the script step',
         /actual dependency results/,
-        (jobs) => (jobs.gate.steps.at(-1)['continue-on-error'] = true),
+        (jobs) => (jobs[gateJobName].steps.at(-1)['continue-on-error'] = true),
       ],
       [
         'conditioning the script step',
         /actual dependency results/,
-        (jobs) => (jobs.gate.steps.at(-1).if = 'false'),
+        (jobs) => (jobs[gateJobName].steps.at(-1).if = 'false'),
       ],
     ])
       test(`${title} is rejected`, () => {
@@ -404,6 +452,28 @@ describe('share-card parallel lane validator', () => {
         problems.join('\n')
       )
     }
+  })
+
+  test('giving the legacy API32 journey a new step timeout is rejected', () => {
+    for (const change of [
+      (jobs) =>
+        (jobs['original-resource'].strategy.matrix.include[0].journey_timeout = 65),
+      (jobs) =>
+        (jobs['original-resource'].steps.find(
+          (row) => row.uses === 'reactivecircus/android-emulator-runner@v2'
+        )['timeout-minutes'] = 65),
+    ]) {
+      const problems = mutate(change)
+      assert.ok(
+        problems.some((problem) => /must not gain a step timeout/.test(problem)),
+        problems.join('\n') || 'no problem raised'
+      )
+    }
+    const row = source.jobs['original-resource'].strategy.matrix.include
+    assert.equal(
+      row.some((item) => item.journey_timeout !== undefined),
+      false
+    )
   })
 
   test('raising the legacy 90 minute limit is rejected', () => {
