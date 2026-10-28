@@ -632,7 +632,6 @@ if (command === 'prebuild') {
 } else if (command === 'a11y' && platform === 'android') {
   requireDevice()
   activeLocale = 'en-US'
-  maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
   const env = {
     ...read('public-build-env.json'),
     ANDROID_SERIAL: device,
@@ -682,12 +681,15 @@ if (command === 'prebuild') {
         'build/outputs/apk/androidTest/debug/accessibility-focus-debug-androidTest.apk'
       ),
     ])
-    run('bash', ['scripts/ci/android-talkback.sh', 'enable'], { ...env, ADB: adb })
     run(adb, ['-s', device, 'shell', 'am', 'force-stop', appId])
     openUrl(
       `couturecast-story68://expo-development-client/?url=${encodeURIComponent('http://127.0.0.1:8089')}`
     )
     maestro('maestro/story65/open-app.yaml')
+    maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
+    // Maestro owns UiAutomation during setup and its teardown changes touch
+    // exploration. Bind TalkBack and await readiness after that handoff.
+    run('bash', ['scripts/ci/android-talkback.sh', 'enable'], { ...env, ADB: adb })
     const output = run(adb, [
       '-s',
       device,

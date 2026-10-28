@@ -10,6 +10,67 @@ import {
 import vm from 'node:vm'
 import { describe, test } from 'node:test'
 
+describe('TalkBack driver handoff', () => {
+  for (const initiallyEnabled of [false, true]) {
+    test(`waits for TalkBack after Maestro and restores enabled=${initiallyEnabled}`, () => {
+      const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
+      const marker = "} else if (command === 'a11y' && platform === 'android') {"
+      const start = source.indexOf(marker) + marker.length
+      const end = source.indexOf("} else if (command === 'a11y'", start)
+      const previousService = initiallyEnabled ? 'owned.reader/Service' : 'null'
+      let touchExploration = initiallyEnabled
+      let modalOpen = true
+      let instrumented = false
+      const restored = new Map()
+      vm.runInNewContext(`(() => {${source.slice(start, end)}})()`, {
+        requireDevice: () => undefined,
+        activeLocale: 'en-US',
+        platform: 'android',
+        read: () => ({}),
+        device: 'owned-device',
+        adb: '/owned/adb',
+        appId: 'com.couturecast.story68',
+        root: '/owned/repo',
+        directory: '/owned/runtime',
+        path,
+        process: { env: {} },
+        fs: { writeFileSync: () => undefined },
+        privateJson: () => undefined,
+        openUrl: () => undefined,
+        maestro: (flow) => {
+          if (flow.endsWith('/set-locale.yaml'))
+            assert.equal(modalOpen, false, 'Cold launch must clear a prior failed modal')
+          touchExploration = false
+        },
+        run: (binary, args) => {
+          if (args.includes('force-stop') && args.includes('com.couturecast.story68'))
+            modalOpen = false
+          if (binary === 'bash' && args[1] === 'enable') touchExploration = true
+          if (args.includes('instrument')) {
+            assert.equal(touchExploration, true, 'TalkBack must recover from Maestro')
+            instrumented = true
+            return 'OK (2 tests)'
+          }
+          if (args.includes('settings')) {
+            const [, operation, , key, value] = args.slice(args.indexOf('settings'))
+            if (operation === 'get')
+              return key === 'enabled_accessibility_services'
+                ? previousService
+                : initiallyEnabled
+                  ? '1'
+                  : '0'
+            restored.set(key, operation === 'delete' ? 'null' : value)
+          }
+          return ''
+        },
+      })
+      assert.equal(instrumented, true)
+      assert.equal(restored.get('enabled_accessibility_services'), previousService)
+      assert.equal(restored.get('accessibility_enabled'), initiallyEnabled ? '1' : '0')
+    })
+  }
+})
+
 describe('original-resource proof', () => {
   for (const platform of ['android', 'ios']) {
     test(`actual ${platform} original-resource proof returns a tab-ready app for the matrix`, async () => {
