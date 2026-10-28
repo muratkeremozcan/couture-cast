@@ -232,6 +232,24 @@ describe('public evidence publisher', () => {
     assert.deepEqual(result.published, [...nativeEvidenceFamilies].sort())
   })
 
+  for (const platform of ['android', 'ios']) {
+    for (const suffix of ['367fea4a-e1da-456e-a355-1bcc7f9da4f3', 'Private-Person']) {
+      test(`${platform} publishes nothing for an identifier or name suffix: ${suffix}`, () => {
+        const name = `native-matrix-${platform}.json`
+        const result = publish({
+          ...valid(),
+          [name]: {
+            ...valid()[name],
+            cases: [{ id: `M-LOCALE:${suffix}`, passed: true }],
+          },
+        })
+        assert.notEqual(result.status, 0)
+        assert.match(result.stderr, /invalid_native_evidence/)
+        assert.deepEqual(result.published, [])
+      })
+    }
+  }
+
   test('publishes nothing when any family breaks its schema', () => {
     const result = publish({
       ...valid(),

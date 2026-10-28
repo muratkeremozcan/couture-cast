@@ -38,8 +38,6 @@ const oneOf =
     values.includes(value)
 const integer = (min, max) => (value) =>
   Number.isSafeInteger(value) && value >= min && value <= max
-const pattern = (expression, max) => (value) =>
-  typeof value === 'string' && value.length <= max && expression.test(value)
 const nullable = (schema) => (value) => value === null || schema(value)
 const list = (item, max) => (value) =>
   Array.isArray(value) && value.length <= max && value.every(item)
@@ -58,12 +56,39 @@ const TRUE = literal(true)
 const BOOLEAN = (value) => typeof value === 'boolean'
 const count = integer(0, 100000)
 
+// Only operational IDs emitted by the native matrix may leave the private harness.
+// Parameters are finite too: a bounded string still admits names and identifiers.
+const matrixIDs = (platform) => [
+  'M-CANCEL:preparation-before-commit',
+  'M-POST M-SAVE',
+  'M-CANCEL M-WATERMARK',
+  ...['M-STORAGE:cache_failure', 'M-STORAGE:storage', 'M-OFFLINE'].flatMap((id) => [
+    id,
+    `${id}:retry-recovers`,
+  ]),
+  'M-NATIVE-UNAVAILABLE:restricted-adapter-boundary',
+  'U-PERMISSION-LIMITED:native-adapter-integration',
+  ...shareCardAuditLocales.map((locale) => `M-LOCALE:${locale}`),
+  'M-A11Y:large-text-pt-PT',
+  ...['close', 'navigation'].map(
+    (lifecycle) => `M-CANCEL M-SINGLE-WRITE:precommit-authorization-${lifecycle}`
+  ),
+  'M-SAVE-OWNERSHIP:current-saving',
+  'M-SAVE-OWNERSHIP:reopened-finishing',
+  'M-WATERMARK:reopen-after-settlement',
+  ...['close', 'navigation', 'signout'].map(
+    (lifecycle) => `M-SINGLE-WRITE M-IDENTITY:${lifecycle}`
+  ),
+  ...(platform === 'ios'
+    ? ['M-A11Y:community-draft-native-host-foreground']
+    : shareCardAuditLocales.map((locale) => `M-A11Y:dark-dialog-status-icons:${locale}`)),
+]
 const matrix = (platform) =>
   object({
     platform: literal(platform),
     cases: list(
       object({
-        id: pattern(/^[MU]-[A-Z0-9-]+(?:[ :][A-Za-z0-9_-]+)*$/, 120),
+        id: oneOf(...matrixIDs(platform)),
         passed: TRUE,
       }),
       200
