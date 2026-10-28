@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import data from '../../../test/fixtures/community-text-corpus/development-round5.json'
 import reviewedBank from '../../../policies/community-screening/reviewed-occurrence-constructions-v1.json'
 import { loadCommunityScreeningPolicy } from './community-screening-policy.js'
@@ -30,6 +30,24 @@ const newRules = reviewedBank.constructions.filter((rule) =>
 )
 
 describe('round5 retired development and native occurrence classes', () => {
+  // One-time warm-up under its own budget, so no locale case pays it. Measured
+  // 2026-10-27: the first screen() per locale costs 24 ms cold against 11 ms warm,
+  // and the first 1000-row locale pass about 0.1 s plain and up to 0.7 s covered
+  // above a warm pass. 10 s is over 10x the covered cost on a contended host, and a
+  // setup that hangs fails this hook by name.
+  beforeAll(() => {
+    for (const locale of Object.values(languages))
+      for (const text of [
+        'A wool coat for the office, in pale rose.',
+        'Ein leichter Mantel für das Büro.',
+        'Una chaqueta ligera para la lluvia.',
+        'Une robe longue en lin pour l’été.',
+        'Una borsa in pelle per il fine settimana.',
+        'Uma camisa de algodão para o calor.',
+        'Bu ceket yağmurda da şık durur.',
+      ])
+        screen(text, locale)
+  }, 10_000)
   it.each(data.entries)('$id preserves ordinary submitted copy', (row) => {
     expect(
       screen(row.text, row.locale, row.field as 'caption' | 'altText').disposition
