@@ -7,6 +7,12 @@ const failure = (code: string, sql?: string) =>
     clientVersion: 'test',
     ...(sql ? { meta: { code: sql } } : {}),
   })
+// A model operation's deadlock or lock timeout, as Prisma 6.19 raised it (2026-10-27 probe).
+const modelFailure = (sql: string, message: string) =>
+  new Prisma.PrismaClientUnknownRequestError(
+    `Error occurred during query execution:\nConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "${sql}", message: "${message}", severity: "ERROR", detail: None, column: None, hint: None }), transient: false })`,
+    { clientVersion: 'test' }
+  )
 // The error plpgsql_check's pldbgapi2 layer raised on local Supabase, as Prisma reports it.
 const pldbgapi2 = (
   code = 'XX000',
@@ -22,6 +28,8 @@ describe('privacy transaction recovery contract', () => {
     failure('P2010', '40001'),
     failure('P2010', '40P01'),
     failure('P2010', '55P03'),
+    modelFailure('40P01', 'deadlock detected'),
+    modelFailure('55P03', 'canceling statement due to lock timeout'),
     pldbgapi2(),
   ])(
     'retries a transient database failure and commits the original operation once',
@@ -49,6 +57,7 @@ describe('privacy transaction recovery contract', () => {
     failure('P2002'),
     failure('P2010'),
     failure('P2010', '23514'),
+    modelFailure('23514', 'new row violates check constraint'),
     pldbgapi2('XX000', 'ERROR: some other internal error'),
     pldbgapi2('P0001', 'ERROR: cannot find parent statement on pldbgapi2 call stack'),
     new Error('cannot find parent statement on pldbgapi2 call stack'),

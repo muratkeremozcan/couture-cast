@@ -2,6 +2,7 @@
 import { Prisma, type PrismaClient } from '@prisma/client'
 import { ForbiddenException } from '@nestjs/common'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { postgresError } from '../../prisma/postgres-error.js'
 
 export async function assertCommunitySubjectAvailable(
   tx: Pick<Prisma.TransactionClient, 'communitySubject'>,
@@ -58,10 +59,9 @@ export async function communityPrivacyTransaction<T>(
       })
     } catch (error) {
       const code = error instanceof Prisma.PrismaClientKnownRequestError ? error.code : ''
-      const sql =
-        error instanceof Prisma.PrismaClientKnownRequestError
-          ? String(error.meta?.code)
-          : ''
+      // A model operation raises 40P01 and 55P03 as unknown request errors; Prisma maps
+      // only 40001, to P2034. postgresError reads the state from either form.
+      const sql = postgresError(error)?.code ?? ''
       // Three attempts in all, retried at once.
       if (attempt < 2 && (code === 'P2034' || ['40001', '40P01', '55P03'].includes(sql)))
         continue
