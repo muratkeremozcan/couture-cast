@@ -57,11 +57,18 @@ describe('expected web matrix from the spec', () => {
       ),
       SHARED_BEHAVIORS
     )
-    assert.equal(expected.shared.length, SHARED_BEHAVIORS.length)
-    // The 2026-10 split: 4 cases in each of 10 locales plus 6 shared, per browser.
+    // Each shared behavior's case count, so losing one of several cases fails here.
+    assert.deepEqual(
+      SHARED_BEHAVIORS.map(
+        (p) => expected.shared.filter((title) => title.startsWith(p)).length
+      ),
+      [1, 1, 1, 2, 1, 1]
+    )
+    assert.equal(expected.shared.length, 7)
+    // The 2026-10 split: 4 cases in each of 10 locales plus 7 shared, per browser.
     const perBrowser =
       expected.perLocale.length * expected.locales.length + expected.shared.length
-    assert.deepEqual([expected.locales.length, perBrowser, perBrowser * 3], [10, 46, 138])
+    assert.deepEqual([expected.locales.length, perBrowser, perBrowser * 3], [10, 47, 141])
   })
 
   test('the expectation follows the spec, so a split body adds a required case', () => {
@@ -90,7 +97,12 @@ describe('expected web matrix from the spec', () => {
     )
     assert.throws(
       () => specCases(`${spec}\ntest('${expected.shared[1]}', async () => {})\n`),
-      /web_matrix_spec_behavior_missing: P-REVALIDATE /
+      /web_matrix_spec_duplicate_title/
+    )
+    const [community] = expected.shared.filter((title) => title.startsWith('P-OFFLINE:'))
+    assert.throws(
+      () => specCases(`${spec}\ntest('${community}', async () => {})\n`),
+      /web_matrix_spec_duplicate_title/
     )
     assert.throws(
       () => specCases(spec.replace("test('P-OFFLINE:", "test.skip('P-OFFLINE:")),
@@ -107,10 +119,10 @@ describe('assertWebMatrix', () => {
   test('accepts the full passed matrix and emits only the closed summary', () => {
     assert.deepEqual(assertWebMatrix(report(), expected), {
       passed: true,
-      cases: 138,
+      cases: 141,
       projects: BROWSERS.map((browser) => ({
         browser,
-        passed: 46,
+        passed: 47,
         locales: expected.locales,
       })),
     })
@@ -142,6 +154,15 @@ describe('assertWebMatrix', () => {
         (r) => {
           const [moved] = r.suites[0].specs.splice(offline, 1)
           locale(r, 'tr-TR').specs.push({ ...moved, id: 'tr-TR-moved' })
+        },
+        /web_matrix_behavior_missing/,
+      ],
+      [
+        (r) => {
+          const outfit = r.suites[0].specs.findLastIndex((row) =>
+            row.title.startsWith('P-OFFLINE:')
+          )
+          r.suites[0].specs[outfit].title = r.suites[0].specs[offline].title
         },
         /web_matrix_behavior_missing/,
       ],

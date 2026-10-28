@@ -6,7 +6,9 @@ const repository = fileURLToPath(new URL('../../', import.meta.url))
 export const SPEC_FILE = 'playwright/tests/share-card-export.spec.ts'
 const LOCALE_FILE = 'packages/api-client/src/contracts/http/supported-locales.json'
 export const BROWSERS = ['chromium', 'firefox', 'webkit']
-// Behaviors every locale must prove exactly once, and the locale-independent ones.
+// Behaviors every locale must prove exactly once, and the locale-independent ones,
+// each proven by at least one distinct shared case (P-OFFLINE has a community and
+// an outfit case).
 export const LOCALE_BEHAVIORS = [
   'P-POST ',
   'P-WATERMARK:',
@@ -21,6 +23,20 @@ export const SHARED_BEHAVIORS = [
   'P-CANCEL P-IDENTITY:',
   'P-CANCEL-SAVE:',
 ]
+
+function assertSpecBehaviors(perLocale, shared) {
+  const proofs = (titles, behavior) =>
+    titles.filter((name) => name.startsWith(behavior)).length
+  for (const behavior of LOCALE_BEHAVIORS)
+    if (proofs(perLocale, behavior) !== 1)
+      throw new Error(`web_matrix_spec_behavior_missing: ${behavior}`)
+  for (const behavior of SHARED_BEHAVIORS)
+    if (proofs(shared, behavior) < 1)
+      throw new Error(`web_matrix_spec_behavior_missing: ${behavior}`)
+  for (const titles of [perLocale, shared])
+    if (new Set(titles).size !== titles.length)
+      throw new Error('web_matrix_spec_duplicate_title')
+}
 
 /**
  * The case titles the spec declares: tests inside its per-locale describe and
@@ -46,16 +62,7 @@ export function specCases(source) {
     else if (index > start && match[1] === '    ') perLocale.push(match[2])
     else throw new Error(`web_matrix_spec_unplaced_test: ${match[2]}`)
   }
-  for (const [titles, behaviors] of [
-    [perLocale, LOCALE_BEHAVIORS],
-    [shared, SHARED_BEHAVIORS],
-  ]) {
-    for (const behavior of behaviors)
-      if (titles.filter((name) => name.startsWith(behavior)).length !== 1)
-        throw new Error(`web_matrix_spec_behavior_missing: ${behavior}`)
-    if (new Set(titles).size !== titles.length)
-      throw new Error('web_matrix_spec_duplicate_title')
-  }
+  assertSpecBehaviors(perLocale, shared)
   return { perLocale, shared }
 }
 
