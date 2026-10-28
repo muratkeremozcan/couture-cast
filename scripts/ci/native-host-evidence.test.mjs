@@ -12,6 +12,8 @@ import {
   projectFirstFlow,
   projectMetro,
   projectSample,
+  residentProcesses,
+  projectMemory,
 } from './native-host-evidence.mjs'
 
 const script = fileURLToPath(new URL('./native-host-evidence.mjs', import.meta.url))
@@ -66,6 +68,9 @@ test('a host sample is a closed projection of load, memory and processes', () =>
     memTotalMB: 7168,
     memFreeMB: 512,
     busiest: [{ command: 'diagnosticd', cpuPercent: 41.7 }],
+    resident: [],
+    swapUsedMB: null,
+    memoryPressureFreePercent: null,
   })
   assert.doesNotThrow(() => assertNativeHostEvidence(record({ samples: [sample] })))
   assert.throws(
@@ -229,4 +234,59 @@ test('public evidence publishes a valid host record and refuses an invalid one',
   assert.notEqual(refused.status, 0)
   assert.match(refused.stderr, /invalid_native_host_evidence/)
   assert.deepEqual(fs.readdirSync(evidence), [])
+})
+
+test('RSS reports the top 15 executable basenames, sorted by resident KiB', () => {
+  const rows = residentProcesses(
+    [
+      '9000 2.5 /Applications/Xcode.app/Contents/XCBBuildService',
+      '10 0.0 /usr/bin/other',
+      'bad row',
+      ...Array.from({ length: 20 }, (_, i) => `${100 + i} 0.1 p${i}`),
+    ].join('\n')
+  )
+  assert.equal(rows.length, 15)
+  assert.deepEqual(rows[0], { command: 'XCBBuildService', rssKB: 9000, cpuPercent: 2.5 })
+  assert.equal(rows[1].command, 'p19')
+  assert.equal(rows.at(-1).rssKB, 106)
+})
+
+test('swap and pressure probes preserve zero and mark unsupported output', () => {
+  assert.deepEqual(
+    projectMemory(
+      'vm.swapusage: total = 2048.00M used = 123.25M free = 1924.75M (encrypted)',
+      'System-wide memory free percentage: 7%'
+    ),
+    { swapUsedMB: 123.25, memoryPressureFreePercent: 7 }
+  )
+  assert.deepEqual(
+    projectMemory('used = 0.00M', 'System-wide memory free percentage: 100%'),
+    { swapUsedMB: 0, memoryPressureFreePercent: 100 }
+  )
+  assert.deepEqual(projectMemory('', ''), {
+    swapUsedMB: null,
+    memoryPressureFreePercent: null,
+  })
+  const sample = projectSample({
+    label: 'failure',
+    at: 0,
+    loadavg: [0, 0, 0],
+    cpuCount: 1,
+    totalmem: 1,
+    freemem: 1,
+    ps: '',
+  })
+  for (const bad of [
+    { ...sample, swapUsedMB: -1 },
+    { ...sample, memoryPressureFreePercent: 101 },
+    { ...sample, resident: [{ command: 'ok', rssKB: -1, cpuPercent: 0 }] },
+    {
+      ...sample,
+      resident: [{ command: 'ok', rssKB: 1, cpuPercent: 0, args: 'private' }],
+    },
+  ])
+    assert.throws(
+      () => assertNativeHostEvidence(record({ samples: [bad] })),
+      /invalid_native_host_evidence/
+    )
 })

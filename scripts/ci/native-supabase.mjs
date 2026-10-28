@@ -715,7 +715,7 @@ async function start(root) {
         '--timeout',
         '60',
         '-o',
-        `-c listen_addresses=127.0.0.1 -c port=${PORTS.postgres} -c unix_socket_directories=${socketDirectory}`,
+        `-c listen_addresses=127.0.0.1 -c port=${PORTS.postgres} -c unix_socket_directories=${socketDirectory} -c shared_buffers=32MB -c work_mem=2MB -c maintenance_work_mem=16MB -c max_connections=40`,
         'start',
       ],
       { stdio: ['ignore', 'ignore', 'inherit'] }

@@ -29,6 +29,7 @@ const PLATFORMS = ['ios']
 const PHASES = ['none', 'jvm', 'device', 'driver', 'flow']
 const COMMAND = /^[A-Za-z0-9._+-]{1,32}$/
 const TOP_PROCESSES = 8
+const TOP_RSS_PROCESSES = 15
 
 /**
  * The busiest processes from `ps -A -r -o %cpu=,ucomm=` output, by CPU share.
@@ -53,6 +54,39 @@ export function busiestProcesses(text, limit = TOP_PROCESSES) {
   return rows.sort((a, b) => b.cpuPercent - a.cpuPercent).slice(0, limit)
 }
 
+/** Top resident processes. ps uses KiB; executable basenames contain no arguments. */
+export function residentProcesses(text) {
+  return text
+    .split('\n')
+    .flatMap((line) => {
+      const match = line.trim().match(/^(\d+)\s+(\d+(?:\.\d+)?)\s+(.+)$/)
+      if (!match) return []
+      const command = path
+        .basename(match[3].trim())
+        .replace(/[^A-Za-z0-9._+-]/g, '_')
+        .slice(0, 32)
+      return [
+        {
+          command: COMMAND.test(command) ? command : 'other',
+          rssKB: Number(match[1]),
+          cpuPercent: Number(match[2]),
+        },
+      ]
+    })
+    .sort((a, b) => b.rssKB - a.rssKB)
+    .slice(0, TOP_RSS_PROCESSES)
+}
+
+/** Read-only macOS probes. Unsupported probes remain explicit null values. */
+export function projectMemory(swap, pressure) {
+  const used = swap.match(/used\s*=\s*(\d+(?:\.\d+)?)M/)
+  const free = pressure.match(/System-wide memory free percentage:\s*(\d+)%/)
+  return {
+    swapUsedMB: used ? Number(used[1]) : null,
+    memoryPressureFreePercent: free ? Number(free[1]) : null,
+  }
+}
+
 const round = (/** @type {number} */ value) => Math.round(value * 100) / 100
 
 /**
@@ -64,6 +98,9 @@ const round = (/** @type {number} */ value) => Math.round(value * 100) / 100
  *   totalmem: number
  *   freemem: number
  *   ps: string
+ *   rss?: string
+ *   swap?: string
+ *   pressure?: string
  * }} input
  */
 export function projectSample(input) {
@@ -79,6 +116,8 @@ export function projectSample(input) {
     memTotalMB: Math.floor(input.totalmem / 1048576),
     memFreeMB: Math.floor(input.freemem / 1048576),
     busiest: busiestProcesses(input.ps),
+    resident: residentProcesses(input.rss ?? ''),
+    ...projectMemory(input.swap ?? '', input.pressure ?? ''),
   }
 }
 
@@ -173,6 +212,9 @@ const SAMPLE_KEYS = [
   'memTotalMB',
   'memFreeMB',
   'busiest',
+  'resident',
+  'swapUsedMB',
+  'memoryPressureFreePercent',
 ]
 const FLOW_SECONDS = ['totalSeconds', 'jvmSeconds', 'driverSeconds', 'flowSeconds']
 const nonNegative = (value) => Number.isFinite(value) && value >= 0
@@ -187,6 +229,14 @@ const validProcess = (row) =>
   COMMAND.test(row.command) &&
   nonNegative(row.cpuPercent)
 
+const validResident = (row) =>
+  exactKeys(row, ['command', 'rssKB', 'cpuPercent']) &&
+  COMMAND.test(row.command) &&
+  count(row.rssKB) &&
+  nonNegative(row.cpuPercent)
+
+const validPressure = (value) => value === null || (count(value) && value <= 100)
+
 const validSample = (sample) =>
   exactKeys(sample, SAMPLE_KEYS) &&
   SAMPLE_LABELS.includes(sample.label) &&
@@ -198,7 +248,12 @@ const validSample = (sample) =>
   ) &&
   Array.isArray(sample.busiest) &&
   sample.busiest.length <= TOP_PROCESSES &&
-  sample.busiest.every(validProcess)
+  sample.busiest.every(validProcess) &&
+  Array.isArray(sample.resident) &&
+  sample.resident.length <= TOP_RSS_PROCESSES &&
+  sample.resident.every(validResident) &&
+  seconds(sample.swapUsedMB) &&
+  validPressure(sample.memoryPressureFreePercent)
 
 const validFlow = (flow) =>
   flow === null ||
@@ -266,6 +321,17 @@ function main() {
       cpuCount: os.availableParallelism(),
       totalmem: os.totalmem(),
       freemem: os.freemem(),
+      rss:
+        spawnSync('ps', ['-A', '-o', 'rss=,%cpu=,comm='], {
+          encoding: 'utf8',
+          timeout: 10000,
+        }).stdout ?? '',
+      swap:
+        spawnSync('sysctl', ['vm.swapusage'], { encoding: 'utf8', timeout: 10000 })
+          .stdout ?? '',
+      pressure:
+        spawnSync('memory_pressure', ['-Q'], { encoding: 'utf8', timeout: 10000 })
+          .stdout ?? '',
       ps:
         spawnSync('ps', ['-A', '-r', '-o', '%cpu=,ucomm='], { encoding: 'utf8' })
           .stdout ?? '',

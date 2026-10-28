@@ -69,7 +69,7 @@ jobs:
         with:
           packages: platform-tools
       - name: Verify startup deadline controls
-        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/native-supabase.test.mjs scripts/ci/native-supabase-gateway.test.mjs scripts/e2e-share-card/runtime-sources.test.mjs scripts/ci/native-host-evidence.test.mjs scripts/e2e-share-card/warm-metro.test.mjs
+        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/native-supabase.test.mjs scripts/ci/native-supabase-gateway.test.mjs scripts/e2e-share-card/runtime-sources.test.mjs scripts/ci/native-host-evidence.test.mjs scripts/ci/native-build-daemons.test.mjs scripts/e2e-share-card/warm-metro.test.mjs
       - uses: ./.github/actions/start-local-supabase
         if: runner.os == 'Linux'
       - name: Install the iOS project generator
@@ -187,8 +187,14 @@ jobs:
       - name: Verify fresh Worklets variant and ABI staging
         if: matrix.platform == 'android'
         run: node --test scripts/lib/story68-worklets-staging.test.mjs
+      - name: Mark the owned iOS build-service window
+        if: matrix.platform == 'ios'
+        run: node scripts/ci/native-build-daemons.mjs mark
       - name: Build native development client
         run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
+      - name: Release the owned iOS build services
+        if: matrix.platform == 'ios'
+        run: node scripts/ci/native-build-daemons.mjs stop
       - name: Genuine browser share-card acceptance matrix
         if: matrix.platform == 'android' && matrix.api == 36
         run: |
@@ -244,6 +250,7 @@ jobs:
           xcrun simctl bootstatus "$device" -b
           node scripts/ci/native-host-evidence.mjs sample after-simulator-boot --platform ios
           xcrun simctl install "$device" /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app
+          node scripts/ci/native-host-evidence.mjs sample before-first-flow --platform ios
           node scripts/run-story68-native.mjs open --platform ios --device "$device"
           node scripts/ci/native-host-evidence.mjs first-flow passed --platform ios
           node scripts/ci/native-host-evidence.mjs metro --platform ios
