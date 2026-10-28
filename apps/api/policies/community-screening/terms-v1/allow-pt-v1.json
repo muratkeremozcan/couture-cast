@@ -12,7 +12,7 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "96be7c29ed93635d8e79c53593a90adea3487790070c794769c2ec67f355ecfd",
+    "allowListSha256": "f21a63d89b31f8246a9563bdfa4f115edf34b2d1ab5145ca5234d890978359fa",
     "reviewedOccurrenceSha256": "f6daa1a2142d9a69f230771000ad17594a384af04e18d27b40e4c30f36459e2f"
   },
   "entries": [
@@ -33,7 +33,6 @@
     "mama",
     "niger",
     "níger",
-    "pede",
     "pera",
     "pica",
     "pinto a camisa",
@@ -42,49 +41,25 @@
     "pinto o tecido",
     "pipa"
   ],
+  "scopedWords": ["pede"],
   "scopedPhrases": [
     {
       "phrase": "pé de",
-      "complements": [
-        "elefante",
-        "galinha",
-        "cabra",
-        "moleque",
-        "vento",
-        "atleta",
-        "meia",
-        "pato",
-        "bebê",
-        "criança",
-        "boneca",
-        "madeira",
-        "ferro",
-        "mesa",
-        "sofá",
-        "cadeira",
-        "cama"
-      ]
+      "complements": ["elefante", "galinha", "cabra", "moleque", "vento", "meia"]
     },
     {
       "phrase": "pé do",
       "complements": [
-        "sofá",
-        "bebê",
-        "criança",
-        "filho",
-        "menino",
-        "menina",
-        "noivo",
-        "modelo",
-        "manequim",
-        "cavalo",
-        "piano",
-        "mesa",
-        "banco",
-        "cabide",
-        "armário",
         "sapato",
-        "tripé"
+        "tênis",
+        "casaco",
+        "tapete",
+        "jeans",
+        "sobretudo",
+        "colete",
+        "chinelo",
+        "mocassim",
+        "coturno"
       ]
     }
   ],

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
 import { CommunityTextScreener } from './community-text-screener'
 
 /**
@@ -14,12 +16,12 @@ const screen = (text: string, locale: string | null = 'pt-BR') =>
 const footCopy = [
   'Calça pé de elefante em jeans escuro.',
   'Casaco com estampa pé de galinha em lã.',
-  'Meia de algodão macia até o pé do bebê.',
-  'Criança sentada no chão ao pé do sofá.',
+  'Palmilha macia para o pé do sapato.',
+  'Costura reforçada no pé do tênis branco.',
   'Doce pé-de-moleque sobre a mesa do ateliê.',
   'Corrente pé-de-cabra decorativa na bolsa.',
   'Vestido de seda com barra pé de vento.',
-  'Palmilha anatômica para pé de atleta.',
+  'Meia de lã com estampa pé de meia listrada.',
 ]
 // Family B: ordinary words that equal the repeat-collapsed spelling of a foreign term.
 const collapsedCopy = [
@@ -177,7 +179,7 @@ describe('round 7 bare and disguised shapes stay blocked in every locale', () =>
 describe('round 7 enumerated phrases need declared Portuguese', () => {
   const phrases = [
     'Calça pé de elefante em jeans escuro.',
-    'Meia de algodão macia até o pé do bebê.',
+    'Palmilha macia para o pé do sapato.',
     'Doce pé-de-moleque sobre a mesa do ateliê.',
     'Tapete de yoga antiderrapante na cor lilás.',
     'Tapete persa sob a mesa de jantar.',
@@ -209,5 +211,93 @@ describe('round 7 enumerated phrases need declared Portuguese', () => {
     ])
       for (const locale of nonPortuguese)
         expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+})
+
+describe('round 7 complements never launder a high-severity term', () => {
+  const policyDir = path.resolve(__dirname, '../../../policies/community-screening')
+  const allow = JSON.parse(
+    fs.readFileSync(path.join(policyDir, 'allow-list-v1.json'), 'utf8')
+  ) as { scopedPhrases: { entry: string; complements: string[] }[] }
+  const high = [
+    ...new Set(
+      ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr'].flatMap((language) =>
+        (
+          JSON.parse(
+            fs.readFileSync(path.join(policyDir, `terms-v1/${language}-v1.json`), 'utf8')
+          ) as { entries: { term: string; severity: string }[] }
+        ).entries
+          .filter((entry) => entry.severity === 'high')
+          .map((entry) => entry.term)
+      )
+    ),
+  ]
+
+  it('has high-severity terms and complements to combine', () => {
+    expect(high.length).toBeGreaterThan(100)
+    expect(allow.scopedPhrases.length).toBeGreaterThan(0)
+  })
+
+  it('keeps every high term blocked next to every complement under declared pt', () => {
+    const leaked: string[] = []
+    for (const { entry, complements } of allow.scopedPhrases)
+      for (const complement of complements)
+        for (const term of high)
+          for (const text of [
+            `${term} ${complement}`,
+            `${complement} ${term}`,
+            `${term} ${entry} ${complement}`,
+            `${entry} ${complement} ${term}`,
+            `${term}-${entry.replace(' ', '-')}-${complement}`,
+          ])
+            if (screen(text, 'pt-BR').disposition === 'pass') leaked.push(text)
+    expect(leaked).toEqual([])
+  }, 120_000)
+
+  it('keeps complements to footwear, trouser, coat and rug nouns', () => {
+    const people = ['bebê', 'criança', 'filho', 'menino', 'menina', 'noivo', 'atleta']
+    for (const { complements } of allow.scopedPhrases)
+      for (const person of people) expect(complements).not.toContain(person)
+  })
+})
+
+describe('round 7 stray combining marks cannot split a term', () => {
+  const terms = ['viado', 'puta', 'caralho', 'fuck', 'cabrão', 'tapette']
+  const marks = ['\u0301', '\u0300', '\u0303', '\u0332', '\u20e3', '\u0301\u0301']
+  it('withholds a term with a mark after any letter in every locale', () => {
+    for (const term of terms)
+      for (const mark of marks)
+        for (let at = 1; at <= term.length; at++) {
+          const text = term.slice(0, at) + mark + term.slice(at)
+          for (const locale of everyLocale)
+            expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+        }
+  })
+
+  it('still passes ordinary accented Portuguese copy', () => {
+    for (const text of [
+      'Calça jeans com bolsos',
+      'Sandália rasteira',
+      'Pé de meia confortável',
+    ])
+      expect(screen(text).disposition, text).toBe('pass')
+  })
+})
+
+describe('round 7 the pede verb is Portuguese-scoped and exact', () => {
+  const shapes = ['pede', 'pe de', 'p e d e', 'pe  de', 'pe-de', 'p.e.d.e']
+  it('blocks every shape for fr-FR, es-ES, en-US and no locale', () => {
+    for (const text of shapes)
+      for (const locale of ['fr-FR', 'es-ES', 'en-US', 'de-DE', 'it-IT', 'tr-TR', null])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('lets declared Portuguese pass only the exact verb token', () => {
+    for (const locale of ['pt-BR', 'pt-PT']) {
+      expect(screen('pede', locale).disposition).toBe('pass')
+      expect(screen('O tempo pede casaco.', locale).disposition).toBe('pass')
+      for (const text of shapes.slice(1))
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+    }
   })
 })

@@ -371,6 +371,7 @@ const allowFileSchema = z.object({
   // Head phrases cleared only when the declared locale resolves to this file's
   // language AND the next word is one of the enumerated complements. They reach the
   // short-token rejoin pass, which literal contexts cannot.
+  scopedWords: z.array(z.string().trim().min(1)).default([]),
   scopedPhrases: z
     .array(
       z.object({
@@ -432,6 +433,12 @@ const JOINABLE_TOKEN_LENGTH = 2
 
 const IGNORABLE_PATTERN = /[\p{Default_Ignorable_Code_Point}\p{Cf}]/gu
 const COMBINING_MARK_PATTERN = /\p{M}/gu
+/**
+ * A combining mark that survived NFKC has no precomposed letter, so it is stray. Left in place
+ * it splits a token (v + U+0301 + iado), because marks are neither letters nor digits.
+ */
+const STRAY_MARK_PATTERN =
+  /([\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}\p{N}])\p{M}+/gu
 const TOKEN_SPLIT_PATTERN = /[^\p{L}\p{N}]+/u
 const LEET_TRIGGER_PATTERN = /[0-9!@$|+]/
 const REPEAT_PATTERN = /(.)\1+/gu
@@ -580,7 +587,11 @@ const SEVERITY_RANK: Readonly<Record<TextScreeningSeverity, number>> = {
  * `cono`, the Spanish word for cone, be allow-listed while `coño` still screens.
  */
 export function toLiteralForm(raw: string): string {
-  let value = raw.normalize('NFKC').replace(IGNORABLE_PATTERN, '').toLowerCase()
+  let value = raw
+    .normalize('NFKC')
+    .replace(IGNORABLE_PATTERN, '')
+    .replace(STRAY_MARK_PATTERN, '$1')
+    .toLowerCase()
   for (const [pattern, replacement] of LITERAL_EXPANSIONS) {
     value = value.replace(pattern, replacement)
   }
@@ -1082,6 +1093,9 @@ export class CommunityTextScreener {
   >
   /** The scoped phrases of the language the current screen() call declared. */
   private activeScopedPhrases: readonly ScopedPhrase[] = []
+  private readonly scopedAllowWords: ReadonlyMap<ScreeningLanguage, ReadonlySet<string>>
+  /** Exact tokens cleared for the language the current screen() call declared. */
+  private activeScopedWords: ReadonlySet<string> = new Set()
   private readonly literalContexts: readonly (z.infer<typeof literalContextSchema> & {
     language: ScreeningLanguage
   })[]
@@ -1168,6 +1182,12 @@ export class CommunityTextScreener {
     this.allowSingles = allowSingles
     this.allowPhrases = allowPhrases
     this.scopedAllowPhrases = indexScopedPhrases(allowLists)
+    this.scopedAllowWords = new Map(
+      allowLists.map((list) => [
+        list.language,
+        new Set((list.scopedWords ?? []).map(toLiteralForm)),
+      ])
+    )
     if (
       allowLists.some((list) =>
         list.entries.some((entry) =>
@@ -1278,14 +1298,18 @@ export class CommunityTextScreener {
       verdict.flag(LOCALE_UNSCREENABLE_REASON, this.policy.unscreenableLocaleDisposition)
     }
 
-    this.activeScopedPhrases =
-      this.scopedAllowPhrases.get(
-        this.resolveLanguage(declaredLocale) as ScreeningLanguage
-      ) ?? []
+    const declaredLanguage = this.resolveLanguage(declaredLocale)
+    this.activeScopedWords = declaredLanguage
+      ? (this.scopedAllowWords.get(declaredLanguage) ?? new Set())
+      : new Set()
+    this.activeScopedPhrases = declaredLanguage
+      ? (this.scopedAllowPhrases.get(declaredLanguage) ?? [])
+      : []
     try {
       return this.screenWithVerdict(input, declaredLocale, verdict)
     } finally {
       this.activeScopedPhrases = []
+      this.activeScopedWords = new Set()
     }
   }
 
@@ -1313,7 +1337,10 @@ export class CommunityTextScreener {
     const phraseAllowed = literalTokens.map(() => false)
     this.markAllowedPhrases(literalTokens, phraseAllowed)
     const allowed = literalTokens.map(
-      (token, index) => this.allowSingles.has(token) || (phraseAllowed[index] as boolean)
+      (token, index) =>
+        this.allowSingles.has(token) ||
+        this.activeScopedWords.has(token) ||
+        (phraseAllowed[index] as boolean)
     )
     this.markLiteralContexts(literal, literalTokens, allowed, declaredLocale)
     this.markOccurrenceConstructions(boundedRaw, literalTokens, allowed, declaredLocale)

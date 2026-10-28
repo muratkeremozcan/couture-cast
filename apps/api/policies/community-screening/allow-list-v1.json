@@ -336,11 +336,6 @@
       "reason": "One of the commonest Portuguese verbs: fica lindo, fica bem. The cost is that the Italian vulgar spelling fica is not screened; figa, its usual spelling, still is."
     },
     {
-      "entry": "pede",
-      "language": "pt",
-      "reason": "Portuguese for asks, as in o tempo pede casaco. It folds onto the French slur pédé, which still screens in its accented spelling."
-    },
-    {
       "entry": "camisinha",
       "language": "pt",
       "reason": "A small shirt in Brazilian Portuguese, and the everyday word for a condom; neither is abusive."
@@ -1190,50 +1185,32 @@
     {
       "entry": "pé de",
       "language": "pt",
-      "complements": [
-        "elefante",
-        "galinha",
-        "cabra",
-        "moleque",
-        "vento",
-        "atleta",
-        "meia",
-        "pato",
-        "bebê",
-        "criança",
-        "boneca",
-        "madeira",
-        "ferro",
-        "mesa",
-        "sofá",
-        "cadeira",
-        "cama"
-      ],
-      "reason": "Portuguese foot-of noun phrase ('calça pé de elefante', 'estampa pé de galinha', 'pé de vento', 'pé de atleta', 'pé-de-moleque'). The short-token rejoin builds the accented 'péde', misses the unaccented allow entry 'pede' and reads as the French slur. Clears only the exact accented tokens pé and de when the declared locale is Portuguese and the next word is one of the enumerated Portuguese complements; the bare phrase, a trailing phrase, 'pé dé' and every other spelling keep screening in every locale."
+      "complements": ["elefante", "galinha", "cabra", "moleque", "vento", "meia"],
+      "reason": "Portuguese foot-of noun phrase ('calça pé de elefante', 'estampa pé de galinha', 'pé de vento', 'pé de atleta', 'pé-de-moleque'). The short-token rejoin builds the accented 'péde', misses the unaccented allow entry 'pede' and reads as the French slur. Clears only the exact accented tokens pé and de when the declared locale is Portuguese and the next word is one of the enumerated Portuguese footwear, trouser, coat and rug nouns; the bare phrase, a trailing phrase, 'pé dé' and every other spelling keep screening in every locale."
     },
     {
       "entry": "pé do",
       "language": "pt",
       "complements": [
-        "sofá",
-        "bebê",
-        "criança",
-        "filho",
-        "menino",
-        "menina",
-        "noivo",
-        "modelo",
-        "manequim",
-        "cavalo",
-        "piano",
-        "mesa",
-        "banco",
-        "cabide",
-        "armário",
         "sapato",
-        "tripé"
+        "tênis",
+        "casaco",
+        "tapete",
+        "jeans",
+        "sobretudo",
+        "colete",
+        "chinelo",
+        "mocassim",
+        "coturno"
       ],
       "reason": "Portuguese foot-of noun phrase ('pé do sofá', 'pé do bebê') whose accented rejoin 'pédo' met the Spanish term pedo. Clears only the exact accented tokens pé and do when the declared locale is Portuguese and the next word is one of the enumerated complements; the bare phrase and every other spelling keep screening in every locale."
+    }
+  ],
+  "scopedWords": [
+    {
+      "entry": "pede",
+      "language": "pt",
+      "reason": "Portuguese verb for asks, as in o tempo pede casaco. The exact token folds onto the French slur pédé, as do its split and spaced spellings. It clears only as the single exact token and only when the declared locale is Portuguese; 'pe de', 'p e d e', stretched spellings and every other locale keep screening. Residual: a client can declare pt, so the exact token passes there because it is the ordinary verb."
     }
   ]
 }

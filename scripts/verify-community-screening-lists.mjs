@@ -293,6 +293,18 @@ export function globallyAllowsOccurrenceTarget(value) {
   )
 }
 
+function scopedWordProblems(scopedWords) {
+  return scopedWords.flatMap((scoped) => {
+    const literal = toLiteral(scoped.entry ?? '')
+    return !LANGUAGES.includes(scoped.language) ||
+      tokenize(literal).length !== 1 ||
+      typeof scoped.reason !== 'string' ||
+      scoped.reason.length < 20
+      ? [`scoped allow word "${scoped.entry}" needs a language, one word and a reason`]
+      : []
+  })
+}
+
 function scopedPhraseProblems(scopedPhrases) {
   const problems = []
   for (const scoped of scopedPhrases) {
@@ -344,6 +356,7 @@ function loadAllowList() {
     )
   )
   problems.push(...scopedPhraseProblems(allow.scopedPhrases ?? []))
+  problems.push(...scopedWordProblems(allow.scopedWords ?? []))
   if ('occurrenceConstructions' in allow)
     problems.push('reviewed constructions must use the authoritative bank')
   problems.push(...occurrenceConstructionProblems(REVIEWED_OCCURRENCE_CONSTRUCTIONS))
@@ -488,6 +501,9 @@ function buildAllowFile(language, allowState, hashes) {
       .filter((entry) => entry.language === language)
       .map((entry) => toLiteral(entry.entry))
       .toSorted(),
+    scopedWords: (allowState.allow.scopedWords ?? [])
+      .filter((entry) => entry.language === language)
+      .map((entry) => toLiteral(entry.entry)),
     scopedPhrases: (allowState.allow.scopedPhrases ?? [])
       .filter((entry) => entry.language === language)
       .map((entry) => ({
