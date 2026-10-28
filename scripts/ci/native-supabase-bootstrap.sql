@@ -41,11 +41,17 @@ GRANT USAGE, CREATE ON SCHEMA auth TO supabase_auth_admin;
 CREATE SCHEMA storage AUTHORIZATION supabase_storage_admin;
 GRANT USAGE ON SCHEMA auth, storage TO anon, authenticated, service_role;
 
--- storage-api's migration ledger, created ahead of storage-api as the image does
--- (00000000000002-storage-schema.sql), with postgres-migrations' own definition.
--- storage-api v1.32.0 runs CREATE SCHEMA IF NOT EXISTS storage whenever this
--- table is missing, and that statement needs CREATE on the database, which
--- supabase_storage_admin does not hold in the image either.
+-- WORKAROUND for storage-api v1.32.0: create its migration ledger ahead of it,
+-- as the image does (00000000000002-storage-schema.sql), with
+-- postgres-migrations' own definition. Without this table storage-api calls
+-- doesSchemaExists(), which compares node-pg's boolean to the string 'true'
+-- (src/internal/database/migrations/migrate.ts line 750 at v1.32.0:
+-- `result.rows[0].exists === 'true'`), so it always runs
+-- CREATE SCHEMA IF NOT EXISTS storage. That statement needs CREATE on the
+-- database, which supabase_storage_admin does not hold in the image either, and
+-- fails with "permission denied for database postgres". Reported upstream as
+-- supabase/storage#928 and fixed by #968 (commit 6e988b5f), which v1.32.0
+-- predates. Drop this block when the lane moves to a storage-api with that fix.
 SET ROLE supabase_storage_admin;
 CREATE TABLE storage.migrations (
   id integer PRIMARY KEY,

@@ -272,3 +272,27 @@ test('the bootstrap SQL provides exactly the parity roles, schemas and storage l
     'RESET ROLE',
   ])
 })
+
+test('the bootstrap pre-creates the storage-api v1.32.0 migration ledger as its owner', async () => {
+  const sql = await readFile(
+    path.join(root, 'scripts/ci/native-supabase-bootstrap.sql'),
+    'utf8'
+  )
+  // storage-api v1.32.0 needs CREATE on the database when this table is missing
+  // (supabase/storage#928, fixed by #968 after v1.32.0).
+  assert.equal(PINS.storage.tag, 'v1.32.0')
+  assert.match(sql, /supabase\/storage#928/)
+  const ledger = sql.match(
+    /SET ROLE supabase_storage_admin;\s*CREATE TABLE storage\.migrations \(([^;]+)\);\s*RESET ROLE;/
+  )
+  assert.ok(ledger, 'storage.migrations is created as supabase_storage_admin')
+  assert.deepEqual(
+    ledger[1].split(',').map((column) => column.trim().replace(/\s+/g, ' ')),
+    [
+      'id integer PRIMARY KEY',
+      'name varchar(100) UNIQUE NOT NULL',
+      'hash varchar(40) NOT NULL',
+      'executed_at timestamp DEFAULT current_timestamp',
+    ]
+  )
+})
