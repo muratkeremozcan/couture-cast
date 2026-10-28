@@ -280,6 +280,7 @@ jobs:
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-log-counts.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-metro-bundles.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-flow-command-timings.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-flow-progress.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-device-cleanup.json
           if-no-files-found: warn
       - name: Select and scan closed evidence
@@ -341,5 +342,6 @@ jobs:
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-log-counts.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-metro-bundles.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-flow-command-timings.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-flow-progress.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-device-cleanup.json
           if-no-files-found: error

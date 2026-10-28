@@ -15,7 +15,10 @@ import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs
 import { withColdAndroidFontScale } from './lib/story68-cold-font-scale.mjs'
 import { runReleaseLiveFontCommand } from './lib/story68-release-live-font-command.mjs'
 import { metroServerEnv } from './lib/story68-metro-env.mjs'
-import { recordIosCommandTimings } from './ci/native-ios-maestro-trace.mjs'
+import {
+  recordIosCommandTimings,
+  recordIosFlowProgress,
+} from './ci/native-ios-maestro-trace.mjs'
 import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
 import {
   assertIosReadDenied,
@@ -315,6 +318,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
     result.status !== 0 &&
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })
   if (result.status !== 0 && !recoverSnapshot) {
+    recordIosFlowProgress({ platform, flow, maestroLog: snapshotLog, directory })
     privateJson(
       `native-flow-failure-${platform}.json`,
       summarizeNativeFlowFailure({

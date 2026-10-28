@@ -2,12 +2,13 @@ appId: ${MAESTRO_APP_ID}
 ---
 - tapOn:
     id: share-card-save
-# The first Save lazily bundles expo-media-library on the dev server (13.8 s in CI run
-# 40726798107), so the permission prompt can arrive well after the tap. Wait for either
-# the prompt or the permanent-denial message instead of probing once.
+# The prompt used to arrive after a lazy expo-media-library bundle built mid-flow (13.8 s in
+# CI run 40726798107). With lazy bundling off on iOS the wait stayed under 1 s (run
+# 40737120864), so 15 s is a generous bound. Wait for either the prompt or the
+# permanent-denial message instead of probing once.
 - extendedWaitUntil:
     visible: "Don.t allow|Don’t Allow|Don't Allow|${MAESTRO_PERMANENT}"
-    timeout: 45000
+    timeout: 15000
 - runFlow:
     when:
       visible: "Don.t allow|Don’t Allow|Don't Allow"

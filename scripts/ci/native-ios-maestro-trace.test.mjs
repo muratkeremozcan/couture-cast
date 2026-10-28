@@ -4,7 +4,9 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import {
+  maestroFlowProgress,
   recordIosCommandTimings,
+  recordIosFlowProgress,
   slowMaestroCommands,
 } from './native-ios-maestro-trace.mjs'
 
@@ -71,4 +73,65 @@ test('the receipt appends flows, is iOS only and survives a missing trace', (t) 
       ['b.yaml', 0],
     ]
   )
+})
+
+const L = 'maestro.cli.runner.MaestroCommandRunner.runCommands$lambda$0'
+const stamped = (time, text) => `${time} [ INFO] ${L}: ${text}`
+const killedLog = [
+  '14:00:00.000 [ INFO] maestro.cli.runner.TestRunner.runSingle: Running flow open-post.yaml...',
+  stamped('14:00:01.000', 'Tap on id: tab-community RUNNING'),
+  stamped('14:00:03.500', 'Tap on id: tab-community COMPLETED'),
+  stamped('14:00:04.000', 'Swipe from (50%,45%) to (50%,80%) RUNNING'),
+  stamped('14:00:06.000', 'Swipe from (50%,45%) to (50%,80%) COMPLETED'),
+  stamped('14:00:07.000', 'Swipe from (50%,45%) to (50%,80%) RUNNING'),
+  stamped('14:00:09.000', 'Swipe from (50%,45%) to (50%,80%) COMPLETED'),
+  stamped('14:00:10.000', 'Run flow when visible "Maria Private" SKIPPED'),
+  stamped('14:02:00.000', 'Swipe from (50%,75%) to (50%,40%) RUNNING'),
+  'a stack trace line that is not a command line',
+].join('\n')
+
+test('a killed flow shows which commands ran, how often and where it stopped, without label text', () => {
+  const progress = maestroFlowProgress(killedLog)
+  assert.equal(progress.commandLines, 8)
+  assert.deepEqual(progress.last, { verb: 'Swipe from', status: 'RUNNING' })
+  assert.equal(progress.spanSeconds, 119)
+  assert.deepEqual(
+    progress.verbs.find((v) => v.verb === 'Swipe from' && v.status === 'COMPLETED'),
+    { verb: 'Swipe from', status: 'COMPLETED', count: 2 }
+  )
+  assert.doesNotMatch(JSON.stringify(progress), /Maria|Private|50%|tab-community/)
+  assert.deepEqual(maestroFlowProgress(undefined), {
+    commandLines: 0,
+    verbs: [],
+    last: null,
+    spanSeconds: null,
+  })
+})
+
+test('failed iOS flows append their progress and other platforms record nothing', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-progress-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const lines = []
+  recordIosFlowProgress({
+    platform: 'ios',
+    flow: 'maestro/story68/open-post.yaml',
+    maestroLog: killedLog,
+    directory,
+    report: (line) => lines.push(line),
+  })
+  assert.equal(
+    recordIosFlowProgress({
+      platform: 'android',
+      flow: 'x',
+      maestroLog: killedLog,
+      directory,
+    }),
+    null
+  )
+  const record = JSON.parse(
+    fs.readFileSync(path.join(directory, 'native-ios-flow-progress.json'))
+  )
+  assert.equal(record.failedFlows.length, 1)
+  assert.equal(record.failedFlows[0].flow, 'maestro/story68/open-post.yaml')
+  assert.match(lines[0], /iosFlowProgress/)
 })

@@ -75,3 +75,68 @@ export function recordIosCommandTimings({
   }
   return entry
 }
+
+const PROGRESS_LINE =
+  /^(\d{2}):(\d{2}):(\d{2})\.(\d{3}) \[ *\w+\] maestro\.cli\.runner\.MaestroCommandRunner\.runCommands\$lambda\$\d+: (.*) (RUNNING|COMPLETED|FAILED|SKIPPED)$/
+// Only the leading words of a command label are kept: never its quoted text or coordinates.
+const verbOf = (label) => /^[A-Za-z]+(?: [A-Za-z]+){0,2}/.exec(label)?.[0] ?? 'unknown'
+
+/**
+ * Where a flow was when it ended, from the progressive Maestro log: per command verb the
+ * count of each status, the last command line and the seconds from the first to the last
+ * command line. A killed flow leaves no command trace, so this is its only evidence.
+ */
+export function maestroFlowProgress(log) {
+  const counts = new Map()
+  let first = null
+  let last = null
+  for (const line of String(log ?? '').split('\n')) {
+    const match = PROGRESS_LINE.exec(line)
+    if (!match) continue
+    const [, h, m, sec, ms, label, status] = match
+    const at = Number(h) * 3600 + Number(m) * 60 + Number(sec) + Number(ms) / 1000
+    first ??= at
+    const verb = verbOf(label)
+    const key = `${verb}\0${status}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+    last = { verb, status, at }
+  }
+  return {
+    commandLines: [...counts.values()].reduce((total, count) => total + count, 0),
+    verbs: [...counts]
+      .map(([key, count]) => ({
+        verb: key.split('\0')[0],
+        status: key.split('\0')[1],
+        count,
+      }))
+      .sort((a, b) => b.count - a.count || a.verb.localeCompare(b.verb)),
+    last: last && { verb: last.verb, status: last.status },
+    spanSeconds: first === null ? null : Math.round((last.at - first) * 10) / 10,
+  }
+}
+
+/** Append a failed flow's progress to the run's receipt (nonfatal, iOS only). */
+export function recordIosFlowProgress({
+  platform,
+  flow,
+  maestroLog,
+  directory,
+  report = console.log,
+}) {
+  if (platform !== 'ios') return null
+  const entry = { flow, ...maestroFlowProgress(maestroLog) }
+  const file = path.join(directory, 'native-ios-flow-progress.json')
+  try {
+    const record = fs.existsSync(file)
+      ? JSON.parse(fs.readFileSync(file, 'utf8'))
+      : { version: 1, failedFlows: [] }
+    record.failedFlows.push(entry)
+    fs.writeFileSync(file, JSON.stringify(record, null, 2) + '\n', { mode: 0o600 })
+  } catch (error) {
+    report(
+      JSON.stringify({ iosFlowProgressWriteFailure: { errorCode: error.code ?? null } })
+    )
+  }
+  report(JSON.stringify({ iosFlowProgress: entry }))
+  return entry
+}
