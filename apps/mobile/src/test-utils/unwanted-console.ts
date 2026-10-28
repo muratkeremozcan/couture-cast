@@ -1,10 +1,10 @@
 // Suite-wide guard for signals that only a broken test environment produces.
 //
 // Each one means an Expo package loaded without what Expo's own toolchain gives it:
-// babel-preset-expo's EXPO_OS inline, Expo's web global (globalThis.expo), or the native
-// module behind a platform path a test simulates without mocking. The console patterns are
-// scoped to these messages, so a test that injects a failure on purpose
-// (ritual-cache-ordering's "disk full") still logs freely.
+// babel-preset-expo's EXPO_OS inline, Expo's web global (globalThis.expo) and web
+// constants module, or the native module behind a platform path a test simulates without
+// mocking. The console patterns are scoped to these messages, so a test that injects a
+// failure on purpose (ritual-cache-ordering's "disk full") still logs freely.
 //
 // Everything stays installed for the whole file, because an Expo package often loads from
 // a lazy import that settles after its test ended. A signal between tests is reported by
@@ -14,6 +14,7 @@ import { afterAll, afterEach, expect } from 'vitest'
 
 export const unwantedConsolePatterns = [
   /process\.env\.EXPO_OS is not defined/,
+  /No native ExponentConstants module found/,
   /\[RitualCache\][\s\S]*EventEmitter/,
 ]
 
