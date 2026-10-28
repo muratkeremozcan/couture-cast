@@ -113,9 +113,22 @@ describe('deployment workflows', () => {
     const budgetSeconds = Number(webCall?.[1]) * Number(webCall?.[2])
     // Run 40728198560: the web build outlived 20 x 30s (10 minutes) by seconds.
     expect(budgetSeconds).toBeGreaterThanOrEqual(1200)
-    // The job limit must leave room for curl time on top of the polling budget.
+    // A hung connection must not stall an attempt: every fetch carries a hard limit.
+    const fetchLimit = Number(/curl -sS -L --max-time (\d+) /.exec(wait)?.[1])
+    expect(fetchLimit).toBeGreaterThan(0)
+    expect(fetchLimit).toBeLessThanOrEqual(30)
+    // Worst case every attempt hangs to its fetch limit, plus the final verification fetch.
+    const sleep = Number(webCall?.[2])
+    const worstCaseSeconds = Number(webCall?.[1]) * (sleep + fetchLimit) + fetchLimit
     const limitMinutes = Number(/timeout-minutes: (\d+)/.exec(wait)?.[1])
-    expect(limitMinutes * 60).toBeGreaterThanOrEqual(budgetSeconds + 300)
+    expect(limitMinutes * 60).toBeGreaterThanOrEqual(worstCaseSeconds)
+  })
+
+  it('the wait fetch uses a hard time limit so a hung connection cannot stall polling', () => {
+    const wait = fs.readFileSync(vercelWaitWorkflow, 'utf8')
+    const fetches = wait.match(/^\s*curl .*$/gm) ?? []
+    expect(fetches).toHaveLength(1)
+    expect(fetches[0]).toMatch(/--max-time \d+/)
   })
 
   it('the wait step names the HTML page it received and the elapsed time per attempt', () => {

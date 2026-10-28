@@ -32,8 +32,9 @@ on:
 jobs:
   wait:
     runs-on: ubuntu-latest
-    # Callers poll up to 40 x 30s for a slow web build; the rest is curl and verification time.
-    timeout-minutes: 30
+    # Worst case is every attempt hanging to its 20s curl limit: callers poll up to 40 x
+    # (30s sleep + 20s fetch), plus the final verification fetch.
+    timeout-minutes: 40
     outputs:
       observed_sha: ${{ steps.health_check.outputs.observed_sha }}
     steps:
@@ -65,7 +66,7 @@ jobs:
           fetch_health() {
             local response
             response=$(
-              curl -sS -L \
+              curl -sS -L --max-time 20 \
                 -c "${COOKIE_JAR}" \
                 -b "${COOKIE_JAR}" \
                 -H "x-vercel-protection-bypass: ${VERCEL_BYPASS_SECRET}" \
