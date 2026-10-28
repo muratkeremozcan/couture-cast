@@ -1035,8 +1035,13 @@ test('P-MODAL-STACK: detail and share dialogs resume in order after foreground r
   await expect(detail).toBeVisible()
   await expect(detail).not.toHaveAttribute('aria-hidden', 'true')
   expect((await modalPageState(page)).overflow).toBe('hidden')
+  // Focus returns to the control inside the detail that opened the share dialog.
+  await expect(detail.getByTestId('share-card-open')).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(detail).toHaveCount(0)
+  // Revalidation remounted the card that opened the detail; focus returns to its
+  // replacement on the same surface.
+  await expect(card.getByTestId(`lookbook-open-${fixture.postId}`)).toBeFocused()
 
   // The shell is interactive again and the scroll lock is gone.
   expect(await modalPageState(page)).toEqual({
@@ -1044,8 +1049,14 @@ test('P-MODAL-STACK: detail and share dialogs resume in order after foreground r
     background: [],
     overflow: '',
   })
-  await card.getByTestId(`lookbook-open-${fixture.postId}`).click()
+  // Opened and closed again with no revalidation in between, focus returns to the
+  // card control that opened the detail.
+  const invoker = card.getByTestId(`lookbook-open-${fixture.postId}`)
+  await invoker.click()
   await expect(detailModal(page)).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(detailModal(page)).toHaveCount(0)
+  await expect(invoker).toBeFocused()
 })
 
 test('P-MODAL-STACK: access denied during foreground revalidation removes both dialogs and releases the page', async ({
