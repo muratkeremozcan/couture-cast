@@ -14,6 +14,7 @@ import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics
 import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs'
 import { withColdAndroidFontScale } from './lib/story68-cold-font-scale.mjs'
 import { runReleaseLiveFontCommand } from './lib/story68-release-live-font-command.mjs'
+import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
 import {
   assertIosReadDenied,
   shouldRetryIosSnapshot,
@@ -348,6 +349,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   const log = `${result.stdout}\n${result.stderr}`
     .split(secret || '\0')
     .join('[REDACTED]')
+  const successOutput = output
   if (secret) fs.rmSync(output, { recursive: true })
   fs.writeFileSync(
     path.join(directory, `maestro-${platform}-${path.basename(flow)}.log`),
@@ -356,6 +358,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   )
   if (recoverSnapshot) return maestro(flow, env, secret, attempt + 1)
   if (result.status !== 0) throw new Error(`native_flow_failed:${flow}`)
+  recordIosStackPop({ platform, flow, output: successOutput, directory })
 }
 async function signin() {
   activeLocale = 'en-US'

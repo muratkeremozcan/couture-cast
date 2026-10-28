@@ -65,17 +65,6 @@ appId: ${MAESTRO_APP_ID}
                 commands:
                   - tapOn: 'Back'
                   - waitForAnimationToEnd
-            # The label follows the OS locale; the edge swipe pops the stack in every locale.
-            - runFlow:
-                when:
-                  platform: iOS
-                  notVisible:
-                    id: 'tab-home'
-                commands:
-                  - swipe:
-                      start: 2%, 50%
-                      end: 80%, 50%
-                  - waitForAnimationToEnd
       - extendedWaitUntil:
           visible:
             id: 'tab-home'
