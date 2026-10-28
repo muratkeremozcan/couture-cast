@@ -295,6 +295,7 @@ function invokeMaestro(t, capture) {
     process: { env: {}, kill: () => assert.fail('unexpected process mutation') },
     withNativeTransport: (work) => work(),
     recordIosFlowTiming: () => undefined,
+    recordIosFlowProgress: () => undefined,
     reverse: () => undefined,
     localeEnv: () => ({}),
     spawnSync: () => ({

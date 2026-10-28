@@ -135,3 +135,29 @@ test('failed iOS flows append their progress and other platforms record nothing'
   assert.equal(record.failedFlows[0].flow, 'maestro/story68/open-post.yaml')
   assert.match(lines[0], /iosFlowProgress/)
 })
+
+test('a failing progress record or report never throws into the flow failure path', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-progress-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const throwing = () => {
+    throw new Error('console closed')
+  }
+  assert.doesNotThrow(() =>
+    recordIosFlowProgress({
+      platform: 'ios',
+      flow: 'f',
+      maestroLog: killedLog,
+      directory,
+      report: throwing,
+    })
+  )
+  assert.doesNotThrow(() =>
+    recordIosFlowProgress({
+      platform: 'ios',
+      flow: 'f',
+      maestroLog: killedLog,
+      directory: path.join(directory, 'missing', 'deeper'),
+      report: () => undefined,
+    })
+  )
+})

@@ -1,7 +1,26 @@
 appId: ${MAESTRO_APP_ID}
 ---
+# Opens the owned post's Share card from the Community feed card. The feed mounts at the
+# top, so the post is at most a few screens down; the walk is bounded, and each way the
+# post can be missing fails with its own label instead of a timeout at the flow budget.
 - tapOn:
     id: tab-community
+- extendedWaitUntil:
+    visible:
+      id: community-screen
+    timeout: 20000
+    label: 'community_screen_absent'
+- extendedWaitUntil:
+    notVisible:
+      id: community-feed-skeleton
+    timeout: 30000
+    label: 'feed_skeleton_still_showing'
+- assertNotVisible:
+    id: community-feed-error
+    label: 'feed_error_state'
+- assertNotVisible:
+    id: community-feed-unavailable
+    label: 'feed_unavailable_state'
 - runFlow:
     when:
       platform: iOS
@@ -11,19 +30,7 @@ appId: ${MAESTRO_APP_ID}
           while:
             notVisible:
               id: community-card-author-${MAESTRO_POST_ID}
-          times: 12
-          commands:
-            - swipe:
-                start: 50%, 45%
-                end: 50%, 80%
-                duration: 800
-            - waitForAnimationToEnd
-      # A freshly mounted feed starts above the post, below the spotlight section.
-      - repeat:
-          while:
-            notVisible:
-              id: community-card-author-${MAESTRO_POST_ID}
-          times: 16
+          times: 8
           commands:
             - swipe:
                 start: 50%, 75%
@@ -32,11 +39,12 @@ appId: ${MAESTRO_APP_ID}
             - waitForAnimationToEnd
       - assertVisible:
           id: community-card-author-${MAESTRO_POST_ID}
+          label: 'post_not_within_8_swipes'
       - repeat:
           while:
             notVisible:
               id: community-share-card-open-${MAESTRO_POST_ID}
-          times: 10
+          times: 3
           commands:
             - swipe:
                 start: 50%, 75%
@@ -65,3 +73,4 @@ appId: ${MAESTRO_APP_ID}
     visible:
       id: share-card-preview-loaded-.*
     timeout: 20000
+    label: 'share_card_preview_not_loaded'

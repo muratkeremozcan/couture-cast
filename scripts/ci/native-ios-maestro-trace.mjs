@@ -124,19 +124,24 @@ export function recordIosFlowProgress({
   report = console.log,
 }) {
   if (platform !== 'ios') return null
-  const entry = { flow, ...maestroFlowProgress(maestroLog) }
-  const file = path.join(directory, 'native-ios-flow-progress.json')
+  // Diagnostics never replace the original Maestro failure, so nothing here may throw.
   try {
-    const record = fs.existsSync(file)
-      ? JSON.parse(fs.readFileSync(file, 'utf8'))
-      : { version: 1, failedFlows: [] }
-    record.failedFlows.push(entry)
-    fs.writeFileSync(file, JSON.stringify(record, null, 2) + '\n', { mode: 0o600 })
-  } catch (error) {
-    report(
-      JSON.stringify({ iosFlowProgressWriteFailure: { errorCode: error.code ?? null } })
-    )
+    const entry = { flow, ...maestroFlowProgress(maestroLog) }
+    const file = path.join(directory, 'native-ios-flow-progress.json')
+    try {
+      const record = fs.existsSync(file)
+        ? JSON.parse(fs.readFileSync(file, 'utf8'))
+        : { version: 1, failedFlows: [] }
+      record.failedFlows.push(entry)
+      fs.writeFileSync(file, JSON.stringify(record, null, 2) + '\n', { mode: 0o600 })
+    } catch (error) {
+      report(
+        JSON.stringify({ iosFlowProgressWriteFailure: { errorCode: error.code ?? null } })
+      )
+    }
+    report(JSON.stringify({ iosFlowProgress: entry }))
+    return entry
+  } catch {
+    return null
   }
-  report(JSON.stringify({ iosFlowProgress: entry }))
-  return entry
 }
