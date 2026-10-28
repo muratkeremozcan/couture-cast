@@ -85,6 +85,62 @@ describe('original-resource proof', () => {
   }
 })
 
+describe('native matrix retry resource accounting', () => {
+  for (const importedDuringRetry of [null, 'cache_failure', 'storage', 'offline']) {
+    test(`Retry ${importedDuringRetry ? `rejects an import during ${importedDuringRetry}` : 'preserves the pre-Save baseline for all failure modes'}`, () => {
+      const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
+      const start = source.indexOf(
+        "  for (const mode of ['cache_failure', 'storage', 'offline'])"
+      )
+      const end = source.indexOf("  fixture('real')\n  close()", start)
+      assert.ok(start >= 0 && end > start)
+      const guardStart = source.indexOf('  const assertUnchanged = (before) => {')
+      const guardEnd = source.indexOf('  const extract = ', guardStart)
+      assert.ok(guardStart >= 0 && guardEnd > guardStart)
+      const resources = []
+      const captures = []
+      const extracts = []
+      let failureMode
+      const execute = () =>
+        vm.runInNewContext(
+          `(() => {
+        let before;
+        ${source.slice(guardStart, guardEnd)}
+        ${source.slice(start, end)}
+      })()`,
+          {
+            originals: () => JSON.stringify(resources),
+            fixture: (mode) => {
+              if (mode !== 'real') failureMode = mode
+            },
+            readLocale: () => ({ shareCard: { offline: 'offline', storage: 'storage' } }),
+            maestro: (flow) => {
+              if (flow.endsWith('/retry.yaml') && failureMode === importedDuringRetry)
+                resources.push('unexpected-retry-photo.png')
+              if (flow.endsWith('/save.yaml')) resources.push(`saved-${failureMode}.png`)
+            },
+            captureApproved: () => captures.push(failureMode),
+            extract: (name) => extracts.push(name),
+            mark: () => undefined,
+          }
+        )
+      if (importedDuringRetry) {
+        assert.throws(execute, { message: 'unexpected_native_import' })
+        assert.equal(captures.includes(importedDuringRetry), false)
+        assert.equal(extracts.includes(`retry-${importedDuringRetry}`), false)
+      } else {
+        execute()
+        assert.deepEqual(captures, ['cache_failure', 'storage', 'offline'])
+        assert.deepEqual(extracts, [
+          'retry-cache_failure',
+          'retry-storage',
+          'retry-offline',
+        ])
+      }
+    })
+  }
+})
+
 describe('owned Play emulator', () => {
   test('owned Play emulator and CI allocate 4GiB while retaining existing user data', () => {
     const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')

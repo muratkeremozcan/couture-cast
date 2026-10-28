@@ -1381,6 +1381,7 @@ if (command === 'prebuild') {
     // Retry prepares a fresh preview; the next Save takes a new final authorization.
     fixture('real')
     maestro('maestro/story68/retry.yaml')
+    assertUnchanged(before)
     captureApproved()
     maestro('maestro/story68/save.yaml')
     extract(`retry-${mode}`)
