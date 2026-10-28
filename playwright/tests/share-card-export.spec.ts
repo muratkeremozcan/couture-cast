@@ -958,10 +958,58 @@ test('P-CANCEL-SAVE: closing during held save authorization prevents browser han
       else await holdThenFulfill(route, request, gate)
     },
   })
+  const verification = routeGate()
+  const preferences = routeGate()
+  const heldSession = interceptNetworkCall({
+    method: 'GET',
+    url: '**/api/v1/user/profile',
+    handler: async (route, request) => {
+      if (!verification.request) {
+        verification.request = request
+        verification.enter()
+        await verification.released
+      }
+      await route.continue()
+    },
+  })
+  const heldPreferences = interceptNetworkCall({
+    method: 'GET',
+    url: '**/api/v1/community/notification-preferences',
+    handler: async (route, request) => {
+      if (!preferences.request) {
+        preferences.request = request
+        preferences.enter()
+        await preferences.released
+      }
+      await route.continue()
+    },
+  })
   await page.goto('/notification-settings')
+  const back = page.getByRole('link', { name: 'Back to community', exact: true })
+  const boxes = []
+  try {
+    await heldSession
+    await verification.started
+    await expect(back).toBeVisible()
+    boxes.push(await back.boundingBox())
+    verification.release()
+    await heldPreferences
+    await preferences.started
+    boxes.push(await back.boundingBox())
+  } finally {
+    verification.release()
+    preferences.release()
+  }
   await settingsLoaded(page)
+  boxes.push(await back.boundingBox())
+  // The form's place is held while identity and settings load, so links never move.
+  expect(boxes, 'Back link box while verifying, loading and loaded').toEqual([
+    boxes[0],
+    boxes[0],
+    boxes[0],
+  ])
   const sameDocument = await markDocument(page)
-  await page.getByRole('link', { name: 'Back to community', exact: true }).click()
+  await back.click()
   await expect(page).toHaveURL('/')
   await sameDocument()
   const { opener, preview, dialog } = await ownPhoto(page, null)
