@@ -9,6 +9,13 @@ import {
 } from './story68-worklets-staging.mjs'
 import vm from 'node:vm'
 import { describe, test } from 'node:test'
+import { talkbackFailureSummary } from './story68-talkback-failure.mjs'
+import {
+  bundleBuilds,
+  focusLatencies,
+  talkBackVersion,
+  talkbackEvidence,
+} from './story68-talkback-evidence.mjs'
 
 describe('TalkBack driver handoff', () => {
   for (const initiallyEnabled of [false, true]) {
@@ -22,7 +29,16 @@ describe('TalkBack driver handoff', () => {
       let modalOpen = true
       let instrumented = false
       const restored = new Map()
+      const logs = []
       vm.runInNewContext(`(() => {${source.slice(start, end)}})()`, {
+        // Globals and imports the extracted a11y branch uses; the real modules, not stubs.
+        performance,
+        console: { log: (line) => logs.push(line) },
+        bundleBuilds,
+        focusLatencies,
+        talkBackVersion,
+        talkbackEvidence,
+        talkbackFailureSummary,
         requireDevice: () => undefined,
         activeLocale: 'en-US',
         platform: 'android',
@@ -65,6 +81,12 @@ describe('TalkBack driver handoff', () => {
         },
       })
       assert.equal(instrumented, true)
+      // The closed evidence is printed on a passing run too, and no failure summary is.
+      assert.equal(logs.filter((line) => line.includes('talkbackEvidence')).length, 1)
+      assert.equal(
+        logs.some((line) => line.includes('talkbackComposer')),
+        false
+      )
       assert.equal(restored.get('enabled_accessibility_services'), previousService)
       assert.equal(restored.get('accessibility_enabled'), initiallyEnabled ? '1' : '0')
     })
