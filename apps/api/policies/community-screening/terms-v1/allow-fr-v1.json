@@ -12,8 +12,8 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "1f77c9c648137d2510d46106bc72466079e871ab45314e2b8b9ca7d7df5391bc",
-    "reviewedOccurrenceSha256": "a212c091e56b68db0142be24ddddd8b1a5ae0a03de54cd0ccac7f425690f89bb"
+    "allowListSha256": "fb6705741dd336e77f38db4cb131820c0787e325ca89ceef20099ef02ac5d3c5",
+    "reviewedOccurrenceSha256": "da22299c1bb3431bed21e13045834488de36e15b7fc2eb621a1741cfa21059a4"
   },
   "entries": [
     "chatte brodée",
@@ -29,7 +29,9 @@
   "splitFrames": [],
   "cutFamily": {
     "terms": [],
-    "reviewHalves": []
+    "reviewHalves": [],
+    "copulas": [],
+    "nameFollowers": []
   },
   "scopedWords": [],
   "scopedPhrases": [],

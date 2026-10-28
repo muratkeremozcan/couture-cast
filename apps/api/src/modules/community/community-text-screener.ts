@@ -404,8 +404,10 @@ const allowFileSchema = z.object({
     .object({
       terms: z.array(z.string().regex(/^\p{L}+$/u)),
       reviewHalves: z.array(z.string().regex(/^\p{L}+$/u)),
+      copulas: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+      nameFollowers: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
     })
-    .default({ terms: [], reviewHalves: [] }),
+    .default({ terms: [], reviewHalves: [], copulas: [], nameFollowers: [] }),
   // Reviewed two-word cuts of a high-severity term that stay clean, but only inside the
   // enumerated frame: the word before the pair (or the text start) and the closed phrase
   // after it must both be listed. Everything else about a cut keeps the high-severity block.
@@ -1212,6 +1214,84 @@ const VERB_FORMS: Readonly<
   en: { rape: ['raped', 'raping'] },
 }
 
+/**
+ * Every indexed spelling of a high-severity term, or of a sexual-violence family term of
+ * any grade, with each letter in turn replaced by "?" and classed like the leet index.
+ * A word censored with one symbol ("n*gger", "r_ped", "wh#re") meets its key.
+ */
+function buildCensorKeys(
+  indexes: readonly LanguageIndex[],
+  family: ReadonlySet<string>
+): ReadonlyMap<string, TermMeta> {
+  const keys = new Map<string, TermMeta>()
+  for (const index of indexes) {
+    for (const [term, meta] of index.single) {
+      if (meta.severity !== 'high' && !family.has(collapseRepeats(term))) continue
+      if (term.length < MIN_SINGLE_TERM_LENGTH || !/^\p{L}+$/u.test(term)) continue
+      const classed = toLeetRunForm(term)
+      for (let at = 0; at < classed.length; at += 1) {
+        const key = `${classed.slice(0, at)}?${classed.slice(at + 1)}`
+        const previous = keys.get(key)
+        if (!previous || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[previous.severity])
+          keys.set(key, meta)
+      }
+    }
+  }
+  return keys
+}
+
+/**
+ * Across plain whitespace a one- or two-letter word is a function word in most of the
+ * seven languages ("put a", "via do"), so only whole words of three letters or more
+ * rejoin there. Across a symbol every length rejoins, at review when a part is that short.
+ */
+function classifyCutGaps(
+  window: readonly string[],
+  plainGap: (gap: number) => boolean
+): 'whole' | 'short' | 'unusable' {
+  let result: 'whole' | 'short' = 'whole'
+  for (let gap = 0; gap < window.length - 1; gap += 1) {
+    const short =
+      (window[gap] as string).length <= JOINABLE_TOKEN_LENGTH ||
+      (window[gap + 1] as string).length <= JOINABLE_TOKEN_LENGTH
+    if (short && plainGap(gap)) return 'unusable'
+    if (short) result = 'short'
+  }
+  return result
+}
+
+/** Terms of this many letters or more have their one-letter typos indexed; shorter ones collide with ordinary words. */
+const TYPO_MIN_TERM_LENGTH = 8
+
+/**
+ * Every high-severity spelling of TYPO_MIN_TERM_LENGTH letters or more with one inner letter
+ * deleted, or two adjacent inner letters swapped: "schwanzlutscer", "kikeriki"-safe because
+ * the keys of a term never equal the term itself. Ordinary words that meet a key are cleared
+ * on the allow list.
+ */
+function buildTypoKeys(indexes: readonly LanguageIndex[]): ReadonlyMap<string, TermMeta> {
+  const keys = new Map<string, TermMeta>()
+  const add = (key: string, meta: TermMeta): void => {
+    const previous = keys.get(key)
+    if (!previous || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[previous.severity])
+      keys.set(key, meta)
+  }
+  for (const index of indexes) {
+    for (const [term, meta] of index.single) {
+      if (meta.severity !== 'high' || term.length < TYPO_MIN_TERM_LENGTH) continue
+      if (!/^\p{L}+$/u.test(term)) continue
+      for (let at = 1; at < term.length - 1; at += 1) {
+        add(`${term.slice(0, at)}${term.slice(at + 1)}`, meta)
+        if (at < term.length - 2 && term[at] !== term[at + 1])
+          add(`${term.slice(0, at)}${term[at + 1]}${term[at]}${term.slice(at + 2)}`, meta)
+      }
+    }
+  }
+  for (const [key] of keys)
+    if (indexes.some((index) => index.single.has(key))) keys.delete(key)
+  return keys
+}
+
 export function inflectedForms(term: string, language: ScreeningLanguage): string[] {
   const forms = new Set<string>(VERB_FORMS[language]?.[term] ?? [])
   const last = term.at(-1) as string
@@ -1466,6 +1546,13 @@ export class CommunityTextScreener {
   /** The sexual-violence family: repeat-collapsed terms that rejoin from short cuts. */
   private readonly cutFamilyTerms: ReadonlySet<string>
   private readonly cutFamilyReviewHalves: ReadonlySet<string>
+  /** Ordinary continuations of a review half: a copula after it, or a name after "ed". */
+  private readonly cutFamilyCopulas: ReadonlySet<string>
+  private readonly cutFamilyNameFollowers: ReadonlySet<string>
+  /** Each indexed high-severity or family form with one letter replaced by "?", in leet-class form. */
+  private censorKeys: ReadonlyMap<string, TermMeta> = new Map()
+  /** One inner deletion or adjacent transposition of every long high-severity spelling. */
+  private typoKeys: ReadonlyMap<string, TermMeta> = new Map()
   private readonly scopedAllowWords: ReadonlyMap<ScreeningLanguage, ReadonlySet<string>>
   /** Exact tokens cleared for the language the current screen() call declared. */
   private activeScopedWords: ReadonlySet<string> = new Set()
@@ -1599,9 +1686,21 @@ export class CommunityTextScreener {
         )
       )
     )
+    const foldedWords = (
+      pick: (list: (typeof allowLists)[number]) => string[] | undefined
+    ) =>
+      new Set(
+        allowLists.flatMap((list) =>
+          (pick(list) ?? []).map((word) => toFoldedForm(toLiteralForm(word)))
+        )
+      )
+    this.cutFamilyCopulas = foldedWords((list) => list.cutFamily?.copulas)
+    this.cutFamilyNameFollowers = foldedWords((list) => list.cutFamily?.nameFollowers)
     this.indexes = termLists.map((list) =>
       buildLanguageIndex(list, this.policy, allowSingles, new Set(familyForms))
     )
+    this.censorKeys = buildCensorKeys(this.indexes, this.cutFamilyTerms)
+    this.typoKeys = buildTypoKeys(this.indexes)
     for (const term of this.cutFamilyTerms) {
       if (!this.indexes.some((index) => index.singleCollapsed.has(term)))
         throw new CommunityTextScreenerConfigError(
@@ -1972,7 +2071,7 @@ export class CommunityTextScreener {
       ...this.collectResplitPhraseMatches(foldedTokens, phraseAllowed, literalTokens)
     )
     outcomes.push(
-      ...this.collectSplitHighTermMatches(foldedTokens, literalTokens, allowed)
+      ...this.collectSplitHighTermMatches(literal, foldedTokens, literalTokens, allowed)
     )
     outcomes.push(...this.collectFamilyCutMatches(foldedTokens))
 
@@ -1980,6 +2079,9 @@ export class CommunityTextScreener {
       const outcome = this.matchCandidate(toFoldedForm(candidate), true, budget)
       if (outcome) outcomes.push({ meta: outcome.meta, obfuscated: true })
     }
+
+    outcomes.push(...this.collectCensoredMatches(literal, budget))
+    outcomes.push(...this.collectTypoMatches(foldedTokens, allowed))
 
     for (const candidate of this.buildJoinCandidates(literal, literalTokens, budget)) {
       const outcome = this.matchCandidate(
@@ -2038,6 +2140,7 @@ export class CommunityTextScreener {
    * cheapest disguise and the same two-way cut of a medium term only routes to review.
    */
   private collectSplitHighTermMatches(
+    literal: string,
     foldedTokens: readonly string[],
     literalTokens: readonly string[],
     allowed: readonly boolean[]
@@ -2048,32 +2151,66 @@ export class CommunityTextScreener {
     const cleared = (position: number): boolean =>
       (allowed[position] as boolean) &&
       !this.allowSingles.has(literalTokens[position] as string)
+    const spans = [...literal.matchAll(/[\p{L}\p{N}]+/gu)]
+    const aligned = spans.length === foldedTokens.length
+    // A gap of plain whitespace is a word break; anything else (a hyphen, dot, slash,
+    // asterisk, comma ...) inside a would-be word is a disguise.
+    const plainGap = (at: number): boolean => {
+      if (!aligned) return true
+      const left = spans[at] as RegExpMatchArray
+      const right = spans[at + 1] as RegExpMatchArray
+      return /^[\p{Zs}\t\r\n]+$/u.test(
+        literal.slice((left.index ?? 0) + left[0].length, right.index)
+      )
+    }
     for (let start = 0; start + 1 < foldedTokens.length; start += 1) {
-      if (cleared(start) || cleared(start + 1)) continue
-      // A one- or two-letter word is a function word in most of the seven languages
-      // ("via do", "a borto"), so only two whole words of three letters or more rejoin.
-      const left = foldedTokens[start] as string
-      const right = foldedTokens[start + 1] as string
-      if (left.length <= JOINABLE_TOKEN_LENGTH || right.length <= JOINABLE_TOKEN_LENGTH)
-        continue
-      // A cut of a hate or sexual term never passes on its own. Only a reviewed fashion
-      // pair inside its enumerated frame ("then you pin the hem") is left alone.
-      if (this.inReviewedSplitFrame(foldedTokens, start)) continue
-      const joined = (foldedTokens[start] as string) + (foldedTokens[start + 1] as string)
-      if (joined.length < MIN_SINGLE_TERM_LENGTH) continue
-      if (collapseRepeats(joined).length > this.longestTerm) continue
-      const meta = this.worstAcross((index) => matchRun(index.singleCollapsed, joined))
-      if (meta?.severity !== 'high') continue
-      // Two ordinary words with an open frame are withheld for review, not hard-blocked;
-      // a slur-leading frame or a cut with a non-ordinary half keeps the block.
-      outcomes.push({
-        meta: this.isOrdinaryOpenSplit(foldedTokens, start)
-          ? { ...meta, severity: 'medium' }
-          : meta,
-        obfuscated: true,
-      })
+      for (let size = 2; size <= 3 && start + size <= foldedTokens.length; size += 1) {
+        const window = foldedTokens.slice(start, start + size)
+        if (window.some((_, offset) => cleared(start + offset))) continue
+        const gaps = classifyCutGaps(window, (gap) => plainGap(start + gap))
+        if (gaps === 'unusable') continue
+        const shortPart = gaps === 'short'
+        const joined = window.join('')
+        if (joined.length < MIN_SINGLE_TERM_LENGTH) continue
+        if (collapseRepeats(joined).length > this.longestTerm) continue
+        // A cut of a hate or sexual term never passes on its own. Only a reviewed fashion
+        // pair inside its enumerated frame ("then you pin the hem") is left alone.
+        if (size === 2 && this.inReviewedSplitFrame(foldedTokens, start)) continue
+        const meta = this.worstAcross((index) => matchRun(index.singleCollapsed, joined))
+        if (meta?.severity !== 'high') continue
+        // Two ordinary words with an open frame are withheld for review, not hard-blocked;
+        // a slur-leading frame or a cut with a non-ordinary half keeps the block.
+        outcomes.push({
+          meta:
+            shortPart || (size === 2 && this.isOrdinaryOpenSplit(foldedTokens, start))
+              ? { ...meta, severity: 'medium' }
+              : meta,
+          obfuscated: true,
+        })
+      }
     }
     return outcomes
+  }
+
+  /**
+   * "El rap es genial", "il rap e musica", "Der Rap ist laut" and "rap Ed Hardy tee" are
+   * ordinary copy: the review half "rap", then a copula with a word after it, or "ed" with
+   * a listed surname after it.
+   */
+  private isOrdinaryFamilyContinuation(
+    foldedTokens: readonly string[],
+    start: number,
+    size: number
+  ): boolean {
+    if (size !== 2 || !this.cutFamilyReviewHalves.has(foldedTokens[start] as string))
+      return false
+    const second = foldedTokens[start + 1] as string
+    const next = foldedTokens[start + 2]
+    if (next === undefined) return false
+    return (
+      this.cutFamilyCopulas.has(second) ||
+      (second === 'ed' && this.cutFamilyNameFollowers.has(next))
+    )
   }
 
   /**
@@ -2089,6 +2226,7 @@ export class CommunityTextScreener {
         const window = foldedTokens.slice(start, start + size)
         const joined = window.join('')
         if (!this.cutFamilyTerms.has(collapseRepeats(joined))) continue
+        if (this.isOrdinaryFamilyContinuation(foldedTokens, start, size)) continue
         const meta = this.worstAcross((index) => matchRun(index.singleCollapsed, joined))
         if (!meta) continue
         outcomes.push({
@@ -2098,6 +2236,47 @@ export class CommunityTextScreener {
           obfuscated: true,
         })
       }
+    }
+    return outcomes
+  }
+
+  /** A long high-severity term with one inner letter missing or two swapped ("arschficer"). */
+  private collectTypoMatches(
+    foldedTokens: readonly string[],
+    allowed: readonly boolean[]
+  ): MatchOutcome[] {
+    const outcomes: MatchOutcome[] = []
+    for (const [at, token] of foldedTokens.entries()) {
+      if (allowed[at] || token.length < TYPO_MIN_TERM_LENGTH - 1) continue
+      const meta = this.typoKeys.get(token)
+      if (meta) outcomes.push({ meta, obfuscated: true })
+    }
+    return outcomes
+  }
+
+  /**
+   * A word with one letter replaced by a censor symbol (* _ # . -) is one whitespace-bounded
+   * run that the tokenizer splits at the symbol. The run is read with the symbol as a
+   * wildcard against every high-severity spelling and every sexual-violence family term.
+   * A dot or hyphen at either edge is punctuation, never a censored letter.
+   */
+  private collectCensoredMatches(
+    literal: string,
+    budget: ExpansionBudget
+  ): MatchOutcome[] {
+    const outcomes: MatchOutcome[] = []
+    if (this.censorKeys.size === 0) return outcomes
+    for (const chunk of literal.matchAll(/\S+/gu)) {
+      // The run between whitespace, without surrounding punctuation. An asterisk, hash or
+      // underscore at an edge may be a censored letter; a dot or hyphen there is punctuation.
+      const core = chunk[0].replace(/^[^\p{L}\p{N}*_#]+|[^\p{L}\p{N}*_#]+$/gu, '')
+      if (!/^[\p{L}\p{N}]*[*_#.-][\p{L}\p{N}]*$/u.test(core)) continue
+      if (core.length < MIN_SINGLE_TERM_LENGTH) continue
+      if (!budget.spend(core)) return outcomes
+      const at = core.search(/[*_#.-]/u)
+      const folded = toFoldedForm(`${core.slice(0, at)}?${core.slice(at + 1)}`)
+      const meta = this.censorKeys.get(toLeetRunForm(folded))
+      if (meta) outcomes.push({ meta, obfuscated: true })
     }
     return outcomes
   }
@@ -2350,6 +2529,15 @@ export class CommunityTextScreener {
     if (!budget.spend(classed)) return null
     const leet = this.worstAcross((index) => matchRun(index.singleLeet, classed))
     if (leet) return { meta: leet, obfuscated: true }
+
+    // A nine is also a mirrored p (ra9ed); the g reading above covers the other.
+    if (folded.includes('9') && (folded.match(/\p{L}/gu)?.length ?? 0) >= 4) {
+      const mirrored = toLeetRunForm(folded.replaceAll('9', 'p'))
+      const mirroredMeta = this.worstAcross((index) =>
+        matchRun(index.singleLeet, mirrored)
+      )
+      if (mirroredMeta) return { meta: mirroredMeta, obfuscated: true }
+    }
 
     return null
   }

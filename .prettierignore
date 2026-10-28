@@ -37,3 +37,4 @@ apps/api/.cache
 k6/*.json
 k6/summary*.json
 .playwright-cli
+apps/api/test/fixtures/community-text-acceptance

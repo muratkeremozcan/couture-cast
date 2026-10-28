@@ -579,6 +579,16 @@
       "entry": "spices",
       "language": "en",
       "reason": "The plural of spice (cinnamon, cumin and other spices), common in food and textile-dye copy. It is the generated plural form (spic plus es) of the high-severity English slur spic. It clears only the exact lowercase token spices; spics, spic and every stretched, spaced or leet spelling keep screening."
+    },
+    {
+      "entry": "açıklar",
+      "language": "tr",
+      "reason": "Turkish plural of açık (open, the open ones), ordinary copy. With the dotless i and cedilla folded it is one deleted letter from the generated plurals of amcık, so the typo index of long high-severity terms meets it. It clears only the exact accented lowercase token; the unaccented spelling aciklar and every other spelling keep screening."
+    },
+    {
+      "entry": "açıkları",
+      "language": "tr",
+      "reason": "Turkish plural of açık (open, the open ones), ordinary copy. With the dotless i and cedilla folded it is one deleted letter from the generated plurals of amcık, so the typo index of long high-severity terms meets it. It clears only the exact accented lowercase token; the unaccented spelling aciklar and every other spelling keep screening."
     }
   ],
   "literalContexts": [
@@ -2692,7 +2702,32 @@
         "gangraping"
       ],
       "reviewHalves": ["rap"],
-      "reason": "Sexual-violence family of the English list. A cut of one of these terms into two or three words of any length (ra ped, rap ed, r aped, ra-ped, sa-ed her) rejoins and is withheld at the term's own grade, because the spaced and hyphenated spellings are the cheapest disguise of the family. A cut whose half is the ordinary word rap (rap ed, rap es) is routed to review instead of a block. Medium terms of the family (rapist) also receive generated plural and inflected forms (rapists)."
+      "reason": "Sexual-violence family of the English list. A cut of one of these terms into two or three words of any length (ra ped, rap ed, r aped, ra-ped, sa-ed her) rejoins and is withheld at the term's own grade, because the spaced and hyphenated spellings are the cheapest disguise of the family. A cut whose half is the ordinary word rap (rap ed, rap es) is routed to review instead of a block. Medium terms of the family (rapist) also receive generated plural and inflected forms (rapists).",
+      "copulas": [
+        "es",
+        "est",
+        "ist",
+        "e",
+        "sono",
+        "son",
+        "era",
+        "fue",
+        "sera",
+        "ser",
+        "was",
+        "is"
+      ],
+      "nameFollowers": [
+        "hardy",
+        "sheeran",
+        "norton",
+        "kelly",
+        "sullivan",
+        "gein",
+        "miliband",
+        "balls",
+        "west"
+      ]
     }
   ]
 }

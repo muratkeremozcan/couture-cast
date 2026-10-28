@@ -363,6 +363,8 @@ function cutFamilyProblems(families) {
       isLetterWords(family.terms) &&
       family.terms.length > 0 &&
       isLetterWords(family.reviewHalves) &&
+      isLetterWords(family.copulas ?? []) &&
+      isLetterWords(family.nameFollowers ?? []) &&
       typeof family.reason === 'string' &&
       family.reason.length >= 20
     return valid
@@ -596,6 +598,12 @@ function buildAllowFile(language, allowState, hashes) {
       reviewHalves: (allowState.allow.cutFamilies ?? [])
         .filter((family) => family.language === language)
         .flatMap((family) => family.reviewHalves.map(toLiteral)),
+      copulas: (allowState.allow.cutFamilies ?? [])
+        .filter((family) => family.language === language)
+        .flatMap((family) => (family.copulas ?? []).map(toLiteral)),
+      nameFollowers: (allowState.allow.cutFamilies ?? [])
+        .filter((family) => family.language === language)
+        .flatMap((family) => (family.nameFollowers ?? []).map(toLiteral)),
     },
     scopedWords: (allowState.allow.scopedWords ?? [])
       .filter((entry) => entry.language === language)

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import { CommunityTextScreener } from './community-text-screener'
@@ -7,7 +7,14 @@ import { CommunityTextScreener } from './community-text-screener'
  * Round 7 Portuguese repair. Every sentence below is generic fashion copy written for
  * this spec; none comes from a holdout or a corpus fixture.
  */
+const HEAVY_TIMEOUT_MS = 180_000
 const screener = new CommunityTextScreener()
+
+// The loop tests screen thousands of texts (5 heads x 11 separators x 5 tails x every
+// locale and more). Measured with coverage instrumentation, the slowest takes 19.5 s while the machine is loaded (measured with coverage; CI runs
+// about 2.6 times slower, from the round 7c timeouts at 10.2 s against 3.9 s locally);
+// the timeout below leaves a wide margin for the 4 vCPU runner.
+vi.setConfig({ testTimeout: HEAVY_TIMEOUT_MS })
 const screen = (text: string, locale: string | null = 'pt-BR') =>
   screener.screen({ text, locale, field: 'altText' })
 
@@ -1379,6 +1386,79 @@ describe('round 7k the rape family is handled as a family', () => {
         'a|b|c and x+y',
       ])
         expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+})
+
+describe('round 7l censor characters, names and the rap half', () => {
+  const locales = [...everyLocale, 'en-US', 'en-GB', 'fr-FR']
+  it.each([
+    'n*gger',
+    'c*nt',
+    'f*ggot',
+    'wh*re',
+    'r*pe',
+    'r*ped',
+    'r_ped',
+    'r-pe',
+    'r#pe',
+    'r.pe',
+    'n.gger',
+    'ch#nk',
+    'k*ke',
+    'ra9ed her',
+    'he r*ped her.',
+    'ni-gger',
+    'nig/ger',
+    'n_igger',
+    'nig*ger',
+    'pu-ta',
+  ])('withholds %s in every locale', (text) => {
+    for (const locale of locales)
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('clears the names Saed, Saeed and Rapin in name frames only', () => {
+    for (const locale of locales)
+      for (const text of [
+        'Saed wears the oversized coat.',
+        'by Saed',
+        'designer Saed',
+        'Meet Saed, our founder.',
+        'Collection by Saeed',
+        'Photographed by Rapin',
+        'Hi Saed!',
+        'Names such as Saad and Saeed are common.',
+      ])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+    for (const locale of locales)
+      for (const text of [
+        'sa-ed her',
+        'sa ed her',
+        'saed her',
+        'Saed assaulted her',
+        'saed the girl',
+        'the saed victim',
+        'go home saed her',
+        'raper',
+        'the raper',
+      ])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('does not rejoin rap and a copula or a name', () => {
+    for (const locale of locales)
+      for (const text of [
+        'El rap es genial',
+        'Mi rap es mejor',
+        'Le rap est un art',
+        'il rap e musica',
+        'Der Rap ist laut',
+        'Hip hop rap Ed Hardy tee',
+      ])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+    for (const locale of locales)
+      for (const text of ['rap ed her', 'rap e', 'rap ed', 'rap es', 'rap ist'])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
   })
 })
 
