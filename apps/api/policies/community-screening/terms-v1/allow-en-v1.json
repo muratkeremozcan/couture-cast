@@ -12,8 +12,8 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "af1b9addae19b960c7e84dae1669f8d5a708178de5d9726d2e5ab26db9ffec0a",
-    "reviewedOccurrenceSha256": "d640bd985ea5f471d58fa108aca751cf9ba7b231d647508842a2f334e41c35c5"
+    "allowListSha256": "767a9205abfd9c93e0f8cb32dd7f0a69328c11dab1bcbdc78ef26133c520731f",
+    "reviewedOccurrenceSha256": "4f6e5195949d202f99e7c7026b2a4833774455b0c22bd9edf6fcb78093ef4971"
   },
   "entries": [
     "big black",
@@ -65,6 +65,22 @@
         "finally",
         "also"
       ],
+      "leads": [
+        "here is",
+        "this is",
+        "see",
+        "learn",
+        "watch",
+        "cut the fabric",
+        "cut the fabric first",
+        "mark the hem",
+        "press the seam",
+        "press the fabric",
+        "lay the fabric flat",
+        "lay the pattern flat",
+        "okay",
+        "ok"
+      ],
       "after": [
         "the pattern",
         "the pattern pieces",
@@ -92,6 +108,53 @@
         "your scarf",
         "your brooch",
         "each pleat"
+      ],
+      "tails": [
+        "then you sew it",
+        "then you sew them",
+        "then you sew it by hand",
+        "then sew it",
+        "then sew them",
+        "and sew it",
+        "and sew them",
+        "and then sew it",
+        "then you stitch it",
+        "and stitch it",
+        "then you cut",
+        "before you cut",
+        "before cutting",
+        "before you sew",
+        "before sewing",
+        "before stitching",
+        "before you stitch",
+        "then baste the lining",
+        "and baste the lining",
+        "by hand",
+        "with a soft cloth",
+        "with a damp cloth",
+        "with pins",
+        "with a needle",
+        "to the fabric",
+        "to the lining",
+        "to the paper",
+        "in place",
+        "on a lapel",
+        "on your coat",
+        "on your lapel",
+        "here",
+        "carefully",
+        "up",
+        "and press it",
+        "then press it flat",
+        "and press",
+        "flat",
+        "so it stays in place",
+        "so it stays put",
+        "to keep it in place",
+        "to hold it",
+        "to the sleeve",
+        "and then sew them",
+        "and then stitch them"
       ]
     },
     {
@@ -120,6 +183,7 @@
         "about",
         "despite"
       ],
+      "leads": ["expect", "dress for", "plan for", "wear layers in", "wear layers for"],
       "after": [
         "temperature",
         "temperatures",
@@ -135,12 +199,42 @@
         "readings",
         "heat",
         "cold"
+      ],
+      "tails": [
+        "in winter",
+        "in autumn",
+        "in spring",
+        "during winter",
+        "this week",
+        "this winter",
+        "today",
+        "call for a lined coat",
+        "calls for a lined coat",
+        "call for a warm coat",
+        "calls for a warm coat",
+        "call for a wool coat",
+        "call for layers",
+        "calls for layers",
+        "call for a lined jacket",
+        "are common in winter",
+        "is common in winter"
       ]
     },
     {
       "pair": "wet back",
       "atStart": true,
       "before": ["the", "a", "this", "our", "your", "its"],
+      "leads": [
+        "wipe",
+        "dry",
+        "clean",
+        "wash",
+        "hang",
+        "brush",
+        "check",
+        "turn",
+        "wipe down"
+      ],
       "after": [
         "lining",
         "panel",
@@ -158,6 +252,32 @@
         "of the garment",
         "of the parka",
         "of the vest"
+      ],
+      "tails": [
+        "with a soft cloth",
+        "with a dry cloth",
+        "with a damp cloth",
+        "with a towel",
+        "dries fast",
+        "dries quickly",
+        "keeps you dry",
+        "stays dry",
+        "wicks moisture",
+        "is waterproof",
+        "is sealed",
+        "prevents leaks",
+        "before storing it",
+        "before you hang it",
+        "before you hang it up",
+        "then hang it to dry",
+        "and hang it to dry",
+        "to dry",
+        "then let it dry",
+        "and let it dry",
+        "and stays dry",
+        "and dries fast",
+        "and dries quickly",
+        "and keeps you dry"
       ]
     },
     {
@@ -177,6 +297,7 @@
         "quick",
         "dry"
       ],
+      "leads": ["shop", "buy", "wear", "choose"],
       "after": [
         "wrap",
         "wraps",
@@ -186,6 +307,33 @@
         "band",
         "cap",
         "cover"
+      ],
+      "tails": [
+        "keeps hair dry",
+        "keeps hair dry after a swim",
+        "keeps hair dry after a shower",
+        "after a swim",
+        "after a shower",
+        "after swimming",
+        "for drying hair",
+        "for drying",
+        "for hair",
+        "for long hair",
+        "for curly hair",
+        "dries hair fast",
+        "in cotton",
+        "in terry",
+        "in soft cotton",
+        "for the beach",
+        "at the pool",
+        "is soft",
+        "is quick dry",
+        "is machine washable",
+        "in three colours",
+        "in two sizes",
+        "in blue",
+        "in white",
+        "in grey"
       ]
     }
   ],

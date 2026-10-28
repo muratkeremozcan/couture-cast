@@ -322,6 +322,12 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
               .array(z.string().regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u))
               .min(1)
               .optional(),
+            // Left bound: all text before the phrase must be these closed opener phrases
+            // (no punctuation is read), so nothing unlisted can lead into the clearance.
+            openers: z
+              .array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u))
+              .min(1)
+              .optional(),
             // The construction does not clear when the whole field text holds any of these
             // words, whichever sentence or line they sit in.
             textForbidden: z
@@ -400,7 +406,11 @@ const allowFileSchema = z.object({
         pair: z.string().regex(/^\p{L}+ \p{L}+$/u),
         atStart: z.boolean(),
         before: z.array(z.string().regex(/^\p{L}+$/u)),
+        // Closed phrases that may precede the `before` word, and closed phrases that may
+        // follow the `after` phrase. The whole text outside the frame must be tiled by them.
+        leads: z.array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u)).default([]),
         after: z.array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u)).min(1),
+        tails: z.array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u)).default([]),
       })
     )
     .default([]),
@@ -711,12 +721,35 @@ function indexScopedPhrases(
 interface SplitFrame {
   readonly atStart: boolean
   readonly before: readonly string[]
+  readonly leads: readonly (readonly string[])[]
   readonly after: readonly (readonly string[])[]
+  readonly tails: readonly (readonly string[])[]
+}
+
+/** The longest text outside a reviewed split frame that the closed-phrase tiling will consider. */
+const SPLIT_FRAME_MAX_OUTSIDE_TOKENS = 64
+
+/** Whether the tokens are exactly a concatenation of the listed phrases (empty counts). */
+function tiledByPhrases(
+  tokens: readonly string[],
+  phrases: readonly (readonly string[])[]
+): boolean {
+  if (tokens.length > SPLIT_FRAME_MAX_OUTSIDE_TOKENS) return false
+  const reachable = new Array<boolean>(tokens.length + 1).fill(false)
+  reachable[0] = true
+  for (let at = 0; at < tokens.length; at += 1) {
+    if (!reachable[at]) continue
+    for (const phrase of phrases) {
+      if (phrase.every((word, offset) => tokens[at + offset] === word))
+        reachable[at + phrase.length] = true
+    }
+  }
+  return reachable[tokens.length] as boolean
 }
 
 /** The reviewed split-pair frames of every language, keyed by the folded pair "you pin". */
 function indexSplitFrames(
-  lists: readonly { splitFrames?: z.infer<typeof allowFileSchema>['splitFrames'] }[]
+  lists: readonly { splitFrames?: z.input<typeof allowFileSchema>['splitFrames'] }[]
 ): ReadonlyMap<string, readonly SplitFrame[]> {
   const folded = (word: string): string => toFoldedForm(toLiteralForm(word))
   const frames = new Map<string, SplitFrame[]>()
@@ -728,7 +761,9 @@ function indexSplitFrames(
         {
           atStart: frame.atStart,
           before: frame.before.map(folded),
+          leads: (frame.leads ?? []).map((phrase) => phrase.split(' ').map(folded)),
           after: frame.after.map((phrase) => phrase.split(' ').map(folded)),
+          tails: (frame.tails ?? []).map((phrase) => phrase.split(' ').map(folded)),
         },
       ])
     }
@@ -776,6 +811,7 @@ function compileOccurrenceConstructions(
   requiredDeclaredLanguages?: readonly ScreeningLanguage[]
   rejectedPrefixFrames: readonly string[]
   textForbidden: readonly string[]
+  openers: readonly (readonly string[])[]
 }[] {
   const groups = new Map<
     string,
@@ -787,6 +823,7 @@ function compileOccurrenceConstructions(
       sentenceInitial: boolean
       closedTails?: readonly string[]
       textForbidden?: readonly string[]
+      openers?: readonly string[]
       phrases: string[]
     }
   >()
@@ -802,6 +839,7 @@ function compileOccurrenceConstructions(
       entry.sentenceInitial ?? false,
       entry.closedTails ?? null,
       entry.textForbidden ?? null,
+      entry.openers ?? null,
     ])
     const group = groups.get(key) ?? {
       target: entry.target,
@@ -811,6 +849,7 @@ function compileOccurrenceConstructions(
       sentenceInitial: entry.sentenceInitial ?? false,
       closedTails: entry.closedTails,
       textForbidden: entry.textForbidden,
+      openers: entry.openers,
       phrases: [],
     }
     group.phrases.push(entry.phrase)
@@ -820,6 +859,9 @@ function compileOccurrenceConstructions(
     target: group.target,
     requiredDeclaredLanguages: group.requiredDeclaredLanguages,
     rejectedPrefixFrames: group.rejectedPrefixFrames,
+    openers: (group.openers ?? []).map((phrase) =>
+      tokenize(toFoldedForm(toLiteralForm(phrase)))
+    ),
     textForbidden: (group.textForbidden ?? []).map((word) =>
       collapseRepeats(toLeetClassForm(toFoldedForm(toLiteralForm(word))))
     ),
@@ -849,6 +891,7 @@ function reviewedOccurrencePhrases(
   sentenceInitial?: boolean
   closedTails?: readonly string[]
   textForbidden?: readonly string[]
+  openers?: readonly string[]
 }[] {
   const phrases: {
     target: string
@@ -859,6 +902,7 @@ function reviewedOccurrencePhrases(
     sentenceInitial?: boolean
     closedTails?: readonly string[]
     textForbidden?: readonly string[]
+    openers?: readonly string[]
   }[] = []
   const targets = new Set<string>()
   for (const list of lists) {
@@ -887,6 +931,7 @@ function reviewedOccurrencePhrases(
           sentenceInitial: reviewed.sentenceInitial,
           closedTails: reviewed.closedTails,
           textForbidden: reviewed.textForbidden,
+          openers: reviewed.openers,
         }))
       )
     }
@@ -1277,6 +1322,7 @@ export class CommunityTextScreener {
     requiredDeclaredLanguages?: readonly ScreeningLanguage[]
     rejectedPrefixFrames: readonly string[]
     textForbidden: readonly string[]
+    openers: readonly (readonly string[])[]
   }[]
   private readonly listVersions: Readonly<Record<string, string>>
   private readonly loadedLanguages: readonly ScreeningLanguage[]
@@ -1692,6 +1738,14 @@ export class CommunityTextScreener {
         }
         if (rejected) continue
         if (
+          construction.openers.length > 0 &&
+          !tiledByPhrases(
+            tokenize(toFoldedForm(toLiteralForm(prefix))),
+            construction.openers
+          )
+        )
+          continue
+        if (
           construction.textForbidden.length > 0 &&
           this.textHoldsForbidden(exact, construction.textForbidden)
         )
@@ -1835,20 +1889,33 @@ export class CommunityTextScreener {
     return outcomes
   }
 
-  /** Whether the pair at `start` sits inside a reviewed frame: listed word before, closed phrase after. */
+  /**
+   * Whether the pair at `start` sits inside a reviewed frame: the text before the listed
+   * word is empty or closed lead phrases, the closed `after` phrase follows, and the
+   * whole remainder of the text is closed tail phrases or empty. A clause break does not
+   * end the check, so nothing unlisted can ride on the clearance.
+   */
   private inReviewedSplitFrame(foldedTokens: readonly string[], start: number): boolean {
     const frames = this.splitFrames.get(
       `${foldedTokens[start]} ${foldedTokens[start + 1]}`
     )
     if (!frames) return false
-    const before = start === 0 ? null : (foldedTokens[start - 1] as string)
-    return frames.some(
-      (frame) =>
-        (before === null ? frame.atStart : frame.before.includes(before)) &&
-        frame.after.some((phrase) =>
-          phrase.every((word, offset) => foldedTokens[start + 2 + offset] === word)
-        )
-    )
+    return frames.some((frame) => {
+      if (start === 0) {
+        if (!frame.atStart) return false
+      } else {
+        const before = foldedTokens[start - 1] as string
+        if (!frame.before.includes(before)) return false
+        const lead = foldedTokens.slice(0, start - 1)
+        const words = frame.before.map((word) => [word])
+        if (!tiledByPhrases(lead, [...frame.leads, ...words])) return false
+      }
+      return frame.after.some(
+        (phrase) =>
+          phrase.every((word, offset) => foldedTokens[start + 2 + offset] === word) &&
+          tiledByPhrases(foldedTokens.slice(start + 2 + phrase.length), frame.tails)
+      )
+    })
   }
 
   /**

@@ -60,7 +60,8 @@ function sameBankScope(rule, reviewed) {
     same('precedingWords', []) &&
     same('sentenceInitial', false) &&
     same('closedTails', []) &&
-    same('textForbidden', [])
+    same('textForbidden', []) &&
+    same('openers', [])
   )
 }
 
@@ -309,26 +310,35 @@ function scopedWordProblems(scopedWords) {
   })
 }
 
+function isLetterWords(words) {
+  return Array.isArray(words) && words.every((word) => /^\p{L}+$/u.test(toLiteral(word)))
+}
+
+function isPhraseList(phrases) {
+  return (
+    Array.isArray(phrases) &&
+    phrases.every((phrase) => tokenize(toLiteral(phrase)).length > 0)
+  )
+}
+
 function splitPairProblems(pairs) {
-  const wordsOnly = (words) =>
-    Array.isArray(words) && words.every((word) => /^\p{L}+$/u.test(toLiteral(word)))
   return pairs.flatMap((frame) => {
-    const literal = toLiteral(frame.entry ?? '')
     const valid =
       LANGUAGES.includes(frame.language) &&
-      tokenize(literal).length === 2 &&
+      tokenize(toLiteral(frame.entry ?? '')).length === 2 &&
       typeof frame.atStart === 'boolean' &&
-      wordsOnly(frame.before) &&
+      isLetterWords(frame.before) &&
       (frame.atStart || frame.before.length > 0) &&
-      Array.isArray(frame.after) &&
+      isPhraseList(frame.after) &&
       frame.after.length > 0 &&
-      frame.after.every((phrase) => tokenize(toLiteral(phrase)).length > 0) &&
+      isPhraseList(frame.leads) &&
+      isPhraseList(frame.tails) &&
       typeof frame.reason === 'string' &&
       frame.reason.length >= 20
     return valid
       ? []
       : [
-          `reviewed split pair "${frame.entry}" needs a language, two words, a bounded before, a closed after and a reason`,
+          `reviewed split pair "${frame.entry}" needs a language, two words, a bounded before, closed leads, after and tails and a reason`,
         ]
   })
 }
@@ -542,7 +552,9 @@ function buildAllowFile(language, allowState, hashes) {
         pair: toLiteral(entry.entry),
         atStart: entry.atStart,
         before: entry.before.map(toLiteral),
+        leads: entry.leads.map(toLiteral),
         after: entry.after.map(toLiteral),
+        tails: entry.tails.map(toLiteral),
       })),
     scopedWords: (allowState.allow.scopedWords ?? [])
       .filter((entry) => entry.language === language)

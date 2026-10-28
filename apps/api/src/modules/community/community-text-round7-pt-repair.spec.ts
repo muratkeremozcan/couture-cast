@@ -665,6 +665,160 @@ describe('round 7b fashion and sewing copy never trips the whole-word cut rule',
   })
 })
 
+describe('round 7c reviewed split pairs have a closed tail and a closed lead', () => {
+  const heads = [
+    'towel head wrap',
+    'wet back lining',
+    'send the wet back lining',
+    'You pin the hem',
+    'a sub normal temperature',
+  ]
+  const hostile = [
+    'go back to your country',
+    'go home',
+    'send the wet back lining home',
+    'you people are vermin',
+    'get out of here',
+  ]
+  const separators = [
+    ' ',
+    '. ',
+    '... ',
+    '! ',
+    '? ',
+    '; ',
+    ', ',
+    ': ',
+    '\n',
+    '\n\n',
+    ' - ',
+  ]
+
+  it('withholds a reviewed frame followed by anything outside the closed tails', () => {
+    for (const locale of everyLocale)
+      for (const head of heads)
+        for (const separator of separators)
+          for (const tail of hostile)
+            expect(
+              screen(`${head}${separator}${tail}`, locale).disposition,
+              `${locale} ${JSON.stringify(`${head}${separator}${tail}`)}`
+            ).not.toBe('pass')
+  })
+
+  it('withholds the coordinator sentences in every locale', () => {
+    for (const text of [
+      'towel head wrap go back to your country',
+      'wet back lining go home',
+      'send the wet back lining home',
+    ])
+      for (const locale of everyLocale)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('withholds a reviewed frame that follows hostile text', () => {
+    for (const locale of everyLocale)
+      for (const lead of hostile)
+        for (const separator of separators)
+          for (const head of heads)
+            expect(
+              screen(`${lead}${separator}${head}`, locale).disposition,
+              `${locale} ${JSON.stringify(`${lead}${separator}${head}`)}`
+            ).not.toBe('pass')
+  })
+
+  it('still passes longer real sewing and garment copy with ordinary continuations', () => {
+    for (const text of [
+      'First you pin the hem, then you sew it by hand.',
+      'Lay the pattern flat, then you pin the pattern to the fabric before cutting.',
+      'Here is how you pin the brooch on a lapel so it stays in place.',
+      'You pin the seam carefully and then sew it.',
+      'Cut the fabric first. Then you pin the pattern pieces, and then sew them.',
+      'Sub-normal temperatures in winter call for a lined coat.',
+      'A sub normal temperature calls for layers this week.',
+      'Wipe the wet back of the jacket with a soft cloth, then let it dry.',
+      'The wet back lining dries fast and stays dry.',
+      'A towel head wrap keeps hair dry after a swim, in soft cotton.',
+      'Cotton towel head wrap for drying hair in three colours.',
+    ])
+      for (const locale of everyLocale)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+})
+
+describe('round 7c both sides of every reviewed clearance are closed', () => {
+  const locales = ['pt-BR', 'pt-PT', 'en-US', null]
+  const separators = [' ', '. ', '... ', '! ', '? ', '; ', ', ', '\n', '\n\n', ' - ']
+
+  it('withholds the independent reviewer sentences for the reviewed pairs', () => {
+    for (const text of [
+      'towel head wrap go home',
+      'towel head wrap you animals',
+      'kill the towel head wrap',
+      'wet back panel go home',
+      'wet back panel you animals',
+      'kill the wet back lining',
+      'kill the sub normal temperature',
+      'slur the you pin the hem',
+      'burn the towel head wrap',
+      'the towel head wrap go home',
+    ])
+      for (const locale of [...locales, ...everyLocale])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  const leads = [
+    'menor de idade',
+    'minha prima de 12 anos',
+    'peladinha',
+    'sem roupa',
+    'fio dental',
+    'de quatro',
+    'pro meu pau',
+    'tarada',
+    'estudante',
+    'aluna',
+    'mocinha',
+    'gata',
+    'amor',
+  ]
+  const fit = ['calça que valoriza o bumbum', 'legging que levanta o bumbum']
+
+  it('withholds a bumbum fit frame led by anything outside the closed openers', () => {
+    for (const locale of locales)
+      for (const lead of leads)
+        for (const separator of separators)
+          for (const head of fit)
+            expect(
+              screen(`${lead}${separator}${head}`, locale).disposition,
+              `${locale} ${JSON.stringify(`${lead}${separator}${head}`)}`
+            ).not.toBe('pass')
+  })
+
+  it('withholds a pinto painting frame led by anything outside the closed openers', () => {
+    for (const locale of locales)
+      for (const lead of leads)
+        for (const separator of separators)
+          expect(
+            screen(`${lead}${separator}Pinto a mão`, locale).disposition,
+            `${locale} ${JSON.stringify(`${lead}${separator}Pinto a mão`)}`
+          ).not.toBe('pass')
+  })
+
+  it('keeps fit and painting copy with closed openers clean under declared Portuguese', () => {
+    for (const text of [
+      'Jeans de cintura alta que valoriza o bumbum.',
+      'Nova coleção. Calça que valoriza o bumbum sem marcar.',
+      'Look do dia: legging que levanta o bumbum com conforto.',
+      'Short com bolsos no bumbum e cintura alta.',
+      'Todo dia eu pinto as unhas de rosa.',
+      'Eu pinto à mão cada peça da coleção.',
+      'Pinto a mão.',
+    ])
+      for (const locale of ['pt-BR', 'pt-PT'])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+})
+
 describe('round 7b a high-severity term cut in two whole words', () => {
   it('withholds tap ete and other two-way cuts with both parts of three letters or more', () => {
     for (const text of [
