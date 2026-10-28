@@ -786,7 +786,9 @@ function LookbookCardContent({
       {canAct &&
         item.author.isSelf &&
         item.status === 'published' &&
-        item.publishedAt !== null && <CommunityShareCardControl postId={item.id} />}
+        item.publishedAt !== null && (
+          <CommunityShareCardControl postId={item.id} scope={scope} />
+        )}
       {canAct && (
         <CommunityReactions item={item} controls={reactionControls} scope={scope} />
       )}
@@ -1035,7 +1037,9 @@ function LookbookDetailDialog({
         {canAct &&
           item.author.isSelf &&
           item.status === 'published' &&
-          item.publishedAt !== null && <CommunityShareCardControl postId={item.id} />}
+          item.publishedAt !== null && (
+            <CommunityShareCardControl postId={item.id} scope="detail-" />
+          )}
         <CommunityReactions item={item} controls={reactionControls} />
         <div
           role="status"
@@ -3426,6 +3430,7 @@ export function CommunityLookbookGrid({
   const { shareHost, shareDialog } = useCommunityShareHost(
     presentation.items,
     presentation.detail,
+    spotlight.state.items,
     presentation.canAct
   )
 
@@ -3682,27 +3687,36 @@ function mergeFeedPages(
 function useCommunityShareHost(
   items: readonly CommunityFeedItem[],
   detail: CommunityFeedItem | null,
+  spotlightItems: readonly CommunityFeedItem[],
   canAct: boolean
 ) {
   const [share, setShare] = useState<{ postId: string; open: boolean } | null>(null)
   const opener = useRef<HTMLElement | null>(null)
-  const postId = useRef<string | null>(null)
-  postId.current = share?.postId ?? null
+  const invokingSurface = useRef<{ postId: string; scope: string } | null>(null)
   const shareHost = useMemo<ShareCardHost>(
     () => ({
-      open: (target, element) => {
+      open: (target, scope, element) => {
+        invokingSurface.current = { postId: target, scope }
         opener.current = element
         setShare({ postId: target, open: true })
       },
-      register: (target, element) => {
-        if (element && target === postId.current) opener.current = element
+      register: (target, scope, element) => {
+        // The feed, spotlight and detail may all render this post. Rebind only
+        // the invoking surface when access re-verification remounts its button.
+        if (
+          element &&
+          target === invokingSurface.current?.postId &&
+          scope === invokingSurface.current.scope
+        )
+          opener.current = element
       },
     }),
     []
   )
   const item = share
     ? (items.find((candidate) => candidate.id === share.postId) ??
-      (detail?.id === share.postId ? detail : null))
+      (detail?.id === share.postId ? detail : null) ??
+      spotlightItems.find((candidate) => candidate.id === share.postId))
     : null
   const eligible = Boolean(
     item?.author.isSelf && item.status === 'published' && item.publishedAt !== null

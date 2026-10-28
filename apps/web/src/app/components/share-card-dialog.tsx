@@ -59,17 +59,23 @@ function ShareCardOpenButton({
  * is re-verified) keep one share dialog and its composition above those cards.
  */
 export type ShareCardHost = {
-  open: (postId: string, opener: HTMLElement) => void
-  register: (postId: string, opener: HTMLElement | null) => void
+  open: (postId: string, scope: string, opener: HTMLElement) => void
+  register: (postId: string, scope: string, opener: HTMLElement | null) => void
 }
 export const ShareCardHostContext = createContext<ShareCardHost | null>(null)
-export function CommunityShareCardControl({ postId }: { postId: string }) {
+export function CommunityShareCardControl({
+  postId,
+  scope,
+}: {
+  postId: string
+  scope: string
+}) {
   const host = useContext(ShareCardHostContext)
   if (!host) return <ShareCardControl source={{ kind: 'community_post', postId }} />
   return (
     <ShareCardOpenButton
-      onOpen={(opener) => host.open(postId, opener)}
-      register={(opener) => host.register(postId, opener)}
+      onOpen={(opener) => host.open(postId, scope, opener)}
+      register={(opener) => host.register(postId, scope, opener)}
     />
   )
 }
