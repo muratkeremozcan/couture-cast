@@ -23,4 +23,6 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: ${{ inputs.install-command }}
+      env:
+        INSTALL_COMMAND: ${{ inputs.install-command }}
+      run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"

@@ -53,7 +53,9 @@ jobs:
     needs: preview-ready
     if: >-
       !cancelled() && inputs.test_env == 'preview' &&
-      contains(fromJSON('["success","skipped"]'), needs.preview-ready.result)
+      contains(fromJSON('["success","skipped"]'), needs.preview-ready.result) &&
+      (inputs.custom_base_url != '' || inputs.custom_api_base_url != '' ||
+       needs.preview-ready.outputs.required == 'true')
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: ${{ inputs.test_env }}
