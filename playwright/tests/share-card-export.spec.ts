@@ -21,7 +21,10 @@ import type {
   Response,
   Route,
 } from '@playwright/test'
-import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
+import {
+  interceptNetworkCall as interceptPageNetworkCall,
+  type InterceptNetworkCallFn,
+} from '@seontechnologies/playwright-utils/intercept-network-call'
 import {
   supportedLocales,
   prepareShareCardInputSchema,
@@ -43,7 +46,7 @@ if (!/^\/tea_community_[a-f0-9]{32}$/.test(new URL(env.DATABASE_URL).pathname))
   throw new Error('owned_uuid_required')
 const fixture = read('fixtures.json') as {
   postId: string
-  identities: { email: string; appUserId: string; label: string }[]
+  identities: { email: string; appUserId: string; authUserId: string; label: string }[]
 }
 const build = read('public-build-env.json') as {
   EXPO_PUBLIC_SUPABASE_ANON_KEY: string
@@ -260,11 +263,12 @@ function renderCatalog(locale: string) {
   return { body, watermarked: body + `. ${catalog.watermarkRole}: CoutureCast` }
 }
 const webCatalog = (locale: string) =>
-  (
-    JSON.parse(
-      fs.readFileSync(path.resolve(`apps/web/src/i18n/locales/${locale}.json`), 'utf8')
-    ) as { shareCard: { photoPrivacyHelp: string; offline: string; retry: string } }
-  ).shareCard
+  JSON.parse(
+    fs.readFileSync(path.resolve(`apps/web/src/i18n/locales/${locale}.json`), 'utf8')
+  ) as {
+    shareCard: { photoPrivacyHelp: string; offline: string; retry: string }
+    community: { notifications: { back: string; save: string } }
+  }
 type ProfileRead = (apiOrigin: string) => Promise<{ status: number; body: unknown }>
 function pinnedWatermarkDatabase(apiOrigin: string) {
   const database = new URL(env.DATABASE_URL)
@@ -515,6 +519,65 @@ async function downloadedDigest(download: Download, file: string) {
 // The settings form loads above the page's links; click them only once it is in place.
 const settingsLoaded = (page: Page) =>
   expect(page.getByRole('button', { name: 'Save settings', exact: true })).toBeVisible()
+// Holds identity verification, then the preferences read, and checks that the Back link
+// keeps one box and the settings region reports busy until the settings render.
+async function expectStableSettingsLayout(
+  page: Page,
+  locale: string,
+  intercept: InterceptNetworkCallFn
+) {
+  const copy = webCatalog(locale).community.notifications
+  const verification = routeGate()
+  const preferences = routeGate()
+  const hold =
+    (gate: ReturnType<typeof routeGate>) => async (route: Route, request: Request) => {
+      if (!gate.request) {
+        gate.request = request
+        gate.enter()
+        await gate.released
+      }
+      await route.continue()
+    }
+  const heldSession = intercept({
+    method: 'GET',
+    url: '**/api/v1/user/profile',
+    handler: hold(verification),
+  })
+  const heldPreferences = intercept({
+    method: 'GET',
+    url: '**/api/v1/community/notification-preferences',
+    handler: hold(preferences),
+  })
+  await page.goto('/notification-settings')
+  const back = page.getByRole('link', { name: copy.back, exact: true })
+  const region = page.getByRole('main')
+  const boxes = []
+  try {
+    await heldSession
+    await verification.started
+    await expect(back).toBeVisible()
+    await expect(region).toHaveAttribute('aria-busy', 'true')
+    boxes.push(await back.boundingBox())
+    verification.release()
+    await heldPreferences
+    await preferences.started
+    await expect(region).toHaveAttribute('aria-busy', 'true')
+    boxes.push(await back.boundingBox())
+  } finally {
+    verification.release()
+    preferences.release()
+  }
+  await expect(page.getByRole('button', { name: copy.save, exact: true })).toBeVisible()
+  await expect(region).not.toHaveAttribute('aria-busy')
+  boxes.push(await back.boundingBox())
+  // The form's place is held while identity and settings load, so links never move.
+  expect(boxes, `${locale} Back link box while verifying, loading and loaded`).toEqual([
+    boxes[0],
+    boxes[0],
+    boxes[0],
+  ])
+  return back
+}
 for (const locale of supportedLocales)
   test.describe(locale, () => {
     test.use({ locale })
@@ -527,7 +590,7 @@ for (const locale of supportedLocales)
       const { preview, dialog } = await ownPhoto(page, interceptNetworkCall)
       await expect(preview).toHaveAttribute('alt', renderCatalog(locale).watermarked)
       await expect(
-        dialog.getByText(webCatalog(locale).photoPrivacyHelp, { exact: true })
+        dialog.getByText(webCatalog(locale).shareCard.photoPrivacyHelp, { exact: true })
       ).toBeVisible()
       expect(sha256(await previewBytes(preview))).toBe(
         await preview.getAttribute('data-sha256')
@@ -813,13 +876,60 @@ test('P-OUTFIT P-CANCEL: all persisted scenarios render, and reopening retains e
     await expect(modal(page)).not.toBeVisible()
   }
 })
-test('P-OFFLINE: offline Save refuses export and keeps the preview; the same member retry downloads it', async ({
+test('P-OFFLINE: a community card refuses export offline and keeps its composition through the reconnect resync', async ({
   context,
   page,
   interceptNetworkCall,
 }, info) => {
   await identify(context)
-  // An outfit card: reconnecting resyncs the community feed, which remounts its cards.
+  const { preview, dialog } = await ownPhoto(page, interceptNetworkCall)
+  // A non-default composition shows that the reconnect keeps the member's choices.
+  await dialog.getByRole('checkbox').uncheck()
+  await expect(preview).toHaveAttribute('alt', renderCatalog('en-US').body)
+  await expect(preview).toHaveAttribute('data-loaded', 'true')
+  const digest = await preview.getAttribute('data-sha256')
+  const copy = webCatalog('en-US').shareCard
+  const saved = interceptNetworkCall({
+    method: 'POST',
+    url: '**/api/v1/share-cards/prepare',
+  })
+  // Reconnecting re-verifies community access, which hides the feed and its cards
+  // until this catch-up resolves the rendered posts again.
+  const caughtUp = interceptNetworkCall({
+    method: 'POST',
+    url: '**/api/v1/community/targets/resolve',
+  })
+  await context.setOffline(true)
+  try {
+    await dialog.getByTestId('share-card-save').click()
+    await expect(dialog.getByRole('alert')).toHaveText(copy.offline)
+    await expect(preview).toHaveAttribute('data-sha256', digest!)
+  } finally {
+    await context.setOffline(false)
+  }
+  expect((await caughtUp).status).toBe(200)
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('checkbox')).not.toBeChecked()
+  await expect(preview).toHaveAttribute('data-loaded', 'true')
+  await expect(preview).toHaveAttribute('data-sha256', digest!)
+  const downloaded = nextDownload(page)
+  await dialog.getByTestId('share-card-save').click()
+  const download = await downloaded
+  const authorization = await saved
+  expect(authorization.status).toBe(200)
+  expect(prepareShareCardInputSchema.parse(authorization.requestJson)).toMatchObject({
+    purpose: 'save',
+    watermark: false,
+    expectedSha256: digest,
+  })
+  expect(await downloadedDigest(download, info.outputPath('community.png'))).toBe(digest)
+})
+test('P-OFFLINE: an outfit card refuses export offline, keeps its preview, and the same member retry downloads it', async ({
+  context,
+  page,
+  interceptNetworkCall,
+}, info) => {
+  await identify(context)
   await page.goto('/')
   const launcher = page.getByTestId('ritual-share-card-launcher')
   await launcher.getByRole('button').first().click()
@@ -828,7 +938,7 @@ test('P-OFFLINE: offline Save refuses export and keeps the preview; the same mem
   const preview = dialog.getByTestId('share-card-preview')
   await expect(preview).toHaveAttribute('data-loaded', 'true')
   const digest = await preview.getAttribute('data-sha256')
-  const copy = webCatalog('en-US')
+  const copy = webCatalog('en-US').shareCard
   // Observes the next preparation; an offline Save that reached the network would
   // resolve this with a failed request before the online retry.
   const saved = interceptNetworkCall({
@@ -943,16 +1053,23 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
           }
         ).access_token
     )
-    // Firefox revalidates the profile the control tab just read in the shared context
-    // cache, so a 304 for the new bearer confirms the same account without a body.
+    // The profile is private and never stored, so every engine reads it fresh for the
+    // new bearer; its JWT subject and the profile both name the second account.
     expect(switchedProfile.request?.headers().authorization).toBe(
       `Bearer ${switchedBearer}`
     )
-    expect([200, 304]).toContain(switchedProfile.status)
-    if (switchedProfile.status === 200)
-      expect(userProfileResponseSchema.parse(switchedProfile.responseJson).user.id).toBe(
-        account.appUserId
-      )
+    expect(
+      (
+        JSON.parse(
+          Buffer.from(switchedBearer.split('.')[1]!, 'base64url').toString('utf8')
+        ) as { sub: string }
+      ).sub
+    ).toBe(account.authUserId)
+    expect(switchedProfile.status).toBe(200)
+    expect(switchedProfile.response?.headers()['cache-control']).toBe('private, no-store')
+    expect(userProfileResponseSchema.parse(switchedProfile.responseJson).user.id).toBe(
+      account.appUserId
+    )
     await sameDocument()
     await expect(page.getByTestId('share-card-preview')).toHaveCount(0)
     await expect(
@@ -969,6 +1086,7 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
 })
 
 test('P-CANCEL-SAVE: closing during held save authorization prevents browser handoff and retains composition', async ({
+  browser,
   context,
   page,
   interceptNetworkCall,
@@ -985,56 +1103,27 @@ test('P-CANCEL-SAVE: closing during held save authorization prevents browser han
       else await holdThenFulfill(route, request, gate)
     },
   })
-  const verification = routeGate()
-  const preferences = routeGate()
-  const heldSession = interceptNetworkCall({
-    method: 'GET',
-    url: '**/api/v1/user/profile',
-    handler: async (route, request) => {
-      if (!verification.request) {
-        verification.request = request
-        verification.enter()
-        await verification.released
-      }
-      await route.continue()
-    },
-  })
-  const heldPreferences = interceptNetworkCall({
-    method: 'GET',
-    url: '**/api/v1/community/notification-preferences',
-    handler: async (route, request) => {
-      if (!preferences.request) {
-        preferences.request = request
-        preferences.enter()
-        await preferences.released
-      }
-      await route.continue()
-    },
-  })
-  await page.goto('/notification-settings')
-  const back = page.getByRole('link', { name: 'Back to community', exact: true })
-  const boxes = []
-  try {
-    await heldSession
-    await verification.started
-    await expect(back).toBeVisible()
-    boxes.push(await back.boundingBox())
-    verification.release()
-    await heldPreferences
-    await preferences.started
-    boxes.push(await back.boundingBox())
-  } finally {
-    verification.release()
-    preferences.release()
+  const back = await expectStableSettingsLayout(page, 'en-US', interceptNetworkCall)
+  for (const [locale, width] of [
+    ['en-US', 375],
+    ['de-DE', 1440],
+    ['de-DE', 375],
+  ] as const) {
+    const variant = await browser.newContext({
+      locale,
+      viewport: { width, height: 1100 },
+      baseURL: test.info().project.use.baseURL,
+    })
+    try {
+      await identify(variant)
+      const variantPage = await variant.newPage()
+      await expectStableSettingsLayout(variantPage, locale, (options) =>
+        interceptPageNetworkCall({ ...options, page: variantPage })
+      )
+    } finally {
+      await variant.close()
+    }
   }
-  await settingsLoaded(page)
-  boxes.push(await back.boundingBox())
-  // The form's place is held while identity and settings load, so links never move.
-  expect(boxes, 'Back link box while verifying, loading and loaded').toEqual([
-    boxes[0],
-    boxes[0],
-    boxes[0],
-  ])
   const sameDocument = await markDocument(page)
   await back.click()
   await expect(page).toHaveURL('/')
