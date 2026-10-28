@@ -240,7 +240,23 @@ describe('native public evidence', () => {
 
   test('public Release font evidence rejects missing state, cleanup, production or text preservation before any copy', (t) => {
     const { directory, write, run } = evidenceFixture(t)
-    write('accessibility-bridge.json', { passed: 90 })
+    // A schema-valid record that would otherwise publish, so only the Release proof refuses.
+    write('accessibility-bridge.json', {
+      method:
+        'React Native posted accessibility announcement and intended focus bridge unit assertions',
+      passed: true,
+      cases: [{ locale: 'en-US', state: 'saved', passed: true }],
+      runner: {
+        classification: 'passed',
+        exitCode: 0,
+        reportPresent: true,
+        reportSuccessful: true,
+        assertionsObserved: 1,
+        assertionsFailed: 0,
+        matchedCases: 1,
+        requiredCases: 1,
+      },
+    })
     for (const patch of [
       { platform: 'ios' },
       { configuration: 'Debug' },

@@ -36,6 +36,12 @@ describe('original-resource proof', () => {
         privateJson: () => undefined,
         read: () => ({}),
         captureApproved: () => events.push('approved'),
+        previewDigest: () => 'a'.repeat(64),
+        openOsSettings: () => {
+          events.push('settings-opened')
+          return { foregroundMarkers: [] }
+        },
+        IOS_RETRYABLE_DENIAL_EVIDENCE: 'restricted adapter response',
         console: { log: () => undefined },
         run: (_binary, args) => {
           if (args.includes('extract')) {
@@ -228,6 +234,7 @@ describe('Maestro driver port', () => {
           redactRapidWatermarkControl: () => undefined,
           spawnSync: capture,
           spawn: capture,
+          flowTimeoutMs: () => 120_000,
           MAESTRO_ANDROID_DRIVER_PORT: 17001,
           DRIVER_HOST_PORT_ARG: '--driver-host-port',
           signal: new AbortController().signal,
