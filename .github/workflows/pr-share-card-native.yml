@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      startup_probe:
+        description: Diagnose iOS startup commands and CPU settling without an app build
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -11,6 +16,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   original-resource:
+    if: ${{ !inputs.startup_probe }}
     strategy:
       fail-fast: false
       matrix:
@@ -80,7 +86,7 @@ jobs:
         with:
           packages: platform-tools
       - name: Verify startup deadline controls
-        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/native-supabase.test.mjs scripts/ci/native-supabase-gateway.test.mjs scripts/e2e-share-card/runtime-sources.test.mjs scripts/ci/native-host-evidence.test.mjs scripts/ci/native-build-daemons.test.mjs scripts/ci/native-ios-quiesce.test.mjs scripts/ci/native-ios-flow-deadline.test.mjs scripts/e2e-share-card/warm-metro.test.mjs
+        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/native-supabase.test.mjs scripts/ci/native-supabase-gateway.test.mjs scripts/e2e-share-card/runtime-sources.test.mjs scripts/ci/native-host-evidence.test.mjs scripts/ci/native-build-daemons.test.mjs scripts/ci/native-ios-quiesce.test.mjs scripts/ci/native-ios-command-evidence.test.mjs scripts/ci/native-ios-flow-deadline.test.mjs scripts/e2e-share-card/warm-metro.test.mjs
       - uses: ./.github/actions/start-local-supabase
         if: runner.os == 'Linux'
       - name: Install the iOS project generator
@@ -309,3 +315,24 @@ jobs:
           if [ -f /tmp/cc68-simulator ]; then
             xcrun simctl delete "$(cat /tmp/cc68-simulator)"
           fi
+
+  ios-startup-probe:
+    if: ${{ inputs.startup_probe }}
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      CC68_HARNESS_DIR: _bmad-output/test-artifacts/story-6-8/runtime
+    steps:
+      - uses: actions/checkout@v4
+      - name: Diagnose owned simulator tuning and settling
+        run: node scripts/ci/native-ios-startup-probe.mjs
+      - name: Collect complete startup command diagnostics and CPU settle evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc68-ios-startup-probe
+          path: |
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-startup-private.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-quiesce-ios.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-host-ios.json
+          if-no-files-found: error

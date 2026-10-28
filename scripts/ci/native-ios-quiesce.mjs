@@ -4,6 +4,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import {
+  simulatorCommandRecorder,
+  simulatorJobs,
+  simulatorManager,
+  extractionService,
+} from './native-ios-command-evidence.mjs'
 
 export const CPU_TARGETS = ['STExtractionService', 'healthappd', 'diagnosticd']
 export const QUIESCE_POLICY = Object.freeze({
@@ -176,38 +182,57 @@ export function assertNativeQuiesceEvidence(value) {
     throw new Error('invalid_native_quiesce_evidence')
 }
 
-function execute(args, timeout = 15000) {
-  const r = spawnSync('xcrun', args, { encoding: 'utf8', timeout, killSignal: 'SIGKILL' })
-  if (r.status !== 0) throw new Error('owned_simulator_command_failed')
-  return r.stdout
+export function probeSimulatorTuning(device, execute) {
+  const simctl = (operation, args, options) =>
+    execute(operation, 'xcrun', ['simctl', ...args], options)
+  simctl('log-level-off', ['spawn', device, 'log', 'config', '--mode', 'level:off'], {
+    fatal: false,
+  })
+  const reported = simctl('manager-pid', ['spawn', device, 'launchctl', 'managerpid'], {
+    fatal: false,
+  })
+  const listed = simctl('list-services', ['spawn', device, 'launchctl', 'list'], {
+    fatal: false,
+  })
+  const ps = execute('simulator-processes', 'ps', ['-A', '-o', 'pid=,ppid=,%cpu=,comm='])
+  const jobs = simulatorJobs(listed.stdout)
+  const manager = simulatorManager(
+    ps.stdout,
+    jobs,
+    reported.exitCode === 0 ? Number(reported.stdout.trim()) : null
+  )
+  const service = extractionService(ps.stdout, jobs, manager)
+  if (service) {
+    // The PID domain is the verified simulator bootstrap namespace, with the exact listed label.
+    simctl(
+      'bootout-extraction-service',
+      ['spawn', device, 'launchctl', 'bootout', `pid/${manager}/${service.label}`],
+      { fatal: false }
+    )
+  } else console.log(JSON.stringify({ extractionBootout: 'no_matching_owned_label' }))
+  return manager
 }
 
-async function main() {
+export async function quiesceOwnedSimulator(device, command) {
   if (
     process.platform !== 'darwin' ||
     process.env.GITHUB_ACTIONS !== 'true' ||
     process.env.RUNNER_ENVIRONMENT !== 'github-hosted'
   )
     throw new Error('quiesce_requires_disposable_macos')
-  const device = process.argv[2]
+  const directory = path.resolve(
+    process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
+  )
+  const execute = command ?? simulatorCommandRecorder(directory)
+  const simctl = (operation, args, options) =>
+    execute(operation, 'xcrun', ['simctl', ...args], options)
   const devices = Object.values(
-    JSON.parse(execute(['simctl', 'list', 'devices', '--json'])).devices
+    JSON.parse(simctl('list-devices', ['list', 'devices', '--json']).stdout).devices
   ).flat()
   const selected = devices.find((d) => d.udid === device)
   if (!selected || !selected.name.startsWith('cc68-') || selected.state !== 'Booted')
     throw new Error('owned_booted_simulator_required')
-  // This changes logging inside the exact owned simulator only.
-  execute(['simctl', 'spawn', device, 'log', 'config', '--mode', 'level:off'])
-  console.log(JSON.stringify({ simulatorLoggingLevel: 'off' }))
-  const manager = Number(
-    execute(['simctl', 'spawn', device, 'launchctl', 'managerpid']).trim()
-  )
-  if (!Number.isSafeInteger(manager) || manager <= 1)
-    throw new Error('owned_simulator_manager_required')
-  const directory = path.resolve(
-    process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
-  )
-  fs.mkdirSync(directory, { recursive: true, mode: 0o700 })
+  const manager = probeSimulatorTuning(device, execute)
   const result = await waitForSimulatorCpu({
     sample: (remaining) => {
       const r = spawnSync('ps', ['-A', '-o', 'pid=,ppid=,%cpu=,comm='], {
@@ -237,5 +262,7 @@ async function main() {
     },
   })
   if (result.outcome !== 'settled') throw new Error(`ios_quiesce_${result.outcome}`)
+  return result
 }
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
+if (process.argv[1] === fileURLToPath(import.meta.url))
+  await quiesceOwnedSimulator(process.argv[2])
