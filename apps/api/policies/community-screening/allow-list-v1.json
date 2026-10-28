@@ -581,16 +581,6 @@
       "reason": "Portuguese kite, a common printed, embroidered or illustrated motif. Clear this exact literal ordinary noun; Italian pippa and disguised or stretched variants continue screening through general collapsed matching."
     },
     {
-      "entry": "pé de",
-      "language": "pt",
-      "reason": "Portuguese foot-of noun phrase ('pé de elefante', 'pé de galinha', 'pé de vento', 'pé de atleta') in footwear, trouser and fabric copy. The short-token rejoin builds the accented 'péde' and misses the unaccented allow entry 'pede', so the ordinary phrase read as the French slur. Only the exact accented tokens pé and de clear; 'pé dé', spaced letters and every other spelling still screen."
-    },
-    {
-      "entry": "pé do",
-      "language": "pt",
-      "reason": "Portuguese foot-of noun phrase ('pé do sofá', 'pé do bebê') whose accented rejoin 'pédo' met the Spanish term pedo. Only the exact accented tokens pé and do clear; 'pé dó', spaced letters and every other spelling still screen."
-    },
-    {
       "entry": "lo fa",
       "language": "it",
       "reason": "Italian object pronoun plus third-person fare, meaning does it or makes it. Clear this exact complete contiguous phrase when reconstructing a joined candidate; raw lofa, letter-spaced forms and punctuation-separated fragments remain screened."
@@ -1194,6 +1184,56 @@
       ],
       "maxDistance": 5,
       "reason": "Portuguese balé (ballet) folds and repeat-collapses onto the Italian term balle. Clear the exact accented literal only inside bounded dance, costume or footwear grammar; the unaccented bale, stretched spellings and independently unsafe words keep screening."
+    }
+  ],
+  "scopedPhrases": [
+    {
+      "entry": "pé de",
+      "language": "pt",
+      "complements": [
+        "elefante",
+        "galinha",
+        "cabra",
+        "moleque",
+        "vento",
+        "atleta",
+        "meia",
+        "pato",
+        "bebê",
+        "criança",
+        "boneca",
+        "madeira",
+        "ferro",
+        "mesa",
+        "sofá",
+        "cadeira",
+        "cama"
+      ],
+      "reason": "Portuguese foot-of noun phrase ('calça pé de elefante', 'estampa pé de galinha', 'pé de vento', 'pé de atleta', 'pé-de-moleque'). The short-token rejoin builds the accented 'péde', misses the unaccented allow entry 'pede' and reads as the French slur. Clears only the exact accented tokens pé and de when the declared locale is Portuguese and the next word is one of the enumerated Portuguese complements; the bare phrase, a trailing phrase, 'pé dé' and every other spelling keep screening in every locale."
+    },
+    {
+      "entry": "pé do",
+      "language": "pt",
+      "complements": [
+        "sofá",
+        "bebê",
+        "criança",
+        "filho",
+        "menino",
+        "menina",
+        "noivo",
+        "modelo",
+        "manequim",
+        "cavalo",
+        "piano",
+        "mesa",
+        "banco",
+        "cabide",
+        "armário",
+        "sapato",
+        "tripé"
+      ],
+      "reason": "Portuguese foot-of noun phrase ('pé do sofá', 'pé do bebê') whose accented rejoin 'pédo' met the Spanish term pedo. Clears only the exact accented tokens pé and do when the declared locale is Portuguese and the next word is one of the enumerated complements; the bare phrase and every other spelling keep screening in every locale."
     }
   ]
 }

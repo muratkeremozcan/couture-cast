@@ -307,6 +307,11 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
               .array(z.enum(SCREENING_LANGUAGES))
               .min(1)
               .optional(),
+            // A phrase listed here needs these declared languages instead of the rule's
+            // own, so one target can be wider in one language than in another.
+            phraseRequiredDeclaredLanguages: z
+              .record(z.string(), z.array(z.enum(SCREENING_LANGUAGES)).min(1))
+              .optional(),
             rejectedPrefixFrames: z
               .array(z.string().regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u))
               .min(1)
@@ -331,6 +336,11 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
               rule.nativeLanguages.includes(rule.language) &&
               (rule.requiredDeclaredLanguages ?? []).every((language) =>
                 rule.nativeLanguages.includes(language)
+              ) &&
+              Object.entries(rule.phraseRequiredDeclaredLanguages ?? {}).every(
+                ([phrase, languages]) =>
+                  rule.phrases.includes(phrase) &&
+                  languages.every((language) => rule.nativeLanguages.includes(language))
               ) &&
               rule.target.toLowerCase() === rule.target &&
               rule.phrases.every(
@@ -358,6 +368,17 @@ const allowFileSchema = z.object({
   listType: z.literal('allowList'),
   provenance: provenanceSchema,
   entries: z.array(z.string().trim().min(1)),
+  // Head phrases cleared only when the declared locale resolves to this file's
+  // language AND the next word is one of the enumerated complements. They reach the
+  // short-token rejoin pass, which literal contexts cannot.
+  scopedPhrases: z
+    .array(
+      z.object({
+        phrase: z.string().trim().min(1),
+        complements: z.array(z.string().regex(/^\p{L}+$/u)).min(1),
+      })
+    )
+    .default([]),
   literalContexts: z.array(literalContextSchema).default([]),
   occurrenceConstructions: z.array(occurrenceConstructionSchema).default([]),
 })
@@ -621,6 +642,29 @@ function connectedLiteralTokens(
   return joiner === 'space-or-hyphen' && gap === '-'
 }
 
+function indexScopedPhrases(
+  lists: readonly {
+    language: ScreeningLanguage
+    scopedPhrases?: { phrase: string; complements: string[] }[]
+  }[]
+): ReadonlyMap<ScreeningLanguage, readonly ScopedPhrase[]> {
+  const scoped = new Map<ScreeningLanguage, ScopedPhrase[]>()
+  for (const list of lists) {
+    for (const entry of list.scopedPhrases ?? []) {
+      const tokens = tokenize(toLiteralForm(entry.phrase))
+      if (tokens.length < 2)
+        throw new CommunityTextScreenerConfigError(
+          'a scoped allow phrase needs at least two words'
+        )
+      scoped.set(list.language, [
+        ...(scoped.get(list.language) ?? []),
+        { tokens, complements: new Set(entry.complements.map(toLiteralForm)) },
+      ])
+    }
+  }
+  return scoped
+}
+
 function reviewedOccurrencePhrases(
   lists: readonly {
     language: ScreeningLanguage
@@ -657,7 +701,9 @@ function reviewedOccurrencePhrases(
         ...rule.phrases.map((phrase) => ({
           target: rule.target,
           phrase,
-          requiredDeclaredLanguages: reviewed.requiredDeclaredLanguages,
+          requiredDeclaredLanguages:
+            reviewed.phraseRequiredDeclaredLanguages?.[phrase] ??
+            reviewed.requiredDeclaredLanguages,
           rejectedPrefixFrames: reviewed.rejectedPrefixFrames,
         }))
       )
@@ -691,6 +737,11 @@ function indexRun(index: Map<string, TermMeta>, form: string, meta: TermMeta): v
 
 function matchRun(index: RunIndex, candidate: string): TermMeta | undefined {
   return index.get(collapseRepeats(candidate))
+}
+
+interface ScopedPhrase {
+  readonly tokens: readonly string[]
+  readonly complements: ReadonlySet<string>
 }
 
 interface PhraseEntry {
@@ -1025,6 +1076,12 @@ export class CommunityTextScreener {
   private readonly indexes: readonly LanguageIndex[]
   private readonly allowSingles: ReadonlySet<string>
   private readonly allowPhrases: readonly string[][]
+  private readonly scopedAllowPhrases: ReadonlyMap<
+    ScreeningLanguage,
+    readonly ScopedPhrase[]
+  >
+  /** The scoped phrases of the language the current screen() call declared. */
+  private activeScopedPhrases: readonly ScopedPhrase[] = []
   private readonly literalContexts: readonly (z.infer<typeof literalContextSchema> & {
     language: ScreeningLanguage
   })[]
@@ -1110,6 +1167,7 @@ export class CommunityTextScreener {
     }
     this.allowSingles = allowSingles
     this.allowPhrases = allowPhrases
+    this.scopedAllowPhrases = indexScopedPhrases(allowLists)
     if (
       allowLists.some((list) =>
         list.entries.some((entry) =>
@@ -1220,6 +1278,22 @@ export class CommunityTextScreener {
       verdict.flag(LOCALE_UNSCREENABLE_REASON, this.policy.unscreenableLocaleDisposition)
     }
 
+    this.activeScopedPhrases =
+      this.scopedAllowPhrases.get(
+        this.resolveLanguage(declaredLocale) as ScreeningLanguage
+      ) ?? []
+    try {
+      return this.screenWithVerdict(input, declaredLocale, verdict)
+    } finally {
+      this.activeScopedPhrases = []
+    }
+  }
+
+  private screenWithVerdict(
+    input: CommunityTextScreeningInput,
+    declaredLocale: string | null,
+    verdict: Verdict
+  ): CommunityTextScreeningResult {
     const limit = this.fieldLimits[input.field]
     const raw = input.text ?? ''
     const overLength = raw.length > limit
@@ -1327,6 +1401,16 @@ export class CommunityTextScreener {
   }
 
   private markAllowedPhrases(literalTokens: string[], allowed: boolean[]): void {
+    for (const scoped of this.activeScopedPhrases) {
+      const { tokens: head, complements } = scoped
+      for (let start = 0; start + head.length < literalTokens.length; start += 1) {
+        if (!head.every((token, offset) => literalTokens[start + offset] === token))
+          continue
+        if (!complements.has(literalTokens[start + head.length] as string)) continue
+        for (let offset = 0; offset < head.length; offset += 1)
+          allowed[start + offset] = true
+      }
+    }
     for (const phrase of this.allowPhrases) {
       for (let start = 0; start + phrase.length <= literalTokens.length; start += 1) {
         const matches = phrase.every(
@@ -1623,11 +1707,24 @@ export class CommunityTextScreener {
     size: number
   ): boolean {
     return (
-      this.allowPhrases.some(
+      (this.allowPhrases.some(
         (phrase) =>
           phrase.length === size &&
           phrase.every((word, offset) => tokens[start + offset] === word)
-      ) &&
+      ) ||
+        this.activeScopedPhrases.some(
+          (scoped) =>
+            scoped.tokens.length === size &&
+            scoped.tokens.every((word, offset) => tokens[start + offset] === word) &&
+            scoped.complements.has(tokens[start + size] as string) &&
+            connectedLiteralTokens(
+              literal,
+              spans,
+              start + size - 1,
+              start + size,
+              'space-or-hyphen'
+            )
+        )) &&
       Array.from({ length: size - 1 }, (_, offset) =>
         connectedLiteralTokens(
           literal,

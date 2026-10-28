@@ -125,9 +125,13 @@ describe('round4 deletion and occurrence-bound context development regressions',
   const historicalRules = reviewedOccurrenceBank.constructions.filter((rule) =>
     ['retard', 'tapete'].includes(rule.target)
   )
-  it('pins the round6 two-target two-phrase authoritative surface', () => {
+  // Round 7 coordinator ruling (revised): the tapete surface is widened from the single
+  // round 6 phrase to enumerated Portuguese noun phrases, each bound to declared
+  // Portuguese through phraseRequiredDeclaredLanguages. Spanish keeps only um tapete and
+  // the bare, article and contraction forms stay blocked everywhere.
+  it('pins the round7 two-target authoritative surface', () => {
     expect(historicalRules.map((rule) => rule.target)).toEqual(['retard', 'tapete'])
-    expect(historicalRules.map((rule) => rule.phrases.length)).toEqual([1, 1])
+    expect(historicalRules.map((rule) => rule.phrases.length)).toEqual([1, 34])
     expect(historicalRules.map((rule) => rule.nativeLanguages)).toEqual([
       ['fr'],
       ['pt', 'es'],
@@ -138,19 +142,22 @@ describe('round4 deletion and occurrence-bound context development regressions',
       createHash('sha256')
         .update(historicalRules.flatMap((rule) => rule.phrases).join('\n'))
         .digest('hex')
-    ).toBe('3a18e189706e4e52681d4df33ca7d7025c006903000a01264686f53b63e4effc')
+    ).toBe('bdfd65fca144efeacb8aa191e9f495995312d49386666d9e30d27748c1da1b99')
   })
   describe.each(historicalRules)(
     'reviewed occurrence surface $target',
-    ({ target, phrases, requiredDeclaredLanguages }) => {
+    ({ target, phrases, requiredDeclaredLanguages, phraseRequiredDeclaredLanguages }) => {
       it.each(phrases)('clears only the exact bound occurrence in %s', (phrase) => {
         for (const locale of [...locales, undefined]) {
+          const perPhrase = phraseRequiredDeclaredLanguages as
+            | Record<string, string[]>
+            | undefined
+          const required: string[] | undefined =
+            perPhrase?.[phrase] ?? requiredDeclaredLanguages
           expect(
             screener.screen({ text: phrase, locale, field: 'caption' }).disposition
           ).toBe(
-            requiredDeclaredLanguages?.some((language) => locale?.startsWith(language))
-              ? 'pass'
-              : 'block'
+            required?.some((language) => locale?.startsWith(language)) ? 'pass' : 'block'
           )
           for (const text of [
             target,

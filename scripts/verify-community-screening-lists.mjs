@@ -66,6 +66,8 @@ export function occurrenceConstructionProblems(rules) {
         JSON.stringify(reviewed.requiredDeclaredLanguages ?? []) &&
       JSON.stringify(rule.rejectedPrefixFrames ?? []) ===
         JSON.stringify(reviewed.rejectedPrefixFrames ?? []) &&
+      JSON.stringify(rule.phraseRequiredDeclaredLanguages ?? {}) ===
+        JSON.stringify(reviewed.phraseRequiredDeclaredLanguages ?? {}) &&
       typeof rule.reason === 'string' &&
       rule.reason.length >= 20 &&
       Array.isArray(rule.phrases) &&
@@ -315,6 +317,22 @@ function loadAllowList() {
       )
     )
   )
+  for (const scoped of allow.scopedPhrases ?? []) {
+    const literal = toLiteral(scoped.entry ?? '')
+    if (
+      !LANGUAGES.includes(scoped.language) ||
+      tokenize(literal).length < 2 ||
+      !Array.isArray(scoped.complements) ||
+      scoped.complements.length === 0 ||
+      typeof scoped.reason !== 'string' ||
+      scoped.reason.length < 20
+    )
+      problems.push(
+        `scoped allow phrase "${scoped.entry}" needs a language, two words, complements and a reason`
+      )
+    if (globallyAllowsOccurrenceTarget(literal))
+      problems.push('reviewed occurrence target cannot be globally allow-listed')
+  }
   if ('occurrenceConstructions' in allow)
     problems.push('reviewed constructions must use the authoritative bank')
   problems.push(...occurrenceConstructionProblems(REVIEWED_OCCURRENCE_CONSTRUCTIONS))
@@ -459,6 +477,12 @@ function buildAllowFile(language, allowState, hashes) {
       .filter((entry) => entry.language === language)
       .map((entry) => toLiteral(entry.entry))
       .toSorted(),
+    scopedPhrases: (allowState.allow.scopedPhrases ?? [])
+      .filter((entry) => entry.language === language)
+      .map((entry) => ({
+        phrase: toLiteral(entry.entry),
+        complements: entry.complements.map(toLiteral),
+      })),
     literalContexts: (allowState.allow.literalContexts ?? [])
       .filter((context) => context.language === language)
       .map(({ terms, objects, connectors, maxDistance }) => ({

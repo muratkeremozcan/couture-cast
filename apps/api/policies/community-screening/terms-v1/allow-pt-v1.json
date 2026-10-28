@@ -12,8 +12,8 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "38b2d78b781ac89252c8dd7be2eadb2c80d40cf585c2081b0fc21dbd80c94af7",
-    "reviewedOccurrenceSha256": "ecd283578ce1a739102db9c317e124955ae1ddd26eb1851d6c97988a7075a87a"
+    "allowListSha256": "96be7c29ed93635d8e79c53593a90adea3487790070c794769c2ec67f355ecfd",
+    "reviewedOccurrenceSha256": "f6daa1a2142d9a69f230771000ad17594a384af04e18d27b40e4c30f36459e2f"
   },
   "entries": [
     "aranha",
@@ -40,9 +40,53 @@
     "pinto as botas",
     "pinto o cabelo",
     "pinto o tecido",
-    "pipa",
-    "pé de",
-    "pé do"
+    "pipa"
+  ],
+  "scopedPhrases": [
+    {
+      "phrase": "pé de",
+      "complements": [
+        "elefante",
+        "galinha",
+        "cabra",
+        "moleque",
+        "vento",
+        "atleta",
+        "meia",
+        "pato",
+        "bebê",
+        "criança",
+        "boneca",
+        "madeira",
+        "ferro",
+        "mesa",
+        "sofá",
+        "cadeira",
+        "cama"
+      ]
+    },
+    {
+      "phrase": "pé do",
+      "complements": [
+        "sofá",
+        "bebê",
+        "criança",
+        "filho",
+        "menino",
+        "menina",
+        "noivo",
+        "modelo",
+        "manequim",
+        "cavalo",
+        "piano",
+        "mesa",
+        "banco",
+        "cabide",
+        "armário",
+        "sapato",
+        "tripé"
+      ]
+    }
   ],
   "literalContexts": [
     {
@@ -531,7 +575,42 @@
   "occurrenceConstructions": [
     {
       "target": "tapete",
-      "phrases": ["um tapete"]
+      "phrases": [
+        "um tapete",
+        "tapete de yoga",
+        "tapete de ioga",
+        "tapete de banho",
+        "tapete de crochê",
+        "tapete de croche",
+        "tapete de pelúcia",
+        "tapete de lã",
+        "tapete de algodão",
+        "tapete de sisal",
+        "tapete de juta",
+        "tapete de pelo",
+        "tapete de couro",
+        "tapete de pilates",
+        "tapete de treino",
+        "tapete de brincar",
+        "tapete de atividades",
+        "tapete de entrada",
+        "tapete de cozinha",
+        "tapete de eva",
+        "tapete persa",
+        "tapete oriental",
+        "tapete felpudo",
+        "tapete macio",
+        "tapete redondo",
+        "tapete retangular",
+        "tapete listrado",
+        "tapete xadrez",
+        "tapete estampado",
+        "tapete artesanal",
+        "tapete trançado",
+        "tapete antiderrapante",
+        "tapete infantil",
+        "tapete emborrachado"
+      ]
     }
   ]
 }
