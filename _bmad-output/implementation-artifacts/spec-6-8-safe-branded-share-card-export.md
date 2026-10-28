@@ -1027,7 +1027,7 @@ Evidence: `runs/cief22-cache-miss-red-1` and `runs/cief22-cache-miss-green-1` (2
 The in-flight ef22 CI run is preserved until publication of this concrete repair; no CI
 failure is inferred from its pending state.
 
-- 2026-10-27 platform risk, plpgsql_check pldbgapi2 (eef2b69d): the Supabase Postgres image
+- 2026-10-27 platform risk, plpgsql_check pldbgapi2 (230c8b18): the Supabase Postgres image
   preloads plpgsql_check through `shared_preload_libraries`, and its pldbgapi2 layer hooks every
   PL/pgSQL call. Locally it aborted `community_prepare_subject_privacy` inside `revokeConsent` with
   SQLSTATE XX000 `cannot find parent statement on pldbgapi2 call stack`, once in each of two full
