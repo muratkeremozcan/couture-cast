@@ -4,6 +4,12 @@ appId: ${MAESTRO_APP_ID}
     id: tab-wardrobe
 - tapOn:
     id: tab-home
+# Home can keep an earlier scroll offset. Start every search from the top of Home.
+- scrollUntilVisible:
+    element:
+      id: weather-header(-skeleton)?
+    direction: UP
+    timeout: 30000
 - scrollUntilVisible:
     element:
       id: outfit-share-card-open
