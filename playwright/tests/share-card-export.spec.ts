@@ -14,6 +14,7 @@ import AxeBuilder from '@axe-core/playwright'
 import type {
   APIResponse,
   BrowserContext,
+  Download,
   Page,
   Locator,
   Request,
@@ -506,6 +507,11 @@ async function holdThenFulfill(
 // playwright-utils deviation: handleDownload saves the file but does not expose
 // Download.suggestedFilename, which these cases assert.
 const nextDownload = (page: Page) => page.waitForEvent('download')
+async function downloadedDigest(download: Download, file: string) {
+  // saveAs works for local and remote browsers; Download.path() only for local ones.
+  await download.saveAs(file)
+  return sha256(fs.readFileSync(file))
+}
 // The settings form loads above the page's links; click them only once it is in place.
 const settingsLoaded = (page: Page) =>
   expect(page.getByRole('button', { name: 'Save settings', exact: true })).toBeVisible()
@@ -668,7 +674,7 @@ test('P-REVALIDATE P-DOWNLOAD-ERROR: final conflict and handoff error retain the
   context,
   page,
   interceptNetworkCall,
-}) => {
+}, info) => {
   await identify(context)
   let conflict = true
   let refresh: ReturnType<typeof routeGate> | null = null
@@ -745,7 +751,7 @@ test('P-REVALIDATE P-DOWNLOAD-ERROR: final conflict and handoff error retain the
   }
   const download = await retried
   expect(download.suggestedFilename()).toBe('couturecast-card.png')
-  expect(sha256(fs.readFileSync(await download.path()))).toBe(digest)
+  expect(await downloadedDigest(download, info.outputPath('retried.png'))).toBe(digest)
   expect(purposes).toEqual(['preview', 'save', 'preview', 'save', 'save'])
   await expect(retryButton).toHaveCount(0)
   await expect(dialog.getByTestId('share-card-save')).toBeFocused()
@@ -811,9 +817,16 @@ test('P-OFFLINE: offline Save refuses export and keeps the preview; the same mem
   context,
   page,
   interceptNetworkCall,
-}) => {
+}, info) => {
   await identify(context)
-  const { preview, dialog } = await ownPhoto(page, interceptNetworkCall)
+  // An outfit card: reconnecting resyncs the community feed, which remounts its cards.
+  await page.goto('/')
+  const launcher = page.getByTestId('ritual-share-card-launcher')
+  await launcher.getByRole('button').first().click()
+  await launcher.getByTestId('share-card-open').click()
+  const dialog = modal(page)
+  const preview = dialog.getByTestId('share-card-preview')
+  await expect(preview).toHaveAttribute('data-loaded', 'true')
   const digest = await preview.getAttribute('data-sha256')
   const copy = webCatalog('en-US')
   // Observes the next preparation; an offline Save that reached the network would
@@ -840,7 +853,7 @@ test('P-OFFLINE: offline Save refuses export and keeps the preview; the same mem
     expectedSha256: digest,
   })
   expect(download.suggestedFilename()).toBe('couturecast-card.png')
-  expect(sha256(fs.readFileSync(await download.path()))).toBe(digest)
+  expect(await downloadedDigest(download, info.outputPath('retried.png'))).toBe(digest)
   await expect(dialog.getByRole('alert')).toHaveCount(0)
   await expect(preview).toHaveAttribute('data-sha256', digest!)
 })
@@ -922,10 +935,24 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
     await control.getByRole('button', { name: 'Verify code', exact: true }).click()
     await control.waitForURL('/')
     const switchedProfile = await switched
-    expect(switchedProfile.status).toBe(200)
-    expect(userProfileResponseSchema.parse(switchedProfile.responseJson).user.id).toBe(
-      account.appUserId
+    const switchedBearer = await control.evaluate(
+      () =>
+        (
+          JSON.parse(localStorage.getItem('couturecast.auth-session')!) as {
+            access_token: string
+          }
+        ).access_token
     )
+    // Firefox revalidates the profile the control tab just read in the shared context
+    // cache, so a 304 for the new bearer confirms the same account without a body.
+    expect(switchedProfile.request?.headers().authorization).toBe(
+      `Bearer ${switchedBearer}`
+    )
+    expect([200, 304]).toContain(switchedProfile.status)
+    if (switchedProfile.status === 200)
+      expect(userProfileResponseSchema.parse(switchedProfile.responseJson).user.id).toBe(
+        account.appUserId
+      )
     await sameDocument()
     await expect(page.getByTestId('share-card-preview')).toHaveCount(0)
     await expect(
