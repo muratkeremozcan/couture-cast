@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url'
 export const SAMPLE_LABELS = [
   'before-simulator-boot',
   'after-simulator-boot',
+  'before-first-flow',
   'after-first-flow',
   'failure',
 ]

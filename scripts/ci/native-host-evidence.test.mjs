@@ -290,3 +290,41 @@ test('swap and pressure probes preserve zero and mark unsupported output', () =>
       /invalid_native_host_evidence/
     )
 })
+
+test('every workflow host sample label is accepted by the real sampler CLI', (t) => {
+  const root = fileURLToPath(new URL('../../', import.meta.url))
+  const workflow = fs.readFileSync(
+    path.join(root, '.github/workflows/pr-share-card-native.yml'),
+    'utf8'
+  )
+  const labels = [
+    ...new Set(
+      [
+        ...workflow.matchAll(
+          /native-host-evidence\.mjs sample ([a-z-]+) --platform ios/g
+        ),
+      ].map((match) => match[1])
+    ),
+  ]
+  assert.ok(labels.includes('before-first-flow'))
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-host-labels-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  for (const label of labels) {
+    const result = spawnSync(
+      process.execPath,
+      [script, 'sample', label, '--platform', 'ios'],
+      {
+        env: { ...process.env, CC68_HARNESS_DIR: directory },
+        encoding: 'utf8',
+      }
+    )
+    assert.equal(result.status, 0, `${label}: ${result.stderr}`)
+  }
+  const evidence = JSON.parse(
+    fs.readFileSync(path.join(directory, 'native-host-ios.json'), 'utf8')
+  )
+  assert.deepEqual(
+    evidence.samples.map((sample) => sample.label),
+    labels
+  )
+})
