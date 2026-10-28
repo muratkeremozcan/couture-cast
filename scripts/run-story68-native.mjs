@@ -862,7 +862,7 @@ if (command === 'prebuild') {
   console.log('Owned Story68 API and weather processes started. See private api.log.')
 } else if (command === 'metro') {
   ownedEnv()
-  const env = metroServerEnv(read('public-build-env.json'))
+  const env = metroServerEnv(read('public-build-env.json'), platform)
   const metro = child(
     path.join(root, 'node_modules/.bin/expo'),
     ['start', '--dev-client', '--port', '8089', '--localhost'],

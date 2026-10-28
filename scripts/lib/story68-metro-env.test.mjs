@@ -6,10 +6,23 @@ import { metroServerEnv } from './story68-metro-env.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 
-test('the owned Metro runs with lazy bundling disabled and keeps the build environment', () => {
-  const env = metroServerEnv({ STORY68_NATIVE_TEST_BUILD: '1', EXPO_NO_METRO_LAZY: '0' })
+test('the iOS Metro runs with lazy bundling disabled and keeps the build environment', () => {
+  const env = metroServerEnv(
+    { STORY68_NATIVE_TEST_BUILD: '1', EXPO_NO_METRO_LAZY: '0' },
+    'ios'
+  )
   assert.equal(env.EXPO_NO_METRO_LAZY, '1')
   assert.equal(env.STORY68_NATIVE_TEST_BUILD, '1')
+})
+
+test('Android and unspecified platforms leave Expo lazy bundling untouched', () => {
+  const build = { STORY68_NATIVE_TEST_BUILD: '1' }
+  for (const platform of ['android', undefined, 'web']) {
+    const env = metroServerEnv(build, platform)
+    assert.equal('EXPO_NO_METRO_LAZY' in env, false, String(platform))
+    assert.deepEqual(env, build)
+  }
+  assert.notEqual(metroServerEnv(build, 'android'), build)
 })
 
 test('the installed Expo CLI still reads that variable to decide lazy bundling', () => {
@@ -20,7 +33,15 @@ test('the installed Expo CLI still reads that variable to decide lazy bundling',
   assert.match(cli, /lazy: !_env\d*\.env\.EXPO_NO_METRO_LAZY/)
 })
 
-test('the harness starts Metro through the helper', () => {
+test('the harness passes the platform to the helper and every workflow start names one', () => {
   const harness = fs.readFileSync(`${root}scripts/run-story68-native.mjs`, 'utf8')
-  assert.match(harness, /metroServerEnv\(read\('public-build-env\.json'\)\)/)
+  assert.match(harness, /metroServerEnv\(read\('public-build-env\.json'\), platform\)/)
+  const workflow = fs.readFileSync(
+    `${root}.github/workflows/pr-share-card-native.yml`,
+    'utf8'
+  )
+  const starts = workflow.match(/run-story68-native\.mjs metro\b[^\n]*/g) ?? []
+  assert.ok(starts.length > 0)
+  for (const start of starts)
+    assert.match(start, /--platform \$\{\{ matrix\.platform \}\}/)
 })

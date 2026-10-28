@@ -181,7 +181,7 @@ jobs:
           node scripts/lib/story68-built-render.mjs
           node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1 &
           node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1 &
-          node scripts/run-story68-native.mjs metro > /tmp/cc68-metro.log 2>&1 &
+          node scripts/run-story68-native.mjs metro --platform ${{ matrix.platform }} > /tmp/cc68-metro.log 2>&1 &
           node scripts/maestro-install.mjs
       - name: Verify localized native accessibility announcements and focus bridge
         run: |
