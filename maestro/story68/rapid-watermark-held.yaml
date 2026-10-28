@@ -4,12 +4,11 @@ appId: ${MAESTRO_APP_ID}
     file: rapid-watermark-control.js
     env:
       MAESTRO_RAPID_ACTION: acquire
-# Home renders one primary outfit card. Fail if a second opener ever appears.
-- assertNotVisible:
-    id: outfit-share-card-open
-    index: 1
+# rapid-ready-outfit.yaml proved this opener unique on this same screen just before the
+# hold, so index 0 is that single opener. The whole flow must fit the 12 s hold.
 - tapOn:
     id: outfit-share-card-open
+    index: 0
 - assertVisible: ${MAESTRO_PREPARING}
 - assertNotVisible:
     id: share-card-preview-loaded-.*
