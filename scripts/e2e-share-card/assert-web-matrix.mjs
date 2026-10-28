@@ -23,6 +23,7 @@ export const SHARED_BEHAVIORS = [
   'P-OFFLINE:',
   'P-CANCEL P-IDENTITY:',
   'P-CANCEL-SAVE:',
+  'P-MODAL-STACK:',
 ]
 
 function assertSpecBehaviors(perLocale, shared) {

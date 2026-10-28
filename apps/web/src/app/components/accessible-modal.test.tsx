@@ -183,7 +183,7 @@ describe('AccessibleModal', () => {
     view.rerender(<Stacked inner />)
     const inner = screen.getByRole('dialog', { name: 'Inner' })
     expect(outer).toHaveAttribute('aria-hidden', 'true')
-    expect(outer.inert).toBe(true)
+    expect(outer).toHaveAttribute('inert')
     expect(inner).not.toHaveAttribute('aria-hidden')
     expect(document.activeElement).toBe(screen.getByLabelText('Close inner'))
 
@@ -193,7 +193,7 @@ describe('AccessibleModal', () => {
     })
     expect(screen.queryByRole('dialog', { name: 'Inner' })).not.toBeInTheDocument()
     expect(outer).not.toHaveAttribute('aria-hidden')
-    expect(outer.inert).toBe(false)
+    expect(outer).not.toHaveAttribute('inert')
     expect(document.activeElement).toBe(screen.getByLabelText('Close outer'))
     // The page behind the outer modal stays hidden while the outer modal is open.
     expect(view.container).toHaveAttribute('aria-hidden', 'true')

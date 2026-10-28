@@ -62,13 +62,13 @@ describe('expected web matrix from the spec', () => {
       SHARED_BEHAVIORS.map(
         (p) => expected.shared.filter((title) => title.startsWith(p)).length
       ),
-      [1, 1, 1, 1, 2, 1, 1]
+      [1, 1, 1, 1, 2, 1, 1, 2]
     )
-    assert.equal(expected.shared.length, 8)
-    // The 2026-10 split: 4 cases in each of 10 locales plus 8 shared, per browser.
+    assert.equal(expected.shared.length, 10)
+    // The 2026-10 split: 4 cases in each of 10 locales plus 10 shared, per browser.
     const perBrowser =
       expected.perLocale.length * expected.locales.length + expected.shared.length
-    assert.deepEqual([expected.locales.length, perBrowser, perBrowser * 3], [10, 48, 144])
+    assert.deepEqual([expected.locales.length, perBrowser, perBrowser * 3], [10, 50, 150])
   })
 
   test('the expectation follows the spec, so a split body adds a required case', () => {
@@ -119,10 +119,10 @@ describe('assertWebMatrix', () => {
   test('accepts the full passed matrix and emits only the closed summary', () => {
     assert.deepEqual(assertWebMatrix(report(), expected), {
       passed: true,
-      cases: 144,
+      cases: 150,
       projects: BROWSERS.map((browser) => ({
         browser,
-        passed: 48,
+        passed: 50,
         locales: expected.locales,
       })),
     })

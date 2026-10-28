@@ -22,6 +22,7 @@ import {
   resolveBody,
   resolvedTarget,
   spotlightBody,
+  unavailableTarget,
 } from '../../test-utils/community-spotlight'
 import type * as WebSession from '../../lib/web-session'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
@@ -61,6 +62,8 @@ function useTransport(duplicate = false) {
   let release: (() => void) | undefined
   let held: Promise<void> | undefined
   let self = true
+  let eventsStatus = 200
+  let removed = false
   const post = () => ({ ...own(), author: { displayName: 'Member', isSelf: self } })
   useMswHandlers(
     http.get(FEED_PATH, () => reactionFeedBody(duplicate ? [post()] : [])),
@@ -82,11 +85,17 @@ function useTransport(duplicate = false) {
     }),
     http.get('/api/v1/community/events', async () => {
       if (held) await held
+      if (eventsStatus !== 200)
+        return HttpResponse.json({ message: 'denied' }, { status: eventsStatus })
       return eventsBody([], 'cursor')
     }),
     http.post('/api/v1/community/targets/resolve', async ({ request }) => {
       const { targets } = (await request.json()) as { targets: { key: string }[] }
-      return resolveBody(targets.map(({ key }) => ({ ...resolvedTarget(post()), key })))
+      return resolveBody(
+        targets.map(({ key }) =>
+          removed ? unavailableTarget(key) : { ...resolvedTarget(post()), key }
+        )
+      )
     })
   )
   return {
@@ -94,6 +103,12 @@ function useTransport(duplicate = false) {
     sync: () => syncs.at(-1)!,
     changeOwner: () => {
       self = false
+    },
+    deny: () => {
+      eventsStatus = 403
+    },
+    removePost: () => {
+      removed = true
     },
     hold: () => {
       held = new Promise<void>((resolve) => {
@@ -236,4 +251,124 @@ describe('community share host across card surfaces', () => {
       expect(view.requests).toHaveLength(1)
     }
   )
+})
+
+const detailDialog = () =>
+  document.querySelector('[aria-labelledby="community-detail-title"]')!
+const shareDialog = () => document.querySelector('[aria-labelledby="share-card-title"]')!
+const reachable = (dialog: Element) =>
+  !dialog.hasAttribute('inert') && dialog.getAttribute('aria-hidden') !== 'true'
+// The page behind the dialogs: the app shell and any other body sibling the stack owns.
+const pageIsInteractive = () =>
+  document.body.style.overflow === '' &&
+  [...document.body.children].every(
+    (element) =>
+      element.matches('[role="dialog"],script,style,link') ||
+      (!element.hasAttribute('inert') && !(element as HTMLElement).inert)
+  )
+
+/**
+ * The detail dialog stays logically open underneath its share dialog. Foreground
+ * re-verification suspends both and resumes them in one commit, so the stack, not each
+ * dialog's own snapshot of the page, decides what is reachable.
+ */
+describe('community share host above an open detail dialog', () => {
+  setupCommunityGridSurface()
+  beforeEach(async () => {
+    identity.member = 'member-one'
+    signIn()
+    if (!globalThis.crypto.subtle)
+      vi.stubGlobal('crypto', (await import('node:crypto')).webcrypto)
+  })
+
+  async function reverify(view: ReturnType<typeof useTransport>, outcome?: () => void) {
+    const release = view.hold()
+    outcome?.()
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 9000)
+    let pending!: Promise<void>
+    try {
+      await act(async () => {
+        view.sync().foreground()
+        pending = view.sync().catchUp()
+        await Promise.resolve()
+      })
+      expect(detailDialog()).not.toBeVisible()
+      expect(screen.queryByRole('dialog', { name: 'Your share card' })).toBeNull()
+    } finally {
+      release()
+      await act(() => pending)
+    }
+  }
+
+  it('resumes with the share dialog reachable and the detail covered, then unwinds on Escape', async () => {
+    const view = useTransport(true)
+    renderGrid()
+    await open('detail')
+    expect(reachable(shareDialog())).toBe(true)
+    expect(reachable(detailDialog())).toBe(false)
+    await reverify(view)
+    await screen.findByRole('dialog', { name: 'Your share card' })
+    expect(reachable(shareDialog())).toBe(true)
+    expect(reachable(detailDialog())).toBe(false)
+    expect(document.body.style.overflow).toBe('hidden')
+    expect(pageIsInteractive()).toBe(false)
+
+    await userEvent.keyboard('{Escape}')
+    expect(shareDialog()).toBeNull()
+    expect(reachable(detailDialog())).toBe(true)
+    expect(document.body.style.overflow).toBe('hidden')
+    await userEvent.keyboard('{Escape}')
+    expect(detailDialog()).toBeNull()
+    expect(pageIsInteractive()).toBe(true)
+  })
+
+  it('keeps Cancel working after resuming', async () => {
+    const view = useTransport(true)
+    renderGrid()
+    await open('detail')
+    await reverify(view)
+    await screen.findByRole('dialog', { name: 'Your share card' })
+    await cancel()
+    expect(reachable(detailDialog())).toBe(true)
+    await userEvent.click(
+      within(detailDialog() as HTMLElement).getAllByRole('button', {
+        name: 'Close this look',
+      })[0]!
+    )
+    expect(detailDialog()).toBeNull()
+    expect(pageIsInteractive()).toBe(true)
+  })
+
+  it('releases the page when access is denied during re-verification', async () => {
+    const view = useTransport(true)
+    renderGrid()
+    await open('detail')
+    const release = view.hold()
+    view.deny()
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 9000)
+    let pending!: Promise<void>
+    try {
+      await act(async () => {
+        view.sync().foreground()
+        pending = view.sync().catchUp()
+        await Promise.resolve()
+      })
+    } finally {
+      release()
+      await act(() => pending)
+    }
+    await waitFor(() => expect(detailDialog()).toBeNull())
+    expect(shareDialog()).toBeNull()
+    expect(pageIsInteractive()).toBe(true)
+  })
+
+  it('releases the page when the owned post is removed during re-verification', async () => {
+    const view = useTransport(true)
+    renderGrid()
+    await open('detail')
+    await reverify(view, view.removePost)
+    await waitFor(() => expect(detailDialog()).toBeNull())
+    expect(shareDialog()).toBeNull()
+    expect(pageIsInteractive()).toBe(true)
+  })
 })

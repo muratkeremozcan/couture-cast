@@ -209,27 +209,30 @@ async function expectNoLateDownload(page: Page) {
   // The probe settles only after every continuation of the save path has run.
   expect(await page.evaluate(settleHandoffProbe), 'late download handoffs').toBe(0)
 }
+// Loads the home feed once the owned post is verified, and returns the API origin.
+async function loadOwnFeed(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
+  const profile = interceptNetworkCall({ method: 'GET', url: '**/api/v1/user/profile' })
+  // The feed settles only after the owned target resolves and the cursor replay lands,
+  // and the spotlight above it grows past its skeleton's height when its cards land.
+  // A click pressed before both can release over another element and never open.
+  await afterInitialCommunityVerification({
+    page,
+    postId: fixture.postId,
+    navigate: () => page.goto('/').then(() => undefined),
+  })
+  await expect(page.getByTestId('community-spotlight-loading')).toHaveCount(0)
+  const verified = await profile
+  expect(verified.status).toBe(200)
+  return new URL(verified.request!.url()).origin
+}
 async function ownPhoto(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn | null,
   preparationJourney?: (open: () => Promise<void>, apiOrigin: string) => Promise<void>
 ) {
-  let apiOrigin = ''
-  if (interceptNetworkCall) {
-    const profile = interceptNetworkCall({ method: 'GET', url: '**/api/v1/user/profile' })
-    // The feed settles only after the owned target resolves and the cursor replay lands,
-    // and the spotlight above it grows past its skeleton's height when its cards land.
-    // A click pressed before both can release over another element and never open.
-    await afterInitialCommunityVerification({
-      page,
-      postId: fixture.postId,
-      navigate: () => page.goto('/').then(() => undefined),
-    })
-    await expect(page.getByTestId('community-spotlight-loading')).toHaveCount(0)
-    const verified = await profile
-    expect(verified.status).toBe(200)
-    apiOrigin = new URL(verified.request!.url()).origin
-  }
+  const apiOrigin = interceptNetworkCall
+    ? await loadOwnFeed(page, interceptNetworkCall)
+    : ''
   const opener = page
     .locator(`[data-testid$="lookbook-card-${fixture.postId}"]`)
     .first()
@@ -487,6 +490,71 @@ function routeGate() {
     enter: () => enter(),
     settle: () => settle(),
   }
+  return gate
+}
+const detailModal = (page: Page) =>
+  page.locator('[aria-labelledby="community-detail-title"]')
+// The page state every open dialog shares: which dialogs are reachable, whether anything
+// behind them is still inert or hidden from assistive technology, and the scroll lock.
+function modalPageState(page: Page) {
+  return page.evaluate(() => ({
+    dialogs: Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]')).map(
+      (dialog) => ({
+        labelledBy: dialog.getAttribute('aria-labelledby'),
+        inert: dialog.inert,
+        hidden: dialog.getAttribute('aria-hidden'),
+        display: getComputedStyle(dialog).display,
+      })
+    ),
+    background: Array.from(document.body.children)
+      .filter(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement &&
+          !element.matches('script,style,link,[role="dialog"]') &&
+          (element.inert || element.getAttribute('aria-hidden') === 'true')
+      )
+      .map((element) => element.tagName.toLowerCase()),
+    overflow: document.body.style.overflow,
+  }))
+}
+// Opens the own post's detail, then its share dialog from inside the detail.
+async function openDetailThenShare(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn
+) {
+  await loadOwnFeed(page, interceptNetworkCall)
+  const card = page.locator(`[data-testid$="lookbook-card-${fixture.postId}"]`).first()
+  await card.getByTestId(`lookbook-open-${fixture.postId}`).click()
+  const detail = detailModal(page)
+  await expect(detail).toBeVisible()
+  await detail.getByTestId('share-card-open').click()
+  const share = modal(page)
+  await expect(share.getByTestId('share-card-preview')).toHaveAttribute(
+    'data-loaded',
+    'true'
+  )
+  return { card, detail, share }
+}
+// Holds the next catch-up request, then simulates the tab returning to the foreground,
+// which hides community content until that request verifies access again.
+async function holdForegroundRevalidation(
+  page: Page,
+  answer: (route: Route) => Promise<void>
+) {
+  const gate = routeGate()
+  await page.route('**/api/v1/community/events**', async (route) => {
+    if (gate.request) return route.continue()
+    gate.request = route.request()
+    gate.enter()
+    await gate.released
+    try {
+      await answer(route)
+    } finally {
+      gate.settle()
+    }
+  })
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+  await gate.started
   return gate
 }
 async function fulfillUnlessCancelled(route: Route, response: APIResponse) {
@@ -923,6 +991,85 @@ test('P-REVALIDATE P-DOWNLOAD-ERROR: final conflict and handoff error retain the
   await page.keyboard.press('Escape')
   await expect(dialog).not.toBeVisible()
   expect(downloads).toEqual(['couturecast-card.png'])
+})
+
+test('P-MODAL-STACK: detail and share dialogs resume in order after foreground revalidation and release the page when closed', async ({
+  context,
+  page,
+  interceptNetworkCall,
+}) => {
+  await identify(context)
+  const { card, detail, share } = await openDetailThenShare(page, interceptNetworkCall)
+  const open = (await modalPageState(page)).dialogs
+  expect(open.find((d) => d.labelledBy === 'share-card-title')).toMatchObject({
+    inert: false,
+    hidden: null,
+  })
+  expect(open.find((d) => d.labelledBy === 'community-detail-title')).toMatchObject({
+    inert: true,
+    hidden: 'true',
+  })
+
+  const revalidation = await holdForegroundRevalidation(page, (route) => route.continue())
+  await expect(share).toHaveCount(0)
+  await expect(detail).toBeHidden()
+  revalidation.release()
+  await revalidation.finished
+
+  // Both come back together; the share dialog is the one that is reachable.
+  await expect(share).toBeVisible()
+  await expect(detail).toHaveAttribute('aria-hidden', 'true')
+  const resumed = await modalPageState(page)
+  expect(resumed.dialogs.find((d) => d.labelledBy === 'share-card-title')).toMatchObject({
+    inert: false,
+    hidden: null,
+  })
+  expect(
+    resumed.dialogs.find((d) => d.labelledBy === 'community-detail-title')
+  ).toMatchObject({ inert: true, hidden: 'true' })
+  expect(resumed.overflow).toBe('hidden')
+
+  // Escape closes the share dialog first, then the detail.
+  await page.keyboard.press('Escape')
+  await expect(share).toHaveCount(0)
+  await expect(detail).toBeVisible()
+  await expect(detail).not.toHaveAttribute('aria-hidden', 'true')
+  expect((await modalPageState(page)).overflow).toBe('hidden')
+  await page.keyboard.press('Escape')
+  await expect(detail).toHaveCount(0)
+
+  // The shell is interactive again and the scroll lock is gone.
+  expect(await modalPageState(page)).toEqual({
+    dialogs: [],
+    background: [],
+    overflow: '',
+  })
+  await card.getByTestId(`lookbook-open-${fixture.postId}`).click()
+  await expect(detailModal(page)).toBeVisible()
+})
+
+test('P-MODAL-STACK: access denied during foreground revalidation removes both dialogs and releases the page', async ({
+  context,
+  page,
+  interceptNetworkCall,
+}) => {
+  await identify(context)
+  const { detail, share } = await openDetailThenShare(page, interceptNetworkCall)
+  const revalidation = await holdForegroundRevalidation(page, (route) =>
+    route.fulfill({
+      status: 403,
+      json: { code: 'forbidden', statusCode: 403, message: 'forbidden' },
+    })
+  )
+  revalidation.release()
+  await revalidation.finished
+  await expect(share).toHaveCount(0)
+  await expect(detail).toHaveCount(0)
+  expect(await modalPageState(page)).toEqual({
+    dialogs: [],
+    background: [],
+    overflow: '',
+  })
 })
 
 test('P-OUTFIT P-CANCEL: all persisted scenarios render, and reopening retains each composition', async ({

@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useLayoutEffect, useRef } from 'react'
+import React, { useId, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { nextModalOrder, registerModal, useModalCovered } from './modal-stack'
 
 export interface AccessibleModalProps {
   isOpen: boolean
@@ -46,21 +47,24 @@ export function AccessibleModal({
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
+  // The page-level state every open dialog shares (background inertness, scroll lock,
+  // which dialog Escape closes) belongs to the modal stack. A dialog keeps its open
+  // order while suspended, so dialogs that resume together keep their relative order.
+  const id = useId()
+  const openOrderRef = useRef<number | null>(null)
+  const covered = useModalCovered(id)
+  useLayoutEffect(() => {
+    if (!isOpen) openOrderRef.current = null
+  }, [isOpen])
   useLayoutEffect(() => {
     if (!isOpen || suspended) return
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      const activeDialogs = Array.from(
-        document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')
-      ).filter((dialog) => !dialog.inert && dialog.getAttribute('aria-hidden') !== 'true')
-      if (activeDialogs.at(-1) !== dialogRef.current?.parentElement) return
-      event.preventDefault()
-      event.stopPropagation()
-      onCloseRef.current()
-    }
-    document.addEventListener('keydown', handleEscape, true)
-    return () => document.removeEventListener('keydown', handleEscape, true)
-  }, [isOpen, suspended])
+    openOrderRef.current ??= nextModalOrder()
+    return registerModal({
+      id,
+      order: openOrderRef.current,
+      close: () => onCloseRef.current(),
+    })
+  }, [id, isOpen, suspended])
 
   useLayoutEffect(() => {
     if (!isOpen || suspended) {
@@ -75,31 +79,7 @@ export function AccessibleModal({
         ? document.activeElement
         : null
 
-    // Lock body scroll
-    const originalStyle = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     const dialog = dialogRef.current
-    const overlay = dialog?.parentElement
-    const background = new Set<HTMLElement>([
-      ...Array.from(document.body.children).filter(
-        (element): element is HTMLElement =>
-          element instanceof HTMLElement &&
-          element !== overlay &&
-          !element.matches('script,style,link')
-      ),
-      ...Array.from(document.querySelectorAll<HTMLElement>('[data-app-shell]')).filter(
-        (element) => !element.contains(overlay ?? null)
-      ),
-    ])
-    const priorBackground = [...background].map((element) => ({
-      element,
-      inert: element.inert ?? false,
-      hidden: element.getAttribute('aria-hidden'),
-    }))
-    for (const { element } of priorBackground) {
-      element.inert = true
-      element.setAttribute('aria-hidden', 'true')
-    }
 
     // Establish modal focus before paint so a user action cannot race delayed focus setup.
     const resume = resumeFocusRef.current?.isConnected ? resumeFocusRef.current : null
@@ -110,12 +90,6 @@ export function AccessibleModal({
       const focused = document.activeElement
       if (focused instanceof HTMLElement && dialog?.contains(focused))
         resumeFocusRef.current = focused
-      document.body.style.overflow = originalStyle
-      for (const { element, inert, hidden } of priorBackground) {
-        element.inert = inert
-        if (hidden === null) element.removeAttribute('aria-hidden')
-        else element.setAttribute('aria-hidden', hidden)
-      }
 
       const restoreGeneration = ++focusGeneration.value
       // React detaches a deleted ancestor after its descendant layout cleanups.
@@ -189,9 +163,10 @@ export function AccessibleModal({
   return createPortal(
     <div
       role="dialog"
+      data-modal-overlay=""
       aria-modal={!suspended}
-      aria-hidden={suspended || undefined}
-      inert={suspended}
+      aria-hidden={suspended || covered || undefined}
+      inert={suspended || covered}
       style={suspended ? { display: 'none' } : undefined}
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
