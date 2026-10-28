@@ -506,6 +506,9 @@ async function holdThenFulfill(
 // playwright-utils deviation: handleDownload saves the file but does not expose
 // Download.suggestedFilename, which these cases assert.
 const nextDownload = (page: Page) => page.waitForEvent('download')
+// The settings form loads above the page's links; click them only once it is in place.
+const settingsLoaded = (page: Page) =>
+  expect(page.getByRole('button', { name: 'Save settings', exact: true })).toBeVisible()
 for (const locale of supportedLocales)
   test.describe(locale, () => {
     test.use({ locale })
@@ -872,6 +875,7 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
   const control = await context.newPage()
   try {
     await control.goto('/notification-settings')
+    await settingsLoaded(control)
     // The original document and open dialog receive Supabase's real storage event.
     await expect(modal(page)).toBeVisible()
     const cancelled = cancellationWitness(page, heldRequest!)
@@ -955,6 +959,7 @@ test('P-CANCEL-SAVE: closing during held save authorization prevents browser han
     },
   })
   await page.goto('/notification-settings')
+  await settingsLoaded(page)
   const sameDocument = await markDocument(page)
   await page.getByRole('link', { name: 'Back to community', exact: true }).click()
   await expect(page).toHaveURL('/')
