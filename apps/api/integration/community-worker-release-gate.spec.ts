@@ -351,6 +351,74 @@ describe('production launcher selector', () => {
   })
 })
 
+/**
+ * The container CMD itself, against the compiled build: the launcher loads
+ * `dist/src/workers/community.bootstrap.js`, starts it, and turns SIGTERM into
+ * one shutdown. Every service points at a refused loopback port, so the worker
+ * starts degraded and touches nothing shared. The degraded selector needs no
+ * model; the image's build-time `--self-test` drills the same path with the
+ * real one.
+ */
+describe('production launcher start and shutdown', () => {
+  // Measured 2026-10-28 at load average 40 to 50: start 0.6 to 1.1 s, shutdown
+  // 2.7 to 3.7 s. The launcher's own 25 s deadline bounds the shutdown half.
+  const BUDGET_MS = 60_000
+  it(
+    'starts the compiled bootstrap and shuts it down once on SIGTERM',
+    async () => {
+      const compiled = path.join(
+        repoRoot,
+        'apps/api/dist/src/workers/community.bootstrap.js'
+      )
+      expect(fs.existsSync(compiled), `${compiled} is built by \`nest build\``).toBe(true)
+      const child = spawn(
+        process.execPath,
+        [path.join(repoRoot, 'scripts/start-community-worker-production.mjs')],
+        {
+          cwd: repoRoot,
+          env: {
+            PATH: process.env.PATH ?? '',
+            NODE_ENV: 'production',
+            LOG_LEVEL: 'info',
+            COMMUNITY_NSFW_SCREENER: 'unavailable',
+            COMMUNITY_NSFW_INCIDENT_MODE: 'unavailable',
+            COMMUNITY_NSFW_INCIDENT_REFERENCE: 'release-gate-start-shutdown',
+            COMMUNITY_DISPATCH_ENABLED: 'false',
+            REDIS_URL: 'redis://127.0.0.1:1',
+            DATABASE_URL: 'postgresql://gate:gate@127.0.0.1:1/gate',
+            SUPABASE_URL: 'http://127.0.0.1:1',
+            SUPABASE_SERVICE_ROLE_KEY: 'release-gate-placeholder',
+            ANALYTICS_ID_SECRET: 'release-gate-placeholder-0123456789abcdef',
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }
+      )
+      let output = ''
+      let signaled = false
+      const exited = new Promise<number | null>((resolve) => {
+        const read = (chunk: Buffer) => {
+          output += chunk.toString()
+          if (!signaled && output.includes('Dedicated community worker started')) {
+            signaled = true
+            child.kill('SIGTERM')
+          }
+        }
+        child.stdout.on('data', read)
+        child.stderr.on('data', read)
+        child.on('exit', (code) => resolve(code))
+      })
+      const code = await exited
+      const count = (text: string) => output.split(text).length - 1
+      expect(signaled, output).toBe(true)
+      expect(code, output).toBe(0)
+      expect(count('"event":"community_worker_shutdown_requested"'), output).toBe(1)
+      expect(count('Shutting down community workers'), output).toBe(1)
+      expect(output).not.toMatch(/Failed to start community workers|TypeError|Unhandled/)
+    },
+    BUDGET_MS
+  )
+})
+
 describe('shutdown budgets', () => {
   // Story 6.2b final review (RF4): the bootstrap's deadline, then the
   // launcher's, then the host's SIGKILL, each logged by the one that gives up.

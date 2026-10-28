@@ -174,16 +174,20 @@ async function loadBootstrap() {
   const startCommunityWorkers =
     bootstrap.startCommunityWorkers ?? bootstrap.default?.startCommunityWorkers
   const performShutdown = bootstrap.performShutdown ?? bootstrap.default?.performShutdown
+  const createCommunityWorkerProcessState =
+    bootstrap.createCommunityWorkerProcessState ??
+    bootstrap.default?.createCommunityWorkerProcessState
   if (
     typeof startCommunityWorkers !== 'function' ||
-    typeof performShutdown !== 'function'
+    typeof performShutdown !== 'function' ||
+    typeof createCommunityWorkerProcessState !== 'function'
   ) {
     fail(
       'community_worker_bootstrap_invalid',
-      'The compiled community bootstrap does not export startCommunityWorkers and performShutdown.'
+      'The compiled community bootstrap does not export startCommunityWorkers, performShutdown and createCommunityWorkerProcessState.'
     )
   }
-  return { startCommunityWorkers, performShutdown }
+  return { startCommunityWorkers, performShutdown, createCommunityWorkerProcessState }
 }
 
 async function selfTest() {
@@ -260,7 +264,10 @@ async function selfTest() {
 }
 
 async function start(selector) {
-  const { startCommunityWorkers, performShutdown } = await loadBootstrap()
+  const { startCommunityWorkers, performShutdown, createCommunityWorkerProcessState } =
+    await loadBootstrap()
+  // This process's one worker state: start fills it, shutdown closes what it holds.
+  const state = createCommunityWorkerProcessState()
 
   let shuttingDown = false
   const shutdown = (signal) => {
@@ -276,13 +283,13 @@ async function start(selector) {
     }, SHUTDOWN_DEADLINE_MS)
     deadline.unref()
     // performShutdown closes everything and calls process.exit itself.
-    void performShutdown()
+    void performShutdown(state)
   }
   process.on('SIGTERM', () => shutdown('SIGTERM'))
   process.on('SIGINT', () => shutdown('SIGINT'))
 
   log('community_worker_starting', { selector, node: process.version })
-  await startCommunityWorkers()
+  await startCommunityWorkers(state)
 }
 
 async function main() {
