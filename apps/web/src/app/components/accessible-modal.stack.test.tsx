@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react'
 import { act, fireEvent, render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AccessibleModal } from './accessible-modal'
+import { acquireScrollLock } from './modal-stack'
 
 type Open = { detail: boolean; share: boolean; detailSuspended: boolean }
 type Controls = { set: (next: Partial<Open>) => void; closes: string[] }
@@ -211,5 +212,26 @@ describe('AccessibleModal stack', () => {
     view.rerender(<Single suspended />)
     view.rerender(<Single suspended={false} />)
     expect(isInert(dialog('Solo'))).toBe(false)
+  })
+
+  it('shares one scroll lock with a surface that is not a dialog, whatever the release order', () => {
+    document.body.style.overflow = 'auto'
+    try {
+      const releaseSurface = acquireScrollLock()
+      expect(document.body.style.overflow).toBe('hidden')
+      const { controls } = mountSurface()
+      act(() => controls.current!.set({ detail: false, share: false }))
+      // The dialogs left first, but the other surface still holds the lock.
+      expect(document.body.style.overflow).toBe('hidden')
+      releaseSurface()
+      expect(document.body.style.overflow).toBe('auto')
+      // A second release of the same holder changes nothing.
+      const again = acquireScrollLock()
+      again()
+      again()
+      expect(document.body.style.overflow).toBe('auto')
+    } finally {
+      document.body.style.overflow = ''
+    }
   })
 })

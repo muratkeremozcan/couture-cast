@@ -42,6 +42,7 @@ import {
   plannerFailureReason,
   reshufflePlannerDayFromWeb,
 } from '../../lib/planner'
+import { acquireScrollLock } from './modal-stack'
 
 export interface PlannerRailProps {
   isOpen: boolean
@@ -507,13 +508,12 @@ export function PlannerRail({
     if (!isOpen || variant !== 'overlay') return
     previousActiveElementRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const originalOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const releaseScrollLock = acquireScrollLock()
     closeButtonRef.current?.focus()
     const invoker = invokingElementRef?.current
 
     return () => {
-      document.body.style.overflow = originalOverflow
+      releaseScrollLock()
       const target =
         invoker?.isConnected === true
           ? invoker

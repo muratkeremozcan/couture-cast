@@ -5,7 +5,8 @@ import { useSyncExternalStore } from 'react'
 /**
  * One stack owns everything modals share on the page: which dialog is on top (Escape
  * closes only that one), the inertness of the background behind every open dialog, and
- * the body scroll lock. Each AccessibleModal registers while it is open and not
+ * the body scroll lock (shared with full-screen surfaces that are not dialogs through
+ * acquireScrollLock). Each AccessibleModal registers while it is open and not
  * suspended, so nested and simultaneous suspend, resume and teardown all reduce to
  * entries joining and leaving this one list. The page state is captured when the first
  * entry joins and restored when the last one leaves; no dialog snapshots it itself.
@@ -20,8 +21,26 @@ const OVERLAYS = '[data-modal-overlay]'
 const entries: Entry[] = []
 const listeners = new Set<() => void>()
 const background = new Map<HTMLElement, Prior>()
-let scrollLock: { overflow: string } | null = null
+let releaseStackScrollLock: (() => void) | null = null
+let scrollHolders = 0
+let overflowBeforeLock = ''
 let nextOrder = 0
+
+/**
+ * The page's one body scroll lock. Every holder, a stacked dialog or a full-screen
+ * overlay that is not a dialog, takes the lock here; the overflow value in place before
+ * the first holder is restored when the last one releases, whatever the release order.
+ */
+export function acquireScrollLock(): () => void {
+  if (scrollHolders++ === 0) overflowBeforeLock = document.body.style.overflow
+  document.body.style.overflow = 'hidden'
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    if (--scrollHolders === 0) document.body.style.overflow = overflowBeforeLock
+  }
+}
 
 /** A rank fixed when a dialog opens, so resuming dialogs regain their relative order. */
 export const nextModalOrder = () => ++nextOrder
@@ -60,11 +79,10 @@ function restore(element: HTMLElement, { inert, hidden }: Prior) {
 }
 
 function engage() {
-  if (!scrollLock) {
-    scrollLock = { overflow: document.body.style.overflow }
+  if (!releaseStackScrollLock) {
+    releaseStackScrollLock = acquireScrollLock()
     document.addEventListener('keydown', handleEscape, true)
   }
-  document.body.style.overflow = 'hidden'
   const next = backgroundElements()
   for (const [element, prior] of background)
     if (!next.has(element)) {
@@ -83,10 +101,10 @@ function engage() {
 }
 
 function release() {
-  if (!scrollLock) return
+  if (!releaseStackScrollLock) return
   document.removeEventListener('keydown', handleEscape, true)
-  document.body.style.overflow = scrollLock.overflow
-  scrollLock = null
+  releaseStackScrollLock()
+  releaseStackScrollLock = null
   for (const [element, prior] of background) restore(element, prior)
   background.clear()
 }
