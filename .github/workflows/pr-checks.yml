@@ -330,6 +330,8 @@ jobs:
       NODE_OPTIONS: --conditions=development
       COMMUNITY_SCREENING_RUN_PRODUCT_DIR: .cache/community-screening
       RUN_COMMENT_RESOURCE_MEASUREMENT: 'true'
+      # The text corpus specs are excluded from every other apps/api run.
+      RUN_COMMUNITY_TEXT_CORPUS: 'true'
     services:
       postgres:
         image: postgres:17-alpine
@@ -353,6 +355,7 @@ jobs:
       # their lockfile-keyed npm cache; the manifest verification also runs on cache hits.
       - uses: ./.github/actions/setup-node-env
       - name: Generate Prisma client and shared packages
+        id: packages
         run: |
           npm run db:generate
           npm run build:packages
@@ -379,21 +382,42 @@ jobs:
       - name: Mandatory seven-locale release corpus evaluation
         working-directory: apps/api
         run: npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
+      # Pure data checks over the development corpora, run without coverage
+      # instrumentation and one file at a time. Measured 2026-10-27 with coverage in
+      # the shared quality-gate run on this runner size, the slowest cases took 9.5 s
+      # (a locale with the default budget) and 23.8 s (the retired-corpora loop with
+      # its own 20 s budget); locally without coverage they take 2.0-2.7 s and
+      # 5.6-6.8 s. 15 s per case is 1.6x the worst covered, contended measurement for
+      # the cases on the default budget, and an awaited hang still fails at 15 s. The
+      # step timeout stops a synchronous loop: the two files take 82 s of CPU locally,
+      # and 10 minutes is over 7x that.
+      - name: Mandatory corpus development specs without coverage instrumentation
+        if: ${{ !cancelled() && steps.packages.outcome == 'success' }}
+        working-directory: apps/api
+        timeout-minutes: 10
+        run: npx vitest run src/modules/community/community-text-round3-development.spec.ts src/modules/community/community-text-round5-development.spec.ts --maxWorkers=1 --testTimeout=15000 --reporter=default --reporter=json --outputFile=.cache/community-screening/development-ci-tests.json
       - name: Mandatory compiled mixed workload and resource budgets
         if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
         working-directory: apps/api
         run: npx vitest run integration/community-comments-measurement.integration.spec.ts --maxWorkers=1 --reporter=default --reporter=json --outputFile=.cache/community-screening/mixed-ci-tests.json
+      # The development specs are frozen, so their count is exact: 181 round3 cases
+      # and 43 round5 cases. A dropped or renamed fixture set changes it.
       - name: Require complete execution with every opt-in case enabled
-        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.packages.outcome == 'success' }}
         run: |
           node --input-type=module <<'JS'
           import fs from 'node:fs'
-          for (const [file, minimum] of [['corpus-ci-tests.json',52],['mixed-ci-tests.json',1]]) {
-            const report = JSON.parse(fs.readFileSync(`apps/api/.cache/community-screening/${file}`,'utf8'))
-            if (report.numTotalTests < minimum || report.numPassedTests !== report.numTotalTests ||
-                report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
-              throw new Error(`Incomplete mandatory screening execution: ${file}`)
+          const problems = []
+          for (const [file, minimum, exact] of [['corpus-ci-tests.json',52],['mixed-ci-tests.json',1],['development-ci-tests.json',224,224]]) {
+            const name = `apps/api/.cache/community-screening/${file}`
+            if (!fs.existsSync(name)) { problems.push(`${file}: no report`); continue }
+            const report = JSON.parse(fs.readFileSync(name,'utf8'))
+            if (report.numTotalTests < minimum || (exact !== undefined && report.numTotalTests !== exact) ||
+                report.numPassedTests !== report.numTotalTests || report.numPendingTests !== 0 ||
+                report.numFailedTests !== 0 || report.numTodoTests !== 0)
+              problems.push(`${file}: ${report.numPassedTests}/${report.numTotalTests} passed`)
           }
+          if (problems.length) throw new Error(`Incomplete mandatory screening execution: ${problems.join('; ')}`)
           JS
       - name: Upload corpus and compiled-worker measurements
         if: always()

@@ -72,7 +72,7 @@
     "community:screening:canary:local": "node scripts/community-screening-canary.mjs --target local --env-file .env.local --json-out apps/api/.cache/community-screening/canary-local.json",
     "community:screening:canary:restart-drill": "node scripts/community-screening-canary.mjs --target local --env-file .env.local --restart-drill --timeout-ms 180000 --json-out apps/api/.cache/community-screening/canary-restart-local.json",
     "community:screening:sweep": "cross-env COMMUNITY_SCREENING_RUN_PRODUCT_DIR=.cache/community-screening npm run test --workspace api -- src/modules/community/community-screening-policy.sweep.spec.ts",
-    "community:screening:text": "cross-env COMMUNITY_SCREENING_RUN_PRODUCT_DIR=.cache/community-screening npm run test --workspace api -- src/modules/community/community-text-corpus.evaluation.spec.ts",
+    "community:screening:text": "cross-env RUN_COMMUNITY_TEXT_CORPUS=true COMMUNITY_SCREENING_RUN_PRODUCT_DIR=.cache/community-screening npm run test --workspace api -- src/modules/community/community-text-corpus.evaluation.spec.ts",
     "community:screening:corpus:fetch": "node scripts/fetch-community-safe-corpus.mjs",
     "community:screening:corpus:verify": "node scripts/fetch-community-safe-corpus.mjs --verify-only",
     "community:screening:corpus:evaluate": "cross-env RUN_COMMUNITY_SAFE_CORPUS_EVALUATION=true COMMUNITY_NSFW_SCREENER=tensorflow COMMUNITY_SCREENING_RUN_PRODUCT_DIR=.cache/community-screening npm run test --workspace api -- src/modules/community/community-safe-corpus.evaluation.spec.ts",

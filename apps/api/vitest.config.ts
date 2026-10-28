@@ -104,6 +104,23 @@ export default defineConfig({
       ...(process.env.RUN_COMMUNITY_SCREENING_READINESS === 'true'
         ? []
         : ['**/community-content-screening.readiness.spec.ts']),
+      // The seven-locale text corpus evaluation and the two heaviest corpus
+      // development specs run only in pr-checks' community corpus job, which sets
+      // RUN_COMMUNITY_TEXT_CORPUS and gates exact test counts. Their per-locale
+      // loops screen 400 to 1000 rows each and are pure data checks, so coverage
+      // instrumentation measures nothing there while adding a quarter to a half of
+      // their CPU time (measured 2026-10-27: round3 60.8 s plain, 75.6 s covered;
+      // round5 17.2 s plain, 25.4 s covered). Inside the shared coverage run that
+      // pushed single cases to 5.9-23.8 s on the 4 vCPU runner and past their
+      // budgets, and the evaluation spec's retired-holdout refusal masked every
+      // other failure in the quality gate.
+      ...(process.env.RUN_COMMUNITY_TEXT_CORPUS === 'true'
+        ? []
+        : [
+            '**/community-text-corpus.evaluation.spec.ts',
+            '**/community-text-round3-development.spec.ts',
+            '**/community-text-round5-development.spec.ts',
+          ]),
       // Story 6.2b, AC 4: loads the real model and reads licensed photographs
       // that live outside Git, so it runs only through its own release command.
       ...(process.env.RUN_COMMUNITY_SAFE_CORPUS_EVALUATION === 'true'
