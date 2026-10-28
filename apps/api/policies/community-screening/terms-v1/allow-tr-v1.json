@@ -12,8 +12,8 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "fe484df449dd945468914731a10e8c811fc9d448609d29feedac7cd7354588cc",
-    "reviewedOccurrenceSha256": "4f6e5195949d202f99e7c7026b2a4833774455b0c22bd9edf6fcb78093ef4971"
+    "allowListSha256": "371540621bcd64918e0afd28da8e39dde0719326524fbc561ce96ae165bd3e03",
+    "reviewedOccurrenceSha256": "1fc031afa9d4ab96a97370dfb8d7d7b12c37c9f980dd89d4a703f4d8083d2cea"
   },
   "entries": ["fagot", "gok", "gök", "kasar", "sikke", "sıkı", "sıkış", "şıktır"],
   "splitFrames": [],

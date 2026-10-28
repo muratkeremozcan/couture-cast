@@ -12,8 +12,8 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "fe484df449dd945468914731a10e8c811fc9d448609d29feedac7cd7354588cc",
-    "reviewedOccurrenceSha256": "4f6e5195949d202f99e7c7026b2a4833774455b0c22bd9edf6fcb78093ef4971"
+    "allowListSha256": "371540621bcd64918e0afd28da8e39dde0719326524fbc561ce96ae165bd3e03",
+    "reviewedOccurrenceSha256": "1fc031afa9d4ab96a97370dfb8d7d7b12c37c9f980dd89d4a703f4d8083d2cea"
   },
   "entries": [
     "big black",
@@ -31,10 +31,15 @@
     "pof",
     "puttee",
     "puttees",
+    "rapped",
+    "rapper",
+    "rappers",
+    "rapping",
     "screw",
     "screws",
     "sexy",
     "shirtdress",
+    "spices",
     "tied up",
     "tight white"
   ],
@@ -1456,6 +1461,85 @@
     {
       "target": "balls",
       "phrases": ["balls of wool", "balls of yarn", "wool balls"]
+    },
+    {
+      "target": "chink",
+      "phrases": [
+        "chink of light",
+        "chink of sunlight",
+        "chink of daylight",
+        "chink of sun",
+        "chink of dim light",
+        "chink in the armour",
+        "chink in the armor",
+        "chink in the wall",
+        "chink in the walls",
+        "chink in the curtain",
+        "chink in the curtains",
+        "chink in the fabric",
+        "chink in the shutters",
+        "chink in the shutter",
+        "chink in the fence",
+        "chink in the roof",
+        "chink in the door",
+        "chink in the blinds",
+        "chink in the blind",
+        "chink in the window",
+        "chink in the lace",
+        "chink in the knit",
+        "chink in the weave",
+        "chink in the seam",
+        "chink in the canopy",
+        "chink between the boards"
+      ]
+    },
+    {
+      "target": "chinks",
+      "phrases": [
+        "chinks of light",
+        "chinks of sunlight",
+        "chinks of daylight",
+        "chinks of sun",
+        "chinks of dim light",
+        "chinks in the armour",
+        "chinks in the armor",
+        "chinks in the wall",
+        "chinks in the walls",
+        "chinks in the curtain",
+        "chinks in the curtains",
+        "chinks in the fabric",
+        "chinks in the shutters",
+        "chinks in the shutter",
+        "chinks in the fence",
+        "chinks in the roof",
+        "chinks in the door",
+        "chinks in the blinds",
+        "chinks in the blind",
+        "chinks in the window",
+        "chinks in the lace",
+        "chinks in the knit",
+        "chinks in the weave",
+        "chinks in the seam",
+        "chinks in the canopy",
+        "chinks between the boards"
+      ]
+    },
+    {
+      "target": "retards",
+      "phrases": [
+        "retards the",
+        "retards its",
+        "retards their",
+        "retards your",
+        "retards our",
+        "retards his",
+        "retards her",
+        "retards this",
+        "retards that",
+        "retards a",
+        "retards an",
+        "retards any"
+      ]
     }
   ]
 }

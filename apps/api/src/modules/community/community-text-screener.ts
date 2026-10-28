@@ -1015,6 +1015,8 @@ interface LanguageIndex {
   readonly phraseLeetConcatenations: RunIndex
   /** Each phrase's own collapsed tokens joined by a space, which that pass skips. */
   readonly phraseForms: ReadonlySet<string>
+  /** The generated plural and inflected spellings of this language's high-severity terms. */
+  readonly generatedForms: readonly string[]
 }
 
 export interface CommunityTextScreenerOptions {
@@ -1172,7 +1174,7 @@ const VERB_FORMS: Readonly<
   en: { rape: ['raped', 'raping'] },
 }
 
-function inflectedForms(term: string, language: ScreeningLanguage): string[] {
+export function inflectedForms(term: string, language: ScreeningLanguage): string[] {
   const forms = new Set<string>(VERB_FORMS[language]?.[term] ?? [])
   const last = term.at(-1) as string
   for (const suffix of INFLECTION_SUFFIXES[language]) {
@@ -1198,6 +1200,7 @@ function buildLanguageIndex(
   const phraseConcatenations = new Map<string, TermMeta>()
   const phraseLeetConcatenations = new Map<string, TermMeta>()
   const phraseForms = new Set<string>()
+  const generatedForms = new Set<string>()
 
   for (const entry of list.entries) {
     if (!policy.categories.includes(entry.category)) {
@@ -1252,7 +1255,8 @@ function buildLanguageIndex(
       // spelling may be guarded by an allow-list entry, never a generated one.
       for (const form of inflectedForms(term, list.language).filter(
         (candidate) => collapseRepeats(candidate).length >= MIN_SINGLE_TERM_LENGTH
-      ))
+      )) {
+        generatedForms.add(form)
         indexSingleTerm(
           form,
           meta,
@@ -1262,6 +1266,7 @@ function buildLanguageIndex(
           singleCollapsed,
           singleLeet
         )
+      }
     }
 
     indexSingleTerm(
@@ -1286,6 +1291,7 @@ function buildLanguageIndex(
     phraseConcatenations,
     phraseLeetConcatenations,
     phraseForms,
+    generatedForms: [...generatedForms].toSorted(),
   }
 }
 
@@ -1405,6 +1411,13 @@ export class CommunityTextScreener {
     ScreeningLanguage,
     readonly ScopedPhrase[]
   >
+  /** The generated plural and inflected spellings, as language:form, for the collision pin spec. */
+  generatedInflectionForms(): string[] {
+    return this.indexes.flatMap((index) =>
+      index.generatedForms.map((form) => `${index.language}:${form}`)
+    )
+  }
+
   /** The scoped phrases of the language the current screen() call declared. */
   private activeScopedPhrases: readonly ScopedPhrase[] = []
   private readonly splitFrames: ReadonlyMap<string, readonly SplitFrame[]>
@@ -1794,7 +1807,7 @@ export class CommunityTextScreener {
 
   /**
    * Whether the whole field text holds one of the forbidden words, in any spelling the
-   * folds merge, also when letters are spaced or separated ("crian ça"). Words of five
+   * folds merge, also when letters are spaced or separated ("crian ça"). Words of six
    * letters or more are looked for in the text with every separator removed.
    */
   private textHoldsForbidden(exact: string, forbidden: readonly string[]): boolean {
@@ -1802,7 +1815,7 @@ export class CommunityTextScreener {
     if (words.some((word) => forbidden.includes(collapseRepeats(toLeetClassForm(word)))))
       return true
     const squashed = collapseRepeats(toLeetClassForm(words.join('')))
-    return forbidden.some((word) => word.length >= 5 && squashed.includes(word))
+    return forbidden.some((word) => word.length >= 6 && squashed.includes(word))
   }
 
   private markOccurrenceConstructions(

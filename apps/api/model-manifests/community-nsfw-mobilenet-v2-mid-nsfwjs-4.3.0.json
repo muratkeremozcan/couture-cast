@@ -89,7 +89,7 @@
     "version": "v2",
     "hashAlgorithm": "sha256",
     "hashInput": "file bytes",
-    "sha256": "2caf036cb6ae72d49019a87be2d84a08ec7e49c8ed961215cf12cff5ae7be702"
+    "sha256": "279adc0891bb64c7582cd9086957a4759c74f1b84feab890cac2d335aaf1f88b"
   },
   "runtime": {
     "node": ">=24.0.0",

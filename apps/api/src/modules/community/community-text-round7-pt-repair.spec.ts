@@ -1024,6 +1024,166 @@ describe('round 7g plural and inflected hate forms meet the term, in every local
   })
 })
 
+describe('round 7h rapping and chinks of light', () => {
+  it('clears the exact rapping words and still blocks the generated rape forms', () => {
+    for (const locale of everyLocale) {
+      for (const text of [
+        'Rapping on the door twice',
+        'He is rapping about fashion',
+        'A rapper in a bomber jacket',
+        'Rappers wear oversized hoodies',
+        'She rapped on the window',
+      ])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+      for (const text of [
+        'raping',
+        'he was raping her',
+        'raped',
+        'they raped her',
+        'rapes',
+        'r a p i n g',
+        'rappping',
+        'rapiing',
+      ])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+    }
+    expect(screen('raping and raped', 'en-US').disposition).toBe('block')
+  })
+
+  const clean = [
+    'A chink of light came under the door.',
+    'Chinks of light fell on the floor.',
+    'There were chinks of sunlight through the curtains.',
+    'He found chinks in the armour.',
+    'The chinks in the wall let in the wind.',
+    'Chinks in the armor at dawn.',
+    'Only a few chinks of daylight in the room.',
+    'Look for chinks in the fabric.',
+  ]
+  const hostile = [
+    'kill the chinks',
+    'chinks go home',
+    'chinks',
+    'chink',
+    'all chinks are vermin',
+    'stupid chinks of light',
+    'you chinks in the armour',
+    'chinks of light, go home',
+    'chinks in the wall people',
+    'those chinks in the armour',
+    'chinks of light. kill them',
+    'chinks of light\nyou animals',
+    'the chinks in the wall are vermin',
+    'chinks in the armour and the asian people',
+    'chinkks of light',
+    'a chink in the armour you animals',
+  ]
+  it.each(clean)('passes %s under declared English', (text) => {
+    for (const locale of ['en-US', 'en-GB'])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+  it('keeps the same chinks frames withheld without declared English', () => {
+    for (const text of clean)
+      for (const locale of ['fr-FR', 'pt-BR', 'de-DE', null])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+  it.each(hostile)('withholds %s in every locale', (text) => {
+    for (const locale of [...everyLocale, 'en-US', 'en-GB'])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+})
+
+describe('round 7i spices, retards and tapetes', () => {
+  it('passes spices everywhere and keeps spics blocked', () => {
+    for (const locale of [...everyLocale, 'en-US'])
+      for (const text of [
+        'Cinnamon, cumin and other spices',
+        'spices',
+        'Warm spices dye the wool',
+      ])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+    for (const text of ['spics', 'all spics', 'spiices go home'])
+      expect(screen(text, 'en-US').disposition, text).not.toBe('pass')
+  })
+
+  const verb = [
+    'Wax retards the drying of the fabric.',
+    'This finish retards its fading.',
+    'It retards their growth of mould.',
+    'Cold retards the ageing.',
+    'A coating that retards the wear of the seam.',
+  ]
+  const noun = [
+    'retards',
+    'all retards',
+    'you retards',
+    'those retards the dumb ones',
+    'retards the people',
+    'stupid retards the fabric',
+    'retards the growth, you animals',
+    'they retards the',
+    'retards are vermin',
+    'the retards',
+    'retards go home',
+    'kill the retards',
+  ]
+  it.each(verb)('passes the verb %s under declared English', (text) => {
+    for (const locale of ['en-US', 'en-GB'])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+  it.each(noun)('withholds %s in every locale', (text) => {
+    for (const locale of [...everyLocale, 'en-US', 'en-GB'])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('clears tapetes only inside the plural rug phrases under declared Portuguese', () => {
+    for (const text of [
+      'Tapetes de yoga em algodão',
+      'Crianças sentadas nos tapetes',
+      'Sapatos sobre os tapetes',
+      'Tapetes persas e tapetes macios',
+      'Tapetes da sala',
+    ])
+      for (const locale of ['pt-BR', 'pt-PT'])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('block')
+    for (const text of [
+      'Tapetes de yoga',
+      'Crianças sentadas nos tapetes',
+      'Brincando em tapetes persas',
+    ])
+      expect(screen(text, 'pt-BR').disposition, text).toBe('pass')
+    for (const text of [
+      'tapetes',
+      'os tapetes',
+      'nos tapetes',
+      'tapetes.',
+      'todos os tapetes são nojentos',
+      'tapetess de yoga',
+      'tapettes',
+    ])
+      for (const locale of [...everyLocale, 'pt-BR', 'pt-PT'])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+    for (const locale of ['fr-FR', 'en-US', 'es-ES', null])
+      expect(screen('Tapetes de yoga', locale).disposition, String(locale)).not.toBe(
+        'pass'
+      )
+  })
+
+  it('records the plural collisions that stay blocked', () => {
+    for (const text of [
+      'raped',
+      'rapes',
+      'whores',
+      'hures',
+      'negroes',
+      'subnormals',
+      'saloopes',
+    ])
+      for (const locale of everyLocale)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+})
+
 describe('round 7b a high-severity term cut in two whole words', () => {
   it('withholds tap ete and other two-way cuts with both parts of three letters or more', () => {
     for (const text of [

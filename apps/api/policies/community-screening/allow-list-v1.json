@@ -564,6 +564,31 @@
       "entry": "negros",
       "language": "es",
       "reason": "The colour black, plural, in Spanish and Portuguese fashion copy (zapatos negros, vestidos negros). It is the generated plural of the French négro, whose singular negro is already allow-listed for the same reason; the French négro, nègre and the English slur still screen through the graded overlay."
+    },
+    {
+      "entry": "rapping",
+      "language": "en",
+      "reason": "Ordinary English verb and noun for knocking or talking in rhythm (rapping on the door, rapping about fashion). Repeat-collapse folds the spelling onto the generated verb form of the high-severity term rape. It clears only the exact lowercase tokens rapping, rapper, rappers and rapped; raping, raped, rapist and every stretched or spaced spelling keep screening."
+    },
+    {
+      "entry": "rapper",
+      "language": "en",
+      "reason": "Ordinary English verb and noun for knocking or talking in rhythm (rapping on the door, rapping about fashion). Repeat-collapse folds the spelling onto the generated verb form of the high-severity term rape. It clears only the exact lowercase tokens rapping, rapper, rappers and rapped; raping, raped, rapist and every stretched or spaced spelling keep screening."
+    },
+    {
+      "entry": "rappers",
+      "language": "en",
+      "reason": "Ordinary English verb and noun for knocking or talking in rhythm (rapping on the door, rapping about fashion). Repeat-collapse folds the spelling onto the generated verb form of the high-severity term rape. It clears only the exact lowercase tokens rapping, rapper, rappers and rapped; raping, raped, rapist and every stretched or spaced spelling keep screening."
+    },
+    {
+      "entry": "rapped",
+      "language": "en",
+      "reason": "Ordinary English verb and noun for knocking or talking in rhythm (rapping on the door, rapping about fashion). Repeat-collapse folds the spelling onto the generated verb form of the high-severity term rape. It clears only the exact lowercase tokens rapping, rapper, rappers and rapped; raping, raped, rapist and every stretched or spaced spelling keep screening."
+    },
+    {
+      "entry": "spices",
+      "language": "en",
+      "reason": "The plural of spice (cinnamon, cumin and other spices), common in food and textile-dye copy. It is the generated plural form (spic plus es) of the high-severity English slur spic. It clears only the exact lowercase token spices; spics, spic and every stretched, spaced or leet spelling keep screening."
     }
   ],
   "literalContexts": [
