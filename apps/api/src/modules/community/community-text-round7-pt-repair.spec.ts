@@ -1044,6 +1044,16 @@ describe('round 7h rapping and chinks of light', () => {
       ])
         expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
     }
+    for (const locale of [...everyLocale, 'en-US', 'en-GB'])
+      for (const text of [
+        'raping',
+        'raped',
+        'rapes',
+        'he was raping',
+        'rapping',
+        'rapped',
+      ])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('block')
     expect(screen('raping and raped', 'en-US').disposition).toBe('block')
   })
 
@@ -1076,6 +1086,10 @@ describe('round 7h rapping and chinks of light', () => {
     'rapped on the door\nrapped by a gang',
     'rapping on the door, rapping women',
     'rapping her',
+    'rapping a child',
+    'he is rapping the girl in the dark',
+    'rapping the kids',
+    'she keeps rapping him',
     'she was rapped',
     'rapped',
     'rapping',

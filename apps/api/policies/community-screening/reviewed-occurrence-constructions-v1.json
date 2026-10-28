@@ -7023,7 +7023,27 @@
         "kill",
         "killed",
         "murder",
-        "drunk"
+        "drunk",
+        "child",
+        "children",
+        "girl",
+        "girls",
+        "boy",
+        "boys",
+        "kid",
+        "kids",
+        "woman",
+        "women",
+        "teen",
+        "teens",
+        "minor",
+        "baby",
+        "daughter",
+        "sister",
+        "student",
+        "students",
+        "him",
+        "them"
       ]
     },
     {
@@ -7410,7 +7430,27 @@
         "kill",
         "killed",
         "murder",
-        "drunk"
+        "drunk",
+        "child",
+        "children",
+        "girl",
+        "girls",
+        "boy",
+        "boys",
+        "kid",
+        "kids",
+        "woman",
+        "women",
+        "teen",
+        "teens",
+        "minor",
+        "baby",
+        "daughter",
+        "sister",
+        "student",
+        "students",
+        "him",
+        "them"
       ]
     }
   ]

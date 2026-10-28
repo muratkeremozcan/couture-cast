@@ -1111,7 +1111,11 @@ function indexSingleTerm(
   singleCollapsed: Map<string, TermMeta>,
   singleLeet: Map<string, TermMeta>
 ): void {
-  single.set(term, meta)
+  // A generated inflection can meet a listed term of a lower grade (rape generates raping,
+  // which the English list grades medium); the higher grade stays.
+  const listed = single.get(term)
+  if (!listed || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[listed.severity])
+    single.set(term, meta)
   const collapsed = collapseRepeats(term)
   if (
     collapsed.length < MIN_SINGLE_TERM_LENGTH &&
