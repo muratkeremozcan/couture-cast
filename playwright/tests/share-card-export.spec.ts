@@ -215,14 +215,15 @@ async function ownPhoto(
   let apiOrigin = ''
   if (interceptNetworkCall) {
     const profile = interceptNetworkCall({ method: 'GET', url: '**/api/v1/user/profile' })
-    const navigateHome = () => page.goto('/').then(() => undefined)
-    if (preparationJourney)
-      await afterInitialCommunityVerification({
-        page,
-        postId: fixture.postId,
-        navigate: navigateHome,
-      })
-    else await navigateHome()
+    // The feed settles only after the owned target resolves and the cursor replay lands,
+    // and the spotlight above it grows past its skeleton's height when its cards land.
+    // A click pressed before both can release over another element and never open.
+    await afterInitialCommunityVerification({
+      page,
+      postId: fixture.postId,
+      navigate: () => page.goto('/').then(() => undefined),
+    })
+    await expect(page.getByTestId('community-spotlight-loading')).toHaveCount(0)
     const verified = await profile
     expect(verified.status).toBe(200)
     apiOrigin = new URL(verified.request!.url()).origin
