@@ -25,6 +25,10 @@
     "worklets-staging": ["prebuild"],
     "vitest": ["runtime"]
   },
+  "rowRestrictions": {
+    "browser-deps": { "platform": ["android"] },
+    "worklets-staging": { "platform": ["android"] }
+  },
   "runElsewhere": {
     "apps/mobile/plugins/with-watchos.test.js": "apps/mobile npm test (test:watchos-prebuild) and watchos-native.yml",
     "apps/mobile/plugins/with-widgets.test.js": "apps/mobile npm test (test:widget-prebuild)"

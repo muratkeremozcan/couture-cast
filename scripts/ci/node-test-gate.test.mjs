@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
+import { matrixRows } from './workflow-step-shadowing.mjs'
 import {
   assertNodeTestGate,
   coverageProblems,
@@ -361,11 +362,19 @@ describe('node-test-gate discovery and coverage', () => {
       for (const condition of [
         '${{ !cancelled() }}',
         "${{ !cancelled() && steps.setup.outcome == 'success' }}",
-        "${{ !cancelled() && matrix.platform == 'android' && steps.setup.outcome == 'success' }}",
         "${{ !cancelled() && ((matrix.platform == 'android' && steps.setup.outcome == 'success') || (matrix.platform == 'ios' && steps.setup.outcome == 'success')) }}",
-        "matrix.platform == 'android'",
       ])
         assert.deepEqual(check(conditioned(`"${condition}"`)), [], condition)
+      // In the grammar, but narrower than the rows the unrestricted suite covers.
+      for (const condition of [
+        "${{ !cancelled() && matrix.platform == 'android' && steps.setup.outcome == 'success' }}",
+        "matrix.platform == 'android'",
+      ])
+        assert.deepEqual(
+          check(conditioned(`"${condition}"`)),
+          ['step default suite skips matrix row platform=ios, which default must run on'],
+          condition
+        )
       const vitest = fixtureWorkflow.replace(
         '      - run: npx vitest run',
         "      - if: github.ref == 'refs/heads/main'\n        run: npx vitest run"
@@ -434,7 +443,9 @@ describe('node-test-gate discovery and coverage', () => {
         )
       const check = (lines) =>
         coverageProblems({ root, manifest: fixtureManifest, workflow: step(lines) })
-      assert.deepEqual(check(['        if: "matrix.platform == \'ios\'"']), [])
+      assert.deepEqual(check(['        if: "matrix.platform == \'ios\'"']), [
+        'step default suite skips matrix row platform=android, which default must run on',
+      ])
       assert.deepEqual(check(['        if: "matrix.platform == \'androd\'"']), [
         'step default suite can be skipped by its condition: "matrix.platform == \'androd\'"',
         "step default suite: matrix.platform is never 'androd' in the job matrix",
@@ -455,6 +466,62 @@ describe('node-test-gate discovery and coverage', () => {
           `step default suite sets continue-on-error (${shown}), which hides a gate failure`,
         ])
     }))
+
+  test('a gate step runs on every matrix row its suites cover, honouring row restrictions', () =>
+    temporary((root) => {
+      write(root, fixtureTree)
+      const workflow = (condition) =>
+        fixtureWorkflow.replace(
+          '      - run: |\n          node scripts/ci/node-test-gate.mjs outside\n          node scripts/ci/node-test-gate.mjs default',
+          [
+            '      - run: node scripts/ci/node-test-gate.mjs default',
+            '      - name: outside suite',
+            `        if: "${condition}"`,
+            '        run: node scripts/ci/node-test-gate.mjs outside',
+          ].join('\n')
+        )
+      const restricted = {
+        ...fixtureManifest,
+        rowRestrictions: { outside: { platform: ['android'] } },
+      }
+      const check = (manifest, condition) =>
+        coverageProblems({ root, manifest, workflow: workflow(condition) })
+      const android = "${{ !cancelled() && matrix.platform == 'android' }}"
+      assert.deepEqual(check(fixtureManifest, android), [
+        'step outside suite skips matrix row platform=ios, which outside must run on',
+      ])
+      assert.deepEqual(check(restricted, android), [])
+      assert.deepEqual(check(restricted, '${{ !cancelled() }}'), [])
+      assert.deepEqual(
+        check(restricted, "${{ !cancelled() && matrix.platform == 'ios' }}"),
+        [
+          'step outside suite skips matrix row platform=android, which outside must run on',
+        ]
+      )
+    }))
+
+  test('matrix rows follow the product, include and exclude rules', () => {
+    assert.deepEqual(matrixRows(undefined), [{}])
+    assert.deepEqual(
+      matrixRows({ include: [{ platform: 'android', api: 32 }, { platform: 'ios' }] }),
+      [{ platform: 'android', api: 32 }, { platform: 'ios' }]
+    )
+    assert.deepEqual(
+      matrixRows({
+        platform: ['android', 'ios'],
+        api: [32, 36],
+        include: [{ platform: 'ios', runner: 'macos' }, { platform: 'web' }],
+        exclude: [{ platform: 'ios', api: 32 }],
+      }),
+      [
+        { platform: 'android', api: 32 },
+        { platform: 'android', api: 36 },
+        { platform: 'ios', api: 36, runner: 'macos' },
+        { platform: 'web' },
+      ]
+    )
+    assert.equal(matrixRows({ platform: '${{ fromJSON(inputs.platforms) }}' }), null)
+  })
 
   test('a gate step may wait only on the steps its suites declare they need', () =>
     temporary((root) => {

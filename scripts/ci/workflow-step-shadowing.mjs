@@ -198,6 +198,38 @@ export function matrixDomain(matrix) {
   return domain
 }
 
+/**
+ * The rows a job's matrix expands to, following GitHub's rules: the product of the
+ * array keys, each `include` entry merged into the rows whose array values it
+ * matches or added as its own row, then `exclude` removed. A job with no matrix
+ * has one empty row. Keys whose values come from an expression make it unknowable,
+ * so this returns null.
+ */
+export function matrixRows(matrix) {
+  if (!matrix || typeof matrix !== 'object') return [{}]
+  const keys = Object.keys(matrix).filter((key) => key !== 'include' && key !== 'exclude')
+  if (keys.some((key) => !Array.isArray(matrix[key]))) return null
+  let rows = keys.length ? [{}] : []
+  for (const key of keys)
+    rows = rows.flatMap((row) => matrix[key].map((value) => ({ ...row, [key]: value })))
+  const original = new Set(keys)
+  for (const entry of Array.isArray(matrix.include) ? matrix.include : []) {
+    const matches = rows.filter((row) =>
+      Object.entries(entry).every(
+        ([key, value]) => !original.has(key) || String(row[key]) === String(value)
+      )
+    )
+    if (matches.length && Object.keys(entry).some((key) => original.has(key)))
+      for (const row of matches) Object.assign(row, entry)
+    else rows.push({ ...entry })
+  }
+  const excluded = (row) =>
+    (Array.isArray(matrix.exclude) ? matrix.exclude : []).some((entry) =>
+      Object.entries(entry).every(([key, value]) => String(row[key]) === String(value))
+    )
+  return rows.filter((row) => !excluded(row))
+}
+
 /** Every `matrix.<key>` a condition names that the job's matrix cannot produce. */
 export function matrixReferenceProblems(condition, matrix) {
   const text = String(condition ?? '')

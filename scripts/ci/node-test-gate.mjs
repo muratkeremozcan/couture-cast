@@ -9,7 +9,8 @@
 // discovered file and every suite, that no gate step has a condition outside the
 // explicit-prerequisite grammar, and that each gate step waits only on the steps its
 // suites declare in conditionNeeds, so a suite with no database or browser need cannot
-// hide behind a failed runtime.
+// hide behind a failed runtime. A gate step must also run on every matrix row its
+// suites cover: all rows, unless rowRestrictions limits a suite to listed values.
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -17,8 +18,10 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
 import {
+  evaluateApprovedCondition,
   isExplicitPrerequisiteCondition,
   matrixReferenceProblems,
+  matrixRows,
 } from './workflow-step-shadowing.mjs'
 
 export const GATE_SCRIPT = 'scripts/ci/node-test-gate.mjs'
@@ -164,6 +167,44 @@ function needsProblems(manifest, step, lines) {
   return [...new Set(problems)]
 }
 
+const stepSuites = (lines) => [
+  ...lines.map(gatedSuite).filter(Boolean),
+  ...(lines.some((line) => /^npx vitest run\b/.test(line)) ? ['vitest'] : []),
+]
+const rowLabel = (row) =>
+  Object.entries(row)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(', ') || 'the only row'
+const allSucceeded = new Proxy({}, { get: () => 'success' })
+
+// A matrix clause that narrows a step drops its suites on the other rows, so a gate
+// step must run on every row its suites cover: all rows, unless the manifest's
+// rowRestrictions limits a suite to rows with the listed key values.
+function rowProblems(manifest, step, lines, matrix) {
+  if (!isExplicitPrerequisiteCondition(step.if, { matrix })) return []
+  const rows = matrixRows(matrix)
+  if (rows === null) return []
+  const restrictions = manifest.rowRestrictions ?? {}
+  const covers = (suite, row) =>
+    Object.entries(restrictions[suite] ?? {}).every(([key, values]) =>
+      values.map(String).includes(String(row[key]))
+    )
+  const problems = []
+  for (const row of rows) {
+    const runs = evaluateApprovedCondition(step.if, {
+      matrix,
+      row,
+      outcomes: allSucceeded,
+    })
+    const dropped = stepSuites(lines).filter((suite) => covers(suite, row))
+    if (!runs && dropped.length)
+      problems.push(
+        `step ${step.name ?? step.id ?? 'unnamed'} skips matrix row ${rowLabel(row)}, which ${dropped.join(' and ')} must run on`
+      )
+  }
+  return problems
+}
+
 const stepLines = (step) => (step.run ?? '').split(/\r?\n/).map((line) => line.trim())
 
 // A condition that can skip a gate step silences its suite on a green run, and
@@ -191,6 +232,7 @@ function gateStepProblems(manifest, step, matrix) {
         ]
       : []),
     ...needsProblems(manifest, step, lines),
+    ...rowProblems(manifest, step, lines, matrix),
   ]
 }
 
