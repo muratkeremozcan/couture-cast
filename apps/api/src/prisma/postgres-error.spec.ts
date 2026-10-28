@@ -18,6 +18,7 @@ describe('postgres error in either Prisma form', () => {
   it.each([
     ['55P03', 'canceling statement due to lock timeout', 'ERROR'],
     ['57014', 'canceling statement due to statement timeout', 'ERROR'],
+    ['25P03', 'terminating connection due to idle-in-transaction timeout', 'FATAL'],
     ['25P04', 'terminating connection due to transaction timeout', 'FATAL'],
     ['40P01', 'deadlock detected', 'ERROR'],
   ])('reads %s with its message from both forms', (code, message, severity) => {

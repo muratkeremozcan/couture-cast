@@ -20,6 +20,7 @@ const modelFailure = (sql: string, message: string, severity = 'ERROR') =>
     { clientVersion: 'test' }
   )
 const TRANSACTION_TIMEOUT = 'terminating connection due to transaction timeout'
+const IDLE_TIMEOUT = 'terminating connection due to idle-in-transaction timeout'
 
 describe('community append failure classification', () => {
   it.each([
@@ -45,6 +46,16 @@ describe('community append failure classification', () => {
       modelFailure('25P04', TRANSACTION_TIMEOUT, 'FATAL'),
       'budget_pressure',
     ],
+    [
+      'an idle-in-transaction timeout',
+      failure('P2010', '25P03', `FATAL: ${IDLE_TIMEOUT}`),
+      'budget_pressure',
+    ],
+    [
+      'a model idle-in-transaction timeout',
+      modelFailure('25P03', IDLE_TIMEOUT, 'FATAL'),
+      'budget_pressure',
+    ],
     ['an expired interactive transaction', failure('P2028'), 'budget_pressure'],
     [
       'the completion budget',
@@ -63,6 +74,12 @@ describe('community append failure classification', () => {
     ['a model deadlock', modelFailure('40P01', 'deadlock detected')],
     ['25P04 with another message', modelFailure('25P04', 'some other fatal', 'FATAL')],
     ['a raw 25P04 without its message', failure('P2010', '25P04')],
+    ['25P03 with another message', modelFailure('25P03', 'some other fatal', 'FATAL')],
+    [
+      '25P03 with the transaction timeout text',
+      modelFailure('25P03', TRANSACTION_TIMEOUT),
+    ],
+    ['25P04 with the idle timeout text', modelFailure('25P04', IDLE_TIMEOUT, 'FATAL')],
     ['a closed connection', failure('P1017')],
     ['a plain error', new Error('connection refused')],
     ['a non-error rejection', 'unavailable'],

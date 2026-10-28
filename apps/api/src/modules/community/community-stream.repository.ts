@@ -32,15 +32,23 @@ function subjectIdentity(subjects: Subject[]): string {
 }
 
 export class AppendBudgetExceeded extends Error {}
-// SQLSTATE 25P04 is PostgreSQL 17's transaction_timeout, raised as a FATAL with this text.
-const TRANSACTION_TIMEOUT = 'terminating connection due to transaction timeout'
+// PostgreSQL 17 ends a transaction past either of its time budgets with a FATAL, each
+// under its own SQLSTATE and fixed text (postgres.c ProcessInterrupts, REL_17_STABLE;
+// reproduced on 17.6). Both are this transaction's budget running out. When either
+// fires while the session is idle, Prisma 6.19 reports only P1017 with no SQLSTATE,
+// which cannot be told from a lost connection and stays a dependency failure.
+const TRANSACTION_BUDGET_FATAL: Readonly<Record<string, string>> = {
+  '25P03': 'terminating connection due to idle-in-transaction timeout',
+  '25P04': 'terminating connection due to transaction timeout',
+}
 /** A lock miss or one of the append's own SQL timeouts, in either Prisma error form. */
 function sqlDeferral(error: unknown) {
   const sql = postgresError(error)
-  if (sql?.code === '55P03') return 'head_contention'
-  if (sql?.code === '57014') return 'budget_pressure'
-  if (sql?.code === '25P04' && sql.message === TRANSACTION_TIMEOUT)
-    return 'budget_pressure'
+  if (!sql) return null
+  if (sql.code === '55P03') return 'head_contention'
+  if (sql.code === '57014') return 'budget_pressure'
+  if (Object.hasOwn(TRANSACTION_BUDGET_FATAL, sql.code))
+    return TRANSACTION_BUDGET_FATAL[sql.code] === sql.message ? 'budget_pressure' : null
   return null
 }
 export function appendFailure(error: unknown) {
@@ -62,6 +70,14 @@ export type AppendReport = {
   limit: number
   /** Preparation time when the loop stopped, the figure the window is measured on. */
   preparedMs: number
+  /**
+   * Ready rows written: all of them, or the rows that fit the remaining completion
+   * budget at the measured per-row write cost when that budget trimmed the batch.
+   */
+  selected: number
+  selectedReason: 'all' | 'budget'
+  remainingMs: number
+  writeCostMs: number
 }
 /** Head contention and budget pressure defer a batch; the append loop retries it. */
 export function isAppendDeferral(error: unknown): boolean {
@@ -195,11 +211,17 @@ export class CommunityStreamRepository {
         const remaining = 400 - (performance.now() - started)
         if (ready.length && remaining < 30)
           throw new AppendBudgetExceeded('Community append completion budget exhausted')
-        const selected = ready.slice(
-          0,
-          Math.max(1, Math.floor(remaining / this.writeCostMs))
-        )
-        if (!selected.length) return { ...report, count: 0 }
+        const writeCostMs = this.writeCostMs
+        const fit = Math.max(1, Math.floor(remaining / writeCostMs))
+        const trimmed = fit < ready.length
+        const selected = trimmed ? ready.slice(0, fit) : ready
+        const written = {
+          selected: selected.length,
+          selectedReason: trimmed ? ('budget' as const) : ('all' as const),
+          remainingMs: remaining,
+          writeCostMs,
+        }
+        if (!selected.length) return { ...report, ...written, count: 0 }
         signal?.throwIfAborted()
         const writeStarted = performance.now()
         await this.writeBatch(tx, selected)
@@ -209,7 +231,7 @@ export class CommunityStreamRepository {
         )
         // An abort that lands during the write still rolls the batch back here.
         signal?.throwIfAborted()
-        return { ...report, count: selected.length }
+        return { ...report, ...written, count: selected.length }
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
