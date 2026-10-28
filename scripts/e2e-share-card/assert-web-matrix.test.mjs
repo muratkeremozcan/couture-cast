@@ -12,35 +12,13 @@ import {
   expectedWebMatrix,
   specCases,
 } from './assert-web-matrix.mjs'
+import { passingReport } from './web-matrix-fixture.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const spec = fs.readFileSync(path.join(root, SPEC_FILE), 'utf8')
 const expected = expectedWebMatrix()
 
-/** A passing Playwright JSON report for exactly the expected matrix. */
-function report() {
-  const pass = () =>
-    BROWSERS.map((projectName) => ({
-      projectName,
-      expectedStatus: 'passed',
-      status: 'expected',
-      results: [{ status: 'passed' }],
-    }))
-  const suites = expected.locales.map((locale) => ({
-    title: locale,
-    specs: expected.perLocale.map((title, index) => ({
-      id: `${locale}-${index}`,
-      title,
-      tests: pass(),
-    })),
-  }))
-  const specs = expected.shared.map((title, index) => ({
-    id: `shared-${index}`,
-    title,
-    tests: pass(),
-  }))
-  return { suites: [{ title: 'share-card-export.spec.ts', specs, suites }], errors: [] }
-}
+const report = () => passingReport(expected)
 const locale = (value, name) => value.suites[0].suites.find((row) => row.title === name)
 
 describe('expected web matrix from the spec', () => {

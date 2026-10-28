@@ -6,6 +6,11 @@ const repository = fileURLToPath(new URL('../../', import.meta.url))
 export const SPEC_FILE = 'playwright/tests/share-card-export.spec.ts'
 const LOCALE_FILE = 'packages/api-client/src/contracts/http/supported-locales.json'
 export const BROWSERS = ['chromium', 'firefox', 'webkit']
+/**
+ * The validated summary's private runtime file. It sits in the runtime root, outside the
+ * uploaded directory; public-evidence.mjs validates it and projects it into that directory.
+ */
+export const WEB_MATRIX_SUMMARY_FILE = 'web-matrix-summary.json'
 // Behaviors every locale must prove exactly once, and the locale-independent ones,
 // each proven by at least one distinct shared case (P-OFFLINE has a community and
 // an outfit case).
@@ -124,6 +129,44 @@ export function assertWebMatrix(report, expected = expectedWebMatrix()) {
   return { passed: true, cases: cases.length, projects: summary }
 }
 
+/**
+ * Re-validates a summary read back from its private file against the expected matrix and
+ * returns a fresh object built only from the closed fields, so nothing else in the file
+ * can reach the uploaded directory.
+ */
+export function assertWebMatrixSummary(value, expected = expectedWebMatrix()) {
+  const closed = (object, keys) =>
+    object !== null &&
+    typeof object === 'object' &&
+    !Array.isArray(object) &&
+    Object.keys(object).sort().join() === keys.slice().sort().join()
+  const perBrowser =
+    expected.perLocale.length * expected.locales.length + expected.shared.length
+  if (
+    !closed(value, ['passed', 'cases', 'projects']) ||
+    value.passed !== true ||
+    value.cases !== perBrowser * BROWSERS.length ||
+    !Array.isArray(value.projects) ||
+    value.projects.length !== BROWSERS.length
+  )
+    throw new Error('web_matrix_summary_invalid')
+  const projects = value.projects.map((project, index) => {
+    if (
+      !closed(project, ['browser', 'passed', 'locales']) ||
+      project.browser !== BROWSERS[index] ||
+      project.passed !== perBrowser ||
+      JSON.stringify(project.locales) !== JSON.stringify(expected.locales)
+    )
+      throw new Error('web_matrix_summary_invalid')
+    return {
+      browser: project.browser,
+      passed: project.passed,
+      locales: [...expected.locales],
+    }
+  })
+  return { passed: true, cases: value.cases, projects }
+}
+
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
@@ -131,16 +174,15 @@ if (
   const directory = path.resolve(
     process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
   )
+  const summaryFile = path.join(directory, WEB_MATRIX_SUMMARY_FILE)
+  // A summary left by an earlier run must never stand in for this one.
+  fs.rmSync(summaryFile, { force: true })
   const summary = assertWebMatrix(
     JSON.parse(
       fs.readFileSync(path.join(directory, 'playwright-web-matrix.json'), 'utf8')
     )
   )
-  fs.mkdirSync(path.join(directory, 'public-evidence'), { recursive: true })
-  fs.writeFileSync(
-    path.join(directory, 'public-evidence', 'web-matrix.json'),
-    JSON.stringify(summary, null, 2) + '\n'
-  )
+  fs.writeFileSync(summaryFile, JSON.stringify(summary, null, 2) + '\n', { mode: 0o600 })
   console.log(
     `All ${summary.cases} durable web cases passed across Chromium, Firefox and WebKit.`
   )

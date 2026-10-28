@@ -10,6 +10,7 @@ import {
   browserWatermarkChecks,
 } from '../lib/story68-browser-watermark.mjs'
 import { assertWebStartupEvidence } from './wait-web.mjs'
+import { WEB_MATRIX_SUMMARY_FILE, assertWebMatrixSummary } from './assert-web-matrix.mjs'
 import {
   assertNativeEvidence,
   nativeEvidenceFamilies,
@@ -102,6 +103,18 @@ for (const name of nativeEvidenceFamilies) {
     throw new Error('invalid_native_evidence')
   }
   nativeEvidence.set(name, assertNativeEvidence(name, value))
+}
+// The browser acceptance summary is written to a private runtime file by
+// assert-web-matrix.mjs. It is re-validated against the closed matrix schema here and
+// projected from its validated fields, so the rebuilt upload directory keeps the proof.
+const webMatrixFile = path.join(directory, WEB_MATRIX_SUMMARY_FILE)
+let webMatrix
+if (fs.existsSync(webMatrixFile)) {
+  try {
+    webMatrix = assertWebMatrixSummary(JSON.parse(fs.readFileSync(webMatrixFile)))
+  } catch {
+    throw new Error('invalid_web_matrix_evidence')
+  }
 }
 const releaseName = 'native-release-live-font-android.json'
 const releaseFile = path.join(directory, releaseName)
@@ -279,6 +292,7 @@ const closedJSON = (name, value) => {
 // Startup can fail before a native flow exists. Preserve that outcome without
 // fabricating a flow result or publishing provisioning logs.
 if (ciStatus) closedJSON('ci-job-status.json', ciStatus)
+if (webMatrix) closedJSON('web-matrix.json', webMatrix)
 for (const [name, value] of browserProofs) closedJSON(name, value)
 for (const [name, value] of diagnostics) {
   closedJSON(name, value)
