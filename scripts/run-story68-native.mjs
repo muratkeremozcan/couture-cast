@@ -224,9 +224,42 @@ function openOsSettings() {
     throw new Error('os_settings_not_opened')
   return { foregroundMarkers: IOS_SETTINGS_MARKERS }
 }
+// A cold Metro needs longer to build the launch bundle than open-app.yaml waits for the
+// tab bar, so the dev client is only pointed at Metro once that exact bundle is built.
+const DEV_CLIENT_URL = 'couturecast-story68://expo-development-client/'
+const LAUNCH_BUNDLE_DEADLINE_SECONDS = 600
+let launchBundleWarm = false
+function warmLaunchBundle() {
+  if (launchBundleWarm) return
+  const manifest = JSON.parse(
+    run('curl', [
+      '-sf',
+      '--max-time',
+      '30',
+      '-H',
+      `expo-platform: ${platform}`,
+      '-H',
+      'Accept: application/expo+json,application/json',
+      'http://127.0.0.1:8089',
+    ])
+  )
+  const bundle = new URL(manifest.launchAsset?.url ?? '')
+  if (bundle.origin !== 'http://127.0.0.1:8089' || !bundle.pathname.endsWith('.bundle'))
+    throw new Error('owned_metro_launch_bundle_required')
+  run('curl', [
+    '-sf',
+    '--max-time',
+    String(LAUNCH_BUNDLE_DEADLINE_SECONDS),
+    '-o',
+    '/dev/null',
+    bundle.href,
+  ])
+  launchBundleWarm = true
+}
 function openUrl(url) {
   requireDevice()
   reverse()
+  if (url.startsWith(DEV_CLIENT_URL)) warmLaunchBundle()
   if (platform === 'ios') run('xcrun', ['simctl', 'openurl', device, url])
   else
     run(adb, [
