@@ -607,13 +607,18 @@ function connectedLiteralTokens(
   literal: string,
   spans: readonly RegExpMatchArray[],
   at: number,
-  neighbor: number
+  neighbor: number,
+  joiner: 'space' | 'space-or-hyphen' = 'space'
 ): boolean {
   const left = spans[Math.min(at, neighbor)]
   const right = spans[Math.max(at, neighbor)]
   if (!left || !right) return false
   const gap = literal.slice((left.index ?? 0) + left[0].length, right.index)
-  return /^[\p{Zs}\t]+$/u.test(gap)
+  if (/^[\p{Zs}\t]+$/u.test(gap)) return true
+  // A native hyphenated compound ("pé-de-galinha") joins the same words an ordinary
+  // phrase does. Only one plain hyphen-minus counts, so every other separator
+  // (dots, underscores, slashes, zero-width characters) keeps splitting a phrase.
+  return joiner === 'space-or-hyphen' && gap === '-'
 }
 
 function reviewedOccurrencePhrases(
@@ -1624,7 +1629,13 @@ export class CommunityTextScreener {
           phrase.every((word, offset) => tokens[start + offset] === word)
       ) &&
       Array.from({ length: size - 1 }, (_, offset) =>
-        connectedLiteralTokens(literal, spans, start + offset, start + offset + 1)
+        connectedLiteralTokens(
+          literal,
+          spans,
+          start + offset,
+          start + offset + 1,
+          'space-or-hyphen'
+        )
       ).every(Boolean)
     )
   }
