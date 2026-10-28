@@ -20,6 +20,8 @@ class ModalSystemBarsTest {
   private fun assertOnlyAttachedDialogWindowIsStyled(styled: (View) -> Boolean) {
     val activity = Robolectric.buildActivity(Activity::class.java).setup().visible().get()
     val activityRoot = activity.window.decorView
+    @Suppress("DEPRECATION")
+    val activityFlags = activityRoot.systemUiVisibility
     assertFalse("Activity starts with dark status icons", styled(activityRoot))
     repeat(2) {
       val dialog = Dialog(activity)
@@ -31,6 +33,10 @@ class ModalSystemBarsTest {
       assertTrue(setDarkModalStatusBar(child))
       assertTrue("Dialog window has light-status appearance", styled(child.rootView))
       assertFalse("Activity window keeps its own appearance", styled(activityRoot))
+      if (Build.VERSION.SDK_INT < 30) {
+        @Suppress("DEPRECATION")
+        assertEquals("Activity keeps every system UI flag", activityFlags, activityRoot.systemUiVisibility)
+      }
       dialog.dismiss()
       shadowOf(Looper.getMainLooper()).idle()
       assertFalse(setDarkModalStatusBar(child))
