@@ -29,6 +29,21 @@
       "newSha256": "64d235c156167fe45d58c14697a460badbb8819f16de0d389edfb5cc072e9d06",
       "reason": "Coordinator-granted test-review exception: every round3 fixture loop now asserts its exact non-zero set size first, so an empty fixture can no longer pass vacuously. Sizes were read as entry counts only. Only the test file changed; no screening module, list, table or corpus file is touched.",
       "commit": "8f8699f22d3e6e289d38e4a6627853b90f73fde3"
+    },
+    {
+      "path": "apps/api/src/modules/community/community-text-round3-development.spec.ts",
+      "oldSha256": "64d235c156167fe45d58c14697a460badbb8819f16de0d389edfb5cc072e9d06",
+      "newSha256": "120477566c31d4de7274c1656f873699e81ddfc536b9cb706dfdb9d0f8306f9e",
+      "reason": "Coordinator-granted test-only change, second amendment of this path (chains from its first entry): the one-time screener warm-up moves into a beforeAll with its own measured 10 s hook timeout, so a slow setup fails the hook by name instead of the first locale case. No assertion, screening module, list, table or corpus file changes.",
+      "commit": "7a8e9d312c6eec782d9d564f7763dd8c6187c42c"
+    },
+    {
+      "path": "apps/api/src/modules/community/community-text-round5-development.spec.ts",
+      "oldSha256": "e16eec08927c23c89cacaa8422d8564bd4f66a767b25f25888a29f8552d7784e",
+      "newSha256": "913d5dea9f8144ae395cb9c05ed6af946f7bbdd3b75d5548700e6587c4848757",
+      "reason": "Coordinator-granted test-only change: the one-time screener warm-up moves into a beforeAll with its own measured 10 s hook timeout, so a slow setup fails the hook by name instead of the first locale case. No assertion, screening module, list, table or corpus file changes.",
+      "commit": "dbb679afbce64a54689247ea02ba5c37cdab88fc"
     }
-  ]
+  ],
+  "chaining": "Entries for one path apply in order: the first oldSha256 equals the manifest entry, each later oldSha256 equals the previous newSha256, and the last newSha256 equals the committed file."
 }
