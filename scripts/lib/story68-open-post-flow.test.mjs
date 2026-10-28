@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import test from 'node:test'
+
+const flow = fs.readFileSync(
+  fileURLToPath(new URL('../../maestro/story68/open-post.yaml', import.meta.url)),
+  'utf8'
+)
+const AUTHOR = 'community-card-author-${MAESTRO_POST_ID}'
+const repeats = [...flow.matchAll(/- repeat:[\s\S]*?times:\s*(\d+)/g)].map((m) => ({
+  at: m.index,
+  times: Number(m[1]),
+  target: /id:\s*(\S+)/.exec(m[0])?.[1],
+}))
+
+test('every way the post can be missing fails with its own named reason', () => {
+  for (const reason of [
+    'community_screen_absent',
+    'feed_skeleton_still_showing',
+    'feed_error_state',
+    'feed_unavailable_state',
+    'share_card_preview_not_loaded',
+  ])
+    assert.match(flow, new RegExp(`label: '${reason}'`), reason)
+})
+
+test('the walk restores the list position upward, then walks down, both bounded and both named', () => {
+  const [up, down, opener] = repeats
+  assert.equal(repeats.length, 3)
+  assert.equal(up.target, AUTHOR)
+  assert.equal(down.target, AUTHOR)
+  assert.ok(up.at < down.at && down.at < opener.at)
+  // The upward drag moves toward the top: it ends lower on the screen than it starts.
+  const upDrag = /start: 50%, (\d+)%\n\s*end: 50%, (\d+)%/.exec(
+    flow.slice(up.at, down.at)
+  )
+  assert.ok(Number(upDrag[1]) < Number(upDrag[2]))
+  const downDrag = /start: 50%, (\d+)%\n\s*end: 50%, (\d+)%/.exec(flow.slice(down.at))
+  assert.ok(Number(downDrag[1]) > Number(downDrag[2]))
+  assert.match(
+    flow,
+    new RegExp(`label: 'post_not_within_${up.times}_up_${down.times}_down_swipes'`)
+  )
+})
+
+test('the walk waits for the feed to finish loading before it swipes', () => {
+  const skeleton = flow.indexOf('id: community-feed-skeleton')
+  const firstSwipe = flow.indexOf('- swipe:')
+  assert.ok(skeleton > 0 && skeleton < firstSwipe)
+})
+
+test('the card is found on the feed surface, not through the highlighted deep-link copy', () => {
+  assert.doesNotMatch(flow, /highlighted-community-card|openLink|source=notification/)
+  assert.match(flow, /community-card-author-\$\{MAESTRO_POST_ID\}/)
+})

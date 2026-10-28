@@ -1,42 +1,63 @@
 appId: ${MAESTRO_APP_ID}
 ---
+# Opens the owned post's Share card from the Community feed card. The walk is bounded and
+# every way the post can be missing fails with its own label instead of a kill at the
+# Maestro budget. The budget is derived from this file in story68-flow-timeouts.
 - tapOn:
     id: tab-community
+- extendedWaitUntil:
+    visible:
+      id: community-screen
+    timeout: 10000
+    label: 'community_screen_absent'
+- extendedWaitUntil:
+    notVisible:
+      id: community-feed-skeleton
+    timeout: 20000
+    label: 'feed_skeleton_still_showing'
+- assertNotVisible:
+    id: community-feed-error
+    label: 'feed_error_state'
+- assertNotVisible:
+    id: community-feed-unavailable
+    label: 'feed_unavailable_state'
 - runFlow:
     when:
       platform: iOS
     commands:
-      # Explicit list-region drags avoid the nested horizontal climate filter.
+      # The matrix opens this flow many times, and after a Share card closes the list can sit
+      # past the author row: restore the position first (the owned feed's first row is the
+      # post), then walk down. Explicit list-region drags avoid the nested climate filter.
       - repeat:
           while:
             notVisible:
               id: community-card-author-${MAESTRO_POST_ID}
-          times: 12
+          times: 3
           commands:
             - swipe:
-                start: 50%, 45%
+                start: 50%, 25%
                 end: 50%, 80%
                 duration: 800
             - waitForAnimationToEnd
-      # A freshly mounted feed starts above the post, below the spotlight section.
       - repeat:
           while:
             notVisible:
               id: community-card-author-${MAESTRO_POST_ID}
-          times: 16
+          times: 5
           commands:
             - swipe:
                 start: 50%, 75%
-                end: 50%, 40%
+                end: 50%, 35%
                 duration: 800
             - waitForAnimationToEnd
       - assertVisible:
           id: community-card-author-${MAESTRO_POST_ID}
+          label: 'post_not_within_3_up_5_down_swipes'
       - repeat:
           while:
             notVisible:
               id: community-share-card-open-${MAESTRO_POST_ID}
-          times: 10
+          times: 2
           commands:
             - swipe:
                 start: 50%, 75%
@@ -65,3 +86,4 @@ appId: ${MAESTRO_APP_ID}
     visible:
       id: share-card-preview-loaded-.*
     timeout: 20000
+    label: 'share_card_preview_not_loaded'

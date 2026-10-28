@@ -17,9 +17,20 @@ export const FLOW_TIMEOUT_MARGIN = 1.25
 export const OPEN_APP_WORST_CASE_MS =
   FLOW_STARTUP_MS + 4 * (100_000 + 15 * CONDITION_CHECK_MS)
 
+/**
+ * open-post.yaml on iOS (its slower platform), one attempt: 10 s + 20 s + 20 s of declared
+ * waits, and 14 budgeted steps: 2 feed-state checks, 3 up and 5 down walk iterations, 2
+ * opener iterations, the post assertion and the final lift swipe. Every named failure fires
+ * inside this budget, so a missing post is reported, not killed.
+ */
+export const OPEN_POST_WORST_CASE_MS = FLOW_STARTUP_MS + 50_000 + 14 * CONDITION_CHECK_MS
+
 const flowTimeouts = {
   'maestro/story65/open-app.yaml': Math.ceil(
     OPEN_APP_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
+  ),
+  'maestro/story68/open-post.yaml': Math.ceil(
+    OPEN_POST_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
   ),
 }
 
