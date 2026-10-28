@@ -9,6 +9,7 @@ import {
   prepareWorkletsStaging,
   verifyWorkletsStaging,
 } from './story68-worklets-staging.mjs'
+import { gradleRunLog, requireGradleWrapper } from './story68-gradle-precondition.mjs'
 
 const wrapper = path.resolve('apps/mobile/android/gradlew')
 const fixtures = new Set()
@@ -100,6 +101,7 @@ const GRADLE_RUN_TIMEOUT_MS = 60_000
 const budget = (runs) => ({ timeout: runs * GRADLE_RUN_TIMEOUT_MS + 30_000 })
 
 function run(input, init = true) {
+  requireGradleWrapper(wrapper)
   const plan = init ? prepareWorkletsStaging(input) : undefined
   const result = spawnSync(
     wrapper,
@@ -115,7 +117,7 @@ function run(input, init = true) {
     ],
     { encoding: 'utf8', timeout: GRADLE_RUN_TIMEOUT_MS, maxBuffer: 2 * 1024 * 1024 }
   )
-  return { plan, result, log: result.stdout + result.stderr }
+  return { plan, result, log: gradleRunLog(result) }
 }
 
 describe('worklets staging', () => {
