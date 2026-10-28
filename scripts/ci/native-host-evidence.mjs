@@ -349,7 +349,7 @@ export function assertNativeHostEvidence(value) {
     value.version !== 3 ||
     !PLATFORMS.includes(value.platform) ||
     !Array.isArray(value.samples) ||
-    value.samples.length > 16 ||
+    value.samples.length > 32 ||
     !value.samples.every(validSample) ||
     !validFlow(value.firstFlow) ||
     !validMetro(value.metro)

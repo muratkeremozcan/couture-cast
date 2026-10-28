@@ -284,6 +284,24 @@ test('RSS reports the top 15 executable basenames, sorted by resident KiB', () =
   assert.equal(rows.at(-1).rssKB, 106)
 })
 
+test('a run with ten locale passes and both failure samples stays within the sample bound', () => {
+  const sample = projectSample({
+    label: 'locale-loop',
+    at: 0,
+    loadavg: [0, 0, 0],
+    cpuCount: 1,
+    totalmem: 1,
+    freemem: 1,
+    ps: '',
+  })
+  assert.doesNotThrow(() =>
+    assertNativeHostEvidence(record({ samples: Array(22).fill(sample) }))
+  )
+  assert.throws(() =>
+    assertNativeHostEvidence(record({ samples: Array(33).fill(sample) }))
+  )
+})
+
 test('in-flow sample labels are accepted', () => {
   for (const label of ['locale-loop', 'flow-failure'])
     assert.equal(
