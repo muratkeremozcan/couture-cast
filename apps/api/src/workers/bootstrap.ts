@@ -66,12 +66,14 @@ import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources, type ShutdownQueue } from './shutdown-resources'
 
-// Flow ref S0.4/T5: track worker/queue instances for coordinated shutdown.
 const logger = createBaseLogger().child({ feature: 'workers' })
-const workers: Worker[] = []
-const queues: Queue[] = []
+
 /**
- * Resources that close like a queue but are not BullMQ `Queue` objects.
+ * Flow ref S0.4/T5: the worker/queue instances one process started, for its
+ * coordinated shutdown. Owned by the caller, so each start gets its own lists.
+ *
+ * `closeables` holds resources that close like a queue but are not BullMQ
+ * `Queue` objects.
  *
  * The community runtime is the one that matters: `CommunityModerationQueue`
  * creates its own BullMQ `Queue`, and therefore its own Redis connection, the
@@ -82,9 +84,17 @@ const queues: Queue[] = []
  * open for the lifetime of the container. `community.bootstrap.ts` had always
  * retained that hook; this process had not.
  */
-const closeables: ShutdownQueue[] = []
-const redisClients: Redis[] = []
-let posthogService: PostHogService | undefined
+export type WorkerProcessState = {
+  readonly workers: Worker[]
+  readonly queues: Queue[]
+  readonly closeables: ShutdownQueue[]
+  readonly redisClients: Redis[]
+  posthogService?: PostHogService
+}
+
+export function createWorkerProcessState(): WorkerProcessState {
+  return { workers: [], queues: [], closeables: [], redisClients: [] }
+}
 
 // One standalone weather composition shared by startup and isolated provider-boundary proof.
 export function createStandaloneWeatherFanout(
@@ -103,7 +113,8 @@ export function createStandaloneWeatherFanout(
   )
 }
 
-export async function startWorkers() {
+export async function startWorkers(state: WorkerProcessState) {
+  const { workers, queues, closeables, redisClients } = state
   try {
     // Flow ref S0.4/T5: create queue clients for the known queues before any
     // workers start consuming jobs.
@@ -146,7 +157,8 @@ export async function startWorkers() {
       maxRetriesPerRequest: 1,
     })
     redisClients.push(alertRelayRedis)
-    posthogService = new PostHogService()
+    const posthogService = new PostHogService()
+    state.posthogService = posthogService
     const telemetryService = new TelemetryService(prisma, posthogService)
     try {
       const engagement = await startCommunityEngagementRuntime(prisma, posthogService)
@@ -370,7 +382,8 @@ export async function startWorkers() {
   }
 }
 
-export async function performShutdown() {
+export async function performShutdown(state: WorkerProcessState) {
+  const { workers, queues, closeables, redisClients, posthogService } = state
   logger.info('Shutting down workers and queues...')
   let exitCode = 0
   try {
@@ -395,20 +408,16 @@ export async function performShutdown() {
   }
 }
 
-let shutdownPromise: Promise<void> | undefined
-
-function shutdown(): Promise<void> {
-  shutdownPromise ??= performShutdown()
-  return shutdownPromise
-}
-
 // Flow ref S0.4/T5: handle SIGTERM/SIGINT and close resources cleanly.
 // Guarded like `wardrobe.bootstrap.ts`, so a spec can import this module's
 // composition without the import itself opening Redis connections, registering
 // signal handlers, and calling `process.exit` inside the test runner.
 if (require.main === module) {
+  const state = createWorkerProcessState()
+  let shutdownPromise: Promise<void> | undefined
+  const shutdown = () => (shutdownPromise ??= performShutdown(state))
   process.on('SIGTERM', () => void shutdown())
   process.on('SIGINT', () => void shutdown())
 
-  void startWorkers()
+  void startWorkers(state)
 }
