@@ -19,7 +19,7 @@ import {
 const script = fileURLToPath(new URL('./native-host-evidence.mjs', import.meta.url))
 
 const record = (overrides = {}) => ({
-  version: 2,
+  version: 3,
   platform: 'ios',
   samples: [],
   firstFlow: null,
@@ -103,6 +103,7 @@ test('the first flow splits into JVM, driver and flow time', () => {
     jvmSeconds: 36.4,
     driverSeconds: 47.03,
     flowSeconds: 11.5,
+    wall: null,
   })
 })
 
@@ -115,6 +116,7 @@ test('a first flow cut off early names the last phase it reached', () => {
     jvmSeconds: 36.4,
     driverSeconds: null,
     flowSeconds: null,
+    wall: null,
   })
   assert.equal(projectFirstFlow('', 'failed').reached, 'none')
   assert.throws(() => projectFirstFlow(maestroLog, 'maybe'), /invalid_first_flow_status/)
@@ -190,6 +192,20 @@ test('the command line appends to one closed record per platform', (t) => {
   fs.mkdirSync(path.join(directory, 'maestro-ios-1'))
   fs.writeFileSync(path.join(directory, 'maestro-ios-1', 'maestro.log'), maestroLog)
   fs.writeFileSync(path.join(directory, 'metro.log'), 'iOS Bundled 900ms entry.js')
+  const wall = {
+    timeoutMs: 120000,
+    childMs: 50000,
+    timedOut: false,
+    killAfterMs: null,
+    wrapperMs: 50030,
+    workerOverheadMs: 30,
+    setupMs: 10,
+    harnessMs: 50040,
+  }
+  fs.writeFileSync(
+    path.join(directory, 'maestro-ios-1', 'flow-timing.json'),
+    JSON.stringify(wall)
+  )
   const run = (...args) =>
     execFileSync(process.execPath, [script, ...args, '--platform', 'ios'], {
       env: { ...process.env, CC68_HARNESS_DIR: directory },
@@ -204,6 +220,7 @@ test('the command line appends to one closed record per platform', (t) => {
   assert.doesNotThrow(() => assertNativeHostEvidence(value))
   assert.equal(value.samples[0].label, 'before-simulator-boot')
   assert.equal(value.firstFlow.status, 'passed')
+  assert.deepEqual(value.firstFlow.wall, wall)
   assert.equal(value.metro.lastBundleMs, 900)
   assert.throws(
     () =>
@@ -340,4 +357,30 @@ test('every workflow host sample label is accepted by the real sampler CLI', (t)
     evidence.samples.map((sample) => sample.label),
     labels
   )
+})
+
+test('first-flow evidence keeps child deadline, setup and worker bootstrap separate', () => {
+  const wall = {
+    timeoutMs: 120000,
+    childMs: 120004,
+    timedOut: true,
+    killAfterMs: 120001,
+    wrapperMs: 120040,
+    workerOverheadMs: 36,
+    setupMs: 20,
+    harnessMs: 120060,
+  }
+  const firstFlow = projectFirstFlow(maestroLog, 'failed', wall)
+  assert.doesNotThrow(() => assertNativeHostEvidence(record({ firstFlow })))
+  assert.equal(firstFlow.wall.childMs, 120004)
+  for (const bad of [
+    { ...wall, timeoutMs: 148000 },
+    { ...wall, timedOut: 'yes' },
+    { ...wall, workerOverheadMs: -1 },
+    { ...wall, env: 'private' },
+  ])
+    assert.throws(
+      () => assertNativeHostEvidence(record({ firstFlow: { ...firstFlow, wall: bad } })),
+      /invalid_native_host_evidence/
+    )
 })

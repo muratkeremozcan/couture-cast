@@ -128,7 +128,7 @@ function stamp(line) {
  * @param {string} log
  * @param {'passed' | 'failed'} status
  */
-export function projectFirstFlow(log, status) {
+export function projectFirstFlow(log, status, wall = null) {
   if (!['passed', 'failed'].includes(status)) throw new Error('invalid_first_flow_status')
   const marks = firstFlowMarks(log)
   const span = (from, to) => (from === null || to === null ? null : round(to - from))
@@ -139,6 +139,7 @@ export function projectFirstFlow(log, status) {
     jvmSeconds: span(marks.jvm, marks.device),
     driverSeconds: span(marks.driver, marks.flow),
     flowSeconds: span(marks.flow, marks.last),
+    wall,
   }
 }
 
@@ -243,12 +244,33 @@ const validSample = (sample) =>
   seconds(sample.swapUsedMB) &&
   validPressure(sample.memoryPressureFreePercent)
 
+const WALL_KEYS = [
+  'timeoutMs',
+  'childMs',
+  'timedOut',
+  'killAfterMs',
+  'wrapperMs',
+  'workerOverheadMs',
+  'setupMs',
+  'harnessMs',
+]
+const validWall = (wall) =>
+  wall === null ||
+  (exactKeys(wall, WALL_KEYS) &&
+    wall.timeoutMs === 120000 &&
+    typeof wall.timedOut === 'boolean' &&
+    ['childMs', 'wrapperMs', 'workerOverheadMs', 'setupMs', 'harnessMs'].every((key) =>
+      count(wall[key])
+    ) &&
+    (wall.timedOut ? count(wall.killAfterMs) : wall.killAfterMs === null))
+
 const validFlow = (flow) =>
   flow === null ||
-  (exactKeys(flow, ['status', 'reached', ...FLOW_SECONDS]) &&
+  (exactKeys(flow, ['status', 'reached', ...FLOW_SECONDS, 'wall']) &&
     ['passed', 'failed'].includes(flow.status) &&
     PHASES.includes(flow.reached) &&
-    FLOW_SECONDS.every((key) => seconds(flow[key])))
+    FLOW_SECONDS.every((key) => seconds(flow[key])) &&
+    validWall(flow.wall))
 
 const validMetro = (metro) =>
   metro === null ||
@@ -261,7 +283,7 @@ const validMetro = (metro) =>
 export function assertNativeHostEvidence(value) {
   if (
     !exactKeys(value, ['version', 'platform', 'samples', 'firstFlow', 'metro']) ||
-    value.version !== 2 ||
+    value.version !== 3 ||
     !PLATFORMS.includes(value.platform) ||
     !Array.isArray(value.samples) ||
     value.samples.length > 16 ||
@@ -286,6 +308,18 @@ export function firstMaestroLog(directory, platform) {
   return ''
 }
 
+export function firstMaestroTiming(directory, platform) {
+  const runs = fs
+    .readdirSync(directory)
+    .filter((name) => new RegExp(`^maestro-${platform}-\\d+$`).test(name))
+    .sort((a, b) => Number(a.split('-').at(-1)) - Number(b.split('-').at(-1)))
+  for (const run of runs) {
+    const file = path.join(directory, run, 'flow-timing.json')
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'))
+  }
+  return null
+}
+
 function main() {
   const args = process.argv.slice(2)
   const at = args.indexOf('--platform')
@@ -299,7 +333,7 @@ function main() {
   const file = path.join(directory, `native-host-${platform}.json`)
   const record = fs.existsSync(file)
     ? JSON.parse(fs.readFileSync(file, 'utf8'))
-    : { version: 2, platform, samples: [], firstFlow: null, metro: null }
+    : { version: 3, platform, samples: [], firstFlow: null, metro: null }
   let recorded
   if (command === 'sample') {
     if (!SAMPLE_LABELS.includes(argument)) throw new Error('invalid_host_sample_label')
@@ -327,7 +361,11 @@ function main() {
     record.samples.push(recorded)
   } else if (command === 'first-flow') {
     // The first record stands: a later failure step never rewrites a passed flow.
-    record.firstFlow ??= projectFirstFlow(firstMaestroLog(directory, platform), argument)
+    record.firstFlow ??= projectFirstFlow(
+      firstMaestroLog(directory, platform),
+      argument,
+      firstMaestroTiming(directory, platform)
+    )
     recorded = record.firstFlow
   } else if (command === 'metro') {
     const log = path.join(directory, 'metro.log')

@@ -80,7 +80,7 @@ jobs:
         with:
           packages: platform-tools
       - name: Verify startup deadline controls
-        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/native-supabase.test.mjs scripts/ci/native-supabase-gateway.test.mjs scripts/e2e-share-card/runtime-sources.test.mjs scripts/ci/native-host-evidence.test.mjs scripts/ci/native-build-daemons.test.mjs scripts/e2e-share-card/warm-metro.test.mjs
+        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/native-supabase.test.mjs scripts/ci/native-supabase-gateway.test.mjs scripts/e2e-share-card/runtime-sources.test.mjs scripts/ci/native-host-evidence.test.mjs scripts/ci/native-build-daemons.test.mjs scripts/ci/native-ios-quiesce.test.mjs scripts/ci/native-ios-flow-deadline.test.mjs scripts/e2e-share-card/warm-metro.test.mjs
       - uses: ./.github/actions/start-local-supabase
         if: runner.os == 'Linux'
       - name: Install the iOS project generator
@@ -261,6 +261,7 @@ jobs:
           xcrun simctl bootstatus "$device" -b
           node scripts/ci/native-host-evidence.mjs sample after-simulator-boot --platform ios
           xcrun simctl install "$device" /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app
+          node scripts/ci/native-ios-quiesce.mjs "$device"
           node scripts/ci/native-host-evidence.mjs sample before-first-flow --platform ios
           node scripts/run-story68-native.mjs open --platform ios --device "$device"
           node scripts/ci/native-host-evidence.mjs first-flow passed --platform ios

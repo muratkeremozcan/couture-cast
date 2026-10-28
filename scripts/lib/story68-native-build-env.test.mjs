@@ -218,6 +218,7 @@ for (const flow of ['maestro', 'rapidWatermarkFlow']) {
         summarizeNativeFlowFailure: () => ({}),
         redactRapidWatermarkControl: () => undefined,
         spawnSync: capture,
+        spawnIosFlow: capture,
         spawn: capture,
         MAESTRO_ANDROID_DRIVER_PORT: 17001,
         DRIVER_HOST_PORT_ARG: '--driver-host-port',

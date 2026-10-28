@@ -24,6 +24,7 @@ import {
 } from './lib/story68-native-safety.mjs'
 import { assertStory68DiskSpace } from './lib/test-disk-space.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
+import { spawnIosFlow, recordIosFlowTiming } from './ci/native-ios-flow-deadline.mjs'
 import {
   prepareWorkletsStaging,
   verifyWorkletsStaging,
@@ -257,7 +258,8 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   const output = path.join(directory, `maestro-${platform}-${Date.now()}`)
   fs.mkdirSync(output, { mode: 0o700 })
   const result = withNativeTransport(() => {
-    const result = spawnSync(
+    const launch = platform === 'ios' ? spawnIosFlow : spawnSync
+    const result = launch(
       maestroBinary,
       [
         '--device',
@@ -289,7 +291,8 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
         detached: true,
         timeout: 120_000,
         killSignal: 'SIGTERM',
-      }
+      },
+      path.join(output, 'flow-timing.json')
     )
     if (result.error?.code === 'ETIMEDOUT') {
       // Detached child owns this process group, including its XCTest driver.
@@ -304,6 +307,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   const driverLog = path.join(output, 'maestro.log')
   const snapshotLog = fs.existsSync(driverLog) ? fs.readFileSync(driverLog, 'utf8') : ''
   const failureDurationMs = Math.max(0, Date.now() - started)
+  recordIosFlowTiming(path.join(output, 'flow-timing.json'), result, failureDurationMs)
   const recoverSnapshot =
     result.status !== 0 &&
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })

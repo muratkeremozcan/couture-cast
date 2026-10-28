@@ -11,6 +11,7 @@ import {
 } from '../lib/story68-browser-watermark.mjs'
 import { assertWebStartupEvidence } from './wait-web.mjs'
 import { assertNativeHostEvidence } from '../ci/native-host-evidence.mjs'
+import { assertNativeQuiesceEvidence } from '../ci/native-ios-quiesce.mjs'
 const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
@@ -80,6 +81,12 @@ for (const platform of ['ios']) {
   assertNativeHostEvidence(value)
   if (value.platform !== platform) throw new Error('invalid_native_host_evidence')
   hostEvidence.set(name, value)
+}
+const quiesceFile = path.join(directory, 'native-quiesce-ios.json')
+if (fs.existsSync(quiesceFile)) {
+  const value = JSON.parse(fs.readFileSync(quiesceFile, 'utf8'))
+  assertNativeQuiesceEvidence(value)
+  hostEvidence.set('native-quiesce-ios.json', value)
 }
 // Only primitive proof facts cross the native evidence boundary. Private logs and
 // resource identities are deliberately absent from the public projection.

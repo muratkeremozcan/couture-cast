@@ -294,6 +294,7 @@ function invokeMaestro(t, capture) {
     MAESTRO_ANDROID_DRIVER_PORT: 17001,
     process: { env: {}, kill: () => assert.fail('unexpected process mutation') },
     withNativeTransport: (work) => work(),
+    recordIosFlowTiming: () => undefined,
     reverse: () => undefined,
     localeEnv: () => ({}),
     spawnSync: () => ({
