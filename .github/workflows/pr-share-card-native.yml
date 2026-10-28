@@ -23,7 +23,7 @@ jobs:
             platform: android
             api: 36
             target: google_apis_playstore
-          - os: macos-15-intel
+          - os: macos-15
             platform: ios
             api: 0
     runs-on: ${{ matrix.os }}

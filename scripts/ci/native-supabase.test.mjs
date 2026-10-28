@@ -172,6 +172,14 @@ test('cache keys follow every pinned input and name the install paths', () => {
   assert.equal(outputs['postgres-path'], path.join('/r', 'postgres'))
   assert.equal(outputs['storage-path'], path.join('/r', 'storage'))
 
+  // The architecture is part of every key: an arm64 runner never restores x64 builds.
+  const arm = cacheOutputs({ root: '/r', platform: 'darwin', arch: 'arm64' })
+  for (const [index, line] of arm.entries())
+    if (line.includes('-key=')) {
+      assert.match(line, /=native-supabase-darwin-arm64-/)
+      assert.notEqual(line, lines[index])
+    }
+
   // A configure flag change is a different build, so a different key.
   const flags = PINS.postgres.configureFlags
   PINS.postgres.configureFlags = [...flags, '--with-zlib']
