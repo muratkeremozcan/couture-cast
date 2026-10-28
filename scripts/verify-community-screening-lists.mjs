@@ -50,6 +50,16 @@ const reviewedOccurrencePath = path.join(
 )
 const REVIEWED_OCCURRENCE_CONSTRUCTIONS = readJson(reviewedOccurrencePath).constructions
 
+function sameBankScope(rule, reviewed) {
+  const same = (key, fallback) =>
+    JSON.stringify(rule[key] ?? fallback) === JSON.stringify(reviewed[key] ?? fallback)
+  return (
+    same('requiredDeclaredLanguages', []) &&
+    same('rejectedPrefixFrames', []) &&
+    same('phraseRequiredDeclaredLanguages', {})
+  )
+}
+
 export function occurrenceConstructionProblems(rules) {
   if (!Array.isArray(rules) || rules.length > REVIEWED_OCCURRENCE_CONSTRUCTIONS.length)
     return ['unreviewed occurrence construction bank']
@@ -62,12 +72,7 @@ export function occurrenceConstructionProblems(rules) {
     )
     return (
       reviewed &&
-      JSON.stringify(rule.requiredDeclaredLanguages ?? []) ===
-        JSON.stringify(reviewed.requiredDeclaredLanguages ?? []) &&
-      JSON.stringify(rule.rejectedPrefixFrames ?? []) ===
-        JSON.stringify(reviewed.rejectedPrefixFrames ?? []) &&
-      JSON.stringify(rule.phraseRequiredDeclaredLanguages ?? {}) ===
-        JSON.stringify(reviewed.phraseRequiredDeclaredLanguages ?? {}) &&
+      sameBankScope(rule, reviewed) &&
       typeof rule.reason === 'string' &&
       rule.reason.length >= 20 &&
       Array.isArray(rule.phrases) &&
@@ -288,6 +293,27 @@ export function globallyAllowsOccurrenceTarget(value) {
   )
 }
 
+function scopedPhraseProblems(scopedPhrases) {
+  const problems = []
+  for (const scoped of scopedPhrases) {
+    const literal = toLiteral(scoped.entry ?? '')
+    if (
+      !LANGUAGES.includes(scoped.language) ||
+      tokenize(literal).length < 2 ||
+      !Array.isArray(scoped.complements) ||
+      scoped.complements.length === 0 ||
+      typeof scoped.reason !== 'string' ||
+      scoped.reason.length < 20
+    )
+      problems.push(
+        `scoped allow phrase "${scoped.entry}" needs a language, two words, complements and a reason`
+      )
+    if (globallyAllowsOccurrenceTarget(literal))
+      problems.push('reviewed occurrence target cannot be globally allow-listed')
+  }
+  return problems
+}
+
 function loadAllowList() {
   const allow = readJson(allowListPath)
   const problems = []
@@ -317,22 +343,7 @@ function loadAllowList() {
       )
     )
   )
-  for (const scoped of allow.scopedPhrases ?? []) {
-    const literal = toLiteral(scoped.entry ?? '')
-    if (
-      !LANGUAGES.includes(scoped.language) ||
-      tokenize(literal).length < 2 ||
-      !Array.isArray(scoped.complements) ||
-      scoped.complements.length === 0 ||
-      typeof scoped.reason !== 'string' ||
-      scoped.reason.length < 20
-    )
-      problems.push(
-        `scoped allow phrase "${scoped.entry}" needs a language, two words, complements and a reason`
-      )
-    if (globallyAllowsOccurrenceTarget(literal))
-      problems.push('reviewed occurrence target cannot be globally allow-listed')
-  }
+  problems.push(...scopedPhraseProblems(allow.scopedPhrases ?? []))
   if ('occurrenceConstructions' in allow)
     problems.push('reviewed constructions must use the authoritative bank')
   problems.push(...occurrenceConstructionProblems(REVIEWED_OCCURRENCE_CONSTRUCTIONS))
