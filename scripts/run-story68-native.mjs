@@ -15,7 +15,7 @@ import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs
 import { withColdAndroidFontScale } from './lib/story68-cold-font-scale.mjs'
 import { runReleaseLiveFontCommand } from './lib/story68-release-live-font-command.mjs'
 import { nativeFlowTimeoutMs } from './ci/native-ios-flow-budget.mjs'
-import { metroServerEnv } from './lib/story68-metro-env.mjs'
+import { metroServerArgs, metroServerEnv } from './lib/story68-metro-env.mjs'
 import {
   recordIosCommandTimings,
   recordIosFlowProgress,
@@ -879,7 +879,14 @@ if (command === 'prebuild') {
   const env = metroServerEnv(read('public-build-env.json'), platform)
   const metro = child(
     path.join(root, 'node_modules/.bin/expo'),
-    ['start', '--dev-client', '--port', '8089', '--localhost'],
+    [
+      'start',
+      '--dev-client',
+      '--port',
+      '8089',
+      '--localhost',
+      ...metroServerArgs(platform),
+    ],
     env,
     'metro.log',
     path.join(root, 'apps/mobile')

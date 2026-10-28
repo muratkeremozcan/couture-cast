@@ -11,6 +11,8 @@ import {
 } from './native-ios-command-evidence.mjs'
 import {
   probeSimulatorTuning,
+  bootoutQuietServices,
+  QUIET_SERVICES,
   bootoutOwnedEmitter,
   shouldEscalateEmitter,
   EMITTER_ESCALATION_SECONDS,
@@ -185,4 +187,36 @@ test('apsd is stopped only after the accepted level change fails to quiet diagno
     shouldEscalateEmitter({ levelApplied: true, escalated: true }, late, busy),
     false
   )
+})
+
+test('quiet services are stopped by exact listed label, only when owned by the simulator manager', () => {
+  const quietPs =
+    ps +
+    '\n110 100 1 /s/chronod\n111 100 1 /s/healthappd\n112 100 1 /s/tccd\n300 1 1 /host/chronod'
+  const quietJobs = simulatorJobs(
+    jobsText +
+      '\n110 0 com.apple.chronod\n111 0 com.apple.healthappd\n112 0 com.apple.tccd\n300 0 host.chronod'
+  )
+  const calls = []
+  const execute = (operation, binary, args, options) => {
+    calls.push({ operation, binary, args, options })
+    return { exitCode: operation === 'bootout-quiet-healthappd' ? 1 : 0 }
+  }
+  const stopped = bootoutQuietServices('owned-uuid', quietPs, quietJobs, 100, execute)
+  assert.deepEqual(stopped, ['chronod'])
+  assert.deepEqual(
+    calls.map((c) => c.operation),
+    ['bootout-quiet-chronod', 'bootout-quiet-healthappd']
+  )
+  assert.deepEqual(calls[0].args, [
+    'simctl',
+    'spawn',
+    'owned-uuid',
+    'launchctl',
+    'bootout',
+    'system/com.apple.chronod',
+  ])
+  assert.equal(calls[0].options.fatal, false)
+  for (const protectedName of ['SpringBoard', 'tccd', 'backboardd', 'launchd_sim'])
+    assert.equal(QUIET_SERVICES.includes(protectedName), false, protectedName)
 })

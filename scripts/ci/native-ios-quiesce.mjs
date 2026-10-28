@@ -311,6 +311,45 @@ export function bootoutOwnedEmitter(device, manager, emitter, execute) {
 }
 
 /**
+ * Simulator jobs the share-card flows never use: widgets (chronod hosts every widget extension),
+ * Health, Siri and suggestion daemons, experiments and search indexing. In CI runs 21 and 22 the
+ * simulator held about 1.5 GB of them next to a 7 GB host that had already swapped 1.1 GB.
+ * SpringBoard, tccd and the permission alert path are not listed.
+ */
+export const QUIET_SERVICES = Object.freeze([
+  'chronod',
+  'healthappd',
+  'healthd',
+  'triald',
+  'suggestd',
+  'siriknowledged',
+  'assistant_cdmd',
+  'assistantd',
+  'parsecd',
+  'searchd',
+  'siriactionsd',
+  'amsengagementd',
+])
+
+/** Stop each running owned job from the list; every attempt is recorded and nonfatal. */
+export function bootoutQuietServices(device, ps, jobs, manager, execute) {
+  const stopped = []
+  for (const name of QUIET_SERVICES) {
+    const service = ownedService(ps, jobs, manager, name)
+    if (!service) continue
+    // The system form is the one the simulator accepts (apsd, run 9).
+    const result = execute(
+      `bootout-quiet-${name}`,
+      'xcrun',
+      ['simctl', 'spawn', device, 'launchctl', 'bootout', `system/${service.label}`],
+      { fatal: false }
+    )
+    if (result.exitCode === 0) stopped.push(name)
+  }
+  return stopped
+}
+
+/**
  * `tuning` receives the owned emitter and whether a scoped log level change was accepted;
  * the system-wide level change is rejected by the simulator (exit 64).
  */
@@ -361,6 +400,7 @@ export function probeSimulatorTuning(device, execute, tuning = {}) {
       { fatal: false }
     )
   } else console.log(JSON.stringify({ extractionBootout: 'no_matching_owned_label' }))
+  tuning.quietStopped = bootoutQuietServices(device, ps.stdout, jobs, manager, execute)
   return manager
 }
 

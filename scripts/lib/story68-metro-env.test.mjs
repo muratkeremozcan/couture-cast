@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { metroServerEnv } from './story68-metro-env.mjs'
+import { metroServerArgs, metroServerEnv } from './story68-metro-env.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 
@@ -44,4 +44,17 @@ test('the harness passes the platform to the helper and every workflow start nam
   assert.ok(starts.length > 0)
   for (const start of starts)
     assert.match(start, /--platform \$\{\{ matrix\.platform \}\}/)
+})
+
+test('only the iOS Metro runs a single transform worker, and the installed Expo CLI offers the flag', () => {
+  assert.deepEqual(metroServerArgs('ios'), ['--max-workers', '1'])
+  for (const platform of ['android', undefined, 'web'])
+    assert.deepEqual(metroServerArgs(platform), [], String(platform))
+  const cli = fs.readFileSync(
+    `${root}node_modules/@expo/cli/build/src/start/index.js`,
+    'utf8'
+  )
+  assert.match(cli, /--max-workers/)
+  const harness = fs.readFileSync(`${root}scripts/run-story68-native.mjs`, 'utf8')
+  assert.match(harness, /\.\.\.metroServerArgs\(platform\)/)
 })

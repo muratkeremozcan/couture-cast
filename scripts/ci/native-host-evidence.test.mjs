@@ -15,6 +15,7 @@ import {
   projectSample,
   residentProcesses,
   projectMemory,
+  projectVm,
 } from './native-host-evidence.mjs'
 
 const script = fileURLToPath(new URL('./native-host-evidence.mjs', import.meta.url))
@@ -79,6 +80,7 @@ test('a host sample is a closed projection of load, memory and processes', () =>
     ],
     swapUsedMB: null,
     memoryPressureFreePercent: null,
+    vm: null,
   })
   assert.doesNotThrow(() => assertNativeHostEvidence(record({ samples: [sample] })))
   assert.throws(
@@ -282,6 +284,28 @@ test('RSS reports the top 15 executable basenames, sorted by resident KiB', () =
   assert.equal(rows.at(-1).rssKB, 106)
 })
 
+test('vm_stat paging counters are cumulative integers and any missing counter makes the probe unsupported', () => {
+  const text = [
+    'Mach Virtual Memory Statistics: (page size of 16384 bytes)',
+    'Pages compressed:                       1000.',
+    'Pages decompressed:                      400.',
+    'Pageins:                                  25.',
+    'Pageouts:                                  0.',
+    'Swapins:                                   7.',
+    'Swapouts:                                 11.',
+  ].join('\n')
+  assert.deepEqual(projectVm(text), {
+    pageins: 25,
+    pageouts: 0,
+    swapins: 7,
+    swapouts: 11,
+    compressions: 1000,
+    decompressions: 400,
+  })
+  assert.equal(projectVm(text.replace(/^Swapins.*$/m, '')), null)
+  assert.equal(projectVm(''), null)
+})
+
 test('swap and pressure probes preserve zero and mark unsupported output', () => {
   assert.deepEqual(
     projectMemory(
@@ -310,6 +334,11 @@ test('swap and pressure probes preserve zero and mark unsupported output', () =>
   for (const bad of [
     { ...sample, swapUsedMB: -1 },
     { ...sample, memoryPressureFreePercent: 101 },
+    { ...sample, vm: { pageins: -1 } },
+    {
+      ...sample,
+      vm: { pageins: 1, pageouts: 1, swapins: 1, swapouts: 1, compressions: 1 },
+    },
     { ...sample, resident: [{ command: 'ok', rssKB: -1, cpuPercent: 0 }] },
     {
       ...sample,

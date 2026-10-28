@@ -79,6 +79,28 @@ export function projectMemory(swap, pressure) {
   }
 }
 
+const VM_COUNTERS = {
+  pageins: /^Pageins:\s+(\d+)\./m,
+  pageouts: /^Pageouts:\s+(\d+)\./m,
+  swapins: /^Swapins:\s+(\d+)\./m,
+  swapouts: /^Swapouts:\s+(\d+)\./m,
+  compressions: /^Pages compressed:\s+(\d+)\./m,
+  decompressions: /^Pages decompressed:\s+(\d+)\./m,
+}
+
+/**
+ * Cumulative paging counters from vm_stat. The difference between two samples is the paging
+ * the host did in between, which separates a paging stall from CPU starvation. Null when the
+ * probe is unsupported or any counter is missing.
+ */
+export function projectVm(text) {
+  const entries = Object.entries(VM_COUNTERS).map(([key, pattern]) => {
+    const match = text.match(pattern)
+    return [key, match ? Number(match[1]) : null]
+  })
+  return entries.every(([, value]) => value !== null) ? Object.fromEntries(entries) : null
+}
+
 const round = (/** @type {number} */ value) => Math.round(value * 100) / 100
 
 /**
@@ -92,6 +114,7 @@ const round = (/** @type {number} */ value) => Math.round(value * 100) / 100
  *   ps: string
  *   swap?: string
  *   pressure?: string
+ *   vm?: string
  * }} input
  */
 export function projectSample(input) {
@@ -109,6 +132,7 @@ export function projectSample(input) {
     busiest: busiestProcesses(input.ps),
     resident: residentProcesses(input.ps),
     ...projectMemory(input.swap ?? '', input.pressure ?? ''),
+    vm: projectVm(input.vm ?? ''),
   }
 }
 
@@ -237,6 +261,7 @@ const SAMPLE_KEYS = [
   'resident',
   'swapUsedMB',
   'memoryPressureFreePercent',
+  'vm',
 ]
 const FLOW_SECONDS = ['totalSeconds', 'jvmSeconds', 'driverSeconds', 'flowSeconds']
 const nonNegative = (value) => Number.isFinite(value) && value >= 0
@@ -253,6 +278,11 @@ const validProcess = (row) =>
   count(row.ppid) &&
   count(row.rssKB) &&
   nonNegative(row.cpuPercent)
+
+const validVm = (value) =>
+  value === null ||
+  (exactKeys(value, Object.keys(VM_COUNTERS)) &&
+    Object.values(value).every((counter) => count(counter)))
 
 const validPressure = (value) => value === null || (count(value) && value <= 100)
 
@@ -272,7 +302,8 @@ const validSample = (sample) =>
   sample.resident.length <= TOP_RSS_PROCESSES &&
   sample.resident.every(validProcess) &&
   seconds(sample.swapUsedMB) &&
-  validPressure(sample.memoryPressureFreePercent)
+  validPressure(sample.memoryPressureFreePercent) &&
+  validVm(sample.vm)
 
 const WALL_KEYS = [
   'timeoutMs',
@@ -350,6 +381,45 @@ export function firstMaestroTiming(directory, platform) {
   return null
 }
 
+/** The closed private record of one unusable host probe. */
+const probeFailure = (label, binary, args, r) => ({
+  label,
+  binary,
+  args,
+  exitCode: r.status ?? null,
+  signal: r.signal ?? null,
+  errorCode: r.error?.code ?? null,
+  errorName: r.error?.name ?? null,
+  errorMessage: r.error?.message ?? null,
+  stderr: r.stderr ?? '',
+  stdout: r.stdout ?? '',
+  reason: r.error?.message ?? 'host_probe_output_unavailable',
+})
+
+/** Print a failed host probe and keep it in the private diagnostics file; never throws. */
+function recordProbeFailure(directory, failure) {
+  console.log(JSON.stringify({ hostSnapshotFailure: failure }))
+  try {
+    const diagnosticFile = path.join(directory, 'native-host-snapshot-private.json')
+    const failures = fs.existsSync(diagnosticFile)
+      ? JSON.parse(fs.readFileSync(diagnosticFile, 'utf8'))
+      : []
+    failures.push(failure)
+    fs.writeFileSync(diagnosticFile, JSON.stringify(failures, null, 2) + '\n', {
+      mode: 0o600,
+    })
+  } catch (error) {
+    console.log(
+      JSON.stringify({
+        hostDiagnosticWriteFailure: {
+          errorCode: error.code ?? null,
+          errorMessage: error.message,
+        },
+      })
+    )
+  }
+}
+
 function main() {
   const args = process.argv.slice(2)
   const at = args.indexOf('--platform')
@@ -380,39 +450,8 @@ function main() {
       }
       const usable = r.status === 0 && !r.error && valid(r.stdout ?? '')
       if (!usable) {
-        const failure = {
-          label: argument,
-          binary,
-          args,
-          exitCode: r.status ?? null,
-          signal: r.signal ?? null,
-          errorCode: r.error?.code ?? null,
-          errorName: r.error?.name ?? null,
-          errorMessage: r.error?.message ?? null,
-          stderr: r.stderr ?? '',
-          stdout: r.stdout ?? '',
-          reason: r.error?.message ?? 'host_probe_output_unavailable',
-        }
-        console.log(JSON.stringify({ hostSnapshotFailure: failure }))
-        try {
-          const diagnosticFile = path.join(directory, 'native-host-snapshot-private.json')
-          const failures = fs.existsSync(diagnosticFile)
-            ? JSON.parse(fs.readFileSync(diagnosticFile, 'utf8'))
-            : []
-          failures.push(failure)
-          fs.writeFileSync(diagnosticFile, JSON.stringify(failures, null, 2) + '\n', {
-            mode: 0o600,
-          })
-        } catch (error) {
-          console.log(
-            JSON.stringify({
-              hostDiagnosticWriteFailure: {
-                errorCode: error.code ?? null,
-                errorMessage: error.message,
-              },
-            })
-          )
-        }
+        const failure = probeFailure(argument, binary, args, r)
+        recordProbeFailure(directory, failure)
       }
       return usable ? (r.stdout ?? '') : ''
     }
@@ -430,6 +469,7 @@ function main() {
       freemem: os.freemem(),
       swap: probe('sysctl', ['vm.swapusage']),
       pressure: probe('memory_pressure', ['-Q']),
+      vm: probe('vm_stat', []),
       ps,
     })
     record.samples.push(recorded)

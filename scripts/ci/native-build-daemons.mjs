@@ -5,7 +5,8 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
-const SERVICES = new Set(['XCBBuildService', 'SWBBuildService'])
+// ibtoold (Interface Builder) outlives the build and stays resident at about 100 MB per instance.
+const SERVICES = new Set(['XCBBuildService', 'SWBBuildService', 'ibtoold'])
 
 export function buildServices(text) {
   return text.split('\n').flatMap((line) => {

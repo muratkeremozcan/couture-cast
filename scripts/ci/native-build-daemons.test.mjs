@@ -15,6 +15,12 @@ test('cleanup accepts exact build-service names and parses their start identity'
     rows.map((row) => row.pid),
     [42, 43]
   )
+  assert.deepEqual(
+    buildServices('46 Wed Oct 28 10:00:00 2026 /Applications/Xcode.app/ibtoold').map(
+      (row) => row.pid
+    ),
+    [46]
+  )
   assert.equal(rows[0].startedAt, Date.parse('Wed Oct 28 10:00:00 2026'))
 })
 
