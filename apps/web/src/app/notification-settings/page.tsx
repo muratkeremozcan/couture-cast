@@ -13,16 +13,29 @@ import type { CommunityNotificationSettings } from '@couture/api-client/contract
 import { getI18n } from '../../i18n'
 import { communitySyncFromWeb } from '../../lib/community'
 import {
+  hasStoredWebSession,
   webSessionIdentity,
   resolveWebSessionToken,
   signOutWebSession,
 } from '../../lib/web-session'
+// Holds the settings form's place while it loads, so the links below never move.
+const LOADING_SETTINGS: CommunityNotificationSettings = {
+  enabled: false,
+  pushEnabled: false,
+  quietHoursEnabled: false,
+  quietHoursStart: '',
+  quietHoursEnd: '',
+  timezone: '',
+  timezoneConfigured: false,
+  revision: '',
+}
 export default function NotificationSettingsPage() {
   const { t } = useTranslation('translation', { i18n: getI18n() })
   const [settings, setSettings] = useState<CommunityNotificationSettings | null>(null)
   const [draft, setDraft] = useState<CommunityNotificationSettings | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(false)
   const suggestedTimezone = useRef<string | undefined>(undefined)
   const generation = useRef(0)
   const clientRef = useRef<ReturnType<typeof communitySyncFromWeb> | null>(null)
@@ -32,23 +45,38 @@ export default function NotificationSettingsPage() {
     const update = () => {
       const next = webSessionIdentity()
       if (next === owner) return
+      const initial = owner === undefined
       owner = next
       const request = ++generation.current
+      const current = () => active && request === generation.current
       clientRef.current = null
       setSettings(null)
       setDraft(null)
       setMessage(null)
       setBusy(false)
-      if (!next) return
+      if (!next) {
+        // On first render a stored session may still be under verification. Keep the
+        // form's place until it names a member (a new update) or settles without one.
+        const pending = initial && hasStoredWebSession()
+        setLoading(pending)
+        if (pending)
+          void resolveWebSessionToken().then(
+            (token) => {
+              if (!token && current()) setLoading(false)
+            },
+            () => {
+              if (current()) setLoading(false)
+            }
+          )
+        return
+      }
+      setLoading(true)
       void (async () => {
         const token = await resolveWebSessionToken()
-        if (
-          !active ||
-          request !== generation.current ||
-          webSessionIdentity() !== next ||
-          !token
-        )
+        if (!current() || webSessionIdentity() !== next || !token) {
+          if (current()) setLoading(false)
           return
+        }
         const client = communitySyncFromWeb(async () => {
           const fresh = await resolveWebSessionToken()
           if (!fresh || webSessionIdentity() !== next)
@@ -57,8 +85,7 @@ export default function NotificationSettingsPage() {
         })
         clientRef.current = client
         const value = await client.preferences()
-        if (!active || request !== generation.current || webSessionIdentity() !== next)
-          return
+        if (!current() || webSessionIdentity() !== next) return
         setSettings(value)
         const draft = communityDeviceTimezoneDraft(
           value,
@@ -66,9 +93,11 @@ export default function NotificationSettingsPage() {
         )
         suggestedTimezone.current = value.timezoneConfigured ? undefined : draft.timezone
         setDraft(draft)
+        setLoading(false)
       })().catch(() => {
-        if (active && request === generation.current)
-          setMessage('community.notifications.failed')
+        if (!current()) return
+        setLoading(false)
+        setMessage('community.notifications.failed')
       })
     }
     update()
@@ -135,12 +164,19 @@ export default function NotificationSettingsPage() {
       if (current()) setBusy(false)
     }
   }
+  const ready = Boolean(draft && settings)
+  const form = ready ? draft : loading ? LOADING_SETTINGS : null
+  const edit = (change: Partial<CommunityNotificationSettings>) =>
+    setDraft((previous) => (previous ? { ...previous, ...change } : previous))
   return (
     <main id="main-content" className="mx-auto flex max-w-lg flex-col gap-5 p-6">
       <h1 className="text-3xl font-semibold">{t('community.notifications.title')}</h1>
-      {draft && settings && (
+      {form && (
         <form
-          className="flex flex-col gap-4"
+          className={`flex flex-col gap-4${ready ? '' : ' invisible'}`}
+          inert={!ready}
+          aria-hidden={ready ? undefined : true}
+          data-testid={ready ? undefined : 'notification-settings-loading'}
           onSubmit={(event) => {
             event.preventDefault()
             void save()
@@ -149,18 +185,16 @@ export default function NotificationSettingsPage() {
           <label className="flex min-h-12 items-center gap-3">
             <input
               type="checkbox"
-              checked={draft.enabled}
-              onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })}
+              checked={form.enabled}
+              onChange={(event) => edit({ enabled: event.target.checked })}
             />
             {t('community.notifications.enabled')}
           </label>
           <label className="flex min-h-12 items-center gap-3">
             <input
               type="checkbox"
-              checked={draft.quietHoursEnabled}
-              onChange={(event) =>
-                setDraft({ ...draft, quietHoursEnabled: event.target.checked })
-              }
+              checked={form.quietHoursEnabled}
+              onChange={(event) => edit({ quietHoursEnabled: event.target.checked })}
             />
             {t('community.notifications.quiet')}
           </label>
@@ -169,10 +203,8 @@ export default function NotificationSettingsPage() {
             <input
               type="time"
               required
-              value={draft.quietHoursStart}
-              onChange={(event) =>
-                setDraft({ ...draft, quietHoursStart: event.target.value })
-              }
+              value={form.quietHoursStart}
+              onChange={(event) => edit({ quietHoursStart: event.target.value })}
               className="min-h-12 rounded border p-3"
             />
           </label>
@@ -181,10 +213,8 @@ export default function NotificationSettingsPage() {
             <input
               type="time"
               required
-              value={draft.quietHoursEnd}
-              onChange={(event) =>
-                setDraft({ ...draft, quietHoursEnd: event.target.value })
-              }
+              value={form.quietHoursEnd}
+              onChange={(event) => edit({ quietHoursEnd: event.target.value })}
               className="min-h-12 rounded border p-3"
             />
           </label>
@@ -192,10 +222,10 @@ export default function NotificationSettingsPage() {
             {t('community.notifications.timezone')}
             <input
               required
-              value={draft.timezone}
+              value={form.timezone}
               onChange={(event) => {
                 suggestedTimezone.current = undefined
-                setDraft({ ...draft, timezone: event.target.value })
+                edit({ timezone: event.target.value })
               }}
               className="min-h-12 rounded border p-3"
             />
