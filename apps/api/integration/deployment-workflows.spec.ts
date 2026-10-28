@@ -72,7 +72,7 @@ function jobSteps(workflow: string): Map<string, string[]> {
     const header = /^ {4}steps:(?: ([&*])([A-Za-z0-9_-]+))?\s*$/m.exec(block)
     if (!header) continue
     if (header[1] === '*') {
-      aliases.push([name, header[2]])
+      aliases.push([name, header[2] as string])
       continue
     }
     const steps = block
@@ -80,7 +80,7 @@ function jobSteps(workflow: string): Map<string, string[]> {
       .split(/^ {6}- /m)
       .slice(1)
     jobs.set(name, steps)
-    if (header[1] === '&') anchored.set(header[2], steps)
+    if (header[1] === '&') anchored.set(header[2] as string, steps)
   }
   for (const [name, anchor] of aliases) {
     const steps = anchored.get(anchor)
@@ -133,7 +133,7 @@ describe('deployment workflows', () => {
 
   it('the wait step names the HTML page it received and the elapsed time per attempt', () => {
     const wait = fs.readFileSync(vercelWaitWorkflow, 'utf8')
-    const script = /run: \|\n((?: {10}.*\n|\n)+)/.exec(wait)?.[1].replace(/^ {10}/gm, '')
+    const script = /run: \|\n((?: {10}.*\n|\n)+)/.exec(wait)?.[1]?.replace(/^ {10}/gm, '')
     expect(script).toBeDefined()
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-wait-'))
     try {
