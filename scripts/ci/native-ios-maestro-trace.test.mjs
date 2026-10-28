@@ -5,6 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import {
   maestroFlowProgress,
+  shareCardApiRows,
   recordIosCommandTimings,
   recordIosFlowProgress,
   slowMaestroCommands,
@@ -160,4 +161,80 @@ test('a failing progress record or report never throws into the flow failure pat
       report: () => undefined,
     })
   )
+})
+
+test('share-card API rows keep only path, method, status and duration of share-card requests', () => {
+  const log = [
+    JSON.stringify({
+      path: '/api/v1/share-cards/prepare',
+      method: 'POST',
+      statusCode: 200,
+      durationMs: 812,
+      userId: 'u-secret',
+    }),
+    JSON.stringify({
+      path: '/api/v1/community/feed',
+      method: 'GET',
+      statusCode: 200,
+      durationMs: 5,
+    }),
+    JSON.stringify({
+      path: '/api/v1/share-cards/prepare?x=Maria',
+      method: 'POST',
+      statusCode: 429,
+      durationMs: 3,
+      body: 'Private',
+    }),
+    'not json',
+    JSON.stringify({
+      path: '/api/v1/share-cards/prepare',
+      method: 'TRACE',
+      statusCode: 'x',
+      durationMs: 1.5,
+    }),
+  ].join('\n')
+  const rows = shareCardApiRows(log)
+  assert.deepEqual(rows, [
+    { path: '/api/v1/share-cards/prepare', method: 'POST', status: 200, ms: 812 },
+    { path: '/api/v1/share-cards/prepare_x_Maria', method: 'POST', status: 429, ms: 3 },
+    { path: '/api/v1/share-cards/prepare', method: 'OTHER', status: null, ms: null },
+  ])
+  assert.doesNotMatch(JSON.stringify(rows), /secret|Private|userId/)
+  assert.equal(shareCardApiRows(undefined).length, 0)
+  assert.equal(shareCardApiRows(log, 1).length, 1)
+})
+
+test('a failed flow record carries the recent share-card API rows from the API log tail', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-progress-api-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const apiLogFile = path.join(directory, 'api.log')
+  fs.writeFileSync(
+    apiLogFile,
+    JSON.stringify({
+      path: '/api/v1/share-cards/prepare',
+      method: 'POST',
+      statusCode: 503,
+      durationMs: 20100,
+    }) + '\n'
+  )
+  const entry = recordIosFlowProgress({
+    platform: 'ios',
+    flow: 'maestro/story68/open-outfit.yaml',
+    maestroLog: killedLog,
+    directory,
+    apiLogFile,
+    report: () => undefined,
+  })
+  assert.deepEqual(entry.shareCardApi, [
+    { path: '/api/v1/share-cards/prepare', method: 'POST', status: 503, ms: 20100 },
+  ])
+  const missing = recordIosFlowProgress({
+    platform: 'ios',
+    flow: 'f',
+    maestroLog: killedLog,
+    directory,
+    apiLogFile: path.join(directory, 'absent.log'),
+    report: () => undefined,
+  })
+  assert.deepEqual(missing.shareCardApi, [])
 })

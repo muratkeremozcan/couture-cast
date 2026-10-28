@@ -319,7 +319,13 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
     result.status !== 0 &&
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })
   if (result.status !== 0 && !recoverSnapshot) {
-    recordIosFlowProgress({ platform, flow, maestroLog: snapshotLog, directory })
+    recordIosFlowProgress({
+      platform,
+      flow,
+      maestroLog: snapshotLog,
+      directory,
+      apiLogFile: path.join(directory, 'api.log'),
+    })
     privateJson(
       `native-flow-failure-${platform}.json`,
       summarizeNativeFlowFailure({

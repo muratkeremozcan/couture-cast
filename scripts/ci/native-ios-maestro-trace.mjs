@@ -115,18 +115,69 @@ export function maestroFlowProgress(log) {
   }
 }
 
+/**
+ * Share-card API requests from the owned API's JSON request log: path, method, status and
+ * duration only (never user ids or bodies). The last [limit] rows are kept, newest last.
+ */
+export function shareCardApiRows(apiLog, limit = 20) {
+  const rows = []
+  for (const line of String(apiLog ?? '').split('\n')) {
+    let row
+    try {
+      row = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (typeof row?.path !== 'string' || !row.path.startsWith('/api/v1/share-cards/'))
+      continue
+    const method = ['GET', 'POST', 'PUT', 'DELETE'].includes(row.method)
+      ? row.method
+      : 'OTHER'
+    rows.push({
+      path: row.path.replace(/[^A-Za-z0-9/_-]/g, '_').slice(0, 80),
+      method,
+      status: Number.isSafeInteger(row.statusCode) ? row.statusCode : null,
+      ms: Number.isSafeInteger(row.durationMs) ? row.durationMs : null,
+    })
+  }
+  return rows.slice(-limit)
+}
+
+/** The last 256 KiB of a log file, or '' when it cannot be read. */
+function logTail(file) {
+  try {
+    const size = fs.statSync(file).size
+    const length = Math.min(size, 256 * 1024)
+    const fd = fs.openSync(file, 'r')
+    try {
+      const buffer = Buffer.alloc(length)
+      fs.readSync(fd, buffer, 0, length, size - length)
+      return buffer.toString('utf8')
+    } finally {
+      fs.closeSync(fd)
+    }
+  } catch {
+    return ''
+  }
+}
+
 /** Append a failed flow's progress to the run's receipt (nonfatal, iOS only). */
 export function recordIosFlowProgress({
   platform,
   flow,
   maestroLog,
   directory,
+  apiLogFile = null,
   report = console.log,
 }) {
   if (platform !== 'ios') return null
   // Diagnostics never replace the original Maestro failure, so nothing here may throw.
   try {
-    const entry = { flow, ...maestroFlowProgress(maestroLog) }
+    const entry = {
+      flow,
+      ...maestroFlowProgress(maestroLog),
+      shareCardApi: apiLogFile ? shareCardApiRows(logTail(apiLogFile)) : [],
+    }
     const file = path.join(directory, 'native-ios-flow-progress.json')
     try {
       const record = fs.existsSync(file)
