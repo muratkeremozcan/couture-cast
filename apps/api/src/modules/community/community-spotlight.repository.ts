@@ -18,6 +18,7 @@ import {
   SPOTLIGHT_SNAPSHOT_CAP,
   SPOTLIGHT_WINDOW_DAYS,
 } from './community-spotlight-ranking.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 export interface SpotlightRankedRow {
   id: string
@@ -99,7 +100,8 @@ export class CommunitySpotlightRepository {
     userId: string,
     now: Date
   ): Promise<{ reads: number; windowStart: Date }> {
-    return this.prisma.$transaction(
+    return interactiveTransaction(
+      this.prisma,
       async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtext('community_member:' || ${userId}))`
         await assertCommunitySubjectAvailable(tx, userId)
@@ -204,7 +206,7 @@ export class CommunitySpotlightRepository {
 
   /** Runs reads that must share one MVCC snapshot. */
   repeatableRead<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-    return this.prisma.$transaction(work, {
+    return interactiveTransaction(this.prisma, work, {
       isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
     })
   }

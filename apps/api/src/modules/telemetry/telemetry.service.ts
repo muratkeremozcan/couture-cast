@@ -94,6 +94,7 @@ import { z } from 'zod'
 import { ANALYTICS_CLIENT, type AnalyticsClient } from '../../analytics/analytics.service'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import { createBaseLogger } from '../../logger/pino.config'
+import { singleRunTransaction } from '../../prisma/prisma-client.js'
 
 export interface TelemetryPropertiesMap {
   profile_completed: {
@@ -1339,7 +1340,8 @@ export class TelemetryService {
         return
       }
 
-      await this.prisma.$transaction(async (tx) => {
+      // captureEvent writes and sends outside this transaction, so it runs once.
+      await singleRunTransaction(this.prisma, async (tx) => {
         // Acquire an advisory lock for this user's first outfit check (Postgres only)
         try {
           await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${lockId})`)

@@ -45,6 +45,7 @@ import {
   verifyAndNormalizeCommunityImage,
   type CommunityMimeType,
 } from './community-image-validation.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 /**
  * Hard ceilings on the two external calls a screening job makes. Without them a hung
@@ -340,7 +341,7 @@ export class CommunityModerationProcessor {
 
     if (normalized.sha256 !== declared.sha256) {
       await this.storage.upload(objectPath, normalized.bytes, normalized.mimeType)
-      const updated = await this.prisma.$transaction(async (tx) => {
+      const updated = await interactiveTransaction(this.prisma, async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
         await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
         return tx.lookbookPost.updateMany({
@@ -384,7 +385,7 @@ export class CommunityModerationProcessor {
     if (!canary && !(await this.flags?.getFeatureFlag('community_write_enabled', userId)))
       throw new ServiceUnavailableException('Community publication is unavailable.')
     const publishedAt = new Date()
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
       if (!canary) {
@@ -499,7 +500,7 @@ export class CommunityModerationProcessor {
     const reason = screeningResult.reasons.join(', ') || FLAGGED_BY_SCREENING_REASON
     const flaggedAt = new Date()
 
-    await this.prisma.$transaction(async (tx) => {
+    await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
       const updateResult = await tx.lookbookPost.updateMany({
@@ -581,7 +582,7 @@ export class CommunityModerationProcessor {
     const failedAt = new Date()
     const source = await this.prisma.lookbookPost.findUnique({ where: { id: postId } })
     if (!source) return
-    await this.prisma.$transaction(async (tx) => {
+    await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${source.user_id}))`
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
       const updateResult = await tx.lookbookPost.updateMany({

@@ -1,6 +1,6 @@
 // Step 5 support owner: searchable owner anchor
 import { Injectable } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import { createPrismaClient } from '../prisma/prisma-client.js'
 import { Queue } from 'bullmq'
 import { redisOptionsFromConfig, getRedisConfig } from '../config/redis'
 import { defaultJobOptions } from '../workers/base.worker'
@@ -14,7 +14,7 @@ import { defaultJobOptions } from '../workers/base.worker'
  * Flow refs:
  * - S0.4/T3: operators inspect, prune, and replay the durable DLQ records created by worker failures.
  */
-const prisma = new PrismaClient()
+const prisma = createPrismaClient()
 
 @Injectable()
 export class AdminService {

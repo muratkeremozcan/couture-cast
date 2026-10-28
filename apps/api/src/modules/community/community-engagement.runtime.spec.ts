@@ -78,6 +78,8 @@ function databaseBoundary(capability: 'ready' | 'old-server' | 'bad-timeout' = '
     $transaction: vi.fn(async (work: (tx: unknown) => Promise<unknown>) => work(db)),
     $disconnect: vi.fn(() => Promise.resolve()),
   }
+  // createPrismaClient extends the constructed pool; the stand-in is its own extension.
+  Object.assign(db, { $extends: () => db })
   return { db, prisma: db as unknown as PrismaClient, queries }
 }
 

@@ -47,6 +47,7 @@ import {
   requireUploadTokenSecret,
   verifyUploadToken,
 } from './wardrobe-upload-token'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 const READ_URL_EXPIRY_SECONDS = 900
@@ -683,7 +684,8 @@ export class WardrobeService {
   ): Promise<TagConfirmationResult> {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
-        return await this.prisma.$transaction(
+        return await interactiveTransaction(
+          this.prisma,
           (tx) => this.confirmTagsInTransaction(tx, userId, garmentId, input),
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
         )
@@ -857,7 +859,8 @@ export class WardrobeService {
       attempt += 1
     ) {
       try {
-        return await this.prisma.$transaction(
+        return await interactiveTransaction(
+          this.prisma,
           async (tx) => {
             const keyOwner = await tx.garmentItem.findUnique({
               where: {

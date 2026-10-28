@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 export type SavedLocationRecord = Prisma.SavedLocationGetPayload<Record<string, never>>
 
@@ -99,7 +100,7 @@ export class PrismaLocationPreferencesRepository
     options: CreateSavedLocationOptions = {}
   ): Promise<SavedLocationRecord> {
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await interactiveTransaction(this.prisma, async (transaction) => {
         await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`
 
         const duplicate = await transaction.savedLocation.findUnique({
@@ -157,7 +158,7 @@ export class PrismaLocationPreferencesRepository
   }
 
   async delete(userId: string, locationId: string): Promise<SavedLocationRecord | null> {
-    return this.prisma.$transaction(async (transaction) => {
+    return interactiveTransaction(this.prisma, async (transaction) => {
       await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`
 
       const existing = await transaction.savedLocation.findFirst({
@@ -243,7 +244,7 @@ export class PrismaLocationPreferencesRepository
   }
 
   setPrimary(userId: string, locationId: string): Promise<SavedLocationRecord | null> {
-    return this.prisma.$transaction(async (transaction) => {
+    return interactiveTransaction(this.prisma, async (transaction) => {
       const existing = await transaction.savedLocation.findFirst({
         where: { id: locationId, user_id: userId },
       })

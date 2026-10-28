@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { parseArgs, parseEnv } from 'node:util'
-import { PrismaClient } from '@prisma/client'
+import type { PrismaClient } from '@prisma/client'
+import { createPrismaClient } from '../../prisma/prisma-client.js'
 import {
   CommunitySponsorshipOperatorService,
   CommunitySponsorshipRefusal,
@@ -96,7 +97,7 @@ const defaultDeps: CommunitySponsorshipCliDeps = {
   stderr: (line) => process.stderr.write(`${line}\n`),
   readEnvFile: (path) => readFileSync(path, 'utf8'),
   createPrisma: (databaseUrl) =>
-    new PrismaClient({ datasources: { db: { url: databaseUrl } } }),
+    createPrismaClient({ datasources: { db: { url: databaseUrl } } }),
 }
 
 class UsageError extends Error {}

@@ -30,6 +30,9 @@ vi.mock('@prisma/client', async (importOriginal) => {
       return {
         $transaction: () => Promise.reject(new Error('no database in a unit test')),
         $disconnect: () => Promise.resolve(),
+        $extends() {
+          return this
+        },
       }
     }),
   }

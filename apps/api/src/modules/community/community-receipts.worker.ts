@@ -3,6 +3,7 @@ import { z } from 'zod'
 // Story 6.5 owner: receipt uncertainty never authorizes a resend; pruning is generation-scoped.
 import type { PrismaClient } from '@prisma/client'
 import { type PushTokenRepository } from '../notifications/push-token.repository.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 const receiptBodySchema = z.object({
   data: z.record(
     z.object({
@@ -145,7 +146,7 @@ export class CommunityReceiptsWorker {
     }
   }
   private async settle(attempt: string, status: string) {
-    await this.prisma.$transaction(async (tx) => {
+    await interactiveTransaction(this.prisma, async (tx) => {
       const settled = await tx.communityDeliveryReceipt.updateMany({
         where: {
           attempt_id: attempt,

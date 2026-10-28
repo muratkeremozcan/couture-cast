@@ -6,6 +6,7 @@ import type {
   WeatherAlertEvaluationRule,
   WeatherAlertRuleType,
 } from './weather-alert-evaluator.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 export interface WeatherAlertRuleRecord extends WeatherAlertEvaluationRule {
   id: string
@@ -93,7 +94,7 @@ export class PrismaWeatherAlertProcessingRepository
       return []
     }
 
-    const inserted = await this.prisma.$transaction(async (transaction) => {
+    const inserted = await interactiveTransaction(this.prisma, async (transaction) => {
       const reservedEvents: WeatherAlertEventCandidate[] = []
       const reservationOrder = [...events].sort(
         (left, right) =>

@@ -1,6 +1,5 @@
 import {
   guardCommunitySubject,
-  isPldbgapi2StackError,
   forgetCommunitySubject,
 } from '../community/community-privacy.js'
 import { assertWardrobeParticipationAllowed } from './guardian-participation.js'
@@ -29,6 +28,7 @@ import {
 } from '../../contracts/http'
 import { calculateAge } from '@couture/utils'
 import { z } from 'zod'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 type InvitationTokenPayload = {
   sub: string
@@ -412,17 +412,6 @@ function isRetryableSerializationFailure(error: unknown) {
   return code === 'P2034' || code === '40001' || code?.includes('40001') === true
 }
 
-/**
- * Revocation and emancipation guard the community subject through
- * community_prepare_subject_privacy, so the plpgsql_check stack error can abort them
- * too. Both run every write on `tx`, so the abort rolls all of it back, and they share
- * the serialization retry budget: MAX_REVOKE_CONSENT_TRANSACTION_RETRIES attempts in
- * all, retried at once.
- */
-function isRetryableConsentTransactionFailure(error: unknown) {
-  return isRetryableSerializationFailure(error) || isPldbgapi2StackError(error)
-}
-
 @Injectable()
 export class GuardianService {
   private readonly logger = createBaseLogger().child({ feature: 'guardian-consent' })
@@ -486,57 +475,60 @@ export class GuardianService {
     const expiresAt = new Date(Date.now() + GUARDIAN_INVITATION_TOKEN_TTL_MS)
     const invitationSecret = resolveInvitationSecret()
     const invitationBaseUrl = resolveInvitationBaseUrl()
-    const { invitation, invitationLink } = await this.prisma.$transaction(async (tx) => {
-      const createdInvitation = await tx.guardianInvitation.create({
-        data: {
-          teen_id: teen.id,
-          guardian_email: normalizedGuardianEmail,
-          consent_level: parsed.consentLevel,
-          expires_at: expiresAt,
-        },
-      })
-      const token = signJwt(
-        {
-          sub: createdInvitation.id,
-          teenId: teen.id,
-          guardianEmail: normalizedGuardianEmail,
-          consentLevel: parsed.consentLevel,
-          type: 'guardian_invitation',
-          iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(expiresAt.getTime() / 1000),
-        },
-        invitationSecret
-      )
-      const nextInvitationLink = `${invitationBaseUrl}/guardian/accept?token=${encodeURIComponent(token)}`
-
-      await tx.eventEnvelope.create({
-        data: {
-          channel: 'email.guardian-invitation',
-          user_id: teen.id,
-          payload: {
-            to: normalizedGuardianEmail,
-            teenId: teen.id,
-            teenEmail: teen.email,
-            invitationId: createdInvitation.id,
-            invitationLink: nextInvitationLink,
-            consentLevel: parsed.consentLevel,
-            expiresAt: expiresAt.toISOString(),
-            template: buildGuardianInvitationEmailTemplate({
-              teenEmail: teen.email,
-              guardianEmail: normalizedGuardianEmail,
-              consentLevel: parsed.consentLevel,
-              invitationLink: nextInvitationLink,
-              expiresAt,
-            }),
+    const { invitation, invitationLink } = await interactiveTransaction(
+      this.prisma,
+      async (tx) => {
+        const createdInvitation = await tx.guardianInvitation.create({
+          data: {
+            teen_id: teen.id,
+            guardian_email: normalizedGuardianEmail,
+            consent_level: parsed.consentLevel,
+            expires_at: expiresAt,
           },
-        },
-      })
+        })
+        const token = signJwt(
+          {
+            sub: createdInvitation.id,
+            teenId: teen.id,
+            guardianEmail: normalizedGuardianEmail,
+            consentLevel: parsed.consentLevel,
+            type: 'guardian_invitation',
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(expiresAt.getTime() / 1000),
+          },
+          invitationSecret
+        )
+        const nextInvitationLink = `${invitationBaseUrl}/guardian/accept?token=${encodeURIComponent(token)}`
 
-      return {
-        invitation: createdInvitation,
-        invitationLink: nextInvitationLink,
+        await tx.eventEnvelope.create({
+          data: {
+            channel: 'email.guardian-invitation',
+            user_id: teen.id,
+            payload: {
+              to: normalizedGuardianEmail,
+              teenId: teen.id,
+              teenEmail: teen.email,
+              invitationId: createdInvitation.id,
+              invitationLink: nextInvitationLink,
+              consentLevel: parsed.consentLevel,
+              expiresAt: expiresAt.toISOString(),
+              template: buildGuardianInvitationEmailTemplate({
+                teenEmail: teen.email,
+                guardianEmail: normalizedGuardianEmail,
+                consentLevel: parsed.consentLevel,
+                invitationLink: nextInvitationLink,
+                expiresAt,
+              }),
+            },
+          },
+        })
+
+        return {
+          invitation: createdInvitation,
+          invitationLink: nextInvitationLink,
+        }
       }
-    })
+    )
 
     return guardianInvitationResponseSchema.parse({
       invitationId: invitation.id,
@@ -555,7 +547,7 @@ export class GuardianService {
     const acceptedAt = new Date()
     const normalizedIpAddress = ipAddress?.trim() || null
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${payload.teenId}))`
       const invitation = await tx.guardianInvitation.findUnique({
         where: { id: payload.sub },
@@ -751,7 +743,8 @@ export class GuardianService {
       attempt += 1
     ) {
       try {
-        result = await this.prisma.$transaction(
+        result = await interactiveTransaction(
+          this.prisma,
           async (tx) => {
             await guardCommunitySubject(tx, teenId)
             await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${teenId}))`
@@ -928,7 +921,7 @@ export class GuardianService {
       } catch (error) {
         if (
           attempt < MAX_REVOKE_CONSENT_TRANSACTION_RETRIES &&
-          isRetryableConsentTransactionFailure(error)
+          isRetryableSerializationFailure(error)
         ) {
           this.logger.warn(
             {
@@ -1050,7 +1043,8 @@ export class GuardianService {
         attempt += 1
       ) {
         try {
-          result = await this.prisma.$transaction(
+          result = await interactiveTransaction(
+            this.prisma,
             async (tx) => {
               await guardCommunitySubject(tx, candidate.id)
               const teen = await tx.user.findUnique({
@@ -1179,7 +1173,7 @@ export class GuardianService {
         } catch (error) {
           if (
             attempt < MAX_REVOKE_CONSENT_TRANSACTION_RETRIES &&
-            isRetryableConsentTransactionFailure(error)
+            isRetryableSerializationFailure(error)
           ) {
             this.logger.warn(
               {

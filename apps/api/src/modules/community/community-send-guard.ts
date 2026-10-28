@@ -22,6 +22,10 @@ import {
   type CommunityPushOutcome,
 } from './community-push-policy.js'
 import { PUBLICLY_VISIBLE_POST_WHERE } from './community.repository.js'
+import {
+  interactiveTransaction,
+  singleRunTransaction,
+} from '../../prisma/prisma-client.js'
 
 type Delivery = Prisma.CommunityTokenDeliveryGetPayload<{
   include: { group: { include: { intents: true } } }
@@ -57,7 +61,7 @@ export class CommunitySendGuard {
     `
     if (!version[0] || version[0].version < 170000 || version[0].privacy_version < 1)
       throw new Error('Community dispatch capability unavailable.')
-    await this.prisma.$transaction(async (tx) => {
+    await interactiveTransaction(this.prisma, async (tx) => {
       await this.configure(tx)
       const [settings] = await tx.$queryRaw<
         { transaction: string; idle: string; statement: string; lock: string }[]
@@ -99,7 +103,7 @@ export class CommunitySendGuard {
   }
 
   private async claim(delivery: Delivery, contexts: Context[], owner: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRawUnsafe("SET LOCAL transaction_timeout = '500ms'")
       await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
       await this.lockPrivacy(tx, delivery, contexts)
@@ -201,7 +205,9 @@ export class CommunitySendGuard {
     const timeout = setTimeout(() => abort.abort(), 2000)
     let invoked = false
     try {
-      await this.prisma.$transaction(
+      // The provider send happens before commit, so a re-run could send twice.
+      await singleRunTransaction(
+        this.prisma,
         async (tx) => {
           await this.configure(tx)
           await this.lock(tx, delivery, attempt, contexts)
@@ -226,7 +232,7 @@ export class CommunitySendGuard {
       )
     } catch {
       abort.abort()
-      await this.prisma.$transaction((tx) =>
+      await interactiveTransaction(this.prisma, (tx) =>
         this.finish(
           tx,
           attempt,

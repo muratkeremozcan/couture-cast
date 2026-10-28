@@ -3,6 +3,7 @@ import { communityBuildIdentity } from './community-operational-telemetry.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient, type LookbookPost } from '@prisma/client'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 type Subject = { member_id: string; generation: number; role: string }
 type Candidate = {
@@ -88,7 +89,8 @@ export class CommunityStreamRepository {
         'Community append deferred'
       )
       try {
-        await this.prisma.$transaction(
+        await interactiveTransaction(
+          this.prisma,
           async (tx) => {
             await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '100ms'")
             await tx.communityEngagementTelemetry.create({
@@ -111,7 +113,8 @@ export class CommunityStreamRepository {
   }
 
   private async appendBatch(): Promise<number> {
-    return this.prisma.$transaction(
+    return interactiveTransaction(
+      this.prisma,
       async (tx) => {
         await tx.$executeRawUnsafe("SET LOCAL transaction_timeout = '500ms'")
         await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '450ms'")
@@ -291,7 +294,7 @@ export class CommunityStreamRepository {
   }
 
   async retain(): Promise<number> {
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       const expired = await tx.communityStreamEvent.findMany({
         where: { appended_at: { lt: new Date(Date.now() - 48 * 60 * 60 * 1000) } },
         orderBy: [{ stream_id: 'asc' }, { sequence: 'asc' }],

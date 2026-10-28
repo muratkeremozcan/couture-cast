@@ -11,6 +11,7 @@ import type { CommunityModerationEngine } from './community-moderation.engine.js
 import { assertCommunityDatabaseAccess } from './community-access.service.js'
 import { PUBLICLY_VISIBLE_POST_WHERE } from './community.repository.js'
 import { commentAnalytics } from './community-comments.repository.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 export class CommunityCommentsProcessor {
   constructor(
@@ -49,7 +50,8 @@ export class CommunityCommentsProcessor {
       await this.defer(commentId, generation)
       return
     }
-    await this.prisma.$transaction(
+    await interactiveTransaction(
+      this.prisma,
       async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${input.user_id}))`
         await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${input.post_id} FOR UPDATE`
@@ -146,7 +148,7 @@ export class CommunityCommentsProcessor {
       await this.defer(commentId, generation)
       return
     }
-    await this.prisma.$transaction(async (tx) => {
+    await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${row.user_id}))`
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${row.post_id} FOR UPDATE`
       const [owned] = await tx.$queryRaw<

@@ -106,11 +106,7 @@ describe('PaletteAdvisorService', () => {
     },
     auditLog: { create: auditLogCreate },
     $executeRaw: executeRaw,
-    $transaction: vi.fn((arg: unknown) =>
-      Array.isArray(arg)
-        ? Promise.all(arg)
-        : (arg as (tx: unknown) => Promise<unknown>)(prisma)
-    ),
+    $transaction: vi.fn((work: (tx: unknown) => Promise<unknown>) => work(prisma)),
   } as unknown as PrismaClient
 
   const hasPremiumAccess = vi.fn().mockResolvedValue(true)

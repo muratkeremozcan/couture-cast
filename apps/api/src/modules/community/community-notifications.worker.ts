@@ -9,6 +9,7 @@ import {
 } from '@prisma/client'
 import { nextAllowedCommunityInstant } from './community-push-policy.js'
 import type { CommunitySendGuard } from './community-send-guard.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 function subjectSignature(links: CommunityArtifactSubject[]) {
   return JSON.stringify(
@@ -80,18 +81,19 @@ export class CommunityNotificationsWorker {
         where: { artifact_kind: 'intent', artifact_id: candidate.id },
       })
       if (!links.length) continue
-      await this.prisma.$transaction(
+      count += await interactiveTransaction(
+        this.prisma,
         async (tx) => {
           await tx.$executeRaw(
             Prisma.sql`SELECT community_privacy_guards(ARRAY[${Prisma.join([...new Set(links.map((l) => l.member_id))])}]::text[],ARRAY[${candidate.post_id}]::text[],false)`
           )
-          if (!(await currentSubjectLinks(tx, 'intent', candidate.id, links))) return
+          if (!(await currentSubjectLinks(tx, 'intent', candidate.id, links))) return 0
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${candidate.recipient_id}))`
           const intent = await tx.communityNotificationIntent.findUnique({
             where: { id: candidate.id },
           })
           if (!intent?.deliverable || intent.group_id || intent.expires_at <= new Date())
-            return
+            return 0
           const pref = await tx.communityNotificationPreference.findUnique({
             where: { user_id: candidate.recipient_id! },
           })
@@ -100,7 +102,7 @@ export class CommunityNotificationsWorker {
               where: { id: candidate.id },
               data: { deliverable: false },
             })
-            return
+            return 0
           }
           const account = await tx.notificationPreference.findUnique({
             where: { user_id: candidate.recipient_id! },
@@ -110,7 +112,7 @@ export class CommunityNotificationsWorker {
               where: { id: candidate.id },
               data: { deliverable: false },
             })
-            return
+            return 0
           }
           const original = nextAllowedCommunityInstant(
             {
@@ -127,7 +129,7 @@ export class CommunityNotificationsWorker {
               where: { id: candidate.id },
               data: { deliverable: false },
             })
-            return
+            return 0
           }
           const [attachable] = await tx.$queryRaw<{ id: string }[]>`
             SELECT id FROM "CommunityNotificationGroup" WHERE recipient_id=${candidate.recipient_id}
@@ -175,7 +177,8 @@ export class CommunityNotificationsWorker {
             account.policy_revision,
             original.status === 'deferred'
           )
-          count++
+          // Counted only once the attachment commits.
+          return 1
         },
         { timeout: 1000, maxWait: 250 }
       )
@@ -239,18 +242,21 @@ export class CommunityNotificationsWorker {
         where: { artifact_kind: 'group', artifact_id: group.id },
       })
       if (!links.length) continue
-      await this.prisma.$transaction(
+      count += await interactiveTransaction(
+        this.prisma,
         async (tx) => {
+          // Deliveries count only once this transaction commits.
+          let created = 0
           await tx.$executeRaw(
             Prisma.sql`SELECT community_privacy_guards(ARRAY[${Prisma.join([...new Set(links.map((l) => l.member_id))])}]::text[],ARRAY[${group.post_id}]::text[],false)`
           )
-          if (!(await currentSubjectLinks(tx, 'group', group.id, links))) return
+          if (!(await currentSubjectLinks(tx, 'group', group.id, links))) return 0
           const claimed = await tx.$queryRaw<
             { id: string }[]
           >`SELECT id FROM "CommunityNotificationGroup" WHERE id = ${group.id}::uuid AND snapshot_at IS NULL FOR UPDATE SKIP LOCKED`
-          if (!claimed.length) return
+          if (!claimed.length) return 0
           // Attachment and snapshot share this row lock. Rediscover privacy guards if its links changed.
-          if (!(await currentSubjectLinks(tx, 'group', group.id, links))) return
+          if (!(await currentSubjectLinks(tx, 'group', group.id, links))) return 0
           group = await tx.communityNotificationGroup.findUniqueOrThrow({
             where: { id: group.id },
           })
@@ -265,7 +271,7 @@ export class CommunityNotificationsWorker {
               where: { id: group.id },
               data: { status: 'suppressed' },
             })
-            return
+            return 0
           }
           const allowed = nextAllowedCommunityInstant(
             {
@@ -305,7 +311,7 @@ export class CommunityNotificationsWorker {
                   : {}),
               },
             })
-            return
+            return 0
           }
           const registrations = await tx.pushToken.findMany({
             where: {
@@ -331,7 +337,7 @@ export class CommunityNotificationsWorker {
                 data: [{ ...link, artifact_kind: 'delivery', artifact_id: delivery.id }],
                 skipDuplicates: true,
               })
-            count++
+            created++
           }
           await tx.communityNotificationGroup.update({
             where: { id: group.id },
@@ -340,6 +346,7 @@ export class CommunityNotificationsWorker {
               status: registrations.length ? 'sending' : 'suppressed',
             },
           })
+          return created
         },
         { timeout: 1000, maxWait: 250 }
       )
@@ -359,7 +366,8 @@ export class CommunityNotificationsWorker {
       ORDER BY g.eligible_at,g.id LIMIT 100
     `
     for (const candidate of candidates) {
-      await this.prisma.$transaction(
+      await interactiveTransaction(
+        this.prisma,
         async (tx) => {
           await tx.$executeRawUnsafe("SET LOCAL transaction_timeout = '2s'")
           await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${candidate.recipient_id}]::text[],ARRAY[]::text[],false)`
@@ -479,7 +487,7 @@ export class CommunityNotificationsWorker {
       take: 100,
     })
     for (const attempt of attempts) {
-      await this.prisma.$transaction(async (tx) => {
+      await interactiveTransaction(this.prisma, async (tx) => {
         const expired = await tx.communityDeliveryAttempt.updateMany({
           where: {
             id: attempt.id,

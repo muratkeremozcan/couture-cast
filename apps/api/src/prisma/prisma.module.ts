@@ -1,7 +1,8 @@
 import { Global, Module } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
+import { createPrismaClient } from './prisma-client.js'
 
-const prisma = new PrismaClient()
+const prisma = createPrismaClient()
 
 @Global()
 @Module({

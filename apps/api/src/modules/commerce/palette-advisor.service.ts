@@ -52,6 +52,7 @@ import {
 import { AffiliateOfferService } from './affiliate-offer.service.js'
 import { PaletteAnalysisProcessingQueue } from './palette-analysis-processing.queue.js'
 import { PremiumEntitlementService } from './premium-entitlement.service.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 
@@ -284,8 +285,8 @@ export class PaletteAdvisorService {
     })
     const from = consentAuditState(existing)
 
-    await this.prisma.$transaction([
-      this.prisma.paletteProfile.upsert({
+    await interactiveTransaction(this.prisma, async (tx) => {
+      await tx.paletteProfile.upsert({
         where: { user_id: userId },
         create: {
           user_id: userId,
@@ -293,16 +294,16 @@ export class PaletteAdvisorService {
           consent_revoked_at: null,
         },
         update: { consent_granted_at: new Date(), consent_revoked_at: null },
-      }),
-      this.prisma.auditLog.create({
+      })
+      await tx.auditLog.create({
         data: {
           user_id: userId,
           event_type: 'palette_analysis_consent_changed',
           event_data: { from, to: 'granted', source: 'user' },
           ip_address: null,
         },
-      }),
-    ])
+      })
+    })
 
     return this.getProfile(userId)
   }
@@ -360,7 +361,7 @@ export class PaletteAdvisorService {
     await this.assertAnalysisEnabled(userId)
     await this.guardianService.assertWardrobeUploadAllowed(userId, role)
 
-    const outcome = await this.prisma.$transaction(async (tx) => {
+    const outcome = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('palette_profile:' || ${userId}))`
 
       const existing = await tx.paletteProfile.findUnique({ where: { user_id: userId } })
@@ -716,9 +717,9 @@ export class PaletteAdvisorService {
     const from = consentAuditState(existing)
     const selfieObjectPath = existing?.selfie_object_path ?? null
 
-    await this.prisma.$transaction([
-      this.prisma.advisorRecommendationState.deleteMany({ where: { user_id: userId } }),
-      this.prisma.paletteProfile.upsert({
+    await interactiveTransaction(this.prisma, async (tx) => {
+      await tx.advisorRecommendationState.deleteMany({ where: { user_id: userId } })
+      await tx.paletteProfile.upsert({
         where: { user_id: userId },
         create: { user_id: userId, consent_revoked_at: new Date() },
         update: {
@@ -746,16 +747,16 @@ export class PaletteAdvisorService {
           selfie_purged_at: null,
           revision: { increment: 1 },
         },
-      }),
-      this.prisma.auditLog.create({
+      })
+      await tx.auditLog.create({
         data: {
           user_id: userId,
           event_type: 'palette_analysis_consent_changed',
           event_data: { from, to: 'revoked', source: 'user' },
           ip_address: null,
         },
-      }),
-    ])
+      })
+    })
 
     if (selfieObjectPath) {
       await this.storage.remove([selfieObjectPath]).catch(() => undefined)

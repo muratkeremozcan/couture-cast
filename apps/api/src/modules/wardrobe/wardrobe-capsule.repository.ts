@@ -28,6 +28,7 @@ import {
   CapsuleTelemetryOutbox,
   type CapsuleMutationEventName,
 } from './wardrobe-capsule.outbox.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 /**
  * Lets the caller persist its analytics claim inside the mutation transaction.
@@ -236,7 +237,7 @@ export class WardrobeCapsuleRepository {
     }
 
     try {
-      const capsule = await this.prisma.$transaction(async (tx) => {
+      const capsule = await interactiveTransaction(this.prisma, async (tx) => {
         await lockOwnerProfile(tx, ownerUserId)
         await lockGarments(tx, ownerUserId, input.garmentIds)
         await this.assertGarmentsEligible(tx, ownerUserId, input.garmentIds)
@@ -448,7 +449,7 @@ export class WardrobeCapsuleRepository {
         ? canonicalizeDescription(input.description)
         : undefined
 
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await lockOwnerProfile(tx, ownerUserId)
       await lockCapsules(tx, ownerUserId, [capsuleId])
 
@@ -572,7 +573,7 @@ export class WardrobeCapsuleRepository {
     auditActor?: CapsuleAuditActor,
     telemetry?: CapsuleTelemetryRequest
   ): Promise<{ capsule: CapsuleWithGarmentJoins; isNoOp: boolean }> {
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await lockOwnerProfile(tx, ownerUserId)
       await lockCapsules(tx, ownerUserId, [capsuleId])
 
@@ -619,7 +620,7 @@ export class WardrobeCapsuleRepository {
     auditActor?: CapsuleAuditActor,
     telemetry?: CapsuleTelemetryRequest
   ): Promise<{ acceptedRevision: number }> {
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await lockOwnerProfile(tx, ownerUserId)
       await lockCapsules(tx, ownerUserId, [capsuleId])
 

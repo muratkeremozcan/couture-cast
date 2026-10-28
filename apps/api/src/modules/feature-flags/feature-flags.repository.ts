@@ -5,6 +5,7 @@ import type {
   FeatureFlagRecord,
   FeatureFlagStoredValue,
 } from '@couture/config'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 /** Story 0.7 Task 8 support file: persistent cache for the fallback flag flow.
  * Why this repository exists:
@@ -48,9 +49,9 @@ export class FeatureFlagsRepository {
   async upsertMany(flags: FeatureFlagRecord[]): Promise<void> {
     // Flow ref S0.7/T8/4: sync writes the full known set in one transaction so
     // cache updates are consistent across all flags.
-    await this.prisma.$transaction(
-      flags.map((flag) =>
-        this.prisma.featureFlag.upsert({
+    await interactiveTransaction(this.prisma, async (tx) => {
+      for (const flag of flags)
+        await tx.featureFlag.upsert({
           where: { key: flag.key },
           create: {
             key: flag.key,
@@ -60,7 +61,6 @@ export class FeatureFlagsRepository {
             value: flag.value,
           },
         })
-      )
-    )
+    })
   }
 }

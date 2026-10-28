@@ -13,6 +13,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { requireAnalyticsIdSecret } from '../telemetry/telemetry.service.js'
 import { CommunityAccessService } from './community-access.service.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 @Injectable()
 export class CommunityPreferencesService {
@@ -76,14 +77,14 @@ export class CommunityPreferencesService {
 
   async get(user: string) {
     await this.access.assert(user)
-    return this.prisma.$transaction((tx) => this.snapshot(user, tx), {
+    return interactiveTransaction(this.prisma, (tx) => this.snapshot(user, tx), {
       isolationLevel: 'RepeatableRead',
     })
   }
 
   async patch(user: string, input: PatchCommunityNotificationPreferences) {
     await this.access.assert(user)
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${user}]::text[],ARRAY[]::text[],true)`
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${user}))`
       await this.access.assertDatabase(user, tx)

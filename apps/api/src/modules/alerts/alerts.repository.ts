@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 export type AlertRuleRecord = Prisma.AlertRuleGetPayload<Record<string, never>>
 export type NotificationPreferenceRecord = Prisma.NotificationPreferenceGetPayload<
@@ -69,7 +70,7 @@ export class PrismaAlertsRepository implements AlertsRepository {
       timezone_configured: true,
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${userId}]::text[],ARRAY[]::text[],true)`
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       const result = await tx.notificationPreference.upsert({
@@ -88,7 +89,7 @@ export class PrismaAlertsRepository implements AlertsRepository {
     userId: string,
     commands: UpsertAlertRuleCommand[]
   ): Promise<AlertRuleRecord[]> {
-    return this.prisma.$transaction(async (transaction) => {
+    return interactiveTransaction(this.prisma, async (transaction) => {
       for (const command of commands) {
         await transaction.alertRule.upsert({
           where: {

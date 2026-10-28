@@ -8,11 +8,13 @@ import { FeatureFlagsRepository } from './feature-flags.repository'
 const createRepository = () => {
   const findUnique = vi.fn()
   const upsert = vi.fn((args: unknown) => args)
-  const $transaction = vi.fn().mockResolvedValue([])
   const prisma = {
     featureFlag: { findUnique, upsert },
-    $transaction,
   } as unknown as PrismaClient
+  // Writes run on the transaction client, so a write outside it would miss `tx`.
+  const tx = { featureFlag: { upsert } }
+  const $transaction = vi.fn((work: (client: typeof tx) => Promise<unknown>) => work(tx))
+  Object.assign(prisma, { $transaction })
 
   return {
     findUnique,
@@ -111,8 +113,6 @@ describe('FeatureFlagsRepository', () => {
         create: { key: 'ritual_v2', value: { enabled: true } },
         update: { value: { enabled: true } },
       })
-      // The batch is handed to $transaction as one array of operations.
-      expect($transaction.mock.calls[0]?.[0]).toHaveLength(2)
     })
 
     it('still opens a transaction when there is nothing to sync', async () => {
@@ -121,7 +121,7 @@ describe('FeatureFlagsRepository', () => {
       await expect(repository.upsertMany([])).resolves.toBeUndefined()
 
       expect(upsert).not.toHaveBeenCalled()
-      expect($transaction).toHaveBeenCalledWith([])
+      expect($transaction).toHaveBeenCalledOnce()
     })
   })
 })

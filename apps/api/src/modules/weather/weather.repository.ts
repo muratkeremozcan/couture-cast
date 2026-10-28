@@ -6,6 +6,7 @@ import type {
   NormalizedDailyWeatherEntry,
   NormalizedWeatherForecast,
 } from './providers/weather.types.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 // Story 5.5 Decision 3: `WeatherSnapshot.daily_summaries` is parsed with this
 // schema on every read. A malformed entry is discarded and logged rather
@@ -56,7 +57,7 @@ export class WeatherRepository {
   ): Promise<PersistedWeatherSnapshot> {
     const locationKey = normalizeLocationKey(forecast.locationKey)
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await interactiveTransaction(this.prisma, async (transaction) => {
         const existing = await transaction.weatherSnapshot.findUnique({
           where: {
             location_key_provider_provider_updated_at: {

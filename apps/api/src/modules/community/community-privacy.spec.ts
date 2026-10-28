@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Prisma, type PrismaClient } from '@prisma/client'
-import {
-  communityPrivacyTransaction,
-  isPldbgapi2StackError,
-} from './community-privacy.js'
+import { communityPrivacyTransaction } from './community-privacy.js'
 const failure = (code: string, sql?: string) =>
   new Prisma.PrismaClientKnownRequestError('Controlled transaction failure', {
     code,
@@ -69,12 +66,6 @@ describe('privacy transaction recovery contract', () => {
       expect(transaction).toHaveBeenCalledTimes(1)
     }
   )
-  it('matches only SQLSTATE XX000 with the pldbgapi2 message', () => {
-    expect(isPldbgapi2StackError(pldbgapi2())).toBe(true)
-    expect(isPldbgapi2StackError(pldbgapi2('XX000', 'ERROR: other'))).toBe(false)
-    expect(isPldbgapi2StackError(pldbgapi2('40001'))).toBe(false)
-    expect(isPldbgapi2StackError({ meta: { code: 'XX000' } })).toBe(false)
-  })
   it('ends after three pldbgapi2 failures and preserves the original error', async () => {
     const error = pldbgapi2()
     const transaction = vi.fn().mockRejectedValue(error)

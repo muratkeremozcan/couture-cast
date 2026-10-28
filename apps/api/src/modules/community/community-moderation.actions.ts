@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common'
 import { PrismaClient, type LookbookPost } from '@prisma/client'
 import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 /**
  * The operator half of moderation: resolving a report, releasing a post the
@@ -85,7 +86,7 @@ export class CommunityModerationActionsService {
       throw new ServiceUnavailableException('Community publication is unavailable.')
     const releasedAt = new Date()
 
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${source.user_id}))`
       const post = await this.lockPost(tx, postId)
 
@@ -167,7 +168,7 @@ export class CommunityModerationActionsService {
     if (!source) throw new NotFoundException('COMMUNITY_POST_NOT_FOUND')
     const takenDownAt = new Date()
 
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await guardCommunityPost(tx, postId)
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${source.user_id}))`
       const post = await this.lockPost(tx, postId)
@@ -231,7 +232,7 @@ export class CommunityModerationActionsService {
     const { reportId, operatorId, resolution } = params
     const resolvedAt = new Date()
 
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       const updated = await tx.communityPostReport.updateMany({
         where: { id: reportId, resolved_at: null },
         data: { resolved_at: resolvedAt },

@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@prisma/client', () => ({
   PrismaClient: class {
     jobFailure = mocks.jobFailure
+    $extends() {
+      return this
+    }
   },
 }))
 

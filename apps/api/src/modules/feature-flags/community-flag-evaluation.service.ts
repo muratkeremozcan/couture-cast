@@ -13,6 +13,7 @@ import {
   CommunityUnavailableException,
   type CommunityGrant,
 } from '../community/community-availability.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 export { CommunityUnavailableException } from '../community/community-availability.js'
 type Evaluation = CommunityGrant
 type CacheRow = {
@@ -78,11 +79,13 @@ export class CommunityFlagEvaluationService {
     member: string,
     budget: CommunityAuthorizationBudget
   ): Promise<CacheRow | undefined> {
-    const timeout = Math.min(500, budget.remaining())
     return budget.run(() =>
-      this.prisma.$transaction(
+      interactiveTransaction(
+        this.prisma,
         async (tx) => {
-          await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = '${timeout}ms'`)
+          await tx.$executeRawUnsafe(
+            `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
+          )
           return (
             await tx.$queryRaw<CacheRow[]>`
         SELECT e.*,clock_timestamp() AS now FROM "CommunityFlagEvaluation" e
@@ -91,7 +94,10 @@ export class CommunityFlagEvaluationService {
       `
           )[0]
         },
-        { timeout, maxWait: budget.remaining() }
+        () => ({
+          timeout: Math.min(500, budget.remaining()),
+          maxWait: budget.remaining(),
+        })
       )
     )
   }
@@ -170,9 +176,10 @@ export class CommunityFlagEvaluationService {
       budget.check()
       let inserting = false
       try {
-        const timeout = Math.min(400, budget.remaining())
-        return await this.prisma.$transaction(
+        return await interactiveTransaction(
+          this.prisma,
           async (tx) => {
+            inserting = false
             await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
             await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
             inserting = true
@@ -195,7 +202,10 @@ export class CommunityFlagEvaluationService {
           `
             )[0]
           },
-          { timeout, maxWait: budget.remaining() }
+          () => ({
+            timeout: Math.min(400, budget.remaining()),
+            maxWait: budget.remaining(),
+          })
         )
       } catch (error) {
         if (
@@ -250,7 +260,8 @@ export class CommunityFlagEvaluationService {
     }
     try {
       return await budget.run(() =>
-        this.prisma.$transaction(
+        interactiveTransaction(
+          this.prisma,
           async (tx) => {
             await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
             await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
@@ -267,10 +278,10 @@ export class CommunityFlagEvaluationService {
       `
             )[0]
           },
-          {
+          () => ({
             timeout: Math.min(400, budget.remaining()),
             maxWait: budget.remaining(),
-          }
+          })
         )
       )
     } catch (error) {
@@ -281,7 +292,8 @@ export class CommunityFlagEvaluationService {
     }
   }
   private async releaseFailedClaim(member: string, owner: string, generation: number) {
-    await this.prisma.$transaction(
+    await interactiveTransaction(
+      this.prisma,
       async (tx) => {
         await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
         await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`

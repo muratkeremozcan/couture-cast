@@ -17,6 +17,7 @@ import { verifyAndNormalizeCommunityImage } from '../community/community-image-v
 import { ShareCardSourceRepository } from './share-card-source.repository.js'
 import { ShareCardRenderer } from './share-card-renderer.js'
 import { ShareCardAdmission } from './share-card-admission.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 export const SHARE_CARD_GLOBAL_LIMIT = 4
 export const SHARE_CARD_MEMBER_LIMIT = 1
@@ -114,7 +115,8 @@ export class ShareCardsService {
         },
       }).data
       if (input.purpose === 'save') {
-        await this.prisma.$transaction(
+        await interactiveTransaction(
+          this.prisma,
           async (tx) => {
             check()
             await tx.auditLog.create({

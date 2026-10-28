@@ -23,6 +23,7 @@ import {
   resolveRevenueCatWebhookAuth,
   resolveStripeWebhookSecret,
 } from './billing-webhook-secrets.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 // Re-exported so existing importers keep one import site. The definitions live
 // in a Nest-free module because suites outside the Nest runtime import them.
@@ -606,7 +607,9 @@ export class BillingWebhookService {
 
     let transition: EntitlementTransition | null = null
     try {
-      await this.prisma.$transaction(async (tx) => {
+      await interactiveTransaction(this.prisma, async (tx) => {
+        // A re-run after a rolled-back attempt reports only what it commits.
+        transition = null
         await tx.billingEvent.create({
           data: {
             provider: 'revenuecat',
@@ -665,7 +668,10 @@ export class BillingWebhookService {
     let gainTransition: EntitlementTransition | null = null
 
     try {
-      await this.prisma.$transaction(async (tx) => {
+      await interactiveTransaction(this.prisma, async (tx) => {
+        // A re-run after a rolled-back attempt reports only what it commits.
+        lossTransition = null
+        gainTransition = null
         await tx.billingEvent.create({
           data: {
             provider: 'revenuecat',
