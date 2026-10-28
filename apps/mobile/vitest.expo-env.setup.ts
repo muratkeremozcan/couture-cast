@@ -13,9 +13,11 @@
 // entry, which vitest.config.ts prebundles so Vite never re-optimizes it mid-run.
 import { installExpoGlobalPolyfill } from 'expo-modules-core/src/polyfill/dangerous-internal'
 // expo-constants is web-aware through ExponentConstants.web, which Vite also does not pick.
-// The package does not export that file, so it is registered from its built path, the way
-// Expo's web build registers it under the native module's name.
-import webExponentConstants from '../../node_modules/expo-constants/build/ExponentConstants.web.js'
+// The package does not export that file, so vitest.config.ts aliases this specifier to it,
+// located from expo-constants/package.json. It is registered under the native module's
+// name, the way Expo's web build registers it.
+// eslint-disable-next-line import/no-unresolved -- resolved by the vitest.config.ts alias
+import webExponentConstants from 'expo-constants/exponent-constants-web'
 import { reportMissingExpoGlobalReads } from './src/test-utils/unwanted-console'
 
 process.env.EXPO_OS = 'web'

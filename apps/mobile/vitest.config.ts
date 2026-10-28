@@ -1,6 +1,18 @@
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { defineConfig } from 'vitest/config'
 import { playwright } from '@vitest/browser-playwright' // eslint-disable-line import/no-unresolved
+
+// expo-constants keeps its web module out of its exports map, so it is located from the
+// package's own exported package.json; vitest.expo-env.setup.ts registers it.
+const expoConstantsWebModule = path.join(
+  path.dirname(
+    createRequire(path.join(__dirname, 'package.json')).resolve(
+      'expo-constants/package.json'
+    )
+  ),
+  'build/ExponentConstants.web.js'
+)
 
 const isWatchMode = !process.argv.includes('run') && !process.argv.includes('--run')
 
@@ -58,6 +70,10 @@ export default defineConfig({
   },
   resolve: {
     alias: [
+      {
+        find: /^expo-constants\/exponent-constants-web$/,
+        replacement: expoConstantsWebModule,
+      },
       {
         find: /^msw\/node$/,
         replacement: path.resolve(
