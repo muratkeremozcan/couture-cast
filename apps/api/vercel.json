@@ -1,5 +1,7 @@
 {
   "version": 2,
+  "outputDirectory": "public",
+  "ignoreCommand": "node ../../scripts/vercel-preview-inputs.mjs --ignore",
   "functions": {
     "api/index.ts": {
       "maxDuration": 25,

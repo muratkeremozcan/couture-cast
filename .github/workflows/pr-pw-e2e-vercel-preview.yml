@@ -27,6 +27,7 @@ jobs:
   pw-e2e:
     # Pass the exact URLs through so the test command does not re-resolve previews.
     needs: preview-ready
+    if: needs.preview-ready.outputs.required == 'true'
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: preview
