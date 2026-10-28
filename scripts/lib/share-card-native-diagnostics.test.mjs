@@ -894,3 +894,67 @@ describe('native flow diagnostics CI registration', () => {
     )
   })
 })
+
+describe('global failure ranking across all command files', () => {
+  const reviewerOrders = [
+    ['captured', 'failed', 'running'],
+    ['captured', 'running', 'failed'],
+    ['failed', 'captured', 'running'],
+    ['failed', 'running', 'captured'],
+    ['running', 'captured', 'failed'],
+    ['running', 'failed', 'captured'],
+  ]
+  for (const separate of [false, true]) {
+    for (const order of reviewerOrders) {
+      test(`three-way ranking ${separate ? 'files' : 'rows'} ${order.join(',')}`, async (t) => {
+        const { collectNativeFlowDiagnostics } = await helper()
+        const directory = fixture(t)
+        const output = path.join(directory, 'maestro-current')
+        fs.mkdirSync(output, { recursive: true })
+        const captured = command('tapOnElement', 'tab-home', 'FAILED', 4, 1)
+        captured.metadata.artifacts = [{ type: 'SCREEN_HIERARCHY', path: 'capture.json' }]
+        const failed = command(
+          'scrollUntilVisible',
+          'outfit-share-card-open',
+          'FAILED',
+          8,
+          2
+        )
+        const running = command('tapOnElement', 'share-card-save', 'RUNNING', 9, 3)
+        const byKind = { captured, failed, running }
+        if (separate) {
+          order.forEach((kind, index) => {
+            const dir = path.join(output, String(index))
+            fs.mkdirSync(dir)
+            fs.writeFileSync(
+              path.join(dir, 'commands.json'),
+              JSON.stringify([byKind[kind]])
+            )
+            if (kind === 'captured')
+              fs.writeFileSync(path.join(dir, 'capture.json'), JSON.stringify(hierarchy))
+          })
+        } else {
+          fs.writeFileSync(
+            path.join(output, 'commands.json'),
+            JSON.stringify(order.map((kind) => byKind[kind]))
+          )
+          fs.writeFileSync(path.join(output, 'capture.json'), JSON.stringify(hierarchy))
+        }
+        const result = await collectNativeFlowDiagnostics(
+          {
+            ...context,
+            root,
+            directory,
+            output,
+            device: 'emulator-5554',
+            adb: '/owned/adb',
+            startedAt: Date.now(),
+          },
+          { execute: () => ({ status: 1, stdout: '' }) }
+        )
+        assert.equal(result.failedCommand.selector.value, 'outfit-share-card-open')
+        assert.equal(result.failedCommand.status, 'FAILED')
+      })
+    }
+  }
+})

@@ -216,23 +216,25 @@ const capturedFailure = (row) =>
   row?.metadata?.status === 'FAILED' &&
   Array.isArray(row.metadata.artifacts) &&
   row.metadata.artifacts.some((artifact) => artifact?.type === 'SCREEN_HIERARCHY')
-// A FAILED row with its own hierarchy explains the failure. A deeper RUNNING row is
-// what a killed run leaves behind and carries no artifacts, so it ranks below.
 function compareFailures(a, b) {
-  // Only an interrupted RUNNING row loses to a captured failure. Among FAILED
-  // rows, keep the deepest/latest command even if an outer command has a capture.
-  if (capturedFailure(a) && b.metadata.status === 'RUNNING') return -1
-  if (capturedFailure(b) && a.metadata.status === 'RUNNING') return 1
+  const aKey = JSON.stringify(a),
+    bKey = JSON.stringify(b)
   return (
     (b.metadata.depth ?? 0) - (a.metadata.depth ?? 0) ||
-    (b.metadata.sequenceNumber ?? 0) - (a.metadata.sequenceNumber ?? 0)
+    (b.metadata.sequenceNumber ?? 0) - (a.metadata.sequenceNumber ?? 0) ||
+    (aKey < bKey ? -1 : aKey > bKey ? 1 : 0)
   )
 }
 function selectFailure(rows) {
   const candidates = rows.filter((row) =>
     ['FAILED', 'RUNNING'].includes(row?.metadata?.status)
   )
-  return candidates.sort(compareFailures)[0]
+  // Decide eligibility once for the entire run. Pairwise capture preferences can
+  // form a cycle among captured FAILED, deeper FAILED and deepest RUNNING rows.
+  const eligible = candidates.some(capturedFailure)
+    ? candidates.filter((row) => row.metadata.status === 'FAILED')
+    : candidates
+  return eligible.sort(compareFailures)[0]
 }
 function allNodes(tree) {
   return tree && typeof tree === 'object'
@@ -722,10 +724,9 @@ const textFile = (file) => {
 }
 function readArtifacts(output) {
   const files = filesUnder(output)
-  let rows = [],
-    failed,
-    base = output,
-    hierarchy,
+  const rows = [],
+    bases = new Map()
+  let hierarchy,
     screenshot,
     log = ''
   for (const file of files.filter((file) => path.basename(file) === 'commands.json')) {
@@ -756,16 +757,16 @@ function readArtifacts(output) {
           },
         }
       })
-      const failure = selectFailure(candidate)
-      if (failure && (!failed || compareFailures(failure, failed) <= 0)) {
-        rows = candidate
-        failed = failure
-        base = path.dirname(file)
+      for (const row of candidate) {
+        rows.push(row)
+        bases.set(row, path.dirname(file))
       }
     } catch {
       /* Raw malformed artifacts stay private. */
     }
   }
+  const failed = selectFailure(rows)
+  const base = bases.get(failed) ?? output
   for (const file of files.filter((file) => path.basename(file) === 'maestro.log'))
     log += '\n' + textFile(file)
   for (const artifact of failed?.metadata?.artifacts ?? []) {
