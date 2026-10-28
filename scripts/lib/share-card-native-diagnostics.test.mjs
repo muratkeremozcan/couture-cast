@@ -609,7 +609,26 @@ describe('native flow public evidence', () => {
   test('browser summary poisoning and filename mismatch fail before any artifact is copied', async (t) => {
     const { browserWatermarkChecks } = await import('./story68-browser-watermark.mjs')
     const directory = fixture(t)
-    fs.writeFileSync(path.join(directory, 'accessibility-bridge.json'), '{}')
+    // A schema-valid record that would otherwise publish, so only the browser summary refuses.
+    fs.writeFileSync(
+      path.join(directory, 'accessibility-bridge.json'),
+      JSON.stringify({
+        method:
+          'React Native posted accessibility announcement and intended focus bridge unit assertions',
+        passed: true,
+        cases: [{ locale: 'en-US', state: 'saved', passed: true }],
+        runner: {
+          classification: 'passed',
+          exitCode: 0,
+          reportPresent: true,
+          reportSuccessful: true,
+          assertionsObserved: 1,
+          assertionsFailed: 0,
+          matchedCases: 1,
+          requiredCases: 1,
+        },
+      })
+    )
     const value = {
       version: 1,
       browser: 'webkit',
@@ -740,7 +759,7 @@ describe('native flow public evidence', () => {
     const { projectNativeFlowDiagnostics } = await helper()
     const directory = fixture(t)
     // The diagnostics JSON and its redacted render are produced before the proof loop
-    // reaches the poisoned matrix summary.
+    // reaches the poisoned original-proof projection.
     fs.writeFileSync(
       path.join(directory, 'native-flow-diagnostics-android.json'),
       JSON.stringify(
@@ -754,8 +773,12 @@ describe('native flow public evidence', () => {
       )
     )
     fs.writeFileSync(
-      path.join(directory, 'native-matrix-android.json'),
-      JSON.stringify({ platform: 'android', note: 'access_token=leaked' })
+      path.join(directory, 'original-proof-android.json'),
+      JSON.stringify({
+        sha256: 'a'.repeat(64),
+        bytes: 1,
+        chunks: ['access_token=leaked'],
+      })
     )
     const result = spawnSync(
       process.execPath,
