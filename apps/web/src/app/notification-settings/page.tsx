@@ -169,7 +169,11 @@ export default function NotificationSettingsPage() {
   const edit = (change: Partial<CommunityNotificationSettings>) =>
     setDraft((previous) => (previous ? { ...previous, ...change } : previous))
   return (
-    <main id="main-content" className="mx-auto flex max-w-lg flex-col gap-5 p-6">
+    <main
+      id="main-content"
+      className="mx-auto flex max-w-lg flex-col gap-5 p-6"
+      aria-busy={loading || undefined}
+    >
       <h1 className="text-3xl font-semibold">{t('community.notifications.title')}</h1>
       {form && (
         <form

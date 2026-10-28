@@ -121,14 +121,30 @@ describe('R11 verified settings journeys', () => {
     expect(placeholder).toHaveAttribute('aria-hidden', 'true')
     expect(placeholder).toHaveClass('invisible')
     expect(screen.queryByRole('button', { name: label('save') })).toBeNull()
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true')
     identify('member-a')
     expect(screen.getByTestId('notification-settings-loading')).toBe(placeholder)
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true')
     release()
     const save = await screen.findByRole('button', { name: label('save') })
+    expect(screen.getByRole('main')).not.toHaveAttribute('aria-busy')
     expect(placeholder).toContainElement(save)
     expect(placeholder).not.toHaveAttribute('inert')
     expect(placeholder).not.toHaveAttribute('aria-hidden')
     expect(placeholder).not.toHaveClass('invisible')
+    expect(screen.queryByTestId('notification-settings-loading')).toBeNull()
+  })
+  it('clears the busy state and the held place when preferences fail to load', async () => {
+    useMswHandlers(
+      http.get('*/api/v1/community/notification-preferences', () =>
+        HttpResponse.json({}, { status: 503 })
+      )
+    )
+    session.owner = 'member-a'
+    render(<NotificationSettingsPage />)
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true')
+    await screen.findByText(label('failed'))
+    expect(screen.getByRole('main')).not.toHaveAttribute('aria-busy')
     expect(screen.queryByTestId('notification-settings-loading')).toBeNull()
   })
   it('releases the held place when a stored session verifies to no member', async () => {
@@ -138,10 +154,12 @@ describe('R11 verified settings journeys', () => {
     await waitFor(() =>
       expect(screen.queryByTestId('notification-settings-loading')).toBeNull()
     )
+    expect(screen.getByRole('main')).not.toHaveAttribute('aria-busy')
     expect(screen.queryByLabelText(label('timezone'))).toBeNull()
   })
   it('reserves nothing for a visitor without a stored session', () => {
     render(<NotificationSettingsPage />)
+    expect(screen.getByRole('main')).not.toHaveAttribute('aria-busy')
     expect(screen.queryByTestId('notification-settings-loading')).toBeNull()
     expect(screen.queryByLabelText(label('timezone'))).toBeNull()
   })
