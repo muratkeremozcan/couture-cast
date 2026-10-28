@@ -195,6 +195,23 @@ describe('native flow diagnostics projection', () => {
     }
   })
 
+  test('Home scroll and weather header selectors stay named in the public command record', async () => {
+    const { projectNativeFlowDiagnostics } = await helper()
+    for (const id of [
+      'hero-experience-scrollview',
+      'weather-header',
+      'weather-header-skeleton',
+    ])
+      assert.deepEqual(
+        projectNativeFlowDiagnostics({
+          ...context,
+          root,
+          commands: [command('scrollUntilVisible', id)],
+          hierarchy,
+        }).failedCommand.selector,
+        { kind: 'id', value: id }
+      )
+  })
   test('a failed flow reports Maestro scroll, tap and settle facts plus the closed dialog trace', async () => {
     const { projectNativeFlowDiagnostics, assertNativeFlowDiagnostics } = await helper()
     const log = [
