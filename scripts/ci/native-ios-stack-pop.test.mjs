@@ -24,7 +24,24 @@ test('only completed taps on the exact Back label are counted', (t) => {
     row('COMPLETED', { idRegex: 'BackButton' }),
     row('COMPLETED', { text: 'Back' }),
   ])
-  assert.equal(iosStackPopTaps(output), 2)
+  assert.equal(iosStackPopTaps(output, 'Back'), 2)
+})
+
+test('a localized label counts only its own taps', (t) => {
+  const output = outputWith(t, [
+    row('COMPLETED', { textRegex: 'Zurück' }),
+    row('COMPLETED', { textRegex: 'Back' }),
+  ])
+  assert.equal(iosStackPopTaps(output, 'Zurück'), 1)
+  const record = recordIosStackPop({
+    platform: 'ios',
+    label: 'Zurück',
+    flow: 'maestro/story65/open-app.yaml',
+    output,
+    directory: output,
+    log: () => undefined,
+  })
+  assert.deepEqual(record.element, { kind: 'text', value: 'Zurück' })
 })
 
 test('the receipt names the tapped element and tolerates a missing or malformed trace', (t) => {
@@ -32,6 +49,7 @@ test('the receipt names the tapped element and tolerates a missing or malformed 
   const lines = []
   const record = recordIosStackPop({
     platform: 'ios',
+    label: 'Back',
     flow: 'maestro/story65/open-app.yaml',
     output,
     directory: output,
@@ -64,6 +82,6 @@ test('the receipt names the tapped element and tolerates a missing or malformed 
   )
   assert.match(lines[0], /iosStackPop/)
   fs.writeFileSync(path.join(output, 'run', 'commands.json'), '{not json')
-  assert.equal(iosStackPopTaps(output), 0)
-  assert.equal(iosStackPopTaps(path.join(output, 'missing')), 0)
+  assert.equal(iosStackPopTaps(output, 'Back'), 0)
+  assert.equal(iosStackPopTaps(path.join(output, 'missing'), 'Back'), 0)
 })

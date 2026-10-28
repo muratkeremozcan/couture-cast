@@ -18,8 +18,8 @@ function commandFiles(directory) {
   })
 }
 
-/** Completed taps on the exact Back label, from the flow's own Maestro command trace. */
-export function iosStackPopTaps(output) {
+/** Completed taps on the exact back label, from the flow's own Maestro command trace. */
+export function iosStackPopTaps(output, label) {
   let taps = 0
   for (const file of commandFiles(output)) {
     let rows
@@ -34,7 +34,7 @@ export function iosStackPopTaps(output) {
       const selector = tap?.selector ?? {}
       if (
         row?.metadata?.status === 'COMPLETED' &&
-        (selector.textRegex ?? selector.text) === 'Back'
+        (selector.textRegex ?? selector.text) === label
       )
         taps++
     }
@@ -47,14 +47,15 @@ export function recordIosStackPop({
   flow,
   output,
   directory,
+  label,
   log = console.log,
 }) {
   if (platform !== 'ios' || flow !== OPEN_APP_FLOW) return null
   const record = {
     version: 1,
     flow,
-    element: { kind: 'text', value: 'Back' },
-    completedTaps: iosStackPopTaps(output),
+    element: { kind: 'text', value: label },
+    completedTaps: iosStackPopTaps(output, label),
   }
   try {
     fs.writeFileSync(

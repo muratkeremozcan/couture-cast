@@ -358,7 +358,13 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   )
   if (recoverSnapshot) return maestro(flow, env, secret, attempt + 1)
   if (result.status !== 0) throw new Error(`native_flow_failed:${flow}`)
-  recordIosStackPop({ platform, flow, output: successOutput, directory })
+  recordIosStackPop({
+    platform,
+    flow,
+    output: successOutput,
+    directory,
+    label: localeEnv().MAESTRO_BACK,
+  })
 }
 async function signin() {
   activeLocale = 'en-US'
