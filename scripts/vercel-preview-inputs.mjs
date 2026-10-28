@@ -35,7 +35,23 @@ export function ignoredBuildExitCode(env, cwd = repoRoot) {
   // branch explicitly; an unavailable common ancestor always keeps the build.
   const fetched = git(['fetch', '--no-tags', '--depth=50', 'origin', 'main'], cwd)
   if (fetched.status !== 0) return 1
-  return previewRequired(cwd, 'FETCH_HEAD') ? 1 : 0
+  const base = git(['rev-parse', 'FETCH_HEAD'], cwd).stdout?.trim()
+  if (!/^[a-f0-9]{40}$/.test(base)) return 1
+  if (git(['merge-base', base, 'HEAD'], cwd).status !== 0) {
+    const branch =
+      env.VERCEL_GIT_COMMIT_REF ??
+      git(['symbolic-ref', '--short', 'HEAD'], cwd).stdout?.trim()
+    if (!branch || git(['check-ref-format', '--branch', branch], cwd).status !== 0)
+      return 1
+    // The main fetch does not deepen the preview side of a shallow clone.
+    // Recover both histories within a bounded fetch; missing history still keeps the build.
+    const deepened = git(
+      ['fetch', '--no-tags', '--deepen=1000', 'origin', 'main', branch],
+      cwd
+    )
+    if (deepened.status !== 0) return 1
+  }
+  return previewRequired(cwd, base) ? 1 : 0
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

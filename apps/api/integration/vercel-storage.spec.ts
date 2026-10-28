@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
@@ -100,6 +101,27 @@ describe('Vercel preview storage', () => {
     git('remote', 'remove', 'origin')
     expect(ignoredBuildExitCode({ VERCEL_ENV: 'preview' }, fixture)).toBe(1)
   })
+
+  it.each([
+    ['apps/mobile/app/index.tsx', 0],
+    ['docs/guide.md', 0],
+    ['_bmad-output/notes.md', 0],
+    ['apps/api/src/main.ts', 1],
+  ] as const)(
+    'recovers shallow preview history before deciding for %s',
+    (file, expected) => {
+      commit(file, 'first change')
+      commit(file, 'second change')
+      const clone = path.join(fixture, 'shallow')
+      git('clone', '--depth=1', '--branch=preview', pathToFileURL(fixture).href, clone)
+      expect(
+        ignoredBuildExitCode(
+          { VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_REF: 'preview' },
+          clone
+        )
+      ).toBe(expected)
+    }
+  )
 
   it.each(['production', 'development', undefined])('keeps %s builds', (environment) => {
     commit('apps/mobile/app/index.tsx')
