@@ -276,16 +276,36 @@ function canonical(cwd, file) {
   }
 }
 
+/**
+ * The runner reports a file that loads no test, or fails to load, as one top-level
+ * event named after the file itself. That wrapper never counts as a passing test,
+ * so an empty file cannot pass on its own.
+ */
+const isFileWrapper = (event, cwd) =>
+  event.nesting === 0 && canonical(cwd, event.name) === canonical(cwd, event.file)
+
+// Fail closed when a Node release reports a different event shape.
+function assertAttributable(event) {
+  if (
+    typeof event.name !== 'string' ||
+    typeof event.file !== 'string' ||
+    !Number.isInteger(event.nesting)
+  )
+    throw new Error(
+      `node_test_gate_failed: a test event lacks the name, file or nesting that attribution needs (Node ${process.version})`
+    )
+}
+
 export function summarizeNodeTestEvents(events, files, cwd = process.cwd()) {
   const summary = { passed: 0, failed: 0, skipped: 0, todo: 0, perFile: {} }
   const byPath = new Map(files.map((file) => [canonical(cwd, file), file]))
   for (const file of files) summary.perFile[file] = 0
   for (const event of events) {
+    assertAttributable(event)
     if (event.outcome === 'fail' && !event.todo) summary.failed++
     if (event.skip) summary.skipped++
     if (event.todo) summary.todo++
-    // Child-process events carry entryFile; the runner's per-file wrapper does not.
-    if (event.kind !== 'test' || event.entryFile === null) continue
+    if (event.kind !== 'test' || isFileWrapper(event, cwd)) continue
     if (event.outcome !== 'pass' || event.skip || event.todo) continue
     summary.passed++
     const file = byPath.get(canonical(cwd, event.file))

@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { matrixRows } from './workflow-step-shadowing.mjs'
+import nodeTestGateReporter from './node-test-gate-reporter.mjs'
 import {
   assertNodeTestGate,
   coverageProblems,
@@ -141,8 +142,8 @@ describe('node-test-gate summary', () => {
     outcome: 'pass',
     kind: 'test',
     name: 'case',
+    nesting: 0,
     file: '/repo/a.test.mjs',
-    entryFile: '/repo/a.test.mjs',
     skip: false,
     todo: false,
     ...overrides,
@@ -154,7 +155,7 @@ describe('node-test-gate summary', () => {
         [
           event({}),
           event({ kind: 'suite' }),
-          event({ file: '/repo/b.test.mjs', entryFile: null }),
+          event({ name: 'b.test.mjs', file: '/repo/b.test.mjs' }),
         ],
         ['a.test.mjs', 'b.test.mjs'],
         '/repo'
@@ -186,6 +187,109 @@ describe('node-test-gate summary', () => {
       () => assertNodeTestGate(summary, { status: 0 }),
       /node_test_gate_failed: 1 todo; a\.test\.mjs reported no passing test$/
     )
+  })
+})
+
+// Raw node:test events recorded from a one-test file, an empty file, a file that throws
+// while loading and a suite with skipped and todo children. Node 24.19 omits
+// entryFile, which 24.22 adds to every child-process event.
+function recordedEvents(version) {
+  const child = (data) =>
+    version === '24.22' ? { ...data, entryFile: data.file } : { ...data }
+  return [
+    [
+      'test:pass',
+      child({ name: 'one', nesting: 0, file: '/repo/one.test.mjs', line: 2 }),
+    ],
+    [
+      'test:pass',
+      { name: 'empty.test.mjs', nesting: 0, file: '/repo/empty.test.mjs', line: 1 },
+    ],
+    [
+      'test:fail',
+      { name: 'crash.test.mjs', nesting: 0, file: '/repo/crash.test.mjs', line: 1 },
+    ],
+    ['test:pass', child({ name: 'ok', nesting: 1, file: '/repo/a.test.mjs', line: 2 })],
+    [
+      'test:pass',
+      child({ name: 'sk', nesting: 1, file: '/repo/a.test.mjs', skip: true }),
+    ],
+    [
+      'test:pass',
+      child({ name: 'td', nesting: 1, file: '/repo/a.test.mjs', todo: true }),
+    ],
+    ['test:pass', child({ name: 'g', nesting: 0, file: '/repo/a.test.mjs' }), 'suite'],
+  ].map(([type, data, kind = 'test']) => ({
+    type,
+    data: { column: 1, ...data, details: { type: kind } },
+  }))
+}
+
+async function replay(events) {
+  async function* source() {
+    yield* events
+  }
+  const lines = []
+  for await (const line of nodeTestGateReporter(source())) lines.push(JSON.parse(line))
+  return lines
+}
+
+describe('node-test-gate attribution across Node 24 releases', () => {
+  for (const version of ['24.19', '24.22'])
+    test(`recorded ${version} events attribute passes and never count the empty-file wrapper`, async () => {
+      const files = ['one.test.mjs', 'empty.test.mjs', 'crash.test.mjs', 'a.test.mjs']
+      const summary = summarizeNodeTestEvents(
+        await replay(recordedEvents(version)),
+        files,
+        '/repo'
+      )
+      assert.deepEqual(summary, {
+        passed: 2,
+        failed: 1,
+        skipped: 1,
+        todo: 1,
+        perFile: {
+          'one.test.mjs': 1,
+          'empty.test.mjs': 0,
+          'crash.test.mjs': 0,
+          'a.test.mjs': 1,
+        },
+      })
+      assert.throws(
+        () => assertNodeTestGate(summary, { status: 1 }),
+        /empty\.test\.mjs reported no passing test; crash\.test\.mjs reported no passing test$/
+      )
+    })
+
+  test('a test named like another path still counts; only a file named after itself is a wrapper', async () => {
+    const [event] = await replay([
+      {
+        type: 'test:pass',
+        data: {
+          name: 'one.test.mjs',
+          nesting: 0,
+          file: '/repo/a.test.mjs',
+          details: { type: 'test' },
+        },
+      },
+    ])
+    assert.equal(
+      summarizeNodeTestEvents([event], ['a.test.mjs'], '/repo').perFile['a.test.mjs'],
+      1
+    )
+  })
+
+  test('events without the attribution fields fail closed', async () => {
+    for (const missing of ['name', 'file', 'nesting']) {
+      const [raw] = recordedEvents('24.19')
+      delete raw.data[missing]
+      const events = await replay([raw])
+      assert.throws(
+        () => summarizeNodeTestEvents(events, ['one.test.mjs'], '/repo'),
+        /node_test_gate_failed: a test event lacks the name, file or nesting that attribution needs/,
+        missing
+      )
+    }
   })
 })
 
