@@ -25,7 +25,10 @@ appId: ${MAESTRO_APP_ID}
 - tapOn:
     id: community-caption-input
 - inputText: A draft kept across background
-- hideKeyboard
+# iOS reports a failure when the simulator shows no software keyboard (run 40761149989);
+# the next scroll fails by its own name if the keyboard really stayed up.
+- hideKeyboard:
+    optional: true
 - scrollUntilVisible:
     element:
       id: community-pick-image-button
