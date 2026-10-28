@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { supportedLocales } from '@couture/api-client/contracts/http'
 import { loadCommunityScreeningPolicy } from './community-screening-policy.js'
 import {
@@ -38,6 +38,24 @@ const clean = (text: string, locale: string, field: TextScreeningField = 'captio
   screener.screen({ text, locale, field }).disposition
 
 describe('round 3 development data, including released v4', () => {
+  // One-time warm-up under its own budget, so no locale case pays it. Measured
+  // 2026-10-27: the first screen() per locale costs 24 ms cold against 11 ms warm,
+  // and the first 1000-row locale pass about 0.1 s plain and up to 0.7 s covered
+  // above a warm pass. 10 s is over 10x the covered cost on a contended host, and a
+  // setup that hangs fails this hook by name.
+  beforeAll(() => {
+    for (const locale of Object.values(locales))
+      for (const text of [
+        'A wool coat for the office, in pale rose.',
+        'Ein leichter Mantel für das Büro.',
+        'Una chaqueta ligera para la lluvia.',
+        'Une robe longue en lin pour l’été.',
+        'Una borsa in pelle per il fine settimana.',
+        'Uma camisa de algodão para o calor.',
+        'Bu ceket yağmurda da şık durur.',
+      ])
+        clean(text, locale)
+  }, 10_000)
   it.each(Object.entries(locales))(
     '%s keeps the unchanged released-v4 development limit',
     (language, locale) => {
