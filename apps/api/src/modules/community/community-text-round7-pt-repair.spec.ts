@@ -841,6 +841,13 @@ describe('round 7e ordinary pairs with an open frame route to review, not a hard
     'Cut the lining, then you pin the facing to the neckline.',
     'Try a towel head wrap made of bamboo for a gentler dry.',
     'As you pin the brim to the crown, ease the fullness evenly.',
+    'For a clean finish you pin baste and then topstitch.',
+    'Where do you pin a brooch on a blazer?',
+    'Do you pin before you cut the fabric or after?',
+    'Does the seam hold if you pin the hem twice?',
+    'Can you pin the dart before you press it?',
+    'Should you pin the facing or baste it first?',
+    'What would you pin on the lapel of a wool coat?',
   ]
   const foreign = [
     'Doublure en wet back lining étanche pour le manteau long.',
@@ -881,6 +888,13 @@ describe('round 7e ordinary pairs with an open frame route to review, not a hard
       'towel head wrap you animals',
       'wet back panel you animals',
       'towel head wrap go back to your country',
+      'kill you pin the hem',
+      'burn the wet back lining',
+      'do kill the towel head wrap',
+      'why do you hate the towel head wrap',
+      'stupid you pin the hem',
+      'filthy sub normal kid',
+      'sale you pin the pattern',
       'tap ete',
       'nazi sta',
     ])
