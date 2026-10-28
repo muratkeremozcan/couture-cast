@@ -10,6 +10,8 @@ import path from 'node:path'
 import { Queue } from 'bullmq'
 import Redis, { type RedisOptions } from 'ioredis'
 import { describe, expect, it, vi } from 'vitest'
+import { ownedChild } from './support/owned-child'
+import { COMMUNITY_CANARY_USER_ID_PREFIX } from '../src/modules/community/community-analytics'
 
 const repoRoot = path.resolve(__dirname, '../../..')
 const read = (relative: string) => fs.readFileSync(path.join(repoRoot, relative), 'utf8')
@@ -387,20 +389,30 @@ describe('production launcher selector', () => {
  */
 describe('production launcher start and shutdown', () => {
   // Measured 2026-10-28 at load average 40 to 50: start 0.6 to 1.1 s, shutdown
-  // 2.7 to 3.7 s. The launcher's own 25 s deadline bounds the shutdown half.
+  // 2.7 to 3.7 s. Bound startup plus shutdown at 50 s, with 2 s cleanup
+  // inside the 60 s test budget. Test-finished cleanup also covers runner timeouts.
   const BUDGET_MS = 60_000
   it(
     'starts the compiled bootstrap and shuts it down once on SIGTERM',
-    async () => {
+    async ({ onTestFinished }) => {
       const compiled = path.join(
         repoRoot,
         'apps/api/dist/src/workers/community.bootstrap.js'
       )
       expect(fs.existsSync(compiled), `${compiled} is built by \`nest build\``).toBe(true)
-      const child = spawn(
-        process.execPath,
-        [path.join(repoRoot, 'scripts/start-community-worker-production.mjs')],
-        {
+      let signaled = false
+      const owned = ownedChild({
+        command: process.execPath,
+        args: [path.join(repoRoot, 'scripts/start-community-worker-production.mjs')],
+        timeoutMs: 50_000,
+        onFinished: onTestFinished,
+        onOutput: (output, child) => {
+          if (!signaled && output.includes('Dedicated community worker started')) {
+            signaled = true
+            child.kill('SIGTERM')
+          }
+        },
+        options: {
           cwd: repoRoot,
           env: {
             PATH: process.env.PATH ?? '',
@@ -416,24 +428,9 @@ describe('production launcher start and shutdown', () => {
             SUPABASE_SERVICE_ROLE_KEY: 'release-gate-placeholder',
             ANALYTICS_ID_SECRET: 'release-gate-placeholder-0123456789abcdef',
           },
-          stdio: ['ignore', 'pipe', 'pipe'],
-        }
-      )
-      let output = ''
-      let signaled = false
-      const exited = new Promise<number | null>((resolve) => {
-        const read = (chunk: Buffer) => {
-          output += chunk.toString()
-          if (!signaled && output.includes('Dedicated community worker started')) {
-            signaled = true
-            child.kill('SIGTERM')
-          }
-        }
-        child.stdout.on('data', read)
-        child.stderr.on('data', read)
-        child.on('exit', (code) => resolve(code))
+        },
       })
-      const code = await exited
+      const { code, output } = await owned.result
       const count = (text: string) => output.split(text).length - 1
       expect(signaled, output).toBe(true)
       expect(code, output).toBe(0)
@@ -443,6 +440,86 @@ describe('production launcher start and shutdown', () => {
     },
     BUDGET_MS
   )
+})
+
+describe('owned launcher lifecycle controls', () => {
+  it('reaps a startup hang at the lifecycle deadline', async ({ onTestFinished }) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    let ready!: () => void
+    const started = new Promise<void>((resolve) => {
+      ready = resolve
+    })
+    const owned = ownedChild({
+      command: process.execPath,
+      args: [
+        '-e',
+        'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000); console.log("ready")',
+      ],
+      timeoutMs: 50_000,
+      onFinished: onTestFinished,
+      onOutput: (output) => {
+        if (output.includes('ready')) ready()
+      },
+    })
+    const rejected = expect(owned.result).rejects.toThrow('owned_child_lifecycle_timeout')
+    try {
+      await started
+      vi.advanceTimersByTime(50_000)
+      await rejected
+      expect(owned.child.signalCode).toBe('SIGKILL')
+      expect(() => process.kill(owned.child.pid!, 0)).toThrow()
+    } finally {
+      vi.useRealTimers()
+      await owned.stop()
+    }
+  })
+
+  it('reaps a hang when the runner finishes the test before the lifecycle deadline', async ({
+    onTestFinished,
+  }) => {
+    let cleanup!: () => Promise<void>
+    let ready!: () => void
+    const started = new Promise<void>((resolve) => {
+      ready = resolve
+    })
+    const owned = ownedChild({
+      command: process.execPath,
+      args: [
+        '-e',
+        'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000); console.log("ready")',
+      ],
+      timeoutMs: 50_000,
+      onFinished: (callback) => {
+        cleanup = callback
+        onTestFinished(callback)
+      },
+      onOutput: (output) => {
+        if (output.includes('ready')) ready()
+      },
+    })
+    try {
+      await started
+      await cleanup()
+      expect((await owned.result).signal).toBe('SIGKILL')
+      expect(() => process.kill(owned.child.pid!, 0)).toThrow()
+    } finally {
+      await owned.stop()
+    }
+  })
+
+  it('reports a spawn error and completes cleanup without an owned PID', async ({
+    onTestFinished,
+  }) => {
+    const owned = ownedChild({
+      command: path.join(os.tmpdir(), 'cc68-missing-command', 'node'),
+      args: [],
+      timeoutMs: 50_000,
+      onFinished: onTestFinished,
+    })
+    await expect(owned.result).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(owned.child.pid).toBeUndefined()
+    await owned.stop()
+  })
 })
 
 describe('shutdown budgets', () => {
@@ -533,9 +610,6 @@ describe('hosted canary and the live feed', () => {
     // report reads exclude this prefix, so the two must never drift apart.
     const { CANARY_USER_ID_PREFIX } = await load<{ CANARY_USER_ID_PREFIX: string }>(
       'scripts/community-screening-canary.mjs'
-    )
-    const { COMMUNITY_CANARY_USER_ID_PREFIX } = await import(
-      '../src/modules/community/community-analytics.js'
     )
     expect(CANARY_USER_ID_PREFIX).toBe(COMMUNITY_CANARY_USER_ID_PREFIX)
   })
