@@ -220,6 +220,7 @@ for (const flow of ['maestro', 'rapidWatermarkFlow']) {
         spawnSync: capture,
         spawnIosFlow: capture,
         nativeFlowTimeoutMs: () => 120_000,
+        logSize: () => 0,
         spawn: capture,
         MAESTRO_ANDROID_DRIVER_PORT: 17001,
         DRIVER_HOST_PORT_ARG: '--driver-host-port',

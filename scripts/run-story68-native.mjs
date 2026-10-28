@@ -19,6 +19,7 @@ import { metroServerEnv } from './lib/story68-metro-env.mjs'
 import {
   recordIosCommandTimings,
   recordIosFlowProgress,
+  logSize,
 } from './ci/native-ios-maestro-trace.mjs'
 import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
 import {
@@ -262,6 +263,7 @@ function localeEnv() {
 function maestro(flow, env = {}, secret = '', attempt = 0) {
   requireDevice()
   const started = Date.now()
+  const apiLogFromByte = logSize(path.join(directory, 'api.log'))
   const output = path.join(directory, `maestro-${platform}-${Date.now()}`)
   fs.mkdirSync(output, { mode: 0o700 })
   const result = withNativeTransport(() => {
@@ -325,6 +327,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
       maestroLog: snapshotLog,
       directory,
       apiLogFile: path.join(directory, 'api.log'),
+      apiLogFromByte,
     })
     privateJson(
       `native-flow-failure-${platform}.json`,

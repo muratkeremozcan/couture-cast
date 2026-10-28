@@ -8,6 +8,7 @@ import {
   shareCardApiRows,
   recordIosCommandTimings,
   recordIosFlowProgress,
+  logSize,
   slowMaestroCommands,
 } from './native-ios-maestro-trace.mjs'
 
@@ -237,4 +238,40 @@ test('a failed flow record carries the recent share-card API rows from the API l
     report: () => undefined,
   })
   assert.deepEqual(missing.shareCardApi, [])
+})
+
+test('a failed flow record excludes API rows written before the flow began', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-progress-since-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const apiLogFile = path.join(directory, 'api.log')
+  const row = (statusCode) =>
+    JSON.stringify({
+      path: '/api/v1/share-cards/prepare',
+      method: 'POST',
+      statusCode,
+      durationMs: 5,
+    }) + '\n'
+  assert.equal(logSize(apiLogFile), 0)
+  fs.writeFileSync(apiLogFile, row(200))
+  const fromByte = logSize(apiLogFile)
+  const record = (apiLogFromByte) =>
+    recordIosFlowProgress({
+      platform: 'ios',
+      flow: 'maestro/story68/open-outfit.yaml',
+      maestroLog: killedLog,
+      directory,
+      apiLogFile,
+      apiLogFromByte,
+      report: () => undefined,
+    }).shareCardApi
+  assert.deepEqual(record(fromByte), [])
+  fs.appendFileSync(apiLogFile, row(503))
+  assert.deepEqual(
+    record(fromByte).map((entry) => entry.status),
+    [503]
+  )
+  assert.deepEqual(
+    record(0).map((entry) => entry.status),
+    [200, 503]
+  )
 })

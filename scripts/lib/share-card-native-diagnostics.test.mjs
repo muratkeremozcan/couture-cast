@@ -296,6 +296,7 @@ function invokeMaestro(t, capture) {
     withNativeTransport: (work) => work(),
     recordIosFlowTiming: () => undefined,
     recordIosFlowProgress: () => undefined,
+    logSize: () => 0,
     reverse: () => undefined,
     localeEnv: () => ({}),
     spawnSync: () => ({

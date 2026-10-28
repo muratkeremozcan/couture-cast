@@ -143,11 +143,20 @@ export function shareCardApiRows(apiLog, limit = 20) {
   return rows.slice(-limit)
 }
 
-/** The last 256 KiB of a log file, or '' when it cannot be read. */
-function logTail(file) {
+/** Current byte length of a log file, 0 when it does not exist yet. */
+export function logSize(file) {
+  try {
+    return fs.statSync(file).size
+  } catch {
+    return 0
+  }
+}
+
+/** The last 256 KiB of a log file, never reaching before `fromByte`; '' when unreadable. */
+function logTail(file, fromByte = 0) {
   try {
     const size = fs.statSync(file).size
-    const length = Math.min(size, 256 * 1024)
+    const length = Math.min(size - Math.min(fromByte, size), 256 * 1024)
     const fd = fs.openSync(file, 'r')
     try {
       const buffer = Buffer.alloc(length)
@@ -168,6 +177,7 @@ export function recordIosFlowProgress({
   maestroLog,
   directory,
   apiLogFile = null,
+  apiLogFromByte = 0,
   report = console.log,
 }) {
   if (platform !== 'ios') return null
@@ -176,7 +186,10 @@ export function recordIosFlowProgress({
     const entry = {
       flow,
       ...maestroFlowProgress(maestroLog),
-      shareCardApi: apiLogFile ? shareCardApiRows(logTail(apiLogFile)) : [],
+      // Only rows written since the flow began, so an earlier flow's requests never pose as its own.
+      shareCardApi: apiLogFile
+        ? shareCardApiRows(logTail(apiLogFile, apiLogFromByte))
+        : [],
     }
     const file = path.join(directory, 'native-ios-flow-progress.json')
     try {
