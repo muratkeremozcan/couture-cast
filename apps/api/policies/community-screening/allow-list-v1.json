@@ -581,6 +581,26 @@
       "reason": "The plural of spice (cinnamon, cumin and other spices), common in food and textile-dye copy. It is the generated plural form (spic plus es) of the high-severity English slur spic. It clears only the exact lowercase token spices; spics, spic and every stretched, spaced or leet spelling keep screening."
     },
     {
+      "entry": "açıklara",
+      "language": "tr",
+      "reason": "Turkish dative plural of açık (open, the open ones), ordinary copy. With the dotless i and cedilla folded it is one deleted letter from the listed amcıklara, so the typo index of long high-severity terms meets it. It clears only the exact accented lowercase token; the unaccented spelling and every other spelling keep screening."
+    },
+    {
+      "entry": "açıklarda",
+      "language": "tr",
+      "reason": "Turkish locative plural of açık (open, the open ones), ordinary copy. With the dotless i and cedilla folded it is one deleted letter from the listed amcıklarda, so the typo index of long high-severity terms meets it. It clears only the exact accented lowercase token; the unaccented spelling and every other spelling keep screening."
+    },
+    {
+      "entry": "açıklardan",
+      "language": "tr",
+      "reason": "Turkish ablative plural of açık (open, the open ones), ordinary copy. With the dotless i and cedilla folded it is one deleted letter from the listed amcıklardan, so the typo index of long high-severity terms meets it. It clears only the exact accented lowercase token; the unaccented spelling and every other spelling keep screening."
+    },
+    {
+      "entry": "açıkların",
+      "language": "tr",
+      "reason": "Turkish genitive plural of açık (open, the open ones), ordinary copy. With the dotless i and cedilla folded it is one deleted letter from the listed amcıkların, so the typo index of long high-severity terms meets it. It clears only the exact accented lowercase token; the unaccented spelling and every other spelling keep screening."
+    },
+    {
       "entry": "açıklar",
       "language": "tr",
       "reason": "Turkish plural of açık (open, the open ones), ordinary copy. With the dotless i and cedilla folded it is one deleted letter from the generated plurals of amcık, so the typo index of long high-severity terms meets it. It clears only the exact accented lowercase token; the unaccented spelling aciklar and every other spelling keep screening."

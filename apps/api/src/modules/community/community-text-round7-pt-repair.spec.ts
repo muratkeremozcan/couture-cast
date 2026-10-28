@@ -1708,3 +1708,109 @@ describe('round 7b a high-severity term cut in two whole words', () => {
       expect(screen(text).disposition, text).toBe('pass')
   })
 })
+
+/**
+ * Round 7p. A complete-phrase allowance clears its words only when the phrase is contiguous in
+ * the literal text: plain spaces between the words. A full stop, newline, emoji or hyphen
+ * between them is a boundary, so an allowed tail cannot clear a reviewable token appended to
+ * it ("you are a dick. und weich"). Native Portuguese compounds keep their one hyphen in the
+ * scoped phrases only.
+ */
+describe('round 7p complete-phrase allowances stay within permitted literal boundaries', () => {
+  const policy = JSON.parse(
+    fs.readFileSync(
+      path.resolve(__dirname, '../../../policies/community-screening/allow-list-v1.json'),
+      'utf8'
+    )
+  ) as { entries: { entry: string; language: string }[] }
+  const LOCALE: Record<string, string> = {
+    de: 'de-DE',
+    en: 'en-US',
+    es: 'es-ES',
+    fr: 'fr-FR',
+    it: 'it-IT',
+    pt: 'pt-BR',
+    tr: 'tr-TR',
+  }
+  const phrases = policy.entries.filter((entry) => entry.entry.includes(' '))
+  const verdict = (text: string, language: string): string =>
+    screen(text, LOCALE[language] as string).disposition
+  // A phrase has something to clear when a word of it, or the words run together, screen.
+  const needsClearing = (entry: { entry: string; language: string }): boolean =>
+    [...entry.entry.split(' '), entry.entry.replaceAll(' ', '')].some(
+      (text) => verdict(text, entry.language) !== 'pass'
+    )
+
+  it('keeps every complete phrase clean when it stands alone', () => {
+    expect(phrases.length).toBeGreaterThan(10)
+    for (const { entry, language } of phrases)
+      expect(verdict(entry, language), `${language} ${entry}`).toBe('pass')
+  })
+
+  it('withholds the phrase when a full stop, newline, emoji or hyphen splits it', () => {
+    let checked = 0
+    for (const phrase of phrases) {
+      if (!needsClearing(phrase)) continue
+      checked += 1
+      const words = phrase.entry.split(' ')
+      for (let gap = 0; gap < words.length - 1; gap += 1)
+        for (const separator of [
+          '. ',
+          '.',
+          '\n',
+          '\u{1F603}',
+          ' \u{1F603} ',
+          '-',
+          ' - ',
+          '_',
+        ]) {
+          const text = words
+            .map((word, at) =>
+              at === 0 ? word : (at === gap + 1 ? separator : ' ') + word
+            )
+            .join('')
+          expect(
+            verdict(text, phrase.language),
+            `${phrase.language} ${JSON.stringify(text)}`
+          ).not.toBe('pass')
+        }
+    }
+    expect(checked).toBeGreaterThan(5)
+  })
+
+  it('withholds a reviewable word followed by the allowed tail of its phrase', () => {
+    for (const text of [
+      'you are a dick. und weich',
+      'you are a dick\nund weich',
+      'you are a dick\u{1F603}und weich',
+      'you are a dick, und weich',
+      'bicha. Para entrar',
+      'bicha\nPara entrar',
+    ])
+      expect(screen(text, 'en-US').disposition, JSON.stringify(text)).not.toBe('pass')
+    expect(screen('dick und weich', 'de-DE').disposition).toBe('pass')
+  })
+
+  it('keeps lo fa clean as a phrase and screens its fragments', () => {
+    expect(screen('lo fa', 'it-IT').disposition).toBe('pass')
+    for (const text of ['lo-fa', 'lo.fa', 'lo_fa', 'lofa', 'lo\nfa'])
+      expect(screen(text, 'it-IT').disposition, text).not.toBe('pass')
+  })
+
+  it('keeps the Portuguese native compound hyphen in the scoped phrases', () => {
+    for (const text of [
+      'pé-de-moleque',
+      'calça pé de elefante',
+      'estampa pé-de-galinha',
+      'pé do sapato',
+    ])
+      expect(screen(text, 'pt-BR').disposition, text).toBe('pass')
+    expect(screen('pé. de elefante', 'pt-BR').disposition).not.toBe('pass')
+  })
+
+  it('does not read a typo of a generated inflection as a typo of the term', () => {
+    for (const text of ['çiftler', 'çiftleri', 'sıkışan', 'açıklar', 'açıkları'])
+      expect(screen(text, 'tr-TR').disposition, text).toBe('pass')
+    expect(screen('çıfıtler', 'tr-TR').disposition).not.toBe('pass')
+  })
+})

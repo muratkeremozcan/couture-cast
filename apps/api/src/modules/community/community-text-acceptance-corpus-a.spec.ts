@@ -32,7 +32,7 @@ import {
 } from './community-text-acceptance-corpus.shared'
 
 const select = (key: string): boolean => !key.startsWith('clean-prose-markdown-en.json|')
-const PINNED_TOTAL = 16254
+const PINNED_TOTAL = 16272
 const CORPUS_TIMEOUT_MS = 300_000
 
 describe('frozen clean corpus, locale strings, symbol snippets and extra set', () => {

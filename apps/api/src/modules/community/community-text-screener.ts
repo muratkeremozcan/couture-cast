@@ -1201,6 +1201,8 @@ interface LanguageIndex {
   readonly phraseForms: ReadonlySet<string>
   /** The generated plural and inflected spellings of this language's high-severity terms. */
   readonly generatedForms: readonly string[]
+  /** The single-word terms the list names itself, folded. */
+  readonly listedTerms: ReadonlySet<string>
 }
 
 export interface CommunityTextScreenerOptions {
@@ -1454,9 +1456,14 @@ function buildTypoKeys(indexes: readonly LanguageIndex[]): ReadonlyMap<string, T
       keys.set(key, meta)
   }
   for (const index of indexes) {
+    const generated = new Set(index.generatedForms)
     for (const [term, meta] of index.single) {
       if (meta.severity !== 'high' || term.length < TYPO_MIN_TERM_LENGTH) continue
       if (!/^\p{L}+$/u.test(term)) continue
+      // A typo of a generated inflection is not a typo of a term: cifit plus the plural suffix,
+      // less one letter, is the ordinary Turkish plural of "pair" (çiftler). The suffix grammar
+      // is the text's own, so only the spellings the list names are typo-checked.
+      if (generated.has(term) && !index.listedTerms.has(term)) continue
       for (let at = 1; at < term.length - 1; at += 1) {
         add(`${term.slice(0, at)}${term.slice(at + 1)}`, meta)
         if (at < term.length - 2 && term[at] !== term[at + 1])
@@ -1497,6 +1504,7 @@ function buildLanguageIndex(
   const phraseLeetConcatenations = new Map<string, TermMeta>()
   const phraseForms = new Set<string>()
   const generatedForms = new Set<string>()
+  const listedTerms = new Set<string>()
 
   for (const entry of list.entries) {
     if (!policy.categories.includes(entry.category)) {
@@ -1541,6 +1549,7 @@ function buildLanguageIndex(
     }
 
     const term = foldedTokens[0] as string
+    listedTerms.add(term)
     if (term.length < MIN_SINGLE_TERM_LENGTH && !SHORT_TERM_EXCEPTIONS.has(term)) {
       throw new CommunityTextScreenerConfigError(
         `${list.language} has a single-word term under ${MIN_SINGLE_TERM_LENGTH} characters that is not a reviewed exception`
@@ -1591,6 +1600,7 @@ function buildLanguageIndex(
     phraseLeetConcatenations,
     phraseForms,
     generatedForms: [...generatedForms].toSorted(),
+    listedTerms,
   }
 }
 
@@ -1998,7 +2008,7 @@ export class CommunityTextScreener {
     // for both let an ordinary word disable every phrase it appears in: clearing
     // `concha` (a shell) also cleared `concha de tu madre`.
     const phraseAllowed = literalTokens.map(() => false)
-    this.markAllowedPhrases(literalTokens, phraseAllowed)
+    this.markAllowedPhrases(literal, literalTokens, phraseAllowed)
     const allowed = literalTokens.map(
       (token, index) =>
         this.allowSingles.has(token) ||
@@ -2108,13 +2118,34 @@ export class CommunityTextScreener {
     return SCREENING_LANGUAGES.find((candidate) => candidate === mapped) ?? null
   }
 
-  private markAllowedPhrases(literalTokens: string[], allowed: boolean[]): void {
+  /**
+   * Phrase allowances clear the words they cover only when the phrase is contiguous in the
+   * literal text: adjacent words are separated by plain spaces (a Portuguese native compound
+   * may also use one hyphen, in the scoped phrases only). A full stop, newline, emoji or any
+   * other separator between the words is a boundary, so an allowed tail appended to a
+   * reviewable word ("you are a dick. und weich") cannot clear it.
+   */
+  private markAllowedPhrases(
+    literal: string,
+    literalTokens: string[],
+    allowed: boolean[]
+  ): void {
+    const spans = [...literal.matchAll(/[\p{L}\p{N}]+/gu)]
+    const contiguous = (
+      start: number,
+      length: number,
+      joiner: 'space' | 'space-or-hyphen'
+    ): boolean =>
+      Array.from({ length: length - 1 }, (_, offset) =>
+        connectedLiteralTokens(literal, spans, start + offset, start + offset + 1, joiner)
+      ).every(Boolean)
     for (const scoped of this.activeScopedPhrases) {
       const { tokens: head, complements } = scoped
       for (let start = 0; start + head.length < literalTokens.length; start += 1) {
         if (!head.every((token, offset) => literalTokens[start + offset] === token))
           continue
         if (!complements.has(literalTokens[start + head.length] as string)) continue
+        if (!contiguous(start, head.length + 1, 'space-or-hyphen')) continue
         for (let offset = 0; offset < head.length; offset += 1)
           allowed[start + offset] = true
       }
@@ -2124,7 +2155,7 @@ export class CommunityTextScreener {
         const matches = phrase.every(
           (token, offset) => literalTokens[start + offset] === token
         )
-        if (!matches) continue
+        if (!matches || !contiguous(start, phrase.length, 'space')) continue
         for (let offset = 0; offset < phrase.length; offset += 1) {
           allowed[start + offset] = true
         }
@@ -2784,34 +2815,34 @@ export class CommunityTextScreener {
     start: number,
     size: number
   ): boolean {
-    return (
-      (this.allowPhrases.some(
+    const contiguous = (joiner: 'space' | 'space-or-hyphen'): boolean =>
+      Array.from({ length: size - 1 }, (_, offset) =>
+        connectedLiteralTokens(literal, spans, start + offset, start + offset + 1, joiner)
+      ).every(Boolean)
+    // An ordinary complete phrase joins across plain spaces only ("lo-fa" is still lofa);
+    // the hyphen of a native Portuguese compound belongs to the scoped phrases alone.
+    if (
+      this.allowPhrases.some(
         (phrase) =>
           phrase.length === size &&
           phrase.every((word, offset) => tokens[start + offset] === word)
-      ) ||
-        this.activeScopedPhrases.some(
-          (scoped) =>
-            scoped.tokens.length === size &&
-            scoped.tokens.every((word, offset) => tokens[start + offset] === word) &&
-            scoped.complements.has(tokens[start + size] as string) &&
-            connectedLiteralTokens(
-              literal,
-              spans,
-              start + size - 1,
-              start + size,
-              'space-or-hyphen'
-            )
-        )) &&
-      Array.from({ length: size - 1 }, (_, offset) =>
+      ) &&
+      contiguous('space')
+    )
+      return true
+    return this.activeScopedPhrases.some(
+      (scoped) =>
+        scoped.tokens.length === size &&
+        scoped.tokens.every((word, offset) => tokens[start + offset] === word) &&
+        scoped.complements.has(tokens[start + size] as string) &&
         connectedLiteralTokens(
           literal,
           spans,
-          start + offset,
-          start + offset + 1,
+          start + size - 1,
+          start + size,
           'space-or-hyphen'
-        )
-      ).every(Boolean)
+        ) &&
+        contiguous('space-or-hyphen')
     )
   }
 

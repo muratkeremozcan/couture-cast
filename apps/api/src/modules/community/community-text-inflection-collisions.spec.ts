@@ -16,7 +16,10 @@ import { CommunityTextScreener } from './community-text-screener'
  * withheld, rerun for the round 7k rape-family spellings (17 new forms, all withheld) and
  * for round 7l (20 new forms from the typo index: nonsense joins such as marcaes, junk
  * suffixes on mari-/mongol- stems, and the Turkish plurals açıklar and açıkları, which
- * are ordinary words and pass through the allow list). Any new generated form changes the hash below and fails the first test: rerun
+ * are ordinary words and pass through the allow list). Round 7p stops building typo
+ * spellings from generated inflections (only from the spellings a list names), which
+ * releases 18 of those forms, all nonsense strings or ordinary Turkish, and fixes çiftler,
+ * çiftleri and sıkışan; the typo index still reads every listed spelling. Any new generated form changes the hash below and fails the first test: rerun
  * the sweep, rule on each new collision and update the pins together.
  */
 const screener = new CommunityTextScreener()
@@ -99,26 +102,8 @@ const COLLISIONS: readonly (readonly [string, string, 'pass' | 'withheld'])[] = 
   ['rappistes', 'en', 'withheld'],
   ['rappists', 'en', 'withheld'],
   ['saaed', 'en', 'withheld'],
-  ['açıkdan', 'tr', 'withheld'],
-  ['açıkden', 'tr', 'withheld'],
   ['açıklar', 'tr', 'pass'],
   ['açıkları', 'tr', 'pass'],
-  ['açıkler', 'tr', 'withheld'],
-  ['açıkleri', 'tr', 'withheld'],
-  ['bolleres', 'en', 'withheld'],
-  ['bollers', 'en', 'withheld'],
-  ['marcaes', 'es,pt', 'withheld'],
-  ['marcases', 'es,pt', 'withheld'],
-  ['marcass', 'es,pt', 'withheld'],
-  ['marciaes', 'en', 'withheld'],
-  ['mariaes', 'en', 'withheld'],
-  ['mariones', 'en', 'withheld'],
-  ['marions', 'en', 'withheld'],
-  ['mongolices', 'en', 'withheld'],
-  ['mongolics', 'en', 'withheld'],
-  ['rayedes', 'en', 'withheld'],
-  ['retares', 'en', 'withheld'],
-  ['retrades', 'en', 'withheld'],
 ]
 
 describe('generated inflection forms and their collisions', () => {
@@ -131,7 +116,7 @@ describe('generated inflection forms and their collisions', () => {
   })
 
   it('pins the sweep result', () => {
-    expect(COLLISIONS).toHaveLength(88)
+    expect(COLLISIONS).toHaveLength(70)
   })
 
   it.each(COLLISIONS)('%s (%s) is %s', (form, _languages, expected) => {

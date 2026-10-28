@@ -12,12 +12,16 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "fb6705741dd336e77f38db4cb131820c0787e325ca89ceef20099ef02ac5d3c5",
+    "allowListSha256": "df4a0750362671ee5c151736aed07c5e0586183fc1588a91cfc0ab3fe13fb539",
     "reviewedOccurrenceSha256": "da22299c1bb3431bed21e13045834488de36e15b7fc2eb621a1741cfa21059a4"
   },
   "entries": [
     "açıklar",
+    "açıklara",
+    "açıklarda",
+    "açıklardan",
     "açıkları",
+    "açıkların",
     "fagot",
     "gok",
     "gök",
