@@ -22,6 +22,11 @@ android {
       excludes += ["**/*.so"]
     }
   }
+  // Pure waiting logic shared by the instrumented TalkBack test and its JVM unit tests.
+  sourceSets {
+    test.java.srcDirs += 'src/testShared/java'
+    androidTest.java.srcDirs += 'src/testShared/java'
+  }
   testOptions {
     unitTests {
       includeAndroidResources = true

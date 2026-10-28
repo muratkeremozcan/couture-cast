@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 // Story 6.8 native harness. Every mutation is scoped to the explicitly owned runtime/device.
 import { talkbackFailureSummary } from './lib/story68-talkback-failure.mjs'
+import {
+  bundleBuilds,
+  focusLatencies,
+  talkBackVersion,
+  talkbackEvidence,
+} from './lib/story68-talkback-evidence.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
@@ -690,7 +696,18 @@ if (command === 'prebuild') {
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
     // Maestro owns UiAutomation during setup and its teardown changes touch
     // exploration. Bind TalkBack and await readiness after that handoff.
+    const readMetro = () => {
+      try {
+        return bundleBuilds(fs.readFileSync(path.join(directory, 'metro.log'), 'utf8'))
+      } catch {
+        return []
+      }
+    }
+    const bundlesBefore = readMetro()
+    const enableStarted = performance.now()
     run('bash', ['scripts/ci/android-talkback.sh', 'enable'], { ...env, ADB: adb })
+    const enableMs = performance.now() - enableStarted
+    const instrumentStarted = performance.now()
     const output = run(adb, [
       '-s',
       device,
@@ -703,9 +720,32 @@ if (command === 'prebuild') {
       'expo.modules.accessibilityfocus.ShareCardComposerTalkBackTest',
       'expo.modules.accessibilityfocus.test/androidx.test.runner.AndroidJUnitRunner',
     ])
+    const instrumentMs = performance.now() - instrumentStarted
     fs.writeFileSync(path.join(directory, 'talkback-composer.log'), output, {
       mode: 0o600,
     })
+    // Closed facts for telling a flake apart from a regression; printed on pass and fail.
+    console.log(
+      JSON.stringify({
+        talkbackEvidence: talkbackEvidence({
+          version: talkBackVersion(
+            run(adb, [
+              '-s',
+              device,
+              'shell',
+              'dumpsys',
+              'package',
+              'com.google.android.marvin.talkback',
+            ])
+          ),
+          enableMs,
+          instrumentMs,
+          bundlesBefore,
+          bundlesAfter: readMetro(),
+          focusWaits: focusLatencies(output),
+        }),
+      })
+    )
     if (
       !/OK \(2 tests\)/.test(output) ||
       /FAILURES|INSTRUMENTATION_FAILED/.test(output)
