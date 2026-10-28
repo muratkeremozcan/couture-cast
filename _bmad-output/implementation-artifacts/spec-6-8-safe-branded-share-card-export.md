@@ -1085,6 +1085,27 @@ failure is inferred from its pending state.
     queried. This note treats the preload as present in production.
   - Local runs can use CI's database through `node scripts/integration-postgres.mjs start`.
 
+- 2026-10-28 platform note, PostgreSQL 17 transaction timeouts and their Prisma forms (4df12583,
+  aa7ceed9, b794c596): PostgreSQL 17 ends a transaction past either time budget with a FATAL under
+  its own SQLSTATE and fixed text (`postgres.c` `ProcessInterrupts` on REL_17_STABLE, reproduced
+  on 17.6): 25P03 `terminating connection due to idle-in-transaction timeout` and 25P04
+  `terminating connection due to transaction timeout`. Neither arrives under the other's code,
+  and PG17 arms the idle timer only when it is shorter than `transaction_timeout`.
+  - Prisma 6.19 forms, measured on an isolated database: with a statement in flight, a raw query
+    reports P2010 with the SQLSTATE in `meta.code`, and a model operation reports
+    `PrismaClientUnknownRequestError` carrying `PostgresError { code, message }`. 55P03, 57014,
+    25P04 and 40P01 all take the second form from model operations; Prisma maps only 40001, to
+    P2034. `apps/api/src/prisma/postgres-error.ts` reads the SQLSTATE and message from both.
+  - Classification: the stream appender's `appendFailure` treats 57014, and 25P03 or 25P04 with
+    its exact text, as budget pressure, and 55P03 as head contention, in both forms.
+    `communityPrivacyTransaction` retries 40001, 40P01 and 55P03 in both forms.
+  - Idle-session case, coordinator decision 2026-10-28: when either timeout fires while the
+    session is idle, the server closes the connection before the next statement and Prisma
+    reports only P1017 `Server has closed the connection.` with no SQLSTATE. 25P03 fires only
+    while idle, so through Prisma it always arrives this way. P1017 stays
+    `dependency_unavailable`: it cannot be told apart from a real lost connection, so the
+    classifier does not guess. A unit test in `community-stream.repository.spec.ts` pins it.
+
 ## Spec Change Log
 
 - 2026-10-25, iteration 2 in progress, Astra round 1: accepted A1 and A2. iOS now imports the
