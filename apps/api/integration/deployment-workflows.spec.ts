@@ -49,21 +49,35 @@ const reserveSupabasePortsAction = path.join(
 const startLocalSupabaseUse = 'uses: ./.github/actions/start-local-supabase'
 const reservePortsUse = 'uses: ./.github/actions/reserve-supabase-ports'
 
-/** Each job's steps in order, as the raw text of each `- ` step entry. */
+/**
+ * Each job's steps in order, as the raw text of each `- ` step entry. A job whose
+ * `steps:` key is a YAML anchor (`&name`) or alias (`*name`) gets the anchored list, so
+ * jobs that reuse one step list are checked like any other.
+ */
 function jobSteps(workflow: string): Map<string, string[]> {
   const jobs = new Map<string, string[]>()
+  const anchored = new Map<string, string[]>()
+  const aliases: [string, string][] = []
   const body = workflow.slice(workflow.search(/^jobs:\s*$/m))
   for (const block of body.split(/^(?= {2}[A-Za-z0-9_-]+:\s*$)/m).slice(1)) {
     const name = block.slice(2, block.indexOf(':'))
-    const stepsAt = block.search(/^ {4}steps:\s*$/m)
-    if (stepsAt === -1) continue
-    jobs.set(
-      name,
-      block
-        .slice(stepsAt)
-        .split(/^ {6}- /m)
-        .slice(1)
-    )
+    const header = /^ {4}steps:(?: ([&*])([A-Za-z0-9_-]+))?\s*$/m.exec(block)
+    if (!header) continue
+    if (header[1] === '*') {
+      aliases.push([name, header[2]])
+      continue
+    }
+    const steps = block
+      .slice(header.index)
+      .split(/^ {6}- /m)
+      .slice(1)
+    jobs.set(name, steps)
+    if (header[1] === '&') anchored.set(header[2], steps)
+  }
+  for (const [name, anchor] of aliases) {
+    const steps = anchored.get(anchor)
+    expect(steps, `${name} aliases an unknown steps anchor ${anchor}`).toBeDefined()
+    jobs.set(name, steps as string[])
   }
   return jobs
 }
@@ -189,8 +203,10 @@ describe('deployment workflows', () => {
         expect(reserve, `${file} ${job}`).toBeLessThan(start)
       }
     }
-    // pr-share-card-native.yml starts it twice: the image prewarm job and the native lane.
-    expect(startingJobs).toBe(8)
+    // pr-share-card-native.yml starts it in six jobs: the image prewarm job, the API32 and
+    // iOS original-resource job, the browser lane and the three Android 36 partitions (two
+    // of them reuse the first one's anchored steps).
+    expect(startingJobs).toBe(12)
   })
 
   it('local Supabase starts from the image cache with its host ports guarded', () => {
