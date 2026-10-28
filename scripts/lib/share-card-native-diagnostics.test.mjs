@@ -402,6 +402,62 @@ describe('native flow diagnostics capture', () => {
     assert.equal(result.failedCommand.selector.value, 'tab-home')
   })
 
+  test('a killed retry keeps the captured FAILED attempt over its deeper artifact-free RUNNING row', async (t) => {
+    const { collectNativeFlowDiagnostics, projectNativeFlowDiagnostics } = await helper()
+    const captured = command('tapOnElement', 'tab-home', 'FAILED', 4, 1)
+    captured.metadata.artifacts = [
+      { type: 'SCREEN_HIERARCHY', path: 'screen-hierarchy/attempt-1.json' },
+    ]
+    const running = command(
+      'scrollUntilVisible',
+      'outfit-share-card-open',
+      'RUNNING',
+      9,
+      2
+    )
+    const rows = [captured, running]
+    assert.equal(
+      projectNativeFlowDiagnostics({ ...context, root, commands: rows, hierarchy })
+        .failedCommand.selector.value,
+      'tab-home'
+    )
+    // Without a captured hierarchy the deepest row still wins, as before.
+    assert.equal(
+      projectNativeFlowDiagnostics({
+        ...context,
+        root,
+        commands: [command('tapOnElement', 'tab-home', 'FAILED', 4, 1), running],
+        hierarchy,
+      }).failedCommand.selector.value,
+      'outfit-share-card-open'
+    )
+    const directory = fixture(t)
+    const output = path.join(directory, 'maestro-current')
+    const flowDir = path.join(output, 'open-app')
+    fs.mkdirSync(path.join(flowDir, 'screen-hierarchy'), { recursive: true })
+    fs.writeFileSync(
+      path.join(flowDir, 'screen-hierarchy/attempt-1.json'),
+      JSON.stringify(hierarchy)
+    )
+    fs.writeFileSync(path.join(flowDir, 'commands.json'), JSON.stringify(rows))
+    const result = await collectNativeFlowDiagnostics(
+      {
+        ...context,
+        flow: 'maestro/story65/open-app.yaml',
+        root,
+        directory,
+        output,
+        device: 'emulator-5554',
+        adb: '/owned/adb',
+        startedAt: Date.now() - 125000,
+      },
+      { execute: () => ({ status: 1, stdout: '' }) }
+    )
+    assert.equal(result.failedCommand.status, 'FAILED')
+    assert.equal(result.failedCommand.selector.value, 'tab-home')
+    assert.equal(result.captures.hierarchy, true)
+    assert.equal(result.screen.controls.length, 2)
+  })
   test('missing command output preserves unavailable step instead of inventing a failed selector', async (t) => {
     const { collectNativeFlowDiagnostics } = await helper()
     const directory = fixture(t),

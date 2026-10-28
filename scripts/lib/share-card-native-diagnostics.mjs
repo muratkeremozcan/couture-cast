@@ -209,15 +209,24 @@ function commandRecord(row, labels) {
     durationMs: integer(metadata.duration) ? metadata.duration : null,
   }
 }
+const capturedFailure = (row) =>
+  row?.metadata?.status === 'FAILED' &&
+  Array.isArray(row.metadata.artifacts) &&
+  row.metadata.artifacts.some((artifact) => artifact?.type === 'SCREEN_HIERARCHY')
+// A FAILED row with its own hierarchy explains the failure. A deeper RUNNING row is
+// what a killed run leaves behind and carries no artifacts, so it ranks below.
+function compareFailures(a, b) {
+  return (
+    Number(capturedFailure(b)) - Number(capturedFailure(a)) ||
+    (b.metadata.depth ?? 0) - (a.metadata.depth ?? 0) ||
+    (b.metadata.sequenceNumber ?? 0) - (a.metadata.sequenceNumber ?? 0)
+  )
+}
 function selectFailure(rows) {
   const candidates = rows.filter((row) =>
     ['FAILED', 'RUNNING'].includes(row?.metadata?.status)
   )
-  return candidates.sort(
-    (a, b) =>
-      (b.metadata.depth ?? 0) - (a.metadata.depth ?? 0) ||
-      (b.metadata.sequenceNumber ?? 0) - (a.metadata.sequenceNumber ?? 0)
-  )[0]
+  return candidates.sort(compareFailures)[0]
 }
 function allNodes(tree) {
   return tree && typeof tree === 'object'
@@ -705,9 +714,6 @@ const textFile = (file) => {
     return ''
   }
 }
-function failureDepth(row) {
-  return row.metadata?.depth ?? 0
-}
 function readArtifacts(output) {
   const files = filesUnder(output)
   let rows = [],
@@ -721,7 +727,7 @@ function readArtifacts(output) {
       const candidate = JSON.parse(textFile(file))
       if (!Array.isArray(candidate)) continue
       const failure = selectFailure(candidate)
-      if (failure && (!failed || failureDepth(failure) >= failureDepth(failed))) {
+      if (failure && (!failed || compareFailures(failure, failed) <= 0)) {
         rows = candidate
         failed = failure
         base = path.dirname(file)
