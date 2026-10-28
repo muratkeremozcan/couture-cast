@@ -19,6 +19,7 @@ import { metroServerArgs, metroServerEnv } from './lib/story68-metro-env.mjs'
 import {
   recordIosCommandTimings,
   recordIosFlowProgress,
+  recordIosHostSample,
   logSize,
 } from './ci/native-ios-maestro-trace.mjs'
 import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
@@ -328,6 +329,8 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
       directory,
       apiLogFile: path.join(directory, 'api.log'),
       apiLogFromByte,
+      output,
+      root,
     })
     privateJson(
       `native-flow-failure-${platform}.json`,
@@ -1380,6 +1383,7 @@ if (command === 'prebuild') {
     'tr-TR',
   ]) {
     activeLocale = locale
+    if (platform === 'ios') recordIosHostSample('locale-loop', { root })
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: locale })
     open('outfit')
     maestro('maestro/story68/localized.yaml')

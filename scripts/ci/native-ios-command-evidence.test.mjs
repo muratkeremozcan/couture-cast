@@ -202,8 +202,23 @@ test('quiet services are stopped by exact listed label, only when owned by the s
     calls.push({ operation, binary, args, options })
     return { exitCode: operation === 'bootout-quiet-healthappd' ? 1 : 0 }
   }
-  const stopped = bootoutQuietServices('owned-uuid', quietPs, quietJobs, 100, execute)
+  const listed =
+    '110 0 com.apple.chronod\n- 0 com.apple.triald\n111 0 com.apple.healthappd'
+  const log = console.log
+  const lines = []
+  console.log = (line) => lines.push(line)
+  let stopped
+  try {
+    stopped = bootoutQuietServices('owned-uuid', quietPs, quietJobs, 100, execute, listed)
+  } finally {
+    console.log = log
+  }
   assert.deepEqual(stopped, ['chronod'])
+  const { census } = JSON.parse(lines.at(-1)).quietServices
+  assert.deepEqual(census.chronod, { state: 'running', bootoutExit: 0 })
+  assert.deepEqual(census.healthappd, { state: 'running', bootoutExit: 1 })
+  assert.deepEqual(census.triald, { state: 'idle', bootoutExit: null })
+  assert.deepEqual(census.searchd, { state: 'absent', bootoutExit: null })
   assert.deepEqual(
     calls.map((c) => c.operation),
     ['bootout-quiet-chronod', 'bootout-quiet-healthappd']

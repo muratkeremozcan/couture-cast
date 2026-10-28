@@ -8,6 +8,9 @@ import {
   shareCardApiRows,
   recordIosCommandTimings,
   recordIosFlowProgress,
+  recordIosHostSample,
+  failedStepHierarchy,
+  systemSurfaceSummary,
   logSize,
   slowMaestroCommands,
 } from './native-ios-maestro-trace.mjs'
@@ -274,4 +277,129 @@ test('a failed flow record excludes API rows written before the flow began', (t)
     record(0).map((entry) => entry.status),
     [200, 503]
   )
+})
+
+const alertTree = {
+  attributes: { class: 'Root' },
+  children: [
+    {
+      attributes: { text: '"CoutureCast" Would Like to Add to Your Photos' },
+      children: [
+        { attributes: { text: 'Allow' }, children: [] },
+        { attributes: { accessibilityText: 'Don\u2019t Allow' }, children: [] },
+        { attributes: { text: 'Private caption 50%' }, children: [] },
+      ],
+    },
+    { attributes: { 'resource-id': 'share-card-save' }, children: [] },
+  ],
+}
+
+test('the failure summary is closed: counts, listed alert buttons and a permission flag only', () => {
+  const summary = systemSurfaceSummary(alertTree)
+  assert.deepEqual(summary, {
+    nodeCount: 6,
+    topLevelCount: 2,
+    alertButtons: ["Don't Allow", 'Allow'].sort(),
+    permissionTextSeen: true,
+  })
+  assert.doesNotMatch(JSON.stringify(summary), /Private|caption|50%|share-card-save/)
+  const quiet = systemSurfaceSummary({
+    attributes: {},
+    children: [{ attributes: { text: 'Save to photos' }, children: [] }],
+  })
+  assert.deepEqual(quiet.alertButtons, [])
+  assert.equal(quiet.permissionTextSeen, false)
+  assert.equal(systemSurfaceSummary(null), null)
+})
+
+test('the failed step hierarchy is read from its Maestro artifact and nothing else', (t) => {
+  const output = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-hierarchy-'))
+  t.after(() => fs.rmSync(output, { recursive: true, force: true }))
+  assert.equal(failedStepHierarchy(output), null)
+  fs.writeFileSync(path.join(output, 'hierarchy_1.json'), JSON.stringify(alertTree))
+  fs.writeFileSync(
+    path.join(output, 'commands.json'),
+    JSON.stringify([
+      { command: {}, metadata: { status: 'COMPLETED', artifacts: [] } },
+      {
+        command: {},
+        metadata: {
+          status: 'FAILED',
+          artifacts: [{ type: 'SCREEN_HIERARCHY', path: '/x/hierarchy_1.json' }],
+        },
+      },
+    ])
+  )
+  assert.deepEqual(failedStepHierarchy(output), alertTree)
+})
+
+test('host samples run the evidence script with the label and never throw', () => {
+  const calls = []
+  const lines = []
+  const ok = recordIosHostSample('locale-loop', {
+    root: '/r',
+    spawn: (binary, args, options) => {
+      calls.push({ binary, args, options })
+      return { status: 0 }
+    },
+    report: (line) => lines.push(line),
+  })
+  assert.equal(ok, true)
+  assert.deepEqual(calls[0].args, [
+    'scripts/ci/native-host-evidence.mjs',
+    'sample',
+    'locale-loop',
+    '--platform',
+    'ios',
+  ])
+  assert.equal(calls[0].options.cwd, '/r')
+  assert.equal(
+    recordIosHostSample('flow-failure', {
+      spawn: () => ({ status: 3 }),
+      report: (line) => lines.push(line),
+    }),
+    false
+  )
+  assert.match(lines[0], /hostSampleFailure.*flow-failure.*3/)
+  assert.equal(
+    recordIosHostSample('flow-failure', {
+      spawn: () => {
+        throw new Error('boom')
+      },
+    }),
+    false
+  )
+})
+
+test('a failed flow with its output directory samples the host first and records the surface', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-surface-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const labels = []
+  const entry = recordIosFlowProgress({
+    platform: 'ios',
+    flow: 'maestro/story68/permanent.yaml',
+    maestroLog: killedLog,
+    directory,
+    output: directory,
+    spawn: (binary, args) => {
+      labels.push(args[2])
+      return { status: 0 }
+    },
+    report: () => undefined,
+  })
+  assert.deepEqual(labels, ['flow-failure'])
+  assert.equal(entry.hostSampled, true)
+  assert.equal(entry.systemSurface, null)
+})
+
+test('the runner samples the host in the locale loop and hands the failure path its output directory', () => {
+  const runner = fs.readFileSync(
+    new URL('../run-story68-native.mjs', import.meta.url),
+    'utf8'
+  )
+  assert.match(
+    runner,
+    /activeLocale = locale\n\s+if \(platform === 'ios'\) recordIosHostSample\('locale-loop', \{ root \}\)\n\s+maestro\('maestro\/story65\/set-locale\.yaml'/
+  )
+  assert.match(runner, /apiLogFromByte,\n\s+output,\n\s+root,\n\s+\}\)/)
 })

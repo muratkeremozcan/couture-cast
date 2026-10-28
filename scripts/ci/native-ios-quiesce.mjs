@@ -331,11 +331,32 @@ export const QUIET_SERVICES = Object.freeze([
   'amsengagementd',
 ])
 
-/** Stop each running owned job from the list; every attempt is recorded and nonfatal. */
-export function bootoutQuietServices(device, ps, jobs, manager, execute) {
+/** Labels the simulator lists, running or idle. */
+const listedLabels = (listed) =>
+  new Set(
+    String(listed)
+      .split('\n')
+      .flatMap((line) => {
+        const m = line.trim().match(/^(?:\d+|-)\s+-?\d+\s+(\S+)$/)
+        return m ? [m[1]] : []
+      })
+  )
+
+/**
+ * Stop each running owned job from the list; every attempt is recorded and nonfatal. The census
+ * names, per entry, whether the runtime ran it ('running'), listed it idle ('idle') or does not
+ * have it ('absent'), and the exit code of the boot-out, so the next run shows which labels exist.
+ */
+export function bootoutQuietServices(device, ps, jobs, manager, execute, listed = '') {
+  const labels = listedLabels(listed)
   const stopped = []
+  const census = {}
   for (const name of QUIET_SERVICES) {
     const service = ownedService(ps, jobs, manager, name)
+    census[name] = {
+      state: service ? 'running' : labels.has(`com.apple.${name}`) ? 'idle' : 'absent',
+      bootoutExit: null,
+    }
     if (!service) continue
     // The system form is the one the simulator accepts (apsd, run 9).
     const result = execute(
@@ -344,8 +365,10 @@ export function bootoutQuietServices(device, ps, jobs, manager, execute) {
       ['simctl', 'spawn', device, 'launchctl', 'bootout', `system/${service.label}`],
       { fatal: false }
     )
+    census[name].bootoutExit = result.exitCode ?? null
     if (result.exitCode === 0) stopped.push(name)
   }
+  console.log(JSON.stringify({ quietServices: { stopped, census } }))
   return stopped
 }
 
@@ -400,7 +423,14 @@ export function probeSimulatorTuning(device, execute, tuning = {}) {
       { fatal: false }
     )
   } else console.log(JSON.stringify({ extractionBootout: 'no_matching_owned_label' }))
-  tuning.quietStopped = bootoutQuietServices(device, ps.stdout, jobs, manager, execute)
+  tuning.quietStopped = bootoutQuietServices(
+    device,
+    ps.stdout,
+    jobs,
+    manager,
+    execute,
+    listed.stdout
+  )
   return manager
 }
 

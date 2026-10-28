@@ -1,6 +1,7 @@
 /** Read and project the Maestro command trace a flow leaves in its debug output. */
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 
 function commandFiles(directory) {
   let entries = []
@@ -170,6 +171,94 @@ function logTail(file, fromByte = 0) {
   }
 }
 
+const ALERT_BUTTONS = [
+  "Don't Allow",
+  'Don\u2019t Allow',
+  'Allow',
+  'Allow Once',
+  'Allow Full Access',
+  'Limit Access',
+  'OK',
+]
+
+/** The hierarchy Maestro stored for the failed step (springboard alerts included), else null. */
+export function failedStepHierarchy(output) {
+  for (const file of commandFiles(output)) {
+    try {
+      const rows = JSON.parse(fs.readFileSync(file, 'utf8'))
+      for (const row of Array.isArray(rows) ? rows : []) {
+        if (row?.metadata?.status !== 'FAILED' && row?.status !== 'FAILED') continue
+        for (const artifact of row?.metadata?.artifacts ?? []) {
+          if (artifact?.type !== 'SCREEN_HIERARCHY' || typeof artifact.path !== 'string')
+            continue
+          const stored = path.join(path.dirname(file), path.basename(artifact.path))
+          return JSON.parse(fs.readFileSync(stored, 'utf8'))
+        }
+      }
+    } catch {
+      // Unreadable raw artifacts stay private; the summary is then null.
+    }
+  }
+  return null
+}
+
+/**
+ * A closed summary of the screen at failure: node counts, which system alert buttons from a fixed
+ * list are on it, and whether any text asks for permission. No raw text or identifiers leave.
+ */
+export function systemSurfaceSummary(hierarchy) {
+  if (!hierarchy || typeof hierarchy !== 'object') return null
+  const found = new Set()
+  let nodeCount = 0
+  let permissionTextSeen = false
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return
+    nodeCount++
+    for (const key of ['text', 'accessibilityText', 'title']) {
+      const value = node.attributes?.[key]
+      if (typeof value !== 'string') continue
+      if (ALERT_BUTTONS.includes(value)) found.add(value.replace('\u2019', "'"))
+      if (/would like to|access to your photos|add to your photos/i.test(value))
+        permissionTextSeen = true
+    }
+    for (const child of Array.isArray(node.children) ? node.children : []) visit(child)
+  }
+  visit(hierarchy)
+  return {
+    nodeCount,
+    topLevelCount: Array.isArray(hierarchy.children) ? hierarchy.children.length : 0,
+    alertButtons: [...found].sort(),
+    permissionTextSeen,
+  }
+}
+
+/** One closed host sample at this instant (paging counters, swap, top memory); nonfatal. */
+export function recordIosHostSample(
+  label,
+  { root = process.cwd(), spawn = spawnSync, report = console.log } = {}
+) {
+  try {
+    const result = spawn(
+      process.execPath,
+      ['scripts/ci/native-host-evidence.mjs', 'sample', label, '--platform', 'ios'],
+      {
+        cwd: root,
+        env: process.env,
+        encoding: 'utf8',
+        timeout: 20000,
+        killSignal: 'SIGKILL',
+      }
+    )
+    if (result.status !== 0)
+      report(
+        JSON.stringify({ hostSampleFailure: { label, exitCode: result.status ?? null } })
+      )
+    return result.status === 0
+  } catch {
+    return false
+  }
+}
+
 /** Append a failed flow's progress to the run's receipt (nonfatal, iOS only). */
 export function recordIosFlowProgress({
   platform,
@@ -178,13 +267,23 @@ export function recordIosFlowProgress({
   directory,
   apiLogFile = null,
   apiLogFromByte = 0,
+  output = null,
+  root = process.cwd(),
+  spawn = spawnSync,
   report = console.log,
 }) {
   if (platform !== 'ios') return null
   // Diagnostics never replace the original Maestro failure, so nothing here may throw.
   try {
+    // First, so the sample is as close to the failure as the host allows.
+    // Only the runner passes `output`; callers that record progress alone never sample the host.
+    const hostSampled = output
+      ? recordIosHostSample('flow-failure', { root, spawn, report })
+      : false
     const entry = {
       flow,
+      hostSampled,
+      systemSurface: output ? systemSurfaceSummary(failedStepHierarchy(output)) : null,
       ...maestroFlowProgress(maestroLog),
       // Only rows written since the flow began, so an earlier flow's requests never pose as its own.
       shareCardApi: apiLogFile

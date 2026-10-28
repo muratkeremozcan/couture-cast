@@ -284,6 +284,22 @@ test('RSS reports the top 15 executable basenames, sorted by resident KiB', () =
   assert.equal(rows.at(-1).rssKB, 106)
 })
 
+test('in-flow sample labels are accepted', () => {
+  for (const label of ['locale-loop', 'flow-failure'])
+    assert.equal(
+      projectSample({
+        label,
+        at: 0,
+        loadavg: [0, 0, 0],
+        cpuCount: 1,
+        totalmem: 1,
+        freemem: 1,
+        ps: '',
+      }).label,
+      label
+    )
+})
+
 test('vm_stat paging counters are cumulative integers and any missing counter makes the probe unsupported', () => {
   const text = [
     'Mach Virtual Memory Statistics: (page size of 16384 bytes)',

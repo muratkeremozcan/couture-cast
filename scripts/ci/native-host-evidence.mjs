@@ -26,6 +26,8 @@ export const SAMPLE_LABELS = [
   'after-simulator-boot',
   'before-first-flow',
   'after-first-flow',
+  'locale-loop',
+  'flow-failure',
   'failure',
 ]
 const PLATFORMS = ['ios']
