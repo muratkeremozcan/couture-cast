@@ -29,8 +29,14 @@ import {
  * - enclosed-<alphabet>-all [whole] / -single, alphabets circled, negative-circled, squared,
  *   negative-squared, regional (regional indicators), parenthesized and tag (tag characters):
  *   one letter, or every letter, in that alphabet.
+ * - latin-extended-all / -single: every letter, or one letter, replaced by a Latin Extended or IPA
+ *   look-alike (ɾ ɑ ƥ ɛ ɖ ƒ ɡ ɔ ƫ ...; the whole blocks, see LATIN_EXTENDED below).
+ * - flag-splice: a regional-indicator spelling with a valid flag (US, FR, JP) spliced in after
+ *   every possible number of letters.
  * - stretch: one letter tripled.
- * - split2: one cut at every position with every separator - . _ / * | , · ~ and, across
+ * - split2: one cut at every position with every separator - . _ / * | , · ~, the US and
+ *   French flags, the England flag and a lone regional letter (all four stand between the
+ *   letters like a smiley) and, across
  *   plain whitespace, only when both parts have three letters or more (a one- or two-letter
  *   word beside a space is a function word: "put a"). Phrases: words of six letters or more,
  *   symbol separators.
@@ -120,6 +126,39 @@ const ENCLOSED: Record<string, (index: number) => string> = {
   parenthesized: (index) => String.fromCodePoint(0x249c + index),
   tag: (index) => String.fromCodePoint(0xe0061 + index),
 }
+/**
+ * Letters of Latin Extended-A to D, IPA and phonetic extensions that read as a-z, generated from
+ * the Unicode character names (LATIN ... LETTER X WITH ..., TURNED, OPEN, BARRED, SCRIPT ...) and
+ * kept here as the frozen oracle, separate from the table the engine uses.
+ */
+const LATIN_EXTENDED: Readonly<Record<string, string>> = {
+  a: 'ȺɐᶏⱥⱯɑɒ',
+  b: 'ƀƁƂƃɃɓᵬᶀꞖꞗ',
+  c: 'ƇƈȻȼɕꜾꜿꞒꞓꞔꟄ',
+  d: 'ƊƋƌȡɖɗᵭᶁᶑꟇꟈ',
+  e: 'ƎƐǝɆɇɘɛᶒᶓꬳꬴⱸ',
+  f: 'ƑƒʄᵮᶂꞘꞙɸ',
+  g: 'ƓǤǥɠɡᵷᶃꞠꞡꞬꬶ',
+  h: 'ɥɦʮʯꞍꞕꞪⱧⱨ',
+  i: 'ƗɨᴉᶖꞮɩ',
+  j: 'ȷɈɉɟʝꞲ',
+  k: 'ƘƙʞᶄꝀꝁꝂꝃꝄꝅꞢꞣꞰⱩⱪ',
+  l: 'ƚȴȽɫɬɭᶅꝈꝉꞀꞁꞎꞭꬷꬸꬹⱠⱡⱢ',
+  m: 'ƜɯɰɱᵯᶆꬺⱮ',
+  n: 'ƝƞȠȵɲɳᵰᶇꞐꞑꞤꞥꬻ',
+  o: 'ƆƟɔɵᶗꝊꝋꝌꝍꬿⱺ',
+  p: 'ƤƥᵱᵽᶈꝐꝑꝒꝓꝔꝕⱣ',
+  q: 'ɋʠꝖꝗꝘꝙ',
+  r: 'ɌɍɹɺɻɼɽɾɿᵲᵳᶉꞦꞧꭉꭋꭌꭨⱤⱹ',
+  s: 'ȿʂᵴᶊꞨꞩꟅꟉꟊⱾ',
+  t: 'ŦŧƫƬƭƮȶȾʇʈᵵꞱⱦ',
+  u: 'ᶙꞸꞹꭎꭒ',
+  v: 'ƲɅʋʌᶌꝞꝟⱱⱴ',
+  w: 'ʍⱲⱳ',
+  x: 'ᶍꭖꭗꭘꭙ',
+  y: 'ƳƴɎɏʎꭚ',
+  z: 'ƵƶȤȥɀʐʑᵶᶎꟆⱫⱬⱿ',
+}
 const SEPARATORS = ['-', '.', '_', '/', '*', '|', ',', '·', '~']
 const CENSORS = ['*', '_', '-', '#', '.']
 
@@ -162,6 +201,8 @@ function perLetter(word: string, emit: Emit): void {
       emit('censor', swap(symbol))
     }
     for (const look of LOOKALIKE[letter] ?? []) emit('confusable-single', swap(look))
+    for (const look of LATIN_EXTENDED[letter] ?? [])
+      emit('latin-extended-single', swap(look))
     emit('stretch', swap(letter.repeat(3)))
     for (const [name, glyph] of Object.entries(ENCLOSED))
       emit(`enclosed-${name}-single`, swap(glyph(index)))
@@ -199,6 +240,10 @@ function wholeWord(words: string[], term: string, emit: Emit): void {
     [...word].map((ch) => LOOKALIKE[ch]?.find(isSmallCapital) ?? ch).join('')
   )
   if (small !== plain) emit('smallcaps-all', small)
+  const extended = each((word) =>
+    [...word].map((ch) => LATIN_EXTENDED[ch]?.[0] ?? ch).join('')
+  )
+  if (extended !== plain) emit('latin-extended-all', extended)
   for (const [name, glyph] of Object.entries(ENCLOSED)) {
     const converted = each(letters(glyph))
     if (
@@ -215,9 +260,35 @@ function wholeWord(words: string[], term: string, emit: Emit): void {
   }
 }
 
+const SPLICE_FLAGS = ['\u{1F1FA}\u{1F1F8}', '\u{1F1EB}\u{1F1F7}', '\u{1F1EF}\u{1F1F5}']
+/** A regional-indicator spelling of a single word with a valid flag spliced in at every position. */
+function flagSplices(word: string, emit: Emit): void {
+  const regional = [...word].map(
+    (ch) => ENCLOSED.regional?.(ch.charCodeAt(0) - 97) as string
+  )
+  for (const flag of SPLICE_FLAGS)
+    for (let at = 1; at < regional.length; at += 1) {
+      const text = regional.slice(0, at).join('') + flag + regional.slice(at).join('')
+      const letters = [...text]
+        .map((g) => String.fromCharCode(97 + (g.codePointAt(0) as number) - 0x1f1e6))
+        .join('')
+      if (isFlagRow(letters)) continue
+      emit('flag-splice', text)
+    }
+}
+
+/** Flags and a lone regional letter standing between letters cut a word like a smiley does. */
+const FLAG_CUTS = [
+  '\u{1F1FA}\u{1F1F8}',
+  '\u{1F1EB}\u{1F1F7}',
+  '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}',
+  '\u{1F1FA}',
+]
+
 function splits(word: string, emit: Emit, three: boolean, spaces: boolean): void {
   const n = word.length
-  const all = spaces ? [...SEPARATORS, ' '] : SEPARATORS
+  const symbols = [...SEPARATORS, ...FLAG_CUTS]
+  const all = spaces ? [...symbols, ' '] : symbols
   for (let cut = 1; cut < n; cut += 1)
     for (const separator of all) {
       if (separator === ' ' && (cut < 3 || n - cut < 3)) continue
@@ -284,13 +355,13 @@ function runMatrix(): void {
       if (!short && (!phrase || word.length >= 6))
         splits(word, dropShort, !phrase, !phrase)
       if (!phrase && !short) typos(word, dropShort)
+      if (!phrase && !short) flagSplices(word, emitWord)
     }
   }
 }
 
-// The matrix screens about 60,000 spellings. Measured with coverage instrumentation the run
-// takes 15 s; the budget keeps a wide margin for the 4 vCPU runner (about 2.6 times
-// slower than a local run).
+// The matrix screens about 100,000 spellings. Measured locally the run takes 46 s; the
+// budget keeps a wide margin for the 4 vCPU runner (about 2.6 times slower than a local run).
 const MATRIX_TIMEOUT_MS = 300_000
 
 describe('frozen adversarial matrix', () => {
@@ -356,13 +427,16 @@ const PINNED_COUNTS: Record<string, number> = {
   'enclosed-tag-single': 2016,
   'fullwidth-all': 245,
   inflection: 964,
+  'flag-splice': 3457,
+  'latin-extended-all': 245,
+  'latin-extended-single': 22451,
   'leet-all': 245,
   'leet-all-sym': 245,
   'leet-single': 2071,
   'math-bold-all': 245,
   'smallcaps-all': 245,
-  split2: 13027,
-  split3: 3493,
+  split2: 18603,
+  split3: 3551,
   stretch: 2016,
   'typo-delete': 670,
   'typo-transpose': 571,

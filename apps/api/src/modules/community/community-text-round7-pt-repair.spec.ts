@@ -1538,6 +1538,120 @@ describe('round 7m phrases with one obfuscated word, emoji letters and tag chara
   })
 })
 
+describe('round 7n flags spliced into letters, IPA look-alikes and bogus subdivision flags', () => {
+  const locales = [...everyLocale, 'en-US', 'en-GB', 'fr-FR']
+  const regional = (word: string): string[] =>
+    [...word].map((ch) => String.fromCodePoint(0x1f1e6 + ch.charCodeAt(0) - 97))
+  const US = '\u{1F1FA}\u{1F1F8}'
+  const FR = '\u{1F1EB}\u{1F1F7}'
+
+  it('reads a regional-letter spelling with a valid flag spliced in at every position', () => {
+    for (const locale of locales) {
+      for (let at = 1; at < 5; at += 1) {
+        const raped = regional('raped')
+        const text = raped.slice(0, at).join('') + US + raped.slice(at).join('')
+        expect(screen(text, locale).disposition, `${locale} raped US@${at}`).not.toBe(
+          'pass'
+        )
+      }
+      for (let at = 1; at < 6; at += 1) {
+        const faggot = regional('faggot')
+        const text = faggot.slice(0, at).join('') + FR + faggot.slice(at).join('')
+        expect(screen(text, locale).disposition, `${locale} faggot FR@${at}`).not.toBe(
+          'pass'
+        )
+      }
+    }
+  })
+
+  it('reads regional letters beside a flag with Latin letters around', () => {
+    const letters = regional('raped').join('')
+    for (const locale of locales)
+      for (const text of [
+        `x${FR}${letters}y`,
+        `he ${letters}${US} her`,
+        `${US}${letters}${FR}`,
+        `ra${US}${regional('ped').join('')}`,
+      ])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('treats a flag or a lone regional letter inside a word as a separator', () => {
+    const england = '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}'
+    for (const locale of locales)
+      for (const separator of [US, FR, england, '\u{1F1FA}'])
+        for (const word of ['faggot', 'nigger', 'raped', 'kike', 'whore'])
+          for (let at = 1; at < word.length; at += 1)
+            expect(
+              screen(word.slice(0, at) + separator + word.slice(at), locale).disposition,
+              `${locale} ${word}@${at}`
+            ).not.toBe('pass')
+  })
+
+  it('does not let a flag touching a regional phrase shield it', () => {
+    for (const locale of locales)
+      for (const phrase of [
+        'kill yourself',
+        'white power',
+        'te voy a violar',
+        'heil hitler',
+      ]) {
+        const words = phrase.split(' ').map((word) => regional(word).join(''))
+        for (const text of [
+          US + words.join(' '),
+          words.join(' ') + US,
+          words.map((word) => word + FR).join(' '),
+        ])
+          expect(screen(text, locale).disposition, `${locale} ${phrase}`).not.toBe('pass')
+      }
+  })
+
+  it('maps Latin Extended and IPA look-alikes', () => {
+    const ipa: Record<string, string> = {
+      r: '\u027E',
+      a: '\u0251',
+      p: '\u01A5',
+      e: '\u025B',
+      d: '\u0256',
+      f: '\u0192',
+      g: '\u0261',
+      o: '\u0254',
+      t: '\u01AB',
+    }
+    const spell = (word: string): string => [...word].map((ch) => ipa[ch] ?? ch).join('')
+    for (const locale of locales)
+      for (const word of ['raped', 'faggot']) {
+        expect(screen(spell(word), locale).disposition, `${locale} ${word}`).not.toBe(
+          'pass'
+        )
+        for (const [letter, glyph] of Object.entries(ipa))
+          if (word.includes(letter))
+            expect(
+              screen(word.replace(letter, glyph), locale).disposition,
+              `${locale} ${word} ${glyph}`
+            ).not.toBe('pass')
+      }
+  })
+
+  it('accepts only England, Scotland and Wales as subdivision flags', () => {
+    const tags = (code: string): string =>
+      '\u{1F3F4}' +
+      [...code].map((ch) => String.fromCodePoint(0xe0000 + ch.charCodeAt(0))).join('') +
+      '\u{E007F}'
+    for (const locale of locales) {
+      for (const code of ['gbeng', 'gbsct', 'gbwls'])
+        expect(
+          screen(`${tags(code)} fans`, locale).disposition,
+          `${locale} ${code}`
+        ).toBe('pass')
+      for (const code of ['raped', 'faggot', 'usca', 'gbxyz'])
+        expect(screen(`${tags(code)}`, locale).disposition, `${locale} ${code}`).not.toBe(
+          code === 'usca' || code === 'gbxyz' ? 'block' : 'pass'
+        )
+    }
+  })
+})
+
 describe('round 7b a high-severity term cut in two whole words', () => {
   it('withholds tap ete and other two-way cuts with both parts of three letters or more', () => {
     for (const text of [

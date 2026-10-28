@@ -511,9 +511,10 @@ const STRAY_MARK_PATTERN =
  *
  * Two grammar bounds keep real flags clean. A run of regional indicators that is entirely
  * valid flag pairs ("🇫🇷🇩🇪") is a row of flags and reads as a break. A black flag followed by
- * tag characters and the cancel tag ("🏴󠁧󠁢󠁥󠁮󠁧󠁿") is a subdivision flag and reads as a break.
+ * the tag characters of England, Scotland or Wales (gbeng, gbsct, gbwls) and the cancel tag ("🏴󠁧󠁢󠁥󠁮󠁧󠁿") is a subdivision flag and reads as a break.
  */
-const SUBDIVISION_FLAG_PATTERN = /\u{1F3F4}[\u{E0020}-\u{E007E}]+\u{E007F}/gu
+const SUBDIVISION_FLAG_PATTERN =
+  /\u{1F3F4}(?:\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}|\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}|\u{E0067}\u{E0062}\u{E0077}\u{E006C}\u{E0073})\u{E007F}/gu
 const REGIONAL_RUN_PATTERN = /[\u{1F1E6}-\u{1F1FF}]+/gu
 const EMOJI_LETTER_PATTERN =
   /[\u{1F150}-\u{1F169}\u{1F170}-\u{1F189}\u{E0020}-\u{E007E}]/gu
@@ -536,7 +537,7 @@ const regionalLetters = (run: string): string =>
     .map((glyph) => String.fromCharCode(97 + (glyph.codePointAt(0) as number) - 0x1f1e6))
     .join('')
 
-/** The pairs of a regional run that are valid flags from the start, then from the end. */
+/** A regional run that is entirely valid flag pairs is a row of flags and reads as a break. */
 function isFlagRun(letters: string): boolean {
   if (letters.length % 2 !== 0) return false
   for (let at = 0; at < letters.length; at += 2)
@@ -544,24 +545,46 @@ function isFlagRun(letters: string): boolean {
   return true
 }
 
-/** The Latin letters of a regional run with valid flags peeled off either end, in every combination. */
-function regionalRunCandidates(letters: string): string[] {
-  const peel = (value: string, fromEnd: boolean): string[] => {
-    const steps = [value]
-    let current = value
-    while (current.length >= 2) {
-      const pair = fromEnd ? current.slice(-2) : current.slice(0, 2)
-      if (!REGIONAL_FLAG_CODES.has(pair.toUpperCase())) break
-      current = fromEnd ? current.slice(0, -2) : current.slice(2)
-      steps.push(current)
-    }
-    return steps
+/**
+ * What a flag leaves behind in the literal form. A symbol, not a space: a flag spliced into a
+ * word separates its halves the way a smiley does, and the cut windows rejoin across symbols.
+ */
+const FLAG_SEPARATOR = '\u{1F600}'
+const MAX_REGIONAL_ALTERNATIVES = 256
+
+function defaultRegionalReading(letters: string): string {
+  return isFlagRun(letters) ? FLAG_SEPARATOR : letters
+}
+
+/**
+ * The readings of a regional run that is not a row of flags: all letters, and the letters with
+ * one or two valid flag pairs removed from anywhere in it ("🇷🇺🇸🇦🇵🇪🇩" is raped with the US flag
+ * spliced in after the first letter).
+ */
+function regionalReadings(letters: string): string[] {
+  const readings = new Set<string>([letters])
+  const removeOne = (value: string): string[] => {
+    const out: string[] = []
+    for (let at = 0; at + 1 < value.length; at += 1)
+      if (REGIONAL_FLAG_CODES.has(value.slice(at, at + 2).toUpperCase()))
+        out.push(value.slice(0, at) + value.slice(at + 2))
+    return out
   }
-  const out = new Set<string>()
-  for (const left of peel(letters, false))
-    for (const both of peel(left, true)) out.add(both)
-  out.delete(letters)
-  return [...out].filter((candidate) => candidate.length >= 4)
+  const onces = removeOne(letters)
+  for (const once of onces) readings.add(once)
+  for (const once of onces) for (const twice of removeOne(once)) readings.add(twice)
+  return [...readings].slice(0, 48)
+}
+
+/** A regional letter run as it stands and with a valid flag pair peeled off either edge. */
+function edgeReadings(letters: string): string[] {
+  const readings = new Set<string>([letters])
+  const lead = REGIONAL_FLAG_CODES.has(letters.slice(0, 2).toUpperCase())
+  const trail = REGIONAL_FLAG_CODES.has(letters.slice(-2).toUpperCase())
+  if (lead) readings.add(letters.slice(2))
+  if (trail) readings.add(letters.slice(0, -2))
+  if (lead && trail && letters.length > 4) readings.add(letters.slice(2, -2))
+  return [...readings]
 }
 
 const TOKEN_SPLIT_PATTERN = /[^\p{L}\p{N}]+/u
@@ -593,6 +616,47 @@ const FOLD_SINGLETONS: Readonly<Record<string, string>> = {
   ŋ: 'n',
   þ: 'th',
 }
+
+/**
+ * Letters of Latin Extended-A to D, IPA and the phonetic extensions that read as a-z (ɾ ɑ ƥ ɛ
+ * ɖ ƒ ɡ ɔ ƫ ...), generated from the Unicode character names (LATIN ... LETTER X WITH ...,
+ * TURNED, OPEN, BARRED, SCRIPT). Letters of the screened languages (ı ø đ ð ł ħ ŋ þ) and
+ * letters that decompose to a base letter plus a mark are handled elsewhere.
+ */
+const LATIN_EXTENDED_LOOKALIKES: Readonly<Record<string, string>> = {
+  a: 'ȺɐᶏⱥⱯɑɒ',
+  b: 'ƀƁƂƃɃɓᵬᶀꞖꞗ',
+  c: 'ƇƈȻȼɕꜾꜿꞒꞓꞔꟄ',
+  d: 'ƊƋƌȡɖɗᵭᶁᶑꟇꟈ',
+  e: 'ƎƐǝɆɇɘɛᶒᶓꬳꬴⱸ',
+  f: 'ƑƒʄᵮᶂꞘꞙɸ',
+  g: 'ƓǤǥɠɡᵷᶃꞠꞡꞬꬶ',
+  h: 'ɥɦʮʯꞍꞕꞪⱧⱨ',
+  i: 'ƗɨᴉᶖꞮɩ',
+  j: 'ȷɈɉɟʝꞲ',
+  k: 'ƘƙʞᶄꝀꝁꝂꝃꝄꝅꞢꞣꞰⱩⱪ',
+  l: 'ƚȴȽɫɬɭᶅꝈꝉꞀꞁꞎꞭꬷꬸꬹⱠⱡⱢ',
+  m: 'ƜɯɰɱᵯᶆꬺⱮ',
+  n: 'ƝƞȠȵɲɳᵰᶇꞐꞑꞤꞥꬻ',
+  o: 'ƆƟɔɵᶗꝊꝋꝌꝍꬿⱺ',
+  p: 'ƤƥᵱᵽᶈꝐꝑꝒꝓꝔꝕⱣ',
+  q: 'ɋʠꝖꝗꝘꝙ',
+  r: 'ɌɍɹɺɻɼɽɾɿᵲᵳᶉꞦꞧꭉꭋꭌꭨⱤⱹ',
+  s: 'ȿʂᵴᶊꞨꞩꟅꟉꟊⱾ',
+  t: 'ŦŧƫƬƭƮȶȾʇʈᵵꞱⱦ',
+  u: 'ᶙꞸꞹꭎꭒ',
+  v: 'ƲɅʋʌᶌꝞꝟⱱⱴ',
+  w: 'ʍⱲⱳ',
+  x: 'ᶍꭖꭗꭘꭙ',
+  y: 'ƳƴɎɏʎꭚ',
+  z: 'ƵƶȤȥɀʐʑᵶᶎꟆⱫⱬⱿ',
+}
+
+const LATIN_EXTENDED_MAP: ReadonlyMap<string, string> = new Map(
+  Object.entries(LATIN_EXTENDED_LOOKALIKES).flatMap(([letter, glyphs]) =>
+    [...glyphs].map((glyph): [string, string] => [glyph, letter])
+  )
+)
 
 /** Cyrillic and Greek letters that render as a Latin letter in most typefaces. */
 const CONFUSABLES: Readonly<Record<string, string>> = {
@@ -737,13 +801,19 @@ const SEVERITY_RANK: Readonly<Record<TextScreeningSeverity, number>> = {
  * `cono`, the Spanish word for cone, be allow-listed while `coño` still screens.
  */
 export function toLiteralForm(raw: string): string {
+  return toLiteralFormWith(raw, defaultRegionalReading)
+}
+
+/** The literal form with each regional indicator run read by `regional` (letters, run number). */
+function toLiteralFormWith(
+  raw: string,
+  regional: (letters: string, run: number) => string
+): string {
+  let runs = 0
   let value = raw
     .normalize('NFKC')
-    .replace(SUBDIVISION_FLAG_PATTERN, ' ')
-    .replace(REGIONAL_RUN_PATTERN, (run) => {
-      const letters = regionalLetters(run)
-      return isFlagRun(letters) ? ' ' : letters
-    })
+    .replace(SUBDIVISION_FLAG_PATTERN, FLAG_SEPARATOR)
+    .replace(REGIONAL_RUN_PATTERN, (run) => regional(regionalLetters(run), runs++))
     .replace(EMOJI_LETTER_PATTERN, (glyph) => {
       const code = glyph.codePointAt(0) as number
       if (code >= 0xe0020) return String.fromCharCode(code - 0xe0000)
@@ -763,7 +833,11 @@ export function toFoldedForm(literal: string): string {
   const stripped = literal.normalize('NFD').replace(COMBINING_MARK_PATTERN, '')
   let folded = ''
   for (const character of stripped) {
-    folded += FOLD_SINGLETONS[character] ?? CONFUSABLES[character] ?? character
+    folded +=
+      FOLD_SINGLETONS[character] ??
+      CONFUSABLES[character] ??
+      LATIN_EXTENDED_MAP.get(character) ??
+      character
   }
   return folded.normalize('NFC')
 }
@@ -1942,16 +2016,18 @@ export class CommunityTextScreener {
       verdict.match(outcome, this.dispositionFor(outcome.meta.severity))
     }
 
-    for (const outcome of this.collectRegionalRunMatches(boundedRaw, budget))
-      verdict.match(outcome, this.dispositionFor(outcome.meta.severity))
-
-    for (const restored of this.restorePhraseWords(literal)) {
-      const restoredTokens = this.foldTokens(restored, budget)
-      const none = restoredTokens.literalTokens.map(() => false)
+    // Alternative readings of the text, run through the same passes with no allowances:
+    // a regional-letter spelling with a valid flag removed, and one obfuscated phrase word put back.
+    for (const alternative of [
+      ...this.regionalAlternatives(boundedRaw),
+      ...this.restorePhraseWords(literal),
+    ]) {
+      const tokens = this.foldTokens(alternative, budget)
+      const none = tokens.literalTokens.map(() => false)
       for (const outcome of this.collectMatches(
-        restored,
-        restoredTokens.literalTokens,
-        restoredTokens.foldedTokens,
+        alternative,
+        tokens.literalTokens,
+        tokens.foldedTokens,
         { allowed: none, phraseAllowed: none },
         budget
       ))
@@ -2378,23 +2454,50 @@ export class CommunityTextScreener {
   }
 
   /**
-   * A regional indicator run that is not a row of flags, with valid flags peeled off either
-   * end ("🇫🇷" beside the letters 🇷🇦🇵🇪🇩), read as the Latin word it spells.
+   * The other literal readings of regional indicator runs that are not rows of flags: with one
+   * or two valid flags removed from anywhere in the run. A real flag spliced into a spelling
+   * (or standing beside it) therefore does not hide the word. Capped at 16 texts.
    */
-  private collectRegionalRunMatches(
-    raw: string,
-    budget: ExpansionBudget
-  ): MatchOutcome[] {
-    const outcomes: MatchOutcome[] = []
-    for (const run of raw.matchAll(REGIONAL_RUN_PATTERN)) {
-      const letters = regionalLetters(run[0])
-      if (isFlagRun(letters)) continue
-      for (const candidate of regionalRunCandidates(letters)) {
-        const outcome = this.matchCandidate(toFoldedForm(candidate), false, budget)
-        if (outcome) outcomes.push({ meta: outcome.meta, obfuscated: true })
-      }
-    }
-    return outcomes
+  private regionalAlternatives(raw: string): string[] {
+    const runs = [...raw.normalize('NFKC').matchAll(REGIONAL_RUN_PATTERN)].map((run) =>
+      regionalLetters(run[0])
+    )
+    if (runs.length === 0) return []
+    // A run read as its own word may also stand apart from Latin letters written against it.
+    const options = runs.map((letters) =>
+      isFlagRun(letters)
+        ? [FLAG_SEPARATOR]
+        : [
+            ...regionalReadings(letters).flatMap((reading) => [reading, ` ${reading} `]),
+            FLAG_SEPARATOR,
+          ]
+    )
+    // One run read differently at a time, then every run with a flag peeled off either edge
+    // (a flag glued to a word of a phrase), so a flag touching a term does not shield it.
+    const readings: string[][] = []
+    const base = options.map(() => 0)
+    options.forEach((choices, run) => {
+      for (let at = 1; at < choices.length; at += 1)
+        readings.push(base.map((_, i) => (i === run ? at : 0)).map(String))
+    })
+    const edges = runs.map((letters) => [...edgeReadings(letters), FLAG_SEPARATOR])
+    let edgeCombos: string[][] = [[]]
+    for (const choices of edges)
+      edgeCombos = edgeCombos
+        .flatMap((combo) => choices.map((choice) => [...combo, choice]))
+        .slice(0, MAX_REGIONAL_ALTERNATIVES)
+    const chosen = readings.map((combo) =>
+      toLiteralFormWith(
+        raw,
+        (_letters, run) => (options[run] as string[])[Number(combo[run])] as string
+      )
+    )
+    const peeled = edgeCombos.map((combo) =>
+      toLiteralFormWith(raw, (letters, run) =>
+        isFlagRun(letters) ? FLAG_SEPARATOR : (combo[run] as string)
+      )
+    )
+    return [...chosen, ...peeled].slice(0, MAX_REGIONAL_ALTERNATIVES)
   }
 
   /**
