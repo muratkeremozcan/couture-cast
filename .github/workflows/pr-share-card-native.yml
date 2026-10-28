@@ -33,6 +33,17 @@ jobs:
       MAESTRO_CLI_NO_ANALYTICS: '1'
     steps:
       - uses: actions/checkout@v4
+      - name: Disable Spotlight indexing on the disposable iOS runner
+        if: matrix.platform == 'ios'
+        run: |
+          test "$GITHUB_ACTIONS" = 'true'
+          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
+          test "$RUNNER_OS" = 'macOS'
+          node scripts/ci/native-host-evidence.mjs sample before-indexing-disable --platform ios
+          sudo mdutil -a -s
+          sudo mdutil -a -i off
+          sudo mdutil -s /System/Volumes/Data
+          node scripts/ci/native-host-evidence.mjs sample after-indexing-disable --platform ios
       - uses: ./.github/actions/reserve-supabase-ports
         if: runner.os == 'Linux'
       # storage-api runs on the Node major its Dockerfile pins; the repo's own Node

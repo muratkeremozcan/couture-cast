@@ -19,7 +19,7 @@ import {
 const script = fileURLToPath(new URL('./native-host-evidence.mjs', import.meta.url))
 
 const record = (overrides = {}) => ({
-  version: 1,
+  version: 2,
   platform: 'ios',
   samples: [],
   firstFlow: null,
@@ -30,21 +30,24 @@ const record = (overrides = {}) => ({
 test('the busiest processes keep closed names and their CPU order', () => {
   const rows = busiestProcesses(
     [
-      ' 12.5 healthd         ',
-      '182.2 chrome-headless-',
-      '  0.0 /bin/sh -c x',
+      '10 1 2048 12.5 /usr/libexec/healthd',
+      '11 1 8192 182.2 chrome-headless-',
+      '12 1 1024 0.0 bad name',
       'garbage line',
-      ' 41.7 diagnosticd',
+      '13 1 4096 41.7 diagnosticd',
     ].join('\n')
   )
   assert.deepEqual(rows, [
-    { command: 'chrome-headless-', cpuPercent: 182.2 },
-    { command: 'diagnosticd', cpuPercent: 41.7 },
-    { command: 'healthd', cpuPercent: 12.5 },
-    { command: '_bin_sh_-c_x', cpuPercent: 0 },
+    { pid: 11, ppid: 1, command: 'chrome-headless-', rssKB: 8192, cpuPercent: 182.2 },
+    { pid: 13, ppid: 1, command: 'diagnosticd', rssKB: 4096, cpuPercent: 41.7 },
+    { pid: 10, ppid: 1, command: 'healthd', rssKB: 2048, cpuPercent: 12.5 },
+    { pid: 12, ppid: 1, command: 'bad_name', rssKB: 1024, cpuPercent: 0 },
   ])
-  const many = Array.from({ length: 20 }, (_, index) => `${index} p${index}`).join('\n')
-  assert.equal(busiestProcesses(many).length, 8)
+  const many = Array.from(
+    { length: 20 },
+    (_, index) => `${index + 1} 1 10 ${index} p${index}`
+  ).join('\n')
+  assert.equal(busiestProcesses(many).length, 15)
   assert.equal(busiestProcesses(many)[0].command, 'p19')
 })
 
@@ -56,7 +59,7 @@ test('a host sample is a closed projection of load, memory and processes', () =>
     cpuCount: 3,
     totalmem: 7 * 1024 ** 3,
     freemem: 512 * 1024 ** 2,
-    ps: '41.7 diagnosticd',
+    ps: '13 1 4096 41.7 diagnosticd',
   })
   assert.deepEqual(sample, {
     label: 'after-simulator-boot',
@@ -67,8 +70,12 @@ test('a host sample is a closed projection of load, memory and processes', () =>
     load15: 80,
     memTotalMB: 7168,
     memFreeMB: 512,
-    busiest: [{ command: 'diagnosticd', cpuPercent: 41.7 }],
-    resident: [],
+    busiest: [
+      { pid: 13, ppid: 1, command: 'diagnosticd', rssKB: 4096, cpuPercent: 41.7 },
+    ],
+    resident: [
+      { pid: 13, ppid: 1, command: 'diagnosticd', rssKB: 4096, cpuPercent: 41.7 },
+    ],
     swapUsedMB: null,
     memoryPressureFreePercent: null,
   })
@@ -239,14 +246,20 @@ test('public evidence publishes a valid host record and refuses an invalid one',
 test('RSS reports the top 15 executable basenames, sorted by resident KiB', () => {
   const rows = residentProcesses(
     [
-      '9000 2.5 /Applications/Xcode.app/Contents/XCBBuildService',
-      '10 0.0 /usr/bin/other',
+      '20 1 9000 2.5 /Applications/Xcode.app/Contents/XCBBuildService',
+      '21 1 10 0.0 /usr/bin/other',
       'bad row',
-      ...Array.from({ length: 20 }, (_, i) => `${100 + i} 0.1 p${i}`),
+      ...Array.from({ length: 20 }, (_, i) => `${100 + i} 1 ${100 + i} 0.1 p${i}`),
     ].join('\n')
   )
   assert.equal(rows.length, 15)
-  assert.deepEqual(rows[0], { command: 'XCBBuildService', rssKB: 9000, cpuPercent: 2.5 })
+  assert.deepEqual(rows[0], {
+    pid: 20,
+    ppid: 1,
+    command: 'XCBBuildService',
+    rssKB: 9000,
+    cpuPercent: 2.5,
+  })
   assert.equal(rows[1].command, 'p19')
   assert.equal(rows.at(-1).rssKB, 106)
 })

@@ -20,6 +20,8 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 export const SAMPLE_LABELS = [
+  'before-indexing-disable',
+  'after-indexing-disable',
   'before-simulator-boot',
   'after-simulator-boot',
   'before-first-flow',
@@ -29,51 +31,40 @@ export const SAMPLE_LABELS = [
 const PLATFORMS = ['ios']
 const PHASES = ['none', 'jvm', 'device', 'driver', 'flow']
 const COMMAND = /^[A-Za-z0-9._+-]{1,32}$/
-const TOP_PROCESSES = 8
+const TOP_PROCESSES = 15
 const TOP_RSS_PROCESSES = 15
 
-/**
- * The busiest processes from `ps -A -r -o %cpu=,ucomm=` output, by CPU share.
- * A command name outside the closed character set becomes `other`.
- *
- * @param {string} text
- */
-export function busiestProcesses(text, limit = TOP_PROCESSES) {
-  const rows = []
-  for (const line of text.split('\n')) {
-    const match = line.trim().match(/^(\d+(?:\.\d+)?)\s+(.+)$/)
-    if (!match) continue
-    const name = match[2]
-      .trim()
+/** Closed per-process projection from ps PID, PPID, RSS KiB, CPU and executable. */
+function processUsage(text) {
+  return text.split('\n').flatMap((line) => {
+    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(.+)$/)
+    if (!match) return []
+    const command = path
+      .basename(match[5].trim())
       .replace(/[^A-Za-z0-9._+-]/g, '_')
       .slice(0, 32)
-    rows.push({
-      command: COMMAND.test(name) ? name : 'other',
-      cpuPercent: Number(match[1]),
-    })
-  }
-  return rows.sort((a, b) => b.cpuPercent - a.cpuPercent).slice(0, limit)
+    return [
+      {
+        pid: Number(match[1]),
+        ppid: Number(match[2]),
+        command: COMMAND.test(command) ? command : 'other',
+        rssKB: Number(match[3]),
+        cpuPercent: Number(match[4]),
+      },
+    ]
+  })
 }
 
-/** Top resident processes. ps uses KiB; executable basenames contain no arguments. */
+/** The top 15 CPU consumers, identified by process and parent IDs. */
+export function busiestProcesses(text, limit = TOP_PROCESSES) {
+  return processUsage(text)
+    .sort((a, b) => b.cpuPercent - a.cpuPercent)
+    .slice(0, limit)
+}
+
+/** The top 15 resident processes from the same snapshot. */
 export function residentProcesses(text) {
-  return text
-    .split('\n')
-    .flatMap((line) => {
-      const match = line.trim().match(/^(\d+)\s+(\d+(?:\.\d+)?)\s+(.+)$/)
-      if (!match) return []
-      const command = path
-        .basename(match[3].trim())
-        .replace(/[^A-Za-z0-9._+-]/g, '_')
-        .slice(0, 32)
-      return [
-        {
-          command: COMMAND.test(command) ? command : 'other',
-          rssKB: Number(match[1]),
-          cpuPercent: Number(match[2]),
-        },
-      ]
-    })
+  return processUsage(text)
     .sort((a, b) => b.rssKB - a.rssKB)
     .slice(0, TOP_RSS_PROCESSES)
 }
@@ -99,7 +90,6 @@ const round = (/** @type {number} */ value) => Math.round(value * 100) / 100
  *   totalmem: number
  *   freemem: number
  *   ps: string
- *   rss?: string
  *   swap?: string
  *   pressure?: string
  * }} input
@@ -117,7 +107,7 @@ export function projectSample(input) {
     memTotalMB: Math.floor(input.totalmem / 1048576),
     memFreeMB: Math.floor(input.freemem / 1048576),
     busiest: busiestProcesses(input.ps),
-    resident: residentProcesses(input.rss ?? ''),
+    resident: residentProcesses(input.ps),
     ...projectMemory(input.swap ?? '', input.pressure ?? ''),
   }
 }
@@ -226,13 +216,10 @@ const isoTime = (value) =>
   new Date(value).toISOString() === value
 
 const validProcess = (row) =>
-  exactKeys(row, ['command', 'cpuPercent']) &&
+  exactKeys(row, ['pid', 'ppid', 'command', 'rssKB', 'cpuPercent']) &&
   COMMAND.test(row.command) &&
-  nonNegative(row.cpuPercent)
-
-const validResident = (row) =>
-  exactKeys(row, ['command', 'rssKB', 'cpuPercent']) &&
-  COMMAND.test(row.command) &&
+  count(row.pid) &&
+  count(row.ppid) &&
   count(row.rssKB) &&
   nonNegative(row.cpuPercent)
 
@@ -252,7 +239,7 @@ const validSample = (sample) =>
   sample.busiest.every(validProcess) &&
   Array.isArray(sample.resident) &&
   sample.resident.length <= TOP_RSS_PROCESSES &&
-  sample.resident.every(validResident) &&
+  sample.resident.every(validProcess) &&
   seconds(sample.swapUsedMB) &&
   validPressure(sample.memoryPressureFreePercent)
 
@@ -274,7 +261,7 @@ const validMetro = (metro) =>
 export function assertNativeHostEvidence(value) {
   if (
     !exactKeys(value, ['version', 'platform', 'samples', 'firstFlow', 'metro']) ||
-    value.version !== 1 ||
+    value.version !== 2 ||
     !PLATFORMS.includes(value.platform) ||
     !Array.isArray(value.samples) ||
     value.samples.length > 16 ||
@@ -312,9 +299,16 @@ function main() {
   const file = path.join(directory, `native-host-${platform}.json`)
   const record = fs.existsSync(file)
     ? JSON.parse(fs.readFileSync(file, 'utf8'))
-    : { version: 1, platform, samples: [], firstFlow: null, metro: null }
+    : { version: 2, platform, samples: [], firstFlow: null, metro: null }
   let recorded
   if (command === 'sample') {
+    if (!SAMPLE_LABELS.includes(argument)) throw new Error('invalid_host_sample_label')
+    const ps = spawnSync('ps', ['-A', '-o', 'pid=,ppid=,rss=,%cpu=,comm='], {
+      encoding: 'utf8',
+      timeout: 10000,
+    })
+    if (ps.status !== 0 || !busiestProcesses(ps.stdout).length)
+      throw new Error('host_process_snapshot_unavailable')
     recorded = projectSample({
       label: argument,
       at: Date.now(),
@@ -322,20 +316,13 @@ function main() {
       cpuCount: os.availableParallelism(),
       totalmem: os.totalmem(),
       freemem: os.freemem(),
-      rss:
-        spawnSync('ps', ['-A', '-o', 'rss=,%cpu=,comm='], {
-          encoding: 'utf8',
-          timeout: 10000,
-        }).stdout ?? '',
       swap:
         spawnSync('sysctl', ['vm.swapusage'], { encoding: 'utf8', timeout: 10000 })
           .stdout ?? '',
       pressure:
         spawnSync('memory_pressure', ['-Q'], { encoding: 'utf8', timeout: 10000 })
           .stdout ?? '',
-      ps:
-        spawnSync('ps', ['-A', '-r', '-o', '%cpu=,ucomm='], { encoding: 'utf8' })
-          .stdout ?? '',
+      ps: ps.stdout,
     })
     record.samples.push(recorded)
   } else if (command === 'first-flow') {
