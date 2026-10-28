@@ -224,7 +224,19 @@ jobs:
       - name: iOS original Photos resource and add-only save
         if: matrix.platform == 'ios'
         run: |
-          device=$(xcrun simctl create cc68-ci 'iPhone 16 Pro')
+          # XCUITest (Maestro's driver and the accessibility audit) runs through
+          # the selected Xcode, which drives only a simulator on its own SDK
+          # version; an unpinned create takes the newest installed runtime.
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          runtime=$(xcrun simctl list runtimes -j | jq -r --arg v "$sdk" \
+            '[.runtimes[] | select(.platform == "iOS" and .isAvailable and (.version == $v or (.version | startswith($v + "."))))] | last | .identifier // empty')
+          if [ -z "$runtime" ]; then
+            echo "::error::No available iOS ${sdk} simulator runtime for $(xcodebuild -version | head -1)."
+            xcrun simctl list runtimes
+            exit 1
+          fi
+          echo "iOS simulator runtime ${runtime} for SDK ${sdk}"
+          device=$(xcrun simctl create cc68-ci 'iPhone 16 Pro' "$runtime")
           echo "$device" > /tmp/cc68-simulator
           xcrun simctl boot "$device"
           xcrun simctl bootstatus "$device" -b
