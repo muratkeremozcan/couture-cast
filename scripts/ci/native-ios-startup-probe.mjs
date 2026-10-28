@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { simulatorCommandRecorder } from './native-ios-command-evidence.mjs'
 import { quiesceOwnedSimulator } from './native-ios-quiesce.mjs'
+import { preflightObserver, observedRuntimeQuery } from './native-ios-preflight.mjs'
 
 async function main() {
   if (
@@ -26,14 +27,26 @@ async function main() {
       'ios',
     ])
   command('indexing-off', 'sudo', ['mdutil', '-a', '-i', 'off'])
+  sample('before-simulator-boot')
   const sdk = command('sdk-version', 'xcrun', [
     '--sdk',
     'iphonesimulator',
     '--show-sdk-version',
   ]).stdout.trim()
-  const available = JSON.parse(
-    command('list-runtimes', 'xcrun', ['simctl', 'list', 'runtimes', '--json']).stdout
-  ).runtimes
+  let queried
+  try {
+    queried = await observedRuntimeQuery({
+      directory,
+      command,
+      observe: preflightObserver(directory),
+    })
+  } finally {
+    command('runtime-image-list', 'xcrun', ['simctl', 'runtime', 'list', '--json'], {
+      timeout: 10000,
+      fatal: false,
+    })
+  }
+  const available = JSON.parse(queried.stdout).runtimes
   const runtime = available.findLast(
     (r) =>
       r.platform === 'iOS' &&
@@ -41,7 +54,6 @@ async function main() {
       (r.version === sdk || r.version.startsWith(sdk + '.'))
   )
   if (!runtime) throw new Error('matching_simulator_runtime_required')
-  sample('before-simulator-boot')
   const device = command('create-device', 'xcrun', [
     'simctl',
     'create',

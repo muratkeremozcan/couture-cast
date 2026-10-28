@@ -9,18 +9,19 @@ export function simulatorCommandRecorder(directory, execute = spawnSync) {
   const record = fs.existsSync(file)
     ? JSON.parse(fs.readFileSync(file, 'utf8'))
     : { version: 1, commands: [] }
-  return (operation, binary, args, { timeout = 60000, fatal = true } = {}) => {
-    const began = performance.now()
-    const result = execute(binary, args, {
-      encoding: 'utf8',
-      timeout,
-      killSignal: 'SIGKILL',
-    })
+  const completed = (
+    operation,
+    binary,
+    args,
+    result,
+    durationMs,
+    { fatal = true } = {}
+  ) => {
     const row = {
       operation,
       binary,
       args,
-      durationMs: Math.round(performance.now() - began),
+      durationMs,
       exitCode: result.status,
       signal: result.signal ?? null,
       errorCode: result.error?.code ?? null,
@@ -36,6 +37,24 @@ export function simulatorCommandRecorder(directory, execute = spawnSync) {
       )
     return row
   }
+  const command = (operation, binary, args, { timeout = 60000, fatal = true } = {}) => {
+    const began = performance.now()
+    const result = execute(binary, args, {
+      encoding: 'utf8',
+      timeout,
+      killSignal: 'SIGKILL',
+    })
+    return completed(
+      operation,
+      binary,
+      args,
+      result,
+      Math.round(performance.now() - began),
+      { fatal }
+    )
+  }
+  command.completed = completed
+  return command
 }
 
 export function simulatorJobs(text) {

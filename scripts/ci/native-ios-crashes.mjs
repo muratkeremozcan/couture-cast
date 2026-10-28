@@ -51,17 +51,22 @@ export function crashMetadata(text) {
 }
 
 export function crashReportCollector(device, { home = os.homedir() } = {}) {
-  if (!/^[A-Fa-f0-9-]{36}$/.test(device)) throw new Error('owned_device_uuid_required')
+  if (device !== null && !/^[A-Fa-f0-9-]{36}$/.test(device))
+    throw new Error('owned_device_uuid_required')
   const roots = [
-    [
-      'simulator',
-      path.join(
-        home,
-        'Library/Developer/CoreSimulator/Devices',
-        device,
-        'data/Library/Logs/DiagnosticReports'
-      ),
-    ],
+    ...(device === null
+      ? []
+      : [
+          [
+            'simulator',
+            path.join(
+              home,
+              'Library/Developer/CoreSimulator/Devices',
+              device,
+              'data/Library/Logs/DiagnosticReports'
+            ),
+          ],
+        ]),
     ['host', path.join(home, 'Library/Logs/DiagnosticReports')],
   ]
   const known = new Map()

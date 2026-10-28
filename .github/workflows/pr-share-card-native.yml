@@ -86,7 +86,7 @@ jobs:
         with:
           packages: platform-tools
       - name: Verify startup deadline controls
-        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/native-supabase.test.mjs scripts/ci/native-supabase-gateway.test.mjs scripts/e2e-share-card/runtime-sources.test.mjs scripts/ci/native-host-evidence.test.mjs scripts/ci/native-build-daemons.test.mjs scripts/ci/native-ios-quiesce.test.mjs scripts/ci/native-ios-command-evidence.test.mjs scripts/ci/native-ios-collectors.test.mjs scripts/ci/native-ios-crashes.test.mjs scripts/ci/native-ios-flow-deadline.test.mjs scripts/e2e-share-card/warm-metro.test.mjs
+        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/native-supabase.test.mjs scripts/ci/native-supabase-gateway.test.mjs scripts/e2e-share-card/runtime-sources.test.mjs scripts/ci/native-host-evidence.test.mjs scripts/ci/native-build-daemons.test.mjs scripts/ci/native-ios-quiesce.test.mjs scripts/ci/native-ios-command-evidence.test.mjs scripts/ci/native-ios-collectors.test.mjs scripts/ci/native-ios-crashes.test.mjs scripts/ci/native-ios-preflight.test.mjs scripts/ci/native-ios-flow-deadline.test.mjs scripts/e2e-share-card/warm-metro.test.mjs
       - uses: ./.github/actions/start-local-supabase
         if: runner.os == 'Linux'
       - name: Install the iOS project generator
@@ -325,7 +325,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify simulator sampler and collector controls
-        run: node --test --test-concurrency=1 scripts/ci/native-ios-quiesce.test.mjs scripts/ci/native-ios-command-evidence.test.mjs scripts/ci/native-ios-collectors.test.mjs scripts/ci/native-ios-crashes.test.mjs
+        run: node --test --test-concurrency=1 scripts/ci/native-ios-quiesce.test.mjs scripts/ci/native-ios-command-evidence.test.mjs scripts/ci/native-ios-collectors.test.mjs scripts/ci/native-ios-crashes.test.mjs scripts/ci/native-ios-preflight.test.mjs
       - name: Diagnose owned simulator tuning and settling
         run: node scripts/ci/native-ios-startup-probe.mjs
       - name: Collect complete startup command diagnostics and CPU settle evidence
@@ -340,4 +340,6 @@ jobs:
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-collectors.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-sampler-private.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-crashes.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-preflight.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-runtime-deadline.json
           if-no-files-found: error
