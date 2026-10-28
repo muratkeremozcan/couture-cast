@@ -6,13 +6,14 @@ import { flagCorpus } from './community-text-acceptance-flags'
  * FROZEN CLEAN CORPUS (round 7m), part "flags". Regional indicator letters are mapped to
  * Latin letters because they also spell words; the flag emoji people post must not newly
  * withhold. See community-text-acceptance-flags.ts for the generator (every valid flag, every
- * two-flag run, seeded longer runs, flags beside words in all seven languages). Nothing in
- * this part may be withheld.
+ * two-flag run, seeded longer runs, flags beside words in all seven languages, and city or
+ * country lists of 4 to 12 name-and-flag pairs in all seven languages, round 7o). Nothing in
+ * this part may be withheld or sent to review, text_input_truncated included.
  *
  * Budget: measured with coverage instrumentation on a quiet machine the part takes
  * 13 s; CI runs about 2.6 times slower (35 s), and the timeout keeps more than 8 times that.
  */
-const PINNED_TOTAL = 140430
+const PINNED_TOTAL = 141270
 const FLAGS_TIMEOUT_MS = 300_000
 
 describe('frozen clean corpus, flags', () => {

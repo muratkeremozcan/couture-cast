@@ -454,6 +454,8 @@ const allowFileSchema = z.object({
  * two-letter one folds to English "am". Both are excluded by this floor.
  */
 const MIN_SINGLE_TERM_LENGTH = 4
+/** The most fragments of one word that are rejoined across symbols (f*a*g*g*o*t is six). */
+const MAX_CUT_FRAGMENTS = 12
 
 /**
  * Reviewed exceptions to {@link MIN_SINGLE_TERM_LENGTH}, kept visible on purpose
@@ -2363,15 +2365,22 @@ export class CommunityTextScreener {
       )
     }
     for (let start = 0; start + 1 < foldedTokens.length; start += 1) {
-      for (let size = 2; size <= 3 && start + size <= foldedTokens.length; size += 1) {
+      if (cleared(start)) continue
+      // A chain of fragments of any length rejoins (f*a*g*got). Everything that rules a window
+      // out is monotonic in its size, so the first window that cannot grow ends the chain.
+      for (
+        let size = 2;
+        size <= MAX_CUT_FRAGMENTS && start + size <= foldedTokens.length;
+        size += 1
+      ) {
         const window = foldedTokens.slice(start, start + size)
-        if (window.some((_, offset) => cleared(start + offset))) continue
+        if (cleared(start + size - 1)) break
         const gaps = classifyCutGaps(window, (gap) => plainGap(start + gap))
-        if (gaps === 'unusable') continue
+        if (gaps === 'unusable') break
         const shortPart = gaps === 'short'
         const joined = window.join('')
+        if (collapseRepeats(joined).length > this.longestTerm) break
         if (joined.length < MIN_SINGLE_TERM_LENGTH) continue
-        if (collapseRepeats(joined).length > this.longestTerm) continue
         // A cut of a hate or sexual term never passes on its own. Only a reviewed fashion
         // pair inside its enumerated frame ("then you pin the hem") is left alone.
         if (size === 2 && this.inReviewedSplitFrame(foldedTokens, start)) continue
@@ -2421,9 +2430,14 @@ export class CommunityTextScreener {
     if (this.cutFamilyTerms.size === 0) return []
     const outcomes: MatchOutcome[] = []
     for (let start = 0; start < foldedTokens.length; start += 1) {
-      for (let size = 2; size <= 3 && start + size <= foldedTokens.length; size += 1) {
+      for (
+        let size = 2;
+        size <= MAX_CUT_FRAGMENTS && start + size <= foldedTokens.length;
+        size += 1
+      ) {
         const window = foldedTokens.slice(start, start + size)
         const joined = window.join('')
+        if (collapseRepeats(joined).length > this.longestTerm) break
         if (!this.cutFamilyTerms.has(collapseRepeats(joined))) continue
         if (this.isOrdinaryFamilyContinuation(foldedTokens, start, size)) continue
         const meta = this.worstAcross((index) => matchRun(index.singleCollapsed, joined))
@@ -2462,7 +2476,9 @@ export class CommunityTextScreener {
     const runs = [...raw.normalize('NFKC').matchAll(REGIONAL_RUN_PATTERN)].map((run) =>
       regionalLetters(run[0])
     )
-    if (runs.length === 0) return []
+    // A text whose regional runs are all rows of flags ("Paris 🇫🇷 Berlin 🇩🇪") has nothing to
+    // peel: building alternatives for it would spend the work budget on clean captions.
+    if (runs.every((letters) => isFlagRun(letters))) return []
     // A run read as its own word may also stand apart from Latin letters written against it.
     const options = runs.map((letters) =>
       isFlagRun(letters)
@@ -2480,7 +2496,9 @@ export class CommunityTextScreener {
       for (let at = 1; at < choices.length; at += 1)
         readings.push(base.map((_, i) => (i === run ? at : 0)).map(String))
     })
-    const edges = runs.map((letters) => [...edgeReadings(letters), FLAG_SEPARATOR])
+    const edges = runs.map((letters) =>
+      isFlagRun(letters) ? [FLAG_SEPARATOR] : [...edgeReadings(letters), FLAG_SEPARATOR]
+    )
     let edgeCombos: string[][] = [[]]
     for (const choices of edges)
       edgeCombos = edgeCombos

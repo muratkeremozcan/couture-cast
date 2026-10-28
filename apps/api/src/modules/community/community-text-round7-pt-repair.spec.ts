@@ -1606,6 +1606,43 @@ describe('round 7n flags spliced into letters, IPA look-alikes and bogus subdivi
       }
   })
 
+  it('rejoins a chain of any length across symbols', () => {
+    const symbols = ['*', '.', '-', '_', '\u{1F600}', US, FR]
+    for (const locale of locales)
+      for (const symbol of symbols)
+        for (const word of ['faggot', 'nigger', 'raped', 'kike', 'whore']) {
+          for (let fragments = 3; fragments <= word.length; fragments += 1) {
+            // cut after the first (fragments - 1) letters, the last fragment keeps the rest
+            const parts = [...word.slice(0, fragments - 1), word.slice(fragments - 1)]
+            expect(
+              screen(parts.join(symbol), locale).disposition,
+              `${locale} ${parts.join(symbol)}`
+            ).not.toBe('pass')
+          }
+        }
+  })
+
+  it('keeps captions of name and flag pairs clean', () => {
+    const places = ['Paris', 'Berlin', 'Roma', 'Lisboa', 'Madrid', 'Wien', 'İstanbul']
+    const flags = [
+      US,
+      FR,
+      '\u{1F1E9}\u{1F1EA}',
+      '\u{1F1EE}\u{1F1F9}',
+      '\u{1F1EA}\u{1F1F8}',
+    ]
+    for (const locale of locales)
+      for (let pairs = 4; pairs <= 12; pairs += 1) {
+        const text = Array.from(
+          { length: pairs },
+          (_, at) => `${places[at % places.length]} ${flags[at % flags.length]}`
+        ).join(' ')
+        const verdict = screen(text, locale)
+        expect(verdict.disposition, `${locale} ${pairs} pairs`).toBe('pass')
+        expect(verdict.reasons, `${locale} ${pairs} pairs`).toEqual(['text_clean'])
+      }
+  })
+
   it('maps Latin Extended and IPA look-alikes', () => {
     const ipa: Record<string, string> = {
       r: '\u027E',

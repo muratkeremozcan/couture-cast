@@ -50,9 +50,44 @@ const SUBDIVISION_FLAGS = ['gbeng', 'gbsct', 'gbwls'].map(
     '\u{E007F}'
 )
 
+/** Place names a caption pairs with a flag, per language. */
+const PLACES: Readonly<Record<string, readonly string[]>> = {
+  'en-US': ['Paris', 'London', 'Berlin', 'Tokyo', 'New York', 'Rome', 'Lisbon', 'Vienna'],
+  'de-DE': ['Wien', 'Köln', 'Hamburg', 'Zürich', 'München', 'Prag', 'Rom', 'Lissabon'],
+  'es-ES': ['Madrid', 'Sevilla', 'México', 'Lima', 'Bogotá', 'Roma', 'Lisboa', 'París'],
+  'fr-FR': ['Paris', 'Lyon', 'Bruxelles', 'Genève', 'Québec', 'Rome', 'Lisbonne', 'Nice'],
+  'it-IT': ['Roma', 'Milano', 'Napoli', 'Torino', 'Firenze', 'Parigi', 'Vienna', 'Praga'],
+  'pt-BR': [
+    'Lisboa',
+    'Porto',
+    'São Paulo',
+    'Recife',
+    'Brasília',
+    'Roma',
+    'Paris',
+    'Viena',
+  ],
+  'tr-TR': ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Paris', 'Roma', 'Berlin', 'Viyana'],
+}
+
 export interface FlagText {
   readonly text: string
   readonly locale: string | null
+}
+
+/** City or country lists, each name followed (or preceded) by its flag: 4 to 12 pairs. */
+function placeCaptions(pick: () => string, next: () => number): FlagText[] {
+  const out: FlagText[] = []
+  for (const [locale, places] of Object.entries(PLACES))
+    for (let list = 0; list < 60; list += 1) {
+      const items = Array.from({ length: 4 + (list % 9) }, () => {
+        const place = places[next() % places.length] as string
+        return list % 3 === 0 ? `${pick()} ${place}` : `${place} ${pick()}`
+      })
+      out.push({ text: items.join(list % 2 === 0 ? ' ' : ', '), locale })
+      out.push({ text: items.join(' / '), locale })
+    }
+  return out
 }
 
 export function flagCorpus(): FlagText[] {
@@ -87,6 +122,7 @@ export function flagCorpus(): FlagText[] {
       if (run % 4 === 0) out.push({ text: items.join(' '), locale: 'en-US' })
       if (run % 4 === 1) out.push({ text: items.join(', '), locale: 'fr-FR' })
     }
+  out.push(...placeCaptions(pick, next))
   for (const [locale, phrases] of Object.entries(WORDS))
     for (const phrase of phrases)
       for (const item of flags) {

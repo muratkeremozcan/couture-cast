@@ -311,6 +311,75 @@ function splits(word: string, emit: Emit, three: boolean, spaces: boolean): void
     }
 }
 
+/** Every choice of `count` cut positions among 1..n-1, in order. */
+function cutSets(n: number, count: number): number[][] {
+  const sets: number[][] = []
+  const walk = (from: number, chosen: number[]): void => {
+    if (chosen.length === count) {
+      sets.push(chosen)
+      return
+    }
+    for (let at = from; at < n; at += 1) walk(at + 1, [...chosen, at])
+  }
+  walk(1, [])
+  return sets
+}
+
+function cutWith(word: string, cuts: readonly number[], separators: readonly string[]) {
+  let out = word.slice(0, cuts[0])
+  cuts.forEach((cut, index) => {
+    out += separators[index] + word.slice(cut, cuts[index + 1] ?? word.length)
+  })
+  return out
+}
+
+/**
+ * Chains of four to six fragments at every placement (split4 and split5 are three and four
+ * symbol cuts, one rotating symbol per cut), and seeded random chains of 2 to 12 fragments with
+ * mixed symbols (chain): no cut count is special.
+ */
+function chains(word: string, emit: Emit): void {
+  const n = word.length
+  const symbols = [...SEPARATORS, ...FLAG_CUTS]
+  for (const [cls, count] of [
+    ['split4', 3],
+    ['split5', 4],
+  ] as const)
+    for (const cuts of cutSets(n, count))
+      emit(
+        cls,
+        cutWith(
+          word,
+          cuts,
+          cuts.map(
+            (cut, index) => symbols[(cut * 7 + index * 3 + n) % symbols.length] as string
+          )
+        )
+      )
+  let state = [...word].reduce(
+    (sum, ch) => (sum * 31 + ch.charCodeAt(0)) % 2147483648,
+    17
+  )
+  const next = (): number => {
+    state = (state * 1103515245 + 12345) % 2147483648
+    return state >>> 8
+  }
+  for (let round = 0; round < 6; round += 1) {
+    const count = 1 + (next() % Math.min(11, n - 1))
+    const cuts = [
+      ...new Set(Array.from({ length: count }, () => 1 + (next() % (n - 1)))),
+    ].toSorted((a, b) => a - b)
+    emit(
+      'chain',
+      cutWith(
+        word,
+        cuts,
+        cuts.map(() => symbols[next() % symbols.length] as string)
+      )
+    )
+  }
+}
+
 function typos(word: string, emit: Emit): void {
   const n = word.length
   if (n < 8) return
@@ -341,28 +410,30 @@ function runMatrix(): void {
       if (phrase && word.length < 3) continue
       const around = (variant: string): string =>
         words.map((other, at) => (at === index ? variant : other)).join(' ')
-      const emitWord: Emit = (cls, variant) => emitTerm(cls, around(variant))
-      const short = !phrase && word.length < 4
-      const dropShort = (cls: string, variant: string): void => {
-        if (
-          short &&
-          (cls === 'censor' || cls.startsWith('split') || cls.startsWith('typo'))
-        )
-          return
-        emitWord(cls, variant)
-      }
-      perLetter(word, dropShort)
-      if (!short && (!phrase || word.length >= 6))
-        splits(word, dropShort, !phrase, !phrase)
-      if (!phrase && !short) typos(word, dropShort)
-      if (!phrase && !short) flagSplices(word, emitWord)
+      wordClasses(word, phrase, (cls, variant) => emitTerm(cls, around(variant)))
     }
   }
 }
 
-// The matrix screens about 100,000 spellings. Measured locally the run takes 46 s; the
-// budget keeps a wide margin for the 4 vCPU runner (about 2.6 times slower than a local run).
-const MATRIX_TIMEOUT_MS = 300_000
+/** Every per-word class for one word of a term (a whole term when it is a single word). */
+function wordClasses(word: string, phrase: boolean, emitWord: Emit): void {
+  const short = !phrase && word.length < 4
+  const dropShort: Emit = (cls, variant) => {
+    if (short && (cls === 'censor' || cls.startsWith('split') || cls.startsWith('typo')))
+      return
+    emitWord(cls, variant)
+  }
+  perLetter(word, dropShort)
+  if (!short && (!phrase || word.length >= 6)) splits(word, dropShort, !phrase, !phrase)
+  if (phrase || short) return
+  chains(word, dropShort)
+  typos(word, dropShort)
+  flagSplices(word, emitWord)
+}
+
+// The matrix screens about 125,000 spellings. Measured locally the run takes 73 s; the 4 vCPU
+// runner is about 2.6 times slower (190 s), and the budget keeps 2.4 times that.
+const MATRIX_TIMEOUT_MS = 450_000
 
 describe('frozen adversarial matrix', () => {
   beforeAll(runMatrix, MATRIX_TIMEOUT_MS)
@@ -437,6 +508,9 @@ const PINNED_COUNTS: Record<string, number> = {
   'smallcaps-all': 245,
   split2: 18603,
   split3: 3551,
+  split4: 8116,
+  split5: 12762,
+  chain: 1056,
   stretch: 2016,
   'typo-delete': 670,
   'typo-transpose': 571,
