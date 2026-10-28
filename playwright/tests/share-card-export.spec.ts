@@ -11,20 +11,24 @@ import {
 } from '../../scripts/lib/story68-browser-watermark.mjs'
 import { createClient, type Session } from '@supabase/supabase-js'
 import AxeBuilder from '@axe-core/playwright'
-import {
-  test,
-  expect,
-  type BrowserContext,
-  type Page,
-  type Locator,
-  type Request,
-  type Response,
+import type {
+  APIResponse,
+  BrowserContext,
+  Page,
+  Locator,
+  Request,
+  Response,
+  Route,
 } from '@playwright/test'
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import {
   supportedLocales,
   prepareShareCardInputSchema,
+  communitySponsoredFeedResponseSchema,
+  userProfileResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { decodeShareCardBase64, validateShareCardPng } from '@couture/api-client'
+import { test, expect } from '../support/fixtures/share-card-fixtures'
 const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
@@ -101,15 +105,14 @@ async function session(account: number): Promise<Session> {
   return verified.data.session!
 }
 async function identify(context: BrowserContext, account = 0) {
-  await context.addInitScript(
-    (value) => {
-      if (!sessionStorage.getItem('cc68-session-initialized')) {
-        localStorage.setItem('couturecast.auth-session', JSON.stringify(value))
-        sessionStorage.setItem('cc68-session-initialized', 'true')
-      }
-    },
-    await session(account)
-  )
+  const member = await session(account)
+  await context.addInitScript((value) => {
+    if (!sessionStorage.getItem('cc68-session-initialized')) {
+      localStorage.setItem('couturecast.auth-session', JSON.stringify(value))
+      sessionStorage.setItem('cc68-session-initialized', 'true')
+    }
+  }, member)
+  return member
 }
 const modal = (page: Page) => page.locator('[aria-labelledby="share-card-title"]')
 const cancellationWitness = (page: Page, request: Request) =>
@@ -122,28 +125,91 @@ const cancellationWitness = (page: Page, request: Request) =>
       () => true,
       () => false
     )
+type HandoffProbe = { inflight: Promise<unknown>[]; handoffs: number }
+type HandoffProbeWindow = Window &
+  typeof globalThis & { __shareCardHandoffProbe?: HandoffProbe }
+// Init script. Tracks each asynchronous step a share-card save takes before its
+// handoff (preparation fetch, its body read, digest) and counts download clicks.
+function handoffProbe() {
+  const target = window as HandoffProbeWindow
+  if (target.__shareCardHandoffProbe) return
+  const probe: HandoffProbe = { inflight: [], handoffs: 0 }
+  target.__shareCardHandoffProbe = probe
+  const preparation = (url: string) => url.endsWith('/api/v1/share-cards/prepare')
+  const track = <T>(pending: Promise<T>) => {
+    probe.inflight.push(
+      pending.then(
+        () => undefined,
+        () => undefined
+      )
+    )
+    return pending
+  }
+  const fetch = target.fetch
+  target.fetch = (...args: Parameters<typeof fetch>) => {
+    const pending = fetch.apply(target, args)
+    const input = args[0]
+    const url = typeof input === 'object' && 'url' in input ? input.url : String(input)
+    return preparation(url) ? track(pending) : pending
+  }
+  // The Playwright Response type shadows the DOM one in this file.
+  type BodyResponse = InstanceType<typeof target.Response>
+  const body = target.Response.prototype as unknown as Record<
+    string,
+    (this: BodyResponse) => Promise<unknown>
+  >
+  for (const name of ['json', 'text', 'arrayBuffer', 'blob']) {
+    const original = body[name]!
+    body[name] = function (this: BodyResponse) {
+      const pending = original.call(this)
+      return preparation(this.url) ? track(pending) : pending
+    }
+  }
+  const subtle = target.crypto.subtle
+  const digest = subtle.digest.bind(subtle)
+  subtle.digest = (...args: Parameters<SubtleCrypto['digest']>) => track(digest(...args))
+  const anchor = target.HTMLAnchorElement.prototype
+  // click is inherited from HTMLElement; read it as a value, then shadow it on anchors.
+  const click = Object.getOwnPropertyDescriptor(target.HTMLElement.prototype, 'click')!
+    .value as (this: HTMLAnchorElement) => void
+  anchor.click = function (this: HTMLAnchorElement) {
+    if (this.download) probe.handoffs += 1
+    return click.call(this)
+  }
+}
+// Runs in the page. Waits until every tracked step, including steps those steps
+// started, has settled and a task boundary has passed, then reports handoffs.
+async function settleHandoffProbe() {
+  const probe = (window as HandoffProbeWindow).__shareCardHandoffProbe
+  if (!probe) throw new Error('share_card_handoff_probe_missing')
+  let settled = -1
+  while (settled !== probe.inflight.length) {
+    settled = probe.inflight.length
+    await Promise.all(probe.inflight)
+    await new Promise((resolve) => {
+      const channel = new MessageChannel()
+      channel.port1.onmessage = () => {
+        channel.port1.close()
+        resolve(undefined)
+      }
+      channel.port2.postMessage(null)
+    })
+  }
+  return probe.handoffs
+}
 async function expectNoLateDownload(page: Page) {
   // A fulfilled route alone does not mean the browser has run its fetch callbacks.
-  // Keep a listener through a bounded event window, including later handoff tasks.
-  const outcome = await page.waitForEvent('download', { timeout: 1000 }).then(
-    () => 'download',
-    (error: unknown) => {
-      if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error
-      return 'none'
-    }
-  )
-  expect(outcome).toBe('none')
+  // The probe settles only after every continuation of the save path has run.
+  expect(await page.evaluate(settleHandoffProbe), 'late download handoffs').toBe(0)
 }
 async function ownPhoto(
   page: Page,
-  navigate = true,
+  interceptNetworkCall: InterceptNetworkCallFn | null,
   preparationJourney?: (open: () => Promise<void>, apiOrigin: string) => Promise<void>
 ) {
   let apiOrigin = ''
-  if (navigate) {
-    const profile = page.waitForResponse(
-      (r) => r.url().endsWith('/api/v1/user/profile') && r.status() === 200
-    )
+  if (interceptNetworkCall) {
+    const profile = interceptNetworkCall({ method: 'GET', url: '**/api/v1/user/profile' })
     const navigateHome = () => page.goto('/').then(() => undefined)
     if (preparationJourney)
       await afterInitialCommunityVerification({
@@ -152,7 +218,9 @@ async function ownPhoto(
         navigate: navigateHome,
       })
     else await navigateHome()
-    apiOrigin = new URL((await profile).url()).origin
+    const verified = await profile
+    expect(verified.status).toBe(200)
+    apiOrigin = new URL(verified.request!.url()).origin
   }
   const opener = page
     .locator(`[data-testid$="lookbook-card-${fixture.postId}"]`)
@@ -165,6 +233,38 @@ async function ownPhoto(
   await expect(preview).toHaveAttribute('data-loaded', 'true')
   return { opener, preview, dialog: modal(page) }
 }
+async function previewBytes(preview: Locator) {
+  const bytes = decodeShareCardBase64((await preview.getAttribute('src'))!.split(',')[1]!)
+  validateShareCardPng(bytes)
+  return bytes
+}
+const sha256 = (bytes: Uint8Array | Buffer) =>
+  createHash('sha256').update(bytes).digest('hex')
+function renderCatalog(locale: string) {
+  const catalog = JSON.parse(
+    fs.readFileSync(
+      path.resolve(`apps/api/src/modules/share-cards/assets/${locale}.json`),
+      'utf8'
+    )
+  ) as {
+    community: string
+    climateBands: Record<string, string>
+    watermarkRole: string
+  }
+  const body = [
+    catalog.community,
+    catalog.climateBands.temperate_dry,
+    'CoutureCast',
+  ].join('. ')
+  return { body, watermarked: body + `. ${catalog.watermarkRole}: CoutureCast` }
+}
+const webCatalog = (locale: string) =>
+  (
+    JSON.parse(
+      fs.readFileSync(path.resolve(`apps/web/src/i18n/locales/${locale}.json`), 'utf8')
+    ) as { shareCard: { photoPrivacyHelp: string; offline: string; retry: string } }
+  ).shareCard
+type ProfileRead = (apiOrigin: string) => Promise<{ status: number; body: unknown }>
 function pinnedWatermarkDatabase(apiOrigin: string) {
   const database = new URL(env.DATABASE_URL)
   if (
@@ -195,7 +295,8 @@ function pinnedWatermarkDatabase(apiOrigin: string) {
 async function rapidWatermarkDuringRealPreparation(
   page: Page,
   open: () => Promise<void>,
-  apiOrigin: string
+  apiOrigin: string,
+  readProfile: ProfileRead
 ) {
   const started = performance.now()
   const browser = test.info().project.name
@@ -240,20 +341,17 @@ async function rapidWatermarkDuringRealPreparation(
     )
       record.unavailableResponses += 1
   }
+  // playwright-utils deviation: interceptNetworkCall resolves on one request and
+  // matches only URL and method; this proof counts every preparation and every 503.
   page.on('request', requestObserved)
   page.on('response', responseObserved)
   try {
     const connectionString = pinnedWatermarkDatabase(apiOrigin)
-    const token = (await session(0)).access_token
-    const profile = () =>
-      page.request.get(`${apiOrigin}/api/v1/user/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-    const owner = await profile()
+    const owner = await readProfile(apiOrigin)
     check(
       'ownerVerified',
-      owner.status() === 200 &&
-        ((await owner.json()) as { user: { id: string } }).user.id ===
+      owner.status === 200 &&
+        userProfileResponseSchema.parse(owner.body).user.id ===
           fixture.identities[0]!.appUserId
     )
     await withBrowserWatermarkLock({
@@ -268,6 +366,8 @@ async function rapidWatermarkDuringRealPreparation(
         const live = () => {
           if (signal.aborted) throw signal.reason
         }
+        // playwright-utils deviation: interceptNetworkCall cannot select a request by
+        // its body, and each wait here selects the preparation by its watermark value.
         phase('initial')
         const initial = page.waitForRequest((request) => isPreparation(request, true))
         await open()
@@ -291,7 +391,7 @@ async function rapidWatermarkDuringRealPreparation(
         live()
         check('watermarkOn', true)
         phase('profile-after')
-        check('authenticatedProfile', (await profile()).status() === 200)
+        check('authenticatedProfile', (await readProfile(apiOrigin)).status === 200)
         phase('blocked-after')
         check('blockedAtRelease', await checkBlocked())
       },
@@ -352,61 +452,77 @@ async function activateFocused(control: Locator) {
   await expect(control).toBeFocused()
   await control.press('Enter')
 }
+// One held route step: the handler records the request, signals entry and waits for
+// the test to release it.
+function routeGate() {
+  let release!: () => void
+  let enter!: () => void
+  let settle!: () => void
+  const gate = {
+    request: undefined as Request | undefined,
+    released: new Promise<void>((resolve) => {
+      release = resolve
+    }),
+    started: new Promise<void>((resolve) => {
+      enter = resolve
+    }),
+    finished: new Promise<void>((resolve) => {
+      settle = resolve
+    }),
+    release: () => release(),
+    enter: () => enter(),
+    settle: () => settle(),
+  }
+  return gate
+}
+async function fulfillUnlessCancelled(route: Route, response: APIResponse) {
+  try {
+    await route.fulfill({ response })
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !/Target closed|Request canceled|Request was aborted|already handled|Invalid InterceptionId/i.test(
+        error.message
+      )
+    )
+      throw error
+  }
+}
+async function holdThenFulfill(
+  route: Route,
+  request: Request,
+  gate: ReturnType<typeof routeGate>
+) {
+  gate.request = request
+  const response = await route.fetch()
+  gate.enter()
+  await gate.released
+  try {
+    await fulfillUnlessCancelled(route, response)
+  } finally {
+    gate.settle()
+  }
+}
+// playwright-utils deviation: handleDownload saves the file but does not expose
+// Download.suggestedFilename, which these cases assert.
+const nextDownload = (page: Page) => page.waitForEvent('download')
 for (const locale of supportedLocales)
   test.describe(locale, () => {
     test.use({ locale })
-    test('P-POST P-PHOTO-PREVIEW P-LOCALE P-WATERMARK P-DOWNLOAD-BYTES P-A11Y: exact full labels, pixels, keyboard, nested and fallback focus', async ({
+    test('P-POST P-PHOTO-PREVIEW P-LOCALE: exact localized labels, privacy help and unclipped layout', async ({
       context,
       page,
+      interceptNetworkCall,
     }, info) => {
       await identify(context)
-      const errors: string[] = []
-      page.on('pageerror', (error) => errors.push(error.message))
-      const { opener, preview, dialog } = await ownPhoto(
-        page,
-        true,
-        locale === 'en-US'
-          ? (open, origin) => rapidWatermarkDuringRealPreparation(page, open, origin)
-          : undefined
+      const { preview, dialog } = await ownPhoto(page, interceptNetworkCall)
+      await expect(preview).toHaveAttribute('alt', renderCatalog(locale).watermarked)
+      await expect(
+        dialog.getByText(webCatalog(locale).photoPrivacyHelp, { exact: true })
+      ).toBeVisible()
+      expect(sha256(await previewBytes(preview))).toBe(
+        await preview.getAttribute('data-sha256')
       )
-      const catalog = JSON.parse(
-        fs.readFileSync(
-          path.resolve(`apps/api/src/modules/share-cards/assets/${locale}.json`),
-          'utf8'
-        )
-      ) as {
-        community: string
-        climateBands: Record<string, string>
-        watermarkRole: string
-      }
-      const body = [
-        catalog.community,
-        catalog.climateBands.temperate_dry,
-        'CoutureCast',
-      ].join('. ')
-      await expect(preview).toHaveAttribute(
-        'alt',
-        body + `. ${catalog.watermarkRole}: CoutureCast`
-      )
-      const digest = await preview.getAttribute('data-sha256')
-      await dialog.getByRole('checkbox').uncheck()
-      await expect(preview).toHaveAttribute('alt', body)
-      await expect(preview).toHaveAttribute('data-loaded', 'true')
-      await dialog.getByRole('checkbox').check()
-      await expect(preview).toHaveAttribute('data-sha256', digest!)
-      await expect(preview).toHaveAttribute('data-loaded', 'true')
-      const bytes = decodeShareCardBase64(
-        (await preview.getAttribute('src'))!.split(',')[1]!
-      )
-      validateShareCardPng(bytes)
-      expect(createHash('sha256').update(bytes).digest('hex')).toBe(digest)
-      expect(
-        (
-          await new AxeBuilder({ page })
-            .include('[aria-labelledby="share-card-title"]')
-            .analyze()
-        ).violations
-      ).toEqual([])
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 1100 })
         await expect(dialog.getByTestId('share-card-save')).toBeVisible()
@@ -418,13 +534,77 @@ for (const locale of supportedLocales)
           path: info.outputPath(`${locale}-${width}.png`),
         })
       }
-      const downloaded = page.waitForEvent('download')
+    })
+    test('P-WATERMARK: OFF then ON returns the original approved digest', async ({
+      context,
+      page,
+      interceptNetworkCall,
+      apiRequest,
+    }) => {
+      const member = await identify(context)
+      const readProfile: ProfileRead = (apiOrigin) =>
+        apiRequest({
+          method: 'GET',
+          baseUrl: apiOrigin,
+          path: '/api/v1/user/profile',
+          headers: { Authorization: `Bearer ${member.access_token}` },
+          retryConfig: { maxRetries: 0 },
+        })
+      const { preview, dialog } = await ownPhoto(
+        page,
+        interceptNetworkCall,
+        locale === 'en-US'
+          ? (open, origin) =>
+              rapidWatermarkDuringRealPreparation(page, open, origin, readProfile)
+          : undefined
+      )
+      const labels = renderCatalog(locale)
+      await expect(preview).toHaveAttribute('alt', labels.watermarked)
+      const digest = await preview.getAttribute('data-sha256')
+      await dialog.getByRole('checkbox').uncheck()
+      await expect(preview).toHaveAttribute('alt', labels.body)
+      await expect(preview).toHaveAttribute('data-loaded', 'true')
+      await dialog.getByRole('checkbox').check()
+      await expect(preview).toHaveAttribute('data-sha256', digest!)
+      await expect(preview).toHaveAttribute('data-loaded', 'true')
+      await expect(preview).toHaveAttribute('alt', labels.watermarked)
+    })
+    test('P-DOWNLOAD-BYTES: the downloaded file is the approved preview PNG', async ({
+      context,
+      page,
+      interceptNetworkCall,
+    }, info) => {
+      await identify(context)
+      const { preview, dialog } = await ownPhoto(page, interceptNetworkCall)
+      const bytes = await previewBytes(preview)
+      const downloaded = nextDownload(page)
       await dialog.getByTestId('share-card-save').click()
       const download = await downloaded
       expect(download.suggestedFilename()).toBe('couturecast-card.png')
       const file = info.outputPath('couturecast-card.png')
       await download.saveAs(file)
       expect(fs.readFileSync(file)).toEqual(Buffer.from(bytes))
+      expect(sha256(fs.readFileSync(file))).toBe(
+        await preview.getAttribute('data-sha256')
+      )
+    })
+    test('P-A11Y: axe-clean dialog, keyboard Save keeps focus, opener and fallback focus return', async ({
+      context,
+      page,
+      interceptNetworkCall,
+    }) => {
+      await identify(context)
+      const { opener, preview, dialog } = await ownPhoto(page, interceptNetworkCall)
+      expect(
+        (
+          await new AxeBuilder({ page })
+            .include('[aria-labelledby="share-card-title"]')
+            .analyze()
+        ).violations
+      ).toEqual([])
+      const downloaded = nextDownload(page)
+      await activateFocused(dialog.getByTestId('share-card-save'))
+      await downloaded
       await expect(dialog.getByTestId('share-card-save')).toBeFocused()
       await page.keyboard.press('Escape')
       await expect(opener).toBeFocused()
@@ -435,89 +615,85 @@ for (const locale of supportedLocales)
       await expect(
         page.locator('[data-share-card-focus-fallback="community"]')
       ).toBeFocused()
-      expect(errors).toEqual([])
     })
   })
 test('P-FOREIGN P-IDENTITY: a second genuine account has no export action or access to former member source', async ({
   context,
   page,
-  request,
+  interceptNetworkCall,
+  apiRequest,
 }) => {
-  await identify(context, 1)
+  const secondary = await identify(context, 1)
+  const profile = interceptNetworkCall({ method: 'GET', url: '**/api/v1/user/profile' })
+  const feed = interceptNetworkCall({ method: 'GET', url: '**/api/v1/community/feed*' })
   await page.goto('/')
-  const foreign = page.locator(`[data-testid$="lookbook-card-${fixture.postId}"]`).first()
-  await expect(foreign).toBeVisible()
-  await expect(foreign.getByTestId('share-card-open')).toHaveCount(0)
-  const response = await request.post(
-    'http://127.0.0.1:4088/api/v1/share-cards/prepare',
-    {
-      headers: { Authorization: `Bearer ${(await session(1)).access_token}` },
-      data: {
-        source: { kind: 'community_post', postId: fixture.postId },
-        locale: 'en-US',
-        watermark: true,
-        purpose: 'preview',
-      },
-    }
+  const verified = await profile
+  expect(verified.status).toBe(200)
+  expect(userProfileResponseSchema.parse(verified.responseJson).user.id).toBe(
+    fixture.identities[1]!.appUserId
   )
-  expect(response.status()).toBe(404)
-  expect(await response.json()).not.toHaveProperty('data')
+  const listed = await feed
+  expect(listed.status).toBe(200)
+  expect(listed.request?.headers().authorization).toBe(`Bearer ${secondary.access_token}`)
+  const item = communitySponsoredFeedResponseSchema
+    .parse(listed.responseJson)
+    .data.items.find(({ id }) => id === fixture.postId)
+  expect(item?.author.isSelf).toBe(false)
+  const foreign = page.locator(`[data-testid$="lookbook-card-${fixture.postId}"]`).first()
+  // Reactions render only for a signed-in viewer, the same gate as the export action.
+  await expect(
+    foreign.locator(`[data-testid$="community-reactions-${fixture.postId}"]`)
+  ).toBeVisible()
+  await expect(foreign.getByTestId('share-card-open')).toHaveCount(0)
+  const { status, body } = await apiRequest({
+    method: 'POST',
+    baseUrl: env.API_BASE_URL,
+    path: '/api/v1/share-cards/prepare',
+    headers: { Authorization: `Bearer ${secondary.access_token}` },
+    body: {
+      source: { kind: 'community_post', postId: fixture.postId },
+      locale: 'en-US',
+      watermark: true,
+      purpose: 'preview',
+    },
+    retryConfig: { maxRetries: 0 },
+  })
+  expect(status).toBe(404)
+  expect(body).not.toHaveProperty('data')
 })
-test('P-REVALIDATE P-DOWNLOAD-ERROR P-CANCEL: final conflict and handoff error retain approved preview; cancellation prevents download', async ({
+test('P-REVALIDATE P-DOWNLOAD-ERROR: final conflict and handoff error retain the approved preview, and Retry downloads it', async ({
   context,
   page,
+  interceptNetworkCall,
 }) => {
   await identify(context)
-  const { dialog, preview } = await ownPhoto(page)
-  const digest = await preview.getAttribute('data-sha256')
   let conflict = true
-  let holdRefresh = false
-  let holdRetry = false
-  let releaseRefresh!: () => void
-  let refreshEntered!: () => void
-  let releaseRetry!: () => void
-  let retryEntered!: () => void
-  const refreshHold = new Promise<void>((resolve) => {
-    releaseRefresh = resolve
-  })
-  const refreshStarted = new Promise<void>((resolve) => {
-    refreshEntered = resolve
-  })
-  const retryHold = new Promise<void>((resolve) => {
-    releaseRetry = resolve
-  })
-  const retryStarted = new Promise<void>((resolve) => {
-    retryEntered = resolve
-  })
+  let refresh: ReturnType<typeof routeGate> | null = null
+  let retry: ReturnType<typeof routeGate> | null = null
   const purposes: string[] = []
   // Body-dependent authorization and a deferred handoff need a route handler.
-  await page.route('**/api/v1/share-cards/prepare', async (route) => {
-    const input = prepareShareCardInputSchema.parse(route.request().postDataJSON())
-    purposes.push(input.purpose)
-    if (input.purpose === 'save' && conflict)
-      await route.fulfill({
-        status: 409,
-        json: {
-          code: 'preview_changed',
-          statusCode: 409,
-          message: 'preview_changed',
-        },
-      })
-    else if (
-      (input.purpose === 'preview' && holdRefresh) ||
-      (input.purpose === 'save' && holdRetry)
-    ) {
-      const response = await route.fetch()
-      if (input.purpose === 'preview') {
-        refreshEntered()
-        await refreshHold
-      } else {
-        retryEntered()
-        await retryHold
-      }
-      await route.fulfill({ response })
-    } else await route.continue()
+  const prepareRoute = interceptNetworkCall({
+    url: '**/api/v1/share-cards/prepare',
+    handler: async (route, request) => {
+      const input = prepareShareCardInputSchema.parse(request.postDataJSON())
+      purposes.push(input.purpose)
+      const gate = input.purpose === 'preview' ? refresh : retry
+      if (input.purpose === 'save' && conflict)
+        await route.fulfill({
+          status: 409,
+          json: {
+            code: 'preview_changed',
+            statusCode: 409,
+            message: 'preview_changed',
+          },
+        })
+      else if (gate && !gate.request) await holdThenFulfill(route, request, gate)
+      else await route.continue()
+    },
   })
+  const { dialog, preview } = await ownPhoto(page, interceptNetworkCall)
+  await prepareRoute
+  const digest = await preview.getAttribute('data-sha256')
   await activateFocused(dialog.getByTestId('share-card-save'))
   await expect(dialog.getByRole('alert')).toContainText('changed')
   await expect(dialog.getByTestId('share-card-save')).toBeFocused()
@@ -529,13 +705,14 @@ test('P-REVALIDATE P-DOWNLOAD-ERROR P-CANCEL: final conflict and handoff error r
   conflict = false
   const recovery = dialog.getByTestId('share-card-recovery')
   await expect(recovery).toHaveText('Refresh preview')
-  holdRefresh = true
+  const refreshGate = routeGate()
+  refresh = refreshGate
   try {
     await activateFocused(recovery)
-    await refreshStarted
+    await refreshGate.started
     await expect(recovery).toBeFocused()
   } finally {
-    releaseRefresh()
+    refreshGate.release()
   }
   await expect(preview).toHaveAttribute('data-loaded', 'true')
   await expect(recovery).toHaveCount(0)
@@ -552,25 +729,22 @@ test('P-REVALIDATE P-DOWNLOAD-ERROR P-CANCEL: final conflict and handoff error r
   await activateFocused(dialog.getByTestId('share-card-save'))
   await expect(dialog.getByRole('alert')).toContainText('Something went wrong')
   await expect(preview).toHaveAttribute('data-loaded', 'true')
-  const retry = dialog.getByRole('button', { name: 'Try again', exact: true })
-  const retried = page.waitForEvent('download')
-  holdRetry = true
+  const retryButton = dialog.getByRole('button', { name: 'Try again', exact: true })
+  const retried = nextDownload(page)
+  const retryGate = routeGate()
+  retry = retryGate
   try {
-    await activateFocused(retry)
-    await retryStarted
-    await expect(retry).toBeFocused()
+    await activateFocused(retryButton)
+    await retryGate.started
+    await expect(retryButton).toBeFocused()
   } finally {
-    releaseRetry()
+    retryGate.release()
   }
   const download = await retried
   expect(download.suggestedFilename()).toBe('couturecast-card.png')
-  expect(
-    createHash('sha256')
-      .update(fs.readFileSync(await download.path()))
-      .digest('hex')
-  ).toBe(digest)
-  expect(purposes).toEqual(['save', 'preview', 'save', 'save'])
-  await expect(retry).toHaveCount(0)
+  expect(sha256(fs.readFileSync(await download.path()))).toBe(digest)
+  expect(purposes).toEqual(['preview', 'save', 'preview', 'save', 'save'])
+  await expect(retryButton).toHaveCount(0)
   await expect(dialog.getByTestId('share-card-save')).toBeFocused()
   await expect(preview).toHaveAttribute('data-sha256', digest!)
   await page.keyboard.press('Escape')
@@ -578,37 +752,37 @@ test('P-REVALIDATE P-DOWNLOAD-ERROR P-CANCEL: final conflict and handoff error r
   expect(downloads).toEqual(['couturecast-card.png'])
 })
 
-test('P-OUTFIT P-CANCEL P-OFFLINE: all persisted scenarios, retained composition and offline export refusal', async ({
+test('P-OUTFIT P-CANCEL: all persisted scenarios render, and reopening retains each composition', async ({
   context,
   page,
+  interceptNetworkCall,
 }) => {
-  await identify(context)
-  let releaseProfile!: () => void
-  const heldProfile = new Promise<void>((resolve) => {
-    releaseProfile = resolve
+  const member = await identify(context)
+  const profileGate = routeGate()
+  const heldProfile = interceptNetworkCall({
+    url: '**/api/v1/user/profile',
+    handler: async (route) => {
+      profileGate.enter()
+      await profileGate.released
+      await route.continue()
+    },
   })
-  let profileEntered!: () => void
-  const profileStarted = new Promise<void>((resolve) => {
-    profileEntered = resolve
-  })
-  await page.route('**/api/v1/user/profile', async (route) => {
-    profileEntered()
-    await heldProfile
-    await route.continue()
-  })
-  await page.route('**/api/v1/ritual?*', async (route) => {
-    expect(route.request().headers().authorization).toMatch(/^Bearer .+/)
-    await route.continue()
-  })
+  const ritual = interceptNetworkCall({ method: 'GET', url: '**/api/v1/ritual?*' })
   await page.goto('/')
-  await profileStarted
+  await heldProfile
+  await profileGate.started
   const launcher = page.getByTestId('ritual-share-card-launcher')
   try {
     await launcher.getByRole('button').first().click()
     await expect(launcher.getByRole('button').first()).toBeDisabled()
   } finally {
-    releaseProfile()
+    profileGate.release()
   }
+  const ritualCall = await ritual
+  expect(ritualCall.status).toBe(200)
+  expect(ritualCall.request?.headers().authorization).toBe(
+    `Bearer ${member.access_token}`
+  )
   for (const [scenario, label] of [
     ['morning', 'Morning'],
     ['midday', 'Midday'],
@@ -622,22 +796,66 @@ test('P-OUTFIT P-CANCEL P-OFFLINE: all persisted scenarios, retained composition
     await expect(preview).toHaveAttribute('alt', new RegExp(`^Outfit\\. ${label}\\.`))
     const digest = await preview.getAttribute('data-sha256')
     await page.keyboard.press('Escape')
+    await expect(modal(page)).not.toBeVisible()
     await opener.click()
     await expect(preview).toHaveAttribute('data-loaded', 'true')
     await expect(preview).toHaveAttribute('data-sha256', digest!)
-    await context.setOffline(true)
-    await modal(page).getByTestId('share-card-save').click()
-    await expect(modal(page).getByRole('alert')).toContainText('Connect to the internet')
-    await expect(preview).toHaveAttribute('data-sha256', digest!)
-    await context.setOffline(false)
     await page.keyboard.press('Escape')
+    await expect(modal(page)).not.toBeVisible()
   }
+})
+test('P-OFFLINE: offline Save refuses export and keeps the preview; the same member retry downloads it', async ({
+  context,
+  page,
+  interceptNetworkCall,
+}) => {
+  await identify(context)
+  const { preview, dialog } = await ownPhoto(page, interceptNetworkCall)
+  const digest = await preview.getAttribute('data-sha256')
+  const copy = webCatalog('en-US')
+  // Observes the next preparation; an offline Save that reached the network would
+  // resolve this with a failed request before the online retry.
+  const saved = interceptNetworkCall({
+    method: 'POST',
+    url: '**/api/v1/share-cards/prepare',
+  })
+  await context.setOffline(true)
+  try {
+    await dialog.getByTestId('share-card-save').click()
+    await expect(dialog.getByRole('alert')).toHaveText(copy.offline)
+    await expect(preview).toHaveAttribute('data-sha256', digest!)
+  } finally {
+    await context.setOffline(false)
+  }
+  const downloaded = nextDownload(page)
+  await dialog.getByRole('button', { name: copy.retry, exact: true }).click()
+  const download = await downloaded
+  const authorization = await saved
+  expect(authorization.status).toBe(200)
+  expect(prepareShareCardInputSchema.parse(authorization.requestJson)).toMatchObject({
+    purpose: 'save',
+    expectedSha256: digest,
+  })
+  expect(download.suggestedFilename()).toBe('couturecast-card.png')
+  expect(sha256(fs.readFileSync(await download.path()))).toBe(digest)
+  await expect(dialog.getByRole('alert')).toHaveCount(0)
+  await expect(preview).toHaveAttribute('data-sha256', digest!)
 })
 test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-document cross-tab sign-out and account switch', async ({
   context,
   page,
+  interceptNetworkCall,
 }) => {
   await identify(context)
+  await context.addInitScript(handoffProbe)
+  const gate = routeGate()
+  const heldPreview = interceptNetworkCall({
+    url: '**/api/v1/share-cards/prepare',
+    handler: async (route, request) => {
+      if (gate.request) await route.continue()
+      else await holdThenFulfill(route, request, gate)
+    },
+  })
   await page.goto('/')
   const sameDocument = await markDocument(page)
   const opener = page
@@ -645,53 +863,18 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
     .first()
     .getByTestId('share-card-open')
   await expect(opener).toBeVisible()
-  let release!: () => void
-  let entered!: () => void
-  let settled!: () => void
-  const held = new Promise<void>((resolve) => {
-    release = resolve
-  })
-  const started = new Promise<void>((resolve) => {
-    entered = resolve
-  })
-  const finished = new Promise<void>((resolve) => {
-    settled = resolve
-  })
-  let heldRequest!: Request
-  await page.route(
-    '**/api/v1/share-cards/prepare',
-    async (route) => {
-      heldRequest = route.request()
-      const response = await route.fetch()
-      entered()
-      await held
-      try {
-        await route.fulfill({ response })
-      } catch (error) {
-        if (
-          !(error instanceof Error) ||
-          !/Request canceled|Request was aborted|already handled|Invalid InterceptionId/i.test(
-            error.message
-          )
-        )
-          throw error
-      } finally {
-        settled()
-      }
-    },
-    { times: 1 }
-  )
   const downloads: string[] = []
   page.on('download', (d) => downloads.push(d.suggestedFilename()))
   await opener.click()
-  await started
+  const { request: heldRequest } = await heldPreview
+  await gate.started
   await expect(modal(page)).toBeVisible()
   const control = await context.newPage()
   try {
     await control.goto('/notification-settings')
     // The original document and open dialog receive Supabase's real storage event.
     await expect(modal(page)).toBeVisible()
-    const cancelled = cancellationWitness(page, heldRequest)
+    const cancelled = cancellationWitness(page, heldRequest!)
     await control.getByRole('button', { name: 'Sign out', exact: true }).click()
     await control.waitForURL('/')
     await expect(
@@ -701,8 +884,8 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
         .getByTestId('share-card-open')
     ).toHaveCount(0)
     await sameDocument()
-    release()
-    await finished
+    gate.release()
+    await gate.finished
     expect(await cancelled, 'former member preview request was cancelled').toBe(true)
     await expectNoLateDownload(page)
     await expect(page.getByTestId('share-card-preview')).toHaveCount(0)
@@ -727,19 +910,18 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
       )
     ) as { issuedAt: number; code: string }
     expect(code.issuedAt).toBeGreaterThanOrEqual(since)
-    const switched = page.waitForResponse(async (response) => {
-      if (!response.url().endsWith('/api/v1/user/profile') || response.status() !== 200)
-        return false
-      const profile = (await response.json()) as { user: { id: string } }
-      return profile.user.id === account.appUserId
+    const switched = interceptNetworkCall({
+      method: 'GET',
+      url: '**/api/v1/user/profile',
     })
     await control.getByLabel('Email code', { exact: true }).fill(code.code)
     await control.getByRole('button', { name: 'Verify code', exact: true }).click()
     await control.waitForURL('/')
-    const switchedProfile = (await (await switched).json()) as {
-      user: { id: string }
-    }
-    expect(switchedProfile.user.id).toBe(account.appUserId)
+    const switchedProfile = await switched
+    expect(switchedProfile.status).toBe(200)
+    expect(userProfileResponseSchema.parse(switchedProfile.responseJson).user.id).toBe(
+      account.appUserId
+    )
     await sameDocument()
     await expect(page.getByTestId('share-card-preview')).toHaveCount(0)
     await expect(
@@ -750,7 +932,7 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
     ).toHaveCount(0)
     expect(downloads).toEqual([])
   } finally {
-    release()
+    gate.release()
     await control.close()
   }
 })
@@ -758,60 +940,45 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
 test('P-CANCEL-SAVE: closing during held save authorization prevents browser handoff and retains composition', async ({
   context,
   page,
+  interceptNetworkCall,
 }) => {
   await identify(context)
+  await context.addInitScript(handoffProbe)
+  let hold: ReturnType<typeof routeGate> | null = null
+  const prepareRoute = interceptNetworkCall({
+    url: '**/api/v1/share-cards/prepare',
+    handler: async (route, request) => {
+      const gate = hold
+      const input = prepareShareCardInputSchema.parse(request.postDataJSON())
+      if (input.purpose !== 'save' || !gate || gate.request) await route.continue()
+      else await holdThenFulfill(route, request, gate)
+    },
+  })
   await page.goto('/notification-settings')
   const sameDocument = await markDocument(page)
   await page.getByRole('link', { name: 'Back to community', exact: true }).click()
   await expect(page).toHaveURL('/')
   await sameDocument()
-  const { opener, preview, dialog } = await ownPhoto(page, false)
+  const { opener, preview, dialog } = await ownPhoto(page, null)
+  await prepareRoute
   const digest = await preview.getAttribute('data-sha256')
-  let release!: () => void
-  let entered!: () => void
-  const held = new Promise<void>((resolve) => {
-    release = resolve
-  })
-  const started = new Promise<void>((resolve) => {
-    entered = resolve
-  })
-  let settled!: () => void
-  const finished = new Promise<void>((resolve) => {
-    settled = resolve
-  })
-  let heldRequest!: Request
-  await page.route('**/api/v1/share-cards/prepare', async (route) => {
-    const input = prepareShareCardInputSchema.parse(route.request().postDataJSON())
-    if (input.purpose !== 'save') return route.continue()
-    heldRequest = route.request()
-    const response = await route.fetch()
-    entered()
-    await held
-    try {
-      await route.fulfill({ response })
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        !/Target closed|Request canceled|Request was aborted|already handled|Invalid InterceptionId/i.test(
-          error.message
-        )
-      )
-        throw error
-    } finally {
-      settled()
-    }
-  })
+  const closeGate = routeGate()
+  hold = closeGate
   const downloads: string[] = []
   page.on('download', (download) => downloads.push(download.suggestedFilename()))
-  await dialog.getByTestId('share-card-save').click()
-  await started
-  const cancelled = cancellationWitness(page, heldRequest)
-  await page.keyboard.press('Escape')
-  await expect(dialog).not.toBeVisible()
-  await expect(opener).toBeFocused()
-  release()
-  await finished
-  expect(await cancelled, 'closed save authorization request was cancelled').toBe(true)
+  try {
+    await dialog.getByTestId('share-card-save').click()
+    await closeGate.started
+    const cancelled = cancellationWitness(page, closeGate.request!)
+    await page.keyboard.press('Escape')
+    await expect(dialog).not.toBeVisible()
+    await expect(opener).toBeFocused()
+    closeGate.release()
+    await closeGate.finished
+    expect(await cancelled, 'closed save authorization request was cancelled').toBe(true)
+  } finally {
+    closeGate.release()
+  }
   await expectNoLateDownload(page)
   await opener.click()
   await expect(preview).toHaveAttribute('data-loaded', 'true')
@@ -819,57 +986,29 @@ test('P-CANCEL-SAVE: closing during held save authorization prevents browser han
   await expect(dialog.getByRole('alert')).toHaveCount(0)
   expect(downloads).toEqual([])
   await page.keyboard.press('Escape')
-  await page.unroute('**/api/v1/share-cards/prepare')
+  hold = null
   await opener.click()
   await expect(preview).toHaveAttribute('data-loaded', 'true')
   await expect(dialog).not.toContainText('Saving')
-  let releaseNavigation!: () => void
-  let navigationEntered!: () => void
-  let navigationSettled!: () => void
-  const navigationHold = new Promise<void>((resolve) => {
-    releaseNavigation = resolve
-  })
-  const navigationStarted = new Promise<void>((resolve) => {
-    navigationEntered = resolve
-  })
-  const navigationFinished = new Promise<void>((resolve) => {
-    navigationSettled = resolve
-  })
-  let navigationRequest!: Request
-  await page.route('**/api/v1/share-cards/prepare', async (route) => {
-    const input = prepareShareCardInputSchema.parse(route.request().postDataJSON())
-    if (input.purpose !== 'save') return route.continue()
-    navigationRequest = route.request()
-    const response = await route.fetch()
-    navigationEntered()
-    await navigationHold
-    try {
-      await route.fulfill({ response })
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        !/Target closed|Request canceled|Request was aborted|already handled|Invalid InterceptionId/i.test(
-          error.message
-        )
-      )
-        throw error
-    } finally {
-      navigationSettled()
-    }
-  })
-  await dialog.getByTestId('share-card-save').click()
-  await navigationStarted
-  const navigationCancelled = cancellationWitness(page, navigationRequest)
-  await page.goBack()
-  await expect(page).toHaveURL('/notification-settings')
-  await sameDocument()
-  await expect(page.getByTestId('share-card-save')).toHaveCount(0)
-  releaseNavigation()
-  await navigationFinished
-  expect(
-    await navigationCancelled,
-    'unmounted save authorization request was cancelled'
-  ).toBe(true)
+  const navigationGate = routeGate()
+  hold = navigationGate
+  try {
+    await dialog.getByTestId('share-card-save').click()
+    await navigationGate.started
+    const navigationCancelled = cancellationWitness(page, navigationGate.request!)
+    await page.goBack()
+    await expect(page).toHaveURL('/notification-settings')
+    await sameDocument()
+    await expect(page.getByTestId('share-card-save')).toHaveCount(0)
+    navigationGate.release()
+    await navigationGate.finished
+    expect(
+      await navigationCancelled,
+      'unmounted save authorization request was cancelled'
+    ).toBe(true)
+  } finally {
+    navigationGate.release()
+  }
   await expectNoLateDownload(page)
   await sameDocument()
   expect(downloads).toEqual([])
