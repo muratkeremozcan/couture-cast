@@ -322,4 +322,47 @@ describe('TRANSFER after a pldbgapi2 re-run (repeat safety)', () => {
     // The committed attempt skipped the gain, and only it reaches the log.
     expect(warn).toHaveBeenCalledTimes(1)
   })
+
+  it('logs a gain skipped by both runs once, after commit', async () => {
+    delete process.env.REVENUECAT_WEBHOOK_AUTH
+    const tx = {
+      billingEvent: { create: vi.fn().mockResolvedValue({}) },
+      premiumEntitlement: { findUnique: vi.fn().mockResolvedValue(null) },
+    }
+    const prisma = {
+      billingEvent: { findUnique: vi.fn().mockResolvedValue(null) },
+      user: {
+        findUnique: vi.fn(({ where }: { where: { id: string } }) =>
+          Promise.resolve({ id: where.id })
+        ),
+      },
+      $transaction: vi.fn(abortFirstRun(() => tx)),
+    }
+    const service = new BillingWebhookService(
+      prisma as unknown as PrismaClient,
+      { applyLedgerEvent: vi.fn() } as unknown as PremiumEntitlementService,
+      { emitTransition: vi.fn() } as unknown as SubscriptionService,
+      {} as RevenueCatClient
+    )
+    const warn = vi
+      .spyOn((service as unknown as { logger: { warn: () => void } }).logger, 'warn')
+      .mockImplementation(() => undefined)
+    const body = {
+      event: rcEvent({
+        type: 'TRANSFER',
+        app_user_id: null,
+        product_id: null,
+        expiration_at_ms: null,
+        store: null,
+        transferred_from: ['loser'],
+        transferred_to: ['gainer'],
+      }),
+    }
+    await service.handleRevenueCatWebhook({
+      authorization: buildTestOnlyRevenueCatWebhookAuth(),
+      rawBody: Buffer.from(JSON.stringify(body)),
+    })
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
 })

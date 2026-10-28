@@ -7,18 +7,20 @@ import { FeatureFlagsRepository } from './feature-flags.repository'
 
 const createRepository = () => {
   const findUnique = vi.fn()
+  // Separate delegates: a write on the root client would land outside the transaction.
   const upsert = vi.fn((args: unknown) => args)
-  const prisma = {
-    featureFlag: { findUnique, upsert },
-  } as unknown as PrismaClient
-  // Writes run on the transaction client, so a write outside it would miss `tx`.
+  const outsideUpsert = vi.fn((args: unknown) => args)
   const tx = { featureFlag: { upsert } }
   const $transaction = vi.fn((work: (client: typeof tx) => Promise<unknown>) => work(tx))
-  Object.assign(prisma, { $transaction })
+  const prisma = {
+    featureFlag: { findUnique, upsert: outsideUpsert },
+    $transaction,
+  } as unknown as PrismaClient
 
   return {
     findUnique,
     upsert,
+    outsideUpsert,
     $transaction,
     repository: new FeatureFlagsRepository(prisma),
   }
@@ -98,7 +100,7 @@ describe('FeatureFlagsRepository', () => {
 
   describe('upsertMany', () => {
     it('writes every flag in a single transaction so the cache stays consistent', async () => {
-      const { $transaction, upsert, repository } = createRepository()
+      const { $transaction, upsert, outsideUpsert, repository } = createRepository()
       const flags = [
         { key: 'ritual_v2', value: { enabled: true } },
         { key: 'capsule_beta', value: { enabled: false } },
@@ -107,6 +109,7 @@ describe('FeatureFlagsRepository', () => {
       await repository.upsertMany(flags)
 
       expect($transaction).toHaveBeenCalledOnce()
+      expect(outsideUpsert).not.toHaveBeenCalled()
       expect(upsert).toHaveBeenCalledTimes(2)
       expect(upsert).toHaveBeenNthCalledWith(1, {
         where: { key: 'ritual_v2' },
