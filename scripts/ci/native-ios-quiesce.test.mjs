@@ -9,6 +9,7 @@ import {
   simulatorCpu,
   waitForSimulatorCpu,
   assertNativeQuiesceEvidence,
+  sampleSimulatorCpu,
 } from './native-ios-quiesce.mjs'
 
 const quiet = { STExtractionService: 0, healthappd: 0, diagnosticd: 0 }
@@ -58,6 +59,131 @@ test('failed process sampling fails closed', async () => {
   })
   assert.equal(report.outcome, 'sample_failed')
   assert.equal(report.elapsedSeconds, 0)
+})
+
+test('the exact sampler failure reaches the diagnostic publisher before failing closed', async () => {
+  const failure = new Error('owned_simulator_springboard_missing')
+  let observed
+  const report = await waitForSimulatorCpu({
+    sample: () => {
+      throw failure
+    },
+    onSampleFailure: (error) => {
+      observed = error
+    },
+  })
+  assert.equal(report.outcome, 'sample_failed')
+  assert.equal(observed, failure)
+})
+
+test('a real sampler timeout retains status, signal, error code, stderr and exact failed operation', () => {
+  assert.throws(
+    () =>
+      sampleSimulatorCpu(100, 1000, {
+        execute: () => ({
+          status: null,
+          signal: 'SIGKILL',
+          error: { code: 'ETIMEDOUT' },
+          stdout: 'partial snapshot',
+          stderr: 'snapshot diagnostic',
+        }),
+      }),
+    (error) => {
+      assert.equal(error.message, 'simulator_cpu_snapshot_failed')
+      assert.deepEqual(
+        { ...error.diagnostic, durationMs: 0 },
+        {
+          operation: 'cpu-processes',
+          reason: 'simulator_cpu_snapshot_failed',
+          exitCode: null,
+          signal: 'SIGKILL',
+          errorCode: 'ETIMEDOUT',
+          errorName: null,
+          errorMessage: null,
+          durationMs: 0,
+          stdout: 'partial snapshot',
+          stderr: 'snapshot diagnostic',
+        }
+      )
+      return true
+    }
+  )
+})
+
+test('the final fractional remaining budget stays valid for the real Node child API', () => {
+  let observed
+  let calls = 0
+  const cpu = sampleSimulatorCpu(100, 4649.61, {
+    execute: (_binary, _args, options) => {
+      assert.ok(Number.isInteger(options.timeout))
+      assert.ok(options.timeout >= 1 && options.timeout <= 4649)
+      const text =
+        ++calls === 1
+          ? '100 1 0 launchd_sim\n101 100 0 /sim/SpringBoard'
+          : '100 1 launchd_sim\n101 100 /sim/SpringBoard\n102 100 /sim/log stream'
+      return spawnSync(
+        process.execPath,
+        ['-e', `process.stdout.write(${JSON.stringify(text)})`],
+        options
+      )
+    },
+    onCollectors: (clients) => {
+      observed = clients
+    },
+  })
+  assert.deepEqual(cpu, quiet)
+  assert.equal(calls, 2)
+  assert.equal(observed[0].kind, 'log-stream')
+  assert.equal(observed[0].ownedSimulator, true)
+})
+
+test('errors thrown before a sampling child starts retain their original Node diagnostic', () => {
+  assert.throws(
+    () =>
+      sampleSimulatorCpu(100, 5000, {
+        execute: () => {
+          throw Object.assign(new RangeError('exact timeout error'), {
+            code: 'ERR_OUT_OF_RANGE',
+          })
+        },
+      }),
+    (error) => {
+      assert.equal(error.diagnostic.errorCode, 'ERR_OUT_OF_RANGE')
+      assert.equal(error.diagnostic.errorName, 'RangeError')
+      assert.equal(error.diagnostic.errorMessage, 'exact timeout error')
+      return true
+    }
+  )
+})
+
+test('a failed collector inventory also fails closed, while scope errors retain their exact reason', () => {
+  const ps = '100 1 0 launchd_sim\n101 100 0 /sim/SpringBoard'
+  let calls = 0
+  assert.throws(
+    () =>
+      sampleSimulatorCpu(100, 1000, {
+        execute: () =>
+          ++calls === 1
+            ? { status: 0, stdout: ps }
+            : { status: 1, stderr: 'collector snapshot failed' },
+      }),
+    (error) => {
+      assert.equal(error.diagnostic.operation, 'collector-processes')
+      assert.equal(error.diagnostic.stderr, 'collector snapshot failed')
+      return true
+    }
+  )
+  assert.throws(
+    () =>
+      sampleSimulatorCpu(100, 1000, {
+        execute: () => ({ status: 0, stdout: '100 1 0 launchd_sim' }),
+      }),
+    (error) => {
+      assert.equal(error.diagnostic.reason, 'owned_simulator_springboard_missing')
+      assert.equal(error.diagnostic.stdout, '100 1 0 launchd_sim')
+      return true
+    }
+  )
 })
 
 test('settle evidence rejects private fields and an unproved settled flag', async () => {

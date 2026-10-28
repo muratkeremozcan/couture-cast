@@ -10,6 +10,8 @@ import {
   simulatorManager,
   extractionService,
 } from './native-ios-command-evidence.mjs'
+import { simulatorCollectors } from './native-ios-collectors.mjs'
+import { crashReportCollector } from './native-ios-crashes.mjs'
 
 export const CPU_TARGETS = ['STExtractionService', 'healthappd', 'diagnosticd']
 export const QUIESCE_POLICY = Object.freeze({
@@ -66,6 +68,7 @@ export async function waitForSimulatorCpu({
   pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   policy = QUIESCE_POLICY,
   record = () => undefined,
+  onSampleFailure = () => undefined,
 }) {
   const began = now()
   let quietSince = null
@@ -92,7 +95,8 @@ export async function waitForSimulatorCpu({
     let cpu
     try {
       cpu = await sample(Math.max(1, policy.maxSeconds * 1000 - (now() - began)))
-    } catch {
+    } catch (error) {
+      onSampleFailure(error)
       result.outcome = 'sample_failed'
       save()
       return result
@@ -124,6 +128,60 @@ export async function waitForSimulatorCpu({
     await pause(Math.min(policy.pollMs, policy.maxSeconds * 1000 - (now() - began)))
   }
   return result
+}
+
+/** Two read-only snapshots retain exact command failures and project only safe client identities. */
+export function sampleSimulatorCpu(
+  manager,
+  remaining,
+  { execute = spawnSync, onCollectors = () => undefined, harnessPid = process.pid } = {}
+) {
+  const began = performance.now()
+  const snapshot = (operation, fields) => {
+    const started = performance.now()
+    let result
+    try {
+      result = execute('ps', ['-A', '-ww', '-o', fields], {
+        encoding: 'utf8',
+        timeout: Math.max(1, Math.floor(Math.min(5000, remaining - (started - began)))),
+        killSignal: 'SIGKILL',
+      })
+    } catch (error) {
+      result = { status: null, error }
+    }
+    const diagnostic = {
+      operation,
+      reason: 'simulator_cpu_snapshot_failed',
+      exitCode: result.status ?? null,
+      signal: result.signal ?? null,
+      errorCode: result.error?.code ?? null,
+      errorName: result.error?.name ?? null,
+      errorMessage: result.error?.message ?? null,
+      durationMs: Math.round(performance.now() - started),
+      // Command arguments from the collector inventory are never retained.
+      stdout: operation === 'cpu-processes' ? (result.stdout ?? '') : '',
+      stderr: result.stderr ?? '',
+    }
+    if (result.status !== 0 || result.error) {
+      const error = new Error(diagnostic.reason)
+      error.diagnostic = diagnostic
+      throw error
+    }
+    return { result, diagnostic }
+  }
+  const cpu = snapshot('cpu-processes', 'pid=,ppid=,%cpu=,comm=')
+  let values
+  try {
+    values = simulatorCpu(cpu.result.stdout, manager)
+  } catch (error) {
+    error.diagnostic = { ...cpu.diagnostic, reason: error.message }
+    throw error
+  }
+  const clients = snapshot('collector-processes', 'pid=,ppid=,args=')
+  onCollectors(
+    simulatorCollectors(cpu.result.stdout, clients.result.stdout, manager, harnessPid)
+  )
+  return values
 }
 
 const keys = (value, expected) =>
@@ -233,18 +291,52 @@ export async function quiesceOwnedSimulator(device, command) {
   if (!selected || !selected.name.startsWith('cc68-') || selected.state !== 'Booted')
     throw new Error('owned_booted_simulator_required')
   const manager = probeSimulatorTuning(device, execute)
+  const collectors = { version: 1, managerPid: manager, snapshots: [] }
+  const crashScan = crashReportCollector(device)
+  const crashes = { version: 1, snapshots: [], reports: [] }
+  const began = performance.now()
   const result = await waitForSimulatorCpu({
-    sample: (remaining) => {
-      const r = spawnSync('ps', ['-A', '-o', 'pid=,ppid=,%cpu=,comm='], {
-        encoding: 'utf8',
-        timeout: Math.min(5000, remaining),
-        killSignal: 'SIGKILL',
-      })
-      if (r.status !== 0) throw new Error('simulator_cpu_snapshot_failed')
-      return simulatorCpu(r.stdout, manager)
+    sample: (remaining) =>
+      sampleSimulatorCpu(manager, remaining, {
+        onCollectors: (clients) => {
+          collectors.snapshots.push({
+            elapsedSeconds: Math.round((performance.now() - began) / 10) / 100,
+            collectors: clients,
+          })
+          fs.writeFileSync(
+            path.join(directory, 'native-ios-collectors.json'),
+            JSON.stringify(collectors, null, 2) + '\n',
+            { mode: 0o600 }
+          )
+        },
+      }),
+    onSampleFailure: (error) => {
+      const diagnostic = error.diagnostic ?? {
+        reason: error.message,
+        errorName: error.name,
+        errorCode: error.code ?? null,
+      }
+      fs.writeFileSync(
+        path.join(directory, 'native-ios-sampler-private.json'),
+        JSON.stringify(diagnostic, null, 2) + '\n',
+        { mode: 0o600 }
+      )
+      console.log(JSON.stringify({ simulatorSamplingFailure: diagnostic }))
     },
     record: (value) => {
       assertNativeQuiesceEvidence(value)
+      const crash = crashScan(value.elapsedSeconds)
+      crashes.snapshots.push({
+        elapsedSeconds: value.elapsedSeconds,
+        sources: crash.sources,
+        counts: crash.counts,
+      })
+      crashes.reports = crash.reports
+      fs.writeFileSync(
+        path.join(directory, 'native-ios-crashes.json'),
+        JSON.stringify(crashes, null, 2) + '\n',
+        { mode: 0o600 }
+      )
       fs.writeFileSync(
         path.join(directory, 'native-quiesce-ios.json'),
         JSON.stringify(value, null, 2) + '\n',
