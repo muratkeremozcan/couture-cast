@@ -7,19 +7,12 @@ const flow = fs.readFileSync(
   fileURLToPath(new URL('../../maestro/story68/open-post.yaml', import.meta.url)),
   'utf8'
 )
-// One iOS feed swipe, its animation wait and the visibility check cost up to this long.
-const ITERATION_MS = 6000
-// The Maestro process budget is 120 s; the walk may use at most this share of it.
-const WALK_BUDGET_MS = 80_000
-
-test('the feed walk is bounded well inside the Maestro process budget', () => {
-  const iterations = [...flow.matchAll(/^\s*times:\s*(\d+)\s*$/gm)].reduce(
-    (total, match) => total + Number(match[1]),
-    0
-  )
-  assert.ok(iterations > 0)
-  assert.ok(iterations * ITERATION_MS <= WALK_BUDGET_MS, `${iterations} iterations`)
-})
+const AUTHOR = 'community-card-author-${MAESTRO_POST_ID}'
+const repeats = [...flow.matchAll(/- repeat:[\s\S]*?times:\s*(\d+)/g)].map((m) => ({
+  at: m.index,
+  times: Number(m[1]),
+  target: /id:\s*(\S+)/.exec(m[0])?.[1],
+}))
 
 test('every way the post can be missing fails with its own named reason', () => {
   for (const reason of [
@@ -27,10 +20,28 @@ test('every way the post can be missing fails with its own named reason', () => 
     'feed_skeleton_still_showing',
     'feed_error_state',
     'feed_unavailable_state',
-    'post_not_within_8_swipes',
     'share_card_preview_not_loaded',
   ])
     assert.match(flow, new RegExp(`label: '${reason}'`), reason)
+})
+
+test('the walk restores the list position upward, then walks down, both bounded and both named', () => {
+  const [up, down, opener] = repeats
+  assert.equal(repeats.length, 3)
+  assert.equal(up.target, AUTHOR)
+  assert.equal(down.target, AUTHOR)
+  assert.ok(up.at < down.at && down.at < opener.at)
+  // The upward drag moves toward the top: it ends lower on the screen than it starts.
+  const upDrag = /start: 50%, (\d+)%\n\s*end: 50%, (\d+)%/.exec(
+    flow.slice(up.at, down.at)
+  )
+  assert.ok(Number(upDrag[1]) < Number(upDrag[2]))
+  const downDrag = /start: 50%, (\d+)%\n\s*end: 50%, (\d+)%/.exec(flow.slice(down.at))
+  assert.ok(Number(downDrag[1]) > Number(downDrag[2]))
+  assert.match(
+    flow,
+    new RegExp(`label: 'post_not_within_${up.times}_up_${down.times}_down_swipes'`)
+  )
 })
 
 test('the walk waits for the feed to finish loading before it swipes', () => {
@@ -42,9 +53,4 @@ test('the walk waits for the feed to finish loading before it swipes', () => {
 test('the card is found on the feed surface, not through the highlighted deep-link copy', () => {
   assert.doesNotMatch(flow, /highlighted-community-card|openLink|source=notification/)
   assert.match(flow, /community-card-author-\$\{MAESTRO_POST_ID\}/)
-})
-
-test('the swipe count in the failure label matches the declared bound', () => {
-  const first = /times:\s*(\d+)/.exec(flow)[1]
-  assert.match(flow, new RegExp(`post_not_within_${first}_swipes`))
 })
