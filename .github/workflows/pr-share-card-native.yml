@@ -199,7 +199,9 @@ jobs:
       - name: Genuine browser share-card acceptance matrix
         if: ${{ !cancelled() && matrix.platform == 'android' && matrix.api == 36 && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
         run: |
-          node scripts/e2e-share-card/web.mjs > "$CC68_HARNESS_DIR/web-startup-private.log" 2>&1 &
+          # A production build served by next start: no route compiles during the matrix.
+          node scripts/e2e-share-card/web.mjs build
+          node scripts/e2e-share-card/web.mjs start > "$CC68_HARNESS_DIR/web-startup-private.log" 2>&1 &
           node scripts/e2e-share-card/wait-web.mjs
           npx playwright test --config playwright/share-card.config.ts
           node scripts/e2e-share-card/assert-web-matrix.mjs

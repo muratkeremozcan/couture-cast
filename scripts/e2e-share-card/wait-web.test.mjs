@@ -406,3 +406,23 @@ describe('web startup CI wiring', () => {
     )
   })
 })
+test('the API36 browser matrix builds the production web before it starts and waits for it', () => {
+  const workflow = parse(
+    fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
+  )
+  const step = workflow.jobs['original-resource'].steps.find(
+    (row) => row.name === 'Genuine browser share-card acceptance matrix'
+  )
+  const lines = step.run.split('\n').map((line) => line.trim())
+  const build = lines.indexOf('node scripts/e2e-share-card/web.mjs build')
+  const start = lines.findIndex((line) =>
+    line.startsWith('node scripts/e2e-share-card/web.mjs start >')
+  )
+  assert.ok(build >= 0 && start > build, 'web.mjs build, then web.mjs start')
+  assert.ok(lines[start].endsWith('&'))
+  assert.ok(lines.indexOf('node scripts/e2e-share-card/wait-web.mjs') > start)
+  assert.equal(step.run.includes('npm run dev'), false)
+  const web = fs.readFileSync('scripts/e2e-share-card/web.mjs', 'utf8')
+  assert.equal(/['"]dev['"]/.test(web), false)
+  assert.match(web, /NODE_ENV: 'production'/)
+})

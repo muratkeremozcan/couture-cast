@@ -20,12 +20,12 @@ const signatures = {
   compilation_error: /Failed to compile|Compilation error/,
 }
 const resourceKeys = ['freeMemoryBytes', 'totalMemoryBytes', 'freeDiskBytes', 'load1']
+// The lane serves `next start`, so production server frames name where a render failed.
 const frameworkFiles = [
   'server/base-server.js',
   'server/app-render/app-render.js',
-  'server/dev/hot-reloader-webpack.js',
-  'server/dev/next-dev-server.js',
-  'compiled/next-server/app-page.runtime.dev.js',
+  'server/next-server.js',
+  'compiled/next-server/app-page.runtime.prod.js',
   'server/require.js',
   'server/load-components.js',
   'server/next.js',
