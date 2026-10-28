@@ -22,6 +22,9 @@ on:
       VERCEL_AUTOMATION_BYPASS_SECRET:
         required: true
     outputs:
+      required:
+        description: "Whether this branch needs web/API preview deployments"
+        value: ${{ jobs.preview-scope.outputs.required }}
       web_url:
         description: "Web preview deployment URL"
         value: ${{ jobs.resolve-url.outputs.web_url }}
@@ -30,7 +33,27 @@ on:
         value: ${{ jobs.resolve-url.outputs.api_url }}
 
 jobs:
+  preview-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      required: ${{ steps.scope.outputs.required }}
+    steps:
+      - name: Checkout preview inputs
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Check shared Vercel preview inputs
+        id: scope
+        run: node scripts/vercel-preview-inputs.mjs
+
   resolve-url:
+    needs: preview-scope
+    if: needs.preview-scope.outputs.required == 'true'
     runs-on: ubuntu-latest
     outputs:
       web_url: ${{ steps.resolve.outputs.web_url }}
