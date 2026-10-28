@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { simulatorCommandRecorder } from './native-ios-command-evidence.mjs'
 import { quiesceOwnedSimulator } from './native-ios-quiesce.mjs'
 import { preflightObserver, observedRuntimeQuery } from './native-ios-preflight.mjs'
+import { seedOwnedSiriPreferences } from './native-ios-siri-preferences.mjs'
+import { cleanupOwnedDevice } from './native-ios-device-cleanup.mjs'
 
 export async function finishOwnedStartup({
   device,
@@ -14,11 +16,14 @@ export async function finishOwnedStartup({
   quiesce = quiesceOwnedSimulator,
   prepareForFlow = false,
   appPath,
+  afterBoot = () => undefined,
+  cleanup = () =>
+    command('delete-device', 'xcrun', ['simctl', 'delete', device], { fatal: false }),
 }) {
   let ready = false
-  const snapshot = (label) => {
+  const snapshot = (label, operation = () => sample(label)) => {
     try {
-      sample(label)
+      operation()
     } catch (error) {
       console.log(
         JSON.stringify({
@@ -38,6 +43,7 @@ export async function finishOwnedStartup({
     command('bootstatus', 'xcrun', ['simctl', 'bootstatus', device, '-b'], {
       timeout: 300000,
     })
+    snapshot('siri-preference-readback', afterBoot)
     snapshot('after-simulator-boot')
     if (prepareForFlow)
       command('install-client', 'xcrun', ['simctl', 'install', device, appPath])
@@ -45,8 +51,7 @@ export async function finishOwnedStartup({
     snapshot('before-first-flow')
     ready = true
   } finally {
-    if (!prepareForFlow || !ready)
-      command('delete-device', 'xcrun', ['simctl', 'delete', device], { fatal: false })
+    if (!prepareForFlow || !ready) snapshot('device-cleanup', cleanup)
   }
 }
 
@@ -111,11 +116,44 @@ async function main() {
   const prepareForFlow = process.argv.includes('--for-native-flow')
   if (prepareForFlow)
     fs.writeFileSync('/tmp/cc68-simulator', device + '\n', { mode: 0o600 })
+  fs.writeFileSync(
+    path.join(directory, 'native-ios-device.json'),
+    JSON.stringify(
+      {
+        version: 1,
+        device,
+        deviceType: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro',
+        runtime: {
+          identifier: runtime.identifier,
+          version: runtime.version,
+          build: runtime.buildversion,
+        },
+      },
+      null,
+      2
+    ) + '\n',
+    { mode: 0o600 }
+  )
+  let afterBoot = () => undefined
+  try {
+    afterBoot = seedOwnedSiriPreferences({ device, directory, runtime, command })
+  } catch (error) {
+    console.log(
+      JSON.stringify({
+        siriPreferenceFailure: {
+          errorCode: error.code ?? null,
+          errorMessage: error.message,
+        },
+      })
+    )
+  }
   await finishOwnedStartup({
     device,
     command,
     sample,
     prepareForFlow,
+    afterBoot,
+    cleanup: () => cleanupOwnedDevice(device, directory, command),
     appPath:
       '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app',
   })

@@ -12,6 +12,7 @@ import {
 } from './native-ios-command-evidence.mjs'
 import { simulatorCollectors } from './native-ios-collectors.mjs'
 import { crashReportCollector } from './native-ios-crashes.mjs'
+import { collectSimulatorLogCounts } from './native-ios-log-counts.mjs'
 
 export const CPU_TARGETS = ['STExtractionService', 'healthappd', 'diagnosticd']
 export const QUIESCE_POLICY = Object.freeze({
@@ -439,6 +440,11 @@ export async function quiesceOwnedSimulator(device, command) {
       )
     },
   })
+  try {
+    await collectSimulatorLogCounts(device, directory, { gateOutcome: result.outcome })
+  } catch (error) {
+    console.log(JSON.stringify({ logCountFailure: diagnosticError(error) }))
+  }
   if (result.outcome !== 'settled') throw new Error(`ios_quiesce_${result.outcome}`)
   return result
 }
