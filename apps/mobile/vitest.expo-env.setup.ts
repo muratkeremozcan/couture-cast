@@ -16,8 +16,10 @@ import { installExpoGlobalPolyfill } from 'expo-modules-core/src/polyfill/danger
 // The package does not export that file, so it is registered from its built path, the way
 // Expo's web build registers it under the native module's name.
 import webExponentConstants from '../../node_modules/expo-constants/build/ExponentConstants.web.js'
+import { reportMissingExpoGlobalReads } from './src/test-utils/unwanted-console'
 
 process.env.EXPO_OS = 'web'
 installExpoGlobalPolyfill()
 const expoGlobal = (globalThis as { expo?: { modules: Record<string, unknown> } }).expo
 if (expoGlobal) expoGlobal.modules.ExponentConstants ??= webExponentConstants
+reportMissingExpoGlobalReads()
