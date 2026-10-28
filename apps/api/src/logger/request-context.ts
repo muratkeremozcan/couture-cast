@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import type { NextFunction, Request, Response } from 'express'
 import type { AuthenticatedRequest } from '../modules/auth/security.types'
+import { COMMUNITY_AUTHORIZATION_BUDGET_MS } from '../modules/community/community-authorization-budget.js'
 
 /** Story 0.7 support file: request-scoped logging context.
  * Why this exists:
@@ -84,7 +85,10 @@ export function createRequestContext(request: RequestLike): RequestContext {
   return {
     requestId,
     ...(communityRead
-      ? { communityAuthorizationDeadline: performance.now() + 1950 }
+      ? {
+          communityAuthorizationDeadline:
+            performance.now() + COMMUNITY_AUTHORIZATION_BUDGET_MS,
+        }
       : {}),
     userId: extractUserId(request),
     feature: inferFeatureFromPath(request.originalUrl ?? request.url),

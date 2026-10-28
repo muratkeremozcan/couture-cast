@@ -3,6 +3,7 @@ import { getRequestContext } from '../../logger/request-context.js'
 import { HttpException, ServiceUnavailableException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { createBaseLogger } from '../../logger/pino.config.js'
+import { COMMUNITY_AUTHORIZATION_BUDGET_MS } from './community-authorization-budget.js'
 export class CommunityUnavailableException extends ServiceUnavailableException {
   constructor(readonly retryAfterSeconds = 2) {
     super({
@@ -19,7 +20,7 @@ export class CommunityAuthorizationBudget {
   readonly deadline: number
   constructor(
     deadline = getRequestContext()?.communityAuthorizationDeadline ??
-      performance.now() + 1950
+      performance.now() + COMMUNITY_AUTHORIZATION_BUDGET_MS
   ) {
     this.deadline = deadline
   }
