@@ -2646,8 +2646,13 @@ export function CommunityLookbookGrid({
 
       const existing = new Set(itemsRef.current.map((item) => item.id))
       const incoming = page.items.filter((item) => !existing.has(item.id))
-      if (!itemsRef.current.length) setItems(() => page.items.map(live))
-      else if (incoming.length) {
+      if (!itemsRef.current.length) {
+        // Bootstrap validates targets as soon as this rebuild returns. React may
+        // commit the queued render later, so publish its feed snapshot now.
+        const rebuilt = page.items.map(live)
+        itemsRef.current = rebuilt
+        setItems(rebuilt)
+      } else if (incoming.length) {
         const buffered = mergeFeedPages(incoming, newLooksRef.current).map(live)
         newLooksRef.current = buffered
         setNewLooks(buffered)

@@ -696,6 +696,43 @@ for (const locale of supportedLocales)
       ).toBeFocused()
     })
   })
+test('P-BOOTSTRAP: the rebuilt own feed post is verified before the initial feed response arrives', async ({
+  context,
+  page,
+  interceptNetworkCall,
+}) => {
+  await identify(context)
+  let release!: () => void
+  const released = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let feeds = 0
+  const replayStarted = (request: Request) => {
+    const url = new URL(request.url())
+    if (url.pathname === '/api/v1/community/events' && url.searchParams.has('cursor'))
+      release()
+  }
+  page.on('request', replayStarted)
+  // Retain both real API responses. Deliver the bootstrap rebuild first so its
+  // target validation cannot borrow the initial feed's committed React state.
+  await page.route('**/api/v1/community/feed?*', async (route) => {
+    if (++feeds !== 1) return route.continue()
+    const response = await route.fetch()
+    await released
+    await route.fulfill({ response })
+  })
+  try {
+    const { preview } = await ownPhoto(page, interceptNetworkCall)
+    expect(feeds).toBeGreaterThanOrEqual(2)
+    expect(sha256(await previewBytes(preview))).toBe(
+      await preview.getAttribute('data-sha256')
+    )
+  } finally {
+    release()
+    page.off('request', replayStarted)
+    await page.unrouteAll({ behavior: 'wait' })
+  }
+})
 test('P-FOREIGN P-IDENTITY: a second genuine account has no export action or access to former member source', async ({
   context,
   page,

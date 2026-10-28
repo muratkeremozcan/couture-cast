@@ -16,6 +16,7 @@ export const LOCALE_BEHAVIORS = [
   'P-A11Y:',
 ]
 export const SHARED_BEHAVIORS = [
+  'P-BOOTSTRAP:',
   'P-FOREIGN ',
   'P-REVALIDATE ',
   'P-OUTFIT ',
