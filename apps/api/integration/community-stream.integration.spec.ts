@@ -125,6 +125,9 @@ describe('Story 6.5 committed stream append', () => {
     // idle, 2.8 s at load average 22 on 14 cores; 20 s is 7x that and still stops a hang.
   }, 20_000)
   it('R01 adapts after slow append writes and exposes every aborted batch', async () => {
+    const priorTelemetry = await prisma.communityEngagementTelemetry.findMany({
+      select: { id: true },
+    })
     const { user } = await fixture()
     await prisma.lookbookPost.createMany({
       data: Array.from({ length: 39 }, () =>
@@ -153,14 +156,15 @@ describe('Story 6.5 committed stream append', () => {
     // above one row fails, the 40 rows take 4 halvings, 40 one-row successes and 39
     // failures between them: 83 attempts. The old bound of 12 covered only an idle
     // host, where the first insert's 0.6 s overrun is the one failure. An appender
-    // that never recovers fails here: past 83 attempts, or at the 20 s timeout first.
+    // that never recovers stops at the 83rd attempt and fails the drained check below,
+    // inside the test timeout set at the end of this case.
+    let attempts = 0
     try {
-      for (
-        let attempt = 0;
-        attempt < 83 &&
-        (await prisma.communityDomainOutbox.count({ where: { appended_at: null } }));
-        attempt++
+      while (
+        attempts < 83 &&
+        (await prisma.communityDomainOutbox.count({ where: { appended_at: null } }))
       ) {
+        attempts++
         try {
           await stream.append()
         } catch {
@@ -168,7 +172,8 @@ describe('Story 6.5 committed stream append', () => {
         }
       }
       expect(
-        await prisma.communityDomainOutbox.count({ where: { appended_at: null } })
+        await prisma.communityDomainOutbox.count({ where: { appended_at: null } }),
+        `rows left after ${attempts} appends, ${failures} failed (bound 83)`
       ).toBe(0)
       expect(await prisma.communityStreamEvent.count()).toBe(40)
       expect(
@@ -184,14 +189,19 @@ describe('Story 6.5 committed stream append', () => {
       await prisma.$executeRawUnsafe('DROP SEQUENCE story65_slow_event_inserts')
     }
     expect(failures).toBeGreaterThan(0)
-    expect(
-      await prisma.communityEngagementTelemetry.count({
-        where: {
-          event_type: 'community_append_retry',
-          reason: 'budget_pressure',
-        },
-      })
-    ).toBeGreaterThan(0)
+    // The first failure is the 0.6 s overrun at the full limit of 25, so its retry
+    // record carries the halved limit. The preparation window alone also shrinks
+    // batches on a slow host, which is why only this record proves the halving.
+    const pressure = await prisma.communityEngagementTelemetry.findMany({
+      where: {
+        id: { notIn: priorTelemetry.map((row) => row.id) },
+        event_type: 'community_append_retry',
+        reason: 'budget_pressure',
+      },
+      orderBy: { created_at: 'asc' },
+      select: { backlog_count: true },
+    })
+    expect(pressure[0]?.backlog_count).toBe(12)
     await prisma.lookbookPost.createMany({
       data: Array.from({ length: 250 }, () =>
         buildLookbookPostCreateInput(
@@ -238,7 +248,13 @@ describe('Story 6.5 committed stream append', () => {
         restoredBatch: 25,
       })
     )
-  }, 20000)
+    // Timeout from the recovering worst case above. A failed append costs at most its
+    // 150 ms preparation window, the 450 ms statement timeout and the 150 ms telemetry
+    // transaction, 0.75 s; a success took at most 0.46 s at load average 15. 43
+    // failures and 40 successes are 51 s, and the rest of this case took 7.7 s loaded,
+    // so about 59 s. 90 s is 1.5x that, and an appender that never recovers (83
+    // failures, about 62 s) reaches the attempt bound first.
+  }, 90_000)
 
   // The 150 ms preparation window closes once a batch has spent it, so with at least
   // 20 ms of real latency per candidate no batch can exceed eight (eight candidates are
