@@ -148,13 +148,16 @@ describe('Story 6.5 committed stream append', () => {
       'CREATE TRIGGER story65_slow_event BEFORE INSERT ON "CommunityStreamEvent" FOR EACH ROW EXECUTE FUNCTION story65_slow_event_write()'
     )
     let failures = 0
-    // A failed append halves the ready limit and a one-row append always fits the
-    // budget, so 40 rows drain within 40 successes plus five halvings (25 to 1) before
-    // each of them. 12 attempts only covered an idle host.
+    // Worst case that still recovers: a failure halves the ready limit (25, 12, 6, 3, 1)
+    // and a success at limit 1 commits one row and raises it to 3. If every append
+    // above one row fails, the 40 rows take 4 halvings, 40 one-row successes and 39
+    // failures between them: 83 attempts. The old bound of 12 covered only an idle
+    // host, where the first insert's 0.6 s overrun is the one failure. An appender
+    // that never recovers fails here: past 83 attempts, or at the 20 s timeout first.
     try {
       for (
         let attempt = 0;
-        attempt < 40 * 6 &&
+        attempt < 83 &&
         (await prisma.communityDomainOutbox.count({ where: { appended_at: null } }));
         attempt++
       ) {
@@ -299,7 +302,8 @@ describe('Story 6.5 committed stream append', () => {
           capacities.push(Reflect.get(appender, 'readyLimit') as unknown)
         }
         expect(batches[0]).toBeGreaterThan(1)
-        expect(batches.every((count) => count >= 1 && count <= maxBatch)).toBe(true)
+        expect(Math.min(...batches)).toBeGreaterThanOrEqual(1)
+        expect(Math.max(...batches)).toBeLessThanOrEqual(maxBatch)
         expect(capacities).toEqual(batches.map(() => 25))
         const events = await prisma.communityStreamEvent.findMany({
           where: { stream_id: 'public' },
