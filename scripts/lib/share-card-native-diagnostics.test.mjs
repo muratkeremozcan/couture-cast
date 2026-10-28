@@ -476,6 +476,54 @@ describe('native flow diagnostics capture', () => {
     assert.equal(result.captures.hierarchy, true)
     assert.equal(result.screen.controls.length, 2)
   })
+  for (const separate of [false, true]) {
+    for (const scenario of ['captured-running', 'missing-running', 'captured-failed']) {
+      test(`${scenario} ranks actual captures across ${separate ? 'separate-commands.json files' : 'one commands.json file'}`, async (t) => {
+        const { collectNativeFlowDiagnostics } = await helper()
+        const directory = fixture(t)
+        const output = path.join(directory, 'maestro-current')
+        const first = path.join(output, 'a-first')
+        const second = separate ? path.join(output, 'z-second') : first
+        fs.mkdirSync(first, { recursive: true })
+        fs.mkdirSync(second, { recursive: true })
+        const shallow = command('tapOnElement', 'tab-home', 'FAILED', 4, 1)
+        shallow.metadata.artifacts = [{ type: 'SCREEN_HIERARCHY', path: 'capture.json' }]
+        if (scenario !== 'missing-running')
+          fs.writeFileSync(path.join(first, 'capture.json'), JSON.stringify(hierarchy))
+        const deeper = command(
+          'scrollUntilVisible',
+          'outfit-share-card-open',
+          scenario === 'captured-failed' ? 'FAILED' : 'RUNNING',
+          9,
+          2
+        )
+        fs.writeFileSync(
+          path.join(first, 'commands.json'),
+          JSON.stringify(separate ? [shallow] : [shallow, deeper])
+        )
+        if (separate)
+          fs.writeFileSync(path.join(second, 'commands.json'), JSON.stringify([deeper]))
+        const result = await collectNativeFlowDiagnostics(
+          {
+            ...context,
+            root,
+            directory,
+            output,
+            device: 'emulator-5554',
+            adb: '/owned/adb',
+            startedAt: Date.now(),
+          },
+          { execute: () => ({ status: 1, stdout: '' }) }
+        )
+        assert.equal(
+          result.failedCommand.selector.value,
+          scenario === 'captured-running' ? 'tab-home' : 'outfit-share-card-open'
+        )
+        assert.equal(result.captures.hierarchy, scenario === 'captured-running')
+      })
+    }
+  }
+
   test('missing command output preserves unavailable step instead of inventing a failed selector', async (t) => {
     const { collectNativeFlowDiagnostics } = await helper()
     const directory = fixture(t),

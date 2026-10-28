@@ -219,8 +219,11 @@ const capturedFailure = (row) =>
 // A FAILED row with its own hierarchy explains the failure. A deeper RUNNING row is
 // what a killed run leaves behind and carries no artifacts, so it ranks below.
 function compareFailures(a, b) {
+  // Only an interrupted RUNNING row loses to a captured failure. Among FAILED
+  // rows, keep the deepest/latest command even if an outer command has a capture.
+  if (capturedFailure(a) && b.metadata.status === 'RUNNING') return -1
+  if (capturedFailure(b) && a.metadata.status === 'RUNNING') return 1
   return (
-    Number(capturedFailure(b)) - Number(capturedFailure(a)) ||
     (b.metadata.depth ?? 0) - (a.metadata.depth ?? 0) ||
     (b.metadata.sequenceNumber ?? 0) - (a.metadata.sequenceNumber ?? 0)
   )
@@ -727,8 +730,32 @@ function readArtifacts(output) {
     log = ''
   for (const file of files.filter((file) => path.basename(file) === 'commands.json')) {
     try {
-      const candidate = JSON.parse(textFile(file))
-      if (!Array.isArray(candidate)) continue
+      const raw = JSON.parse(textFile(file))
+      if (!Array.isArray(raw)) continue
+      // A metadata tag is insufficient: killed runs can leave dangling paths.
+      // Strip unavailable hierarchies before both cross-file and row ranking.
+      const candidate = raw.map((row) => {
+        if (!Array.isArray(row?.metadata?.artifacts)) return row
+        return {
+          ...row,
+          metadata: {
+            ...row.metadata,
+            artifacts: row.metadata.artifacts.filter((artifact) => {
+              if (artifact?.type !== 'SCREEN_HIERARCHY') return true
+              const capture = artifactFile(path.dirname(file), artifact.path)
+              if (!capture) return false
+              try {
+                const value = JSON.parse(textFile(capture))
+                return (
+                  value !== null && typeof value === 'object' && !Array.isArray(value)
+                )
+              } catch {
+                return false
+              }
+            }),
+          },
+        }
+      })
       const failure = selectFailure(candidate)
       if (failure && (!failed || compareFailures(failure, failed) <= 0)) {
         rows = candidate
