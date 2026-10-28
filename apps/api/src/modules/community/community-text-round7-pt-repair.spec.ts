@@ -1025,14 +1025,11 @@ describe('round 7g plural and inflected hate forms meet the term, in every local
 })
 
 describe('round 7h rapping and chinks of light', () => {
-  it('clears the exact rapping words and still blocks the generated rape forms', () => {
+  it('clears rapper and rappers exactly and still blocks the generated rape forms', () => {
     for (const locale of everyLocale) {
       for (const text of [
-        'Rapping on the door twice',
-        'He is rapping about fashion',
         'A rapper in a bomber jacket',
         'Rappers wear oversized hoodies',
-        'She rapped on the window',
       ])
         expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
       for (const text of [
@@ -1048,6 +1045,47 @@ describe('round 7h rapping and chinks of light', () => {
         expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
     }
     expect(screen('raping and raped', 'en-US').disposition).toBe('block')
+  })
+
+  const knock = [
+    'Rapping on the door twice',
+    'He is rapping about fashion',
+    'She rapped on the window',
+    'Someone rapped at the door and waited.',
+    'The rapper rapped the verse over the beat.',
+    'They kept rapping along to the beat.',
+    'He rapped against the table with his knuckles.',
+    'She was rapping bars on stage.',
+  ]
+  it.each(knock)('passes %s under declared English only', (text) => {
+    for (const locale of ['en-US', 'en-GB'])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+    for (const locale of ['fr-FR', 'pt-BR', 'de-DE', null])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  const euphemism = [
+    'he rapped her',
+    'she got rapped last night',
+    'rapped by a gang',
+    'I rapped her in the car',
+    'rapping women is fun',
+    'he was rapping a girl',
+    'he rapped on the door and then rapped her',
+    'rapped on the door. she got rapped',
+    'rapped on the door\nrapped by a gang',
+    'rapping on the door, rapping women',
+    'rapping her',
+    'she was rapped',
+    'rapped',
+    'rapping',
+    'they rapped him in the park',
+    'he rapped on the door of the victim',
+    'rapped on the door after the assault',
+  ]
+  it.each(euphemism)('withholds %s in every locale', (text) => {
+    for (const locale of [...everyLocale, 'en-US', 'en-GB', 'fr-FR'])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
   })
 
   const clean = [
@@ -1113,6 +1151,30 @@ describe('round 7i spices, retards and tapetes', () => {
     'Cold retards the ageing.',
     'A coating that retards the wear of the seam.',
   ]
+  const objectless = [
+    'retards the',
+    'It retards the.',
+    'This retards the',
+    'that retards the',
+    'It retards their',
+    'wax retards the dumb ones',
+    'it retards the growth you animals',
+  ]
+  it.each(objectless)('withholds the objectless or open verb frame %s', (text) => {
+    for (const locale of [...everyLocale, 'en-US', 'en-GB'])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+  it('passes it, this and that as subjects with a real object', () => {
+    for (const text of [
+      'It retards the growth of the plant.',
+      'This retards the process.',
+      'That retards their growth.',
+      'It retards the drying of the fabric over time.',
+    ])
+      for (const locale of ['en-US', 'en-GB'])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+
   const noun = [
     'retards',
     'all retards',

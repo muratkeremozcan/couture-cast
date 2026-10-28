@@ -51,6 +51,8 @@ const COLLISIONS: readonly (readonly [string, string, 'pass' | 'withheld'])[] = 
   ['pedes', 'en,pt', 'withheld'],
   ['pedess', 'en', 'withheld'],
   ['peedes', 'en', 'withheld'],
+  ['rapped', 'en', 'withheld'],
+  ['rapping', 'en', 'withheld'],
   ['raped', 'en', 'withheld'],
   ['rapeed', 'en', 'withheld'],
   ['rapees', 'en', 'withheld'],
@@ -88,7 +90,7 @@ describe('generated inflection forms and their collisions', () => {
   })
 
   it('pins the sweep result', () => {
-    expect(COLLISIONS).toHaveLength(48)
+    expect(COLLISIONS).toHaveLength(50)
   })
 
   it.each(COLLISIONS)('%s (%s) is %s', (form, _languages, expected) => {
