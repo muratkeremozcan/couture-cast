@@ -1260,6 +1260,128 @@ describe('round 7i spices, retards and tapetes', () => {
   })
 })
 
+describe('round 7k the rape family is handled as a family', () => {
+  const locales = [...everyLocale, 'en-US', 'en-GB', 'fr-FR']
+  const evasions = [
+    // leet and symbols inside the word
+    'r@ped',
+    'r@pe',
+    'r@ping',
+    'r4ped',
+    'r4pe',
+    'rap3d',
+    'rap3',
+    'r@p3d',
+    'R@PED her',
+    '(r@ped)',
+    'he r@ped her.',
+    // short cuts of any length
+    'ra ped',
+    'ra-ped',
+    'ra.ped',
+    'r aped',
+    'r ape',
+    'ra pe d',
+    'ra pe',
+    'sa-ed her',
+    'sa ed her',
+    'gang ra ped',
+    // small capitals and confusables
+    'ʀaped',
+    'ʀape',
+    'ʀᴀᴘᴇᴅ',
+    'ʀᴀᴘᴇ',
+    'Rᴀᴘᴇᴅ',
+    'ꜱᴀ-ᴇᴅ',
+    'rаped',
+    // typo forms
+    'rapeing',
+    'rapin',
+    'raepd',
+    'raype',
+    'rayped',
+    'rapd',
+    'rapeed',
+    // word forms
+    'raper',
+    'rapers',
+    'rapey',
+    'rapeable',
+    'rapings',
+    // compounds
+    'gangrape',
+    'gangraped',
+    'gangrapes',
+    'gangraping',
+    'gangraper',
+    'gang rape',
+    'gang-raped',
+    'g4ngr@ped',
+  ]
+  const reviewOnly = ['rapist', 'rapists', 'rap ed', 'rap e', 'rap es', 'rap ist']
+
+  it.each(evasions)('withholds %s in every locale', (text) => {
+    for (const locale of locales)
+      expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('block')
+  })
+
+  it.each(reviewOnly)('withholds %s in every locale', (text) => {
+    for (const locale of locales)
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('keeps ordinary words that contain or spell near the family clean', () => {
+    for (const locale of locales)
+      for (const text of [
+        'wrapped',
+        'draped',
+        'trapped',
+        'strapped',
+        'scraped',
+        'grapes',
+        'rapeseed oil',
+        'therapist',
+        'therapists',
+        'rapid',
+        'rapidly',
+        'rapport',
+        'rapids',
+        'trapeze',
+        'rapier',
+        'raptor',
+        'Rapunzel',
+        'rapt',
+        'drape',
+        'grape',
+        'scrape',
+        'napped',
+        'sapped',
+        'tapped',
+        'A wrapped dress, draped sleeves and strapped sandals',
+        'Grapes and rapeseed in the rapid therapist rapport',
+      ])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+
+  it('keeps ordinary copy with symbols inside and around words clean', () => {
+    for (const locale of locales)
+      for (const text of [
+        'Sale! $20 off',
+        '20% off + free shipping',
+        'Wow!amazing dress',
+        'Email us at hello@couture.com',
+        'Price: $19.99 | free returns',
+        'Rock&roll tee, size S+M',
+        'C++ and A+ grade',
+        'Buy 2+ get 1 free!',
+        '@couturecast loves this',
+        'Hot!! New!! Now!!',
+        'a|b|c and x+y',
+      ])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+})
+
 describe('round 7b a high-severity term cut in two whole words', () => {
   it('withholds tap ete and other two-way cuts with both parts of three letters or more', () => {
     for (const text of [

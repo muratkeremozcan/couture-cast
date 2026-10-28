@@ -397,6 +397,15 @@ const allowFileSchema = z.object({
   // language AND the next word is one of the enumerated complements. They reach the
   // short-token rejoin pass, which literal contexts cannot.
   scopedWords: z.array(z.string().trim().min(1)).default([]),
+  // The sexual-violence family: its terms rejoin when cut into two or three words of any
+  // length, a half listed in reviewHalves routes the cut to review, and a term of any
+  // grade receives generated inflected forms.
+  cutFamily: z
+    .object({
+      terms: z.array(z.string().regex(/^\p{L}+$/u)),
+      reviewHalves: z.array(z.string().regex(/^\p{L}+$/u)),
+    })
+    .default({ terms: [], reviewHalves: [] }),
   // Reviewed two-word cuts of a high-severity term that stay clean, but only inside the
   // enumerated frame: the word before the pair (or the text start) and the closed phrase
   // after it must both be listed. Everything else about a cut keeps the high-severity block.
@@ -561,6 +570,31 @@ const CONFUSABLES: Readonly<Record<string, string>> = {
   γ: 'y',
   η: 'n',
   ζ: 'z',
+  // Latin small capitals render as the capital of the same letter in most typefaces.
+  ᴀ: 'a',
+  ʙ: 'b',
+  ᴄ: 'c',
+  ᴅ: 'd',
+  ᴇ: 'e',
+  ꜰ: 'f',
+  ɢ: 'g',
+  ʜ: 'h',
+  ɪ: 'i',
+  ᴊ: 'j',
+  ᴋ: 'k',
+  ʟ: 'l',
+  ᴍ: 'm',
+  ɴ: 'n',
+  ᴏ: 'o',
+  ᴘ: 'p',
+  ʀ: 'r',
+  ꜱ: 's',
+  ᴛ: 't',
+  ᴜ: 'u',
+  ᴠ: 'v',
+  ᴡ: 'w',
+  ʏ: 'y',
+  ᴢ: 'z',
 }
 
 /**
@@ -1195,7 +1229,8 @@ export function inflectedForms(term: string, language: ScreeningLanguage): strin
 function buildLanguageIndex(
   list: z.infer<typeof termsFileSchema>,
   policy: CommunityTextPolicy,
-  allowSingles: ReadonlySet<string>
+  allowSingles: ReadonlySet<string>,
+  familyTerms: ReadonlySet<string>
 ): LanguageIndex {
   const single = new Map<string, TermMeta>()
   const singleCollapsed = new Map<string, TermMeta>()
@@ -1254,7 +1289,10 @@ function buildLanguageIndex(
         `${list.language} has a single-word term under ${MIN_SINGLE_TERM_LENGTH} characters that is not a reviewed exception`
       )
     }
-    if (entry.severity === 'high' && term.length >= MIN_SINGLE_TERM_LENGTH) {
+    if (
+      (entry.severity === 'high' || familyTerms.has(term)) &&
+      term.length >= MIN_SINGLE_TERM_LENGTH
+    ) {
       // A derived form that collapses under the floor is skipped: only the reviewed root
       // spelling may be guarded by an allow-list entry, never a generated one.
       for (const form of inflectedForms(term, list.language).filter(
@@ -1425,6 +1463,9 @@ export class CommunityTextScreener {
   /** The scoped phrases of the language the current screen() call declared. */
   private activeScopedPhrases: readonly ScopedPhrase[] = []
   private readonly splitFrames: ReadonlyMap<string, readonly SplitFrame[]>
+  /** The sexual-violence family: repeat-collapsed terms that rejoin from short cuts. */
+  private readonly cutFamilyTerms: ReadonlySet<string>
+  private readonly cutFamilyReviewHalves: ReadonlySet<string>
   private readonly scopedAllowWords: ReadonlyMap<ScreeningLanguage, ReadonlySet<string>>
   /** Exact tokens cleared for the language the current screen() call declared. */
   private activeScopedWords: ReadonlySet<string> = new Set()
@@ -1547,9 +1588,26 @@ export class CommunityTextScreener {
       reviewedOccurrencePhrases(allowLists)
     )
 
-    this.indexes = termLists.map((list) =>
-      buildLanguageIndex(list, this.policy, allowSingles)
+    const familyForms = allowLists.flatMap((list) =>
+      (list.cutFamily?.terms ?? []).map((term) => toFoldedForm(toLiteralForm(term)))
     )
+    this.cutFamilyTerms = new Set(familyForms.map(collapseRepeats))
+    this.cutFamilyReviewHalves = new Set(
+      allowLists.flatMap((list) =>
+        (list.cutFamily?.reviewHalves ?? []).map((word) =>
+          toFoldedForm(toLiteralForm(word))
+        )
+      )
+    )
+    this.indexes = termLists.map((list) =>
+      buildLanguageIndex(list, this.policy, allowSingles, new Set(familyForms))
+    )
+    for (const term of this.cutFamilyTerms) {
+      if (!this.indexes.some((index) => index.singleCollapsed.has(term)))
+        throw new CommunityTextScreenerConfigError(
+          `cut family term ${term} is not a listed term of any language`
+        )
+    }
     this.assertDeliberateReviewTerms()
     this.assertContextTargets()
     this.longestTerm = Math.max(
@@ -1916,6 +1974,12 @@ export class CommunityTextScreener {
     outcomes.push(
       ...this.collectSplitHighTermMatches(foldedTokens, literalTokens, allowed)
     )
+    outcomes.push(...this.collectFamilyCutMatches(foldedTokens))
+
+    for (const candidate of this.buildSymbolLeetCandidates(literal, budget)) {
+      const outcome = this.matchCandidate(toFoldedForm(candidate), true, budget)
+      if (outcome) outcomes.push({ meta: outcome.meta, obfuscated: true })
+    }
 
     for (const candidate of this.buildJoinCandidates(literal, literalTokens, budget)) {
       const outcome = this.matchCandidate(
@@ -2010,6 +2074,52 @@ export class CommunityTextScreener {
       })
     }
     return outcomes
+  }
+
+  /**
+   * A term of the sexual-violence family cut into two or three words of any length
+   * ("ra ped", "rap ed", "sa-ed her") rejoins at the term's own grade. The ordinary
+   * word "rap" as a half downgrades the cut to review.
+   */
+  private collectFamilyCutMatches(foldedTokens: readonly string[]): MatchOutcome[] {
+    if (this.cutFamilyTerms.size === 0) return []
+    const outcomes: MatchOutcome[] = []
+    for (let start = 0; start < foldedTokens.length; start += 1) {
+      for (let size = 2; size <= 3 && start + size <= foldedTokens.length; size += 1) {
+        const window = foldedTokens.slice(start, start + size)
+        const joined = window.join('')
+        if (!this.cutFamilyTerms.has(collapseRepeats(joined))) continue
+        const meta = this.worstAcross((index) => matchRun(index.singleCollapsed, joined))
+        if (!meta) continue
+        outcomes.push({
+          meta: window.some((word) => this.cutFamilyReviewHalves.has(word))
+            ? { ...meta, severity: 'medium' }
+            : meta,
+          obfuscated: true,
+        })
+      }
+    }
+    return outcomes
+  }
+
+  /**
+   * A word written with a leet symbol inside it ("r@ped") is one
+   * whitespace-bounded run that the tokenizer splits at the symbol. The run, and the run
+   * without its edge symbols, are offered as candidates and matched in leet-class form.
+   */
+  private buildSymbolLeetCandidates(literal: string, budget: ExpansionBudget): string[] {
+    const candidates: string[] = []
+    for (const run of literal.matchAll(/[\p{L}\p{N}@$!|+]*[@$|+!][\p{L}\p{N}@$!|+]*/gu)) {
+      const whole = run[0]
+      const trimmed = whole.replace(/^[@$!|+]+|[@$!|+]+$/gu, '')
+      for (const candidate of new Set([whole, trimmed])) {
+        if (!/[\p{L}\p{N}]/u.test(candidate) || !/[@$!|+]/.test(candidate)) continue
+        if (candidate.length < MIN_SINGLE_TERM_LENGTH) continue
+        if (!budget.spend(candidate)) return candidates
+        candidates.push(candidate)
+      }
+    }
+    return candidates
   }
 
   /**

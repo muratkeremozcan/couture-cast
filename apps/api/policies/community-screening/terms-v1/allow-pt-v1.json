@@ -12,7 +12,7 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "b7534403244b6d17f81697bb7ad06b0db5dca17adaac646011ef4cdf0c6d747c",
+    "allowListSha256": "1f77c9c648137d2510d46106bc72466079e871ab45314e2b8b9ca7d7df5391bc",
     "reviewedOccurrenceSha256": "a212c091e56b68db0142be24ddddd8b1a5ae0a03de54cd0ccac7f425690f89bb"
   },
   "entries": [
@@ -38,6 +38,10 @@
     "pipa"
   ],
   "splitFrames": [],
+  "cutFamily": {
+    "terms": [],
+    "reviewHalves": []
+  },
   "scopedWords": ["pede", "pedes"],
   "scopedPhrases": [
     {

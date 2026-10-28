@@ -356,6 +356,21 @@ function splitPairProblems(pairs) {
   )
 }
 
+function cutFamilyProblems(families) {
+  return families.flatMap((family) => {
+    const valid =
+      LANGUAGES.includes(family.language) &&
+      isLetterWords(family.terms) &&
+      family.terms.length > 0 &&
+      isLetterWords(family.reviewHalves) &&
+      typeof family.reason === 'string' &&
+      family.reason.length >= 20
+    return valid
+      ? []
+      : [`cut family for ${family.language} needs letter-only terms, halves and a reason`]
+  })
+}
+
 function scopedPhraseProblems(scopedPhrases) {
   const problems = []
   for (const scoped of scopedPhrases) {
@@ -382,6 +397,7 @@ function scopedAndSplitProblems(allow) {
     ...scopedPhraseProblems(allow.scopedPhrases ?? []),
     ...scopedWordProblems(allow.scopedWords ?? []),
     ...splitPairProblems(allow.reviewedSplitPairs ?? []),
+    ...cutFamilyProblems(allow.cutFamilies ?? []),
   ]
 }
 
@@ -573,6 +589,14 @@ function buildAllowFile(language, allowState, hashes) {
         reviewForbiddenNear: entry.reviewForbiddenNear.map(toLiteral),
         reviewForbiddenPhrases: entry.reviewForbiddenPhrases.map(toLiteral),
       })),
+    cutFamily: {
+      terms: (allowState.allow.cutFamilies ?? [])
+        .filter((family) => family.language === language)
+        .flatMap((family) => family.terms.map(toLiteral)),
+      reviewHalves: (allowState.allow.cutFamilies ?? [])
+        .filter((family) => family.language === language)
+        .flatMap((family) => family.reviewHalves.map(toLiteral)),
+    },
     scopedWords: (allowState.allow.scopedWords ?? [])
       .filter((entry) => entry.language === language)
       .map((entry) => toLiteral(entry.entry)),

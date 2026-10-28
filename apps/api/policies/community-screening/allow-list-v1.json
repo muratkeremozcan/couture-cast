@@ -2672,5 +2672,27 @@
         "towel head kids"
       ]
     }
+  ],
+  "cutFamilies": [
+    {
+      "language": "en",
+      "terms": [
+        "rape",
+        "raped",
+        "rapes",
+        "raping",
+        "raper",
+        "rapers",
+        "rapist",
+        "rapists",
+        "saed",
+        "gangrape",
+        "gangraped",
+        "gangrapes",
+        "gangraping"
+      ],
+      "reviewHalves": ["rap"],
+      "reason": "Sexual-violence family of the English list. A cut of one of these terms into two or three words of any length (ra ped, rap ed, r aped, ra-ped, sa-ed her) rejoins and is withheld at the term's own grade, because the spaced and hyphenated spellings are the cheapest disguise of the family. A cut whose half is the ordinary word rap (rap ed, rap es) is routed to review instead of a block. Medium terms of the family (rapist) also receive generated plural and inflected forms (rapists)."
+    }
   ]
 }

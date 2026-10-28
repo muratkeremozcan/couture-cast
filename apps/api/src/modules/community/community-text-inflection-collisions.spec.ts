@@ -13,14 +13,14 @@ import { CommunityTextScreener } from './community-text-screener'
  * each), generated s, es, ies, ed, d and ing forms (and each language's own suffixes) for
  * every base word, and compared what the screener withholds with and without the generated
  * forms. 1,552,704 distinct forms were screened; the list below is every form that became
- * withheld. Any new generated form changes the hash below and fails the first test: rerun
+ * withheld, rerun for the round 7k rape-family spellings (17 new forms, all withheld). Any new generated form changes the hash below and fails the first test: rerun
  * the sweep, rule on each new collision and update the pins together.
  */
 const screener = new CommunityTextScreener()
 
-const GENERATED_FORM_COUNT = 926
+const GENERATED_FORM_COUNT = 964
 const GENERATED_FORMS_SHA256 =
-  'c85fcd56382da82bd04574134e04c49f52e7423798073945b0e7150bfba29ad8'
+  'b969d7f721f49508d88273b47df984e0857edb1441143c7ccc8a5bcb01b92502'
 
 // [form, languages whose sweep found it, expected disposition for the bare form, no locale]
 // pass: ruled an ordinary word. withheld: a hate or violence plural, a generated spelling
@@ -78,6 +78,24 @@ const COLLISIONS: readonly (readonly [string, string, 'pass' | 'withheld'])[] = 
   ['wetbacks', 'en', 'withheld'],
   ['whorees', 'en', 'withheld'],
   ['whores', 'en', 'withheld'],
+  ['rapd', 'en', 'withheld'],
+  ['rapeing', 'en', 'withheld'],
+  ['raper', 'en', 'withheld'],
+  ['raperes', 'en', 'withheld'],
+  ['rapers', 'en', 'withheld'],
+  ['rapinees', 'en', 'withheld'],
+  ['rapines', 'en', 'withheld'],
+  ['rapinges', 'en', 'withheld'],
+  ['rapings', 'en', 'withheld'],
+  ['rapistes', 'en', 'withheld'],
+  ['rapists', 'en', 'withheld'],
+  ['rappeing', 'en', 'withheld'],
+  ['rapperes', 'en', 'withheld'],
+  ['rappinges', 'en', 'withheld'],
+  ['rappings', 'en', 'withheld'],
+  ['rappistes', 'en', 'withheld'],
+  ['rappists', 'en', 'withheld'],
+  ['saaed', 'en', 'withheld'],
 ]
 
 describe('generated inflection forms and their collisions', () => {
@@ -90,7 +108,7 @@ describe('generated inflection forms and their collisions', () => {
   })
 
   it('pins the sweep result', () => {
-    expect(COLLISIONS).toHaveLength(50)
+    expect(COLLISIONS).toHaveLength(68)
   })
 
   it.each(COLLISIONS)('%s (%s) is %s', (form, _languages, expected) => {

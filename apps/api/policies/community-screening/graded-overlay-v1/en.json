@@ -240,6 +240,96 @@
       "term": "rape",
       "category": "violence",
       "severity": "high"
+    },
+    {
+      "term": "rapeing",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "rapin",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "raepd",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "raype",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "rayped",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "rapd",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "raper",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "rapers",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "rapey",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "rapeable",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "rapings",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "gangrape",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "gangraped",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "gangrapes",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "gangraping",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "gangraper",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "gangrapers",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "saed",
+      "category": "violence",
+      "severity": "high"
     }
   ]
 }
