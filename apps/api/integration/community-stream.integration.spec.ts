@@ -1,13 +1,16 @@
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { Client } from 'pg'
-import { PrismaClient, type Prisma } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
+import { postgresError } from '../src/prisma/postgres-error.js'
 import {
+  AppendBudgetExceeded,
   appendFailure,
   CommunityStreamRepository,
+  type AppendReport,
 } from '../src/modules/community/community-stream.repository.js'
 
 const database = isolatedCommunityDatabase()
@@ -38,26 +41,26 @@ function bounded(repository: CommunityStreamRepository) {
     if (message === 'Community append deferred') deferrals.push({ ...fields })
     warn(fields, message)
   }
-  async function settle(): Promise<PromiseSettledResult<number>> {
+  async function settle(): Promise<PromiseSettledResult<AppendReport>> {
     const label = `${test}: append attempt ${++attempt}`
     const started = performance.now()
+    // The deadline aborts the append it gives up on, so it cannot write afterwards.
+    const abort = new AbortController()
     let timer: NodeJS.Timeout | undefined
     try {
       return await Promise.race([
-        repository.append().then(
+        repository.appendWithReport(abort.signal).then(
           (value) => ({ status: 'fulfilled', value }) as const,
           (reason: unknown) => ({ status: 'rejected', reason }) as const
         ),
         new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () =>
-              reject(
-                new AppendDeadlineExceeded(
-                  `${label} did not settle within ${APPEND_DEADLINE_MS} ms`
-                )
-              ),
-            APPEND_DEADLINE_MS
-          )
+          timer = setTimeout(() => {
+            const error = new AppendDeadlineExceeded(
+              `${label} did not settle within ${APPEND_DEADLINE_MS} ms`
+            )
+            abort.abort(error)
+            reject(error)
+          }, APPEND_DEADLINE_MS)
         }),
       ])
     } finally {
@@ -66,17 +69,32 @@ function bounded(repository: CommunityStreamRepository) {
       if (ms > slowestAppend.ms) slowestAppend = { label, ms }
     }
   }
+  // The product's append loop retries a budget deferral. Twelve in a row halve any
+  // limit to one and keep failing there, so the twelfth is thrown.
+  async function retrying(): Promise<AppendReport> {
+    for (let deferred = 1; ; deferred++) {
+      const outcome = await settle()
+      if (outcome.status === 'fulfilled') return outcome.value
+      if (appendFailure(outcome.reason) !== 'budget_pressure' || deferred >= 12)
+        throw outcome.reason
+    }
+  }
   return {
     repository,
     deferrals,
     settle,
     async append() {
-      const outcome = await settle()
-      if (outcome.status === 'rejected') throw outcome.reason
-      return outcome.value
+      return (await retrying()).count
+    },
+    /** A burst can take more than one batch on a loaded host, so drain it. */
+    async drain() {
+      let appended = 0
+      while (await backlog()) appended += (await retrying()).count
+      return appended
     },
   }
 }
+const backlog = () => prisma.communityDomainOutbox.count({ where: { appended_at: null } })
 // One appender per test: its adaptive batch limit is per-instance state, and a test that
 // drove it into budget pressure must not shrink the next test's batches.
 let stream: ReturnType<typeof bounded>
@@ -87,8 +105,11 @@ async function connection() {
   clients.push(client)
   return client
 }
-function candidatePreparationLatency(delayMs: number): PrismaClient {
-  if (!delayMs) return prisma
+function candidatePreparationLatency(
+  delayMs: number,
+  onCandidate?: () => void
+): PrismaClient {
+  if (!delayMs && !onCandidate) return prisma
   return new Proxy(prisma, {
     get(target, key, receiver) {
       if (key === '$transaction')
@@ -107,8 +128,11 @@ function candidatePreparationLatency(delayMs: number): PrismaClient {
                   get(connection, property, connectionReceiver) {
                     if (property === '$executeRawUnsafe')
                       return async (query: string, ...values: unknown[]) => {
-                        if (query === 'SAVEPOINT community_candidate')
-                          await connection.$executeRaw`SELECT pg_sleep(${delayMs / 1000})`
+                        if (query === 'SAVEPOINT community_candidate') {
+                          onCandidate?.()
+                          if (delayMs)
+                            await connection.$executeRaw`SELECT pg_sleep(${delayMs / 1000})`
+                        }
                         return connection.$executeRawUnsafe(query, ...values)
                       }
                     return Reflect.get(
@@ -174,26 +198,39 @@ describe('Story 6.5 committed stream append', () => {
         )
       ),
     })
+    // The appender stops preparing at its 150 ms window and gives up at its 400 ms
+    // completion budget so that it never reaches the server's 450 ms statement and
+    // 500 ms transaction timeouts. A loaded host can exhaust that budget, which the
+    // append loop retries; a server timeout rollback is what this burst must never hit.
     const started = performance.now()
     const batches: { count: number; elapsedMs: number }[] = []
-    while (await prisma.communityDomainOutbox.count({ where: { appended_at: null } })) {
+    let guarded = 0
+    while (await backlog()) {
       const before = performance.now()
-      const count = await stream.append()
-      batches.push({ count, elapsedMs: performance.now() - before })
-      expect(count).toBeGreaterThan(0)
+      const outcome = await stream.settle()
+      if (outcome.status === 'rejected') {
+        if (!(outcome.reason instanceof AppendBudgetExceeded)) throw outcome.reason
+        expect(++guarded, 'completion budget deferrals in a row').toBeLessThan(12)
+        continue
+      }
+      guarded = 0
+      batches.push({ count: outcome.value.count, elapsedMs: performance.now() - before })
+      expect(outcome.value.count).toBeGreaterThan(0)
     }
     expect(await prisma.communityStreamEvent.count()).toBe(100)
     console.info(
       JSON.stringify({
         evidence: '6.5-PERF-local-append100',
         elapsedMs: performance.now() - started,
+        deferrals: stream.deferrals.length,
         batches,
       })
     )
     // The appender sizes each batch from real elapsed time, so a loaded host takes more,
-    // smaller batches; progress per append is the invariant. Measured 2026-10-27: 0.5 s
-    // idle, 2.8 s at load average 22 on 14 cores; 20 s is 7x that and still stops a hang.
-  }, 20_000)
+    // smaller batches; progress per append is the invariant. Measured 0.5 s idle, 3.2 to
+    // 8.4 s at load average 70 to 196 on 14 cores (2026-10-28) and 16.1 s at 204; 60 s
+    // is 3.7x the slowest, and the per-append deadline names a hang long before it.
+  }, 60_000)
   it('R01 adapts after slow append writes and exposes every aborted batch', async () => {
     const priorTelemetry = await prisma.communityEngagementTelemetry.findMany({
       select: { id: true },
@@ -281,8 +318,6 @@ describe('Story 6.5 committed stream append', () => {
     // halves the limit, and 12 committed batches raise any limit back to 25 (1 + 2 x 12),
     // so this phase tops the backlog up until 12 batches have committed since the last
     // deferral. More than 12 deferrals here means the appender is not recovering.
-    const backlog = () =>
-      prisma.communityDomainOutbox.count({ where: { appended_at: null } })
     const recovered: number[] = []
     let deferrals = 0
     const retryDeferral = (reason: unknown) => {
@@ -300,8 +335,8 @@ describe('Story 6.5 committed stream append', () => {
         })
       const outcome = await stream.settle()
       if (outcome.status === 'fulfilled') {
-        recovered.push(outcome.value)
-        if (outcome.value) committed++
+        recovered.push(outcome.value.count)
+        if (outcome.value.count) committed++
       } else {
         retryDeferral(outcome.reason)
         committed = 0
@@ -333,7 +368,7 @@ describe('Story 6.5 committed stream append', () => {
     let restored = 0
     while (await backlog()) {
       const outcome = await stream.settle()
-      if (outcome.status === 'fulfilled') restored += outcome.value
+      if (outcome.status === 'fulfilled') restored += outcome.value.count
       else retryDeferral(outcome.reason)
     }
     expect(restored).toBe(25)
@@ -358,11 +393,11 @@ describe('Story 6.5 committed stream append', () => {
   // 20 ms of real latency per candidate no batch can exceed eight (eight candidates are
   // already 160 ms). Without injected latency a batch holds at most the 25-event ready
   // limit. How many batches a burst takes follows the host's load, so the bound is per
-  // batch: the per-batch maximum holds at any load. A batch below the ready limit ends
-  // only when the window closes, so every one but the drained last batch spent 150 ms;
-  // an appender that stops early, at two rows per batch, ends them in 20 to 120 ms. The
-  // largest batch is load-shaped: without latency it fell from 25 idle to 5 at load
-  // average 102 on 14 cores (2026-10-27), so its size is no efficiency bound.
+  // batch: the per-batch maximum holds at any load. Efficiency is checked by why each
+  // batch stopped, which the appender reports: timing a whole append includes its
+  // commit, and a two-row appender at 20 ms ran 14 of 49 batches past 150 ms under load.
+  // Batch sizes are load-shaped: without latency the largest fell from 25 idle to 5 at
+  // load average 102 on 14 cores (2026-10-27), so no size is an efficiency bound.
   it.each([
     [0, 25],
     [20, 8],
@@ -409,32 +444,45 @@ describe('Story 6.5 committed stream append', () => {
         ),
       })
       const start = performance.now()
-      const batches: number[] = []
-      const timings: number[] = []
-      const capacities: unknown[] = []
+      const steps: (AppendReport | 'budget_pressure')[] = []
       try {
-        while (
-          await prisma.communityDomainOutbox.count({ where: { appended_at: null } })
-        ) {
-          const before = performance.now()
-          batches.push(await appender.append())
-          timings.push(Math.round(performance.now() - before))
-          capacities.push(Reflect.get(appender.repository, 'readyLimit') as unknown)
+        while (await backlog()) {
+          const outcome = await appender.settle()
+          if (outcome.status === 'fulfilled') steps.push(outcome.value)
+          else if (appendFailure(outcome.reason) === 'budget_pressure') {
+            steps.push('budget_pressure')
+            expect(
+              steps.filter((step) => step === 'budget_pressure').length,
+              'budget deferrals in the burst'
+            ).toBeLessThanOrEqual(12)
+          } else throw outcome.reason
         }
-        expect(batches[0]).toBeGreaterThan(1)
+        const reports = steps.filter((step) => step !== 'budget_pressure')
+        const batches = reports.map((report) => report.count)
         expect(Math.min(...batches)).toBeGreaterThanOrEqual(1)
         expect(Math.max(...batches)).toBeLessThanOrEqual(maxBatch)
+        // Contention left the limit at 25. After it, every committed batch raises the
+        // limit by two up to 25 and every budget deferral halves it.
+        const limits: number[] = []
+        steps.reduce((limit, step) => {
+          if (step === 'budget_pressure') return Math.max(1, Math.floor(limit / 2))
+          limits.push(limit)
+          return step.count ? Math.min(25, limit + 2) : limit
+        }, 25)
+        expect(reports.map((report) => report.limit)).toEqual(limits)
+        // A batch ends only when its preparation window closes or its ready limit
+        // fills; only the batch that drains the backlog may end for running out.
         expect(
-          batches
+          reports
             .slice(0, -1)
-            .flatMap((count, index) =>
-              count < 25 && timings[index]! < 150
-                ? [{ append: index + 1, count, ms: timings[index] }]
-                : []
+            .flatMap((report, index) =>
+              (report.stop === 'window' && report.preparedMs >= 150) ||
+              (report.stop === 'limit' && report.ready === report.limit)
+                ? []
+                : [{ batch: index + 1, ...report }]
             ),
-          'batches below the ready limit that ended before the 150 ms window closed'
+          'batches that ended before their window closed or their limit filled'
         ).toEqual([])
-        expect(capacities).toEqual(batches.map(() => 25))
         const events = await prisma.communityStreamEvent.findMany({
           where: { stream_id: 'public' },
           select: { source_outbox_id: true, sequence: true, post_id: true },
@@ -464,22 +512,25 @@ describe('Story 6.5 committed stream append', () => {
           JSON.stringify({
             evidence: 'A03-contention-burst',
             elapsedMs: Math.round(performance.now() - start),
-            batches,
-            timings,
-            capacities,
+            steps: steps.map((step) =>
+              step === 'budget_pressure'
+                ? step
+                : `${step.count}/${step.limit} ${step.stop} ${Math.round(step.preparedMs)}ms`
+            ),
             telemetry,
           })
         )
       }
     },
-    // 100 candidates at 20 ms is 2 s of injected latency alone; measured 4.8 s at load
-    // average 15 and past 5 s at 22. 20 s is 4x the loaded run and still stops a hang.
-    20_000
+    // 100 candidates at 20 ms is 2 s of injected latency alone. Measured 6.0 to 8.5 s
+    // at load average 70 to 196 on 14 cores (2026-10-28); one run at load 204 passed the
+    // old 20 s cap. 60 s is 3x that, and the per-append deadline names a hang sooner.
+    60_000
   )
   it('6.5-INT-001: reverse source commit order and aborted source cannot leave a skipped cursor', async () => {
     const a = await fixture()
     const b = await fixture()
-    await stream.append()
+    await stream.drain()
     const before = await prisma.communityStreamHead.findUniqueOrThrow({
       where: { id: 'public' },
     })
@@ -524,10 +575,10 @@ describe('Story 6.5 committed stream append', () => {
       await prisma.communityDomainOutbox.count({ where: { appended_at: null } })
     ).toBe(1)
     await locker.query('ROLLBACK')
+    // Either concurrent appender may defer on the other's head lock or on a loaded
+    // host's budget; a retry finishes the row. Two events would mean a double append.
     await Promise.all([stream.settle(), stream.settle()])
-    expect(
-      await prisma.communityDomainOutbox.count({ where: { appended_at: null } })
-    ).toBe(0)
+    await stream.drain()
     const events = await prisma.communityStreamEvent.findMany()
     expect(events).toHaveLength(1)
     expect(new Set(events.map((e) => e.source_outbox_id)).size).toBe(1)
@@ -544,6 +595,78 @@ describe('Story 6.5 committed stream append', () => {
     await locker.query('ROLLBACK')
     expect(await stream.append()).toBe(1)
     expect(await prisma.communityStreamEvent.count()).toBe(2)
+  })
+
+  it('a SQL timeout in an append model operation defers the batch as budget pressure', async () => {
+    const a = await fixture()
+    await fixture()
+    // A busy candidate makes the append record contention with a model create; the
+    // trigger holds that insert past the 450 ms statement and 500 ms transaction
+    // timeouts. Prisma raises either one from a model operation as an unknown request
+    // error, which the append once reported as a dependency failure.
+    await prisma.$executeRawUnsafe(
+      "CREATE FUNCTION story65_slow_contention() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.event_type = 'community_append_contention' THEN PERFORM pg_sleep(1); END IF; RETURN NEW; END $$"
+    )
+    await prisma.$executeRawUnsafe(
+      'CREATE TRIGGER story65_slow_contention BEFORE INSERT ON "CommunityEngagementTelemetry" FOR EACH ROW EXECUTE FUNCTION story65_slow_contention()'
+    )
+    const locker = await connection()
+    await locker.query('BEGIN')
+    await locker.query('SELECT pg_advisory_xact_lock(65001,hashtext($1))', [a.user.id])
+    try {
+      const outcome = await stream.settle()
+      expect(outcome.status).toBe('rejected')
+      const reason: unknown = outcome.status === 'rejected' ? outcome.reason : undefined
+      expect(reason).toBeInstanceOf(Prisma.PrismaClientUnknownRequestError)
+      const code = postgresError(reason)?.code
+      console.info(JSON.stringify({ evidence: 'append-model-timeout', code }))
+      expect(['57014', '25P04']).toContain(code)
+      expect(stream.deferrals).toEqual([
+        { reason: 'budget_pressure', nextBatchLimit: 12 },
+      ])
+      expect(await prisma.communityStreamEvent.count()).toBe(0)
+    } finally {
+      await locker.query('ROLLBACK')
+      await prisma.$executeRawUnsafe(
+        'DROP TRIGGER story65_slow_contention ON "CommunityEngagementTelemetry"'
+      )
+      await prisma.$executeRawUnsafe('DROP FUNCTION story65_slow_contention()')
+    }
+  })
+
+  it('an aborted append rolls its batch back and writes nothing afterwards', async () => {
+    await fixture()
+    await fixture()
+    await fixture()
+    const priorTelemetry = await prisma.communityEngagementTelemetry.findMany({
+      select: { id: true },
+    })
+    // Abort while the first candidate is prepared. It becomes ready all the same, so
+    // without the abort this append would go on to write it, at any load.
+    const abort = new AbortController()
+    let candidates = 0
+    const appender = new CommunityStreamRepository(
+      candidatePreparationLatency(0, () => {
+        if (++candidates === 1) abort.abort(new Error('append abandoned'))
+      })
+    )
+    await expect(appender.appendWithReport(abort.signal)).rejects.toThrow(
+      'append abandoned'
+    )
+    expect(candidates).toBe(1)
+    expect(await backlog()).toBe(3)
+    expect(await prisma.communityStreamEvent.count()).toBe(0)
+    expect(
+      await prisma.communityEngagementTelemetry.count({
+        where: { id: { notIn: priorTelemetry.map((row) => row.id) } },
+      })
+    ).toBe(0)
+    // The same appender with a live signal still appends all three; a loaded host's
+    // window can split them across batches.
+    let appended = 0
+    while (await backlog())
+      appended += (await appender.appendWithReport(new AbortController().signal)).count
+    expect(appended).toBe(3)
   })
 
   it('6.5-INT-004: savepoint rollback releases only candidate guards and row locks', async () => {
@@ -592,7 +715,7 @@ describe('Story 6.5 committed stream append', () => {
 
   it('6.5-INT-008: private status stays private; hidden source becomes identifier-free resync', async () => {
     const { user, post } = await fixture()
-    await stream.append()
+    await stream.drain()
     await prisma.communityStreamEvent.deleteMany()
     await prisma.communityComment.create({
       data: {
@@ -611,7 +734,7 @@ describe('Story 6.5 committed stream append', () => {
       where: { id: post.id },
       data: { status: 'withdrawn' },
     })
-    await stream.append()
+    await stream.drain()
     const removal = await prisma.communityStreamEvent.findFirstOrThrow({
       where: { stream_id: 'public' },
     })
