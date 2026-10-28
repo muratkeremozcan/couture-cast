@@ -105,15 +105,24 @@ describe('Maestro flow timeouts', () => {
 
   test('the harness passes each flow its own budget to the Maestro process', () => {
     const harness = fs.readFileSync(`${root}scripts/run-story68-native.mjs`, 'utf8')
-    assert.match(harness, /timeout: flowTimeoutMs\(flow\),/)
+    assert.match(
+      harness,
+      /timeout: (?:flowTimeoutMs|nativeFlowTimeoutMs)\(flow(?:, platform)?\),/
+    )
     assert.doesNotMatch(harness, /timeout: 120_000/)
     // maestro() hands the process (and the iOS deadline worker) only the derived budget.
     const body = harness.slice(
       harness.indexOf('function maestro('),
       harness.indexOf('\nasync function signin(')
     )
-    assert.ok(body.includes('timeout: flowTimeoutMs(flow)'))
-    assert.doesNotMatch(body, /timeout:(?!\s*flowTimeoutMs\(flow\))/)
+    assert.match(
+      body,
+      /timeout: (?:flowTimeoutMs|nativeFlowTimeoutMs)\(flow(?:, platform)?\),/
+    )
+    assert.doesNotMatch(
+      body,
+      /timeout:(?!\s*(?:flowTimeoutMs|nativeFlowTimeoutMs)\(flow(?:, platform)?\),)/
+    )
     assert.equal(flowTimeoutMs('maestro/story68/cancel.yaml'), DEFAULT_FLOW_TIMEOUT_MS)
   })
 })

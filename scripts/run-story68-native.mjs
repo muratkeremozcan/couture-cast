@@ -14,7 +14,7 @@ import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics
 import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs'
 import { withColdAndroidFontScale } from './lib/story68-cold-font-scale.mjs'
 import { runReleaseLiveFontCommand } from './lib/story68-release-live-font-command.mjs'
-import { flowTimeoutMs } from './lib/story68-flow-timeouts.mjs'
+import { nativeFlowTimeoutMs } from './ci/native-ios-flow-budget.mjs'
 import { metroServerEnv } from './lib/story68-metro-env.mjs'
 import {
   recordIosCommandTimings,
@@ -296,7 +296,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
         encoding: 'utf8',
         maxBuffer: 30 * 1024 * 1024,
         detached: true,
-        timeout: flowTimeoutMs(flow),
+        timeout: nativeFlowTimeoutMs(flow, platform),
         killSignal: 'SIGTERM',
       },
       path.join(output, 'flow-timing.json')

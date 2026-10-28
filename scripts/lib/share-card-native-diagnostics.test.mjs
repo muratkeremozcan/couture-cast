@@ -304,7 +304,7 @@ function invokeMaestro(t, capture) {
       stderr: '',
     }),
     shouldRetryIosSnapshot: () => false,
-    flowTimeoutMs: () => 120_000,
+    nativeFlowTimeoutMs: () => 120_000,
     privateJson: () => undefined,
     summarizeNativeFlowFailure: () => ({}),
     recordNativeFlowDiagnostics: capture,
