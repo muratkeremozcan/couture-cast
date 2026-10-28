@@ -30,6 +30,8 @@ import {
   supportedLocales,
   prepareShareCardInputSchema,
   communitySponsoredFeedResponseSchema,
+  resolveCommunityTargetsInputSchema,
+  resolveCommunityTargetsResponseSchema,
   userProfileResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { decodeShareCardBase64, validateShareCardPng } from '@couture/api-client'
@@ -707,11 +709,59 @@ test('P-BOOTSTRAP: the rebuilt own feed post is verified before the initial feed
     release = resolve
   })
   let feeds = 0
+  let ownedResolution: Promise<boolean> | undefined
+  const resolved = (response: Response) => {
+    if (
+      response.status() !== 200 ||
+      new URL(response.url()).pathname !== '/api/v1/community/targets/resolve'
+    )
+      return
+    const input = resolveCommunityTargetsInputSchema.safeParse(
+      response.request().postDataJSON()
+    )
+    if (
+      !input.success ||
+      !input.data.targets.some(
+        (target) => target.key === fixture.postId && target.postId === fixture.postId
+      )
+    )
+      return
+    ownedResolution = response
+      .json()
+      .then((body: unknown) => {
+        const parsed = resolveCommunityTargetsResponseSchema.safeParse(body)
+        return (
+          parsed.success &&
+          parsed.data.data.targets.some(
+            (target) => target.key === fixture.postId && target.status === 'available'
+          )
+        )
+      })
+      .catch(() => false)
+  }
+  let checkFirstReplay!: (verified: boolean) => void
+  const firstReplay = new Promise<boolean>((resolve) => {
+    checkFirstReplay = resolve
+  })
+  let replayObserved = false
   const replayStarted = (request: Request) => {
     const url = new URL(request.url())
-    if (url.pathname === '/api/v1/community/events' && url.searchParams.has('cursor'))
-      release()
+    if (
+      replayObserved ||
+      url.pathname !== '/api/v1/community/events' ||
+      !url.searchParams.has('cursor')
+    )
+      return
+    replayObserved = true
+    // Freeze the resolution already observed at the first cursor request. A later
+    // reconnect must prove its own recovery without satisfying this bootstrap check.
+    const beforeReplay = ownedResolution ?? Promise.resolve(false)
+    void beforeReplay.then((verified) => {
+      checkFirstReplay(verified)
+      if (verified) release()
+    })
   }
+  page.on('response', resolved)
   page.on('request', replayStarted)
   // Retain both real API responses. Deliver the bootstrap rebuild first so its
   // target validation cannot borrow the initial feed's committed React state.
@@ -722,13 +772,20 @@ test('P-BOOTSTRAP: the rebuilt own feed post is verified before the initial feed
     await route.fulfill({ response })
   })
   try {
-    const { preview } = await ownPhoto(page, interceptNetworkCall)
+    const opened = ownPhoto(page, interceptNetworkCall)
+    void opened.catch(() => undefined)
+    await expect(
+      firstReplay,
+      'owned target resolved before the first cursor request'
+    ).resolves.toBe(true)
+    const { preview } = await opened
     expect(feeds).toBeGreaterThanOrEqual(2)
     expect(sha256(await previewBytes(preview))).toBe(
       await preview.getAttribute('data-sha256')
     )
   } finally {
     release()
+    page.off('response', resolved)
     page.off('request', replayStarted)
     await page.unrouteAll({ behavior: 'wait' })
   }
