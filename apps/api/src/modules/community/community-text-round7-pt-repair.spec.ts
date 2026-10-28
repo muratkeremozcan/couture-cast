@@ -819,6 +819,82 @@ describe('round 7c both sides of every reviewed clearance are closed', () => {
   })
 })
 
+describe('round 7e ordinary pairs with an open frame route to review, not a hard block', () => {
+  const english = [
+    'Once you pin the pocket sew along the edge.',
+    'Here is how you pin a hem on a skirt.',
+    'Use a towel head wrap with a cotton lining.',
+    'Sub normal wear on the hem after a year.',
+    'When you pin a dart, keep the fabric flat on the table.',
+    'Then you pin each sleeve to the armhole and match the notches.',
+    'If you pin the zipper first, the seam sits straight.',
+    'After you pin the ribbon onto the collar, stitch it in two passes.',
+    'Wear a towel head wrap in the bath to keep the curls dry.',
+    'A towel head wrap in soft terry is gentle on long hair.',
+    'The wet back panel of this coat is bonded to the shell for rain.',
+    'Hang the jacket to dry because the wet back lining takes an hour.',
+    'Check the wet back seam for tape before you wear it in the rain.',
+    'Sub normal stretch in the knit means the cuff keeps its shape.',
+    'Sub normal shrinkage after the first wash is covered by the guarantee.',
+    'Before you pin the bias tape, press the fold.',
+    'Do not skip it when you pin the pleats, or the skirt will twist.',
+    'Cut the lining, then you pin the facing to the neckline.',
+    'Try a towel head wrap made of bamboo for a gentler dry.',
+    'As you pin the brim to the crown, ease the fullness evenly.',
+  ]
+  const foreign = [
+    'Doublure en wet back lining étanche pour le manteau long.',
+    'Utilisez le towel head wrap avec une doublure en coton.',
+    "Le sub normal wear sur l'ourlet apparaît après un an.",
+    'Puis you pin the hem avant de coudre.',
+    'Un wet back panel en nylon sur le dos de la veste.',
+    'Usa el towel head wrap con un forro de algodón.',
+    'El sub normal wear del dobladillo aparece tras un año.',
+    'Luego you pin the hem antes de coser a mano.',
+    'El wet back lining del abrigo es impermeable.',
+    'Un towel head wrap de rizo para secar el cabello.',
+    'Usa il towel head wrap con una fodera di cotone.',
+    "Il sub normal wear sull'orlo compare dopo un anno.",
+    'Poi you pin the hem prima di cucire.',
+    'Il wet back lining del cappotto è impermeabile.',
+    'Un towel head wrap in spugna per asciugare i capelli.',
+    'Das wet back lining der Jacke ist wasserdicht.',
+    'Der towel head wrap aus Frottee trocknet das Haar schnell.',
+    'Dann you pin the hem vor dem Nähen.',
+    'Ein sub normal wear am Saum zeigt sich nach einem Jahr.',
+    'Die wet back panel der Jacke ist verklebt.',
+  ]
+  it.each([...english, ...foreign])('never hard-blocks natural copy: %s', (text) => {
+    for (const locale of everyLocale)
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('block')
+  })
+
+  it('keeps block for slur-leading frames, forbidden words and cuts with a non-ordinary half', () => {
+    for (const text of [
+      'stupid towel head wrap',
+      'stupid towel head',
+      'go home wet back',
+      'sale you pin',
+      'espece de you pin',
+      'kill the towel head wrap',
+      'kill the wet back lining',
+      'towel head wrap you animals',
+      'wet back panel you animals',
+      'towel head wrap go back to your country',
+      'tap ete',
+      'nazi sta',
+    ])
+      for (const locale of everyLocale)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('block')
+  })
+
+  it('still withholds, as review, a reviewed pair with an open tail', () => {
+    for (const text of ['towel head wrap go home', 'wet back panel go home'])
+      for (const locale of everyLocale)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('review')
+  })
+})
+
 describe('round 7b a high-severity term cut in two whole words', () => {
   it('withholds tap ete and other two-way cuts with both parts of three letters or more', () => {
     for (const text of [

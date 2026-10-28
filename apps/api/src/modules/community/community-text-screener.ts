@@ -411,6 +411,10 @@ const allowFileSchema = z.object({
         leads: z.array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u)).default([]),
         after: z.array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u)).min(1),
         tails: z.array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u)).default([]),
+        // An ordinary pair outside its clearing frame routes to review instead of a hard
+        // block when the word before it is one of these and no word of the text is forbidden.
+        reviewBefore: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+        reviewForbidden: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
       })
     )
     .default([]),
@@ -724,6 +728,8 @@ interface SplitFrame {
   readonly leads: readonly (readonly string[])[]
   readonly after: readonly (readonly string[])[]
   readonly tails: readonly (readonly string[])[]
+  readonly reviewBefore: readonly string[]
+  readonly reviewForbidden: readonly string[]
 }
 
 /** The longest text outside a reviewed split frame that the closed-phrase tiling will consider. */
@@ -764,6 +770,8 @@ function indexSplitFrames(
           leads: (frame.leads ?? []).map((phrase) => phrase.split(' ').map(folded)),
           after: frame.after.map((phrase) => phrase.split(' ').map(folded)),
           tails: (frame.tails ?? []).map((phrase) => phrase.split(' ').map(folded)),
+          reviewBefore: (frame.reviewBefore ?? []).map(folded),
+          reviewForbidden: (frame.reviewForbidden ?? []).map(folded),
         },
       ])
     }
@@ -1884,9 +1892,34 @@ export class CommunityTextScreener {
       if (joined.length < MIN_SINGLE_TERM_LENGTH) continue
       if (collapseRepeats(joined).length > this.longestTerm) continue
       const meta = this.worstAcross((index) => matchRun(index.singleCollapsed, joined))
-      if (meta?.severity === 'high') outcomes.push({ meta, obfuscated: true })
+      if (meta?.severity !== 'high') continue
+      // Two ordinary words with an open frame are withheld for review, not hard-blocked;
+      // a slur-leading frame or a cut with a non-ordinary half keeps the block.
+      outcomes.push({
+        meta: this.isOrdinaryOpenSplit(foldedTokens, start)
+          ? { ...meta, severity: 'medium' }
+          : meta,
+        obfuscated: true,
+      })
     }
     return outcomes
+  }
+
+  /** A reviewed ordinary pair, led by a listed ordinary word, in a text with no forbidden word. */
+  private isOrdinaryOpenSplit(foldedTokens: readonly string[], start: number): boolean {
+    const frames = this.splitFrames.get(
+      `${foldedTokens[start]} ${foldedTokens[start + 1]}`
+    )
+    if (!frames) return false
+    const outside = [...foldedTokens.slice(0, start), ...foldedTokens.slice(start + 2)]
+    return frames.some(
+      (frame) =>
+        (start === 0
+          ? frame.atStart
+          : frame.before.includes(foldedTokens[start - 1] as string) ||
+            frame.reviewBefore.includes(foldedTokens[start - 1] as string)) &&
+        !outside.some((word) => frame.reviewForbidden.includes(word))
+    )
   }
 
   /**

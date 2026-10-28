@@ -321,26 +321,37 @@ function isPhraseList(phrases) {
   )
 }
 
+function splitPairShapeValid(frame) {
+  return (
+    LANGUAGES.includes(frame.language) &&
+    tokenize(toLiteral(frame.entry ?? '')).length === 2 &&
+    typeof frame.atStart === 'boolean' &&
+    isLetterWords(frame.before) &&
+    (frame.atStart || frame.before.length > 0) &&
+    isPhraseList(frame.after) &&
+    frame.after.length > 0
+  )
+}
+
+function splitPairListsValid(frame) {
+  return (
+    isPhraseList(frame.leads) &&
+    isPhraseList(frame.tails) &&
+    isLetterWords(frame.reviewBefore) &&
+    isLetterWords(frame.reviewForbidden) &&
+    typeof frame.reason === 'string' &&
+    frame.reason.length >= 20
+  )
+}
+
 function splitPairProblems(pairs) {
-  return pairs.flatMap((frame) => {
-    const valid =
-      LANGUAGES.includes(frame.language) &&
-      tokenize(toLiteral(frame.entry ?? '')).length === 2 &&
-      typeof frame.atStart === 'boolean' &&
-      isLetterWords(frame.before) &&
-      (frame.atStart || frame.before.length > 0) &&
-      isPhraseList(frame.after) &&
-      frame.after.length > 0 &&
-      isPhraseList(frame.leads) &&
-      isPhraseList(frame.tails) &&
-      typeof frame.reason === 'string' &&
-      frame.reason.length >= 20
-    return valid
+  return pairs.flatMap((frame) =>
+    splitPairShapeValid(frame) && splitPairListsValid(frame)
       ? []
       : [
-          `reviewed split pair "${frame.entry}" needs a language, two words, a bounded before, closed leads, after and tails and a reason`,
+          `reviewed split pair "${frame.entry}" needs a language, two words, a bounded before, closed leads, after, tails and review lists, and a reason`,
         ]
-  })
+  )
 }
 
 function scopedPhraseProblems(scopedPhrases) {
@@ -555,6 +566,8 @@ function buildAllowFile(language, allowState, hashes) {
         leads: entry.leads.map(toLiteral),
         after: entry.after.map(toLiteral),
         tails: entry.tails.map(toLiteral),
+        reviewBefore: entry.reviewBefore.map(toLiteral),
+        reviewForbidden: entry.reviewForbidden.map(toLiteral),
       })),
     scopedWords: (allowState.allow.scopedWords ?? [])
       .filter((entry) => entry.language === language)
