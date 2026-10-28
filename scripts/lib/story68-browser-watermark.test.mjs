@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import vm from 'node:vm'
 import { EventEmitter } from 'node:events'
+import { setImmediate as nextTask } from 'node:timers/promises'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import {
@@ -501,10 +502,11 @@ describe('community readiness', () => {
     assert.equal(f.navigated(), 1)
     f.early()
     f.foreign()
-    await Promise.resolve()
+    // Drain response/body promise chains before asserting that readiness is pending.
+    await nextTask()
     assert.equal(f.ready(), false)
     f.initial()
-    await Promise.resolve()
+    await nextTask()
     assert.equal(f.ready(), false)
     f.replay()
     await f.promise
