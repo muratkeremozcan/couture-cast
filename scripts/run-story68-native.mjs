@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Story 6.8 native harness. Every mutation is scoped to the explicitly owned runtime/device.
+import { talkbackFailureSummary } from './lib/story68-talkback-failure.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
@@ -705,8 +706,14 @@ if (command === 'prebuild') {
     fs.writeFileSync(path.join(directory, 'talkback-composer.log'), output, {
       mode: 0o600,
     })
-    if (!/OK \(2 tests\)/.test(output) || /FAILURES|INSTRUMENTATION_FAILED/.test(output))
+    if (
+      !/OK \(2 tests\)/.test(output) ||
+      /FAILURES|INSTRUMENTATION_FAILED/.test(output)
+    ) {
+      // The full output stays private; the closed summary names the failing assertion.
+      console.log(JSON.stringify({ talkbackComposer: talkbackFailureSummary(output) }))
       throw new Error('actual_talkback_composer_failed')
+    }
     privateJson('accessibility-android.json', {
       platform,
       service: 'TalkBack',
