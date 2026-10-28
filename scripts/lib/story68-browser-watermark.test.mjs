@@ -11,14 +11,33 @@ import {
   assertBrowserWatermarkEvidence,
   afterInitialCommunityVerification,
   browserWatermarkChecks,
+  browserWatermarkHoldDeadlineMs,
   closedBrowserWatermarkFailure,
   withBrowserWatermarkLock,
 } from './story68-browser-watermark.mjs'
-
 const privateRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const { transpileModule, ScriptTarget } = createRequire(
+const { transpileModule, ScriptTarget, ModuleKind } = createRequire(
   path.join(privateRoot, 'package.json')
 )('typescript')
+// The API's own constant, so these controls move with the product budget.
+const { COMMUNITY_AUTHORIZATION_BUDGET_MS } = (() => {
+  const exports = {}
+  vm.runInNewContext(
+    transpileModule(
+      fs.readFileSync(
+        path.join(
+          privateRoot,
+          'apps/api/src/modules/community/community-authorization-budget.ts'
+        ),
+        'utf8'
+      ),
+      { compilerOptions: { module: ModuleKind.CommonJS } }
+    ).outputText,
+    { exports }
+  )
+  return exports
+})()
+const holdDeadlineMs = browserWatermarkHoldDeadlineMs(COMMUNITY_AUTHORIZATION_BUDGET_MS)
 const connectionString = `postgresql://owned@127.0.0.1:54322/tea_community_${'a'.repeat(32)}`
 const database = `tea_community_${'a'.repeat(32)}`
 function clientFactory({ mismatch = -1, blocked = true } = {}) {
@@ -57,6 +76,7 @@ function actualJourney({
   unavailable = false,
   finalProfile = 200,
   reuseOnRequest = false,
+  offDelayMs = 400.5,
 } = {}) {
   let source = fs.readFileSync(
     path.join(privateRoot, 'playwright/tests/share-card-export.spec.ts'),
@@ -76,7 +96,11 @@ function actualJourney({
   const page = new EventEmitter()
   const pending = []
   let firstOnRequest
+  const order = []
   const emit = (watermark) => {
+    order.push(
+      `${watermark ? 'on' : 'off'}:${f.queries.some(([, sql]) => sql === 'BEGIN') ? 'held' : 'free'}`
+    )
     const request = (reuseOnRequest && watermark && firstOnRequest) || {
       url: () => 'http://127.0.0.1:4088/api/v1/share-cards/prepare',
       postDataJSON: () => ({ watermark }),
@@ -91,21 +115,27 @@ function actualJourney({
   page.waitForRequest = (predicate) =>
     new Promise((resolve) => pending.push({ predicate, resolve }))
   let profiles = 0
-  page.request = {
-    get: async () => ({
-      status: () => (++profiles === 1 ? 200 : finalProfile),
-      json: async () => ({ user: { id: 'synthetic-unit-member' } }),
-    }),
+  // The spec reads the owner's profile through playwright-utils apiRequest.
+  const readProfile = async (origin) => {
+    assert.equal(origin, 'http://127.0.0.1:4088')
+    return {
+      status: ++profiles === 1 ? 200 : finalProfile,
+      body: { user: { id: 'synthetic-unit-member' } },
+    }
   }
+  let watermarkOn = true
   const checkbox = {
-    uncheck: async () => {
+    press: async (key) => {
+      assert.equal(key, 'Space')
       mutations++
-      if (failOff) throw new Error('synthetic access_token private@example.test')
-      clock += 2005.593315
-      emit(false)
-    },
-    check: async () => {
-      mutations++
+      if (watermarkOn && failOff)
+        throw new Error('synthetic access_token private@example.test')
+      watermarkOn = !watermarkOn
+      if (!watermarkOn) {
+        clock += offDelayMs
+        emit(false)
+        return
+      }
       emit(true)
       if (unavailable)
         page.emit('response', {
@@ -130,7 +160,7 @@ function actualJourney({
     performance: { now: () => clock },
     expect,
     pg: { Client: f.Client },
-    session: async () => ({ access_token: 'synthetic-unit-token' }),
+    userProfileResponseSchema: { parse: (body) => body },
     fixture: { identities: [{ appUserId: 'synthetic-unit-member' }] },
     pinnedWatermarkDatabase: () => connectionString,
     prepareShareCardInputSchema: { parse: (input) => input },
@@ -140,6 +170,7 @@ function actualJourney({
     },
     withBrowserWatermarkLock: (input) =>
       withBrowserWatermarkLock({ ...input, now: () => clock }),
+    COMMUNITY_AUTHORIZATION_BUDGET_MS,
     browserWatermarkChecks,
     assertBrowserWatermarkEvidence,
     closedBrowserWatermarkFailure,
@@ -157,7 +188,7 @@ function actualJourney({
     context
   )
   return {
-    run: () => invoke(page, async () => emit(true), 'http://127.0.0.1:4088'),
+    run: () => invoke(page, async () => emit(true), 'http://127.0.0.1:4088', readProfile),
     cleanup: () => fs.rmSync(directory, { recursive: true, force: true }),
     proof: () =>
       JSON.parse(
@@ -165,13 +196,14 @@ function actualJourney({
       ),
     failureFile: path.join(directory, 'browser-watermark-failure-webkit.json'),
     mutations: () => mutations,
+    order: () => order,
     ...f,
   }
 }
-
 function lockInput(f, overrides = {}) {
   return {
     connectionString,
+    authorizationBudgetMs: COMMUNITY_AUTHORIZATION_BUDGET_MS,
     createClient: (options) => new f.Client(options),
     whileLocked: async ({ waitForBlocked }) => {
       await waitForBlocked()
@@ -188,7 +220,6 @@ function lockInput(f, overrides = {}) {
     ...overrides,
   }
 }
-
 function communityReadiness({ available = true, resyncRequired = false } = {}) {
   const page = new EventEmitter()
   const waits = []
@@ -253,17 +284,18 @@ function communityReadiness({ available = true, resyncRequired = false } = {}) {
 }
 
 describe('browser watermark journey', () => {
-  test('actual browser journey accepts the same 2005 ms UI delay with all original checks and three fresh requests', async () => {
+  test('actual browser journey opens, then toggles OFF and ON by keyboard inside the barrier, with all checks and three fresh requests', async () => {
     const f = actualJourney()
     try {
       await f.run()
       const proof = f.proof()
       assertBrowserWatermarkEvidence(proof)
       assert.equal(proof.passed, true)
-      assert.equal(proof.heldMs, 2005.593315)
+      assert.equal(proof.heldMs, 400.5)
       assert.equal(proof.requests, 3)
       assert.equal(proof.unavailableResponses, 0)
       assert.equal(f.mutations(), 2)
+      assert.deepEqual(f.order(), ['on:held', 'off:held', 'on:held'])
       assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
       assert.equal(
         f.queries.some(([, sql]) =>
@@ -276,7 +308,23 @@ describe('browser watermark journey', () => {
       f.cleanup()
     }
   })
-
+  test('a UI delay that would outlast the API authorization budget fails as the hold deadline, never a product 503', async () => {
+    // CI WebKit held the barrier 3271 ms against the 1950 ms budget and the API answered 503.
+    const f = actualJourney({ offDelayMs: 3271 })
+    try {
+      await assert.rejects(f.run(), /browser_watermark_hold_deadline/)
+      const proof = f.proof()
+      assertBrowserWatermarkEvidence(proof)
+      assert.equal(proof.passed, false)
+      assert.equal(proof.code, 'browser_watermark_hold_deadline')
+      assert.equal(proof.heldMs, 3271)
+      assert.equal(proof.unavailableResponses, 0)
+      assert.equal(proof.checks.rolledBack, true)
+      assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
+    } finally {
+      f.cleanup()
+    }
+  })
   for (const [options, phase, code] of [
     [{ failOff: true }, 'off', 'browser_watermark_failed'],
     [{ unavailable: true }, 'requests', 'browser_watermark_prepare_503'],
@@ -302,7 +350,6 @@ describe('browser watermark journey', () => {
         f.cleanup()
       }
     })
-
   test('actual journey retains the first closed failure artifact across later failures', async () => {
     const f = actualJourney({ failOff: true })
     try {
@@ -333,7 +380,6 @@ describe('browser watermark lock', () => {
       assert.deepEqual(f.ended.sort(), [0, 1])
     }
   })
-
   test('a cached preview cannot replace the actual blocked SQL source witness', async () => {
     const f = clientFactory({ blocked: false })
     await assert.rejects(
@@ -342,26 +388,46 @@ describe('browser watermark lock', () => {
     )
     assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
   })
-
-  test('12000 ms held time fails without changing the product deadline', async () => {
+  test('the hold deadline is three quarters of the API community authorization budget', () => {
+    assert.equal(COMMUNITY_AUTHORIZATION_BUDGET_MS, 1950)
+    assert.equal(holdDeadlineMs, 1462)
+    assert.equal(browserWatermarkHoldDeadlineMs(100), 75)
+    for (const budget of [undefined, 0, -1, Number.NaN, '1950'])
+      assert.throws(
+        () => browserWatermarkHoldDeadlineMs(budget),
+        /browser_watermark_authorization_budget_required/
+      )
+  })
+  test('a barrier without the API budget is refused before any connection', async () => {
     const f = clientFactory()
-    let clock = 0
     await assert.rejects(
-      withBrowserWatermarkLock(
+      withBrowserWatermarkLock(lockInput(f, { authorizationBudgetMs: undefined })),
+      /browser_watermark_authorization_budget_required/
+    )
+    assert.deepEqual(f.options, [])
+    assert.deepEqual(f.queries, [])
+  })
+  for (const [heldMs, outcome] of [
+    [holdDeadlineMs - 0.5, 'passes'],
+    [holdDeadlineMs, 'fails'],
+  ])
+    test(`${heldMs} ms held time ${outcome} against the budget-derived deadline without changing the product budget`, async () => {
+      const f = clientFactory()
+      let clock = 0
+      const run = withBrowserWatermarkLock(
         lockInput(f, {
           now: () => clock,
           whileLocked: async ({ waitForBlocked }) => {
             await waitForBlocked()
-            clock = 12000
+            clock = heldMs
           },
         })
-      ),
-      /browser_watermark_hold_deadline/
-    )
-    assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
-  })
-
-  test('the real 12 second watchdog aborts pending UI work and rolls back', async (t) => {
+      )
+      if (outcome === 'passes') assert.equal((await run).heldMs, heldMs)
+      else await assert.rejects(run, /browser_watermark_hold_deadline/)
+      assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
+    })
+  test('the budget-derived watchdog aborts pending UI work and rolls back', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] })
     const f = clientFactory()
     let entered
@@ -379,9 +445,15 @@ describe('browser watermark lock', () => {
           }),
       })
     )
-    const rejected = assert.rejects(run, /browser_watermark_hold_deadline/)
+    let settled = false
+    const rejected = assert
+      .rejects(run, /browser_watermark_hold_deadline/)
+      .finally(() => (settled = true))
     await ready
-    t.mock.timers.tick(12000)
+    t.mock.timers.tick(holdDeadlineMs - 1)
+    await new Promise(setImmediate)
+    assert.equal(settled, false)
+    t.mock.timers.tick(1)
     await rejected
     assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
   })
@@ -427,15 +499,12 @@ describe('community readiness', () => {
   test('community readiness requires genuine owned target resolution and subsequent cursor replay before lock acquisition', async () => {
     const f = communityReadiness()
     assert.equal(f.navigated(), 1)
-    // A full macrotask turn lets the helper's await chain settle, so a still-false
-    // ready() means it is waiting for the replay, not merely mid-chain.
-    const settle = () => new Promise(setImmediate)
     f.early()
     f.foreign()
-    await settle()
+    await Promise.resolve()
     assert.equal(f.ready(), false)
     f.initial()
-    await settle()
+    await Promise.resolve()
     assert.equal(f.ready(), false)
     f.replay()
     await f.promise
@@ -443,7 +512,6 @@ describe('community readiness', () => {
     assert.equal(f.page.listenerCount('request'), 0)
     assert.equal(f.page.listenerCount('response'), 0)
   })
-
   for (const options of [{ available: false }, { resyncRequired: true }])
     test(`community readiness rejects unverified target/replay ${JSON.stringify(options)}`, async () => {
       const f = communityReadiness(options)

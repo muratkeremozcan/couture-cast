@@ -9,6 +9,7 @@ import {
   assertBrowserWatermarkEvidence,
   closedBrowserWatermarkFailure,
 } from '../../scripts/lib/story68-browser-watermark.mjs'
+import { COMMUNITY_AUTHORIZATION_BUDGET_MS } from '../../apps/api/src/modules/community/community-authorization-budget'
 import { createClient, type Session } from '@supabase/supabase-js'
 import AxeBuilder from '@axe-core/playwright'
 import type {
@@ -361,6 +362,9 @@ async function rapidWatermarkDuringRealPreparation(
     )
     await withBrowserWatermarkLock({
       connectionString,
+      // Every source read the barrier blocks runs under this API budget, and the
+      // barrier's own deadline is a share of it.
+      authorizationBudgetMs: COMMUNITY_AUTHORIZATION_BUDGET_MS,
       createClient: (options) => new pg.Client(options),
       onPhase: phase,
       onCheck: check,
@@ -382,16 +386,18 @@ async function rapidWatermarkDuringRealPreparation(
         phase('blocked')
         await waitForBlocked()
         check('blockedSource', true)
+        // Keyboard toggles skip pointer actionability waits, which keeps the held
+        // window short on a slow browser.
         const checkbox = modal(page).getByRole('checkbox')
         phase('off')
         const off = page.waitForRequest((request) => isPreparation(request, false))
-        await checkbox.uncheck()
+        await checkbox.press('Space')
         await off
         live()
         check('watermarkOff', true)
         phase('on')
         const on = page.waitForRequest((request) => isPreparation(request, true))
-        await checkbox.check()
+        await checkbox.press('Space')
         await on
         live()
         check('watermarkOn', true)

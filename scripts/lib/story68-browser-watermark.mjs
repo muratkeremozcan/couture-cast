@@ -1,4 +1,15 @@
 const holdLimitMs = 12_000
+// Each LookbookPost read the barrier blocks starts after the barrier is taken and runs
+// inside the API's community authorization budget; a read still blocked when its budget
+// ends answers 503. Releasing within this share of the budget leaves every blocked read
+// the remaining quarter to finish its authorization.
+const budgetShareHeld = 0.75
+/** The longest the barrier may be held for a given API community authorization budget. */
+export function browserWatermarkHoldDeadlineMs(authorizationBudgetMs) {
+  if (!Number.isFinite(authorizationBudgetMs) || authorizationBudgetMs <= 0)
+    throw new Error('browser_watermark_authorization_budget_required')
+  return Math.min(holdLimitMs, Math.floor(authorizationBudgetMs * budgetShareHeld))
+}
 export const browserWatermarkPhases = [
   'profile-before',
   'connect',
@@ -123,18 +134,19 @@ function assertOperationCurrent(connectionFailure, signal, observed) {
   if (signal.aborted) throw signal.reason
   if (!observed) throw new Error('browser_watermark_source_not_blocked')
 }
-function finishHeldTime({ started, now, onHeld, result, failure }) {
+function finishHeldTime({ started, now, onHeld, result, failure, deadlineMs }) {
   if (started === undefined) return failure
   const heldMs = now() - started
   onHeld(heldMs)
   if (result) result.heldMs = heldMs
-  return heldMs >= holdLimitMs
+  return heldMs >= deadlineMs
     ? (failure ?? new Error('browser_watermark_hold_deadline'))
     : failure
 }
 /** Own only a loopback UUID database and one LookbookPost table barrier. */
 export async function withBrowserWatermarkLock({
   connectionString,
+  authorizationBudgetMs,
   createClient,
   whileLocked,
   onPhase,
@@ -142,6 +154,7 @@ export async function withBrowserWatermarkLock({
   onCheck,
   now = () => performance.now(),
 }) {
+  const deadlineMs = browserWatermarkHoldDeadlineMs(authorizationBudgetMs)
   const name = ownedDatabaseName(connectionString)
   const clients = [0, 1].map(() =>
     createClient({
@@ -213,7 +226,7 @@ export async function withBrowserWatermarkLock({
         const error = new Error('browser_watermark_hold_deadline')
         abort.abort(error)
         reject(error)
-      }, holdLimitMs)
+      }, deadlineMs)
     })
     watcher = observeBlocked({
       stopped: () => stopped,
@@ -247,7 +260,7 @@ export async function withBrowserWatermarkLock({
         failure ??= new Error('browser_watermark_cleanup_failed')
       }
     }
-    failure = finishHeldTime({ started, now, onHeld, result, failure })
+    failure = finishHeldTime({ started, now, onHeld, result, failure, deadlineMs })
     await Promise.allSettled([watcher, work])
     const ended = await Promise.allSettled(clients.map((client) => client.end()))
     failure ??= connectionFailure

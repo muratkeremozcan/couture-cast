@@ -2,8 +2,10 @@ export const browserWatermarkPhases: readonly string[]
 export const browserWatermarkChecks: readonly string[]
 export function assertBrowserWatermarkEvidence(value: unknown): void
 export function closedBrowserWatermarkFailure(error: unknown): string
+export function browserWatermarkHoldDeadlineMs(authorizationBudgetMs: number): number
 export function withBrowserWatermarkLock(input: {
   connectionString: string
+  authorizationBudgetMs: number
   createClient(options: {
     connectionString: string
     connectionTimeoutMillis: number
