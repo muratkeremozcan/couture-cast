@@ -81,6 +81,8 @@ class ShareCardComposerTalkBackTest {
     assertTrue("Actual TalkBack touch exploration required", manager.isEnabled && manager.isTouchExplorationEnabled)
     val services = manager.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
     assertTrue("TalkBack service must be bound", services.any { it.id.contains("com.google.android.marvin.talkback") })
+    // The real adapter writes "Saved to photos"; earlier harness steps may leave another mode.
+    fixture("real")
     waitFor("Story68 app active") { find("tab-home") != null || find("share-card-cancel") != null }
     if (find("share-card-cancel") != null) click("share-card-cancel")
     click("tab-home")
@@ -96,7 +98,9 @@ class ShareCardComposerTalkBackTest {
     assertTrue(find("share-card-save")!!.isClickable)
     click("share-card-save")
     waitFor("Saved status") { all().any { label(it) == "Saved to photos" } }
-    assertNotNull("Focus stays in active modal", automation.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY))
+    // Saved feedback returns TalkBack focus to Save, the same target iOS asserts.
+    waitFor("TalkBack focus on Save after saving") { find("share-card-save")?.isAccessibilityFocused == true }
+    assertTrue("Focused Save is in the active modal window", automation.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)?.let { hasId(it, "share-card-save") } == true)
     click("share-card-cancel")
     waitFor("Title dismissed") { find("share-card-title") == null }
     waitFor("TalkBack restored to opener") { find("outfit-share-card-open")?.isAccessibilityFocused == true }
