@@ -1035,10 +1035,49 @@ failure is inferred from its pending state.
   Upstream: okbob/plpgsql_check#197, the same error on a Supabase build with the library
   preloaded. CI's integration database is stock postgres:17-alpine with no preload, so CI never
   loads it.
-  - Mitigation: the three transactions that run `community_prepare_subject_privacy`
-    (`communityPrivacyTransaction`, `revokeConsent`, emancipation) retry exactly that SQLSTATE
-    and message within their existing three-attempt budget, with no backoff. The error rolls the
-    whole transaction back and every write in those callbacks runs on `tx`.
+  - Mitigation, first step (230c8b18): the three transactions that run
+    `community_prepare_subject_privacy` (`communityPrivacyTransaction`, `revokeConsent`,
+    emancipation) retried exactly that SQLSTATE and message within their three-attempt budget.
+  - Mitigation, central (the follow-up fix commit "retry the pldbgapi2 stack error at one
+    central layer"): `apps/api/src/prisma/prisma-client.ts` owns the retry for the whole API.
+    `isPldbgapi2StackError` matches XX000 plus the message in both Prisma forms: P2010 with
+    `meta.code` for raw queries, and `PrismaClientUnknownRequestError` carrying the engine's
+    `PostgresError { code: "XX000", ... }` for model writes. The 230c8b18 predicate saw only the
+    first form, so it missed every trigger-driven model write. `interactiveTransaction` re-runs a
+    whole transaction, 3 attempts in all, at once; `createPrismaClient` adds a query extension
+    that retries top-level operations with the same bound and passes operations inside an
+    interactive or batch transaction through once. `singleRunTransaction` runs once, for the
+    three callbacks with an effect a rollback cannot undo. A guard spec fails on any other
+    `$transaction` call or `new PrismaClient(` in `apps/api/src` and `apps/api/api`.
+  - Path table. "Nested call" names the PL/pgSQL call chain the path can run; "cannot hit"
+    means no nested PL/pgSQL call runs at runtime, so the retry is present but unreachable.
+
+    | Path | Tables or functions | Nested call | Retry |
+    | --- | --- | --- | --- |
+    | Erasure and community maintenance (`communityPrivacyTransaction`: purge, claim, sponsorship sweep, delete, raw `UPDATE "LookbookPost"`, account erase) | `community_prepare_subject_privacy`, `community_forget_subject`, LookbookPost, CommunityReaction, CommunityComment, PushToken, CommunityNotificationPreference | prepare calls `community_privacy_guards`; forget calls `community_require_guard` and writes PushToken and CommunityNotificationPreference, whose assert triggers call it again; post updates fire `community_post_invalidation`, which calls `community_record_invalidation` | `interactiveTransaction` inside the serialization loop |
+    | Guardian revocation and emancipation | GuardianConsent, LookbookPost, CommunityComment, CommunityReaction, prepare and forget | `community_privacy_assert_consent` calls `community_require_guard`; the invalidation chains above | `interactiveTransaction` inside the serialization loop |
+    | Guardian consent grant | User insert, GuardianConsent upsert | the upsert's update of a granted consent calls `community_require_guard` | `interactiveTransaction` |
+    | Account alert preferences | NotificationPreference | `community_privacy_assert_policy` calls `community_require_guard` on every insert and update | `interactiveTransaction` |
+    | Community notification preferences | CommunityNotificationPreference, NotificationPreference | same as above | `interactiveTransaction` |
+    | Reactions | CommunityReaction | `community_reaction_invalidation` calls `community_record_invalidation`, which updates LookbookPost; `community_reaction_generation` updates LookbookPost and fires its triggers | `interactiveTransaction` |
+    | Post create, publish, moderation and removal (repository, moderation processor and actions, comment processor) | LookbookPost | `community_post_invalidation` calls `community_record_invalidation` on publish or removal; `community_privacy_assert_post` calls `community_require_guard` on leaving published | `interactiveTransaction` |
+    | Comments: create, delete, screening outcome, report hide | CommunityComment | `community_comment_invalidation` calls `community_record_invalidation`; `community_privacy_assert_comment` calls `community_require_guard` | `interactiveTransaction` |
+    | Push token register, rebind, remove | PushToken | `community_privacy_assert_token` calls `community_require_guard` on update and delete | `interactiveTransaction` |
+    | Stale review sweep (`sweepStalePendingReview`, top-level `updateMany`) | LookbookPost | `pending_review` to `review_failed`: the triggers run, neither status is published, so nothing nested runs (cannot hit) | query extension |
+    | Garment erasure palette cleanup | PaletteInsights delete, FK `SET NULL` on LookbookPost | the post triggers test columns this update never changes (cannot hit) | `interactiveTransaction` |
+    | Signup and guardian account creation | User insert | `community_create_subject` writes CommunitySubject and CommunityStreamHead, which have no PL/pgSQL triggers (cannot hit) | `interactiveTransaction` |
+    | Direct `community_privacy_guards` calls (flag evaluation, share-card source, workers, preferences, push) | `community_privacy_guards` | takes advisory locks and calls no PL/pgSQL (cannot hit on its own) | the enclosing transaction's row |
+    | Send guard dispatch, comment analytics outbox, first-outfit telemetry | CommunityDeliveryAttempt, CommunityTokenDelivery, CommunityCommentAnalyticsOutbox, TelemetryEvent | no PL/pgSQL triggers on these tables; the guards call is single level (cannot hit) | `singleRunTransaction`: a provider send, analytics capture or out-of-transaction write precedes commit, so a re-run would repeat it |
+    | `community_post_reaction_invalidation` trigger | LookbookPost | assigns `NEW.reaction_generation` and runs no statement or function: a leaf that adds no nesting | the row of whichever path writes LookbookPost |
+    | Every other API transaction (wardrobe, capsules, commerce, weather, location, spotlight, stream, sync, targets, access, flags) | tables with no PL/pgSQL triggers beyond single-level guards | none (cannot hit) | `interactiveTransaction`, enforced by the guard spec |
+    | User delete | User | `community_privacy_assert_user` calls `community_require_guard` and `community_forget_subject` | no API path deletes a User row |
+    | Test fixtures and seeds (`packages/testing`, `packages/db` seeds, integration helpers) | various | can write the tables above | not API paths; they use plain clients by design |
+
+  - Callback audit for the re-run: billing transitions reset per attempt, the flag-evaluation
+    claim resets its insert marker, notification grouping counts only committed work, and the
+    authorization-budget transactions recompute `timeout` and `maxWait` per attempt. The stream
+    append updates an in-memory write-cost average before commit; it writes no nested-trigger
+    table, so no re-run reaches it.
   - Upgrade path: a plpgsql_check build that includes upstream commit 9ec1364 (fail fast on a
     broken function cache) or later, or the later pldbgapi3 rewrite, on every Supabase-hosted
     database this product uses.
