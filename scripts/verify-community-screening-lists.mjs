@@ -339,6 +339,8 @@ function splitPairListsValid(frame) {
     isPhraseList(frame.tails) &&
     isLetterWords(frame.reviewBefore) &&
     isLetterWords(frame.reviewForbidden) &&
+    isLetterWords(frame.reviewForbiddenNear) &&
+    isPhraseList(frame.reviewForbiddenPhrases) &&
     typeof frame.reason === 'string' &&
     frame.reason.length >= 20
   )
@@ -568,6 +570,8 @@ function buildAllowFile(language, allowState, hashes) {
         tails: entry.tails.map(toLiteral),
         reviewBefore: entry.reviewBefore.map(toLiteral),
         reviewForbidden: entry.reviewForbidden.map(toLiteral),
+        reviewForbiddenNear: entry.reviewForbiddenNear.map(toLiteral),
+        reviewForbiddenPhrases: entry.reviewForbiddenPhrases.map(toLiteral),
       })),
     scopedWords: (allowState.allow.scopedWords ?? [])
       .filter((entry) => entry.language === language)

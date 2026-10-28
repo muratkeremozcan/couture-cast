@@ -415,6 +415,12 @@ const allowFileSchema = z.object({
         // block when the word before it is one of these and no word of the text is forbidden.
         reviewBefore: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
         reviewForbidden: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+        // Violent verbs and hate nouns forbidden only within three words of the pair, and
+        // hate or removal phrases forbidden anywhere in the text.
+        reviewForbiddenNear: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+        reviewForbiddenPhrases: z
+          .array(z.string().regex(/^\p{L}+(?: \p{L}+)+$/u))
+          .default([]),
       })
     )
     .default([]),
@@ -730,6 +736,8 @@ interface SplitFrame {
   readonly tails: readonly (readonly string[])[]
   readonly reviewBefore: readonly string[]
   readonly reviewForbidden: readonly string[]
+  readonly reviewForbiddenNear: readonly string[]
+  readonly reviewForbiddenPhrases: readonly (readonly string[])[]
 }
 
 /** The longest text outside a reviewed split frame that the closed-phrase tiling will consider. */
@@ -772,6 +780,10 @@ function indexSplitFrames(
           tails: (frame.tails ?? []).map((phrase) => phrase.split(' ').map(folded)),
           reviewBefore: (frame.reviewBefore ?? []).map(folded),
           reviewForbidden: (frame.reviewForbidden ?? []).map(folded),
+          reviewForbiddenNear: (frame.reviewForbiddenNear ?? []).map(folded),
+          reviewForbiddenPhrases: (frame.reviewForbiddenPhrases ?? []).map((phrase) =>
+            phrase.split(' ').map(folded)
+          ),
         },
       ])
     }
@@ -1112,6 +1124,68 @@ function indexSingleTerm(
   indexRun(singleLeet, toLeetRunForm(term), meta)
 }
 
+/**
+ * Explicit plural and inflected spellings of a high-severity term, generated per language
+ * so that "wetbacks", "faggots" and "towelheads" meet the same term as the singular. The
+ * suffixes are listed, never stemmed: a form exists only when this table produces it.
+ * Final-vowel languages also swap the gender vowel. Forms are folded like the terms.
+ */
+const INFLECTION_SUFFIXES: Readonly<Record<ScreeningLanguage, readonly string[]>> = {
+  en: ['s', 'es'],
+  de: ['e', 'en', 'n', 's'],
+  es: ['s', 'es'],
+  pt: ['s', 'es'],
+  fr: ['s', 'e', 'es'],
+  it: [],
+  tr: [
+    'lar',
+    'ler',
+    'ı',
+    'i',
+    'u',
+    'ü',
+    'a',
+    'e',
+    'da',
+    'de',
+    'dan',
+    'den',
+    'ın',
+    'in',
+    'un',
+    'ün',
+    'ları',
+    'leri',
+  ],
+}
+
+/**
+ * Italian plurals replace the final vowel. Gender swaps are not generated: a swapped
+ * vowel spells ordinary words in the other six languages (bolero, zoccolo, fagoting).
+ */
+const ITALIAN_PLURALS: Readonly<Record<string, string>> = { o: 'i', a: 'e', e: 'i' }
+
+/** Verb forms of the reviewed violent terms, listed because a general verb suffix collides. */
+const VERB_FORMS: Readonly<
+  Partial<Record<ScreeningLanguage, Readonly<Record<string, readonly string[]>>>>
+> = {
+  en: { rape: ['raped', 'raping'] },
+}
+
+function inflectedForms(term: string, language: ScreeningLanguage): string[] {
+  const forms = new Set<string>(VERB_FORMS[language]?.[term] ?? [])
+  const last = term.at(-1) as string
+  for (const suffix of INFLECTION_SUFFIXES[language]) {
+    if (!(term.endsWith('e') && suffix.startsWith('e'))) forms.add(`${term}${suffix}`)
+  }
+  if (language === 'it' && ITALIAN_PLURALS[last])
+    forms.add(`${term.slice(0, -1)}${ITALIAN_PLURALS[last]}`)
+  if (language === 'it' && !'aeiou'.includes(last)) forms.add(`${term}i`)
+  if (language === 'en' && last === 'y') forms.add(`${term.slice(0, -1)}ies`)
+  forms.delete(term)
+  return [...forms].map((form) => toFoldedForm(toLiteralForm(form)))
+}
+
 function buildLanguageIndex(
   list: z.infer<typeof termsFileSchema>,
   policy: CommunityTextPolicy,
@@ -1172,6 +1246,22 @@ function buildLanguageIndex(
       throw new CommunityTextScreenerConfigError(
         `${list.language} has a single-word term under ${MIN_SINGLE_TERM_LENGTH} characters that is not a reviewed exception`
       )
+    }
+    if (entry.severity === 'high' && term.length >= MIN_SINGLE_TERM_LENGTH) {
+      // A derived form that collapses under the floor is skipped: only the reviewed root
+      // spelling may be guarded by an allow-list entry, never a generated one.
+      for (const form of inflectedForms(term, list.language).filter(
+        (candidate) => collapseRepeats(candidate).length >= MIN_SINGLE_TERM_LENGTH
+      ))
+        indexSingleTerm(
+          form,
+          meta,
+          list.language,
+          allowSingles,
+          single,
+          singleCollapsed,
+          singleLeet
+        )
     }
 
     indexSingleTerm(
@@ -1905,20 +1995,33 @@ export class CommunityTextScreener {
     return outcomes
   }
 
-  /** A reviewed ordinary pair, led by a listed ordinary word, in a text with no forbidden word. */
+  /**
+   * A reviewed ordinary pair, led by a listed ordinary word, in a text with no forbidden
+   * word, no violent or hate word within three words of the pair and no forbidden phrase.
+   */
   private isOrdinaryOpenSplit(foldedTokens: readonly string[], start: number): boolean {
     const frames = this.splitFrames.get(
       `${foldedTokens[start]} ${foldedTokens[start + 1]}`
     )
     if (!frames) return false
     const outside = [...foldedTokens.slice(0, start), ...foldedTokens.slice(start + 2)]
+    const near = [
+      ...foldedTokens.slice(Math.max(0, start - 3), start),
+      ...foldedTokens.slice(start + 2, start + 5),
+    ]
     return frames.some(
       (frame) =>
         (start === 0
           ? frame.atStart
           : frame.before.includes(foldedTokens[start - 1] as string) ||
             frame.reviewBefore.includes(foldedTokens[start - 1] as string)) &&
-        !outside.some((word) => frame.reviewForbidden.includes(word))
+        !outside.some((word) => frame.reviewForbidden.includes(word)) &&
+        !near.some((word) => frame.reviewForbiddenNear.includes(word)) &&
+        !frame.reviewForbiddenPhrases.some((phrase) =>
+          foldedTokens.some((_, at) =>
+            phrase.every((word, offset) => foldedTokens[at + offset] === word)
+          )
+        )
     )
   }
 

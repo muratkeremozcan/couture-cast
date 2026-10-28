@@ -559,6 +559,11 @@
       "entry": "lo fa",
       "language": "it",
       "reason": "Italian object pronoun plus third-person fare, meaning does it or makes it. Clear this exact complete contiguous phrase when reconstructing a joined candidate; raw lofa, letter-spaced forms and punctuation-separated fragments remain screened."
+    },
+    {
+      "entry": "negros",
+      "language": "es",
+      "reason": "The colour black, plural, in Spanish and Portuguese fashion copy (zapatos negros, vestidos negros). It is the generated plural of the French négro, whose singular negro is already allow-listed for the same reason; the French négro, nègre and the English slur still screen through the graded overlay."
     }
   ],
   "literalContexts": [
@@ -1227,6 +1232,11 @@
       "entry": "pede",
       "language": "pt",
       "reason": "Portuguese verb for asks, as in o tempo pede casaco. The exact token folds onto the French slur pédé, as do its split and spaced spellings. It clears only as the single exact token and only when the declared locale is Portuguese; 'pe de', 'p e d e', stretched spellings and every other locale keep screening. Residual: a client can declare pt, so the exact token passes there because it is the ordinary verb."
+    },
+    {
+      "entry": "pedes",
+      "language": "pt",
+      "reason": "Portuguese second person of pedir (tu pedes, you ask). The exact token folds onto the generated plural of the French slur pédé. It clears only as the single exact token and only when the declared locale is Portuguese; 'pe des', 'p e d e s', stretched spellings and every other locale keep screening."
     }
   ],
   "reviewedSplitPairs": [
@@ -1579,7 +1589,53 @@
         "verme",
         "tuer",
         "salaud",
-        "connard"
+        "connard",
+        "exterminate",
+        "deport",
+        "deported",
+        "lynched"
+      ],
+      "reviewForbiddenNear": [
+        "hang",
+        "gas",
+        "burn",
+        "shoot",
+        "lynch",
+        "stab",
+        "bomb",
+        "hurt",
+        "beat",
+        "deport",
+        "deported",
+        "exterminate",
+        "kill",
+        "murder",
+        "attack",
+        "punch",
+        "rape",
+        "ban",
+        "send",
+        "expel"
+      ],
+      "reviewForbiddenPhrases": [
+        "go home",
+        "send back",
+        "need to leave",
+        "needs to leave",
+        "have to leave",
+        "get rid of",
+        "round up",
+        "throw out",
+        "what a",
+        "those people",
+        "these people",
+        "should die",
+        "must go",
+        "you pin people",
+        "you pin folks",
+        "you pin men",
+        "you pin women",
+        "you pin kids"
       ]
     },
     {
@@ -1876,7 +1932,53 @@
         "verme",
         "tuer",
         "salaud",
-        "connard"
+        "connard",
+        "exterminate",
+        "deport",
+        "deported",
+        "lynched"
+      ],
+      "reviewForbiddenNear": [
+        "hang",
+        "gas",
+        "burn",
+        "shoot",
+        "lynch",
+        "stab",
+        "bomb",
+        "hurt",
+        "beat",
+        "deport",
+        "deported",
+        "exterminate",
+        "kill",
+        "murder",
+        "attack",
+        "punch",
+        "rape",
+        "ban",
+        "send",
+        "expel"
+      ],
+      "reviewForbiddenPhrases": [
+        "go home",
+        "send back",
+        "need to leave",
+        "needs to leave",
+        "have to leave",
+        "get rid of",
+        "round up",
+        "throw out",
+        "what a",
+        "those people",
+        "these people",
+        "should die",
+        "must go",
+        "sub normal people",
+        "sub normal folks",
+        "sub normal men",
+        "sub normal women",
+        "sub normal kids"
       ]
     },
     {
@@ -2170,7 +2272,53 @@
         "verme",
         "tuer",
         "salaud",
-        "connard"
+        "connard",
+        "exterminate",
+        "deport",
+        "deported",
+        "lynched"
+      ],
+      "reviewForbiddenNear": [
+        "hang",
+        "gas",
+        "burn",
+        "shoot",
+        "lynch",
+        "stab",
+        "bomb",
+        "hurt",
+        "beat",
+        "deport",
+        "deported",
+        "exterminate",
+        "kill",
+        "murder",
+        "attack",
+        "punch",
+        "rape",
+        "ban",
+        "send",
+        "expel"
+      ],
+      "reviewForbiddenPhrases": [
+        "go home",
+        "send back",
+        "need to leave",
+        "needs to leave",
+        "have to leave",
+        "get rid of",
+        "round up",
+        "throw out",
+        "what a",
+        "those people",
+        "these people",
+        "should die",
+        "must go",
+        "wet back people",
+        "wet back folks",
+        "wet back men",
+        "wet back women",
+        "wet back kids"
       ]
     },
     {
@@ -2460,7 +2608,53 @@
         "verme",
         "tuer",
         "salaud",
-        "connard"
+        "connard",
+        "exterminate",
+        "deport",
+        "deported",
+        "lynched"
+      ],
+      "reviewForbiddenNear": [
+        "hang",
+        "gas",
+        "burn",
+        "shoot",
+        "lynch",
+        "stab",
+        "bomb",
+        "hurt",
+        "beat",
+        "deport",
+        "deported",
+        "exterminate",
+        "kill",
+        "murder",
+        "attack",
+        "punch",
+        "rape",
+        "ban",
+        "send",
+        "expel"
+      ],
+      "reviewForbiddenPhrases": [
+        "go home",
+        "send back",
+        "need to leave",
+        "needs to leave",
+        "have to leave",
+        "get rid of",
+        "round up",
+        "throw out",
+        "what a",
+        "those people",
+        "these people",
+        "should die",
+        "must go",
+        "towel head people",
+        "towel head folks",
+        "towel head men",
+        "towel head women",
+        "towel head kids"
       ]
     }
   ]

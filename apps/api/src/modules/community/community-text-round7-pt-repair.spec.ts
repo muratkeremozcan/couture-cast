@@ -903,9 +903,124 @@ describe('round 7e ordinary pairs with an open frame route to review, not a hard
   })
 
   it('still withholds, as review, a reviewed pair with an open tail', () => {
-    for (const text of ['towel head wrap go home', 'wet back panel go home'])
+    for (const text of [
+      'towel head wrap stitched in the shop',
+      'wet back panel zipped by the shop',
+    ])
       for (const locale of everyLocale)
         expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('review')
+  })
+})
+
+describe('round 7g violent and hate sentences with the ordinary pairs always block', () => {
+  const templates = [
+    'hang the X',
+    'gas the X',
+    'burn the X',
+    'shoot the X',
+    'lynch the X',
+    'stab the X',
+    'bomb the X',
+    'hurt the X',
+    'beat the X',
+    'deport the X',
+    'exterminate the X',
+    'kill the X',
+    'the X are vermin',
+    'those X people need to leave',
+    'what a X',
+    'X go home',
+    'send the X back',
+    'X scum',
+    'all X are scum',
+    'get rid of the X',
+    'the X need to leave',
+    'throw out the X',
+    'I hate the X',
+    'X people',
+    'the X should die',
+    'round up the X',
+    'ban the X',
+  ]
+  const pairs = ['you pin', 'sub normal', 'wet back', 'towel head']
+  const sentences = pairs.flatMap((pair) =>
+    templates.map((template) => template.replaceAll('X', pair))
+  )
+  it('has 108 sentences', () => expect(sentences).toHaveLength(108))
+  it.each(sentences)('blocks %s in every locale', (text) => {
+    for (const locale of everyLocale)
+      expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('block')
+  })
+})
+
+describe('round 7g plural and inflected hate forms meet the term, in every locale', () => {
+  const hate = [
+    'all towelheads are vermin',
+    'deport the wetbacks',
+    'no wetbacks allowed here',
+    'all faggots are vermin',
+    'all towel heads are vermin',
+    'all nig gers are vermin',
+    'the niggers and the kikes',
+    'chinks gooks spics',
+    'nazis everywhere',
+    'he raped her and they were raping',
+    'sluts and whores',
+    'cunts',
+    'Huren und Schlampen',
+    'alle Kanaken',
+    'les pédés',
+    'les nazis',
+    'los maricones y los nazis',
+    'las putas',
+    'os nazistas e as vadias',
+    'le puttane e i froci',
+    'gavurlar',
+    'gavurları',
+  ]
+  it.each(hate)('withholds %s', (text) => {
+    for (const locale of everyLocale)
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('blocks the coordinator plural sentences', () => {
+    for (const text of [
+      'all towelheads are vermin',
+      'deport the wetbacks',
+      'no wetbacks allowed here',
+      'all faggots are vermin',
+      'all towel heads are vermin',
+      'all nig gers are vermin',
+    ])
+      for (const locale of everyLocale)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('block')
+  })
+
+  const fashion = [
+    'dresses skirts blouses jackets coats scarves shirts jeans shoes boots socks hats caps gloves belts bags sandals sneakers heels pumps loafers leggings shorts suits ties vests cardigans sweaters hoodies tees tanks bras briefs trunks swimsuits bikinis ponchos capes kimonos boleros clogs mules slippers wedges platforms stilettos espadrilles fedoras berets beanies bandanas turbans veils shawls stoles wraps brooches pins buttons zippers buckles beads sequins ribbons laces bows ruffles pleats darts hems seams cuffs collars sleeves pockets linings patterns stitches threads needles spiced fagoting retarding bolero',
+    'robes jupes chemises vestes manteaux écharpes chaussures bottes chaussettes chapeaux gants ceintures sacs sandales baskets talons bonnets pulls gilets cravates maillots pantalons boutons rubans dentelles plis ourlets coutures manches poches doublures patrons points aiguilles pédales',
+    'vestidos faldas camisas chaquetas abrigos bufandas zapatos botas calcetines sombreros guantes cinturones bolsos sandalias zapatillas tacones gorros jerseys chalecos corbatas bañadores pantalones botones cintas encajes pliegues dobladillos costuras mangas bolsillos forros patrones puntadas agujas',
+    'vestiti gonne camicie giacche cappotti sciarpe scarpe stivali calzini cappelli guanti cinture borse sandali scarpe tacchi berretti maglioni gilet cravatte costumi pantaloni bottoni nastri pizzi pieghe orli cuciture maniche tasche fodere cartamodelli punti aghi',
+    'vestidos saias camisas jaquetas casacos cachecóis sapatos botas meias chapéus luvas cintos bolsas sandálias tênis saltos gorros suéteres coletes gravatas biquínis calças botões fitas rendas pregas barras costuras mangas bolsos forros moldes pontos agulhas',
+    'Kleider Röcke Blusen Jacken Mäntel Schals Schuhe Stiefel Socken Hüte Handschuhe Gürtel Taschen Sandalen Absätze Mützen Pullover Westen Krawatten Badeanzüge Hosen Knöpfe Bänder Spitzen Falten Säume Nähte Ärmel Taschen Futter Schnittmuster Stiche Nadeln',
+    'elbiseler etekler gömlekler ceketler paltolar atkılar ayakkabılar botlar çoraplar şapkalar eldivenler kemerler çantalar sandaletler topuklar bereler kazaklar yelekler kravatlar pantolonlar düğmeler kurdeleler dantelller pileler etekler dikişler kollar cepler astarlar kalıplar iğneler',
+  ]
+  it('keeps the Spanish and Portuguese colour plural and the Portuguese verb clean', () => {
+    for (const locale of everyLocale) {
+      expect(screen('Zapatos negros y vestidos negros', locale).disposition).toBe('pass')
+      expect(screen('Sapatos negros e meias negras', locale).disposition).toBe('pass')
+    }
+    expect(screen('Tu pedes casaco quando faz frio', 'pt-BR').disposition).toBe('pass')
+    expect(screen('les pédés', 'fr-FR').disposition).not.toBe('pass')
+  })
+
+  it('keeps ordinary fashion plurals clean in every locale', () => {
+    for (const group of fashion)
+      for (const word of group.split(' ')) {
+        for (const locale of everyLocale)
+          expect(screen(word, locale).disposition, `${locale} ${word}`).toBe('pass')
+        expect(screen(`New ${word} for sale`, 'en-US').disposition, word).toBe('pass')
+      }
   })
 })
 

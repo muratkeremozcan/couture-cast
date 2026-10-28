@@ -12,7 +12,7 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "1f4ee9b97d304c40c3c479cc2b1a6fbad24895d6463f850530922525a4b0aa48",
+    "allowListSha256": "fe484df449dd945468914731a10e8c811fc9d448609d29feedac7cd7354588cc",
     "reviewedOccurrenceSha256": "4f6e5195949d202f99e7c7026b2a4833774455b0c22bd9edf6fcb78093ef4971"
   },
   "entries": [
