@@ -349,6 +349,8 @@ describe('round 7b floor play, posture, fit and print copy', () => {
       'pinto',
       'o pinto',
       'pinto!',
+      'tap ete',
+      'Tap ete macio',
     ])
       for (const locale of ['pt-BR', 'fr-FR', 'en-US', 'es-ES', null])
         expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
@@ -363,5 +365,83 @@ describe('round 7b floor play, posture, fit and print copy', () => {
       'pinto à mão filho da puta',
     ])
       expect(screen(text, 'pt-BR').disposition, text).not.toBe('pass')
+  })
+})
+
+describe('round 7b pinto and bumbum never launder sexual use', () => {
+  // Independent reviewer and coordinator lists, with and without accents, as written.
+  const sexual = [
+    'minha mao no meu pinto',
+    'tira a mao do meu pinto',
+    'pinto na calca',
+    'pinto no jeans dela',
+    'empina o bumbum pra mim',
+    'pega no bumbum na calca jeans',
+    'meu pinto na mão',
+    'seu pinto na calça',
+    'tire o pinto da calça',
+    'mostrei meu pinto na camisa',
+    'quero ver teu bumbum no biquíni',
+    'bumbum na calcinha',
+    'minha mão no meu pinto',
+    'tira a mão do meu pinto',
+    'pinto na calça',
+    'pinto no jeans dela',
+    'empina o bumbum pra mim',
+    'pega no bumbum na calça jeans',
+    'tire pinto a camisa',
+    'meu pinto a parede',
+    'o pinto a parede',
+    'calcinha que valoriza o bumbum',
+    'biquíni que valoriza o bumbum',
+    'sunga valoriza o bumbum',
+    'cueca que levanta o bumbum',
+    'maiô que destaca o bumbum',
+    'teu bumbum',
+    'quero o bumbum',
+  ]
+  it.each(sexual)('keeps %s withheld in pt-BR, pt-PT and elsewhere', (text) => {
+    for (const locale of ['pt-BR', 'pt-PT', 'fr-FR', 'en-US', 'es-ES', null])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('clears pinto only as the verb and bumbum only in garment-led fit frames', () => {
+    for (const text of [
+      'Eu pinto à mão cada peça da coleção.',
+      'Pinto a parede do ateliê de azul.',
+      'Todo dia eu pinto as unhas de rosa.',
+      'Jeans de cintura alta que valoriza o bumbum.',
+      'Short de linho com bolsos no bumbum.',
+      'Legging que modela o bumbum sem marcar.',
+    ])
+      for (const locale of ['pt-BR', 'pt-PT'])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+    // pinto is cleared by grammar alone, as its four development rows require in every
+    // locale; bumbum still needs a declared Portuguese locale.
+    expect(screen('Eu pinto à mão cada peça da coleção.', 'en-US').disposition).toBe(
+      'pass'
+    )
+    for (const locale of ['fr-FR', 'en-US', 'es-ES', null])
+      expect(screen('Jeans que valoriza o bumbum.', locale).disposition).not.toBe('pass')
+  })
+})
+
+describe('round 7b a high-severity term cut in two whole words', () => {
+  it('withholds tap ete and other two-way cuts with both parts of three letters or more', () => {
+    for (const text of [
+      'tap ete',
+      'nazi sta',
+      'estu pro',
+      'mari cas',
+      'tra veco',
+      'boq uete',
+    ])
+      for (const locale of everyLocale)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('leaves ordinary pairs with a function word alone', () => {
+    for (const text of ['A via do rio é linda', 'Pela via do bordado', 'Bi cha', 'Mai ô'])
+      expect(screen(text).disposition, text).toBe('pass')
   })
 })

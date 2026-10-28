@@ -309,6 +309,13 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
               .optional(),
             // A phrase listed here needs these declared languages instead of the rule's
             // own, so one target can be wider in one language than in another.
+            // The phrase clears only when it starts the text or a sentence
+            // (sentenceInitial) or directly follows one of these words.
+            precedingWords: z
+              .array(z.string().regex(/^\p{L}+$/u))
+              .min(1)
+              .optional(),
+            sentenceInitial: z.boolean().optional(),
             phraseRequiredDeclaredLanguages: z
               .record(z.string(), z.array(z.enum(SCREENING_LANGUAGES)).min(1))
               .optional(),
@@ -676,6 +683,81 @@ function indexScopedPhrases(
   return scoped
 }
 
+/** The position a verb-led construction may start at: a sentence start or after a listed word. */
+function occurrenceLookbehind(
+  precedingWords: readonly string[] | undefined,
+  sentenceInitial: boolean
+): string {
+  const alternatives = [
+    ...(sentenceInitial ? ['(?<=^\\s*)', '(?<=[.!?;:\\n]\\s*)'] : []),
+    ...(precedingWords?.length
+      ? [`(?<=(?<![\\p{L}\\p{N}])(?:${precedingWords.join('|')}) +)`]
+      : []),
+  ]
+  return alternatives.length ? `(?:${alternatives.join('|')})` : ''
+}
+
+/**
+ * One alternation per target and scope instead of one pattern per phrase: a bank with
+ * a thousand phrases would otherwise run a thousand scans on every screened text.
+ */
+function compileOccurrenceConstructions(
+  phrases: ReturnType<typeof reviewedOccurrencePhrases>
+): {
+  target: string
+  pattern: RegExp
+  requiredDeclaredLanguages?: readonly ScreeningLanguage[]
+  rejectedPrefixFrames: readonly string[]
+}[] {
+  const groups = new Map<
+    string,
+    {
+      target: string
+      requiredDeclaredLanguages?: readonly ScreeningLanguage[]
+      rejectedPrefixFrames: readonly string[]
+      precedingWords?: readonly string[]
+      sentenceInitial: boolean
+      phrases: string[]
+    }
+  >()
+  for (const entry of phrases) {
+    const rejectedPrefixFrames = (entry.rejectedPrefixFrames ?? []).map((frame) =>
+      toLeetClassForm(toFoldedForm(toLiteralForm(frame))).replaceAll(' ', '')
+    )
+    const key = JSON.stringify([
+      entry.target,
+      entry.requiredDeclaredLanguages ?? null,
+      rejectedPrefixFrames,
+      entry.precedingWords ?? null,
+      entry.sentenceInitial ?? false,
+    ])
+    const group = groups.get(key) ?? {
+      target: entry.target,
+      requiredDeclaredLanguages: entry.requiredDeclaredLanguages,
+      rejectedPrefixFrames,
+      precedingWords: entry.precedingWords,
+      sentenceInitial: entry.sentenceInitial ?? false,
+      phrases: [],
+    }
+    group.phrases.push(entry.phrase)
+    groups.set(key, group)
+  }
+  return [...groups.values()].map((group) => ({
+    target: group.target,
+    requiredDeclaredLanguages: group.requiredDeclaredLanguages,
+    rejectedPrefixFrames: group.rejectedPrefixFrames,
+    pattern: new RegExp(
+      `${occurrenceLookbehind(group.precedingWords, group.sentenceInitial)}(?<![\\p{L}\\p{N}])(?:${[
+        ...group.phrases,
+      ]
+        .sort((left, right) => right.length - left.length)
+        .map((phrase) => phrase.replaceAll(' ', ' +'))
+        .join('|')})(?![\\p{L}\\p{N}])`,
+      'gu'
+    ),
+  }))
+}
+
 function reviewedOccurrencePhrases(
   lists: readonly {
     language: ScreeningLanguage
@@ -686,12 +768,16 @@ function reviewedOccurrencePhrases(
   phrase: string
   requiredDeclaredLanguages?: readonly ScreeningLanguage[]
   rejectedPrefixFrames?: readonly string[]
+  precedingWords?: readonly string[]
+  sentenceInitial?: boolean
 }[] {
   const phrases: {
     target: string
     phrase: string
     requiredDeclaredLanguages?: readonly ScreeningLanguage[]
     rejectedPrefixFrames?: readonly string[]
+    precedingWords?: readonly string[]
+    sentenceInitial?: boolean
   }[] = []
   const targets = new Set<string>()
   for (const list of lists) {
@@ -716,6 +802,8 @@ function reviewedOccurrencePhrases(
             reviewed.phraseRequiredDeclaredLanguages?.[phrase] ??
             reviewed.requiredDeclaredLanguages,
           rejectedPrefixFrames: reviewed.rejectedPrefixFrames,
+          precedingWords: reviewed.precedingWords,
+          sentenceInitial: reviewed.sentenceInitial,
         }))
       )
     }
@@ -1100,7 +1188,6 @@ export class CommunityTextScreener {
     language: ScreeningLanguage
   })[]
   private readonly occurrenceConstructions: readonly {
-    words: readonly string[]
     target: string
     pattern: RegExp
     requiredDeclaredLanguages?: readonly ScreeningLanguage[]
@@ -1209,19 +1296,8 @@ export class CommunityTextScreener {
         language: list.language,
       }))
     )
-    this.occurrenceConstructions = reviewedOccurrencePhrases(allowLists).map(
-      ({ target, phrase, requiredDeclaredLanguages, rejectedPrefixFrames }) => ({
-        target,
-        requiredDeclaredLanguages,
-        rejectedPrefixFrames: (rejectedPrefixFrames ?? []).map((frame) =>
-          toLeetClassForm(toFoldedForm(toLiteralForm(frame))).replaceAll(' ', '')
-        ),
-        words: phrase.split(' '),
-        pattern: new RegExp(
-          `(?<![\\p{L}\\p{N}])${phrase.replaceAll(' ', ' +')}(?![\\p{L}\\p{N}])`,
-          'gu'
-        ),
-      })
+    this.occurrenceConstructions = compileOccurrenceConstructions(
+      reviewedOccurrencePhrases(allowLists)
     )
 
     this.indexes = termLists.map((list) =>
@@ -1516,10 +1592,10 @@ export class CommunityTextScreener {
           if (frame.length > 32) break
         }
         if (rejected) continue
+        const words = match[0].split(/ +/)
         const at = tokenize(toLiteralForm(prefix)).length
-        if (!construction.words.every((word, index) => tokens[at + index] === word))
-          continue
-        allowed[at + construction.words.indexOf(construction.target)] = true
+        if (!words.every((word, index) => tokens[at + index] === word)) continue
+        allowed[at + words.indexOf(construction.target)] = true
       }
     }
   }
@@ -1564,6 +1640,7 @@ export class CommunityTextScreener {
     outcomes.push(
       ...this.collectResplitPhraseMatches(foldedTokens, phraseAllowed, literalTokens)
     )
+    outcomes.push(...this.collectSplitHighTermMatches(foldedTokens, allowed))
 
     for (const candidate of this.buildJoinCandidates(literal, literalTokens, budget)) {
       const outcome = this.matchCandidate(
@@ -1610,6 +1687,36 @@ export class CommunityTextScreener {
           if (hit !== null) outcomes.push({ meta: phrase.meta, obfuscated: hit })
         }
       }
+    }
+    return outcomes
+  }
+
+  /**
+   * A high-severity single-word term cut in two ("tap ete") rejoins to the term. Two
+   * ordinary words that happen to spell a single-word term stay unflagged for lower
+   * severities, which is why the single-term passes never rejoin whole tokens; the
+   * hate, violence and self-harm tier is the exception, because a cut there is the
+   * cheapest disguise and the same two-way cut of a medium term only routes to review.
+   */
+  private collectSplitHighTermMatches(
+    foldedTokens: readonly string[],
+    allowed: readonly boolean[]
+  ): MatchOutcome[] {
+    const outcomes: MatchOutcome[] = []
+    for (let start = 0; start + 1 < foldedTokens.length; start += 1) {
+      if (allowed[start] || allowed[start + 1]) continue
+      // A one- or two-letter word is a function word in most of the seven languages
+      // ("via do", "a borto"), so only two whole words of three letters or more rejoin.
+      if (
+        (foldedTokens[start] as string).length <= JOINABLE_TOKEN_LENGTH ||
+        (foldedTokens[start + 1] as string).length <= JOINABLE_TOKEN_LENGTH
+      )
+        continue
+      const joined = (foldedTokens[start] as string) + (foldedTokens[start + 1] as string)
+      if (joined.length < MIN_SINGLE_TERM_LENGTH) continue
+      if (collapseRepeats(joined).length > this.longestTerm) continue
+      const meta = this.worstAcross((index) => matchRun(index.singleCollapsed, joined))
+      if (meta?.severity === 'high') outcomes.push({ meta, obfuscated: true })
     }
     return outcomes
   }

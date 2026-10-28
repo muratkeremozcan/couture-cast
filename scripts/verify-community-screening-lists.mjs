@@ -56,7 +56,9 @@ function sameBankScope(rule, reviewed) {
   return (
     same('requiredDeclaredLanguages', []) &&
     same('rejectedPrefixFrames', []) &&
-    same('phraseRequiredDeclaredLanguages', {})
+    same('phraseRequiredDeclaredLanguages', {}) &&
+    same('precedingWords', []) &&
+    same('sentenceInitial', false)
   )
 }
 
