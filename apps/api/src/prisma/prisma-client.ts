@@ -80,9 +80,13 @@ export function interactiveTransaction<T>(
 
 /**
  * Runs once, for a callback that does something before commit that a rollback cannot
- * undo: a provider send, an analytics capture, a write on another connection. Each
- * caller writes no table whose triggers run nested PL/pgSQL, so the pldbgapi2 abort
- * cannot reach it; the guard spec pins the callers.
+ * undo: a provider send, an analytics capture, a write on another connection. The
+ * callers write no table whose triggers run nested PL/pgSQL, but the send guard calls
+ * community_privacy_guards, so a pldbgapi2 abort can still reach one. It reaches the
+ * caller unretried, and each caller settles it: the send guard records an abort before
+ * the provider call as deferred and one after it as handoff_uncertain, the comment
+ * outbox leaves the row to redeliver after its lease, and first-outfit telemetry logs
+ * it. The guard spec pins the callers.
  */
 export function singleRunTransaction<T>(
   prisma: Transactor,

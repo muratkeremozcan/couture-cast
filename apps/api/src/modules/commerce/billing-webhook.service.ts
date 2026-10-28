@@ -607,9 +607,9 @@ export class BillingWebhookService {
 
     let transition: EntitlementTransition | null = null
     try {
+      // `plan` and `userId` are fixed before the transaction, so every attempt either
+      // assigns `transition` or never touches it.
       await interactiveTransaction(this.prisma, async (tx) => {
-        // A re-run after a rolled-back attempt reports only what it commits.
-        transition = null
         await tx.billingEvent.create({
           data: {
             provider: 'revenuecat',
@@ -666,12 +666,14 @@ export class BillingWebhookService {
 
     let lossTransition: EntitlementTransition | null = null
     let gainTransition: EntitlementTransition | null = null
+    let gainSkipped = false
 
     try {
       await interactiveTransaction(this.prisma, async (tx) => {
         // A re-run after a rolled-back attempt reports only what it commits.
         lossTransition = null
         gainTransition = null
+        gainSkipped = false
         await tx.billingEvent.create({
           data: {
             provider: 'revenuecat',
@@ -721,10 +723,7 @@ export class BillingWebhookService {
               provider: 'revenuecat',
             })
           } else {
-            this.logger.warn(
-              { eventId: event.id },
-              'TRANSFER gain skipped: no store/product/period derivable from the event or the losing row'
-            )
+            gainSkipped = true
           }
         }
       })
@@ -735,6 +734,11 @@ export class BillingWebhookService {
       throw error
     }
 
+    if (gainSkipped)
+      this.logger.warn(
+        { eventId: event.id },
+        'TRANSFER gain skipped: no store/product/period derivable from the event or the losing row'
+      )
     if (losingUserId !== null && lossTransition !== null) {
       // TRANSFER-loss carries reason 'transferred', not 'revoked' (AC 6).
       await this.subscriptions.emitTransition(losingUserId, lossTransition, 'transferred')

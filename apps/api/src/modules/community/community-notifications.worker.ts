@@ -236,15 +236,16 @@ export class CommunityNotificationsWorker {
     })
     let count = 0
     for (const candidate of groups) {
-      let group = candidate
-      if (!group.recipient_id || !group.post_id) continue
+      if (!candidate.recipient_id || !candidate.post_id) continue
       const links = await this.prisma.communityArtifactSubject.findMany({
-        where: { artifact_kind: 'group', artifact_id: group.id },
+        where: { artifact_kind: 'group', artifact_id: candidate.id },
       })
       if (!links.length) continue
       count += await interactiveTransaction(
         this.prisma,
         async (tx) => {
+          // Each attempt starts from the listed row; a re-read belongs to its attempt.
+          let group = candidate
           // Deliveries count only once this transaction commits.
           let created = 0
           await tx.$executeRaw(
