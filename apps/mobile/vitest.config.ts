@@ -3,14 +3,15 @@ import path from 'node:path'
 import { defineConfig } from 'vitest/config'
 import { playwright } from '@vitest/browser-playwright' // eslint-disable-line import/no-unresolved
 
+const resolveFromMobile = createRequire(path.join(__dirname, 'package.json')).resolve
+/** A package's directory, located through its exported package.json. */
+const packageDirectory = (name: string) =>
+  path.dirname(resolveFromMobile(`${name}/package.json`))
+
 // expo-constants keeps its web module out of its exports map, so it is located from the
 // package's own exported package.json; vitest.expo-env.setup.ts registers it.
 const expoConstantsWebModule = path.join(
-  path.dirname(
-    createRequire(path.join(__dirname, 'package.json')).resolve(
-      'expo-constants/package.json'
-    )
-  ),
+  packageDirectory('expo-constants'),
   'build/ExponentConstants.web.js'
 )
 
@@ -134,11 +135,13 @@ export default defineConfig({
       },
       {
         find: /^react$/,
-        replacement: path.resolve(__dirname, '../../node_modules/react'),
+        // One React for the app, the renderer and the testing libraries; see
+        // src/lib/react-single-instance.spec.tsx.
+        replacement: packageDirectory('react'),
       },
       {
         find: /^react-dom$/,
-        replacement: path.resolve(__dirname, '../../node_modules/react-dom'),
+        replacement: packageDirectory('react-dom'),
       },
       {
         find: /^@couture\/api-client\/contracts\/http$/,
