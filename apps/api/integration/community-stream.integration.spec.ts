@@ -470,6 +470,21 @@ describe('Story 6.5 committed stream append', () => {
           return step.count ? Math.min(25, limit + 2) : limit
         }, 25)
         expect(reports.map((report) => report.limit)).toEqual(limits)
+        // Every prepared row is written unless the 400 ms completion budget trims the
+        // batch, and then exactly the rows that fit at the measured per-row write cost.
+        expect(
+          reports.flatMap((report, index) =>
+            report.count === report.selected &&
+            ((report.selectedReason === 'all' && report.selected === report.ready) ||
+              (report.selectedReason === 'budget' &&
+                report.selected < report.ready &&
+                report.selected ===
+                  Math.max(1, Math.floor(report.remainingMs / report.writeCostMs))))
+              ? []
+              : [{ batch: index + 1, ...report }]
+          ),
+          'batches that wrote fewer rows than they prepared without a budget trim'
+        ).toEqual([])
         // A batch ends only when its preparation window closes or its ready limit
         // fills; only the batch that drains the backlog may end for running out.
         expect(
@@ -515,7 +530,7 @@ describe('Story 6.5 committed stream append', () => {
             steps: steps.map((step) =>
               step === 'budget_pressure'
                 ? step
-                : `${step.count}/${step.limit} ${step.stop} ${Math.round(step.preparedMs)}ms`
+                : `${step.count}/${step.ready}/${step.limit} ${step.stop} ${Math.round(step.preparedMs)}ms ${step.selectedReason}`
             ),
             telemetry,
           })
