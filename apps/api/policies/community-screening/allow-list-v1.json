@@ -1229,398 +1229,163 @@
       "reason": "Portuguese verb for asks, as in o tempo pede casaco. The exact token folds onto the French slur pédé, as do its split and spaced spellings. It clears only as the single exact token and only when the declared locale is Portuguese; 'pe de', 'p e d e', stretched spellings and every other locale keep screening. Residual: a client can declare pt, so the exact token passes there because it is the ordinary verb."
     }
   ],
-  "ordinarySplitWords": [
-    {
-      "entry": "are",
-      "language": "en"
-    },
-    {
-      "entry": "ate",
-      "language": "en"
-    },
-    {
-      "entry": "back",
-      "language": "en"
-    },
-    {
-      "entry": "bang",
-      "language": "en"
-    },
-    {
-      "entry": "blow",
-      "language": "en"
-    },
-    {
-      "entry": "boll",
-      "language": "en"
-    },
-    {
-      "entry": "chin",
-      "language": "en"
-    },
-    {
-      "entry": "chine",
-      "language": "en"
-    },
-    {
-      "entry": "cum",
-      "language": "en"
-    },
-    {
-      "entry": "cums",
-      "language": "en"
-    },
-    {
-      "entry": "date",
-      "language": "en"
-    },
-    {
-      "entry": "deep",
-      "language": "en"
-    },
-    {
-      "entry": "dan",
-      "language": "en"
-    },
-    {
-      "entry": "fag",
-      "language": "en"
-    },
-    {
-      "entry": "gang",
-      "language": "en"
-    },
-    {
-      "entry": "got",
-      "language": "en"
-    },
-    {
-      "entry": "hand",
-      "language": "en"
-    },
-    {
-      "entry": "head",
-      "language": "en"
-    },
-    {
-      "entry": "her",
-      "language": "en"
-    },
-    {
-      "entry": "hot",
-      "language": "en"
-    },
-    {
-      "entry": "icon",
-      "language": "en"
-    },
-    {
-      "entry": "job",
-      "language": "en"
-    },
-    {
-      "entry": "lee",
-      "language": "en"
-    },
-    {
-      "entry": "mar",
-      "language": "en"
-    },
-    {
-      "entry": "mat",
-      "language": "en"
-    },
-    {
-      "entry": "normal",
-      "language": "en"
-    },
-    {
-      "entry": "one",
-      "language": "en"
-    },
-    {
-      "entry": "pan",
-      "language": "en"
-    },
-    {
-      "entry": "pin",
-      "language": "en"
-    },
-    {
-      "entry": "pom",
-      "language": "en"
-    },
-    {
-      "entry": "pomp",
-      "language": "en"
-    },
-    {
-      "entry": "pro",
-      "language": "en"
-    },
-    {
-      "entry": "put",
-      "language": "en"
-    },
-    {
-      "entry": "putt",
-      "language": "en"
-    },
-    {
-      "entry": "rare",
-      "language": "en"
-    },
-    {
-      "entry": "rim",
-      "language": "en"
-    },
-    {
-      "entry": "shot",
-      "language": "en"
-    },
-    {
-      "entry": "shots",
-      "language": "en"
-    },
-    {
-      "entry": "sub",
-      "language": "en"
-    },
-    {
-      "entry": "tan",
-      "language": "en"
-    },
-    {
-      "entry": "tape",
-      "language": "en"
-    },
-    {
-      "entry": "throat",
-      "language": "en"
-    },
-    {
-      "entry": "tone",
-      "language": "en"
-    },
-    {
-      "entry": "toque",
-      "language": "en"
-    },
-    {
-      "entry": "towel",
-      "language": "en"
-    },
-    {
-      "entry": "wet",
-      "language": "en"
-    },
-    {
-      "entry": "you",
-      "language": "en"
-    },
-    {
-      "entry": "zig",
-      "language": "en"
-    },
-    {
-      "entry": "zing",
-      "language": "en"
-    },
-    {
-      "entry": "aca",
-      "language": "es"
-    },
-    {
-      "entry": "ana",
-      "language": "es"
-    },
-    {
-      "entry": "aro",
-      "language": "es"
-    },
-    {
-      "entry": "bol",
-      "language": "es"
-    },
-    {
-      "entry": "con",
-      "language": "es"
-    },
-    {
-      "entry": "dado",
-      "language": "es"
-    },
-    {
-      "entry": "den",
-      "language": "es"
-    },
-    {
-      "entry": "era",
-      "language": "es"
-    },
-    {
-      "entry": "las",
-      "language": "es"
-    },
-    {
-      "entry": "mal",
-      "language": "es"
-    },
-    {
-      "entry": "mon",
-      "language": "es"
-    },
-    {
-      "entry": "oro",
-      "language": "es"
-    },
-    {
-      "entry": "pino",
-      "language": "es"
-    },
-    {
-      "entry": "rata",
-      "language": "es"
-    },
-    {
-      "entry": "sal",
-      "language": "es"
-    },
-    {
-      "entry": "sur",
-      "language": "es"
-    },
-    {
-      "entry": "ver",
-      "language": "es"
-    },
-    {
-      "entry": "reta",
-      "language": "es"
-    },
-    {
-      "entry": "que",
-      "language": "es"
-    },
-    {
-      "entry": "tel",
-      "language": "es"
-    },
-    {
-      "entry": "ali",
-      "language": "pt"
-    },
-    {
-      "entry": "ata",
-      "language": "pt"
-    },
-    {
-      "entry": "bunda",
-      "language": "pt"
-    },
-    {
-      "entry": "cola",
-      "language": "pt"
-    },
-    {
-      "entry": "ler",
-      "language": "pt"
-    },
-    {
-      "entry": "rende",
-      "language": "pt"
-    },
-    {
-      "entry": "ola",
-      "language": "pt"
-    },
-    {
-      "entry": "cher",
-      "language": "fr"
-    },
-    {
-      "entry": "est",
-      "language": "fr"
-    },
-    {
-      "entry": "leur",
-      "language": "fr"
-    },
-    {
-      "entry": "leurs",
-      "language": "fr"
-    },
-    {
-      "entry": "ter",
-      "language": "fr"
-    },
-    {
-      "entry": "verre",
-      "language": "fr"
-    },
-    {
-      "entry": "pane",
-      "language": "it"
-    },
-    {
-      "entry": "panel",
-      "language": "it"
-    },
-    {
-      "entry": "sta",
-      "language": "it"
-    },
-    {
-      "entry": "sui",
-      "language": "it"
-    },
-    {
-      "entry": "tana",
-      "language": "it"
-    },
-    {
-      "entry": "tra",
-      "language": "it"
-    },
-    {
-      "entry": "ende",
-      "language": "de"
-    },
-    {
-      "entry": "gebe",
-      "language": "de"
-    },
-    {
-      "entry": "kalt",
-      "language": "de"
-    },
-    {
-      "entry": "lampe",
-      "language": "de"
-    },
-    {
-      "entry": "nun",
-      "language": "de"
-    },
-    {
-      "entry": "unter",
-      "language": "de"
-    },
-    {
-      "entry": "unterm",
-      "language": "de"
-    },
-    {
-      "entry": "kan",
-      "language": "tr"
-    },
-    {
-      "entry": "kal",
-      "language": "tr"
-    },
-    {
-      "entry": "icona",
-      "language": "it"
+  "reviewedSplitPairs": [
+    {
+      "entry": "you pin",
+      "language": "en",
+      "atStart": true,
+      "before": [
+        "first",
+        "then",
+        "next",
+        "now",
+        "how",
+        "when",
+        "if",
+        "before",
+        "after",
+        "once",
+        "so",
+        "and",
+        "here",
+        "where",
+        "that",
+        "while",
+        "until",
+        "as",
+        "because",
+        "finally",
+        "also"
+      ],
+      "after": [
+        "the pattern",
+        "the pattern pieces",
+        "the paper pattern",
+        "the hem",
+        "the hem up",
+        "the seam",
+        "the seams",
+        "the fabric",
+        "the lining",
+        "the sleeve",
+        "the cuffs",
+        "the pleats",
+        "the darts",
+        "the pieces",
+        "the layers",
+        "the brooch",
+        "the badge",
+        "the corsage",
+        "the scarf",
+        "the veil",
+        "your pattern",
+        "your hem",
+        "your fabric",
+        "your scarf",
+        "your brooch",
+        "each pleat"
+      ],
+      "reason": "Reviewed fashion and sewing copy: the ordinary English verb phrase \"you pin\" before a sewing or accessory object. The cut of the French slur youpin passes only in this closed frame (listed word or text start before, listed object after); every bare or slur-leading use stays blocked."
+    },
+    {
+      "entry": "sub normal",
+      "language": "en",
+      "atStart": true,
+      "before": [
+        "a",
+        "an",
+        "the",
+        "in",
+        "with",
+        "for",
+        "of",
+        "at",
+        "during",
+        "under",
+        "any",
+        "some",
+        "and",
+        "or",
+        "by",
+        "from",
+        "on",
+        "amid",
+        "to",
+        "about",
+        "despite"
+      ],
+      "after": [
+        "temperature",
+        "temperatures",
+        "temps",
+        "temp",
+        "weather",
+        "conditions",
+        "climate",
+        "humidity",
+        "rainfall",
+        "winter",
+        "winters",
+        "readings",
+        "heat",
+        "cold"
+      ],
+      "reason": "Reviewed weather copy: \"sub normal\" before a temperature or weather word. The cut of the Spanish and Portuguese slur subnormal passes only in this closed frame; bare and person-directed uses stay blocked."
+    },
+    {
+      "entry": "wet back",
+      "language": "en",
+      "atStart": true,
+      "before": ["the", "a", "this", "our", "your", "its"],
+      "after": [
+        "lining",
+        "panel",
+        "coating",
+        "layer",
+        "seam",
+        "fabric",
+        "of the jacket",
+        "of the coat",
+        "of the shirt",
+        "of the dress",
+        "of the raincoat",
+        "of the poncho",
+        "of the cape",
+        "of the garment",
+        "of the parka",
+        "of the vest"
+      ],
+      "reason": "Reviewed garment care copy: the back of a wet garment or its coating. The cut of the English slur passes only in this closed garment frame (listed determiner before, lining, panel or a garment after); bare and slur-leading uses stay blocked."
+    },
+    {
+      "entry": "towel head",
+      "language": "en",
+      "atStart": true,
+      "before": [
+        "a",
+        "the",
+        "our",
+        "this",
+        "your",
+        "soft",
+        "cotton",
+        "terry",
+        "microfiber",
+        "hair",
+        "quick",
+        "dry"
+      ],
+      "after": [
+        "wrap",
+        "wraps",
+        "drying",
+        "drying wrap",
+        "drying cap",
+        "band",
+        "cap",
+        "cover"
+      ],
+      "reason": "Reviewed hair care copy: a towel head wrap or drying cap. The cut of the English slur passes only in this closed garment frame (listed article or fabric word before, wrap, drying, band, cap or cover after); bare and slur-leading uses stay blocked."
     }
   ]
 }

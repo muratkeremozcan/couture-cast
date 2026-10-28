@@ -60,7 +60,7 @@ function sameBankScope(rule, reviewed) {
     same('precedingWords', []) &&
     same('sentenceInitial', false) &&
     same('closedTails', []) &&
-    same('sentenceForbidden', [])
+    same('textForbidden', [])
   )
 }
 
@@ -309,6 +309,30 @@ function scopedWordProblems(scopedWords) {
   })
 }
 
+function splitPairProblems(pairs) {
+  const wordsOnly = (words) =>
+    Array.isArray(words) && words.every((word) => /^\p{L}+$/u.test(toLiteral(word)))
+  return pairs.flatMap((frame) => {
+    const literal = toLiteral(frame.entry ?? '')
+    const valid =
+      LANGUAGES.includes(frame.language) &&
+      tokenize(literal).length === 2 &&
+      typeof frame.atStart === 'boolean' &&
+      wordsOnly(frame.before) &&
+      (frame.atStart || frame.before.length > 0) &&
+      Array.isArray(frame.after) &&
+      frame.after.length > 0 &&
+      frame.after.every((phrase) => tokenize(toLiteral(phrase)).length > 0) &&
+      typeof frame.reason === 'string' &&
+      frame.reason.length >= 20
+    return valid
+      ? []
+      : [
+          `reviewed split pair "${frame.entry}" needs a language, two words, a bounded before, a closed after and a reason`,
+        ]
+  })
+}
+
 function scopedPhraseProblems(scopedPhrases) {
   const problems = []
   for (const scoped of scopedPhrases) {
@@ -328,6 +352,14 @@ function scopedPhraseProblems(scopedPhrases) {
       problems.push('reviewed occurrence target cannot be globally allow-listed')
   }
   return problems
+}
+
+function scopedAndSplitProblems(allow) {
+  return [
+    ...scopedPhraseProblems(allow.scopedPhrases ?? []),
+    ...scopedWordProblems(allow.scopedWords ?? []),
+    ...splitPairProblems(allow.reviewedSplitPairs ?? []),
+  ]
 }
 
 function loadAllowList() {
@@ -359,8 +391,7 @@ function loadAllowList() {
       )
     )
   )
-  problems.push(...scopedPhraseProblems(allow.scopedPhrases ?? []))
-  problems.push(...scopedWordProblems(allow.scopedWords ?? []))
+  problems.push(...scopedAndSplitProblems(allow))
   if ('occurrenceConstructions' in allow)
     problems.push('reviewed constructions must use the authoritative bank')
   problems.push(...occurrenceConstructionProblems(REVIEWED_OCCURRENCE_CONSTRUCTIONS))
@@ -505,9 +536,14 @@ function buildAllowFile(language, allowState, hashes) {
       .filter((entry) => entry.language === language)
       .map((entry) => toLiteral(entry.entry))
       .toSorted(),
-    ordinaryWords: (allowState.allow.ordinarySplitWords ?? [])
+    splitFrames: (allowState.allow.reviewedSplitPairs ?? [])
       .filter((entry) => entry.language === language)
-      .map((entry) => toLiteral(entry.entry)),
+      .map((entry) => ({
+        pair: toLiteral(entry.entry),
+        atStart: entry.atStart,
+        before: entry.before.map(toLiteral),
+        after: entry.after.map(toLiteral),
+      })),
     scopedWords: (allowState.allow.scopedWords ?? [])
       .filter((entry) => entry.language === language)
       .map((entry) => toLiteral(entry.entry)),

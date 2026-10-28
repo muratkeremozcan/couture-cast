@@ -450,11 +450,91 @@ describe('round 7b leering tails never ride on a fit or painting frame', () => {
       expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
   })
 
+  const separators = [
+    '. ',
+    '.\n',
+    '... ',
+    '… ',
+    '! ',
+    '? ',
+    '; ',
+    ', ',
+    ': ',
+    '\n\n',
+    ' - ',
+    ' ) ',
+  ]
+  const heads = [
+    'calça que valoriza o bumbum',
+    'legging que levanta o bumbum',
+    'Pinto a mão',
+  ]
+  const tails = [
+    'dela nu',
+    'de criança',
+    'da minha filha',
+    'pra mim',
+    'chupa',
+    'gostosa',
+    'de menina',
+    'bebê',
+    'nua',
+    'sexy',
+    'novinha',
+    'safada',
+    'delícia',
+    'rabuda',
+    'gostosinha',
+    'lamber',
+    'sarrar',
+    'menininha',
+    'garotinha',
+    'garota de 12 anos',
+    'meninas',
+    'filhas',
+    'bebês',
+    'tire a calça',
+    'quero ver',
+  ]
+  it('withholds a fit or painting frame followed by anything outside the closed tails', () => {
+    for (const locale of ['pt-BR', 'pt-PT'])
+      for (const head of heads)
+        for (const separator of separators)
+          for (const tail of tails)
+            expect(
+              screen(`${head}${separator}${tail}`, locale).disposition,
+              `${locale} ${JSON.stringify(`${head}${separator}${tail}`)}`
+            ).not.toBe('pass')
+  })
+
+  it('withholds a forbidden word placed before the frame, across any sentence or line break', () => {
+    for (const locale of ['pt-BR', 'pt-PT'])
+      for (const head of heads)
+        for (const separator of separators)
+          for (const lead of tails.slice(0, 22))
+            expect(
+              screen(`${lead}${separator}${head}`, locale).disposition,
+              `${locale} ${JSON.stringify(`${lead}${separator}${head}`)}`
+            ).not.toBe('pass')
+  })
+
+  it('catches a forbidden word cut apart or stretched', () => {
+    for (const text of [
+      'crian ça. calça que valoriza o bumbum',
+      'c r i a n ç a\ncalça que valoriza o bumbum',
+      'meniiina. legging que levanta o bumbum',
+      'calça que valoriza o bumbum. de gost0sa',
+    ])
+      expect(screen(text, 'pt-BR').disposition, text).not.toBe('pass')
+  })
+
   it('still clears the bounded fit and painting copy, with closed tails', () => {
     for (const text of [
       'Jeans de cintura alta que valoriza o bumbum.',
       'Legging que modela o bumbum sem marcar.',
       'Calça que valoriza o bumbum com conforto e as coxas também.',
+      'Calça que valoriza o bumbum.\nSem marcar. O dia todo!',
+      'Legging que levanta o bumbum, com conforto…',
       'Short com bolsos no bumbum',
       'Pinto as botas de azul para renovar o conjunto.',
       'Pinto o tecido com tinta azul.',
@@ -476,7 +556,9 @@ describe('round 7b fashion and sewing copy never trips the whole-word cut rule',
     'A towel head wrap keeps hair dry after a swim.',
     'Sub-normal temperatures in winter call for a lined coat.',
     'Pin tuck blouse with a cum laude print on the cuff.',
-    'Hand embroidered mar icon patch on the sleeve.',
+    'Hand embroidered anchor patch on the sleeve.',
+    'Here is how you pin the brooch on a lapel.',
+    'Cotton towel head wrap for drying hair.',
     // Portuguese
     'Prenda o molde com alfinetes e alinhave a bainha antes de costurar.',
     'Primeiro você prende a barra e depois costura.',
@@ -501,15 +583,18 @@ describe('round 7b fashion and sewing copy never trips the whole-word cut rule',
       expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
   })
 
-  it('keeps two ordinary words from different languages clean and cuts with a non-word half withheld', () => {
+  it('withholds every cut of a hate or sexual term, ordinary-word halves included', () => {
     for (const text of [
       'you pin',
       'wet back',
       'towel head',
       'sub normal',
+      'sub-normal',
       'mar icon',
       'mar icona',
+      'mari con',
       'cum shot',
+      'cum shots',
       'fag got',
       'boll era',
       'put tana',
@@ -517,9 +602,11 @@ describe('round 7b fashion and sewing copy never trips the whole-word cut rule',
       'pom pino',
       'zing aro',
       'chine toque',
-    ])
-      expect(screen(text, null).disposition, text).toBe('pass')
-    for (const text of [
+      'stupid towel head',
+      'go home wet back',
+      'you are a fag got',
+      'sale you pin',
+      'espece de you pin',
       'tap ete',
       'nazi sta',
       'estu pro',
@@ -529,6 +616,49 @@ describe('round 7b fashion and sewing copy never trips the whole-word cut rule',
       'fro cio',
       'sal ope',
       'kan ake',
+    ])
+      for (const locale of everyLocale)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('clears a reviewed fashion pair only inside its enumerated frame', () => {
+    for (const text of [
+      'You pin the pattern to the fabric before you cut.',
+      'First you pin the hem then you sew it.',
+      'Then you pin your scarf here.',
+      'A sub normal temperature calls for a lined coat.',
+      'Sub-normal weather in winter.',
+      'Wipe the wet back of the jacket with a soft cloth.',
+      'The wet back lining dries fast.',
+      'A towel head wrap keeps hair dry after a swim.',
+      'Soft terry towel head drying cap.',
+    ])
+      for (const locale of everyLocale)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+
+  it('keeps slur-leading and unlisted frames of the reviewed pairs withheld', () => {
+    for (const text of [
+      'stupid towel head wrap',
+      'stupid you pin the hem',
+      'sale you pin the pattern',
+      'espece de you pin the hem',
+      'go home wet back lining',
+      'stupid sub normal weather',
+      'you pin the jews',
+      'you pin',
+      'you pin.',
+      'then you pin',
+      'the towel head',
+      'towel head turban',
+      'a sub normal kid',
+      'a sub normal',
+      'the wet back',
+      'the wet back of the neighbour',
+      'wet back worker',
+      'You pin the pattern. You pin',
+      'then you pin the hem. sale you pin',
+      'then you pin the hem sale youu pin',
     ])
       for (const locale of everyLocale)
         expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')

@@ -316,14 +316,15 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
               .min(1)
               .optional(),
             sentenceInitial: z.boolean().optional(),
-            // Right bound: after the phrase the text must end, reach clause punctuation, or
-            // continue only with these closed fit-copy tails and then end or punctuate.
+            // Right bound: after the phrase the whole remainder of the text must be these
+            // closed tails separated by spaces and punctuation, then the end of the text.
             closedTails: z
               .array(z.string().regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u))
               .min(1)
               .optional(),
-            // The construction does not clear when its sentence holds any of these words.
-            sentenceForbidden: z
+            // The construction does not clear when the whole field text holds any of these
+            // words, whichever sentence or line they sit in.
+            textForbidden: z
               .array(z.string().regex(/^\p{L}+$/u))
               .min(1)
               .optional(),
@@ -390,7 +391,19 @@ const allowFileSchema = z.object({
   // language AND the next word is one of the enumerated complements. They reach the
   // short-token rejoin pass, which literal contexts cannot.
   scopedWords: z.array(z.string().trim().min(1)).default([]),
-  ordinaryWords: z.array(z.string().trim().min(1)).default([]),
+  // Reviewed two-word cuts of a high-severity term that stay clean, but only inside the
+  // enumerated frame: the word before the pair (or the text start) and the closed phrase
+  // after it must both be listed. Everything else about a cut keeps the high-severity block.
+  splitFrames: z
+    .array(
+      z.object({
+        pair: z.string().regex(/^\p{L}+ \p{L}+$/u),
+        atStart: z.boolean(),
+        before: z.array(z.string().regex(/^\p{L}+$/u)),
+        after: z.array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u)).min(1),
+      })
+    )
+    .default([]),
   scopedPhrases: z
     .array(
       z.object({
@@ -695,14 +708,46 @@ function indexScopedPhrases(
   return scoped
 }
 
-/** The right bound: the phrase, then closed tails, must be followed by the end or clause punctuation. */
+interface SplitFrame {
+  readonly atStart: boolean
+  readonly before: readonly string[]
+  readonly after: readonly (readonly string[])[]
+}
+
+/** The reviewed split-pair frames of every language, keyed by the folded pair "you pin". */
+function indexSplitFrames(
+  lists: readonly { splitFrames?: z.infer<typeof allowFileSchema>['splitFrames'] }[]
+): ReadonlyMap<string, readonly SplitFrame[]> {
+  const folded = (word: string): string => toFoldedForm(toLiteralForm(word))
+  const frames = new Map<string, SplitFrame[]>()
+  for (const list of lists) {
+    for (const frame of list.splitFrames ?? []) {
+      const key = frame.pair.split(' ').map(folded).join(' ')
+      frames.set(key, [
+        ...(frames.get(key) ?? []),
+        {
+          atStart: frame.atStart,
+          before: frame.before.map(folded),
+          after: frame.after.map((phrase) => phrase.split(' ').map(folded)),
+        },
+      ])
+    }
+  }
+  return frames
+}
+
+/**
+ * The right bound: after the phrase, every remaining character of the text is a closed
+ * tail or a separator. A period, ellipsis or line break ends no clause for this check,
+ * so nothing unlisted can follow the clearance.
+ */
 function occurrenceLookahead(closedTails: readonly string[] | undefined): string {
   if (!closedTails?.length) return ''
   const tails = [...closedTails]
     .sort((left, right) => right.length - left.length)
     .map((tail) => tail.replaceAll(' ', ' +'))
     .join('|')
-  return `(?=(?: +(?:${tails}))*[ \\t]*(?:$|[.,;:!?\\n)]))`
+  return `(?=(?:[\\s,.;:!?…()]*(?:${tails})(?![\\p{L}\\p{N}]))*[\\s,.;:!?…()]*$)`
 }
 
 /** The position a verb-led construction may start at: a sentence start or after a listed word. */
@@ -730,7 +775,7 @@ function compileOccurrenceConstructions(
   pattern: RegExp
   requiredDeclaredLanguages?: readonly ScreeningLanguage[]
   rejectedPrefixFrames: readonly string[]
-  sentenceForbidden: readonly string[]
+  textForbidden: readonly string[]
 }[] {
   const groups = new Map<
     string,
@@ -741,7 +786,7 @@ function compileOccurrenceConstructions(
       precedingWords?: readonly string[]
       sentenceInitial: boolean
       closedTails?: readonly string[]
-      sentenceForbidden?: readonly string[]
+      textForbidden?: readonly string[]
       phrases: string[]
     }
   >()
@@ -756,7 +801,7 @@ function compileOccurrenceConstructions(
       entry.precedingWords ?? null,
       entry.sentenceInitial ?? false,
       entry.closedTails ?? null,
-      entry.sentenceForbidden ?? null,
+      entry.textForbidden ?? null,
     ])
     const group = groups.get(key) ?? {
       target: entry.target,
@@ -765,7 +810,7 @@ function compileOccurrenceConstructions(
       precedingWords: entry.precedingWords,
       sentenceInitial: entry.sentenceInitial ?? false,
       closedTails: entry.closedTails,
-      sentenceForbidden: entry.sentenceForbidden,
+      textForbidden: entry.textForbidden,
       phrases: [],
     }
     group.phrases.push(entry.phrase)
@@ -775,7 +820,7 @@ function compileOccurrenceConstructions(
     target: group.target,
     requiredDeclaredLanguages: group.requiredDeclaredLanguages,
     rejectedPrefixFrames: group.rejectedPrefixFrames,
-    sentenceForbidden: (group.sentenceForbidden ?? []).map((word) =>
+    textForbidden: (group.textForbidden ?? []).map((word) =>
       collapseRepeats(toLeetClassForm(toFoldedForm(toLiteralForm(word))))
     ),
     pattern: new RegExp(
@@ -803,7 +848,7 @@ function reviewedOccurrencePhrases(
   precedingWords?: readonly string[]
   sentenceInitial?: boolean
   closedTails?: readonly string[]
-  sentenceForbidden?: readonly string[]
+  textForbidden?: readonly string[]
 }[] {
   const phrases: {
     target: string
@@ -813,7 +858,7 @@ function reviewedOccurrencePhrases(
     precedingWords?: readonly string[]
     sentenceInitial?: boolean
     closedTails?: readonly string[]
-    sentenceForbidden?: readonly string[]
+    textForbidden?: readonly string[]
   }[] = []
   const targets = new Set<string>()
   for (const list of lists) {
@@ -841,7 +886,7 @@ function reviewedOccurrencePhrases(
           precedingWords: reviewed.precedingWords,
           sentenceInitial: reviewed.sentenceInitial,
           closedTails: reviewed.closedTails,
-          sentenceForbidden: reviewed.sentenceForbidden,
+          textForbidden: reviewed.textForbidden,
         }))
       )
     }
@@ -1219,7 +1264,7 @@ export class CommunityTextScreener {
   >
   /** The scoped phrases of the language the current screen() call declared. */
   private activeScopedPhrases: readonly ScopedPhrase[] = []
-  private readonly ordinarySplitWords: ReadonlySet<string>
+  private readonly splitFrames: ReadonlyMap<string, readonly SplitFrame[]>
   private readonly scopedAllowWords: ReadonlyMap<ScreeningLanguage, ReadonlySet<string>>
   /** Exact tokens cleared for the language the current screen() call declared. */
   private activeScopedWords: ReadonlySet<string> = new Set()
@@ -1231,7 +1276,7 @@ export class CommunityTextScreener {
     pattern: RegExp
     requiredDeclaredLanguages?: readonly ScreeningLanguage[]
     rejectedPrefixFrames: readonly string[]
-    sentenceForbidden: readonly string[]
+    textForbidden: readonly string[]
   }[]
   private readonly listVersions: Readonly<Record<string, string>>
   private readonly loadedLanguages: readonly ScreeningLanguage[]
@@ -1309,11 +1354,7 @@ export class CommunityTextScreener {
     this.allowSingles = allowSingles
     this.allowPhrases = allowPhrases
     this.scopedAllowPhrases = indexScopedPhrases(allowLists)
-    this.ordinarySplitWords = new Set(
-      allowLists.flatMap((list) =>
-        (list.ordinaryWords ?? []).map((word) => toFoldedForm(toLiteralForm(word)))
-      )
-    )
+    this.splitFrames = indexSplitFrames(allowLists)
     this.scopedAllowWords = new Map(
       allowLists.map((list) => [
         list.language,
@@ -1607,27 +1648,17 @@ export class CommunityTextScreener {
     }
   }
 
-  /** Whether the sentence around a match holds one of the forbidden words, in any spelling the folds merge. */
-  private sentenceHoldsForbidden(
-    exact: string,
-    at: number,
-    forbidden: readonly string[]
-  ): boolean {
-    const before = exact.slice(0, at)
-    const start = Math.max(
-      before.lastIndexOf('.'),
-      before.lastIndexOf('!'),
-      before.lastIndexOf('?'),
-      before.lastIndexOf(';'),
-      before.lastIndexOf('\n')
-    )
-    const rest = exact.slice(at)
-    const ends = [...rest.matchAll(/[.!?;\n]/g)].map((hit) => hit.index)
-    const end = ends.length > 0 ? at + (ends[0] as number) : exact.length
-    const sentence = exact.slice(start + 1, end)
-    return tokenize(toFoldedForm(toLiteralForm(sentence))).some((word) =>
-      forbidden.includes(collapseRepeats(toLeetClassForm(word)))
-    )
+  /**
+   * Whether the whole field text holds one of the forbidden words, in any spelling the
+   * folds merge, also when letters are spaced or separated ("crian ça"). Words of five
+   * letters or more are looked for in the text with every separator removed.
+   */
+  private textHoldsForbidden(exact: string, forbidden: readonly string[]): boolean {
+    const words = tokenize(toFoldedForm(toLiteralForm(exact)))
+    if (words.some((word) => forbidden.includes(collapseRepeats(toLeetClassForm(word)))))
+      return true
+    const squashed = collapseRepeats(toLeetClassForm(words.join('')))
+    return forbidden.some((word) => word.length >= 5 && squashed.includes(word))
   }
 
   private markOccurrenceConstructions(
@@ -1661,8 +1692,8 @@ export class CommunityTextScreener {
         }
         if (rejected) continue
         if (
-          construction.sentenceForbidden.length > 0 &&
-          this.sentenceHoldsForbidden(exact, match.index, construction.sentenceForbidden)
+          construction.textForbidden.length > 0 &&
+          this.textHoldsForbidden(exact, construction.textForbidden)
         )
           continue
         const words = match[0].split(/ +/)
@@ -1713,7 +1744,9 @@ export class CommunityTextScreener {
     outcomes.push(
       ...this.collectResplitPhraseMatches(foldedTokens, phraseAllowed, literalTokens)
     )
-    outcomes.push(...this.collectSplitHighTermMatches(foldedTokens, allowed))
+    outcomes.push(
+      ...this.collectSplitHighTermMatches(foldedTokens, literalTokens, allowed)
+    )
 
     for (const candidate of this.buildJoinCandidates(literal, literalTokens, budget)) {
       const outcome = this.matchCandidate(
@@ -1773,21 +1806,26 @@ export class CommunityTextScreener {
    */
   private collectSplitHighTermMatches(
     foldedTokens: readonly string[],
+    literalTokens: readonly string[],
     allowed: readonly boolean[]
   ): MatchOutcome[] {
     const outcomes: MatchOutcome[] = []
+    // An ordinary word the lists clear as a term on its own ("con") must not shield a
+    // cut of a high-severity term ("mari con"); only phrase and construction clearances do.
+    const cleared = (position: number): boolean =>
+      (allowed[position] as boolean) &&
+      !this.allowSingles.has(literalTokens[position] as string)
     for (let start = 0; start + 1 < foldedTokens.length; start += 1) {
-      if (allowed[start] || allowed[start + 1]) continue
+      if (cleared(start) || cleared(start + 1)) continue
       // A one- or two-letter word is a function word in most of the seven languages
       // ("via do", "a borto"), so only two whole words of three letters or more rejoin.
       const left = foldedTokens[start] as string
       const right = foldedTokens[start + 1] as string
       if (left.length <= JOINABLE_TOKEN_LENGTH || right.length <= JOINABLE_TOKEN_LENGTH)
         continue
-      // Two ordinary words ("wet back", "you pin") keep the parent behaviour; only a cut
-      // with at least one half that is no ordinary word in any shipped language rejoins.
-      if (this.ordinarySplitWords.has(left) && this.ordinarySplitWords.has(right))
-        continue
+      // A cut of a hate or sexual term never passes on its own. Only a reviewed fashion
+      // pair inside its enumerated frame ("then you pin the hem") is left alone.
+      if (this.inReviewedSplitFrame(foldedTokens, start)) continue
       const joined = (foldedTokens[start] as string) + (foldedTokens[start + 1] as string)
       if (joined.length < MIN_SINGLE_TERM_LENGTH) continue
       if (collapseRepeats(joined).length > this.longestTerm) continue
@@ -1795,6 +1833,22 @@ export class CommunityTextScreener {
       if (meta?.severity === 'high') outcomes.push({ meta, obfuscated: true })
     }
     return outcomes
+  }
+
+  /** Whether the pair at `start` sits inside a reviewed frame: listed word before, closed phrase after. */
+  private inReviewedSplitFrame(foldedTokens: readonly string[], start: number): boolean {
+    const frames = this.splitFrames.get(
+      `${foldedTokens[start]} ${foldedTokens[start + 1]}`
+    )
+    if (!frames) return false
+    const before = start === 0 ? null : (foldedTokens[start - 1] as string)
+    return frames.some(
+      (frame) =>
+        (before === null ? frame.atStart : frame.before.includes(before)) &&
+        frame.after.some((phrase) =>
+          phrase.every((word, offset) => foldedTokens[start + 2 + offset] === word)
+        )
+    )
   }
 
   /**
