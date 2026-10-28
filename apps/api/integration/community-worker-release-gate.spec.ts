@@ -144,6 +144,13 @@ interface LauncherModule {
   IMAGE_DATABASE_CA: string
   SHUTDOWN_DEADLINE_MS: number
   HOST_GRACE_PERIOD_MS: number
+  DRILL_ENV: Record<string, string>
+  drillStartAndShutdown: (env?: Record<string, string | undefined>) => Promise<{
+    started: boolean
+    exitCode: number | null
+    signal: string | null
+    shutdowns: number
+  }>
 }
 interface SignModule {
   signingRefusal: (context: {
@@ -227,6 +234,25 @@ describe('community worker image', () => {
       /RUN COMMUNITY_NSFW_SCREENER=tensorflow node .*--self-test/
     )
   })
+
+  it('drills the CMD start and shutdown in the build-time self-test, reaching no service', async () => {
+    const { DRILL_ENV, drillStartAndShutdown } = await load<LauncherModule>(
+      'scripts/start-community-worker-production.mjs'
+    )
+    for (const key of ['REDIS_URL', 'DATABASE_URL', 'SUPABASE_URL'])
+      expect(new URL(DRILL_ENV[key]!).hostname).toBe('127.0.0.1')
+    // The degraded selector stands in for the model here; the image runs it with
+    // the real one.
+    await expect(
+      drillStartAndShutdown({
+        PATH: process.env.PATH,
+        NODE_ENV: 'production',
+        COMMUNITY_NSFW_SCREENER: 'unavailable',
+        COMMUNITY_NSFW_INCIDENT_MODE: 'unavailable',
+        COMMUNITY_NSFW_INCIDENT_REFERENCE: 'release-gate-drill',
+      })
+    ).resolves.toEqual({ started: true, exitCode: 0, signal: null, shutdowns: 1 })
+  }, 60_000)
 
   it('bakes no screener selector into the image', () => {
     const envLines = dockerfile

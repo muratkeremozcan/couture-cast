@@ -21,11 +21,14 @@
  * sandbox envelope does not have to spend twice.
  *
  * `--self-test` loads the real model from the installed tree, screens a generated
- * image, validates the text lists, prints the identity, and exits. The Docker
+ * image, validates the text lists, prints the identity, then drills the container
+ * CMD: it runs this launcher as a child exactly as the CMD does, waits for the
+ * started line, sends SIGTERM and requires one shutdown and exit 0. The Docker
  * build runs it against the pruned dependency tree, so a dependency the prune
- * trace missed fails the build rather than the first job.
+ * trace missed, or a start or shutdown call the compiled bootstrap no longer
+ * accepts, fails the build rather than the first job.
  */
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -263,6 +266,60 @@ async function selfTest() {
   }
 }
 
+/**
+ * The drill's child reaches no service: Redis and Postgres point at a refused
+ * loopback port, and the storage, analytics and incident settings are local
+ * placeholders. The worker starts degraded, as it does when its services are
+ * down, which is all the drill needs: the same start and shutdown calls the CMD
+ * makes, with the same compiled bootstrap.
+ */
+export const DRILL_READY_DEADLINE_MS = 120_000
+export const DRILL_ENV = {
+  REDIS_URL: 'redis://127.0.0.1:1',
+  DATABASE_URL: 'postgresql://drill:drill@127.0.0.1:1/drill',
+  SUPABASE_URL: 'http://127.0.0.1:1',
+  SUPABASE_SERVICE_ROLE_KEY: 'community-worker-drill-placeholder',
+  ANALYTICS_ID_SECRET: 'community-worker-drill-placeholder-0123456789',
+  COMMUNITY_DISPATCH_ENABLED: 'false',
+  // The started and shutdown lines are info lines; production defaults quieter.
+  LOG_LEVEL: 'info',
+}
+const STARTED_LINE = 'Dedicated community worker started'
+const SHUTDOWN_LINE = 'Shutting down community workers'
+
+export function drillStartAndShutdown(env = process.env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
+      env: { ...env, ...DRILL_ENV },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let output = ''
+    let signaled = false
+    const deadline = setTimeout(() => {
+      child.kill('SIGKILL')
+      reject(
+        new Error(`no clean start and shutdown within ${DRILL_READY_DEADLINE_MS} ms`)
+      )
+    }, DRILL_READY_DEADLINE_MS + SHUTDOWN_DEADLINE_MS)
+    const read = (chunk) => {
+      output += chunk
+      if (!signaled && output.includes(STARTED_LINE)) {
+        signaled = true
+        child.kill('SIGTERM')
+      }
+    }
+    child.stdout.on('data', read)
+    child.stderr.on('data', read)
+    child.on('exit', (code, signal) => {
+      clearTimeout(deadline)
+      const shutdowns = output.split(SHUTDOWN_LINE).length - 1
+      const report = { started: signaled, exitCode: code, signal, shutdowns }
+      if (signaled && code === 0 && shutdowns === 1) resolve(report)
+      else reject(Object.assign(new Error(output.slice(-2000)), { report }))
+    })
+  })
+}
+
 async function start(selector) {
   const { startCommunityWorkers, performShutdown, createCommunityWorkerProcessState } =
     await loadBootstrap()
@@ -308,6 +365,15 @@ async function main() {
       )
     }
     await selfTest()
+    try {
+      log('community_worker_drill_passed', await drillStartAndShutdown())
+    } catch (error) {
+      fail(
+        'community_worker_drill_failed',
+        'The launcher did not start and shut down cleanly as the CMD runs it.',
+        { ...(error.report ?? {}), output: error.message }
+      )
+    }
     process.exit(0)
   }
   const tlsRefusal = databaseTlsRefusal()
