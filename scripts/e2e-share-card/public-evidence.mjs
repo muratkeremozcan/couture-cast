@@ -10,6 +10,7 @@ import {
   browserWatermarkChecks,
 } from '../lib/story68-browser-watermark.mjs'
 import { assertWebStartupEvidence } from './wait-web.mjs'
+import { assertNativeHostEvidence } from '../ci/native-host-evidence.mjs'
 const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
@@ -63,6 +64,22 @@ for (const platform of ['android', 'ios']) {
   assertNativeFlowDiagnostics(value)
   if (value.platform !== platform) throw new Error('invalid_native_flow_diagnostics')
   diagnostics.set(name, value)
+}
+// Host load, first-flow phase times and Metro counts: closed numbers and names.
+const hostEvidence = new Map()
+for (const platform of ['ios']) {
+  const name = `native-host-${platform}.json`
+  const file = path.join(directory, name)
+  if (!fs.existsSync(file)) continue
+  let value
+  try {
+    value = JSON.parse(fs.readFileSync(file))
+  } catch {
+    throw new Error('invalid_native_host_evidence')
+  }
+  assertNativeHostEvidence(value)
+  if (value.platform !== platform) throw new Error('invalid_native_host_evidence')
+  hostEvidence.set(name, value)
 }
 // Only primitive proof facts cross the native evidence boundary. Private logs and
 // resource identities are deliberately absent from the public projection.
@@ -255,6 +272,7 @@ const closedJSON = (name, value) => {
 // fabricating a flow result or publishing provisioning logs.
 if (ciStatus) closedJSON('ci-job-status.json', ciStatus)
 for (const [name, value] of browserProofs) closedJSON(name, value)
+for (const [name, value] of hostEvidence) closedJSON(name, value)
 for (const [name, value] of diagnostics) {
   closedJSON(name, value)
   // Re-render from validated primitives. Never trust or copy a claimed redacted PNG.
