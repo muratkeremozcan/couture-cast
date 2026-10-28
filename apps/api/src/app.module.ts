@@ -1,5 +1,11 @@
 import { ShareCardsModule } from './modules/share-cards/share-cards.module.js'
-import { Module } from '@nestjs/common'
+import {
+  Module,
+  RequestMethod,
+  type MiddlewareConsumer,
+  type NestModule,
+} from '@nestjs/common'
+import { ApiCacheHeadersMiddleware } from './common/api-cache-headers.middleware'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
@@ -57,4 +63,13 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
   controllers: [AppController, ApiHealthController, HealthController, AdminController],
   providers: [AppService, AdminService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    // Versioned API responses answer for the bearer's account (or carry per-viewer
+    // state such as isSelf), so none may be stored by the browser or a shared cache.
+    consumer.apply(ApiCacheHeadersMiddleware).forRoutes({
+      path: '/api/v1{/*path}',
+      method: RequestMethod.ALL,
+    })
+  }
+}

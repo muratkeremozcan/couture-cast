@@ -1,12 +1,12 @@
 import type { NextFunction, Request, Response } from 'express'
 import { describe, expect, it, vi } from 'vitest'
-import { UserCacheHeadersMiddleware } from './user-cache-headers.middleware.js'
+import { ApiCacheHeadersMiddleware } from './api-cache-headers.middleware.js'
 
-describe('UserCacheHeadersMiddleware', () => {
+describe('ApiCacheHeadersMiddleware', () => {
   it('sets a private no-store policy before continuing the chain', () => {
     const setHeader = vi.fn()
     const next = vi.fn()
-    new UserCacheHeadersMiddleware().use(
+    new ApiCacheHeadersMiddleware().use(
       {} as Request,
       { setHeader } as unknown as Response,
       next as unknown as NextFunction
