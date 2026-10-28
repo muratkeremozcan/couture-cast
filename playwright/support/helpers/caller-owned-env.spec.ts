@@ -9,6 +9,7 @@
  */
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 import { config as loadEnv } from 'dotenv'
@@ -16,7 +17,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadLauncherEnv } from '../../../scripts/lib/caller-owned-env.mjs'
 
 const repoRoot = path.resolve(__dirname, '../../..')
-const PLAYWRIGHT_CLI = path.join(repoRoot, 'node_modules/@playwright/test/cli.js')
+// The CLI the package declares as its `playwright` bin, wherever it is installed.
+const playwrightPackage = createRequire(__filename).resolve(
+  '@playwright/test/package.json'
+)
+const PLAYWRIGHT_CLI = path.join(
+  path.dirname(playwrightPackage),
+  (
+    JSON.parse(fs.readFileSync(playwrightPackage, 'utf8')) as {
+      bin: { playwright: string }
+    }
+  ).bin.playwright
+)
 /**
  * ENV-03 and ENV-04 each wait on one real `playwright test` run: a runner, its
  * config transpile and one worker process, so its cost grows with machine load.
