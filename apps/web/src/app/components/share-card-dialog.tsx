@@ -1,5 +1,13 @@
 'use client'
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PreparedShareCard, ShareCardSource } from '@couture/api-client'
 import { resolveSupportedLocale } from '@couture/api-client/contracts/http'
@@ -26,21 +34,56 @@ const recoveryLabel = (changed: boolean) => (changed ? 'refresh' : 'retry')
 const recoveryIsVisible = (action: string | null, changed: boolean) =>
   action !== null || changed
 const buttonLabel = (busy: boolean) => (busy ? 'saving' : 'download')
-export function ShareCardControl({ source }: { source: ShareCardSource }) {
+function ShareCardOpenButton({
+  onOpen,
+  register,
+}: {
+  onOpen: (opener: HTMLButtonElement) => void
+  register?: (opener: HTMLButtonElement | null) => void
+}) {
   const { t } = useTranslation(undefined, { i18n: currentI18n() })
+  return (
+    <button
+      ref={register}
+      type="button"
+      data-testid="share-card-open"
+      onClick={(event) => onOpen(event.currentTarget)}
+      className="min-h-[44px] rounded border border-[#B28D46] px-4 text-sm text-[#292724]"
+    >
+      {t('shareCard.title')}
+    </button>
+  )
+}
+/**
+ * Lets a list that may unmount its cards (the community feed hides them while access
+ * is re-verified) keep one share dialog and its composition above those cards.
+ */
+export type ShareCardHost = {
+  open: (postId: string, opener: HTMLElement) => void
+  register: (postId: string, opener: HTMLElement | null) => void
+}
+export const ShareCardHostContext = createContext<ShareCardHost | null>(null)
+export function CommunityShareCardControl({ postId }: { postId: string }) {
+  const host = useContext(ShareCardHostContext)
+  if (!host) return <ShareCardControl source={{ kind: 'community_post', postId }} />
+  return (
+    <ShareCardOpenButton
+      onOpen={(opener) => host.open(postId, opener)}
+      register={(opener) => host.register(postId, opener)}
+    />
+  )
+}
+export function ShareCardControl({ source }: { source: ShareCardSource }) {
   const [open, setOpen] = useState(false)
-  const opener = useRef<HTMLButtonElement>(null)
+  const opener = useRef<HTMLButtonElement | null>(null)
   return (
     <>
-      <button
-        ref={opener}
-        type="button"
-        data-testid="share-card-open"
-        onClick={() => setOpen(true)}
-        className="min-h-[44px] rounded border border-[#B28D46] px-4 text-sm text-[#292724]"
-      >
-        {t('shareCard.title')}
-      </button>
+      <ShareCardOpenButton
+        onOpen={(element) => {
+          opener.current = element
+          setOpen(true)
+        }}
+      />
       <ShareCardDialog
         source={source}
         open={open}
