@@ -23,6 +23,12 @@ import { defineConfig } from 'vitest/config'
  * trap; see `_bmad-output/test-artifacts/maestro-suite-repair-handoff.md` and its
  * standing rule: never resolve a test database URL through that variable.
  *
+ * CI's integration database is stock postgres:17-alpine. Local Supabase preloads
+ * extensions CI does not, among them plpgsql_check, whose pldbgapi2 hooks have aborted
+ * an ordinary nested PL/pgSQL call with XX000 "cannot find parent statement on
+ * pldbgapi2 call stack". `node scripts/integration-postgres.mjs start` starts the CI
+ * database locally and prints its URL for INTEGRATION_TEST_DATABASE_URL.
+ *
  * This config is evaluated before any test module, and therefore before that dotenv
  * load can run, so the value below is the one the shell or CI actually chose. Pinning
  * it into `test.env` also makes it win afterwards, because dotenv never overwrites a
