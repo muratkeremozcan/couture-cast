@@ -56,6 +56,11 @@ export function conditionViolations(workflow) {
         violations.push(
           `${job}: ${label(step, index)}: implicit success() after a check that can fail`
         )
+      for (const problem of matrixReferenceProblems(
+        condition,
+        definition?.strategy?.matrix
+      ))
+        violations.push(`${job}: ${label(step, index)}: ${problem}`)
       for (const [, id] of condition.matchAll(/\bsteps\.([A-Za-z0-9_-]+)\./g))
         if (!earlier.has(id))
           violations.push(
@@ -87,7 +92,7 @@ export function requiredWorkflows(directory) {
 }
 
 const PREREQUISITE = /^steps\.([A-Za-z0-9_-]+)\.outcome == 'success'$/
-const PLATFORM = /^matrix\.platform == '([a-z]+)'$/
+const MATRIX = /^matrix\.([A-Za-z0-9_-]+) == '([^']*)'$/
 const NOT_CANCELLED = /^!\s*cancelled\(\)$/
 
 function unwrapExpression(expression) {
@@ -138,20 +143,21 @@ function atom(text) {
   if (NOT_CANCELLED.test(value)) return { kind: 'notCancelled' }
   const outcome = PREREQUISITE.exec(value)
   if (outcome) return { kind: 'outcome', id: outcome[1] }
-  const platform = PLATFORM.exec(value)
-  if (platform) return { kind: 'platform', value: platform[1] }
+  const matrix = MATRIX.exec(value)
+  if (matrix) return { kind: 'matrix', key: matrix[1], value: matrix[2] }
   return null
 }
 
-// One branch of a per-platform choice: exactly one platform and only prerequisites.
+// One branch of a per-row choice: exactly one matrix clause and only prerequisites.
 function branch(text) {
   const terms = splitTopLevel(bare(text), '&&').map(atom)
-  const platforms = terms.filter((term) => term?.kind === 'platform')
-  if (terms.some((term) => term?.kind !== 'platform' && term?.kind !== 'outcome'))
+  const rows = terms.filter((term) => term?.kind === 'matrix')
+  if (terms.some((term) => term?.kind !== 'matrix' && term?.kind !== 'outcome'))
     return null
-  if (platforms.length !== 1) return null
+  if (rows.length !== 1) return null
   return {
-    platform: platforms[0].value,
+    key: rows[0].key,
+    value: rows[0].value,
     outcomes: terms.filter((term) => term.kind === 'outcome').map((term) => term.id),
   }
 }
@@ -165,22 +171,64 @@ function term(text) {
   if (branches.length < 2) return null
   const parsed = branches.map(branch)
   if (parsed.some((item) => item === null)) return null
-  if (new Set(parsed.map((item) => item.platform)).size !== parsed.length) return null
+  if (new Set(parsed.map((item) => `${item.key}=${item.value}`)).size !== parsed.length)
+    return null
   return { kind: 'choice', branches: parsed }
+}
+
+/**
+ * The values each matrix key can take in a job: its own array, plus every
+ * `include` entry. A key whose values come from an expression accepts any value.
+ */
+export function matrixDomain(matrix) {
+  const domain = new Map()
+  if (!matrix || typeof matrix !== 'object') return domain
+  const add = (key, value) => {
+    if (!domain.has(key)) domain.set(key, new Set())
+    domain.get(key)?.add(String(value))
+  }
+  for (const [key, values] of Object.entries(matrix)) {
+    if (key === 'include' || key === 'exclude') continue
+    if (Array.isArray(values)) for (const value of values) add(key, value)
+    else domain.set(key, null)
+  }
+  for (const entry of Array.isArray(matrix.include) ? matrix.include : [])
+    for (const [key, value] of Object.entries(entry ?? {}))
+      if (domain.get(key) !== null) add(key, value)
+  return domain
+}
+
+/** Every `matrix.<key>` a condition names that the job's matrix cannot produce. */
+export function matrixReferenceProblems(condition, matrix) {
+  const text = String(condition ?? '')
+  const domain = matrixDomain(matrix)
+  const problems = []
+  for (const [, key] of text.matchAll(/\bmatrix\.([A-Za-z0-9_-]+)/g))
+    if (!domain.has(key)) problems.push(`matrix.${key} is not a key of the job matrix`)
+  for (const [, key, value] of text.matchAll(
+    /\bmatrix\.([A-Za-z0-9_-]+)\s*[!=]=\s*'([^']*)'/g
+  )) {
+    const values = domain.get(key)
+    if (values && !values.has(value))
+      problems.push(`matrix.${key} is never '${value}' in the job matrix`)
+  }
+  return [...new Set(problems)]
 }
 
 /**
  * The approved explicit-prerequisite grammar, or null for anything else:
  *   condition := term ('&&' term)*
- *   term      := '!cancelled()' | prerequisite | platform | '(' choice ')'
- *   choice    := branch ('||' branch)+, each branch one distinct platform and
+ *   term      := '!cancelled()' | prerequisite | row | '(' choice ')'
+ *   choice    := branch ('||' branch)+, each branch one distinct row clause and
  *                otherwise only prerequisites
- * where prerequisite is `steps.<id>.outcome == 'success'` and platform is
- * `matrix.platform == '<name>'`. `&&` binds tighter than `||`, so any top-level `||`
- * (`|| always()`, `|| true`) is outside the grammar.
+ * where prerequisite is `steps.<id>.outcome == 'success'` and row is
+ * `matrix.<key> == '<value>'` naming a key and value the job's matrix produces.
+ * `&&` binds tighter than `||`, so any top-level `||` (`|| always()`, `|| true`) is
+ * outside the grammar.
  */
-export function parseApprovedCondition(condition) {
+export function parseApprovedCondition(condition, { matrix } = {}) {
   if (typeof condition !== 'string' || !condition.trim()) return null
+  if (matrixReferenceProblems(condition, matrix).length) return null
   const text = unwrapExpression(condition)
   if (splitTopLevel(text, '||').length !== 1) return null
   const terms = splitTopLevel(text, '&&').map(term)
@@ -192,28 +240,29 @@ export function parseApprovedCondition(condition) {
  * a named earlier prerequisite failed, or the matrix row is another platform. No
  * condition at all is the implicit success() that follows an earlier failure.
  */
-export function isExplicitPrerequisiteCondition(condition) {
+export function isExplicitPrerequisiteCondition(condition, { matrix } = {}) {
   return condition === undefined || condition === null
     ? true
-    : parseApprovedCondition(condition) !== null
+    : parseApprovedCondition(condition, { matrix }) !== null
 }
 
-/** Evaluates an approved condition against step outcomes and the matrix platform. */
+/** Evaluates an approved condition against step outcomes and one matrix row. */
 export function evaluateApprovedCondition(
   condition,
-  { cancelled = false, outcomes = {}, platform, previousSucceeded = true }
+  { cancelled = false, outcomes = {}, matrix, row = {}, previousSucceeded = true }
 ) {
   if (condition === undefined || condition === null)
     return !cancelled && previousSucceeded
-  const terms = parseApprovedCondition(condition)
+  const terms = parseApprovedCondition(condition, { matrix })
   if (!terms) throw new Error(`condition outside the approved grammar: ${condition}`)
   const succeeded = (id) => outcomes[id] === 'success'
   return terms.every((item) => {
     if (item.kind === 'notCancelled') return !cancelled
     if (item.kind === 'outcome') return succeeded(item.id)
-    if (item.kind === 'platform') return item.value === platform
+    if (item.kind === 'matrix') return String(row[item.key]) === item.value
     return item.branches.some(
-      (choice) => choice.platform === platform && choice.outcomes.every(succeeded)
+      (choice) =>
+        String(row[choice.key]) === choice.value && choice.outcomes.every(succeeded)
     )
   })
 }

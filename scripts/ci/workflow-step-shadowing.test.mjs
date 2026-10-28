@@ -12,7 +12,11 @@ const workflows = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../.github/workflows'
 )
-const job = (steps) => ({ on: { pull_request: {} }, jobs: { gate: { steps } } })
+const job = (steps, matrix) => ({
+  on: { pull_request: {} },
+  jobs: { gate: { ...(matrix && { strategy: { matrix } }), steps } },
+})
+const rows = { platform: ['android'], include: [{ platform: 'ios', api: 0 }] }
 const implicit = (step) => `gate: ${step}: implicit success() after a check that can fail`
 const unknown = (step, id) =>
   `gate: ${step}: names steps.${id}, which is not an earlier step`
@@ -66,7 +70,27 @@ test('a matrix-only condition after a failed check is still implicit success', (
     { name: 'Robolectric tests', run: 'npm run test:android' },
     { name: 'Enable KVM', if: "matrix.platform == 'android'", run: 'true' },
   ]
-  assert.deepEqual(conditionViolations(job(steps)), [implicit('Enable KVM')])
+  assert.deepEqual(conditionViolations(job(steps, rows)), [implicit('Enable KVM')])
+})
+
+test('a matrix clause must name a key and value the job matrix produces', () => {
+  const steps = [
+    { name: 'Lint', if: "matrix.platform == 'ios' && matrix.api == '0'", run: 'true' },
+    { name: 'Typo value', if: "matrix.platform == 'androd'", run: 'true' },
+    {
+      name: 'Typo key',
+      if: "${{ !cancelled() && matrix.platfrom == 'android' }}",
+      run: 'true',
+    },
+  ]
+  assert.deepEqual(conditionViolations(job(steps, rows)), [
+    "gate: Typo value: matrix.platform is never 'androd' in the job matrix",
+    'gate: Typo key: matrix.platfrom is not a key of the job matrix',
+  ])
+  assert.deepEqual(conditionViolations(job(steps.slice(0, 1))), [
+    'gate: Lint: matrix.platform is not a key of the job matrix',
+    'gate: Lint: matrix.api is not a key of the job matrix',
+  ])
 })
 
 test('setup before the first check, and checks that cannot fail the job, keep implicit success', () => {

@@ -16,7 +16,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
-import { isExplicitPrerequisiteCondition } from './workflow-step-shadowing.mjs'
+import {
+  isExplicitPrerequisiteCondition,
+  matrixReferenceProblems,
+} from './workflow-step-shadowing.mjs'
 
 export const GATE_SCRIPT = 'scripts/ci/node-test-gate.mjs'
 const repository = fileURLToPath(new URL('../../', import.meta.url))
@@ -163,8 +166,9 @@ function needsProblems(manifest, step, lines) {
 
 const stepLines = (step) => (step.run ?? '').split(/\r?\n/).map((line) => line.trim())
 
-// A condition that can skip a gate step silences its suite on a green run.
-function gateStepProblems(manifest, step) {
+// A condition that can skip a gate step silences its suite on a green run, and
+// continue-on-error turns its failure into a green step.
+function gateStepProblems(manifest, step, matrix) {
   const lines = stepLines(step)
   const runsTests = lines.some(
     (line) =>
@@ -173,12 +177,19 @@ function gateStepProblems(manifest, step) {
         manifest.vitest.some((file) => line.includes(file)))
   )
   if (!runsTests) return []
+  const name = step.name ?? step.id ?? 'unnamed'
   return [
-    ...(isExplicitPrerequisiteCondition(step.if)
+    ...(isExplicitPrerequisiteCondition(step.if, { matrix })
       ? []
-      : [
-          `step ${step.name ?? step.id ?? 'unnamed'} can be skipped by its condition: ${JSON.stringify(step.if)}`,
-        ]),
+      : [`step ${name} can be skipped by its condition: ${JSON.stringify(step.if)}`]),
+    ...matrixReferenceProblems(step.if, matrix).map(
+      (problem) => `step ${name}: ${problem}`
+    ),
+    ...(Object.hasOwn(step, 'continue-on-error')
+      ? [
+          `step ${name} sets continue-on-error (${JSON.stringify(step['continue-on-error'])}), which hides a gate failure`,
+        ]
+      : []),
     ...needsProblems(manifest, step, lines),
   ]
 }
@@ -186,11 +197,12 @@ function gateStepProblems(manifest, step) {
 function workflowProblems(manifest, workflow) {
   const problems = []
   const names = Object.keys(manifest.suites)
-  const steps = Object.values(parse(workflow).jobs ?? {}).flatMap(
-    (job) => job.steps ?? []
-  )
+  const jobs = Object.values(parse(workflow).jobs ?? {})
+  const steps = jobs.flatMap((job) => job.steps ?? [])
   const lines = steps.flatMap(stepLines)
-  for (const step of steps) problems.push(...gateStepProblems(manifest, step))
+  for (const job of jobs)
+    for (const step of job.steps ?? [])
+      problems.push(...gateStepProblems(manifest, step, job.strategy?.matrix))
   const invoked = new Set(lines.map(gatedSuite).filter(Boolean))
   for (const name of invoked)
     if (!names.includes(name)) problems.push(`workflow runs unknown suite ${name}`)

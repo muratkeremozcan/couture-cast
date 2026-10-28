@@ -213,6 +213,11 @@ const fixtureTree = {
 const fixtureWorkflow = [
   'jobs:',
   '  first:',
+  '    strategy:',
+  '      matrix:',
+  '        platform: [android]',
+  '        include:',
+  '          - platform: ios',
   '    steps:',
   '      - run: node scripts/ci/node-test-gate.mjs pinned',
   '      - run: |',
@@ -381,6 +386,9 @@ describe('node-test-gate discovery and coverage', () => {
         [
           '',
           '  third:',
+          '    strategy:',
+          '      matrix:',
+          '        platform: [android, ios]',
           '    steps:',
           '      - id: setup',
           '        run: echo setup',
@@ -409,6 +417,43 @@ describe('node-test-gate discovery and coverage', () => {
           ],
           condition
         )
+    }))
+
+  test('a gate step must name real matrix rows and may not continue on error', () =>
+    temporary((root) => {
+      write(root, fixtureTree)
+      const step = (lines) =>
+        fixtureWorkflow.replace(
+          '      - run: |\n          node scripts/ci/node-test-gate.mjs outside\n          node scripts/ci/node-test-gate.mjs default',
+          [
+            '      - run: node scripts/ci/node-test-gate.mjs outside',
+            '      - name: default suite',
+            ...lines,
+            '        run: node scripts/ci/node-test-gate.mjs default',
+          ].join('\n')
+        )
+      const check = (lines) =>
+        coverageProblems({ root, manifest: fixtureManifest, workflow: step(lines) })
+      assert.deepEqual(check(['        if: "matrix.platform == \'ios\'"']), [])
+      assert.deepEqual(check(['        if: "matrix.platform == \'androd\'"']), [
+        'step default suite can be skipped by its condition: "matrix.platform == \'androd\'"',
+        "step default suite: matrix.platform is never 'androd' in the job matrix",
+      ])
+      assert.deepEqual(
+        check(['        if: "${{ !cancelled() && matrix.platfrom == \'android\' }}"']),
+        [
+          'step default suite can be skipped by its condition: "${{ !cancelled() && matrix.platfrom == \'android\' }}"',
+          'step default suite: matrix.platfrom is not a key of the job matrix',
+        ]
+      )
+      for (const [value, shown] of [
+        ['true', 'true'],
+        ['false', 'false'],
+        ["${{ matrix.platform == 'ios' }}", '"${{ matrix.platform == \'ios\' }}"'],
+      ])
+        assert.deepEqual(check([`        continue-on-error: ${value}`]), [
+          `step default suite sets continue-on-error (${shown}), which hides a gate failure`,
+        ])
     }))
 
   test('a gate step may wait only on the steps its suites declare they need', () =>

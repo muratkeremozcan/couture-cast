@@ -4,8 +4,10 @@ import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import { evaluateApprovedCondition } from './workflow-step-shadowing.mjs'
 
-const steps = parse(fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8'))
-  .jobs['original-resource'].steps
+const job = parse(fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8'))
+  .jobs['original-resource']
+const steps = job.steps
+const matrix = job.strategy.matrix
 const step = (name) => {
   const found = steps.find((row) => row.name === name)
   assert.ok(found, name)
@@ -16,7 +18,7 @@ const bridge = step(
   'Verify localized native accessibility announcements and focus bridge'
 )
 const runs = (row, platform, outcomes) =>
-  evaluateApprovedCondition(row.if, { platform, outcomes })
+  evaluateApprovedCondition(row.if, { matrix, row: { platform }, outcomes })
 
 describe('share-card native step conditions', () => {
   for (const platform of ['android', 'ios'])
@@ -48,7 +50,8 @@ describe('share-card native step conditions', () => {
     assert.equal(runs(suites, 'android', { install: 'failure' }), false)
     assert.equal(
       evaluateApprovedCondition(suites.if, {
-        platform: 'android',
+        matrix,
+        row: { platform: 'android' },
         outcomes: { install: 'success' },
         cancelled: true,
       }),
