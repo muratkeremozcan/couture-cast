@@ -11,6 +11,7 @@ import {
   firstMaestroLog,
   projectFirstFlow,
   projectMetro,
+  projectMetroBundles,
   projectSample,
   residentProcesses,
   projectMemory,
@@ -427,4 +428,33 @@ test('first-flow evidence keeps child deadline, setup and worker bootstrap separ
       () => assertNativeHostEvidence(record({ firstFlow: { ...firstFlow, wall: bad } })),
       /invalid_native_host_evidence/
     )
+})
+
+test('Metro bundle builds are listed in order by entry without any other log text', () => {
+  const log = [
+    'iOS Bundled 4522ms node_modules/expo-router/entry.js (1874 modules)',
+    'secret token abc123 in a log line',
+    'iOS Bundled 13848ms node_modules/expo-media-library/build/MediaLibrary.js (3 modules)',
+    'Bundled 90ms apps/mobile/x y.js',
+  ].join('\n')
+  const { bundles } = projectMetroBundles(log)
+  assert.deepEqual(bundles, [
+    {
+      index: 0,
+      platform: 'iOS',
+      ms: 4522,
+      entry: 'node_modules/expo-router/entry.js',
+      modules: 1874,
+    },
+    {
+      index: 1,
+      platform: 'iOS',
+      ms: 13848,
+      entry: 'node_modules/expo-media-library/build/MediaLibrary.js',
+      modules: 3,
+    },
+    { index: 2, platform: null, ms: 90, entry: 'apps/mobile/x', modules: null },
+  ])
+  assert.doesNotMatch(JSON.stringify(bundles), /secret|abc123/)
+  assert.deepEqual(projectMetroBundles('').bundles, [])
 })

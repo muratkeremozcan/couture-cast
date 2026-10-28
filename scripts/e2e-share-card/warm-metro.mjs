@@ -63,12 +63,15 @@ export async function warmMetro({
     signal: AbortSignal.timeout(60_000),
   })
   const { url, source } = bundleUrlFromManifest(await manifest.text(), baseUrl, platform)
+  // Lazy bundling would leave dynamic imports to build during a flow (see story68-metro-env).
+  const lazy = new URL(url).searchParams.get('lazy')
+  if (lazy === 'true') throw new Error('metro_bundle_still_lazy')
   const bundle = await get(url, { signal: AbortSignal.timeout(timeoutMs) })
   // Metro counts the build as served only once the body is drained.
   const bytes = (await bundle.arrayBuffer()).byteLength
   if (!bundle.ok || bytes === 0)
     throw new Error(`metro_bundle_unavailable:${bundle.status}`)
-  return { source, bytes, seconds: Math.round((Date.now() - started) / 100) / 10 }
+  return { source, lazy, bytes, seconds: Math.round((Date.now() - started) / 100) / 10 }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

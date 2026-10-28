@@ -187,6 +187,36 @@ export function projectMetro(log) {
   }
 }
 
+/** Ordered Metro bundle builds: platform, build time, entry and module count only. */
+export function projectMetroBundles(log) {
+  const safe = (value) => value.replace(/[^A-Za-z0-9._/@+-]/g, '_').slice(0, 200)
+  const bundles = [
+    ...log.matchAll(
+      /(?:(Android|iOS|Web) )?Bundled (\d+)ms (\S+)(?: \((\d+) modules?\))?/g
+    ),
+  ].map((match, index) => ({
+    index,
+    platform: match[1] ?? null,
+    ms: Number(match[2]),
+    entry: safe(match[3]),
+    modules: match[4] === undefined ? null : Number(match[4]),
+  }))
+  return { version: 1, bundles }
+}
+
+/** Summarize the owned Metro log and keep its ordered bundle builds beside the host record. */
+function recordMetro(directory, platform) {
+  const log = path.join(directory, 'metro.log')
+  const text = fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : ''
+  // The build order shows which stage triggered each bundle (lazy chunks name their module).
+  fs.writeFileSync(
+    path.join(directory, `native-${platform}-metro-bundles.json`),
+    JSON.stringify(projectMetroBundles(text), null, 2) + '\n',
+    { mode: 0o600 }
+  )
+  return projectMetro(text)
+}
+
 const exactKeys = (value, keys) =>
   value !== null &&
   typeof value === 'object' &&
@@ -412,8 +442,7 @@ function main() {
     )
     recorded = record.firstFlow
   } else if (command === 'metro') {
-    const log = path.join(directory, 'metro.log')
-    record.metro = projectMetro(fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '')
+    record.metro = recordMetro(directory, platform)
     recorded = record.metro
   } else {
     console.error(

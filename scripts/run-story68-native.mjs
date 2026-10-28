@@ -14,6 +14,8 @@ import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics
 import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs'
 import { withColdAndroidFontScale } from './lib/story68-cold-font-scale.mjs'
 import { runReleaseLiveFontCommand } from './lib/story68-release-live-font-command.mjs'
+import { metroServerEnv } from './lib/story68-metro-env.mjs'
+import { recordIosCommandTimings } from './ci/native-ios-maestro-trace.mjs'
 import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
 import {
   assertIosReadDenied,
@@ -358,6 +360,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   )
   if (recoverSnapshot) return maestro(flow, env, secret, attempt + 1)
   if (result.status !== 0) throw new Error(`native_flow_failed:${flow}`)
+  recordIosCommandTimings({ platform, flow, output: successOutput, directory })
   recordIosStackPop({
     platform,
     flow,
@@ -859,7 +862,7 @@ if (command === 'prebuild') {
   console.log('Owned Story68 API and weather processes started. See private api.log.')
 } else if (command === 'metro') {
   ownedEnv()
-  const env = read('public-build-env.json')
+  const env = metroServerEnv(read('public-build-env.json'))
   const metro = child(
     path.join(root, 'node_modules/.bin/expo'),
     ['start', '--dev-client', '--port', '8089', '--localhost'],
