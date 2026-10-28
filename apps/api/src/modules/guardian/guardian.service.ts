@@ -1,5 +1,6 @@
 import {
   guardCommunitySubject,
+  isPldbgapi2StackError,
   forgetCommunitySubject,
 } from '../community/community-privacy.js'
 import { assertWardrobeParticipationAllowed } from './guardian-participation.js'
@@ -409,6 +410,17 @@ function extractRetryableSerializationCode(error: unknown): string | undefined {
 function isRetryableSerializationFailure(error: unknown) {
   const code = extractRetryableSerializationCode(error)
   return code === 'P2034' || code === '40001' || code?.includes('40001') === true
+}
+
+/**
+ * Revocation and emancipation guard the community subject through
+ * community_prepare_subject_privacy, so the plpgsql_check stack error can abort them
+ * too. Both run every write on `tx`, so the abort rolls all of it back, and they share
+ * the serialization retry budget: MAX_REVOKE_CONSENT_TRANSACTION_RETRIES attempts in
+ * all, retried at once.
+ */
+function isRetryableConsentTransactionFailure(error: unknown) {
+  return isRetryableSerializationFailure(error) || isPldbgapi2StackError(error)
 }
 
 @Injectable()
@@ -916,7 +928,7 @@ export class GuardianService {
       } catch (error) {
         if (
           attempt < MAX_REVOKE_CONSENT_TRANSACTION_RETRIES &&
-          isRetryableSerializationFailure(error)
+          isRetryableConsentTransactionFailure(error)
         ) {
           this.logger.warn(
             {
@@ -1167,7 +1179,7 @@ export class GuardianService {
         } catch (error) {
           if (
             attempt < MAX_REVOKE_CONSENT_TRANSACTION_RETRIES &&
-            isRetryableSerializationFailure(error)
+            isRetryableConsentTransactionFailure(error)
           ) {
             this.logger.warn(
               {

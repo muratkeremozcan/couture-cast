@@ -39,6 +39,23 @@ export async function forgetCommunitySubject(
   if (erase)
     await tx.communitySpotlightReadWindow.deleteMany({ where: { user_id: member } })
 }
+/**
+ * The Supabase Postgres image preloads plpgsql_check, whose pldbgapi2 layer hooks every
+ * PL/pgSQL call and can abort an ordinary nested call with this internal error
+ * (okbob/plpgsql_check#197). It aborts and rolls back the whole transaction, so a
+ * transaction that is safe to repeat after a serialization failure is safe to repeat
+ * after this. Only this exact signature matches: SQLSTATE XX000 plus the message.
+ */
+export const PLDBGAPI2_STACK_ERROR =
+  'cannot find parent statement on pldbgapi2 call stack'
+export function isPldbgapi2StackError(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false
+  const meta = error.meta as { code?: unknown; message?: unknown } | undefined
+  if (meta?.code !== 'XX000') return false
+  const message = typeof meta.message === 'string' ? meta.message : error.message
+  return message.includes(PLDBGAPI2_STACK_ERROR)
+}
+
 export async function communityPrivacyTransaction<T>(
   prisma: PrismaClient,
   work: (tx: Prisma.TransactionClient) => Promise<T>
@@ -56,7 +73,14 @@ export async function communityPrivacyTransaction<T>(
         error instanceof Prisma.PrismaClientKnownRequestError
           ? String(error.meta?.code)
           : ''
-      if (attempt < 2 && (code === 'P2034' || ['40001', '40P01', '55P03'].includes(sql)))
+      // Three attempts in all, retried at once: every retryable cause rolled back the
+      // whole transaction first.
+      if (
+        attempt < 2 &&
+        (code === 'P2034' ||
+          ['40001', '40P01', '55P03'].includes(sql) ||
+          isPldbgapi2StackError(error))
+      )
         continue
       throw error
     }
