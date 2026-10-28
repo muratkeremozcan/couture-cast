@@ -99,6 +99,27 @@ describe('browser matrix evidence from producer to upload directory', () => {
       assert.ok(!listing(upload).includes(name), name)
   })
 
+  test('the private summary is consumed so a reused runtime cannot republish stale proof', () => {
+    const { directory, upload } = runtime()
+    produce(directory)
+    const first = run('public-evidence.mjs', directory, ciEnv)
+    assert.equal(first.status, 0, first.stderr)
+    assert.ok(listing(upload).includes('web-matrix.json'))
+    assert.ok(!fs.existsSync(path.join(directory, WEB_MATRIX_SUMMARY_FILE)))
+    // The same runtime projected again, with no new producer run in between.
+    const second = run('public-evidence.mjs', directory, ciEnv)
+    assert.equal(second.status, 0, second.stderr)
+    assert.deepEqual(listing(upload), ['ci-job-status.json'])
+  })
+
+  test('a refused summary is consumed too', () => {
+    const { directory } = runtime()
+    write(directory, WEB_MATRIX_SUMMARY_FILE, { passed: false })
+    const refused = run('public-evidence.mjs', directory, ciEnv)
+    assert.notEqual(refused.status, 0)
+    assert.ok(!fs.existsSync(path.join(directory, WEB_MATRIX_SUMMARY_FILE)))
+  })
+
   test('a run without a validated summary uploads no matrix proof', () => {
     const { directory, upload } = runtime()
     // The browser run failed: the producer wrote nothing, but a raw report may exist.

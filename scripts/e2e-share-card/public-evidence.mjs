@@ -105,8 +105,9 @@ for (const name of nativeEvidenceFamilies) {
   nativeEvidence.set(name, assertNativeEvidence(name, value))
 }
 // The browser acceptance summary is written to a private runtime file by
-// assert-web-matrix.mjs. It is re-validated against the closed matrix schema here and
-// projected from its validated fields, so the rebuilt upload directory keeps the proof.
+// assert-web-matrix.mjs and consumed here. It is re-validated against the closed matrix
+// schema and projected from its validated fields, so the rebuilt upload directory keeps
+// the proof.
 const webMatrixFile = path.join(directory, WEB_MATRIX_SUMMARY_FILE)
 let webMatrix
 if (fs.existsSync(webMatrixFile)) {
@@ -114,6 +115,10 @@ if (fs.existsSync(webMatrixFile)) {
     webMatrix = assertWebMatrixSummary(JSON.parse(fs.readFileSync(webMatrixFile)))
   } catch {
     throw new Error('invalid_web_matrix_evidence')
+  } finally {
+    // Consumed on read, valid or not, so a reused local runtime cannot republish it
+    // after a later run that produced no new summary.
+    fs.rmSync(webMatrixFile, { force: true })
   }
 }
 const releaseName = 'native-release-live-font-android.json'
