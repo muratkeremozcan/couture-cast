@@ -44,7 +44,7 @@ describe('Maestro flow timeouts', () => {
     const { waitsMs, attempts, checks } = declaredOpenAppBudget()
     assert.deepEqual(
       { waitsMs, attempts, checks },
-      { waitsMs: 100_000, attempts: 4, checks: 12 }
+      { waitsMs: 100_000, attempts: 4, checks: 15 }
     )
     const worst = FLOW_STARTUP_MS + attempts * (waitsMs + checks * CONDITION_CHECK_MS)
     assert.equal(OPEN_APP_WORST_CASE_MS, worst)

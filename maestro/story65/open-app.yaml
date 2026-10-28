@@ -57,6 +57,15 @@ appId: ${MAESTRO_APP_ID}
                   - tapOn:
                       id: 'comments-close'
                   - waitForAnimationToEnd
+            # iOS 18 exposes the native stack back item by its localized label only (no
+            # BackButton id); the runner supplies the app locale's common.back.
+            - runFlow:
+                when:
+                  platform: iOS
+                  visible: ${MAESTRO_BACK}
+                commands:
+                  - tapOn: ${MAESTRO_BACK}
+                  - waitForAnimationToEnd
       - extendedWaitUntil:
           visible:
             id: 'tab-home'
