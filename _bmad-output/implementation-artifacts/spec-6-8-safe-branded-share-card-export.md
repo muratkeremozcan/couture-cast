@@ -1027,6 +1027,25 @@ Evidence: `runs/cief22-cache-miss-red-1` and `runs/cief22-cache-miss-green-1` (2
 The in-flight ef22 CI run is preserved until publication of this concrete repair; no CI
 failure is inferred from its pending state.
 
+- 2026-10-27 platform risk, plpgsql_check pldbgapi2 (eef2b69d): the Supabase Postgres image
+  preloads plpgsql_check through `shared_preload_libraries`, and its pldbgapi2 layer hooks every
+  PL/pgSQL call. Locally it aborted `community_prepare_subject_privacy` inside `revokeConsent` with
+  SQLSTATE XX000 `cannot find parent statement on pldbgapi2 call stack`, once in each of two full
+  coverage runs (Story 6.5 `ci-api-full-coverage5` and the 6.8 corpus-timeout coverage run).
+  Upstream: okbob/plpgsql_check#197, the same error on a Supabase build with the library
+  preloaded. CI's integration database is stock postgres:17-alpine with no preload, so CI never
+  loads it.
+  - Mitigation: the three transactions that run `community_prepare_subject_privacy`
+    (`communityPrivacyTransaction`, `revokeConsent`, emancipation) retry exactly that SQLSTATE
+    and message within their existing three-attempt budget, with no backoff. The error rolls the
+    whole transaction back and every write in those callbacks runs on `tx`.
+  - Upgrade path: a plpgsql_check build that includes upstream commit 9ec1364 (fail fast on a
+    broken function cache) or later, or the later pldbgapi3 rewrite, on every Supabase-hosted
+    database this product uses.
+  - Not verified: the hosted database's `shared_preload_libraries` was deliberately not
+    queried. This note treats the preload as present in production.
+  - Local runs can use CI's database through `node scripts/integration-postgres.mjs start`.
+
 ## Spec Change Log
 
 - 2026-10-25, iteration 2 in progress, Astra round 1: accepted A1 and A2. iOS now imports the
