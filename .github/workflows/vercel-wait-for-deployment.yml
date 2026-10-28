@@ -32,7 +32,8 @@ on:
 jobs:
   wait:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Callers poll up to 40 x 30s for a slow web build; the rest is curl and verification time.
+    timeout-minutes: 30
     outputs:
       observed_sha: ${{ steps.health_check.outputs.observed_sha }}
     steps:
@@ -55,6 +56,12 @@ jobs:
 
           MATCHED=false
 
+          # SECONDS counts from the start of this step, so each wait line shows how long
+          # the deployment has taken and build-time drift is visible across runs.
+          page_title() {
+            printf '%s' "${FETCH_BODY}" | tr '\n' ' ' | grep -o '<title>[^<]*</title>' | head -n 1 | sed 's/<[^>]*>//g' || true
+          }
+
           fetch_health() {
             local response
             response=$(
@@ -75,14 +82,17 @@ jobs:
             fetch_health
 
             if [ -z "${FETCH_BODY}" ]; then
-              echo "⏳ Waiting for health... (attempt ${i}/${RETRIES}, http=${FETCH_STATUS:-none})"
+              echo "⏳ Waiting for health... (attempt ${i}/${RETRIES}, http=${FETCH_STATUS:-none}, elapsed=${SECONDS}s)"
               sleep "${SLEEP_SECONDS}"
               continue
             fi
 
             # Debug: Check if response is JSON
             if ! echo "${FETCH_BODY}" | jq empty 2>/dev/null; then
-              echo "⏳ Response is not valid JSON (attempt ${i}/${RETRIES}, http=${FETCH_STATUS:-none})"
+              echo "⏳ Response is not valid JSON (attempt ${i}/${RETRIES}, http=${FETCH_STATUS:-none}, elapsed=${SECONDS}s)"
+              # A Vercel login or protection page and a still-building deployment both
+              # answer 200 with HTML; the title tells them apart.
+              echo "HTML page title: '$(page_title)'"
               echo "First 200 chars of response:"
               echo "${FETCH_BODY}" | head -c 200
               echo ""
@@ -95,24 +105,24 @@ jobs:
             DEPLOYED_SHORT="${DEPLOYED_SHA:0:7}"
 
             if [ "${STATUS}" != "ok" ]; then
-              echo "⏳ Health endpoint not ready (status=${STATUS}, http=${FETCH_STATUS:-none})... (attempt ${i}/${RETRIES})"
+              echo "⏳ Health endpoint not ready (status=${STATUS}, http=${FETCH_STATUS:-none})... (attempt ${i}/${RETRIES}, elapsed=${SECONDS}s)"
               sleep "${SLEEP_SECONDS}"
               continue
             fi
 
             if [ "${DEPLOYED_SHA}" = "unknown" ]; then
-              echo "⏳ Health OK but gitSha unknown... retrying (attempt ${i}/${RETRIES})"
+              echo "⏳ Health OK but gitSha unknown... retrying (attempt ${i}/${RETRIES}, elapsed=${SECONDS}s)"
               sleep "${SLEEP_SECONDS}"
               continue
             fi
 
             if [ "${DEPLOYED_SHORT}" = "${EXPECTED_SHORT}" ]; then
-              echo "✅ Deployment healthy with expected SHA: ${DEPLOYED_SHORT}"
+              echo "✅ Deployment healthy with expected SHA: ${DEPLOYED_SHORT} (elapsed=${SECONDS}s)"
               MATCHED=true
               break
             fi
 
-            echo "⏳ Health OK but waiting for correct deployment... (attempt ${i}/${RETRIES})"
+            echo "⏳ Health OK but waiting for correct deployment... (attempt ${i}/${RETRIES}, elapsed=${SECONDS}s)"
             echo "   Expected SHA: ${EXPECTED_SHORT}"
             echo "   Deployed SHA: ${DEPLOYED_SHORT}"
             sleep "${SLEEP_SECONDS}"
@@ -121,7 +131,7 @@ jobs:
           # Final verification
           fetch_health
           if [ -z "${FETCH_BODY}" ] || ! echo "${FETCH_BODY}" | jq empty 2>/dev/null; then
-            echo "❌ Deployment failed to become healthy after waiting."
+            echo "❌ Deployment failed to become healthy after waiting (elapsed=${SECONDS}s, last page title: '$(page_title)')."
             exit 1
           fi
 

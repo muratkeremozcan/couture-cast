@@ -2,7 +2,9 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-7-ci-and-cd-automated-quality-gates
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 
 const repoRoot = path.resolve(__dirname, '../../..')
 
@@ -17,6 +19,12 @@ const previewReadyWorkflow = path.join(
   '.github',
   'workflows',
   'rwf-vercel-preview-ready.yml'
+)
+const vercelWaitWorkflow = path.join(
+  repoRoot,
+  '.github',
+  'workflows',
+  'vercel-wait-for-deployment.yml'
 )
 const manualE2eWorkflow = path.join(
   repoRoot,
@@ -95,6 +103,59 @@ describe('deployment workflows', () => {
     expect(
       ready.match(/uses: \.\/\.github\/workflows\/vercel-wait-for-deployment\.yml/g)
     ).toHaveLength(2)
+  })
+
+  it('the web preview wait outlasts the slowest observed web build', () => {
+    const ready = fs.readFileSync(previewReadyWorkflow, 'utf8')
+    const wait = fs.readFileSync(vercelWaitWorkflow, 'utf8')
+    const webCall = /wait-web:[\s\S]*?retries: (\d+)\s+sleep_seconds: (\d+)/.exec(ready)
+    expect(webCall).not.toBeNull()
+    const budgetSeconds = Number(webCall?.[1]) * Number(webCall?.[2])
+    // Run 40728198560: the web build outlived 20 x 30s (10 minutes) by seconds.
+    expect(budgetSeconds).toBeGreaterThanOrEqual(1200)
+    // The job limit must leave room for curl time on top of the polling budget.
+    const limitMinutes = Number(/timeout-minutes: (\d+)/.exec(wait)?.[1])
+    expect(limitMinutes * 60).toBeGreaterThanOrEqual(budgetSeconds + 300)
+  })
+
+  it('the wait step names the HTML page it received and the elapsed time per attempt', () => {
+    const wait = fs.readFileSync(vercelWaitWorkflow, 'utf8')
+    const script = /run: \|\n((?: {10}.*\n|\n)+)/.exec(wait)?.[1].replace(/^ {10}/gm, '')
+    expect(script).toBeDefined()
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-wait-'))
+    try {
+      fs.writeFileSync(
+        path.join(directory, 'curl'),
+        "#!/bin/bash\nprintf '<!DOCTYPE html><html><head><title>Login - Vercel</title></head></html>\\n__STATUS__:200'\n",
+        { mode: 0o700 }
+      )
+      const run = spawnSync('/bin/bash', ['-e', '-c', script as string], {
+        encoding: 'utf8',
+        env: {
+          PATH: `${directory}:${process.env.PATH ?? ''}`,
+          GITHUB_OUTPUT: path.join(directory, 'out'),
+          HEALTH_URL: 'https://preview.invalid/api/health',
+          EXPECTED_SHA: 'a'.repeat(40),
+          RETRIES: '2',
+          SLEEP_SECONDS: '0',
+          VERCEL_BYPASS_SECRET: 'unit-test-value',
+        },
+      })
+      expect(run.status).toBe(1)
+      expect(run.stdout).toMatch(
+        /Response is not valid JSON \(attempt 1\/2, http=200, elapsed=\d+s\)/
+      )
+      expect(run.stdout).toMatch(
+        /Response is not valid JSON \(attempt 2\/2, http=200, elapsed=\d+s\)/
+      )
+      expect(run.stdout).toContain("HTML page title: 'Login - Vercel'")
+      expect(run.stdout).toMatch(
+        /failed to become healthy after waiting \(elapsed=\d+s, last page title: 'Login/
+      )
+      expect(run.stdout).not.toContain('unit-test-value')
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
   })
 
   it('manual preview e2e runs only after both previews serve the dispatched commit', () => {
