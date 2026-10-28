@@ -1462,6 +1462,82 @@ describe('round 7l censor characters, names and the rap half', () => {
   })
 })
 
+describe('round 7m phrases with one obfuscated word, emoji letters and tag characters', () => {
+  const locales = [...everyLocale, 'en-US', 'en-GB', 'fr-FR']
+  it.each([
+    'te voy a v*olar',
+    'te voy a viol@r',
+    'je vais te v*oler',
+    'kill y*urself',
+    'k*ll yourself',
+    'kill yourse|f',
+    'heil h!tler',
+    'wh*te power',
+    'te voy a m@tar',
+    'kill yourse1f',
+    'ky$',
+    'k*ll y0urself',
+    'blow j*b',
+    'g@ng bang',
+  ])('withholds %s in every locale', (text) => {
+    for (const locale of locales)
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  const glyphs: Record<string, (index: number) => string> = {
+    regional: (index) => String.fromCodePoint(0x1f1e6 + index),
+    'negative-circled': (index) => String.fromCodePoint(0x1f150 + index),
+    'negative-squared': (index) => String.fromCodePoint(0x1f170 + index),
+    squared: (index) => String.fromCodePoint(0x1f130 + index),
+    circled: (index) => String.fromCodePoint(0x24d0 + index),
+    parenthesized: (index) => String.fromCodePoint(0x249c + index),
+    tag: (index) => String.fromCodePoint(0xe0061 + index),
+  }
+  const spell = (word: string, glyph: (index: number) => string): string =>
+    [...word].map((ch) => glyph(ch.charCodeAt(0) - 97)).join('')
+
+  it('reads emoji-letter and tag spellings of raped and faggot', () => {
+    for (const locale of locales)
+      for (const [name, glyph] of Object.entries(glyphs))
+        for (const word of ['raped', 'faggot']) {
+          const text = spell(word, glyph)
+          expect(screen(text, locale).disposition, `${locale} ${name} ${word}`).not.toBe(
+            'pass'
+          )
+          expect(
+            screen(`he ${text} her`, locale).disposition,
+            `${locale} ${name} he ${word} her`
+          ).not.toBe('pass')
+        }
+  })
+
+  it('reads the spelling beside real flags, in either order', () => {
+    const flag = '\u{1F1EB}\u{1F1F7}'
+    const raped = spell('raped', glyphs.regional as (index: number) => string)
+    for (const text of [
+      `${flag}${raped}`,
+      `${raped}${flag}`,
+      `${flag}${raped}${flag}`,
+      `${flag} ${raped}`,
+    ])
+      for (const locale of locales)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('keeps flags clean: valid pairs, rows, beside words and subdivision flags', () => {
+    for (const locale of locales)
+      for (const text of [
+        '\u{1F1EB}\u{1F1F7}',
+        '\u{1F1FA}\u{1F1F8}\u{1F1EC}\u{1F1E7}\u{1F1EB}\u{1F1F7}\u{1F1E9}\u{1F1EA}',
+        'Made in\u{1F1EE}\u{1F1F9}',
+        '\u{1F1F9}\u{1F1F7} Teslimat',
+        '\u{1F1F0}\u{1F1EE}\u{1F1F0}\u{1F1EA} team',
+        '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F} fans',
+      ])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+})
+
 describe('round 7b a high-severity term cut in two whole words', () => {
   it('withholds tap ete and other two-way cuts with both parts of three letters or more', () => {
     for (const text of [

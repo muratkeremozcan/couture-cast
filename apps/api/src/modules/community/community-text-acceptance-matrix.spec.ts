@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { FLAG_CODES } from './community-text-acceptance-flags'
 import {
   CommunityTextScreener,
   toFoldedForm,
@@ -8,30 +9,48 @@ import {
 } from './community-text-screener'
 
 /**
- * FROZEN ACCEPTANCE MATRIX (round 7l). Every high-severity term of the seven lists, and
- * every term of the sexual-violence family, is crossed with every transform class below. A
- * transformed spelling must be withheld (review or block), never pass. Later screening
- * reviews judge against this matrix and the clean corpus spec: a finding is a merge blocker
+ * FROZEN ACCEPTANCE MATRIX (round 7m). Every high-severity term of the seven lists, and
+ * every term of the sexual-violence family, 245 terms in all (single words, multi-word
+ * phrases and the three-letter kys), is crossed with every transform class that applies to
+ * it. A transformed spelling must be withheld (review or block), never pass. Later screening
+ * reviews judge against this matrix and the clean corpus specs: a finding is a merge blocker
  * only if it fails one of them, or is a new transform class that lets a high-severity or
  * sexual-violence term pass outright.
  *
- * Classes and their exact definition (w is the folded term, n its length in letters):
+ * Classes (w is the folded word, n its length in letters; a phrase is transformed one word
+ * at a time, any one word, and a class marked [whole] is applied to every word at once):
  * - inflection: every generated plural and inflected form, bare.
- * - leet-single / leet-all / leet-all-sym: one letter, or every letter, replaced by its
- *   digit or symbol (a 4 @, e 3, i 1 ! |, o 0, s 5 $, t 7 +, l 1 |, b 8, g 9 6, z 2).
+ * - leet-single / leet-all / leet-all-sym [whole]: one letter, or every letter, replaced by
+ *   its digit or symbol (a 4 @, e 3, i 1 ! |, o 0, s 5 $, t 7 +, l 1 |, b 8, g 9 6, z 2).
  * - censor: one letter replaced by one of * _ - # . (a dot or hyphen replaces an inner
  *   letter only: at an edge it is sentence punctuation).
- * - confusable-single, fullwidth-all, math-bold-all, smallcaps-all: Cyrillic, Greek,
+ * - confusable-single, fullwidth-all, math-bold-all, smallcaps-all [whole]: Cyrillic, Greek,
  *   small-capital, fullwidth and mathematical-bold look-alikes, one letter or all.
+ * - enclosed-<alphabet>-all [whole] / -single, alphabets circled, negative-circled, squared,
+ *   negative-squared, regional (regional indicators), parenthesized and tag (tag characters):
+ *   one letter, or every letter, in that alphabet.
  * - stretch: one letter tripled.
  * - split2: one cut at every position with every separator - . _ / * | , · ~ and, across
  *   plain whitespace, only when both parts have three letters or more (a one- or two-letter
- *   word beside a space is a function word: "put a").
+ *   word beside a space is a function word: "put a"). Phrases: words of six letters or more,
+ *   symbol separators.
  * - split3: two cuts at every pair of positions, one separator per pair rotated through the
- *   same set.
+ *   same set (single words only).
  * - typo-transpose / typo-delete: two adjacent inner letters swapped, or one inner letter
- *   removed, for terms of eight letters or more.
- * Accepted exceptions are listed in EXCEPTIONS and each is an ordinary word.
+ *   removed, for single words of eight letters or more.
+ * Exclusions, each stated with its reason:
+ * - A term whose regional-indicator spelling (or the spelling of one of its words) is a row of
+ *   valid flag pairs cannot be told from the flags (kike is Kiribati and Kenya): the grammar
+ *   bound reads such a row as flags, and the term list is pinned in PINNED_FLAG_AMBIGUOUS.
+ * - Whole-phrase classes leave words of one or two letters (a, te, um) untouched: a symbol or
+ *   flag standing for one of them is any letter or country.
+ * - Words of one or two letters inside a phrase ("a" in te voy a matar) take no per-word
+ *   class: a wildcard or leet symbol there stands for any letter or function word.
+ * - kys (three letters) takes no censor, split or typo class: a three-letter wildcard or cut
+ *   collides with ordinary fragments (k*s, ky*, k ys).
+ * - Phrases take no split3 or typo class: the re-split pass reads cuts inside phrase words,
+ *   which split2 covers.
+ * - Ordinary words that cannot be withheld are listed in EXCEPTIONS.
  */
 const screener = new CommunityTextScreener()
 const LANGS = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr'] as const
@@ -92,6 +111,15 @@ const LOOKALIKE: Record<string, string[]> = {
   y: ['у', 'ʏ', 'ｙ'],
   z: ['ᴢ', 'ｚ'],
 }
+const ENCLOSED: Record<string, (index: number) => string> = {
+  circled: (index) => String.fromCodePoint(0x24d0 + index),
+  'negative-circled': (index) => String.fromCodePoint(0x1f150 + index),
+  squared: (index) => String.fromCodePoint(0x1f130 + index),
+  'negative-squared': (index) => String.fromCodePoint(0x1f170 + index),
+  regional: (index) => String.fromCodePoint(0x1f1e6 + index),
+  parenthesized: (index) => String.fromCodePoint(0x249c + index),
+  tag: (index) => String.fromCodePoint(0xe0061 + index),
+}
 const SEPARATORS = ['-', '.', '_', '/', '*', '|', ',', '·', '~']
 const CENSORS = ['*', '_', '-', '#', '.']
 
@@ -99,10 +127,15 @@ const CENSORS = ['*', '_', '-', '#', '.']
 const EXCEPTIONS = new Set([
   'inflection|spices',
   'inflection|negros',
-  ...['confusable-single', 'fullwidth-all', 'math-bold-all'].flatMap((cls) => [
-    `${cls}|mongólico`,
-    `${cls}|négro`,
-  ]),
+  ...[
+    'confusable-single',
+    'fullwidth-all',
+    'math-bold-all',
+    ...Object.keys(ENCLOSED).flatMap((name) => [
+      `enclosed-${name}-all`,
+      `enclosed-${name}-single`,
+    ]),
+  ].flatMap((cls) => [`${cls}|mongólico`, `${cls}|négro`]),
 ])
 
 const failures: Record<string, string[]> = {}
@@ -114,63 +147,90 @@ function check(cls: string, term: string, text: string): void {
     (failures[cls] ??= []).push(`${term} => ${text}`)
 }
 
-function checkPerLetter(term: string, word: string): void {
+type Emit = (cls: string, variant: string) => void
+
+/** Per-word classes: any one letter changed. `all` are the classes that change every letter. */
+function perLetter(word: string, emit: Emit): void {
   const n = word.length
   for (let at = 0; at < n; at += 1) {
     const letter = word[at] as string
-    for (const symbol of LEET[letter] ?? [])
-      check('leet-single', term, word.slice(0, at) + symbol + word.slice(at + 1))
+    const index = letter.charCodeAt(0) - 97
+    const swap = (glyph: string): string => word.slice(0, at) + glyph + word.slice(at + 1)
+    for (const symbol of LEET[letter] ?? []) emit('leet-single', swap(symbol))
     for (const symbol of CENSORS) {
       if ((at === 0 || at === n - 1) && (symbol === '-' || symbol === '.')) continue
-      check('censor', term, word.slice(0, at) + symbol + word.slice(at + 1))
+      emit('censor', swap(symbol))
     }
-    for (const look of LOOKALIKE[letter] ?? [])
-      check('confusable-single', term, word.slice(0, at) + look + word.slice(at + 1))
-    check('stretch', term, word.slice(0, at) + letter.repeat(3) + word.slice(at + 1))
+    for (const look of LOOKALIKE[letter] ?? []) emit('confusable-single', swap(look))
+    emit('stretch', swap(letter.repeat(3)))
+    for (const [name, glyph] of Object.entries(ENCLOSED))
+      emit(`enclosed-${name}-single`, swap(glyph(index)))
   }
 }
 
-function checkWholeWord(term: string, word: string): void {
-  const leetAll = (pick: (options: string[]) => string): string =>
+const FLAG_SET = new Set(FLAG_CODES)
+/** Terms whose regional-indicator spelling is a row of valid flags (kike is Kiribati + Kenya). */
+const flagAmbiguous = new Set<string>()
+const isFlagRow = (letters: string): boolean =>
+  letters.length % 2 === 0 &&
+  [...letters.matchAll(/../g)].every((pair) => FLAG_SET.has(pair[0].toUpperCase()))
+
+/** Whole-word classes: every letter of every word of three letters or more changed at once. */
+function wholeWord(words: string[], term: string, emit: Emit): void {
+  const phrase = words.length > 1
+  const each = (convert: (word: string) => string): string =>
+    words.map((word) => (phrase && word.length < 3 ? word : convert(word))).join(' ')
+  const letters = (glyph: (index: number) => string) => (word: string) =>
+    [...word].map((ch) => glyph(ch.charCodeAt(0) - 97)).join('')
+  const leetAll = (pick: (options: string[]) => string) => (word: string) =>
     [...word].map((ch) => (LEET[ch] ? pick(LEET[ch]) : ch)).join('')
-  const first = leetAll((options) => options[0] as string)
-  const last = leetAll((options) => options.at(-1) as string)
-  if (first !== word) check('leet-all', term, first)
-  if (last !== word) check('leet-all-sym', term, last)
-  check(
-    'fullwidth-all',
-    term,
-    [...word].map((ch) => String.fromCharCode(ch.charCodeAt(0) + 0xfee0)).join('')
-  )
-  check(
-    'math-bold-all',
-    term,
-    [...word].map((ch) => String.fromCodePoint(0x1d41a + ch.charCodeAt(0) - 97)).join('')
-  )
+  const plain = words.join(' ')
+  const first = each(leetAll((options) => options[0] as string))
+  const last = each(leetAll((options) => options.at(-1) as string))
+  if (first !== plain) emit('leet-all', first)
+  if (last !== plain) emit('leet-all-sym', last)
+  emit('fullwidth-all', each(letters((index) => String.fromCharCode(0xff41 + index))))
+  emit('math-bold-all', each(letters((index) => String.fromCodePoint(0x1d41a + index))))
   const isSmallCapital = (look: string): boolean => {
     const code = look.codePointAt(0) as number
     return code >= 0x1d00 && code <= 0xa7ff
   }
-  const small = [...word].map((ch) => LOOKALIKE[ch]?.find(isSmallCapital) ?? ch).join('')
-  if (small !== word) check('smallcaps-all', term, small)
+  const small = each((word) =>
+    [...word].map((ch) => LOOKALIKE[ch]?.find(isSmallCapital) ?? ch).join('')
+  )
+  if (small !== plain) emit('smallcaps-all', small)
+  for (const [name, glyph] of Object.entries(ENCLOSED)) {
+    const converted = each(letters(glyph))
+    if (
+      name === 'regional' &&
+      converted.split(' ').some((run, at) => {
+        const word = words[at] as string
+        return run !== word && isFlagRow(word)
+      })
+    ) {
+      flagAmbiguous.add(term)
+      continue
+    }
+    emit(`enclosed-${name}-all`, converted)
+  }
 }
 
-function checkSplits(term: string, word: string): void {
+function splits(word: string, emit: Emit, three: boolean, spaces: boolean): void {
   const n = word.length
-  const all = [...SEPARATORS, ' ']
+  const all = spaces ? [...SEPARATORS, ' '] : SEPARATORS
   for (let cut = 1; cut < n; cut += 1)
     for (const separator of all) {
       if (separator === ' ' && (cut < 3 || n - cut < 3)) continue
-      check('split2', term, word.slice(0, cut) + separator + word.slice(cut))
+      emit('split2', word.slice(0, cut) + separator + word.slice(cut))
     }
+  if (!three) return
   for (let first = 1; first < n - 1; first += 1)
     for (let second = first + 1; second < n; second += 1) {
       const separator = all[(first * 7 + second * 3 + n) % all.length] as string
       const short = first < 3 || second - first < 3 || n - second < 3
       if (separator === ' ' && short) continue
-      check(
+      emit(
         'split3',
-        term,
         word.slice(0, first) +
           separator +
           word.slice(first, second) +
@@ -180,15 +240,15 @@ function checkSplits(term: string, word: string): void {
     }
 }
 
-function checkTypos(term: string, word: string): void {
+function typos(word: string, emit: Emit): void {
   const n = word.length
   if (n < 8) return
   for (let at = 1; at < n - 2; at += 1) {
     const swapped = word.slice(0, at) + word[at + 1] + word[at] + word.slice(at + 2)
-    if (swapped !== word) check('typo-transpose', term, swapped)
+    if (swapped !== word) emit('typo-transpose', swapped)
   }
   for (let at = 1; at < n - 1; at += 1)
-    check('typo-delete', term, word.slice(0, at) + word.slice(at + 1))
+    emit('typo-delete', word.slice(0, at) + word.slice(at + 1))
 }
 
 function runMatrix(): void {
@@ -200,25 +260,49 @@ function runMatrix(): void {
   for (const { term } of terms) {
     if (seen.has(term)) continue
     seen.add(term)
-    const word = toFoldedForm(toLiteralForm(term))
-    if (!/^[a-z]{4,}$/.test(word)) continue
-    checkPerLetter(term, word)
-    checkWholeWord(term, word)
-    checkSplits(term, word)
-    checkTypos(term, word)
+    const words = toFoldedForm(toLiteralForm(term))
+      .split(/[^a-z]+/)
+      .filter(Boolean)
+    const phrase = words.length > 1
+    const emitTerm: Emit = (cls, variant) => check(cls, term, variant)
+    wholeWord(words, term, emitTerm)
+    for (const [index, word] of words.entries()) {
+      if (phrase && word.length < 3) continue
+      const around = (variant: string): string =>
+        words.map((other, at) => (at === index ? variant : other)).join(' ')
+      const emitWord: Emit = (cls, variant) => emitTerm(cls, around(variant))
+      const short = !phrase && word.length < 4
+      const dropShort = (cls: string, variant: string): void => {
+        if (
+          short &&
+          (cls === 'censor' || cls.startsWith('split') || cls.startsWith('typo'))
+        )
+          return
+        emitWord(cls, variant)
+      }
+      perLetter(word, dropShort)
+      if (!short && (!phrase || word.length >= 6))
+        splits(word, dropShort, !phrase, !phrase)
+      if (!phrase && !short) typos(word, dropShort)
+    }
   }
 }
 
-// The matrix screens about 26,000 spellings. Measured with coverage instrumentation the
-// run takes 7 s (CI about 2.6 times slower); the budget keeps a wide margin for the 4 vCPU runner.
-const MATRIX_TIMEOUT_MS = 120_000
+// The matrix screens about 60,000 spellings. Measured with coverage instrumentation the run
+// takes 15 s; the budget keeps a wide margin for the 4 vCPU runner (about 2.6 times
+// slower than a local run).
+const MATRIX_TIMEOUT_MS = 300_000
 
 describe('frozen adversarial matrix', () => {
   beforeAll(runMatrix, MATRIX_TIMEOUT_MS)
 
   it('covers the pinned number of terms and checks', () => {
-    expect(seenTerms()).toBe(PINNED_TERMS)
+    expect(new Set(terms.map((entry) => entry.term)).size).toBe(PINNED_TERMS)
     expect(counts).toEqual(PINNED_COUNTS)
+  })
+
+  it('lists the terms whose regional spelling is a row of valid flags', () => {
+    expect([...flagAmbiguous].toSorted()).toEqual(PINNED_FLAG_AMBIGUOUS)
   })
 
   for (const cls of Object.keys(PINNED_COUNTS))
@@ -227,23 +311,59 @@ describe('frozen adversarial matrix', () => {
     })
 })
 
-function seenTerms(): number {
-  return new Set(terms.map((entry) => entry.term)).size
-}
+const PINNED_FLAG_AMBIGUOUS: string[] = [
+  'boiola',
+  'canına kıy',
+  'deep throat',
+  'figlio di puttana',
+  'fils de pute',
+  'gang bang',
+  'gangbang',
+  'hure',
+  'ich bringe dich um',
+  'je vais te tuer',
+  'je vais te violer',
+  'kike',
+  'macaco de merda',
+  'mata te',
+  'morte agli ebrei',
+  'nigger',
+  'nique ta mère',
+  'ojalá te mueras',
+  'orospu çocuğu',
+  'pédé',
+  'seni öldüreceğim',
+  'sieg heil',
+  'töte dich selbst',
+]
 const PINNED_TERMS = 245
 const PINNED_COUNTS: Record<string, number> = {
-  censor: 6036,
-  'confusable-single': 4438,
-  'fullwidth-all': 176,
+  censor: 8809,
+  'confusable-single': 6676,
+  'enclosed-circled-all': 245,
+  'enclosed-circled-single': 2016,
+  'enclosed-negative-circled-all': 245,
+  'enclosed-negative-circled-single': 2016,
+  'enclosed-negative-squared-all': 245,
+  'enclosed-negative-squared-single': 2016,
+  'enclosed-parenthesized-all': 245,
+  'enclosed-parenthesized-single': 2016,
+  'enclosed-regional-all': 222,
+  'enclosed-regional-single': 2016,
+  'enclosed-squared-all': 245,
+  'enclosed-squared-single': 2016,
+  'enclosed-tag-all': 245,
+  'enclosed-tag-single': 2016,
+  'fullwidth-all': 245,
   inflection: 964,
-  'leet-all': 176,
-  'leet-all-sym': 176,
-  'leet-single': 1374,
-  'math-bold-all': 176,
-  'smallcaps-all': 176,
-  split2: 11029,
+  'leet-all': 245,
+  'leet-all-sym': 245,
+  'leet-single': 2071,
+  'math-bold-all': 245,
+  'smallcaps-all': 245,
+  split2: 13027,
   split3: 3493,
-  stretch: 1348,
+  stretch: 2016,
   'typo-delete': 670,
   'typo-transpose': 571,
 }

@@ -502,6 +502,68 @@ const COMBINING_MARK_PATTERN = /\p{M}/gu
  */
 const STRAY_MARK_PATTERN =
   /([\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}\p{N}])\p{M}+/gu
+/**
+ * Letters drawn as emoji or tag characters that NFKC leaves alone: negative circled
+ * (U+1F150 to U+1F169), negative squared (U+1F170 to U+1F189), regional indicator letters
+ * (U+1F1E6 to U+1F1FF) and the tag characters (U+E0020 to U+E007E, which mirror ASCII and
+ * are otherwise stripped as invisible). Circled, squared and parenthesized letters are
+ * already compatibility characters. Each maps onto the Latin letter it shows.
+ *
+ * Two grammar bounds keep real flags clean. A run of regional indicators that is entirely
+ * valid flag pairs ("🇫🇷🇩🇪") is a row of flags and reads as a break. A black flag followed by
+ * tag characters and the cancel tag ("🏴󠁧󠁢󠁥󠁮󠁧󠁿") is a subdivision flag and reads as a break.
+ */
+const SUBDIVISION_FLAG_PATTERN = /\u{1F3F4}[\u{E0020}-\u{E007E}]+\u{E007F}/gu
+const REGIONAL_RUN_PATTERN = /[\u{1F1E6}-\u{1F1FF}]+/gu
+const EMOJI_LETTER_PATTERN =
+  /[\u{1F150}-\u{1F169}\u{1F170}-\u{1F189}\u{E0020}-\u{E007E}]/gu
+
+/** ISO 3166-1 alpha-2 codes plus the reserved flag codes (AC CP DG EA EU IC TA UN XK). */
+export const REGIONAL_FLAG_CODES: ReadonlySet<string> = new Set(
+  (
+    'AC AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ ' +
+    'CA CC CD CF CG CH CI CK CL CM CN CO CP CR CU CV CW CX CY CZ DE DG DJ DK DM DO DZ EA EC EE EG EH ER ES ET EU ' +
+    'FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU IC ID IE IL IM IN IO IQ IR IS IT ' +
+    'JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ ' +
+    'NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW ' +
+    'SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TA TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ ' +
+    'UA UG UM UN US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW'
+  ).split(' ')
+)
+
+const regionalLetters = (run: string): string =>
+  [...run]
+    .map((glyph) => String.fromCharCode(97 + (glyph.codePointAt(0) as number) - 0x1f1e6))
+    .join('')
+
+/** The pairs of a regional run that are valid flags from the start, then from the end. */
+function isFlagRun(letters: string): boolean {
+  if (letters.length % 2 !== 0) return false
+  for (let at = 0; at < letters.length; at += 2)
+    if (!REGIONAL_FLAG_CODES.has(letters.slice(at, at + 2).toUpperCase())) return false
+  return true
+}
+
+/** The Latin letters of a regional run with valid flags peeled off either end, in every combination. */
+function regionalRunCandidates(letters: string): string[] {
+  const peel = (value: string, fromEnd: boolean): string[] => {
+    const steps = [value]
+    let current = value
+    while (current.length >= 2) {
+      const pair = fromEnd ? current.slice(-2) : current.slice(0, 2)
+      if (!REGIONAL_FLAG_CODES.has(pair.toUpperCase())) break
+      current = fromEnd ? current.slice(0, -2) : current.slice(2)
+      steps.push(current)
+    }
+    return steps
+  }
+  const out = new Set<string>()
+  for (const left of peel(letters, false))
+    for (const both of peel(left, true)) out.add(both)
+  out.delete(letters)
+  return [...out].filter((candidate) => candidate.length >= 4)
+}
+
 const TOKEN_SPLIT_PATTERN = /[^\p{L}\p{N}]+/u
 const LEET_TRIGGER_PATTERN = /[0-9!@$|+]/
 const REPEAT_PATTERN = /(.)\1+/gu
@@ -677,6 +739,16 @@ const SEVERITY_RANK: Readonly<Record<TextScreeningSeverity, number>> = {
 export function toLiteralForm(raw: string): string {
   let value = raw
     .normalize('NFKC')
+    .replace(SUBDIVISION_FLAG_PATTERN, ' ')
+    .replace(REGIONAL_RUN_PATTERN, (run) => {
+      const letters = regionalLetters(run)
+      return isFlagRun(letters) ? ' ' : letters
+    })
+    .replace(EMOJI_LETTER_PATTERN, (glyph) => {
+      const code = glyph.codePointAt(0) as number
+      if (code >= 0xe0020) return String.fromCharCode(code - 0xe0000)
+      return String.fromCharCode(97 + code - (code >= 0x1f170 ? 0x1f170 : 0x1f150))
+    })
     .replace(IGNORABLE_PATTERN, '')
     .replace(STRAY_MARK_PATTERN, '$1')
     .toLowerCase()
@@ -1260,6 +1332,35 @@ function classifyCutGaps(
   return result
 }
 
+/**
+ * The words of every high-severity phrase ("te voy a violar", "kill yourself", "heil
+ * hitler") with each letter in turn replaced by "?" and in leet-class form, so one censored
+ * or symbol-leet word inside a phrase can be put back before the phrase windows run.
+ */
+function buildPhraseWordKeys(indexes: readonly LanguageIndex[]): {
+  censored: ReadonlyMap<string, readonly string[]>
+  leet: ReadonlyMap<string, readonly string[]>
+} {
+  const censored = new Map<string, string[]>()
+  const leet = new Map<string, string[]>()
+  const add = (map: Map<string, string[]>, key: string, word: string): void => {
+    const words = map.get(key) ?? []
+    if (!words.includes(word)) map.set(key, [...words, word])
+  }
+  for (const index of indexes)
+    for (const phrase of index.phrases) {
+      if (phrase.meta.severity !== 'high') continue
+      for (const word of phrase.tokens) {
+        if (word.length < 3 || !/^\p{L}+$/u.test(word)) continue
+        const classed = toLeetRunForm(word)
+        add(leet, classed, word)
+        for (let at = 0; at < classed.length; at += 1)
+          add(censored, `${classed.slice(0, at)}?${classed.slice(at + 1)}`, word)
+      }
+    }
+  return { censored, leet }
+}
+
 /** Terms of this many letters or more have their one-letter typos indexed; shorter ones collide with ordinary words. */
 const TYPO_MIN_TERM_LENGTH = 8
 
@@ -1553,6 +1654,9 @@ export class CommunityTextScreener {
   private censorKeys: ReadonlyMap<string, TermMeta> = new Map()
   /** One inner deletion or adjacent transposition of every long high-severity spelling. */
   private typoKeys: ReadonlyMap<string, TermMeta> = new Map()
+  /** The words of high-severity phrases, keyed by their censored and leet spellings. */
+  private phraseWordCensorKeys: ReadonlyMap<string, readonly string[]> = new Map()
+  private phraseWordLeetKeys: ReadonlyMap<string, readonly string[]> = new Map()
   private readonly scopedAllowWords: ReadonlyMap<ScreeningLanguage, ReadonlySet<string>>
   /** Exact tokens cleared for the language the current screen() call declared. */
   private activeScopedWords: ReadonlySet<string> = new Set()
@@ -1701,6 +1805,9 @@ export class CommunityTextScreener {
     )
     this.censorKeys = buildCensorKeys(this.indexes, this.cutFamilyTerms)
     this.typoKeys = buildTypoKeys(this.indexes)
+    const phraseWords = buildPhraseWordKeys(this.indexes)
+    this.phraseWordCensorKeys = phraseWords.censored
+    this.phraseWordLeetKeys = phraseWords.leet
     for (const term of this.cutFamilyTerms) {
       if (!this.indexes.some((index) => index.singleCollapsed.has(term)))
         throw new CommunityTextScreenerConfigError(
@@ -1833,6 +1940,22 @@ export class CommunityTextScreener {
       budget
     )) {
       verdict.match(outcome, this.dispositionFor(outcome.meta.severity))
+    }
+
+    for (const outcome of this.collectRegionalRunMatches(boundedRaw, budget))
+      verdict.match(outcome, this.dispositionFor(outcome.meta.severity))
+
+    for (const restored of this.restorePhraseWords(literal)) {
+      const restoredTokens = this.foldTokens(restored, budget)
+      const none = restoredTokens.literalTokens.map(() => false)
+      for (const outcome of this.collectMatches(
+        restored,
+        restoredTokens.literalTokens,
+        restoredTokens.foldedTokens,
+        { allowed: none, phraseAllowed: none },
+        budget
+      ))
+        verdict.match(outcome, this.dispositionFor(outcome.meta.severity))
     }
 
     const truncated = overLength || budget.exhausted
@@ -2255,6 +2378,63 @@ export class CommunityTextScreener {
   }
 
   /**
+   * A regional indicator run that is not a row of flags, with valid flags peeled off either
+   * end ("🇫🇷" beside the letters 🇷🇦🇵🇪🇩), read as the Latin word it spells.
+   */
+  private collectRegionalRunMatches(
+    raw: string,
+    budget: ExpansionBudget
+  ): MatchOutcome[] {
+    const outcomes: MatchOutcome[] = []
+    for (const run of raw.matchAll(REGIONAL_RUN_PATTERN)) {
+      const letters = regionalLetters(run[0])
+      if (isFlagRun(letters)) continue
+      for (const candidate of regionalRunCandidates(letters)) {
+        const outcome = this.matchCandidate(toFoldedForm(candidate), false, budget)
+        if (outcome) outcomes.push({ meta: outcome.meta, obfuscated: true })
+      }
+    }
+    return outcomes
+  }
+
+  /**
+   * One word of a high-severity phrase written censored ("v*olar") or with a leet symbol
+   * ("viol@r") is put back, so the phrase windows can see "te voy a violar". Returns the
+   * rewritten text, or null when no word was restored.
+   */
+  private restorePhraseWords(literal: string): string[] {
+    if (this.phraseWordCensorKeys.size === 0) return []
+    // Each obfuscated chunk may restore to several phrase words ("?ang" is gang or hang),
+    // so the texts are the combinations, capped.
+    let texts: string[] = ['']
+    let changed = false
+    let cursor = 0
+    for (const chunk of literal.matchAll(/\S+/gu)) {
+      const raw = chunk[0]
+      const core = raw.replace(/^[^\p{L}\p{N}*_#@$!|+]+|[^\p{L}\p{N}*_#@$!|+]+$/gu, '')
+      let words: readonly string[] | undefined
+      if (core.length >= 3) {
+        if (/^[\p{L}\p{N}]*[*_#.-][\p{L}\p{N}]*$/u.test(core)) {
+          const at = core.search(/[*_#.-]/u)
+          words = this.phraseWordCensorKeys.get(
+            toLeetRunForm(toFoldedForm(`${core.slice(0, at)}?${core.slice(at + 1)}`))
+          )
+        } else if (/[@$!|+]/.test(core) && /^[\p{L}\p{N}@$!|+]+$/u.test(core)) {
+          words = this.phraseWordLeetKeys.get(toLeetRunForm(toFoldedForm(core)))
+        }
+      }
+      const gap = literal.slice(cursor, chunk.index)
+      cursor = chunk.index + raw.length
+      const options = words ? words.map((word) => raw.replace(core, word)) : [raw]
+      if (words) changed = true
+      texts = texts
+        .flatMap((text) => options.map((option) => text + gap + option))
+        .slice(0, 16)
+    }
+    return changed ? texts : []
+  }
+
+  /**
    * A word with one letter replaced by a censor symbol (* _ # . -) is one whitespace-bounded
    * run that the tokenizer splits at the symbol. The run is read with the symbol as a
    * wildcard against every high-severity spelling and every sexual-violence family term.
@@ -2293,7 +2473,11 @@ export class CommunityTextScreener {
       const trimmed = whole.replace(/^[@$!|+]+|[@$!|+]+$/gu, '')
       for (const candidate of new Set([whole, trimmed])) {
         if (!/[\p{L}\p{N}]/u.test(candidate) || !/[@$!|+]/.test(candidate)) continue
-        if (candidate.length < MIN_SINGLE_TERM_LENGTH) continue
+        if (
+          candidate.length < MIN_SINGLE_TERM_LENGTH &&
+          !SHORT_TERM_EXCEPTIONS.has(toLeetRunForm(toFoldedForm(candidate)))
+        )
+          continue
         if (!budget.spend(candidate)) return candidates
         candidates.push(candidate)
       }
