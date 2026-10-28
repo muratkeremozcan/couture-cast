@@ -315,65 +315,109 @@ describe('pinned browser installer', () => {
 })
 
 describe('browser dependency workflow', () => {
-  test('every browser-mode mobile bridge has bounded pinned Chromium provisioning and API36 retains all three engines', async () => {
-    const workflow = parse(
+  const read = async () =>
+    parse(
       await readFile(
         new URL('../../.github/workflows/pr-share-card-native.yml', import.meta.url),
         'utf8'
       )
     )
-    const steps = workflow.jobs['original-resource'].steps
-    const provisioning = steps.filter((step) =>
+  const provisioningOf = (steps) =>
+    steps.filter((step) =>
       step.run?.includes('node scripts/ci/share-card-browser-deps.mjs')
     )
-    assert.equal(provisioning.length, 1)
-    const step = provisioning[0]
-    assert.equal(step.if, "matrix.platform == 'android'")
+  const bridge = (steps) =>
+    steps.findIndex((item) =>
+      item.run?.includes('node scripts/e2e-share-card/bridge-a11y.mjs')
+    )
+  const assertBounded = (step) => {
     assert.equal(step['timeout-minutes'], 12)
     assert.equal(step['continue-on-error'], undefined)
-    const controls = step.run.indexOf('node scripts/ci/node-test-gate.mjs browser-deps')
     assert.equal(
       runGatesTestFile(step.run, 'scripts/ci/share-card-browser-deps.test.mjs'),
       true
     )
     assert.ok(
-      controls >= 0 &&
-        controls < step.run.indexOf('node scripts/ci/share-card-browser-deps.mjs')
+      step.run.indexOf('node scripts/ci/node-test-gate.mjs browser-deps') >= 0 &&
+        step.run.indexOf('node scripts/ci/node-test-gate.mjs browser-deps') <
+          step.run.indexOf('node scripts/ci/share-card-browser-deps.mjs')
     )
-    assert.ok(step.run.includes("if [ '${{ matrix.api }}' = '32' ]; then"))
-    assert.ok(
-      step.run.includes('node scripts/ci/share-card-browser-deps.mjs --chromium-only')
-    )
-    assert.ok(
-      step.run
-        .split('\n')
-        .some((line) => line.trim() === 'node scripts/ci/share-card-browser-deps.mjs')
-    )
-    const mac = steps.find((item) =>
+  }
+
+  test('every browser-mode mobile bridge has bounded pinned Chromium provisioning', async () => {
+    const workflow = await read()
+    const jobs = [
+      'original-resource',
+      'android36-native-matrix',
+      'android36-original',
+      'android36-interaction',
+    ]
+    for (const name of jobs) {
+      const steps = workflow.jobs[name].steps
+      const provisioning = provisioningOf(steps)
+      assert.equal(provisioning.length, 1, name)
+      const step = provisioning[0]
+      assertBounded(step)
+      assert.equal(
+        step.run
+          .split('\n')
+          .some((line) => line.trim() === 'node scripts/ci/share-card-browser-deps.mjs'),
+        false,
+        `${name}: native bridge needs Chromium only`
+      )
+      assert.ok(
+        step.run.includes('node scripts/ci/share-card-browser-deps.mjs --chromium-only'),
+        name
+      )
+      assert.equal(
+        steps.some((item) => item.run?.includes('npx playwright install --with-deps')),
+        false,
+        name
+      )
+      assert.ok(steps.indexOf(step) < bridge(steps), name)
+      assert.ok(bridge(steps) >= 0, name)
+      assert.equal(
+        steps.some(
+          (item) => item.name === 'Genuine browser share-card acceptance matrix'
+        ),
+        false,
+        `${name}: the browser matrix belongs to browser-acceptance`
+      )
+    }
+    const original = workflow.jobs['original-resource'].steps
+    assert.equal(provisioningOf(original)[0].if, "matrix.platform == 'android'")
+    const mac = original.find((item) =>
       item.run?.includes('npx --no-install playwright install chromium')
     )
     assert.ok(mac)
     assert.equal(mac.if, "matrix.platform == 'ios'")
     assert.equal(mac['timeout-minutes'], 6)
     assert.equal(mac['continue-on-error'], undefined)
-    const bridge = steps.findIndex((item) =>
-      item.run?.includes('node scripts/e2e-share-card/bridge-a11y.mjs')
+    assert.ok(original.indexOf(mac) < bridge(original))
+  })
+
+  test('the independent browser acceptance job retains all three pinned engines before the matrix', async () => {
+    const steps = (await read()).jobs['browser-acceptance'].steps
+    const provisioning = provisioningOf(steps)
+    assert.equal(provisioning.length, 1)
+    const step = provisioning[0]
+    assertBounded(step)
+    assert.ok(
+      step.run
+        .split('\n')
+        .some((line) => line.trim() === 'node scripts/ci/share-card-browser-deps.mjs')
     )
-    assert.ok(steps.indexOf(step) < bridge && steps.indexOf(mac) < bridge)
+    assert.equal(step.run.includes('--chromium-only'), false)
     assert.equal(
       steps.some((item) => item.run?.includes('npx playwright install --with-deps')),
       false
     )
     assert.ok(
-      steps.findIndex((item) => item === step) <
+      steps.indexOf(step) <
         steps.findIndex(
           (item) => item.name === 'Genuine browser share-card acceptance matrix'
         )
     )
-    assert.ok(
-      steps.some((item) =>
-        item.run?.includes('node scripts/e2e-share-card/bridge-a11y.mjs')
-      )
-    )
+    assert.equal(bridge(steps), -1)
   })
 })

@@ -11,7 +11,8 @@ async function journey(
   sdk,
   expected = '36',
   status = 0,
-  accel = 'KVM (version 12) is installed and usable.'
+  accel = 'KVM (version 12) is installed and usable.',
+  { suite = sdk.trim() === '32' ? 'all' : 'matrix', failOn = '' } = {}
 ) {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'cc68-sdk-guard-'))
   t.after(() => rm(directory, { recursive: true, force: true }))
@@ -19,7 +20,7 @@ async function journey(
   for (const binary of ['adb', 'node', 'bash']) {
     await writeFile(
       path.join(directory, binary),
-      `#!/bin/bash\nprintf '%s %s\\n' '${binary}' "$*" >> "$CAPTURE"\nif [[ "$*" == *getprop* ]]; then printf '%s\\n' "$SDK"; exit "$SDK_STATUS"; fi\n`,
+      `#!/bin/bash\nprintf '%s %s\\n' '${binary}' "$*" >> "$CAPTURE"\nif [[ "$*" == *getprop* ]]; then printf '%s\\n' "$SDK"; exit "$SDK_STATUS"; fi\nif [[ -n "$FAIL_ON" && "$*" == *"$FAIL_ON"* ]]; then exit 1; fi\n`,
       { mode: 0o700 }
     )
   }
@@ -38,6 +39,8 @@ async function journey(
       SDK: sdk,
       SDK_STATUS: String(status),
       CC68_ANDROID_API: expected,
+      CC68_ANDROID_SUITE: suite,
+      FAIL_ON: failOn,
       ANDROID_HOME: directory,
       ACCEL: accel,
     },
@@ -60,21 +63,112 @@ describe('Android SDK guard', () => {
     })
   }
 
-  for (const sdk of ['32', '36']) {
-    test(`Android API ${sdk} executes every required native path after one verified probe`, async (t) => {
-      const { result, commands } = await journey(t, `${sdk}\r`, sdk)
+  // Every selectable suite and the exact commands it owns after install, open and signin.
+  const suites = [
+    ['32', 'all', ['proof', 'matrix', 'rapid-watermark'], []],
+    ['36', 'matrix', ['matrix'], []],
+    ['36', 'original', ['proof'], []],
+    [
+      '36',
+      'interaction',
+      ['rapid-watermark', 'a11y', 'fallback-focus'],
+      ['bash scripts/ci/share-card-android-release-font.sh'],
+    ],
+  ]
+  const owned = ['proof', 'matrix', 'rapid-watermark', 'a11y', 'fallback-focus']
+  const font = 'bash scripts/ci/share-card-android-release-font.sh'
+
+  for (const [sdk, suite, expected, extra] of suites) {
+    test(`Android API ${sdk} ${suite} installs, opens and signs in before only its own proofs`, async (t) => {
+      const { result, commands } = await journey(t, `${sdk}\r`, sdk, 0, undefined, {
+        suite,
+      })
       assert.equal(result.status, 0, result.stderr)
       assert.equal(commands.match(/getprop/g)?.length, 1)
-      for (const command of ['open', 'signin', 'proof', 'matrix', 'rapid-watermark'])
-        assert.match(commands, new RegExp(`mjs ${command} `))
-      assert.equal(commands.includes('mjs a11y '), sdk === '36')
-      assert.equal(commands.includes('mjs fallback-focus '), sdk === '36')
-      assert.equal(
-        commands.includes('bash scripts/ci/share-card-android-release-font.sh'),
-        sdk === '36'
+      const order = ['install ', 'mjs open ', 'mjs signin ']
+      const at = (needle) => commands.indexOf(needle)
+      assert.ok(
+        order.every(
+          (needle, i) => at(needle) >= 0 && (i === 0 || at(needle) > at(order[i - 1]))
+        )
       )
+      for (const command of owned) {
+        const ran = commands.includes(`mjs ${command} `)
+        assert.equal(ran, expected.includes(command), `${suite}: ${command}`)
+        if (ran)
+          assert.ok(at(`mjs ${command} `) > at('mjs signin '), `${suite}: ${command}`)
+      }
+      assert.equal(commands.includes(font), extra.includes(font), suite)
+      if (extra.includes(font)) assert.ok(at(font) > at('mjs signin '))
     })
   }
+
+  test('the Android36 partitions together cover every proof command exactly once', async (t) => {
+    const ran = []
+    for (const suite of ['matrix', 'original', 'interaction']) {
+      const { result, commands } = await journey(t, '36', '36', 0, undefined, { suite })
+      assert.equal(result.status, 0, result.stderr)
+      ran.push(
+        ...[...owned, 'font'].filter((command) =>
+          commands.includes(command === 'font' ? font : `mjs ${command} `)
+        )
+      )
+    }
+    // The pre-split API36 journey: proof, matrix, rapid, a11y, fallback and Release font.
+    assert.deepEqual([...ran].sort(), [
+      'a11y',
+      'fallback-focus',
+      'font',
+      'matrix',
+      'proof',
+      'rapid-watermark',
+    ])
+  })
+
+  for (const [name, sdk, suite] of [
+    ['an unpartitioned API36 run', '36', 'all'],
+    ['an empty API36 suite', '36', ''],
+    ['an unknown API36 suite', '36', 'browser'],
+    ['an Android36 suite on API32', '32', 'matrix'],
+    ['an empty API32 suite', '32', ''],
+    ['a mixed-case suite', '36', 'Matrix'],
+  ]) {
+    test(`${name} stops before install`, async (t) => {
+      const { result, commands } = await journey(t, sdk, sdk, 0, undefined, { suite })
+      assert.equal(result.status, 2)
+      assert.match(result.stderr, /suite must match the verified Android API/)
+      assert.doesNotMatch(commands, /install |node |bash |accel-check/)
+    })
+  }
+
+  for (const [suite, failOn] of [
+    ['matrix', 'mjs matrix '],
+    ['original', 'mjs proof '],
+    ['interaction', 'mjs a11y '],
+    ['interaction', 'android-release-font'],
+  ]) {
+    test(`a failing ${failOn.trim()} command fails the ${suite} suite and stops later proofs`, async (t) => {
+      const { result, commands } = await journey(t, '36', '36', 0, undefined, {
+        suite,
+        failOn,
+      })
+      assert.notEqual(result.status, 0)
+      assert.ok(commands.includes(failOn))
+      if (failOn === 'mjs a11y ') assert.equal(commands.includes('fallback-focus'), false)
+    })
+  }
+
+  test('a failing sign-in stops every suite before its proofs', async (t) => {
+    for (const suite of ['matrix', 'original', 'interaction']) {
+      const { result, commands } = await journey(t, '36', '36', 0, undefined, {
+        suite,
+        failOn: 'mjs signin ',
+      })
+      assert.notEqual(result.status, 0)
+      for (const command of owned)
+        assert.equal(commands.includes(`mjs ${command} `), false)
+    }
+  })
 })
 
 describe('Android KVM guard', () => {

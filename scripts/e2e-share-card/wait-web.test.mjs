@@ -387,11 +387,11 @@ describe('web startup evidence schema', () => {
 })
 
 describe('web startup CI wiring', () => {
-  test('mandatory API36 CI waits through the instrumented wrapper and registers its controls', () => {
+  test('the independent browser acceptance job waits through the instrumented wrapper and registers its controls', () => {
     const workflow = parse(
       fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
     )
-    const steps = workflow.jobs['original-resource'].steps
+    const steps = workflow.jobs['browser-acceptance'].steps
     const step = steps.find(
       (row) => row.name === 'Genuine browser share-card acceptance matrix'
     )
@@ -410,7 +410,7 @@ test('the API36 browser matrix builds the production web before it starts and wa
   const workflow = parse(
     fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
   )
-  const step = workflow.jobs['original-resource'].steps.find(
+  const step = workflow.jobs['browser-acceptance'].steps.find(
     (row) => row.name === 'Genuine browser share-card acceptance matrix'
   )
   const lines = step.run.split('\n').map((line) => line.trim())

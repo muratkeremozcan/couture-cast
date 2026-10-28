@@ -51,16 +51,17 @@ jobs:
             platform: android
             api: 32
             target: google_apis
-          - os: ubuntu-latest
-            platform: android
-            api: 36
-            target: google_apis_playstore
+            suite: all
+            journey_timeout: 65
           - os: macos-15-intel
             platform: ios
             api: 0
+            suite: all
+            journey_timeout: 65
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
-    env:
+    env: &runtime_env
+      PLAYWRIGHT_SKIP_DB_RESET: 'true'
       CC68_HARNESS_DIR: _bmad-output/test-artifacts/story-6-8/runtime
       MAESTRO_CLI_NO_ANALYTICS: '1'
     steps:
@@ -81,11 +82,7 @@ jobs:
         timeout-minutes: 12
         run: |
           node scripts/ci/node-test-gate.mjs browser-deps
-          if [ '${{ matrix.api }}' = '32' ]; then
-            node scripts/ci/share-card-browser-deps.mjs --chromium-only
-          else
-            node scripts/ci/share-card-browser-deps.mjs
-          fi
+          node scripts/ci/share-card-browser-deps.mjs --chromium-only
       # These suites need only the installed dependencies, so a browser, Supabase or
       # runtime failure cannot hide them. They follow the browser steps only so those
       # keep their plain platform conditions.
@@ -196,15 +193,6 @@ jobs:
           swift test --package-path apps/mobile/modules/share-card-photo-save/ios 2>&1 | tee /tmp/cc68-png-file-tests.log
           # Four tests ran and none failed or was skipped.
           grep -q 'Executed 4 tests, with 0 failures' /tmp/cc68-png-file-tests.log
-      - name: Genuine browser share-card acceptance matrix
-        if: ${{ !cancelled() && matrix.platform == 'android' && matrix.api == 36 && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
-        run: |
-          # A production build served by next start: no route compiles during the matrix.
-          node scripts/e2e-share-card/web.mjs build
-          node scripts/e2e-share-card/web.mjs start > "$CC68_HARNESS_DIR/web-startup-private.log" 2>&1 &
-          node scripts/e2e-share-card/wait-web.mjs
-          npx playwright test --config playwright/share-card.config.ts
-          node scripts/e2e-share-card/assert-web-matrix.mjs
       - name: Enable and verify Android hardware acceleration
         id: kvm
         if: ${{ !cancelled() && matrix.platform == 'android' }}
@@ -216,11 +204,13 @@ jobs:
           sudo udevadm settle --timeout=30
           ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
-      - name: Android real original and API32 denied/permanent permission proof
+      - name: Android isolated native journey
+        timeout-minutes: ${{ matrix.journey_timeout }}
         if: ${{ !cancelled() && matrix.platform == 'android' && steps.native_build.outcome == 'success' && steps.kvm.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CC68_ANDROID_API: ${{ matrix.api }}
+          CC68_ANDROID_SUITE: ${{ matrix.suite }}
         with:
           api-level: ${{ matrix.api }}
           avd-name: cc68-api${{ matrix.api }}
@@ -270,7 +260,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: share-card-${{ matrix.platform }}-${{ matrix.api }}
+          name: share-card-${{ matrix.platform }}-${{ matrix.api }}-${{ matrix.suite }}
           path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
           if-no-files-found: error
       - name: Clean exact owned runtime
@@ -282,3 +272,309 @@ jobs:
           if [ -f /tmp/cc68-simulator ]; then
             xcrun simctl delete "$(cat /tmp/cc68-simulator)"
           fi
+  # The three API36 partitions run on separate free runners with no dependency on each
+  # other or on the macOS image prewarm. Each one prepares, signs in and cleans up its own
+  # UUID runtime, so they share steps (the alias) but never state. API32 and iOS stay in
+  # original-resource above; this list is its Android path without the iOS-only steps.
+  android36-native-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+            api: 36
+            target: google_apis_playstore
+            suite: matrix
+            journey_timeout: 60
+    env: *runtime_env
+    steps: &android36_steps
+      - uses: actions/checkout@v4
+        id: checkout
+      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/install
+        id: install
+      - name: Provision pinned share-card browser dependencies
+        id: browser_deps
+        timeout-minutes: 12
+        run: |
+          node scripts/ci/node-test-gate.mjs browser-deps
+          node scripts/ci/share-card-browser-deps.mjs --chromium-only
+      - name: Verify share-card harness and plugin suites
+        id: harness_suites
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          node scripts/ci/node-test-gate.mjs share-card-plugins
+          node scripts/ci/node-test-gate.mjs native-harness
+      - uses: actions/setup-java@v4
+        if: ${{ !cancelled() }}
+        id: java
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        id: android_sdk
+        if: ${{ !cancelled() }}
+        with:
+          packages: platform-tools
+      - name: Verify startup deadline controls
+        id: deadline_controls
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/ci/node-test-gate.mjs startup-deadline
+      - uses: ./.github/actions/start-local-supabase
+        if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' }}
+        id: supabase
+      - name: Prepare isolated UUID runtime and built renderer
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        id: runtime
+        run: |
+          npm run db:generate
+          npm run build:packages
+          npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
+          node scripts/lib/story68-built-render.mjs
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (node scripts/run-story68-native.mjs metro > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          node scripts/maestro-install.mjs
+      - name: Verify the owned API database entry guard
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
+        run: |
+          npx vitest run scripts/lib/story68-api-entry.test.mjs --reporter=default --reporter=json --outputFile="$RUNNER_TEMP/story68-api-entry.json"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          const report = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/story68-api-entry.json`, 'utf8'))
+          if (report.numTotalTests < 2 || report.numPassedTests !== report.numTotalTests ||
+              report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
+            throw new Error('Incomplete API entry guard execution')
+          JS
+      - name: Verify localized native accessibility announcements and focus bridge
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
+        run: |
+          node scripts/e2e-share-card/bridge-a11y.mjs
+      - name: Generate native development client
+        id: prebuild
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
+        run: node scripts/run-story68-native.mjs prebuild --platform ${{ matrix.platform }}
+      - name: Verify fresh Worklets variant and ABI staging
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' }}
+        run: node scripts/ci/node-test-gate.mjs worklets-staging
+      - name: Build native development client
+        id: native_build
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
+      - name: Verify modal status-bar styling on both Android SDK branches
+        id: modal_system_bars
+        # Robolectric compiles the module inside the generated Android project.
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        working-directory: apps/mobile/android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
+          # Both SDK branches ran, and none was skipped.
+          grep -q 'tests="2" skipped="0" failures="0" errors="0"' ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml
+      - name: Enable and verify Android hardware acceleration
+        id: kvm
+        if: ${{ !cancelled() }}
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          # trigger only queues the uevent; wait until the rule has applied before testing.
+          sudo udevadm settle --timeout=30
+          ls -l /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Android isolated native journey
+        timeout-minutes: ${{ matrix.journey_timeout }}
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' && steps.kvm.outcome == 'success' }}
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CC68_ANDROID_API: ${{ matrix.api }}
+          CC68_ANDROID_SUITE: ${{ matrix.suite }}
+        with:
+          api-level: ${{ matrix.api }}
+          avd-name: cc68-api${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-linux-hw-accel: false
+          disable-animations: true
+          script: bash scripts/ci/share-card-android.sh
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api metro; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Select and scan closed evidence
+        if: always()
+        env:
+          CC68_CI_PLATFORM: ${{ matrix.platform }}
+          CC68_CI_API: ${{ matrix.api }}
+          CC68_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/e2e-share-card/public-evidence.mjs
+      - name: Collect original PNG proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-card-${{ matrix.platform }}-${{ matrix.api }}-${{ matrix.suite }}
+          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
+          if-no-files-found: error
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
+  android36-original:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+            api: 36
+            target: google_apis_playstore
+            suite: original
+            journey_timeout: 25
+    env: *runtime_env
+    steps: *android36_steps
+  android36-interaction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+            api: 36
+            target: google_apis_playstore
+            suite: interaction
+            journey_timeout: 45
+    env: *runtime_env
+    steps: *android36_steps
+  browser-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: android
+            api: 36
+            suite: browser
+    env: *runtime_env
+    steps:
+      - uses: actions/checkout@v4
+        id: checkout
+      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/install
+        id: install
+      - name: Provision pinned share-card browser dependencies
+        id: browser_deps
+        if: matrix.platform == 'android'
+        timeout-minutes: 12
+        run: |
+          node scripts/ci/node-test-gate.mjs browser-deps
+          node scripts/ci/share-card-browser-deps.mjs
+      - name: Verify share-card harness and plugin suites
+        id: harness_suites
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          node scripts/ci/node-test-gate.mjs share-card-plugins
+          node scripts/ci/node-test-gate.mjs native-harness
+      - name: Verify startup deadline controls
+        id: deadline_controls
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/ci/node-test-gate.mjs startup-deadline
+      - uses: ./.github/actions/start-local-supabase
+        if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' }}
+        id: supabase
+      - name: Prepare isolated UUID runtime and built renderer
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        id: runtime
+        run: |
+          npm run db:generate
+          npm run build:packages
+          npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
+          node scripts/lib/story68-built-render.mjs
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+      - name: Verify the owned API database entry guard
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
+        run: |
+          npx vitest run scripts/lib/story68-api-entry.test.mjs --reporter=default --reporter=json --outputFile="$RUNNER_TEMP/story68-api-entry.json"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          const report = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/story68-api-entry.json`, 'utf8'))
+          if (report.numTotalTests < 2 || report.numPassedTests !== report.numTotalTests ||
+              report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
+            throw new Error('Incomplete API entry guard execution')
+          JS
+      - name: Genuine browser share-card acceptance matrix
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
+        run: |
+          # A production build served by next start: no route compiles during the matrix.
+          node scripts/e2e-share-card/web.mjs build
+          node scripts/e2e-share-card/web.mjs start > "$CC68_HARNESS_DIR/web-startup-private.log" 2>&1 &
+          node scripts/e2e-share-card/wait-web.mjs
+          npx playwright test --config playwright/share-card.config.ts
+          node scripts/e2e-share-card/assert-web-matrix.mjs
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Select and scan closed evidence
+        if: always()
+        env:
+          CC68_CI_PLATFORM: ${{ matrix.platform }}
+          CC68_CI_API: ${{ matrix.api }}
+          CC68_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/e2e-share-card/public-evidence.mjs
+      - name: Collect original PNG proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-card-${{ matrix.platform }}-${{ matrix.api }}-${{ matrix.suite }}
+          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
+          if-no-files-found: error
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
+  gate:
+    if: always()
+    needs:
+      - original-resource
+      - browser-acceptance
+      - android36-native-matrix
+      - android36-original
+      - android36-interaction
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require every native and browser lane
+        env:
+          CC68_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci/share-card-job-gate.mjs
