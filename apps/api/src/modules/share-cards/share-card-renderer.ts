@@ -126,7 +126,9 @@ export class ShareCardRenderer {
         .rotate()
         .resize(936, 900, { fit: 'cover', position: 'centre', kernel: 'lanczos3' })
         .toColourspace('srgb')
-        .removeAlpha()
+        // Blend onto the card before the alpha channel goes; dropping it alone would
+        // reveal the RGB hidden beneath transparent pixels.
+        .flatten({ background: ivory })
         .raw()
       const { data, info } = await runAbortableSharp(pipeline, signal, () =>
         pipeline.toBuffer({ resolveWithObject: true })

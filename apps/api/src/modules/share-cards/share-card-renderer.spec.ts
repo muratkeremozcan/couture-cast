@@ -177,6 +177,61 @@ describe('safe card renderer', () => {
     const sign = await sharp(second).extract(signRegion).raw().toBuffer()
     expect(new Set(sign).size).toBeGreaterThan(2)
   })
+  it('U-ALPHA: composites a transparent photo onto the card background instead of exposing its hidden RGB', async () => {
+    // Exactly the 936x900 photo box, so nothing is resampled and the RGB hidden beneath
+    // zero alpha reaches the card unchanged unless the renderer flattens it.
+    const width = 936
+    const height = 900
+    const bands = [
+      [255, 0, 0, 0],
+      [0, 255, 0, 128],
+      [0, 0, 255, 255],
+    ] as const
+    const pixels = Buffer.alloc(width * height * 4)
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++)
+        pixels.set(bands[Math.floor(y / 300)]!, (y * width + x) * 4)
+    const photo = await sharp(pixels, { raw: { width, height, channels: 4 } })
+      .png()
+      .toBuffer()
+    expect(await sharp(photo).metadata()).toMatchObject({ width, height, hasAlpha: true })
+    const card = await renderer.render(
+      {
+        kind: 'community_post',
+        path: 'unused',
+        mimeType: 'image/png',
+        sha256: 'a'.repeat(64),
+        byteSize: photo.length,
+        climateBand: null,
+      },
+      'en-US',
+      false,
+      photo
+    )
+    validateShareCardPng(card)
+    const ivory = [0xf7, 0xf3, 0xe8]
+    const sample = async (row: number) =>
+      [
+        ...(await sharp(card)
+          .extract({ left: 72 + 400, top: 240 + row, width: 1, height: 1 })
+          .raw()
+          .toBuffer()),
+      ] as number[]
+    const blend = (coverage: number, source: number[]) =>
+      source.map((value, index) =>
+        Math.round(value * coverage + ivory[index]! * (1 - coverage))
+      )
+    // Fully transparent red shows the card, not the red stored beneath zero alpha.
+    expect(await sample(100)).toEqual(ivory)
+    // Half-transparent green blends with the card behind it.
+    const translucent = await sample(450)
+    blend(128 / 255, [0, 255, 0]).forEach((expected, index) =>
+      expect(Math.abs(translucent[index]! - expected)).toBeLessThanOrEqual(1)
+    )
+    expect(translucent).not.toEqual([0, 255, 0])
+    // Opaque blue is untouched.
+    expect(await sample(750)).toEqual([0, 0, 255])
+  })
   it('U-PREPARE-ERROR: a missing packaged font fails before any system-font fallback', async () => {
     const read = (await vi.importActual<typeof files>('node:fs/promises')).readFile
     vi.mocked(files.readFile).mockImplementation(
