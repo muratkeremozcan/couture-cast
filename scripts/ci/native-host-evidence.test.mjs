@@ -359,6 +359,50 @@ test('every workflow host sample label is accepted by the real sampler CLI', (t)
   )
 })
 
+test('a failed host snapshot records its exact error and the real shell proceeds to the next stage', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-host-failed-snapshot-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const bin = path.join(directory, 'bin')
+  fs.mkdirSync(bin)
+  for (const [name, body] of [
+    ['ps', 'echo snapshot-refused >&2\nexit 23'],
+    ['sysctl', 'echo "vm.swapusage: used = 0.00M"'],
+    ['memory_pressure', 'echo "System-wide memory free percentage: 50%"'],
+  ])
+    fs.writeFileSync(path.join(bin, name), '#!/bin/sh\n' + body + '\n', { mode: 0o700 })
+  const r = spawnSync(
+    '/bin/sh',
+    [
+      '-c',
+      '"$CC68_NODE" "$CC68_PROBE" sample after-simulator-boot --platform ios && printf "NEXT_FLOW_STAGE\\n"',
+    ],
+    {
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        CC68_HARNESS_DIR: directory,
+        CC68_NODE: process.execPath,
+        CC68_PROBE: script,
+      },
+      encoding: 'utf8',
+    }
+  )
+  assert.equal(r.status, 0, r.stderr)
+  assert.match(r.stdout, /NEXT_FLOW_STAGE/)
+  const failures = JSON.parse(
+    fs.readFileSync(path.join(directory, 'native-host-snapshot-private.json'), 'utf8')
+  )
+  assert.equal(failures[0].exitCode, 23)
+  assert.equal(failures[0].stderr, 'snapshot-refused\n')
+  assert.equal(failures[0].binary, 'ps')
+  const record = JSON.parse(
+    fs.readFileSync(path.join(directory, 'native-host-ios.json'), 'utf8')
+  )
+  assert.deepEqual(record.samples[0].busiest, [])
+  assert.equal(record.samples[0].label, 'after-simulator-boot')
+  assertNativeHostEvidence(record)
+})
+
 test('first-flow evidence keeps child deadline, setup and worker bootstrap separate', () => {
   const wall = {
     timeoutMs: 120000,

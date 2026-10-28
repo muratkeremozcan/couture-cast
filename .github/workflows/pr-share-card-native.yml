@@ -9,6 +9,10 @@ on:
         description: Diagnose iOS startup commands and CPU settling without an app build
         type: boolean
         default: false
+      ios_only:
+        description: Run only the full iOS native journey on standard macos-15
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -20,18 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            platform: android
-            api: 32
-            target: google_apis
-          - os: ubuntu-latest
-            platform: android
-            api: 36
-            target: google_apis_playstore
-          - os: macos-15
-            platform: ios
-            api: 0
+        include: ${{ fromJSON(inputs.ios_only && '[{"os":"macos-15","platform":"ios","api":0}]' || '[{"os":"ubuntu-latest","platform":"android","api":32,"target":"google_apis"},{"os":"ubuntu-latest","platform":"android","api":36,"target":"google_apis_playstore"},{"os":"macos-15","platform":"ios","api":0}]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
@@ -86,7 +79,7 @@ jobs:
         with:
           packages: platform-tools
       - name: Verify startup deadline controls
-        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/native-supabase.test.mjs scripts/ci/native-supabase-gateway.test.mjs scripts/e2e-share-card/runtime-sources.test.mjs scripts/ci/native-host-evidence.test.mjs scripts/ci/native-build-daemons.test.mjs scripts/ci/native-ios-quiesce.test.mjs scripts/ci/native-ios-command-evidence.test.mjs scripts/ci/native-ios-collectors.test.mjs scripts/ci/native-ios-crashes.test.mjs scripts/ci/native-ios-preflight.test.mjs scripts/ci/native-ios-flow-deadline.test.mjs scripts/e2e-share-card/warm-metro.test.mjs
+        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/native-supabase.test.mjs scripts/ci/native-supabase-gateway.test.mjs scripts/e2e-share-card/runtime-sources.test.mjs scripts/ci/native-host-evidence.test.mjs scripts/ci/native-build-daemons.test.mjs scripts/ci/native-ios-quiesce.test.mjs scripts/ci/native-ios-command-evidence.test.mjs scripts/ci/native-ios-collectors.test.mjs scripts/ci/native-ios-crashes.test.mjs scripts/ci/native-ios-preflight.test.mjs scripts/ci/native-ios-startup-probe.test.mjs scripts/ci/native-ios-flow-deadline.test.mjs scripts/e2e-share-card/warm-metro.test.mjs
       - uses: ./.github/actions/start-local-supabase
         if: runner.os == 'Linux'
       - name: Install the iOS project generator
@@ -247,27 +240,9 @@ jobs:
       - name: iOS original Photos resource and add-only save
         if: matrix.platform == 'ios'
         run: |
-          # XCUITest (Maestro's driver and the accessibility audit) runs through
-          # the selected Xcode, which drives only a simulator on its own SDK
-          # version; an unpinned create takes the newest installed runtime.
-          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
-          runtime=$(xcrun simctl list runtimes -j | jq -r --arg v "$sdk" \
-            '[.runtimes[] | select(.platform == "iOS" and .isAvailable and (.version == $v or (.version | startswith($v + "."))))] | last | .identifier // empty')
-          if [ -z "$runtime" ]; then
-            echo "::error::No available iOS ${sdk} simulator runtime for $(xcodebuild -version | head -1)."
-            xcrun simctl list runtimes
-            exit 1
-          fi
-          echo "iOS simulator runtime ${runtime} for SDK ${sdk}"
           node scripts/e2e-share-card/warm-metro.mjs --platform ios
-          node scripts/ci/native-host-evidence.mjs sample before-simulator-boot --platform ios
-          device=$(xcrun simctl create cc68-ci 'iPhone 16 Pro' "$runtime")
-          echo "$device" > /tmp/cc68-simulator
-          xcrun simctl boot "$device"
-          xcrun simctl bootstatus "$device" -b
-          node scripts/ci/native-host-evidence.mjs sample after-simulator-boot --platform ios
-          xcrun simctl install "$device" /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app
-          node scripts/ci/native-ios-quiesce.mjs "$device"
+          node scripts/ci/native-ios-startup-probe.mjs --for-native-flow
+          device=$(cat /tmp/cc68-simulator)
           node scripts/ci/native-host-evidence.mjs sample before-first-flow --platform ios
           node scripts/run-story68-native.mjs open --platform ios --device "$device"
           node scripts/ci/native-host-evidence.mjs first-flow passed --platform ios
@@ -286,6 +261,21 @@ jobs:
           node scripts/ci/native-host-evidence.mjs sample failure --platform ios
           node scripts/ci/native-host-evidence.mjs first-flow failed --platform ios
           node scripts/ci/native-host-evidence.mjs metro --platform ios
+      - name: Collect iOS startup diagnostics
+        if: always() && matrix.platform == 'ios'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc68-ios-startup-diagnostics
+          path: |
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-startup-private.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-preflight.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-runtime-deadline.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-collectors.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-crashes.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-sampler-private.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-host-snapshot-private.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-quiesce-ios.json
+          if-no-files-found: warn
       - name: Select and scan closed evidence
         if: always()
         env:
@@ -325,7 +315,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify simulator sampler and collector controls
-        run: node --test --test-concurrency=1 scripts/ci/native-ios-quiesce.test.mjs scripts/ci/native-ios-command-evidence.test.mjs scripts/ci/native-ios-collectors.test.mjs scripts/ci/native-ios-crashes.test.mjs scripts/ci/native-ios-preflight.test.mjs
+        run: node --test --test-concurrency=1 scripts/ci/native-ios-quiesce.test.mjs scripts/ci/native-ios-command-evidence.test.mjs scripts/ci/native-ios-collectors.test.mjs scripts/ci/native-ios-crashes.test.mjs scripts/ci/native-ios-preflight.test.mjs scripts/ci/native-ios-startup-probe.test.mjs scripts/ci/native-host-evidence.test.mjs
       - name: Diagnose owned simulator tuning and settling
         run: node scripts/ci/native-ios-startup-probe.mjs
       - name: Collect complete startup command diagnostics and CPU settle evidence
@@ -342,4 +332,5 @@ jobs:
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-crashes.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-preflight.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-runtime-deadline.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-host-snapshot-private.json
           if-no-files-found: error

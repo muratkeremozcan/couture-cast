@@ -7,6 +7,49 @@ import { simulatorCommandRecorder } from './native-ios-command-evidence.mjs'
 import { quiesceOwnedSimulator } from './native-ios-quiesce.mjs'
 import { preflightObserver, observedRuntimeQuery } from './native-ios-preflight.mjs'
 
+export async function finishOwnedStartup({
+  device,
+  command,
+  sample,
+  quiesce = quiesceOwnedSimulator,
+  prepareForFlow = false,
+  appPath,
+}) {
+  let ready = false
+  const snapshot = (label) => {
+    try {
+      sample(label)
+    } catch (error) {
+      console.log(
+        JSON.stringify({
+          startupSnapshotFailure: {
+            label,
+            errorName: error.name,
+            errorCode: error.code ?? null,
+            errorMessage: error.message,
+            stderr: error.stderr ?? '',
+          },
+        })
+      )
+    }
+  }
+  try {
+    command('boot-device', 'xcrun', ['simctl', 'boot', device])
+    command('bootstatus', 'xcrun', ['simctl', 'bootstatus', device, '-b'], {
+      timeout: 300000,
+    })
+    snapshot('after-simulator-boot')
+    if (prepareForFlow)
+      command('install-client', 'xcrun', ['simctl', 'install', device, appPath])
+    await quiesce(device, command)
+    snapshot('before-first-flow')
+    ready = true
+  } finally {
+    if (!prepareForFlow || !ready)
+      command('delete-device', 'xcrun', ['simctl', 'delete', device], { fatal: false })
+  }
+}
+
 async function main() {
   if (
     process.platform !== 'darwin' ||
@@ -19,13 +62,12 @@ async function main() {
   )
   const command = simulatorCommandRecorder(directory)
   const sample = (label) =>
-    command(`host-${label}`, process.execPath, [
-      'scripts/ci/native-host-evidence.mjs',
-      'sample',
-      label,
-      '--platform',
-      'ios',
-    ])
+    command(
+      `host-${label}`,
+      process.execPath,
+      ['scripts/ci/native-host-evidence.mjs', 'sample', label, '--platform', 'ios'],
+      { fatal: false }
+    )
   command('indexing-off', 'sudo', ['mdutil', '-a', '-i', 'off'])
   sample('before-simulator-boot')
   const sdk = command('sdk-version', 'xcrun', [
@@ -66,22 +108,24 @@ async function main() {
   fs.writeFileSync(path.join(directory, 'owned-startup-device.txt'), device + '\n', {
     mode: 0o600,
   })
-  try {
-    command('boot-device', 'xcrun', ['simctl', 'boot', device])
-    command('bootstatus', 'xcrun', ['simctl', 'bootstatus', device, '-b'], {
-      timeout: 300000,
+  const prepareForFlow = process.argv.includes('--for-native-flow')
+  if (prepareForFlow)
+    fs.writeFileSync('/tmp/cc68-simulator', device + '\n', { mode: 0o600 })
+  await finishOwnedStartup({
+    device,
+    command,
+    sample,
+    prepareForFlow,
+    appPath:
+      '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app',
+  })
+  console.log(
+    JSON.stringify({
+      startupProbe: 'settled',
+      firstFlow: prepareForFlow
+        ? 'ready_for_native_first_flow'
+        : 'not_started_startup_only_probe',
     })
-    sample('after-simulator-boot')
-    await quiesceOwnedSimulator(device, command)
-    sample('before-first-flow')
-    console.log(
-      JSON.stringify({
-        startupProbe: 'settled',
-        firstFlow: 'not_started_startup_only_probe',
-      })
-    )
-  } finally {
-    command('delete-device', 'xcrun', ['simctl', 'delete', device], { fatal: false })
-  }
+  )
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()

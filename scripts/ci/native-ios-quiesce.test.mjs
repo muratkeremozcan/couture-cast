@@ -13,7 +13,7 @@ import {
 } from './native-ios-quiesce.mjs'
 
 const quiet = { STExtractionService: 0, healthappd: 0, diagnosticd: 0 }
-const run = async (sample) => {
+const run = async (sample, options = {}) => {
   let at = 0
   return waitForSimulatorCpu({
     sample: () => sample(at / 1000),
@@ -22,6 +22,7 @@ const run = async (sample) => {
       at += ms
     },
     record: assertNativeQuiesceEvidence,
+    ...options,
   })
 }
 
@@ -53,26 +54,29 @@ test('all three targets gate settling and the 600 second cap prevents flow eligi
   }
 })
 
-test('failed process sampling fails closed', async () => {
+test('unavailable CPU snapshots remain ineligible and wait until the 600 second cap', async () => {
   const report = await run(() => {
     throw new Error('no snapshot')
   })
-  assert.equal(report.outcome, 'sample_failed')
-  assert.equal(report.elapsedSeconds, 0)
+  assert.equal(report.outcome, 'cap_hit')
+  assert.equal(report.elapsedSeconds, 600)
+  assert.equal(report.interruptions.length, 121)
 })
 
 test('the exact sampler failure reaches the diagnostic publisher before failing closed', async () => {
   const failure = new Error('owned_simulator_springboard_missing')
   let observed
-  const report = await waitForSimulatorCpu({
-    sample: () => {
+  const report = await run(
+    () => {
       throw failure
     },
-    onSampleFailure: (error) => {
-      observed = error
-    },
-  })
-  assert.equal(report.outcome, 'sample_failed')
+    {
+      onSampleFailure: (error) => {
+        observed = error
+      },
+    }
+  )
+  assert.equal(report.outcome, 'cap_hit')
   assert.equal(observed, failure)
 })
 
@@ -156,23 +160,23 @@ test('errors thrown before a sampling child starts retain their original Node di
   )
 })
 
-test('a failed collector inventory also fails closed, while scope errors retain their exact reason', () => {
+test('a failed collector inventory records its error and preserves valid CPU eligibility', () => {
   const ps = '100 1 0 launchd_sim\n101 100 0 /sim/SpringBoard'
   let calls = 0
-  assert.throws(
-    () =>
-      sampleSimulatorCpu(100, 1000, {
-        execute: () =>
-          ++calls === 1
-            ? { status: 0, stdout: ps }
-            : { status: 1, stderr: 'collector snapshot failed' },
-      }),
-    (error) => {
-      assert.equal(error.diagnostic.operation, 'collector-processes')
-      assert.equal(error.diagnostic.stderr, 'collector snapshot failed')
-      return true
-    }
-  )
+  let diagnostic
+  const cpu = sampleSimulatorCpu(100, 1000, {
+    execute: () =>
+      ++calls === 1
+        ? { status: 0, stdout: ps }
+        : { status: 1, stderr: 'collector snapshot failed' },
+    onDiagnosticFailure: (error) => {
+      diagnostic = error.diagnostic
+    },
+  })
+  assert.equal(diagnostic.operation, 'collector-processes')
+  assert.equal(diagnostic.exitCode, 1)
+  assert.equal(diagnostic.stderr, 'collector snapshot failed')
+  assert.deepEqual(cpu, quiet)
   assert.throws(
     () =>
       sampleSimulatorCpu(100, 1000, {
@@ -184,6 +188,53 @@ test('a failed collector inventory also fails closed, while scope errors retain 
       return true
     }
   )
+})
+
+test('a failed snapshot resets the quiet interval, then a full valid interval permits the next flow', async () => {
+  let flowStarted = false
+  let failureCount = 0
+  const report = await run(
+    (at) => {
+      if (at === 20) throw new Error('transient ps failure')
+      return quiet
+    },
+    {
+      onSampleFailure: () => {
+        failureCount++
+      },
+    }
+  )
+  if (report.outcome === 'settled') flowStarted = true
+  assert.equal(failureCount, 1)
+  assert.deepEqual(report.interruptions, [20])
+  assert.equal(report.elapsedSeconds, 55)
+  assert.equal(flowStarted, true)
+  assertNativeQuiesceEvidence(report)
+  assert.throws(
+    () =>
+      assertNativeQuiesceEvidence({
+        ...report,
+        samples: report.samples.filter((s) => s.elapsedSeconds <= 35),
+        elapsedSeconds: 35,
+      }),
+    /invalid_native_quiesce_evidence/
+  )
+})
+
+test('a broken diagnostic publisher cannot prevent later valid CPU samples from settling', async () => {
+  const report = await run(
+    (at) => {
+      if (at === 0) throw new Error('snapshot failed')
+      return quiet
+    },
+    {
+      onSampleFailure: () => {
+        throw new Error('diagnostic write failed')
+      },
+    }
+  )
+  assert.equal(report.outcome, 'settled')
+  assert.equal(report.elapsedSeconds, 35)
 })
 
 test('settle evidence rejects private fields and an unproved settled flag', async () => {

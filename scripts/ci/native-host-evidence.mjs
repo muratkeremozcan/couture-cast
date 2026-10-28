@@ -337,12 +337,60 @@ function main() {
   let recorded
   if (command === 'sample') {
     if (!SAMPLE_LABELS.includes(argument)) throw new Error('invalid_host_sample_label')
-    const ps = spawnSync('ps', ['-A', '-o', 'pid=,ppid=,rss=,%cpu=,comm='], {
-      encoding: 'utf8',
-      timeout: 10000,
-    })
-    if (ps.status !== 0 || !busiestProcesses(ps.stdout).length)
-      throw new Error('host_process_snapshot_unavailable')
+    const probe = (binary, args, valid = () => true) => {
+      let r
+      try {
+        r = spawnSync(binary, args, {
+          encoding: 'utf8',
+          timeout: 10000,
+          killSignal: 'SIGKILL',
+        })
+      } catch (error) {
+        r = { status: null, error }
+      }
+      const usable = r.status === 0 && !r.error && valid(r.stdout ?? '')
+      if (!usable) {
+        const failure = {
+          label: argument,
+          binary,
+          args,
+          exitCode: r.status ?? null,
+          signal: r.signal ?? null,
+          errorCode: r.error?.code ?? null,
+          errorName: r.error?.name ?? null,
+          errorMessage: r.error?.message ?? null,
+          stderr: r.stderr ?? '',
+          stdout: r.stdout ?? '',
+          reason: r.error?.message ?? 'host_probe_output_unavailable',
+        }
+        console.log(JSON.stringify({ hostSnapshotFailure: failure }))
+        try {
+          const diagnosticFile = path.join(directory, 'native-host-snapshot-private.json')
+          const failures = fs.existsSync(diagnosticFile)
+            ? JSON.parse(fs.readFileSync(diagnosticFile, 'utf8'))
+            : []
+          failures.push(failure)
+          fs.writeFileSync(diagnosticFile, JSON.stringify(failures, null, 2) + '\n', {
+            mode: 0o600,
+          })
+        } catch (error) {
+          console.log(
+            JSON.stringify({
+              hostDiagnosticWriteFailure: {
+                errorCode: error.code ?? null,
+                errorMessage: error.message,
+              },
+            })
+          )
+        }
+      }
+      return usable ? (r.stdout ?? '') : ''
+    }
+    const ps = probe(
+      'ps',
+      ['-A', '-o', 'pid=,ppid=,rss=,%cpu=,comm='],
+      (text) => busiestProcesses(text).length > 0
+    )
     recorded = projectSample({
       label: argument,
       at: Date.now(),
@@ -350,13 +398,9 @@ function main() {
       cpuCount: os.availableParallelism(),
       totalmem: os.totalmem(),
       freemem: os.freemem(),
-      swap:
-        spawnSync('sysctl', ['vm.swapusage'], { encoding: 'utf8', timeout: 10000 })
-          .stdout ?? '',
-      pressure:
-        spawnSync('memory_pressure', ['-Q'], { encoding: 'utf8', timeout: 10000 })
-          .stdout ?? '',
-      ps: ps.stdout,
+      swap: probe('sysctl', ['vm.swapusage']),
+      pressure: probe('memory_pressure', ['-Q']),
+      ps,
     })
     record.samples.push(recorded)
   } else if (command === 'first-flow') {

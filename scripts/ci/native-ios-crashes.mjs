@@ -75,12 +75,24 @@ export function crashReportCollector(device, { home = os.homedir() } = {}) {
     const sources = roots.map(([source, directory]) => {
       let files = 0
       let errorCode = null
+      const errors = []
+      const failed = (operation, error) => {
+        errorCode ??= error.code ?? 'READ_FAILED'
+        errors.push({
+          operation,
+          errorCode: error.code ?? null,
+          errorName: error.name,
+          errorMessage: error.message,
+          exitCode: null,
+          stderr: '',
+        })
+      }
       const visit = (dir) => {
         let entries
         try {
           entries = fs.readdirSync(dir, { withFileTypes: true })
         } catch (error) {
-          errorCode ??= error.code ?? 'READ_FAILED'
+          failed('read-directory', error)
           return
         }
         for (const entry of entries) {
@@ -111,12 +123,12 @@ export function crashReportCollector(device, { home = os.homedir() } = {}) {
             } else reports[previous] = { ...report, id: reports[previous].id }
             known.set(file, identity)
           } catch (error) {
-            errorCode ??= error.code ?? 'READ_FAILED'
+            failed('read-report', error)
           }
         }
       }
       visit(directory)
-      return { source, files, errorCode }
+      return { source, files, errorCode, errors }
     })
     const counts = new Map()
     for (const r of reports) {

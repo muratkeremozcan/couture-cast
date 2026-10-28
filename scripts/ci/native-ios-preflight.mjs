@@ -108,7 +108,24 @@ export async function observedRuntimeQuery({
   pollMs = 5000,
 }) {
   fs.mkdirSync(directory, { recursive: true })
-  observe('before-query')
+  const diagnostic = (phase) => {
+    try {
+      observe(phase)
+    } catch (error) {
+      console.log(
+        JSON.stringify({
+          preflightSnapshotFailure: {
+            phase,
+            errorName: error.name,
+            errorCode: error.code ?? null,
+            errorMessage: error.message,
+            stderr: error.stderr ?? '',
+          },
+        })
+      )
+    }
+  }
+  diagnostic('before-query')
   const began = performance.now()
   const timingFile = path.join(directory, 'native-ios-runtime-deadline.json')
   const child = spawn(
@@ -131,7 +148,7 @@ export async function observedRuntimeQuery({
   child.stdin.end(
     JSON.stringify({ binary, args, cwd: process.cwd(), env: process.env, timeoutMs })
   )
-  const timer = setInterval(() => observe('during-query'), pollMs)
+  const timer = setInterval(() => diagnostic('during-query'), pollMs)
   let exitCode
   try {
     exitCode = await new Promise((resolve, reject) => {
@@ -140,7 +157,7 @@ export async function observedRuntimeQuery({
     })
   } finally {
     clearInterval(timer)
-    observe('after-query')
+    diagnostic('after-query')
   }
   const timing = JSON.parse(fs.readFileSync(timingFile, 'utf8'))
   return command.completed(

@@ -21,6 +21,19 @@ export const QUIESCE_POLICY = Object.freeze({
   pollMs: 5000,
 })
 
+const diagnosticError = (error) => ({
+  reason: error.message,
+  errorName: error.name,
+  errorCode: error.code ?? null,
+})
+const safely = (operation) => {
+  try {
+    return operation()
+  } catch (error) {
+    console.log(JSON.stringify({ diagnosticFailure: diagnosticError(error) }))
+  }
+}
+
 export function simulatorCpu(text, managerPid) {
   const rows = text.split('\n').flatMap((line) => {
     const m = line.trim().match(/^(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(.+)$/)
@@ -73,7 +86,7 @@ export async function waitForSimulatorCpu({
   const began = now()
   let quietSince = null
   const result = {
-    version: 1,
+    version: 2,
     platform: 'ios',
     thresholdPercent: policy.thresholdPercent,
     stableRequiredSeconds: policy.stableSeconds,
@@ -81,10 +94,11 @@ export async function waitForSimulatorCpu({
     outcome: 'waiting',
     elapsedSeconds: 0,
     samples: [],
+    interruptions: [],
   }
   const save = () => {
     result.elapsedSeconds = Math.round((now() - began) / 10) / 100
-    record(result)
+    safely(() => record(result))
   }
   while (result.outcome === 'waiting') {
     if (now() - began > policy.maxSeconds * 1000) {
@@ -96,10 +110,14 @@ export async function waitForSimulatorCpu({
     try {
       cpu = await sample(Math.max(1, policy.maxSeconds * 1000 - (now() - began)))
     } catch (error) {
-      onSampleFailure(error)
-      result.outcome = 'sample_failed'
+      safely(() => onSampleFailure(error))
+      quietSince = null
+      result.interruptions.push(Math.round((now() - began) / 10) / 100)
+      if (now() - began >= policy.maxSeconds * 1000) result.outcome = 'cap_hit'
       save()
-      return result
+      if (result.outcome === 'cap_hit') return result
+      await pause(Math.min(policy.pollMs, policy.maxSeconds * 1000 - (now() - began)))
+      continue
     }
     const at = now()
     result.samples.push({ elapsedSeconds: Math.round((at - began) / 10) / 100, cpu })
@@ -134,7 +152,12 @@ export async function waitForSimulatorCpu({
 export function sampleSimulatorCpu(
   manager,
   remaining,
-  { execute = spawnSync, onCollectors = () => undefined, harnessPid = process.pid } = {}
+  {
+    execute = spawnSync,
+    onCollectors = () => undefined,
+    onDiagnosticFailure = () => undefined,
+    harnessPid = process.pid,
+  } = {}
 ) {
   const began = performance.now()
   const snapshot = (operation, fields) => {
@@ -177,10 +200,14 @@ export function sampleSimulatorCpu(
     error.diagnostic = { ...cpu.diagnostic, reason: error.message }
     throw error
   }
-  const clients = snapshot('collector-processes', 'pid=,ppid=,args=')
-  onCollectors(
-    simulatorCollectors(cpu.result.stdout, clients.result.stdout, manager, harnessPid)
-  )
+  try {
+    const clients = snapshot('collector-processes', 'pid=,ppid=,args=')
+    onCollectors(
+      simulatorCollectors(cpu.result.stdout, clients.result.stdout, manager, harnessPid)
+    )
+  } catch (error) {
+    safely(() => onDiagnosticFailure(error))
+  }
   return values
 }
 
@@ -200,8 +227,9 @@ const validHeader = (value) =>
     'outcome',
     'elapsedSeconds',
     'samples',
+    ...(value?.version === 2 ? ['interruptions'] : []),
   ]) &&
-  value.version === 1 &&
+  [1, 2].includes(value.version) &&
   value.platform === 'ios' &&
   value.thresholdPercent === 5 &&
   value.stableRequiredSeconds === 30 &&
@@ -217,14 +245,19 @@ function settledEvidence(value) {
   if (value.outcome !== 'settled') return true
   const last = value.samples.at(-1)
   let firstQuiet = null
+  let previous = -1
   for (const s of value.samples) {
+    if ((value.interruptions ?? []).some((at) => at > previous && at <= s.elapsedSeconds))
+      firstQuiet = null
     if (CPU_TARGETS.every((name) => s.cpu[name] <= value.thresholdPercent))
       firstQuiet ??= s
     else firstQuiet = null
+    previous = s.elapsedSeconds
   }
   return (
     !!last &&
     !!firstQuiet &&
+    !(value.interruptions ?? []).some((at) => at > last.elapsedSeconds) &&
     last.elapsedSeconds - firstQuiet.elapsedSeconds >= 30 &&
     value.elapsedSeconds <= 600
   )
@@ -235,6 +268,10 @@ export function assertNativeQuiesceEvidence(value) {
     !Array.isArray(value.samples) ||
     value.samples.length > 130 ||
     !value.samples.every(validSample) ||
+    (value.version === 2 &&
+      (!Array.isArray(value.interruptions) ||
+        value.interruptions.length > 130 ||
+        !value.interruptions.every(nonnegative))) ||
     !settledEvidence(value)
   )
     throw new Error('invalid_native_quiesce_evidence')
@@ -282,65 +319,114 @@ export async function quiesceOwnedSimulator(device, command) {
     process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
   )
   const execute = command ?? simulatorCommandRecorder(directory)
-  const simctl = (operation, args, options) =>
-    execute(operation, 'xcrun', ['simctl', ...args], options)
-  const devices = Object.values(
-    JSON.parse(simctl('list-devices', ['list', 'devices', '--json']).stdout).devices
-  ).flat()
-  const selected = devices.find((d) => d.udid === device)
-  if (!selected || !selected.name.startsWith('cc68-') || selected.state !== 'Booted')
-    throw new Error('owned_booted_simulator_required')
-  const manager = probeSimulatorTuning(device, execute)
-  const collectors = { version: 1, managerPid: manager, snapshots: [] }
+  const collectors = { version: 1, managerPid: null, snapshots: [] }
   const crashScan = crashReportCollector(device)
   const crashes = { version: 1, snapshots: [], reports: [] }
+  const failures = { version: 1, failures: [] }
   const began = performance.now()
-  const result = await waitForSimulatorCpu({
-    sample: (remaining) =>
-      sampleSimulatorCpu(manager, remaining, {
-        onCollectors: (clients) => {
-          collectors.snapshots.push({
-            elapsedSeconds: Math.round((performance.now() - began) / 10) / 100,
-            collectors: clients,
-          })
-          fs.writeFileSync(
-            path.join(directory, 'native-ios-collectors.json'),
-            JSON.stringify(collectors, null, 2) + '\n',
-            { mode: 0o600 }
-          )
-        },
-      }),
-    onSampleFailure: (error) => {
-      const diagnostic = error.diagnostic ?? {
-        reason: error.message,
-        errorName: error.name,
-        errorCode: error.code ?? null,
-      }
+  let manager = null
+  let logTuning = null
+  const failure = (error) => {
+    if (error.message === 'owned_simulator_manager_missing') manager = null
+    const diagnostic = error.diagnostic ?? diagnosticError(error)
+    failures.failures.push({
+      elapsedSeconds: Math.round((performance.now() - began) / 10) / 100,
+      diagnostic,
+    })
+    safely(() =>
       fs.writeFileSync(
         path.join(directory, 'native-ios-sampler-private.json'),
-        JSON.stringify(diagnostic, null, 2) + '\n',
+        JSON.stringify(failures, null, 2) + '\n',
         { mode: 0o600 }
       )
-      console.log(JSON.stringify({ simulatorSamplingFailure: diagnostic }))
+    )
+    console.log(JSON.stringify({ simulatorSamplingFailure: diagnostic }))
+  }
+  const result = await waitForSimulatorCpu({
+    sample: (remaining) => {
+      if (manager === null) {
+        const bounded = (operation, binary, args) => {
+          if (operation === 'log-level-off' && logTuning) return logTuning
+          const remainingMs =
+            QUIESCE_POLICY.maxSeconds * 1000 - (performance.now() - began)
+          const r = execute(operation, binary, args, {
+            fatal: false,
+            timeout: Math.max(1, Math.floor(Math.min(10000, remainingMs))),
+          })
+          if (operation === 'log-level-off') logTuning = r
+          return r
+        }
+        const devices = Object.values(
+          JSON.parse(
+            bounded('list-devices', 'xcrun', ['simctl', 'list', 'devices', '--json'])
+              .stdout
+          ).devices
+        ).flat()
+        const selected = devices.find((d) => d.udid === device)
+        if (
+          !selected ||
+          !selected.name.startsWith('cc68-') ||
+          selected.state !== 'Booted'
+        )
+          throw new Error('owned_booted_simulator_required')
+        manager = probeSimulatorTuning(device, bounded)
+        collectors.managerPid = manager
+      }
+      return sampleSimulatorCpu(
+        manager,
+        Math.max(
+          1,
+          Math.min(
+            remaining,
+            QUIESCE_POLICY.maxSeconds * 1000 - (performance.now() - began)
+          )
+        ),
+        {
+          onDiagnosticFailure: failure,
+          onCollectors: (clients) => {
+            collectors.snapshots.push({
+              elapsedSeconds: Math.round((performance.now() - began) / 10) / 100,
+              collectors: clients,
+            })
+            safely(() =>
+              fs.writeFileSync(
+                path.join(directory, 'native-ios-collectors.json'),
+                JSON.stringify(collectors, null, 2) + '\n',
+                { mode: 0o600 }
+              )
+            )
+          },
+        }
+      )
     },
+    onSampleFailure: failure,
     record: (value) => {
       assertNativeQuiesceEvidence(value)
-      const crash = crashScan(value.elapsedSeconds)
+      const crash = safely(() => crashScan(value.elapsedSeconds)) ?? {
+        sources: [],
+        reports: [],
+        counts: [],
+        error: 'scan_failed',
+      }
       crashes.snapshots.push({
         elapsedSeconds: value.elapsedSeconds,
         sources: crash.sources,
         counts: crash.counts,
       })
       crashes.reports = crash.reports
-      fs.writeFileSync(
-        path.join(directory, 'native-ios-crashes.json'),
-        JSON.stringify(crashes, null, 2) + '\n',
-        { mode: 0o600 }
+      safely(() =>
+        fs.writeFileSync(
+          path.join(directory, 'native-ios-crashes.json'),
+          JSON.stringify(crashes, null, 2) + '\n',
+          { mode: 0o600 }
+        )
       )
-      fs.writeFileSync(
-        path.join(directory, 'native-quiesce-ios.json'),
-        JSON.stringify(value, null, 2) + '\n',
-        { mode: 0o600 }
+      safely(() =>
+        fs.writeFileSync(
+          path.join(directory, 'native-quiesce-ios.json'),
+          JSON.stringify(value, null, 2) + '\n',
+          { mode: 0o600 }
+        )
       )
       console.log(
         JSON.stringify({

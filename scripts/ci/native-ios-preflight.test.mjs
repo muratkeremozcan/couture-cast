@@ -105,3 +105,27 @@ test('a hung first query is fatal at its independently enforced cap and preserve
   assert.equal(record.signal, 'SIGKILL')
   assert.equal(record.exitCode, 124)
 })
+
+test('failed preflight snapshots preserve query success and permit the next stage', async (t) => {
+  const directory = temporary(t)
+  const command = simulatorCommandRecorder(directory)
+  let failures = 0
+  const result = await observedRuntimeQuery({
+    directory,
+    command,
+    observe: () => {
+      failures++
+      throw Object.assign(new Error('snapshot refused'), {
+        code: 'EACCES',
+        stderr: 'exact snapshot stderr',
+      })
+    },
+    binary: process.execPath,
+    args: ['-e', 'setTimeout(()=>console.log("query-complete"),100)'],
+    timeoutMs: 2000,
+    pollMs: 25,
+  })
+  assert.equal(result.exitCode, 0)
+  assert.match(result.stdout, /query-complete/)
+  assert.ok(failures >= 2)
+})
