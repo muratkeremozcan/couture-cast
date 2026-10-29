@@ -144,6 +144,30 @@ export function shareCardApiRows(apiLog, limit = 20) {
   return rows.slice(-limit)
 }
 
+/**
+ * Notification-preference requests from the owned API's JSON request log: method, status and
+ * duration only. They show whether the settings screen's load after sign-in reached the API.
+ */
+export function communityPreferenceApiRows(apiLog, limit = 10) {
+  const rows = []
+  for (const line of String(apiLog ?? '').split('\n')) {
+    let row
+    try {
+      row = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (typeof row?.path !== 'string' || !row.path.endsWith('/notification-preferences'))
+      continue
+    rows.push({
+      method: ['GET', 'PATCH'].includes(row.method) ? row.method : 'OTHER',
+      status: Number.isSafeInteger(row.statusCode) ? row.statusCode : null,
+      ms: Number.isSafeInteger(row.durationMs) ? row.durationMs : null,
+    })
+  }
+  return rows.slice(-limit)
+}
+
 /** Current byte length of a log file, 0 when it does not exist yet. */
 export function logSize(file) {
   try {
@@ -352,6 +376,10 @@ const OPENER_EVENTS = new Set([
   'signin-verify-denied',
   'signin-verify-code_invalid',
   'signin-verify-unavailable',
+  'prefs-loaded',
+  'prefs-failed',
+  'prefs-token-null',
+  'prefs-stale',
   'press',
   'state-open',
   'composer-idle',
@@ -561,6 +589,9 @@ export function recordIosFlowProgress({
       openerTrace: device && appId ? readIosOpenerTrace({ device, appId, spawn }) : null,
       appLog: device ? readIosAppLogSummary({ device, spawn }) : null,
       ...maestroFlowProgress(maestroLog),
+      communityApi: apiLogFile
+        ? communityPreferenceApiRows(logTail(apiLogFile, apiLogFromByte))
+        : [],
       // Only rows written since the flow began, so an earlier flow's requests never pose as its own.
       shareCardApi: apiLogFile
         ? shareCardApiRows(logTail(apiLogFile, apiLogFromByte))

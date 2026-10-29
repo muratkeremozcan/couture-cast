@@ -41,6 +41,11 @@ export type ShareCardOpenerEvent =
   | 'signin-verify-denied'
   | 'signin-verify-code_invalid'
   | 'signin-verify-unavailable'
+  // Notification settings load after sign-in: why the owner's controls did or did not render.
+  | 'prefs-loaded'
+  | 'prefs-failed'
+  | 'prefs-token-null'
+  | 'prefs-stale'
 type OpenerSink = (event: ShareCardOpenerEvent, length?: number) => void
 let openerSink: OpenerSink | null = null
 export function traceShareCardOpener(event: ShareCardOpenerEvent, length?: number) {

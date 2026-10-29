@@ -18,6 +18,7 @@ import {
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
+import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import type { CommunityNotificationSettings } from '@couture/api-client/contracts/http'
 import { communitySyncFromMobile } from '@/src/lib/community'
 import { enableNativeCommunityNotifications } from '@/src/lib/native-notifications'
@@ -59,8 +60,10 @@ export default function NotificationSettingsScreen() {
           request !== generation.current ||
           nativeSessionIdentity() !== next ||
           !token
-        )
+        ) {
+          traceShareCardOpener(token ? 'prefs-stale' : 'prefs-token-null')
           return
+        }
         const client = communitySyncFromMobile(async () => {
           const fresh = await resolveMobileAccessToken()
           if (!fresh || nativeSessionIdentity() !== next)
@@ -69,8 +72,15 @@ export default function NotificationSettingsScreen() {
         })
         clientRef.current = client
         const value = await client.preferences()
-        if (!active || request !== generation.current || nativeSessionIdentity() !== next)
+        if (
+          !active ||
+          request !== generation.current ||
+          nativeSessionIdentity() !== next
+        ) {
+          traceShareCardOpener('prefs-stale')
           return
+        }
+        traceShareCardOpener('prefs-loaded')
         setSettings(value)
         const draft = communityDeviceTimezoneDraft(
           value,
@@ -79,6 +89,7 @@ export default function NotificationSettingsScreen() {
         suggestedTimezone.current = value.timezoneConfigured ? undefined : draft.timezone
         setDraft(draft)
       })().catch(() => {
+        traceShareCardOpener('prefs-failed')
         if (active && request === generation.current)
           setMessage('community.notifications.failed')
       })

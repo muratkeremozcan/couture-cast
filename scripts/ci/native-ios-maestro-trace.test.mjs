@@ -12,6 +12,7 @@ import {
   readIosAppLogSummary,
   readIosOpenerTrace,
   inputSurface,
+  communityPreferenceApiRows,
   recordIosHostSample,
   scheduleIosInFlowSample,
   scrollPath,
@@ -599,6 +600,8 @@ test('the opener trace is read from the app container and reduced to closed name
         { e: 'signin-code-change', t: 31, n: '123456' },
         { e: 'signin-verify-press', t: 32, n: 250 },
         { e: 'signin-verify-unavailable', t: 33 },
+        { e: 'prefs-token-null', t: 34 },
+        { e: 'prefs-loaded', t: 35, n: 3 },
       ],
     })
   )
@@ -615,6 +618,8 @@ test('the opener trace is read from the app container and reduced to closed name
     { event: 'signin-code-change', ms: 31 },
     { event: 'signin-verify-press', ms: 32 },
     { event: 'signin-verify-unavailable', ms: 33 },
+    { event: 'prefs-token-null', ms: 34 },
+    { event: 'prefs-loaded', ms: 35, length: 3 },
   ])
   assert.deepEqual(calls[0], [
     'xcrun',
@@ -734,4 +739,25 @@ test('the input surface tells an unfocused empty field from an absent one', () =
     focusedNodeCount: 0,
   })
   assert.equal(inputSurface(null), null)
+})
+
+test('community preference rows keep method, status and duration only', () => {
+  const log = [
+    JSON.stringify({
+      path: '/api/v1/community/notification-preferences',
+      method: 'GET',
+      statusCode: 200,
+      durationMs: 41,
+      userId: 'cc68-native-secret',
+    }),
+    JSON.stringify({ path: '/api/v1/share-cards/x', method: 'GET', statusCode: 200 }),
+    JSON.stringify({ path: '/x/notification-preferences', method: 'TRACE' }),
+    'not json',
+  ].join('\n')
+  const rows = communityPreferenceApiRows(log)
+  assert.deepEqual(rows, [
+    { method: 'GET', status: 200, ms: 41 },
+    { method: 'OTHER', status: null, ms: null },
+  ])
+  assert.ok(!JSON.stringify(rows).includes('secret'))
 })
