@@ -73,6 +73,24 @@ async function heroFeedSettled() {
   )
 }
 
+/**
+ * Waits for the feed's own "Showing ... looks. N loaded." announcement. It is the
+ * live region's first message and arrives whenever the independent feed read lands,
+ * so a test that records or asserts announcements must let it pass first.
+ */
+async function feedAnnounced() {
+  const escaped = enUS.community.feed.announceLoaded.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    '\\$&'
+  )
+  const loaded = new RegExp(
+    `^${escaped.replace('\\{\\{filter\\}\\}', '.+').replace('\\{\\{count\\}\\}', '\\d+')}$`
+  )
+  await waitFor(() =>
+    expect(screen.getByTestId('community-live-region').textContent).toMatch(loaded)
+  )
+}
+
 /** The hero canvas markup with the teaser taken out. */
 function heroWithoutTeaser(): string {
   const clone = heroCanvas().cloneNode(true) as HTMLElement
@@ -392,6 +410,7 @@ describe('6.7 web Home spotlight teaser', () => {
       expect(element).not.toBeNull()
       return element!
     })
+    await feedAnnounced()
     return { link, card }
   }
 
