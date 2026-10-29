@@ -299,7 +299,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       // focus message: both stay, in the order they happened.
       await waitFor(() =>
         expect(region.textContent).toMatch(
-          /Focused on the highlighted look\..*Showing .+ looks\. 2 loaded\./
+          /^Focused on the highlighted look\. Showing .+ looks\. 2 loaded\.$/
         )
       )
     })

@@ -88,6 +88,7 @@ import {
 } from './community-spotlight'
 
 import React, {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -3648,15 +3649,17 @@ export function CommunityLookbookGrid({
           className="sr-only"
         >
           {announcements.map((message, index) => (
-            <span
+            <Fragment
               key={
                 index === 0
                   ? `current-${message.announcementId ?? ''}`
                   : `queued-${index}`
               }
             >
-              {openedItem ? null : renderMessage(message, t, viewerBand)}
-            </span>
+              {/* A space between messages, so the region reads as separate sentences. */}
+              {index > 0 ? ' ' : null}
+              <span>{openedItem ? null : renderMessage(message, t, viewerBand)}</span>
+            </Fragment>
           ))}
         </div>
 
