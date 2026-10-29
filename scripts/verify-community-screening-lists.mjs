@@ -64,7 +64,8 @@ function sameBankScope(rule, reviewed) {
     same('openers', []) &&
     same('contextPhrases', []) &&
     same('contextRequiredDeclaredLanguages', []) &&
-    same('contextMinWords', 0)
+    same('contextMinWords', 0) &&
+    same('forbiddenLetters', '')
   )
 }
 

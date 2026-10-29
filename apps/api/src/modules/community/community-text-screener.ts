@@ -369,6 +369,13 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
               .min(1)
               .optional(),
             contextMinWords: z.number().int().min(2).max(8).optional(),
+            // Letters the target's language never writes (French è ù û î ë ï ü œ ÿ for a
+            // Portuguese rug noun): one of them anywhere in the raw text refuses the clearance.
+            forbiddenLetters: z
+              .string()
+              .regex(/^\p{L}+$/u)
+              .max(40)
+              .optional(),
             rejectedPrefixFrames: z
               .array(z.string().regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u))
               .min(1)
@@ -1244,6 +1251,7 @@ function compileOccurrenceConstructions(
   textForbidden: readonly string[]
   openers: readonly (readonly string[])[]
   minWords: number
+  forbiddenLetters: string
 }[] {
   const groups = new Map<
     string,
@@ -1257,6 +1265,7 @@ function compileOccurrenceConstructions(
       textForbidden?: readonly string[]
       openers?: readonly string[]
       minWords: number
+      forbiddenLetters: string
       phrases: string[]
     }
   >()
@@ -1274,6 +1283,7 @@ function compileOccurrenceConstructions(
       entry.textForbidden ?? null,
       entry.openers ?? null,
       entry.minWords ?? 0,
+      entry.forbiddenLetters ?? '',
     ])
     const group = groups.get(key) ?? {
       target: entry.target,
@@ -1285,6 +1295,7 @@ function compileOccurrenceConstructions(
       textForbidden: entry.textForbidden,
       openers: entry.openers,
       minWords: entry.minWords ?? 0,
+      forbiddenLetters: entry.forbiddenLetters ?? '',
       phrases: [],
     }
     group.phrases.push(entry.phrase)
@@ -1293,6 +1304,7 @@ function compileOccurrenceConstructions(
   return [...groups.values()].map((group) => ({
     target: group.target,
     minWords: group.minWords,
+    forbiddenLetters: group.forbiddenLetters,
     requiredDeclaredLanguages: group.requiredDeclaredLanguages,
     rejectedPrefixFrames: group.rejectedPrefixFrames,
     openers: (group.openers ?? []).map((phrase) =>
@@ -1332,6 +1344,7 @@ function reviewedOccurrencePhrases(
   textForbidden?: readonly string[]
   openers?: readonly string[]
   minWords?: number
+  forbiddenLetters?: string
 }[] {
   const phrases: {
     target: string
@@ -1344,6 +1357,7 @@ function reviewedOccurrencePhrases(
     textForbidden?: readonly string[]
     openers?: readonly string[]
     minWords?: number
+    forbiddenLetters?: string
   }[] = []
   const targets = new Set<string>()
   for (const list of lists) {
@@ -1377,6 +1391,7 @@ function reviewedOccurrencePhrases(
           closedTails: reviewed.closedTails,
           textForbidden: reviewed.textForbidden,
           openers: reviewed.openers,
+          forbiddenLetters: reviewed.forbiddenLetters,
         })),
         ...(reviewed.contextPhrases ?? []).map((phrase) => ({
           target: rule.target,
@@ -1389,6 +1404,7 @@ function reviewedOccurrencePhrases(
           textForbidden: reviewed.textForbidden,
           openers: reviewed.openers,
           minWords: reviewed.contextMinWords,
+          forbiddenLetters: reviewed.forbiddenLetters,
         }))
       )
     }
@@ -2213,6 +2229,7 @@ export class CommunityTextScreener {
   private readonly occurrenceConstructions: readonly {
     target: string
     minWords: number
+    forbiddenLetters: string
     pattern: () => RegExp
     requiredDeclaredLanguages?: readonly ScreeningLanguage[]
     rejectedPrefixFrames: readonly string[]
@@ -2709,6 +2726,13 @@ export class CommunityTextScreener {
       // Every phrase holds the target word, so a text without it cannot match: skip the scan.
       if (!exact.includes(construction.target)) continue
       if (!declaresRequiredLanguage(construction.requiredDeclaredLanguages, language))
+        continue
+      if (
+        construction.forbiddenLetters &&
+        [...raw.normalize('NFC').toLowerCase()].some((letter) =>
+          construction.forbiddenLetters.includes(letter)
+        )
+      )
         continue
       for (const match of exact.matchAll(construction.pattern())) {
         const prefix = exact.slice(0, match.index)

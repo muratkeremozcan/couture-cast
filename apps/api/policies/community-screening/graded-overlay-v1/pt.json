@@ -260,6 +260,31 @@
       "term": "corta os pulsos",
       "category": "self_harm",
       "severity": "high"
+    },
+    {
+      "term": "raça ariana",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "raças arianas",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "pureza ariana",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "supremacia ariana",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "nação ariana",
+      "category": "hate",
+      "severity": "high"
     }
   ]
 }

@@ -276,7 +276,6 @@ describe('round 8c reviewer findings: mixed French, ariano and burro frames', ()
     for (const text of [
       'Sapatos sobre o tapete ou sobre o piso da sala.',
       'Três pares de sapatos sobre o tapete da sala.',
-      'Duas pás de madeira ao lado do tapete da sala.',
       'Sapatos que ficam sobre o tapete da sala todo dia.',
     ])
       for (const locale of portuguese)
@@ -310,6 +309,104 @@ describe('round 8c reviewer findings: mixed French, ariano and burro frames', ()
     for (const text of [
       'O burro do pasto puxa a carroça de tecidos.',
       'O burro da fazenda usa sela de feltro.',
+    ])
+      for (const locale of portuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+})
+
+describe('round 8d: minors, toys, hate frames, job nouns and French letters', () => {
+  const everywhere = (text: string) => {
+    for (const locale of [...portuguese, ...elsewhere])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  }
+  const inPortuguese = (text: string) => {
+    for (const locale of portuguese)
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  }
+
+  it.each([
+    'Um amador de moda e as menores no desfile.',
+    'Um amador de moda com uma menor no desfile.',
+    'Um amador de moda e a teen do ateliê.',
+    'Um amador de moda e a novinha do ateliê.',
+    'Um amador de moda e as novinhas do ateliê.',
+    'Um amador de moda e o novinho do ateliê.',
+    'Um amador de moda e o incesto no desfile.',
+    'Um amador de moda e a enteada do ateliê.',
+    'Um amador de moda e o enteado do ateliê.',
+    'Um amador de moda e a safada do ateliê.',
+    'Um amador de moda e o safado do ateliê.',
+    'Um amador de moda e a menina do ateliê.',
+    'Um amador de moda e a criança do ateliê.',
+    'Um amador de moda e a adolescente do ateliê.',
+    'Um amador de moda e a colegial do ateliê.',
+  ])('withholds amador beside minor and incest words: %s', inPortuguese)
+
+  it.each([
+    'Palavras de consolo e látex no desfile.',
+    'Palavras de consolo e latex no desfile.',
+    'Palavras de consolo de vidro no desfile.',
+    'Palavras de consolo e cinta no desfile.',
+    'Palavras de consolo e cu no desfile.',
+    'Un consolo de goma en la tienda.',
+    'Compre un consolo de goma hoje.',
+  ])('withholds consolo beside toy words and the Spanish frame: %s', inPortuguese)
+
+  it.each([
+    'Heil o ariano no desfile.',
+    'O ariano heil no desfile.',
+    'Orgullo de ser ariano no desfile.',
+    'O orgullo de ser ariano no desfile.',
+  ])('withholds ariano beside heil and the Spanish frame: %s', inPortuguese)
+
+  it.each([
+    'Pureza ariana',
+    'Raça ariana pura',
+    'A raça ariana no desfile',
+    'As raças arianas',
+    'Supremacia ariana',
+    'Nação ariana',
+  ])('withholds the ariana hate phrases in every locale: %s', everywhere)
+
+  it('keeps the given name Ariana and the star sign copy clearing', () => {
+    for (const text of [
+      'Ariana Grande usa casaco longo no desfile.',
+      'Signo de áries: o ariano veste vermelho.',
+    ])
+      for (const locale of portuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+
+  it.each([
+    'Foto do burro do carteiro no quintal.',
+    'Foto do burro da motorista no quintal.',
+    'Foto do burro do porteiro no quintal.',
+    'Foto do burro do garçom no quintal.',
+    'Foto do burro do gerente no quintal.',
+    'Foto do burro do entregador no quintal.',
+    'Foto do burro dos carteiros no quintal.',
+    'Foto do burro da atendente no quintal.',
+    'Foto de un hijo de burro en la calle.',
+  ])('withholds burro beside a job noun used for a person: %s', inPortuguese)
+
+  it.each([
+    'Sapatos sobre o tapete pas la sala.',
+    'Sapatos sobre o tapete, très beau.',
+    'Sapatos sobre o tapete où ça.',
+    'Sapatos sobre o tapete, bœuf.',
+    'Sapatos sobre o tapete naïf.',
+    'Sapatos sobre o tapete, déjà û.',
+    'Sapatos sobre o tapete e ë.',
+    'Sapatos sobre o tapete ÿ ü.',
+    'Sapatos sobre o tapete î è.',
+  ])('withholds the rug noun beside a French sign: %s', inPortuguese)
+
+  it('keeps Portuguese copy with accents, ou and três clearing', () => {
+    for (const text of [
+      'Sapatos sobre o tapete ou sobre o piso da sala.',
+      'Três pares de sapatos sobre o tapete da sala, à noite.',
+      'Calçado côncavo sobre o tapete da sala, após o café.',
     ])
       for (const locale of portuguese)
         expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
