@@ -302,13 +302,16 @@ const alertTree = {
   ],
 }
 
-test('the failure summary is closed: counts, listed alert buttons and a permission flag only', () => {
+test('the failure summary is closed: counts, listed alert buttons, flags and Apple ids only', () => {
   const summary = systemSurfaceSummary(alertTree)
   assert.deepEqual(summary, {
     nodeCount: 6,
     topLevelCount: 2,
     alertButtons: ["Don't Allow", 'Allow'].sort(),
     permissionTextSeen: true,
+    appleResourceIds: [],
+    breadcrumbSeen: false,
+    returnLinkSeen: false,
   })
   assert.doesNotMatch(JSON.stringify(summary), /Private|caption|50%|share-card-save/)
   const quiet = systemSurfaceSummary({
@@ -785,4 +788,31 @@ test('the request phase is read from own names only, so inherited property names
     rows.map((row) => row.phase),
     ['other', 'other', 'other', 'other', 'completed']
   )
+})
+
+test('the system surface records Apple resource ids, the breadcrumb and a return link, and nothing the app owns', () => {
+  const node = (attributes, children = []) => ({ attributes, children })
+  const summary = systemSurfaceSummary(
+    node({}, [
+      node({ 'resource-id': 'com.apple.settings.general', text: 'General' }),
+      node({ 'resource-id': 'com.apple.settings.siri' }),
+      node({ 'resource-id': 'breadcrumb', text: 'Return to CoutureCast Story68' }),
+      node({ 'resource-id': 'garment-tile-8F3C6A1E-1B2D-4C5E-9A7B-0123456789AB' }),
+      node({ 'resource-id': 'com.apple.' + 'x'.repeat(70) }),
+      node({ 'resource-id': 'share-card-title' }),
+    ])
+  )
+  assert.deepEqual(summary.appleResourceIds, [
+    'com.apple.settings.general',
+    'com.apple.settings.siri',
+  ])
+  assert.equal(summary.breadcrumbSeen, true)
+  assert.equal(summary.returnLinkSeen, true)
+  assert.doesNotMatch(JSON.stringify(summary), /garment|share-card-title|8F3C/)
+  const none = systemSurfaceSummary(
+    node({}, [node({ 'resource-id': 'share-card-title' })])
+  )
+  assert.deepEqual(none.appleResourceIds, [])
+  assert.equal(none.breadcrumbSeen, false)
+  assert.equal(none.returnLinkSeen, false)
 })

@@ -249,20 +249,33 @@ export function failedStepHierarchy(output) {
  * A closed summary of the screen at failure: node counts, which system alert buttons from a fixed
  * list are on it, and whether any text asks for permission. No raw text or identifiers leave.
  */
+const APPLE_RESOURCE_ID = /^com\.apple\.[A-Za-z0-9._-]{1,60}$/
+const MAX_APPLE_IDS = 40
+
 export function systemSurfaceSummary(hierarchy) {
   if (!hierarchy || typeof hierarchy !== 'object') return null
   const found = new Set()
   let nodeCount = 0
   let permissionTextSeen = false
+  let breadcrumbSeen = false
+  let returnLinkSeen = false
+  const appleIds = new Set()
   const visit = (node) => {
     if (!node || typeof node !== 'object') return
     nodeCount++
+    // Which OS screen is in front: system ids only, never an id the app owns.
+    const id = node.attributes?.['resource-id']
+    if (typeof id === 'string') {
+      if (APPLE_RESOURCE_ID.test(id) && appleIds.size < MAX_APPLE_IDS) appleIds.add(id)
+      if (id === 'breadcrumb') breadcrumbSeen = true
+    }
     for (const key of ['text', 'accessibilityText', 'title']) {
       const value = node.attributes?.[key]
       if (typeof value !== 'string') continue
       if (ALERT_BUTTONS.includes(value)) found.add(value.replace('\u2019', "'"))
       if (/would like to|access to your photos|add to your photos/i.test(value))
         permissionTextSeen = true
+      if (/^Return to /.test(value)) returnLinkSeen = true
     }
     for (const child of Array.isArray(node.children) ? node.children : []) visit(child)
   }
@@ -272,6 +285,9 @@ export function systemSurfaceSummary(hierarchy) {
     topLevelCount: Array.isArray(hierarchy.children) ? hierarchy.children.length : 0,
     alertButtons: [...found].sort(),
     permissionTextSeen,
+    appleResourceIds: [...appleIds].sort(),
+    breadcrumbSeen,
+    returnLinkSeen,
   }
 }
 
