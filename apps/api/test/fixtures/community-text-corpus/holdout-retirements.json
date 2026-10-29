@@ -1,6 +1,13 @@
 {
   "schemaVersion": 3,
-  "eligible": {},
+  "eligible": {
+    "holdout-v6": {
+      "corpusVersion": "holdout-v6",
+      "sealedAt": "2026-10-28T17:05:57.585289+00:00",
+      "corpusSha256": "f5ac17f8dce28422821beef3d6d7c065c30c570d265f2a7304a970f06f60456e",
+      "locales": ["de", "en", "es", "fr", "it", "tr"]
+    }
+  },
   "retired": {
     "holdout-v1": "Superseded historical cohort; retained as history and ineligible for release evidence.",
     "holdout-v2": "Superseded frozen historical cohort; retained as history and ineligible for release evidence.",
@@ -10,6 +17,10 @@
     "holdout-v7": {
       "locales": ["pt"],
       "reason": "Coordinator retirement after failed PT-only evaluation (14 of 2000, Wilson upper 1.1716 percent): development data; PT row-level handoff authorized only after this retirement is committed."
+    },
+    "holdout-v6": {
+      "locales": ["pt"],
+      "reason": "Coordinator retirement after failed PT evaluation of the sealed v6 holdout (16 of 2000, Wilson upper 1.2956 percent): spent, never decides acceptance; a fresh PT holdout decides it."
     }
   }
 }

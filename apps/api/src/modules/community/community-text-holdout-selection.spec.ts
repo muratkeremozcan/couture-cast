@@ -1,6 +1,11 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { passesCleanHoldoutGate, wilsonInterval } from './community-text-corpus-gate.js'
+import {
+  parseActiveHoldout,
+  requireEligibleHoldout,
+} from './community-text-holdout-eligibility-core.mjs'
 import {
   describeCleanGates,
   loadActiveHoldouts,
@@ -34,11 +39,27 @@ describe('per-locale clean gate', () => {
 })
 
 describe('checked-in selector', () => {
-  it('fails closed until every locale names an eligible, sealed holdout', () => {
-    const corpusDir = path.resolve(
-      __dirname,
-      '../../../test/fixtures/community-text-corpus'
+  const corpusDir = path.resolve(
+    __dirname,
+    '../../../test/fixtures/community-text-corpus'
+  )
+
+  it('fails closed on Portuguese until a fresh holdout is registered for it', () => {
+    expect(() => loadActiveHoldouts(corpusDir)).toThrow(/holdout-v6 is retired for pt/)
+  })
+
+  it('names holdout-v6 for the six locales it is eligible for', () => {
+    const active = parseActiveHoldout(
+      JSON.parse(fs.readFileSync(path.join(corpusDir, 'active-holdout.json'), 'utf8'))
     )
-    expect(() => loadActiveHoldouts(corpusDir)).toThrow(/holdout-v5 is retired for de/)
+    const ledger: unknown = JSON.parse(
+      fs.readFileSync(path.join(corpusDir, 'holdout-retirements.json'), 'utf8')
+    )
+    for (const locale of ['de', 'en', 'es', 'fr', 'it', 'tr']) {
+      expect(active[locale]).toBe('holdout-v6')
+      expect(requireEligibleHoldout('holdout-v6', ledger, locale).corpusVersion).toBe(
+        'holdout-v6'
+      )
+    }
   })
 })
