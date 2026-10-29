@@ -4,6 +4,8 @@
 ![branches](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-branches.json)
 ![functions](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-functions.json)
 ![lines](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-lines.json)
+[![nightly native share-card lanes](https://github.com/muratkeremozcan/couture-cast/actions/workflows/pr-share-card-native.yml/badge.svg?event=schedule)](https://github.com/muratkeremozcan/couture-cast/actions/workflows/pr-share-card-native.yml?query=event%3Aschedule)
+[![nightly accessibility focus app build](https://github.com/muratkeremozcan/couture-cast/actions/workflows/pr-accessibility-focus.yml/badge.svg?event=schedule)](https://github.com/muratkeremozcan/couture-cast/actions/workflows/pr-accessibility-focus.yml?query=event%3Aschedule)
 
 Thin Turborepo for Couture Cast apps and smoke tests. Keep it lean: shared lint config, root Playwright, and a minimal Maestro sanity.
 
