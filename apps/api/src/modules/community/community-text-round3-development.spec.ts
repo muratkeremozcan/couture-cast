@@ -10,6 +10,11 @@ import {
 } from './community-text-screener.js'
 import { wilsonInterval } from './community-text-corpus-gate.js'
 
+// Each per-language case screens 1,000 development rows. Measured 1.9 to 2.4 s locally at
+// load 30 and up to 14 s while the machine ran above load 60; CI is about 2.6 times slower
+// than a quiet local run. 60 s keeps four times the slowest measurement.
+const DEVELOPMENT_CASE_TIMEOUT_MS = 60_000
+
 const loaded = loadCommunityScreeningPolicy()
 const screener = new CommunityTextScreener({ policy: loaded.policy.text })
 const root = path.resolve(__dirname, '../../../test/fixtures/community-text-corpus')
@@ -76,7 +81,8 @@ describe('round 3 development data, including released v4', () => {
         wilsonInterval(withheld.length, development.length)[1],
         JSON.stringify(withheld)
       ).toBeLessThanOrEqual(0.01)
-    }
+    },
+    DEVELOPMENT_CASE_TIMEOUT_MS
   )
   it.each(Object.entries(locales))(
     '%s preserves in-sample clean copy',

@@ -7,6 +7,11 @@ import { loadCommunityScreeningPolicy } from './community-screening-policy.js'
 import { CommunityTextScreener, toLiteralForm } from './community-text-screener.js'
 import { wilsonInterval } from './community-text-corpus-gate.js'
 
+// Each per-language case screens 1,000 development rows. Measured 2.3 to 2.5 s locally at
+// load 30 and up to 14 s while the machine ran above load 60; CI is about 2.6 times slower
+// than a quiet local run. 60 s keeps four times the slowest measurement.
+const DEVELOPMENT_CASE_TIMEOUT_MS = 60_000
+
 const screener = new CommunityTextScreener({
   policy: loadCommunityScreeningPolicy().policy.text,
 })
@@ -82,7 +87,8 @@ describe('round5 retired development and native occurrence classes', () => {
       expect(
         wilsonInterval(withheld.length, corpus.entries.length)[1]
       ).toBeLessThanOrEqual(0.01)
-    }
+    },
+    DEVELOPMENT_CASE_TIMEOUT_MS
   )
 
   it('keeps a finite reviewed surface with native provenance', () => {

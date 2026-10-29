@@ -44,6 +44,9 @@ import {
  *   same set (single words only).
  * - typo-transpose / typo-delete: two adjacent inner letters swapped, or one inner letter
  *   removed, for single words of eight letters or more.
+ * - edit1: one letter added (appended, prepended, inserted), dropped, changed or two
+ *   neighbours swapped, for single words of six letters or more, letters seeded per word.
+ *   A variant that is an ordinary word the lists clear is listed in EDIT1_REAL_WORDS.
  * - inflection-typo: the same two typos over every generated plural and inflected spelling of
  *   eight letters or more, except the Turkish inflections whose suffix breaks vowel harmony
  *   (PINNED_DISHARMONIC).
@@ -182,10 +185,42 @@ const EXCEPTIONS = new Set([
 
 const failures: Record<string, string[]> = {}
 const counts: Record<string, number> = {}
+/**
+ * Ordinary words that sit one edit from a listed term and that the allow list clears, each
+ * with its reason in allow-list-v1.json (or an earlier allow entry: fagot, niger). The edit1
+ * class cannot withhold them; every other edit of every eligible term is withheld.
+ */
+const EDIT1_REAL_WORDS: ReadonlySet<string> = new Set([
+  'aping',
+  'borra',
+  'fagot',
+  'marca',
+  'marcas',
+  'marcia',
+  'maria',
+  'marion',
+  'matite',
+  'matte',
+  'mongolic',
+  'narica',
+  'niger',
+  'pompion',
+  'racing',
+  'rayed',
+  'slope',
+  'stupor',
+  'terron',
+  'tyranny',
+])
+
 function check(cls: string, term: string, text: string): void {
   counts[cls] = (counts[cls] ?? 0) + 1
   const { disposition } = screener.screen({ text, field: 'caption', locale: null })
-  if (disposition === 'pass' && !EXCEPTIONS.has(`${cls}|${term}`))
+  if (
+    disposition === 'pass' &&
+    !EXCEPTIONS.has(`${cls}|${term}`) &&
+    !(cls === 'edit1' && EDIT1_REAL_WORDS.has(text))
+  )
     (failures[cls] ??= []).push(`${term} => ${text}`)
 }
 
@@ -436,6 +471,37 @@ function runMatrix(): void {
 }
 
 /** Every per-word class for one word of a term (a whole term when it is a single word). */
+/**
+ * One letter added (appended, prepended or inserted at every inner position), dropped,
+ * changed, or two neighbours swapped, for single words of six letters or more. The added
+ * and changed letters are seeded per word, so the class is the same on every run.
+ */
+function edit1(word: string, emit: Emit): void {
+  const n = word.length
+  if (n < 6) return
+  let state = [...word].reduce(
+    (sum, ch) => (sum * 31 + ch.charCodeAt(0)) % 2147483648,
+    29
+  )
+  const letter = (avoid?: string): string => {
+    for (;;) {
+      state = (state * 1103515245 + 12345) % 2147483648
+      const candidate = String.fromCharCode(97 + ((state >>> 8) % 26))
+      if (candidate !== avoid) return candidate
+    }
+  }
+  emit('edit1', word + letter())
+  emit('edit1', letter() + word)
+  for (let at = 1; at < n; at += 1)
+    emit('edit1', word.slice(0, at) + letter() + word.slice(at))
+  for (let at = 0; at < n; at += 1) {
+    emit('edit1', word.slice(0, at) + word.slice(at + 1))
+    emit('edit1', word.slice(0, at) + letter(word[at]) + word.slice(at + 1))
+    if (at < n - 1 && word[at] !== word[at + 1])
+      emit('edit1', word.slice(0, at) + word[at + 1] + word[at] + word.slice(at + 2))
+  }
+}
+
 function wordClasses(word: string, phrase: boolean, emitWord: Emit): void {
   const short = !phrase && word.length < 4
   const dropShort: Emit = (cls, variant) => {
@@ -447,6 +513,7 @@ function wordClasses(word: string, phrase: boolean, emitWord: Emit): void {
   if (!short && (!phrase || word.length >= 6)) splits(word, dropShort, !phrase, !phrase)
   if (phrase || short) return
   chains(word, dropShort)
+  edit1(word, dropShort)
   typos(word, dropShort)
   flagSplices(word, emitWord)
 }
@@ -503,7 +570,7 @@ const PINNED_FLAG_AMBIGUOUS: string[] = [
   'töte dich selbst',
 ]
 const PINNED_TERMS = 245
-const PINNED_DISHARMONIC = 364
+const PINNED_DISHARMONIC = 350
 
 const PINNED_COUNTS: Record<string, number> = {
   censor: 8809,
@@ -538,7 +605,8 @@ const PINNED_COUNTS: Record<string, number> = {
   split5: 12762,
   chain: 1056,
   stretch: 2016,
-  'inflection-typo': 7597,
+  'inflection-typo': 7829,
+  edit1: 4682,
   'typo-delete': 670,
   'typo-transpose': 571,
 }

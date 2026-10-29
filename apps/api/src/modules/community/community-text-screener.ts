@@ -1463,8 +1463,14 @@ function buildTypoKeys(indexes: readonly LanguageIndex[]): ReadonlyMap<string, T
       if (!/^\p{L}+$/u.test(term)) continue
       // A generated Turkish inflection whose suffix breaks vowel harmony (cifit plus ler, for
       // the back-vowel stem çıfıt) is a spelling nobody writes; one letter less is the ordinary
-      // front-vowel word çiftler. Only harmonic inflections are typo-checked.
-      if (index.disharmonicForms.has(term) && !index.listedTerms.has(term)) continue
+      // front-vowel word çiftler. Only harmonic inflections are typo-checked, except the
+      // violence terms (tecavüz), whose forms are never released.
+      if (
+        index.disharmonicForms.has(term) &&
+        !index.listedTerms.has(term) &&
+        meta.category !== 'violence'
+      )
+        continue
       for (let at = 1; at < term.length - 1; at += 1) {
         add(`${term.slice(0, at)}${term.slice(at + 1)}`, meta)
         if (at < term.length - 2 && term[at] !== term[at + 1])
@@ -1474,6 +1480,68 @@ function buildTypoKeys(indexes: readonly LanguageIndex[]): ReadonlyMap<string, T
   }
   for (const [key] of keys)
     if (indexes.some((index) => index.single.has(key))) keys.delete(key)
+  return keys
+}
+
+const EDIT_ONE_MIN_TERM_LENGTH = 6
+
+interface EditOneTerm {
+  readonly term: string
+  readonly meta: TermMeta
+}
+
+/** The word with each letter removed in turn. */
+function singleDeletes(word: string): string[] {
+  return Array.from(
+    { length: word.length },
+    (_, at) => word.slice(0, at) + word.slice(at + 1)
+  )
+}
+
+/** Whether two different words are one insertion, deletion, substitution or adjacent swap apart. */
+function isEditDistanceOne(a: string, b: string): boolean {
+  if (a === b || Math.abs(a.length - b.length) > 1) return false
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a]
+  let start = 0
+  while (start < short.length && short[start] === long[start]) start += 1
+  if (short.length === long.length) {
+    if (a.slice(start + 1) === b.slice(start + 1)) return true
+    return (
+      a[start] === b[start + 1] &&
+      a[start + 1] === b[start] &&
+      a.slice(start + 2) === b.slice(start + 2)
+    )
+  }
+  return short.slice(start) === long.slice(start + 1)
+}
+
+/**
+ * Every high-severity single-word term of six letters or more that the lists name, and every
+ * sexual-violence family term, found again with one letter added, dropped or changed, or two
+ * neighbours swapped ("hurex", "axrschficker"). The index is the deletion neighbourhood: a term
+ * is filed under itself and each of its deletions, a token is looked up under itself and each of
+ * its deletions, and a candidate is kept only at edit distance exactly one.
+ */
+function buildEditOneIndex(
+  indexes: readonly LanguageIndex[],
+  family: ReadonlySet<string>
+): ReadonlyMap<string, readonly EditOneTerm[]> {
+  const keys = new Map<string, EditOneTerm[]>()
+  const add = (key: string, entry: EditOneTerm): void => {
+    const bucket = keys.get(key)
+    if (!bucket) keys.set(key, [entry])
+    else if (!bucket.some((other) => other.term === entry.term)) bucket.push(entry)
+  }
+  for (const index of indexes)
+    for (const term of index.listedTerms) {
+      const meta = index.single.get(term)
+      if (!meta || term.length < EDIT_ONE_MIN_TERM_LENGTH || !/^\p{L}+$/u.test(term))
+        continue
+      if (meta.severity !== 'high' && !family.has(collapseRepeats(term))) continue
+      const entry = { term, meta }
+      add(term, entry)
+      for (const deleted of singleDeletes(term)) add(deleted, entry)
+    }
   return keys
 }
 
@@ -1773,7 +1841,11 @@ export class CommunityTextScreener {
   disharmonicInflectionForms(): string[] {
     return this.indexes.flatMap((index) =>
       [...index.disharmonicForms]
-        .filter((form) => !index.listedTerms.has(form))
+        .filter(
+          (form) =>
+            !index.listedTerms.has(form) &&
+            index.single.get(form)?.category !== 'violence'
+        )
         .map((form) => `${index.language}:${form}`)
     )
   }
@@ -1786,7 +1858,8 @@ export class CommunityTextScreener {
           (form) =>
             index.single.get(form)?.severity === 'high' &&
             !index.listedTerms.has(form) &&
-            !index.disharmonicForms.has(form)
+            (!index.disharmonicForms.has(form) ||
+              index.single.get(form)?.category === 'violence')
         )
         .map((form) => `${index.language}:${form}`)
     )
@@ -1805,6 +1878,7 @@ export class CommunityTextScreener {
   private censorKeys: ReadonlyMap<string, TermMeta> = new Map()
   /** One inner deletion or adjacent transposition of every long high-severity spelling. */
   private typoKeys: ReadonlyMap<string, TermMeta> = new Map()
+  private editOneKeys: ReadonlyMap<string, readonly EditOneTerm[]> = new Map()
   /** The words of high-severity phrases, keyed by their censored and leet spellings. */
   private phraseWordCensorKeys: ReadonlyMap<string, readonly string[]> = new Map()
   private phraseWordLeetKeys: ReadonlyMap<string, readonly string[]> = new Map()
@@ -1956,6 +2030,7 @@ export class CommunityTextScreener {
     )
     this.censorKeys = buildCensorKeys(this.indexes, this.cutFamilyTerms)
     this.typoKeys = buildTypoKeys(this.indexes)
+    this.editOneKeys = buildEditOneIndex(this.indexes, this.cutFamilyTerms)
     const phraseWords = buildPhraseWordKeys(this.indexes)
     this.phraseWordCensorKeys = phraseWords.censored
     this.phraseWordLeetKeys = phraseWords.leet
@@ -2556,11 +2631,35 @@ export class CommunityTextScreener {
   ): MatchOutcome[] {
     const outcomes: MatchOutcome[] = []
     for (const [at, token] of foldedTokens.entries()) {
-      if (allowed[at] || token.length < TYPO_MIN_TERM_LENGTH - 1) continue
-      const meta = this.typoKeys.get(token)
-      if (meta) outcomes.push({ meta, obfuscated: true })
+      if (allowed[at]) continue
+      if (token.length >= TYPO_MIN_TERM_LENGTH - 1) {
+        const meta = this.typoKeys.get(token)
+        if (meta) outcomes.push({ meta, obfuscated: true })
+      }
+      const near = this.editOneMatch(token)
+      if (near) outcomes.push(near)
     }
     return outcomes
+  }
+
+  /**
+   * A token one edit from a listed high-severity or sexual-violence term of six letters or
+   * more. A real word that sits one edit from a term is cleared by an allow entry; any other
+   * is withheld for review, the grade of a spelling that may be an ordinary word.
+   */
+  private editOneMatch(token: string): MatchOutcome | null {
+    if (
+      token.length < EDIT_ONE_MIN_TERM_LENGTH - 1 ||
+      token.length > this.longestTerm + 1
+    )
+      return null
+    // A listed spelling is matched as itself, whatever other term sits one edit from it.
+    if (this.indexes.some((index) => index.single.has(token))) return null
+    for (const key of [token, ...singleDeletes(token)])
+      for (const { term, meta } of this.editOneKeys.get(key) ?? [])
+        if (isEditDistanceOne(token, term))
+          return { meta: { ...meta, severity: 'medium' }, obfuscated: true }
+    return null
   }
 
   /**

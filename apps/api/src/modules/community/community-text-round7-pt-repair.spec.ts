@@ -1840,3 +1840,55 @@ describe('round 7q typo spellings of generated inflections', () => {
       expect(screen(text, 'tr-TR').disposition, text).toBe('pass')
   })
 })
+
+/**
+ * Round 7r. A token one edit from a listed high-severity or sexual-violence term of six
+ * letters or more (a letter added, dropped or changed, or two neighbours swapped) is withheld
+ * for review. Terms under six letters stay exact; an ordinary word that sits one edit from a
+ * term is cleared by an allow entry with its reason.
+ */
+describe('round 7r edit distance one from a long term', () => {
+  it('withholds an added, dropped, changed or swapped letter of a long term', () => {
+    for (const [text, locale] of [
+      ['arschfickerq', 'de-DE'],
+      ['qarschficker', 'de-DE'],
+      ['axrschficker', 'de-DE'],
+      ['arschfixker', 'de-DE'],
+      ['arschficekr', 'de-DE'],
+      ['niggerz', 'en-US'],
+      ['nigxer', 'en-US'],
+      ['fagxot', 'en-US'],
+      ['kanakex', 'de-DE'],
+      ['orospux', 'tr-TR'],
+      ['axrschficker', null],
+    ] as const)
+      expect(screen(text, locale).disposition, text).not.toBe('pass')
+  })
+
+  it('keeps ordinary words one edit from a term clean', () => {
+    for (const text of [
+      'racing',
+      'bigger',
+      'papers',
+      'marina',
+      'regard',
+      'reward',
+      'granny',
+    ])
+      expect(screen(text, 'en-US').disposition, text).toBe('pass')
+    expect(screen('soquete', 'pt-BR').disposition).toBe('pass')
+    expect(screen('nakışta', 'tr-TR').disposition).toBe('pass')
+    expect(screen('marcá la cintura', 'es-ES').disposition).toBe('pass')
+  })
+
+  it('leaves terms under six letters exact', () => {
+    for (const text of ['hurex', 'fotzex'])
+      expect(screen(text, 'de-DE').disposition, text).toBe('pass')
+  })
+
+  it('does not release a violence term by the Turkish harmony exclusion', () => {
+    // tecavzlar is tecavuzlar less one letter; lar breaks harmony with the front-vowel stem tecavüz.
+    expect(screen('tecavzlar', 'tr-TR').disposition).not.toBe('pass')
+    expect(screen('ciftler', 'tr-TR').disposition).toBe('pass')
+  })
+})
