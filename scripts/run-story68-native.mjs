@@ -49,6 +49,7 @@ import { assertStory68DiskSpace } from './lib/test-disk-space.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
 import {
   IOS_RETRYABLE_DENIAL_EVIDENCE,
+  breadcrumbIn,
   IOS_SETTINGS_MARKERS,
 } from './lib/story68-native-evidence-schema.mjs'
 import { spawnIosFlow, recordIosFlowTiming } from './ci/native-ios-flow-deadline.mjs'
@@ -242,14 +243,7 @@ function openOsSettings() {
     if (resumed !== 'com.android.settings') throw new Error('os_settings_not_opened')
     return { foregroundPackage: resumed }
   }
-  const [breadcrumbId, breadcrumbText] = IOS_SETTINGS_MARKERS
-  const hasBreadcrumb = (node) =>
-    (node?.attributes?.['resource-id'] === breadcrumbId &&
-      [node.attributes.text, node.attributes.accessibilityText].includes(
-        breadcrumbText
-      )) ||
-    (node?.children ?? []).some(hasBreadcrumb)
-  if (!hasBreadcrumb(JSON.parse(run(maestroBinary, ['--device', device, 'hierarchy']))))
+  if (!breadcrumbIn(JSON.parse(run(maestroBinary, ['--device', device, 'hierarchy']))))
     throw new Error('os_settings_not_opened')
   return { foregroundMarkers: IOS_SETTINGS_MARKERS }
 }

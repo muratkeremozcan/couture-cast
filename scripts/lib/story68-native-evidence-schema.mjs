@@ -10,13 +10,26 @@ import {
 // Every object has exact keys; anything unlisted, missing or mistyped is rejected.
 
 /**
- * iOS brings the Settings app to the front with a status-bar breadcrumb back to this app (id and
- * text below), on whichever Settings screen app-settings: lands on: the app pane or the root.
+ * iOS brings the Settings app to the front with a status-bar breadcrumb back to this app, on
+ * whichever Settings screen app-settings: lands on: the app pane or the root. The element has id
+ * `breadcrumb` and a label that ends with the app name, either the arrow form or `Return to`
+ * (which of the two shows depends on how the accessibility session started).
  */
-export const IOS_SETTINGS_MARKERS = Object.freeze([
-  'breadcrumb',
-  'Return to CoutureCast Story68',
-])
+export const IOS_SETTINGS_MARKERS = Object.freeze(['breadcrumb', 'CoutureCast Story68'])
+
+/** True when a Maestro hierarchy holds the Settings breadcrumb that names this app. */
+export function breadcrumbIn(node) {
+  const [id, appName] = IOS_SETTINGS_MARKERS
+  if (!node || typeof node !== 'object') return false
+  const attributes = node.attributes ?? {}
+  return (
+    (attributes['resource-id'] === id &&
+      [attributes.text, attributes.accessibilityText].some(
+        (label) => typeof label === 'string' && label.endsWith(appName)
+      )) ||
+    (Array.isArray(node.children) ? node.children : []).some(breadcrumbIn)
+  )
+}
 export const IOS_RETRYABLE_DENIAL_EVIDENCE =
   'restricted adapter response; iOS denies further runtime prompts after its first real denial'
 // Mirrors the states bridge-a11y.mjs requires per locale.

@@ -7,14 +7,7 @@ appId: ${MAESTRO_APP_ID}
 - runFlow:
     when:
       platform: iOS
-    commands:
-      # The Settings status bar shows a breadcrumb back to this app on every Settings screen it
-      # opened: the app pane or the root. A Settings row such as General is on the root only.
-      - extendedWaitUntil:
-          visible:
-            id: breadcrumb
-            text: Return to CoutureCast Story68
-          timeout: 15000
+    file: wait-os-settings-ios.yaml
 - runFlow:
     when:
       platform: Android

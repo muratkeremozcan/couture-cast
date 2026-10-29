@@ -265,31 +265,57 @@ describe('public evidence publisher', () => {
 })
 
 // On a real landing screen of app-settings: (iOS 26.1 probe, 2026-10-29) the Settings status bar
-// carries id `breadcrumb` with the text `Return to CoutureCast Story68` on every screen opened
+// carries id `breadcrumb` whose text ends with the app name (the arrow form or `Return to`, which
+// differs with how the accessibility session started) on every screen opened
 // from this app. The General row (com.apple.settings.general) is on the Settings root only; the
 // first iOS 18.5 CI run waited 15.66 s for it and failed, so it cannot be a marker.
 test('the iOS Settings markers are the breadcrumb pair, which every Settings screen opened from this app shows', () => {
-  assert.deepEqual(
-    [...IOS_SETTINGS_MARKERS],
-    ['breadcrumb', 'Return to CoutureCast Story68']
-  )
+  assert.deepEqual([...IOS_SETTINGS_MARKERS], ['breadcrumb', 'CoutureCast Story68'])
   assert.equal(
     IOS_SETTINGS_MARKERS.some((marker) => marker.startsWith('com.apple.settings.')),
     false
   )
 })
 
-test('settings.yaml waits for that breadcrumb on iOS and no longer for a Settings row', async () => {
+// Maestro scopes a flow to its appId. Probed on iOS 26.1 (2026-10-29) with the Settings app in
+// front: a flow with appId = the app under test does not see the breadcrumb (extendedWaitUntil
+// FAILED), a flow with appId com.apple.Preferences does, and a parent flow can run such a flow.
+// Both CI waits (the General row, then the breadcrumb) sat under the app's appId and could never
+// succeed, whatever Settings showed.
+test('settings.yaml waits for the breadcrumb in a subflow scoped to the Settings app', async () => {
   const { readFileSync } = await import('node:fs')
-  const flow = readFileSync(
-    new URL('../../maestro/story68/settings.yaml', import.meta.url),
-    'utf8'
-  )
+  const read = (name) =>
+    readFileSync(new URL(`../../maestro/story68/${name}`, import.meta.url), 'utf8')
+  const flow = read('settings.yaml')
   const ios = flow.slice(flow.indexOf('platform: iOS'), flow.indexOf('platform: Android'))
-  assert.match(
-    ios,
-    /extendedWaitUntil:\s+visible:\s+id: breadcrumb\s+text: Return to CoutureCast Story68\s+timeout: 15000/
-  )
-  assert.doesNotMatch(flow, /com\.apple\.settings\./)
+  assert.match(ios, /file: wait-os-settings-ios\.yaml/)
+  assert.doesNotMatch(flow, /breadcrumb|com\.apple\.settings\./)
   assert.match(flow, /assertNotVisible:\s+id: share-card-title/)
+  const sub = read('wait-os-settings-ios.yaml')
+  assert.match(sub, /^appId: com\.apple\.Preferences\n---/)
+  assert.match(
+    sub,
+    /extendedWaitUntil:\s+visible:\s+id: breadcrumb\s+text: ".\*CoutureCast Story68"\s+timeout: 15000/
+  )
+})
+
+test('the breadcrumb check accepts both label forms the status bar shows and rejects other apps', async () => {
+  const { breadcrumbIn } = await import('./story68-native-evidence-schema.mjs')
+  const tree = (text) => ({
+    attributes: {},
+    children: [
+      {
+        attributes: { 'resource-id': 'breadcrumb', accessibilityText: text },
+        children: [],
+      },
+    ],
+  })
+  assert.equal(breadcrumbIn(tree('\u200e\u25c0\ufe0e CoutureCast Story68')), true)
+  assert.equal(breadcrumbIn(tree('Return to CoutureCast Story68')), true)
+  assert.equal(breadcrumbIn(tree('Return to Other App')), false)
+  assert.equal(
+    breadcrumbIn({ attributes: { 'resource-id': 'other', text: 'CoutureCast Story68' } }),
+    false
+  )
+  assert.equal(breadcrumbIn(null), false)
 })

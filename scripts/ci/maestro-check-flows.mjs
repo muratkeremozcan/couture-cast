@@ -12,6 +12,8 @@ export const CHECKED_FLOWS = Object.freeze([
   'maestro/story65/signin-verify.yaml',
   'maestro/story65/wait-notification-settings.yaml',
   'maestro/story68/position-outfit-open.yaml',
+  'maestro/story68/settings.yaml',
+  'maestro/story68/wait-os-settings-ios.yaml',
   'maestro/story68/open-outfit.yaml',
   'maestro/story68/preparing-cancel.yaml',
   'maestro/story68/expo-go-unavailable.yaml',
