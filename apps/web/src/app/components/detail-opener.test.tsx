@@ -24,7 +24,7 @@ describe('detail opener', () => {
         initialProps: { id: null as string | null },
       }
     )
-    expect(result.current.restoreFocus).toBeUndefined()
+    expect(result.current.restoreFocus).toEqual([COMMUNITY])
     act(() => result.current.record('community_feed', false, 'p1'))
     rerender({ id: 'p1' })
     expect(result.current.restoreFocus).toEqual([
@@ -47,7 +47,7 @@ describe('detail opener', () => {
     rerender({ id: 'p1' })
     rerender({ id: null })
     rerender({ id: 'p1' })
-    expect(result.current.restoreFocus).toBeUndefined()
+    expect(result.current.restoreFocus).toEqual([COMMUNITY])
   })
 
   it('ignores a control recorded for another post that a deep link replaced it with', () => {
@@ -60,7 +60,8 @@ describe('detail opener', () => {
     act(() => result.current.record('community_feed', false, 'p1'))
     rerender({ id: 'p1' })
     rerender({ id: 'p2' })
-    expect(result.current.restoreFocus).toBeUndefined()
+    // The community section stays as the fallback; the other post's control does not.
+    expect(result.current.restoreFocus).toEqual([COMMUNITY])
   })
 
   it('clears the control on request, as the notification open path does', () => {
@@ -73,6 +74,6 @@ describe('detail opener', () => {
     act(() => result.current.record('community_feed', false, 'p1'))
     rerender({ id: 'p1' })
     act(() => result.current.clear())
-    expect(result.current.restoreFocus).toBeUndefined()
+    expect(result.current.restoreFocus).toEqual([COMMUNITY])
   })
 })

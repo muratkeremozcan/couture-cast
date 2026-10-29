@@ -39,10 +39,11 @@ export function useDetailOpener(opened: { id: string } | null) {
     []
   )
   const clear = useCallback(() => setOpener(null), [])
-  // That control first; the community section only when its card is gone.
+  // The recorded control first, only while it belongs to the open post; the community
+  // section always stays last, for a card that is gone and for a post opened without one.
   const restoreFocus =
     opener !== null && opener.postId === openedId
       ? [opener.selector, COMMUNITY_FALLBACK]
-      : undefined
+      : [COMMUNITY_FALLBACK]
   return { restoreFocus, record, clear }
 }

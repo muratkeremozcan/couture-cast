@@ -324,4 +324,38 @@ describe('AccessibleModal stack', () => {
     })
     expect(screen.getByTestId('second-target')).toHaveFocus()
   })
+
+  it('still focuses the remaining fallback when the list shrinks while the dialog is open', async () => {
+    function Shrinking({ open, selectors }: { open: boolean; selectors: string[] }) {
+      return (
+        <>
+          <button data-testid="card-target">Card</button>
+          <button data-testid="section-target">Section</button>
+          <AccessibleModal
+            isOpen={open}
+            onClose={vi.fn()}
+            titleId="solo-title"
+            title="Solo"
+            fallbackFocusSelector={selectors}
+          >
+            <button type="button">Solo action</button>
+          </AccessibleModal>
+        </>
+      )
+    }
+    const card = '[data-testid="card-target"]'
+    const section = '[data-testid="section-target"]'
+    const view = render(<Shrinking open selectors={[card, section]} />)
+    view.rerender(<Shrinking open selectors={[section]} />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    // Changing the list is not a close: focus stays in the dialog.
+    expect(screen.getByTestId('section-target')).not.toHaveFocus()
+    view.rerender(<Shrinking open={false} selectors={[section]} />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.getByTestId('section-target')).toHaveFocus()
+  })
 })
