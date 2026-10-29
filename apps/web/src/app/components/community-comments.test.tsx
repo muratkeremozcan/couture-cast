@@ -679,9 +679,9 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     )
     const user = userEvent.setup()
     render(<Journey state={makeState()} />)
-    await screen.findByText('Unavailable.')
-    // An unavailable own entry has no author or body, so only the placeholder names it.
-    await user.click(screen.getByRole('button', { name: 'Delete: Unavailable.' }))
+    // An unavailable own entry has no author or body, so only the placeholder names it. The
+    // private row shows the same text before the public read lands, so wait for the control.
+    await user.click(await screen.findByRole('button', { name: 'Delete: Unavailable.' }))
     expect(await screen.findByText('Comment deleted.')).toBeVisible()
   })
 
