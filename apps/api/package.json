@@ -43,7 +43,7 @@
     }
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": "24.x"
   },
   "scripts": {
     "prepare:shared-deps": "npm run build --workspace @couture/config && npm run build --workspace @couture/utils && npm run build --workspace @couture/api-client && npm run build --workspace @couture/testing",
