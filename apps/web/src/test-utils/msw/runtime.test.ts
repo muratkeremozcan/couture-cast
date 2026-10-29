@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delayHandler, useMswHandlers } from './runtime'
 
 const PATH = 'http://localhost/msw-delay-probe'
@@ -13,6 +13,13 @@ async function timedRead() {
 const answer = () => http.get(PATH, () => HttpResponse.json({ ok: true }))
 
 describe('opt-in MSW response delay', () => {
+  // The tests below set the switch themselves, so the shell's own value (the README runs the
+  // whole suite with it set) must not leak into them.
+  beforeEach(() => {
+    vi.stubEnv('MSW_TEST_DELAY_MS', '')
+    vi.stubEnv('MSW_TEST_DELAY_RANDOM', '')
+  })
+
   afterEach(() => {
     vi.unstubAllEnvs()
     vi.restoreAllMocks()
