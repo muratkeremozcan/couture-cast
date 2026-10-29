@@ -318,11 +318,58 @@ test('in-flow sample labels are accepted', () => {
     )
 })
 
+const REAL_VM_STAT = `Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   145816.
+Pages active:                                 947782.
+Pages inactive:                               933859.
+Pages speculative:                             14366.
+Pages throttled:                                   0.
+Pages wired down:                             306485.
+Pages purgeable:                               17319.
+"Translation faults":                    36575066354.
+Pages copy-on-write:                      4493603714.
+Pages zero filled:                       19835266833.
+Pages reactivated:                         916493019.
+Pages purged:                               56354017.
+File-backed pages:                            571700.
+Anonymous pages:                             1324307.
+Pages stored in compressor:                  1377537.
+Pages occupied by compressor:                 754476.
+Decompressions:                            577146434.
+Compressions:                              709108739.
+Pageins:                                   425077635.
+Pageouts:                                     420779.
+Swapins:                                      421818.
+Swapouts:                                     977766.
+`
+
+test('the real vm_stat output format (captured on macOS) yields every counter', () => {
+  const vm = projectVm(REAL_VM_STAT)
+  assert.deepEqual(Object.keys(vm), [
+    'pageins',
+    'pageouts',
+    'swapins',
+    'swapouts',
+    'compressions',
+    'decompressions',
+  ])
+  assert.equal(vm.pageins, Number(REAL_VM_STAT.match(/^Pageins:\s+(\d+)/m)[1]))
+  assert.equal(
+    vm.decompressions,
+    Number(REAL_VM_STAT.match(/^Decompressions:\s+(\d+)/m)[1])
+  )
+  // Run 23 recorded null in every sample because the counters were matched under invented names.
+  if (process.platform === 'darwin') {
+    const live = spawnSync('vm_stat', [], { encoding: 'utf8' })
+    assert.notEqual(projectVm(live.stdout), null)
+  }
+})
+
 test('vm_stat paging counters are cumulative integers and any missing counter makes the probe unsupported', () => {
   const text = [
     'Mach Virtual Memory Statistics: (page size of 16384 bytes)',
-    'Pages compressed:                       1000.',
-    'Pages decompressed:                      400.',
+    'Decompressions:                          400.',
+    'Compressions:                           1000.',
     'Pageins:                                  25.',
     'Pageouts:                                  0.',
     'Swapins:                                   7.',

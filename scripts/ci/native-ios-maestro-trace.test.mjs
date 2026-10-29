@@ -316,7 +316,11 @@ test('the failed step hierarchy is read from its Maestro artifact and nothing el
   const output = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-hierarchy-'))
   t.after(() => fs.rmSync(output, { recursive: true, force: true }))
   assert.equal(failedStepHierarchy(output), null)
-  fs.writeFileSync(path.join(output, 'hierarchy_1.json'), JSON.stringify(alertTree))
+  fs.mkdirSync(path.join(output, 'screen-hierarchy'))
+  fs.writeFileSync(
+    path.join(output, 'screen-hierarchy/failure.json'),
+    JSON.stringify(alertTree)
+  )
   fs.writeFileSync(
     path.join(output, 'commands.json'),
     JSON.stringify([
@@ -325,7 +329,11 @@ test('the failed step hierarchy is read from its Maestro artifact and nothing el
         command: {},
         metadata: {
           status: 'FAILED',
-          artifacts: [{ type: 'SCREEN_HIERARCHY', path: '/x/hierarchy_1.json' }],
+          artifacts: [
+            { type: 'SCREEN_HIERARCHY', path: '../outside.json' },
+            { type: 'SCREEN_HIERARCHY', path: '/abs/failure.json' },
+            { type: 'SCREEN_HIERARCHY', path: 'screen-hierarchy/failure.json' },
+          ],
         },
       },
     ])

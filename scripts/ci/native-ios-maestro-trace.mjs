@@ -186,14 +186,22 @@ export function failedStepHierarchy(output) {
   for (const file of commandFiles(output)) {
     try {
       const rows = JSON.parse(fs.readFileSync(file, 'utf8'))
-      for (const row of Array.isArray(rows) ? rows : []) {
-        if (row?.metadata?.status !== 'FAILED' && row?.status !== 'FAILED') continue
-        for (const artifact of row?.metadata?.artifacts ?? []) {
-          if (artifact?.type !== 'SCREEN_HIERARCHY' || typeof artifact.path !== 'string')
-            continue
-          const stored = path.join(path.dirname(file), path.basename(artifact.path))
-          return JSON.parse(fs.readFileSync(stored, 'utf8'))
-        }
+      const failed = (Array.isArray(rows) ? rows : [])
+        .filter((row) => ['FAILED', 'RUNNING'].includes(row?.metadata?.status))
+        .sort(
+          (a, b) =>
+            (b.metadata.depth ?? 0) - (a.metadata.depth ?? 0) ||
+            (b.metadata.sequenceNumber ?? 0) - (a.metadata.sequenceNumber ?? 0)
+        )[0]
+      const base = path.dirname(file)
+      for (const artifact of failed?.metadata?.artifacts ?? []) {
+        // Artifact paths are relative to the trace, often in a subdirectory (screen-hierarchy/x.json).
+        if (artifact?.type !== 'SCREEN_HIERARCHY' || typeof artifact.path !== 'string')
+          continue
+        if (path.isAbsolute(artifact.path)) continue
+        const stored = path.resolve(base, artifact.path)
+        if (!stored.startsWith(path.resolve(base) + path.sep)) continue
+        return JSON.parse(fs.readFileSync(stored, 'utf8'))
       }
     } catch {
       // Unreadable raw artifacts stay private; the summary is then null.

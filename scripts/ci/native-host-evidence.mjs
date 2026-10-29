@@ -86,8 +86,8 @@ const VM_COUNTERS = {
   pageouts: /^Pageouts:\s+(\d+)\./m,
   swapins: /^Swapins:\s+(\d+)\./m,
   swapouts: /^Swapouts:\s+(\d+)\./m,
-  compressions: /^Pages compressed:\s+(\d+)\./m,
-  decompressions: /^Pages decompressed:\s+(\d+)\./m,
+  compressions: /^Compressions:\s+(\d+)\./m,
+  decompressions: /^Decompressions:\s+(\d+)\./m,
 }
 
 /**
