@@ -72,7 +72,10 @@ function start() {
   console.log(`postgresql://postgres:postgres@127.0.0.1:${port}/postgres`)
 }
 
-if (fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   if (process.argv[2] === 'start') start()
   else if (process.argv[2] === 'stop') docker('rm', '-f', name)
   else throw new Error('usage: integration-postgres.mjs start|stop [--name N] [--port P]')
