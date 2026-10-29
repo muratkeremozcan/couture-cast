@@ -47,8 +47,8 @@ import { inputSetHash, inputSetPathspecs } from './lib/community-screening-input
 import { readCommunityRolloutDefaults } from './lib/community-rollout-flags.mjs'
 import { restartDrillProblems } from './community-screening-canary.mjs'
 import {
-  assertActiveHoldoutEligible,
-  requireEligibleHoldout,
+  parseActiveHoldout,
+  resolveActiveHoldouts,
 } from '../apps/api/src/modules/community/community-text-holdout-eligibility-core.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -91,15 +91,17 @@ const INPUTS = {
   heartbeatSource: 'apps/api/src/modules/community/community-worker-heartbeat.ts',
 }
 export const TEXT_LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr']
-/** Refuse retired or unknown selectors before reading screening inputs. */
-function activeTextHoldoutVersion() {
+/**
+ * Refuse a retired, unknown or unsealed holdout for any locale before reading screening
+ * inputs. Each locale answers for the version it names; the error names that locale.
+ */
+function activeTextHoldouts() {
   const corpus = 'apps/api/test/fixtures/community-text-corpus'
-  const version = readJson(`${corpus}/active-holdout.json`)?.corpusVersion
+  const active = parseActiveHoldout(readJson(`${corpus}/active-holdout.json`))
   const ledger = readJson(`${corpus}/holdout-retirements.json`)
-  requireEligibleHoldout(version, ledger)
-  const seal = readJson(`${corpus}/${version}/freeze-manifest.json`)
-  assertActiveHoldoutEligible(version, seal, ledger)
-  return version
+  return resolveActiveHoldouts(active, ledger, (version) =>
+    readJson(`${corpus}/${version}/freeze-manifest.json`)
+  )
 }
 const DEFAULT_IMAGE = 'couture-cast-community-worker:local'
 const NODE_MODULES_BUDGET_MB = 150
@@ -671,7 +673,11 @@ function summariseClean(result) {
   }
 }
 
-function textSection(current, holdoutVersion) {
+function holdoutPath(holdouts, language) {
+  return `apps/api/test/fixtures/community-text-corpus/${holdouts[language].version}/${language}.json`
+}
+
+function textSection(current, holdouts) {
   const evaluation = runProduct('text-corpus-evaluation.json')
   const corpusHashes = Object.fromEntries(
     TEXT_LANGUAGES.flatMap((language) => [
@@ -679,12 +685,7 @@ function textSection(current, holdoutVersion) {
         language,
         sha256File(`apps/api/test/fixtures/community-text-corpus/${language}.json`),
       ],
-      [
-        `${language}-holdout`,
-        sha256File(
-          `apps/api/test/fixtures/community-text-corpus/${holdoutVersion}/${language}.json`
-        ),
-      ],
+      [`${language}-holdout`, sha256File(holdoutPath(holdouts, language))],
     ])
   )
   if (!evaluation) return { available: false, stale: [], corpusSha256: corpusHashes }
@@ -692,6 +693,14 @@ function textSection(current, holdoutVersion) {
     Object.entries(evaluation.languages ?? {}).map(([language, result]) => [
       language,
       {
+        holdoutVersion: holdouts[language]?.version ?? null,
+        holdoutPath: holdouts[language] ? holdoutPath(holdouts, language) : null,
+        holdoutSeal: holdouts[language]
+          ? {
+              sealedAt: holdouts[language].seal.sealedAt,
+              corpusSha256: holdouts[language].seal.corpusSha256,
+            }
+          : null,
         clean: summariseClean(result.clean),
         cleanInSample: summariseClean(result.cleanInSample),
         disallowed: {
@@ -2349,7 +2358,7 @@ function parseArgs(argv) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
-  const holdoutVersion = activeTextHoldoutVersion()
+  const holdouts = activeTextHoldouts()
   const current = {
     commitSha: git(['rev-parse', 'HEAD']),
     inputSetHash: inputSetHash(),
@@ -2378,7 +2387,7 @@ async function main() {
     sweep: sweepSection(current),
     calibration: calibrationSection(current, policy, manifest),
     safeCorpus: safeCorpusSection(current, options.dailySubmissions, policy),
-    text: textSection(current, holdoutVersion),
+    text: textSection(current, holdouts),
     lists: listsSection(),
     model: modelVerification(),
     runtime: runtimeSection(manifest, current),

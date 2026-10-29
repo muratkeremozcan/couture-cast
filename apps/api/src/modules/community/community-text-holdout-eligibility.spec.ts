@@ -36,20 +36,25 @@ describe('active text holdout eligibility API bridge', () => {
     'rejects retired %s even when its historical seal is valid',
     (retiredVersion) => {
       expect(() =>
-        assertActiveHoldoutEligible(retiredVersion, sealed(retiredVersion), retirements)
+        assertActiveHoldoutEligible(
+          retiredVersion,
+          sealed(retiredVersion),
+          retirements,
+          'de'
+        )
       ).toThrow(/retired/)
     }
   )
 
   it('accepts a sealed, explicitly eligible version', () => {
     expect(() =>
-      assertActiveHoldoutEligible(version, sealed(version), eligible)
+      assertActiveHoldoutEligible(version, sealed(version), eligible, 'de')
     ).not.toThrow()
   })
 
   it('rejects an unclassified version despite a valid seal', () => {
     expect(() =>
-      assertActiveHoldoutEligible('holdout-v100', sealed('holdout-v100'), eligible)
+      assertActiveHoldoutEligible('holdout-v100', sealed('holdout-v100'), eligible, 'de')
     ).toThrow(/eligible/)
   })
 
@@ -62,14 +67,21 @@ describe('active text holdout eligibility API bridge', () => {
     { ...sealed(version), corpusSha256: 'g'.repeat(64) },
     { ...sealed(version), corpusSha256: 'b'.repeat(64) },
   ])('rejects an absent, mismatched or unregistered seal identity: %j', (seal) => {
-    expect(() => assertActiveHoldoutEligible(version, seal, eligible)).toThrow(/seal/)
+    expect(() => assertActiveHoldoutEligible(version, seal, eligible, 'de')).toThrow(
+      /seal/
+    )
   })
 
   it.each(['../holdout-v5', 'holdout-v0', 'holdout-v05', '', 'development-v4'])(
     'rejects invalid selector %s',
     (invalidVersion) => {
       expect(() =>
-        assertActiveHoldoutEligible(invalidVersion, sealed(invalidVersion), eligible)
+        assertActiveHoldoutEligible(
+          invalidVersion,
+          sealed(invalidVersion),
+          eligible,
+          'de'
+        )
       ).toThrow(/invalid/)
     }
   )

@@ -132,7 +132,7 @@ describe('community text holdout eligibility', () => {
   ]) {
     test(`rejects malformed or contradictory ledger ${JSON.stringify(invalidLedger)}`, () => {
       assert.throws(
-        () => requireEligibleHoldout(approvedVersion, invalidLedger),
+        () => requireEligibleHoldout(approvedVersion, invalidLedger, 'de'),
         /ledger is invalid/
       )
     })
@@ -144,7 +144,7 @@ describe('community text holdout eligibility', () => {
       eligible: Object.create({ [approvedVersion]: approvedSeal }),
     }
     assert.throws(
-      () => assertActiveHoldoutEligible(approvedVersion, approvedSeal, inherited),
+      () => assertActiveHoldoutEligible(approvedVersion, approvedSeal, inherited, 'de'),
       /not eligible/
     )
   })
@@ -161,11 +161,14 @@ describe('community text holdout eligibility', () => {
     )
     for (const number of [1, 2, 3, 4, 5]) {
       assert.throws(
-        () => requireEligibleHoldout(`holdout-v${number}`, current),
+        () => requireEligibleHoldout(`holdout-v${number}`, current, 'de'),
         /retired/
       )
     }
     assert.equal(current.schemaVersion, 2)
-    assert.throws(() => requireEligibleHoldout('holdout-v100', current), /not eligible/)
+    assert.throws(
+      () => requireEligibleHoldout('holdout-v100', current, 'de'),
+      /not eligible/
+    )
   })
 })
