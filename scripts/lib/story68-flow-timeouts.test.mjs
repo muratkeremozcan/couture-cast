@@ -9,6 +9,9 @@ import {
   FLOW_TIMEOUT_MARGIN,
   OPEN_APP_WORST_CASE_MS,
   OPEN_POST_WORST_CASE_MS,
+  WAIT_SETTINGS_FLOWS,
+  WAIT_SETTINGS_TURNS,
+  WAIT_SETTINGS_WORST_CASE_MS,
   flowTimeoutMs,
 } from './story68-flow-timeouts.mjs'
 
@@ -124,5 +127,26 @@ describe('Maestro flow timeouts', () => {
       /timeout:(?!\s*(?:flowTimeoutMs|nativeFlowTimeoutMs)\(flow(?:, platform)?\),)/
     )
     assert.equal(flowTimeoutMs('maestro/story68/cancel.yaml'), DEFAULT_FLOW_TIMEOUT_MS)
+  })
+
+  test('the settings wait subflow count bound and the process budgets of its flows agree', () => {
+    const wait = fs.readFileSync(
+      new URL('../../maestro/story65/wait-notification-settings.yaml', import.meta.url),
+      'utf8'
+    )
+    assert.equal(Number(/times:\s*(\d+)/.exec(wait)[1]), WAIT_SETTINGS_TURNS)
+    assert.equal(WAIT_SETTINGS_FLOWS.length, 3)
+    for (const flow of WAIT_SETTINGS_FLOWS) {
+      const text = fs.readFileSync(new URL(`../../${flow}`, import.meta.url), 'utf8')
+      assert.match(text, /runFlow: wait-notification-settings\.yaml/, flow)
+      assert.ok(
+        flowTimeoutMs(flow) >=
+          Math.ceil(
+            (DEFAULT_FLOW_TIMEOUT_MS + WAIT_SETTINGS_WORST_CASE_MS) * FLOW_TIMEOUT_MARGIN
+          ),
+        flow
+      )
+      assert.ok(flowTimeoutMs(flow) > DEFAULT_FLOW_TIMEOUT_MS, flow)
+    }
   })
 })

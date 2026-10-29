@@ -15,6 +15,12 @@ import {
   assertNativeEvidence,
   nativeEvidenceFamilies,
 } from '../lib/story68-native-evidence-schema.mjs'
+import { assertNativeHostEvidence } from '../ci/native-host-evidence.mjs'
+import { assertNativeQuiesceEvidence } from '../ci/native-ios-quiesce.mjs'
+import {
+  OMITTED_FILE,
+  selectPublicDiagnostics,
+} from '../ci/native-ios-public-diagnostics.mjs'
 const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
@@ -76,6 +82,31 @@ for (const platform of ['android', 'ios']) {
   if (value.platform !== platform) throw new Error('invalid_native_flow_diagnostics')
   diagnostics.set(name, value)
 }
+// Host load, first-flow phase times and Metro counts: closed numbers and names.
+const hostEvidence = new Map()
+for (const platform of ['ios']) {
+  const name = `native-host-${platform}.json`
+  const file = path.join(directory, name)
+  if (!fs.existsSync(file)) continue
+  let value
+  try {
+    value = JSON.parse(fs.readFileSync(file))
+  } catch {
+    throw new Error('invalid_native_host_evidence')
+  }
+  assertNativeHostEvidence(value)
+  if (value.platform !== platform) throw new Error('invalid_native_host_evidence')
+  hostEvidence.set(name, value)
+}
+const quiesceFile = path.join(directory, 'native-quiesce-ios.json')
+if (fs.existsSync(quiesceFile)) {
+  const value = JSON.parse(fs.readFileSync(quiesceFile, 'utf8'))
+  assertNativeQuiesceEvidence(value)
+  hostEvidence.set('native-quiesce-ios.json', value)
+}
+// iOS run diagnostics: a record is published only if every value is closed (no identifier,
+// path or secret-shaped text). Records that fail are named in the omitted list, never copied.
+const iosDiagnostics = selectPublicDiagnostics(directory)
 // Only primitive proof facts cross the native evidence boundary. Private logs and
 // resource identities are deliberately absent from the public projection.
 const proofs = new Map()
@@ -299,6 +330,9 @@ const closedJSON = (name, value) => {
 if (ciStatus) closedJSON('ci-job-status.json', ciStatus)
 if (webMatrix) closedJSON('web-matrix.json', webMatrix)
 for (const [name, value] of browserProofs) closedJSON(name, value)
+for (const [name, value] of hostEvidence) closedJSON(name, value)
+for (const [name, value] of iosDiagnostics.published) closedJSON(name, value)
+if (iosDiagnostics.omitted.length) closedJSON(OMITTED_FILE, iosDiagnostics.omitted)
 for (const [name, value] of diagnostics) {
   closedJSON(name, value)
   // Re-render from validated primitives. Never trust or copy a claimed redacted PNG.

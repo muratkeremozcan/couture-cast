@@ -25,7 +25,27 @@ export const OPEN_APP_WORST_CASE_MS =
  */
 export const OPEN_POST_WORST_CASE_MS = FLOW_STARTUP_MS + 50_000 + 14 * CONDITION_CHECK_MS
 
+/**
+ * wait-notification-settings.yaml waits for the member's notification controls or fails when the
+ * Try again button shows. Its repeat count only bounds a stuck screen and must equal `times` in
+ * that flow (a test reads it). Each turn is a 1 s wait plus two condition checks (the Try again
+ * guard and the loop condition), each budgeted at the slowest observed check.
+ */
+export const WAIT_SETTINGS_TURNS = 60
+export const WAIT_SETTINGS_TURN_MS = 1_000 + 2 * CONDITION_CHECK_MS
+export const WAIT_SETTINGS_WORST_CASE_MS = WAIT_SETTINGS_TURNS * WAIT_SETTINGS_TURN_MS
+export const WAIT_SETTINGS_FLOWS = [
+  'maestro/story65/signin-verify.yaml',
+  'maestro/story65/notification-settings-loaded.yaml',
+  'maestro/story65/session-restore.yaml',
+]
+// The flow's own steps keep the default budget; the subflow adds its declared worst case.
+const waitSettingsTimeoutMs = Math.ceil(
+  (DEFAULT_FLOW_TIMEOUT_MS + WAIT_SETTINGS_WORST_CASE_MS) * FLOW_TIMEOUT_MARGIN
+)
+
 const flowTimeouts = {
+  ...Object.fromEntries(WAIT_SETTINGS_FLOWS.map((flow) => [flow, waitSettingsTimeoutMs])),
   'maestro/story65/open-app.yaml': Math.ceil(
     OPEN_APP_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
   ),

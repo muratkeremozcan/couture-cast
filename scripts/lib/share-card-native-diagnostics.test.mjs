@@ -5,6 +5,7 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { describe, test } from 'node:test'
 import vm from 'node:vm'
+import { LOCALES } from '../ci/native-ios-shards.mjs'
 import { fileURLToPath } from 'node:url'
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const helper = () => import('./share-card-native-diagnostics.mjs')
@@ -86,6 +87,19 @@ function invokeMaestro(t, capture) {
     }),
     shouldRetryIosSnapshot: () => false,
     flowTimeoutMs: () => 120_000,
+    appId: 'com.couturecast.story68',
+    spawnIosFlow: capture,
+    nativeFlowTimeoutMs: () => 120_000,
+    logSize: () => 0,
+    recordIosFlowTiming: () => undefined,
+    recordIosFlowProgress: () => undefined,
+    scheduleIosInFlowSample: () => false,
+    inMatrixSection: () => true,
+    localesForShard: () => [...LOCALES],
+    parseShard: () => undefined,
+    iosDriverGlobalArgs: () => [],
+    iosDriverTestArgs: () => [],
+    recordIosDriverFlow: () => null,
     privateJson: () => undefined,
     summarizeNativeFlowFailure: () => ({}),
     recordNativeFlowDiagnostics: capture,

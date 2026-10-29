@@ -102,6 +102,12 @@ describe('isolated native fixtures and browser boundaries', () => {
       true
     )
   })
+  it('selects the notification-settings failure mode only inside the fixture build flag', () => {
+    mode('prefs_unavailable')
+    expect(nativeFixture.shareCardFixtureMode()).toBe('prefs_unavailable')
+    environment.enabled = false
+    expect(nativeFixture.shareCardFixtureMode()).toBe('real')
+  })
   it('fixture URL boundary rejects other hosts/routes/schemes and unknown modes', () => {
     for (const url of [
       'bad url',
@@ -228,5 +234,71 @@ describe('isolated native fixtures and browser boundaries', () => {
   })
   it('portable digest matches the fixture sha256 for the exact decoded bytes', async () => {
     expect(await sha256Hex(decodeShareCardBase64(card.pngBase64))).toBe(card.sha256)
+  })
+})
+
+describe('opener trace recorder', () => {
+  it('writes closed events with ms offsets, bounded and in order', async () => {
+    const writes: { uri: string; contents: string }[] = []
+    let clock = 1000
+    const record = nativeFixture.openerTraceRecorder(
+      'file:///docs/',
+      (uri, contents) => {
+        writes.push({ uri, contents })
+        return Promise.resolve()
+      },
+      () => (clock += 7)
+    )
+    record('press')
+    record('state-open')
+    for (let index = 0; index < 45; index++) record('composer-idle')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(
+      writes.every((write) => write.uri === 'file:///docs/cc68-opener-trace.json')
+    ).toBe(true)
+    const last = JSON.parse(writes.at(-1)?.contents ?? '{}')
+    expect(last.version).toBe(1)
+    expect(last.events).toHaveLength(40)
+    expect(last.events.at(-1).e).toBe('composer-idle')
+    const first = JSON.parse(writes[0]?.contents ?? '{}')
+    expect(first.events).toEqual([{ e: 'press', t: 7 }])
+  })
+
+  it('records a sign-in input length as a bounded count and drops anything else', async () => {
+    const writes: string[] = []
+    const record = nativeFixture.openerTraceRecorder(
+      'file:///docs/',
+      (_uri, contents) => {
+        writes.push(contents)
+        return Promise.resolve()
+      },
+      () => 1
+    )
+    record('signin-code-change', 6)
+    record('signin-code-change', 4000)
+    record('signin-code-change', -1)
+    record('signin-code-change', 1.5)
+    record('signin-code-focus')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const events = JSON.parse(writes.at(-1) ?? '{}').events
+    expect(events.map((event: { n?: number }) => event.n)).toEqual([
+      6,
+      99,
+      undefined,
+      undefined,
+      undefined,
+    ])
+  })
+
+  it('stays silent without a documents directory and survives a failed write', async () => {
+    const quiet = nativeFixture.openerTraceRecorder(null, () =>
+      Promise.reject(new Error('x'))
+    )
+    expect(() => quiet('press')).not.toThrow()
+    const failing = nativeFixture.openerTraceRecorder('file:///docs/', () =>
+      Promise.reject(new Error('disk'))
+    )
+    expect(() => failing('press')).not.toThrow()
+    await new Promise((resolve) => setTimeout(resolve, 0))
   })
 })

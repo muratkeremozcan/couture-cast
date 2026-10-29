@@ -386,14 +386,15 @@ describe('browser dependency workflow', () => {
     }
     const original = workflow.jobs['original-resource'].steps
     assert.equal(provisioningOf(original)[0].if, "matrix.platform == 'android'")
-    const mac = original.find((item) =>
+    const iosSteps = workflow.jobs['ios-build'].steps
+    const mac = iosSteps.find((item) =>
       item.run?.includes('npx --no-install playwright install chromium')
     )
     assert.ok(mac)
-    assert.equal(mac.if, "matrix.platform == 'ios'")
+    assert.equal(mac.if, undefined)
     assert.equal(mac['timeout-minutes'], 6)
     assert.equal(mac['continue-on-error'], undefined)
-    assert.ok(original.indexOf(mac) < bridge(original))
+    assert.ok(iosSteps.indexOf(mac) < bridge(iosSteps))
   })
 
   test('the independent browser acceptance job retains all three pinned engines before the matrix', async () => {

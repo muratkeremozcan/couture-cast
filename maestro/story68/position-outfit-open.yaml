@@ -1,0 +1,43 @@
+appId: ${MAESTRO_APP_ID}
+---
+# iOS only. The Home ScrollView keeps a sticky chip bar (about 56 pt) over its content under the
+# native header, and a tap whose centre lands there hits a chip, never the opener (runs 26 and 27:
+# centerElement pushed the opener from 351 pt up to 117 pt and then 0 pt). So the opener is never
+# centred or scrolled past: go back to scroll offset 0, where the layout puts it after the chip
+# bar, and only when it is below the fold bring it in from the bottom edge and lift it a little.
+# Maestro's below/above compare top edges only, so the harness records the chip bar and opener
+# frames at any failure and names an obstruction (openerGeometry in native-ios-flow-progress.json).
+- repeat:
+    times: 3
+    commands:
+      - swipe:
+          start: 50%, 30%
+          end: 50%, 85%
+          duration: 300
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      notVisible:
+        id: outfit-share-card-open
+        above:
+          id: tab-home
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: outfit-share-card-open
+            above:
+              id: tab-home
+          direction: DOWN
+          timeout: 30000
+          centerElement: false
+      # A 105 pt lift keeps the opener's bottom clear of the tab bar and its top clear of the chip bar.
+      - swipe:
+          start: 50%, 60%
+          end: 50%, 48%
+          duration: 500
+      - waitForAnimationToEnd
+- assertVisible:
+    id: outfit-share-card-open
+    above:
+      id: tab-home
+    label: outfit_opener_clear_of_tab_bar

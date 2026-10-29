@@ -4,8 +4,10 @@ import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import { evaluateApprovedCondition } from './workflow-step-shadowing.mjs'
 
-const job = parse(fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8'))
-  .jobs['original-resource']
+const workflow = parse(
+  fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
+)
+const job = workflow.jobs['original-resource']
 const steps = job.steps
 const matrix = job.strategy.matrix
 const step = (name) => {
@@ -21,7 +23,7 @@ const runs = (row, platform, outcomes) =>
   evaluateApprovedCondition(row.if, { matrix, row: { platform }, outcomes })
 
 describe('share-card native step conditions', () => {
-  for (const platform of ['android', 'ios'])
+  for (const platform of ['android'])
     for (const [failure, outcomes] of [
       ['the runtime', { install: 'success', supabase: 'failure', runtime: 'skipped' }],
       [
@@ -30,7 +32,6 @@ describe('share-card native step conditions', () => {
           install: 'success',
           runtime: 'success',
           browser_deps: 'failure',
-          ios_browser: 'failure',
         },
       ],
     ])
@@ -65,12 +66,19 @@ describe('share-card native step conditions', () => {
       true
     )
     assert.equal(
-      runs(bridge, 'ios', { runtime: 'success', ios_browser: 'success' }),
-      true
-    )
-    assert.equal(
-      runs(bridge, 'ios', { runtime: 'success', browser_deps: 'success' }),
+      runs(bridge, 'android', { runtime: 'success', browser_deps: 'failure' }),
       false
     )
+  })
+
+  test('the iOS build bridge runs once its runtime and browser succeeded', () => {
+    const iosBridge = workflow.jobs['ios-build'].steps.find(
+      (row) => row.name === bridge.name
+    )
+    const iosRuns = (outcomes) =>
+      evaluateApprovedCondition(iosBridge.if, { matrix: undefined, row: {}, outcomes })
+    assert.equal(iosRuns({ runtime: 'success', ios_browser: 'success' }), true)
+    assert.equal(iosRuns({ runtime: 'success', ios_browser: 'failure' }), false)
+    assert.equal(iosRuns({ runtime: 'failure', ios_browser: 'success' }), false)
   })
 })

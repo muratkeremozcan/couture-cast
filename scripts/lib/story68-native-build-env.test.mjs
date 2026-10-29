@@ -8,6 +8,7 @@ import {
   verifyWorkletsStaging,
 } from './story68-worklets-staging.mjs'
 import vm from 'node:vm'
+import { LOCALES } from '../ci/native-ios-shards.mjs'
 import { describe, test } from 'node:test'
 import { talkbackFailureSummary } from './story68-talkback-failure.mjs'
 import {
@@ -153,7 +154,7 @@ describe('original-resource proof', () => {
       assert.equal(dialogOpen, false, 'completed proof must leave tabs reachable')
       const matrixStart = end + "} else if (command === 'matrix') {".length
       const matrixSetupEnd = source.indexOf(
-        '  const beforePreparation = originals()',
+        "  if (inMatrixSection(shard, 'pre-locale')) {",
         matrixStart
       )
       const setup = source
@@ -162,6 +163,8 @@ describe('original-resource proof', () => {
       vm.runInNewContext(`(() => {${setup}})()`, {
         ...context,
         activeLocale: 'en-US',
+        option: () => undefined,
+        parseShard: () => undefined,
       })
       assert.equal(events.at(-1), 'maestro/story65/set-locale.yaml')
     })
@@ -173,9 +176,9 @@ describe('native matrix retry resource accounting', () => {
     test(`Retry ${importedDuringRetry ? `rejects an import during ${importedDuringRetry}` : 'preserves the pre-Save baseline for all failure modes'}`, () => {
       const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
       const start = source.indexOf(
-        "  for (const mode of ['cache_failure', 'storage', 'offline'])"
+        "for (const mode of ['cache_failure', 'storage', 'offline'])"
       )
-      const end = source.indexOf("  fixture('real')\n  close()", start)
+      const end = source.indexOf("fixture('real')\n    close()", start)
       assert.ok(start >= 0 && end > start)
       const guardStart = source.indexOf('  const assertUnchanged = (before) => {')
       const guardEnd = source.indexOf('  const extract = ', guardStart)
@@ -374,6 +377,18 @@ describe('Maestro driver port', () => {
           spawnSync: capture,
           spawn: capture,
           flowTimeoutMs: () => 120_000,
+          spawnIosFlow: capture,
+          nativeFlowTimeoutMs: () => 120_000,
+          logSize: () => 0,
+          recordIosFlowTiming: () => undefined,
+          recordIosFlowProgress: () => undefined,
+          scheduleIosInFlowSample: () => false,
+          inMatrixSection: () => true,
+          localesForShard: () => [...LOCALES],
+          parseShard: () => undefined,
+          iosDriverGlobalArgs: () => [],
+          iosDriverTestArgs: () => [],
+          recordIosDriverFlow: () => null,
           MAESTRO_ANDROID_DRIVER_PORT: 17001,
           DRIVER_HOST_PORT_ARG: '--driver-host-port',
           signal: new AbortController().signal,

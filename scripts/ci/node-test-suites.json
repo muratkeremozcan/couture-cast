@@ -4,11 +4,7 @@
   "workflow": ".github/workflows/pr-share-card-native.yml",
   "vitest": ["scripts/lib/story68-api-entry.test.mjs"],
   "suites": {
-    "startup-deadline": [
-      "scripts/ci/supabase-start-deadline.test.mjs",
-      "scripts/ci/share-card-supabase-artifact.test.mjs",
-      "scripts/ci/share-card-ios-host.test.mjs"
-    ],
+    "startup-deadline": ["scripts/ci/supabase-start-deadline.test.mjs"],
     "browser-deps": ["scripts/ci/share-card-browser-deps.test.mjs"],
     "worklets-staging": ["scripts/lib/story68-worklets-staging.test.mjs"],
     "share-card-plugins": [

@@ -21,6 +21,22 @@ import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics
 import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs'
 import { withColdAndroidFontScale } from './lib/story68-cold-font-scale.mjs'
 import { runReleaseLiveFontCommand } from './lib/story68-release-live-font-command.mjs'
+import { nativeFlowTimeoutMs } from './ci/native-ios-flow-budget.mjs'
+import { metroServerArgs, metroServerEnv } from './lib/story68-metro-env.mjs'
+import {
+  recordIosCommandTimings,
+  recordIosFlowProgress,
+  recordIosHostSample,
+  scheduleIosInFlowSample,
+  logSize,
+} from './ci/native-ios-maestro-trace.mjs'
+import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
+import { inMatrixSection, localesForShard, parseShard } from './ci/native-ios-shards.mjs'
+import {
+  iosDriverGlobalArgs,
+  iosDriverTestArgs,
+  recordIosDriverFlow,
+} from './ci/native-ios-maestro-driver.mjs'
 import {
   assertIosReadDenied,
   shouldRetryIosSnapshot,
@@ -31,11 +47,11 @@ import {
 } from './lib/story68-native-safety.mjs'
 import { assertStory68DiskSpace } from './lib/test-disk-space.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
-import { flowTimeoutMs } from './lib/story68-flow-timeouts.mjs'
 import {
   IOS_RETRYABLE_DENIAL_EVIDENCE,
   IOS_SETTINGS_MARKERS,
 } from './lib/story68-native-evidence-schema.mjs'
+import { spawnIosFlow, recordIosFlowTiming } from './ci/native-ios-flow-deadline.mjs'
 import {
   prepareWorkletsStaging,
   verifyWorkletsStaging,
@@ -303,6 +319,8 @@ function localeEnv() {
     MAESTRO_EMAIL_LABEL: n.email,
     MAESTRO_CODE_LABEL: n.code,
     MAESTRO_ENABLED: n.enabled,
+    MAESTRO_PREFS_RETRY: n.retry,
+    MAESTRO_LOAD_FAILED: n.loadFailed,
     MAESTRO_SIGNOUT: n.signout,
     MAESTRO_BACK: json.common.back,
     MAESTRO_SAVED: json.shareCard.saved,
@@ -326,15 +344,20 @@ function localeEnv() {
 function maestro(flow, env = {}, secret = '', attempt = 0) {
   requireDevice()
   const started = Date.now()
+  const apiLogFromByte = logSize(path.join(directory, 'api.log'))
   const output = path.join(directory, `maestro-${platform}-${Date.now()}`)
   fs.mkdirSync(output, { mode: 0o700 })
+  scheduleIosInFlowSample(flow, { platform, root })
   const result = withNativeTransport(() => {
-    const result = spawnSync(
+    const launch = platform === 'ios' ? spawnIosFlow : spawnSync
+    const result = launch(
       maestroBinary,
       [
         '--device',
         device,
+        ...iosDriverGlobalArgs(platform),
         'test',
+        ...iosDriverTestArgs({ platform, directory, device }),
         ...(platform === 'android'
           ? [DRIVER_HOST_PORT_ARG, String(MAESTRO_ANDROID_DRIVER_PORT)]
           : []),
@@ -359,9 +382,10 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
         encoding: 'utf8',
         maxBuffer: 30 * 1024 * 1024,
         detached: true,
-        timeout: flowTimeoutMs(flow),
+        timeout: nativeFlowTimeoutMs(flow, platform),
         killSignal: 'SIGTERM',
-      }
+      },
+      path.join(output, 'flow-timing.json')
     )
     if (result.error?.code === 'ETIMEDOUT') {
       // Detached child owns this process group, including its XCTest driver.
@@ -376,10 +400,23 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   const driverLog = path.join(output, 'maestro.log')
   const snapshotLog = fs.existsSync(driverLog) ? fs.readFileSync(driverLog, 'utf8') : ''
   const failureDurationMs = Math.max(0, Date.now() - started)
+  recordIosFlowTiming(path.join(output, 'flow-timing.json'), result, failureDurationMs)
   const recoverSnapshot =
     result.status !== 0 &&
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })
   if (result.status !== 0 && !recoverSnapshot) {
+    recordIosFlowProgress({
+      platform,
+      flow,
+      maestroLog: snapshotLog,
+      directory,
+      apiLogFile: path.join(directory, 'api.log'),
+      apiLogFromByte,
+      output,
+      root,
+      device,
+      appId,
+    })
     privateJson(
       `native-flow-failure-${platform}.json`,
       summarizeNativeFlowFailure({
@@ -413,9 +450,11 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
       // Diagnostics must preserve the original Maestro failure.
     }
   }
+  recordIosDriverFlow({ platform, directory, device, ok: result.status === 0 })
   const log = `${result.stdout}\n${result.stderr}`
     .split(secret || '\0')
     .join('[REDACTED]')
+  const successOutput = output
   if (secret) fs.rmSync(output, { recursive: true })
   fs.writeFileSync(
     path.join(directory, `maestro-${platform}-${path.basename(flow)}.log`),
@@ -424,6 +463,14 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   )
   if (recoverSnapshot) return maestro(flow, env, secret, attempt + 1)
   if (result.status !== 0) throw new Error(`native_flow_failed:${flow}`)
+  recordIosCommandTimings({ platform, flow, output: successOutput, directory })
+  recordIosStackPop({
+    platform,
+    flow,
+    output: successOutput,
+    directory,
+    label: localeEnv().MAESTRO_BACK,
+  })
 }
 async function signin() {
   activeLocale = 'en-US'
@@ -960,10 +1007,17 @@ if (command === 'prebuild') {
   console.log('Owned Story68 API and weather processes started. See private api.log.')
 } else if (command === 'metro') {
   ownedEnv()
-  const env = read('public-build-env.json')
+  const env = metroServerEnv(read('public-build-env.json'), platform)
   const metro = child(
     path.join(root, 'node_modules/.bin/expo'),
-    ['start', '--dev-client', '--port', '8089', '--localhost'],
+    [
+      'start',
+      '--dev-client',
+      '--port',
+      '8089',
+      '--localhost',
+      ...metroServerArgs(platform),
+    ],
     env,
     'metro.log',
     path.join(root, 'apps/mobile')
@@ -1345,6 +1399,8 @@ if (command === 'prebuild') {
 } else if (command === 'matrix') {
   requireDevice()
   const report = { platform, cases: [], completed: false }
+  const shard = option('shard') === undefined ? undefined : parseShard(option('shard'))
+  let before
   const mark = (id) => {
     report.cases.push({ id, passed: true })
     privateJson(`native-matrix-${platform}.json`, report)
@@ -1389,83 +1445,76 @@ if (command === 'prebuild') {
   // Real Settings controls establish locale; no direct i18n test setter is used.
   activeLocale = 'en-US'
   maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
-  const beforePreparation = originals()
-  fixture('prepare_deferred')
-  maestro('maestro/story68/preparing-cancel.yaml')
-  fixture('release')
-  maestro('maestro/story68/no-late-feedback.yaml')
-  assertUnchanged(beforePreparation)
-  mark('M-CANCEL:preparation-before-commit')
-  fixture('real')
-  open('post')
-  captureApproved()
-  maestro('maestro/story68/save.yaml')
-  extract('post')
-  mark('M-POST M-SAVE')
-  close()
-  if (platform === 'ios') {
-    maestro('maestro/story68/community-draft-background-ios.yaml')
-    mark('M-A11Y:community-draft-native-host-foreground')
-  }
-  open('outfit')
-  maestro('maestro/story68/watermark.yaml', { MAESTRO_ON_PREVIEW: previewDigest() })
-  captureApproved()
-  const retained = read(`approved-${platform}.json`).sha256
-  let before = originals()
-  close()
-  open('outfit')
-  captureApproved()
-  if (read(`approved-${platform}.json`).sha256 !== retained)
-    throw new Error('reopen_composition_changed')
-  assertUnchanged(before)
-  mark('M-CANCEL M-WATERMARK')
-  for (const mode of ['cache_failure', 'storage', 'offline']) {
-    before = originals()
-    fixture(mode)
-    maestro('maestro/story68/failure.yaml', {
-      MAESTRO_FAILURE: readLocale().shareCard[mode === 'offline' ? 'offline' : 'storage'],
-    })
-    assertUnchanged(before)
-    mark(mode === 'offline' ? 'M-OFFLINE' : `M-STORAGE:${mode}`)
-    // Retry prepares a fresh preview; the next Save takes a new final authorization.
+  if (inMatrixSection(shard, 'pre-locale')) {
+    const beforePreparation = originals()
+    fixture('prepare_deferred')
+    maestro('maestro/story68/preparing-cancel.yaml')
+    fixture('release')
+    maestro('maestro/story68/no-late-feedback.yaml')
+    assertUnchanged(beforePreparation)
+    mark('M-CANCEL:preparation-before-commit')
     fixture('real')
-    maestro('maestro/story68/retry.yaml')
-    assertUnchanged(before)
+    open('post')
     captureApproved()
     maestro('maestro/story68/save.yaml')
-    extract(`retry-${mode}`)
-    mark(`${mode === 'offline' ? 'M-OFFLINE' : `M-STORAGE:${mode}`}:retry-recovers`)
+    extract('post')
+    mark('M-POST M-SAVE')
+    close()
+    if (platform === 'ios') {
+      maestro('maestro/story68/community-draft-background-ios.yaml')
+      mark('M-A11Y:community-draft-native-host-foreground')
+    }
+    open('outfit')
+    maestro('maestro/story68/watermark.yaml', { MAESTRO_ON_PREVIEW: previewDigest() })
+    captureApproved()
+    const retained = read(`approved-${platform}.json`).sha256
     before = originals()
+    close()
+    open('outfit')
+    captureApproved()
+    if (read(`approved-${platform}.json`).sha256 !== retained)
+      throw new Error('reopen_composition_changed')
+    assertUnchanged(before)
+    mark('M-CANCEL M-WATERMARK')
+    for (const mode of ['cache_failure', 'storage', 'offline']) {
+      before = originals()
+      fixture(mode)
+      maestro('maestro/story68/failure.yaml', {
+        MAESTRO_FAILURE:
+          readLocale().shareCard[mode === 'offline' ? 'offline' : 'storage'],
+      })
+      assertUnchanged(before)
+      mark(mode === 'offline' ? 'M-OFFLINE' : `M-STORAGE:${mode}`)
+      // Retry prepares a fresh preview; the next Save takes a new final authorization.
+      fixture('real')
+      maestro('maestro/story68/retry.yaml')
+      assertUnchanged(before)
+      captureApproved()
+      maestro('maestro/story68/save.yaml')
+      extract(`retry-${mode}`)
+      mark(`${mode === 'offline' ? 'M-OFFLINE' : `M-STORAGE:${mode}`}:retry-recovers`)
+      before = originals()
+    }
+    fixture('real')
+    close()
+    fixture('unavailable')
+    open('outfit')
+    maestro('maestro/story68/unavailable.yaml')
+    assertUnchanged(before)
+    mark('M-NATIVE-UNAVAILABLE:restricted-adapter-boundary')
+    close()
+    fixture('limited')
+    open('outfit')
+    captureApproved()
+    maestro('maestro/story68/save.yaml')
+    extract('limited')
+    mark('U-PERMISSION-LIMITED:native-adapter-integration')
+    close()
   }
   fixture('real')
-  close()
-  fixture('unavailable')
-  open('outfit')
-  maestro('maestro/story68/unavailable.yaml')
-  assertUnchanged(before)
-  mark('M-NATIVE-UNAVAILABLE:restricted-adapter-boundary')
-  close()
-  fixture('limited')
-  open('outfit')
-  captureApproved()
-  maestro('maestro/story68/save.yaml')
-  extract('limited')
-  mark('U-PERMISSION-LIMITED:native-adapter-integration')
-  close()
-  fixture('real')
-  for (const locale of [
-    'en-US',
-    'en-CA',
-    'fr-FR',
-    'fr-CA',
-    'de-DE',
-    'es-419',
-    'it-IT',
-    'pt-BR',
-    'pt-PT',
-    'tr-TR',
-  ]) {
+  for (const locale of localesForShard(shard)) {
     activeLocale = locale
+    if (platform === 'ios') recordIosHostSample('locale-loop', { root })
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: locale })
     open('outfit')
     maestro('maestro/story68/localized.yaml')
@@ -1516,92 +1565,132 @@ if (command === 'prebuild') {
     mark(`M-LOCALE:${locale}`)
     close()
   }
-  activeLocale = 'pt-PT'
-  maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
-  const previousFont =
-    platform === 'ios'
-      ? run('xcrun', ['simctl', 'ui', device, 'content_size']).trim()
-      : undefined
-  const verifyLargeText = () => {
-    open('outfit')
-    maestro('maestro/story68/large-text.yaml')
-    screenshot('large-text')
-    close()
-    mark('M-A11Y:large-text-pt-PT')
-  }
-  if (platform === 'android') {
-    await withColdAndroidFontScale(
-      { appId, adb, device, run, openUrl, maestro },
-      verifyLargeText
-    )
-  } else {
-    try {
-      run('xcrun', ['simctl', 'ui', device, 'content_size', 'accessibility-medium'])
-      verifyLargeText()
-    } finally {
-      run('xcrun', ['simctl', 'ui', device, 'content_size', previousFont])
-    }
-  }
-  activeLocale = 'en-US'
-  maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
-  for (const lifecycle of ['close', 'navigation']) {
-    fixture('real')
-    open('outfit')
-    captureApproved()
-    const retainedDigest = read(`approved-${platform}.json`).sha256
-    close()
-    open('outfit')
-    captureApproved()
-    if (read(`approved-${platform}.json`).sha256 !== retainedDigest)
-      throw new Error('retained_precommit_preview_changed')
-    fixture('authorization_deferred')
-    before = originals()
-    maestro('maestro/story68/precommit-cancel.yaml')
-    if (lifecycle === 'navigation') maestro('maestro/story68/navigate-pending.yaml')
-    fixture('release')
-    maestro('maestro/story68/no-late-feedback.yaml')
-    assertUnchanged(before)
-    fixture('real')
-    open('outfit')
-    captureApproved()
-    if (read(`approved-${platform}.json`).sha256 !== retainedDigest)
-      throw new Error('cancelled_precommit_composition_changed')
-    maestro('maestro/story68/precommit-reopened.yaml')
-    assertUnchanged(before)
-    close()
-    mark(`M-CANCEL M-SINGLE-WRITE:precommit-authorization-${lifecycle}`)
-  }
-  for (const lifecycle of ['close', 'navigation', 'signout']) {
-    fixture('deferred')
-    open('outfit')
-    captureApproved()
-    before = originals()
-    maestro('maestro/story68/pending.yaml')
-    assertUnchanged(before)
-    mark('M-SAVE-OWNERSHIP:current-saving')
-    if (lifecycle === 'close') {
+  if (inMatrixSection(shard, 'large-text')) {
+    activeLocale = 'pt-PT'
+    maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
+    const previousFont =
+      platform === 'ios'
+        ? run('xcrun', ['simctl', 'ui', device, 'content_size']).trim()
+        : undefined
+    const verifyLargeText = () => {
       open('outfit')
-      maestro('maestro/story68/pending-reopened.yaml')
-      mark('M-SAVE-OWNERSHIP:reopened-finishing')
-    }
-    if (lifecycle !== 'close') maestro('maestro/story68/navigate-pending.yaml')
-    if (lifecycle === 'signout') maestro('maestro/story68/signout.yaml')
-    fixture('release')
-    for (let n = 0; n < 80 && originals() === before; n++)
-      await new Promise((resolve) => setTimeout(resolve, 100))
-
-    if (lifecycle === 'close') {
-      maestro('maestro/story68/pending-settled.yaml', {
-        MAESTRO_ON_PREVIEW: read(`approved-${platform}.json`).sha256,
-      })
-      mark('M-WATERMARK:reopen-after-settlement')
+      maestro('maestro/story68/large-text.yaml')
+      screenshot('large-text')
       close()
+      mark('M-A11Y:large-text-pt-PT')
     }
-    maestro('maestro/story68/no-late-feedback.yaml')
-    extract(`pending-${lifecycle}`)
-    mark(`M-SINGLE-WRITE M-IDENTITY:${lifecycle}`)
-    fixture('real')
-    if (lifecycle === 'signout') await signin()
+    if (platform === 'android') {
+      await withColdAndroidFontScale(
+        { appId, adb, device, run, openUrl, maestro },
+        verifyLargeText
+      )
+    } else {
+      try {
+        run('xcrun', ['simctl', 'ui', device, 'content_size', 'accessibility-medium'])
+        verifyLargeText()
+      } finally {
+        run('xcrun', ['simctl', 'ui', device, 'content_size', previousFont])
+      }
+    }
+  }
+  if (
+    inMatrixSection(shard, 'precommit-lifecycle') ||
+    inMatrixSection(shard, 'save-lifecycle')
+  ) {
+    activeLocale = 'en-US'
+    maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
+  }
+  if (inMatrixSection(shard, 'precommit-lifecycle')) {
+    for (const lifecycle of ['close', 'navigation']) {
+      fixture('real')
+      open('outfit')
+      captureApproved()
+      const retainedDigest = read(`approved-${platform}.json`).sha256
+      close()
+      open('outfit')
+      captureApproved()
+      if (read(`approved-${platform}.json`).sha256 !== retainedDigest)
+        throw new Error('retained_precommit_preview_changed')
+      fixture('authorization_deferred')
+      before = originals()
+      maestro('maestro/story68/precommit-cancel.yaml')
+      if (lifecycle === 'navigation') maestro('maestro/story68/navigate-pending.yaml')
+      fixture('release')
+      maestro('maestro/story68/no-late-feedback.yaml')
+      assertUnchanged(before)
+      fixture('real')
+      open('outfit')
+      captureApproved()
+      if (read(`approved-${platform}.json`).sha256 !== retainedDigest)
+        throw new Error('cancelled_precommit_composition_changed')
+      maestro('maestro/story68/precommit-reopened.yaml')
+      assertUnchanged(before)
+      close()
+      mark(`M-CANCEL M-SINGLE-WRITE:precommit-authorization-${lifecycle}`)
+    }
+  }
+  if (inMatrixSection(shard, 'save-lifecycle')) {
+    for (const lifecycle of ['close', 'navigation', 'signout']) {
+      fixture('deferred')
+      open('outfit')
+      captureApproved()
+      before = originals()
+      maestro('maestro/story68/pending.yaml')
+      assertUnchanged(before)
+      mark('M-SAVE-OWNERSHIP:current-saving')
+      if (lifecycle === 'close') {
+        open('outfit')
+        maestro('maestro/story68/pending-reopened.yaml')
+        mark('M-SAVE-OWNERSHIP:reopened-finishing')
+      }
+      if (lifecycle !== 'close') maestro('maestro/story68/navigate-pending.yaml')
+      if (lifecycle === 'signout') maestro('maestro/story68/signout.yaml')
+      fixture('release')
+      for (let n = 0; n < 80 && originals() === before; n++)
+        await new Promise((resolve) => setTimeout(resolve, 100))
+
+      if (lifecycle === 'close') {
+        maestro('maestro/story68/pending-settled.yaml', {
+          MAESTRO_ON_PREVIEW: read(`approved-${platform}.json`).sha256,
+        })
+        mark('M-WATERMARK:reopen-after-settlement')
+        close()
+      }
+      maestro('maestro/story68/no-late-feedback.yaml')
+      extract(`pending-${lifecycle}`)
+      mark(`M-SINGLE-WRITE M-IDENTITY:${lifecycle}`)
+      fixture('real')
+      if (lifecycle === 'signout') await signin()
+    }
+  }
+  // Native pixel evidence of the stalled notification-settings state in both color schemes.
+  const setAppearance = async (scheme) => {
+    if (platform === 'ios') run('xcrun', ['simctl', 'ui', device, 'appearance', scheme])
+    else
+      run(adb, [
+        '-s',
+        device,
+        'shell',
+        'cmd',
+        'uimode',
+        'night',
+        scheme === 'dark' ? 'yes' : 'no',
+      ])
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+  }
+  if (inMatrixSection(shard, 'prefs-failed')) {
+    fixture('prefs_unavailable')
+    try {
+      maestro('maestro/story68/prefs-failed.yaml')
+      for (const scheme of ['light', 'dark']) {
+        await setAppearance(scheme)
+        screenshot(`prefs-failed-${scheme}`)
+      }
+      mark('M-UI:prefs-failed-state-light-dark')
+    } finally {
+      await setAppearance('light')
+      fixture('real')
+    }
   }
   report.completed = true
   privateJson(`native-matrix-${platform}.json`, report)

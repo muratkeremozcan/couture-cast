@@ -68,6 +68,7 @@ const matrixIDs = (platform) => [
   ]),
   'M-NATIVE-UNAVAILABLE:restricted-adapter-boundary',
   'U-PERMISSION-LIMITED:native-adapter-integration',
+  'M-UI:prefs-failed-state-light-dark',
   ...shareCardAuditLocales.map((locale) => `M-LOCALE:${locale}`),
   'M-A11Y:large-text-pt-PT',
   ...['close', 'navigation'].map(

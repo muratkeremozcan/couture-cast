@@ -31,7 +31,16 @@ describe('one Node release on every runner', () => {
         document?.runs?.steps ?? [],
       ]
       for (const steps of sequences) {
-        const pinned = (step) => {
+        // The native storage-api runs on the Node major its Dockerfile pins. That binary is
+        // recorded for the Supabase stack alone, and the repo's own pinned Node is installed
+        // after it and stays first on PATH, so no test or script runs on it.
+        const storageRuntime = (step, index) =>
+          step.with?.['node-version'] === '22' &&
+          steps[index + 1]?.run?.trim() ===
+            'echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"' &&
+          steps.slice(index + 2).some((row) => row.uses === './.github/actions/install')
+        const pinned = (step, index) => {
+          if (storageRuntime(step, index)) return true
           const source = step.with?.['node-version-file']
           const input = /^\$\{\{ inputs\.([\w-]+) \}\}$/.exec(source ?? '')?.[1]
           if ((input ? document.inputs?.[input]?.default : source) === '.nvmrc')
@@ -47,12 +56,14 @@ describe('one Node release on every runner', () => {
           // A bare setup-node is harmless only when a pinned one follows it.
           const bare = !step.with?.['node-version'] && !step.with?.['node-version-file']
           assert.ok(
-            pinned(step) ||
+            pinned(step, index) ||
               (bare &&
                 steps
                   .slice(index + 1)
                   .some(
-                    (row) => row.uses?.startsWith('actions/setup-node@') && pinned(row)
+                    (row, offset) =>
+                      row.uses?.startsWith('actions/setup-node@') &&
+                      pinned(row, index + 1 + offset)
                   )),
             `${file}: ${JSON.stringify(step.with ?? {})}`
           )

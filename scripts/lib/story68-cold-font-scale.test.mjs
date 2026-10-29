@@ -11,7 +11,11 @@ function matrixFontBlock() {
     '  const previousFont =',
     source.indexOf("command === 'matrix'")
   )
-  const end = source.indexOf("  activeLocale = 'en-US'", start)
+  // The large-text section is one shard-gated block; the slice stops before its closing brace.
+  const end = source.indexOf(
+    "\n  }\n  if (\n    inMatrixSection(shard, 'precommit-lifecycle')",
+    start
+  )
   assert.ok(start > 0 && end > start)
   return source.slice(start, end)
 }

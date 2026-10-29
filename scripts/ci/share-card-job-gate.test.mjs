@@ -17,12 +17,15 @@ const cli = (value) =>
   })
 
 describe('share-card aggregate job gate', () => {
-  test('requires the legacy lane, the browser lane and all three Android36 partitions', () => {
+  test('requires the Android lane, the browser lane, all three Android36 partitions and the three iOS shard jobs', () => {
     assert.deepEqual([...requiredShareCardJobs].sort(), [
       'android36-interaction',
       'android36-native-matrix',
       'android36-original',
       'browser-acceptance',
+      'ios-build',
+      'ios-evidence',
+      'ios-shard',
       'original-resource',
     ])
   })

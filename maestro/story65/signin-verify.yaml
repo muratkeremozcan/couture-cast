@@ -2,9 +2,26 @@
 # (never argv or artifacts); the runner keeps this flow's debug output private.
 appId: ${MAESTRO_APP_ID}
 ---
-- tapOn:
-    text: ${MAESTRO_CODE_LABEL}
-    index: 1
+# iOS taps the code field by its testID. The label text and the input share one accessible name,
+# so the index-1 match depends on layout order. (The focused attribute lands on a child node of
+# the field in iOS hierarchies, so focus is recorded at failure, not gated here.)
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: 'signin-code-input'
+          timeout: 15000
+      - tapOn:
+          id: 'signin-code-input'
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: ${MAESTRO_CODE_LABEL}
+          index: 1
 - waitForAnimationToEnd
 - inputText: ${MAESTRO_OTP}
 - assertVisible: ${MAESTRO_OTP}
@@ -14,6 +31,4 @@ appId: ${MAESTRO_APP_ID}
 - tapOn: ${MAESTRO_VERIFY}
 # verifyNativeOtp resolves the canonical app account, then the screen returns to settings,
 # which renders the owner's preference controls.
-- extendedWaitUntil:
-    visible: ${MAESTRO_ENABLED}
-    timeout: 30000
+- runFlow: wait-notification-settings.yaml

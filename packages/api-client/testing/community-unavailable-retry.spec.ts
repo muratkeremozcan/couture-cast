@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ResponseError } from '../src/generated/runtime'
 import {
   COMMUNITY_UNAVAILABLE_MAX_RETRY_SECONDS,
+  communityUnavailableRetrySeconds,
   retryOnceWhenCommunityUnavailable,
 } from '../src/community-unavailable-retry'
 
@@ -114,5 +115,29 @@ describe('6.6 community unavailable retry', () => {
     await settled
     await vi.advanceTimersByTimeAsync(2000)
     expect(work).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('community unavailable retry hint, read by every client', () => {
+  it('returns the advised seconds, capped, only for a 503 marked unavailable', async () => {
+    expect(await communityUnavailableRetrySeconds(unavailable(2))).toBe(2)
+    expect(await communityUnavailableRetrySeconds(unavailable(3600))).toBe(
+      COMMUNITY_UNAVAILABLE_MAX_RETRY_SECONDS
+    )
+    expect(
+      await communityUnavailableRetrySeconds(refusal(503, { retryAfterSeconds: 2 }))
+    ).toBeUndefined()
+    expect(
+      await communityUnavailableRetrySeconds(
+        refusal(500, { code: 'unavailable', retryAfterSeconds: 2 })
+      )
+    ).toBeUndefined()
+    expect(await communityUnavailableRetrySeconds(new Error('network'))).toBeUndefined()
+  })
+
+  it('leaves the response body readable for the caller', async () => {
+    const error = unavailable(2)
+    await communityUnavailableRetrySeconds(error)
+    expect(await error.response.json()).toMatchObject({ code: 'unavailable' })
   })
 })

@@ -39,7 +39,7 @@ describe('share-card parallel lane validator', () => {
     [
       'serializing any lane behind a dependency',
       /start independently/,
-      (jobs, name) => (jobs[name].needs = ['supabase-images']),
+      (jobs, name) => (jobs[name].needs = ['original-resource']),
     ],
     [
       'gating any lane on a condition',
@@ -233,7 +233,7 @@ describe('share-card parallel lane validator', () => {
       [
         'adding an unknown dependency',
         /require every browser and native partition/,
-        (jobs) => jobs[gateJobName].needs.push('supabase-images'),
+        (jobs) => jobs[gateJobName].needs.push('unknown-job'),
       ],
       [
         'running only on success',
@@ -438,20 +438,174 @@ describe('share-card parallel lane validator', () => {
         })
   })
 
-  test('the legacy API32 and iOS rows must stay complete', () => {
+  test('the legacy API32 row must stay complete and alone', () => {
     for (const change of [
       (rows) => rows.pop(),
       (rows) => (rows[0].suite = 'matrix'),
-      (rows) => (rows[1].platform = 'android'),
+      (rows) =>
+        rows.push({ os: 'macos-15-intel', platform: 'ios', api: 0, suite: 'all' }),
     ]) {
       const problems = mutate((jobs) =>
         change(jobs['original-resource'].strategy.matrix.include)
       )
       assert.ok(
-        problems.some((problem) => /legacy API32 and iOS journeys/.test(problem)),
+        problems.some((problem) => /legacy API32 journey must remain/.test(problem)),
         problems.join('\n')
       )
     }
+  })
+
+  describe('iOS journey', () => {
+    const iosJobs = ['ios-build', 'ios-shard', 'ios-evidence']
+    const rejected = (title, expected, change) =>
+      test(`${title} is rejected`, () => {
+        const problems = mutate(change)
+        assert.ok(
+          problems.some((problem) => expected.test(problem)),
+          problems.join('\n') || 'no problem raised'
+        )
+      })
+    for (const name of iosJobs)
+      rejected(
+        `removing ${name}`,
+        /required iOS job missing/,
+        (jobs) => delete jobs[name]
+      )
+    rejected('the retired Intel runner', /Intel macOS runner is retired/, (jobs) => {
+      jobs['ios-shard']['runs-on'] = 'macos-15-intel'
+    })
+    rejected('a longer ios-shard limit', /ios-shard: independent limit/, (jobs) => {
+      jobs['ios-shard']['timeout-minutes'] = 151
+    })
+    rejected('an ios-shard that does not need the build', /exactly ios-build/, (jobs) => {
+      delete jobs['ios-shard'].needs
+    })
+    rejected(
+      'a build that waits on something',
+      /ios-build must start independently/,
+      (jobs) => {
+        jobs['ios-build'].needs = ['original-resource']
+      }
+    )
+    rejected('a single shard', /shards 1 and 2/, (jobs) => {
+      jobs['ios-shard'].strategy.matrix.shard = [1]
+    })
+    rejected('a shard matrix that cancels its sibling', /shards 1 and 2/, (jobs) => {
+      delete jobs['ios-shard'].strategy['fail-fast']
+    })
+    rejected(
+      'an evidence job skipped after a failed shard',
+      /ios-evidence must run after/,
+      (jobs) => {
+        delete jobs['ios-evidence'].if
+      }
+    )
+    rejected(
+      'an evidence job that does not check the shard result',
+      /exact cases/,
+      (jobs) => {
+        jobs['ios-evidence'].steps = jobs['ios-evidence'].steps.filter(
+          (row) => !row.run?.includes('CC68_SHARD_RESULT')
+        )
+      }
+    )
+    rejected('a shard command without its shard', /receive its shard/, (jobs) => {
+      const row = step(jobs['ios-shard'], (item) =>
+        item.run?.includes('--shard "$shard"')
+      )
+      row.run = row.run.replace('--shard "$shard"', '')
+    })
+    rejected(
+      'uploading the app before the secret scan',
+      /secret-scanned before/,
+      (jobs) => {
+        const steps = jobs['ios-build'].steps
+        const at = steps.findIndex((row) =>
+          row.run?.includes('native-ios-app-secret-scan')
+        )
+        steps.splice(at, 1)
+      }
+    )
+    rejected(
+      'an ios-shard without the harness directory env',
+      /ios-shard: the harness directory env is required/,
+      (jobs) => {
+        delete jobs['ios-shard'].env
+      }
+    )
+    for (const name of ['ios-build', 'ios-shard'])
+      rejected(
+        `an evidence upload of a broader path in ${name}`,
+        /evidence upload must fail closed/,
+        (jobs) => {
+          const row = jobs[name].steps.find(
+            (item) =>
+              item.uses === 'actions/upload-artifact@v4' &&
+              String(item.with?.path).includes('public-evidence')
+          )
+          row.with.path = '_bmad-output/test-artifacts/story-6-8/runtime/'
+        }
+      )
+    rejected(
+      'an app scan without the harness directory env',
+      /scan must run with the harness directory/,
+      (jobs) => {
+        delete jobs['ios-build'].env
+      }
+    )
+    rejected(
+      'an app scan with an empty harness argument',
+      /scan must run with the harness directory/,
+      (jobs) => {
+        const row = step(jobs['ios-build'], (item) =>
+          item.run?.includes('native-ios-app-secret-scan')
+        )
+        row.run = row.run.replace('"$CC68_HARNESS_DIR"', '""')
+      }
+    )
+    rejected(
+      'keeping the app artifact for longer',
+      /app artifact keeps one day/,
+      (jobs) => {
+        step(jobs['ios-build'], (row) => row.with?.name === 'cc68-ios-app').with[
+          'retention-days'
+        ] = 7
+      }
+    )
+    for (const path of [
+      '_bmad-output/test-artifacts/story-6-8/runtime/native-ios-startup-private.json',
+      '_bmad-output/test-artifacts/story-6-8/runtime/native-ios-sampler-private.json',
+      '_bmad-output/test-artifacts/story-6-8/runtime/native-host-snapshot-private.json',
+      '_bmad-output/test-artifacts/story-6-8/runtime/native-ios-device.json',
+      '/tmp/cc68-metro.log',
+      '_bmad-output/test-artifacts/story-6-8/runtime/owned-env.json',
+    ])
+      for (const name of [...iosJobs, 'original-resource', 'android36-original'])
+        rejected(
+          `uploading ${path.split('/').pop()} from ${name}`,
+          /may not name a private/,
+          (jobs) => {
+            jobs[name].steps.push({
+              uses: 'actions/upload-artifact@v4',
+              with: { name: 'extra', path },
+            })
+          }
+        )
+    for (const name of [
+      'original-resource',
+      'android36-native-matrix',
+      'ios-build',
+      'ios-shard',
+    ])
+      rejected(
+        `a Metro start without --platform in ${name}`,
+        /Metro start must pass --platform/,
+        (jobs) => {
+          jobs[name].steps.push({
+            run: 'node scripts/run-story68-native.mjs metro > /tmp/m.log',
+          })
+        }
+      )
   })
 
   test('giving the legacy API32 journey a new step timeout is rejected', () => {

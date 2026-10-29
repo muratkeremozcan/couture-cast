@@ -7,9 +7,14 @@ export const requiredShareCardJobs = Object.freeze([
   'android36-native-matrix',
   'android36-original',
   'android36-interaction',
+  // The iOS journey: one build, two shards (a matrix job succeeds only when both legs do) and
+  // the job that proves both shards reported their exact cases.
+  'ios-build',
+  'ios-shard',
+  'ios-evidence',
 ])
 
-/** Missing, skipped, cancelled and failed jobs all prevent aggregate success. */
+/** Missing, skipped, cancelled and failed jobs all prevent aggregate success, so a skipped shard never counts. */
 export function assertShareCardJobs(results) {
   if (
     !results ||

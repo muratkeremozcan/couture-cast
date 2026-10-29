@@ -1,0 +1,13 @@
+46758	0	com.apple.localizationswitcherd
+46753	-9	com.apple.SpringBoard
+46762	0	com.apple.PosterBoard
+46926	0	UIKitApplication:com.apple.mobilecal[f9a3][rb-legacy]
+46771	0	UIKitApplication:com.apple.chrono.WidgetRenderer-Default[e37f][rb-legacy]
+46638	0	com.apple.tccd
+46648	0	com.apple.backboardd
+46734	0	com.apple.searchd
+46652	0	com.apple.nanoprefsyncd.2
+46742	0	com.apple.suggestd
+46628	0	com.apple.assistantd
+46684	0	com.apple.chronod
+46715	0	com.apple.mobileassetd
