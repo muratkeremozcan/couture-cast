@@ -568,3 +568,30 @@ test('Metro bundle builds are listed in order by entry without any other log tex
   assert.doesNotMatch(JSON.stringify(bundles), /secret|abc123/)
   assert.deepEqual(projectMetroBundles('').bundles, [])
 })
+
+test('the shipped sample command records non-null paging counters from the real vm_stat', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-real-vm-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const run = spawnSync(
+    process.execPath,
+    [
+      fileURLToPath(new URL('./native-host-evidence.mjs', import.meta.url)),
+      'sample',
+      'locale-loop',
+      '--platform',
+      'ios',
+    ],
+    { env: { ...process.env, CC68_HARNESS_DIR: directory }, encoding: 'utf8' }
+  )
+  assert.equal(run.status, 0, run.stderr)
+  const written = JSON.parse(
+    fs.readFileSync(path.join(directory, 'native-host-ios.json'), 'utf8')
+  )
+  const [sample] = written.samples
+  assert.equal(sample.label, 'locale-loop')
+  // vm_stat exists only on macOS; the hosted lane is macOS, so there it must never be null.
+  if (process.platform === 'darwin') {
+    assert.notEqual(sample.vm, null)
+    for (const value of Object.values(sample.vm)) assert.ok(Number.isSafeInteger(value))
+  }
+})

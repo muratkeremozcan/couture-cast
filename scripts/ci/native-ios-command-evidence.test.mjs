@@ -192,36 +192,42 @@ test('apsd is stopped only after the accepted level change fails to quiet diagno
 test('quiet services are stopped by exact listed label, only when owned by the simulator manager', () => {
   const quietPs =
     ps +
-    '\n110 100 1 /s/chronod\n111 100 1 /s/healthappd\n112 100 1 /s/tccd\n300 1 1 /host/chronod'
+    '\n110 100 1 /s/chronod\n111 100 1 /s/healthd\n112 100 1 /s/tccd\n113 100 1 /s/searchd\n300 1 1 /host/chronod'
   const quietJobs = simulatorJobs(
     jobsText +
-      '\n110 0 com.apple.chronod\n111 0 com.apple.healthappd\n112 0 com.apple.tccd\n300 0 host.chronod'
+      '\n110 0 com.apple.chronod\n111 0 com.apple.healthd\n112 0 com.apple.tccd\n113 0 com.apple.searchd\n300 0 host.chronod'
   )
   const calls = []
   const execute = (operation, binary, args, options) => {
     calls.push({ operation, binary, args, options })
-    return { exitCode: operation === 'bootout-quiet-healthappd' ? 1 : 0 }
+    return { exitCode: operation === 'bootout-quiet-healthd' ? 1 : 0 }
   }
-  const listed =
-    '110 0 com.apple.chronod\n- 0 com.apple.triald\n111 0 com.apple.healthappd'
+  const listed = '110 0 com.apple.chronod\n- 0 com.apple.triald\n111 0 com.apple.healthd'
   const log = console.log
   const lines = []
   console.log = (line) => lines.push(line)
-  let stopped
+  let record
   try {
-    stopped = bootoutQuietServices('owned-uuid', quietPs, quietJobs, 100, execute, listed)
+    record = bootoutQuietServices('owned-uuid', quietPs, quietJobs, 100, execute, listed)
   } finally {
     console.log = log
   }
-  assert.deepEqual(stopped, ['chronod'])
-  const { census } = JSON.parse(lines.at(-1)).quietServices
-  assert.deepEqual(census.chronod, { state: 'running', bootoutExit: 0 })
-  assert.deepEqual(census.healthappd, { state: 'running', bootoutExit: 1 })
-  assert.deepEqual(census.triald, { state: 'idle', bootoutExit: null })
-  assert.deepEqual(census.searchd, { state: 'absent', bootoutExit: null })
+  assert.deepEqual(record.stopped, ['chronod'])
+  assert.deepEqual(record.policy, [
+    'chronod',
+    'healthd',
+    'triald',
+    'amsengagementd',
+    'siriactionsd',
+  ])
+  assert.deepEqual(JSON.parse(lines.at(-1)).quietServices, record)
+  assert.deepEqual(record.census.chronod, { state: 'running', bootoutExit: 0 })
+  assert.deepEqual(record.census.healthd, { state: 'running', bootoutExit: 1 })
+  assert.deepEqual(record.census.triald, { state: 'idle', bootoutExit: null })
+  assert.deepEqual(record.census.siriactionsd, { state: 'absent', bootoutExit: null })
   assert.deepEqual(
     calls.map((c) => c.operation),
-    ['bootout-quiet-chronod', 'bootout-quiet-healthappd']
+    ['bootout-quiet-chronod', 'bootout-quiet-healthd']
   )
   assert.deepEqual(calls[0].args, [
     'simctl',
@@ -232,6 +238,21 @@ test('quiet services are stopped by exact listed label, only when owned by the s
     'system/com.apple.chronod',
   ])
   assert.equal(calls[0].options.fatal, false)
-  for (const protectedName of ['SpringBoard', 'tccd', 'backboardd', 'launchd_sim'])
-    assert.equal(QUIET_SERVICES.includes(protectedName), false, protectedName)
+  // searchd is running and owned in the fixture but is not on the list: it stays up (run 23 picker wait).
+  assert.equal(
+    calls.some((c) => c.operation === 'bootout-quiet-searchd'),
+    false
+  )
+  for (const kept of [
+    'SpringBoard',
+    'tccd',
+    'backboardd',
+    'launchd_sim',
+    'searchd',
+    'suggestd',
+    'siriknowledged',
+    'assistantd',
+    'assistant_cdmd',
+  ])
+    assert.equal(QUIET_SERVICES.includes(kept), false, kept)
 })

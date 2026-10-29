@@ -411,3 +411,32 @@ test('the runner samples the host in the locale loop and hands the failure path 
   )
   assert.match(runner, /apiLogFromByte,\n\s+output,\n\s+root,\n\s+\}\)/)
 })
+
+const realLayout = new URL('./fixtures/maestro-failed-step/', import.meta.url)
+
+test('a real Maestro artifact layout (failed assertCondition, screen-hierarchy subdirectory) yields a non-null surface', (t) => {
+  // The fixture keeps the real FAILED row and a real COMPLETED row verbatim, the real artifact
+  // paths, and a pruned copy of the real hierarchy file. Run 23 recorded null on this shape.
+  const output = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-real-layout-'))
+  t.after(() => fs.rmSync(output, { recursive: true, force: true }))
+  fs.cpSync(realLayout, output, { recursive: true })
+  const hierarchy = failedStepHierarchy(output)
+  assert.notEqual(hierarchy, null)
+  const summary = systemSurfaceSummary(hierarchy)
+  assert.ok(summary.nodeCount > 10, String(summary.nodeCount))
+  assert.ok(summary.topLevelCount >= 1)
+  assert.deepEqual(summary.alertButtons, [])
+  assert.equal(summary.permissionTextSeen, false)
+  const lines = []
+  const entry = recordIosFlowProgress({
+    platform: 'ios',
+    flow: 'maestro/story68/community-draft-background-ios.yaml',
+    maestroLog: killedLog,
+    directory: output,
+    output,
+    spawn: () => ({ status: 0 }),
+    report: (line) => lines.push(line),
+  })
+  assert.deepEqual(entry.systemSurface, summary)
+  assert.match(lines.at(-1), /"systemSurface":\{"nodeCount":\d+/)
+})

@@ -312,23 +312,18 @@ export function bootoutOwnedEmitter(device, manager, emitter, execute) {
 
 /**
  * Simulator jobs the share-card flows never use: widgets (chronod hosts every widget extension),
- * Health, Siri and suggestion daemons, experiments and search indexing. In CI runs 21 and 22 the
- * simulator held about 1.5 GB of them next to a 7 GB host that had already swapped 1.1 GB.
- * SpringBoard, tccd and the permission alert path are not listed.
+ * Health, experiments, the engagement and Siri-action daemons. In CI runs 21 and 22 the simulator
+ * held about 1.5 GB of widgets and daemons next to a 7 GB host that had already swapped 1.1 GB.
+ * Run 23 also stopped searchd, suggestd, siriknowledged, assistantd and assistant_cdmd and then
+ * failed waiting for the photo picker's Cancel button; those five stay running until that is
+ * understood. SpringBoard, tccd and the permission alert path are not listed.
  */
 export const QUIET_SERVICES = Object.freeze([
   'chronod',
-  'healthappd',
   'healthd',
   'triald',
-  'suggestd',
-  'siriknowledged',
-  'assistant_cdmd',
-  'assistantd',
-  'parsecd',
-  'searchd',
-  'siriactionsd',
   'amsengagementd',
+  'siriactionsd',
 ])
 
 /** Labels the simulator lists, running or idle. */
@@ -368,8 +363,9 @@ export function bootoutQuietServices(device, ps, jobs, manager, execute, listed 
     census[name].bootoutExit = result.exitCode ?? null
     if (result.exitCode === 0) stopped.push(name)
   }
-  console.log(JSON.stringify({ quietServices: { stopped, census } }))
-  return stopped
+  const record = { policy: [...QUIET_SERVICES], stopped, census }
+  console.log(JSON.stringify({ quietServices: record }))
+  return record
 }
 
 /**
@@ -423,7 +419,7 @@ export function probeSimulatorTuning(device, execute, tuning = {}) {
       { fatal: false }
     )
   } else console.log(JSON.stringify({ extractionBootout: 'no_matching_owned_label' }))
-  tuning.quietStopped = bootoutQuietServices(
+  tuning.quiet = bootoutQuietServices(
     device,
     ps.stdout,
     jobs,
@@ -492,6 +488,14 @@ export async function quiesceOwnedSimulator(device, command) {
         )
           throw new Error('owned_booted_simulator_required')
         manager = probeSimulatorTuning(device, bounded, tuning)
+        // Which jobs this run stopped, so runs with different lists compare cleanly.
+        safely(() =>
+          fs.writeFileSync(
+            path.join(directory, 'native-ios-quiet-services.json'),
+            JSON.stringify({ version: 1, ...tuning.quiet }, null, 2) + '\n',
+            { mode: 0o600 }
+          )
+        )
         collectors.managerPid = manager
       }
       const values = sampleSimulatorCpu(

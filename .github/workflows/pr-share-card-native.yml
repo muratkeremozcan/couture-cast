@@ -275,6 +275,7 @@ jobs:
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-sampler-private.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-host-snapshot-private.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-quiesce-ios.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-quiet-services.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-device.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-siri-preferences.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-log-counts.json
@@ -330,6 +331,7 @@ jobs:
           path: |
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-startup-private.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-quiesce-ios.json
+            _bmad-output/test-artifacts/story-6-8/runtime/native-ios-quiet-services.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-host-ios.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-collectors.json
             _bmad-output/test-artifacts/story-6-8/runtime/native-ios-sampler-private.json
