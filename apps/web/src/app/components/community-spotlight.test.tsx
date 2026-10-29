@@ -54,7 +54,11 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     renderGrid()
 
     const section = await screen.findByTestId('community-spotlight')
-    const heading = within(section).getByRole('heading', { level: 2 })
+    // The section mounts while the spotlight loads, under the fallback heading.
+    const heading = await within(section).findByRole('heading', {
+      level: 2,
+      name: 'Spotlight in Lisbon',
+    })
     expect(heading.textContent).toBe('Spotlight in Lisbon')
     expect(section).toHaveAttribute('data-level', 'city')
     const list = await within(section).findByTestId('community-spotlight-list')
