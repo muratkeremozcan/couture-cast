@@ -36,6 +36,11 @@ const reply = createCommunityComment({
 })
 // Contextual action names are "<Action>: <author>. <body>" (community-comments.tsx L67-72).
 const rootContext = `${root.author}. ${root.body}`
+/** The visible body of a published fixture comment; a tombstone has none. */
+function bodyText(comment: { body: string | null }): string {
+  if (comment.body === null) throw new Error('fixture comment has no body')
+  return comment.body
+}
 const page = (items = [root]) => ({
   data: { items, snapshot: 2, nextCursor: null, hasNewer: false },
 })
@@ -317,7 +322,7 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
       await waitFor(() => expect(rootReads).toBe(2))
     })
     await user.click(expand)
-    expect(await screen.findByText(reply.body)).toBeVisible()
+    expect(await screen.findByText(bodyText(reply))).toBeVisible()
     await act(async () => {
       releaseRefresh()
       await refreshing
@@ -325,7 +330,7 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     expect(
       screen.getByRole('button', { name: `Replies (1): ${rootContext}` })
     ).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByText(reply.body)).toBeVisible()
+    expect(screen.getByText(bodyText(reply))).toBeVisible()
   })
 
   it('keeps the next replies a member loads while a refresh is still reading the roots', async () => {
@@ -364,20 +369,20 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     await user.click(
       await screen.findByRole('button', { name: `Replies (1): ${rootContext}` })
     )
-    expect(await screen.findByText(reply.body)).toBeVisible()
+    expect(await screen.findByText(bodyText(reply))).toBeVisible()
     let refreshing: Promise<void> = Promise.resolve()
     await act(async () => {
       refreshing = state.refresh('community-post-1')
       await waitFor(() => expect(rootReads).toBe(2))
     })
     await user.click(screen.getByRole('button', { name: 'More replies' }))
-    expect(await screen.findByText(nextReply.body)).toBeVisible()
+    expect(await screen.findByText(bodyText(nextReply))).toBeVisible()
     await act(async () => {
       releaseRefresh()
       await refreshing
     })
-    expect(screen.getByText(reply.body)).toBeVisible()
-    expect(screen.getByText(nextReply.body)).toBeVisible()
+    expect(screen.getByText(bodyText(reply))).toBeVisible()
+    expect(screen.getByText(bodyText(nextReply))).toBeVisible()
     expect(screen.queryByRole('button', { name: 'More replies' })).toBeNull()
   })
 
@@ -409,20 +414,20 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     const state = makeState()
     const user = userEvent.setup()
     render(<CommunityComments postId="community-post-1" state={state} />)
-    expect(await screen.findByText(root.body)).toBeVisible()
+    expect(await screen.findByText(bodyText(root))).toBeVisible()
     let refreshing: Promise<void> = Promise.resolve()
     await act(async () => {
       refreshing = state.refresh('community-post-1')
       await waitFor(() => expect(firstPageReads).toBe(2))
     })
     await user.click(screen.getByRole('button', { name: 'More comments' }))
-    expect(await screen.findByText(nextRoot.body)).toBeVisible()
+    expect(await screen.findByText(bodyText(nextRoot))).toBeVisible()
     await act(async () => {
       releaseRefresh()
       await refreshing
     })
-    expect(screen.getByText(root.body)).toBeVisible()
-    expect(screen.getByText(nextRoot.body)).toBeVisible()
+    expect(screen.getByText(bodyText(root))).toBeVisible()
+    expect(screen.getByText(bodyText(nextRoot))).toBeVisible()
     expect(screen.queryByRole('button', { name: 'More comments' })).toBeNull()
   })
 
