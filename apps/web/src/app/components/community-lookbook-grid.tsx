@@ -998,7 +998,7 @@ interface LookbookDetailDialogProps {
   sponsored: SponsoredCtaHost
   t: Translate
   /** Where focus goes after close when the control that opened the detail is gone. */
-  restoreFocus?: readonly string[]
+  restoreFocus: { opener: string | undefined; final: string }
   onClose: () => void
 }
 
@@ -1035,7 +1035,8 @@ function LookbookDetailDialog({
       title={t('community.card.label', { author: authorName })}
       surface="theme"
       titleId="community-detail-title"
-      fallbackFocusSelector={restoreFocus}
+      fallbackFocusSelector={restoreFocus.opener}
+      finalFocusSelector={restoreFocus.final}
       closeLabel={t('community.card.detailClose')}
     >
       <div data-testid="community-detail" className="flex flex-col gap-4">

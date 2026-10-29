@@ -17,6 +17,8 @@ export interface AccessibleModalProps {
   initialFocusRef?: React.RefObject<HTMLElement | null>
   /** Where focus goes when the invoker is gone: the first selector that still matches. */
   fallbackFocusSelector?: string | readonly string[]
+  /** The last resort, tried after the element that was focused when the dialog opened. */
+  finalFocusSelector?: string
   closeLabel?: string
   children: React.ReactNode
   ariaLiveMessage?: string | null
@@ -36,6 +38,7 @@ export function AccessibleModal({
   initialFocusRef,
   closeLabel = 'Close modal',
   fallbackFocusSelector,
+  finalFocusSelector,
   children,
   ariaLiveMessage,
   errorMessage,
@@ -107,10 +110,14 @@ export function AccessibleModal({
           (JSON.parse(fallbackSelectors) as string[])
             .map((selector) => document.querySelector<HTMLElement>(selector))
             .find((element) => element !== null) ?? null
+        const final = finalFocusSelector
+          ? document.querySelector<HTMLElement>(finalFocusSelector)
+          : null
         const targetToFocus = [
           currentInvoker,
           fallback,
           previousActiveElementRef.current,
+          final,
         ].find((target) => {
           if (!target?.isConnected) return false
           for (
@@ -129,7 +136,14 @@ export function AccessibleModal({
         targetToFocus?.focus()
       })
     }
-  }, [initialFocusRef, isOpen, suspended, invokingElementRef, fallbackSelectors])
+  }, [
+    initialFocusRef,
+    isOpen,
+    suspended,
+    invokingElementRef,
+    fallbackSelectors,
+    finalFocusSelector,
+  ])
 
   if (!isOpen || typeof document === 'undefined') {
     return null

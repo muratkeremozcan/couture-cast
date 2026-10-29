@@ -39,11 +39,13 @@ export function useDetailOpener(opened: { id: string } | null) {
     []
   )
   const clear = useCallback(() => setOpener(null), [])
-  // The recorded control first, only while it belongs to the open post; the community
-  // section always stays last, for a card that is gone and for a post opened without one.
-  const restoreFocus =
-    opener !== null && opener.postId === openedId
-      ? [opener.selector, COMMUNITY_FALLBACK]
-      : [COMMUNITY_FALLBACK]
+  // The recorded control leads only while it belongs to the open post. The community
+  // section is the final target, after the element that was focused when the detail
+  // opened, so a post opened without a recorded control (a notification, a deep link)
+  // returns to where the reader was and only then to the section.
+  const restoreFocus = {
+    opener: opener !== null && opener.postId === openedId ? opener.selector : undefined,
+    final: COMMUNITY_FALLBACK,
+  }
   return { restoreFocus, record, clear }
 }

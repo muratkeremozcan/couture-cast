@@ -358,4 +358,60 @@ describe('AccessibleModal stack', () => {
     })
     expect(screen.getByTestId('section-target')).toHaveFocus()
   })
+
+  describe('focus target order on close', () => {
+    const recorded = '[data-testid="recorded-target"]'
+    const section = '[data-testid="section-target"]'
+    function Ordered({ open, withRecorded }: { open: boolean; withRecorded: boolean }) {
+      return (
+        <>
+          <button data-testid="earlier-focus">Earlier</button>
+          {withRecorded && <button data-testid="recorded-target">Recorded</button>}
+          <button data-testid="section-target">Section</button>
+          <AccessibleModal
+            isOpen={open}
+            onClose={vi.fn()}
+            titleId="solo-title"
+            title="Solo"
+            fallbackFocusSelector={recorded}
+            finalFocusSelector={section}
+          >
+            <button type="button">Solo action</button>
+          </AccessibleModal>
+        </>
+      )
+    }
+    const close = async (view: ReturnType<typeof render>, withRecorded: boolean) => {
+      view.rerender(<Ordered open={false} withRecorded={withRecorded} />)
+      await act(async () => {
+        await Promise.resolve()
+      })
+    }
+
+    it('prefers the recorded control, then the element focused at open, then the final target', async () => {
+      const view = render(<Ordered open={false} withRecorded />)
+      screen.getByTestId('earlier-focus').focus()
+      view.rerender(<Ordered open withRecorded />)
+      await close(view, true)
+      expect(screen.getByTestId('recorded-target')).toHaveFocus()
+    })
+
+    it('keeps the element focused at open when the recorded control is gone', async () => {
+      const view = render(<Ordered open={false} withRecorded={false} />)
+      screen.getByTestId('earlier-focus').focus()
+      view.rerender(<Ordered open withRecorded={false} />)
+      await close(view, false)
+      expect(screen.getByTestId('earlier-focus')).toHaveFocus()
+    })
+
+    it('falls to the final target when neither the recorded control nor the earlier element remains', async () => {
+      const view = render(<Ordered open={false} withRecorded={false} />)
+      const earlier = screen.getByTestId('earlier-focus')
+      earlier.focus()
+      view.rerender(<Ordered open withRecorded={false} />)
+      earlier.remove()
+      await close(view, false)
+      expect(screen.getByTestId('section-target')).toHaveFocus()
+    })
+  })
 })
