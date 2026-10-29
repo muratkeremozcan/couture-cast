@@ -10,17 +10,24 @@ const clean = (value, limit) =>
     .replace(/[^A-Za-z0-9 _.\-/]/g, '_')
     .slice(0, limit)
     .trim()
+const MAX_FRAMES = 6
 // Test names are source identifiers, so only their charset is restricted.
 const identifier = (value) => value.replace(/[^A-Za-z0-9_]/g, '_').slice(0, 120)
 
-/** `ShareCardComposerTalkBackTest.kt:102` from the first at-line of the test class, else null. */
-function testFrame(block, className) {
+/**
+ * `ShareCardComposerTalkBackTest.kt:102` for every at-line of the test class, in stack order,
+ * without repeats. The first is the innermost helper (a wait loop); the next names its caller,
+ * which is the step of the journey that failed.
+ */
+function testFrames(block, className) {
   const simple = className.split(/[.$]/).at(-1)
   const frame = new RegExp(
     String.raw`^\s*at [\w.$]*${simple}[\w$]*\.[\w$<>]+\(${simple}\.kt:(\d{1,5})\)\s*$`,
-    'm'
-  ).exec(block)
-  return frame ? `${simple}.kt:${frame[1]}` : null
+    'gm'
+  )
+  return [
+    ...new Set([...block.matchAll(frame)].map((match) => `${simple}.kt:${match[1]}`)),
+  ].slice(0, MAX_FRAMES)
 }
 
 function parseFailures(text) {
@@ -31,7 +38,8 @@ function parseFailures(text) {
       {
         test: identifier(head[1]),
         assertion: clean((head[4] ?? '').split(':')[0], 160) || clean(head[3], 160),
-        frame: testFrame(block, head[2]),
+        frame: testFrames(block, head[2])[0] ?? null,
+        frames: testFrames(block, head[2]),
       },
     ]
   })
@@ -49,6 +57,7 @@ export function talkbackFailureSummary(output) {
         test: instrumentationFailed ? 'instrumentation' : 'unknown',
         assertion: instrumentationFailed ? 'INSTRUMENTATION_FAILED' : 'no_failure_parsed',
         frame: null,
+        frames: [],
       },
     ]
   return {

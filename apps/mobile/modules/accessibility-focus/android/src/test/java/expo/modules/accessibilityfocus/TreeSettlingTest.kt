@@ -158,4 +158,43 @@ class TreeSettlingTest {
       recorded.map { it.line() }
     )
   }
+
+  /** A control on a virtual timeline: present until [leavesAt], clickable from [clickableAt]. */
+  private class FakeControl(private val leavesAt: Long, private val clickableAt: Long) {
+    var time = 0L
+    var clicks = 0
+    val clock = TreeSettling.Clock({ time }, { time += it })
+    fun present() = time < leavesAt
+    fun click(): Boolean {
+      if (!present()) return false
+      clicks++
+      return time >= clickableAt
+    }
+  }
+
+  @Test
+  fun clickIfPresentIsDoneAtOnceWhenTheControlIsAlreadyGone() {
+    val control = FakeControl(leavesAt = 0, clickableAt = 0)
+    assertTrue(TreeSettling.clickIfPresent(control.clock, control::present, control::click))
+    assertEquals(0, control.clicks)
+    assertEquals(0L, control.time)
+  }
+
+  @Test
+  fun aControlThatLeavesBetweenTheLookAndTheClickIsASuccessNotATwentySecondWait() {
+    // Present at the look, gone before it can take a click: a blur or a deep link closed it.
+    val control = FakeControl(leavesAt = 200, clickableAt = 10_000)
+    assertTrue(TreeSettling.clickIfPresent(control.clock, control::present, control::click))
+    assertTrue("done well inside the 5 s bound", control.time <= 300)
+  }
+
+  @Test
+  fun aClickThatLandsEndsTheWaitAndAControlThatNeverLeavesNorClicksFailsAtTheBound() {
+    val lands = FakeControl(leavesAt = Long.MAX_VALUE, clickableAt = 400)
+    assertTrue(TreeSettling.clickIfPresent(lands.clock, lands::present, lands::click))
+    assertEquals(400L, lands.time)
+    val stuck = FakeControl(leavesAt = Long.MAX_VALUE, clickableAt = Long.MAX_VALUE)
+    assertFalse(TreeSettling.clickIfPresent(stuck.clock, stuck::present, stuck::click))
+    assertEquals(5_000L, stuck.time)
+  }
 }

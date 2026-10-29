@@ -29,6 +29,7 @@ test('a failed run names the test, assertion head and test frame and drops the n
         test: 'actualTalkBackOpenSaveCancelTraversalAndFocus',
         assertion: 'Saved status',
         frame: 'ShareCardComposerTalkBackTest.kt:102',
+        frames: ['ShareCardComposerTalkBackTest.kt:102'],
       },
     ],
   })
@@ -42,6 +43,7 @@ test('a bare AssertionError without a message is still located by its test frame
       test: 'actualTalkBackOpenSaveCancelTraversalAndFocus',
       assertion: 'java.lang.AssertionError',
       frame: 'ShareCardComposerTalkBackTest.kt:96',
+      frames: ['ShareCardComposerTalkBackTest.kt:96'],
     },
   ])
 })
@@ -91,7 +93,12 @@ test('a passing run, an instrumentation crash and an unparsed failure are told a
   assert.equal(crash.ok, false)
   assert.equal(crash.instrumentationFailed, true)
   assert.deepEqual(crash.failures, [
-    { test: 'instrumentation', assertion: 'INSTRUMENTATION_FAILED', frame: null },
+    {
+      test: 'instrumentation',
+      assertion: 'INSTRUMENTATION_FAILED',
+      frame: null,
+      frames: [],
+    },
   ])
   for (const output of ['garbage', undefined, '']) {
     const summary = talkbackFailureSummary(output)
@@ -149,4 +156,30 @@ test('the harness prints the closed summary before it throws the composer failur
     source.split("throw new Error('actual_talkback_composer_failed')").length,
     2
   )
+})
+
+test('a wait failure names its caller: every test-class frame is kept, innermost first', () => {
+  const method = 'actualTalkBackOwnedSavingAndReopenedFinishingRestoreWatermark'
+  const output = [
+    'There was 1 failure:',
+    `1) ${method}(${CLASS})`,
+    'java.lang.AssertionError: Click share-card-cancel: null:Maria Private:note',
+    '\tat expo.modules.accessibilityfocus.TreeSettling.waitFor(TreeSettling.kt:29)',
+    `\tat ${CLASS}.waitFor(ShareCardComposerTalkBackTest.kt:36)`,
+    `\tat ${CLASS}.click(ShareCardComposerTalkBackTest.kt:52)`,
+    `\tat ${CLASS}.${method}(ShareCardComposerTalkBackTest.kt:187)`,
+    `\tat ${CLASS}.click(ShareCardComposerTalkBackTest.kt:52)`,
+    '\tat java.lang.reflect.Method.invoke(Method.java:580)',
+    'FAILURES!!!',
+    'Tests run: 2,  Failures: 1',
+    '',
+  ].join('\n')
+  const [failure] = talkbackFailureSummary(output).failures
+  assert.equal(failure.frame, 'ShareCardComposerTalkBackTest.kt:36')
+  assert.deepEqual(failure.frames, [
+    'ShareCardComposerTalkBackTest.kt:36',
+    'ShareCardComposerTalkBackTest.kt:52',
+    'ShareCardComposerTalkBackTest.kt:187',
+  ])
+  assert.doesNotMatch(JSON.stringify(failure), /Maria|Private/)
 })

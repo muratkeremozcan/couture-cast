@@ -55,12 +55,25 @@ class ShareCardComposerTalkBackTest {
     "${it.viewIdResourceName}@${bounds.flattenToString()}"
   }
   private fun settledTree(message: String) = TreeSettling.settled(message, clock, signature = ::signature)
+  private fun tryClick(id: String): Boolean {
+    val node = find(id) ?: return false
+    node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.id)
+    return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+  }
   private fun click(id: String) {
-    waitFor("Click $id") {
-      val node = find(id) ?: return@waitFor false
-      node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.id)
-      node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-    }
+    waitFor("Click $id") { tryClick(id) }
+  }
+  /**
+   * Leaves the composer if it is open. A deep link or screen blur can close it between the look
+   * and the click, so a Cancel that is gone by then is the wanted outcome, never a 20 s wait.
+   */
+  private fun closeComposerIfOpen() {
+    val closed = TreeSettling.clickIfPresent(
+      clock,
+      present = { find("share-card-cancel") != null },
+      click = { tryClick("share-card-cancel") },
+    )
+    assertTrue("The composer's Cancel stayed present and unclickable: ${dump()}", closed)
   }
   private fun label(node: AccessibilityNodeInfo) = (node.contentDescription ?: node.text ?: "").toString()
 
@@ -113,7 +126,7 @@ class ShareCardComposerTalkBackTest {
     // The real adapter writes "Saved to photos"; earlier harness steps may leave another mode.
     fixture("real")
     waitFor("Story68 app active") { find("tab-home") != null || find("share-card-cancel") != null }
-    if (find("share-card-cancel") != null) click("share-card-cancel")
+    closeComposerIfOpen()
     click("tab-home")
     waitFor("Outfit action") { find("outfit-share-card-open") != null }
     click("outfit-share-card-open")
@@ -150,7 +163,7 @@ class ShareCardComposerTalkBackTest {
     try {
       fixture("real")
       assertCacheEnumeration()
-      if (find("share-card-cancel") != null) click("share-card-cancel")
+      closeComposerIfOpen()
       click("tab-home")
       assertHeader("Home", "Outfit")
       click("tab-community")
@@ -185,11 +198,18 @@ class ShareCardComposerTalkBackTest {
       waitFor("Re-enabled watermark toggles") { find("share-card-watermark")?.isChecked != checked }
       assertFalse("No Saved to photos label for the old save", all().any { label(it) == "Saved to photos" })
       click("share-card-cancel")
-    } finally {
-      fixture("release")
-      fixture("real")
-      if (find("share-card-cancel") != null) click("share-card-cancel")
+    } catch (failure: Throwable) {
+      // Cleanup runs for the next test's sake; whatever it hits must not replace this failure.
+      try { restoreRealFixture() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+      throw failure
     }
+    restoreRealFixture()
+  }
+
+  private fun restoreRealFixture() {
+    fixture("release")
+    fixture("real")
+    closeComposerIfOpen()
   }
 
 }

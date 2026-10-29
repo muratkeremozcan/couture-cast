@@ -33,6 +33,28 @@ object TreeSettling {
     throw AssertionError(message + ": " + diagnostic())
   }
 
+  /**
+   * Clicks a control that may leave on its own: a screen blur or a deep link closes the composer
+   * while the test is looking at it. Done once [present] is false or [click] lands, so a control
+   * that vanishes between the look and the click is a success. False only when it stayed present
+   * and unclickable for [timeoutMs]. A required click uses [waitFor] instead.
+   */
+  fun clickIfPresent(
+    clock: Clock,
+    present: () -> Boolean,
+    click: () -> Boolean,
+    timeoutMs: Long = 5_000,
+    pollMs: Long = 100,
+  ): Boolean {
+    val until = clock.now() + timeoutMs
+    while (clock.now() < until) {
+      if (!present()) return true
+      if (click()) return true
+      clock.sleep(pollMs)
+    }
+    return !present()
+  }
+
   /** How long one named focus wait took, and whether it ran out of its bound. */
   class FocusLatency(val wait: String, val elapsedMs: Long, val timedOut: Boolean) {
     /** One closed line the host harness parses out of the instrumentation output. */
