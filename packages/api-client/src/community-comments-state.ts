@@ -146,6 +146,11 @@ export class CommunityCommentsState {
   private readonly threads = new Map<string, CommentThreadState>()
   private readonly fences = new Map<string, number>()
   private readonly requests = new Map<string, number>()
+  /** Public loads that have not answered yet, so a discarded one can be read again. */
+  private readonly pendingLoads = new Map<
+    string,
+    { postId: string; parentId: string | null; append: boolean }
+  >()
   private readonly startCursors = new Map<string, string | undefined>()
   private readonly focusTargets = new Map<
     string,
@@ -347,6 +352,17 @@ export class CommunityCommentsState {
     }
   }
 
+  /** Records a public load until it answers; the returned function forgets this one only. */
+  private trackLoad(
+    key: string,
+    pending: { postId: string; parentId: string | null; append: boolean }
+  ): () => void {
+    this.pendingLoads.set(key, pending)
+    return () => {
+      if (this.pendingLoads.get(key) === pending) this.pendingLoads.delete(key)
+    }
+  }
+
   private invalidateReads(postId: string, includePrivate = true): void {
     for (const key of this.requests.keys())
       if (key.startsWith(`${postId}/`) && (includePrivate || key !== `${postId}/private`))
@@ -460,6 +476,7 @@ export class CommunityCommentsState {
     state.loading = true
     state.error = null
     this.emit()
+    const untrack = this.trackLoad(key, { postId, parentId, append })
     try {
       const page = await this.readPage(postId, parentId, current, append)
       if (!isCurrent()) return
@@ -473,6 +490,7 @@ export class CommunityCommentsState {
     } catch (error) {
       if (isCurrent()) this.failed(postId, state, error)
     } finally {
+      untrack()
       if (isCurrent()) {
         state.loading = false
         this.emit()
@@ -752,9 +770,20 @@ export class CommunityCommentsState {
     // A comment a live insert already shows publicly needs no "refresh to view" prompt;
     // that wording is only for the polling fallback, where it is not yet in the thread.
     const publicIds = this.publicIds(state)
+    // Invalidating drops the answer of every public read in flight, so those reads are
+    // issued again once the suppression is in place; otherwise the thread stays empty.
+    const discarded = [...this.pendingLoads.values()].filter(
+      (pending) => pending.postId === postId
+    )
+    let invalidated = false
     for (const item of collected) {
       if (['author_deleted', 'consent_suspended', 'erased'].includes(item.status)) {
-        this.invalidateReads(postId, false)
+        // Only a status that is new to the client drops reads in flight, so the same
+        // status arriving on every poll cannot keep discarding the reads issued again.
+        if (previous.get(item.id) !== item.status) {
+          this.invalidateReads(postId, false)
+          invalidated = true
+        }
         this.suppress(state, item.id)
       }
       if (
@@ -769,6 +798,10 @@ export class CommunityCommentsState {
     state.submissionsCursor = cursor ?? null
     this.statusPages.set(postId, append ? this.privatePageCount(postId) + pages : pages)
     this.emit()
+    if (invalidated) {
+      for (const { parentId, append: more } of discarded)
+        void this.load(postId, parentId, more)
+    }
   }
 
   private isDefinitiveRejection(error: unknown): boolean {

@@ -261,8 +261,17 @@ describe('private status suppression of cached public comments', () => {
           ? state.current('post').replies.get(parentId)
           : state.current('post').roots
       const cached = view()
+      const rows = cached?.items ?? []
       ;(parentId ? transport.replies : transport.roots).mockReturnValueOnce(stale.promise)
       const reading = state.load('post', parentId)
+      // The discarded read is issued again, and the server answers it with the target gone.
+      ;(parentId ? transport.replies : transport.roots).mockResolvedValueOnce(
+        page(
+          rows.map((row, index) =>
+            index === 0 ? { ...row, body: null, author: null, unavailable: true } : row
+          )
+        )
+      )
       transport.submissions.mockResolvedValueOnce(
         ownPage([
           { ...own(target), parentId, status, body: null, publicationSequence: 1 },

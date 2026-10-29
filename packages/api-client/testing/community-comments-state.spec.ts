@@ -399,6 +399,83 @@ describe('screen-owned comments state', () => {
         ?.items.map((reply) => reply.id)
     ).toEqual(['old', 'new'])
   })
+  describe('a suppressing private status that lands while a public read is in flight', () => {
+    const suspended = (id = 'root') => ({
+      items: [{ ...own(id), status: 'consent_suspended' as const, body: null }],
+      nextCursor: null,
+    })
+    const unavailable = () =>
+      page([
+        { ...item('root'), isOwn: true, unavailable: true, body: null, author: null },
+      ])
+
+    it('reads the thread again instead of leaving it empty', async () => {
+      const { state, transport } = setup(),
+        stale = deferred<CommunityCommentsPage>()
+      transport.roots
+        .mockReturnValueOnce(stale.promise)
+        .mockResolvedValueOnce(unavailable())
+      transport.submissions.mockResolvedValueOnce(suspended())
+      const loading = state.load('post')
+      await state.statuses('post')
+      stale.resolve(page([item('root')]))
+      await loading
+      await vi.waitFor(() =>
+        expect(state.current('post').roots?.items.map((root) => root.id)).toEqual([
+          'root',
+        ])
+      )
+      expect(state.current('post').roots?.items[0]?.unavailable).toBe(true)
+      expect(state.current('post').loading).toBe(false)
+      expect(transport.roots).toHaveBeenCalledTimes(2)
+    })
+
+    it('reads a discarded reply page again with the same parent', async () => {
+      const { state, transport } = setup(),
+        stale = deferred<CommunityCommentsPage>()
+      transport.replies
+        .mockReturnValueOnce(stale.promise)
+        .mockResolvedValueOnce(page([item('reply', 2)]))
+      transport.submissions.mockResolvedValueOnce(suspended('other'))
+      const loading = state.load('post', 'root')
+      await state.statuses('post')
+      stale.resolve(page([item('old', 2)]))
+      await loading
+      await vi.waitFor(() =>
+        expect(
+          state
+            .current('post')
+            .replies.get('root')
+            ?.items.map((reply) => reply.id)
+        ).toEqual(['reply'])
+      )
+      expect(transport.replies).toHaveBeenCalledTimes(2)
+      expect(transport.replies.mock.calls.map((call: unknown[]) => call[1])).toEqual([
+        'root',
+        'root',
+      ])
+    })
+
+    it('does not discard the read again when the same status arrives on the next poll', async () => {
+      const { state, transport } = setup(),
+        stale = deferred<CommunityCommentsPage>(),
+        again = deferred<CommunityCommentsPage>()
+      transport.roots
+        .mockReturnValueOnce(stale.promise)
+        .mockReturnValueOnce(again.promise)
+      transport.submissions.mockResolvedValue(suspended())
+      const loading = state.load('post')
+      await state.statuses('post')
+      await state.statuses('post')
+      again.resolve(unavailable())
+      stale.resolve(page([item('root')]))
+      await loading
+      await vi.waitFor(() =>
+        expect(state.current('post').roots?.items[0]?.unavailable).toBe(true)
+      )
+      expect(transport.roots).toHaveBeenCalledTimes(2)
+    })
+  })
   it('ignores older success and errors after newer requests and visibility loss', async () => {
     const { state, transport } = setup(),
       first = deferred<CommunityCommentsPage>()
@@ -683,7 +760,12 @@ describe('Story 6.4 peer-review concurrency regressions', () => {
     const { state, transport } = setup(),
       old = deferred<CommunityCommentsPage>()
     await state.load('post')
-    transport.roots.mockReturnValueOnce(old.promise)
+    transport.roots
+      .mockReturnValueOnce(old.promise)
+      // The discarded read is issued again, and the server answers it as unavailable.
+      .mockResolvedValueOnce(
+        page([{ ...item('root'), body: null, author: null, unavailable: true }])
+      )
     const reading = state.load('post')
     transport.submissions.mockResolvedValue(
       ownPage([

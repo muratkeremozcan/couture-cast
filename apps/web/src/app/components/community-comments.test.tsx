@@ -616,6 +616,39 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     expect(close).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps the public thread when a suspension lands while the first read is in flight', async () => {
+    let releaseFirstRead: () => void = () => undefined
+    const firstRead = new Promise<void>((resolve) => {
+      releaseFirstRead = resolve
+    })
+    let reads = 0
+    useMswHandlers(
+      http.get(`${base}/comments`, async () => {
+        if (++reads === 1) await firstRead
+        return HttpResponse.json(
+          page([{ ...root, isOwn: true, unavailable: true, body: null, author: null }])
+        )
+      }),
+      http.get(`${base}/comment-submissions`, () =>
+        HttpResponse.json(
+          submissionsPage([
+            createCommunityCommentSubmission({
+              id: root.id,
+              status: 'consent_suspended',
+              body: null,
+            }),
+          ])
+        )
+      )
+    )
+    render(<Journey state={makeState()} />)
+    await screen.findByTestId('comment-submission-root')
+    releaseFirstRead()
+    expect(
+      await screen.findByRole('button', { name: 'Delete: Unavailable.' })
+    ).toBeVisible()
+  })
+
   it('keeps author deletion available on an own unavailable public placeholder', async () => {
     useMswHandlers(
       http.get(`${base}/comments`, () =>
