@@ -8,6 +8,7 @@ import {
   FLOW_STARTUP_MS,
   FLOW_TIMEOUT_MARGIN,
   PICK_IMAGE_FLOW,
+  PICK_IMAGE_GUARDED_STEPS,
   PICK_IMAGE_OTHER_STEPS_MS,
   PICK_IMAGE_TAP_ATTEMPTS,
   PICK_IMAGE_TAP_ATTEMPT_MS,
@@ -34,7 +35,7 @@ function openerTaps(node) {
   return []
 }
 
-test('the picker opener is tapped only while it reads enabled and the picker is not up, and the tap waits for Cancel', () => {
+test('the picker opener is tapped only while it reads enabled and the picker is not up, after the sheet is pulled to its top, and the tap waits for Cancel', () => {
   assert.equal(commands.filter((step) => step.retry).length, 1)
   assert.ok(retryStep.retry.maxRetries >= 2 && retryStep.retry.maxRetries <= 4)
   assert.deepEqual(guard.runFlow.when, {
@@ -43,6 +44,19 @@ test('the picker opener is tapped only while it reads enabled and the picker is 
   })
   assert.equal(openerTaps(guard.runFlow.commands).length, 1)
   assert.equal(openerTaps(commands).length, 1, 'the only tap is the guarded one')
+  // The tap is the last guarded command, right after the scroll has settled, and every
+  // command before that wait is a swipe that drags the sheet's content down to its top.
+  const steps = guard.runFlow.commands
+  assert.equal(steps.at(-1).tapOn.id, opener)
+  assert.equal(steps.at(-2), 'waitForAnimationToEnd')
+  const swipes = steps.slice(0, -2)
+  assert.ok(swipes.length >= 2)
+  for (const step of swipes) {
+    const y = (point) => Number.parseFloat(point.split(',')[1])
+    assert.ok(step.swipe, 'only swipes precede the settle wait')
+    assert.ok(y(step.swipe.end) > y(step.swipe.start), 'a swipe drags the content down')
+  }
+  assert.equal(steps.length, PICK_IMAGE_GUARDED_STEPS)
   assert.equal(wait.extendedWaitUntil.visible, 'Cancel')
   assert.ok(
     wait.extendedWaitUntil.timeout >= 5000 && wait.extendedWaitUntil.timeout <= 10000
@@ -52,8 +66,10 @@ test('the picker opener is tapped only while it reads enabled and the picker is 
 test('the process budget covers the guarded tap and every other step', () => {
   const attempts = retryStep.retry.maxRetries + 1
   assert.ok(attempts <= PICK_IMAGE_TAP_ATTEMPTS)
+  // Guard (two condition checks), each guarded command, the wait for Cancel and its poll.
   const attempt =
-    2 * CONDITION_CHECK_MS + wait.extendedWaitUntil.timeout + CONDITION_CHECK_MS
+    (2 + guard.runFlow.commands.length + 1) * CONDITION_CHECK_MS +
+    wait.extendedWaitUntil.timeout
   assert.ok(attempt <= PICK_IMAGE_TAP_ATTEMPT_MS)
   assert.equal(
     PICK_IMAGE_TAP_WORST_CASE_MS,

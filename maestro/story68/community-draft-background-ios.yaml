@@ -34,8 +34,13 @@ appId: ${MAESTRO_APP_ID}
       id: community-pick-image-button
     direction: UP
     centerElement: false
-# A press that the starved CI host drops leaves the sheet as it was (run 40927902095), so the
-# tap repeats only while the picker's Cancel is not up.
+# scrollUntilVisible stops once the button's frame is inside the screen, and a scroll view still
+# reports the frame of content that sits under the sheet header. Both failed runs (40927902095,
+# 40938852299) stopped with the button's top at 34 pt, its centre at 94 pt, under the header that
+# starts at about 87 pt: the tap reported COMPLETED, hit the header and opened nothing, four times
+# at the same spot. Each attempt pulls the sheet to its top first, as position-outfit-open.yaml
+# does, so the button sits below the header, and the tap repeats only while the picker's Cancel
+# is not up.
 - retry:
     maxRetries: 3
     commands:
@@ -46,6 +51,15 @@ appId: ${MAESTRO_APP_ID}
               enabled: true
             notVisible: Cancel
           commands:
+            - swipe:
+                start: 50%, 30%
+                end: 50%, 85%
+                duration: 300
+            - swipe:
+                start: 50%, 30%
+                end: 50%, 85%
+                duration: 300
+            - waitForAnimationToEnd
             - tapOn:
                 id: community-pick-image-button
       - extendedWaitUntil:

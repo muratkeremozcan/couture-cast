@@ -67,13 +67,15 @@ const saveTapTimeoutMs = Math.ceil(
 
 /**
  * community-draft-background-ios.yaml taps the photo picker's opener inside a retry of maxRetries 3
- * (4 attempts). An attempt is the guard (its two condition checks), the 8 s wait for the picker's
+ * (4 attempts). An attempt is the guard (its two condition checks), the four commands the guard
+ * runs (two swipes to the sheet's top, the animation wait, the tap), the 8 s wait for the picker's
  * Cancel and that wait's poll. The flow's other steps are budgeted at one condition check each plus
  * their declared waits. A test reads the flow and keeps these numbers at or above what it declares.
  */
 export const PICK_IMAGE_TAP_ATTEMPTS = 4
+export const PICK_IMAGE_GUARDED_STEPS = 4
 export const PICK_IMAGE_TAP_ATTEMPT_MS =
-  2 * CONDITION_CHECK_MS + 8_000 + CONDITION_CHECK_MS
+  (2 + PICK_IMAGE_GUARDED_STEPS + 1) * CONDITION_CHECK_MS + 8_000
 export const PICK_IMAGE_TAP_WORST_CASE_MS =
   PICK_IMAGE_TAP_ATTEMPTS * PICK_IMAGE_TAP_ATTEMPT_MS
 export const PICK_IMAGE_OTHER_STEPS_MS = 117_000
