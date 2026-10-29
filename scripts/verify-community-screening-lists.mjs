@@ -245,6 +245,19 @@ function contextVetoProblems(context) {
     if (key in context && !validLiteralTokens(context[key], false))
       problems.push(`a literal context has invalid ${key}`)
   if (
+    'vetoFrames' in context &&
+    (!Array.isArray(context.vetoFrames) ||
+      context.vetoFrames.some(
+        (frame) =>
+          typeof frame !== 'string' ||
+          !/^\p{L}+(?: \p{L}+){1,4}$/u.test(frame) ||
+          frame !== toLiteral(frame) ||
+          frame.split(' ').filter((word) => (context.terms ?? []).includes(word))
+            .length !== 1
+      ))
+  )
+    problems.push('a literal context has invalid vetoFrames')
+  if (
     'vetoRadius' in context &&
     (!Number.isInteger(context.vetoRadius) ||
       context.vetoRadius < 1 ||
@@ -668,6 +681,7 @@ function buildAllowFile(language, allowState, hashes) {
           vetoes,
           vetoRadius,
           textVetoes,
+          vetoFrames,
         }) => ({
           terms,
           objects,
@@ -676,6 +690,7 @@ function buildAllowFile(language, allowState, hashes) {
           ...(evidence?.length ? { evidence, evidenceRadius } : {}),
           ...(vetoes?.length ? { vetoes, vetoRadius } : {}),
           ...(textVetoes?.length ? { textVetoes } : {}),
+          ...(vetoFrames?.length ? { vetoFrames } : {}),
         })
       ),
     occurrenceConstructions: REVIEWED_OCCURRENCE_CONSTRUCTIONS.filter(

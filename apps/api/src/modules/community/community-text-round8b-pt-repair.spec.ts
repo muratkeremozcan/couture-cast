@@ -253,3 +253,65 @@ describe('round 8b reviewer findings: French insults and pé de leaks stay withh
         expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
   })
 })
+
+describe('round 8c reviewer findings: mixed French, ariano and burro frames', () => {
+  const mixed = [
+    'Regardez o tapete danser devant tout le monde',
+    'Hier o tapete marchait derriere la boulangerie',
+    'Nous avons vu o tapete dans une rue',
+    'Elle dit que o tapete est sale ici',
+    'Voila um tapete avec des amis',
+    'Quand o tapete arrive chez nous',
+    'Il faut ne pas laisser o tapete sur le sol',
+    'Notre tapete est aussi grand comme votre sol',
+    'Alors o tapete sous la table',
+    'Cet homme et o tapete sans leur chien',
+  ]
+  it.each(mixed)('withholds mixed French under every locale: %s', (text) => {
+    for (const locale of [...portuguese, ...elsewhere])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('keeps ordinary Portuguese copy with ou, três, pás and que clearing', () => {
+    for (const text of [
+      'Sapatos sobre o tapete ou sobre o piso da sala.',
+      'Três pares de sapatos sobre o tapete da sala.',
+      'Duas pás de madeira ao lado do tapete da sala.',
+      'Sapatos que ficam sobre o tapete da sala todo dia.',
+    ])
+      for (const locale of portuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+
+  it('withholds ariano beside white, nation, pride, blood, power and ideology words', () => {
+    for (const text of [
+      'O ariano da raça branca no desfile.',
+      'O ariano branco e o orgulho da nação.',
+      'O ariano de sangue puro no desfile.',
+      'O ariano do movimento nacionalista no desfile.',
+      'O ariano e a ideologia do poder no desfile.',
+      'O ariano e a pureza no desfile.',
+      'O ariano da nacao no desfile.',
+    ])
+      for (const locale of portuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('withholds the article plus burro plus do or da plus a person frame', () => {
+    for (const text of [
+      'Foto do burro do chefe no escritório.',
+      'Foto do burro do vizinho no quintal.',
+      'O burro da professora no pasto da escola.',
+      'O burro dos irmãos no quintal da loja.',
+      'Um burro do gerente na reunião de moda.',
+    ])
+      for (const locale of portuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+    for (const text of [
+      'O burro do pasto puxa a carroça de tecidos.',
+      'O burro da fazenda usa sela de feltro.',
+    ])
+      for (const locale of portuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+})

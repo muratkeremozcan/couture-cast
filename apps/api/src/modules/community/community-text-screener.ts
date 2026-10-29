@@ -285,6 +285,8 @@ const literalContextSchema = z
     vetoes: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
     vetoRadius: z.number().int().min(1).max(6).default(3),
     textVetoes: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    // Word-for-word frames that hold the term and veto the clearance ("burro do chefe").
+    vetoFrames: z.array(z.string().regex(/^\p{L}+(?: \p{L}+){1,4}$/u)).default([]),
   })
   .refine((context) => context.objects.length > 0 || context.evidence.length > 0)
 
@@ -944,15 +946,39 @@ function isVetoed(
     vetoes: readonly string[]
     vetoRadius: number
     textVetoes: readonly string[]
+    vetoFrames: readonly string[]
   }
 ): boolean {
   if (context.textVetoes.length > 0 && tokens.some((t) => context.textVetoes.includes(t)))
     return true
+  return (
+    hasVetoNear(tokens, position, context) || holdsVetoFrame(tokens, position, context)
+  )
+}
+
+function hasVetoNear(
+  tokens: readonly string[],
+  position: number,
+  context: { vetoes: readonly string[]; vetoRadius: number }
+): boolean {
   if (context.vetoes.length === 0) return false
   const from = Math.max(0, position - context.vetoRadius)
   return tokens
     .slice(from, position + context.vetoRadius + 1)
     .some((token, index) => from + index !== position && context.vetoes.includes(token))
+}
+
+/** Whether the words around the term spell one of the veto frames exactly. */
+function holdsVetoFrame(
+  tokens: readonly string[],
+  position: number,
+  context: { vetoFrames: readonly string[] }
+): boolean {
+  return context.vetoFrames.some((frame) => {
+    const words = frame.split(' ')
+    const at = words.indexOf(tokens[position] as string)
+    return at >= 0 && words.every((word, index) => tokens[position - at + index] === word)
+  })
 }
 
 /** Whether an object noun stands within the context's distance, joined through its connectors. */
@@ -2301,6 +2327,7 @@ export class CommunityTextScreener {
         vetoes: context.vetoes ?? [],
         vetoRadius: context.vetoRadius ?? 3,
         textVetoes: context.textVetoes ?? [],
+        vetoFrames: context.vetoFrames ?? [],
         language: list.language,
       }))
     )
