@@ -188,7 +188,9 @@ export function ShareCardDialog({
         }
       })
       .finally(() => {
-        if (generation === sequence.current) setBusy(false)
+        // An unmount aborts without bumping the sequence; a settled request
+        // must not set state on an unmounted dialog.
+        if (!abort.signal.aborted && generation === sequence.current) setBusy(false)
       })
     return () => {
       abort.abort()
