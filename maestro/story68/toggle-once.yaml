@@ -3,12 +3,27 @@ appId: ${MAESTRO_APP_ID}
 # The harness passes the pre-tap digest and checks the drawn label after this flow.
 - assertVisible:
     id: share-card-preview-loaded-${MAESTRO_PREVIOUS_PREVIEW}
-- tapOn:
-    id: share-card-watermark
-- extendedWaitUntil:
-    notVisible:
-      id: share-card-preview-loaded-${MAESTRO_PREVIOUS_PREVIEW}
-    timeout: 20000
+# A toggle that reached the product drops the loaded digest id at once (the composer clears
+# `loaded` in the same press) and prepares the other composition. Run 40860218822 shard 2
+# (it-IT): Maestro reported the tap COMPLETED, the app logged no prepare for it and the old
+# digest stayed on screen for the whole 20 s wait, so the press never registered. Maestro's iOS
+# hierarchy never reports `checked`, so the previous digest is the postcondition. A tap is only
+# repeated while that digest is still on screen, which keeps a press that merely landed late
+# from toggling the watermark back.
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: share-card-preview-loaded-${MAESTRO_PREVIOUS_PREVIEW}
+          commands:
+            - tapOn:
+                id: share-card-watermark
+      - extendedWaitUntil:
+          notVisible:
+            id: share-card-preview-loaded-${MAESTRO_PREVIOUS_PREVIEW}
+          timeout: 8000
 - extendedWaitUntil:
     visible:
       id: share-card-preview-loaded-.*
