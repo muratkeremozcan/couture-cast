@@ -6,6 +6,7 @@
  * a name from a closed set, so the record can join the public evidence.
  *
  *   node scripts/ci/native-host-evidence.mjs sample <label> --platform ios
+ *   node scripts/ci/native-host-evidence.mjs sample in-flow --flow <name> --platform ios
  *   node scripts/ci/native-host-evidence.mjs first-flow <passed|failed> --platform ios
  *   node scripts/ci/native-host-evidence.mjs metro --platform ios
  *
@@ -27,14 +28,16 @@ export const SAMPLE_LABELS = [
   'before-first-flow',
   'after-first-flow',
   'locale-loop',
+  'in-flow',
   'flow-failure',
   'failure',
 ]
 const PLATFORMS = ['ios']
+const FLOW_NAME = /^maestro\/[A-Za-z0-9/_.-]{1,80}\.yaml$/
 const PHASES = ['none', 'jvm', 'device', 'driver', 'flow']
 const COMMAND = /^[A-Za-z0-9._+-]{1,32}$/
 const TOP_PROCESSES = 15
-const TOP_RSS_PROCESSES = 15
+const TOP_RSS_PROCESSES = 25
 
 /** Closed per-process projection from ps PID, PPID, RSS KiB, CPU and executable. */
 function processUsage(text) {
@@ -64,11 +67,30 @@ export function busiestProcesses(text, limit = TOP_PROCESSES) {
     .slice(0, limit)
 }
 
-/** The top 15 resident processes from the same snapshot. */
+/** The top 25 resident processes from the same snapshot. */
 export function residentProcesses(text) {
   return processUsage(text)
     .sort((a, b) => b.rssKB - a.rssKB)
     .slice(0, TOP_RSS_PROCESSES)
+}
+
+/** Resident memory of every process, in whole MB: the host total and the owned simulator's. */
+export function residentRollup(text) {
+  const rows = processUsage(text)
+  const manager = rows.find((row) => row.command === 'launchd_sim')?.pid
+  const mb = (list) => Math.round(list.reduce((sum, row) => sum + row.rssKB, 0) / 1024)
+  return {
+    rssTotalMB: rows.length > 0 ? mb(rows) : null,
+    simulatorRssMB:
+      manager === undefined ? null : mb(rows.filter((row) => row.ppid === manager)),
+  }
+}
+
+/** Memory the compressor holds, in whole MB, from vm_stat. Null when vm_stat does not say. */
+export function compressorMB(text) {
+  const size = text.match(/page size of (\d+) bytes/)
+  const pages = text.match(/^Pages occupied by compressor:\s+(\d+)\./m)
+  return size && pages ? Math.round((Number(pages[1]) * Number(size[1])) / 1048576) : null
 }
 
 /** Read-only macOS probes. Unsupported probes remain explicit null values. */
@@ -133,6 +155,8 @@ export function projectSample(input) {
     memFreeMB: Math.floor(input.freemem / 1048576),
     busiest: busiestProcesses(input.ps),
     resident: residentProcesses(input.ps),
+    ...residentRollup(input.ps),
+    compressorMB: compressorMB(input.vm ?? ''),
     ...projectMemory(input.swap ?? '', input.pressure ?? ''),
     vm: projectVm(input.vm ?? ''),
   }
@@ -261,6 +285,9 @@ const SAMPLE_KEYS = [
   'memFreeMB',
   'busiest',
   'resident',
+  'rssTotalMB',
+  'simulatorRssMB',
+  'compressorMB',
   'swapUsedMB',
   'memoryPressureFreePercent',
   'vm',
@@ -303,7 +330,9 @@ const validSample = (sample) =>
   Array.isArray(sample.resident) &&
   sample.resident.length <= TOP_RSS_PROCESSES &&
   sample.resident.every(validProcess) &&
-  seconds(sample.swapUsedMB) &&
+  ['rssTotalMB', 'simulatorRssMB', 'compressorMB', 'swapUsedMB'].every((key) =>
+    seconds(sample[key])
+  ) &&
   validPressure(sample.memoryPressureFreePercent) &&
   validVm(sample.vm)
 
@@ -427,6 +456,8 @@ function main() {
   const at = args.indexOf('--platform')
   const platform = at === -1 ? '' : args.splice(at, 2)[1]
   if (!PLATFORMS.includes(platform)) throw new Error('native_host_platform_required')
+  const flowAt = args.indexOf('--flow')
+  const flow = flowAt === -1 ? null : args.splice(flowAt, 2)[1]
   const [command, argument] = args
   const directory = path.resolve(
     process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
@@ -474,6 +505,19 @@ function main() {
       vm: probe('vm_stat', []),
       ps,
     })
+    if (argument === 'in-flow') {
+      // A sample taken while a flow runs races the end-of-flow samples for the main record,
+      // so the latest one has its own file.
+      if (!flow || !FLOW_NAME.test(flow)) throw new Error('invalid_host_sample_flow')
+      const inFlow = { version: 1, flow, sample: recorded }
+      fs.writeFileSync(
+        path.join(directory, `native-host-${platform}-inflow.json`),
+        `${JSON.stringify(inFlow, null, 2)}\n`,
+        { mode: 0o600 }
+      )
+      console.log(JSON.stringify({ [command]: inFlow }))
+      return
+    }
     record.samples.push(recorded)
   } else if (command === 'first-flow') {
     // The first record stands: a later failure step never rewrites a passed flow.

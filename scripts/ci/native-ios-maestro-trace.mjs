@@ -1,7 +1,7 @@
 /** Read and project the Maestro command trace a flow leaves in its debug output. */
 import fs from 'node:fs'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
+import { spawn as spawnChild, spawnSync } from 'node:child_process'
 
 function commandFiles(directory) {
   let entries = []
@@ -262,6 +262,50 @@ export function recordIosHostSample(
         JSON.stringify({ hostSampleFailure: { label, exitCode: result.status ?? null } })
       )
     return result.status === 0
+  } catch {
+    return false
+  }
+}
+
+/** Seconds into a flow at which the in-flow host sample is taken, with Maestro's JVM alive. */
+export const IN_FLOW_SAMPLE_SECONDS = 30
+
+/**
+ * Take one host sample while the flow is running (the other samples fall between flows, when
+ * the Maestro JVM is gone). A detached shell sleeps, then runs the sampler; the flow does not
+ * wait for it, and a failure to start it is ignored. Returns whether it was started (iOS only).
+ */
+export function scheduleIosInFlowSample(
+  flow,
+  {
+    platform = 'ios',
+    root = process.cwd(),
+    spawn = spawnChild,
+    seconds = IN_FLOW_SAMPLE_SECONDS,
+  } = {}
+) {
+  if (platform !== 'ios') return false
+  try {
+    const child = spawn(
+      '/bin/sh',
+      [
+        '-c',
+        'sleep "$1"; shift; exec "$@"',
+        'sh',
+        String(seconds),
+        process.execPath,
+        'scripts/ci/native-host-evidence.mjs',
+        'sample',
+        'in-flow',
+        '--flow',
+        flow,
+        '--platform',
+        'ios',
+      ],
+      { cwd: root, env: process.env, detached: true, stdio: 'ignore' }
+    )
+    child.unref?.()
+    return true
   } catch {
     return false
   }

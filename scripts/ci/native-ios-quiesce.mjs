@@ -14,6 +14,7 @@ import {
 import { simulatorCollectors } from './native-ios-collectors.mjs'
 import { crashReportCollector } from './native-ios-crashes.mjs'
 import { collectSimulatorLogCounts } from './native-ios-log-counts.mjs'
+import { stopPosterWidgets, verifyPosterWidgets } from './native-ios-poster-widgets.mjs'
 
 export const CPU_TARGETS = ['STExtractionService', 'healthappd', 'diagnosticd']
 export const QUIESCE_POLICY = Object.freeze({
@@ -427,7 +428,21 @@ export function probeSimulatorTuning(device, execute, tuning = {}) {
     execute,
     listed.stdout
   )
+  // After the quiet jobs: the poster and widget processes are stopped once, never in a loop.
+  tuning.posterWidgets = stopPosterWidgets(
+    device,
+    ps.stdout,
+    jobs,
+    manager,
+    execute,
+    () => performance.now()
+  )
   return manager
+}
+
+/** The per-run record of what was stopped and what came back (quiet jobs and posters). */
+export function quietServicesRecord(tuning) {
+  return { version: 2, ...tuning.quiet, posterWidgets: tuning.posterWidgets ?? null }
 }
 
 export async function quiesceOwnedSimulator(device, command) {
@@ -448,6 +463,14 @@ export async function quiesceOwnedSimulator(device, command) {
   const began = performance.now()
   let manager = null
   const tuning = {}
+  const writeQuietServices = () =>
+    safely(() =>
+      fs.writeFileSync(
+        path.join(directory, 'native-ios-quiet-services.json'),
+        JSON.stringify(quietServicesRecord(tuning), null, 2) + '\n',
+        { mode: 0o600 }
+      )
+    )
   const failure = (error) => {
     if (error.message === 'owned_simulator_manager_missing') manager = null
     const diagnostic = error.diagnostic ?? diagnosticError(error)
@@ -489,13 +512,7 @@ export async function quiesceOwnedSimulator(device, command) {
           throw new Error('owned_booted_simulator_required')
         manager = probeSimulatorTuning(device, bounded, tuning)
         // Which jobs this run stopped, so runs with different lists compare cleanly.
-        safely(() =>
-          fs.writeFileSync(
-            path.join(directory, 'native-ios-quiet-services.json'),
-            JSON.stringify({ version: 1, ...tuning.quiet }, null, 2) + '\n',
-            { mode: 0o600 }
-          )
-        )
+        writeQuietServices()
         collectors.managerPid = manager
       }
       const values = sampleSimulatorCpu(
@@ -573,6 +590,25 @@ export async function quiesceOwnedSimulator(device, command) {
       )
     },
   })
+  if (tuning.posterWidgets) {
+    // The verdict waits until the stopped processes have had a full minute to come back.
+    try {
+      tuning.posterWidgets.verify = await verifyPosterWidgets(
+        device,
+        tuning.posterWidgets,
+        (operation, binary, args, options) =>
+          execute(operation, binary, args, { timeout: 10000, ...options }),
+        {
+          now: () => performance.now(),
+          wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        }
+      )
+    } catch (error) {
+      tuning.posterWidgets.verify = null
+      console.log(JSON.stringify({ posterWidgetsVerifyFailure: diagnosticError(error) }))
+    }
+    writeQuietServices()
+  }
   try {
     await collectSimulatorLogCounts(device, directory, { gateOutcome: result.outcome })
   } catch (error) {

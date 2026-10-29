@@ -8,12 +8,14 @@ import { fileURLToPath } from 'node:url'
 import {
   assertNativeHostEvidence,
   busiestProcesses,
+  compressorMB,
   firstMaestroLog,
   projectFirstFlow,
   projectMetro,
   projectMetroBundles,
   projectSample,
   residentProcesses,
+  residentRollup,
   projectMemory,
   projectVm,
 } from './native-host-evidence.mjs'
@@ -78,6 +80,9 @@ test('a host sample is a closed projection of load, memory and processes', () =>
     resident: [
       { pid: 13, ppid: 1, command: 'diagnosticd', rssKB: 4096, cpuPercent: 41.7 },
     ],
+    rssTotalMB: 4,
+    simulatorRssMB: null,
+    compressorMB: null,
     swapUsedMB: null,
     memoryPressureFreePercent: null,
     vm: null,
@@ -263,7 +268,7 @@ test('public evidence publishes a valid host record and refuses an invalid one',
   assert.deepEqual(fs.readdirSync(evidence), [])
 })
 
-test('RSS reports the top 15 executable basenames, sorted by resident KiB', () => {
+test('RSS reports the top 25 executable basenames, sorted by resident KiB', () => {
   const rows = residentProcesses(
     [
       '20 1 9000 2.5 /Applications/Xcode.app/Contents/XCBBuildService',
@@ -272,7 +277,7 @@ test('RSS reports the top 15 executable basenames, sorted by resident KiB', () =
       ...Array.from({ length: 20 }, (_, i) => `${100 + i} 1 ${100 + i} 0.1 p${i}`),
     ].join('\n')
   )
-  assert.equal(rows.length, 15)
+  assert.equal(rows.length, 22)
   assert.deepEqual(rows[0], {
     pid: 20,
     ppid: 1,
@@ -281,7 +286,7 @@ test('RSS reports the top 15 executable basenames, sorted by resident KiB', () =
     cpuPercent: 2.5,
   })
   assert.equal(rows[1].command, 'p19')
-  assert.equal(rows.at(-1).rssKB, 106)
+  assert.equal(rows.at(-1).rssKB, 10)
 })
 
 test('a run with ten locale passes and both failure samples stays within the sample bound', () => {
@@ -594,4 +599,75 @@ test('the shipped sample command records non-null paging counters from the real 
     assert.notEqual(sample.vm, null)
     for (const value of Object.values(sample.vm)) assert.ok(Number.isSafeInteger(value))
   }
+})
+
+const PS_WITH_SIMULATOR = [
+  '    1     0  13456   0.0 /sbin/launchd',
+  '  900     1   7200   0.1 /Library/Developer/CoreSimulator/launchd_sim',
+  '  901   900 183424  24.8 /Library/Developer/CoreSimulator/SpringBoard',
+  '  902   900  95000   0.0 /Library/Developer/CoreSimulator/PosterBoard',
+  '  903     1  50000   0.0 /usr/bin/node',
+].join('\n')
+
+test('the resident roll-up sums every process and the owned simulator children', () => {
+  assert.deepEqual(residentRollup(PS_WITH_SIMULATOR), {
+    rssTotalMB: Math.round((13456 + 7200 + 183424 + 95000 + 50000) / 1024),
+    simulatorRssMB: Math.round((183424 + 95000) / 1024),
+  })
+  assert.deepEqual(residentRollup(''), { rssTotalMB: null, simulatorRssMB: null })
+  assert.equal(
+    residentRollup('  903     1  50000   0.0 /usr/bin/node').simulatorRssMB,
+    null
+  )
+})
+
+test('compressor memory is read from the real vm_stat page size and page count', () => {
+  assert.equal(compressorMB(REAL_VM_STAT), Math.round((754476 * 16384) / 1048576))
+  assert.equal(compressorMB('Pageins: 1.'), null)
+  if (process.platform === 'darwin') {
+    const live = spawnSync('vm_stat', [], { encoding: 'utf8' })
+    assert.ok(compressorMB(live.stdout) >= 0)
+  }
+})
+
+test('the shipped sample command records the roll-ups and keeps an in-flow sample apart', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-host-'))
+  const run = (...args) =>
+    spawnSync(process.execPath, [script, ...args], {
+      encoding: 'utf8',
+      env: { ...process.env, CC68_HARNESS_DIR: directory },
+    })
+  const main = run('sample', 'locale-loop', '--platform', 'ios')
+  assert.equal(main.status, 0, main.stderr)
+  const record = JSON.parse(fs.readFileSync(path.join(directory, 'native-host-ios.json')))
+  const [sample] = record.samples
+  assert.ok(sample.resident.length <= 25 && sample.resident.length > 10)
+  assert.ok(sample.rssTotalMB > 0)
+  if (process.platform === 'darwin') {
+    assert.ok(Number.isFinite(sample.compressorMB), 'compressor MB must be a real number')
+    assert.notEqual(sample.vm, null)
+  }
+  assertNativeHostEvidence(record)
+
+  const inFlow = run(
+    'sample',
+    'in-flow',
+    '--flow',
+    'maestro/story68/cancel.yaml',
+    '--platform',
+    'ios'
+  )
+  assert.equal(inFlow.status, 0, inFlow.stderr)
+  const written = JSON.parse(
+    fs.readFileSync(path.join(directory, 'native-host-ios-inflow.json'))
+  )
+  assert.equal(written.flow, 'maestro/story68/cancel.yaml')
+  assert.equal(written.sample.label, 'in-flow')
+  const after = JSON.parse(fs.readFileSync(path.join(directory, 'native-host-ios.json')))
+  assert.equal(after.samples.length, 1, 'an in-flow sample never touches the main record')
+  assert.notEqual(run('sample', 'in-flow', '--platform', 'ios').status, 0)
+  assert.notEqual(
+    run('sample', 'in-flow', '--flow', '../etc/passwd', '--platform', 'ios').status,
+    0
+  )
 })

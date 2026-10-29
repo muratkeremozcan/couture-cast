@@ -20,6 +20,7 @@ import {
   recordIosCommandTimings,
   recordIosFlowProgress,
   recordIosHostSample,
+  scheduleIosInFlowSample,
   logSize,
 } from './ci/native-ios-maestro-trace.mjs'
 import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
@@ -267,6 +268,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   const apiLogFromByte = logSize(path.join(directory, 'api.log'))
   const output = path.join(directory, `maestro-${platform}-${Date.now()}`)
   fs.mkdirSync(output, { mode: 0o700 })
+  scheduleIosInFlowSample(flow, { platform, root })
   const result = withNativeTransport(() => {
     const launch = platform === 'ios' ? spawnIosFlow : spawnSync
     const result = launch(

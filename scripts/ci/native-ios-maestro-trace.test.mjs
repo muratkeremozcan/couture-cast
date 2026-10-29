@@ -9,6 +9,7 @@ import {
   recordIosCommandTimings,
   recordIosFlowProgress,
   recordIosHostSample,
+  scheduleIosInFlowSample,
   failedStepHierarchy,
   systemSurfaceSummary,
   logSize,
@@ -439,4 +440,65 @@ test('a real Maestro artifact layout (failed assertCondition, screen-hierarchy s
   })
   assert.deepEqual(entry.systemSurface, summary)
   assert.match(lines.at(-1), /"systemSurface":\{"nodeCount":\d+/)
+})
+
+test('an in-flow sample is scheduled detached, after the delay, for the named flow', () => {
+  const calls = []
+  const started = scheduleIosInFlowSample('maestro/story68/cancel.yaml', {
+    root: '/work',
+    seconds: 30,
+    spawn: (binary, args, options) => {
+      calls.push({ binary, args, options })
+      return { unref: () => calls.push('unref') }
+    },
+  })
+  assert.equal(started, true)
+  assert.equal(calls[0].binary, '/bin/sh')
+  assert.deepEqual(calls[0].args.slice(0, 5), [
+    '-c',
+    'sleep "$1"; shift; exec "$@"',
+    'sh',
+    '30',
+    process.execPath,
+  ])
+  assert.deepEqual(calls[0].args.slice(5), [
+    'scripts/ci/native-host-evidence.mjs',
+    'sample',
+    'in-flow',
+    '--flow',
+    'maestro/story68/cancel.yaml',
+    '--platform',
+    'ios',
+  ])
+  assert.equal(calls[0].options.detached, true)
+  assert.equal(calls[0].options.stdio, 'ignore')
+  assert.equal(calls[1], 'unref')
+  assert.equal(
+    scheduleIosInFlowSample('maestro/x.yaml', {
+      platform: 'android',
+      spawn: () => {
+        throw new Error('android never samples')
+      },
+    }),
+    false
+  )
+  assert.equal(
+    scheduleIosInFlowSample('maestro/x.yaml', {
+      spawn: () => {
+        throw new Error('no shell')
+      },
+    }),
+    false
+  )
+})
+
+test('the runner schedules the in-flow sample for every iOS flow before Maestro starts', () => {
+  const runner = fs.readFileSync(
+    new URL('../run-story68-native.mjs', import.meta.url),
+    'utf8'
+  )
+  assert.match(
+    runner,
+    /scheduleIosInFlowSample\(flow, \{ platform, root \}\)\n\s+const result = withNativeTransport/
+  )
 })
