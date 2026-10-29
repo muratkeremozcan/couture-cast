@@ -848,6 +848,7 @@
       "saved": "Réglages enregistrés.",
       "failed": "Impossible d’enregistrer les réglages. Réessayez.",
       "loadFailed": "Impossible de charger les réglages. Réessayez.",
+      "loadRetrying": "Impossible de charger les réglages. Nouvelle tentative dans un instant.",
       "retry": "Réessayer",
       "conflict": "Les réglages ont changé sur un autre appareil. Vérifiez les valeurs et réessayez.",
       "permission": "Autorisez les notifications dans les réglages de votre appareil, puis réessayez.",

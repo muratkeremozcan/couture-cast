@@ -34,6 +34,8 @@ import {
   subscribeNativeSession,
   signOutNativeSession,
 } from '@/src/lib/native-session'
+// Shown while automatic retries run, then replaced by LOAD_FAILED once the Try again button is offered.
+const LOAD_RETRYING = 'community.notifications.loadRetrying'
 const LOAD_FAILED = 'community.notifications.loadFailed'
 export default function NotificationSettingsScreen() {
   const { t } = useTranslation()
@@ -58,12 +60,13 @@ export default function NotificationSettingsScreen() {
     const failed = (request: number, next: string) => {
       if (!active || request !== generation.current || nativeSessionIdentity() !== next)
         return
-      setMessage(LOAD_FAILED)
       const delay = LOAD_RETRY_DELAYS_MS[attempts++]
       if (delay === undefined) {
+        setMessage(LOAD_FAILED)
         setLoadStalled(true)
         return
       }
+      setMessage(LOAD_RETRYING)
       traceShareCardOpener('prefs-retry')
       retryTimer = setTimeout(() => {
         if (active && request === generation.current && nativeSessionIdentity() === next)
@@ -221,8 +224,8 @@ export default function NotificationSettingsScreen() {
   }
   // accessibilityLiveRegion is honoured on Android only; iOS needs an explicit announcement.
   useEffect(() => {
-    if (message === LOAD_FAILED && Platform.OS === 'ios')
-      AccessibilityInfo.announceForAccessibility(t(LOAD_FAILED))
+    if ((message === LOAD_FAILED || message === LOAD_RETRYING) && Platform.OS === 'ios')
+      AccessibilityInfo.announceForAccessibility(t(message))
   }, [message, t])
   return (
     <ScrollView contentContainerStyle={styles.container}>

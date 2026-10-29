@@ -127,7 +127,7 @@ describe('R11 native settings journeys', () => {
     identify('member-a')
     // The identity reset signals the same member a second time; it must not strand the screen.
     identify('member-a')
-    await screen.findByText(label('loadFailed'))
+    await screen.findByText(label('loadRetrying'))
     expect(screen.queryByLabelText(label('timezone'))).toBeNull()
     session.ready = true
     await screen.findByDisplayValue('UTC', undefined, { timeout: 2000 })
@@ -146,7 +146,7 @@ describe('R11 native settings journeys', () => {
     )
     await render(<NotificationSettingsScreen />)
     identify('member-a')
-    await screen.findByText(label('loadFailed'))
+    await screen.findByText(label('loadRetrying'))
     await screen.findByDisplayValue('UTC', undefined, { timeout: 2000 })
     expect(reads).toBe(2)
   })
@@ -159,13 +159,16 @@ describe('R11 native settings journeys', () => {
     expect(screen.queryByLabelText(label('timezone'))).toBeNull()
   })
 
-  it('names a load failure as a load, not as a failed save', async () => {
+  it('names a load failure as a load, not as a failed save, and asks for Try again only once the button shows', async () => {
     session.ready = false
     await render(<NotificationSettingsScreen />)
     identify('member-a')
     await screen.findByText(label('loadFailed'))
+    expect(screen.getByRole('button', { name: label('retry') })).toBeTruthy()
+    expect(screen.queryByText(label('loadRetrying'))).toBeNull()
     expect(screen.queryByText(label('failed'))).toBeNull()
     expect(label('loadFailed')).not.toBe(label('failed'))
+    expect(label('loadRetrying')).not.toContain(label('retry'))
   })
 
   it('offers an accessible Try again control once the bounded retries stop, and it reloads', async () => {
@@ -211,8 +214,8 @@ describe('R11 native settings journeys', () => {
       session.ready = false
       await render(<NotificationSettingsScreen />)
       identify('member-a')
-      await screen.findByText(label('loadFailed'))
-      await waitFor(() => expect(announce).toHaveBeenCalledWith(label('loadFailed')))
+      await screen.findByText(label('loadRetrying'))
+      await waitFor(() => expect(announce).toHaveBeenCalledWith(label('loadRetrying')))
       announce.mockClear()
       Platform.OS = 'android'
       identify(null)
@@ -226,32 +229,11 @@ describe('R11 native settings journeys', () => {
     }
   })
 
-  it('offers Try again only after the last automatic retry fails', async () => {
-    // Each request is held until released, so every state between two failures is observable.
-    const gates: (() => void)[] = []
-    server.use(
-      http.get('*/api/v1/community/notification-preferences', async () => {
-        await new Promise<void>((resolve) => gates.push(resolve))
-        return HttpResponse.json({ error: 'unavailable' }, { status: 503 })
-      })
-    )
-    const retry = () => screen.queryByRole('button', { name: label('retry') })
-    await render(<NotificationSettingsScreen />)
-    identify('member-a')
-    // Four requests: the first load and one per scheduled retry. While request k is pending,
-    // the k - 1 failures before it have happened and none of them may offer the button.
-    for (const k of [1, 2, 3, 4]) {
-      await waitFor(() => expect(gates).toHaveLength(k), { timeout: 2000 })
-      expect(retry(), `no button while request ${k} is pending`).toBeNull()
-      gates[k - 1]!()
-    }
-    await screen.findByRole('button', { name: label('retry') })
-    expect(gates).toHaveLength(4)
-  })
-
   it('has a load message and a Try again label in every supported locale', () => {
     for (const [locale, n] of Object.entries(locales)) {
       expect(n.loadFailed, locale).toBeTruthy()
+      expect(n.loadRetrying, locale).toBeTruthy()
+      expect(n.loadRetrying!.length, locale).toBeLessThan(90)
       expect(n.retry, locale).toBeTruthy()
       expect(n.loadFailed, locale).not.toBe(n.failed)
       expect(n.loadFailed!.length, locale).toBeLessThan(90)

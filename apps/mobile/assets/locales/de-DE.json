@@ -848,6 +848,7 @@
       "saved": "Einstellungen gespeichert.",
       "failed": "Die Einstellungen konnten nicht gespeichert werden. Erneut versuchen.",
       "loadFailed": "Die Einstellungen konnten nicht geladen werden. Erneut versuchen.",
+      "loadRetrying": "Die Einstellungen konnten nicht geladen werden. Wir versuchen es gleich erneut.",
       "retry": "Erneut versuchen",
       "conflict": "Die Einstellungen wurden an anderer Stelle geändert. Aktuelle Werte prüfen und erneut versuchen.",
       "permission": "Benachrichtigungen in den Geräteeinstellungen erlauben und erneut versuchen.",
