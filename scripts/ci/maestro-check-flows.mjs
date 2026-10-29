@@ -31,6 +31,7 @@ export const CHECKED_FLOWS = Object.freeze([
   'maestro/story68/pending.yaml',
   'maestro/story68/release-watermark-off.yaml',
   'maestro/story68/prefs-failed.yaml',
+  'maestro/story68/community-draft-background-ios.yaml',
 ])
 
 // The pinned install on CI, the PATH binary on a developer machine.

@@ -66,6 +66,20 @@ const saveTapTimeoutMs = Math.ceil(
 )
 
 /**
+ * community-draft-background-ios.yaml taps the photo picker's opener inside a retry of maxRetries 3
+ * (4 attempts). An attempt is the guard (its two condition checks), the 8 s wait for the picker's
+ * Cancel and that wait's poll. The flow's other steps are budgeted at one condition check each plus
+ * their declared waits. A test reads the flow and keeps these numbers at or above what it declares.
+ */
+export const PICK_IMAGE_TAP_ATTEMPTS = 4
+export const PICK_IMAGE_TAP_ATTEMPT_MS =
+  2 * CONDITION_CHECK_MS + 8_000 + CONDITION_CHECK_MS
+export const PICK_IMAGE_TAP_WORST_CASE_MS =
+  PICK_IMAGE_TAP_ATTEMPTS * PICK_IMAGE_TAP_ATTEMPT_MS
+export const PICK_IMAGE_OTHER_STEPS_MS = 117_000
+export const PICK_IMAGE_FLOW = 'maestro/story68/community-draft-background-ios.yaml'
+
+/**
  * wait-notification-settings.yaml waits for the member's notification controls or fails when the
  * Try again button shows. Its repeat count only bounds a stuck screen and must equal `times` in
  * that flow (a test reads it). Each turn is a 1 s wait plus two condition checks (the Try again
@@ -87,6 +101,10 @@ const waitSettingsTimeoutMs = Math.ceil(
 const flowTimeouts = {
   ...Object.fromEntries(SAVE_TAP_FLOWS.map((flow) => [flow, saveTapTimeoutMs])),
   ...Object.fromEntries(WAIT_SETTINGS_FLOWS.map((flow) => [flow, waitSettingsTimeoutMs])),
+  [PICK_IMAGE_FLOW]: Math.ceil(
+    (FLOW_STARTUP_MS + PICK_IMAGE_OTHER_STEPS_MS + PICK_IMAGE_TAP_WORST_CASE_MS) *
+      FLOW_TIMEOUT_MARGIN
+  ),
   'maestro/story65/open-app.yaml': Math.ceil(
     OPEN_APP_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
   ),

@@ -34,11 +34,23 @@ appId: ${MAESTRO_APP_ID}
       id: community-pick-image-button
     direction: UP
     centerElement: false
-- tapOn:
-    id: community-pick-image-button
-- extendedWaitUntil:
-    visible: Cancel
-    timeout: 15000
+# A press that the starved CI host drops leaves the sheet as it was (run 40927902095), so the
+# tap repeats only while the picker's Cancel is not up.
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: community-pick-image-button
+              enabled: true
+            notVisible: Cancel
+          commands:
+            - tapOn:
+                id: community-pick-image-button
+      - extendedWaitUntil:
+          visible: Cancel
+          timeout: 8000
 - pressKey: Home
 - launchApp:
     appId: ${MAESTRO_APP_ID}
