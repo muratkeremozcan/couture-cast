@@ -1737,57 +1737,106 @@ function buildCensorKeys(
  * Chosen by the collision sweep in the round 8e report: at 0.4 every shape in the frozen
  * clean corpora and code snippets stays clear, and a ratio of 0.5 would miss v**d*.
  */
-const MULTI_CENSOR_SYMBOLS = /[*_#]/gu
+const MULTI_CENSOR_SYMBOLS = /[*_#.-]/gu
+const MULTI_CENSOR_MASKS = /[*_#]/u
 const MULTI_CENSOR_MIN_VISIBLE = 2
 const MULTI_CENSOR_MIN_VISIBLE_RATIO = 0.4
 
-interface MultiCensorTerm {
+interface MultiCensorEntry {
   readonly classed: string
-  readonly meta: TermMeta
+  readonly word: string
+  readonly meta?: TermMeta
+}
+
+type MultiCensorBuckets = ReadonlyMap<string, readonly MultiCensorEntry[]>
+
+function addMultiCensorEntry(
+  buckets: Map<string, MultiCensorEntry[]>,
+  entry: MultiCensorEntry
+): void {
+  const key = `${entry.classed.length}:${entry.classed[0]}`
+  buckets.set(key, [...(buckets.get(key) ?? []), entry])
 }
 
 /** Every eligible term in leet-run form, bucketed by length and first letter. */
 function buildMultiCensorIndex(
   indexes: readonly LanguageIndex[],
   family: ReadonlySet<string>
-): ReadonlyMap<string, readonly MultiCensorTerm[]> {
-  const buckets = new Map<string, MultiCensorTerm[]>()
+): MultiCensorBuckets {
+  const buckets = new Map<string, MultiCensorEntry[]>()
   for (const index of indexes) {
     for (const [term, meta] of index.single) {
       if (meta.severity !== 'high' && !family.has(collapseRepeats(term))) continue
       if (term.length < MIN_SINGLE_TERM_LENGTH || !/^\p{L}+$/u.test(term)) continue
-      const classed = toLeetRunForm(term)
-      const key = `${classed.length}:${classed[0]}`
-      buckets.set(key, [...(buckets.get(key) ?? []), { classed, meta }])
+      addMultiCensorEntry(buckets, { classed: toLeetRunForm(term), word: term, meta })
     }
   }
   return buckets
 }
 
-/** The worst term a run with two or more censor symbols can spell, or undefined. */
-function matchMultiCensored(
-  buckets: ReadonlyMap<string, readonly MultiCensorTerm[]>,
+/** The words of every high-severity phrase, bucketed like the terms. */
+function buildMultiCensorPhraseIndex(
+  indexes: readonly LanguageIndex[]
+): MultiCensorBuckets {
+  const buckets = new Map<string, MultiCensorEntry[]>()
+  const seen = new Set<string>()
+  for (const index of indexes)
+    for (const phrase of index.phrases) {
+      if (phrase.meta.severity !== 'high') continue
+      for (const word of phrase.tokens) {
+        if (word.length < MIN_SINGLE_TERM_LENGTH || !/^\p{L}+$/u.test(word)) continue
+        if (seen.has(word)) continue
+        seen.add(word)
+        addMultiCensorEntry(buckets, { classed: toLeetRunForm(word), word })
+      }
+    }
+  return buckets
+}
+
+/**
+ * Whether a whitespace run is a multi-letter censored word: at least two of * _ # . -
+ * with at least one of * _ # (a dot or hyphen alone is punctuation), and the symbols
+ * between letters and digits only.
+ */
+function isMultiCensorRun(core: string): boolean {
+  return (
+    /^[\p{L}\p{N}*_#.-]+$/u.test(core) &&
+    // A dot or hyphen beside a digit is a version, date, range or price, never a hidden letter.
+    !/\d[.-]|[.-]\d/u.test(core) &&
+    MULTI_CENSOR_MASKS.test(core) &&
+    (core.match(MULTI_CENSOR_SYMBOLS)?.length ?? 0) >= 2
+  )
+}
+
+/** Every entry a censored run can spell under the visibility floor. */
+function multiCensorMatches(
+  buckets: MultiCensorBuckets,
   core: string
-): TermMeta | undefined {
-  const symbols = core.match(MULTI_CENSOR_SYMBOLS)?.length ?? 0
-  if (symbols < 2 || core.length < MIN_SINGLE_TERM_LENGTH) return undefined
+): readonly MultiCensorEntry[] {
+  if (core.length < MIN_SINGLE_TERM_LENGTH || !isMultiCensorRun(core)) return []
   const folded = toFoldedForm(core.replaceAll(MULTI_CENSOR_SYMBOLS, '?'))
-  if (folded.length !== core.length || folded[0] === '?') return undefined
+  if (folded.length !== core.length || folded[0] === '?') return []
   const classed = toLeetRunForm(folded)
   const visible = classed.length - (classed.match(/\?/gu)?.length ?? 0)
   if (
     visible < MULTI_CENSOR_MIN_VISIBLE ||
     visible < Math.ceil(classed.length * MULTI_CENSOR_MIN_VISIBLE_RATIO)
   )
-    return undefined
+    return []
+  return (buckets.get(`${classed.length}:${classed[0]}`) ?? []).filter((entry) =>
+    [...classed].every((letter, at) => letter === '?' || letter === entry.classed[at])
+  )
+}
+
+/** The worst term a run with two or more censor symbols can spell, or undefined. */
+function matchMultiCensored(
+  buckets: MultiCensorBuckets,
+  core: string
+): TermMeta | undefined {
   let worst: TermMeta | undefined
-  for (const term of buckets.get(`${classed.length}:${classed[0]}`) ?? []) {
-    if (
-      ![...classed].every((letter, at) => letter === '?' || letter === term.classed[at])
-    )
-      continue
-    if (!worst || SEVERITY_RANK[term.meta.severity] > SEVERITY_RANK[worst.severity])
-      worst = term.meta
+  for (const { meta } of multiCensorMatches(buckets, core)) {
+    if (meta && (!worst || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[worst.severity]))
+      worst = meta
   }
   return worst
 }
@@ -2342,7 +2391,8 @@ export class CommunityTextScreener {
   private readonly cutFamilyNameFollowers: ReadonlySet<string>
   /** Each indexed high-severity or family form with one letter replaced by "?", in leet-class form. */
   private censorKeys: ReadonlyMap<string, TermMeta> = new Map()
-  private multiCensorTerms: ReadonlyMap<string, readonly MultiCensorTerm[]> = new Map()
+  private multiCensorTerms: MultiCensorBuckets = new Map()
+  private multiCensorPhraseWords: MultiCensorBuckets = new Map()
   /** One inner deletion or adjacent transposition of every long high-severity spelling. */
   private typoKeys: ReadonlyMap<string, TermMeta> = new Map()
   private editOneKeys: ReadonlyMap<string, readonly EditOneTerm[]> = new Map()
@@ -2519,6 +2569,7 @@ export class CommunityTextScreener {
     )
     this.censorKeys = buildCensorKeys(this.indexes, this.cutFamilyTerms)
     this.multiCensorTerms = buildMultiCensorIndex(this.indexes, this.cutFamilyTerms)
+    this.multiCensorPhraseWords = buildMultiCensorPhraseIndex(this.indexes)
     this.typoKeys = buildTypoKeys(this.indexes)
     this.editOneKeys = buildEditOneIndex(this.indexes, this.cutFamilyTerms)
     this.affixTerms = buildAffixTerms(this.indexes, this.cutFamilyTerms)
@@ -3248,6 +3299,9 @@ export class CommunityTextScreener {
           words = this.phraseWordCensorKeys.get(
             toLeetRunForm(toFoldedForm(`${core.slice(0, at)}?${core.slice(at + 1)}`))
           )
+        } else if (isMultiCensorRun(core)) {
+          const matched = multiCensorMatches(this.multiCensorPhraseWords, core)
+          if (matched.length > 0) words = matched.map((entry) => entry.word).slice(0, 4)
         } else if (/[@$!|+]/.test(core) && /^[\p{L}\p{N}@$!|+]+$/u.test(core)) {
           words = this.phraseWordLeetKeys.get(toLeetRunForm(toFoldedForm(core)))
         }
@@ -3279,7 +3333,7 @@ export class CommunityTextScreener {
       // The run between whitespace, without surrounding punctuation. An asterisk, hash or
       // underscore at an edge may be a censored letter; a dot or hyphen there is punctuation.
       const core = chunk[0].replace(/^[^\p{L}\p{N}*_#]+|[^\p{L}\p{N}*_#]+$/gu, '')
-      if (/[*_#].*[*_#]/u.test(core) && /^[\p{L}\p{N}*_#]+$/u.test(core)) {
+      if (isMultiCensorRun(core)) {
         if (!budget.spend(core)) return outcomes
         const multi = matchMultiCensored(this.multiCensorTerms, core)
         if (multi) outcomes.push({ meta: multi, obfuscated: true })

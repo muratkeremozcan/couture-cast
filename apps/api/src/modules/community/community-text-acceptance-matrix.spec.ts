@@ -602,21 +602,39 @@ function multiCensor(word: string, emit: Emit): void {
   const n = word.length
   const feasible = (hidden: ReadonlySet<number>): boolean =>
     hidden.size >= 2 && n - hidden.size >= Math.max(2, Math.ceil(n * 0.4))
-  const render = (hidden: ReadonlySet<number>, symbol: string): string =>
-    [...word].map((letter, at) => (hidden.has(at) ? symbol : letter)).join('')
+  /** One symbol per hidden letter, taken in turn; a dot or hyphen never ends the word. */
+  const render = (hidden: ReadonlySet<number>, symbols: readonly string[]): string => {
+    let used = 0
+    return [...word]
+      .map((letter, at) =>
+        hidden.has(at) ? (symbols[used++ % symbols.length] as string) : letter
+      )
+      .join('')
+  }
+  const lastHidden = (hidden: ReadonlySet<number>): boolean => hidden.has(n - 1)
   const masks: Set<number>[] = [
     new Set(
       [...word].flatMap((letter, at) => (at > 0 && 'aeiou'.includes(letter) ? [at] : []))
     ),
     new Set([...word].flatMap((_, at) => (at > 0 && at % 2 === 1 ? [at] : []))),
   ]
-  for (const mask of masks)
-    if (feasible(mask))
-      for (const symbol of ['*', '_', '#']) emit('multi-censor', render(mask, symbol))
+  for (const mask of masks) {
+    if (!feasible(mask)) continue
+    for (const symbol of ['*', '_', '#']) emit('multi-censor', render(mask, [symbol]))
+    if (!lastHidden(mask)) {
+      emit('multi-censor', render(mask, ['*', '.']))
+      emit('multi-censor', render(mask, ['#', '-']))
+    }
+  }
   for (let first = 1; first < n; first += 1)
     for (let second = first + 1; second < n; second += 1) {
       const pair = new Set([first, second])
-      if (feasible(pair)) emit('multi-censor', render(pair, '*'))
+      if (!feasible(pair)) continue
+      emit('multi-censor', render(pair, ['*']))
+      if (second < n - 1) {
+        emit('multi-censor', render(pair, ['*', '.']))
+        emit('multi-censor', render(pair, ['_', '-']))
+      }
     }
 }
 
@@ -628,7 +646,7 @@ function wordClasses(word: string, phrase: boolean, emitWord: Emit): void {
     emitWord(cls, variant)
   }
   perLetter(word, dropShort)
-  if (!phrase && !short) multiCensor(word, emitWord)
+  if (!short) multiCensor(word, emitWord)
   if (!short && (!phrase || word.length >= 6)) splits(word, dropShort, !phrase, !phrase)
   if (phrase || short) return
   chains(word, dropShort)
@@ -730,5 +748,5 @@ const PINNED_COUNTS: Record<string, number> = {
   'edit1-inflection': 12923,
   'typo-delete': 1040,
   'typo-transpose': 892,
-  'multi-censor': 6868,
+  'multi-censor': 18643,
 }

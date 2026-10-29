@@ -559,3 +559,48 @@ describe('round 8e: several censored letters per term', () => {
         expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
   })
 })
+
+describe('round 8f: censored phrases and mixed dot or hyphen symbols', () => {
+  const everywhere = (text: string) => {
+    for (const locale of [...portuguese, ...elsewhere])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  }
+  it.each([
+    'te voy a v*ol*r',
+    'te voy a v**l*r',
+    'Dijo: te voy a v*ol*r a ti',
+    'k*ll y**rself',
+    'kill y**rself',
+    'k**l yourself',
+    'k**l y**rself',
+    'heil h*tl*r',
+    'Texto: te voy a v*ol*r, ok.',
+    'n*g.*r',
+    'n*g-*r',
+    'n.gg*r',
+    'n-gg*r',
+    'n*gg.r',
+    'v.*d*',
+    'h*r.ns*hn',
+    'r*p-st',
+    'te voy a v*ol-r',
+    'te voy a v.ol*r',
+  ])('withholds censored phrases and mixed symbols in every locale: %s', everywhere)
+
+  it('keeps dotted, hyphenated and starred ordinary text clear', () => {
+    for (const text of [
+      'e-mail*s e well-known* items.',
+      'Pre-fix*ed words and co-op*erative shops.',
+      'n.g.g.r e a-b-c e x.y.z na tabela.',
+      'rock-n-roll e report.final_v2.pdf no disco.',
+      'foo-bar_baz e well-known_item no código.',
+      'Veja a nota-fiscal*final e o co-autor*chefe do texto.',
+      'te voy a ver mañana, te quiero mucho.',
+      'kill the process and your self-signed cert.',
+      '- **User Story 5.1**: As a user, I can control data permissions.',
+      'Versão 2.0**final e 3-4**ok com 5.1**.',
+    ])
+      for (const locale of [...portuguese, ...elsewhere])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+})
