@@ -30,3 +30,5 @@ export declare function isFlakySaveCoordinate(
   longitude: number
 ): boolean
 export declare function coordinateKeySuffix(latitude: number, longitude: number): string
+export declare const NATIVE_JOURNEY_TEMPERATURE_C: number
+export declare function nativeJourneyTemperature(): number

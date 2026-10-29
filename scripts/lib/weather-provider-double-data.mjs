@@ -223,3 +223,12 @@ export function coordinateKeySuffix(latitude, longitude) {
   const lonPart = `${Math.abs(lon).toFixed(3)}${lon < 0 ? 'w' : 'e'}`
   return `${latPart}-${lonPart}`.replace(/\./g, '-')
 }
+
+/**
+ * The native journeys expect one outfit: the starter top, bottom and shoes. The ritual adds
+ * outerwear when the morning segment's feels-like is below 15 degrees, and the default curve
+ * (`18 + 6 sin(hour / 4)`, indexed from the request hour) crosses that line depending on when
+ * the run starts. The journeys serve this flat series instead, so no clock decides the outfit.
+ */
+export const NATIVE_JOURNEY_TEMPERATURE_C = 20
+export const nativeJourneyTemperature = () => NATIVE_JOURNEY_TEMPERATURE_C
