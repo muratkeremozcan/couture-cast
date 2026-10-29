@@ -8,6 +8,7 @@ import { aggregateCorpusSha256 } from '../../apps/api/src/modules/community/comm
 import {
   assertVersionDirectorySealed,
   describeCleanGates,
+  holdoutProductMismatches,
   loadActiveHoldouts,
 } from '../../apps/api/src/modules/community/community-text-holdout-selection.mjs'
 
@@ -140,6 +141,54 @@ describe('active holdout selection on disk', () => {
           corpusSha256: 'f'.repeat(64),
         }),
       /aggregate seal of holdout-v55 does not match its listed files/
+    )
+  })
+
+  test('the run product must record the current selector and seals for every locale', () => {
+    const six = freeze('holdout-v50', SIX)
+    register([{ manifest: six, locales: SIX }])
+    writeJson(path.join(dir, 'active-holdout.json'), {
+      schemaVersion: 2,
+      locales: {
+        ...Object.fromEntries(SIX.map((locale) => [locale, 'holdout-v50'])),
+        pt: 'holdout-v50',
+      },
+    })
+    const sixHoldouts = Object.fromEntries(
+      SIX.map((locale) => [
+        locale,
+        { version: 'holdout-v50', seal: { corpusSha256: six.corpusSha256 } },
+      ])
+    )
+    const current = describeCleanGates(sixHoldouts)
+    assert.deepEqual(holdoutProductMismatches(current, sixHoldouts), [])
+    assert.deepEqual(
+      holdoutProductMismatches(
+        {
+          cleanGatedOn: { ...current.cleanGatedOn, de: 'holdout-v49' },
+          cleanSeals: current.cleanSeals,
+        },
+        sixHoldouts
+      ),
+      ['de: the run product was gated on holdout-v49, the selector names holdout-v50']
+    )
+    assert.deepEqual(
+      holdoutProductMismatches(
+        {
+          cleanGatedOn: current.cleanGatedOn,
+          cleanSeals: { ...current.cleanSeals, tr: 'f'.repeat(64) },
+        },
+        sixHoldouts
+      ),
+      ['tr: the run product recorded a different seal than the registered one']
+    )
+    assert.deepEqual(holdoutProductMismatches(undefined, sixHoldouts).length, SIX.length)
+    assert.deepEqual(
+      holdoutProductMismatches(
+        { cleanGatedOn: 'holdout-v50', cleanSeals: current.cleanSeals },
+        sixHoldouts
+      ).length,
+      SIX.length
     )
   })
 })

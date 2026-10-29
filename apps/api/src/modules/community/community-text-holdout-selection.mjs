@@ -68,3 +68,33 @@ export function assertVersionDirectorySealed(corpusDir, version, manifest) {
     }
   }
 }
+
+/**
+ * The run product is evidence only for the selector and seals it was gated on. Names every
+ * locale whose recorded version or seal differs from the current ones, or is missing.
+ */
+export function holdoutProductMismatches(gates, holdouts) {
+  const gatedOn = gates?.cleanGatedOn
+  const seals = gates?.cleanSeals
+  const problems = []
+  for (const [locale, { version, seal }] of Object.entries(holdouts)) {
+    const recorded =
+      typeof gatedOn === 'object' && gatedOn !== null ? gatedOn[locale] : undefined
+    if (recorded === undefined) {
+      problems.push(`${locale}: the run product records no holdout version`)
+    } else if (recorded !== version) {
+      problems.push(
+        `${locale}: the run product was gated on ${recorded}, the selector names ${version}`
+      )
+    } else if (
+      typeof seals !== 'object' ||
+      seals === null ||
+      seals[locale] !== seal.corpusSha256
+    ) {
+      problems.push(
+        `${locale}: the run product recorded a different seal than the registered one`
+      )
+    }
+  }
+  return problems
+}

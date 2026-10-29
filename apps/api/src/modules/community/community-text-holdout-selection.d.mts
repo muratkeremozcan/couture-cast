@@ -20,3 +20,8 @@ export function assertVersionDirectorySealed(
   version: string,
   manifest: HoldoutFreezeManifest
 ): void
+
+export function holdoutProductMismatches(
+  gates: unknown,
+  holdouts: Record<string, { version: string; seal: { corpusSha256: string } }>
+): string[]

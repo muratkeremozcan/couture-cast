@@ -50,6 +50,7 @@ import {
   parseActiveHoldout,
   resolveActiveHoldouts,
 } from '../apps/api/src/modules/community/community-text-holdout-eligibility-core.mjs'
+import { holdoutProductMismatches } from '../apps/api/src/modules/community/community-text-holdout-selection.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
@@ -718,6 +719,7 @@ function textSection(current, holdouts) {
     stale: [
       ...staleness(evaluation, { policySha256: current.policySha256 }),
       ...inputStaleness(evaluation.inputSetHash, current.inputSetHash),
+      ...holdoutProductMismatches(evaluation.gates, holdouts),
     ],
     textEngineVersion: evaluation.textEngineVersion,
     gates: evaluation.gates,
