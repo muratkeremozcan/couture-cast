@@ -263,3 +263,33 @@ describe('public evidence publisher', () => {
     assert.deepEqual(result.published, [])
   })
 })
+
+// On a real landing screen of app-settings: (iOS 26.1 probe, 2026-10-29) the Settings status bar
+// carries id `breadcrumb` with the text `Return to CoutureCast Story68` on every screen opened
+// from this app. The General row (com.apple.settings.general) is on the Settings root only; the
+// first iOS 18.5 CI run waited 15.66 s for it and failed, so it cannot be a marker.
+test('the iOS Settings markers are the breadcrumb pair, which every Settings screen opened from this app shows', () => {
+  assert.deepEqual(
+    [...IOS_SETTINGS_MARKERS],
+    ['breadcrumb', 'Return to CoutureCast Story68']
+  )
+  assert.equal(
+    IOS_SETTINGS_MARKERS.some((marker) => marker.startsWith('com.apple.settings.')),
+    false
+  )
+})
+
+test('settings.yaml waits for that breadcrumb on iOS and no longer for a Settings row', async () => {
+  const { readFileSync } = await import('node:fs')
+  const flow = readFileSync(
+    new URL('../../maestro/story68/settings.yaml', import.meta.url),
+    'utf8'
+  )
+  const ios = flow.slice(flow.indexOf('platform: iOS'), flow.indexOf('platform: Android'))
+  assert.match(
+    ios,
+    /extendedWaitUntil:\s+visible:\s+id: breadcrumb\s+text: Return to CoutureCast Story68\s+timeout: 15000/
+  )
+  assert.doesNotMatch(flow, /com\.apple\.settings\./)
+  assert.match(flow, /assertNotVisible:\s+id: share-card-title/)
+})

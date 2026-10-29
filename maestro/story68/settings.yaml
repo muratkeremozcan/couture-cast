@@ -8,13 +8,13 @@ appId: ${MAESTRO_APP_ID}
     when:
       platform: iOS
     commands:
+      # The Settings status bar shows a breadcrumb back to this app on every Settings screen it
+      # opened: the app pane or the root. A Settings row such as General is on the root only.
       - extendedWaitUntil:
           visible:
-            id: com.apple.settings.general
+            id: breadcrumb
+            text: Return to CoutureCast Story68
           timeout: 15000
-      # The status-bar breadcrumb proves Settings opened from this app.
-      - assertVisible:
-          id: breadcrumb
 - runFlow:
     when:
       platform: Android

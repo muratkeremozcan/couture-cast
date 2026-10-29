@@ -242,8 +242,14 @@ function openOsSettings() {
     if (resumed !== 'com.android.settings') throw new Error('os_settings_not_opened')
     return { foregroundPackage: resumed }
   }
-  const hierarchy = run(maestroBinary, ['--device', device, 'hierarchy'])
-  if (!IOS_SETTINGS_MARKERS.every((marker) => hierarchy.includes(marker)))
+  const [breadcrumbId, breadcrumbText] = IOS_SETTINGS_MARKERS
+  const hasBreadcrumb = (node) =>
+    (node?.attributes?.['resource-id'] === breadcrumbId &&
+      [node.attributes.text, node.attributes.accessibilityText].includes(
+        breadcrumbText
+      )) ||
+    (node?.children ?? []).some(hasBreadcrumb)
+  if (!hasBreadcrumb(JSON.parse(run(maestroBinary, ['--device', device, 'hierarchy']))))
     throw new Error('os_settings_not_opened')
   return { foregroundMarkers: IOS_SETTINGS_MARKERS }
 }

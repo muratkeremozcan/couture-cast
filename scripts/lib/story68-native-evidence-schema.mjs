@@ -9,9 +9,12 @@ import {
 // Closed schemas for the native evidence families that public-evidence.mjs publishes.
 // Every object has exact keys; anything unlisted, missing or mistyped is rejected.
 
-/** iOS opens the Settings app root with a status-bar breadcrumb back to this app. */
+/**
+ * iOS brings the Settings app to the front with a status-bar breadcrumb back to this app (id and
+ * text below), on whichever Settings screen app-settings: lands on: the app pane or the root.
+ */
 export const IOS_SETTINGS_MARKERS = Object.freeze([
-  'com.apple.settings.general',
+  'breadcrumb',
   'Return to CoutureCast Story68',
 ])
 export const IOS_RETRYABLE_DENIAL_EVIDENCE =
