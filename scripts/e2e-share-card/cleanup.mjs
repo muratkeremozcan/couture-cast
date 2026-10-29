@@ -76,7 +76,10 @@ export async function cleanup(directory) {
     mode: 0o600,
   })
 }
-if (process.argv[1] === fileURLToPath(import.meta.url))
+if (
+  process.argv[1] &&
+  fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+)
   await cleanup(
     path.resolve(
       process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'

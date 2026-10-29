@@ -396,7 +396,10 @@ async function main(command) {
   return 0
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   const command = process.argv[2] ?? 'provision'
   if (!['provision', 'check'].includes(command)) {
     console.error('Usage: local-storage-buckets.mjs [provision|check]')

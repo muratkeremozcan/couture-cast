@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 export const requiredShareCardJobs = Object.freeze([
@@ -26,7 +27,10 @@ export function assertShareCardJobs(results) {
   return [...requiredShareCardJobs]
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href
+) {
   try {
     let results
     try {

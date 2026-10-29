@@ -365,7 +365,10 @@ export function runNodeTestGate({
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href
+) {
   try {
     const [name, ...extra] = process.argv.slice(2)
     if (!name || extra.length) throw new Error('usage: node-test-gate.mjs <suite>')

@@ -19,6 +19,7 @@
  *
  * Usage: node scripts/measure-community-worker-runtime.mjs [--warm 1000] [--warmup 50] [--profile <label>]
  */
+import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -179,7 +180,7 @@ async function main() {
 }
 
 const invokedDirectly =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
 if (invokedDirectly) {
   main().catch((error) => {
     console.error(`[measure] ${error instanceof Error ? error.message : String(error)}`)

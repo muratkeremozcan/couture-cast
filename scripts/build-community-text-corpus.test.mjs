@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { spawnSync } from 'node:child_process'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { importHoldout, parseLocales } from './build-community-text-corpus.mjs'
 
@@ -124,5 +126,25 @@ describe('holdout importer per locale', () => {
     ])
     assert.equal(parseLocales(['--import-holdout', 'x']), undefined)
     assert.throws(() => parseLocales(['--locales']), /locales/)
+  })
+
+  test('runs when started through a symlinked path and reports its error', () => {
+    const link = path.join(work, 'linked-scripts')
+    fs.symlinkSync(path.dirname(fileURLToPath(import.meta.url)), link)
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(link, 'build-community-text-corpus.mjs'),
+        '--import-holdout',
+        input,
+        '--holdout-version',
+        VERSION,
+        '--locales',
+        'pt',
+      ],
+      { encoding: 'utf8' }
+    )
+    assert.equal(result.status, 1, result.stdout + result.stderr)
+    assert.match(result.stderr, /pt: no input file holdout-pt\.json/)
   })
 })

@@ -170,6 +170,6 @@ async function main() {
 
 if (
   process.argv[1] &&
-  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url
+  pathToFileURL(fs.realpathSync(process.argv[1])).href === import.meta.url
 )
   await main()

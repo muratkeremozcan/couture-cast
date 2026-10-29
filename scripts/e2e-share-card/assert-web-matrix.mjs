@@ -169,7 +169,7 @@ export function assertWebMatrixSummary(value, expected = expectedWebMatrix()) {
 
 if (
   process.argv[1] &&
-  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
+  import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href
 ) {
   const directory = path.resolve(
     process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'

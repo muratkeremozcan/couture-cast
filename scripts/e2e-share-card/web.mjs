@@ -64,7 +64,7 @@ export function shareCardWebCommand(command, { root, directory, env }) {
 
 if (
   process.argv[1] &&
-  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url
+  pathToFileURL(fs.realpathSync(process.argv[1])).href === import.meta.url
 ) {
   const { program, args, cwd, env } = shareCardWebCommand(process.argv[2], {
     root,

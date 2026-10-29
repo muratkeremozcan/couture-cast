@@ -103,7 +103,10 @@ export function checkResults(results, positiveStatus, suppressedStatus) {
   ]
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+if (
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1])
+) {
   const [results, positiveStatus, suppressedStatus] = process.argv.slice(2)
   const problems = checkResults(results, Number(positiveStatus), Number(suppressedStatus))
   for (const problem of problems) console.log(`::error::${problem}`)

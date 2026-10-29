@@ -461,7 +461,10 @@ async function main() {
 }
 
 // Only a direct run builds; importing the module (the importer's tests) must not.
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   main().catch((error) => {
     console.error(
       `[text-corpus] ${error instanceof Error ? error.message : String(error)}`

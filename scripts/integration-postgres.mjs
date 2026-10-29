@@ -13,6 +13,7 @@
 //   node scripts/integration-postgres.mjs stop [--name N]
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 
 const IMAGE = 'postgres:17-alpine'
@@ -71,7 +72,7 @@ function start() {
   console.log(`postgresql://postgres:postgres@127.0.0.1:${port}/postgres`)
 }
 
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+if (fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv[2] === 'start') start()
   else if (process.argv[2] === 'stop') docker('rm', '-f', name)
   else throw new Error('usage: integration-postgres.mjs start|stop [--name N] [--port P]')
