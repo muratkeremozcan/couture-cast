@@ -989,6 +989,106 @@
       "entry": "marcá",
       "language": "es",
       "reason": "Spanish (Rioplatense) imperative of marcar, mark, ordinary copy. It is one letter from the listed term marica, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "draping",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term raping, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "taping",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term raping, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "razing",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term raping, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "reaping",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term raping, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "raying",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term raping, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "raring",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term raping, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "capers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "racers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "drapers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "rapiers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "ravers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "rakers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "ropers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "raters",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "reapers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "ravings",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed term rapings, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "pasti",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed term spasti, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "sposti",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed term spasti, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "caricas",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed term maricas, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "terrones",
+      "language": "es",
+      "reason": "Ordinary Spanish word (plural of terr\u00f3n, clod or lump), one letter from the listed term terrone, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
     }
   ],
   "literalContexts": [

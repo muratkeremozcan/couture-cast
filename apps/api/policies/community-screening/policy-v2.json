@@ -69,8 +69,8 @@
         "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/de.json; allow list allow-list-v1.json",
         "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
         "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
-        "termsSha256": "6b423dd6b876725914b7450f49a69eb991895cb8ca3373bd4cef9985c23f8d3f",
-        "allowListSha256": "881d8e5dd433ad7f3ef4f1880b95dfa066aab5e49886c18b972a3039f760c7bf"
+        "termsSha256": "f4618115ce718c4431b928d6846ccede0fc384df007fa7e9d9adf79ff03a169f",
+        "allowListSha256": "1bced66b0a678370f8c40d16644a708499fdc206b5d26e55270c52de20949b12"
       },
       {
         "language": "en",
@@ -80,8 +80,8 @@
         "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/en.json; allow list allow-list-v1.json",
         "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
         "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
-        "termsSha256": "1d3e8731999c88dd6fd9e919f40acf665d1b01cc3df3cf043a1d1babe2cd33b6",
-        "allowListSha256": "6d261782ae8e1009c30f3d33ab62cc0c9a4814e71d16d765ccef086daf776e52"
+        "termsSha256": "868c828bdb3a063ad4a6a044e91319655789ffe26ed25943f818b05fc4d2364c",
+        "allowListSha256": "188c6a006d457a0f41c543c5572783d5ed4724024561efc6219b34eec0d11ddb"
       },
       {
         "language": "es",
@@ -91,8 +91,8 @@
         "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/es.json; allow list allow-list-v1.json",
         "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
         "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
-        "termsSha256": "99d160eb8be4d28d98712700279cebf1e025a922a16088e1f1cbf199064e054f",
-        "allowListSha256": "0e4d0dc6771bbf7e4d532e7480fd16be98dab9c3e893022a771f9348d56455ac"
+        "termsSha256": "d0c75cc42b0783a5f6854d7ca25e0f52bdb4592511f86c051c6f8b77f68e3dc1",
+        "allowListSha256": "47d82b73097e60e404701a14a6b167f12fd786d5db6a8b69527b7b80f7ca5de2"
       },
       {
         "language": "fr",
@@ -102,8 +102,8 @@
         "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/fr.json; allow list allow-list-v1.json",
         "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
         "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
-        "termsSha256": "60efbb20fab8e230b24bcbf84c6716a880f2477e096c66d603abf21a51d6ed5c",
-        "allowListSha256": "c4a383763d073630515f64bd463b9d531375e6bafad869d7b6d7a17e1dc0b937"
+        "termsSha256": "6affc5ae3b9816b5abff38114981a14ef805a86c4157476f35b403465e77f179",
+        "allowListSha256": "1b58d062929dd08d7b83a8340b18056bf226a2930e5521087847b68e06f3d98d"
       },
       {
         "language": "it",
@@ -113,8 +113,8 @@
         "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/it.json; allow list allow-list-v1.json",
         "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
         "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
-        "termsSha256": "10aada3760e8548f9b0fb98a2ad7d3e5bc990b94f584bcd8e09d7c15f936c4f4",
-        "allowListSha256": "24545b435b75b012d139e23e6a06b00bf786c2a23826babbb1c8920c4a181e80"
+        "termsSha256": "7e99b98c01e8d396933c34cd9e01057a0e2e5b9ffafc9e870be5a7173a47a67c",
+        "allowListSha256": "b6d596550f9aaf3973e104613f56456b80b8a0158cf60e7d7d6bd468d1018fd9"
       },
       {
         "language": "pt",
@@ -124,8 +124,8 @@
         "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/pt.json; allow list allow-list-v1.json",
         "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
         "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
-        "termsSha256": "c64b3bcb115436fa687ce658650c10d618c49bfcbffd3dbba4d8ba590965bcfb",
-        "allowListSha256": "141d4c440728f94616486b8ec7982aeda0c08e5630575a23721d74b318416ef5"
+        "termsSha256": "dab54b9bd54633b956f2da563df7b672b4baa89b94b07487c65647498c8809cf",
+        "allowListSha256": "a222d86488d9dc81cb36f57079af49e09c41589d7845961939ca29c5306a43b0"
       },
       {
         "language": "tr",
@@ -135,8 +135,8 @@
         "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/tr.json; allow list allow-list-v1.json",
         "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
         "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
-        "termsSha256": "75064d4eeb85f634896553358165d083a4530a29ccb5549dfac8ee638032f3d0",
-        "allowListSha256": "18f1bf8c1018a45e871227d6a20bb047993b50b3b902eb37386e0b7d233b207e"
+        "termsSha256": "ec8a0e03241a43addee4c61718783e568c94b0199b0c768ca128e20cd52dc7cb",
+        "allowListSha256": "ebb77cfaa5f19a8b1650d3866a67b1a96d06a1670d620d120ab3dbc0f1afe64a"
       }
     ],
     "listsRationale": "One generated list plus one allow list per enabled language, covering the seven languages the ten enabled Community Beta locales map to. Each list is LDNOOBW vendored at one pinned commit merged with the repository's graded overlay, the allow list is repository-owned with a reason per entry, and termsSha256 and allowListSha256 pin every generated file: the screener refuses to start when a loaded list does not hash to its pin.",
