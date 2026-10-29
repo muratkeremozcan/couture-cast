@@ -77,6 +77,43 @@ function observedAuditIssues(log) {
       })
   return issues
 }
+const failureContextLines = 8
+const failureLineChars = 300
+const failureDigestLimit = 24
+// The xcodebuild log is private. A failed XCUITest is only explained by the steps
+// right before its first assertion, so the job log carries that window.
+export function failedAuditTestDigest(log) {
+  const lines = log.split(/\r?\n/)
+  const digests = []
+  for (let end = 0; end < lines.length; end += 1) {
+    const failed = lines[end].match(/^Test Case '-\[\S+ (test\w+)\]' failed/)
+    if (!failed) continue
+    let start = end - 1
+    while (start > 0 && !/^Test Case '.*' started\./.test(lines[start])) start -= 1
+    const section = lines.slice(start + 1, end)
+    const assertion = section.findIndex((line) => /\.swift:\d+: error: /.test(line))
+    const window =
+      assertion < 0
+        ? section.slice(-failureContextLines)
+        : section.slice(
+            Math.max(0, assertion - failureContextLines),
+            assertion + 1 + failureContextLines
+          )
+    digests.push({
+      test: failed[1],
+      lines: window
+        .filter((line) => line.trim())
+        .map((line) =>
+          line
+            .replace(/\S*\/(?=[^/\s]+\.swift)/g, '')
+            .trim()
+            .slice(0, failureLineChars)
+        )
+        .slice(0, failureDigestLimit),
+    })
+  }
+  return digests
+}
 export function closedShareCardAuditReport(summary, tree, log) {
   const tests = []
   const walk = (node) => {

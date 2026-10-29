@@ -15,7 +15,10 @@ import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { story68FocusObservationHandler } from './lib/story68-ios-focus-observation.mjs'
 import { startWeatherProviderDouble } from './weather-provider-double.mjs'
-import { closedShareCardAuditReport } from './lib/share-card-audit-report.mjs'
+import {
+  closedShareCardAuditReport,
+  failedAuditTestDigest,
+} from './lib/share-card-audit-report.mjs'
 import { summarizeNativeFlowFailure } from './lib/share-card-native-failure.mjs'
 import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics.mjs'
 import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs'
@@ -963,13 +966,11 @@ if (command === 'prebuild') {
     const tree = JSON.parse(
       run('xcrun', ['xcresulttool', 'get', 'test-results', 'tests', '--path', result])
     )
-    const closed = closedShareCardAuditReport(
-      summary,
-      tree,
-      fs.readFileSync(auditLog).subarray(offset).toString()
-    )
+    const auditText = fs.readFileSync(auditLog).subarray(offset).toString()
+    const closed = closedShareCardAuditReport(summary, tree, auditText)
     privateJson('accessibility-ios.json', closed)
     if (code !== 0 || !closed.passed) {
+      console.log(JSON.stringify({ iosAuditFailure: failedAuditTestDigest(auditText) }))
       const hierarchy = run(maestroBinary, ['--device', device, 'hierarchy'])
       if (hierarchy.includes('share-card-title'))
         run('xcrun', [
