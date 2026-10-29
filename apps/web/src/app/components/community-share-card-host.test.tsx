@@ -124,6 +124,9 @@ function useTransport(duplicate = false) {
 }
 
 async function open(surface: Surface = 'spotlight') {
+  // A feed or spotlight read that lands after the share dialog opens remounts the cards under
+  // it, so wait until neither surface is busy before interacting.
+  await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull())
   await screen.findByTestId(
     `${surface.startsWith('spotlight') ? 'spotlight-' : ''}lookbook-card-spot-self`
   )
