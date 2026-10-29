@@ -1203,6 +1203,8 @@ interface LanguageIndex {
   readonly generatedForms: readonly string[]
   /** The single-word terms the list names itself, folded. */
   readonly listedTerms: ReadonlySet<string>
+  /** Generated Turkish inflections whose suffix breaks vowel harmony with their stem. */
+  readonly disharmonicForms: ReadonlySet<string>
 }
 
 export interface CommunityTextScreenerOptions {
@@ -1456,14 +1458,13 @@ function buildTypoKeys(indexes: readonly LanguageIndex[]): ReadonlyMap<string, T
       keys.set(key, meta)
   }
   for (const index of indexes) {
-    const generated = new Set(index.generatedForms)
     for (const [term, meta] of index.single) {
       if (meta.severity !== 'high' || term.length < TYPO_MIN_TERM_LENGTH) continue
       if (!/^\p{L}+$/u.test(term)) continue
-      // A typo of a generated inflection is not a typo of a term: cifit plus the plural suffix,
-      // less one letter, is the ordinary Turkish plural of "pair" (çiftler). The suffix grammar
-      // is the text's own, so only the spellings the list names are typo-checked.
-      if (generated.has(term) && !index.listedTerms.has(term)) continue
+      // A generated Turkish inflection whose suffix breaks vowel harmony (cifit plus ler, for
+      // the back-vowel stem çıfıt) is a spelling nobody writes; one letter less is the ordinary
+      // front-vowel word çiftler. Only harmonic inflections are typo-checked.
+      if (index.disharmonicForms.has(term) && !index.listedTerms.has(term)) continue
       for (let at = 1; at < term.length - 1; at += 1) {
         add(`${term.slice(0, at)}${term.slice(at + 1)}`, meta)
         if (at < term.length - 2 && term[at] !== term[at + 1])
@@ -1474,6 +1475,43 @@ function buildTypoKeys(indexes: readonly LanguageIndex[]): ReadonlyMap<string, T
   for (const [key] of keys)
     if (indexes.some((index) => index.single.has(key))) keys.delete(key)
   return keys
+}
+
+/** Suffixes of INFLECTION_SUFFIXES.tr that agree with the last vowel of a stem. */
+const TURKISH_HARMONIC_SUFFIXES: Readonly<Record<string, ReadonlySet<string>>> = (() => {
+  const back = ['lar', 'a', 'da', 'dan', 'ları']
+  const front = ['ler', 'e', 'de', 'den', 'leri']
+  const sets: Record<string, string[]> = {
+    a: [...back, 'ı', 'ın'],
+    ı: [...back, 'ı', 'ın'],
+    o: [...back, 'u', 'un'],
+    u: [...back, 'u', 'un'],
+    e: [...front, 'i', 'in'],
+    i: [...front, 'i', 'in'],
+    ö: [...front, 'ü', 'ün'],
+    ü: [...front, 'ü', 'ün'],
+  }
+  return Object.fromEntries(
+    Object.entries(sets).map(([vowel, suffixes]) => [vowel, new Set(suffixes)])
+  )
+})()
+
+/**
+ * Whether a generated Turkish inflection pairs its stem with a suffix of the wrong vowel
+ * class: the stem's last vowel is read on the listed spelling (çıfıt ends in a back ı), not
+ * on the folded one, which has lost the dotless i.
+ */
+function breaksVowelHarmony(listed: string, form: string, foldedTerm: string): boolean {
+  const stem = toLiteralForm(listed)
+  const vowel = [...stem].reverse().find((letter) => 'aıoueiöü'.includes(letter))
+  const harmonic = vowel ? TURKISH_HARMONIC_SUFFIXES[vowel] : undefined
+  if (!harmonic) return false
+  // ı and i fold together, so a folded suffix can stand for two listed ones.
+  const suffix = form.slice(foldedTerm.length)
+  const spelled = INFLECTION_SUFFIXES.tr.filter(
+    (candidate) => toFoldedForm(candidate) === suffix
+  )
+  return spelled.length > 0 && spelled.every((candidate) => !harmonic.has(candidate))
 }
 
 export function inflectedForms(term: string, language: ScreeningLanguage): string[] {
@@ -1505,6 +1543,7 @@ function buildLanguageIndex(
   const phraseForms = new Set<string>()
   const generatedForms = new Set<string>()
   const listedTerms = new Set<string>()
+  const disharmonicForms = new Set<string>()
 
   for (const entry of list.entries) {
     if (!policy.categories.includes(entry.category)) {
@@ -1565,6 +1604,8 @@ function buildLanguageIndex(
         (candidate) => collapseRepeats(candidate).length >= MIN_SINGLE_TERM_LENGTH
       )) {
         generatedForms.add(form)
+        if (list.language === 'tr' && breaksVowelHarmony(entry.term, form, term))
+          disharmonicForms.add(form)
         indexSingleTerm(
           form,
           meta,
@@ -1601,6 +1642,7 @@ function buildLanguageIndex(
     phraseForms,
     generatedForms: [...generatedForms].toSorted(),
     listedTerms,
+    disharmonicForms,
   }
 }
 
@@ -1724,6 +1766,29 @@ export class CommunityTextScreener {
   generatedInflectionForms(): string[] {
     return this.indexes.flatMap((index) =>
       index.generatedForms.map((form) => `${index.language}:${form}`)
+    )
+  }
+
+  /** The generated Turkish inflections whose suffix breaks vowel harmony, as language:form. */
+  disharmonicInflectionForms(): string[] {
+    return this.indexes.flatMap((index) =>
+      [...index.disharmonicForms]
+        .filter((form) => !index.listedTerms.has(form))
+        .map((form) => `${index.language}:${form}`)
+    )
+  }
+
+  /** The generated inflections the typo index reads: high severity, harmonic, not listed. */
+  typoIndexedInflectionForms(): string[] {
+    return this.indexes.flatMap((index) =>
+      index.generatedForms
+        .filter(
+          (form) =>
+            index.single.get(form)?.severity === 'high' &&
+            !index.listedTerms.has(form) &&
+            !index.disharmonicForms.has(form)
+        )
+        .map((form) => `${index.language}:${form}`)
     )
   }
 

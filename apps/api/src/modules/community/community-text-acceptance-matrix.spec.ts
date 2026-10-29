@@ -44,6 +44,9 @@ import {
  *   same set (single words only).
  * - typo-transpose / typo-delete: two adjacent inner letters swapped, or one inner letter
  *   removed, for single words of eight letters or more.
+ * - inflection-typo: the same two typos over every generated plural and inflected spelling of
+ *   eight letters or more, except the Turkish inflections whose suffix breaks vowel harmony
+ *   (PINNED_DISHARMONIC).
  * Exclusions, each stated with its reason:
  * - A term whose regional-indicator spelling (or the spelling of one of its words) is a row of
  *   valid flag pairs cannot be told from the flags (kike is Kiribati and Kenya): the grammar
@@ -391,11 +394,28 @@ function typos(word: string, emit: Emit): void {
     emit('typo-delete', word.slice(0, at) + word.slice(at + 1))
 }
 
+/**
+ * A generated inflection with one inner letter removed or two swapped: "gangrapss",
+ * "hurensohen" less a letter. The forms are those the screener's typo index reads: high
+ * severity, and not a Turkish inflection whose suffix breaks vowel harmony (its one-letter-less
+ * spelling is an ordinary word, see the screener; their number is pinned).
+ */
+function inflectionTypos(): void {
+  const seen = new Set<string>()
+  for (const entry of screener.typoIndexedInflectionForms()) {
+    const form = entry.split(':').slice(1).join(':')
+    if (seen.has(form) || form.length < 8 || !/^[a-z]+$/.test(form)) continue
+    seen.add(form)
+    typos(form, (_cls, variant) => check('inflection-typo', form, variant))
+  }
+}
+
 function runMatrix(): void {
   for (const form of screener.generatedInflectionForms()) {
     const [, ...rest] = form.split(':')
     check('inflection', rest.join(':'), rest.join(':'))
   }
+  inflectionTypos()
   const seen = new Set<string>()
   for (const { term } of terms) {
     if (seen.has(term)) continue
@@ -443,6 +463,10 @@ describe('frozen adversarial matrix', () => {
     expect(counts).toEqual(PINNED_COUNTS)
   })
 
+  it('skips only the pinned number of harmony-breaking Turkish inflections', () => {
+    expect(screener.disharmonicInflectionForms().length).toBe(PINNED_DISHARMONIC)
+  })
+
   it('lists the terms whose regional spelling is a row of valid flags', () => {
     expect([...flagAmbiguous].toSorted()).toEqual(PINNED_FLAG_AMBIGUOUS)
   })
@@ -479,6 +503,8 @@ const PINNED_FLAG_AMBIGUOUS: string[] = [
   'töte dich selbst',
 ]
 const PINNED_TERMS = 245
+const PINNED_DISHARMONIC = 364
+
 const PINNED_COUNTS: Record<string, number> = {
   censor: 8809,
   'confusable-single': 6676,
@@ -512,6 +538,7 @@ const PINNED_COUNTS: Record<string, number> = {
   split5: 12762,
   chain: 1056,
   stretch: 2016,
+  'inflection-typo': 7597,
   'typo-delete': 670,
   'typo-transpose': 571,
 }

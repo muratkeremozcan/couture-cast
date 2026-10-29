@@ -1814,3 +1814,29 @@ describe('round 7p complete-phrase allowances stay within permitted literal boun
     expect(screen('çıfıtler', 'tr-TR').disposition).not.toBe('pass')
   })
 })
+
+/**
+ * Round 7q. The typo index reads the generated plural and inflected spellings of every
+ * language, so "gangrapss" and "hurensohen" less a letter stay withheld. Only a Turkish
+ * inflection whose suffix breaks vowel harmony with its stem is left out, because one letter
+ * less is an ordinary front-vowel word (çiftler, sıkışan).
+ */
+describe('round 7q typo spellings of generated inflections', () => {
+  it('withholds one-letter typos of generated plurals and inflections', () => {
+    for (const [text, locale] of [
+      ['gangrapss', 'en-US'],
+      ['gangrapses', 'en-US'],
+      ['hurensohen', 'de-DE'],
+      ['hurensohnen', 'de-DE'],
+      ['çıfıtlr', 'tr-TR'],
+      ['ciftlar', 'tr-TR'],
+      ['gangrapss', null],
+    ] as const)
+      expect(screen(text, locale).disposition, text).not.toBe('pass')
+  })
+
+  it('keeps ordinary Turkish words that a harmony-breaking inflection would meet', () => {
+    for (const text of ['çiftler', 'çiftleri', 'sıkışan', 'Çiftler için set hazırlandı.'])
+      expect(screen(text, 'tr-TR').disposition, text).toBe('pass')
+  })
+})
