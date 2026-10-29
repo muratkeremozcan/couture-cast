@@ -39,6 +39,8 @@ const listeners = new Set<() => void>()
 const logoutHooks = new Set<(token?: string) => Promise<void>>()
 // Logout cleanup hooks get at most this long before sign-out returns.
 const LOGOUT_HOOK_DEADLINE_MS = 3500
+const ACCOUNT_CHECK_ATTEMPTS = 3
+const ACCOUNT_CHECK_RETRY_MS = 400
 const emit = () => listeners.forEach((fn) => fn())
 export const nativeSessionIdentity = () => member
 export const subscribeNativeSession = (listener: () => void) => {
@@ -287,15 +289,30 @@ export async function verifyNativeOtp(email: string, token: string) {
       'Sign-in code could not be verified.'
     )
   localSignedOut = false
-  try {
-    await acceptSession(data.session)
-  } catch (failure) {
-    // A 401/403/404 account check is the server saying this identity has no account.
+  // Auth has spent the one-time code, so a slow account check (a cold API on a busy host)
+  // would strand the person with a code that cannot be sent again. The session is valid;
+  // check the account again before asking them to start over.
+  let failure: unknown
+  for (let attempt = 0; attempt < ACCOUNT_CHECK_ATTEMPTS; attempt++) {
+    if (attempt) {
+      await new Promise((resolve) => setTimeout(resolve, ACCOUNT_CHECK_RETRY_MS))
+      if (localSignedOut) break
+    }
+    try {
+      await acceptSession(data.session)
+      failure = undefined
+      break
+    } catch (error) {
+      failure = error
+      // A 401/403/404 account check is the server saying this identity has no account.
+      if (sessionDenied(error)) break
+    }
+  }
+  if (failure)
     throw new NativeSignInError(
       sessionDenied(failure) ? 'denied' : 'unavailable',
       'Session verification is unavailable.'
     )
-  }
   if (!member) throw new NativeSignInError('denied', 'This account is unavailable.')
 }
 export async function signOutNativeSession() {

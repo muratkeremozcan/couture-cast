@@ -102,6 +102,51 @@ describe('native sign-in failure reasons', () => {
     }
   )
 
+  it('keeps the spent code usable through a slow first account check', async () => {
+    let checks = 0
+    server.use(
+      http.get('*/api/v1/user/profile', () => {
+        checks++
+        return checks < 3
+          ? HttpResponse.json({}, { status: 503 })
+          : HttpResponse.json(profile)
+      })
+    )
+    expect(await reason(verifyNativeOtp('member@synthetic.test', '123456'))).toBe(
+      'resolved'
+    )
+    expect(checks).toBe(3)
+    expect(sdk.verify).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops after three account checks when the outage lasts', async () => {
+    let checks = 0
+    server.use(
+      http.get('*/api/v1/user/profile', () => {
+        checks++
+        return HttpResponse.json({}, { status: 503 })
+      })
+    )
+    expect(await reason(verifyNativeOtp('member@synthetic.test', '123456'))).toBe(
+      'unavailable'
+    )
+    expect(checks).toBe(3)
+  })
+
+  it('does not repeat an account check the server denied', async () => {
+    let checks = 0
+    server.use(
+      http.get('*/api/v1/user/profile', () => {
+        checks++
+        return HttpResponse.json({}, { status: 404 })
+      })
+    )
+    expect(await reason(verifyNativeOtp('member@synthetic.test', '123456'))).toBe(
+      'denied'
+    )
+    expect(checks).toBe(1)
+  })
+
   it('signs in when the account check succeeds', async () => {
     server.use(http.get('*/api/v1/user/profile', () => HttpResponse.json(profile)))
     expect(await reason(verifyNativeOtp('member@synthetic.test', '123456'))).toBe(
