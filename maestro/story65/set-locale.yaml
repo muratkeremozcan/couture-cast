@@ -11,6 +11,25 @@ appId: ${MAESTRO_APP_ID}
     # A top-row button cannot be centered beyond the scroll boundary.
     centerElement: false
     timeout: 15000
-- tapOn:
-    id: 'locale-btn-${MAESTRO_LOCALE}'
+# tapOn reports COMPLETED whether or not the product received the press (run 40964148653:
+# the fr-FR tap completed, the next screen was still English). The product disables a
+# language button while it is the current locale and while a change is in flight, so a
+# button that still reads enabled means the press was lost. Tap only while it reads enabled
+# and wait until it does not.
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'locale-btn-${MAESTRO_LOCALE}'
+              enabled: true
+          commands:
+            - tapOn:
+                id: 'locale-btn-${MAESTRO_LOCALE}'
+      - extendedWaitUntil:
+          visible:
+            id: 'locale-btn-${MAESTRO_LOCALE}'
+            enabled: false
+          timeout: 6000
 - waitForAnimationToEnd

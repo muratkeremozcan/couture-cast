@@ -100,9 +100,26 @@ const waitSettingsTimeoutMs = Math.ceil(
   (DEFAULT_FLOW_TIMEOUT_MS + WAIT_SETTINGS_WORST_CASE_MS) * FLOW_TIMEOUT_MARGIN
 )
 
+/**
+ * set-locale.yaml: the Settings tab opener (up to 4 attempts of a tap and a 15 s wait), the
+ * 15 s scroll to the language button and the closing settle wait, then the guarded language
+ * tap. Each tap attempt is the guard check, the tap and a 6 s wait for the button to read
+ * disabled; maxRetries 3 allows 4 attempts.
+ */
+export const SET_LOCALE_FLOW = 'maestro/story65/set-locale.yaml'
+export const SET_LOCALE_TAP_ATTEMPTS = 4
+export const SET_LOCALE_TAP_ATTEMPT_MS = 2 * CONDITION_CHECK_MS + 2_000
+export const SET_LOCALE_TAP_WORST_CASE_MS =
+  SET_LOCALE_TAP_ATTEMPTS * SET_LOCALE_TAP_ATTEMPT_MS
+export const SET_LOCALE_OTHER_STEPS_MS = 4 * 17_000 + 15_000 + 2_000
+
 const flowTimeouts = {
   ...Object.fromEntries(SAVE_TAP_FLOWS.map((flow) => [flow, saveTapTimeoutMs])),
   ...Object.fromEntries(WAIT_SETTINGS_FLOWS.map((flow) => [flow, waitSettingsTimeoutMs])),
+  [SET_LOCALE_FLOW]: Math.ceil(
+    (FLOW_STARTUP_MS + SET_LOCALE_OTHER_STEPS_MS + SET_LOCALE_TAP_WORST_CASE_MS) *
+      FLOW_TIMEOUT_MARGIN
+  ),
   [PICK_IMAGE_FLOW]: Math.ceil(
     (FLOW_STARTUP_MS + PICK_IMAGE_OTHER_STEPS_MS + PICK_IMAGE_TAP_WORST_CASE_MS) *
       FLOW_TIMEOUT_MARGIN
