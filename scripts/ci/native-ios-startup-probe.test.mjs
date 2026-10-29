@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { finishOwnedStartup } from './native-ios-startup-probe.mjs'
+import {
+  INSTALL_CLIENT_TIMEOUT_MS,
+  finishOwnedStartup,
+} from './native-ios-startup-probe.mjs'
 
 const device = 'A63391DE-17A2-4B16-9C93-16B986580C99'
 function fixture(prepareForFlow, gateFailure = false) {
@@ -90,4 +93,16 @@ test('failed postboot diagnostics still reach the unchanged CPU gate and native-
     f.events.some((e) => e.operation === 'delete-device'),
     false
   )
+})
+
+// Runs 28 to 33 installed this 140 MB client in 24 to 33 s. On a fresh shard host (load 312 to 516,
+// 170 MB free) the same install passed the 60 s default and was killed: owned_simulator_command_failed:
+// install-client:ETIMEDOUT. The install is one bounded attempt with the budget bootstatus has.
+test('the client install has its own budget of at least five times the slowest measured install', async () => {
+  const f = fixture(true)
+  await finishOwnedStartup(f.input)
+  const timeout = f.events.find((e) => e.operation === 'install-client').options?.timeout
+  assert.equal(timeout, INSTALL_CLIENT_TIMEOUT_MS)
+  assert.ok(INSTALL_CLIENT_TIMEOUT_MS >= 5 * 32_897)
+  assert.equal(f.events.find((e) => e.operation === 'bootstatus').options.timeout, 300000)
 })

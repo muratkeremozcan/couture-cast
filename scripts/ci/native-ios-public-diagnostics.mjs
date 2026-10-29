@@ -8,7 +8,8 @@
  * path. A record that fails is left out and named in `native-ios-diagnostics-omitted.json`
  * with the first reason, so the omission is itself evidence and never a job failure.
  *
- * The three `*-private.json` records and the two device-identity records are never read.
+ * The three `*-private.json` records and the two device-identity records are never read here; the
+ * startup record alone is projected into per-command timings by native-ios-startup-timings.mjs.
  */
 import fs from 'node:fs'
 import path from 'node:path'

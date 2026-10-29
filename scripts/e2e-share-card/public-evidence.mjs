@@ -21,6 +21,7 @@ import {
   OMITTED_FILE,
   selectPublicDiagnostics,
 } from '../ci/native-ios-public-diagnostics.mjs'
+import { projectStartupTimings } from '../ci/native-ios-startup-timings.mjs'
 const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
@@ -107,6 +108,7 @@ if (fs.existsSync(quiesceFile)) {
 // iOS run diagnostics: a record is published only if every value is closed (no identifier,
 // path or secret-shaped text). Records that fail are named in the omitted list, never copied.
 const iosDiagnostics = selectPublicDiagnostics(directory)
+const startupTimings = projectStartupTimings(directory)
 // Only primitive proof facts cross the native evidence boundary. Private logs and
 // resource identities are deliberately absent from the public projection.
 const proofs = new Map()
@@ -332,6 +334,7 @@ if (webMatrix) closedJSON('web-matrix.json', webMatrix)
 for (const [name, value] of browserProofs) closedJSON(name, value)
 for (const [name, value] of hostEvidence) closedJSON(name, value)
 for (const [name, value] of iosDiagnostics.published) closedJSON(name, value)
+if (startupTimings) closedJSON('native-ios-startup-timings.json', startupTimings)
 if (iosDiagnostics.omitted.length) closedJSON(OMITTED_FILE, iosDiagnostics.omitted)
 for (const [name, value] of diagnostics) {
   closedJSON(name, value)

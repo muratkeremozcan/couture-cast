@@ -9,6 +9,13 @@ import { preflightObserver, observedRuntimeQuery } from './native-ios-preflight.
 import { seedOwnedSiriPreferences } from './native-ios-siri-preferences.mjs'
 import { cleanupOwnedDevice } from './native-ios-device-cleanup.mjs'
 
+/**
+ * Runs 28 to 33 installed this 140 MB client in 24 to 33 s under host load 70 to 100. A fresh shard
+ * host (load 312 to 516, 170 MB free) took longer than the 60 s command default and the install
+ * was killed. One bounded attempt with the same budget bootstatus has; no retry.
+ */
+export const INSTALL_CLIENT_TIMEOUT_MS = 300000
+
 export async function finishOwnedStartup({
   device,
   command,
@@ -46,7 +53,9 @@ export async function finishOwnedStartup({
     snapshot('siri-preference-readback', afterBoot)
     snapshot('after-simulator-boot')
     if (prepareForFlow)
-      command('install-client', 'xcrun', ['simctl', 'install', device, appPath])
+      command('install-client', 'xcrun', ['simctl', 'install', device, appPath], {
+        timeout: INSTALL_CLIENT_TIMEOUT_MS,
+      })
     await quiesce(device, command)
     snapshot('before-first-flow')
     ready = true
