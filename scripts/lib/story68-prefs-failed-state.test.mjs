@@ -15,14 +15,6 @@ test('the flow opens the settings screen and waits for the Try again control and
   assert.match(flow, /open-notification-settings\.yaml/)
   assert.match(flow, /visible: \$\{MAESTRO_PREFS_RETRY\}/)
   assert.match(flow, /assertVisible: \$\{MAESTRO_LOAD_FAILED\}/)
-  const check = spawnSync(
-    'maestro',
-    ['check-syntax', 'maestro/story68/prefs-failed.yaml'],
-    {
-      encoding: 'utf8',
-    }
-  )
-  assert.equal(check.status, 0, check.stderr)
 })
 
 test('the runner screenshots both color schemes on both platforms and always restores light and the real mode', () => {
@@ -51,3 +43,18 @@ test('the screenshot names fit the public evidence allow-list and the mode is a 
     /shareCardFixtureMode\(\) === 'prefs_unavailable'/
   )
 })
+
+test(
+  'the prefs-failed flow is accepted by maestro check-syntax',
+  { skip: spawnSync('maestro', ['--version']).status !== 0 },
+  () => {
+    const check = spawnSync(
+      'maestro',
+      ['check-syntax', 'maestro/story68/prefs-failed.yaml'],
+      {
+        encoding: 'utf8',
+      }
+    )
+    assert.equal(check.status, 0, check.stderr)
+  }
+)
