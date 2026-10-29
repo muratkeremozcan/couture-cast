@@ -8,7 +8,7 @@ import {
 import { useEffect, useState, useRef } from 'react'
 import {
   View,
-  Text,
+  Text as ButtonLabel,
   TextInput,
   Switch,
   Pressable,
@@ -20,6 +20,7 @@ import {
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
+import { Text, useThemeColor } from '@/components/themed'
 import { LOAD_RETRY_DELAYS_MS } from '@/src/lib/notification-load-retry'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import type { CommunityNotificationSettings } from '@couture/api-client/contracts/http'
@@ -43,6 +44,7 @@ export default function NotificationSettingsScreen() {
   // True once the bounded automatic retries have stopped without settings.
   const [loadStalled, setLoadStalled] = useState(false)
   const reload = useRef<(() => void) | null>(null)
+  const inputColor = useThemeColor({}, 'text')
   const suggestedTimezone = useRef<string | undefined>(undefined)
   const generation = useRef(0)
   const clientRef = useRef<ReturnType<typeof communitySyncFromMobile> | null>(null)
@@ -251,14 +253,14 @@ export default function NotificationSettingsScreen() {
             accessibilityLabel={t('community.notifications.start')}
             value={draft.quietHoursStart}
             onChangeText={(quietHoursStart) => setDraft({ ...draft, quietHoursStart })}
-            style={styles.input}
+            style={[styles.input, { color: inputColor }]}
           />
           <Text>{t('community.notifications.end')}</Text>
           <TextInput
             accessibilityLabel={t('community.notifications.end')}
             value={draft.quietHoursEnd}
             onChangeText={(quietHoursEnd) => setDraft({ ...draft, quietHoursEnd })}
-            style={styles.input}
+            style={[styles.input, { color: inputColor }]}
           />
           <Text>{t('community.notifications.timezone')}</Text>
           <TextInput
@@ -269,7 +271,7 @@ export default function NotificationSettingsScreen() {
               setDraft({ ...draft, timezone })
             }}
             autoCapitalize="none"
-            style={styles.input}
+            style={[styles.input, { color: inputColor }]}
           />
           <Pressable
             accessibilityRole="button"
@@ -279,7 +281,9 @@ export default function NotificationSettingsScreen() {
             }}
             style={styles.button}
           >
-            <Text>{t('community.notifications.save')}</Text>
+            <ButtonLabel style={styles.buttonLabel}>
+              {t('community.notifications.save')}
+            </ButtonLabel>
           </Pressable>
         </>
       )}
@@ -291,7 +295,9 @@ export default function NotificationSettingsScreen() {
           onPress={() => reload.current?.()}
           style={styles.button}
         >
-          <Text>{t('community.notifications.retry')}</Text>
+          <ButtonLabel style={styles.buttonLabel}>
+            {t('community.notifications.retry')}
+          </ButtonLabel>
         </Pressable>
       )}
       {message === 'community.notifications.permission' && (
@@ -302,7 +308,9 @@ export default function NotificationSettingsScreen() {
           }}
           style={styles.button}
         >
-          <Text>{t('community.notifications.deviceSettings')}</Text>
+          <ButtonLabel style={styles.buttonLabel}>
+            {t('community.notifications.deviceSettings')}
+          </ButtonLabel>
         </Pressable>
       )}
       <Pressable
@@ -310,7 +318,9 @@ export default function NotificationSettingsScreen() {
         onPress={() => router.push('/signin')}
         style={styles.button}
       >
-        <Text>{t('community.notifications.signin')}</Text>
+        <ButtonLabel style={styles.buttonLabel}>
+          {t('community.notifications.signin')}
+        </ButtonLabel>
       </Pressable>
       <Pressable
         accessibilityRole="button"
@@ -319,7 +329,9 @@ export default function NotificationSettingsScreen() {
         }}
         style={styles.button}
       >
-        <Text>{t('community.notifications.signout')}</Text>
+        <ButtonLabel style={styles.buttonLabel}>
+          {t('community.notifications.signout')}
+        </ButtonLabel>
       </Pressable>
     </ScrollView>
   )
@@ -336,6 +348,7 @@ const styles = StyleSheet.create({
     borderColor: '#777',
     borderRadius: 8,
   },
+  buttonLabel: { color: '#000' },
   button: {
     minHeight: 48,
     padding: 14,
