@@ -27,6 +27,7 @@ import {
 import {
   SPOTLIGHT_PATH,
   ZERO,
+  feedSettled,
   ranked,
   reactionFeedBody,
   spotlightBody,
@@ -96,6 +97,9 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-2')
+    // A feed answer that lands after the open revalidates the open look through a detail
+    // read this spec does not serve, and the 404 closes it.
+    await feedSettled()
     await user.click(screen.getByTestId('spotlight-lookbook-open-spot-2'))
 
     const detail = await screen.findByTestId('community-detail')
