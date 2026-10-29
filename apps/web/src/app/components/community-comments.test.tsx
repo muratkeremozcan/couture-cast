@@ -292,6 +292,42 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     expect(await screen.findByText('Next private page')).toBeVisible()
   })
 
+  it('keeps the replies a member expands while a refresh is still reading the roots', async () => {
+    let rootReads = 0
+    let releaseRefresh: () => void = () => undefined
+    const refreshRead = new Promise<void>((resolve) => {
+      releaseRefresh = resolve
+    })
+    useMswHandlers(
+      http.get(`${base}/comments`, async () => {
+        if (++rootReads > 1) await refreshRead
+        return HttpResponse.json(page())
+      }),
+      http.get(`${base}/comments/root/replies`, () => HttpResponse.json(page([reply])))
+    )
+    const state = makeState()
+    const user = userEvent.setup()
+    render(<CommunityComments postId="community-post-1" state={state} />)
+    const expand = await screen.findByRole('button', {
+      name: `Replies (1): ${rootContext}`,
+    })
+    let refreshing: Promise<void> = Promise.resolve()
+    await act(async () => {
+      refreshing = state.refresh('community-post-1')
+      await waitFor(() => expect(rootReads).toBe(2))
+    })
+    await user.click(expand)
+    expect(await screen.findByText(reply.body)).toBeVisible()
+    await act(async () => {
+      releaseRefresh()
+      await refreshing
+    })
+    expect(
+      screen.getByRole('button', { name: `Replies (1): ${rootContext}` })
+    ).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText(reply.body)).toBeVisible()
+  })
+
   it('cancels a reply draft and drops its reply target', async () => {
     useMswHandlers(http.get(`${base}/comments`, () => HttpResponse.json(page())))
     const user = userEvent.setup()

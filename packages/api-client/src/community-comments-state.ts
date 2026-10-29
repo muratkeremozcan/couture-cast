@@ -471,7 +471,13 @@ export class CommunityCommentsState {
       )
       if (!owns()) throw new CommunityRequestSuperseded()
       state.roots = roots
-      state.replies = new Map(replies)
+      // A reply page expanded while this refresh was reading is newer than anything the
+      // refresh could have captured, so it stays; every page the refresh re-read replaces
+      // its predecessor.
+      state.replies = new Map([
+        ...[...state.replies].filter(([parent]) => !replyBounds.has(parent)),
+        ...replies,
+      ])
       state.error = null
       if ([...this.publicIds(state)].some((id) => !previousIds.has(id)))
         this.announce(state, 'community.realtime.newComments')

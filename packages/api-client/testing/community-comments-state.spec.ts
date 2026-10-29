@@ -162,6 +162,39 @@ describe('screen-owned comments state', () => {
     expect(state.current('other').roots?.items[0]?.id).toBe('other')
     expect(state.current('post').submissions[0]?.id).toBe('own')
   })
+  it('keeps a reply page expanded while a refresh is still reading the roots', async () => {
+    const { state, transport } = setup(),
+      roots = deferred<CommunityCommentsPage>()
+    transport.roots.mockReturnValueOnce(roots.promise)
+    const refreshing = state.refresh('post')
+    transport.replies.mockResolvedValueOnce(page([item('reply', 2)]))
+    await state.load('post', 'root')
+    roots.resolve(page([{ ...item('root'), replyCount: 1 }]))
+    await refreshing
+    expect(
+      state
+        .current('post')
+        .replies.get('root')
+        ?.items.map((reply) => reply.id)
+    ).toEqual(['reply'])
+  })
+  it('lets a refresh replace the reply pages it re-read', async () => {
+    const { state, transport } = setup(),
+      roots = deferred<CommunityCommentsPage>()
+    transport.replies.mockResolvedValueOnce(page([item('old', 2)]))
+    await state.load('post', 'root')
+    transport.roots.mockReturnValueOnce(roots.promise)
+    transport.replies.mockResolvedValueOnce(page([item('old', 2), item('new', 3)]))
+    const refreshing = state.refresh('post')
+    roots.resolve(page([{ ...item('root'), replyCount: 2 }]))
+    await refreshing
+    expect(
+      state
+        .current('post')
+        .replies.get('root')
+        ?.items.map((reply) => reply.id)
+    ).toEqual(['old', 'new'])
+  })
   it('ignores older success and errors after newer requests and visibility loss', async () => {
     const { state, transport } = setup(),
       first = deferred<CommunityCommentsPage>()
