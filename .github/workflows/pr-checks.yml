@@ -16,7 +16,7 @@ permissions:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  # The ephemeral service container declared on `quality-gate`, not a shared
+  # The ephemeral service container declared on `tests`, not a shared
   # environment. `RLS_TEST_DATABASE_URL` falls back to this, so one URL serves
   # both the schema suites and the RLS actor matrix.
   DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
@@ -26,8 +26,121 @@ env:
   COVERAGE_GIST_ID: 64348ebdc6e662b93ade9f40bdc03442
 
 jobs:
-  quality-gate:
+  # The quality checks run as parallel jobs so none of them holds a PR for the
+  # sum of the others; `quality-gate` below aggregates them. Each job states the
+  # same check it ran as a step of the single former job.
+  runtime-deps:
+    name: Web aliased runtime dependencies
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node environment
+        id: setup
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'false'
+
+      - name: Verify web aliased runtime dependencies
+        run: npm run check:web:aliased-runtime-deps
+
+  typecheck:
+    name: Typecheck workspaces
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node environment
+        id: setup
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'false'
+
+      - name: Generate Prisma Client
+        id: prisma
+        run: npm run db:generate
+
+      - name: Typecheck workspaces
+        run: npm run typecheck
+
+  lint:
+    name: Lint sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node environment
+        id: setup
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'false'
+
+      - name: Generate Prisma Client
+        id: prisma
+        run: npm run db:generate
+
+      - name: Lint sources
+        run: npm run lint
+
+  lighthouse:
+    name: Lighthouse accessibility gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node environment
+        id: setup
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'false'
+
+      - name: Generate Prisma Client
+        id: prisma
+        run: npm run db:generate
+
+      - name: Build packages
+        id: build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        id: chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Lighthouse accessibility gate
+        id: lighthouse
+        run: npm run test:a11y:lighthouse
+
+      - name: Upload Lighthouse accessibility reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-accessibility-${{ github.event.pull_request.number || github.sha }}
+          path: playwright/artifacts/lighthouse/
+
+  tests:
+    name: Workspace tests with coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     # `packages/db/test/**` holds the RLS actor matrix and every schema
     # constraint assertion, and it talks to a real PostgreSQL. It only started
     # running here when story 5.1 added `test:coverage` to that workspace, at
@@ -81,10 +194,6 @@ jobs:
         uses: ./.github/actions/setup-node-env
         with:
           use-npm-ci: 'false'
-
-      - name: Verify web aliased runtime dependencies
-        id: runtime_deps
-        run: npm run check:web:aliased-runtime-deps
 
       - name: Generate Prisma Client
         id: prisma
@@ -162,16 +271,6 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.roles.outcome == 'success' }}
         run: node scripts/prisma-migrate-deploy.mjs
 
-      - name: Typecheck workspaces
-        id: typecheck
-        if: ${{ !cancelled() && steps.prisma.outcome == 'success' }}
-        run: npm run typecheck
-
-      - name: Lint sources
-        id: lint
-        if: ${{ !cancelled() && steps.prisma.outcome == 'success' }}
-        run: npm run lint
-
       - name: Build packages
         id: build
         if: ${{ !cancelled() && steps.prisma.outcome == 'success' }}
@@ -181,19 +280,6 @@ jobs:
         id: chromium
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: npx playwright install --with-deps chromium
-
-      - name: Run Lighthouse accessibility gate
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.chromium.outcome == 'success' }}
-        id: lighthouse
-        continue-on-error: true
-        run: npm run test:a11y:lighthouse
-
-      - name: Upload Lighthouse accessibility reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lighthouse-accessibility-${{ github.event.pull_request.number || github.sha }}
-          path: playwright/artifacts/lighthouse/
 
       - name: Run tests with coverage
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.migrations.outcome == 'success' && steps.chromium.outcome == 'success' }}
@@ -220,29 +306,47 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: node --test scripts/ci/workflow-step-shadowing.test.mjs
 
+      - name: Require later checks to run after an earlier check fails
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node --test scripts/ci/workflow-step-shadowing.test.mjs
+
       # `always()` so this runs even when the coverage-comment step above has
       # already failed. `continue-on-error` on the test step is deliberate and
       # should stay: it is what lets the coverage comment post on a red run,
       # which is when it is most useful. But it means a failing test run reaches
       # the comment step, which then dies on the missing lcov and takes the job
       # down with an error about a missing file rather than about the tests.
-      # The gate held either way; the reported cause was wrong. This step now
-      # always runs and names the real one. It still exits 0 when the tests
-      # passed, so a comment step that fails for its own reasons is not masked.
-      #
-      # Every step after the first check runs with `!cancelled()` plus the
-      # outcomes of the steps it consumes. A failed lint or typecheck no longer
-      # skips the tests and hides their result, while a failed build or migration
-      # still does. Those checks already fail the job themselves; the gate names
-      # them alongside the tests.
+      # This step always runs and names the real cause. It still exits 0 when the
+      # tests passed, so a comment step that fails for its own reasons is not masked.
       - name: Fail if tests failed
-        if: >-
-          always() && (steps.tests.outcome == 'failure' ||
-          steps.lighthouse.outcome == 'failure' || steps.lint.outcome == 'failure' ||
-          steps.typecheck.outcome == 'failure' || steps.runtime_deps.outcome == 'failure')
+        if: ${{ always() && steps.tests.outcome == 'failure' }}
         run: |
-          echo "::error::Quality gate failed: tests=${{ steps.tests.outcome }} lighthouse=${{ steps.lighthouse.outcome }} lint=${{ steps.lint.outcome }} typecheck=${{ steps.typecheck.outcome }} runtime-deps=${{ steps.runtime_deps.outcome }}"
+          echo "::error::Workspace tests failed"
           exit 1
+
+  # The one job a ruleset or reader needs: red when any quality check is red,
+  # cancelled or skipped, with every result named.
+  quality-gate:
+    name: quality-gate
+    needs: [runtime-deps, typecheck, lint, lighthouse, tests]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every quality check to pass
+        env:
+          RESULTS: >-
+            tests=${{ needs.tests.result }} lighthouse=${{ needs.lighthouse.result }}
+            lint=${{ needs.lint.result }} typecheck=${{ needs.typecheck.result }}
+            runtime-deps=${{ needs.runtime-deps.result }}
+        run: |
+          for result in $RESULTS; do
+            if [ "${result#*=}" != "success" ]; then
+              echo "::error::Quality gate failed: $RESULTS"
+              exit 1
+            fi
+          done
+          echo "Quality gate passed: $RESULTS"
 
   community-realtime-budget:
     name: Community realtime cold-handshake budget

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { qualityGateProvisioningSql } from './integration-postgres.mjs'
 
-test('local integration Postgres provisions exactly what quality-gate provisions', () => {
+test('local integration Postgres provisions exactly what the tests job provisions', () => {
   const sql = qualityGateProvisioningSql()
   for (const statement of [
     'CREATE ROLE authenticated',
@@ -15,7 +15,7 @@ test('local integration Postgres provisions exactly what quality-gate provisions
 
 test('a workflow without the provisioning step is refused', () => {
   assert.throws(
-    () => qualityGateProvisioningSql('jobs:\n  quality-gate:\n    steps: []\n'),
+    () => qualityGateProvisioningSql('jobs:\n  tests:\n    steps: []\n'),
     /provisioning SQL not found/
   )
 })
