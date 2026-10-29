@@ -244,6 +244,31 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(screen.queryByTestId('sponsored-badge-post-2')).not.toBeInTheDocument()
     })
 
+    it('6.1-WEB-073 renders the live region without React warnings', async () => {
+      signIn()
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      useMswHandlers(
+        feedHandler({ items: [item(), item({ id: 'post-2' })] }),
+        http.get(POST_PATH, () => postBody({ id: 'post-2' }))
+      )
+      renderGrid({ highlightedCardId: 'post-2' })
+      await screen.findByTestId('lookbook-card-post-1')
+      await waitFor(() =>
+        expect(screen.getByTestId('lookbook-card-post-2')).toHaveFocus()
+      )
+      await waitFor(() =>
+        expect(screen.getByTestId('community-live-region')).toHaveTextContent(
+          'Focused on the highlighted look.'
+        )
+      )
+      // Every list the grid renders needs a stable key, the announcement list included.
+      expect(
+        errors.mock.calls
+          .map((call: unknown[]) => String(call[0]))
+          .filter((text) => /key/i.test(text))
+      ).toEqual([])
+    })
+
     it('6.1-WEB-072 keeps the focus announcement, then adds the feed one, when the feed answers after the deep link', async () => {
       signIn()
       let releaseFeed: () => void = () => undefined

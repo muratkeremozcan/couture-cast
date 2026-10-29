@@ -3648,7 +3648,13 @@ export function CommunityLookbookGrid({
           className="sr-only"
         >
           {announcements.map((message, index) => (
-            <span key={index === 0 ? message.announcementId : `queued-${index}`}>
+            <span
+              key={
+                index === 0
+                  ? `current-${message.announcementId ?? ''}`
+                  : `queued-${index}`
+              }
+            >
               {openedItem ? null : renderMessage(message, t, viewerBand)}
             </span>
           ))}
