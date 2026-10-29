@@ -2169,7 +2169,32 @@ export function CommunityLookbookGrid({
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [feedError, setFeedError] = useState<Message | null>(null)
-  const [announcement, setAnnouncement] = useState<Message | null>(null)
+  // What the one live region holds, in the order it happened. A message replaces the list,
+  // except the feed's own completion message, which follows anything announced while that
+  // same read was in flight (see announceFeed).
+  const [announcements, setAnnouncements] = useState<Message[]>([])
+  /** Monotonic request id, so a late response for an abandoned filter is dropped. */
+  const feedGenerationRef = useRef(0)
+  const announcedDuringReadRef = useRef<number | null>(null)
+  const setAnnouncement = useCallback((message: Message | null) => {
+    announcedDuringReadRef.current = feedGenerationRef.current
+    setAnnouncements(message ? [message] : [])
+  }, [])
+  /**
+   * The feed's own messages. The loading message always starts a fresh list; the completion
+   * message joins the list when something else was announced during the same read, a
+   * deep-link focus for one, so a polite region speaks both instead of dropping the first.
+   */
+  const announceFeed = useCallback(
+    (message: Message, generation: number, join: boolean) => {
+      setAnnouncements((previous) =>
+        join && announcedDuringReadRef.current === generation && previous.length > 0
+          ? [...previous, message]
+          : [message]
+      )
+    },
+    []
+  )
   const [reactionFeedback, setReactionFeedback] = useState<{
     key: string
     id: number
@@ -2286,8 +2311,6 @@ export function CommunityLookbookGrid({
 
   const feedControllerRef = useRef<AbortController | null>(null)
   const actionControllerRef = useRef<AbortController | null>(null)
-  /** Monotonic request id, so a late response for an abandoned filter is dropped. */
-  const feedGenerationRef = useRef(0)
   const modeRef = useRef<FilterCategory>(currentMode)
   const languageRef = useRef(i18n.language)
   const failedImagesRef = useRef(failedImages)
@@ -2411,7 +2434,7 @@ export function CommunityLookbookGrid({
         setIsLoading(true)
         setFeedError(null)
         setNextCursor(null)
-        setAnnouncement({ key: 'community.feed.loading' })
+        announceFeed({ key: 'community.feed.loading' }, generation, false)
       }
 
       const stamp = liveSponsorships.begin()
@@ -2455,19 +2478,23 @@ export function CommunityLookbookGrid({
             live(reactionState.current(post))
           )
         )
-        setAnnouncement({
-          key:
-            append && !restarted
-              ? 'community.feed.announceLoadedMore'
-              : 'community.feed.announceLoaded',
-          params: {
-            filterMode: feed.mode,
-            count:
+        announceFeed(
+          {
+            key:
               append && !restarted
-                ? merged.length - itemsRef.current.length
-                : page.length,
+                ? 'community.feed.announceLoadedMore'
+                : 'community.feed.announceLoaded',
+            params: {
+              filterMode: feed.mode,
+              count:
+                append && !restarted
+                  ? merged.length - itemsRef.current.length
+                  : page.length,
+            },
           },
-        })
+          generation,
+          true
+        )
         await revalidateHighlighted(
           detailRevalidationTargets(
             highlightedIdRef.current,
@@ -2497,7 +2524,14 @@ export function CommunityLookbookGrid({
         }
       }
     },
-    [applyLiveSponsorship, liveSponsorships, reactionState, revalidateHighlighted]
+    [
+      announceFeed,
+      applyLiveSponsorship,
+      liveSponsorships,
+      reactionState,
+      revalidateHighlighted,
+      setAnnouncement,
+    ]
   )
 
   useEffect(() => {
@@ -2823,6 +2857,7 @@ export function CommunityLookbookGrid({
     applySpotlight,
     resetSpotlight,
     captureScroll,
+    setAnnouncement,
   ])
 
   useEffect(
@@ -3071,7 +3106,7 @@ export function CommunityLookbookGrid({
       cardElement.focus()
       setAnnouncement({ key: 'community.feed.announceFocused' })
     }
-  }, [highlightedCardId, displayedItems])
+  }, [highlightedCardId, displayedItems, setAnnouncement])
 
   const handleModeChange = (mode: FilterCategory) => {
     setCurrentMode(mode)
@@ -3434,6 +3469,7 @@ export function CommunityLookbookGrid({
     spotlightItems,
     spotlightLevel,
     spotlightStatus,
+    setAnnouncement,
   ])
 
   const presentation = communityPresentation(
@@ -3611,9 +3647,11 @@ export function CommunityLookbookGrid({
           data-testid="community-live-region"
           className="sr-only"
         >
-          <span key={announcement?.announcementId}>
-            {openedItem ? null : renderMessage(announcement, t, viewerBand)}
-          </span>
+          {announcements.map((message, index) => (
+            <span key={index === 0 ? message.announcementId : `queued-${index}`}>
+              {openedItem ? null : renderMessage(message, t, viewerBand)}
+            </span>
+          ))}
         </div>
 
         {presentation.detail && (

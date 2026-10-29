@@ -107,7 +107,8 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       await user.click(await screen.findByTestId('create-post-button'))
       await choosePhoto(user)
       await screen.findByDisplayValue(SUGGESTED_ALT_TEXT)
-      await user.selectOptions(screen.getByTestId('post-challenge-select'), '')
+      // The challenge arrives with the feed, which can answer after the dialog opens.
+      await user.selectOptions(await screen.findByTestId('post-challenge-select'), '')
       await user.click(screen.getByTestId('confirm-alt-text-checkbox'))
       await user.click(screen.getByTestId('post-publish-submit'))
 
@@ -243,6 +244,41 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(screen.queryByTestId('sponsored-badge-post-2')).not.toBeInTheDocument()
     })
 
+    it('6.1-WEB-072 keeps the focus announcement, then adds the feed one, when the feed answers after the deep link', async () => {
+      signIn()
+      let releaseFeed: () => void = () => undefined
+      const feedGate = new Promise<void>((resolve) => {
+        releaseFeed = resolve
+      })
+      useMswHandlers(
+        http.get(FEED_PATH, async () => {
+          await feedGate
+          return feedBody({ items: [item(), item({ id: 'post-2' })] })
+        }),
+        http.get(POST_PATH, () => postBody({ id: 'post-2' }))
+      )
+      renderGrid({ highlightedCardId: 'post-2' })
+
+      // The deep link answers first and takes focus while the feed read is still open.
+      await waitFor(() =>
+        expect(screen.getByTestId('lookbook-card-post-2')).toHaveFocus()
+      )
+      const region = screen.getByTestId('community-live-region')
+      await waitFor(() =>
+        expect(region).toHaveTextContent('Focused on the highlighted look.')
+      )
+
+      releaseFeed()
+      await screen.findByTestId('lookbook-card-post-1')
+      // A polite region speaks what it holds, so the feed's message must not replace the
+      // focus message: both stay, in the order they happened.
+      await waitFor(() =>
+        expect(region.textContent).toMatch(
+          /Focused on the highlighted look\..*Showing .+ looks\. 2 loaded\./
+        )
+      )
+    })
+
     it('6.1-WEB-049 focuses and announces the card a deep link points at', async () => {
       signIn()
       useMswHandlers(
@@ -250,12 +286,6 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         http.get(POST_PATH, () => postBody({ id: 'post-2' }))
       )
       renderGrid({ highlightedCardId: 'post-2' })
-      // A feed read that lands after the focus replaces the region's text, so record every
-      // message it carried instead of reading the last one.
-      const region = await screen.findByTestId('community-live-region')
-      const announced = new Set<string>([region.textContent ?? ''])
-      const observer = new MutationObserver(() => announced.add(region.textContent ?? ''))
-      observer.observe(region, { childList: true, characterData: true, subtree: true })
 
       // The deep-link detail can render post-2 before the feed page that holds post-1 lands,
       // so each card is looked up again once the feed has arrived.
@@ -272,13 +302,11 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       await waitFor(() =>
         expect(screen.getByTestId('lookbook-card-post-2')).toHaveFocus()
       )
-      try {
-        await waitFor(() =>
-          expect([...announced]).toContain('Focused on the highlighted look.')
+      await waitFor(() =>
+        expect(screen.getByTestId('community-live-region')).toHaveTextContent(
+          'Focused on the highlighted look.'
         )
-      } finally {
-        observer.disconnect()
-      }
+      )
     })
 
     it.each([
@@ -364,12 +392,6 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         )
       )
       renderGrid({ highlightedCardId: 'post-99' })
-      // A feed read that lands after the focus replaces the region's text, so record every
-      // message it carried instead of reading the last one.
-      const region = await screen.findByTestId('community-live-region')
-      const announced = new Set<string>([region.textContent ?? ''])
-      const observer = new MutationObserver(() => announced.add(region.textContent ?? ''))
-      observer.observe(region, { childList: true, characterData: true, subtree: true })
 
       // The feed is keyset-paginated twelve rows at a time, so a notification can
       // reference a look from any depth of it. `getElementById` alone found
@@ -378,13 +400,11 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       const card = await screen.findByTestId('lookbook-card-post-99')
       expect(card).toHaveAttribute('data-highlighted', 'true')
       await waitFor(() => expect(card).toHaveFocus())
-      try {
-        await waitFor(() =>
-          expect([...announced]).toContain('Focused on the highlighted look.')
+      await waitFor(() =>
+        expect(screen.getByTestId('community-live-region')).toHaveTextContent(
+          'Focused on the highlighted look.'
         )
-      } finally {
-        observer.disconnect()
-      }
+      )
 
       // The deep-link look renders first; the feed's two looks follow once its read lands.
       await waitFor(() => {
