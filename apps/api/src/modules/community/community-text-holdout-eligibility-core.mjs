@@ -5,6 +5,7 @@ export const TEXT_LOCALES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr']
 const VERSION = /^holdout-v[1-9]\d*$/
 const SHA256 = /^[a-f0-9]{64}$/
 const LEDGER_INVALID = 'text holdout eligibility ledger is invalid'
+const SCHEMA_2_SCOPED = `${LEDGER_INVALID}: schema 2 entries cannot carry a locales list`
 
 function record(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -43,6 +44,8 @@ function parseEligible(ledger, scoped) {
   const eligible = new Map()
   for (const [key, seal] of Object.entries(ledger.eligible)) {
     if (!VERSION.test(key) || !validSeal(key, seal)) throw new Error(LEDGER_INVALID)
+    // A schema 2 entry means every locale, so a locales list there is a mislabelled schema 3.
+    if (!scoped && Object.hasOwn(seal, 'locales')) throw new Error(SCHEMA_2_SCOPED)
     eligible.set(key, {
       seal: {
         corpusVersion: seal.corpusVersion,
@@ -59,6 +62,7 @@ function parseRetired(ledger, scoped, eligible) {
   const retired = new Map()
   for (const [key, entry] of Object.entries(ledger.retired)) {
     if (!VERSION.test(key)) throw new Error(LEDGER_INVALID)
+    if (!scoped && record(entry)) throw new Error(SCHEMA_2_SCOPED)
     const scopedEntry = scoped && record(entry)
     const locales = scopedEntry ? localeSet(entry.locales) : new Set(TEXT_LOCALES)
     const reason = scopedEntry ? entry.reason : entry

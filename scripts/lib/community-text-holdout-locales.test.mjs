@@ -90,6 +90,22 @@ describe('per-locale eligibility', () => {
     }
   })
 
+  test('a schema 2 ledger rejects a locales list instead of reading it as all seven', () => {
+    const legacy = (eligible, retired = {}) => ({ schemaVersion: 2, eligible, retired })
+    for (const bad of [
+      legacy({ 'holdout-v60': seal('holdout-v60', { locales: ['de'] }) }),
+      legacy({ 'holdout-v60': seal('holdout-v60', { locales: [] }) }),
+      legacy({}, { 'holdout-v61': { locales: ['pt'], reason: 'Scoped.' } }),
+    ]) {
+      for (const locale of ['de', 'pt']) {
+        assert.throws(
+          () => requireEligibleHoldout('holdout-v60', bad, locale),
+          /ledger is invalid: schema 2 entries cannot carry a locales list/
+        )
+      }
+    }
+  })
+
   test('eligible locales must be a non-empty list of known, unique locales', () => {
     for (const locales of [[], ['xx'], ['de', 'de'], 'de', undefined]) {
       const bad = ledger3({
