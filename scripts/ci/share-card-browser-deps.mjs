@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
@@ -170,6 +171,6 @@ async function main() {
 
 if (
   process.argv[1] &&
-  pathToFileURL(fs.realpathSync(process.argv[1])).href === import.meta.url
+  pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url
 )
   await main()

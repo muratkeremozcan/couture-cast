@@ -71,6 +71,18 @@ describe('direct-run guards', () => {
     assert.deepEqual(offenders, [])
   })
 
+  test('every realpathSync in an entry-point check comes from node:fs, not node:fs/promises', () => {
+    const offenders = entryPointChecks()
+      .filter((check) => /\bfs\.realpathSync\(/.test(check.window))
+      .filter((check) => {
+        const file = path.join(projectRoot, check.where.replace(/:\d+$/, ''))
+        const source = fs.readFileSync(file, 'utf8')
+        return !/import (fs|\* as fs) from ['"](node:)?fs['"]/.test(source)
+      })
+      .map((check) => check.where)
+    assert.deepEqual(offenders, [])
+  })
+
   test('importing an entry-point script where argv[1] is absent does not throw', () => {
     const result = spawnSync(
       process.execPath,
