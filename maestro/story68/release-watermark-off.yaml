@@ -1,16 +1,23 @@
 appId: ${MAESTRO_APP_ID}
 ---
-- runFlow:
-    when:
-      visible:
-        id: share-card-watermark
-        checked: true
+# Same dropped-press guard as watermark.yaml: tap only while the switch is still checked, and
+# wait for its own state to flip before the render wait.
+- retry:
+    maxRetries: 3
     commands:
-      - tapOn:
-          id: share-card-watermark
-- assertVisible:
-    id: share-card-watermark
-    checked: false
+      - runFlow:
+          when:
+            visible:
+              id: share-card-watermark
+              checked: true
+          commands:
+            - tapOn:
+                id: share-card-watermark
+      - extendedWaitUntil:
+          visible:
+            id: share-card-watermark
+            checked: false
+          timeout: 8000
 - extendedWaitUntil:
     visible:
       id: share-card-preview-loaded
