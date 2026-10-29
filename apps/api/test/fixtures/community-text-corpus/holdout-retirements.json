@@ -6,6 +6,12 @@
       "sealedAt": "2026-10-28T17:05:57.585289+00:00",
       "corpusSha256": "f5ac17f8dce28422821beef3d6d7c065c30c570d265f2a7304a970f06f60456e",
       "locales": ["de", "en", "es", "fr", "it", "tr"]
+    },
+    "holdout-v8": {
+      "corpusVersion": "holdout-v8",
+      "sealedAt": "2026-10-29T00:00:00+00:00",
+      "corpusSha256": "d402f2c4491fd556671c520ab1d28e076720e6a160fcf72553937c1e53a2e7b4",
+      "locales": ["pt"]
     }
   },
   "retired": {

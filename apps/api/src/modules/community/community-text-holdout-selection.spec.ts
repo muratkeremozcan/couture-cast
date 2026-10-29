@@ -44,8 +44,28 @@ describe('checked-in selector', () => {
     '../../../test/fixtures/community-text-corpus'
   )
 
-  it('fails closed on Portuguese until a fresh holdout is registered for it', () => {
-    expect(() => loadActiveHoldouts(corpusDir)).toThrow(/holdout-v6 is retired for pt/)
+  it('gates Portuguese on holdout-v8 and the other six locales on holdout-v6', () => {
+    const { holdouts } = loadActiveHoldouts(corpusDir)
+    expect(describeCleanGates(holdouts).cleanGatedOn).toEqual({
+      de: 'holdout-v6',
+      en: 'holdout-v6',
+      es: 'holdout-v6',
+      fr: 'holdout-v6',
+      it: 'holdout-v6',
+      pt: 'holdout-v8',
+      tr: 'holdout-v6',
+    })
+  })
+
+  it('keeps the spent Portuguese holdouts retired', () => {
+    const ledger: unknown = JSON.parse(
+      fs.readFileSync(path.join(corpusDir, 'holdout-retirements.json'), 'utf8')
+    )
+    for (const version of ['holdout-v6', 'holdout-v7']) {
+      expect(() => requireEligibleHoldout(version, ledger, 'pt')).toThrow(
+        new RegExp(`${version} is retired for pt`)
+      )
+    }
   })
 
   it('names holdout-v6 for the six locales it is eligible for', () => {

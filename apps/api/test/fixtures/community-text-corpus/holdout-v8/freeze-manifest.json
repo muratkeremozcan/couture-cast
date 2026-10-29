@@ -1,0 +1,32 @@
+{
+  "corpusVersion": "holdout-v8",
+  "sealedAt": "2026-10-29T00:00:00+00:00",
+  "authoringBaseCommit": "8b98ad63177f05df11f72694ffbcfc244ad75f4d",
+  "aggregateRecipe": "SHA-256 over sorted UTF-8 lines: repository-relative-path + NUL + file-SHA-256 + LF",
+  "corpusSha256": "d402f2c4491fd556671c520ab1d28e076720e6a160fcf72553937c1e53a2e7b4",
+  "sealedTextSetAggregateSha256": "24a07a348c9687a00bd513fa415ea357fa541d4fe34e46c6049d7f1664296fb4",
+  "sealedTextSetAggregateRecipe": "SEAL MANIFEST PT8. Aggregate = SHA-256 of the UTF-8 text of the line 'pt <corpus-json-sha256> <items>' with a trailing newline.",
+  "sealedTextSetEquivalence": "Importer output texts and fields are identical, in order, to the sealed corpus JSON (FINAL-v8-draft/holdout-v8-pt.json, SHA-256 cebe2ecf96b6c30426871430c2668140e96d3a4dd87d7b1575e7f2474c059e62, coordinator-verified aggregate 24a07a34); importer IDs are pt-holdout-v8-001..2000 in the same order as sealed IDs pt-holdout-v8-0001..2000.",
+  "construction": "2000 complete items individually composed and persisted literally by eight fresh blind authors; no banks, templates, combinatorial assembly or text-generating program. 1000 captions, 1000 altTexts. Two independent readers: zero STRONG collisions; 182 conservative pairs disclosed.",
+  "independenceRequirements": {
+    "maximumFiveWordAffectedItemsPerLocale": 20,
+    "primaryScenarioMaximum": 1,
+    "conceptCapPerScenarioOrMotif": 20,
+    "semanticAcceptanceRemainsReviewable": true,
+    "productionRandomSamplingEstablished": false
+  },
+  "sealManifest": "FINAL-v8-draft/SEAL-MANIFEST-PT8.json (SHA-256 b26e8e4045ed64099e8c8e8463c68176d7dab7f37e73ed3ce829e5a0c20491af; authoring root, backed up under _wt/cc68x-pt8-sealed)",
+  "files": [
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v8/pt.json",
+      "sha256": "00c59356272d24f8e62d211418c329d56234356c3b4ea3ca8ea239f8405f4f66",
+      "language": "pt",
+      "total": 2000,
+      "captions": 1000,
+      "altTexts": 1000,
+      "gatedClean": 2000,
+      "expectedReview": 0
+    }
+  ],
+  "portugueseOnlyNote": "This directory holds pt only. The other six locales stay on holdout-v6. PT v6 and PT v7 are spent and never decide PT acceptance; this fresh PT-only holdout decides it."
+}
