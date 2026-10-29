@@ -9,13 +9,14 @@ export const FLOW_STARTUP_MS = 30_000
 export const FLOW_TIMEOUT_MARGIN = 1.25
 
 /**
- * open-app.yaml, per attempt: 10 s + 60 s + 30 s of declared waits and 15 condition
- * checks (3 dev-client checks, then 4 back-navigation checks repeated 3 times: Navigate
+ * open-app.yaml, per attempt: 10 s + 60 s + 30 s of declared waits and 17 condition
+ * checks (the Android not-responding dialog guard at the start and again before the tab
+ * wait, 3 dev-client checks, then 4 back-navigation checks repeated 3 times: Navigate
  * up, BackButton, comments-close and the iOS localized back label).
  * maxRetries 3 allows 4 attempts.
  */
 export const OPEN_APP_WORST_CASE_MS =
-  FLOW_STARTUP_MS + 4 * (100_000 + 15 * CONDITION_CHECK_MS)
+  FLOW_STARTUP_MS + 4 * (100_000 + 17 * CONDITION_CHECK_MS)
 
 /**
  * open-post.yaml on iOS (its slower platform), one attempt: 10 s + 20 s + 20 s of declared
