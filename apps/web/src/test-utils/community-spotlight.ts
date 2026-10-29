@@ -151,11 +151,10 @@ export function pageOneReads(cursors: (string | null)[]) {
   return cursors.filter((cursor) => cursor === null).length
 }
 
-/** Every text the one live region takes, so a repeated or empty announcement shows. */
 /**
  * Resolves once the feed read that starts on mount has answered. The feed announces its own
- * result through the shared live region, so a spotlight announcement that arrives first would
- * be replaced by it.
+ * result through the shared live region, so waiting for it keeps that message out of the
+ * announcements a test records afterwards.
  */
 export async function feedSettled() {
   await waitFor(() =>
@@ -166,6 +165,7 @@ export async function feedSettled() {
   )
 }
 
+/** Every text the one live region takes, so a repeated or empty announcement shows. */
 export function recordAnnouncements() {
   const seen: string[] = []
   const region = screen.getByTestId('community-live-region')
