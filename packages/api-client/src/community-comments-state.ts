@@ -97,7 +97,8 @@ function mergePage(
  * it. A comment at or below the highest sequence the re-read page holds was inside the
  * range the refresh read, so the refresh decides whether it still exists. A page the refresh
  * read from another snapshot, or one reloaded from its start, has no cursor that
- * continues the later replies, so the re-read page stands alone.
+ * continues the later replies, so the re-read page stands alone. A re-read that reached
+ * the end of the list does too, since the server holds nothing beyond it.
  */
 function withLaterPages(
   captured: CommunityCommentsPage | undefined,
@@ -115,6 +116,8 @@ function withLaterPages(
     return refreshed
   const seen = new Set(captured.items.map(({ id }) => id))
   if (current.items.every(({ id }) => seen.has(id))) return refreshed
+  // A re-read that reached the end of the list leaves nothing beyond it to append.
+  if (refreshed.nextCursor === null) return refreshed
   const known = new Set([...seen, ...refreshed.items.map(({ id }) => id)])
   const ceiling = Math.max(
     -Infinity,

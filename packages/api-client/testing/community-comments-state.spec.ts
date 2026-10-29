@@ -252,6 +252,21 @@ describe('screen-owned comments state', () => {
     await refreshing
     expect(state.current('post').announcement?.key).toBe('community.realtime.newComments')
   })
+  it('does not bring back loaded replies after the server removed them all', async () => {
+    const { state, transport } = setup(),
+      roots = deferred<CommunityCommentsPage>()
+    transport.replies.mockResolvedValueOnce(page([item('r1', 1), item('r2', 2)], 'c1'))
+    await state.load('post', 'root')
+    transport.roots.mockReturnValueOnce(roots.promise)
+    const refreshing = state.refresh('post')
+    transport.replies
+      .mockResolvedValueOnce(page([item('r3', 3), item('r4', 4)], 'c2'))
+      .mockResolvedValueOnce(page([], null))
+    await state.load('post', 'root', true)
+    roots.resolve(page([{ ...item('root'), replyCount: 0 }]))
+    await refreshing
+    expect(state.current('post').replies.get('root')?.items).toEqual([])
+  })
   it('does not bring back a reply the server removed from the re-read range', async () => {
     const { state, transport } = setup(),
       roots = deferred<CommunityCommentsPage>()
@@ -327,6 +342,18 @@ describe('screen-owned comments state', () => {
       expect(ids(state)).toEqual(['root1', 'root2', 'root3'])
       expect(state.current('post').roots?.nextCursor).toBe('rc2')
       expect(state.current('post').replies.has('root3')).toBe(true)
+    })
+    it('does not bring back loaded roots after the server removed them all', async () => {
+      const { state, transport } = setup()
+      transport.roots.mockResolvedValueOnce(page([item('r1', 1), item('r2', 2)], 'rc1'))
+      await state.load('post')
+      laterRoots = () => page([item('r3', 3), item('r4', 4)], 'rc2')
+      const reread = holdRefresh(transport)
+      const refreshing = state.refresh('post')
+      await state.load('post', null, true)
+      reread.resolve(page([], null))
+      await refreshing
+      expect(ids(state)).toEqual([])
     })
     it('does not bring back a root the server removed from the re-read range', async () => {
       const { state, transport } = setup()
