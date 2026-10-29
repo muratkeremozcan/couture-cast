@@ -1227,6 +1227,14 @@ describe('Story 6.3 screen request ownership', () => {
     renderGrid({ highlightedCardId: 'post-1' })
     const card = await screen.findByTestId('lookbook-card-post-1')
     await waitFor(() => expect(card).toHaveFocus())
+    // The deep link can render the card before the feed answers, and the feed's own
+    // announcement would then replace "Reaction saved.", so let the feed settle first.
+    await waitFor(() =>
+      expect(screen.getByTestId('community-card-grid')).toHaveAttribute(
+        'aria-busy',
+        'false'
+      )
+    )
     const applause = within(card).getByRole('button', { name: 'Applaud, 0' })
     await user.click(applause)
     await within(card).findByRole('button', { name: 'Applaud, 1' })

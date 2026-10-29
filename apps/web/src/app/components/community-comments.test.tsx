@@ -572,10 +572,14 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     )
     const state = makeState()
     render(<Journey state={state} />)
-    expect(await screen.findByText(root.body!)).toBeVisible()
+    // The private published row prints the same body until the public root lands and
+    // deduplicates it, so wait for the public entry itself.
+    expect(
+      within(await screen.findByTestId('comment-root')).getByText(root.body!)
+    ).toBeVisible()
     suspended = true
     await act(async () => state.statuses('community-post-1'))
-    expect(screen.queryByText(root.body!)).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText(root.body!)).not.toBeInTheDocument())
     expect(screen.getByText('Unavailable.')).toBeVisible()
   })
 
@@ -847,7 +851,10 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     render(<Journey state={makeState()} />)
     await user.click(await screen.findByRole('button', { name: 'More submissions' }))
     expect(await screen.findByText('Second private page')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+    // Refresh is disabled while the public read is in flight, and a click then does nothing.
+    const refresh = screen.getByRole('button', { name: 'Refresh' })
+    await waitFor(() => expect(refresh).toBeEnabled())
+    await user.click(refresh)
     await waitFor(() => expect(refreshStarted).toBe(true))
     expect(screen.getByText('Second private page')).toBeVisible()
     await act(async () => {
