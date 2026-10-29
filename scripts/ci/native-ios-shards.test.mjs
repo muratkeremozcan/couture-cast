@@ -160,4 +160,10 @@ test('permission-baseline revokes read, grants add-only and asserts both, on iOS
   assert.match(branch, /'revoke', 'photos', appId/)
   assert.match(branch, /'grant', 'photos-add', appId/)
   assert.match(branch, /assertIosReadDenied\(iosPhotoPermissions\(\), true\)/)
+  // proof relaunches the dev client after its grant, so the app reads the permission in a fresh
+  // JS runtime; the baseline does the same, then returns to the tabs.
+  const grant = branch.indexOf("'grant', 'photos-add', appId")
+  const relaunch = branch.indexOf('couturecast-story68://expo-development-client/')
+  const tabs = branch.indexOf("maestro('maestro/story65/open-app.yaml')")
+  assert.ok(grant >= 0 && relaunch > grant && tabs > relaunch)
 })

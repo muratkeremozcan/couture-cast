@@ -1703,6 +1703,12 @@ if (command === 'prebuild') {
     run('xcrun', ['simctl', 'privacy', device, 'revoke', 'photos', appId])
     run('xcrun', ['simctl', 'privacy', device, 'grant', 'photos-add', appId])
     assertIosReadDenied(iosPhotoPermissions(), true)
+    // proof relaunches the dev client after its grant; do the same so the app reads the
+    // permission in a fresh JS runtime and the next flow starts on the tabs.
+    openUrl(
+      `couturecast-story68://expo-development-client/?url=${encodeURIComponent('http://127.0.0.1:8089')}`
+    )
+    maestro('maestro/story65/open-app.yaml')
   }
 } else if (command === 'fixture') {
   const mode = option('mode')
