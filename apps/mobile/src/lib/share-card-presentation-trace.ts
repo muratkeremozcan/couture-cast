@@ -18,3 +18,26 @@ export function installShareCardPresentationTrace(
 ) {
   sink = next
 }
+
+/**
+ * Closed events along the share-card opener path, recorded by the isolated Story 6.8 native test
+ * build only (no sink in production). They show whether a press reached the opener, whether the
+ * screen opened the composer, and which guard in the composer ended the attempt.
+ */
+export type ShareCardOpenerEvent =
+  | 'press'
+  | 'state-open'
+  | 'composer-idle'
+  | 'composer-cached'
+  | 'composer-prepare'
+  | 'reset-identity'
+  | 'reset-blur'
+let openerSink: ((event: ShareCardOpenerEvent) => void) | null = null
+export function traceShareCardOpener(event: ShareCardOpenerEvent) {
+  openerSink?.(event)
+}
+export function installShareCardOpenerTrace(
+  next: ((event: ShareCardOpenerEvent) => void) | null
+) {
+  openerSink = next
+}

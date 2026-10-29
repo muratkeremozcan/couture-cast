@@ -6,60 +6,72 @@ import test from 'node:test'
 
 const dir = fileURLToPath(new URL('../../maestro/story68/', import.meta.url))
 const read = (name) => fs.readFileSync(`${dir}${name}`, 'utf8')
-const BELOW =
-  /id: outfit-share-card-open\n(\s+)below:\n\s+id: header-info-modal\n\s+index: 0/
-// Run 26: the scroll left the opener under the Home header, a tap hit the status bar, and the
-// share-card dialog never opened. Every iOS tap on the opener now requires it below the header.
-const TAPPING = ['open-outfit.yaml', 'preparing-cancel.yaml', 'expo-go-unavailable.yaml']
-// The held flow taps the opener where rapid-ready-outfit.yaml left it (below the header, asserted
-// there) and may not contain a runFlow: its tests pin its exact command list.
+// Runs 26 and 27: the Home ScrollView has a sticky chip bar over its content, and the iOS scroll
+// (centerElement true) left the opener under it, so the tap hit a chip. On iOS the opener is never
+// centred: the flows go back to scroll offset 0 and only scroll when it is below the fold.
+const POSITIONING = [
+  'open-outfit.yaml',
+  'preparing-cancel.yaml',
+  'expo-go-unavailable.yaml',
+  'rapid-ready-outfit.yaml',
+]
+// The held flow taps the opener where rapid-ready-outfit.yaml left it and may not contain a
+// runFlow: its tests pin its exact command list.
 const POSITIONED_BY_PREVIOUS_FLOW = ['rapid-watermark-held.yaml']
 
-test('every iOS tap on the outfit opener requires the opener below the Home header', () => {
-  for (const name of TAPPING) {
+test('every iOS flow that opens the outfit card positions the opener without centring it', () => {
+  for (const name of POSITIONING) {
     const flow = read(name)
-    const [ios, android] = flow.split(/platform: Android/)
+    const [ios, android] = flow.split(/when:\s+platform: Android/)
     assert.match(
       ios,
-      /platform: iOS[\s\S]*tapOn:[\s\S]*below:\s+id: header-info-modal/,
-      name
+      /when:\s+platform: iOS\s+file: position-outfit-open\.yaml/,
+      `${name} positions on iOS`
     )
-    assert.match(ios, BELOW, name)
-    assert.doesNotMatch(android, /below:/, `${name}: Android keeps its plain tap`)
-    assert.match(android, /tapOn:\s+id: outfit-share-card-open\n\s+index: 0/, name)
+    assert.doesNotMatch(ios, /centerElement: true/, `${name}: iOS never centres`)
+    assert.doesNotMatch(
+      flow,
+      /header-info-modal/,
+      `${name}: the header is not the reference`
+    )
+    assert.match(
+      android,
+      /scrollUntilVisible:[\s\S]*centerElement: true/,
+      `${name}: Android keeps its scroll`
+    )
   }
 })
 
-test('the positioning subflow swipes the content down at most three times until the opener is below the header', () => {
+test('the positioning subflow returns to offset 0 and only scrolls when the opener is below the fold', () => {
   const subflow = read('position-outfit-open.yaml')
   assert.match(
     subflow,
-    /while:\s+notVisible:\s+id: outfit-share-card-open\s+below:\s+id: header-info-modal/
+    /repeat:\s+times: 3\s+commands:\s+- swipe:\s+start: 50%, 30%\s+end: 50%, 85%/,
+    'three swipes down reach the top'
   )
-  assert.match(subflow, /times: 3/)
-  assert.match(subflow, /start: 50%, 30%\s+end: 50%, 55%/)
   assert.match(
     subflow,
-    /assertVisible:[\s\S]*below:[\s\S]*label: outfit_opener_under_header/
+    /when:\s+notVisible:\s+id: outfit-share-card-open\s+above:\s+id: tab-home/,
+    'the scroll runs only when the opener is not above the tab bar at offset 0'
   )
-  for (const name of [
-    'open-outfit.yaml',
-    'preparing-cancel.yaml',
-    'expo-go-unavailable.yaml',
-    'rapid-ready-outfit.yaml',
-  ])
-    assert.match(read(name), /runFlow: position-outfit-open\.yaml/, name)
+  assert.match(subflow, /centerElement: false/)
+  assert.doesNotMatch(subflow, /centerElement: true/)
+  assert.match(subflow, /start: 50%, 60%\s+end: 50%, 48%/, 'a 105 pt lift')
+  assert.match(
+    subflow,
+    /assertVisible:\s+id: outfit-share-card-open\s+above:\s+id: tab-home\s+label: outfit_opener_clear_of_tab_bar/
+  )
 })
 
-test('no story68 flow taps the opener without the Android or below-header guard', () => {
+test('no story68 flow centres the outfit opener on iOS or taps it past a header reference', () => {
   for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.yaml'))) {
     if (name === 'release-open-outfit.yaml') continue // Android Release only
-    if (POSITIONED_BY_PREVIOUS_FLOW.includes(name)) continue
     const flow = read(name)
-    const taps = [...flow.matchAll(/tapOn:\s+id: outfit-share-card-open\n(\s+)(\S+)/g)]
-    for (const tap of taps)
-      assert.ok(['below:', 'index:'].includes(tap[2]), `${name}: ${tap[2]}`)
-    if (taps.length) assert.match(flow, /header-info-modal/, `${name} guards its iOS tap`)
+    assert.doesNotMatch(flow, /header-info-modal/, name)
+    if (POSITIONED_BY_PREVIOUS_FLOW.includes(name)) continue
+    if (!/outfit-share-card-open/.test(flow) || name === 'position-outfit-open.yaml')
+      continue
+    assert.match(flow, /file: position-outfit-open\.yaml/, `${name} positions the opener`)
   }
 })
 
@@ -69,8 +81,8 @@ test(
   () => {
     for (const name of [
       'position-outfit-open.yaml',
-      ...TAPPING,
-      'rapid-ready-outfit.yaml',
+      ...POSITIONING,
+      ...POSITIONED_BY_PREVIOUS_FLOW,
     ]) {
       const result = spawnSync('maestro', ['check-syntax', `${dir}${name}`], {
         encoding: 'utf8',

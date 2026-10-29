@@ -240,6 +240,177 @@ export function systemSurfaceSummary(hierarchy) {
   }
 }
 
+const GEOMETRY_IDS = {
+  chips: 'mobile-chip-navigation',
+  opener: 'outfit-share-card-open',
+  tab: 'tab-home',
+}
+
+const nodeBounds = (node) => {
+  const match = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(
+    node?.attributes?.bounds ?? ''
+  )
+  return match ? match.slice(1).map(Number) : null
+}
+
+/**
+ * Where the outfit opener sat against the sticky chip bar and the tab bar when the step failed,
+ * in points. `centreCoveredBy` names what the tap centre (the centre of the opener) lay inside:
+ * a tap there reaches that bar, never the opener. Null when the opener is not on the screen.
+ */
+export function openerGeometry(hierarchy) {
+  if (!hierarchy || typeof hierarchy !== 'object') return null
+  const found = {}
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return
+    for (const [name, id] of Object.entries(GEOMETRY_IDS))
+      if (node.attributes?.['resource-id'] === id && !found[name])
+        found[name] = nodeBounds(node)
+    for (const child of Array.isArray(node.children) ? node.children : []) visit(child)
+  }
+  visit(hierarchy)
+  const opener = found.opener ?? null
+  if (!opener) return null
+  const centre = (opener[1] + opener[3]) / 2
+  const inside = (box) => !!box && centre >= box[1] && centre <= box[3]
+  return {
+    chips: found.chips ?? null,
+    opener,
+    tab: found.tab ?? null,
+    centreCoveredBy: inside(found.chips) ? 'chips' : inside(found.tab) ? 'tab' : null,
+  }
+}
+
+const SCROLL_KINDS = {
+  swipeCommand: 'swipe',
+  scrollCommand: 'scroll',
+  scrollUntilVisible: 'scrollUntilVisible',
+}
+
+/**
+ * The ordered swipes and scrolls of the failed flow with their status, and the top (in points)
+ * of the element at each scroll attempt, so the path that left the opener where it was is on record.
+ */
+export function scrollPath(output, maestroLog = '') {
+  const steps = maestroCommandRows(output)
+    .flatMap((row) => {
+      const kind = Object.keys(row?.command ?? {}).find((key) => SCROLL_KINDS[key])
+      return kind
+        ? [
+            {
+              kind: SCROLL_KINDS[kind],
+              status: String(row.metadata?.status ?? 'UNKNOWN'),
+            },
+          ]
+        : []
+    })
+    .slice(-24)
+  const elementTops = [
+    ...String(maestroLog).matchAll(
+      /Element bounds: Bounds\(x=-?\d+, y=(-?\d+), width=\d+, height=\d+\)/g
+    ),
+  ]
+    .map((match) => Number(match[1]))
+    .slice(-12)
+  return { steps, elementTops }
+}
+
+const OPENER_EVENTS = new Set([
+  'press',
+  'state-open',
+  'composer-idle',
+  'composer-cached',
+  'composer-prepare',
+  'reset-identity',
+  'reset-blur',
+])
+
+/** The app's own opener trace (fixture build only): closed event names with ms offsets. */
+export function readIosOpenerTrace({ device, appId, spawn = spawnSync }) {
+  try {
+    const container = spawn(
+      'xcrun',
+      ['simctl', 'get_app_container', device, appId, 'data'],
+      { encoding: 'utf8', timeout: 15000 }
+    )
+    if (container.status !== 0) return null
+    const file = path.join(container.stdout.trim(), 'Documents', 'cc68-opener-trace.json')
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (!Array.isArray(parsed?.events)) return null
+    return parsed.events
+      .filter(
+        (row) =>
+          OPENER_EVENTS.has(row?.e) &&
+          Number.isFinite(row?.t) &&
+          row.t >= 0 &&
+          row.t < 1e10
+      )
+      .map((row) => ({ event: row.e, ms: Math.round(row.t) }))
+      .slice(-40)
+  } catch {
+    return null
+  }
+}
+
+/** Counts by level and JavaScript exception lines from `log show --style ndjson`; no text kept. */
+export function summarizeAppLog(ndjson) {
+  const summary = { lines: 0, error: 0, fault: 0, jsException: 0 }
+  for (const line of String(ndjson ?? '').split('\n')) {
+    let row
+    try {
+      row = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (!row || typeof row !== 'object' || typeof row.messageType !== 'string') continue
+    summary.lines++
+    if (row.messageType === 'Error') summary.error++
+    if (row.messageType === 'Fault') summary.fault++
+    if (
+      /Unhandled JS Exception|RCTFatal|JavaScript (?:error|exception)/i.test(
+        row.eventMessage ?? ''
+      )
+    )
+      summary.jsException++
+  }
+  return summary
+}
+
+/** The app process's log of the last minute, as counts only; null when the query fails. */
+export function readIosAppLogSummary({
+  device,
+  processName = 'CoutureCastStory68',
+  spawn = spawnSync,
+}) {
+  try {
+    const result = spawn(
+      'xcrun',
+      [
+        'simctl',
+        'spawn',
+        device,
+        'log',
+        'show',
+        '--last',
+        '60s',
+        '--style',
+        'ndjson',
+        '--predicate',
+        `process == "${processName}"`,
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 30000,
+        maxBuffer: 64 * 1024 * 1024,
+        killSignal: 'SIGKILL',
+      }
+    )
+    return result.status === 0 ? summarizeAppLog(result.stdout) : null
+  } catch {
+    return null
+  }
+}
+
 /** One closed host sample at this instant (paging counters, swap, top memory); nonfatal. */
 export function recordIosHostSample(
   label,
@@ -321,6 +492,8 @@ export function recordIosFlowProgress({
   apiLogFromByte = 0,
   output = null,
   root = process.cwd(),
+  device = null,
+  appId = null,
   spawn = spawnSync,
   report = console.log,
 }) {
@@ -332,10 +505,17 @@ export function recordIosFlowProgress({
     const hostSampled = output
       ? recordIosHostSample('flow-failure', { root, spawn, report })
       : false
+    const hierarchy = output ? failedStepHierarchy(output) : null
+    const geometry = openerGeometry(hierarchy)
+    if (geometry?.centreCoveredBy) report(JSON.stringify({ openerObstructed: geometry }))
     const entry = {
       flow,
       hostSampled,
-      systemSurface: output ? systemSurfaceSummary(failedStepHierarchy(output)) : null,
+      systemSurface: systemSurfaceSummary(hierarchy),
+      openerGeometry: geometry,
+      scrollPath: output ? scrollPath(output, maestroLog) : null,
+      openerTrace: device && appId ? readIosOpenerTrace({ device, appId, spawn }) : null,
+      appLog: device ? readIosAppLogSummary({ device, spawn }) : null,
       ...maestroFlowProgress(maestroLog),
       // Only rows written since the flow began, so an earlier flow's requests never pose as its own.
       shareCardApi: apiLogFile

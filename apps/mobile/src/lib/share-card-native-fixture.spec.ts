@@ -207,13 +207,15 @@ describe('isolated native fixtures and browser boundaries', () => {
       expect(environment.listener).toBeNull()
     }
   )
-  it('browser fallback never activates native saving and portable digest validates exact bytes', async () => {
+  it('browser save fallback never activates native saving', async () => {
     expect(fallback.nativeShareCardSaveAvailable()).toBe(false)
     expect(await fallback.shareCardSavePermission(true)).toMatchObject({ granted: false })
     await fallback.cleanOrphanShareCards()
     await expect(
       fallback.saveShareCard(card, new AbortController().signal, () => true)
     ).rejects.toThrow('nativeSaveUnavailable')
+  })
+  it('browser fixture module stays in real mode and passes the adapter through', async () => {
     expect(browserFixture.shareCardFixtureMode()).toBe('real')
     browserFixture.startShareCardNativeFixture()()
     expect(browserFixture.shareCardPreviewTestId(false, '')).toBe('share-card-preview')
@@ -223,6 +225,48 @@ describe('isolated native fixtures and browser boundaries', () => {
     const save = vi.fn(() => Promise.resolve())
     await browserFixture.runShareCardNativeAdapter('', save)
     expect(save).toHaveBeenCalledOnce()
+  })
+  it('portable digest matches the fixture sha256 for the exact decoded bytes', async () => {
     expect(await sha256Hex(decodeShareCardBase64(card.pngBase64))).toBe(card.sha256)
+  })
+})
+
+describe('opener trace recorder', () => {
+  it('writes closed events with ms offsets, bounded and in order', async () => {
+    const writes: { uri: string; contents: string }[] = []
+    let clock = 1000
+    const record = nativeFixture.openerTraceRecorder(
+      'file:///docs/',
+      (uri, contents) => {
+        writes.push({ uri, contents })
+        return Promise.resolve()
+      },
+      () => (clock += 7)
+    )
+    record('press')
+    record('state-open')
+    for (let index = 0; index < 45; index++) record('composer-idle')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(
+      writes.every((write) => write.uri === 'file:///docs/cc68-opener-trace.json')
+    ).toBe(true)
+    const last = JSON.parse(writes.at(-1)?.contents ?? '{}')
+    expect(last.version).toBe(1)
+    expect(last.events).toHaveLength(40)
+    expect(last.events.at(-1).e).toBe('composer-idle')
+    const first = JSON.parse(writes[0]?.contents ?? '{}')
+    expect(first.events).toEqual([{ e: 'press', t: 7 }])
+  })
+
+  it('stays silent without a documents directory and survives a failed write', async () => {
+    const quiet = nativeFixture.openerTraceRecorder(null, () =>
+      Promise.reject(new Error('x'))
+    )
+    expect(() => quiet('press')).not.toThrow()
+    const failing = nativeFixture.openerTraceRecorder('file:///docs/', () =>
+      Promise.reject(new Error('disk'))
+    )
+    expect(() => failing('press')).not.toThrow()
+    await new Promise((resolve) => setTimeout(resolve, 0))
   })
 })

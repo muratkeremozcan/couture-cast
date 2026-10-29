@@ -9,7 +9,11 @@ import * as Application from 'expo-application'
 import Constants from 'expo-constants'
 import * as Linking from 'expo-linking'
 import * as FileSystem from 'expo-file-system/legacy'
-import { installShareCardPresentationTrace } from './share-card-presentation-trace'
+import {
+  installShareCardOpenerTrace,
+  installShareCardPresentationTrace,
+  type ShareCardOpenerEvent,
+} from './share-card-presentation-trace'
 
 const fixtureBuild = () =>
   isShareCardNativeFixtureBuild(
@@ -43,6 +47,30 @@ export function shareCardPreviewTestId(loaded: boolean, digest: string) {
     ? `share-card-preview-loaded-${digest}`
     : 'share-card-preview-loaded'
 }
+const OPENER_TRACE_LIMIT = 40
+/**
+ * The opener trace as a small file in the app's Documents directory, which the harness reads
+ * from the simulator container after a failed flow. Writes are chained so they never interleave.
+ */
+export function openerTraceRecorder(
+  directory: string | null,
+  write: (uri: string, contents: string) => Promise<void>,
+  now: () => number = Date.now
+) {
+  const events: { e: ShareCardOpenerEvent; t: number }[] = []
+  let started: number | null = null
+  let pending: Promise<void> = Promise.resolve()
+  return (event: ShareCardOpenerEvent) => {
+    if (!directory) return
+    started ??= now()
+    events.push({ e: event, t: now() - started })
+    if (events.length > OPENER_TRACE_LIMIT) events.shift()
+    const contents = JSON.stringify({ version: 1, events })
+    pending = pending
+      .then(() => write(`${directory}cc68-opener-trace.json`, contents))
+      .catch(() => undefined)
+  }
+}
 export function startShareCardNativeFixture(): () => void {
   if (!fixtureBuild()) return () => undefined
   // The module also checks Debug and the exact owned bundle before recording.
@@ -50,6 +78,11 @@ export function startShareCardNativeFixture(): () => void {
   // CI diagnostics read these closed lifecycle names from logcat after a failed flow.
   installShareCardPresentationTrace((event) =>
     console.info(`[cc68-presentation] ${event}`)
+  )
+  installShareCardOpenerTrace(
+    openerTraceRecorder(FileSystem.documentDirectory, (uri, contents) =>
+      FileSystem.writeAsStringAsync(uri, contents)
+    )
   )
   const subscription = Linking.addEventListener('url', ({ url }) => {
     if (!isShareCardNativeFixtureUrl(url)) return
@@ -66,6 +99,7 @@ export function startShareCardNativeFixture(): () => void {
   return () => {
     subscription.remove()
     installShareCardPresentationTrace(null)
+    installShareCardOpenerTrace(null)
     void enableStory68FocusObservation(false)?.catch(() => undefined)
   }
 }

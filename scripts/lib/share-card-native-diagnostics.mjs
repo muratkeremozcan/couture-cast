@@ -28,6 +28,7 @@ const ids = new Set([
   'tab-wardrobe',
   'tab-insights',
   'outfit-share-card-open',
+  'mobile-chip-navigation',
   'share-card-title',
   'share-card-preview',
   'share-card-preview-loaded',

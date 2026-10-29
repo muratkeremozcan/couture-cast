@@ -3,6 +3,7 @@ import {
   useShareCardPresentationOpener,
 } from '@/components/android-share-card-presentation'
 import { focusShareCardElement, shareCardHeadingNode } from '@/src/lib/share-card-focus'
+import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import {
   type ShareCardSource,
   ResponseError,
@@ -228,6 +229,7 @@ export default function TabOneScreen() {
       shareVisitFocused.current = true
       return () => {
         shareVisitFocused.current = false
+        traceShareCardOpener('reset-blur')
         setShareCardSource(null)
         setShareCardOpen(false)
       }
@@ -247,6 +249,7 @@ export default function TabOneScreen() {
     mobileApplicationUserId
   )
   useEffect(() => {
+    traceShareCardOpener('reset-identity')
     setShareCardSource(null)
     setShareCardOpen(false)
   }, [applicationUserId])
@@ -880,6 +883,7 @@ export default function TabOneScreen() {
                 }
                 setShareCardSource({ kind: 'outfit', recommendationId })
                 setShareCardOpen(true)
+                traceShareCardOpener('state-open')
               }}
               onSwapGarment={handleSwapGarment}
               onGarmentRef={(garmentId, element) => {

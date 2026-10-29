@@ -28,6 +28,7 @@ import { resolveSupportedLocale } from '@couture/api-client/contracts/http'
 import { EdgeToEdgeModal, useModalInsets } from './edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { focusShareCardElement } from '@/src/lib/share-card-focus'
+import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import {
   mobileApplicationUserId,
   subscribeMobileApplicationUser,
@@ -202,11 +203,18 @@ export function ShareCardComposer({
     source && ('postId' in source ? source.postId : source.recommendationId),
   ])
   useEffect(() => {
-    if (!open || !source) return
+    if (!open || !source) {
+      traceShareCardOpener('composer-idle')
+      return
+    }
     const request = ++generation.current
     const abort = new AbortController()
     abortRef.current = abort
-    if (valid) return () => abort.abort()
+    if (valid) {
+      traceShareCardOpener('composer-cached')
+      return () => abort.abort()
+    }
+    traceShareCardOpener('composer-prepare')
     setBusy(true)
     setFeedbackOwner({ member, key })
     setError(null)

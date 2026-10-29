@@ -288,6 +288,7 @@ function invokeMaestro(t, capture) {
     root,
     platform: 'android',
     device: 'emulator-5554',
+    appId: 'com.couturecast.story68',
     adb: '/owned/adb',
     maestroBinary: '/unused/maestro',
     DRIVER_HOST_PORT_ARG: '--port',

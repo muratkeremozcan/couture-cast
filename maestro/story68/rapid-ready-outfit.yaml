@@ -2,18 +2,20 @@ appId: ${MAESTRO_APP_ID}
 ---
 - tapOn:
     id: tab-home
-- scrollUntilVisible:
-    element:
-      id: outfit-share-card-open
-    direction: DOWN
-    timeout: 30000
-    centerElement: true
 - runFlow:
     when:
       platform: iOS
+    file: position-outfit-open.yaml
+- runFlow:
+    when:
+      platform: Android
     commands:
-      - waitForAnimationToEnd
-      - runFlow: position-outfit-open.yaml
+      - scrollUntilVisible:
+          element:
+            id: outfit-share-card-open
+          direction: DOWN
+          timeout: 30000
+          centerElement: true
 - assertVisible:
     id: outfit-share-card-open
 - assertNotVisible:

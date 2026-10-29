@@ -1,4 +1,5 @@
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import React, { type ComponentRef, useRef, useState } from 'react'
 import { StyleSheet, Platform, Pressable } from 'react-native'
 import { Text, View } from '@/components/themed'
@@ -136,9 +137,10 @@ export function OutfitRecommendationCard({
             borderWidth: 1,
             borderRadius: 8,
           }}
-          onPress={() =>
+          onPress={() => {
+            traceShareCardOpener('press')
             onExport(outfit.id, () => safeFindNodeHandle(shareOpener.current))
-          }
+          }}
         >
           <Text>{t('shareCard.launcher')}</Text>
         </Pressable>

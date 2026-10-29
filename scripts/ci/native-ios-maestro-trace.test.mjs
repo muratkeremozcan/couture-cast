@@ -8,8 +8,13 @@ import {
   shareCardApiRows,
   recordIosCommandTimings,
   recordIosFlowProgress,
+  openerGeometry,
+  readIosAppLogSummary,
+  readIosOpenerTrace,
   recordIosHostSample,
   scheduleIosInFlowSample,
+  scrollPath,
+  summarizeAppLog,
   failedStepHierarchy,
   systemSurfaceSummary,
   logSize,
@@ -410,7 +415,10 @@ test('the runner samples the host in the locale loop and hands the failure path 
     runner,
     /activeLocale = locale\n\s+if \(platform === 'ios'\) recordIosHostSample\('locale-loop', \{ root \}\)\n\s+maestro\('maestro\/story65\/set-locale\.yaml'/
   )
-  assert.match(runner, /apiLogFromByte,\n\s+output,\n\s+root,\n\s+\}\)/)
+  assert.match(
+    runner,
+    /apiLogFromByte,\n\s+output,\n\s+root,\n\s+device,\n\s+appId,\n\s+\}\)/
+  )
 })
 
 const realLayout = new URL('./fixtures/maestro-failed-step/', import.meta.url)
@@ -500,5 +508,181 @@ test('the runner schedules the in-flow sample for every iOS flow before Maestro 
   assert.match(
     runner,
     /scheduleIosInFlowSample\(flow, \{ platform, root \}\)\n\s+const result = withNativeTransport/
+  )
+})
+
+// Node shape and bounds format as Maestro stores them. The opener and tab-home frames are the
+// values of run 27 (points); the chip bar frame is the layout arithmetic (header bottom 106 pt,
+// 56 pt bar), because no stored hierarchy holds it yet.
+const node = (id, bounds, children = []) => ({
+  attributes: { 'resource-id': id, bounds },
+  children,
+})
+const screen = (...nodes) => ({ children: [node('root', '[0,0][402,874]', nodes)] })
+const CHIPS = node('mobile-chip-navigation', '[0,106][402,162]')
+const TAB = node('tab-home', '[0,784][33,802]')
+
+test('the opener geometry names the bar a tap centre would land on', () => {
+  const covered = openerGeometry(
+    screen(node('outfit-share-card-open', '[16,117][386,165]'), CHIPS, TAB)
+  )
+  assert.deepEqual(covered, {
+    chips: [0, 106, 402, 162],
+    opener: [16, 117, 386, 165],
+    tab: [0, 784, 33, 802],
+    centreCoveredBy: 'chips',
+  })
+  const clear = openerGeometry(
+    screen(node('outfit-share-card-open', '[16,351][386,399]'), CHIPS, TAB)
+  )
+  assert.equal(clear.centreCoveredBy, null)
+  const lowered = openerGeometry(
+    screen(
+      node('outfit-share-card-open', '[16,770][386,818]'),
+      CHIPS,
+      node('tab-home', '[0,784][33,802]')
+    )
+  )
+  assert.equal(lowered.centreCoveredBy, 'tab')
+  assert.equal(openerGeometry(screen(CHIPS, TAB)), null)
+  assert.equal(openerGeometry(null), null)
+  assert.equal(openerGeometry(screen(node('outfit-share-card-open', 'not bounds'))), null)
+})
+
+test('the scroll path lists the swipes and scrolls with status and the element top at each try', (t) => {
+  const output = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-scroll-'))
+  t.after(() => fs.rmSync(output, { recursive: true, force: true }))
+  fs.mkdirSync(path.join(output, 'a'))
+  fs.writeFileSync(
+    path.join(output, 'a', 'commands.json'),
+    JSON.stringify([
+      { command: { tapOnElement: {} }, metadata: { status: 'COMPLETED' } },
+      { command: { swipeCommand: {} }, metadata: { status: 'COMPLETED' } },
+      { command: { swipeCommand: {} }, metadata: { status: 'COMPLETED' } },
+      { command: { scrollUntilVisible: {} }, metadata: { status: 'COMPLETED' } },
+      { command: { scrollCommand: {} }, metadata: { status: 'FAILED' } },
+    ])
+  )
+  const log = [
+    'Scrolling try count: 0, DeviceWidth: 402, DeviceWidth: 874',
+    'Element bounds: Bounds(x=16, y=351, width=370, height=48)',
+    'Element bounds: Bounds(x=16, y=117, width=370, height=48)',
+  ].join('\n')
+  assert.deepEqual(scrollPath(output, log), {
+    steps: [
+      { kind: 'swipe', status: 'COMPLETED' },
+      { kind: 'swipe', status: 'COMPLETED' },
+      { kind: 'scrollUntilVisible', status: 'COMPLETED' },
+      { kind: 'scroll', status: 'FAILED' },
+    ],
+    elementTops: [351, 117],
+  })
+  assert.deepEqual(scrollPath('/nonexistent', ''), { steps: [], elementTops: [] })
+})
+
+test('the opener trace is read from the app container and reduced to closed names', (t) => {
+  const container = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-container-'))
+  t.after(() => fs.rmSync(container, { recursive: true, force: true }))
+  fs.mkdirSync(path.join(container, 'Documents'))
+  fs.writeFileSync(
+    path.join(container, 'Documents', 'cc68-opener-trace.json'),
+    JSON.stringify({
+      version: 1,
+      events: [
+        { e: 'press', t: 10.4 },
+        { e: 'state-open', t: 14 },
+        { e: 'secret-token', t: 15 },
+        { e: 'composer-prepare', t: -1 },
+        { e: 'composer-cached', t: 20 },
+      ],
+    })
+  )
+  const calls = []
+  const spawn = (binary, args) => {
+    calls.push([binary, ...args])
+    return { status: 0, stdout: `${container}\n` }
+  }
+  assert.deepEqual(readIosOpenerTrace({ device: 'DEV', appId: 'app.id', spawn }), [
+    { event: 'press', ms: 10 },
+    { event: 'state-open', ms: 14 },
+    { event: 'composer-cached', ms: 20 },
+  ])
+  assert.deepEqual(calls[0], [
+    'xcrun',
+    'simctl',
+    'get_app_container',
+    'DEV',
+    'app.id',
+    'data',
+  ])
+  assert.equal(
+    readIosOpenerTrace({ device: 'DEV', appId: 'app.id', spawn: () => ({ status: 1 }) }),
+    null
+  )
+  assert.equal(
+    readIosOpenerTrace({
+      device: 'DEV',
+      appId: 'app.id',
+      spawn: () => ({ status: 0, stdout: '/nonexistent\n' }),
+    }),
+    null
+  )
+})
+
+const realLog = fs.readFileSync(
+  new URL('./fixtures/app-log/real-log-show.ndjson', import.meta.url),
+  'utf8'
+)
+
+test('the app log summary counts levels in real log show ndjson and keeps no text', () => {
+  const rows = realLog
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+  const expected = (type) => rows.filter((row) => row.messageType === type).length
+  const summary = summarizeAppLog(realLog)
+  assert.deepEqual(summary, {
+    lines: expected('Default') + expected('Error') + expected('Fault'),
+    error: expected('Error'),
+    fault: expected('Fault'),
+    jsException: 0,
+  })
+  assert.ok(
+    summary.error > 0 && summary.fault > 0,
+    'the real sample has error and fault rows'
+  )
+  const withException = `${realLog}\n${JSON.stringify({ messageType: 'Error', eventMessage: 'Unhandled JS Exception: boom' })}\nnot json\n`
+  assert.equal(summarizeAppLog(withException).jsException, 1)
+  assert.deepEqual(Object.keys(summary), ['lines', 'error', 'fault', 'jsException'])
+  assert.deepEqual(summarizeAppLog(''), { lines: 0, error: 0, fault: 0, jsException: 0 })
+})
+
+test('the app log query is bounded to the app process and the last minute', () => {
+  const calls = []
+  const summary = readIosAppLogSummary({
+    device: 'DEV',
+    spawn: (binary, args, options) => {
+      calls.push({ binary, args, options })
+      return { status: 0, stdout: realLog }
+    },
+  })
+  assert.ok(summary.lines > 0)
+  assert.deepEqual(calls[0].args, [
+    'simctl',
+    'spawn',
+    'DEV',
+    'log',
+    'show',
+    '--last',
+    '60s',
+    '--style',
+    'ndjson',
+    '--predicate',
+    'process == "CoutureCastStory68"',
+  ])
+  assert.equal(calls[0].options.timeout, 30000)
+  assert.equal(
+    readIosAppLogSummary({ device: 'DEV', spawn: () => ({ status: 1, stdout: '' }) }),
+    null
   )
 })

@@ -333,6 +333,8 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
       apiLogFromByte,
       output,
       root,
+      device,
+      appId,
     })
     privateJson(
       `native-flow-failure-${platform}.json`,
