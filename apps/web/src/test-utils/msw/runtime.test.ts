@@ -19,11 +19,22 @@ describe('opt-in MSW response delay', () => {
     vi.useRealTimers()
   })
 
-  it('adds no handler unless MSW_TEST_DELAY_MS is a positive number', () => {
-    for (const value of ['', '0', '-5', 'soon']) {
+  it('adds no handler when MSW_TEST_DELAY_MS is unset, empty or zero', () => {
+    for (const value of ['', ' ', '0']) {
       vi.stubEnv('MSW_TEST_DELAY_MS', value)
       expect(delayHandler()).toEqual([])
     }
+  })
+
+  it('refuses a delay that is not a finite number from 0 to 1000', () => {
+    for (const value of ['soon', '-5', 'Infinity', '-Infinity', 'NaN', '1001', '1e9']) {
+      vi.stubEnv('MSW_TEST_DELAY_MS', value)
+      expect(() => delayHandler(), value).toThrow(
+        /MSW_TEST_DELAY_MS must be a number from 0 to 1000/
+      )
+    }
+    vi.stubEnv('MSW_TEST_DELAY_MS', '1000')
+    expect(delayHandler()).toHaveLength(1)
   })
 
   it('answers immediately when the switch is off', async () => {
@@ -32,14 +43,30 @@ describe('opt-in MSW response delay', () => {
     expect(await timedRead()).toBeLessThan(80)
   })
 
-  it('delays a request by the fixed value, once, however many handler sets are registered', async () => {
-    vi.stubEnv('MSW_TEST_DELAY_MS', '100')
-    useMswHandlers(answer())
-    useMswHandlers(answer())
-    useMswHandlers(answer())
+  // Later sets sit in front of the one that answers, so the request falls through every
+  // delay handler before it reaches its answer; two delays would take 200 ms.
+  const other = (name: string) =>
+    http.get(`http://localhost/${name}`, () => HttpResponse.json({}))
+
+  async function expectOneDelay() {
     const elapsed = await timedRead()
     expect(elapsed).toBeGreaterThanOrEqual(90)
     expect(elapsed).toBeLessThan(190)
+  }
+
+  it('delays a request by the fixed value exactly once with two handler sets registered', async () => {
+    vi.stubEnv('MSW_TEST_DELAY_MS', '100')
+    useMswHandlers(answer())
+    useMswHandlers(other('other-a'))
+    await expectOneDelay()
+  })
+
+  it('delays a request by the fixed value exactly once with three handler sets registered', async () => {
+    vi.stubEnv('MSW_TEST_DELAY_MS', '100')
+    useMswHandlers(answer())
+    useMswHandlers(other('other-a'))
+    useMswHandlers(other('other-b'))
+    await expectOneDelay()
   })
 
   it('draws a uniform delay from zero to the value when asked for a random range', async () => {
@@ -52,8 +79,16 @@ describe('opt-in MSW response delay', () => {
     expect(elapsed).toBeLessThan(190)
   })
 
+  it.each(['0', 'false', ''])('counts MSW_TEST_DELAY_RANDOM=%j as off', async (value) => {
+    vi.stubEnv('MSW_TEST_DELAY_MS', '200')
+    vi.stubEnv('MSW_TEST_DELAY_RANDOM', value)
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    useMswHandlers(answer())
+    expect(await timedRead()).toBeGreaterThanOrEqual(190)
+  })
+
   it('does not wait on the clock while fake timers are installed', async () => {
-    vi.stubEnv('MSW_TEST_DELAY_MS', '5000')
+    vi.stubEnv('MSW_TEST_DELAY_MS', '1000')
     useMswHandlers(answer())
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const resolver = vi.fn()
