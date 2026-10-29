@@ -722,6 +722,11 @@ at the new size so that enlarged text is never clipped or blanked until the next
 4. Keep every existing unit, integration, Playwright and Maestro suite green, with the native
    share-card journeys, accessibility focus bridge and large-text matrix rerun on the upgraded
    build.
+5. Re-point the mobile vitest Expo web setup, which imports two Expo package internals by path
+   (the expo-modules-core `polyfill/dangerous-internal` entry and the expo-constants built web
+   module); an upgrade that moves them fails the suite through the missing-`globalThis.expo` guard.
+   Prove both imports resolve under SDK 58 and the console guard still rejects the
+   missing-`ExponentConstants` warning.
    **Prerequisites:** CC-6.8.
    **Facts:** `_bmad-output/test-artifacts/story-6-8/review-font-three-facts.md`.
 

@@ -2,7 +2,7 @@
 title: 'Story 6.8: Safe branded share-card export'
 type: 'feature'
 created: '2026-10-25'
-status: 'in-review'
+status: 'done'
 baseline_commit: '1d7b98485485c224063b573207c7e78bace717be'
 route: 'dispatch'
 story_key: '6-8-safe-branded-share-card-export'

@@ -253,3 +253,9 @@ n=2000 arithmetic and power for v6 before its authoring or evaluation. The activ
 v5 selector remains in place and must fail the retirement guard until a fresh
 eligible version is committed after release. V6 source creation, sealing and
 release are separate; v5 remains frozen development history.
+
+Retirement commit: `11dda5768f1f2463876b7245e7eb8deb7a458e0d`.
+After that commit, all ten English/Italian/Turkish cases and exact reason codes
+were delivered to cc68-impl. The receipt is in the v5 run directory. The remote
+branch was verified at that same retirement commit after pushing, including the
+v5, eligibility and frozen round4 repair commits. No v6 content was included.
