@@ -31,6 +31,4 @@ appId: ${MAESTRO_APP_ID}
 - tapOn: ${MAESTRO_VERIFY}
 # verifyNativeOtp resolves the canonical app account, then the screen returns to settings,
 # which renders the owner's preference controls.
-- extendedWaitUntil:
-    visible: ${MAESTRO_ENABLED}
-    timeout: 30000
+- runFlow: wait-notification-settings.yaml

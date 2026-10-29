@@ -148,6 +148,11 @@ export function shareCardApiRows(apiLog, limit = 20) {
  * Notification-preference requests from the owned API's JSON request log: method, status and
  * duration only. They show whether the settings screen's load after sign-in reached the API.
  */
+const REQUEST_PHASES = {
+  request_received: 'received',
+  request_completed: 'completed',
+  request_failed: 'failed',
+}
 export function communityPreferenceApiRows(apiLog, limit = 10) {
   const rows = []
   for (const line of String(apiLog ?? '').split('\n')) {
@@ -160,6 +165,9 @@ export function communityPreferenceApiRows(apiLog, limit = 10) {
     if (typeof row?.path !== 'string' || !row.path.endsWith('/notification-preferences'))
       continue
     rows.push({
+      // The API logs two lines per request: request_received (no status) and a completion line.
+      // The phase keeps one request from reading as two, and an unfinished one as no answer.
+      phase: REQUEST_PHASES[row.message] ?? 'other',
       method: ['GET', 'PATCH'].includes(row.method) ? row.method : 'OTHER',
       status: Number.isSafeInteger(row.statusCode) ? row.statusCode : null,
       ms: Number.isSafeInteger(row.durationMs) ? row.durationMs : null,

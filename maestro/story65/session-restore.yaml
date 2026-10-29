@@ -20,8 +20,6 @@ appId: ${MAESTRO_APP_ID}
       true: ${MAESTRO_PLATFORM == 'ios'}
     commands:
       - assertVisible: ${MAESTRO_BACK}
-- extendedWaitUntil:
-    visible: ${MAESTRO_ENABLED}
-    timeout: 30000
+- runFlow: wait-notification-settings.yaml
 - takeScreenshot:
     path: settings-restored-${MAESTRO_CASE}

@@ -1,0 +1,22 @@
+# Story 6.5 owner: wait for the signed-in member's notification controls, however long the
+# screen's bounded retries of a retryable 503 take. The wait ends at the controls (pass) or at the
+# Try again button (the retries ran out, a real failure), so no clock decides the outcome.
+# The repeat count only bounds a stuck screen.
+appId: ${MAESTRO_APP_ID}
+---
+- repeat:
+    while:
+      notVisible: ${MAESTRO_ENABLED}
+    times: 90
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'notification-settings-retry'
+          commands:
+            - assertVisible: ${MAESTRO_ENABLED}
+      - extendedWaitUntil:
+          visible: ${MAESTRO_ENABLED}
+          timeout: 1000
+          optional: true
+- assertVisible: ${MAESTRO_ENABLED}

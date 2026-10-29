@@ -741,13 +741,19 @@ test('the input surface tells an unfocused empty field from an absent one', () =
   assert.equal(inputSurface(null), null)
 })
 
-test('community preference rows keep method, status and duration only', () => {
-  const log = [
+test('community preference rows keep phase, method, status and duration only', () => {
+  const line = (extra) =>
     JSON.stringify({
       path: '/api/v1/community/notification-preferences',
       method: 'GET',
-      statusCode: 200,
-      durationMs: 41,
+      ...extra,
+    })
+  const log = [
+    line({ message: 'request_received' }),
+    line({
+      message: 'request_failed',
+      statusCode: 503,
+      durationMs: 2195,
       userId: 'cc68-native-secret',
     }),
     JSON.stringify({ path: '/api/v1/share-cards/x', method: 'GET', statusCode: 200 }),
@@ -756,8 +762,9 @@ test('community preference rows keep method, status and duration only', () => {
   ].join('\n')
   const rows = communityPreferenceApiRows(log)
   assert.deepEqual(rows, [
-    { method: 'GET', status: 200, ms: 41 },
-    { method: 'OTHER', status: null, ms: null },
+    { phase: 'received', method: 'GET', status: null, ms: null },
+    { phase: 'failed', method: 'GET', status: 503, ms: 2195 },
+    { phase: 'other', method: 'OTHER', status: null, ms: null },
   ])
   assert.ok(!JSON.stringify(rows).includes('secret'))
 })

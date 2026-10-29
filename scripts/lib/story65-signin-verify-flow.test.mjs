@@ -46,3 +46,33 @@ test('the settings load after sign-in traces only closed outcome names', () => {
   for (const call of calls)
     assert.match(call, /^'prefs-[a-z-]+'$|^token \? 'prefs-stale' : 'prefs-token-null'$/)
 })
+
+test('the settings wait ends at the controls or at the Try again id, with no clock deciding', () => {
+  const wait = fs.readFileSync(
+    new URL('../../maestro/story65/wait-notification-settings.yaml', import.meta.url),
+    'utf8'
+  )
+  assert.match(wait, /while:\s+notVisible: \$\{MAESTRO_ENABLED\}/)
+  assert.match(
+    wait,
+    /id: 'notification-settings-retry'[\s\S]*assertVisible: \$\{MAESTRO_ENABLED\}/
+  )
+  assert.match(wait, /^- assertVisible: \$\{MAESTRO_ENABLED\}$/m)
+  for (const flow of [
+    'signin-verify',
+    'notification-settings-loaded',
+    'session-restore',
+  ]) {
+    const text = fs.readFileSync(
+      new URL(`../../maestro/story65/${flow}.yaml`, import.meta.url),
+      'utf8'
+    )
+    assert.match(text, /runFlow: wait-notification-settings\.yaml/, flow)
+    assert.doesNotMatch(text, /visible: \$\{MAESTRO_ENABLED\}\s+timeout: 30000/, flow)
+  }
+  const screen = fs.readFileSync(
+    new URL('../../apps/mobile/app/notification-settings.tsx', import.meta.url),
+    'utf8'
+  )
+  assert.match(screen, /testID="notification-settings-retry"/)
+})
