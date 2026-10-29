@@ -252,6 +252,52 @@ describe('screen-owned comments state', () => {
     await refreshing
     expect(state.current('post').announcement?.key).toBe('community.realtime.newComments')
   })
+  it('does not bring back a reply the server removed from the re-read range', async () => {
+    const { state, transport } = setup(),
+      roots = deferred<CommunityCommentsPage>()
+    transport.replies.mockResolvedValueOnce(page([item('r1', 1), item('r2', 2)], 'c1'))
+    await state.load('post', 'root')
+    transport.roots.mockReturnValueOnce(roots.promise)
+    const refreshing = state.refresh('post')
+    transport.replies
+      .mockResolvedValueOnce(page([item('D', 4), item('r5', 5)], 'c2'))
+      .mockResolvedValueOnce(page([item('r1', 1), item('r5', 5)], 'c1'))
+    await state.load('post', 'root', true)
+    roots.resolve(page([{ ...item('root'), replyCount: 2 }]))
+    await refreshing
+    const replies = state.current('post').replies.get('root')
+    expect(replies?.items.map((reply) => reply.id)).toEqual(['r1', 'r5'])
+    expect(replies?.nextCursor).toBe('c2')
+  })
+  it('keeps a reply deleted elsewhere gone when a member loads more during the refresh', async () => {
+    const { state, transport } = setup(),
+      roots = deferred<CommunityCommentsPage>()
+    transport.replies.mockResolvedValueOnce(page([item('r1', 1), item('r2', 2)], 'c1'))
+    await state.load('post', 'root')
+    transport.roots.mockReturnValueOnce(roots.promise)
+    const refreshing = state.refresh('post')
+    transport.replies
+      .mockResolvedValueOnce(page([item('D', 4)], 'c2'))
+      .mockResolvedValueOnce(page([item('r1', 1)], 'c1'))
+    await state.load('post', 'root', true)
+    roots.resolve(page([{ ...item('root'), replyCount: 2 }]))
+    await refreshing
+    expect(
+      state
+        .current('post')
+        .replies.get('root')
+        ?.items.map((reply) => reply.id)
+    ).toEqual(['r1', 'D'])
+  })
+  it('drops a re-read reply page whose parent is gone from the new roots', async () => {
+    const { state, transport } = setup()
+    transport.replies.mockResolvedValueOnce(page([item('reply', 2)]))
+    await state.load('post', 'root')
+    transport.roots.mockResolvedValueOnce(page([item('other', 3)]))
+    transport.replies.mockResolvedValueOnce(page([item('reply', 2)]))
+    await state.refresh('post')
+    expect(state.current('post').replies.has('root')).toBe(false)
+  })
   it('lets a refresh replace the reply pages it re-read', async () => {
     const { state, transport } = setup(),
       roots = deferred<CommunityCommentsPage>()

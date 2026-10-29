@@ -92,10 +92,12 @@ function mergePage(
 
 /**
  * A refresh re-reads a fixed number of pages. When a member loaded more of the same
- * snapshot while it was reading, those later replies and the cursor that follows them
- * are appended to the re-read page. A page the refresh read from another snapshot, or
- * one reloaded from its start, has no cursor that continues the later replies, so the
- * re-read page stands alone.
+ * snapshot while it was reading, the cursor that follows those pages replaces the
+ * re-read page's and the replies beyond what the re-read reached are appended to it. A
+ * reply at or below the highest sequence the re-read page holds was inside the range
+ * the refresh read, so the refresh decides whether it still exists. A page the refresh
+ * read from another snapshot, or one reloaded from its start, has no cursor that
+ * continues the later replies, so the re-read page stands alone.
  */
 function withLaterPages(
   captured: CommunityCommentsPage | undefined,
@@ -111,9 +113,16 @@ function withLaterPages(
     !captured.items.every((item) => current.items.some(({ id }) => id === item.id))
   )
     return refreshed
-  const known = new Set([...captured.items, ...refreshed.items].map(({ id }) => id))
-  const later = current.items.filter(({ id }) => !known.has(id))
-  if (later.length === 0) return refreshed
+  const seen = new Set(captured.items.map(({ id }) => id))
+  if (current.items.every(({ id }) => seen.has(id))) return refreshed
+  const known = new Set([...seen, ...refreshed.items.map(({ id }) => id)])
+  const ceiling = Math.max(
+    -Infinity,
+    ...refreshed.items.map(({ publicationSequence }) => publicationSequence)
+  )
+  const later = current.items.filter(
+    ({ id, publicationSequence }) => !known.has(id) && publicationSequence > ceiling
+  )
   return {
     ...refreshed,
     items: [...refreshed.items, ...later].sort(
@@ -506,9 +515,9 @@ export class CommunityCommentsState {
       if (!owns()) throw new CommunityRequestSuperseded()
       state.roots = roots
       // A reply page expanded while this refresh was reading is newer than anything the
-      // refresh could have captured, so it stays unless its parent left the thread. Pages
-      // the refresh re-read replace their predecessors, keeping any later page a member
-      // loaded onto them meanwhile.
+      // refresh could have captured, so it stays. Pages the refresh re-read replace their
+      // predecessors, keeping any later page a member loaded onto them meanwhile. Pages
+      // whose parent left the new roots are dropped, kept or re-read.
       // Replies the member loaded meanwhile are not news to them, so they count as seen.
       for (const page of state.replies.values())
         for (const { id } of page.items) previousIds.add(id)
@@ -517,13 +526,15 @@ export class CommunityCommentsState {
         ...[...state.replies].filter(
           ([parent]) => !replyBounds.has(parent) && parents.has(parent)
         ),
-        ...replies.map(
-          ([parent, page]) =>
-            [
-              parent,
-              withLaterPages(captured.get(parent), state.replies.get(parent), page),
-            ] as const
-        ),
+        ...replies
+          .filter(([parent]) => parents.has(parent))
+          .map(
+            ([parent, page]) =>
+              [
+                parent,
+                withLaterPages(captured.get(parent), state.replies.get(parent), page),
+              ] as const
+          ),
       ])
       state.error = null
       if ([...this.publicIds(state)].some((id) => !previousIds.has(id)))
