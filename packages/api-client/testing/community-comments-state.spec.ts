@@ -298,6 +298,63 @@ describe('screen-owned comments state', () => {
     await state.refresh('post')
     expect(state.current('post').replies.has('root')).toBe(false)
   })
+  describe('root pages a member loads while a refresh is reading', () => {
+    const ids = (state: ReturnType<typeof setup>['state']) =>
+      state.current('post').roots?.items.map((root) => root.id)
+    // The refresh reads the first page (held), a member's load more carries a cursor.
+    function holdRefresh(transport: ReturnType<typeof setup>['transport']) {
+      const reread = deferred<CommunityCommentsPage>()
+      transport.roots.mockImplementation((_post: string, cursor?: string) =>
+        cursor ? Promise.resolve(laterRoots()) : reread.promise
+      )
+      return reread
+    }
+    let laterRoots: () => CommunityCommentsPage
+    it('keeps the next root page, its cursor and what is under it', async () => {
+      const { state, transport } = setup()
+      transport.roots.mockResolvedValueOnce(
+        page([item('root1', 1), item('root2', 2)], 'rc1')
+      )
+      await state.load('post')
+      laterRoots = () => page([{ ...item('root3', 4), replyCount: 1 }], 'rc2')
+      const reread = holdRefresh(transport)
+      const refreshing = state.refresh('post')
+      await state.load('post', null, true)
+      transport.replies.mockResolvedValueOnce(page([item('reply', 5)]))
+      await state.load('post', 'root3')
+      reread.resolve(page([item('root1', 1), item('root2', 2)], 'rc1'))
+      await refreshing
+      expect(ids(state)).toEqual(['root1', 'root2', 'root3'])
+      expect(state.current('post').roots?.nextCursor).toBe('rc2')
+      expect(state.current('post').replies.has('root3')).toBe(true)
+    })
+    it('does not bring back a root the server removed from the re-read range', async () => {
+      const { state, transport } = setup()
+      transport.roots.mockResolvedValueOnce(page([item('r1', 1), item('r2', 2)], 'rc1'))
+      await state.load('post')
+      laterRoots = () => page([item('D', 4), item('r5', 5)], 'rc2')
+      const reread = holdRefresh(transport)
+      const refreshing = state.refresh('post')
+      await state.load('post', null, true)
+      reread.resolve(page([item('r1', 1), item('r5', 5)], 'rc1'))
+      await refreshing
+      expect(ids(state)).toEqual(['r1', 'r5'])
+      expect(state.current('post').roots?.nextCursor).toBe('rc2')
+    })
+    it('does not announce the roots a member loaded meanwhile', async () => {
+      const { state, transport } = setup()
+      transport.roots.mockResolvedValueOnce(page([item('root1', 1)], 'rc1'))
+      await state.load('post')
+      laterRoots = () => page([item('root2', 3)], 'rc2')
+      const reread = holdRefresh(transport)
+      const refreshing = state.refresh('post')
+      await state.load('post', null, true)
+      reread.resolve(page([item('root1', 1)], 'rc1'))
+      await refreshing
+      expect(ids(state)).toEqual(['root1', 'root2'])
+      expect(state.current('post').announcement).toBeNull()
+    })
+  })
   it('lets a refresh replace the reply pages it re-read', async () => {
     const { state, transport } = setup(),
       roots = deferred<CommunityCommentsPage>()

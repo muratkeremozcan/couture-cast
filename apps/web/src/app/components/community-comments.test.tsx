@@ -381,6 +381,51 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     expect(screen.queryByRole('button', { name: 'More replies' })).toBeNull()
   })
 
+  it('keeps the next comments a member loads while a refresh is still reading the roots', async () => {
+    const nextRoot = createCommunityComment({
+      id: 'root-next',
+      body: 'Next root body.',
+      publicationSequence: 3,
+    })
+    let firstPageReads = 0
+    let releaseRefresh: () => void = () => undefined
+    const refreshRead = new Promise<void>((resolve) => {
+      releaseRefresh = resolve
+    })
+    useMswHandlers(
+      http.get(`${base}/comments`, async ({ request }) => {
+        const next = new URL(request.url).searchParams.has('cursor')
+        if (!next && ++firstPageReads > 1) await refreshRead
+        return HttpResponse.json({
+          data: {
+            items: [next ? nextRoot : root],
+            nextCursor: next ? null : 'roots-next',
+            snapshot: 2,
+            hasNewer: false,
+          },
+        })
+      })
+    )
+    const state = makeState()
+    const user = userEvent.setup()
+    render(<CommunityComments postId="community-post-1" state={state} />)
+    expect(await screen.findByText(root.body)).toBeVisible()
+    let refreshing: Promise<void> = Promise.resolve()
+    await act(async () => {
+      refreshing = state.refresh('community-post-1')
+      await waitFor(() => expect(firstPageReads).toBe(2))
+    })
+    await user.click(screen.getByRole('button', { name: 'More comments' }))
+    expect(await screen.findByText(nextRoot.body)).toBeVisible()
+    await act(async () => {
+      releaseRefresh()
+      await refreshing
+    })
+    expect(screen.getByText(root.body)).toBeVisible()
+    expect(screen.getByText(nextRoot.body)).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'More comments' })).toBeNull()
+  })
+
   it('cancels a reply draft and drops its reply target', async () => {
     useMswHandlers(http.get(`${base}/comments`, () => HttpResponse.json(page())))
     const user = userEvent.setup()

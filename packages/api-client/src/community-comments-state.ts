@@ -91,11 +91,11 @@ function mergePage(
 }
 
 /**
- * A refresh re-reads a fixed number of pages. When a member loaded more of the same
- * snapshot while it was reading, the cursor that follows those pages replaces the
- * re-read page's and the replies beyond what the re-read reached are appended to it. A
- * reply at or below the highest sequence the re-read page holds was inside the range
- * the refresh read, so the refresh decides whether it still exists. A page the refresh
+ * A refresh re-reads a fixed number of root or reply pages. When a member loaded more of
+ * the same snapshot while it was reading, the cursor that follows those pages replaces
+ * the re-read page's and the comments beyond what the re-read reached are appended to
+ * it. A comment at or below the highest sequence the re-read page holds was inside the
+ * range the refresh read, so the refresh decides whether it still exists. A page the refresh
  * read from another snapshot, or one reloaded from its start, has no cursor that
  * continues the later replies, so the re-read page stands alone.
  */
@@ -477,6 +477,57 @@ export class CommunityCommentsState {
     }
   }
 
+  /**
+   * Swaps what a refresh re-read into the thread. A reply page expanded while the refresh
+   * was reading is newer than anything it could have captured, so it stays. Pages the
+   * refresh re-read replace their predecessors, keeping any later page a member loaded
+   * onto them meanwhile, root pages included. Pages whose parent left the new roots are
+   * dropped, kept or re-read. Comments the member loaded meanwhile are not news to them,
+   * so they count as seen.
+   */
+  private settleRefreshed(
+    state: CommentThreadState,
+    previousIds: Set<string>,
+    captured: {
+      roots: CommunityCommentsPage | null
+      replies: Map<string, CommunityCommentsPage>
+    },
+    reread: {
+      roots: CommunityCommentsPage
+      replies: (readonly [string, CommunityCommentsPage])[]
+    }
+  ): void {
+    const roots = withLaterPages(
+      captured.roots ?? undefined,
+      state.roots ?? undefined,
+      reread.roots
+    )
+    const rereadParents = new Set(reread.replies.map(([parent]) => parent))
+    const parents = new Set(roots.items.map((item) => item.id))
+    for (const { id } of state.roots?.items ?? []) previousIds.add(id)
+    for (const page of state.replies.values())
+      for (const { id } of page.items) previousIds.add(id)
+    state.roots = roots
+    state.replies = new Map([
+      ...[...state.replies].filter(
+        ([parent]) => !rereadParents.has(parent) && parents.has(parent)
+      ),
+      ...reread.replies
+        .filter(([parent]) => parents.has(parent))
+        .map(
+          ([parent, page]) =>
+            [
+              parent,
+              withLaterPages(
+                captured.replies.get(parent),
+                state.replies.get(parent),
+                page
+              ),
+            ] as const
+        ),
+    ])
+  }
+
   async refresh(postId: string, signal?: AbortSignal): Promise<void> {
     const state = this.current(postId)
     this.invalidateReads(postId)
@@ -488,6 +539,7 @@ export class CommunityCommentsState {
     const rootsBound =
       this.publicPages.get(`${postId}/`) ??
       Math.max(1, Math.ceil((state.roots?.items.length ?? 0) / 20))
+    const capturedRoots = state.roots
     const captured = new Map(state.replies)
     const replyBounds = new Map(
       [...state.replies].map(
@@ -513,29 +565,12 @@ export class CommunityCommentsState {
         )
       )
       if (!owns()) throw new CommunityRequestSuperseded()
-      state.roots = roots
-      // A reply page expanded while this refresh was reading is newer than anything the
-      // refresh could have captured, so it stays. Pages the refresh re-read replace their
-      // predecessors, keeping any later page a member loaded onto them meanwhile. Pages
-      // whose parent left the new roots are dropped, kept or re-read.
-      // Replies the member loaded meanwhile are not news to them, so they count as seen.
-      for (const page of state.replies.values())
-        for (const { id } of page.items) previousIds.add(id)
-      const parents = new Set(roots.items.map((item) => item.id))
-      state.replies = new Map([
-        ...[...state.replies].filter(
-          ([parent]) => !replyBounds.has(parent) && parents.has(parent)
-        ),
-        ...replies
-          .filter(([parent]) => parents.has(parent))
-          .map(
-            ([parent, page]) =>
-              [
-                parent,
-                withLaterPages(captured.get(parent), state.replies.get(parent), page),
-              ] as const
-          ),
-      ])
+      this.settleRefreshed(
+        state,
+        previousIds,
+        { roots: capturedRoots, replies: captured },
+        { roots, replies }
+      )
       state.error = null
       if ([...this.publicIds(state)].some((id) => !previousIds.has(id)))
         this.announce(state, 'community.realtime.newComments')
