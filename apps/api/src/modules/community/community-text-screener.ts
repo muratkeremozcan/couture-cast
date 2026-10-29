@@ -1542,7 +1542,10 @@ function buildEditOneIndex(
   for (const index of indexes)
     for (const term of [
       ...index.listedTerms,
-      ...(index.language === 'tr' ? [] : index.generatedForms),
+      ...index.generatedForms.filter(
+        (form) =>
+          index.language !== 'tr' || index.single.get(form)?.category === 'violence'
+      ),
     ]) {
       const meta = index.single.get(term)
       if (!meta || term.length < EDIT_ONE_MIN_TERM_LENGTH || !/^\p{L}+$/u.test(term))
@@ -2054,8 +2057,15 @@ export class CommunityTextScreener {
       )
     this.cutFamilyCopulas = foldedWords((list) => list.cutFamily?.copulas)
     this.cutFamilyNameFollowers = foldedWords((list) => list.cutFamily?.nameFollowers)
+    // A term whose collapsed spelling is only three letters is indexable once an ordinary
+    // word of that spelling is cleared, globally or under a declared language ("gok", the
+    // Turkish sky, against the English slur gook).
+    const indexable = new Set([
+      ...allowSingles,
+      ...[...this.scopedAllowWords.values()].flatMap((words) => [...words]),
+    ])
     this.indexes = termLists.map((list) =>
-      buildLanguageIndex(list, this.policy, allowSingles, new Set(familyForms))
+      buildLanguageIndex(list, this.policy, indexable, new Set(familyForms))
     )
     this.censorKeys = buildCensorKeys(this.indexes, this.cutFamilyTerms)
     this.typoKeys = buildTypoKeys(this.indexes)

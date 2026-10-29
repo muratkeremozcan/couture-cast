@@ -12,8 +12,8 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "cd303446a0b7fea3619a780f5c6659f5ff58abb7e4504f4980b706610e1f8669",
-    "reviewedOccurrenceSha256": "da22299c1bb3431bed21e13045834488de36e15b7fc2eb621a1741cfa21059a4"
+    "allowListSha256": "6069401e136c3ea2daea0da67b5b524d144931070a85da7c658987bcb83bc9f3",
+    "reviewedOccurrenceSha256": "88b3e5362fa3d90d5df2caef8c04f0503607488c3236a47ae2ab4608283fe1ad"
   },
   "entries": [
     "açıklar",
@@ -23,7 +23,6 @@
     "açıkları",
     "açıkların",
     "açıkta",
-    "gok",
     "gök",
     "kasar",
     "nakışta",
@@ -41,7 +40,7 @@
     "copulas": [],
     "nameFollowers": []
   },
-  "scopedWords": ["fagot"],
+  "scopedWords": ["gok", "fagot"],
   "scopedPhrases": [],
   "literalContexts": [],
   "occurrenceConstructions": [

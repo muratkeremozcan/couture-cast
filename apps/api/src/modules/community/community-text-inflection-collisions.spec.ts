@@ -16,7 +16,7 @@ import { CommunityTextScreener } from './community-text-screener'
  * withheld, rerun for the round 7k rape-family spellings (17 new forms, all withheld) and
  * for round 7l (20 new forms from the typo index: nonsense joins such as marcaes, junk
  * suffixes on mari-/mongol- stems, and the Turkish plurals açıklar and açıkları, which
- * are ordinary words and pass through the allow list). Round 7q skips the typo spellings of Turkish
+ * are ordinary words and pass through the allow list). Round 7t adds tecavüzcü (rapist) to the Turkish violence terms, which generates 14 forms; the Turkish sweep found no collision among them. Round 7q skips the typo spellings of Turkish
  * inflections whose suffix breaks vowel harmony with their stem (amcık plus ler, the stem of
  * çıfıt plus ler): one letter less is an ordinary front-vowel word (çiftler, sıkışan). That
  * releases the three nonsense forms açıkden, açıkler and açıkleri from the pins. Any new generated form changes the hash below and fails the first test: rerun
@@ -24,9 +24,9 @@ import { CommunityTextScreener } from './community-text-screener'
  */
 const screener = new CommunityTextScreener()
 
-const GENERATED_FORM_COUNT = 964
+const GENERATED_FORM_COUNT = 978
 const GENERATED_FORMS_SHA256 =
-  'b969d7f721f49508d88273b47df984e0857edb1441143c7ccc8a5bcb01b92502'
+  '4eaf089725ff089b0105fc372285696f00d6f626466937eb73492340046936b2'
 
 // [form, languages whose sweep found it, expected disposition for the bare form, no locale]
 // pass: ruled an ordinary word. withheld: a hate or violence plural, a generated spelling

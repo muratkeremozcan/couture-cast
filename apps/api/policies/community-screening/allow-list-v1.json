@@ -171,11 +171,6 @@
       "reason": "The country name with its Portuguese accent; held out for the same reason as niger."
     },
     {
-      "entry": "gok",
-      "language": "tr",
-      "reason": "Turkish for sky written without its umlaut, as in gok mavisi, sky blue. The English slur gook collapses onto it; clearing the literal spelling is what keeps gook and its stretched forms indexed."
-    },
-    {
       "entry": "gök",
       "language": "tr",
       "reason": "Turkish for sky, as in gök mavisi, sky blue."
@@ -1224,11 +1219,6 @@
       "entry": "bolsera",
       "language": "es",
       "reason": "Ordinary Spanish word (a bag maker), one letter from the listed term bollera, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
-    },
-    {
-      "entry": "bollero",
-      "language": "es",
-      "reason": "Ordinary Spanish word (a seller of bollos, buns), one letter from the listed term bollera, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
     },
     {
       "entry": "marisca",
@@ -2978,6 +2968,11 @@
     }
   ],
   "scopedWords": [
+    {
+      "entry": "gok",
+      "language": "tr",
+      "reason": "Turkish for sky written without its umlaut, as in gok mavisi, sky blue. The English slur gook collapses onto it; clearing the literal spelling is what keeps gook and its stretched forms indexed. It clears only when the declared locale is Turkish; in every other locale, and with no declared locale, gok keeps screening as the collapsed English slur."
+    },
     {
       "entry": "fagot",
       "language": "tr",

@@ -2015,3 +2015,100 @@ describe('round 7s allow entries and language scope', () => {
       )
   })
 })
+
+/**
+ * Round 7t. The English knock and music senses of "rapped" clear in a wider closed grammar
+ * (a time or place after it, an adverb between it and the preposition, a possessed knuckles
+ * object, a person noun before it); the rape family and every person object stay withheld.
+ * Spanish bolera (bowling, bolero jacket copy) is an ordinary word; Turkish gok clears only
+ * under a declared Turkish locale.
+ */
+describe('round 7t rapped, bolera and gok', () => {
+  it.each([
+    'Someone rapped on the door at midnight.',
+    'She rapped sharply on the window.',
+    'He rapped softly at the glass and waited.',
+    'The teacher rapped the table with his knuckles.',
+    'He rapped his knuckles on the table.',
+    'My friend rapped on the door of the boutique.',
+    'The courier rapped on the door this morning.',
+    'The singer rapped the hook and the verse.',
+  ])('passes the knock or music sense under declared English: %s', (text) => {
+    expect(screen(text, 'en-US').disposition, text).toBe('pass')
+    expect(screen(text, 'en-GB').disposition, text).toBe('pass')
+  })
+
+  it.each([
+    'He rapped her at the door.',
+    'She rapped sharply on the door of the victim.',
+    'Someone rapped on the door after the assault.',
+    'raped on the door',
+    'rapped them on the window',
+    'rapp3d on the door',
+    'r a p p e d on the door',
+    'rapes at midnight',
+    'raped',
+    'rapped',
+    'she rapped on the door and then rapped her',
+  ])('keeps the rape family and person objects withheld: %s', (text) => {
+    expect(screen(text, 'en-US').disposition, text).not.toBe('pass')
+  })
+
+  it('keeps the knock frames withheld without declared English, as ruled in 7j', () => {
+    expect(screen('Someone rapped on the door at midnight.', null).disposition).not.toBe(
+      'pass'
+    )
+    expect(screen('rapped on the door', 'es-ES').disposition).not.toBe('pass')
+  })
+
+  it('clears the Spanish bolero-style bolera only next to a garment, under declared Spanish', () => {
+    for (const text of [
+      'Una chaqueta bolera negra con falda.',
+      'Combina la chaqueta bolera de cuero con vaqueros.',
+      'Las chaquetas boleras negras.',
+    ])
+      expect(screen(text, 'es-ES').disposition, text).toBe('pass')
+    for (const [text, locale] of [
+      ['Una chaqueta bolera negra con falda.', null],
+      ['Una chaqueta bolera negra con falda.', 'en-US'],
+      ['bolera', 'es-ES'],
+      ['boleras', 'es-ES'],
+      ['bollera', 'es-ES'],
+      ['bolleras', 'es-ES'],
+      ['chaqueta bollera', 'es-ES'],
+      ['chaqueta bolera mujer', 'es-ES'],
+      ['eres una bolera', 'es-ES'],
+      ['boleraa', 'es-ES'],
+      ['bol3ra', 'es-ES'],
+      ['b o l e r a', 'es-ES'],
+    ] as const)
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+
+  it('keeps bollero in review: it has a derogatory use in Spanish', () => {
+    expect(screen('bollero', 'es-ES').disposition).not.toBe('pass')
+    expect(screen('bolero', 'es-ES').disposition).toBe('pass')
+  })
+
+  it('holds the Turkish violence terms and their generated forms against a letter added', () => {
+    for (const text of [
+      'tecavuzlerx',
+      'tecavuzlerr',
+      'tecavuzlar',
+      'tecavuzcu',
+      'tecavuzcular',
+      'tecavuzculer',
+      'tecavüzcü',
+      'tecavüzcüler',
+      'tecavuzcux',
+    ])
+      expect(screen(text, 'tr-TR').disposition, text).not.toBe('pass')
+  })
+
+  it('clears Turkish gok only under a declared Turkish locale', () => {
+    expect(screen('gok mavisi', 'tr-TR').disposition).toBe('pass')
+    for (const locale of ['en-US', 'de-DE', 'es-ES', 'fr-FR', 'it-IT', 'pt-BR', null])
+      expect(screen('what a gok', locale).disposition, String(locale)).not.toBe('pass')
+    expect(screen('niger', 'en-US').disposition).toBe('pass')
+  })
+})
