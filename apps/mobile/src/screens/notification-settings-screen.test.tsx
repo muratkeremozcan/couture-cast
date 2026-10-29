@@ -3,6 +3,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { AccessibilityInfo, Platform } from 'react-native'
+import type * as NotificationLoadRetry from '../lib/notification-load-retry'
 import { http, HttpResponse } from 'msw'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { server } from '../test-utils/msw/server'
@@ -47,7 +48,8 @@ vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US' }],
 }))
 vi.mock('expo-router', () => ({ router: { push: vi.fn(), back: vi.fn() } }))
-vi.mock('../lib/notification-load-retry', () => ({
+vi.mock('../lib/notification-load-retry', async (importOriginal) => ({
+  ...(await importOriginal<typeof NotificationLoadRetry>()),
   LOAD_RETRY_DELAYS_MS: [150, 150, 150],
 }))
 import NotificationSettingsScreen from '../../app/notification-settings'
@@ -296,6 +298,34 @@ describe('R11 native settings journeys', () => {
     await new Promise((resolve) => setTimeout(resolve, 300))
     expect(screen.queryByText(label('loadRetrying'))).toBeNull()
     expect(screen.queryByText(label('loadFailed'))).toBeNull()
+  })
+
+  it('waits at least the retryAfterSeconds of a 503 before the next attempt', async () => {
+    const times: number[] = []
+    const body = { code: 'unavailable', retryAfterSeconds: 0.4 }
+    server.use(
+      http.get('*/api/v1/community/notification-preferences', () => {
+        times.push(Date.now())
+        return times.length < 4
+          ? HttpResponse.json(body, { status: 503 })
+          : HttpResponse.json({ data: { ...settings(), timezoneConfigured: true } })
+      })
+    )
+    await render(<NotificationSettingsScreen />)
+    identify('member-a')
+    await screen.findByDisplayValue('UTC', undefined, { timeout: 4000 })
+    expect(times).toHaveLength(4)
+    // The 150 ms schedule is raised to the requested 400 ms before every retry.
+    for (const i of [1, 2, 3])
+      expect(times[i]! - times[i - 1]!).toBeGreaterThanOrEqual(380)
+  })
+
+  it('gives the Try again button a stable id for the native flows', async () => {
+    session.ready = false
+    await render(<NotificationSettingsScreen />)
+    identify('member-a')
+    const retry = await screen.findByRole('button', { name: label('retry') })
+    expect(retry.getAttribute('data-testid')).toBe('notification-settings-retry')
   })
 
   it('has a load message and a Try again label in every supported locale', () => {

@@ -21,7 +21,11 @@ import {
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import { Text, useThemeColor } from '@/components/themed'
-import { LOAD_RETRY_DELAYS_MS } from '@/src/lib/notification-load-retry'
+import {
+  LOAD_RETRY_DELAYS_MS,
+  nextRetryDelayMs,
+  retryAfterMs,
+} from '@/src/lib/notification-load-retry'
 import { shareCardFixtureMode } from '@/src/lib/share-card-native-fixture'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import type { CommunityNotificationSettings } from '@couture/api-client/contracts/http'
@@ -58,7 +62,7 @@ export default function NotificationSettingsScreen() {
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     // A load that ends without settings is never silent: the failure message shows and a bounded
     // retry follows, so a token that settles after sign-in still produces the controls.
-    const failed = (request: number, next: string) => {
+    const failed = (request: number, next: string, requested?: number) => {
       if (!active || request !== generation.current || nativeSessionIdentity() !== next)
         return
       const delay = LOAD_RETRY_DELAYS_MS[attempts++]
@@ -69,10 +73,17 @@ export default function NotificationSettingsScreen() {
       }
       setMessage(LOAD_RETRYING)
       traceShareCardOpener('prefs-retry')
-      retryTimer = setTimeout(() => {
-        if (active && request === generation.current && nativeSessionIdentity() === next)
-          load(next)
-      }, delay)
+      retryTimer = setTimeout(
+        () => {
+          if (
+            active &&
+            request === generation.current &&
+            nativeSessionIdentity() === next
+          )
+            load(next)
+        },
+        nextRetryDelayMs(delay, requested)
+      )
     }
     const load = (next: string) => {
       const request = ++generation.current
@@ -119,9 +130,10 @@ export default function NotificationSettingsScreen() {
         )
         suggestedTimezone.current = value.timezoneConfigured ? undefined : draft.timezone
         setDraft(draft)
-      })().catch(() => {
+      })().catch((error: unknown) => {
         traceShareCardOpener('prefs-failed')
-        failed(request, next)
+        // A retryable 503 says how long to wait; the schedule is the floor, the bound the ceiling.
+        void retryAfterMs(error).then((requested) => failed(request, next, requested))
       })
     }
     const update = () => {
@@ -299,6 +311,7 @@ export default function NotificationSettingsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('community.notifications.retry')}
+          testID="notification-settings-retry"
           onPress={() => reload.current?.()}
           style={styles.button}
         >
