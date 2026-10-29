@@ -336,6 +336,10 @@ repository-relative. Proposed files are identified in the tasks.
       run automated native share-card proof in CI using built dev clients on iOS and Android,
       including API32 permission coverage. Keep normal flow discovery/sharding and artifact
       collection consistent with local runs. Route native-only flows through the native harness.
+      Pull requests run only the browser lane and `share-card-lanes-gate`; every device lane
+      (API32, the three API36 partitions, the iOS build, shards and evidence) runs on push to
+      main, nightly and `workflow_dispatch` because each takes over an hour. The gate expects the
+      device lanes skipped on `pull_request` and successful on every other event.
 
 **Acceptance criteria:**
 

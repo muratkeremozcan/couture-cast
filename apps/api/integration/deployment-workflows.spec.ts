@@ -283,6 +283,35 @@ describe('deployment workflows', () => {
     expect(startingJobs).toBe(11)
   })
 
+  it('the share-card native workflow runs only the browser lane on pull requests', () => {
+    const content = fs.readFileSync(
+      path.join(repoRoot, '.github', 'workflows', 'pr-share-card-native.yml'),
+      'utf8'
+    )
+    expect(content).toMatch(/on:\s*\n\s*pull_request:/)
+    expect(content).toMatch(/schedule:\s*\n\s*- cron: '[^']+'/)
+    const body = content.slice(content.search(/^jobs:\s*$/m))
+    const jobs = body.split(/^(?= {2}[A-Za-z0-9_-]+:\s*$)/m).slice(1)
+    const ifOf = (block: string) => /^ {4}if: (.+)$/m.exec(block)?.[1]
+    const skipped = new Set<string>()
+    for (const block of jobs) {
+      const name = block.slice(2, block.indexOf(':'))
+      const condition = ifOf(block)
+      if (condition?.includes("github.event_name != 'pull_request'")) skipped.add(name)
+      else expect(['browser-acceptance', 'share-card-lanes-gate'], name).toContain(name)
+    }
+    // Seven device lanes take over an hour each; a pull request would wait on all of them.
+    expect([...skipped].sort()).toEqual([
+      'android36-interaction',
+      'android36-native-matrix',
+      'android36-original',
+      'ios-build',
+      'ios-evidence',
+      'ios-shard',
+      'original-resource',
+    ])
+  })
+
   it('local Supabase starts from the image cache with its host ports guarded', () => {
     const content = fs.readFileSync(startLocalSupabaseAction, 'utf8')
     const reserve = fs.readFileSync(reserveSupabasePortsAction, 'utf8')

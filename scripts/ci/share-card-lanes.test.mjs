@@ -20,6 +20,9 @@ const mutate = (change) => {
 }
 const step = (job, predicate) => job.steps.find(predicate)
 const native = ['android36-native-matrix', 'android36-original', 'android36-interaction']
+const deviceLanes = Object.keys(android36Lanes).filter(
+  (name) => name !== 'browser-acceptance'
+)
 
 describe('share-card parallel lane validator', () => {
   test('the committed workflow passes', () => {
@@ -42,9 +45,21 @@ describe('share-card parallel lane validator', () => {
       (jobs, name) => (jobs[name].needs = ['original-resource']),
     ],
     [
-      'gating any lane on a condition',
-      /start independently/,
+      'gating any lane on another condition',
+      /device lane must be skipped on pull_request|pull request lane cannot be conditional/,
       (jobs, name) => (jobs[name].if = 'success()'),
+    ],
+    [
+      'running any lane on every event',
+      /device lane must be skipped on pull_request/,
+      (jobs, name) => delete jobs[name].if,
+      deviceLanes,
+    ],
+    [
+      'skipping the pull request lane',
+      /pull request lane cannot be conditional/,
+      (jobs, name) => (jobs[name].if = "github.event_name != 'pull_request'"),
+      ['browser-acceptance'],
     ],
     [
       'running any lane on a non-free runner',
@@ -145,8 +160,8 @@ describe('share-card parallel lane validator', () => {
           'success()'),
     ],
   ]
-  for (const [title, expected, change] of controls)
-    for (const name of Object.keys(android36Lanes))
+  for (const [title, expected, change, lanes = Object.keys(android36Lanes)] of controls)
+    for (const name of lanes)
       test(`${title}: ${name}`, () => {
         const problems = mutate((jobs) => change(jobs, name))
         assert.ok(
@@ -211,12 +226,69 @@ describe('share-card parallel lane validator', () => {
         )
       })
 
+    describe('workflow triggers', () => {
+      const mutateOn = (change) => {
+        const workflow = fresh()
+        change(workflow.on)
+        return shareCardLaneProblems(workflow)
+      }
+      for (const [title, expected, change] of [
+        ['no pull_request trigger', /must trigger on/, (on) => delete on.pull_request],
+        ['no push trigger', /must trigger on/, (on) => delete on.push],
+        [
+          'a push trigger beyond main',
+          /must trigger on/,
+          (on) => (on.push.branches = ['*']),
+        ],
+        ['no dispatch trigger', /must trigger on/, (on) => delete on.workflow_dispatch],
+        ['no nightly schedule', /nightly schedule/, (on) => delete on.schedule],
+        ['an empty schedule', /nightly schedule/, (on) => (on.schedule = [])],
+        [
+          'a malformed cron',
+          /nightly schedule/,
+          (on) => (on.schedule = [{ cron: 'nightly' }]),
+        ],
+      ])
+        test(`${title} is rejected`, () => {
+          const problems = mutateOn(change)
+          assert.ok(
+            problems.some((problem) => expected.test(problem)),
+            problems.join('\n') || 'no problem raised'
+          )
+        })
+
+      test('the committed triggers are pull_request, main, nightly and dispatch', () => {
+        assert.deepEqual(Object.keys(source.on).sort(), [
+          'pull_request',
+          'push',
+          'schedule',
+          'workflow_dispatch',
+        ])
+        assert.equal(source.jobs['browser-acceptance'].if, undefined)
+      })
+    })
+
     test('a missing aggregate job is rejected', () => {
       const problems = mutate((jobs) => delete jobs[gateJobName])
       assert.ok(problems.some((problem) => /run after failure/.test(problem)))
     })
 
+    test('the gate receives the triggering event', () => {
+      const gateStep = source.jobs[gateJobName].steps.at(-1)
+      assert.equal(gateStep.env.CC68_EVENT_NAME, '${{ github.event_name }}')
+    })
+
     for (const [title, expected, change] of [
+      [
+        'not telling the script which event triggered it',
+        /triggering event/,
+        (jobs) => delete jobs[gateJobName].steps.at(-1).env.CC68_EVENT_NAME,
+      ],
+      [
+        'telling the script a constant event',
+        /triggering event/,
+        (jobs) => (jobs[gateJobName].steps.at(-1).env.CC68_EVENT_NAME = 'push'),
+      ],
       [
         'dropping a lane from needs',
         /require every browser and native partition/,
@@ -497,9 +569,24 @@ describe('share-card parallel lane validator', () => {
       'an evidence job skipped after a failed shard',
       /ios-evidence must run after/,
       (jobs) => {
-        delete jobs['ios-evidence'].if
+        jobs['ios-evidence'].if = "github.event_name != 'pull_request'"
       }
     )
+    rejected(
+      'an evidence job that also runs on pull_request',
+      /ios-evidence must run after/,
+      (jobs) => {
+        jobs['ios-evidence'].if = 'always()'
+      }
+    )
+    for (const name of ['ios-build', 'ios-shard'])
+      rejected(
+        `${name} running on pull_request`,
+        new RegExp(`${name} must be skipped on pull_request`),
+        (jobs) => {
+          delete jobs[name].if
+        }
+      )
     rejected(
       'an evidence job that does not check the shard result',
       /exact cases/,

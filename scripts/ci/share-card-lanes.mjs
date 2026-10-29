@@ -2,7 +2,11 @@ import fs from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
 import { matrixRows } from './workflow-step-shadowing.mjs'
-import { requiredShareCardJobs } from './share-card-job-gate.mjs'
+import {
+  pullRequestEvent,
+  pullRequestShareCardJobs,
+  requiredShareCardJobs,
+} from './share-card-job-gate.mjs'
 
 export const android36Lanes = Object.freeze({
   'browser-acceptance': 'browser',
@@ -14,6 +18,13 @@ export const android36Lanes = Object.freeze({
 // check run may take that name.
 export const gateJobName = 'share-card-lanes-gate'
 const reservedContext = 'gate'
+// Every device lane takes over an hour, so a pull request runs only the lanes in
+// pullRequestShareCardJobs. The rest carry this job-level condition; the gate expects them
+// skipped on pull_request and successful on main, the nightly schedule and dispatch.
+export const deviceLaneCondition = `github.event_name != '${pullRequestEvent}'`
+export const evidenceCondition = `always() && ${deviceLaneCondition}`
+const deviceLaneIf = (name) =>
+  pullRequestShareCardJobs.includes(name) ? undefined : deviceLaneCondition
 const emulatorAction = 'reactivecircus/android-emulator-runner@v2'
 const nativeSdkActions = ['actions/setup-java@v4', 'android-actions/setup-android@v3']
 const maxMinutes = 90
@@ -22,6 +33,22 @@ const iosHarnessDirectory = '_bmad-output/test-artifacts/story-6-8/runtime'
 const includesRun = (steps, command) => steps.some((step) => step.run?.includes(command))
 const stepIsAlways = (steps, run) =>
   steps.some((step) => step.if === 'always()' && step.run === run)
+
+function triggerProblems(on, check) {
+  check(
+    on !== null &&
+      typeof on === 'object' &&
+      pullRequestEvent in on &&
+      JSON.stringify(on.push?.branches) === JSON.stringify(['main']) &&
+      'workflow_dispatch' in on,
+    'workflow must trigger on pull_request, push to main and workflow_dispatch'
+  )
+  const crons = [on?.schedule ?? []].flat().map((entry) => entry?.cron)
+  check(
+    crons.length > 0 && crons.every((cron) => /^\S+( \S+){4}$/.test(String(cron))),
+    'the device lanes need a nightly schedule'
+  )
+}
 
 function gateProblems(jobs, check) {
   check(
@@ -39,6 +66,11 @@ function gateProblems(jobs, check) {
     'gate must require every browser and native partition'
   )
   check(gate['continue-on-error'] === undefined, 'gate cannot hide failure')
+  check(
+    gate.steps?.find((step) => step.run === 'node scripts/ci/share-card-job-gate.mjs')
+      ?.env?.CC68_EVENT_NAME === '${{ github.event_name }}',
+    'gate must know the triggering event to expect skipped device lanes on pull_request'
+  )
   const gateStep = gate.steps?.find(
     (step) => step.run === 'node scripts/ci/share-card-job-gate.mjs'
   )
@@ -61,6 +93,10 @@ function legacyProblems(jobs, check) {
     'legacy API32 journey must remain complete and be the only original-resource row'
   )
   check(legacy?.needs === undefined, 'original-resource must start independently')
+  check(
+    legacy?.if === deviceLaneCondition,
+    'original-resource must be skipped on pull_request'
+  )
   // Run 40686881166 measured the API32 emulator step at 62m19s, so a 65 minute bound is a
   // flake; its behavior stays exactly as it was, bounded only by the job limit.
   check(
@@ -109,14 +145,16 @@ function iosJobProblems(jobs, check) {
 
 function iosShapeProblems({ build, shard, evidence }, check) {
   check(build?.needs === undefined, 'ios-build must start independently')
+  check(build?.if === deviceLaneCondition, 'ios-build must be skipped on pull_request')
+  check(shard?.if === deviceLaneCondition, 'ios-shard must be skipped on pull_request')
   check(
     JSON.stringify(needsList(shard)) === JSON.stringify(['ios-build']),
     'ios-shard must need exactly ios-build'
   )
   check(
     JSON.stringify(needsList(evidence)) === JSON.stringify(['ios-shard']) &&
-      evidence?.if === 'always()',
-    'ios-evidence must run after any ios-shard result'
+      evidence?.if === evidenceCondition,
+    'ios-evidence must run after any ios-shard result, except on pull_request'
   )
   check(
     JSON.stringify(shard?.strategy?.matrix?.shard) === JSON.stringify([1, 2]) &&
@@ -259,9 +297,12 @@ function workflowProblems(jobs, check) {
 function commonProblems(name, job, suite, rows, check) {
   const steps = job.steps ?? []
   check(job['runs-on'] === 'ubuntu-latest', `${name}: free Ubuntu runner required`)
+  check(job.needs === undefined, `${name}: partitions must start independently`)
   check(
-    job.needs === undefined && job.if === undefined,
-    `${name}: partitions must start independently`
+    job.if === deviceLaneIf(name),
+    pullRequestShareCardJobs.includes(name)
+      ? `${name}: the pull request lane cannot be conditional`
+      : `${name}: device lane must be skipped on pull_request`
   )
   check(job['continue-on-error'] === undefined, `${name}: failures must remain visible`)
   check(
@@ -397,6 +438,7 @@ export function shareCardLaneProblems(workflow) {
   const check = (ok, message) => {
     if (!ok) problems.push(message)
   }
+  triggerProblems(workflow.on, check)
   gateProblems(jobs, check)
   legacyProblems(jobs, check)
   iosProblems(jobs, check)
@@ -440,6 +482,6 @@ if (
     process.exitCode = 1
   } else
     console.log(
-      'Four independent Ubuntu API36 partitions, owned runtimes, budgets and strict gate validated.'
+      'Browser lane on pull requests, device lanes on main, nightly and dispatch, owned runtimes, budgets and strict gate validated.'
     )
 }

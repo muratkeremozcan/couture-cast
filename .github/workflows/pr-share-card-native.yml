@@ -1,8 +1,13 @@
 name: Share-card native originals
+# Pull requests run the browser lane and the lanes gate only. Every device lane takes over an hour,
+# so it runs on main, nightly and on demand: the job-level condition skips it on pull_request, and
+# the gate requires a skip there and a success everywhere else.
 on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: '17 3 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,6 +16,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   original-resource:
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -177,6 +183,7 @@ jobs:
   # steps (the alias) but never state. API32 stays in original-resource above; this list
   # is its Android path.
   android36-native-matrix:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -334,6 +341,7 @@ jobs:
         if: always()
         run: node scripts/e2e-share-card/cleanup.mjs
   android36-original:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -349,6 +357,7 @@ jobs:
     env: *runtime_env
     steps: *android36_steps
   android36-interaction:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 75
     strategy:
@@ -467,6 +476,7 @@ jobs:
   # account and run their share of the matrix, and one job proves both shards reported their exact
   # cases. The lanes gate requires all three; a skipped shard never passes.
   ios-build:
+    if: github.event_name != 'pull_request'
     runs-on: macos-15
     timeout-minutes: 60
     env: *runtime_env
@@ -719,6 +729,7 @@ jobs:
         run: node scripts/ci/native-supabase.mjs stop
   ios-shard:
     needs: ios-build
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -917,7 +928,7 @@ jobs:
 
   # A skipped shard has no report, so this job fails; the lanes gate also requires its result.
   ios-evidence:
-    if: always()
+    if: always() && github.event_name != 'pull_request'
     needs: ios-shard
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -955,4 +966,5 @@ jobs:
       - name: Require every native and browser lane
         env:
           CC68_JOB_RESULTS: ${{ toJSON(needs) }}
+          CC68_EVENT_NAME: ${{ github.event_name }}
         run: node scripts/ci/share-card-job-gate.mjs

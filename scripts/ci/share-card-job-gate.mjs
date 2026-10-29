@@ -14,8 +14,17 @@ export const requiredShareCardJobs = Object.freeze([
   'ios-evidence',
 ])
 
-/** Missing, skipped, cancelled and failed jobs all prevent aggregate success, so a skipped shard never counts. */
-export function assertShareCardJobs(results) {
+// The lanes that run on a pull request. Every other required job drives a device or an emulator
+// for over an hour, so the workflow skips it there and runs it on main, nightly and on demand.
+export const pullRequestShareCardJobs = Object.freeze(['browser-acceptance'])
+export const pullRequestEvent = 'pull_request'
+
+/**
+ * Missing, skipped, cancelled and failed jobs all prevent aggregate success, so a skipped shard
+ * never counts. Only a pull_request run expects the device lanes to be skipped (and requires
+ * it); any other event, an unknown one included, needs every job to succeed.
+ */
+export function assertShareCardJobs(results, eventName) {
   if (
     !results ||
     typeof results !== 'object' ||
@@ -24,8 +33,11 @@ export function assertShareCardJobs(results) {
     Object.keys(results).some((name) => !requiredShareCardJobs.includes(name))
   )
     throw new Error('share_card_job_results_invalid')
+  const deviceLanesSkipped = eventName === pullRequestEvent
+  const expected = (name) =>
+    deviceLanesSkipped && !pullRequestShareCardJobs.includes(name) ? 'skipped' : 'success'
   const failed = requiredShareCardJobs.filter(
-    (name) => results[name]?.result !== 'success'
+    (name) => results[name]?.result !== expected(name)
   )
   if (failed.length)
     throw new Error(`share_card_required_jobs_failed: ${failed.join(', ')}`)
@@ -44,7 +56,10 @@ if (
       throw new Error('share_card_job_results_invalid')
     }
     console.log(
-      `Required share-card jobs passed: ${assertShareCardJobs(results).join(', ')}`
+      `Required share-card jobs passed: ${assertShareCardJobs(
+        results,
+        process.env.CC68_EVENT_NAME
+      ).join(', ')}`
     )
   } catch (error) {
     console.error(error.message)
