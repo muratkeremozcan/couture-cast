@@ -404,6 +404,13 @@ describe('GuardianService consent revocation', () => {
         name: 'a bare Error whose message embeds SQLSTATE 40001',
         error: new Error('could not serialize access (40001)'),
       },
+      {
+        name: 'the plpgsql_check pldbgapi2 stack error (XX000)',
+        error: buildPrismaKnownRequestError('P2010', {
+          code: 'XX000',
+          message: 'ERROR: cannot find parent statement on pldbgapi2 call stack',
+        }),
+      },
     ])('retries revocation after $name', async ({ error }) => {
       const { attempts, promise } = runRevokeWithFailure(error, 1)
 
@@ -424,11 +431,29 @@ describe('GuardianService consent revocation', () => {
       { name: 'an object with no code, meta, or message', error: {} },
       { name: 'an object whose message is not a string', error: { message: 42 } },
       { name: 'a thrown string', error: 'connection reset by peer' },
+      {
+        name: 'another XX000 internal error',
+        error: buildPrismaKnownRequestError('P2010', {
+          code: 'XX000',
+          message: 'ERROR: unexpected internal state',
+        }),
+      },
     ])('rethrows immediately after $name', async ({ error }) => {
       const { attempts, promise } = runRevokeWithFailure(error, 1)
 
       await expect(promise).rejects.toBeDefined()
       expect(attempts()).toBe(1)
+    })
+
+    it('gives up on a repeating pldbgapi2 stack error and surfaces it', async () => {
+      const error = buildPrismaKnownRequestError('P2010', {
+        code: 'XX000',
+        message: 'ERROR: cannot find parent statement on pldbgapi2 call stack',
+      })
+      const { attempts, promise } = runRevokeWithFailure(error, 3)
+
+      await expect(promise).rejects.toBe(error)
+      expect(attempts()).toBe(3)
     })
 
     it('gives up after exhausting the retry budget', async () => {

@@ -1,0 +1,6 @@
+# Native development-client owner. The native harness signs in a genuine owned account first.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: story68/open-outfit.yaml
+- runFlow: story68/watermark.yaml
+- runFlow: story68/save.yaml

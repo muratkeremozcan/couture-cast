@@ -11,6 +11,7 @@ import { calculateAge } from '@couture/utils'
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import { assertWardrobeParticipationAllowed } from '../guardian/guardian-participation.js'
 import { assertCommunitySubjectAvailable } from './community-privacy.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 @Injectable()
 export class CommunityAccessService {
@@ -45,14 +46,15 @@ export class CommunityAccessService {
     await communityDependency(() =>
       budget.run(() =>
         tx === this.prisma
-          ? this.prisma.$transaction(
+          ? interactiveTransaction(
+              this.prisma,
               async (connection) => {
                 await connection.$executeRawUnsafe(
                   `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
                 )
                 await this.assertDatabase(member, connection)
               },
-              { timeout: budget.remaining(), maxWait: budget.remaining() }
+              () => ({ timeout: budget.remaining(), maxWait: budget.remaining() })
             )
           : this.assertDatabase(member, tx)
       )
@@ -81,14 +83,15 @@ export async function assertCommunitySubjectPresent(
 ): Promise<void> {
   await communityDependency(() =>
     budget.run(() =>
-      prisma.$transaction(
+      interactiveTransaction(
+        prisma,
         async (tx) => {
           await tx.$executeRawUnsafe(
             `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
           )
           await assertCommunitySubjectAvailable(tx, member)
         },
-        { timeout: budget.remaining(), maxWait: budget.remaining() }
+        () => ({ timeout: budget.remaining(), maxWait: budget.remaining() })
       )
     )
   )
@@ -131,14 +134,15 @@ export async function assertCommunityReadEligibility(
 ) {
   await communityDependency(() =>
     budget.run(() =>
-      prisma.$transaction(
+      interactiveTransaction(
+        prisma,
         async (tx) => {
           await tx.$executeRawUnsafe(
             `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
           )
           await assertCommunityDatabaseReadAccess(tx, member, true)
         },
-        { timeout: budget.remaining(), maxWait: budget.remaining() }
+        () => ({ timeout: budget.remaining(), maxWait: budget.remaining() })
       )
     )
   )

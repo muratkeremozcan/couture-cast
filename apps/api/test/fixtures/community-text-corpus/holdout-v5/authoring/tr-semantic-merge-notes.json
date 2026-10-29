@@ -1,0 +1,63 @@
+{
+  "author": "/root/general_review",
+  "language": "tr",
+  "merges": [
+    {
+      "concept": "igne-oya-kenar",
+      "sourceConcepts": ["yemeni-oya", "igne-danteli"],
+      "englishGloss": "Needle lace edging on a headscarf or handkerchief",
+      "reason": "Both sets show needle-made lace borders. Floral versus triangular edging and caption versus close view remain in the same conservative group."
+    },
+    {
+      "concept": "kabartma-sirma-bitki",
+      "sourceConcepts": ["bindalli-dal", "marasideval"],
+      "englishGloss": "Raised metallic floral or branch embroidery on clothing",
+      "reason": "Metallic raised botanical ornament is the shared visual motif across the traditional dress and the other embroidered accessories."
+    },
+    {
+      "concept": "musluklu-sicak-kazan",
+      "sourceConcepts": ["salep-kazan", "semaver"],
+      "englishGloss": "An upright hot-drink urn with a dispensing tap",
+      "reason": "The salep vessel and samovar share the essential tall heated-vessel-and-tap composition. Drink identity and accessory type do not split this motif."
+    },
+    {
+      "concept": "gorunur-kumas-onarim",
+      "sourceConcepts": ["yirtik-diz", "sashiko"],
+      "englishGloss": "Visible fabric repair with patches or reinforcing hand stitches",
+      "reason": "Both groups visibly strengthen a worn clothing area. Body location and repair material are consolidated conservatively."
+    },
+    {
+      "concept": "cekirdekli-meyve-yarim",
+      "sourceConcepts": ["kayisi-cekirdek", "erik-yarim"],
+      "englishGloss": "Halved stone fruit displaying a large oval pit or pit cavity",
+      "reason": "Apricot versus plum, accessory type and incidental colour do not split the shared cut-fruit composition."
+    },
+    {
+      "concept": "elde-boya-tekstil",
+      "sourceConcepts": ["iplik-boyama", "kök-boya"],
+      "englishGloss": "Hand-dyed textiles shown during dyeing or beside the dye source",
+      "reason": "Yarn versus cloth and dye ingredients do not create independent hand-dyeing scenarios. Process and sample views are kept in one conservative group."
+    },
+    {
+      "concept": "disli-karsilikli-yaprak",
+      "sourceConcepts": ["isirgan", "nane-cift"],
+      "englishGloss": "Paired serrated herb leaves arranged along a stem",
+      "reason": "Nettle and mint share this specific opposing toothed-leaf composition. Plant names and accessory surfaces do not split the visual motif."
+    },
+    {
+      "concept": "dar-ucta-buzgu",
+      "sourceConcepts": ["salvar-paca", "piskopos-kol"],
+      "englishGloss": "A voluminous garment tube gathered into a narrow cuff",
+      "reason": "Sleeve versus trouser placement does not split the same narrow-cuff gathering motif."
+    }
+  ],
+  "labelCorrections": {
+    "filkete": "firkete",
+    "carpana-bel": "bel-tezgah",
+    "gece-yan\\u00adsima": "gece-yansima",
+    "azik-sirt-canta": "canta-inince-gunes"
+  },
+  "manuallyReauthoredProofreadRows": [230, 261, 288],
+  "manuallyReauthoredBotanicalRows": [657, 658, 659, 660],
+  "botanicalRevisionReason": "Four complete items about linden flower clusters with a distinctive long bract replace the fuzzy oval herb-leaf group. This gives more structural headroom around the conservatively merged mint/nettle motif."
+}

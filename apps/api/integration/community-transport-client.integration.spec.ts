@@ -1,6 +1,7 @@
 import 'reflect-metadata'
 import type { INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
+import { createHash } from 'node:crypto'
 import type { AddressInfo } from 'node:net'
 import { PrismaClient } from '@prisma/client'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -131,6 +132,29 @@ async function setup() {
   // The previous case's sync reads and realtime ticks leave detached assists that can
   // still hold a head; drain the way the runtime does.
   await drainCommunityOutbox(prisma, streams)
+  const trace: Record<string, unknown>[] = []
+  const record = (kind: string, data: Record<string, unknown> = {}) => {
+    if (trace.length < 150) trace.push({ at: performance.now(), kind, ...data })
+  }
+  let activeAssistance: Promise<number> | undefined
+  const realAssist = streams.assist.bind(streams) as CommunityStreamRepository['assist']
+  vi.spyOn(streams, 'assist').mockImplementation(async () => {
+    const started = performance.now()
+    record('assist-start')
+    try {
+      const assistance = realAssist()
+      activeAssistance = assistance
+      const count = await assistance
+      if (activeAssistance === assistance) activeAssistance = undefined
+      record('assist-end', { count, elapsedMs: performance.now() - started })
+      return count
+    } catch (error) {
+      record('assist-error', {
+        errorClass: error instanceof Error ? error.name : 'unknown',
+      })
+      throw error
+    }
+  })
   const runtime = createCommunityRealtimeServer(() =>
     Promise.resolve({
       prisma,
@@ -148,9 +172,36 @@ async function setup() {
   // These spies forward to actual HTTP wrappers; no response or callback is injected.
   const eventStarts: number[] = []
   const realEvents = client.events
-  const events = vi.spyOn(client, 'events').mockImplementation((...args) => {
-    eventStarts.push(performance.now())
-    return realEvents(...args)
+  const cursorHash = (cursor: string | undefined) =>
+    cursor ? createHash('sha256').update(cursor).digest('hex').slice(0, 12) : null
+  const events = vi.spyOn(client, 'events').mockImplementation(async (...args) => {
+    const started = performance.now()
+    eventStarts.push(started)
+    record('events-start', { cursor: cursorHash(args[1]) })
+    try {
+      const page = await realEvents(...args)
+      record('events-end', {
+        elapsedMs: performance.now() - started,
+        events: page.events.map((event) => ({
+          kind: event.kind,
+          matchesTarget: 'postId' in event && event.postId === post.id,
+          revision: 'communityRevision' in event ? event.communityRevision : null,
+        })),
+        cursor: cursorHash(page.nextCursor),
+        resync: page.resyncRequired,
+        hasMore: page.hasMore,
+      })
+      return page
+    } catch (error) {
+      const failure = error as { name?: unknown; response?: { status?: unknown } }
+      record('events-error', {
+        elapsedMs: performance.now() - started,
+        errorClass: typeof failure.name === 'string' ? failure.name : 'unknown',
+        httpStatus:
+          typeof failure.response?.status === 'number' ? failure.response.status : null,
+      })
+      throw error
+    }
   })
   const changed = vi.fn<
     (
@@ -159,8 +210,13 @@ async function setup() {
       >[0],
       signal?: AbortSignal
     ) => Promise<void>
-  >(() => Promise.resolve())
-  const availability = vi.fn()
+  >((events) => {
+    record('changed', { kinds: events.map((event) => event.kind) })
+    return Promise.resolve()
+  })
+  const availability = vi.fn((status: string, realtime?: boolean) =>
+    record('availability', { status, realtime })
+  )
   let visibleTotal: number | undefined
   const state = new CommunitySyncState(client, 'all', {
     rendered: () => [post.id],
@@ -171,8 +227,14 @@ async function setup() {
     apply: (target) => {
       visibleTotal =
         target.status === 'available' ? target.post.reactions.total : undefined
+      record('apply', { total: visibleTotal, status: target.status })
     },
     changed,
+    // A UI refresh can finish after the optional append. Await only the real assist
+    // already launched by the HTTP service so the recovery replay sees its commit.
+    reconcile: async () => {
+      await activeAssistance
+    },
     availability,
   })
   coordinators.push(state)
@@ -186,6 +248,7 @@ async function setup() {
   )
   await state.catchUp()
   return {
+    trace,
     eventStarts,
     owner,
     actor,
@@ -261,31 +324,127 @@ describe('Story 6.5 R16 V2: real server through production transport and coordin
       data: { user_id: f.actor.id, post_id: f.post.id, selection: 'love' },
     })
     const started = performance.now()
-    // Recovery applies the target snapshot before its owned event replay completes.
-    // Observe both results within the original 10s budget.
-    await vi.waitFor(
-      () => {
-        expect(f.total()).toBe(1)
-        expect(f.changed).toHaveBeenCalledWith(
-          expect.arrayContaining([
-            expect.objectContaining({ kind: 'reactions.changed', postId: f.post.id }),
-          ]),
-          expect.any(AbortSignal)
+    expect(
+      await prisma.communityDomainOutbox.count({
+        where: { post_id: f.post.id, kind: 'reactions.changed', appended_at: null },
+      })
+    ).toBe(1)
+    expect(
+      await prisma.communityStreamEvent.count({
+        where: { post_id: f.post.id, kind: 'reactions.changed' },
+      })
+    ).toBe(0)
+    try {
+      await vi.waitFor(
+        () => {
+          expect(f.total()).toBe(1)
+          expect(f.changed).toHaveBeenCalledWith(
+            expect.arrayContaining([
+              expect.objectContaining({ kind: 'reactions.changed', postId: f.post.id }),
+            ]),
+            expect.any(AbortSignal)
+          )
+          expect(f.availability).toHaveBeenLastCalledWith('connected', false)
+        },
+        { timeout: 10_000, interval: 50 }
+      )
+      expect(performance.now() - started).toBeLessThan(10_000)
+      const assistance = f.trace.filter(
+        (entry) =>
+          entry.kind === 'assist-end' &&
+          typeof entry.count === 'number' &&
+          entry.count > 0 &&
+          typeof entry.at === 'number' &&
+          entry.at >= started
+      )
+      expect(assistance.length).toBeGreaterThan(0)
+      expect(
+        f.trace.some(
+          (entry) =>
+            entry.kind === 'assist-start' &&
+            typeof entry.at === 'number' &&
+            entry.at >= started &&
+            entry.at <= (assistance[0]!.at as number)
         )
-        expect(f.availability).toHaveBeenLastCalledWith('connected', false)
-      },
-      { timeout: 10_000, interval: 50 }
-    )
-    expect(performance.now() - started).toBeLessThan(10_000)
-    expect(f.eventStarts[beforeOutage]! - outageStarted).toBeLessThanOrEqual(8000)
-    expect(f.changed).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({ kind: 'reactions.changed', postId: f.post.id }),
-      ]),
-      expect.any(AbortSignal)
-    )
-    const changedSignal = f.changed.mock.calls.at(-1)![1]!
-    expect(changedSignal.aborted).toBe(false)
-    expect(f.availability).toHaveBeenLastCalledWith('connected', false)
+      ).toBe(true)
+      expect(
+        await prisma.communityDomainOutbox.count({
+          where: { post_id: f.post.id, kind: 'reactions.changed', appended_at: null },
+        })
+      ).toBe(0)
+      expect(
+        await prisma.communityStreamEvent.count({
+          where: { post_id: f.post.id, kind: 'reactions.changed' },
+        })
+      ).toBe(1)
+      expect(f.eventStarts[beforeOutage]! - outageStarted).toBeLessThanOrEqual(8000)
+      const applied = f.trace.find(
+        (entry) =>
+          entry.kind === 'apply' &&
+          entry.total === 1 &&
+          typeof entry.at === 'number' &&
+          entry.at >= outageStarted
+      )
+      const verified = f.trace.find(
+        (entry) =>
+          entry.kind === 'availability' &&
+          entry.status === 'connected' &&
+          entry.realtime === false &&
+          typeof entry.at === 'number' &&
+          entry.at >= outageStarted
+      )
+      expect(applied).toBeDefined()
+      expect(verified).toBeDefined()
+      expect((applied!.at as number) - outageStarted).toBeLessThanOrEqual(8000)
+      expect((verified!.at as number) - outageStarted).toBeLessThanOrEqual(8000)
+      expect(f.changed).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'reactions.changed', postId: f.post.id }),
+        ]),
+        expect.any(AbortSignal)
+      )
+      const changedSignal = f.changed.mock.calls.at(-1)![1]!
+      expect(changedSignal.aborted).toBe(false)
+      expect(f.availability).toHaveBeenLastCalledWith('connected', false)
+      // All proof assertions precede this cleanup flush of the already-observed replay.
+      await f.state.catchUp()
+    } finally {
+      const backlog = await prisma.communityDomainOutbox.count({
+        where: { post_id: f.post.id, appended_at: null },
+      })
+      const stored = await prisma.communityStreamEvent.findMany({
+        where: { post_id: f.post.id },
+        orderBy: { sequence: 'asc' },
+        select: { kind: true, sequence: true, revision: true },
+      })
+      const internal = Object.fromEntries(
+        [
+          'connected',
+          'socketConnected',
+          'dirty',
+          'replayAfterRecovery',
+          'nextTargetValidation',
+        ].map((key) => [key, Reflect.get(f.state, key) as unknown])
+      )
+      console.info(
+        JSON.stringify({
+          evidence: 'transport-fallback-closed',
+          elapsedMs: performance.now() - started,
+          total: f.total(),
+          changedCalls: f.changed.mock.calls.length,
+          backlog,
+          stored: stored.map((row) => ({
+            kind: row.kind,
+            sequence: String(row.sequence),
+            revision: String(row.revision),
+          })),
+          internal,
+          trace: f.trace.map(({ at, ...entry }) => ({
+            relativeToOutageMs: Math.round((at as number) - outageStarted),
+            ...entry,
+          })),
+        })
+      )
+    }
   }, 15_000)
 })

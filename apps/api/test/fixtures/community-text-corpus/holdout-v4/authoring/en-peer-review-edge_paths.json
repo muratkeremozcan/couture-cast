@@ -1,0 +1,447 @@
+{
+  "reviewer": "/root/edge_paths",
+  "scope": "Read-only second semantic recheck of English authored corpus after direct complete-text revisions.",
+  "source_sha256": "f48f3aecdff25fa3766a0032fdcf1e214e03f4490cf4d81bb56597117f760388",
+  "concept_merges_sha256": "748e5a52df289fa16a79612fd2a9c113abfdc10b3140b693518dfe920adb66eb",
+  "row_count": 1000,
+  "field_counts": {
+    "caption": 500,
+    "altText": 500
+  },
+  "largest_explicit_concept": 10,
+  "five_word_affected_items": 6,
+  "five_word_affected_rows": [500, 544, 777, 815, 911, 987],
+  "normalized_duplicate_count": 0,
+  "verdict": "READY",
+  "findings": [],
+  "boundary_resolutions": [
+    {
+      "concept": "revealed-inner-surface",
+      "english_gloss": "Opening or folding an edge to reveal decorative lining or an inner reverse surface.",
+      "current_membership": [
+        {
+          "row": 599,
+          "concept_labels": ["revealed-inner-surface"],
+          "field": "altText",
+          "text": "The raised collar exposes a contrasting strip underneath."
+        },
+        {
+          "row": 621,
+          "concept_labels": ["revealed-inner-surface"],
+          "field": "altText",
+          "text": "Printed lining peeks from the inside of an open coat."
+        },
+        {
+          "row": 710,
+          "concept_labels": ["revealed-inner-surface"],
+          "field": "altText",
+          "text": "The open bag reveals a finely checked fabric lining."
+        },
+        {
+          "row": 770,
+          "concept_labels": ["revealed-inner-surface"],
+          "field": "altText",
+          "text": "The open dark bag reveals a vividly coloured lining and keys."
+        },
+        {
+          "row": 819,
+          "concept_labels": ["revealed-inner-surface"],
+          "field": "altText",
+          "text": "The opened coat exposes a patterned lining and an older woven label."
+        }
+      ],
+      "current_count": 5,
+      "status": "RESOLVED",
+      "reason": "The identified sleeve/collar and patchwork-lining candidates, plus four existing reveal rows, now contain distinct complete motifs. Five current members remain. Nearby lining replacement, map embroidery and intentionally reversible construction supply substantive additional actions; no remaining over-cap reveal cluster was identified."
+    },
+    {
+      "concept": "practical-extra-layer",
+      "english_gloss": "Using an additional clothing layer for warmth, previously including a scarf or wrap acting as a knee blanket.",
+      "current_membership": [
+        {
+          "row": 152,
+          "concept_labels": ["practical-extra-layer"],
+          "field": "caption",
+          "text": "A fine layer under my shirt helped with the first frost."
+        },
+        {
+          "row": 762,
+          "concept_labels": ["practical-extra-layer"],
+          "field": "altText",
+          "text": "A knit layer shows beneath an open shell in the morning mist."
+        },
+        {
+          "row": 769,
+          "concept_labels": ["practical-extra-layer"],
+          "field": "altText",
+          "text": "Cardigans hang across the backs of chairs behind open music folders."
+        },
+        {
+          "row": 854,
+          "concept_labels": ["practical-extra-layer"],
+          "field": "altText",
+          "text": "A soft cardigan hangs above a small bag on the visitor's chair."
+        }
+      ],
+      "current_count": 4,
+      "status": "RESOLVED",
+      "reason": "The four knee-blanket candidates and four prior warm-layer alternates retain their distinct replacement motifs. Four current members remain. Clothing-or-bag-on-chair is explicitly annotated on ten rows, including the backpack row; it meets the ten-item cap.",
+      "nearby_conservative_chair_drape_rows": [
+        394, 532, 549, 750, 769, 818, 844, 854, 872, 905
+      ]
+    }
+  ],
+  "inspected_replacements": [
+    {
+      "row": 86,
+      "concept_labels": ["belt-loop-check"],
+      "field": "caption",
+      "text": "I checked each belt loop before buying these secondhand trousers."
+    },
+    {
+      "row": 125,
+      "concept_labels": ["snap-cuff-opening"],
+      "field": "caption",
+      "text": "The cuff opens along a concealed row of press studs."
+    },
+    {
+      "row": 128,
+      "concept_labels": ["waistband-adjustment"],
+      "field": "caption",
+      "text": "I can loosen the waistband with its hidden sliding tab."
+    },
+    {
+      "row": 267,
+      "concept_labels": ["detachable-sleeves"],
+      "field": "caption",
+      "text": "The sleeve unzips completely to make a sleeveless vest."
+    },
+    {
+      "row": 390,
+      "concept_labels": ["belt-end-keeper"],
+      "field": "caption",
+      "text": "A little elastic keeper stops the belt end flapping."
+    },
+    {
+      "row": 505,
+      "concept_labels": ["spring-purse-closure"],
+      "field": "altText",
+      "text": "A flat metal spring holds the coin purse shut."
+    },
+    {
+      "row": 513,
+      "concept_labels": ["shoulder-cutout"],
+      "field": "altText",
+      "text": "Two circular cutouts sit beside the blouse's shoulder seam."
+    },
+    {
+      "row": 571,
+      "concept_labels": ["grip-glove-pads"],
+      "field": "altText",
+      "text": "Small textured pads cover the fingertips of both gloves."
+    },
+    {
+      "row": 729,
+      "concept_labels": ["side-zipped-shirt"],
+      "field": "altText",
+      "text": "The shirt fastens along its side with a narrow concealed zip."
+    },
+    {
+      "row": 777,
+      "concept_labels": ["collar-chain"],
+      "field": "altText",
+      "text": "A short chain joins the two decorative collar points."
+    },
+    {
+      "row": 800,
+      "concept_labels": ["beret-centre-loop"],
+      "field": "altText",
+      "text": "The beret has a small loop at its centre."
+    },
+    {
+      "row": 857,
+      "concept_labels": ["snap-cuff-opening"],
+      "field": "altText",
+      "text": "Small press studs run beneath the sleeve's overlapping wrist panel."
+    },
+    {
+      "row": 860,
+      "concept_labels": ["waistband-adjustment"],
+      "field": "altText",
+      "text": "A sliding metal tab sits along the waistband's inner edge."
+    },
+    {
+      "row": 884,
+      "concept_labels": ["unequal-leg-hems"],
+      "field": "altText",
+      "text": "The two trouser legs have hems at different heights."
+    },
+    {
+      "row": 901,
+      "concept_labels": ["transparent-badge-pocket"],
+      "field": "altText",
+      "text": "A narrow transparent pocket holds a small paper badge."
+    }
+  ],
+  "inspection": "Only authored English TSV, its concept merge provenance and this reviewer note were read. No policy, repair, screener, development corpus or evaluation inspection.",
+  "modifications": "Updated this peer note only. Verified the English source change consists solely of the declared ten new concept annotations. No English source edits by this reviewer.",
+  "signoff_limit": "Semantic spot-audit signoff of the identified concept boundaries. Historical disjointness is covered by the root common audit.",
+  "prior_review": {
+    "reviewer": "/root/edge_paths",
+    "scope": "Read-only semantic spot recheck of English en.tsv and en-concept-merges.txt after complete-caption revisions.",
+    "source_sha256": "0a77f2326f59306ee2160d32c89f72d24d646f7d60f1f2f8a2eb0c0e7461e027",
+    "concept_merges_sha256": "748e5a52df289fa16a79612fd2a9c113abfdc10b3140b693518dfe920adb66eb",
+    "row_count": 1000,
+    "field_counts": {
+      "caption": 500,
+      "altText": 500
+    },
+    "verdict": "CHANGES_REQUIRED",
+    "findings": [
+      {
+        "concept": "revealed-inner-surface",
+        "english_gloss": "Turning or opening clothing edges to reveal inner decoration or lining.",
+        "existing_group_count": 9,
+        "existing_membership": [
+          {
+            "row": 86,
+            "concept_labels": ["revealed-inner-surface"],
+            "field": "caption",
+            "text": "Found a well-made lining while browsing the charity shop racks."
+          },
+          {
+            "row": 513,
+            "concept_labels": ["revealed-inner-surface"],
+            "field": "altText",
+            "text": "A rolled sleeve exposes stripes running in another direction."
+          },
+          {
+            "row": 571,
+            "concept_labels": ["revealed-inner-surface"],
+            "field": "altText",
+            "text": "The glove cuffs turn back to reveal a knitted lining."
+          },
+          {
+            "row": 599,
+            "concept_labels": ["revealed-inner-surface"],
+            "field": "altText",
+            "text": "The raised collar exposes a contrasting strip underneath."
+          },
+          {
+            "row": 621,
+            "concept_labels": ["revealed-inner-surface"],
+            "field": "altText",
+            "text": "Printed lining peeks from the inside of an open coat."
+          },
+          {
+            "row": 710,
+            "concept_labels": ["revealed-inner-surface"],
+            "field": "altText",
+            "text": "The open bag reveals a finely checked fabric lining."
+          },
+          {
+            "row": 729,
+            "concept_labels": ["revealed-inner-surface"],
+            "field": "altText",
+            "text": "A turned front edge shows a narrow patterned facing."
+          },
+          {
+            "row": 770,
+            "concept_labels": ["revealed-inner-surface"],
+            "field": "altText",
+            "text": "The open dark bag reveals a vividly coloured lining and keys."
+          },
+          {
+            "row": 819,
+            "concept_labels": ["revealed-inner-surface"],
+            "field": "altText",
+            "text": "The opened coat exposes a patterned lining and an older woven label."
+          }
+        ],
+        "additional_membership": [
+          {
+            "row": 390,
+            "concept_labels": ["embroidered-cuff"],
+            "field": "caption",
+            "text": "Small stitched leaves peek out whenever I turn my sleeves back."
+          },
+          {
+            "row": 505,
+            "concept_labels": ["folded-collar"],
+            "field": "altText",
+            "text": "A turned collar reveals stitching along its underside."
+          }
+        ],
+        "consolidated_count": 11,
+        "reason": "The additional rows explicitly turn a sleeve or collar to reveal its inner decoration. Changing the decoration from a contrasting pattern to stitching preserves this underlying reveal motif.",
+        "additional_boundary_to_consider": [
+          {
+            "row": 267,
+            "concept_labels": ["patchwork-lining"],
+            "field": "caption",
+            "text": "Scrap squares make the inside of my jacket unexpectedly cheerful."
+          }
+        ]
+      },
+      {
+        "concept": "practical-extra-layer",
+        "english_gloss": "An additional textile layer used for warmth, including a wrap or scarf serving as a knee blanket.",
+        "existing_group_count": 8,
+        "existing_membership": [
+          {
+            "row": 152,
+            "concept_labels": ["practical-extra-layer"],
+            "field": "caption",
+            "text": "A fine layer under my shirt helped with the first frost."
+          },
+          {
+            "row": 762,
+            "concept_labels": ["practical-extra-layer"],
+            "field": "altText",
+            "text": "A knit layer shows beneath an open shell in the morning mist."
+          },
+          {
+            "row": 769,
+            "concept_labels": ["practical-extra-layer"],
+            "field": "altText",
+            "text": "Cardigans hang across the backs of chairs behind open music folders."
+          },
+          {
+            "row": 777,
+            "concept_labels": ["practical-extra-layer"],
+            "field": "altText",
+            "text": "A quilted wrap covers the seated person's knees before an outdoor screen."
+          },
+          {
+            "row": 800,
+            "concept_labels": ["practical-extra-layer"],
+            "field": "altText",
+            "text": "Folded outer layers lie across the knees beneath the domed ceiling."
+          },
+          {
+            "row": 854,
+            "concept_labels": ["practical-extra-layer"],
+            "field": "altText",
+            "text": "A soft cardigan hangs above a small bag on the visitor's chair."
+          },
+          {
+            "row": 884,
+            "concept_labels": ["practical-extra-layer"],
+            "field": "altText",
+            "text": "A fine knit cuff extends from beneath the heavier shirt sleeve."
+          },
+          {
+            "row": 901,
+            "concept_labels": ["practical-extra-layer"],
+            "field": "altText",
+            "text": "A bundled spectator holds a sign above thick gloves and a zipped coat."
+          }
+        ],
+        "additional_membership": [
+          {
+            "row": 128,
+            "concept_labels": ["seated-drape"],
+            "field": "caption",
+            "text": "This generous wrap keeps my knees warm during outdoor readings."
+          },
+          {
+            "row": 860,
+            "concept_labels": ["seated-drape"],
+            "field": "altText",
+            "text": "A long wrap covers knees beneath an outdoor reading table."
+          },
+          {
+            "row": 125,
+            "concept_labels": ["train-sleep"],
+            "field": "caption",
+            "text": "Watching fields go by while my scarf does blanket duty."
+          },
+          {
+            "row": 857,
+            "concept_labels": ["train-sleep"],
+            "field": "altText",
+            "text": "A broad scarf covers the passenger's knees beside a passing landscape."
+          }
+        ],
+        "consolidated_count": 12,
+        "reason": "The existing group includes knee-covering wrap rows777/800. The extra members repeat the knee-blanket function with incidental outdoor-reading or train settings. Row857 alone with the two seated-drape members raises the current group above10."
+      }
+    ],
+    "inspection": "Only the two English authored provenance files were inspected for this recheck. No repair, policy, screener, development corpus or evaluation inspection.",
+    "modifications": "Wrote this peer note only. English TSV and concept metadata unchanged."
+  },
+  "pre_annotation_identity": {
+    "source_sha256": "841ea658d7b517aada36c5408d506bd929e7889de7a90fc2225af331c34fb188",
+    "verdict": "READY",
+    "verification": "Removing only clothing-or-bag-on-chair annotations from the ten declared rows reproduces the previously reviewed file SHA256 exactly. This proves no item wording or other source edits changed."
+  },
+  "annotation_only_update": {
+    "label": "clothing-or-bag-on-chair",
+    "english_gloss": "Clothing or a bag resting on, or hanging from, a chair.",
+    "count": 10,
+    "membership": [
+      {
+        "row": 394,
+        "concept_labels": ["clothing-or-bag-on-chair", "coat-over-chair"],
+        "field": "caption",
+        "text": "Draped the coat across my chair while the afternoon warmed up."
+      },
+      {
+        "row": 532,
+        "concept_labels": ["backpack-chair", "clothing-or-bag-on-chair"],
+        "field": "altText",
+        "text": "A canvas backpack hangs from a wooden chair back."
+      },
+      {
+        "row": 549,
+        "concept_labels": ["clothing-or-bag-on-chair", "scarf-chair"],
+        "field": "altText",
+        "text": "A scarf lies loosely across the arm of an empty chair."
+      },
+      {
+        "row": 750,
+        "concept_labels": ["clothing-or-bag-on-chair", "linen-creases"],
+        "field": "altText",
+        "text": "A creased linen jacket lies across the back of a woven chair."
+      },
+      {
+        "row": 769,
+        "concept_labels": ["clothing-or-bag-on-chair", "practical-extra-layer"],
+        "field": "altText",
+        "text": "Cardigans hang across the backs of chairs behind open music folders."
+      },
+      {
+        "row": 818,
+        "concept_labels": ["clothing-or-bag-on-chair", "warming-room"],
+        "field": "altText",
+        "text": "A removed cardigan hangs across a chair in the meeting room."
+      },
+      {
+        "row": 844,
+        "concept_labels": ["clothing-or-bag-on-chair", "public-speaking"],
+        "field": "altText",
+        "text": "A familiar jacket hangs behind a speaker's notes on the chair."
+      },
+      {
+        "row": 854,
+        "concept_labels": ["clothing-or-bag-on-chair", "practical-extra-layer"],
+        "field": "altText",
+        "text": "A soft cardigan hangs above a small bag on the visitor's chair."
+      },
+      {
+        "row": 872,
+        "concept_labels": ["clothing-or-bag-on-chair", "loose-boat-weather"],
+        "field": "altText",
+        "text": "A folded coat sits on the spare chair overlooking moored boats."
+      },
+      {
+        "row": 905,
+        "concept_labels": ["clothing-or-bag-on-chair", "outdoor-chess"],
+        "field": "altText",
+        "text": "A long coat folds across the chair beside an outdoor chessboard."
+      }
+    ],
+    "consistent": true,
+    "text_changed": false
+  }
+}

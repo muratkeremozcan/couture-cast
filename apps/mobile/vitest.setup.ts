@@ -9,6 +9,9 @@ import { cleanup as cleanupBrowser } from 'vitest-browser-react'
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 
 import { server } from './src/test-utils/msw/server'
+import { failOnUnwantedConsoleOutput } from './src/test-utils/unwanted-console'
+
+failOnUnwantedConsoleOutput()
 
 // React Native0.81 supplies abort-controller3, which has neither static method, and Hermes
 // has no DOMException global.

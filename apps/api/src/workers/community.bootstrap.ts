@@ -65,17 +65,29 @@ const DISPATCH_INTERVAL_MS = 1_000
 export const COMMUNITY_SHUTDOWN_TIMEOUT_MS = 20_000
 const SWEEP_INTERVAL_MS = 30_000
 
-const workers: Worker[] = []
-const timers: NodeJS.Timeout[] = []
-let posthogService: PostHogService | undefined
-let closeRuntime: (() => Promise<void>) | undefined
+/** What one community worker process started, owned by its caller. */
+export type CommunityWorkerProcessState = {
+  readonly workers: Worker[]
+  readonly timers: NodeJS.Timeout[]
+  posthogService?: PostHogService
+  closeRuntime?: () => Promise<void>
+}
+
+export function createCommunityWorkerProcessState(): CommunityWorkerProcessState {
+  return { workers: [], timers: [] }
+}
 
 /**
  * Runs `sweep` on an interval, never overlapping and never rejecting: an
  * unhandled rejection from a timer callback takes the process down, and this
  * process staying up is the whole point of it.
  */
-function schedule(name: string, intervalMs: number, sweep: () => Promise<unknown>): void {
+function schedule(
+  timers: NodeJS.Timeout[],
+  name: string,
+  intervalMs: number,
+  sweep: () => Promise<unknown>
+): void {
   let running = false
   const timer = setInterval(() => {
     if (running) return
@@ -98,17 +110,18 @@ function schedule(name: string, intervalMs: number, sweep: () => Promise<unknown
   timers.push(timer)
 }
 
-export async function startCommunityWorkers() {
+export async function startCommunityWorkers(state: CommunityWorkerProcessState) {
   try {
     const prisma = getPrismaClient()
-    posthogService = new PostHogService()
+    const posthogService = new PostHogService()
+    state.posthogService = posthogService
     const telemetryService = new TelemetryService(prisma, posthogService)
     const engagement = await startCommunityEngagementRuntime(
       prisma,
       posthogService,
       'community'
     )
-    closeRuntime = engagement.close
+    state.closeRuntime = engagement.close
 
     // Readiness first, consumption second. `createCommunityWorkerRuntime`
     // resolves only once the selected screener has loaded and verified whatever
@@ -122,15 +135,35 @@ export async function startCommunityWorkers() {
         new CommunityFlagEvaluationService(prisma, posthogService)
       ),
     })
-    workers.push(community.worker)
-    closeRuntime = async () => {
+    state.workers.push(community.worker)
+    state.closeRuntime = async () => {
       await Promise.all([community.close(), engagement.close()])
     }
 
-    schedule('dispatch', DISPATCH_INTERVAL_MS, community.sweeps.dispatchPending)
-    schedule('stale-review', SWEEP_INTERVAL_MS, community.sweeps.sweepStalePendingReview)
-    schedule('upload-expiry', SWEEP_INTERVAL_MS, community.sweeps.sweepExpiredUploads)
-    schedule('erasure', SWEEP_INTERVAL_MS, community.sweeps.sweepErasureRequests)
+    schedule(
+      state.timers,
+      'dispatch',
+      DISPATCH_INTERVAL_MS,
+      community.sweeps.dispatchPending
+    )
+    schedule(
+      state.timers,
+      'stale-review',
+      SWEEP_INTERVAL_MS,
+      community.sweeps.sweepStalePendingReview
+    )
+    schedule(
+      state.timers,
+      'upload-expiry',
+      SWEEP_INTERVAL_MS,
+      community.sweeps.sweepExpiredUploads
+    )
+    schedule(
+      state.timers,
+      'erasure',
+      SWEEP_INTERVAL_MS,
+      community.sweeps.sweepErasureRequests
+    )
 
     logger.info(
       {
@@ -193,14 +226,15 @@ export async function startCommunityWorkers() {
  * an operator releases or removes it (Story 6.2b review, RF14; recorded in
  * deferred work).
  */
-export async function performShutdown() {
+export async function performShutdown(state: CommunityWorkerProcessState) {
+  const { workers, timers } = state
   logger.info('Shutting down community workers...')
   let exitCode = 0
   for (const timer of timers) {
     clearInterval(timer)
   }
-  const runtime = closeRuntime
-  const posthog = posthogService
+  const runtime = state.closeRuntime
+  const posthog = state.posthogService
   try {
     await shutdownWorkerResources(
       {
@@ -229,19 +263,15 @@ export async function performShutdown() {
   }
 }
 
-let shutdownPromise: Promise<void> | undefined
-
-function shutdown(): Promise<void> {
-  shutdownPromise ??= performShutdown()
-  return shutdownPromise
-}
-
 // Guarded like `wardrobe.bootstrap.ts`, so importing this module in a spec does
 // not open a Redis connection, register signal handlers, or call `process.exit`
 // inside the test runner.
 if (require.main === module) {
+  const state = createCommunityWorkerProcessState()
+  let shutdownPromise: Promise<void> | undefined
+  const shutdown = () => (shutdownPromise ??= performShutdown(state))
   process.on('SIGTERM', () => void shutdown())
   process.on('SIGINT', () => void shutdown())
 
-  void startCommunityWorkers()
+  void startCommunityWorkers(state)
 }

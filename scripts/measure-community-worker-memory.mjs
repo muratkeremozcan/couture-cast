@@ -27,6 +27,7 @@
  *
  * Usage: node scripts/measure-community-worker-memory.mjs [--container cc-community-worker]
  */
+import fs from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -175,7 +176,7 @@ function main() {
 }
 
 const invokedDirectly =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
 if (invokedDirectly) {
   try {
     main()

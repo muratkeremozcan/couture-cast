@@ -1,0 +1,17 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: ../story65/open-notification-settings.yaml
+- tapOn: ${MAESTRO_SIGNOUT}
+# Sign out returns to Settings, whose shopping section reads the signed-out session.
+- extendedWaitUntil:
+    visible:
+      id: settings-screen
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: commerce-settings-signed-out
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertNotVisible:
+    id: share-card-title

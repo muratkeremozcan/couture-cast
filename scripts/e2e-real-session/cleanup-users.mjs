@@ -164,7 +164,10 @@ async function main() {
   if (summary.failed.length > 0) process.exitCode = 1
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   main().catch((error) => {
     console.error(`[real-session] Auth user cleanup failed: ${error.message}`)
     process.exitCode = 1

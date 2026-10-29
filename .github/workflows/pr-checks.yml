@@ -16,7 +16,7 @@ permissions:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  # The ephemeral service container declared on `quality-gate`, not a shared
+  # The ephemeral service container declared on `tests`, not a shared
   # environment. `RLS_TEST_DATABASE_URL` falls back to this, so one URL serves
   # both the schema suites and the RLS actor matrix.
   DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
@@ -26,8 +26,121 @@ env:
   COVERAGE_GIST_ID: 64348ebdc6e662b93ade9f40bdc03442
 
 jobs:
-  quality-gate:
+  # The quality checks run as parallel jobs so none of them holds a PR for the
+  # sum of the others; `quality-gate` below aggregates them. Each job states the
+  # same check it ran as a step of the single former job.
+  runtime-deps:
+    name: Web aliased runtime dependencies
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node environment
+        id: setup
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'false'
+
+      - name: Verify web aliased runtime dependencies
+        run: npm run check:web:aliased-runtime-deps
+
+  typecheck:
+    name: Typecheck workspaces
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node environment
+        id: setup
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'false'
+
+      - name: Generate Prisma Client
+        id: prisma
+        run: npm run db:generate
+
+      - name: Typecheck workspaces
+        run: npm run typecheck
+
+  lint:
+    name: Lint sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node environment
+        id: setup
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'false'
+
+      - name: Generate Prisma Client
+        id: prisma
+        run: npm run db:generate
+
+      - name: Lint sources
+        run: npm run lint
+
+  lighthouse:
+    name: Lighthouse accessibility gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node environment
+        id: setup
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'false'
+
+      - name: Generate Prisma Client
+        id: prisma
+        run: npm run db:generate
+
+      - name: Build packages
+        id: build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        id: chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Lighthouse accessibility gate
+        id: lighthouse
+        run: npm run test:a11y:lighthouse
+
+      - name: Upload Lighthouse accessibility reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-accessibility-${{ github.event.pull_request.number || github.sha }}
+          path: playwright/artifacts/lighthouse/
+
+  tests:
+    name: Workspace tests with coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     # `packages/db/test/**` holds the RLS actor matrix and every schema
     # constraint assertion, and it talks to a real PostgreSQL. It only started
     # running here when story 5.1 added `test:coverage` to that workspace, at
@@ -77,14 +190,14 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node environment
+        id: setup
         uses: ./.github/actions/setup-node-env
         with:
           use-npm-ci: 'false'
 
-      - name: Verify web aliased runtime dependencies
-        run: npm run check:web:aliased-runtime-deps
-
       - name: Generate Prisma Client
+        id: prisma
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: npm run db:generate
 
       # The migrations assume a Supabase database. A stock PostgreSQL image
@@ -100,6 +213,8 @@ jobs:
       # suite drives it by setting `request.jwt.claims` with `set_config`, which
       # is exactly the path this reads.
       - name: Provision Supabase-compatible roles and auth schema
+        id: roles
+        if: ${{ !cancelled() }}
         run: |
           psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
@@ -152,38 +267,28 @@ jobs:
           SQL
 
       - name: Apply migrations to the test database
+        id: migrations
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.roles.outcome == 'success' }}
         run: node scripts/prisma-migrate-deploy.mjs
 
-      - name: Typecheck workspaces
-        run: npm run typecheck
-
-      - name: Lint sources
-        run: npm run lint
-
       - name: Build packages
+        id: build
+        if: ${{ !cancelled() && steps.prisma.outcome == 'success' }}
         run: npm run build
 
       - name: Install Playwright Chromium
+        id: chromium
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: npx playwright install --with-deps chromium
 
-      - name: Run Lighthouse accessibility gate
-        id: lighthouse
-        continue-on-error: true
-        run: npm run test:a11y:lighthouse
-
-      - name: Upload Lighthouse accessibility reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lighthouse-accessibility-${{ github.event.pull_request.number || github.sha }}
-          path: playwright/artifacts/lighthouse/
-
       - name: Run tests with coverage
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.migrations.outcome == 'success' && steps.chromium.outcome == 'success' }}
         id: tests
         continue-on-error: true
         run: npm run test:coverage
 
       - name: Coverage report and PR comment
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
         uses: ./.github/actions/unit-test-coverage-comment
         with:
           coverage-path: ./coverage
@@ -197,17 +302,232 @@ jobs:
           badge-filename-prefix: couture-cast
           badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
 
+      - name: Require later checks to run after an earlier check fails
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node --test scripts/ci/workflow-step-shadowing.test.mjs
+
+      - name: Require later checks to run after an earlier check fails
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node --test scripts/ci/workflow-step-shadowing.test.mjs
+
       # `always()` so this runs even when the coverage-comment step above has
       # already failed. `continue-on-error` on the test step is deliberate and
       # should stay: it is what lets the coverage comment post on a red run,
       # which is when it is most useful. But it means a failing test run reaches
       # the comment step, which then dies on the missing lcov and takes the job
       # down with an error about a missing file rather than about the tests.
-      # The gate held either way; the reported cause was wrong. This step now
-      # always runs and names the real one. It still exits 0 when the tests
-      # passed, so a comment step that fails for its own reasons is not masked.
+      # This step always runs and names the real cause. It still exits 0 when the
+      # tests passed, so a comment step that fails for its own reasons is not masked.
       - name: Fail if tests failed
-        if: always() && (steps.tests.outcome == 'failure' || steps.lighthouse.outcome == 'failure')
+        if: ${{ always() && steps.tests.outcome == 'failure' }}
         run: |
-          echo "::error::Quality gate failed: tests=${{ steps.tests.outcome }} lighthouse=${{ steps.lighthouse.outcome }}"
+          echo "::error::Workspace tests failed"
           exit 1
+
+  # The one job a ruleset or reader needs: red when any quality check is red,
+  # cancelled or skipped, with every result named.
+  quality-gate:
+    name: quality-gate
+    needs: [runtime-deps, typecheck, lint, lighthouse, tests]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every quality check to pass
+        env:
+          RESULTS: >-
+            tests=${{ needs.tests.result }} lighthouse=${{ needs.lighthouse.result }}
+            lint=${{ needs.lint.result }} typecheck=${{ needs.typecheck.result }}
+            runtime-deps=${{ needs.runtime-deps.result }}
+        run: |
+          for result in $RESULTS; do
+            if [ "${result#*=}" != "success" ]; then
+              echo "::error::Quality gate failed: $RESULTS"
+              exit 1
+            fi
+          done
+          echo "Quality gate passed: $RESULTS"
+
+  community-realtime-budget:
+    name: Community realtime cold-handshake budget
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --conditions=development
+      REDIS_URL: redis://127.0.0.1:6379
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-env
+      - name: Prepare generated dependencies before the measured phase
+        run: |
+          npm run db:generate
+          npm run build:packages
+      - name: Provision isolated CI roles
+        run: |
+          psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          CREATE SCHEMA auth;
+          CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $fn$
+            SELECT coalesce(nullif(current_setting('request.jwt.claim', true), ''),
+              nullif(current_setting('request.jwt.claims', true), ''))::jsonb
+          $fn$;
+          GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+          SQL
+      # One test worker, its own runner and services, no concurrent builds or suites.
+      # The product keeps its 1950 ms deadline, five-connection pool and 100 cold members.
+      - name: Require five independent cold-start budget proofs
+        id: proofs
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/realtime-budget
+          for attempt in 1 2 3 4 5; do
+            npx vitest run --config vitest.realtime-budget.config.ts --reporter=default --reporter=json --outputFile=".cache/realtime-budget/run-$attempt.json" 2>&1 | tee ".cache/realtime-budget/run-$attempt.log"
+          done
+      - name: Require execution of every budget proof
+        if: ${{ !cancelled() && (steps.proofs.outcome == 'success' || steps.proofs.outcome == 'failure') }}
+        working-directory: apps/api
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          for (let attempt = 1; attempt <= 5; attempt++) {
+            const report = JSON.parse(fs.readFileSync(`.cache/realtime-budget/run-${attempt}.json`, 'utf8'))
+            if (report.numTotalTests !== 1 || report.numPassedTests !== 1 ||
+                report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
+              throw new Error(`Incomplete realtime budget proof: ${attempt}`)
+          }
+          JS
+      - name: Upload cold-handshake timings and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-realtime-budget
+          path: apps/api/.cache/realtime-budget/
+          if-no-files-found: error
+
+  community-screening-gates:
+    name: Community corpus and mixed workload budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COMMUNITY_NSFW_SCREENER: tensorflow
+      NODE_OPTIONS: --conditions=development
+      COMMUNITY_SCREENING_RUN_PRODUCT_DIR: .cache/community-screening
+      RUN_COMMENT_RESOURCE_MEASUREMENT: 'true'
+      # The text corpus specs are excluded from every other apps/api run.
+      RUN_COMMUNITY_TEXT_CORPUS: 'true'
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      # The pinned model and WASM artifacts ship in npm packages. This action restores
+      # their lockfile-keyed npm cache; the manifest verification also runs on cache hits.
+      - uses: ./.github/actions/setup-node-env
+      - name: Generate Prisma client and shared packages
+        id: packages
+        run: |
+          npm run db:generate
+          npm run build:packages
+      - name: Provision isolated CI cluster roles
+        run: |
+          psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          CREATE SCHEMA auth;
+          CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $fn$
+            SELECT coalesce(nullif(current_setting('request.jwt.claim', true), ''),
+              nullif(current_setting('request.jwt.claims', true), ''))::jsonb
+          $fn$;
+          GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+          SQL
+      - name: Verify cached pinned model and compile the production worker
+        id: compile
+        run: |
+          node scripts/verify-community-screening-model.mjs
+          npm run build --workspace api
+      - name: Mandatory seven-locale release corpus evaluation
+        working-directory: apps/api
+        run: npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
+      # Pure data checks over the development corpora, run without coverage
+      # instrumentation and one file at a time. Measured 2026-10-27 with coverage in
+      # the shared quality-gate run on this runner size, the slowest cases took 9.5 s
+      # (a locale with the default budget) and 23.8 s (the retired-corpora loop with
+      # its own 20 s budget); locally without coverage they take 2.0-2.7 s and
+      # 5.6-6.8 s. 15 s per case is 1.6x the worst covered, contended measurement for
+      # the cases on the default budget, and an awaited hang still fails at 15 s. The
+      # step timeout stops a synchronous loop: the two files take 82 s of CPU locally,
+      # and 10 minutes is over 7x that.
+      - name: Mandatory corpus development specs without coverage instrumentation
+        if: ${{ !cancelled() && steps.packages.outcome == 'success' }}
+        working-directory: apps/api
+        timeout-minutes: 10
+        run: npx vitest run src/modules/community/community-text-round3-development.spec.ts src/modules/community/community-text-round5-development.spec.ts --maxWorkers=1 --testTimeout=15000 --reporter=default --reporter=json --outputFile=.cache/community-screening/development-ci-tests.json
+      - name: Mandatory compiled mixed workload and resource budgets
+        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
+        working-directory: apps/api
+        run: npx vitest run integration/community-comments-measurement.integration.spec.ts --maxWorkers=1 --reporter=default --reporter=json --outputFile=.cache/community-screening/mixed-ci-tests.json
+      # The development specs are frozen, so their count is exact: 181 round3 cases
+      # and 43 round5 cases. A dropped or renamed fixture set changes it.
+      - name: Require complete execution with every opt-in case enabled
+        if: ${{ !cancelled() && steps.packages.outcome == 'success' }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          const problems = []
+          for (const [file, minimum, exact] of [['corpus-ci-tests.json',52],['mixed-ci-tests.json',1],['development-ci-tests.json',224,224]]) {
+            const name = `apps/api/.cache/community-screening/${file}`
+            if (!fs.existsSync(name)) { problems.push(`${file}: no report`); continue }
+            const report = JSON.parse(fs.readFileSync(name,'utf8'))
+            if (report.numTotalTests < minimum || (exact !== undefined && report.numTotalTests !== exact) ||
+                report.numPassedTests !== report.numTotalTests || report.numPendingTests !== 0 ||
+                report.numFailedTests !== 0 || report.numTodoTests !== 0)
+              problems.push(`${file}: ${report.numPassedTests}/${report.numTotalTests} passed`)
+          }
+          if (problems.length) throw new Error(`Incomplete mandatory screening execution: ${problems.join('; ')}`)
+          JS
+      - name: Upload corpus and compiled-worker measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-screening-gates
+          path: apps/api/.cache/community-screening/
+          if-no-files-found: error

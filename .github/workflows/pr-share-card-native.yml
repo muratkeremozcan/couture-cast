@@ -1,0 +1,970 @@
+name: Share-card native originals
+# Pull requests run the browser lane and the lanes gate only. Every device lane takes over an hour,
+# so it runs on main, nightly and on demand: the job-level condition skips it on pull_request, and
+# the gate requires a skip there and a success everywhere else.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: share-card-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  original-resource:
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+            api: 32
+            target: google_apis
+            suite: all
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env: &runtime_env
+      PLAYWRIGHT_SKIP_DB_RESET: 'true'
+      CC68_HARNESS_DIR: _bmad-output/test-artifacts/story-6-8/runtime
+      MAESTRO_CLI_NO_ANALYTICS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        id: checkout
+      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/install
+        id: install
+      - name: Provision pinned share-card browser dependencies
+        id: browser_deps
+        if: matrix.platform == 'android'
+        timeout-minutes: 12
+        run: |
+          node scripts/ci/node-test-gate.mjs browser-deps
+          node scripts/ci/share-card-browser-deps.mjs --chromium-only
+      # These suites need only the installed dependencies, so a browser, Supabase or
+      # runtime failure cannot hide them. They follow the browser steps only so those
+      # keep their plain platform conditions.
+      - name: Verify share-card harness and plugin suites
+        id: harness_suites
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          node scripts/ci/node-test-gate.mjs share-card-plugins
+          node scripts/ci/node-test-gate.mjs native-harness
+      - uses: actions/setup-java@v4
+        if: ${{ !cancelled() }}
+        id: java
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        id: android_sdk
+        if: ${{ !cancelled() && matrix.platform == 'android' }}
+        with:
+          packages: platform-tools
+      - name: Verify startup deadline controls
+        id: deadline_controls
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/ci/node-test-gate.mjs startup-deadline
+      - uses: ./.github/actions/start-local-supabase
+        if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' }}
+        id: supabase
+      - name: Prepare isolated UUID runtime and built renderer
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        id: runtime
+        run: |
+          npm run db:generate
+          npm run build:packages
+          npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
+          node scripts/lib/story68-built-render.mjs
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (node scripts/run-story68-native.mjs metro --platform ${{ matrix.platform }} > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          node scripts/maestro-install.mjs
+      - name: Verify the owned API database entry guard
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
+        run: |
+          npx vitest run scripts/lib/story68-api-entry.test.mjs --reporter=default --reporter=json --outputFile="$RUNNER_TEMP/story68-api-entry.json"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          const report = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/story68-api-entry.json`, 'utf8'))
+          if (report.numTotalTests < 2 || report.numPassedTests !== report.numTotalTests ||
+              report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
+            throw new Error('Incomplete API entry guard execution')
+          JS
+      - name: Verify localized native accessibility announcements and focus bridge
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
+        run: |
+          node scripts/e2e-share-card/bridge-a11y.mjs
+      - name: Generate native development client
+        id: prebuild
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
+        run: node scripts/run-story68-native.mjs prebuild --platform ${{ matrix.platform }}
+      - name: Verify fresh Worklets variant and ABI staging
+        if: ${{ !cancelled() && matrix.platform == 'android' && steps.prebuild.outcome == 'success' }}
+        run: node scripts/ci/node-test-gate.mjs worklets-staging
+      - name: Build native development client
+        id: native_build
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
+      - name: Verify modal status-bar styling on both Android SDK branches
+        id: modal_system_bars
+        # Robolectric compiles the module inside the generated Android project.
+        if: ${{ !cancelled() && matrix.platform == 'android' && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        working-directory: apps/mobile/android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
+          # Both SDK branches ran, and none was skipped.
+          grep -q 'tests="2" skipped="0" failures="0" errors="0"' ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml
+      - name: Enable and verify Android hardware acceleration
+        id: kvm
+        if: ${{ !cancelled() && matrix.platform == 'android' }}
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          # trigger only queues the uevent; wait until the rule has applied before testing.
+          sudo udevadm settle --timeout=30
+          ls -l /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Android isolated native journey
+        if: ${{ !cancelled() && matrix.platform == 'android' && steps.native_build.outcome == 'success' && steps.kvm.outcome == 'success' }}
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CC68_ANDROID_API: ${{ matrix.api }}
+          CC68_ANDROID_SUITE: ${{ matrix.suite }}
+        with:
+          api-level: ${{ matrix.api }}
+          avd-name: cc68-api${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-linux-hw-accel: false
+          disable-animations: true
+          script: bash scripts/ci/share-card-android.sh
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api metro; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Select and scan closed evidence
+        if: always()
+        env:
+          CC68_CI_PLATFORM: ${{ matrix.platform }}
+          CC68_CI_API: ${{ matrix.api }}
+          CC68_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/e2e-share-card/public-evidence.mjs
+      - name: Collect original PNG proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-card-${{ matrix.platform }}-${{ matrix.api }}-${{ matrix.suite }}
+          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
+          if-no-files-found: error
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
+  # The three API36 partitions run on separate free runners with no dependency on each
+  # other. Each one prepares, signs in and cleans up its own UUID runtime, so they share
+  # steps (the alias) but never state. API32 stays in original-resource above; this list
+  # is its Android path.
+  android36-native-matrix:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+            api: 36
+            target: google_apis_playstore
+            suite: matrix
+            journey_timeout: 60
+    env: *runtime_env
+    steps: &android36_steps
+      - uses: actions/checkout@v4
+        id: checkout
+      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/install
+        id: install
+      - name: Provision pinned share-card browser dependencies
+        id: browser_deps
+        timeout-minutes: 12
+        run: |
+          node scripts/ci/node-test-gate.mjs browser-deps
+          node scripts/ci/share-card-browser-deps.mjs --chromium-only
+      - name: Verify share-card harness and plugin suites
+        id: harness_suites
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          node scripts/ci/node-test-gate.mjs share-card-plugins
+          node scripts/ci/node-test-gate.mjs native-harness
+      - uses: actions/setup-java@v4
+        if: ${{ !cancelled() }}
+        id: java
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        id: android_sdk
+        if: ${{ !cancelled() }}
+        with:
+          packages: platform-tools
+      - name: Verify startup deadline controls
+        id: deadline_controls
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/ci/node-test-gate.mjs startup-deadline
+      - uses: ./.github/actions/start-local-supabase
+        if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' }}
+        id: supabase
+      - name: Prepare isolated UUID runtime and built renderer
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        id: runtime
+        run: |
+          npm run db:generate
+          npm run build:packages
+          npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
+          node scripts/lib/story68-built-render.mjs
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (node scripts/run-story68-native.mjs metro --platform android > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          node scripts/maestro-install.mjs
+      - name: Verify the owned API database entry guard
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
+        run: |
+          npx vitest run scripts/lib/story68-api-entry.test.mjs --reporter=default --reporter=json --outputFile="$RUNNER_TEMP/story68-api-entry.json"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          const report = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/story68-api-entry.json`, 'utf8'))
+          if (report.numTotalTests < 2 || report.numPassedTests !== report.numTotalTests ||
+              report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
+            throw new Error('Incomplete API entry guard execution')
+          JS
+      - name: Verify localized native accessibility announcements and focus bridge
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
+        run: |
+          node scripts/e2e-share-card/bridge-a11y.mjs
+      - name: Generate native development client
+        id: prebuild
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
+        run: node scripts/run-story68-native.mjs prebuild --platform ${{ matrix.platform }}
+      - name: Verify fresh Worklets variant and ABI staging
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' }}
+        run: node scripts/ci/node-test-gate.mjs worklets-staging
+      - name: Build native development client
+        id: native_build
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
+      - name: Verify modal status-bar styling on both Android SDK branches
+        id: modal_system_bars
+        # Robolectric compiles the module inside the generated Android project.
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        working-directory: apps/mobile/android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
+          # Both SDK branches ran, and none was skipped.
+          grep -q 'tests="2" skipped="0" failures="0" errors="0"' ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml
+      - name: Enable and verify Android hardware acceleration
+        id: kvm
+        if: ${{ !cancelled() }}
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          # trigger only queues the uevent; wait until the rule has applied before testing.
+          sudo udevadm settle --timeout=30
+          ls -l /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Android isolated native journey
+        timeout-minutes: ${{ matrix.journey_timeout }}
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' && steps.kvm.outcome == 'success' }}
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CC68_ANDROID_API: ${{ matrix.api }}
+          CC68_ANDROID_SUITE: ${{ matrix.suite }}
+        with:
+          api-level: ${{ matrix.api }}
+          avd-name: cc68-api${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-linux-hw-accel: false
+          disable-animations: true
+          script: bash scripts/ci/share-card-android.sh
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api metro; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Select and scan closed evidence
+        if: always()
+        env:
+          CC68_CI_PLATFORM: ${{ matrix.platform }}
+          CC68_CI_API: ${{ matrix.api }}
+          CC68_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/e2e-share-card/public-evidence.mjs
+      - name: Collect original PNG proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-card-${{ matrix.platform }}-${{ matrix.api }}-${{ matrix.suite }}
+          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
+          if-no-files-found: error
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
+  android36-original:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+            api: 36
+            target: google_apis_playstore
+            suite: original
+            journey_timeout: 25
+    env: *runtime_env
+    steps: *android36_steps
+  android36-interaction:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+            api: 36
+            target: google_apis_playstore
+            suite: interaction
+            journey_timeout: 45
+    env: *runtime_env
+    steps: *android36_steps
+  browser-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: android
+            api: 36
+            suite: browser
+    env: *runtime_env
+    steps:
+      - uses: actions/checkout@v4
+        id: checkout
+      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/install
+        id: install
+      - name: Provision pinned share-card browser dependencies
+        id: browser_deps
+        if: matrix.platform == 'android'
+        timeout-minutes: 12
+        run: |
+          node scripts/ci/node-test-gate.mjs browser-deps
+          node scripts/ci/share-card-browser-deps.mjs
+      - name: Verify share-card harness and plugin suites
+        id: harness_suites
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          node scripts/ci/node-test-gate.mjs share-card-plugins
+          node scripts/ci/node-test-gate.mjs native-harness
+      - name: Verify startup deadline controls
+        id: deadline_controls
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/ci/node-test-gate.mjs startup-deadline
+      - uses: ./.github/actions/start-local-supabase
+        if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' }}
+        id: supabase
+      - name: Prepare isolated UUID runtime and built renderer
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        id: runtime
+        run: |
+          npm run db:generate
+          npm run build:packages
+          npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
+          node scripts/lib/story68-built-render.mjs
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+      - name: Verify the owned API database entry guard
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
+        run: |
+          npx vitest run scripts/lib/story68-api-entry.test.mjs --reporter=default --reporter=json --outputFile="$RUNNER_TEMP/story68-api-entry.json"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          const report = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/story68-api-entry.json`, 'utf8'))
+          if (report.numTotalTests < 2 || report.numPassedTests !== report.numTotalTests ||
+              report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
+            throw new Error('Incomplete API entry guard execution')
+          JS
+      - name: Genuine browser share-card acceptance matrix
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
+        run: |
+          # A production build served by next start: no route compiles during the matrix.
+          node scripts/e2e-share-card/web.mjs build
+          node scripts/e2e-share-card/web.mjs start > "$CC68_HARNESS_DIR/web-startup-private.log" 2>&1 &
+          node scripts/e2e-share-card/wait-web.mjs
+          npx playwright test --config playwright/share-card.config.ts
+          node scripts/e2e-share-card/assert-web-matrix.mjs
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Select and scan closed evidence
+        if: always()
+        env:
+          CC68_CI_PLATFORM: ${{ matrix.platform }}
+          CC68_CI_API: ${{ matrix.api }}
+          CC68_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/e2e-share-card/public-evidence.mjs
+      - name: Collect original PNG proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-card-${{ matrix.platform }}-${{ matrix.api }}-${{ matrix.suite }}
+          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
+          if-no-files-found: error
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
+  # The iOS journey runs on the free macos-15 runner as native processes (no Docker): one job
+  # builds the development client, two shards each boot their own Supabase, Metro and signed-in
+  # account and run their share of the matrix, and one job proves both shards reported their exact
+  # cases. The lanes gate requires all three; a skipped shard never passes.
+  ios-build:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 60
+    env: *runtime_env
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disable Spotlight indexing on the disposable iOS runner
+        run: |
+          test "$GITHUB_ACTIONS" = 'true'
+          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
+          test "$RUNNER_OS" = 'macOS'
+          node scripts/ci/native-host-evidence.mjs sample before-indexing-disable --platform ios
+          sudo mdutil -a -s
+          sudo mdutil -a -i off
+          sudo mdutil -s /System/Volumes/Data
+          node scripts/ci/native-host-evidence.mjs sample after-indexing-disable --platform ios
+      # storage-api runs on the Node major its Dockerfile pins; the repo's own Node
+      # comes from the install step after this one and stays first on PATH.
+      - name: Provision Node 22 for the native storage-api
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Record the Node 22 binary for the native storage-api
+        run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/install
+        id: install
+      - name: Provision pinned iOS accessibility browser
+        id: ios_browser
+        timeout-minutes: 6
+        run: npx --no-install playwright install chromium
+      # These suites need only the installed dependencies, so a later Supabase, browser or build
+      # failure cannot hide them.
+      - name: Verify share-card harness and plugin suites
+        id: harness_suites
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          node scripts/ci/node-test-gate.mjs share-card-plugins
+          node scripts/ci/node-test-gate.mjs native-harness
+      - uses: actions/setup-java@v4
+        id: java
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify startup deadline controls
+        id: deadline_controls
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/ci/node-test-gate.mjs startup-deadline
+      - name: Install the iOS project generator
+        id: xcodegen
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: brew install xcodegen
+      # The macOS lane runs Supabase as native processes built from pinned,
+      # checksum-verified sources (scripts/ci/native-supabase.mjs). Each build is
+      # saved to the cache as soon as it exists, so a failed job still keeps it.
+      - name: Pin the native Supabase build inputs
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        id: native
+        run: node scripts/ci/native-supabase.mjs cache-keys >> "$GITHUB_OUTPUT"
+      - name: Restore PostgreSQL
+        if: ${{ !cancelled() && steps.native.outcome == 'success' }}
+        id: postgres-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.postgres-path }}
+          key: ${{ steps.native.outputs.postgres-key }}
+      - name: Build PostgreSQL from its verified source
+        id: postgres_build
+        if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.postgres-cache.outputs.cache-hit != 'true' }}
+        run: node scripts/ci/native-supabase.mjs build postgres
+      - name: Save PostgreSQL
+        if: ${{ !cancelled() && steps.postgres_build.outcome == 'success' && steps.postgres-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.postgres-path }}
+          key: ${{ steps.native.outputs.postgres-key }}
+      - name: Restore Redis
+        if: ${{ !cancelled() && steps.native.outcome == 'success' }}
+        id: redis-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.redis-path }}
+          key: ${{ steps.native.outputs.redis-key }}
+      - name: Build Redis from its verified source
+        id: redis_build
+        if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.redis-cache.outputs.cache-hit != 'true' }}
+        run: node scripts/ci/native-supabase.mjs build redis
+      - name: Save Redis
+        if: ${{ !cancelled() && steps.redis_build.outcome == 'success' && steps.redis-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.redis-path }}
+          key: ${{ steps.native.outputs.redis-key }}
+      - name: Restore GoTrue
+        if: ${{ !cancelled() && steps.native.outcome == 'success' }}
+        id: gotrue-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.gotrue-path }}
+          key: ${{ steps.native.outputs.gotrue-key }}
+      - name: Fetch the pinned GoTrue source
+        if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
+        run: node scripts/ci/native-supabase.mjs fetch gotrue
+      - name: Provision Go for GoTrue
+        if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ runner.temp }}/native-supabase/sources/auth/go.mod
+          cache-dependency-path: ${{ runner.temp }}/native-supabase/sources/auth/go.sum
+      - name: Build GoTrue
+        id: gotrue_build
+        if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
+        run: node scripts/ci/native-supabase.mjs build gotrue
+      - name: Save GoTrue
+        if: ${{ !cancelled() && steps.gotrue_build.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.gotrue-path }}
+          key: ${{ steps.native.outputs.gotrue-key }}
+      - name: Restore storage-api
+        if: ${{ !cancelled() && steps.native.outcome == 'success' }}
+        id: storage-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.storage-path }}
+          key: ${{ steps.native.outputs.storage-key }}
+      - name: Build storage-api
+        id: storage_build
+        if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.storage-cache.outputs.cache-hit != 'true' }}
+        run: node scripts/ci/native-supabase.mjs build storage
+      - name: Save storage-api
+        if: ${{ !cancelled() && steps.storage_build.outcome == 'success' && steps.storage-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.storage-path }}
+          key: ${{ steps.native.outputs.storage-key }}
+      - name: Start the native Supabase stack
+        id: supabase
+        if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' && steps.java.outcome == 'success' && steps.xcodegen.outcome == 'success' && steps.postgres_build.outcome != 'failure' && steps.redis_build.outcome != 'failure' && steps.gotrue_build.outcome != 'failure' && steps.storage_build.outcome != 'failure' }}
+        timeout-minutes: 8
+        run: node scripts/ci/native-supabase.mjs start
+      - name: Provision the local Storage buckets
+        id: buckets
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        run: node scripts/local-storage-buckets.mjs provision
+      - name: Prepare isolated UUID runtime and built renderer
+        id: runtime
+        if: ${{ !cancelled() && steps.buckets.outcome == 'success' }}
+        run: |
+          npm run db:generate
+          npm run build:packages
+          npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
+          node scripts/lib/story68-built-render.mjs
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          node scripts/maestro-install.mjs
+      - name: Check the iOS Maestro flows with the pinned CLI
+        id: maestro_flows
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
+        run: node scripts/ci/maestro-check-flows.mjs
+      - name: Verify localized native accessibility announcements and focus bridge
+        id: bridge
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.ios_browser.outcome == 'success' }}
+        run: |
+          node scripts/e2e-share-card/bridge-a11y.mjs
+      - name: Verify native paragraph heading semantics
+        id: heading
+        if: ${{ !cancelled() }}
+        run: bash scripts/ci/share-card-header-semantics.sh
+      - name: Verify the iOS original PNG and cache-file guards
+        if: ${{ !cancelled() }}
+        id: png_file_guards
+        # SwiftPM builds the validator from the checkout alone.
+        run: |
+          swift test --package-path apps/mobile/modules/share-card-photo-save/ios 2>&1 | tee /tmp/cc68-png-file-tests.log
+          # Four tests ran and none failed or was skipped.
+          grep -q 'Executed 4 tests, with 0 failures' /tmp/cc68-png-file-tests.log
+      - name: Generate native development client
+        id: prebuild
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.maestro_flows.outcome == 'success' }}
+        run: node scripts/run-story68-native.mjs prebuild --platform ios
+      - name: Mark the owned iOS build-service window
+        id: build_window
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' }}
+        run: node scripts/ci/native-build-daemons.mjs mark
+      - name: Build native development client
+        id: native_build
+        if: ${{ !cancelled() && steps.build_window.outcome == 'success' }}
+        run: node scripts/run-story68-native.mjs build --platform ios
+      - name: Release the owned iOS build services
+        if: ${{ !cancelled() && steps.build_window.outcome == 'success' }}
+        run: node scripts/ci/native-build-daemons.mjs stop
+      - name: Package the built development client
+        id: package
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+        run: tar -C /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator -cf /tmp/cc68-ios-app.tar CoutureCastStory68.app
+      # The repository is public, so any signed-in user can download this artifact. It may carry
+      # the anon key of this job's loopback stack (a client key, signed by a secret that dies
+      # with the job) and nothing else: no service role key, no owned environment value.
+      - name: Refuse to upload a development client that embeds a secret
+        id: app_scan
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        run: node scripts/ci/native-ios-app-secret-scan.mjs /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app "$CC68_HARNESS_DIR"
+      - name: Upload the built development client
+        if: ${{ !cancelled() && steps.app_scan.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc68-ios-app
+          path: /tmp/cc68-ios-app.tar
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api metro; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Select and scan closed evidence
+        if: always()
+        env:
+          CC68_CI_PLATFORM: ios
+          CC68_CI_API: 0
+          CC68_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/e2e-share-card/public-evidence.mjs
+      - name: Collect build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-card-ios-build
+          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
+          if-no-files-found: error
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
+      - name: Show the native Supabase service logs
+        if: ${{ !cancelled() && failure() }}
+        run: node scripts/ci/native-supabase.mjs logs
+      - name: Stop the owned native Supabase stack
+        if: always()
+        run: node scripts/ci/native-supabase.mjs stop
+  ios-shard:
+    needs: ios-build
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    runs-on: macos-15
+    timeout-minutes: 100
+    env: *runtime_env
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disable Spotlight indexing on the disposable iOS runner
+        run: |
+          test "$GITHUB_ACTIONS" = 'true'
+          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
+          test "$RUNNER_OS" = 'macOS'
+          node scripts/ci/native-host-evidence.mjs sample before-indexing-disable --platform ios
+          sudo mdutil -a -s
+          sudo mdutil -a -i off
+          sudo mdutil -s /System/Volumes/Data
+          node scripts/ci/native-host-evidence.mjs sample after-indexing-disable --platform ios
+      # storage-api runs on the Node major its Dockerfile pins; the repo's own Node
+      # comes from the install step after this one and stays first on PATH.
+      - name: Provision Node 22 for the native storage-api
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Record the Node 22 binary for the native storage-api
+        run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/install
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install the iOS project generator
+        run: brew install xcodegen
+      # The macOS lane runs Supabase as native processes built from pinned,
+      # checksum-verified sources (scripts/ci/native-supabase.mjs). Each build is
+      # saved to the cache as soon as it exists, so a failed job still keeps it.
+      - name: Pin the native Supabase build inputs
+        id: native
+        run: node scripts/ci/native-supabase.mjs cache-keys >> "$GITHUB_OUTPUT"
+      - name: Restore PostgreSQL
+        id: postgres-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.postgres-path }}
+          key: ${{ steps.native.outputs.postgres-key }}
+      - name: Build PostgreSQL from its verified source
+        if: steps.postgres-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build postgres
+      - name: Save PostgreSQL
+        if: steps.postgres-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.postgres-path }}
+          key: ${{ steps.native.outputs.postgres-key }}
+      - name: Restore Redis
+        id: redis-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.redis-path }}
+          key: ${{ steps.native.outputs.redis-key }}
+      - name: Build Redis from its verified source
+        if: steps.redis-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build redis
+      - name: Save Redis
+        if: steps.redis-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.redis-path }}
+          key: ${{ steps.native.outputs.redis-key }}
+      - name: Restore GoTrue
+        id: gotrue-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.gotrue-path }}
+          key: ${{ steps.native.outputs.gotrue-key }}
+      - name: Fetch the pinned GoTrue source
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs fetch gotrue
+      - name: Provision Go for GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ runner.temp }}/native-supabase/sources/auth/go.mod
+          cache-dependency-path: ${{ runner.temp }}/native-supabase/sources/auth/go.sum
+      - name: Build GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build gotrue
+      - name: Save GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.gotrue-path }}
+          key: ${{ steps.native.outputs.gotrue-key }}
+      - name: Restore storage-api
+        id: storage-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.storage-path }}
+          key: ${{ steps.native.outputs.storage-key }}
+      - name: Build storage-api
+        if: steps.storage-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build storage
+      - name: Save storage-api
+        if: steps.storage-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.storage-path }}
+          key: ${{ steps.native.outputs.storage-key }}
+      - name: Start the native Supabase stack
+        timeout-minutes: 8
+        run: node scripts/ci/native-supabase.mjs start
+      - name: Provision the local Storage buckets
+        run: node scripts/local-storage-buckets.mjs provision
+      - name: Prepare isolated UUID runtime and built renderer
+        run: |
+          npm run db:generate
+          npm run build:packages
+          npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
+          node scripts/lib/story68-built-render.mjs
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          node scripts/maestro-install.mjs
+      - name: Download the built development client
+        uses: actions/download-artifact@v4
+        with:
+          name: cc68-ios-app
+          path: /tmp/cc68-ios-app
+      - name: Place the built development client
+        run: |
+          mkdir -p /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator
+          tar -C /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator -xf /tmp/cc68-ios-app/cc68-ios-app.tar
+          test -d /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app
+      - name: iOS shard flows
+        run: |
+          shard='${{ matrix.shard }}/2'
+          node scripts/e2e-share-card/warm-metro.mjs --platform ios
+          node scripts/ci/native-ios-startup-probe.mjs --for-native-flow
+          device=$(cat /tmp/cc68-simulator)
+          node scripts/ci/native-host-evidence.mjs sample before-first-flow --platform ios
+          node scripts/run-story68-native.mjs open --platform ios --device "$device"
+          node scripts/ci/native-host-evidence.mjs first-flow passed --platform ios
+          node scripts/ci/native-host-evidence.mjs metro --platform ios
+          node scripts/ci/native-host-evidence.mjs sample after-first-flow --platform ios
+          for command in $(node scripts/ci/native-ios-shards.mjs commands "$shard"); do
+            node scripts/run-story68-native.mjs "$command" --platform ios --device "$device" --shard "$shard"
+          done
+      - name: Record closed iOS host, first-flow and Metro diagnostics
+        if: ${{ !cancelled() && failure() }}
+        run: |
+          node scripts/ci/native-host-evidence.mjs sample failure --platform ios
+          node scripts/ci/native-host-evidence.mjs first-flow failed --platform ios
+          node scripts/ci/native-host-evidence.mjs metro --platform ios
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api metro; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Select and scan closed evidence
+        if: always()
+        env:
+          CC68_CI_PLATFORM: ios
+          CC68_CI_API: 0
+          CC68_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/e2e-share-card/public-evidence.mjs
+      - name: Collect shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-card-ios-shard-${{ matrix.shard }}
+          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
+          if-no-files-found: error
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
+      - name: Show the native Supabase service logs
+        if: ${{ !cancelled() && failure() }}
+        run: node scripts/ci/native-supabase.mjs logs
+      - name: Stop the owned native Supabase stack
+        if: always()
+        run: node scripts/ci/native-supabase.mjs stop
+      - name: Delete owned CI simulator
+        if: always()
+        run: node scripts/ci/native-ios-device-cleanup.mjs
+
+  # A skipped shard has no report, so this job fails; the lanes gate also requires its result.
+  ios-evidence:
+    if: always() && github.event_name != 'pull_request'
+    needs: ios-shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: share-card-ios-shard-*
+          path: /tmp/ios-shards
+      - name: Require both iOS shards to report their exact cases
+        env:
+          CC68_SHARD_RESULT: ${{ needs.ios-shard.result }}
+        run: |
+          test "$CC68_SHARD_RESULT" = success
+          for shard in 1 2; do mv "/tmp/ios-shards/share-card-ios-shard-$shard" "/tmp/ios-shards/shard-$shard"; done
+          node scripts/ci/native-ios-shards.mjs merge /tmp/ios-shards
+  # Not named gate: the required ruleset context gate is a commit status from pr-gate.yml,
+  # and a check run with that name could satisfy or fail it independently.
+  share-card-lanes-gate:
+    name: share-card-lanes-gate
+    if: always()
+    needs:
+      - original-resource
+      - ios-build
+      - ios-shard
+      - ios-evidence
+      - browser-acceptance
+      - android36-native-matrix
+      - android36-original
+      - android36-interaction
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require every native and browser lane
+        env:
+          CC68_JOB_RESULTS: ${{ toJSON(needs) }}
+          CC68_EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/ci/share-card-job-gate.mjs

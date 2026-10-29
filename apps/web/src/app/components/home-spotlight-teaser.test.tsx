@@ -59,6 +59,38 @@ function heroEndsWithOutfits(): boolean {
   return Boolean(last?.querySelector('[data-testid="outfit-scroll"]'))
 }
 
+/**
+ * Waits for the feed response to reach the hero: its `auto` chip names the
+ * band the grid lifts from that response. The feed read is independent of the
+ * teaser read, so a hero snapshot taken before it lands races the band label.
+ */
+async function heroFeedSettled() {
+  const prefix = enUS.community.filters.mode.autoWithBand.split('{{band}}')[0]!
+  await waitFor(() =>
+    expect(within(heroCanvas()).getByTestId('community-filter-auto').textContent).toMatch(
+      new RegExp(`^${prefix}\\S`)
+    )
+  )
+}
+
+/**
+ * Waits for the feed's own "Showing ... looks. N loaded." announcement. It is the
+ * live region's first message and arrives whenever the independent feed read lands,
+ * so a test that records or asserts announcements must let it pass first.
+ */
+async function feedAnnounced() {
+  const escaped = enUS.community.feed.announceLoaded.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    '\\$&'
+  )
+  const loaded = new RegExp(
+    `^${escaped.replace('\\{\\{filter\\}\\}', '.+').replace('\\{\\{count\\}\\}', '\\d+')}$`
+  )
+  await waitFor(() =>
+    expect(screen.getByTestId('community-live-region').textContent).toMatch(loaded)
+  )
+}
+
 /** The hero canvas markup with the teaser taken out. */
 function heroWithoutTeaser(): string {
   const clone = heroCanvas().cloneNode(true) as HTMLElement
@@ -100,6 +132,7 @@ describe('6.7 web Home spotlight teaser', () => {
     render(<LookbookPrismLayout />)
     await waitFor(() => expect(teaserReads).toHaveLength(1))
     await screen.findByTestId('community-spotlight-heading')
+    await heroFeedSettled()
     const heroBefore = heroCanvas().innerHTML
     expect(heroEndsWithOutfits()).toBe(true)
     await answer(0, cityPage())
@@ -291,6 +324,7 @@ describe('6.7 web Home spotlight teaser', () => {
       // Reference: the same signed-in Home while the teaser read is still out.
       await waitFor(() => expect(teaserReads).toHaveLength(1))
       await screen.findByTestId('community-spotlight-heading')
+      await heroFeedSettled()
       const expected = heroCanvas().innerHTML
       expect(heroEndsWithOutfits()).toBe(true)
       await answer(0, refusal as Answer)
@@ -376,6 +410,7 @@ describe('6.7 web Home spotlight teaser', () => {
       expect(element).not.toBeNull()
       return element!
     })
+    await feedAnnounced()
     return { link, card }
   }
 

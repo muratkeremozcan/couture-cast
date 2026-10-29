@@ -1,0 +1,74 @@
+{
+  "version": "development-round6",
+  "provenance": "Released R2-H1 external review and coordinator evidence-only native-sense restriction. Development safety regressions; independent release data remains owned by TEA.",
+  "reported": [
+    {
+      "id": "opus-r2-h1-01",
+      "text": "you are un retard",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-r2-h1-02",
+      "text": "stupid un retard",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-r2-h1-03",
+      "text": "you absolute un retard",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-r2-h1-04",
+      "text": "you are du retard",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-r2-h1-05",
+      "text": "such a retard des",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-r2-h1-06",
+      "text": "retard du jour, you",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-r2-h1-07",
+      "text": "what a retard de merde",
+      "expected": "block",
+      "severity": "high"
+    }
+  ],
+  "removedConstructions": [
+    "du retard",
+    "un retard",
+    "de retard",
+    "retard de",
+    "retard du",
+    "retard des",
+    "sans retard",
+    "avec retard",
+    "o tapete",
+    "do tapete",
+    "no tapete",
+    "sobre o tapete",
+    "un tapete",
+    "el tapete"
+  ],
+  "frameAdversarial": [
+    "y0u 4re en retard",
+    "y o u a r e en retard",
+    "WHAT A en retard",
+    "t’es um tapete",
+    "tu és um tapete",
+    "espèce de um tapete",
+    "c’est un um tapete",
+    "t u e s um tapete"
+  ]
+}

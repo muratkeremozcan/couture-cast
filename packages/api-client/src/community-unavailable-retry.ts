@@ -18,14 +18,20 @@ export async function retryOnceWhenCommunityUnavailable<T>(
   try {
     return await work()
   } catch (error: unknown) {
-    const seconds = await unavailableRetrySeconds(error)
+    const seconds = await communityUnavailableRetrySeconds(error)
     if (seconds === undefined) throw error
     await pause(seconds * 1000, signal)
     return work()
   }
 }
 
-async function unavailableRetrySeconds(error: unknown): Promise<number | undefined> {
+/**
+ * The advised wait, in seconds and capped, of a 503 the community gate marked unavailable; any
+ * other failure has no hint. Every client reads the retry hint through this one function.
+ */
+export async function communityUnavailableRetrySeconds(
+  error: unknown
+): Promise<number | undefined> {
   if (!(error instanceof ResponseError) || error.response.status !== 503) return undefined
   try {
     // A clone, so the caller can still read the body to classify a second failure.

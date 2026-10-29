@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/await-thenable */
 import { CommunitySyncState } from '@couture/api-client'
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeTestUtils from '../test-utils/edge-to-edge-modal'
 // Keep mock registration in the test entrypoint so it precedes every case import.
+vi.mock('@/src/lib/use-share-card-status-bar', () => ({
+  useShareCardStatusBar: () => true,
+}))
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn().mockResolvedValue(undefined) }))
 // Passthrough spies keep community requests on the real HTTP boundary.
 vi.mock('@/src/lib/community', { spy: true })
@@ -79,6 +83,9 @@ vi.mock('react-native', async (importOriginal) => {
     '../test-utils/community-screen/mock-state.js'
   )
   const actual = await importOriginal<typeof ReactNativeModule>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '../test-utils/edge-to-edge-modal'
+  )
   function RecordingImage(props: Record<string, unknown>) {
     if (typeof props.testID === 'string' && typeof props.onError === 'function') {
       imageEvents.errors.set(props.testID, props.onError as () => void)
@@ -91,6 +98,7 @@ vi.mock('react-native', async (importOriginal) => {
   }
   return {
     ...actual,
+    Modal: recordModalProps(actual.Modal),
     Image: RecordingImage,
     RefreshControl: RecordingRefreshControl,
     AccessibilityInfo: {
@@ -99,6 +107,7 @@ vi.mock('react-native', async (importOriginal) => {
       setAccessibilityFocus: vi.fn(),
     },
     findNodeHandle: vi.fn(),
+    Linking: { ...actual.Linking, addEventListener: () => ({ remove: vi.fn() }) },
     Platform: { ...actual.Platform, OS: 'web' },
   }
 })
@@ -112,6 +121,7 @@ import {
   setMockParams,
   resetFeedUrls,
 } from '../test-utils/community-screen/harness'
+import { registerCommunityRootRestorationCases } from '../test-utils/community-screen/root-restoration.cases'
 import { registerCommunityFeedCases } from '../test-utils/community-screen/feed.cases'
 import { registerCommunityModerationCases } from '../test-utils/community-screen/moderation.cases'
 import { registerCommunityPublishingCases } from '../test-utils/community-screen/publishing.cases'
@@ -187,6 +197,7 @@ describe('Mobile community screen (Story 6.1)', () => {
     await delay(50)
   })
 
+  registerCommunityRootRestorationCases()
   registerCommunityFeedCases()
   registerCommunityModerationCases()
   registerCommunityPublishingCases()

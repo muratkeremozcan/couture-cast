@@ -17,6 +17,7 @@
 // lists what each one asked for (the query, the coordinates), both read-only,
 // so a harness outside this process can prove which place a forecast was
 // fetched for.
+import fs from 'node:fs'
 import { createServer } from 'node:http'
 import { pathToFileURL } from 'node:url'
 import {
@@ -354,7 +355,10 @@ export async function startWeatherProviderDouble({
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (
+  import.meta.url ===
+  pathToFileURL(process.argv[1] ? fs.realpathSync(process.argv[1]) : '').href
+) {
   const portArgIndex = process.argv.indexOf('--port')
   const port = portArgIndex > -1 ? Number(process.argv[portArgIndex + 1]) : 0
   const double = await startWeatherProviderDouble({ port })

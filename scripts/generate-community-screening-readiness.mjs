@@ -46,6 +46,11 @@ import { fileURLToPath } from 'node:url'
 import { inputSetHash, inputSetPathspecs } from './lib/community-screening-input-set.mjs'
 import { readCommunityRolloutDefaults } from './lib/community-rollout-flags.mjs'
 import { restartDrillProblems } from './community-screening-canary.mjs'
+import {
+  parseActiveHoldout,
+  resolveActiveHoldouts,
+} from '../apps/api/src/modules/community/community-text-holdout-eligibility-core.mjs'
+import { holdoutProductMismatches } from '../apps/api/src/modules/community/community-text-holdout-selection.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
@@ -87,6 +92,18 @@ const INPUTS = {
   heartbeatSource: 'apps/api/src/modules/community/community-worker-heartbeat.ts',
 }
 export const TEXT_LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr']
+/**
+ * Refuse a retired, unknown or unsealed holdout for any locale before reading screening
+ * inputs. Each locale answers for the version it names; the error names that locale.
+ */
+function activeTextHoldouts() {
+  const corpus = 'apps/api/test/fixtures/community-text-corpus'
+  const active = parseActiveHoldout(readJson(`${corpus}/active-holdout.json`))
+  const ledger = readJson(`${corpus}/holdout-retirements.json`)
+  return resolveActiveHoldouts(active, ledger, (version) =>
+    readJson(`${corpus}/${version}/freeze-manifest.json`)
+  )
+}
 const DEFAULT_IMAGE = 'couture-cast-community-worker:local'
 const NODE_MODULES_BUDGET_MB = 150
 const SAFE_CORPUS_MINIMUM_HOLDOUT = 250
@@ -657,7 +674,11 @@ function summariseClean(result) {
   }
 }
 
-function textSection(current) {
+function holdoutPath(holdouts, language) {
+  return `apps/api/test/fixtures/community-text-corpus/${holdouts[language].version}/${language}.json`
+}
+
+function textSection(current, holdouts) {
   const evaluation = runProduct('text-corpus-evaluation.json')
   const corpusHashes = Object.fromEntries(
     TEXT_LANGUAGES.flatMap((language) => [
@@ -665,12 +686,7 @@ function textSection(current) {
         language,
         sha256File(`apps/api/test/fixtures/community-text-corpus/${language}.json`),
       ],
-      [
-        `${language}-holdout`,
-        sha256File(
-          `apps/api/test/fixtures/community-text-corpus/holdout-v1/${language}.json`
-        ),
-      ],
+      [`${language}-holdout`, sha256File(holdoutPath(holdouts, language))],
     ])
   )
   if (!evaluation) return { available: false, stale: [], corpusSha256: corpusHashes }
@@ -678,6 +694,14 @@ function textSection(current) {
     Object.entries(evaluation.languages ?? {}).map(([language, result]) => [
       language,
       {
+        holdoutVersion: holdouts[language]?.version ?? null,
+        holdoutPath: holdouts[language] ? holdoutPath(holdouts, language) : null,
+        holdoutSeal: holdouts[language]
+          ? {
+              sealedAt: holdouts[language].seal.sealedAt,
+              corpusSha256: holdouts[language].seal.corpusSha256,
+            }
+          : null,
         clean: summariseClean(result.clean),
         cleanInSample: summariseClean(result.cleanInSample),
         disallowed: {
@@ -695,6 +719,7 @@ function textSection(current) {
     stale: [
       ...staleness(evaluation, { policySha256: current.policySha256 }),
       ...inputStaleness(evaluation.inputSetHash, current.inputSetHash),
+      ...holdoutProductMismatches(evaluation.gates, holdouts),
     ],
     textEngineVersion: evaluation.textEngineVersion,
     gates: evaluation.gates,
@@ -2335,6 +2360,7 @@ function parseArgs(argv) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
+  const holdouts = activeTextHoldouts()
   const current = {
     commitSha: git(['rev-parse', 'HEAD']),
     inputSetHash: inputSetHash(),
@@ -2363,7 +2389,7 @@ async function main() {
     sweep: sweepSection(current),
     calibration: calibrationSection(current, policy, manifest),
     safeCorpus: safeCorpusSection(current, options.dailySubmissions, policy),
-    text: textSection(current),
+    text: textSection(current, holdouts),
     lists: listsSection(),
     model: modelVerification(),
     runtime: runtimeSection(manifest, current),
@@ -2492,7 +2518,7 @@ async function main() {
 }
 
 const invokedDirectly =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
 if (invokedDirectly) {
   main().catch((error) => {
     console.error('Community screening readiness generation error:', error)

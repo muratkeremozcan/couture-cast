@@ -1,54 +1,108 @@
 import { randomUUID } from 'node:crypto'
-import { Queue, type Job, type Worker } from 'bullmq'
-import { describe, expect, it, vi } from 'vitest'
-import { DefaultCommunityModerationEngine } from '../src/modules/community/community-moderation.engine.js'
-import { createCommunityModerationWorker } from '../src/modules/community/community-moderation.worker.js'
+import { fork } from 'node:child_process'
+import { resolve } from 'node:path'
+import { Queue, type Job } from 'bullmq'
+import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { COMMUNITY_COMMENT_JOB } from '../src/modules/community/community-moderation.queue.js'
-import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
+import modelManifest from '../model-manifests/community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json'
 import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis.js'
 import { commentsTestContext } from './helpers/community-comments-context.js'
 
-const { prisma, flags, namespace, input, fixture, create } = commentsTestContext()
+const { prisma, database, namespace, input, fixture, create } = commentsTestContext()
 const COMMENT_COUNT = 10
 
-type Completion = { kind: string; elapsedMs: number; processingMs: number }
-
-/** Resolve once the worker has completed `expected` jobs; reject on the first failure. */
-function waitForCompletions(worker: Worker, expected: number): Promise<Completion[]> {
-  const completions: Completion[] = []
-  return new Promise((resolve, reject) => {
-    worker.on('completed', (job) => {
-      completions.push({
-        kind: job.name === COMMUNITY_COMMENT_JOB ? 'comment' : 'image',
-        elapsedMs: job.finishedOn! - job.timestamp,
-        processingMs: job.finishedOn! - job.processedOn!,
+const reportSchema = z.object({
+  type: z.literal('report'),
+  executedFrom: z.literal('compiled dist under plain node'),
+  coldStartupMs: z.number().nonnegative(),
+  backend: z.literal('wasm'),
+  modelHash: z.string().min(1),
+  imageSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  completions: z
+    .array(
+      z.object({
+        kind: z.enum(['image', 'comment']),
+        elapsedMs: z.number().nonnegative(),
+        processingMs: z.number().nonnegative(),
       })
-      if (completions.length === expected) resolve(completions)
-    })
-    worker.on('failed', (_job, error) => reject(error))
+    )
+    .length(COMMENT_COUNT + 1),
+  peakProcessRssMiB: z.number().positive(),
+  cpuUserMs: z.number().nonnegative(),
+  cpuSystemMs: z.number().nonnegative(),
+})
+
+function measuredWorker(config: {
+  queue: string
+  objectPath: string
+  imageBase64: string
+}) {
+  const child = fork(
+    resolve(__dirname, '../../../scripts/lib/community-comment-measurement-worker.mjs'),
+    [],
+    {
+      execArgv: [],
+      env: {
+        ...process.env,
+        NODE_OPTIONS: '',
+        LOG_LEVEL: 'fatal',
+        DISABLE_FILE_LOGS: 'true',
+      },
+      stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+    }
+  )
+  let ready!: () => void
+  let refuseReady!: (error: Error) => void
+  const readiness = new Promise<void>((resolve, reject) => {
+    ready = resolve
+    refuseReady = reject
   })
+  let report: z.infer<typeof reportSchema> | undefined
+  const completed = new Promise<z.infer<typeof reportSchema>>((resolve, reject) => {
+    child.on('message', (message: unknown) => {
+      if (z.object({ type: z.literal('ready') }).safeParse(message).success) ready()
+      const parsed = reportSchema.safeParse(message)
+      if (parsed.success) report = parsed.data
+    })
+    child.on('error', (error) => {
+      refuseReady(error)
+      reject(error)
+    })
+    child.once('exit', (code) => {
+      const error = new Error('Compiled measurement worker exited without complete proof')
+      refuseReady(error)
+      if (code === 0 && report) resolve(report)
+      else reject(error)
+    })
+  })
+  void completed.catch(() => undefined)
+  const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()))
+  child.send({ ...config, databaseUrl: database.url, expected: COMMENT_COUNT + 1 })
+  return {
+    readiness,
+    completed,
+    close: async () => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
+      await exited
+    },
+  }
 }
 
 describe('Story 6.4 mixed workload measurement', () => {
-  // Opt-in developer-machine resource measurement with the real TensorFlow model, not a CI budget certificate; run `npm run community:screening:measure:comments`, which writes apps/api/.cache/community-screening/comments-mixed-workload.json.
+  // The mandatory CI lane enables this real-model test after building the worker.
   it.runIf(process.env.RUN_COMMENT_RESOURCE_MEASUREMENT === 'true')(
     'measures mixed real-model image/comment work on the existing single worker',
     async () => {
       const { writeFile, mkdir } = await import('node:fs/promises')
       const { createHash } = await import('node:crypto')
       const sharp = (await import('sharp')).default
-      const { TensorflowNsfwImageScreener } = await import(
-        '../src/modules/community/tensorflow-nsfw-image-screener.js'
-      )
       const { COMMUNITY_MODERATION_JOB, COMMUNITY_MODERATION_QUEUE } = await import(
         '../src/modules/community/community-moderation.queue.js'
       )
       const { COMMUNITY_MODERATION_CONCURRENCY } = await import(
         '../src/modules/community/community-moderation.worker.js'
       )
-      const screener = new TensorflowNsfwImageScreener()
-      await screener.ensureReady()
-      const realEngine = new DefaultCommunityModerationEngine(screener)
       const actor = await fixture(),
         image = await fixture()
       const bytes = await sharp({
@@ -67,8 +121,6 @@ describe('Story 6.4 mixed workload measurement', () => {
           image_checksum: createHash('sha256').update(bytes).digest('hex'),
         },
       })
-      const storage = new InMemoryCommunityStorage()
-      storage.put(objectPath, bytes)
       const pending: Awaited<ReturnType<typeof create>>[] = []
       for (let index = 0; index < COMMENT_COUNT; index++)
         pending.push(
@@ -95,44 +147,58 @@ describe('Story 6.4 mixed workload measurement', () => {
       const jobBytes = await Promise.all(
         comments.map((job) => redis.memory('USAGE', queue.toKey(job.id!)))
       )
-      const baseline = process.resourceUsage()
-      const worker = createCommunityModerationWorker(
-        {
-          prisma,
-          featureFlags: flags,
-          storage,
-          engine: realEngine,
-          telemetryService: { captureEvent: vi.fn() } as never,
-        },
-        { connection },
-        queue.name
-      )
+      const worker = measuredWorker({
+        queue: queue.name,
+        objectPath,
+        imageBase64: bytes.toString('base64'),
+      })
       try {
-        const complete = waitForCompletions(worker, COMMENT_COUNT + 1)
-        await worker.waitUntilReady()
+        await worker.readiness
         await queue.resume()
-        const completions = await complete
+        const report = await worker.completed
         expect(
           await prisma.communityComment.count({
             where: { id: { in: pending.map((row) => row.id) }, status: 'published' },
           })
         ).toBe(COMMENT_COUNT)
-        const usage = process.resourceUsage()
+        const budgets = {
+          coldStartupMs: modelManifest.performance.absoluteCeilings.coldStartupMs,
+          processingMs:
+            modelManifest.performance.absoluteCeilings.outerScreeningCeilingMs,
+          peakResidentMiB: modelManifest.performance.absoluteCeilings.peakResidentMib,
+          // Fixed ten-comment fixture: ID plus generation, with room for Redis bookkeeping.
+          commentPayloadBytes: 256,
+          commentJobBytes: 1024,
+        }
+        expect(report.coldStartupMs).toBeLessThanOrEqual(budgets.coldStartupMs)
+        expect(report.peakProcessRssMiB).toBeLessThanOrEqual(budgets.peakResidentMiB)
+        expect(report.imageSha256).toBe(createHash('sha256').update(bytes).digest('hex'))
+        expect(report.completions.map((row) => row.kind)).toEqual([
+          'image',
+          ...Array<string>(COMMENT_COUNT).fill('comment'),
+        ])
+        for (const row of report.completions)
+          expect(row.processingMs).toBeLessThanOrEqual(budgets.processingMs)
+        const payloadBytes = comments.map((job) =>
+          Buffer.byteLength(JSON.stringify(job.data))
+        )
+        for (const size of payloadBytes)
+          expect(size).toBeLessThanOrEqual(budgets.commentPayloadBytes)
+        for (const size of jobBytes) {
+          expect(size).toEqual(expect.any(Number))
+          expect(size).toBeLessThanOrEqual(budgets.commentJobBytes)
+        }
         const evidence = {
           profile:
-            'developer machine, real pinned TensorFlow model, real Redis/PostgreSQL, one image followed by ten text comments; Vitest process RSS',
+            'CI regression measurement, compiled pinned model, real Redis/PostgreSQL, fixed image followed by ten fixed comments',
           queue: COMMUNITY_MODERATION_QUEUE,
           concurrency: COMMUNITY_MODERATION_CONCURRENCY,
           additionalWorkerProcesses: 0,
+          budgets,
           commentJobBytes: jobBytes,
-          commentPayloadBytes: comments.map((job) =>
-            Buffer.byteLength(JSON.stringify(job.data))
-          ),
+          commentPayloadBytes: payloadBytes,
           imageJobBytes: await redis.memory('USAGE', queue.toKey(imageJob.id!)),
-          completions,
-          peakProcessRssMiB: usage.maxRSS / 1024,
-          cpuUserMs: (usage.userCPUTime - baseline.userCPUTime) / 1000,
-          cpuSystemMs: (usage.systemCPUTime - baseline.systemCPUTime) / 1000,
+          ...report,
         }
         await mkdir('.cache/community-screening', { recursive: true })
         await writeFile(
@@ -144,7 +210,6 @@ describe('Story 6.4 mixed workload measurement', () => {
         await worker.close()
         await queue.obliterate({ force: true })
         await queue.close()
-        await screener.close()
       }
     },
     60_000

@@ -1,0 +1,10 @@
+appId: ${MAESTRO_APP_ID}
+---
+- assertVisible:
+    id: share-card-preview-loaded-.*
+- assertNotVisible: ${MAESTRO_SAVING}
+- assertNotVisible: ${MAESTRO_PENDING}
+- assertNotVisible: ${MAESTRO_SAVED}
+- assertVisible:
+    id: share-card-save
+    enabled: true

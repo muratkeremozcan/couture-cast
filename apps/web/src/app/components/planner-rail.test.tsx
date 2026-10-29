@@ -12,6 +12,7 @@ import {
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { getI18n } from '../../i18n'
+import { AccessibleModal } from './accessible-modal'
 import { PlannerRail } from './planner-rail'
 
 const PLANNER_PATH = '/api/v1/commerce/premium/planner'
@@ -470,6 +471,39 @@ describe('PlannerRail', () => {
     )
     expect(document.activeElement).toBe(opener)
     document.body.removeChild(opener)
+  })
+
+  it('leaves the scroll lock to its last holder when a dialog and the overlay close in either order', () => {
+    document.body.style.overflow = 'auto'
+    const tree = (modal: boolean, planner: boolean) => (
+      <I18nextProvider i18n={getI18n()}>
+        <AccessibleModal
+          isOpen={modal}
+          onClose={vi.fn()}
+          titleId="held-title"
+          title="Held"
+        >
+          <button type="button">Held action</button>
+        </AccessibleModal>
+        <PlannerRail isOpen={planner} onClose={vi.fn()} variant="overlay" />
+      </I18nextProvider>
+    )
+    try {
+      for (const [first, second] of [
+        [(m: boolean) => tree(m, true), (p: boolean) => tree(false, p)],
+        [(p: boolean) => tree(true, p), (m: boolean) => tree(m, false)],
+      ] as const) {
+        const view = render(tree(true, true))
+        expect(document.body.style.overflow).toBe('hidden')
+        view.rerender(first(false))
+        expect(document.body.style.overflow).toBe('hidden')
+        view.rerender(second(false))
+        expect(document.body.style.overflow).toBe('auto')
+        view.unmount()
+      }
+    } finally {
+      document.body.style.overflow = ''
+    }
   })
 
   it('aborts an in-flight reshuffle, not just the week fetch, when the rail closes', async () => {

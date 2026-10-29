@@ -30,6 +30,7 @@ import { server } from '@/src/test-utils/msw/server'
 import { getCommunityPostFromMobile } from '@/src/lib/community'
 import { saveLocationFromSearchFromMobile } from '@/src/lib/locations'
 import { savedLocation } from '@/src/test-utils/locations'
+import { registerShareCardHeading } from '@/src/lib/share-card-focus'
 import {
   setMobileAccessTokenResolver,
   setMobileApplicationUserId,
@@ -47,6 +48,71 @@ function distinctNodeHandles() {
 }
 
 export function registerCommunityFeedCases() {
+  it.each([
+    ['published', true],
+    ['pending_review', false],
+    ['flagged', false],
+    ['withdrawn', false],
+  ] as const)(
+    'M2: an own %s notification detail offers export=%s',
+    async (status, exportable) => {
+      setMockParams({ source: 'notification', type: 'community', cardId: 'own-private' })
+      serveFeed(() => feedJson({ items: [] }))
+      server.use(
+        http.get('*/api/v1/community/posts/own-private', () =>
+          HttpResponse.json({
+            data: item({
+              id: 'own-private',
+              status,
+              publishedAt: status === 'published' ? '2026-01-01T12:00:00.000Z' : null,
+              author: { displayName: 'Me', isSelf: true },
+            }),
+          })
+        )
+      )
+      await render(<CommunityScreen />)
+      const detail = await screen.findByTestId('highlighted-community-card-own-private')
+      expect(within(detail).getByTestId('community-post-card-own-private')).toBeVisible()
+      // The published row proves the detail renders the opener in the same pass, so the
+      // other rows check its absence at the moment it would exist.
+      if (exportable)
+        expect(
+          within(detail).getByTestId('community-share-card-open-own-private')
+        ).toBeVisible()
+      else
+        expect(
+          within(detail).queryByTestId('community-share-card-open-own-private')
+        ).toBeNull()
+    }
+  )
+
+  it('L8: the community content adds no share-card heading of its own', async () => {
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-screen')
+    expect(screen.queryByRole('heading', { name: enUS.community.heading })).toBeNull()
+  })
+
+  it('L8: closing the composer without an invoker node focuses the registered navigation heading', async () => {
+    serveFeed(() =>
+      feedJson({ items: [item({ author: { displayName: 'Own look', isSelf: true } })] })
+    )
+    const setFocus = vi.spyOn(AccessibilityInfo, 'setAccessibilityFocus')
+    // The tab layout registers its title this way; 88 stands in for its native tag.
+    const unregister = registerShareCardHeading('community', () => 88)
+    try {
+      await render(<CommunityScreen />)
+      await browserUser.click(
+        await screen.findByTestId('community-share-card-open-post-a')
+      )
+      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      setFocus.mockClear()
+      await browserUser.click(screen.getByTestId('share-card-cancel'))
+      await waitFor(() => expect(setFocus).toHaveBeenCalledWith(88))
+    } finally {
+      unregister()
+    }
+  })
+
   it('R12 keeps a visible late detail card while stripping revoked reaction capability', async () => {
     let release!: () => void
     const held = new Promise<void>((resolve) => {

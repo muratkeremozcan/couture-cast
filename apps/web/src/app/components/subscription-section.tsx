@@ -428,6 +428,7 @@ export function SubscriptionSection() {
     <section
       aria-labelledby="premium-subscription-title"
       data-testid="premium-subscription-section"
+      aria-busy={sectionState === 'checking' || sectionState === 'loading'}
       className="mt-10 max-w-2xl border-t border-neutral-800 pt-8"
     >
       <h2

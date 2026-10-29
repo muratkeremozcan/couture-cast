@@ -116,7 +116,11 @@ describe('A02 actual installed SDK failed-refresh bearer boundary', () => {
       const fallback = await session.webSupabase().auth.getSession()
       expect(refreshes).toBe(1)
       expect(fallback.error).toBeNull()
-      expect(fallback.data.session!.expires_at! * 1000 - Date.now()).toBeLessThan(1500)
+      // The fallback keeps the stored lifetime. A round trip that lands in the same millisecond
+      // leaves all 1500 of it, so the bound is inclusive.
+      expect(fallback.data.session!.expires_at! * 1000 - Date.now()).toBeLessThanOrEqual(
+        1500
+      )
       expect(fallback.data.session!.expires_at! * 1000 - Date.now()).toBeGreaterThan(0)
       const { communityRealtimeTokenFromWeb } = await import('./community')
       await expect(communityRealtimeTokenFromWeb()).rejects.toThrow(

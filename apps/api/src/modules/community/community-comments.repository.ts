@@ -43,6 +43,7 @@ import {
 import { CommunityRateLimitException } from './community-rate-limit.exception.js'
 import { communitySubjectToken, isCommunityCanaryUser } from './community-analytics.js'
 import { generateCommunityAuthorAlias } from './community-alias.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 type Tx = Prisma.TransactionClient
 export type CommentEligibility = (tx: Tx, participation: boolean) => Promise<void>
@@ -131,7 +132,8 @@ export class CommunityCommentsRepository {
     readOnly = false,
     privacyMutation = false
   ): Promise<T> {
-    return this.prisma.$transaction(
+    return interactiveTransaction(
+      this.prisma,
       async (tx) => {
         if (privacyMutation) await guardCommunityPost(tx, postId)
         if (readOnly) {
@@ -460,7 +462,8 @@ export class CommunityCommentsRepository {
     eligible: CommentEligibility
   }) {
     // Share the reporter lock and quota with post reports. Acquire it before post locks.
-    return this.prisma.$transaction(
+    return interactiveTransaction(
+      this.prisma,
       async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${params.userId}))`
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_report:' || ${params.userId}))`

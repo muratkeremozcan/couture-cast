@@ -1,0 +1,13 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    file: tap-save.yaml
+    env:
+      MAESTRO_SAVE_EFFECT: '${MAESTRO_SAVING}|${MAESTRO_FAILURE}'
+- extendedWaitUntil:
+    visible: ${MAESTRO_FAILURE}
+    timeout: 20000
+- assertVisible:
+    id: share-card-preview-loaded-.*
+- assertVisible:
+    id: share-card-cancel

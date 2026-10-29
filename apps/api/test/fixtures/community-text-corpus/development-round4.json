@@ -1,0 +1,272 @@
+{
+  "version": "development-round4",
+  "provenance": "Released Opus H1/H2 regressions and independently varied deletion/context cases. Development data only; independent release holdouts remain owned by TEA.",
+  "reported": [
+    {
+      "id": "opus-h1-01",
+      "locale": "de-DE",
+      "text": "krüpel",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-02",
+      "locale": "de-DE",
+      "text": "nute",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-03",
+      "locale": "de-DE",
+      "text": "verecke",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-04",
+      "locale": "en-US",
+      "text": "depthroat",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-05",
+      "locale": "en-US",
+      "text": "niga",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-06",
+      "locale": "en-US",
+      "text": "trany",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-07",
+      "locale": "es-419",
+      "text": "bolera",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-08",
+      "locale": "es-419",
+      "text": "chupapolas",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-09",
+      "locale": "fr-FR",
+      "text": "tapete",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-10",
+      "locale": "it-IT",
+      "text": "amazati",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-11",
+      "locale": "it-IT",
+      "text": "culatone",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-12",
+      "locale": "it-IT",
+      "text": "impicati",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-13",
+      "locale": "it-IT",
+      "text": "mignota",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-14",
+      "locale": "it-IT",
+      "text": "putana",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-15",
+      "locale": "it-IT",
+      "text": "richione",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-16",
+      "locale": "it-IT",
+      "text": "sbora",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-17",
+      "locale": "it-IT",
+      "text": "sborata",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-18",
+      "locale": "it-IT",
+      "text": "terone",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-19",
+      "locale": "it-IT",
+      "text": "uciditi",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-20",
+      "locale": "it-IT",
+      "text": "zocola",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-pusy",
+      "locale": "en-US",
+      "text": "pusy",
+      "expected": "review",
+      "severity": "medium"
+    },
+    {
+      "id": "opus-h1-leet-niga",
+      "locale": "en-US",
+      "text": "n1ga",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-spaced-niga",
+      "locale": "en-US",
+      "text": "n i g a",
+      "expected": "block",
+      "severity": "high"
+    },
+    {
+      "id": "opus-h1-leet-trany",
+      "locale": "en-US",
+      "text": "tr4ny",
+      "expected": "block",
+      "severity": "high"
+    }
+  ],
+  "contextAdversarial": [
+    {
+      "id": "h2-context-01",
+      "text": "you retard, train"
+    },
+    {
+      "id": "h2-context-02",
+      "text": "shut up retard - vol"
+    },
+    {
+      "id": "h2-context-03",
+      "text": "mofo, roupa"
+    },
+    {
+      "id": "h2-context-04",
+      "text": "burro, camisa"
+    },
+    {
+      "id": "h2-context-05",
+      "text": "monta, borsa"
+    },
+    {
+      "id": "h2-context-06",
+      "text": "retard\ntrain"
+    },
+    {
+      "id": "h2-context-07",
+      "text": "retard 😃 train"
+    },
+    {
+      "id": "h2-context-08",
+      "text": "en, retard"
+    },
+    {
+      "id": "h2-context-09",
+      "text": "en - retard"
+    },
+    {
+      "id": "h2-context-10",
+      "text": "en\nretard"
+    },
+    {
+      "id": "h2-context-11",
+      "text": "en 😃 retard"
+    },
+    {
+      "id": "h2-context-12",
+      "text": "en re​tard"
+    },
+    {
+      "id": "h2-context-13",
+      "text": "en r3tard"
+    },
+    {
+      "id": "h2-context-14",
+      "text": "you retard en retard"
+    },
+    {
+      "id": "h2-context-15",
+      "text": "en retard you retard"
+    },
+    {
+      "id": "h2-context-16",
+      "text": "en retard niga"
+    },
+    {
+      "id": "h2-context-17",
+      "text": "du retard you retard"
+    },
+    {
+      "id": "h2-context-18",
+      "text": "un retard you retard"
+    },
+    {
+      "id": "h2-context-19",
+      "text": "de retard you retard"
+    },
+    {
+      "id": "h2-context-20",
+      "text": "retard de you retard"
+    },
+    {
+      "id": "h2-context-21",
+      "text": "retard du you retard"
+    },
+    {
+      "id": "h2-context-22",
+      "text": "retard des you retard"
+    },
+    {
+      "id": "h2-context-23",
+      "text": "sans retard you retard"
+    },
+    {
+      "id": "h2-context-24",
+      "text": "avec retard you retard"
+    }
+  ]
+}

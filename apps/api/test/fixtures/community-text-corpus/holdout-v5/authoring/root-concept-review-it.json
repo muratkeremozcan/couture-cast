@@ -1,0 +1,38 @@
+{
+  "reviewer": "cc68-tea (/root)",
+  "locale": "it",
+  "phase": "pre-seal semantic review and resolution",
+  "originalReviewedSourceSha256": "d729783f85b0136be32a72ef44d845f8993697ec1f2d65f35c188ff36bacfb1a",
+  "sourceSha256": "c24f7ea97c32a18e8c8a36cd56665f6e40ae4c375f6115e4a2b825570ea6ee33",
+  "scope": "Consolidated maximum-concept catalog, complete memberships and wording of eight boundary groups, followed by both complete replacement scenarios and the final common audit.",
+  "finding": {
+    "rows": [249, 250, 251, 252, 733, 734, 735, 736, 833, 834, 835, 836],
+    "description": "The interior-reveal group omitted the turned-out skirt bindings. Revealing an interior for finish inspection, cleaning or repair should not split the shared visual operation.",
+    "minimumConsolidatedCount": 12
+  },
+  "resolution": {
+    "author": "/root/edge_paths",
+    "consolidatedInteriorRows": [733, 734, 735, 736, 833, 834, 835, 836],
+    "completeReplacementRows": [249, 250, 251, 252, 689, 690, 691, 692],
+    "newScenarios": [
+      "Bag attached to a bicycle rear rack",
+      "Shirt cuff held by a thumb loop"
+    ],
+    "conservativeExtraBoundary": "The author also replaced the contrasting cuff group to avoid another interior-exposure split.",
+    "provenance": "it-authored-revisions-edge_paths.json"
+  },
+  "finalMetrics": {
+    "total": 1000,
+    "caption": 500,
+    "altText": 500,
+    "fiveWordAffected": 0,
+    "maximumConceptCount": 8,
+    "distinctConcepts": 215,
+    "duplicates": 0,
+    "historicalCollisions": 0,
+    "lengthViolations": 0
+  },
+  "verdict": "READY",
+  "screeningRun": false,
+  "round3Or4RepairInspection": false
+}

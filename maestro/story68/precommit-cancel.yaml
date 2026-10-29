@@ -1,0 +1,22 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    file: tap-save.yaml
+    env:
+      MAESTRO_SAVE_EFFECT: ${MAESTRO_SAVING}
+- extendedWaitUntil:
+    visible: ${MAESTRO_SAVING}
+    timeout: 20000
+- assertNotVisible: ${MAESTRO_PENDING}
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - swipe:
+          start: 50%, 70%
+          end: 50%, 30%
+          duration: 500
+- tapOn:
+    id: share-card-cancel
+- assertNotVisible:
+    id: share-card-title

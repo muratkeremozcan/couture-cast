@@ -6,6 +6,7 @@ import {
   createTeenProfileFixture,
 } from '../../../test/factories.js'
 import {
+  buildPrismaKnownRequestError,
   createService,
   activeCompliancePreferences,
   seedUser,
@@ -74,7 +75,19 @@ describe('GuardianService emancipation', () => {
     expect(markTeenAccessGranted).toHaveBeenCalledWith(teen.id)
   })
 
-  it('retries emancipation when the serializable transaction hits a write conflict', async () => {
+  it.each([
+    {
+      name: 'the serializable transaction hits a write conflict',
+      error: Object.assign(new Error('serialization failure'), { code: 'P2034' }),
+    },
+    {
+      name: 'the plpgsql_check pldbgapi2 stack error (XX000) aborts it',
+      error: buildPrismaKnownRequestError('P2010', {
+        code: 'XX000',
+        message: 'ERROR: cannot find parent statement on pldbgapi2 call stack',
+      }),
+    },
+  ])('retries emancipation when $name', async ({ error }) => {
     const today = new Date('2026-04-22T03:00:00.000Z')
     const teen = createTeenProfileFixture({
       id: 'teen-emancipation-retry',
@@ -108,7 +121,7 @@ describe('GuardianService emancipation', () => {
       })
 
       if (attempts === 1) {
-        throw Object.assign(new Error('serialization failure'), { code: 'P2034' })
+        throw error
       }
 
       return originalTransaction(callback, options)

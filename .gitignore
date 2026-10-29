@@ -1,5 +1,5 @@
 # Dependencies
-node_modules/
+node_modules
 .pnp.cjs
 .pnp.loader.mjs
 .pnpm-store
@@ -10,6 +10,7 @@ build/
 .turbo
 .next
 .next-real-session/
+.next-share-card/
 .cache/
 **/garment-tagging-model/
 coverage/
@@ -70,6 +71,8 @@ packages/*/src/**/*.d.ts.map
 # it on disk. That is exactly why `.claude` sat in this file from 2026-08-12
 # with no effect: its 876 files had been committed on 2026-08-04.
 AGENTS.md
+# The root guide is hand-written repository policy and stays tracked.
+!/AGENTS.md
 CLAUDE.md
 .agents/
 .agent/
@@ -81,4 +84,8 @@ CLAUDE.md
 
 # Raw per-story run evidence (logs, build outputs, worker copies). Summaries live in
 # _bmad-output/implementation-artifacts.
-_bmad-output/test-artifacts/story-*/
+_bmad-output/test-artifacts/story-*/**
+# Directories stay visible so the tracked holdout reviews below can be re-included.
+!_bmad-output/test-artifacts/story-*/**/
+!_bmad-output/test-artifacts/story-6-8/reviews/cc68-tea-text-holdout-v4.md
+!_bmad-output/test-artifacts/story-6-8/reviews/cc68-tea-text-holdout-v5.md

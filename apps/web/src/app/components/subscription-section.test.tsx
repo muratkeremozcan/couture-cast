@@ -123,13 +123,15 @@ describe('SubscriptionSection', () => {
 
     renderSection()
 
+    // The status line shows the same "no subscription" copy while the read is in flight, so
+    // it proves nothing. The subscribe controls render only once the response has landed.
     await waitFor(() =>
-      expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
-        /You don.t have a Premium subscription yet\./
-      )
+      expect(screen.getByTestId('premium-subscribe-monthly')).toBeEnabled()
+    )
+    expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+      /You don.t have a Premium subscription yet\./
     )
     expect(authorization).toHaveBeenCalledWith('Bearer test-access-token')
-    expect(screen.getByTestId('premium-subscribe-monthly')).toBeEnabled()
     expect(screen.getByTestId('premium-subscribe-annual')).toBeEnabled()
     expect(screen.queryByTestId('premium-signed-out-hint')).not.toBeInTheDocument()
   })
@@ -145,9 +147,16 @@ describe('SubscriptionSection', () => {
 
     renderSection()
 
+    // The status line mounts under the "no subscription" copy while the read is in flight,
+    // and no subscribe control exists yet either, so only the section's busy state says the
+    // response has landed.
     await waitFor(() =>
-      expect(screen.getByTestId('premium-status-line')).toBeInTheDocument()
+      expect(screen.getByTestId('premium-subscription-section')).toHaveAttribute(
+        'aria-busy',
+        'false'
+      )
     )
+    expect(screen.getByTestId('premium-status-line')).toBeInTheDocument()
     expect(screen.queryByTestId('premium-subscribe-monthly')).not.toBeInTheDocument()
     expect(screen.queryByTestId('premium-subscribe-annual')).not.toBeInTheDocument()
   })
@@ -165,8 +174,13 @@ describe('SubscriptionSection', () => {
 
     renderSection()
 
-    const statusLine = await screen.findByTestId('premium-status-line')
-    expect(statusLine).toHaveTextContent('Premium is active: Premium Monthly.')
+    // The status line mounts under the "no subscription" copy while the read is in flight, so
+    // wait for the entitled copy itself.
+    await waitFor(() =>
+      expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+        'Premium is active: Premium Monthly.'
+      )
+    )
     expect(screen.queryByTestId('premium-subscribe-monthly')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('premium-manage-button'))
@@ -484,9 +498,11 @@ describe('SubscriptionSection', () => {
 
     renderSection()
 
-    // The poll opens with one refresh (beats webhook latency).
+    // The poll opens with one refresh (beats webhook latency). Each wait below is on the
+    // request itself: in a real browser the mock worker answers over a message channel that
+    // fake timers do not drive, so advancing the clock alone does not run the poll's chain.
     await act(() => vi.advanceTimersByTimeAsync(0))
-    expect(refreshCalls).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(refreshCalls).toHaveBeenCalledTimes(1))
 
     // Mid-poll `none` is "activating", never a failure or a subscribe prompt.
     const statusRegion = screen.getByTestId('premium-status-region')
@@ -500,16 +516,18 @@ describe('SubscriptionSection', () => {
 
     // Tick 2 at +5s still returns `none`; the poll keeps going.
     await act(() => vi.advanceTimersByTimeAsync(5_000))
-    expect(statusCalls).toBe(1)
+    await vi.waitFor(() => expect(statusCalls).toBe(1))
     expect(statusRegion).toHaveTextContent('Activating')
 
     // Tick 3 at +10s lands the entitlement: the poll stops and status renders.
     await act(() => vi.advanceTimersByTimeAsync(5_000))
-    expect(statusCalls).toBe(2)
-    expect(statusRegion).toHaveTextContent('')
-    expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
-      'Premium is active: Premium Monthly.'
+    await vi.waitFor(() => expect(statusCalls).toBe(2))
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+        'Premium is active: Premium Monthly.'
+      )
     )
+    expect(statusRegion).toHaveTextContent('')
     expect(screen.getByTestId('premium-manage-button')).toBeInTheDocument()
 
     // The poll is over: more time must not produce more requests.
@@ -537,10 +555,13 @@ describe('SubscriptionSection', () => {
 
     renderSection()
     await act(() => vi.advanceTimersByTimeAsync(0))
+    await vi.waitFor(() => expect(requests).toBe(1))
 
-    // 23 scheduled ticks after the opening refresh = 24 attempts, inside 2:00.
+    // 23 scheduled ticks after the opening refresh = 24 attempts, inside 2:00. A tick is
+    // scheduled once the previous request has been answered, so each one is awaited.
     for (let tick = 0; tick < 23; tick += 1) {
       await act(() => vi.advanceTimersByTimeAsync(5_000))
+      await vi.waitFor(() => expect(requests).toBe(tick + 2))
     }
 
     expect(requests).toBe(24)
@@ -572,7 +593,8 @@ describe('SubscriptionSection', () => {
 
     const hint = await screen.findByTestId('premium-portal-lag-hint')
     expect(hint).toHaveTextContent('can take a couple of hours')
-    await screen.findByTestId('premium-status-line')
+    // The manage entry renders only once the refresh response has landed.
+    await screen.findByTestId('premium-manage-button')
     expect(refreshCalls).toHaveBeenCalledTimes(1)
   })
 

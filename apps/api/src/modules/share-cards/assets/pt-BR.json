@@ -1,0 +1,26 @@
+{
+  "outfit": "Look",
+  "community": "Look da comunidade",
+  "scenarios": {
+    "morning": "Manhã",
+    "midday": "Meio-dia",
+    "evening": "Noite"
+  },
+  "categories": {
+    "top": "Parte de cima",
+    "bottom": "Parte de baixo",
+    "outerwear": "Casaco",
+    "dress": "Vestido",
+    "shoes": "Calçado",
+    "accessory": "Acessório"
+  },
+  "climateBands": {
+    "cold_dry": "Frio e seco",
+    "cold_wet": "Frio e úmido",
+    "temperate_dry": "Ameno e seco",
+    "temperate_wet": "Ameno e úmido",
+    "warm_dry": "Quente e seco",
+    "warm_wet": "Quente e úmido"
+  },
+  "watermarkRole": "Marca d’água"
+}

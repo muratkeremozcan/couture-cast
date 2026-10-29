@@ -1,5 +1,6 @@
 # Step 12 step 6 owner: searchable owner anchor
 name: Mobile e2e (Maestro)
+# Native-only share-card-export.yaml is registered separately in pr-share-card-native.yml.
 
 # This workflow runs the SAME harness as a local run: `scripts/run-maestro.mjs`
 # against Expo Go, with the local API and Metro started by the script itself.

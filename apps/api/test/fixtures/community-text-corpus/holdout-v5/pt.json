@@ -1,0 +1,5013 @@
+{
+  "language": "pt",
+  "corpusVersion": "holdout-v5",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "67d0fc63c1cbcb7630258f092596e46970de001c726db31a35762112c6148752",
+    "languageAllowListSha256": "418b7ebec286600f7dc9c42867fd5da9f35fb03c24f7516fc9ad5342ebad9929"
+  },
+  "entries": [
+    {
+      "id": "pt-holdout-v5-001",
+      "field": "caption",
+      "text": "A areia da minha pequena ampulheta se move quando viro o broche."
+    },
+    {
+      "id": "pt-holdout-v5-002",
+      "field": "altText",
+      "text": "Um broche transparente contém duas câmaras e alguns grãos de areia."
+    },
+    {
+      "id": "pt-holdout-v5-003",
+      "field": "caption",
+      "text": "Os pesinhos escondidos deixam a barra do casaco mais firme no vento."
+    },
+    {
+      "id": "pt-holdout-v5-004",
+      "field": "altText",
+      "text": "Pequenos discos estão presos dentro da bainha inferior do casaco aberto."
+    },
+    {
+      "id": "pt-holdout-v5-005",
+      "field": "caption",
+      "text": "Testei a altura da pala com papel antes de cortar a peça definitiva."
+    },
+    {
+      "id": "pt-holdout-v5-006",
+      "field": "altText",
+      "text": "Uma pala de papel está sobreposta ao alto de uma saia em montagem."
+    },
+    {
+      "id": "pt-holdout-v5-007",
+      "field": "caption",
+      "text": "Adoro ver cada divisória aparecer quando abro esta bolsa sanfonada."
+    },
+    {
+      "id": "pt-holdout-v5-008",
+      "field": "altText",
+      "text": "A bolsa aberta revela compartimentos unidos por laterais dobradas em sanfona."
+    },
+    {
+      "id": "pt-holdout-v5-009",
+      "field": "caption",
+      "text": "Um ponto em relevo ajuda a reconhecer o lado certo da luva."
+    },
+    {
+      "id": "pt-holdout-v5-010",
+      "field": "altText",
+      "text": "Uma pequena marca elevada aparece na face interna do punho da luva."
+    },
+    {
+      "id": "pt-holdout-v5-011",
+      "field": "caption",
+      "text": "A mola aparente é justamente a parte que mais gosto neste colar."
+    },
+    {
+      "id": "pt-holdout-v5-012",
+      "field": "altText",
+      "text": "Uma espiral metálica flexível une duas partes do colar dianteiro."
+    },
+    {
+      "id": "pt-holdout-v5-013",
+      "field": "caption",
+      "text": "A escovinha estreita alcança a poeira que fica sob a aba do sapato."
+    },
+    {
+      "id": "pt-holdout-v5-014",
+      "field": "altText",
+      "text": "Uma escova fina está encaixada entre a aba e o couro do sapato."
+    },
+    {
+      "id": "pt-holdout-v5-015",
+      "field": "caption",
+      "text": "Filmei uma volta devagar para entender como esta saia se movimenta."
+    },
+    {
+      "id": "pt-holdout-v5-016",
+      "field": "altText",
+      "text": "A saia forma um arco amplo ao redor das pernas durante um giro."
+    },
+    {
+      "id": "pt-holdout-v5-017",
+      "field": "caption",
+      "text": "A tampa desta fivela se abre como uma concha pequena."
+    },
+    {
+      "id": "pt-holdout-v5-018",
+      "field": "altText",
+      "text": "Duas partes curvas de uma fivela articulada estão separadas pela dobradiça."
+    },
+    {
+      "id": "pt-holdout-v5-019",
+      "field": "caption",
+      "text": "A costura fora do centro mudou a maneira como a camisa cai."
+    },
+    {
+      "id": "pt-holdout-v5-020",
+      "field": "altText",
+      "text": "Uma costura vertical atravessa a frente da camisa à esquerda do centro."
+    },
+    {
+      "id": "pt-holdout-v5-021",
+      "field": "caption",
+      "text": "Meu lenço mostra ruas que não existem, mas eu adoraria percorrer."
+    },
+    {
+      "id": "pt-holdout-v5-022",
+      "field": "altText",
+      "text": "Linhas sinuosas e pequenos quarteirões imaginários cobrem o lenço aberto."
+    },
+    {
+      "id": "pt-holdout-v5-023",
+      "field": "caption",
+      "text": "Estes brincos parecem pesados até eu mostrar o interior vazio."
+    },
+    {
+      "id": "pt-holdout-v5-024",
+      "field": "altText",
+      "text": "Um brinco em forma de gota possui uma abertura que revela sua cavidade."
+    },
+    {
+      "id": "pt-holdout-v5-025",
+      "field": "caption",
+      "text": "As janelinhas laterais deixam o capuz mais prático nas caminhadas."
+    },
+    {
+      "id": "pt-holdout-v5-026",
+      "field": "altText",
+      "text": "Painéis transparentes ocupam as duas laterais do capuz levantado."
+    },
+    {
+      "id": "pt-holdout-v5-027",
+      "field": "caption",
+      "text": "O remendo quadriculado deixou minhas meias antigas com uma graça nova."
+    },
+    {
+      "id": "pt-holdout-v5-028",
+      "field": "altText",
+      "text": "Fios cruzados formam um pequeno quadrado contrastante na sola da meia."
+    },
+    {
+      "id": "pt-holdout-v5-029",
+      "field": "caption",
+      "text": "A prega só mostra seu avesso quando dou um passo mais longo."
+    },
+    {
+      "id": "pt-holdout-v5-030",
+      "field": "altText",
+      "text": "Uma prega invertida abre discretamente na parte frontal do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-031",
+      "field": "caption",
+      "text": "Este anel articulado passa pelo meu dedo sem precisar apertar."
+    },
+    {
+      "id": "pt-holdout-v5-032",
+      "field": "altText",
+      "text": "O aro do anel está aberto junto a uma pequena dobradiça lateral."
+    },
+    {
+      "id": "pt-holdout-v5-033",
+      "field": "caption",
+      "text": "Hoje deixei uma aba do gorro dobrada e a outra solta."
+    },
+    {
+      "id": "pt-holdout-v5-034",
+      "field": "altText",
+      "text": "Uma aba lateral do gorro está levantada enquanto a outra cobre a orelha."
+    },
+    {
+      "id": "pt-holdout-v5-035",
+      "field": "caption",
+      "text": "O fundo inclinado do bolso mantém meu lápis num canto fácil de alcançar."
+    },
+    {
+      "id": "pt-holdout-v5-036",
+      "field": "altText",
+      "text": "Um lápis repousa na extremidade mais baixa do bolso com fundo diagonal."
+    },
+    {
+      "id": "pt-holdout-v5-037",
+      "field": "caption",
+      "text": "Anotei a medida no avental de prova antes que ela escapasse da memória."
+    },
+    {
+      "id": "pt-holdout-v5-038",
+      "field": "altText",
+      "text": "Números escritos a lápis aparecem no tecido cru de um avental de teste."
+    },
+    {
+      "id": "pt-holdout-v5-039",
+      "field": "caption",
+      "text": "Minha presilha tem um pequeno cata-vento que acompanha a brisa."
+    },
+    {
+      "id": "pt-holdout-v5-040",
+      "field": "altText",
+      "text": "Quatro pás arredondadas se prendem a um eixo no centro da presilha."
+    },
+    {
+      "id": "pt-holdout-v5-041",
+      "field": "caption",
+      "text": "A pirâmide do meu broche tem pequenas janelas em todas as faces."
+    },
+    {
+      "id": "pt-holdout-v5-042",
+      "field": "altText",
+      "text": "Um broche piramidal apresenta aberturas quadradas distribuídas nas faces inclinadas."
+    },
+    {
+      "id": "pt-holdout-v5-043",
+      "field": "caption",
+      "text": "O laço na lateral deixa livre o desenho inteiro da gáspea."
+    },
+    {
+      "id": "pt-holdout-v5-044",
+      "field": "altText",
+      "text": "O cadarço atravessa ilhoses na lateral externa do sapato e termina num laço."
+    },
+    {
+      "id": "pt-holdout-v5-045",
+      "field": "caption",
+      "text": "Refiz a ponta da gravata mantendo a costura antiga como referência."
+    },
+    {
+      "id": "pt-holdout-v5-046",
+      "field": "altText",
+      "text": "A extremidade triangular da gravata mostra uma nova linha de pontos manuais."
+    },
+    {
+      "id": "pt-holdout-v5-047",
+      "field": "caption",
+      "text": "Prendi um bolso de papel para decidir onde minha mão pousa naturalmente."
+    },
+    {
+      "id": "pt-holdout-v5-048",
+      "field": "altText",
+      "text": "Um molde de bolso está preso por alfinetes sobre a lateral da saia."
+    },
+    {
+      "id": "pt-holdout-v5-049",
+      "field": "caption",
+      "text": "Os dois ramos desta pulseira se encontram sem esconder suas pontas."
+    },
+    {
+      "id": "pt-holdout-v5-050",
+      "field": "altText",
+      "text": "Extremidades em forma de ramos se cruzam no alto de uma pulseira aberta."
+    },
+    {
+      "id": "pt-holdout-v5-051",
+      "field": "caption",
+      "text": "Escolhi esta estampa porque lembra a sombra de folhas na parede."
+    },
+    {
+      "id": "pt-holdout-v5-052",
+      "field": "altText",
+      "text": "Silhuetas difusas de folhas se espalham sobre o tecido da blusa."
+    },
+    {
+      "id": "pt-holdout-v5-053",
+      "field": "caption",
+      "text": "O furo oval deixa a fivela acompanhar melhor o movimento do cinto."
+    },
+    {
+      "id": "pt-holdout-v5-054",
+      "field": "altText",
+      "text": "A lingueta da fivela atravessa uma abertura alongada na tira de couro."
+    },
+    {
+      "id": "pt-holdout-v5-055",
+      "field": "caption",
+      "text": "O molde leve dentro do chapéu protege a copa durante a viagem."
+    },
+    {
+      "id": "pt-holdout-v5-056",
+      "field": "altText",
+      "text": "Uma forma oca está colocada dentro da copa do chapéu guardado na mala."
+    },
+    {
+      "id": "pt-holdout-v5-057",
+      "field": "caption",
+      "text": "Cruzei os painéis de outro jeito e o decote ganhou uma linha nova."
+    },
+    {
+      "id": "pt-holdout-v5-058",
+      "field": "altText",
+      "text": "Duas faixas largas de tecido se sobrepõem em diagonal na frente da blusa."
+    },
+    {
+      "id": "pt-holdout-v5-059",
+      "field": "caption",
+      "text": "Levo um farol minúsculo no pescoço para lembrar nossa viagem à costa."
+    },
+    {
+      "id": "pt-holdout-v5-060",
+      "field": "altText",
+      "text": "Um pingente cilíndrico apresenta janelas e uma pequena varanda de farol."
+    },
+    {
+      "id": "pt-holdout-v5-061",
+      "field": "caption",
+      "text": "Um palito sob o botão deixou espaço suficiente para o tecido grosso."
+    },
+    {
+      "id": "pt-holdout-v5-062",
+      "field": "altText",
+      "text": "Um palito fino separa o botão da superfície durante a costura."
+    },
+    {
+      "id": "pt-holdout-v5-063",
+      "field": "caption",
+      "text": "A prova sentada mostrou onde o gancho da calça precisava de folga."
+    },
+    {
+      "id": "pt-holdout-v5-064",
+      "field": "altText",
+      "text": "Marcas de alinhavo contornam o gancho de uma calça em ajuste."
+    },
+    {
+      "id": "pt-holdout-v5-065",
+      "field": "caption",
+      "text": "A curva natural do bambu virou a alça que eu queria para esta bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-066",
+      "field": "altText",
+      "text": "Uma alça rígida de bambu curvado se prende às duas bordas da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-067",
+      "field": "caption",
+      "text": "Desenrolei a franja com os dedos até recuperar seu movimento solto."
+    },
+    {
+      "id": "pt-holdout-v5-068",
+      "field": "altText",
+      "text": "Fios de franja recém-separados se espalham pela borda de um xale."
+    },
+    {
+      "id": "pt-holdout-v5-069",
+      "field": "caption",
+      "text": "Coloquei a proteção na sola antes de experimentar os sapatos sobre o piso claro."
+    },
+    {
+      "id": "pt-holdout-v5-070",
+      "field": "altText",
+      "text": "Uma película removível acompanha o contorno da sola do sapato novo."
+    },
+    {
+      "id": "pt-holdout-v5-071",
+      "field": "caption",
+      "text": "As laterais abertas do colete deixam aparecer as mangas largas da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-072",
+      "field": "altText",
+      "text": "O colete possui aberturas amplas nas laterais sobre uma camisa de mangas volumosas."
+    },
+    {
+      "id": "pt-holdout-v5-073",
+      "field": "caption",
+      "text": "O desenho muda de posição quando giro o disco do meu broche."
+    },
+    {
+      "id": "pt-holdout-v5-074",
+      "field": "altText",
+      "text": "Um disco ilustrado está montado sobre um eixo central na base do broche."
+    },
+    {
+      "id": "pt-holdout-v5-075",
+      "field": "caption",
+      "text": "Prendi cada ponta da renda antes de deixar a malha secar."
+    },
+    {
+      "id": "pt-holdout-v5-076",
+      "field": "altText",
+      "text": "Alfinetes mantêm as pontas de uma peça rendada esticadas sobre uma base."
+    },
+    {
+      "id": "pt-holdout-v5-077",
+      "field": "caption",
+      "text": "Passei uma ponta pelo anel costurado e o lenço ficou no lugar."
+    },
+    {
+      "id": "pt-holdout-v5-078",
+      "field": "altText",
+      "text": "A extremidade do lenço atravessa um pequeno anel fixado perto de sua borda."
+    },
+    {
+      "id": "pt-holdout-v5-079",
+      "field": "caption",
+      "text": "Desenhei a cotoveleira seguindo a dobra que já existia na manga."
+    },
+    {
+      "id": "pt-holdout-v5-080",
+      "field": "altText",
+      "text": "Um recorte oval acompanha a curvatura do cotovelo na manga da jaqueta."
+    },
+    {
+      "id": "pt-holdout-v5-081",
+      "field": "caption",
+      "text": "Precisei treinar um pouco até abrir esta catraca com uma mão."
+    },
+    {
+      "id": "pt-holdout-v5-082",
+      "field": "altText",
+      "text": "Um pequeno fecho dentado mantém a tira frontal da bolsa tensionada."
+    },
+    {
+      "id": "pt-holdout-v5-083",
+      "field": "caption",
+      "text": "O contorno destes brincos veio das janelas da casa onde cresci."
+    },
+    {
+      "id": "pt-holdout-v5-084",
+      "field": "altText",
+      "text": "Brincos vazados apresentam arcos altos divididos por duas barras finas."
+    },
+    {
+      "id": "pt-holdout-v5-085",
+      "field": "caption",
+      "text": "Virei os punhos para fora e apareceu o tecido que eu tinha guardado."
+    },
+    {
+      "id": "pt-holdout-v5-086",
+      "field": "altText",
+      "text": "O punho dobrado da camisa exibe uma face interna de padrão diferente."
+    },
+    {
+      "id": "pt-holdout-v5-087",
+      "field": "caption",
+      "text": "O fitilho interno ajuda a levantar a saia quando subo a escada."
+    },
+    {
+      "id": "pt-holdout-v5-088",
+      "field": "altText",
+      "text": "Uma pequena argola de fita está presa no avesso da saia longa."
+    },
+    {
+      "id": "pt-holdout-v5-089",
+      "field": "caption",
+      "text": "A pedra parece flutuar entre as duas pontas deste anel."
+    },
+    {
+      "id": "pt-holdout-v5-090",
+      "field": "altText",
+      "text": "Uma pedra lapidada fica suspensa entre as extremidades abertas do aro."
+    },
+    {
+      "id": "pt-holdout-v5-091",
+      "field": "caption",
+      "text": "Uma dobra no canto transforma meu cachecol largo numa cobertura para a cabeça."
+    },
+    {
+      "id": "pt-holdout-v5-092",
+      "field": "altText",
+      "text": "O canto dobrado do cachecol forma uma pequena cobertura sobre a cabeça."
+    },
+    {
+      "id": "pt-holdout-v5-093",
+      "field": "caption",
+      "text": "O passador devolve a tira com as duas bordas dobradas certinhas."
+    },
+    {
+      "id": "pt-holdout-v5-094",
+      "field": "altText",
+      "text": "Uma tira de tecido sai dobrada de uma pequena ferramenta metálica de viés."
+    },
+    {
+      "id": "pt-holdout-v5-095",
+      "field": "caption",
+      "text": "Usei os prendedores largos para segurar a barra durante a prova."
+    },
+    {
+      "id": "pt-holdout-v5-096",
+      "field": "altText",
+      "text": "Dois prendedores largos mantêm a bainha dobrada na perna da calça."
+    },
+    {
+      "id": "pt-holdout-v5-097",
+      "field": "caption",
+      "text": "Troquei só as argolinhas e consegui usar minha corrente nos óculos novos."
+    },
+    {
+      "id": "pt-holdout-v5-098",
+      "field": "altText",
+      "text": "Pequenas argolas flexíveis ligam a corrente às duas hastes dos óculos."
+    },
+    {
+      "id": "pt-holdout-v5-099",
+      "field": "caption",
+      "text": "Bordei a constelação que conseguimos reconhecer naquela noite sem nuvens."
+    },
+    {
+      "id": "pt-holdout-v5-100",
+      "field": "altText",
+      "text": "Pequenos pontos bordados ligados por linhas formam uma constelação na bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-101",
+      "field": "caption",
+      "text": "A linha princesa acompanha o corpo sem exigir um ajuste apertado."
+    },
+    {
+      "id": "pt-holdout-v5-102",
+      "field": "altText",
+      "text": "Costuras curvas descem do ombro até a cintura na frente da blusa."
+    },
+    {
+      "id": "pt-holdout-v5-103",
+      "field": "caption",
+      "text": "A manga ampla se une perto da cintura e abre um espaço enorme sob o braço."
+    },
+    {
+      "id": "pt-holdout-v5-104",
+      "field": "altText",
+      "text": "Uma manga de malha larga desce do ombro até uma junção próxima à cintura."
+    },
+    {
+      "id": "pt-holdout-v5-105",
+      "field": "caption",
+      "text": "Uma passagem por dentro do cadarço mantém a lingueta sempre centralizada."
+    },
+    {
+      "id": "pt-holdout-v5-106",
+      "field": "altText",
+      "text": "O cadarço atravessa um canal estreito sobre a lingueta da botina."
+    },
+    {
+      "id": "pt-holdout-v5-107",
+      "field": "caption",
+      "text": "A folha ficou marcada na cera antes de virar o molde da presilha."
+    },
+    {
+      "id": "pt-holdout-v5-108",
+      "field": "altText",
+      "text": "Uma impressão de folha ocupa a superfície curva do modelo de presilha."
+    },
+    {
+      "id": "pt-holdout-v5-109",
+      "field": "caption",
+      "text": "A pequena mola do cós acompanha a cintura quando me sento."
+    },
+    {
+      "id": "pt-holdout-v5-110",
+      "field": "altText",
+      "text": "Uma seção sanfonada flexível está inserida na parte traseira do cós."
+    },
+    {
+      "id": "pt-holdout-v5-111",
+      "field": "caption",
+      "text": "Mudei o fecho para o ombro e deixei a frente da capa livre."
+    },
+    {
+      "id": "pt-holdout-v5-112",
+      "field": "altText",
+      "text": "Um fecho circular prende a capa sobre um dos ombros."
+    },
+    {
+      "id": "pt-holdout-v5-113",
+      "field": "caption",
+      "text": "O laço fica atrás para deixar o relevo da gargantilha inteiro à mostra."
+    },
+    {
+      "id": "pt-holdout-v5-114",
+      "field": "altText",
+      "text": "Duas fitas se unem num laço na parte posterior da gargantilha."
+    },
+    {
+      "id": "pt-holdout-v5-115",
+      "field": "caption",
+      "text": "Guardei a etiqueta junto da amostra de tecido para futuras alterações."
+    },
+    {
+      "id": "pt-holdout-v5-116",
+      "field": "altText",
+      "text": "Uma etiqueta e um retalho estão presos à mesma página do caderno."
+    },
+    {
+      "id": "pt-holdout-v5-117",
+      "field": "caption",
+      "text": "As pequenas chaves desenham um raio que atravessa a frente da camiseta."
+    },
+    {
+      "id": "pt-holdout-v5-118",
+      "field": "altText",
+      "text": "Chaves ilustradas se alinham num percurso angular semelhante a um relâmpago."
+    },
+    {
+      "id": "pt-holdout-v5-119",
+      "field": "caption",
+      "text": "As preguinhas da pala deixam o tecido ganhar volume nas costas."
+    },
+    {
+      "id": "pt-holdout-v5-120",
+      "field": "altText",
+      "text": "Pregas curtas partem da borda inferior da pala traseira da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-121",
+      "field": "caption",
+      "text": "Prendi o forro no fundo para ele parar de sair junto com minhas coisas."
+    },
+    {
+      "id": "pt-holdout-v5-122",
+      "field": "altText",
+      "text": "Pequenos pontos de fixação unem o forro ao fundo interno da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-123",
+      "field": "caption",
+      "text": "O cordão ajustado segura meu chapéu mesmo quando o vento muda."
+    },
+    {
+      "id": "pt-holdout-v5-124",
+      "field": "altText",
+      "text": "Um cordão fino passa sob o queixo e termina num regulador pequeno."
+    },
+    {
+      "id": "pt-holdout-v5-125",
+      "field": "caption",
+      "text": "O musgo minúsculo ficou preservado dentro deste botão transparente."
+    },
+    {
+      "id": "pt-holdout-v5-126",
+      "field": "altText",
+      "text": "Fragmentos de musgo aparecem encapsulados num botão redondo de resina."
+    },
+    {
+      "id": "pt-holdout-v5-127",
+      "field": "caption",
+      "text": "A faixa macia por dentro deixou o cós mais confortável durante o dia."
+    },
+    {
+      "id": "pt-holdout-v5-128",
+      "field": "altText",
+      "text": "Uma faixa suave reveste a face interna do cós da calça aberta."
+    },
+    {
+      "id": "pt-holdout-v5-129",
+      "field": "caption",
+      "text": "Pintei peças de dominó tombando uma depois da outra no meu lenço."
+    },
+    {
+      "id": "pt-holdout-v5-130",
+      "field": "altText",
+      "text": "Peças ilustradas de dominó se inclinam sucessivamente ao longo do lenço."
+    },
+    {
+      "id": "pt-holdout-v5-131",
+      "field": "caption",
+      "text": "O pino se esconde totalmente quando fecho a trava do broche."
+    },
+    {
+      "id": "pt-holdout-v5-132",
+      "field": "altText",
+      "text": "Uma trava arredondada envolve a ponta do pino na traseira do broche."
+    },
+    {
+      "id": "pt-holdout-v5-133",
+      "field": "caption",
+      "text": "A amostra cresceu depois de lavar, ainda bem que medi antes."
+    },
+    {
+      "id": "pt-holdout-v5-134",
+      "field": "altText",
+      "text": "Uma amostra de malha está ao lado de seu contorno original desenhado."
+    },
+    {
+      "id": "pt-holdout-v5-135",
+      "field": "caption",
+      "text": "Abri com cuidado o alinhavo e descobri um bolso de verdade."
+    },
+    {
+      "id": "pt-holdout-v5-136",
+      "field": "altText",
+      "text": "Uma linha de alinhavo parcialmente retirada atravessa a abertura do bolso."
+    },
+    {
+      "id": "pt-holdout-v5-137",
+      "field": "caption",
+      "text": "Cada fio desce um pouco mais e forma uma escadinha no brinco."
+    },
+    {
+      "id": "pt-holdout-v5-138",
+      "field": "altText",
+      "text": "Fios metálicos de comprimentos graduais pendem de uma barra de brinco."
+    },
+    {
+      "id": "pt-holdout-v5-139",
+      "field": "caption",
+      "text": "A costura mais baixa deixa o vestido acompanhar meu quadril com folga."
+    },
+    {
+      "id": "pt-holdout-v5-140",
+      "field": "altText",
+      "text": "Uma costura horizontal une o corpo à saia abaixo da cintura natural."
+    },
+    {
+      "id": "pt-holdout-v5-141",
+      "field": "caption",
+      "text": "Meu pequeno gancho mantém a bolsa perto de mim sem ocupar outra cadeira."
+    },
+    {
+      "id": "pt-holdout-v5-142",
+      "field": "altText",
+      "text": "Uma bolsa pende de um gancho apoiado na borda da mesa."
+    },
+    {
+      "id": "pt-holdout-v5-143",
+      "field": "caption",
+      "text": "A linha contrastante me ajuda a manter a mesma altura nas duas meias."
+    },
+    {
+      "id": "pt-holdout-v5-144",
+      "field": "altText",
+      "text": "Um fio de marcação atravessa a malha antes do início do punho."
+    },
+    {
+      "id": "pt-holdout-v5-145",
+      "field": "caption",
+      "text": "A luz lateral revelou todo o relevo que eu quase não via no cabide."
+    },
+    {
+      "id": "pt-holdout-v5-146",
+      "field": "altText",
+      "text": "Pequenas sombras acentuam os relevos do tecido na manga do casaco."
+    },
+    {
+      "id": "pt-holdout-v5-147",
+      "field": "caption",
+      "text": "Enrolei a sobra do cinto numa pequena espiral junto à fivela."
+    },
+    {
+      "id": "pt-holdout-v5-148",
+      "field": "altText",
+      "text": "A ponta livre do cinto forma uma espiral presa sob a faixa principal."
+    },
+    {
+      "id": "pt-holdout-v5-149",
+      "field": "caption",
+      "text": "A correntinha entre as pontas mantém a gola aberta na medida que gosto."
+    },
+    {
+      "id": "pt-holdout-v5-150",
+      "field": "altText",
+      "text": "Uma corrente curta liga dois pequenos fechos nas pontas da gola."
+    },
+    {
+      "id": "pt-holdout-v5-151",
+      "field": "caption",
+      "text": "As camadas terminam em alturas diferentes e aparecem a cada passo."
+    },
+    {
+      "id": "pt-holdout-v5-152",
+      "field": "altText",
+      "text": "Três camadas de tecido com comprimentos distintos formam a saia."
+    },
+    {
+      "id": "pt-holdout-v5-153",
+      "field": "caption",
+      "text": "A pequena capa da pulseira abre para mostrar uma frase gravada."
+    },
+    {
+      "id": "pt-holdout-v5-154",
+      "field": "altText",
+      "text": "Uma peça articulada em forma de livro está aberta no centro da pulseira."
+    },
+    {
+      "id": "pt-holdout-v5-155",
+      "field": "caption",
+      "text": "Separei bolsos de tamanhos diferentes para minhas ferramentas de costura."
+    },
+    {
+      "id": "pt-holdout-v5-156",
+      "field": "altText",
+      "text": "Três ferramentas ocupam bolsos estreitos e largos na frente do avental."
+    },
+    {
+      "id": "pt-holdout-v5-157",
+      "field": "caption",
+      "text": "O couro ganhou uma dobra natural exatamente onde meu pé se movimenta."
+    },
+    {
+      "id": "pt-holdout-v5-158",
+      "field": "altText",
+      "text": "Uma dobra suave atravessa o couro do sapato na base dos dedos."
+    },
+    {
+      "id": "pt-holdout-v5-159",
+      "field": "caption",
+      "text": "Um botão pequeno une as pontas do lenço sem precisar de nó."
+    },
+    {
+      "id": "pt-holdout-v5-160",
+      "field": "altText",
+      "text": "As pontas do lenço se sobrepõem e ficam presas por um único botão."
+    },
+    {
+      "id": "pt-holdout-v5-161",
+      "field": "caption",
+      "text": "A fenda do punho abre espaço para meu relógio aparecer."
+    },
+    {
+      "id": "pt-holdout-v5-162",
+      "field": "altText",
+      "text": "Uma abertura curta na manga deixa o relógio visível sobre o pulso."
+    },
+    {
+      "id": "pt-holdout-v5-163",
+      "field": "caption",
+      "text": "As marcas da ferramenta continuam visíveis na gota esculpida do meu colar."
+    },
+    {
+      "id": "pt-holdout-v5-164",
+      "field": "altText",
+      "text": "Um pingente de madeira em forma de gota conserva sulcos de entalhe."
+    },
+    {
+      "id": "pt-holdout-v5-165",
+      "field": "caption",
+      "text": "Costurar os cantos atravessados deu um fundo firme ao meu primeiro tote."
+    },
+    {
+      "id": "pt-holdout-v5-166",
+      "field": "altText",
+      "text": "Costuras transversais nos cantos inferiores criam uma base retangular na bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-167",
+      "field": "caption",
+      "text": "O detalhe refletivo aparece quando viro a barra para pedalar à noite."
+    },
+    {
+      "id": "pt-holdout-v5-168",
+      "field": "altText",
+      "text": "Uma faixa refletiva estreita está exposta no interior da barra dobrada."
+    },
+    {
+      "id": "pt-holdout-v5-169",
+      "field": "caption",
+      "text": "Os dois arcos se cruzam e seguram meu coque sem esconder seu formato."
+    },
+    {
+      "id": "pt-holdout-v5-170",
+      "field": "altText",
+      "text": "Dois arcos metálicos entrelaçados atravessam um coque solto."
+    },
+    {
+      "id": "pt-holdout-v5-171",
+      "field": "caption",
+      "text": "A abertura no ombro facilita vestir a blusa sem desfazer meu penteado."
+    },
+    {
+      "id": "pt-holdout-v5-172",
+      "field": "altText",
+      "text": "Uma fileira de pequenos botões abre a costura de um ombro da blusa."
+    },
+    {
+      "id": "pt-holdout-v5-173",
+      "field": "caption",
+      "text": "Este punho largo fica firme sem deixar uma marca funda na perna."
+    },
+    {
+      "id": "pt-holdout-v5-174",
+      "field": "altText",
+      "text": "Uma faixa de malha larga forma o acabamento superior da meia."
+    },
+    {
+      "id": "pt-holdout-v5-175",
+      "field": "caption",
+      "text": "O caminho do broche termina no centro depois de tantas voltinhas."
+    },
+    {
+      "id": "pt-holdout-v5-176",
+      "field": "altText",
+      "text": "Linhas elevadas desenham um labirinto circular sobre a superfície do broche."
+    },
+    {
+      "id": "pt-holdout-v5-177",
+      "field": "caption",
+      "text": "Juntei as partes gastas com retalhos que guardava havia anos."
+    },
+    {
+      "id": "pt-holdout-v5-178",
+      "field": "altText",
+      "text": "Retalhos de diferentes tamanhos cobrem áreas reparadas num cachecol antigo."
+    },
+    {
+      "id": "pt-holdout-v5-179",
+      "field": "caption",
+      "text": "O forro mais curto deixa a última camada da saia receber a luz."
+    },
+    {
+      "id": "pt-holdout-v5-180",
+      "field": "altText",
+      "text": "Uma faixa translúcida de tecido ultrapassa o comprimento do forro da saia."
+    },
+    {
+      "id": "pt-holdout-v5-181",
+      "field": "caption",
+      "text": "A fivela corre pela tira até encontrar o ajuste confortável."
+    },
+    {
+      "id": "pt-holdout-v5-182",
+      "field": "altText",
+      "text": "Uma fivela sem furos desliza sobre a tira lateral da sandália."
+    },
+    {
+      "id": "pt-holdout-v5-183",
+      "field": "caption",
+      "text": "O organizador sai inteiro quando quero trocar de bolsa rapidamente."
+    },
+    {
+      "id": "pt-holdout-v5-184",
+      "field": "altText",
+      "text": "Um organizador com divisórias está suspenso acima do interior da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-185",
+      "field": "caption",
+      "text": "Deixei a aba secar apoiada para conservar essa ondulação suave."
+    },
+    {
+      "id": "pt-holdout-v5-186",
+      "field": "altText",
+      "text": "A borda do chapéu apresenta uma ondulação larga e contínua."
+    },
+    {
+      "id": "pt-holdout-v5-187",
+      "field": "caption",
+      "text": "O espelhinho escondido no anel me ajuda com um retoque rápido."
+    },
+    {
+      "id": "pt-holdout-v5-188",
+      "field": "altText",
+      "text": "A tampa levantada de um anel revela um pequeno espelho circular."
+    },
+    {
+      "id": "pt-holdout-v5-189",
+      "field": "caption",
+      "text": "Alternar botões pequenos e grandes deu ritmo à frente da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-190",
+      "field": "altText",
+      "text": "Botões de dois tamanhos se alternam ao longo da abertura da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-191",
+      "field": "caption",
+      "text": "As alças cruzadas deixam o vestido estável quando me inclino."
+    },
+    {
+      "id": "pt-holdout-v5-192",
+      "field": "altText",
+      "text": "Duas alças largas se cruzam no alto das costas do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-193",
+      "field": "caption",
+      "text": "A pedrinha desliza pelo aro quando mexo no pingente."
+    },
+    {
+      "id": "pt-holdout-v5-194",
+      "field": "altText",
+      "text": "Uma pequena pedra solta está contida num aro fechado do pingente."
+    },
+    {
+      "id": "pt-holdout-v5-195",
+      "field": "caption",
+      "text": "Preservei a ourela como acabamento na frente da minha blusa."
+    },
+    {
+      "id": "pt-holdout-v5-196",
+      "field": "altText",
+      "text": "A ourela com pequenos fios salientes acompanha a abertura frontal da blusa."
+    },
+    {
+      "id": "pt-holdout-v5-197",
+      "field": "caption",
+      "text": "O bolsinho interno impede que as moedas se espalhem pela calça."
+    },
+    {
+      "id": "pt-holdout-v5-198",
+      "field": "altText",
+      "text": "Um pequeno bolso retangular está costurado dentro do bolso maior da calça."
+    },
+    {
+      "id": "pt-holdout-v5-199",
+      "field": "caption",
+      "text": "Costurei páginas de feltro para separar as agulhas por tamanho."
+    },
+    {
+      "id": "pt-holdout-v5-200",
+      "field": "altText",
+      "text": "Agulhas de vários comprimentos estão presas às páginas de um estojo de feltro."
+    },
+    {
+      "id": "pt-holdout-v5-201",
+      "field": "caption",
+      "text": "A redinha impede que este fio escorregadio desenrole sozinho."
+    },
+    {
+      "id": "pt-holdout-v5-202",
+      "field": "altText",
+      "text": "Uma malha tubular envolve o carretel e contém suas voltas de linha."
+    },
+    {
+      "id": "pt-holdout-v5-203",
+      "field": "caption",
+      "text": "Minha tesoura de bordado ganhou uma capinha para viajar no estojo."
+    },
+    {
+      "id": "pt-holdout-v5-204",
+      "field": "altText",
+      "text": "Uma capa estreita cobre as pontas fechadas de uma tesoura pequena."
+    },
+    {
+      "id": "pt-holdout-v5-205",
+      "field": "caption",
+      "text": "As pedras lisas seguram o papel enquanto organizo o corte."
+    },
+    {
+      "id": "pt-holdout-v5-206",
+      "field": "altText",
+      "text": "Pedras arredondadas repousam sobre as bordas de um molde de papel."
+    },
+    {
+      "id": "pt-holdout-v5-207",
+      "field": "caption",
+      "text": "A base antiderrapante mantém o pedal onde meu pé espera encontrá-lo."
+    },
+    {
+      "id": "pt-holdout-v5-208",
+      "field": "altText",
+      "text": "Um pedal de máquina de costura está apoiado numa placa texturizada."
+    },
+    {
+      "id": "pt-holdout-v5-209",
+      "field": "caption",
+      "text": "O dedal fez diferença na hora de atravessar as camadas mais grossas."
+    },
+    {
+      "id": "pt-holdout-v5-210",
+      "field": "altText",
+      "text": "Um dedo protegido por dedal empurra a agulha através do tecido dobrado."
+    },
+    {
+      "id": "pt-holdout-v5-211",
+      "field": "caption",
+      "text": "Passei a linha na cera antes de terminar os pontos à mão."
+    },
+    {
+      "id": "pt-holdout-v5-212",
+      "field": "altText",
+      "text": "Um fio de costura percorre um sulco num pequeno bloco de cera."
+    },
+    {
+      "id": "pt-holdout-v5-213",
+      "field": "caption",
+      "text": "Alinhavei a abertura inteira para os dois lados do zíper ficarem alinhados."
+    },
+    {
+      "id": "pt-holdout-v5-214",
+      "field": "altText",
+      "text": "Pontos longos mantêm unidas as bordas onde o zíper está sendo aplicado."
+    },
+    {
+      "id": "pt-holdout-v5-215",
+      "field": "caption",
+      "text": "Os pequenos piques deixaram o decote virar sem repuxar."
+    },
+    {
+      "id": "pt-holdout-v5-216",
+      "field": "altText",
+      "text": "Cortes curtos interrompem a margem de costura ao redor do decote curvo."
+    },
+    {
+      "id": "pt-holdout-v5-217",
+      "field": "caption",
+      "text": "Dobrei o viés em diagonal para fazer um canto bem limpo."
+    },
+    {
+      "id": "pt-holdout-v5-218",
+      "field": "altText",
+      "text": "Uma dobra diagonal une duas direções do viés no canto do tecido."
+    },
+    {
+      "id": "pt-holdout-v5-219",
+      "field": "caption",
+      "text": "Aparei cada margem numa largura para o colarinho não ficar volumoso."
+    },
+    {
+      "id": "pt-holdout-v5-220",
+      "field": "altText",
+      "text": "Camadas internas de tecido estão cortadas em larguras diferentes junto à costura."
+    },
+    {
+      "id": "pt-holdout-v5-221",
+      "field": "caption",
+      "text": "Do lado de fora quase não consigo encontrar os pontos da bainha."
+    },
+    {
+      "id": "pt-holdout-v5-222",
+      "field": "altText",
+      "text": "Pequenos pontos espaçados prendem a bainha dobrada ao avesso da calça."
+    },
+    {
+      "id": "pt-holdout-v5-223",
+      "field": "caption",
+      "text": "Um calço manteve o calcador nivelado ao passar pela emenda grossa."
+    },
+    {
+      "id": "pt-holdout-v5-224",
+      "field": "altText",
+      "text": "Uma peça dobrada sustenta o calcador sobre uma junção de várias camadas."
+    },
+    {
+      "id": "pt-holdout-v5-225",
+      "field": "caption",
+      "text": "Enrolei uma fita no bastidor para o tecido fino não escorregar."
+    },
+    {
+      "id": "pt-holdout-v5-226",
+      "field": "altText",
+      "text": "Uma fita estreita cobre o aro interno do bastidor de bordado."
+    },
+    {
+      "id": "pt-holdout-v5-227",
+      "field": "caption",
+      "text": "Voltei duas carreiras e consegui corrigir o ponto que tinha escapado."
+    },
+    {
+      "id": "pt-holdout-v5-228",
+      "field": "altText",
+      "text": "Uma agulha recupera uma laçada solta numa coluna de pontos de tricô."
+    },
+    {
+      "id": "pt-holdout-v5-229",
+      "field": "caption",
+      "text": "O pente separa os fios antes de começar a faixa tecida."
+    },
+    {
+      "id": "pt-holdout-v5-230",
+      "field": "altText",
+      "text": "Fios paralelos passam por fendas regulares num pente de tear estreito."
+    },
+    {
+      "id": "pt-holdout-v5-231",
+      "field": "caption",
+      "text": "As marcas no disco ajudam a acompanhar a ordem desta trança redonda."
+    },
+    {
+      "id": "pt-holdout-v5-232",
+      "field": "altText",
+      "text": "Cordões atravessam o centro de um disco com ranhuras numeradas."
+    },
+    {
+      "id": "pt-holdout-v5-233",
+      "field": "caption",
+      "text": "A última conta de pressão prende o fecho sem esconder o desenho."
+    },
+    {
+      "id": "pt-holdout-v5-234",
+      "field": "altText",
+      "text": "Um pequeno terminal metálico está comprimido junto ao fecho do colar."
+    },
+    {
+      "id": "pt-holdout-v5-235",
+      "field": "caption",
+      "text": "Fechei a argolinha de lado para não deformar seu círculo."
+    },
+    {
+      "id": "pt-holdout-v5-236",
+      "field": "altText",
+      "text": "Dois alicates seguram as extremidades de uma argola metálica parcialmente aberta."
+    },
+    {
+      "id": "pt-holdout-v5-237",
+      "field": "caption",
+      "text": "A borda da tira fica mais lisa a cada passagem do polidor."
+    },
+    {
+      "id": "pt-holdout-v5-238",
+      "field": "altText",
+      "text": "Uma ferramenta arredondada comprime a borda de uma tira de couro."
+    },
+    {
+      "id": "pt-holdout-v5-239",
+      "field": "caption",
+      "text": "Desbastei só a ponta que vai dobrar ao redor da fivela."
+    },
+    {
+      "id": "pt-holdout-v5-240",
+      "field": "altText",
+      "text": "A extremidade afinada da tira se curva ao redor de uma barra metálica."
+    },
+    {
+      "id": "pt-holdout-v5-241",
+      "field": "caption",
+      "text": "O último ilhós ficou pronto e agora posso passar o cordão."
+    },
+    {
+      "id": "pt-holdout-v5-242",
+      "field": "altText",
+      "text": "Uma prensa manual mantém um ilhós posicionado sobre uma abertura no tecido."
+    },
+    {
+      "id": "pt-holdout-v5-243",
+      "field": "caption",
+      "text": "Estes rebites prendem as alças que preparei para a bolsa nova."
+    },
+    {
+      "id": "pt-holdout-v5-244",
+      "field": "altText",
+      "text": "Rebites redondos fixam tiras dobradas na borda superior da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-245",
+      "field": "caption",
+      "text": "Um alfinete atravessado protege o limite da casa enquanto corto."
+    },
+    {
+      "id": "pt-holdout-v5-246",
+      "field": "altText",
+      "text": "Um abridor de casas avança pelo centro da abertura até um alfinete transversal."
+    },
+    {
+      "id": "pt-holdout-v5-247",
+      "field": "caption",
+      "text": "Marquei o sentido do fio antes de mover o molde da mesa."
+    },
+    {
+      "id": "pt-holdout-v5-248",
+      "field": "altText",
+      "text": "Uma seta de giz acompanha o comprimento do tecido ao lado do molde."
+    },
+    {
+      "id": "pt-holdout-v5-249",
+      "field": "caption",
+      "text": "A segunda amostra ficou lisa depois do ajuste na tensão da linha."
+    },
+    {
+      "id": "pt-holdout-v5-250",
+      "field": "altText",
+      "text": "Duas costuras de teste aparecem lado a lado, uma franzida e outra plana."
+    },
+    {
+      "id": "pt-holdout-v5-251",
+      "field": "caption",
+      "text": "A almofada curva sustenta o ombro sem apagar o volume que modelei."
+    },
+    {
+      "id": "pt-holdout-v5-252",
+      "field": "altText",
+      "text": "O ombro da jaqueta repousa sobre uma almofada arredondada de passadoria."
+    },
+    {
+      "id": "pt-holdout-v5-253",
+      "field": "caption",
+      "text": "A tábua estreita entra na manga e evita uma dobra no lugar errado."
+    },
+    {
+      "id": "pt-holdout-v5-254",
+      "field": "altText",
+      "text": "Uma manga envolve a extremidade de uma pequena tábua de passar."
+    },
+    {
+      "id": "pt-holdout-v5-255",
+      "field": "caption",
+      "text": "O rolinho abriu esta costura sem deixar a superfície brilhante."
+    },
+    {
+      "id": "pt-holdout-v5-256",
+      "field": "altText",
+      "text": "Um rolo de mão pressiona as margens abertas de uma costura."
+    },
+    {
+      "id": "pt-holdout-v5-257",
+      "field": "caption",
+      "text": "Comparei três amostras antes de escolher a entretela do colarinho."
+    },
+    {
+      "id": "pt-holdout-v5-258",
+      "field": "altText",
+      "text": "Três quadrados de tecido exibem diferentes graus de rigidez junto a etiquetas."
+    },
+    {
+      "id": "pt-holdout-v5-259",
+      "field": "caption",
+      "text": "A fita interna cobre cada emenda desta capa de chuva."
+    },
+    {
+      "id": "pt-holdout-v5-260",
+      "field": "altText",
+      "text": "Faixas seladas acompanham as costuras no interior da capa impermeável."
+    },
+    {
+      "id": "pt-holdout-v5-261",
+      "field": "caption",
+      "text": "O alfineteiro no pulso deixa minhas duas mãos livres na prova."
+    },
+    {
+      "id": "pt-holdout-v5-262",
+      "field": "altText",
+      "text": "Uma pequena almofada com alfinetes está presa a uma faixa no pulso."
+    },
+    {
+      "id": "pt-holdout-v5-263",
+      "field": "caption",
+      "text": "Os pontos de linha transferiram a pinça para as duas camadas."
+    },
+    {
+      "id": "pt-holdout-v5-264",
+      "field": "altText",
+      "text": "Laçadas frouxas de linha marcam os extremos da pinça no tecido duplo."
+    },
+    {
+      "id": "pt-holdout-v5-265",
+      "field": "caption",
+      "text": "A fitinha por dentro segura o ombro para a malha não ceder."
+    },
+    {
+      "id": "pt-holdout-v5-266",
+      "field": "altText",
+      "text": "Uma fita estreita acompanha a costura interna do ombro da camiseta."
+    },
+    {
+      "id": "pt-holdout-v5-267",
+      "field": "caption",
+      "text": "Enrolei cada retalho com sua medida para encontrar os pequenos mais depressa."
+    },
+    {
+      "id": "pt-holdout-v5-268",
+      "field": "altText",
+      "text": "Rolos curtos de tecido possuem etiquetas com medidas escritas à mão."
+    },
+    {
+      "id": "pt-holdout-v5-269",
+      "field": "caption",
+      "text": "Um cartão me ajuda a deixar os quatro furos na mesma direção."
+    },
+    {
+      "id": "pt-holdout-v5-270",
+      "field": "altText",
+      "text": "Um cartão marcado orienta botões de quatro furos sobre a frente da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-271",
+      "field": "caption",
+      "text": "A alça fininha do passador resolveu o fio que eu não conseguia enfiar."
+    },
+    {
+      "id": "pt-holdout-v5-272",
+      "field": "altText",
+      "text": "Uma pequena alça de arame atravessa o olho da agulha com a linha."
+    },
+    {
+      "id": "pt-holdout-v5-273",
+      "field": "caption",
+      "text": "Empurrei a pontinha com cuidado até o canto ganhar forma."
+    },
+    {
+      "id": "pt-holdout-v5-274",
+      "field": "altText",
+      "text": "Uma ferramenta de ponta arredondada pressiona o interior de um canto costurado."
+    },
+    {
+      "id": "pt-holdout-v5-275",
+      "field": "caption",
+      "text": "Minha amiga marcou a barra enquanto eu usava o sapato da festa."
+    },
+    {
+      "id": "pt-holdout-v5-276",
+      "field": "altText",
+      "text": "Uma régua vertical indica a distância entre a barra do vestido e o chão."
+    },
+    {
+      "id": "pt-holdout-v5-277",
+      "field": "caption",
+      "text": "O cordão saiu pela abertura e consegui substituir o elástico gasto."
+    },
+    {
+      "id": "pt-holdout-v5-278",
+      "field": "altText",
+      "text": "Uma pequena abertura no cós revela a extremidade do elástico interno."
+    },
+    {
+      "id": "pt-holdout-v5-279",
+      "field": "caption",
+      "text": "A segunda costura escondeu toda a borda crua dentro da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-280",
+      "field": "altText",
+      "text": "Uma dobra estreita fechada percorre a costura lateral interna do tote."
+    },
+    {
+      "id": "pt-holdout-v5-281",
+      "field": "caption",
+      "text": "O marcador guarda o começo da volta quando preciso parar."
+    },
+    {
+      "id": "pt-holdout-v5-282",
+      "field": "altText",
+      "text": "Um marcador removível está preso a uma laçada na borda do crochê."
+    },
+    {
+      "id": "pt-holdout-v5-283",
+      "field": "caption",
+      "text": "O desenho suave vai sumir depois de orientar meus pontos do bordado."
+    },
+    {
+      "id": "pt-holdout-v5-284",
+      "field": "altText",
+      "text": "Linhas de guia claras aparecem sob alguns pontos de bordado já concluídos."
+    },
+    {
+      "id": "pt-holdout-v5-285",
+      "field": "caption",
+      "text": "Olhei as linhas contra a janela antes de escolher o tom da costura."
+    },
+    {
+      "id": "pt-holdout-v5-286",
+      "field": "altText",
+      "text": "Carretéis de tons próximos estão alinhados diante de uma janela iluminada."
+    },
+    {
+      "id": "pt-holdout-v5-287",
+      "field": "caption",
+      "text": "A borda serrilhada segura os fios soltos desta pequena amostra."
+    },
+    {
+      "id": "pt-holdout-v5-288",
+      "field": "altText",
+      "text": "O tecido recortado apresenta uma sequência regular de pequenos dentes."
+    },
+    {
+      "id": "pt-holdout-v5-289",
+      "field": "caption",
+      "text": "A dobra do cartão mantém a mesma profundidade em todas as pregas."
+    },
+    {
+      "id": "pt-holdout-v5-290",
+      "field": "altText",
+      "text": "Uma tira de cartão dobrada está posicionada entre duas pregas do tecido."
+    },
+    {
+      "id": "pt-holdout-v5-291",
+      "field": "caption",
+      "text": "Uni as tiras na diagonal para distribuir melhor a emenda do viés."
+    },
+    {
+      "id": "pt-holdout-v5-292",
+      "field": "altText",
+      "text": "Duas tiras estreitas se encontram numa costura diagonal antes de serem dobradas."
+    },
+    {
+      "id": "pt-holdout-v5-293",
+      "field": "caption",
+      "text": "A agulha dupla deixou duas linhas bem certinhas na barra da camiseta."
+    },
+    {
+      "id": "pt-holdout-v5-294",
+      "field": "altText",
+      "text": "Duas costuras paralelas percorrem a face externa da bainha de malha."
+    },
+    {
+      "id": "pt-holdout-v5-295",
+      "field": "caption",
+      "text": "Uma correntinha de linha mantém o forro perto da costura sem prendê-lo demais."
+    },
+    {
+      "id": "pt-holdout-v5-296",
+      "field": "altText",
+      "text": "Uma ligação flexível de linha une o forro à margem interna do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-297",
+      "field": "caption",
+      "text": "O guia firme ao lado da agulha me ajudou a manter a distância."
+    },
+    {
+      "id": "pt-holdout-v5-298",
+      "field": "altText",
+      "text": "Um guia metálico está fixado na chapa da máquina junto à costura reta."
+    },
+    {
+      "id": "pt-holdout-v5-299",
+      "field": "caption",
+      "text": "Deixei um bilhete no cabide para lembrar a alteração que falta."
+    },
+    {
+      "id": "pt-holdout-v5-300",
+      "field": "altText",
+      "text": "Um bilhete manuscrito pende do cabide junto a uma jaqueta em ajuste."
+    },
+    {
+      "id": "pt-holdout-v5-301",
+      "field": "caption",
+      "text": "A nova divisória separa os lenços sem amassar as peças de baixo."
+    },
+    {
+      "id": "pt-holdout-v5-302",
+      "field": "altText",
+      "text": "Uma prateleira estreita divide duas pilhas pequenas de lenços dobrados."
+    },
+    {
+      "id": "pt-holdout-v5-303",
+      "field": "caption",
+      "text": "As formas de descanso mantêm o desenho dos sapatos entre um uso e outro."
+    },
+    {
+      "id": "pt-holdout-v5-304",
+      "field": "altText",
+      "text": "Formas articuladas de madeira ocupam o interior dos dois sapatos."
+    },
+    {
+      "id": "pt-holdout-v5-305",
+      "field": "caption",
+      "text": "Escovei o casaco no mesmo sentido e a superfície ficou uniforme."
+    },
+    {
+      "id": "pt-holdout-v5-306",
+      "field": "altText",
+      "text": "Uma escova de roupa repousa junto a uma área de tecido alinhada."
+    },
+    {
+      "id": "pt-holdout-v5-307",
+      "field": "caption",
+      "text": "Minha bandejinha recebe os anéis assim que chego da rua."
+    },
+    {
+      "id": "pt-holdout-v5-308",
+      "field": "altText",
+      "text": "Três anéis estão apoiados numa pequena bandeja ao lado da entrada."
+    },
+    {
+      "id": "pt-holdout-v5-309",
+      "field": "caption",
+      "text": "Troquei o papel úmido dos sapatos para deixar a secagem continuar devagar."
+    },
+    {
+      "id": "pt-holdout-v5-310",
+      "field": "altText",
+      "text": "Folhas de papel limpo preenchem sapatos abertos sobre uma grade."
+    },
+    {
+      "id": "pt-holdout-v5-311",
+      "field": "caption",
+      "text": "Enrolei a blusa com uma toalhinha para ela chegar com menos marcas."
+    },
+    {
+      "id": "pt-holdout-v5-312",
+      "field": "altText",
+      "text": "Uma blusa parcialmente enrolada envolve uma toalha fina dentro da mala."
+    },
+    {
+      "id": "pt-holdout-v5-313",
+      "field": "caption",
+      "text": "O papel macio sustenta minha bolsa quando ela espera na prateleira."
+    },
+    {
+      "id": "pt-holdout-v5-314",
+      "field": "altText",
+      "text": "Papel leve preenche uma bolsa vazia sem alterar suas laterais."
+    },
+    {
+      "id": "pt-holdout-v5-315",
+      "field": "caption",
+      "text": "Cada corrente fica numa canaleta para não virar um novelo na gaveta."
+    },
+    {
+      "id": "pt-holdout-v5-316",
+      "field": "altText",
+      "text": "Correntes de colares repousam em canaletas paralelas de uma caixa organizadora."
+    },
+    {
+      "id": "pt-holdout-v5-317",
+      "field": "caption",
+      "text": "O clipe mantém o par junto durante o caminho até a lavanderia."
+    },
+    {
+      "id": "pt-holdout-v5-318",
+      "field": "altText",
+      "text": "Um pequeno clipe une duas meias pelas bordas dos punhos."
+    },
+    {
+      "id": "pt-holdout-v5-319",
+      "field": "caption",
+      "text": "Escolhi uma capa leve para guardar o vestido com espaço ao redor."
+    },
+    {
+      "id": "pt-holdout-v5-320",
+      "field": "altText",
+      "text": "Um vestido longo está suspenso dentro de uma capa de tecido poroso."
+    },
+    {
+      "id": "pt-holdout-v5-321",
+      "field": "caption",
+      "text": "A foto da aba original ajuda quando preciso recuperar a forma do chapéu."
+    },
+    {
+      "id": "pt-holdout-v5-322",
+      "field": "altText",
+      "text": "Uma fotografia do chapéu está presa à parte interna da tampa da caixa."
+    },
+    {
+      "id": "pt-holdout-v5-323",
+      "field": "caption",
+      "text": "O desenho no lado da caixa me permite achar a bota sem abri-la."
+    },
+    {
+      "id": "pt-holdout-v5-324",
+      "field": "altText",
+      "text": "Uma silhueta de bota identifica a lateral de uma caixa empilhada."
+    },
+    {
+      "id": "pt-holdout-v5-325",
+      "field": "caption",
+      "text": "As luvas úmidas secam abertas sobre uma telinha que improvisei."
+    },
+    {
+      "id": "pt-holdout-v5-326",
+      "field": "altText",
+      "text": "Um par de luvas está estendido numa tela elevada e arejada."
+    },
+    {
+      "id": "pt-holdout-v5-327",
+      "field": "caption",
+      "text": "Guardei a fivela numa bolsinha antes de enrolar o cinto."
+    },
+    {
+      "id": "pt-holdout-v5-328",
+      "field": "altText",
+      "text": "Uma capa macia envolve a fivela no centro de um cinto enrolado."
+    },
+    {
+      "id": "pt-holdout-v5-329",
+      "field": "caption",
+      "text": "O rolinho evita aquela dobra funda no meio do lenço delicado."
+    },
+    {
+      "id": "pt-holdout-v5-330",
+      "field": "altText",
+      "text": "Um lenço fino está enrolado ao redor de um tubo coberto de papel."
+    },
+    {
+      "id": "pt-holdout-v5-331",
+      "field": "caption",
+      "text": "Anotei o nome da artesã no cartão que guarda estes brincos."
+    },
+    {
+      "id": "pt-holdout-v5-332",
+      "field": "altText",
+      "text": "Um par de brincos está preso a um cartão com uma assinatura manuscrita."
+    },
+    {
+      "id": "pt-holdout-v5-333",
+      "field": "caption",
+      "text": "Fotografei a costura antes de abrir para lembrar como ela estava montada."
+    },
+    {
+      "id": "pt-holdout-v5-334",
+      "field": "altText",
+      "text": "Uma câmera mostra a imagem aproximada da costura ainda fechada da jaqueta."
+    },
+    {
+      "id": "pt-holdout-v5-335",
+      "field": "caption",
+      "text": "Deixei o cachecol secar estendido para o comprimento continuar igual."
+    },
+    {
+      "id": "pt-holdout-v5-336",
+      "field": "altText",
+      "text": "Um cachecol de malha repousa plano sobre uma toalha seca."
+    },
+    {
+      "id": "pt-holdout-v5-337",
+      "field": "caption",
+      "text": "As camisetas em pé na gaveta ficaram mais fáceis de escolher."
+    },
+    {
+      "id": "pt-holdout-v5-338",
+      "field": "altText",
+      "text": "Camisetas dobradas estão organizadas verticalmente numa gaveta aberta."
+    },
+    {
+      "id": "pt-holdout-v5-339",
+      "field": "caption",
+      "text": "Prendi minha manta pelo cordão de fora para liberar espaço dentro da mochila."
+    },
+    {
+      "id": "pt-holdout-v5-340",
+      "field": "altText",
+      "text": "Um cordão cruzado segura uma manta enrolada sobre a face externa da mochila."
+    },
+    {
+      "id": "pt-holdout-v5-341",
+      "field": "caption",
+      "text": "Ajustei a tira traseira até o colete acompanhar melhor minha cintura."
+    },
+    {
+      "id": "pt-holdout-v5-342",
+      "field": "altText",
+      "text": "Uma tira com regulador atravessa horizontalmente as costas do colete."
+    },
+    {
+      "id": "pt-holdout-v5-343",
+      "field": "caption",
+      "text": "Experimentei os sapatos outra vez no fim do dia antes de decidir."
+    },
+    {
+      "id": "pt-holdout-v5-344",
+      "field": "altText",
+      "text": "A pessoa verifica o espaço entre o calcanhar e a parte traseira do sapato."
+    },
+    {
+      "id": "pt-holdout-v5-345",
+      "field": "caption",
+      "text": "Um abraço na prova mostrou que a manga precisava de mais movimento."
+    },
+    {
+      "id": "pt-holdout-v5-346",
+      "field": "altText",
+      "text": "Os braços se cruzam à frente durante a prova de uma camisa alinhavada."
+    },
+    {
+      "id": "pt-holdout-v5-347",
+      "field": "caption",
+      "text": "Subi alguns degraus para conferir a liberdade que a fenda oferece."
+    },
+    {
+      "id": "pt-holdout-v5-348",
+      "field": "altText",
+      "text": "Uma perna sobe o degrau enquanto a fenda da saia se abre."
+    },
+    {
+      "id": "pt-holdout-v5-349",
+      "field": "caption",
+      "text": "Os botões laterais mantêm a capa longe do guidão enquanto pedalo."
+    },
+    {
+      "id": "pt-holdout-v5-350",
+      "field": "altText",
+      "text": "A capa presa nas laterais deixa livres as mãos apoiadas no guidão."
+    },
+    {
+      "id": "pt-holdout-v5-351",
+      "field": "caption",
+      "text": "Inclinei a boina até encontrar o ângulo que combinava com meu corte."
+    },
+    {
+      "id": "pt-holdout-v5-352",
+      "field": "altText",
+      "text": "A boina está inclinada para um lado sobre o cabelo curto."
+    },
+    {
+      "id": "pt-holdout-v5-353",
+      "field": "caption",
+      "text": "Um pingente de papel ajudou a testar a altura antes de montar o colar."
+    },
+    {
+      "id": "pt-holdout-v5-354",
+      "field": "altText",
+      "text": "Um recorte de papel está preso temporariamente à corrente junto ao peito."
+    },
+    {
+      "id": "pt-holdout-v5-355",
+      "field": "caption",
+      "text": "Usei a pulseira por uma hora para conferir seu peso no pulso."
+    },
+    {
+      "id": "pt-holdout-v5-356",
+      "field": "altText",
+      "text": "Uma pulseira larga repousa sobre o pulso relaxado da pessoa."
+    },
+    {
+      "id": "pt-holdout-v5-357",
+      "field": "caption",
+      "text": "Sentei no banco baixo para conferir se o cós continuava confortável."
+    },
+    {
+      "id": "pt-holdout-v5-358",
+      "field": "altText",
+      "text": "A pessoa está sentada num banco com o cós da calça alinhado."
+    },
+    {
+      "id": "pt-holdout-v5-359",
+      "field": "caption",
+      "text": "Uns passos de dança mostraram como o vestido reage aos movimentos rápidos."
+    },
+    {
+      "id": "pt-holdout-v5-360",
+      "field": "altText",
+      "text": "O tecido do vestido se abre para um lado durante um passo de dança."
+    },
+    {
+      "id": "pt-holdout-v5-361",
+      "field": "caption",
+      "text": "O ajuste na haste tirou aquela pressão atrás da minha orelha."
+    },
+    {
+      "id": "pt-holdout-v5-362",
+      "field": "altText",
+      "text": "A ponta curva da haste acompanha suavemente a região atrás da orelha."
+    },
+    {
+      "id": "pt-holdout-v5-363",
+      "field": "caption",
+      "text": "A palmilha sai inteira quando quero arejar o sapato depois do passeio."
+    },
+    {
+      "id": "pt-holdout-v5-364",
+      "field": "altText",
+      "text": "Uma palmilha está fora do sapato, apoiada ao lado da abertura."
+    },
+    {
+      "id": "pt-holdout-v5-365",
+      "field": "caption",
+      "text": "O teste em papel mostrou qual altura de gola me deixava à vontade."
+    },
+    {
+      "id": "pt-holdout-v5-366",
+      "field": "altText",
+      "text": "Duas faixas de papel com alturas diferentes simulam colarinhos sobre a mesa."
+    },
+    {
+      "id": "pt-holdout-v5-367",
+      "field": "caption",
+      "text": "Um livro dentro da bolsa ajuda a experimentar as alças com peso de verdade."
+    },
+    {
+      "id": "pt-holdout-v5-368",
+      "field": "altText",
+      "text": "Um livro grosso ocupa a bolsa durante uma prova de alça no ombro."
+    },
+    {
+      "id": "pt-holdout-v5-369",
+      "field": "caption",
+      "text": "Encurtar só a ponta resolveu o dedo que sempre sobrava na luva."
+    },
+    {
+      "id": "pt-holdout-v5-370",
+      "field": "altText",
+      "text": "Uma costura recém-feita encurta a ponta de um dedo da luva."
+    },
+    {
+      "id": "pt-holdout-v5-371",
+      "field": "caption",
+      "text": "Escolhi brincos mais curtos para deixar um espaço livre acima da gola."
+    },
+    {
+      "id": "pt-holdout-v5-372",
+      "field": "altText",
+      "text": "Um brinco pequeno termina acima da gola alta do casaco."
+    },
+    {
+      "id": "pt-holdout-v5-373",
+      "field": "caption",
+      "text": "Passei pela porta devagar para testar a altura desta copa exagerada."
+    },
+    {
+      "id": "pt-holdout-v5-374",
+      "field": "altText",
+      "text": "Uma copa alta fica próxima ao batente enquanto a pessoa atravessa a porta."
+    },
+    {
+      "id": "pt-holdout-v5-375",
+      "field": "caption",
+      "text": "Deixei um furo de folga para o cinto acompanhar meu dia sentado."
+    },
+    {
+      "id": "pt-holdout-v5-376",
+      "field": "altText",
+      "text": "O cinto fechado deixa uma pequena folga na cintura da pessoa sentada."
+    },
+    {
+      "id": "pt-holdout-v5-377",
+      "field": "caption",
+      "text": "Encurtei um pouco o forro para ele parar de aparecer ao caminhar."
+    },
+    {
+      "id": "pt-holdout-v5-378",
+      "field": "altText",
+      "text": "A borda do forro termina acima da barra externa da saia em movimento."
+    },
+    {
+      "id": "pt-holdout-v5-379",
+      "field": "caption",
+      "text": "A faixa no peito manteve as alças da mochila na distância certa."
+    },
+    {
+      "id": "pt-holdout-v5-380",
+      "field": "altText",
+      "text": "Uma faixa horizontal conecta as duas alças da mochila sobre o peito."
+    },
+    {
+      "id": "pt-holdout-v5-381",
+      "field": "caption",
+      "text": "O aro fininho separa os dois anéis para que suas pedras não se encostem."
+    },
+    {
+      "id": "pt-holdout-v5-382",
+      "field": "altText",
+      "text": "Um aro simples ocupa o espaço entre dois anéis com pedras salientes."
+    },
+    {
+      "id": "pt-holdout-v5-383",
+      "field": "caption",
+      "text": "Segurei a camisa contra a janela para conferir a transparência do tecido."
+    },
+    {
+      "id": "pt-holdout-v5-384",
+      "field": "altText",
+      "text": "A luz da janela atravessa a trama da camisa suspensa."
+    },
+    {
+      "id": "pt-holdout-v5-385",
+      "field": "caption",
+      "text": "Levei as meias mais grossas para a última prova das botas."
+    },
+    {
+      "id": "pt-holdout-v5-386",
+      "field": "altText",
+      "text": "Uma meia espessa aparece entre a perna e a abertura da bota."
+    },
+    {
+      "id": "pt-holdout-v5-387",
+      "field": "caption",
+      "text": "O pequeno losango sob o braço fez uma diferença enorme na prova."
+    },
+    {
+      "id": "pt-holdout-v5-388",
+      "field": "altText",
+      "text": "Um recorte em losango une as costuras sob o braço do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-389",
+      "field": "caption",
+      "text": "Desloquei o nó para deixar o bordado do centro totalmente visível."
+    },
+    {
+      "id": "pt-holdout-v5-390",
+      "field": "altText",
+      "text": "O nó do lenço repousa ao lado do pescoço, afastado do bordado central."
+    },
+    {
+      "id": "pt-holdout-v5-391",
+      "field": "caption",
+      "text": "O elevador desenhado na camiseta chega a um andar feito de nuvens."
+    },
+    {
+      "id": "pt-holdout-v5-392",
+      "field": "altText",
+      "text": "Um elevador ilustrado se abre para uma nuvem acima de prédios pequenos."
+    },
+    {
+      "id": "pt-holdout-v5-393",
+      "field": "caption",
+      "text": "Uma escadinha encostada na xícara deixou minha camiseta com jeito de conto."
+    },
+    {
+      "id": "pt-holdout-v5-394",
+      "field": "altText",
+      "text": "Uma escada em miniatura alcança a borda de uma xícara estampada."
+    },
+    {
+      "id": "pt-holdout-v5-395",
+      "field": "caption",
+      "text": "As flores do meu lenço atravessam o rio por uma ponte de folhas."
+    },
+    {
+      "id": "pt-holdout-v5-396",
+      "field": "altText",
+      "text": "Uma ponte formada por folhas liga duas margens floridas no desenho do lenço."
+    },
+    {
+      "id": "pt-holdout-v5-397",
+      "field": "caption",
+      "text": "A casinha bordada na bolsa tem um carretel enorme como torre."
+    },
+    {
+      "id": "pt-holdout-v5-398",
+      "field": "altText",
+      "text": "Uma casa bordada possui um carretel de linha no lugar da torre."
+    },
+    {
+      "id": "pt-holdout-v5-399",
+      "field": "caption",
+      "text": "As rodas da bicicleta estampada são dois relógios apontando horas diferentes."
+    },
+    {
+      "id": "pt-holdout-v5-400",
+      "field": "altText",
+      "text": "Dois mostradores de relógio formam as rodas da bicicleta desenhada na blusa."
+    },
+    {
+      "id": "pt-holdout-v5-401",
+      "field": "caption",
+      "text": "Um jardim inteiro cresce na parte de dentro da sombrinha do meu broche."
+    },
+    {
+      "id": "pt-holdout-v5-402",
+      "field": "altText",
+      "text": "Flores pequenas preenchem a face interna de uma sombrinha representada no broche."
+    },
+    {
+      "id": "pt-holdout-v5-403",
+      "field": "caption",
+      "text": "Escolhi a camiseta por causa desse barco com uma lua no lugar da vela."
+    },
+    {
+      "id": "pt-holdout-v5-404",
+      "field": "altText",
+      "text": "Um barco ilustrado carrega uma lua crescente presa ao mastro."
+    },
+    {
+      "id": "pt-holdout-v5-405",
+      "field": "caption",
+      "text": "A porta pintada no lenço se abre diretamente para ondas do mar."
+    },
+    {
+      "id": "pt-holdout-v5-406",
+      "field": "altText",
+      "text": "Uma porta isolada emoldura ondas desenhadas no centro do lenço."
+    },
+    {
+      "id": "pt-holdout-v5-407",
+      "field": "caption",
+      "text": "O bule virou um castelo de muitas janelas neste tecido divertido."
+    },
+    {
+      "id": "pt-holdout-v5-408",
+      "field": "altText",
+      "text": "Um bule estampado apresenta torres e janelas pequenas em seu corpo."
+    },
+    {
+      "id": "pt-holdout-v5-409",
+      "field": "caption",
+      "text": "O trenzinho da bolsa leva folhas soltas em todos os vagões."
+    },
+    {
+      "id": "pt-holdout-v5-410",
+      "field": "altText",
+      "text": "Vagões ilustrados carregam pilhas de folhas sobre uma linha curva."
+    },
+    {
+      "id": "pt-holdout-v5-411",
+      "field": "caption",
+      "text": "As cordas do violino desenhado seguem como ruas pela minha camiseta."
+    },
+    {
+      "id": "pt-holdout-v5-412",
+      "field": "altText",
+      "text": "Linhas saem de um violino ilustrado e se ramificam entre pequenos prédios."
+    },
+    {
+      "id": "pt-holdout-v5-413",
+      "field": "caption",
+      "text": "Uma chaleira com janelinhas espaciais ganhou lugar na frente do meu moletom."
+    },
+    {
+      "id": "pt-holdout-v5-414",
+      "field": "altText",
+      "text": "Uma chaleira ilustrada possui aletas e um rastro estrelado sob a base."
+    },
+    {
+      "id": "pt-holdout-v5-415",
+      "field": "caption",
+      "text": "O bordado transforma o bolso numa janela com cortinas abertas."
+    },
+    {
+      "id": "pt-holdout-v5-416",
+      "field": "altText",
+      "text": "Cortinas bordadas contornam a abertura retangular do bolso da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-417",
+      "field": "caption",
+      "text": "A árvore do meu lenço tem pequenas chaves penduradas entre os galhos."
+    },
+    {
+      "id": "pt-holdout-v5-418",
+      "field": "altText",
+      "text": "Chaves de formatos variados aparecem entre os ramos de uma árvore estampada."
+    },
+    {
+      "id": "pt-holdout-v5-419",
+      "field": "caption",
+      "text": "O telefone ilustrado usa duas conchas como fones, um detalhe que adorei."
+    },
+    {
+      "id": "pt-holdout-v5-420",
+      "field": "altText",
+      "text": "Um aparelho telefônico desenhado possui conchas nas duas extremidades do fone."
+    },
+    {
+      "id": "pt-holdout-v5-421",
+      "field": "caption",
+      "text": "O relógio bordado na camiseta marca a hora com duas fatias de pão."
+    },
+    {
+      "id": "pt-holdout-v5-422",
+      "field": "altText",
+      "text": "Duas fatias alongadas de pão representam os ponteiros de um relógio bordado."
+    },
+    {
+      "id": "pt-holdout-v5-423",
+      "field": "caption",
+      "text": "As teclas deste piano parecem descer como uma cascata na estampa."
+    },
+    {
+      "id": "pt-holdout-v5-424",
+      "field": "altText",
+      "text": "Teclas ilustradas se alongam em linhas descendentes sob um piano pequeno."
+    },
+    {
+      "id": "pt-holdout-v5-425",
+      "field": "caption",
+      "text": "Cada lâmpada do tecido guarda uma flor no lugar do filamento."
+    },
+    {
+      "id": "pt-holdout-v5-426",
+      "field": "altText",
+      "text": "Flores delicadas ocupam o interior de lâmpadas desenhadas sobre a saia."
+    },
+    {
+      "id": "pt-holdout-v5-427",
+      "field": "caption",
+      "text": "A escada do meu lenço termina numa pequena varanda suspensa no ar."
+    },
+    {
+      "id": "pt-holdout-v5-428",
+      "field": "altText",
+      "text": "Uma escada helicoidal ilustrada chega a uma varanda sem prédio ao redor."
+    },
+    {
+      "id": "pt-holdout-v5-429",
+      "field": "caption",
+      "text": "As páginas abertas do livro se transformam num bosque no meu tote."
+    },
+    {
+      "id": "pt-holdout-v5-430",
+      "field": "altText",
+      "text": "Árvores desenhadas surgem das páginas de um livro aberto na bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-431",
+      "field": "caption",
+      "text": "As ondas seguem linhas de partitura neste tecido que escolhi para o vestido."
+    },
+    {
+      "id": "pt-holdout-v5-432",
+      "field": "altText",
+      "text": "Linhas musicais onduladas atravessam a estampa com pequenas notas entre elas."
+    },
+    {
+      "id": "pt-holdout-v5-433",
+      "field": "caption",
+      "text": "Os envelopes da minha camisa carregam estrelas que escapam pelas abas."
+    },
+    {
+      "id": "pt-holdout-v5-434",
+      "field": "altText",
+      "text": "Pequenas estrelas saem de envelopes abertos desenhados na camisa."
+    },
+    {
+      "id": "pt-holdout-v5-435",
+      "field": "caption",
+      "text": "A máquina de escrever do meu broche espalha folhinhas pela folha de papel."
+    },
+    {
+      "id": "pt-holdout-v5-436",
+      "field": "altText",
+      "text": "Uma máquina de escrever ilustrada possui um papel coberto por pequenos ramos."
+    },
+    {
+      "id": "pt-holdout-v5-437",
+      "field": "caption",
+      "text": "A torre do farol parece construída com engrenagens neste desenho do lenço."
+    },
+    {
+      "id": "pt-holdout-v5-438",
+      "field": "altText",
+      "text": "Engrenagens sobrepostas formam a estrutura de um farol estampado no lenço."
+    },
+    {
+      "id": "pt-holdout-v5-439",
+      "field": "caption",
+      "text": "Casas com balões presos ao telhado flutuam pelo meu vestido."
+    },
+    {
+      "id": "pt-holdout-v5-440",
+      "field": "altText",
+      "text": "Casas ilustradas ficam suspensas por conjuntos de balões acima de uma paisagem."
+    },
+    {
+      "id": "pt-holdout-v5-441",
+      "field": "caption",
+      "text": "A tesoura da camiseta ganhou asas desenhadas e um caminho pontilhado."
+    },
+    {
+      "id": "pt-holdout-v5-442",
+      "field": "altText",
+      "text": "Uma tesoura com asas ilustradas aparece sobre uma trajetória de pontos."
+    },
+    {
+      "id": "pt-holdout-v5-443",
+      "field": "caption",
+      "text": "Um peixinho passeia no copo desenhado junto à barra da blusa."
+    },
+    {
+      "id": "pt-holdout-v5-444",
+      "field": "altText",
+      "text": "Um peixe ilustrado nada dentro de um copo estampado na blusa."
+    },
+    {
+      "id": "pt-holdout-v5-445",
+      "field": "caption",
+      "text": "A fita métrica se desenrola como uma estrada pela estampa da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-446",
+      "field": "altText",
+      "text": "Uma fita numerada forma curvas de estrada entre pequenas árvores desenhadas."
+    },
+    {
+      "id": "pt-holdout-v5-447",
+      "field": "caption",
+      "text": "O guarda-sol da camiseta está cercado de flocos, uma cena bem improvável."
+    },
+    {
+      "id": "pt-holdout-v5-448",
+      "field": "altText",
+      "text": "Flocos ilustrados caem ao redor de um guarda-sol aberto sobre uma cadeira."
+    },
+    {
+      "id": "pt-holdout-v5-449",
+      "field": "caption",
+      "text": "Uma estrela descansa na cadeira desenhada no bolso do meu casaco."
+    },
+    {
+      "id": "pt-holdout-v5-450",
+      "field": "altText",
+      "text": "Uma estrela de cinco pontas ocupa o assento de uma cadeira bordada."
+    },
+    {
+      "id": "pt-holdout-v5-451",
+      "field": "caption",
+      "text": "As pedrinhas desenhadas parecem girar em órbitas ao redor do fecho."
+    },
+    {
+      "id": "pt-holdout-v5-452",
+      "field": "altText",
+      "text": "Pequenas formas de pedras seguem elipses concêntricas no tecido da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-453",
+      "field": "caption",
+      "text": "O pincel deixa um arco multicolorido no desenho da minha ecobag."
+    },
+    {
+      "id": "pt-holdout-v5-454",
+      "field": "altText",
+      "text": "Um pincel ilustrado está na extremidade de uma faixa curva colorida."
+    },
+    {
+      "id": "pt-holdout-v5-455",
+      "field": "caption",
+      "text": "Gotas enormes se apoiam sobre a ponte no desenho do meu lenço."
+    },
+    {
+      "id": "pt-holdout-v5-456",
+      "field": "altText",
+      "text": "Gotas desenhadas repousam como arcos sobre uma pequena ponte estampada."
+    },
+    {
+      "id": "pt-holdout-v5-457",
+      "field": "caption",
+      "text": "Os telhados parecem feitos dos mesmos retalhos que guardei na caixa."
+    },
+    {
+      "id": "pt-holdout-v5-458",
+      "field": "altText",
+      "text": "Telhados de casas ilustradas apresentam padrões diferentes de pequenos retalhos."
+    },
+    {
+      "id": "pt-holdout-v5-459",
+      "field": "caption",
+      "text": "O vapor da chaleira desenhada termina numa cauda de cometa."
+    },
+    {
+      "id": "pt-holdout-v5-460",
+      "field": "altText",
+      "text": "Uma trilha estrelada sai do bico de uma chaleira estampada."
+    },
+    {
+      "id": "pt-holdout-v5-461",
+      "field": "caption",
+      "text": "As janelas do vestido mostram nuvens com formatos que eu inventava quando criança."
+    },
+    {
+      "id": "pt-holdout-v5-462",
+      "field": "altText",
+      "text": "Nuvens de contornos variados aparecem dentro de pequenas janelas impressas."
+    },
+    {
+      "id": "pt-holdout-v5-463",
+      "field": "caption",
+      "text": "A malinha aberta do meu patch guarda uma horta organizada em fileiras."
+    },
+    {
+      "id": "pt-holdout-v5-464",
+      "field": "altText",
+      "text": "Fileiras de vegetais ilustrados preenchem o interior de uma mala aberta."
+    },
+    {
+      "id": "pt-holdout-v5-465",
+      "field": "caption",
+      "text": "Uma borboleta ocupa o lugar do badalo no sino bordado da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-466",
+      "field": "altText",
+      "text": "Um sino bordado apresenta uma pequena borboleta suspensa em sua abertura."
+    },
+    {
+      "id": "pt-holdout-v5-467",
+      "field": "caption",
+      "text": "A roda-gigante da camiseta tem botões diferentes em todas as cabines."
+    },
+    {
+      "id": "pt-holdout-v5-468",
+      "field": "altText",
+      "text": "Botões circulares formam as cabines de uma roda-gigante desenhada."
+    },
+    {
+      "id": "pt-holdout-v5-469",
+      "field": "caption",
+      "text": "A folha enrolada parece um escorregador na pequena cena da minha camisa."
+    },
+    {
+      "id": "pt-holdout-v5-470",
+      "field": "altText",
+      "text": "Uma folha comprida ilustrada se curva como uma rampa com escadinha lateral."
+    },
+    {
+      "id": "pt-holdout-v5-471",
+      "field": "caption",
+      "text": "As mariposas do lenço rodeiam um castiçal sem vela."
+    },
+    {
+      "id": "pt-holdout-v5-472",
+      "field": "altText",
+      "text": "Mariposas desenhadas formam um círculo ao redor de um castiçal vazio."
+    },
+    {
+      "id": "pt-holdout-v5-473",
+      "field": "caption",
+      "text": "Minha estampa favorita tem uma bússola cujas setas viraram pequenos ramos."
+    },
+    {
+      "id": "pt-holdout-v5-474",
+      "field": "altText",
+      "text": "Ramos folhados substituem as setas no desenho circular de uma bússola."
+    },
+    {
+      "id": "pt-holdout-v5-475",
+      "field": "caption",
+      "text": "Os remos da canoa são lápis de cor no desenho da minha camiseta."
+    },
+    {
+      "id": "pt-holdout-v5-476",
+      "field": "altText",
+      "text": "Dois lápis coloridos se projetam como remos das laterais de uma canoa."
+    },
+    {
+      "id": "pt-holdout-v5-477",
+      "field": "caption",
+      "text": "Os cabides desenhados formam uma escada que atravessa a lateral da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-478",
+      "field": "altText",
+      "text": "Cabides sobrepostos compõem os degraus de uma escada ilustrada na bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-479",
+      "field": "caption",
+      "text": "O vaso com formato de acordeão deixou o bordado cheio de linhas divertidas."
+    },
+    {
+      "id": "pt-holdout-v5-480",
+      "field": "altText",
+      "text": "Um vaso bordado possui laterais sanfonadas e pequenas flores no topo."
+    },
+    {
+      "id": "pt-holdout-v5-481",
+      "field": "caption",
+      "text": "A ponte do meu lenço repousa sobre luas crescentes em vez de pilares."
+    },
+    {
+      "id": "pt-holdout-v5-482",
+      "field": "altText",
+      "text": "Luas crescentes sustentam o arco de uma ponte desenhada sobre ondas."
+    },
+    {
+      "id": "pt-holdout-v5-483",
+      "field": "caption",
+      "text": "Os passarinhos saem de uma gaveta aberta no desenho da minha blusa."
+    },
+    {
+      "id": "pt-holdout-v5-484",
+      "field": "altText",
+      "text": "Três pássaros ilustrados levantam voo a partir de uma gaveta aberta."
+    },
+    {
+      "id": "pt-holdout-v5-485",
+      "field": "caption",
+      "text": "Uma vila inteira ocupa o sapato gigante que aparece na minha camiseta."
+    },
+    {
+      "id": "pt-holdout-v5-486",
+      "field": "altText",
+      "text": "Pequenas casas e ruas preenchem o contorno de um sapato ilustrado."
+    },
+    {
+      "id": "pt-holdout-v5-487",
+      "field": "caption",
+      "text": "Os guarda-chuvas empilhados parecem uma torre na barra do meu vestido."
+    },
+    {
+      "id": "pt-holdout-v5-488",
+      "field": "altText",
+      "text": "Guarda-chuvas abertos se sobrepõem verticalmente numa composição alta e estreita."
+    },
+    {
+      "id": "pt-holdout-v5-489",
+      "field": "caption",
+      "text": "O moinho bordado gira sobre uma base desenhada como carretel de linha."
+    },
+    {
+      "id": "pt-holdout-v5-490",
+      "field": "altText",
+      "text": "Quatro pás bordadas saem de uma torre com formato de carretel."
+    },
+    {
+      "id": "pt-holdout-v5-491",
+      "field": "caption",
+      "text": "Os círculos em relevo tornam este tecido interessante até sem estampa."
+    },
+    {
+      "id": "pt-holdout-v5-492",
+      "field": "altText",
+      "text": "Círculos concêntricos elevados cobrem a superfície da jaqueta lisa."
+    },
+    {
+      "id": "pt-holdout-v5-493",
+      "field": "caption",
+      "text": "Gosto dos pequenos intervalos que quebram a regularidade das listras tecidas."
+    },
+    {
+      "id": "pt-holdout-v5-494",
+      "field": "altText",
+      "text": "Listras estreitas apresentam interrupções regulares na trama do tecido."
+    },
+    {
+      "id": "pt-holdout-v5-495",
+      "field": "caption",
+      "text": "As pregas parecem sair de um mesmo ponto perto do quadril."
+    },
+    {
+      "id": "pt-holdout-v5-496",
+      "field": "altText",
+      "text": "Pregas diagonais irradiam de uma junção lateral no vestido."
+    },
+    {
+      "id": "pt-holdout-v5-497",
+      "field": "caption",
+      "text": "A borda muda de tom aos poucos porque alternei os fios da trama."
+    },
+    {
+      "id": "pt-holdout-v5-498",
+      "field": "altText",
+      "text": "Fios de tonalidades próximas criam uma transição gradual na borda tecida."
+    },
+    {
+      "id": "pt-holdout-v5-499",
+      "field": "caption",
+      "text": "As duas faces servem como lado de fora, e ainda não escolhi a minha."
+    },
+    {
+      "id": "pt-holdout-v5-500",
+      "field": "altText",
+      "text": "Uma dobra revela as duas superfícies acabadas de um tecido reversível."
+    },
+    {
+      "id": "pt-holdout-v5-501",
+      "field": "caption",
+      "text": "Os quadrados inclinados fazem minha bolsa parecer dobrada de outro jeito."
+    },
+    {
+      "id": "pt-holdout-v5-502",
+      "field": "altText",
+      "text": "Quadrados em relevo formam fileiras diagonais na superfície da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-503",
+      "field": "caption",
+      "text": "As aberturas irregulares deixam a blusa leve e cheia de pequenas sombras."
+    },
+    {
+      "id": "pt-holdout-v5-504",
+      "field": "altText",
+      "text": "A trama da blusa apresenta intervalos de tamanhos diferentes entre os fios."
+    },
+    {
+      "id": "pt-holdout-v5-505",
+      "field": "caption",
+      "text": "O desenho aparece nos espaços vazios entre as manchas do tecido."
+    },
+    {
+      "id": "pt-holdout-v5-506",
+      "field": "altText",
+      "text": "Áreas sem tinta formam o contorno de folhas entre manchas impressas."
+    },
+    {
+      "id": "pt-holdout-v5-507",
+      "field": "caption",
+      "text": "Parei cada traço um pouquinho antes do próximo para manter o bordado arejado."
+    },
+    {
+      "id": "pt-holdout-v5-508",
+      "field": "altText",
+      "text": "Pequenos trechos bordados separados formam uma linha curva na manga."
+    },
+    {
+      "id": "pt-holdout-v5-509",
+      "field": "caption",
+      "text": "O plissado começa miúdo e ganha espaço perto da barra."
+    },
+    {
+      "id": "pt-holdout-v5-510",
+      "field": "altText",
+      "text": "Pregas estreitas no alto se abrem gradualmente até a borda da saia."
+    },
+    {
+      "id": "pt-holdout-v5-511",
+      "field": "caption",
+      "text": "Virar a peça muda completamente a leitura deste desenho de tricô."
+    },
+    {
+      "id": "pt-holdout-v5-512",
+      "field": "altText",
+      "text": "O relevo da malha alterna áreas claras e sombreadas conforme sua orientação."
+    },
+    {
+      "id": "pt-holdout-v5-513",
+      "field": "caption",
+      "text": "Os pequenos pontos metálicos aparecem só quando a luz bate de lado."
+    },
+    {
+      "id": "pt-holdout-v5-514",
+      "field": "altText",
+      "text": "Pequenos fios brilhantes pontuam a superfície fosca do tecido."
+    },
+    {
+      "id": "pt-holdout-v5-515",
+      "field": "caption",
+      "text": "Passei a mão no veludo e as duas faixas ficaram com tons diferentes."
+    },
+    {
+      "id": "pt-holdout-v5-516",
+      "field": "altText",
+      "text": "Duas áreas vizinhas do veludo apresentam o pelo orientado em sentidos opostos."
+    },
+    {
+      "id": "pt-holdout-v5-517",
+      "field": "caption",
+      "text": "A barra recortada acompanha ondas que desenhei sem usar régua."
+    },
+    {
+      "id": "pt-holdout-v5-518",
+      "field": "altText",
+      "text": "A borda inferior da blusa apresenta ondulações suaves de alturas diferentes."
+    },
+    {
+      "id": "pt-holdout-v5-519",
+      "field": "caption",
+      "text": "O quadrado do centro ficou vazado para destacar a trama ao redor."
+    },
+    {
+      "id": "pt-holdout-v5-520",
+      "field": "altText",
+      "text": "Uma abertura quadrada interrompe o centro de um painel de crochê."
+    },
+    {
+      "id": "pt-holdout-v5-521",
+      "field": "caption",
+      "text": "Cada pontinho em nó ganhou um lugar diferente neste pequeno campo bordado."
+    },
+    {
+      "id": "pt-holdout-v5-522",
+      "field": "altText",
+      "text": "Pequenos nós bordados se espalham em grupos sobre o bolso."
+    },
+    {
+      "id": "pt-holdout-v5-523",
+      "field": "caption",
+      "text": "Deixei a borda do aplique livre para ela ganhar movimento com o uso."
+    },
+    {
+      "id": "pt-holdout-v5-524",
+      "field": "altText",
+      "text": "Um aplique preso apenas no centro apresenta bordas ligeiramente levantadas."
+    },
+    {
+      "id": "pt-holdout-v5-525",
+      "field": "caption",
+      "text": "Os respingos ficaram exatamente como caíram durante a pintura da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-526",
+      "field": "altText",
+      "text": "Pequenos respingos de tinta de tamanhos variados cobrem o tecido da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-527",
+      "field": "caption",
+      "text": "A linha contrastante mostra o caminho inteiro que a costura percorre."
+    },
+    {
+      "id": "pt-holdout-v5-528",
+      "field": "altText",
+      "text": "Pontos contrastantes acompanham as junções entre os painéis da jaqueta."
+    },
+    {
+      "id": "pt-holdout-v5-529",
+      "field": "caption",
+      "text": "Trancei tiras macias ao redor do aro até cobrir toda a base."
+    },
+    {
+      "id": "pt-holdout-v5-530",
+      "field": "altText",
+      "text": "Tiras de tecido entrelaçadas recobrem um aro de pulseira."
+    },
+    {
+      "id": "pt-holdout-v5-531",
+      "field": "caption",
+      "text": "O ponto cruzado virou o desenho da borda do meu chapéu."
+    },
+    {
+      "id": "pt-holdout-v5-532",
+      "field": "altText",
+      "text": "Pequenos pontos em cruz acompanham a circunferência da aba do chapéu."
+    },
+    {
+      "id": "pt-holdout-v5-533",
+      "field": "caption",
+      "text": "O acolchoado percorre um labirinto que eu mesma desenhei no papel."
+    },
+    {
+      "id": "pt-holdout-v5-534",
+      "field": "altText",
+      "text": "Linhas de costura acolchoada formam um percurso de labirinto na bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-535",
+      "field": "caption",
+      "text": "As tiras se cruzam no painel da saia como num cesto aberto."
+    },
+    {
+      "id": "pt-holdout-v5-536",
+      "field": "altText",
+      "text": "Tiras largas se entrelaçam perpendicularmente num painel da saia."
+    },
+    {
+      "id": "pt-holdout-v5-537",
+      "field": "caption",
+      "text": "O bordado contorna a abertura e faz dela uma pequena moldura."
+    },
+    {
+      "id": "pt-holdout-v5-538",
+      "field": "altText",
+      "text": "Uma borda bordada emoldura o recorte retangular da blusa."
+    },
+    {
+      "id": "pt-holdout-v5-539",
+      "field": "caption",
+      "text": "A pérola fora do centro muda o ritmo deste colar simples."
+    },
+    {
+      "id": "pt-holdout-v5-540",
+      "field": "altText",
+      "text": "Uma pérola única ocupa uma posição lateral na corrente fina."
+    },
+    {
+      "id": "pt-holdout-v5-541",
+      "field": "caption",
+      "text": "A textura do anel veio da casca de uma árvore do quintal."
+    },
+    {
+      "id": "pt-holdout-v5-542",
+      "field": "altText",
+      "text": "Sulcos irregulares semelhantes a casca de árvore cobrem a superfície do anel."
+    },
+    {
+      "id": "pt-holdout-v5-543",
+      "field": "caption",
+      "text": "A dobra faz a folha do brinco refletir a luz em duas direções."
+    },
+    {
+      "id": "pt-holdout-v5-544",
+      "field": "altText",
+      "text": "Uma peça metálica em forma de folha apresenta uma dobra longitudinal."
+    },
+    {
+      "id": "pt-holdout-v5-545",
+      "field": "caption",
+      "text": "Juntei os pequenos fragmentos numa presilha que não tem desenho repetido."
+    },
+    {
+      "id": "pt-holdout-v5-546",
+      "field": "altText",
+      "text": "Fragmentos irregulares compõem um mosaico sobre a base da presilha."
+    },
+    {
+      "id": "pt-holdout-v5-547",
+      "field": "caption",
+      "text": "O calçador se estende para alcançar a bota e depois cabe na minha bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-548",
+      "field": "altText",
+      "text": "Um calçador comprido possui segmentos telescópicos parcialmente recolhidos no cabo."
+    },
+    {
+      "id": "pt-holdout-v5-549",
+      "field": "caption",
+      "text": "As marcas do martelo dão um brilho irregular à minha fivela."
+    },
+    {
+      "id": "pt-holdout-v5-550",
+      "field": "altText",
+      "text": "Pequenas depressões arredondadas cobrem a face metálica da fivela."
+    },
+    {
+      "id": "pt-holdout-v5-551",
+      "field": "caption",
+      "text": "Desloquei um painel de propósito para interromper o xadrez da saia."
+    },
+    {
+      "id": "pt-holdout-v5-552",
+      "field": "altText",
+      "text": "As linhas do xadrez mudam de posição na junção entre dois painéis."
+    },
+    {
+      "id": "pt-holdout-v5-553",
+      "field": "caption",
+      "text": "Bordei as coordenadas da nossa primeira casa no lado de dentro da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-554",
+      "field": "altText",
+      "text": "Números e sinais bordados formam uma linha curta no forro da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-555",
+      "field": "caption",
+      "text": "As camadas do botão vieram de placas que sobraram de outro projeto."
+    },
+    {
+      "id": "pt-holdout-v5-556",
+      "field": "altText",
+      "text": "Faixas de materiais diferentes aparecem na lateral de um botão espesso."
+    },
+    {
+      "id": "pt-holdout-v5-557",
+      "field": "caption",
+      "text": "O cordão segue o contorno da pala e destaca sua curva."
+    },
+    {
+      "id": "pt-holdout-v5-558",
+      "field": "altText",
+      "text": "Um cordão aplicado acompanha a junção curva da pala do casaco."
+    },
+    {
+      "id": "pt-holdout-v5-559",
+      "field": "caption",
+      "text": "O canelado gira pelo punho como uma pequena hélice."
+    },
+    {
+      "id": "pt-holdout-v5-560",
+      "field": "altText",
+      "text": "Colunas de pontos em relevo seguem diagonais ao redor do punho."
+    },
+    {
+      "id": "pt-holdout-v5-561",
+      "field": "caption",
+      "text": "As flores vazadas deixam a camada de baixo completar o desenho."
+    },
+    {
+      "id": "pt-holdout-v5-562",
+      "field": "altText",
+      "text": "Recortes florais revelam o tecido da camada inferior da saia."
+    },
+    {
+      "id": "pt-holdout-v5-563",
+      "field": "caption",
+      "text": "Pintei arcos que lembram sombras de varandas numa tarde clara."
+    },
+    {
+      "id": "pt-holdout-v5-564",
+      "field": "altText",
+      "text": "Arcos largos com bordas suaves se repetem sobre o tecido da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-565",
+      "field": "caption",
+      "text": "Os nós ficam em alturas diferentes e deixam cada conta encontrar seu lugar."
+    },
+    {
+      "id": "pt-holdout-v5-566",
+      "field": "altText",
+      "text": "Nós visíveis separam contas distribuídas de modo irregular ao longo do colar."
+    },
+    {
+      "id": "pt-holdout-v5-567",
+      "field": "caption",
+      "text": "A telinha flexível acompanha meu pulso sem perder seu desenho aberto."
+    },
+    {
+      "id": "pt-holdout-v5-568",
+      "field": "altText",
+      "text": "Uma malha de pequenos elos forma a faixa larga da pulseira."
+    },
+    {
+      "id": "pt-holdout-v5-569",
+      "field": "caption",
+      "text": "O vinco central permite que a lateral da bolsa abra sem perder a linha."
+    },
+    {
+      "id": "pt-holdout-v5-570",
+      "field": "altText",
+      "text": "Uma dobra vertical divide o fole lateral da bolsa em duas partes."
+    },
+    {
+      "id": "pt-holdout-v5-571",
+      "field": "caption",
+      "text": "O pequeno picotado torna a gola discreta mais interessante de perto."
+    },
+    {
+      "id": "pt-holdout-v5-572",
+      "field": "altText",
+      "text": "Recortes triangulares diminutos acompanham a borda externa da gola."
+    },
+    {
+      "id": "pt-holdout-v5-573",
+      "field": "caption",
+      "text": "As flores aparecem como manchas de aquarela, sem linhas para fechá-las."
+    },
+    {
+      "id": "pt-holdout-v5-574",
+      "field": "altText",
+      "text": "Manchas suaves de tinta sugerem flores sobre o tecido claro."
+    },
+    {
+      "id": "pt-holdout-v5-575",
+      "field": "caption",
+      "text": "Enrolei a fita ao redor da copa seguindo uma subida bem suave."
+    },
+    {
+      "id": "pt-holdout-v5-576",
+      "field": "altText",
+      "text": "Uma fita estreita percorre a copa do chapéu em espiral."
+    },
+    {
+      "id": "pt-holdout-v5-577",
+      "field": "caption",
+      "text": "A rede por cima deixa o vestido mudar de desenho a cada movimento."
+    },
+    {
+      "id": "pt-holdout-v5-578",
+      "field": "altText",
+      "text": "Uma camada de rede larga cobre o tecido liso do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-579",
+      "field": "caption",
+      "text": "O fecho de argila guarda a marca da renda que usei no molde."
+    },
+    {
+      "id": "pt-holdout-v5-580",
+      "field": "altText",
+      "text": "Um fecho de cerâmica apresenta pequenas marcas rendadas na superfície."
+    },
+    {
+      "id": "pt-holdout-v5-581",
+      "field": "caption",
+      "text": "As marquinhas redondas do lenço nasceram de uma rolha usada como carimbo."
+    },
+    {
+      "id": "pt-holdout-v5-582",
+      "field": "altText",
+      "text": "Círculos de tinta irregulares se distribuem pelo lenço estampado à mão."
+    },
+    {
+      "id": "pt-holdout-v5-583",
+      "field": "caption",
+      "text": "As letras sobrepostas viraram um desenho quase abstrato na minha camisa."
+    },
+    {
+      "id": "pt-holdout-v5-584",
+      "field": "altText",
+      "text": "Caracteres grandes de diferentes orientações se sobrepõem na estampa da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-585",
+      "field": "caption",
+      "text": "O ziguezague atravessa a saia como uma trilha que une os painéis."
+    },
+    {
+      "id": "pt-holdout-v5-586",
+      "field": "altText",
+      "text": "Uma linha larga de ziguezague conecta as bordas de dois painéis da saia."
+    },
+    {
+      "id": "pt-holdout-v5-587",
+      "field": "caption",
+      "text": "O cristal lapidado funciona como uma janelinha para a textura do aro."
+    },
+    {
+      "id": "pt-holdout-v5-588",
+      "field": "altText",
+      "text": "Uma pedra transparente deixa visível a superfície trabalhada sob sua base."
+    },
+    {
+      "id": "pt-holdout-v5-589",
+      "field": "caption",
+      "text": "As perfurações deixam o brinco leve e desenham pequenos pontos de luz."
+    },
+    {
+      "id": "pt-holdout-v5-590",
+      "field": "altText",
+      "text": "Uma esfera metálica oca apresenta perfurações circulares na superfície."
+    },
+    {
+      "id": "pt-holdout-v5-591",
+      "field": "caption",
+      "text": "Cortei a franja em níveis para ela abrir como um leque."
+    },
+    {
+      "id": "pt-holdout-v5-592",
+      "field": "altText",
+      "text": "Fileiras de franjas com comprimentos graduais pendem da frente da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-593",
+      "field": "caption",
+      "text": "O painel em rede liga as duas partes da blusa sobre o ombro."
+    },
+    {
+      "id": "pt-holdout-v5-594",
+      "field": "altText",
+      "text": "Uma faixa de pontos abertos ocupa a região superior da manga."
+    },
+    {
+      "id": "pt-holdout-v5-595",
+      "field": "caption",
+      "text": "A manga solta por cima lembra uma pequena capa presa ao ombro."
+    },
+    {
+      "id": "pt-holdout-v5-596",
+      "field": "altText",
+      "text": "Uma camada ampla de tecido cobre parcialmente a manga da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-597",
+      "field": "caption",
+      "text": "A pequena abertura atrás deixa o cós acompanhar melhor meu movimento."
+    },
+    {
+      "id": "pt-holdout-v5-598",
+      "field": "altText",
+      "text": "Uma fenda curta interrompe o centro traseiro do cós da calça."
+    },
+    {
+      "id": "pt-holdout-v5-599",
+      "field": "caption",
+      "text": "As pontes de crochê unem os painéis sem fechar os espaços entre eles."
+    },
+    {
+      "id": "pt-holdout-v5-600",
+      "field": "altText",
+      "text": "Faixas curtas de crochê ligam painéis verticais separados da saia."
+    },
+    {
+      "id": "pt-holdout-v5-601",
+      "field": "caption",
+      "text": "Puxei o cordão para reunir a manga sem fazer uma dobra grossa."
+    },
+    {
+      "id": "pt-holdout-v5-602",
+      "field": "altText",
+      "text": "Um cordão atravessa a canaleta do punho e reúne o tecido em pregas."
+    },
+    {
+      "id": "pt-holdout-v5-603",
+      "field": "caption",
+      "text": "Dois botões deixam escolher se a gola fica levantada ou aberta."
+    },
+    {
+      "id": "pt-holdout-v5-604",
+      "field": "altText",
+      "text": "A gola do casaco apresenta dois pontos de fixação em alturas distintas."
+    },
+    {
+      "id": "pt-holdout-v5-605",
+      "field": "caption",
+      "text": "A moldura abre quando aperto os dois cantos desta bolsinha."
+    },
+    {
+      "id": "pt-holdout-v5-606",
+      "field": "altText",
+      "text": "Uma armação flexível mantém aberta a boca de uma pequena bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-607",
+      "field": "caption",
+      "text": "Virei o pingente para mostrar o desenho escondido do outro lado."
+    },
+    {
+      "id": "pt-holdout-v5-608",
+      "field": "altText",
+      "text": "Um pingente de duas faces exibe relevos diferentes na frente e no verso."
+    },
+    {
+      "id": "pt-holdout-v5-609",
+      "field": "caption",
+      "text": "Os três aros se movem separados e se juntam quando coloco o anel."
+    },
+    {
+      "id": "pt-holdout-v5-610",
+      "field": "altText",
+      "text": "Três aros entrelaçados formam um anel com partes móveis."
+    },
+    {
+      "id": "pt-holdout-v5-611",
+      "field": "caption",
+      "text": "A régua dobrável virou uma pulseira que ainda conserva todas as medidas."
+    },
+    {
+      "id": "pt-holdout-v5-612",
+      "field": "altText",
+      "text": "Segmentos articulados com números contornam o pulso como uma pulseira."
+    },
+    {
+      "id": "pt-holdout-v5-613",
+      "field": "caption",
+      "text": "Dobrei o fio em pequenos degraus para desenhar este brinco comprido."
+    },
+    {
+      "id": "pt-holdout-v5-614",
+      "field": "altText",
+      "text": "Um fio metálico forma ângulos retos sucessivos num brinco vertical."
+    },
+    {
+      "id": "pt-holdout-v5-615",
+      "field": "caption",
+      "text": "O salto se inclina para a frente e muda o perfil inteiro do sapato."
+    },
+    {
+      "id": "pt-holdout-v5-616",
+      "field": "altText",
+      "text": "Um salto estreito e reto está inclinado em direção à parte dianteira do sapato."
+    },
+    {
+      "id": "pt-holdout-v5-617",
+      "field": "caption",
+      "text": "A abertura lateral revela uma faixa extra para acomodar a panturrilha."
+    },
+    {
+      "id": "pt-holdout-v5-618",
+      "field": "altText",
+      "text": "O zíper lateral aberto da bota expõe um recorte triangular flexível."
+    },
+    {
+      "id": "pt-holdout-v5-619",
+      "field": "caption",
+      "text": "Uma única tira faz o caminho inteiro ao redor do meu pé."
+    },
+    {
+      "id": "pt-holdout-v5-620",
+      "field": "altText",
+      "text": "Uma tira contínua cruza o peito do pé e contorna o tornozelo."
+    },
+    {
+      "id": "pt-holdout-v5-621",
+      "field": "caption",
+      "text": "A sola em partes deixa o sapato de ensaio dobrar no meio do pé."
+    },
+    {
+      "id": "pt-holdout-v5-622",
+      "field": "altText",
+      "text": "Duas áreas de sola ficam separadas por uma seção flexível sob o arco."
+    },
+    {
+      "id": "pt-holdout-v5-623",
+      "field": "caption",
+      "text": "Os pezinhos levantam o fundo da bolsa um pouquinho acima da mesa."
+    },
+    {
+      "id": "pt-holdout-v5-624",
+      "field": "altText",
+      "text": "Quatro pequenos apoios metálicos estão distribuídos na base da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-625",
+      "field": "caption",
+      "text": "A alça entra por duas aberturas e trava com um movimento curto."
+    },
+    {
+      "id": "pt-holdout-v5-626",
+      "field": "altText",
+      "text": "As pontas da alça rígida atravessam ranhuras na estrutura da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-627",
+      "field": "caption",
+      "text": "O clique deste cinto lembra o fecho de um banco antigo."
+    },
+    {
+      "id": "pt-holdout-v5-628",
+      "field": "altText",
+      "text": "Uma fivela retangular possui uma lingueta de encaixe e botão de liberação."
+    },
+    {
+      "id": "pt-holdout-v5-629",
+      "field": "caption",
+      "text": "Os dois cilindros se encontram e fecham o colar sem esforço."
+    },
+    {
+      "id": "pt-holdout-v5-630",
+      "field": "altText",
+      "text": "Duas extremidades cilíndricas magnéticas se unem atrás do colar."
+    },
+    {
+      "id": "pt-holdout-v5-631",
+      "field": "caption",
+      "text": "O pino atravessa a base e mantém meu cabelo preso num único gesto."
+    },
+    {
+      "id": "pt-holdout-v5-632",
+      "field": "altText",
+      "text": "Um pino comprido passa horizontalmente por uma presilha curva."
+    },
+    {
+      "id": "pt-holdout-v5-633",
+      "field": "caption",
+      "text": "A correntinha continua unindo a pulseira quando abro o fecho principal."
+    },
+    {
+      "id": "pt-holdout-v5-634",
+      "field": "altText",
+      "text": "Uma corrente curta conecta as duas extremidades da pulseira aberta."
+    },
+    {
+      "id": "pt-holdout-v5-635",
+      "field": "caption",
+      "text": "O bolsinho no punho guarda minha pequena chave durante a caminhada."
+    },
+    {
+      "id": "pt-holdout-v5-636",
+      "field": "altText",
+      "text": "Uma abertura com zíper forma um bolso estreito no punho da luva."
+    },
+    {
+      "id": "pt-holdout-v5-637",
+      "field": "caption",
+      "text": "Enrolei o capuz para dentro da gola antes de sair no tempo seco."
+    },
+    {
+      "id": "pt-holdout-v5-638",
+      "field": "altText",
+      "text": "Um capuz dobrado ocupa o compartimento aberto na parte traseira da gola."
+    },
+    {
+      "id": "pt-holdout-v5-639",
+      "field": "caption",
+      "text": "Os laços substituem os botões nestes punhos largos que acabei de costurar."
+    },
+    {
+      "id": "pt-holdout-v5-640",
+      "field": "altText",
+      "text": "Um laço de fitas finas fecha a pequena abertura do punho da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-641",
+      "field": "caption",
+      "text": "A tira interna muda a largura da cintura sem aparecer por fora."
+    },
+    {
+      "id": "pt-holdout-v5-642",
+      "field": "altText",
+      "text": "Uma tira elástica com casas se prende a um botão no interior do cós."
+    },
+    {
+      "id": "pt-holdout-v5-643",
+      "field": "caption",
+      "text": "A fita desliza pela lateral e permite escolher o franzido do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-644",
+      "field": "altText",
+      "text": "Uma fita passa por uma canaleta vertical na lateral franzida do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-645",
+      "field": "caption",
+      "text": "Abri alguns botões para transformar a frente da saia numa fenda curta."
+    },
+    {
+      "id": "pt-holdout-v5-646",
+      "field": "altText",
+      "text": "Os botões inferiores soltos deixam uma abertura na frente da saia."
+    },
+    {
+      "id": "pt-holdout-v5-647",
+      "field": "caption",
+      "text": "A tampa da bolsa se ergue em duas águas como um pequeno telhado."
+    },
+    {
+      "id": "pt-holdout-v5-648",
+      "field": "altText",
+      "text": "Duas faces inclinadas se encontram numa aresta no topo da bolsa rígida."
+    },
+    {
+      "id": "pt-holdout-v5-649",
+      "field": "caption",
+      "text": "O clipe por dentro do casaco guarda minhas luvas durante a visita."
+    },
+    {
+      "id": "pt-holdout-v5-650",
+      "field": "altText",
+      "text": "Um clipe interno prende um par de luvas à lateral do casaco aberto."
+    },
+    {
+      "id": "pt-holdout-v5-651",
+      "field": "caption",
+      "text": "As pontas do cachecol viram bolsos para descansar as mãos."
+    },
+    {
+      "id": "pt-holdout-v5-652",
+      "field": "altText",
+      "text": "As duas extremidades dobradas do cachecol formam aberturas largas para as mãos."
+    },
+    {
+      "id": "pt-holdout-v5-653",
+      "field": "caption",
+      "text": "A copa desce em camadas e o chapéu fica bem baixinho para guardar."
+    },
+    {
+      "id": "pt-holdout-v5-654",
+      "field": "altText",
+      "text": "Anéis flexíveis sobrepostos compõem a copa parcialmente recolhida do chapéu."
+    },
+    {
+      "id": "pt-holdout-v5-655",
+      "field": "caption",
+      "text": "Deixei a ponta mais longa aparecer abaixo da jaqueta curta."
+    },
+    {
+      "id": "pt-holdout-v5-656",
+      "field": "altText",
+      "text": "Uma das pontas frontais do colete desce além da outra."
+    },
+    {
+      "id": "pt-holdout-v5-657",
+      "field": "caption",
+      "text": "A faixa fina acompanha a nuca e deixa a gola distante do pescoço."
+    },
+    {
+      "id": "pt-holdout-v5-658",
+      "field": "altText",
+      "text": "Uma faixa estreita sustenta a gola separada da borda do decote."
+    },
+    {
+      "id": "pt-holdout-v5-659",
+      "field": "caption",
+      "text": "Um quarto de volta prende a tira deste sapato novo."
+    },
+    {
+      "id": "pt-holdout-v5-660",
+      "field": "altText",
+      "text": "Um pequeno fecho giratório atravessa a tira lateral do sapato."
+    },
+    {
+      "id": "pt-holdout-v5-661",
+      "field": "caption",
+      "text": "A lingueta gira e deixa a tampa da bolsa bem assentada."
+    },
+    {
+      "id": "pt-holdout-v5-662",
+      "field": "altText",
+      "text": "Uma lingueta metálica horizontal trava a abertura oval na tampa da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-663",
+      "field": "caption",
+      "text": "O tubo corre pelo cordão e muda a altura do pingente."
+    },
+    {
+      "id": "pt-holdout-v5-664",
+      "field": "altText",
+      "text": "Um tubo curto desliza sobre dois segmentos paralelos do cordão do colar."
+    },
+    {
+      "id": "pt-holdout-v5-665",
+      "field": "caption",
+      "text": "Retirei a parte decorada e ficou um aro simples para o dia."
+    },
+    {
+      "id": "pt-holdout-v5-666",
+      "field": "altText",
+      "text": "Uma peça decorativa destacada está ao lado do aro com pequeno encaixe."
+    },
+    {
+      "id": "pt-holdout-v5-667",
+      "field": "caption",
+      "text": "A placa por trás do pino aparece como um leque sob a orelha."
+    },
+    {
+      "id": "pt-holdout-v5-668",
+      "field": "altText",
+      "text": "Uma peça em leque se projeta atrás do lóbulo sob um brinco pequeno."
+    },
+    {
+      "id": "pt-holdout-v5-669",
+      "field": "caption",
+      "text": "O compartimento da pulseira guarda uma fotografia minúscula da família."
+    },
+    {
+      "id": "pt-holdout-v5-670",
+      "field": "altText",
+      "text": "Uma tampa aberta revela uma fotografia no centro da pulseira larga."
+    },
+    {
+      "id": "pt-holdout-v5-671",
+      "field": "caption",
+      "text": "Deslizo a tampa para olhar a hora e depois volto ao desenho liso."
+    },
+    {
+      "id": "pt-holdout-v5-672",
+      "field": "altText",
+      "text": "Uma placa metálica deslocada deixa parte do mostrador do relógio descoberta."
+    },
+    {
+      "id": "pt-holdout-v5-673",
+      "field": "caption",
+      "text": "A ponte também dobra, então os óculos cabem no meu estojo pequeno."
+    },
+    {
+      "id": "pt-holdout-v5-674",
+      "field": "altText",
+      "text": "Óculos parcialmente fechados apresentam uma articulação no centro da ponte."
+    },
+    {
+      "id": "pt-holdout-v5-675",
+      "field": "caption",
+      "text": "A frente dobrada parece um envelope fechado sobre meus dedos."
+    },
+    {
+      "id": "pt-holdout-v5-676",
+      "field": "altText",
+      "text": "Duas abas diagonais se sobrepõem na parte dianteira do chinelo macio."
+    },
+    {
+      "id": "pt-holdout-v5-677",
+      "field": "caption",
+      "text": "O nó desliza pela ponta e deixa ajustar o lenço com facilidade."
+    },
+    {
+      "id": "pt-holdout-v5-678",
+      "field": "altText",
+      "text": "Uma das pontas do lenço atravessa um nó largo formado pela outra."
+    },
+    {
+      "id": "pt-holdout-v5-679",
+      "field": "caption",
+      "text": "Dobrei a sobra do cinto e prendi pelo botão que fica por dentro."
+    },
+    {
+      "id": "pt-holdout-v5-680",
+      "field": "altText",
+      "text": "Um botão de pressão mantém a extremidade dobrada contra a tira do cinto."
+    },
+    {
+      "id": "pt-holdout-v5-681",
+      "field": "caption",
+      "text": "O zíper dá quase a volta inteira e abre a bolsa como um livro."
+    },
+    {
+      "id": "pt-holdout-v5-682",
+      "field": "altText",
+      "text": "Um zíper acompanha quase toda a circunferência da bolsa redonda aberta."
+    },
+    {
+      "id": "pt-holdout-v5-683",
+      "field": "caption",
+      "text": "Duas voltas no topo bastam para fechar a mochila com o que levo hoje."
+    },
+    {
+      "id": "pt-holdout-v5-684",
+      "field": "altText",
+      "text": "A borda superior da mochila está enrolada e presa por uma fivela."
+    },
+    {
+      "id": "pt-holdout-v5-685",
+      "field": "caption",
+      "text": "A aba nas costas deixa o ar circular sem mostrar toda a abertura."
+    },
+    {
+      "id": "pt-holdout-v5-686",
+      "field": "altText",
+      "text": "Sob a pala traseira existe uma abertura de ventilação coberta por tecido."
+    },
+    {
+      "id": "pt-holdout-v5-687",
+      "field": "caption",
+      "text": "As tiras cruzadas formam o painel que liga a frente às costas do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-688",
+      "field": "altText",
+      "text": "Tiras largas entrelaçadas compõem um painel lateral entre duas partes do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-689",
+      "field": "caption",
+      "text": "O recorte arredondado acompanha meu joelho quando me abaixo."
+    },
+    {
+      "id": "pt-holdout-v5-690",
+      "field": "altText",
+      "text": "Costuras curvas moldam a região dos joelhos na calça."
+    },
+    {
+      "id": "pt-holdout-v5-691",
+      "field": "caption",
+      "text": "O bolso fica plano até receber minhas coisas e abrir suas pregas."
+    },
+    {
+      "id": "pt-holdout-v5-692",
+      "field": "altText",
+      "text": "Um bolso com pregas laterais se expande ao redor dos objetos guardados."
+    },
+    {
+      "id": "pt-holdout-v5-693",
+      "field": "caption",
+      "text": "Os botões do ombro também deixam ajustar a posição da manga."
+    },
+    {
+      "id": "pt-holdout-v5-694",
+      "field": "altText",
+      "text": "Uma fileira curta de botões conecta a manga ao ombro da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-695",
+      "field": "caption",
+      "text": "Bordei raios ao redor do remendo para transformar o desgaste num pequeno sol."
+    },
+    {
+      "id": "pt-holdout-v5-696",
+      "field": "altText",
+      "text": "Pontos radiais circundam um remendo redondo no joelho da calça."
+    },
+    {
+      "id": "pt-holdout-v5-697",
+      "field": "caption",
+      "text": "O botão antigo da minha avó encontrou lugar no casaco que terminei."
+    },
+    {
+      "id": "pt-holdout-v5-698",
+      "field": "altText",
+      "text": "Um botão antigo trabalhado ocupa a posição superior do casaco novo."
+    },
+    {
+      "id": "pt-holdout-v5-699",
+      "field": "caption",
+      "text": "O novo colarinho deixou minha camisa de tantos anos pronta para continuar."
+    },
+    {
+      "id": "pt-holdout-v5-700",
+      "field": "altText",
+      "text": "Um colarinho recém-costurado se junta ao tecido mais gasto da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-701",
+      "field": "caption",
+      "text": "Usei um cinto antigo como alça e preservei sua fivela na lateral."
+    },
+    {
+      "id": "pt-holdout-v5-702",
+      "field": "altText",
+      "text": "Um cinto de couro reutilizado forma a alça da bolsa com a fivela aparente."
+    },
+    {
+      "id": "pt-holdout-v5-703",
+      "field": "caption",
+      "text": "Os lenços que eu quase não usava agora formam os painéis desta saia."
+    },
+    {
+      "id": "pt-holdout-v5-704",
+      "field": "altText",
+      "text": "Painéis de lenços estampados se unem em costuras verticais na saia."
+    },
+    {
+      "id": "pt-holdout-v5-705",
+      "field": "caption",
+      "text": "Recortei borracha reaproveitada para fazer brincos leves e cheios de curvas."
+    },
+    {
+      "id": "pt-holdout-v5-706",
+      "field": "altText",
+      "text": "Tiras curvas de borracha escura formam brincos com bordas recortadas."
+    },
+    {
+      "id": "pt-holdout-v5-707",
+      "field": "caption",
+      "text": "A manta virou um colete e sua franja continua acompanhando a barra."
+    },
+    {
+      "id": "pt-holdout-v5-708",
+      "field": "altText",
+      "text": "Franjas originais da manta aparecem na borda inferior do colete."
+    },
+    {
+      "id": "pt-holdout-v5-709",
+      "field": "caption",
+      "text": "O bolso da camisa antiga virou a frente desta bolsinha de cintura."
+    },
+    {
+      "id": "pt-holdout-v5-710",
+      "field": "altText",
+      "text": "Um bolso de camisa com botão ocupa a face externa de uma pochete."
+    },
+    {
+      "id": "pt-holdout-v5-711",
+      "field": "caption",
+      "text": "Abri as pernas da calça e acrescentei o painel que faltava para a saia."
+    },
+    {
+      "id": "pt-holdout-v5-712",
+      "field": "altText",
+      "text": "Um painel triangular preenche a abertura entre partes reaproveitadas de jeans."
+    },
+    {
+      "id": "pt-holdout-v5-713",
+      "field": "caption",
+      "text": "Os botões soltos da caixa ganharam uma faixa para usar no pulso."
+    },
+    {
+      "id": "pt-holdout-v5-714",
+      "field": "altText",
+      "text": "Botões de formatos variados estão costurados numa tira de pulseira."
+    },
+    {
+      "id": "pt-holdout-v5-715",
+      "field": "caption",
+      "text": "A parte de fora ficou, e o novo forro devolveu conforto ao casaco."
+    },
+    {
+      "id": "pt-holdout-v5-716",
+      "field": "altText",
+      "text": "Um forro novo aparece dentro do casaco com tecido externo envelhecido."
+    },
+    {
+      "id": "pt-holdout-v5-717",
+      "field": "caption",
+      "text": "A faixa retirada da barra virou uma bolsa pequena para acompanhar o vestido."
+    },
+    {
+      "id": "pt-holdout-v5-718",
+      "field": "altText",
+      "text": "Uma bolsa de tecido igual está ao lado do vestido com bainha encurtada."
+    },
+    {
+      "id": "pt-holdout-v5-719",
+      "field": "caption",
+      "text": "Abri a gravata antiga para montar uma faixa de cabelo com o mesmo desenho."
+    },
+    {
+      "id": "pt-holdout-v5-720",
+      "field": "altText",
+      "text": "O tecido de uma gravata reaproveitada recobre uma faixa larga de cabelo."
+    },
+    {
+      "id": "pt-holdout-v5-721",
+      "field": "caption",
+      "text": "As mangas do suéter gasto ainda tinham bastante vida como polainas."
+    },
+    {
+      "id": "pt-holdout-v5-722",
+      "field": "altText",
+      "text": "Dois tubos de malha com punhos formam polainas sobre as pernas."
+    },
+    {
+      "id": "pt-holdout-v5-723",
+      "field": "caption",
+      "text": "Uma tecla que guardei por anos virou o centro deste broche."
+    },
+    {
+      "id": "pt-holdout-v5-724",
+      "field": "altText",
+      "text": "Uma tecla com letra impressa está montada numa base de broche."
+    },
+    {
+      "id": "pt-holdout-v5-725",
+      "field": "caption",
+      "text": "A manga que retirei rendeu um bolso largo para minha sacola de trabalho."
+    },
+    {
+      "id": "pt-holdout-v5-726",
+      "field": "altText",
+      "text": "Um pedaço de manga com punho forma um bolso na frente da sacola."
+    },
+    {
+      "id": "pt-holdout-v5-727",
+      "field": "caption",
+      "text": "O tecido da embalagem virou um cinto macio para meu vestido simples."
+    },
+    {
+      "id": "pt-holdout-v5-728",
+      "field": "altText",
+      "text": "Uma faixa larga de tecido reaproveitado está amarrada à cintura do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-729",
+      "field": "caption",
+      "text": "A borda da moeda continua visível no anel que o artesão fez para mim."
+    },
+    {
+      "id": "pt-holdout-v5-730",
+      "field": "altText",
+      "text": "Marcas de uma moeda aparecem na borda de um anel de metal."
+    },
+    {
+      "id": "pt-holdout-v5-731",
+      "field": "caption",
+      "text": "A corda usada no barco ganhou outra rotina como alça da minha bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-732",
+      "field": "altText",
+      "text": "A bolsa de lona possui uma alça de corda grossa com desgaste visível."
+    },
+    {
+      "id": "pt-holdout-v5-733",
+      "field": "caption",
+      "text": "A renda herdada encontrou seu lugar ao redor da copa do chapéu."
+    },
+    {
+      "id": "pt-holdout-v5-734",
+      "field": "altText",
+      "text": "Uma faixa de renda antiga contorna a base da copa do chapéu."
+    },
+    {
+      "id": "pt-holdout-v5-735",
+      "field": "caption",
+      "text": "O pequeno pedaço do prato quebrou, mas seu desenho continua neste colar."
+    },
+    {
+      "id": "pt-holdout-v5-736",
+      "field": "altText",
+      "text": "Um fragmento cerâmico estampado está preso numa moldura de pingente."
+    },
+    {
+      "id": "pt-holdout-v5-737",
+      "field": "caption",
+      "text": "O tecido do guarda-chuva quebrado virou uma bolsa que cabe dobrada na mão."
+    },
+    {
+      "id": "pt-holdout-v5-738",
+      "field": "altText",
+      "text": "Costuras radiais do antigo guarda-chuva aparecem numa bolsa leve dobrável."
+    },
+    {
+      "id": "pt-holdout-v5-739",
+      "field": "caption",
+      "text": "Uma camada fina cobre o desgaste e deixa a história do tecido aparecer."
+    },
+    {
+      "id": "pt-holdout-v5-740",
+      "field": "altText",
+      "text": "Um remendo translúcido cobre uma área gasta da saia sem ocultá-la."
+    },
+    {
+      "id": "pt-holdout-v5-741",
+      "field": "caption",
+      "text": "A manchinha ganhou uma cauda bordada e virou um cometa na minha camiseta."
+    },
+    {
+      "id": "pt-holdout-v5-742",
+      "field": "altText",
+      "text": "Linhas bordadas se alongam a partir de uma pequena marca arredondada na camiseta."
+    },
+    {
+      "id": "pt-holdout-v5-743",
+      "field": "caption",
+      "text": "Troquei só os punhos e mantive o resto das luvas que adoro."
+    },
+    {
+      "id": "pt-holdout-v5-744",
+      "field": "altText",
+      "text": "Punhos de malha novos estão unidos ao corpo usado das luvas."
+    },
+    {
+      "id": "pt-holdout-v5-745",
+      "field": "caption",
+      "text": "A tira nova conserva a sandália que já acompanha tantos verões."
+    },
+    {
+      "id": "pt-holdout-v5-746",
+      "field": "altText",
+      "text": "Uma tira recém-colocada atravessa o peito da sandália de sola gasta."
+    },
+    {
+      "id": "pt-holdout-v5-747",
+      "field": "caption",
+      "text": "O retalho do projeto anterior encontrou lugar no bolso que faltava ao casaco."
+    },
+    {
+      "id": "pt-holdout-v5-748",
+      "field": "altText",
+      "text": "Um bolso aplicado de tecido diferente ocupa a frente do casaco."
+    },
+    {
+      "id": "pt-holdout-v5-749",
+      "field": "caption",
+      "text": "Recuperei o zíper inteiro antes de desmontar a mochila que não usava mais."
+    },
+    {
+      "id": "pt-holdout-v5-750",
+      "field": "altText",
+      "text": "Um zíper reutilizado está preso por alinhavo à abertura da bolsa nova."
+    },
+    {
+      "id": "pt-holdout-v5-751",
+      "field": "caption",
+      "text": "As fatias finas de cortiça deixaram meu colar leve e cheio de textura."
+    },
+    {
+      "id": "pt-holdout-v5-752",
+      "field": "altText",
+      "text": "Discos de cortiça perfurados se alternam ao longo do cordão do colar."
+    },
+    {
+      "id": "pt-holdout-v5-753",
+      "field": "caption",
+      "text": "Forrei o botão com uma sobra do vestido e montei uma presilha combinando."
+    },
+    {
+      "id": "pt-holdout-v5-754",
+      "field": "altText",
+      "text": "Um botão revestido do mesmo tecido do vestido está preso à base da presilha."
+    },
+    {
+      "id": "pt-holdout-v5-755",
+      "field": "caption",
+      "text": "Trancei tiras das sobras para montar um cinto sem emenda escondida."
+    },
+    {
+      "id": "pt-holdout-v5-756",
+      "field": "altText",
+      "text": "Tiras de diferentes tecidos se entrelaçam ao longo de um cinto flexível."
+    },
+    {
+      "id": "pt-holdout-v5-757",
+      "field": "caption",
+      "text": "Bordei a letra do bilhete numa aplicação que agora acompanha minha camisa."
+    },
+    {
+      "id": "pt-holdout-v5-758",
+      "field": "altText",
+      "text": "Uma pequena aplicação com escrita bordada está presa acima do bolso da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-759",
+      "field": "caption",
+      "text": "Cada retalho representa um lugar por onde esta saia já passou comigo."
+    },
+    {
+      "id": "pt-holdout-v5-760",
+      "field": "altText",
+      "text": "Pequenos retalhos bordados com nomes de lugares se distribuem pela saia."
+    },
+    {
+      "id": "pt-holdout-v5-761",
+      "field": "caption",
+      "text": "Bordei um lince deitado sobre um tronco na frente da minha bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-762",
+      "field": "altText",
+      "text": "Um lince bordado repousa com as patas dianteiras sobre um tronco horizontal."
+    },
+    {
+      "id": "pt-holdout-v5-763",
+      "field": "caption",
+      "text": "O remendo no cotovelo ganhou uma costura de contorno que resolvi deixar aparente."
+    },
+    {
+      "id": "pt-holdout-v5-764",
+      "field": "altText",
+      "text": "Um remendo oval com pontos visíveis cobre o cotovelo da jaqueta."
+    },
+    {
+      "id": "pt-holdout-v5-765",
+      "field": "caption",
+      "text": "Recoloquei o passante com uma base maior para distribuir a força do cinto."
+    },
+    {
+      "id": "pt-holdout-v5-766",
+      "field": "altText",
+      "text": "Um passante da calça está fixado sobre um pequeno reforço de tecido."
+    },
+    {
+      "id": "pt-holdout-v5-767",
+      "field": "caption",
+      "text": "As pontinhas novas fizeram o cadarço antigo passar de novo pelos ilhoses."
+    },
+    {
+      "id": "pt-holdout-v5-768",
+      "field": "altText",
+      "text": "Um terminal recém-aplicado comprime a ponta do cadarço junto ao sapato."
+    },
+    {
+      "id": "pt-holdout-v5-769",
+      "field": "caption",
+      "text": "A curva da bainha deixou as laterais da camisa mais leves ao caminhar."
+    },
+    {
+      "id": "pt-holdout-v5-770",
+      "field": "altText",
+      "text": "A barra da camisa sobe em curvas suaves nas duas laterais."
+    },
+    {
+      "id": "pt-holdout-v5-771",
+      "field": "caption",
+      "text": "Soltei o alinhavo e a prega das costas finalmente ganhou espaço."
+    },
+    {
+      "id": "pt-holdout-v5-772",
+      "field": "altText",
+      "text": "Uma prega aberta se estende abaixo da cintura na parte traseira da saia."
+    },
+    {
+      "id": "pt-holdout-v5-773",
+      "field": "caption",
+      "text": "A manga encurtada deixou a mão livre sem mudar a posição dos botões."
+    },
+    {
+      "id": "pt-holdout-v5-774",
+      "field": "altText",
+      "text": "A borda recém-ajustada da manga termina pouco acima dos botões do punho."
+    },
+    {
+      "id": "pt-holdout-v5-775",
+      "field": "caption",
+      "text": "O fundo novo do bolso impede que minhas chaves desapareçam no forro."
+    },
+    {
+      "id": "pt-holdout-v5-776",
+      "field": "altText",
+      "text": "Um pedaço de tecido novo fecha a base do bolso interno da calça."
+    },
+    {
+      "id": "pt-holdout-v5-777",
+      "field": "caption",
+      "text": "Protegi o canto gasto com uma peça arredondada que acompanha o formato da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-778",
+      "field": "altText",
+      "text": "Um remendo curvo cobre o canto inferior mais gasto da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-779",
+      "field": "caption",
+      "text": "O fecho maior facilitou usar o colar que ficava guardado havia meses."
+    },
+    {
+      "id": "pt-holdout-v5-780",
+      "field": "altText",
+      "text": "Um fecho amplo está ligado às pequenas argolas nas extremidades do colar."
+    },
+    {
+      "id": "pt-holdout-v5-781",
+      "field": "caption",
+      "text": "Bastou tirar um pouco da alça para o decote voltar ao lugar."
+    },
+    {
+      "id": "pt-holdout-v5-782",
+      "field": "altText",
+      "text": "Uma pequena costura transversal reduz o comprimento da alça do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-783",
+      "field": "caption",
+      "text": "A fita nova cobriu a antiga marca sem alterar a forma da copa."
+    },
+    {
+      "id": "pt-holdout-v5-784",
+      "field": "altText",
+      "text": "Uma faixa de fita limpa contorna a região marcada da copa do chapéu."
+    },
+    {
+      "id": "pt-holdout-v5-785",
+      "field": "caption",
+      "text": "O cerzido acompanha a curva do calcanhar para não formar uma dobra dura."
+    },
+    {
+      "id": "pt-holdout-v5-786",
+      "field": "altText",
+      "text": "Uma área de fios entrelaçados cobre a curva do calcanhar da meia."
+    },
+    {
+      "id": "pt-holdout-v5-787",
+      "field": "caption",
+      "text": "Recuperei as últimas laçadas para a borda do cachecol ficar inteira outra vez."
+    },
+    {
+      "id": "pt-holdout-v5-788",
+      "field": "altText",
+      "text": "Pontos recém-reconstituídos fecham a extremidade de um cachecol de malha."
+    },
+    {
+      "id": "pt-holdout-v5-789",
+      "field": "caption",
+      "text": "A conta grande no cursor torna o zíper mais fácil de encontrar com os dedos."
+    },
+    {
+      "id": "pt-holdout-v5-790",
+      "field": "altText",
+      "text": "Uma conta arredondada está presa à lingueta do zíper por um cordão curto."
+    },
+    {
+      "id": "pt-holdout-v5-791",
+      "field": "caption",
+      "text": "O pequeno peso atrás impede que o pingente gire para a nuca."
+    },
+    {
+      "id": "pt-holdout-v5-792",
+      "field": "altText",
+      "text": "Uma peça compacta pende da corrente na parte traseira do pescoço."
+    },
+    {
+      "id": "pt-holdout-v5-793",
+      "field": "caption",
+      "text": "A correntinha atravessa a orelha e deixa as duas pontas em alturas diferentes."
+    },
+    {
+      "id": "pt-holdout-v5-794",
+      "field": "altText",
+      "text": "Uma corrente fina forma um brinco com segmentos pendentes de comprimentos distintos."
+    },
+    {
+      "id": "pt-holdout-v5-795",
+      "field": "caption",
+      "text": "A pequena bússola do meu anel continua apontando enquanto movo a mão."
+    },
+    {
+      "id": "pt-holdout-v5-796",
+      "field": "altText",
+      "text": "Um mostrador circular de bússola ocupa o topo do anel."
+    },
+    {
+      "id": "pt-holdout-v5-797",
+      "field": "caption",
+      "text": "O cordão bordado continua fora da pipa e balança junto ao broche."
+    },
+    {
+      "id": "pt-holdout-v5-798",
+      "field": "altText",
+      "text": "Um broche em forma de pipa possui uma pequena cauda de linha solta."
+    },
+    {
+      "id": "pt-holdout-v5-799",
+      "field": "caption",
+      "text": "A presilha acompanha a curva da cabeça como uma régua levemente arqueada."
+    },
+    {
+      "id": "pt-holdout-v5-800",
+      "field": "altText",
+      "text": "Marcações de medida percorrem uma presilha longa e curva."
+    },
+    {
+      "id": "pt-holdout-v5-801",
+      "field": "caption",
+      "text": "As pequenas caixas desta pulseira entram umas nas outras quando dobro o pulso."
+    },
+    {
+      "id": "pt-holdout-v5-802",
+      "field": "altText",
+      "text": "Segmentos ocos retangulares se encaixam parcialmente ao longo da pulseira articulada."
+    },
+    {
+      "id": "pt-holdout-v5-803",
+      "field": "caption",
+      "text": "A janela na frente deixa aparecer o desenho do organizador que está dentro."
+    },
+    {
+      "id": "pt-holdout-v5-804",
+      "field": "altText",
+      "text": "Uma abertura transparente revela um tecido estampado no interior da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-805",
+      "field": "caption",
+      "text": "Os recortes da capa ficam sobre os ombros como pequenas asas dobradas."
+    },
+    {
+      "id": "pt-holdout-v5-806",
+      "field": "altText",
+      "text": "Duas abas triangulares se projetam sobre os ombros da capa curta."
+    },
+    {
+      "id": "pt-holdout-v5-807",
+      "field": "caption",
+      "text": "Amarrei as pontas da barra para mudar o volume perto do tornozelo."
+    },
+    {
+      "id": "pt-holdout-v5-808",
+      "field": "altText",
+      "text": "Duas tiras saem da barra da calça e se unem acima do tornozelo."
+    },
+    {
+      "id": "pt-holdout-v5-809",
+      "field": "caption",
+      "text": "O bolso se solta inteiro quando quero usar a saia com a frente lisa."
+    },
+    {
+      "id": "pt-holdout-v5-810",
+      "field": "altText",
+      "text": "Um bolso removido está ao lado da saia com pequenos botões de encaixe."
+    },
+    {
+      "id": "pt-holdout-v5-811",
+      "field": "caption",
+      "text": "A prega central dá espaço aos ombros quando estico os braços."
+    },
+    {
+      "id": "pt-holdout-v5-812",
+      "field": "altText",
+      "text": "Nas costas da camisa, uma prega central se abre abaixo da pala."
+    },
+    {
+      "id": "pt-holdout-v5-813",
+      "field": "caption",
+      "text": "A faixa diagonal atravessa o vestido e prende a dobra que cai na lateral."
+    },
+    {
+      "id": "pt-holdout-v5-814",
+      "field": "altText",
+      "text": "Uma faixa ampla cruza o corpo do vestido em direção ao quadril."
+    },
+    {
+      "id": "pt-holdout-v5-815",
+      "field": "caption",
+      "text": "Dobrei o lenço em volta dos óculos antes de colocá-los na bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-816",
+      "field": "altText",
+      "text": "Um lenço macio envolve parcialmente um par de óculos fechado."
+    },
+    {
+      "id": "pt-holdout-v5-817",
+      "field": "caption",
+      "text": "A abertura na palma deixa sentir melhor a alça sem tirar a luva inteira."
+    },
+    {
+      "id": "pt-holdout-v5-818",
+      "field": "altText",
+      "text": "Uma abertura arredondada expõe o centro da palma da mão enluvada."
+    },
+    {
+      "id": "pt-holdout-v5-819",
+      "field": "caption",
+      "text": "As pontas abotoadas transformam este cachecol numa pequena peça com mangas."
+    },
+    {
+      "id": "pt-holdout-v5-820",
+      "field": "altText",
+      "text": "Botões unem trechos das bordas do cachecol, formando duas aberturas tubulares."
+    },
+    {
+      "id": "pt-holdout-v5-821",
+      "field": "caption",
+      "text": "As fitas longas descem da aba e acompanham meus passos sem fechar um nó."
+    },
+    {
+      "id": "pt-holdout-v5-822",
+      "field": "altText",
+      "text": "Duas fitas compridas pendem livremente das laterais da aba do chapéu."
+    },
+    {
+      "id": "pt-holdout-v5-823",
+      "field": "caption",
+      "text": "A aba traseira dobra para baixo quando quero calçar sem usar as mãos."
+    },
+    {
+      "id": "pt-holdout-v5-824",
+      "field": "altText",
+      "text": "A parte traseira flexível do sapato está dobrada sobre a sola."
+    },
+    {
+      "id": "pt-holdout-v5-825",
+      "field": "caption",
+      "text": "A dobra marcada no metal parece ter guardado a memória de uma folha de papel."
+    },
+    {
+      "id": "pt-holdout-v5-826",
+      "field": "altText",
+      "text": "Um pingente de metal fino possui vincos semelhantes aos de uma dobradura."
+    },
+    {
+      "id": "pt-holdout-v5-827",
+      "field": "caption",
+      "text": "O arco fica suspenso sob o pino como uma pequena ponte curva."
+    },
+    {
+      "id": "pt-holdout-v5-828",
+      "field": "altText",
+      "text": "Duas correntes curtas sustentam um arco metálico abaixo do lóbulo."
+    },
+    {
+      "id": "pt-holdout-v5-829",
+      "field": "caption",
+      "text": "O fio atravessa o centro da pedra e deixa sua superfície inteira à mostra."
+    },
+    {
+      "id": "pt-holdout-v5-830",
+      "field": "altText",
+      "text": "Uma haste passa pelo orifício central da pedra montada no anel."
+    },
+    {
+      "id": "pt-holdout-v5-831",
+      "field": "caption",
+      "text": "O nó grande permanece no centro, mesmo quando afrouxo a pulseira."
+    },
+    {
+      "id": "pt-holdout-v5-832",
+      "field": "altText",
+      "text": "Um nó entrelaçado volumoso ocupa o centro de uma pulseira de cordão."
+    },
+    {
+      "id": "pt-holdout-v5-833",
+      "field": "caption",
+      "text": "O broche conserva só as nervuras da folha que encontrei no jardim."
+    },
+    {
+      "id": "pt-holdout-v5-834",
+      "field": "altText",
+      "text": "Uma estrutura delicada de nervuras metálicas forma o contorno de uma folha."
+    },
+    {
+      "id": "pt-holdout-v5-835",
+      "field": "caption",
+      "text": "A presilha em forma de seta acompanha a direção da minha trança."
+    },
+    {
+      "id": "pt-holdout-v5-836",
+      "field": "altText",
+      "text": "Uma seta metálica alongada repousa sobre a parte superior da trança."
+    },
+    {
+      "id": "pt-holdout-v5-837",
+      "field": "caption",
+      "text": "A espuma dentro da alça distribui melhor o peso da minha bolsa de trabalho."
+    },
+    {
+      "id": "pt-holdout-v5-838",
+      "field": "altText",
+      "text": "Uma seção aberta da alça larga mostra o enchimento interno de espuma."
+    },
+    {
+      "id": "pt-holdout-v5-839",
+      "field": "caption",
+      "text": "O pesponto no centro mantém a linha da perna durante o dia todo."
+    },
+    {
+      "id": "pt-holdout-v5-840",
+      "field": "altText",
+      "text": "Uma costura fina percorre verticalmente o centro da frente de cada perna."
+    },
+    {
+      "id": "pt-holdout-v5-841",
+      "field": "caption",
+      "text": "O arco de dentro mantém a saia afastada das pernas ao caminhar."
+    },
+    {
+      "id": "pt-holdout-v5-842",
+      "field": "altText",
+      "text": "Um aro flexível percorre um canal próximo à borda inferior da saia."
+    },
+    {
+      "id": "pt-holdout-v5-843",
+      "field": "caption",
+      "text": "O recorte em degrau interrompe a linha comprida da lapela do meu casaco."
+    },
+    {
+      "id": "pt-holdout-v5-844",
+      "field": "altText",
+      "text": "Um ângulo em degrau marca a borda da lapela larga do casaco."
+    },
+    {
+      "id": "pt-holdout-v5-845",
+      "field": "caption",
+      "text": "A presilha da camisa segura a parte estreita da gravata no caminho certo."
+    },
+    {
+      "id": "pt-holdout-v5-846",
+      "field": "altText",
+      "text": "Uma pequena tira prende a ponta estreita da gravata à camisa."
+    },
+    {
+      "id": "pt-holdout-v5-847",
+      "field": "caption",
+      "text": "O painel interno acompanha a abertura das costas sem esticar a parte de fora."
+    },
+    {
+      "id": "pt-holdout-v5-848",
+      "field": "altText",
+      "text": "Um painel leve preenche parcialmente a abertura alongada nas costas do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-849",
+      "field": "caption",
+      "text": "Enrolei o lenço só numa argola para preservar o desenho da alça."
+    },
+    {
+      "id": "pt-holdout-v5-850",
+      "field": "altText",
+      "text": "Um lenço fino envolve a argola lateral que conecta a alça à bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-851",
+      "field": "caption",
+      "text": "A parte dobrável cobre meus dedos quando a manhã fica mais fria."
+    },
+    {
+      "id": "pt-holdout-v5-852",
+      "field": "altText",
+      "text": "Uma aba arredondada se dobra sobre as pontas expostas dos dedos da luva."
+    },
+    {
+      "id": "pt-holdout-v5-853",
+      "field": "caption",
+      "text": "O lado macio fica junto ao pescoço e o tecido estampado aparece por fora."
+    },
+    {
+      "id": "pt-holdout-v5-854",
+      "field": "altText",
+      "text": "Uma dobra no cachecol revela a face externa estampada e o forro macio."
+    },
+    {
+      "id": "pt-holdout-v5-855",
+      "field": "caption",
+      "text": "A presilha acolchoada leva o chapéu na mochila sem apertar a aba."
+    },
+    {
+      "id": "pt-holdout-v5-856",
+      "field": "altText",
+      "text": "Uma presilha com revestimento macio prende a aba à lateral da mochila."
+    },
+    {
+      "id": "pt-holdout-v5-857",
+      "field": "caption",
+      "text": "Recortei a palmilha seguindo a antiga para não deixar nenhuma ponta sobrando."
+    },
+    {
+      "id": "pt-holdout-v5-858",
+      "field": "altText",
+      "text": "Uma palmilha antiga está sobre uma folha nova com o contorno marcado."
+    },
+    {
+      "id": "pt-holdout-v5-859",
+      "field": "caption",
+      "text": "As pequenas peças esmaltadas parecem um caminho de azulejos ao redor do pescoço."
+    },
+    {
+      "id": "pt-holdout-v5-860",
+      "field": "altText",
+      "text": "Peças quadradas esmaltadas se ligam por pequenas argolas no colar."
+    },
+    {
+      "id": "pt-holdout-v5-861",
+      "field": "caption",
+      "text": "Abri um pouco o leque do brinco para mostrar como as lâminas se movem."
+    },
+    {
+      "id": "pt-holdout-v5-862",
+      "field": "altText",
+      "text": "Lâminas finas giram em torno de um pino comum no brinco em leque."
+    },
+    {
+      "id": "pt-holdout-v5-863",
+      "field": "caption",
+      "text": "A janelinha do anel gira e revela um símbolo de cada vez."
+    },
+    {
+      "id": "pt-holdout-v5-864",
+      "field": "altText",
+      "text": "Um disco perfurado gira sobre pequenos símbolos gravados na base do anel."
+    },
+    {
+      "id": "pt-holdout-v5-865",
+      "field": "caption",
+      "text": "As bolinhas percorrem o canal fechado da pulseira quando inclino o braço."
+    },
+    {
+      "id": "pt-holdout-v5-866",
+      "field": "altText",
+      "text": "Pequenas esferas soltas ocupam um canal transparente ao redor da pulseira."
+    },
+    {
+      "id": "pt-holdout-v5-867",
+      "field": "caption",
+      "text": "O palco do broche tem duas cortinas que consigo abrir com a unha."
+    },
+    {
+      "id": "pt-holdout-v5-868",
+      "field": "altText",
+      "text": "Duas abas articuladas representam cortinas na frente de um broche retangular."
+    },
+    {
+      "id": "pt-holdout-v5-869",
+      "field": "caption",
+      "text": "O volume da presilha vem de uma pequena dobra recheada de tecido."
+    },
+    {
+      "id": "pt-holdout-v5-870",
+      "field": "altText",
+      "text": "Uma dobra acolchoada e arredondada recobre a parte superior da presilha."
+    },
+    {
+      "id": "pt-holdout-v5-871",
+      "field": "caption",
+      "text": "Os pequenos hexágonos bordados lembram um pedaço de favo na minha bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-872",
+      "field": "altText",
+      "text": "Hexágonos contíguos bordados formam um painel semelhante a favo no tecido da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-873",
+      "field": "caption",
+      "text": "As presilhas ficam escondidas por dentro do cós e deixam a frente livre."
+    },
+    {
+      "id": "pt-holdout-v5-874",
+      "field": "altText",
+      "text": "As pontas dos suspensórios se prendem a botões internos do cós."
+    },
+    {
+      "id": "pt-holdout-v5-875",
+      "field": "caption",
+      "text": "Bordei uma linha de horizonte contínua ao redor da barra da saia."
+    },
+    {
+      "id": "pt-holdout-v5-876",
+      "field": "altText",
+      "text": "Casas e árvores bordadas formam uma linha contínua junto à barra."
+    },
+    {
+      "id": "pt-holdout-v5-877",
+      "field": "caption",
+      "text": "A flor passa pela botoeira sem precisar de uma agulha extra."
+    },
+    {
+      "id": "pt-holdout-v5-878",
+      "field": "altText",
+      "text": "Um pequeno ramo atravessa a casa do botão na lapela do casaco."
+    },
+    {
+      "id": "pt-holdout-v5-879",
+      "field": "caption",
+      "text": "As duas camadas da gola terminam em pontas que não coincidem."
+    },
+    {
+      "id": "pt-holdout-v5-880",
+      "field": "altText",
+      "text": "Uma camada estreita de gola aparece abaixo de outra com pontas deslocadas."
+    },
+    {
+      "id": "pt-holdout-v5-881",
+      "field": "caption",
+      "text": "O bolso fica escondido na faixa da cintura e cabe meu cartão."
+    },
+    {
+      "id": "pt-holdout-v5-882",
+      "field": "altText",
+      "text": "Uma abertura discreta ocupa a costura superior da faixa de cintura do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-883",
+      "field": "caption",
+      "text": "A borda enrolada à mão levou tempo, mas ficou com o movimento que eu queria."
+    },
+    {
+      "id": "pt-holdout-v5-884",
+      "field": "altText",
+      "text": "Uma bainha muito estreita e arredondada acompanha a borda do lenço."
+    },
+    {
+      "id": "pt-holdout-v5-885",
+      "field": "caption",
+      "text": "As costuras viradas para fora deixam a parte de dentro bem lisa."
+    },
+    {
+      "id": "pt-holdout-v5-886",
+      "field": "altText",
+      "text": "Margens estreitas de costura aparecem na face externa dos dedos da luva."
+    },
+    {
+      "id": "pt-holdout-v5-887",
+      "field": "caption",
+      "text": "Terminei as pontas com borlas que acompanham o peso da malha."
+    },
+    {
+      "id": "pt-holdout-v5-888",
+      "field": "altText",
+      "text": "Duas borlas densas pendem das extremidades do cachecol de tricô."
+    },
+    {
+      "id": "pt-holdout-v5-889",
+      "field": "caption",
+      "text": "As carreiras circulares ajudam a aba a manter a abertura que desenhei."
+    },
+    {
+      "id": "pt-holdout-v5-890",
+      "field": "altText",
+      "text": "Costuras concêntricas percorrem toda a aba larga do chapéu."
+    },
+    {
+      "id": "pt-holdout-v5-891",
+      "field": "caption",
+      "text": "A pequena peça de couro cobre só a área da sola que estava mais gasta."
+    },
+    {
+      "id": "pt-holdout-v5-892",
+      "field": "altText",
+      "text": "Um recorte de couro novo está aplicado sobre uma área da sola usada."
+    },
+    {
+      "id": "pt-holdout-v5-893",
+      "field": "caption",
+      "text": "O fio passa por fora das peças e vira parte do desenho do colar."
+    },
+    {
+      "id": "pt-holdout-v5-894",
+      "field": "altText",
+      "text": "Um cordão visível contorna peças cerâmicas antes de atravessar seus furos."
+    },
+    {
+      "id": "pt-holdout-v5-895",
+      "field": "caption",
+      "text": "Os pequenos cabides de arame viraram meus brincos favoritos para a oficina."
+    },
+    {
+      "id": "pt-holdout-v5-896",
+      "field": "altText",
+      "text": "Contornos metálicos de cabides formam dois brincos com pequenos ganchos superiores."
+    },
+    {
+      "id": "pt-holdout-v5-897",
+      "field": "caption",
+      "text": "A pequena pegada gravada no aro veio do desenho que meu sobrinho fez."
+    },
+    {
+      "id": "pt-holdout-v5-898",
+      "field": "altText",
+      "text": "Um contorno simples de pegada está gravado na superfície externa do anel."
+    },
+    {
+      "id": "pt-holdout-v5-899",
+      "field": "caption",
+      "text": "A pequena alavanca abaixa e mantém a pulseira fechada ao redor do pulso."
+    },
+    {
+      "id": "pt-holdout-v5-900",
+      "field": "altText",
+      "text": "Uma barra articulada está abaixada sobre o encaixe do fecho da pulseira."
+    },
+    {
+      "id": "pt-holdout-v5-901",
+      "field": "caption",
+      "text": "A dobradura ficou protegida na resina e continua mostrando suas pequenas vincas."
+    },
+    {
+      "id": "pt-holdout-v5-902",
+      "field": "altText",
+      "text": "Uma dobradura de papel está encerrada numa camada transparente de broche."
+    },
+    {
+      "id": "pt-holdout-v5-903",
+      "field": "caption",
+      "text": "Os dentes de comprimentos diferentes alcançam as camadas do meu cabelo."
+    },
+    {
+      "id": "pt-holdout-v5-904",
+      "field": "altText",
+      "text": "Dentes longos e curtos se alternam na borda inferior da presilha."
+    },
+    {
+      "id": "pt-holdout-v5-905",
+      "field": "caption",
+      "text": "A carteira se abre em três partes e deixa tudo visível sobre a mesa."
+    },
+    {
+      "id": "pt-holdout-v5-906",
+      "field": "altText",
+      "text": "Uma carteira aberta apresenta três painéis articulados com compartimentos separados."
+    },
+    {
+      "id": "pt-holdout-v5-907",
+      "field": "caption",
+      "text": "A fita por dentro protege a barra da calça do atrito com o sapato."
+    },
+    {
+      "id": "pt-holdout-v5-908",
+      "field": "altText",
+      "text": "Uma fita resistente acompanha a face interna da barra traseira da calça."
+    },
+    {
+      "id": "pt-holdout-v5-909",
+      "field": "caption",
+      "text": "As claves parecem crescer como ramos pelo tecido da minha saia."
+    },
+    {
+      "id": "pt-holdout-v5-910",
+      "field": "altText",
+      "text": "Claves musicais se prolongam em pequenos ramos desenhados sobre o tecido."
+    },
+    {
+      "id": "pt-holdout-v5-911",
+      "field": "caption",
+      "text": "A pala solta cobre a abertura traseira quando a chuva vem de lado."
+    },
+    {
+      "id": "pt-holdout-v5-912",
+      "field": "altText",
+      "text": "Uma pala ampla sobrepõe a região superior das costas do casaco impermeável."
+    },
+    {
+      "id": "pt-holdout-v5-913",
+      "field": "caption",
+      "text": "Os botões seguem uma diagonal suave até encontrar a cintura."
+    },
+    {
+      "id": "pt-holdout-v5-914",
+      "field": "altText",
+      "text": "Botões dispostos em diagonal acompanham a abertura inclinada da camisa."
+    },
+    {
+      "id": "pt-holdout-v5-915",
+      "field": "caption",
+      "text": "O cinto atravessa o túnel interno e aparece só na frente do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-916",
+      "field": "altText",
+      "text": "Uma faixa entra nas aberturas laterais e passa oculta pelas costas do vestido."
+    },
+    {
+      "id": "pt-holdout-v5-917",
+      "field": "caption",
+      "text": "As casas de cabeça para baixo deixam meu lenço parecer um bairro refletido."
+    },
+    {
+      "id": "pt-holdout-v5-918",
+      "field": "altText",
+      "text": "Casas ilustradas com telhados voltados para baixo formam fileiras no lenço."
+    },
+    {
+      "id": "pt-holdout-v5-919",
+      "field": "caption",
+      "text": "A faixa refletiva acompanha o dorso da luva quando sinalizo no caminho."
+    },
+    {
+      "id": "pt-holdout-v5-920",
+      "field": "altText",
+      "text": "Uma faixa estreita refletiva cruza o dorso da mão enluvada."
+    },
+    {
+      "id": "pt-holdout-v5-921",
+      "field": "caption",
+      "text": "O alfinete comprido atravessa duas dobras e sustenta o cachecol no ombro."
+    },
+    {
+      "id": "pt-holdout-v5-922",
+      "field": "altText",
+      "text": "Um alfinete com proteção prende duas camadas do cachecol sobre o ombro."
+    },
+    {
+      "id": "pt-holdout-v5-923",
+      "field": "caption",
+      "text": "A faixa vazada entre copa e aba deixa o ar circular nas tardes quentes."
+    },
+    {
+      "id": "pt-holdout-v5-924",
+      "field": "altText",
+      "text": "Uma seção de trama aberta separa a copa da aba do chapéu."
+    },
+    {
+      "id": "pt-holdout-v5-925",
+      "field": "caption",
+      "text": "Passei o cadarço em voltas pequenas para formar uma flor no sapato."
+    },
+    {
+      "id": "pt-holdout-v5-926",
+      "field": "altText",
+      "text": "Laçadas do cadarço formam pétalas sobre o peito do sapato."
+    },
+    {
+      "id": "pt-holdout-v5-927",
+      "field": "caption",
+      "text": "O pingente abre para guardar a semente que trouxe da caminhada."
+    },
+    {
+      "id": "pt-holdout-v5-928",
+      "field": "altText",
+      "text": "Duas metades abertas do pingente revelam uma semente pequena no interior."
+    },
+    {
+      "id": "pt-holdout-v5-929",
+      "field": "caption",
+      "text": "O metal amassado mantém as dobras que fiz antes de montar os brincos."
+    },
+    {
+      "id": "pt-holdout-v5-930",
+      "field": "altText",
+      "text": "Superfícies metálicas irregulares e vincadas formam os dois brincos."
+    },
+    {
+      "id": "pt-holdout-v5-931",
+      "field": "caption",
+      "text": "As camadas de papel prensado continuam aparecendo na lateral deste anel."
+    },
+    {
+      "id": "pt-holdout-v5-932",
+      "field": "altText",
+      "text": "Linhas finas de camadas comprimidas atravessam a espessura do aro."
+    },
+    {
+      "id": "pt-holdout-v5-933",
+      "field": "caption",
+      "text": "Cada peça da pulseira guarda um pedacinho de mapa de uma viagem."
+    },
+    {
+      "id": "pt-holdout-v5-934",
+      "field": "altText",
+      "text": "Recortes de mapas estão protegidos em pequenos elos retangulares da pulseira."
+    },
+    {
+      "id": "pt-holdout-v5-935",
+      "field": "caption",
+      "text": "A haste do meu broche faz uma sombra sobre as marcações do pequeno relógio solar."
+    },
+    {
+      "id": "pt-holdout-v5-936",
+      "field": "altText",
+      "text": "Uma haste inclinada projeta sombra sobre linhas radiais na base do broche."
+    },
+    {
+      "id": "pt-holdout-v5-937",
+      "field": "caption",
+      "text": "A argola livre se move na ponta da presilha quando viro a cabeça."
+    },
+    {
+      "id": "pt-holdout-v5-938",
+      "field": "altText",
+      "text": "Uma argola metálica pende de um pequeno eixo na extremidade da presilha."
+    },
+    {
+      "id": "pt-holdout-v5-939",
+      "field": "caption",
+      "text": "O gancho de madeira prende a tampa sem esconder a textura do tecido."
+    },
+    {
+      "id": "pt-holdout-v5-940",
+      "field": "altText",
+      "text": "Um gancho curvo de madeira atravessa uma alça curta na tampa da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-941",
+      "field": "caption",
+      "text": "Abri as laterais da barra para o tecido cair ao redor da bota."
+    },
+    {
+      "id": "pt-holdout-v5-942",
+      "field": "altText",
+      "text": "Fendas curtas nas laterais da barra deixam visível a parte superior da bota."
+    },
+    {
+      "id": "pt-holdout-v5-943",
+      "field": "caption",
+      "text": "A rede rígida por dentro sustenta o volume da saia sem aparecer."
+    },
+    {
+      "id": "pt-holdout-v5-944",
+      "field": "altText",
+      "text": "Uma camada de rede estruturada está exposta sob o tecido externo da saia."
+    },
+    {
+      "id": "pt-holdout-v5-945",
+      "field": "caption",
+      "text": "O pequeno palito atravessa a alça e mantém as duas frentes juntas."
+    },
+    {
+      "id": "pt-holdout-v5-946",
+      "field": "altText",
+      "text": "Um fecho alongado está encaixado numa alça de cordão na frente do casaco."
+    },
+    {
+      "id": "pt-holdout-v5-947",
+      "field": "caption",
+      "text": "Prendi a manga enrolada com a tira que vem do lado de dentro."
+    },
+    {
+      "id": "pt-holdout-v5-948",
+      "field": "altText",
+      "text": "Uma tira abotoada sustenta a manga dobrada acima do cotovelo."
+    },
+    {
+      "id": "pt-holdout-v5-949",
+      "field": "caption",
+      "text": "A abertura da camada de cima revela o movimento da saia de baixo."
+    },
+    {
+      "id": "pt-holdout-v5-950",
+      "field": "altText",
+      "text": "Uma camada externa aberta na frente deixa visível outra saia por baixo."
+    },
+    {
+      "id": "pt-holdout-v5-951",
+      "field": "caption",
+      "text": "Passei as pontas por trás do penteado para deixar o desenho central aparecer."
+    },
+    {
+      "id": "pt-holdout-v5-952",
+      "field": "altText",
+      "text": "Um lenço cobre parte da cabeça com as pontas presas atrás do cabelo."
+    },
+    {
+      "id": "pt-holdout-v5-953",
+      "field": "caption",
+      "text": "O painel triangular acompanha o dorso da luva sem chegar aos dedos."
+    },
+    {
+      "id": "pt-holdout-v5-954",
+      "field": "altText",
+      "text": "Um recorte triangular de tecido ocupa o centro do dorso da luva."
+    },
+    {
+      "id": "pt-holdout-v5-955",
+      "field": "caption",
+      "text": "As iniciais ficaram no avesso para eu lembrar de quem fez o cachecol."
+    },
+    {
+      "id": "pt-holdout-v5-956",
+      "field": "altText",
+      "text": "Duas pequenas letras bordadas aparecem na face interna da ponta do cachecol."
+    },
+    {
+      "id": "pt-holdout-v5-957",
+      "field": "caption",
+      "text": "Um botão prende só um lado da aba e muda o contorno do chapéu."
+    },
+    {
+      "id": "pt-holdout-v5-958",
+      "field": "altText",
+      "text": "Uma das laterais da aba está levantada e abotoada à copa."
+    },
+    {
+      "id": "pt-holdout-v5-959",
+      "field": "caption",
+      "text": "A tela deixa a meia aparecer entre os recortes do sapato."
+    },
+    {
+      "id": "pt-holdout-v5-960",
+      "field": "altText",
+      "text": "Painéis de tela transparente conectam recortes na parte superior do sapato."
+    },
+    {
+      "id": "pt-holdout-v5-961",
+      "field": "caption",
+      "text": "Modelei o rosto inteiro com um fio contínuo sem fechar seus contornos."
+    },
+    {
+      "id": "pt-holdout-v5-962",
+      "field": "altText",
+      "text": "Um fio metálico curvo sugere um rosto no pingente vazado."
+    },
+    {
+      "id": "pt-holdout-v5-963",
+      "field": "caption",
+      "text": "Os pequenos discos do brinco descem como notas numa pauta imaginária."
+    },
+    {
+      "id": "pt-holdout-v5-964",
+      "field": "altText",
+      "text": "Discos de tamanhos graduais se distribuem ao longo de cinco fios paralelos."
+    },
+    {
+      "id": "pt-holdout-v5-965",
+      "field": "caption",
+      "text": "As duas pontes deixam a pedra acima do dedo com espaço por baixo."
+    },
+    {
+      "id": "pt-holdout-v5-966",
+      "field": "altText",
+      "text": "Duas hastes curvas sustentam a pedra sobre um vão aberto no anel."
+    },
+    {
+      "id": "pt-holdout-v5-967",
+      "field": "caption",
+      "text": "Os grãos percorrem o tubo da pulseira quando levanto o braço."
+    },
+    {
+      "id": "pt-holdout-v5-968",
+      "field": "altText",
+      "text": "Grãos finos ocupam parte de um tubo transparente curvado em pulseira."
+    },
+    {
+      "id": "pt-holdout-v5-969",
+      "field": "caption",
+      "text": "As rodinhas do carrinho de broche realmente giram entre meus dedos."
+    },
+    {
+      "id": "pt-holdout-v5-970",
+      "field": "altText",
+      "text": "O carrinho do broche repousa sobre quatro rodas ligadas por eixos finos."
+    },
+    {
+      "id": "pt-holdout-v5-971",
+      "field": "caption",
+      "text": "Cobri a presilha com placas arredondadas que lembram as escamas de um peixe."
+    },
+    {
+      "id": "pt-holdout-v5-972",
+      "field": "altText",
+      "text": "Placas arredondadas sobrepostas recobrem a superfície de uma presilha larga."
+    },
+    {
+      "id": "pt-holdout-v5-973",
+      "field": "caption",
+      "text": "O gancho preso lá em cima mantém a chave longe do fundo da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-974",
+      "field": "altText",
+      "text": "Uma chave pende de um pequeno gancho na borda interna da bolsa."
+    },
+    {
+      "id": "pt-holdout-v5-975",
+      "field": "caption",
+      "text": "Os dois vincos próximos desenham uma faixa estreita na frente da calça."
+    },
+    {
+      "id": "pt-holdout-v5-976",
+      "field": "altText",
+      "text": "Duas dobras prensadas paralelas percorrem cada perna da calça."
+    },
+    {
+      "id": "pt-holdout-v5-977",
+      "field": "caption",
+      "text": "A faixa mais longa cai só de um lado e acompanha a linha da saia."
+    },
+    {
+      "id": "pt-holdout-v5-978",
+      "field": "altText",
+      "text": "Uma faixa de cintura possui uma ponta alongada pendente numa lateral."
+    },
+    {
+      "id": "pt-holdout-v5-979",
+      "field": "caption",
+      "text": "O apoio por dentro mantém a gola alta sem precisar endurecer todo o tecido."
+    },
+    {
+      "id": "pt-holdout-v5-980",
+      "field": "altText",
+      "text": "Uma peça estreita estruturada está inserida no interior da gola alta."
+    },
+    {
+      "id": "pt-holdout-v5-981",
+      "field": "caption",
+      "text": "As pontas retas da gola formam um contorno quase quadrado em volta do pescoço."
+    },
+    {
+      "id": "pt-holdout-v5-982",
+      "field": "altText",
+      "text": "Uma gola de bordas retas apresenta quatro cantos definidos junto ao decote."
+    },
+    {
+      "id": "pt-holdout-v5-983",
+      "field": "caption",
+      "text": "Os laços nos ombros deixam ajustar as alças sem esconder suas pontas."
+    },
+    {
+      "id": "pt-holdout-v5-984",
+      "field": "altText",
+      "text": "As alças do vestido terminam em laços sobre os dois ombros."
+    },
+    {
+      "id": "pt-holdout-v5-985",
+      "field": "caption",
+      "text": "Uma ponta do lenço fica presa sob a pulseira do relógio durante a tarefa."
+    },
+    {
+      "id": "pt-holdout-v5-986",
+      "field": "altText",
+      "text": "A pulseira do relógio mantém uma extremidade curta do lenço junto ao pulso."
+    },
+    {
+      "id": "pt-holdout-v5-987",
+      "field": "caption",
+      "text": "O ziguezague flexível acompanha a abertura quando estico a mão."
+    },
+    {
+      "id": "pt-holdout-v5-988",
+      "field": "altText",
+      "text": "Uma costura em ziguezague percorre a abertura elástica da luva."
+    },
+    {
+      "id": "pt-holdout-v5-989",
+      "field": "caption",
+      "text": "A pátina escura ficou só nos sulcos e fez o desenho da prata aparecer."
+    },
+    {
+      "id": "pt-holdout-v5-990",
+      "field": "altText",
+      "text": "Sulcos escurecidos contrastam com as partes polidas do pingente de prata."
+    },
+    {
+      "id": "pt-holdout-v5-991",
+      "field": "caption",
+      "text": "Os pequenos pompons estão bem separados para a manga continuar leve."
+    },
+    {
+      "id": "pt-holdout-v5-992",
+      "field": "altText",
+      "text": "Pompons macios se distribuem em intervalos amplos sobre a manga do suéter."
+    },
+    {
+      "id": "pt-holdout-v5-993",
+      "field": "caption",
+      "text": "Os suportes infláveis mantêm os canos das botas em pé sem acrescentar peso."
+    },
+    {
+      "id": "pt-holdout-v5-994",
+      "field": "altText",
+      "text": "Dois suportes transparentes cheios de ar preenchem os canos das botas."
+    },
+    {
+      "id": "pt-holdout-v5-995",
+      "field": "caption",
+      "text": "As pequenas aberturas do cachecol lembram fechaduras vistas de longe."
+    },
+    {
+      "id": "pt-holdout-v5-996",
+      "field": "altText",
+      "text": "Aberturas com topo circular e base estreita percorrem o tecido do cachecol."
+    },
+    {
+      "id": "pt-holdout-v5-997",
+      "field": "caption",
+      "text": "Os dois pratos da pequena balança se movem quando toco meu broche."
+    },
+    {
+      "id": "pt-holdout-v5-998",
+      "field": "altText",
+      "text": "Dois pratos metálicos pendem de uma barra horizontal num broche de balança."
+    },
+    {
+      "id": "pt-holdout-v5-999",
+      "field": "caption",
+      "text": "Uma cava mais funda deixa o ombro desenhar uma linha diferente nesta blusa."
+    },
+    {
+      "id": "pt-holdout-v5-1000",
+      "field": "altText",
+      "text": "As duas cavas da blusa apresentam profundidades visivelmente diferentes."
+    }
+  ]
+}

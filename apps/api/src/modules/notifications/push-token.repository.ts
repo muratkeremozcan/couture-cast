@@ -1,6 +1,7 @@
 // Step 6 push token owner: searchable owner anchor
 import { Injectable } from '@nestjs/common'
 import { PrismaClient, Prisma, type PushToken } from '@prisma/client'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 /**
  * Story 0.5 support file: push token persistence for offline/background delivery.
@@ -42,7 +43,7 @@ export class PushTokenRepository {
     const owners = [
       ...new Set([normalizedUserId, ...(previous ? [previous.user_id] : [])]),
     ]
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw(
         Prisma.sql`SELECT community_privacy_guards(ARRAY[${Prisma.join(owners)}]::text[],ARRAY[]::text[],true)`
       )
@@ -96,7 +97,7 @@ export class PushTokenRepository {
   async deleteBindings(bindings: CapturedPushBinding[]): Promise<number> {
     if (!bindings.length) return 0
     const owners = [...new Set(bindings.map((b) => b.ownerId))]
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw(
         Prisma.sql`SELECT community_privacy_guards(ARRAY[${Prisma.join(owners)}]::text[],ARRAY[]::text[],true)`
       )

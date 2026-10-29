@@ -1,0 +1,26 @@
+{
+  "outfit": "Conjunto",
+  "community": "Look de la comunidad",
+  "scenarios": {
+    "morning": "Mañana",
+    "midday": "Mediodía",
+    "evening": "Noche"
+  },
+  "categories": {
+    "top": "Parte superior",
+    "bottom": "Parte inferior",
+    "outerwear": "Abrigo",
+    "dress": "Vestido",
+    "shoes": "Calzado",
+    "accessory": "Accesorio"
+  },
+  "climateBands": {
+    "cold_dry": "Frío y seco",
+    "cold_wet": "Frío y húmedo",
+    "temperate_dry": "Templado y seco",
+    "temperate_wet": "Templado y húmedo",
+    "warm_dry": "Cálido y seco",
+    "warm_wet": "Cálido y húmedo"
+  },
+  "watermarkRole": "Marca de agua"
+}

@@ -160,6 +160,10 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
   expect(community.nextCursor).toBeTruthy()
 
   await page.goto('/notification-settings')
+  // The settings form loads above Sign out; click it only once the form is in place.
+  await expect(
+    page.getByRole('button', { name: 'Save settings', exact: true })
+  ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
   await context.setOffline(true)
   const navigation = page.waitForEvent('framenavigated', {

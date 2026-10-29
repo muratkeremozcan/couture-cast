@@ -10,6 +10,7 @@ import {
   type GarmentTaggingEngine,
 } from './garment-tagging.engine'
 import type { WardrobeStorage } from './wardrobe-storage.adapter'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 function channelHex(value: number): string {
   return Math.max(0, Math.min(255, Math.round(value)))
@@ -156,7 +157,7 @@ export class WardrobeColorProcessor {
     dominantHex: string,
     outcome: TaggingOutcome
   ): Promise<boolean> {
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       const changed = await tx.garmentItem.updateMany({
         where: this.processingGuard(garment),
         data: {

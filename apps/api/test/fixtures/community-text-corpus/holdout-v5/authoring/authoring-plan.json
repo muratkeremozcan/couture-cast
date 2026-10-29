@@ -1,0 +1,53 @@
+{
+  "corpusVersion": "holdout-v5",
+  "retirementAndV5RequirementCommit": "1061931acef45b1c59ccfbe1c7dc0e7cb601fa50",
+  "independencePreregisteredCommit": "406b3e13b6b788bb81d57be4677bb5ee3132976a",
+  "arithmeticPreregisteredCommit": "621bd3fa0ce191344e2a727968676eadbf6c695f",
+  "authoringBaseCommit": "1061931acef45b1c59ccfbe1c7dc0e7cb601fa50",
+  "requiredPerLocale": {
+    "total": 1000,
+    "caption": 500,
+    "altText": 500
+  },
+  "authors": [
+    {
+      "identity": "cc68-tea (/root)",
+      "languages": ["de", "pt"],
+      "sourceRowsPerLanguage": [1, 1000],
+      "differentFromV4Author": true
+    },
+    {
+      "identity": "cc68-tea independent author /root/edge_paths",
+      "languages": ["fr", "it"],
+      "sourceRowsPerLanguage": [1, 1000],
+      "differentFromV4Author": true
+    },
+    {
+      "identity": "cc68-tea independent author /root/general_review",
+      "languages": ["en", "es", "tr"],
+      "sourceRowsPerLanguage": [1, 1000],
+      "differentFromV4Author": true
+    }
+  ],
+  "method": "Every item individually composed as complete literal TSV text; no shared fragment bank, template, combinatorial assembly or text-generating program; helpers only copy complete text and measure it. New wording is not translated or adapted from prior corpora.",
+  "historicalReadScope": "Exactly35 root and holdout-v1/v2/v3/v4 locale JSON files, only for mechanical complete-text equality checks.",
+  "conceptUnit": "Underlying scenario or visual motif; group paraphrases and changes limited to colour, fabric or incidental setting. Allow multiple substantive concepts per item.",
+  "maximumFiveWordAffectedShare": 0.01,
+  "maximumContentConceptShare": 0.01,
+  "knownContext": "Root has v4 results and full cases after its retirement. Existing authors retain their v4 authorship and semantic review context. No author may inspect round-3 repair or v5 screening output before seal. Builder receives only retired v4; v5 content remains blind.",
+  "releaseSequence": "Finish rotated individual authorship and semantic/structural checks; write-once import; seal sources and allseven locale JSONs; send hash/counts to coordinator; wait for explicit release before round-3 repair inspection, corpus commit, active switch or evaluation.",
+  "assignmentAmendmentBeforePortuguese": {
+    "recordedAt": "2026-10-26T09:08:31.916938+00:00",
+    "reason": "Use root in parallel while the two existing authors complete Spanish and Italian. No Portuguese text exists at this point. Portuguese V4 author general_review differs from root.",
+    "originalAssignment": "/root/edge_paths: all Portuguese rows1..1000",
+    "newAssignment": "cc68-tea (/root): all Portuguese rows1..1000",
+    "screeningRun": false,
+    "round3Inspection": false
+  },
+  "targetAmendmentBeforeSeal": {
+    "notice": "Coordinator superseded round3 with future frozen round4 after reviewers reported disguised-term bypasses. No raw new cases, repair manifests, supplements or repairs were opened.",
+    "targetRepair": "round4 manifest pending",
+    "retirementEligibilityCommit": "b02e82022731b963366306b9c4eecb4c89da1fa1",
+    "gateEditScope": "Own pure eligibility function, unit tests, retirement ledger, mandatory evaluator integration and gate documentation only. No screening or repair implementation inspected."
+  }
+}

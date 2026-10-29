@@ -1,0 +1,16 @@
+{
+  "version": "holdout-v3",
+  "author": "cc68-tea",
+  "createdAt": "2026-10-26T04:07:46.449165+00:00",
+  "seed": "3b4bc0a981dac1375ae7cdfb57ab7d4e23a49438e42876158bfa9b2b0462c3f6",
+  "itemsPerLocale": 1000,
+  "fields": {
+    "caption": 500,
+    "altText": 500
+  },
+  "method": "New locale-specific complete sentence banks; seeded sampling without replacement of sentence-index tuples; no screening or term-list input",
+  "deduplication": "Exact and NFKC casefold; disjoint from in-sample clean, v1 and v2; field lengths enforced before one-time import",
+  "repairInspection": "No new builder repair inspected during v3 authoring",
+  "priorKnowledge": "Reviewer retains prior v2 results and the previously released repair. New text comes from a fresh neutral prompt and is never selected using screening outputs.",
+  "gateCommit": "621bd3fa0ce191344e2a727968676eadbf6c695f"
+}

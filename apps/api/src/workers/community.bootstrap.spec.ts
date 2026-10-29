@@ -2,7 +2,12 @@
 // Story 6.2 Task 5: the dedicated community process starts ready and closes clean.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as ShutdownResourcesModule from './shutdown-resources'
-import type * as CommunityBootstrapModule from './community.bootstrap.js'
+import {
+  COMMUNITY_SHUTDOWN_TIMEOUT_MS,
+  createCommunityWorkerProcessState,
+  performShutdown,
+  startCommunityWorkers,
+} from './community.bootstrap.js'
 
 type WorkerShutdownResources = ShutdownResourcesModule.WorkerShutdownResources
 type RealShutdown = (
@@ -42,12 +47,16 @@ vi.mock('./shutdown-resources', async (importOriginal) => {
 })
 
 /**
- * Imported fresh per test, because this module keeps its worker list, its timer
- * list and its retained close hook at module scope.
+ * A fresh process per test. The module is imported once, while the file is
+ * collected, so no test pays for loading the worker graph inside its own time
+ * budget; each test gets its own worker list, timer list and close hook.
  */
-async function loadBootstrap(): Promise<typeof CommunityBootstrapModule> {
-  vi.resetModules()
-  return import('./community.bootstrap.js')
+function freshProcess() {
+  const state = createCommunityWorkerProcessState()
+  return {
+    startCommunityWorkers: () => startCommunityWorkers(state),
+    performShutdown: () => performShutdown(state),
+  }
 }
 
 /** Runs the real deadline-bounded shutdown sequence instead of the recorder. */
@@ -88,7 +97,7 @@ describe('dedicated community worker bootstrap', () => {
   })
 
   it('awaits the runtime before it reports itself started', async () => {
-    const bootstrap = await loadBootstrap()
+    const bootstrap = freshProcess()
 
     await bootstrap.startCommunityWorkers()
 
@@ -115,7 +124,7 @@ describe('dedicated community worker bootstrap', () => {
       },
       close: harness.communityClose,
     })
-    const bootstrap = await loadBootstrap()
+    const bootstrap = freshProcess()
 
     await bootstrap.startCommunityWorkers()
     await bootstrap.performShutdown()
@@ -162,7 +171,7 @@ describe('dedicated community worker bootstrap', () => {
         return Promise.resolve()
       }),
     })
-    const bootstrap = await loadBootstrap()
+    const bootstrap = freshProcess()
     await bootstrap.startCommunityWorkers()
 
     const activeJob = screen().then(
@@ -180,7 +189,7 @@ describe('dedicated community worker bootstrap', () => {
   })
 
   it('hands the worker it started to the shutdown helper', async () => {
-    const bootstrap = await loadBootstrap()
+    const bootstrap = freshProcess()
 
     await bootstrap.startCommunityWorkers()
     await bootstrap.performShutdown()
@@ -193,8 +202,8 @@ describe('dedicated community worker bootstrap', () => {
     const options = harness.shutdownWorkerResources.mock.calls[0]?.[1] as {
       timeoutMs?: number
     }
-    expect(options.timeoutMs).toBe(bootstrap.COMMUNITY_SHUTDOWN_TIMEOUT_MS)
-    expect(bootstrap.COMMUNITY_SHUTDOWN_TIMEOUT_MS).toBeLessThan(25_000)
+    expect(options.timeoutMs).toBe(COMMUNITY_SHUTDOWN_TIMEOUT_MS)
+    expect(COMMUNITY_SHUTDOWN_TIMEOUT_MS).toBeLessThan(25_000)
   })
 
   it('exits nonzero when the screener refuses to start', async () => {
@@ -204,7 +213,7 @@ describe('dedicated community worker bootstrap', () => {
     harness.createCommunityWorkerRuntime.mockRejectedValueOnce(
       new Error('COMMUNITY_NSFW_SCREENER is required')
     )
-    const bootstrap = await loadBootstrap()
+    const bootstrap = freshProcess()
 
     await bootstrap.startCommunityWorkers()
 

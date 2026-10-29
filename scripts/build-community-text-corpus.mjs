@@ -10,9 +10,9 @@
  *     `--import-clean <dir>` (files named captions-<lang>.json) and kept as
  *     committed data thereafter; a re-run without the flag keeps the committed
  *     clean half untouched.
- *   - disallowed: 100 cases per language, generated deterministically from that
- *     language's runtime term list, ten for each obfuscation family Story 6.2 AC 4
- *     requires the screener to see through.
+ *   - disallowed: ten cases per original obfuscation family, plus exhaustive
+ *     doubled-letter deletion variants and reviewed context-boundary adversaries
+ *     generated from the runtime lists and explicit development regressions.
  *
  * A third file per language, holdout-v1/<lang>.json, is the frozen clean
  * holdout the release gate runs on (Story 6.2b review, BH10). Its captions were
@@ -26,6 +26,12 @@
  * Usage:
  *   node scripts/build-community-text-corpus.mjs [--import-clean <dir>]
  *   node scripts/build-community-text-corpus.mjs --import-holdout <dir>
+ *   node scripts/build-community-text-corpus.mjs --import-holdout <dir> --holdout-version holdout-v2
+ *   node scripts/build-community-text-corpus.mjs --import-holdout <dir> --holdout-version holdout-v8 --locales pt[,xx]
+ *
+ * `--locales` writes only the named languages and never creates a file for another
+ * one, so a version directory holds just the locales authored for it. Without it all
+ * seven are written, as before.
  */
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -198,6 +204,82 @@ function buildDisallowed(language, allowed) {
       throw new Error(`${language} produced only ${produced} ${family} cases`)
     }
   }
+  return [
+    ...cases,
+    ...buildDeletionRegressionCases(language, allowed),
+    ...buildInsultFrameRegressionCases(language),
+  ]
+}
+
+/** Round6 reported single-occurrence attacks and every reviewed frame run in all locales. */
+function buildInsultFrameRegressionCases(language) {
+  const development = readJson(path.join(corpusDir, 'development-round6.json'))
+  const bank = readJson(
+    path.join(
+      projectRoot,
+      'apps/api/policies/community-screening/reviewed-occurrence-constructions-v1.json'
+    )
+  ).constructions
+  const rows = [
+    ...development.reported.map((row) => row.text),
+    ...development.removedConstructions,
+    ...development.frameAdversarial,
+  ]
+  for (const rule of bank)
+    for (const phrase of rule.phrases)
+      for (const frame of rule.rejectedPrefixFrames ?? [])
+        for (const separator of [' ', ', ', ' - ', '\n', ' 😃 '])
+          rows.push(frame + separator + phrase)
+  return [...new Set(rows)].map((text, index) => ({
+    id: `${language}-round6-insult-frame-${String(index + 1).padStart(3, '0')}`,
+    family: 'round6-insult-frame',
+    field: index % 2 ? 'altText' : 'caption',
+    text,
+  }))
+}
+
+/** Reviewed reports plus the full multi-dictionary deletion class run in every locale. */
+function buildDeletionRegressionCases(language, allowed) {
+  const regression = readJson(path.join(corpusDir, 'development-round4.json'))
+  const cases = []
+  const seen = new Set()
+  const append = (text, family) => {
+    const key = `${family}:${text}`
+    if (seen.has(key) || allowed.has(text)) return
+    if (text.length > MAX_ALT_TEXT)
+      throw new Error('deletion regression exceeds contract')
+    seen.add(key)
+    cases.push({
+      id: `${language}-${family}-${String(cases.length + 1).padStart(4, '0')}`,
+      family,
+      field: 'caption',
+      text,
+    })
+  }
+  for (const row of regression.reported) append(row.text, 'doubled-letter-deletion')
+  const terms = new Set(
+    LANGUAGES.flatMap((locale) =>
+      readJson(path.join(termsDir, `${locale}-v1.json`)).entries.map(
+        (entry) => entry.term
+      )
+    )
+  )
+  for (const term of [...terms].toSorted()) {
+    if (!/^[\p{L} ]+$/u.test(term) || !/(.)\1/u.test(term)) continue
+    const deleted = term.replace(/(.)\1+/gu, '$1')
+    if (allowed.has(deleted)) continue
+    const leet = mapLetters(deleted, LEET)
+    for (const text of [
+      deleted,
+      leet,
+      [...deleted.replaceAll(' ', '')].join(' '),
+      [...deleted.replaceAll(' ', '')].join('.'),
+      leet && [...leet.replaceAll(' ', '')].join(' '),
+    ])
+      if (text) append(text, 'doubled-letter-deletion')
+  }
+  for (const row of regression.contextAdversarial)
+    append(row.text, 'context-separator-adversarial')
   return cases
 }
 
@@ -246,18 +328,44 @@ async function writeCorpus(
   )
 }
 
-const HOLDOUT_DIRECTORY = path.join(corpusDir, 'holdout-v1')
-
 const sha256File = (filePath) =>
   crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
 
 /** Writes each language's frozen holdout once; an existing one is left alone. */
-async function importHoldout(importDir) {
+export async function importHoldout(
+  importDir,
+  version = 'holdout-v1',
+  { outputDir = corpusDir, locales = LANGUAGES } = {}
+) {
+  if (!/^holdout-v[1-9]\d*$/.test(version)) {
+    throw new Error('holdout version must be holdout-v followed by a positive integer')
+  }
+  if (
+    locales.length === 0 ||
+    new Set(locales).size !== locales.length ||
+    !locales.every((locale) => LANGUAGES.includes(locale))
+  ) {
+    throw new Error(
+      `locales must be a non-empty list of distinct ${LANGUAGES.join(', ')}`
+    )
+  }
+  // Every named locale needs its input before any file is written.
+  for (const language of locales) {
+    const target = path.join(outputDir, version, `${language}.json`)
+    if (
+      !fs.existsSync(target) &&
+      !fs.existsSync(path.join(importDir, `holdout-${language}.json`))
+    ) {
+      throw new Error(
+        `${language}: no input file holdout-${language}.json in ${importDir}`
+      )
+    }
+  }
   const policy = readJson(
     path.join(projectRoot, 'apps/api/policies/community-screening/policy-v2.json')
   )
-  for (const language of LANGUAGES) {
-    const filePath = path.join(HOLDOUT_DIRECTORY, `${language}.json`)
+  for (const language of locales) {
+    const filePath = path.join(outputDir, version, `${language}.json`)
     if (fs.existsSync(filePath)) {
       console.log(`${language}: holdout already frozen, left unchanged`)
       continue
@@ -266,14 +374,14 @@ async function importHoldout(importDir) {
     const entries = labelExpectedReview(
       importClean(language, importDir, {
         file: `holdout-${language}.json`,
-        kind: 'holdout',
+        kind: version === 'holdout-v1' ? 'holdout' : version,
       })
     )
     await writeCorpus(
       language,
       {
         language,
-        corpusVersion: 'holdout-v1',
+        corpusVersion: version,
         description:
           "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
         expected: 'pass',
@@ -290,11 +398,26 @@ async function importHoldout(importDir) {
   }
 }
 
+/** The `--locales a,b` list, or undefined when the flag is absent. */
+export function parseLocales(args) {
+  const index = args.indexOf('--locales')
+  if (index < 0) return undefined
+  const value = args[index + 1]
+  if (!value || value.startsWith('--'))
+    throw new Error('--locales needs a comma list of locales')
+  return value.split(',')
+}
+
 async function main() {
   const args = process.argv.slice(2)
   const holdoutIndex = args.indexOf('--import-holdout')
   if (holdoutIndex >= 0) {
-    await importHoldout(path.resolve(args[holdoutIndex + 1]))
+    const versionIndex = args.indexOf('--holdout-version')
+    await importHoldout(
+      path.resolve(args[holdoutIndex + 1]),
+      versionIndex >= 0 ? args[versionIndex + 1] : 'holdout-v1',
+      { locales: parseLocales(args) }
+    )
     return
   }
   const importIndex = args.indexOf('--import-clean')
@@ -321,7 +444,12 @@ async function main() {
         description:
           'Disguised forms of terms from this language’s runtime list, ten per obfuscation family named in Story 6.2 AC 4, each inside an otherwise clean caption. Every entry is expected to be withheld (review or block). Generated by scripts/build-community-text-corpus.mjs.',
         expected: 'withheld',
-        families: Object.keys(FAMILIES),
+        families: [
+          ...Object.keys(FAMILIES),
+          'doubled-letter-deletion',
+          'context-separator-adversarial',
+          'round6-insult-frame',
+        ],
         entries: buildDisallowed(language, allowed),
       },
     }
@@ -332,7 +460,15 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(`[text-corpus] ${error instanceof Error ? error.message : String(error)}`)
-  process.exit(1)
-})
+// Only a direct run builds; importing the module (the importer's tests) must not.
+if (
+  process.argv[1] &&
+  fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  main().catch((error) => {
+    console.error(
+      `[text-corpus] ${error instanceof Error ? error.message : String(error)}`
+    )
+    process.exit(1)
+  })
+}

@@ -59,3 +59,13 @@ describe('6.7 accessibility-focus native wrapper', () => {
     expect(fake.remove).toHaveBeenCalledTimes(1)
   })
 })
+
+it('guarded read-only diagnostics tolerate absent native support and forward enable/disarm exactly', async () => {
+  const { enableStory68FocusObservation } = await wrapper()
+  expect(enableStory68FocusObservation()).toBeNull()
+  const enable = vi.fn().mockResolvedValue(true)
+  native.module = fakeModule({ enableStory68Observation: enable }).module
+  await expect(enableStory68FocusObservation()).resolves.toBe(true)
+  await expect(enableStory68FocusObservation(false)).resolves.toBe(true)
+  expect(enable.mock.calls).toEqual([[true], [false]])
+})

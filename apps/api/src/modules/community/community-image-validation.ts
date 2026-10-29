@@ -1,3 +1,4 @@
+import { checkImageSignal, runAbortableSharp } from '../../common/abortable-sharp.js'
 import { createHash } from 'node:crypto'
 import {
   communityImageValidationCodeSchema,
@@ -141,8 +142,11 @@ function assertDimensionsInRange(width: number, height: number): void {
  */
 export async function verifyAndNormalizeCommunityImage(
   bytes: Buffer,
-  declaration: CommunityImageDeclaration
+  declaration: CommunityImageDeclaration,
+  timeoutSeconds?: number,
+  signal?: AbortSignal
 ): Promise<NormalizedCommunityImage> {
+  checkImageSignal(signal)
   const sniffedMime = verifyDeclaration(bytes, declaration)
 
   try {
@@ -153,15 +157,16 @@ export async function verifyAndNormalizeCommunityImage(
       sequentialRead: true,
     })
 
-    const metadata = await pipeline.metadata()
+    if (timeoutSeconds) pipeline.timeout({ seconds: timeoutSeconds })
+    const metadata = await runAbortableSharp(pipeline, signal, () => pipeline.metadata())
     if (metadata.format !== format || (metadata.pages ?? 1) !== 1) {
       throw new CommunityImageValidationError(CODE.IMAGE_DECODE_FAILED)
     }
 
-    const { data, info } = await pipeline
-      .rotate()
-      .toFormat(format)
-      .toBuffer({ resolveWithObject: true })
+    const output = pipeline.rotate().toFormat(format)
+    const { data, info } = await runAbortableSharp(output, signal, () =>
+      output.toBuffer({ resolveWithObject: true })
+    )
 
     assertDimensionsInRange(info.width, info.height)
 

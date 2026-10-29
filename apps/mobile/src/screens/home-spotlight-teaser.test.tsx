@@ -30,6 +30,11 @@ const routerPush = vi.hoisted(() => vi.fn())
 const capture = vi.hoisted(() => vi.fn())
 const openBrowserAsync = vi.hoisted(() => vi.fn())
 
+// These browser UI cases own their bearer fixture; rootless native auth is signed out.
+vi.mock('@/src/lib/native-session', () => ({
+  resolveNativeSessionToken: () => Promise.resolve(undefined),
+}))
+
 vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ setParams: vi.fn(), push: routerPush }),

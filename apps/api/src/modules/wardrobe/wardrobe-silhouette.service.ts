@@ -37,6 +37,7 @@ import {
   requireUploadTokenSecret,
   verifyUploadToken,
 } from './wardrobe-upload-token.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 const READ_URL_EXPIRY_SECONDS = 900
@@ -206,7 +207,7 @@ export class WardrobeSilhouetteService {
   ): Promise<SliderResult> {
     const expectedRevision = parseSilhouetteIfMatchHeader(ifMatchHeader, userId)
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('silhouette_profile:' || ${userId}))`
 
       const existing = await tx.silhouetteProfile.findUnique({
@@ -264,7 +265,7 @@ export class WardrobeSilhouetteService {
   ): Promise<UploadUrlResult> {
     await this.guardianService.assertWardrobeUploadAllowed(userId, role)
 
-    const outcome = await this.prisma.$transaction(async (tx) => {
+    const outcome = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('silhouette_profile:' || ${userId}))`
 
       const existing = await tx.silhouetteProfile.findUnique({
@@ -581,7 +582,7 @@ export class WardrobeSilhouetteService {
   ): Promise<{ response: SilhouetteProfileResponse }> {
     const expectedRevision = parseSilhouetteIfMatchHeader(ifMatchHeader, userId)
 
-    const outcome = await this.prisma.$transaction(async (tx) => {
+    const outcome = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('silhouette_profile:' || ${userId}))`
 
       const existing = await tx.silhouetteProfile.findUnique({

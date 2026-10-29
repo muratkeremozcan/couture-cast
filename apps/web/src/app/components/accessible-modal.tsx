@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useLayoutEffect, useRef } from 'react'
+import React, { useId, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { nextModalOrder, registerModal, useModalCovered } from './modal-stack'
 
 export interface AccessibleModalProps {
   isOpen: boolean
@@ -14,10 +15,30 @@ export interface AccessibleModalProps {
   description?: string
   invokingElementRef?: React.RefObject<HTMLElement | null>
   initialFocusRef?: React.RefObject<HTMLElement | null>
+  /** Where focus goes when the invoker is gone: the first selector that still matches. */
+  fallbackFocusSelector?: string | readonly string[]
+  /** The last resort, tried after the element that was focused when the dialog opened. */
+  finalFocusSelector?: string
   closeLabel?: string
   children: React.ReactNode
   ariaLiveMessage?: string | null
   errorMessage?: string | null
+}
+
+/** Whether the element or an ancestor is inert or hidden from assistive technology. */
+function isHiddenFromFocus(target: HTMLElement): boolean {
+  for (
+    let ancestor: HTMLElement | null = target;
+    ancestor;
+    ancestor = ancestor.parentElement
+  )
+    if (
+      ancestor.inert ||
+      ancestor.hasAttribute('inert') ||
+      ancestor.getAttribute('aria-hidden') === 'true'
+    )
+      return true
+  return false
 }
 
 export function AccessibleModal({
@@ -32,6 +53,8 @@ export function AccessibleModal({
   invokingElementRef,
   initialFocusRef,
   closeLabel = 'Close modal',
+  fallbackFocusSelector,
+  finalFocusSelector,
   children,
   ariaLiveMessage,
   errorMessage,
@@ -40,39 +63,49 @@ export function AccessibleModal({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const resumeFocusRef = useRef<HTMLElement | null>(null)
   const previousActiveElementRef = useRef<HTMLElement | null>(null)
+  const focusGenerationRef = useRef({ value: 0 })
+  // One string, so a caller passing a fresh array each render does not restart the effect.
+  const fallbackSelectors = JSON.stringify(
+    fallbackFocusSelector === undefined
+      ? []
+      : [fallbackFocusSelector].flat().filter(Boolean)
+  )
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  // The page-level state every open dialog shares (background inertness, scroll lock,
+  // which dialog Escape closes) belongs to the modal stack. A dialog keeps its open
+  // order while suspended, so dialogs that resume together keep their relative order.
+  const id = useId()
+  const openOrderRef = useRef<number | null>(null)
+  const covered = useModalCovered(id)
+  useLayoutEffect(() => {
+    if (!isOpen) openOrderRef.current = null
+  }, [isOpen])
+  useLayoutEffect(() => {
+    if (!isOpen || suspended) return
+    openOrderRef.current ??= nextModalOrder()
+    return registerModal({
+      id,
+      order: openOrderRef.current,
+      close: () => onCloseRef.current(),
+    })
+  }, [id, isOpen, suspended])
 
   useLayoutEffect(() => {
     if (!isOpen || suspended) {
       return
     }
+    const focusGeneration = focusGenerationRef.current
+    focusGeneration.value++
     previousActiveElementRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body &&
+      document.activeElement !== document.documentElement
+        ? document.activeElement
+        : null
 
-    // Lock body scroll
-    const originalStyle = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     const dialog = dialogRef.current
-    const overlay = dialog?.parentElement
-    const background = new Set<HTMLElement>([
-      ...Array.from(document.body.children).filter(
-        (element): element is HTMLElement =>
-          element instanceof HTMLElement &&
-          element !== overlay &&
-          !element.matches('script,style,link')
-      ),
-      ...Array.from(document.querySelectorAll<HTMLElement>('[data-app-shell]')).filter(
-        (element) => !element.contains(overlay ?? null)
-      ),
-    ])
-    const priorBackground = [...background].map((element) => ({
-      element,
-      inert: element.inert ?? false,
-      hidden: element.getAttribute('aria-hidden'),
-    }))
-    for (const { element } of priorBackground) {
-      element.inert = true
-      element.setAttribute('aria-hidden', 'true')
-    }
 
     // Establish modal focus before paint so a user action cannot race delayed focus setup.
     const resume = resumeFocusRef.current?.isConnected ? resumeFocusRef.current : null
@@ -83,35 +116,47 @@ export function AccessibleModal({
       const focused = document.activeElement
       if (focused instanceof HTMLElement && dialog?.contains(focused))
         resumeFocusRef.current = focused
-      document.body.style.overflow = originalStyle
-      for (const { element, inert, hidden } of priorBackground) {
-        element.inert = inert
-        if (hidden === null) element.removeAttribute('aria-hidden')
-        else element.setAttribute('aria-hidden', hidden)
-      }
 
-      // Restore focus to invoking element or previous active element
-      const targetToFocus =
-        currentInvoker?.isConnected === true
-          ? currentInvoker
-          : previousActiveElementRef.current?.isConnected === true
-            ? previousActiveElementRef.current
-            : null
-      targetToFocus?.focus()
+      const restoreGeneration = ++focusGeneration.value
+      // React detaches a deleted ancestor after its descendant layout cleanups.
+      // Resolve the target after that commit, including its final inert ancestry.
+      queueMicrotask(() => {
+        if (focusGeneration.value !== restoreGeneration) return
+        const fallbacks = (JSON.parse(fallbackSelectors) as string[]).map((selector) =>
+          document.querySelector<HTMLElement>(selector)
+        )
+        const final = finalFocusSelector
+          ? document.querySelector<HTMLElement>(finalFocusSelector)
+          : null
+        // A candidate can be connected and visible yet unable to take focus, such as a
+        // control disabled while the dialog was open. Each attempt is checked, and the
+        // next candidate is tried when focus did not move to it.
+        for (const target of [
+          currentInvoker,
+          ...fallbacks,
+          previousActiveElementRef.current,
+          final,
+        ]) {
+          if (!target?.isConnected || isHiddenFromFocus(target)) continue
+          target.focus()
+          if (document.activeElement === target) return
+        }
+      })
     }
-  }, [initialFocusRef, isOpen, suspended, invokingElementRef])
+  }, [
+    initialFocusRef,
+    isOpen,
+    suspended,
+    invokingElementRef,
+    fallbackSelectors,
+    finalFocusSelector,
+  ])
 
   if (!isOpen || typeof document === 'undefined') {
     return null
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-      return
-    }
-
     if (event.key !== 'Tab') {
       return
     }
@@ -147,14 +192,17 @@ export function AccessibleModal({
   return createPortal(
     <div
       role="dialog"
+      data-modal-overlay=""
       aria-modal={!suspended}
-      aria-hidden={suspended || undefined}
-      inert={suspended}
+      aria-hidden={suspended || covered || undefined}
+      inert={suspended || covered}
       style={suspended ? { display: 'none' } : undefined}
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
       onKeyDown={handleKeyDown}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4"
+      // Only the top dialog dims the page; a covered one keeps its place without
+      // stacking a second scrim over the first.
+      className={`fixed inset-0 z-[60] flex items-center justify-center p-4 ${covered ? 'bg-transparent' : 'bg-black/60'}`}
     >
       <div
         ref={dialogRef}
@@ -186,11 +234,9 @@ export function AccessibleModal({
           </button>
         </div>
 
-        {ariaLiveMessage && (
-          <div role="status" aria-live="polite" className="sr-only">
-            {ariaLiveMessage}
-          </div>
-        )}
+        <div role="status" aria-live="polite" className="sr-only">
+          {ariaLiveMessage ?? ''}
+        </div>
 
         {errorMessage && (
           <div

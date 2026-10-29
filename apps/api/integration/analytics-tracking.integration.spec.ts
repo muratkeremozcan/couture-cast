@@ -58,6 +58,10 @@ vi.mock('posthog-node', () => ({
 vi.mock('@prisma/client', () => {
   class PrismaClientMock {
     $disconnect = vi.fn()
+    // createPrismaClient extends the client; the mock is its own extension.
+    $extends() {
+      return this
+    }
   }
   return { PrismaClient: PrismaClientMock }
 })

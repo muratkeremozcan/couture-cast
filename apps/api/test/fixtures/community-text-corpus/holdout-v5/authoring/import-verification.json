@@ -1,0 +1,77 @@
+{
+  "importer": "scripts/build-community-text-corpus.mjs --import-holdout .cc68-tea-authoring/imports --holdout-version holdout-v5",
+  "writeOnceImport": true,
+  "baselineOnly": true,
+  "files": [
+    {
+      "language": "de",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0,
+      "completeSourceItemsEqualImportedItems": true,
+      "sha256": "493fa8790a51dd1b6f61795007c383a5a1a6262ca9568dc0fe50ac7108754e65"
+    },
+    {
+      "language": "en",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0,
+      "completeSourceItemsEqualImportedItems": true,
+      "sha256": "7bd0715a879a319c8d7a2eba11f85281646995a9fa350ad17bb4127f5d3032bf"
+    },
+    {
+      "language": "es",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0,
+      "completeSourceItemsEqualImportedItems": true,
+      "sha256": "753605298f737632693b6516789cdae5c10549285b68989ed26df9835b5977d4"
+    },
+    {
+      "language": "fr",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0,
+      "completeSourceItemsEqualImportedItems": true,
+      "sha256": "f9b4b78559ad55c10b85fdb142aae35948d2028379931c7c953c56d825778dda"
+    },
+    {
+      "language": "it",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0,
+      "completeSourceItemsEqualImportedItems": true,
+      "sha256": "f9decc67dcda8be17d0c8ee9b87e9328d0801ebb437b8eb832d670801222bd4a"
+    },
+    {
+      "language": "pt",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0,
+      "completeSourceItemsEqualImportedItems": true,
+      "sha256": "95134cffe71d31e522ca135812d28c14b23844641a29d264375a9b99f9b9fd04"
+    },
+    {
+      "language": "tr",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0,
+      "completeSourceItemsEqualImportedItems": true,
+      "sha256": "0fc4b186178dd0d1816088b837b50b85dac80ee4a542fe4ad1068635fc48f55e"
+    }
+  ]
+}

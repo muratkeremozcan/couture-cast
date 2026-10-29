@@ -21,6 +21,7 @@ import {
   type GuardianConsentInput,
   type SignupInput,
 } from '../../contracts/http'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 type SignUpOptions = {
   today?: Date
@@ -81,7 +82,7 @@ export class AuthService {
     const normalized = parsed.data.email.toLowerCase()
     let user: { id: string }
     try {
-      user = await this.prisma.$transaction(async (tx) => {
+      user = await interactiveTransaction(this.prisma, async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('user_email:' || ${normalized}))`
         const existingUser = await tx.user.findFirst({
           where: { email: { equals: normalized, mode: 'insensitive' } },

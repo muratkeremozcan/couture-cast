@@ -1,0 +1,24 @@
+appId: ${MAESTRO_APP_ID}
+---
+# Taps Save until the app shows what a received press does. Maestro reports a tap COMPLETED
+# whether or not the product got it: run 40914232135 shard 1 (permanent.yaml) tapped Save, the
+# app showed neither the photo prompt nor the denial message for 15 s, and the screen was the
+# idle composer. Save is also disabled until the preview has loaded and nothing is busy, so the
+# tap runs only while Save reads enabled. MAESTRO_SAVE_EFFECT is the text a landed press shows
+# (the prompt, the saving message, the outcome). A press that merely landed late already shows it,
+# so it is never repeated, and the product ignores a press while it is saving.
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: share-card-save
+              enabled: true
+            notVisible: ${MAESTRO_SAVE_EFFECT}
+          commands:
+            - tapOn:
+                id: share-card-save
+      - extendedWaitUntil:
+          visible: ${MAESTRO_SAVE_EFFECT}
+          timeout: 8000

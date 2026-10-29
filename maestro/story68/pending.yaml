@@ -1,0 +1,27 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    file: tap-save.yaml
+    env:
+      MAESTRO_SAVE_EFFECT: ${MAESTRO_SAVING}
+- extendedWaitUntil:
+    visible: ${MAESTRO_SAVING}
+    timeout: 20000
+# The second Save lands while the first is still saving; the harness proves one write.
+- tapOn:
+    id: share-card-save
+- assertVisible: ${MAESTRO_SAVING}
+- assertNotVisible: ${MAESTRO_PENDING}
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      # Expose controls inside the clipped list/ScrollView, above the native bottom bar.
+      - swipe:
+          start: 50%, 70%
+          end: 50%, 30%
+          duration: 500
+- tapOn:
+    id: share-card-cancel
+- assertNotVisible:
+    id: share-card-title

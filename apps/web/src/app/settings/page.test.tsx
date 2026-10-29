@@ -9,9 +9,9 @@
 // same tests that cover the UI states.
 import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getI18n } from '../../i18n'
+import { activateBrowserLocale, getI18n } from '../../i18n'
 import deDE from '../../i18n/locales/de-DE.json'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
@@ -419,12 +419,14 @@ describe('Web settings page', () => {
     signIn()
     const gate = deferred<void>()
     const aborted = deferred<void>()
+    const started = deferred<void>()
     useMswHandlers(
       subscriptionHandler(),
       themeHandler(),
       locationsHandler(),
       http.get(PREFERENCES_PATH, async ({ request }) => {
         request.signal.addEventListener('abort', () => aborted.resolve())
+        started.resolve()
         await gate.promise
         return HttpResponse.json({ data: { affiliateCtasEnabled: true } })
       })
@@ -432,6 +434,8 @@ describe('Web settings page', () => {
 
     const view = render(<SettingsPage />)
     await waitFor(() => expect(toggle()).toBeDisabled())
+    // Unmounting before the request reaches the handler would abort it unseen.
+    await started.promise
 
     view.unmount()
     await aborted.promise
@@ -500,12 +504,13 @@ describe('Web settings page', () => {
 
   // Story 1.2b: the page heading was English on every locale before the
   // Locations section moved in; it now reads the catalog.
-  it("1.2b-WEB-SETTINGS-01 titles the page in the reader's language", () => {
-    // `getI18n()` follows the browser languages on every call, so the page reads
-    // German only when the browser asks for it.
+  it("1.2b-WEB-SETTINGS-01 titles the page in the reader's language after hydration", () => {
     vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['de-DE'])
 
     render(<SettingsPage />)
+    act(() => {
+      activateBrowserLocale()
+    })
 
     expect(
       screen.getByRole('heading', { level: 1, name: deDE.settings.title })

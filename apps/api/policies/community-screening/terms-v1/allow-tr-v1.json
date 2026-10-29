@@ -8,11 +8,49 @@
     "licence": "UNLICENSED (repository-owned)",
     "retrievedAt": "2026-10-16",
     "curator": "couture-cast repository owner",
-    "notes": "GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it."
+    "notes": "GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it. Literal contexts clear only their exact target token within bounded grammatical object context; other tokens and unsafe phrases remain screened."
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256"
+    "allowListSha256": "b25c9043213ba09b2ca3f415ae05f79cd9222910c715eeda2100d748d5444613",
+    "reviewedOccurrenceSha256": "e5c93949c90d428f783d1e273c1abf0f97004dbde479663590011f4d2e5c23bf"
   },
-  "entries": ["fagot", "gok", "gök", "kasar", "sikke", "sıkı", "sıkış", "şıktır"]
+  "entries": [
+    "açıklar",
+    "açıklara",
+    "açıklarda",
+    "açıklardan",
+    "açıkları",
+    "açıkların",
+    "açıkta",
+    "gök",
+    "kasar",
+    "nakışta",
+    "nelere",
+    "sikke",
+    "sürtüp",
+    "sıkı",
+    "sıkış",
+    "şıktır"
+  ],
+  "splitFrames": [],
+  "cutFamily": {
+    "terms": [],
+    "reviewHalves": [],
+    "copulas": [],
+    "nameFollowers": []
+  },
+  "scopedWords": ["gok", "fagot"],
+  "scopedPhrases": [],
+  "literalContexts": [],
+  "occurrenceConstructions": [
+    {
+      "target": "bale",
+      "phrases": ["bale ayakkabısının", "bale ayakkabımın"]
+    },
+    {
+      "target": "pişen",
+      "phrases": ["yüzeyde pişen"]
+    }
+  ]
 }

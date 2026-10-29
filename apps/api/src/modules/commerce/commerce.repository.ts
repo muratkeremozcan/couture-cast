@@ -8,6 +8,7 @@ import {
   type SkinUndertone,
 } from '@prisma/client'
 import { publiclyVisiblePostSql } from '../community/community.repository.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 /**
  * Story 5.1: every database access the commerce module makes.
@@ -161,7 +162,7 @@ export class CommerceRepository {
     enabled: boolean,
     ipAddress: string | undefined
   ): Promise<{ affiliateCtasEnabled: boolean; auditWritten: boolean }> {
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       const existing = await tx.commercePreference.findUnique({
         where: { user_id: userId },
         select: { affiliate_ctas_enabled: true },

@@ -1,0 +1,42 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: tab-wardrobe
+- tapOn:
+    id: tab-home
+- runFlow:
+    when:
+      platform: iOS
+    file: position-outfit-open.yaml
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      # Home can keep an earlier scroll offset. Start every search from the top of Home.
+      - scrollUntilVisible:
+          element:
+            id: weather-header(-skeleton)?
+          direction: UP
+          timeout: 30000
+      - scrollUntilVisible:
+          element:
+            id: outfit-share-card-open
+          direction: DOWN
+          timeout: 30000
+          centerElement: true
+      - waitForAnimationToEnd
+# Home renders one primary outfit card. Fail if a second opener ever appears.
+- assertNotVisible:
+    id: outfit-share-card-open
+    index: 1
+- tapOn:
+    id: outfit-share-card-open
+- extendedWaitUntil:
+    visible: ${MAESTRO_PREPARING}
+    timeout: 10000
+- assertNotVisible:
+    id: share-card-preview-loaded-.*
+- tapOn:
+    id: share-card-cancel
+- assertNotVisible:
+    id: share-card-title

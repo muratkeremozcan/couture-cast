@@ -1,0 +1,181 @@
+{
+  "checkedAt": "2026-10-26T09:04:38.638173+00:00",
+  "scope": "Only 35 explicit in-sample and frozen v1-v4 locale JSON files. No repair or manifest read.",
+  "files": [
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/de.json",
+      "sha256": "6c0e3bfcbcc459bd3bb0e13a3be03668db937af1189d85e7ab4ca08dd28067ba",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/en.json",
+      "sha256": "87b82942efd0c19f07c0f12fd8bd1770c04574478096e38c6e155b118f839fc3",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/es.json",
+      "sha256": "69fc6716328963d930044412f409dbe0e494ebdf547be85904a4ea6c559652b3",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/fr.json",
+      "sha256": "2dc96c4eca25b1cb60a9d40e86833f249f4260b38033dc8d7043d63ce2a8b2b8",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/it.json",
+      "sha256": "1d2a6c7cc62e9b36bcb3f872da1248f795c5974a6671f7e22b020166610edbc1",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/pt.json",
+      "sha256": "b32b8fc24c2c43e766089b20b70996f1921fb625d5d0c666455a9e4ab404f1b7",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/tr.json",
+      "sha256": "611852f4393a0b045397d86c4cf879aa12e08f015df24f9464a122af88fb70ae",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/de.json",
+      "sha256": "293a13675913cc08e8cc9b36d93ca7c731e605c5e41b238c217dd5534e24b8df",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/en.json",
+      "sha256": "def0c67a1ed1665d3684658542456ed749f6306a63360a4a786c1561785ae961",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/es.json",
+      "sha256": "1813ee53111c35ca54a1aefe26bb3fc49ce2a34ee5e3281336b6022269afdea3",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/fr.json",
+      "sha256": "ad39bdc231fd59c6a561f89049cbe72cd511255ce3cc8986b12d2994343eff0a",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/it.json",
+      "sha256": "d36932f32b62ee61c47fee8f88ae77a83c1268abd9876a3f51ea76ff88fe8e25",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/pt.json",
+      "sha256": "d63103233dc99abca22a44cb7a6efa8e7fec3f2d0f1ec931ddc015e4d4c765e2",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/tr.json",
+      "sha256": "344f03c4d9a31a416c73a9c815e33331fe5b46ac30561aaf6f26b0667653c34b",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/de.json",
+      "sha256": "786ce564e27f0b83c9b7c5f3cfc8b0d536dcb342d9fe5b1abb16395c7687e27c",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/en.json",
+      "sha256": "bad2e70e1df7d99ad98fb42bde1c3a78b669df37cf8936a187fa0329ca184a0e",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/es.json",
+      "sha256": "89b42ec3572535e932cc6bcc61e6bad45e1288207c9fc44d05df64a92d49f3f7",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/fr.json",
+      "sha256": "e1246971991f9752f10cae6e361db0083a15db9bc08857f407ab929cf7eb8f67",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/it.json",
+      "sha256": "e1f8c4c8bb4b4e6bcd09b9ff796cda705a02b24108bc66b11f7e6cac39ce5517",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+      "sha256": "99a20bc130d3b9337e0169773ff3e873b0b5455555837d316d448c11380160cc",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/tr.json",
+      "sha256": "2ac13c0351d0e8cd2cb4f6ff30473962a32d3c31070a71cbf9e2d75f4bca9baf",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/de.json",
+      "sha256": "6ddaf4d73601a91d7f39258fa3850304aeedb76ed2af3108073007243af2b774",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/en.json",
+      "sha256": "6f116c4f70ec4890cb7eb7f0699a4f6d00c03bc9397d692dfa17400f93d8e8a4",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/es.json",
+      "sha256": "61ca685bcf56362752c18cfbe554f79a00c9b08bb10a5f709336cbc1ccdf508a",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/fr.json",
+      "sha256": "862b76f1c1e1a76548f5983788ff27c4817a0353c2397bc87f68e3a983243af2",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/it.json",
+      "sha256": "95454c0b089068d8810b6f9bcb4cb178e04649733a983a3628621cc9b05aac86",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/pt.json",
+      "sha256": "f9f57979e3a7395150b324a638ba3bcd09a70a58e8a70b5fa6d63e3979465c0b",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/tr.json",
+      "sha256": "d599d94f4c80eb014c7db1129e78edcbd341660fbf76f5f51bbfb09df01460b6",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/de.json",
+      "sha256": "aa980a3542e3440a8e95142b2fb3532ce3f52c0d2c76398ffabc750e52256245",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/en.json",
+      "sha256": "1e8bbe22cf1693b0488a88e25f70d20260b8c4394847edbe8eb2cbb675cd6c68",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/es.json",
+      "sha256": "d67e0fd596e461814253baf900b74ad438da3c10f380f5fb310b656f3b687a88",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/fr.json",
+      "sha256": "f20c177a28ef2034b57aa202dbb0fb6f04b715ef29de06f6928b95c9f373d120",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/it.json",
+      "sha256": "88803909e149e1b59afab4c7403e2012fb85d557bd589e57848bb72894118295",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/pt.json",
+      "sha256": "9d2903c7de3bb02a02bd1140825e3d0ba994244773c9f2141b6e5734cbb56013",
+      "matchesMain": true
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/tr.json",
+      "sha256": "83f70b5e9678f8d228e381cf1220981d5bf0ff315ae538f4e0a88bfb34a65d19",
+      "matchesMain": true
+    }
+  ]
+}

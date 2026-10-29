@@ -1,0 +1,29 @@
+appId: ${MAESTRO_APP_ID}
+---
+# The harness opens a fresh app runtime first, so Home starts at its top here.
+- tapOn:
+    id: tab-home
+- runFlow:
+    when:
+      platform: iOS
+    file: position-outfit-open.yaml
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: outfit-share-card-open
+          direction: DOWN
+          timeout: 30000
+          centerElement: true
+- assertVisible:
+    id: outfit-share-card-open
+# Home renders one primary outfit card. Fail if a second opener ever appears.
+- assertNotVisible:
+    id: outfit-share-card-open
+    index: 1
+- assertNotVisible:
+    id: share-card-title
+- assertNotVisible:
+    id: share-card-preview-loaded-.*

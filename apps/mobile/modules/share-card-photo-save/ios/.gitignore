@@ -1,0 +1,3 @@
+# Swift Package Manager owns these generated test/build artifacts.
+.build/
+.swiftpm/

@@ -9,6 +9,7 @@
  */
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 import { config as loadEnv } from 'dotenv'
@@ -16,6 +17,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadLauncherEnv } from '../../../scripts/lib/caller-owned-env.mjs'
 
 const repoRoot = path.resolve(__dirname, '../../..')
+// The CLI the package declares as its `playwright` bin, wherever it is installed.
+const playwrightPackage = createRequire(__filename).resolve(
+  '@playwright/test/package.json'
+)
+const PLAYWRIGHT_CLI = path.join(
+  path.dirname(playwrightPackage),
+  (
+    JSON.parse(fs.readFileSync(playwrightPackage, 'utf8')) as {
+      bin: { playwright: string }
+    }
+  ).bin.playwright
+)
+/**
+ * ENV-03 and ENV-04 each wait on one real `playwright test` run: a runner, its
+ * config transpile and one worker process, so its cost grows with machine load.
+ * Measured on 2026-10-28 at load average 41 to 55 on 14 cores: 2.7 to 4.6 s
+ * through `npx`, 1.4 to 3.5 s calling the CLI directly, against vitest's 5 s
+ * default that the npx runs overran at load 38 to 61. The child is killed at
+ * about six times the worst direct run, and the test budget adds a second for setup
+ * and reading the records, so a hung child fails here by name instead of by
+ * timeout.
+ */
+const PLAYWRIGHT_RUN_DEADLINE_MS = 20_000
+const PLAYWRIGHT_TEST_BUDGET_MS = PLAYWRIGHT_RUN_DEADLINE_MS + 1_000
 const CALLER_DATABASE_URL = 'postgresql://caller:caller@127.0.0.1:55432/isolated'
 const ENV_LOCAL_DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 const migrateFiles = [
@@ -113,9 +138,10 @@ function runPlaywright(inherited: Stack): { runner: Stack; worker: Stack } {
     path.join(directory, 'probe.spec.ts'),
     `import fs from 'node:fs'\nimport { test } from '@playwright/test'\ntest('records the worker environment', () => fs.writeFileSync(${JSON.stringify(record('worker'))}, ${snapshot}))\n`
   )
+  // The CLI directly: `npx` would add its own package resolution to every run.
   const result = spawnSync(
-    'npx',
-    ['playwright', 'test', '--config', 'playwright.config.ts'],
+    process.execPath,
+    [PLAYWRIGHT_CLI, 'test', '--config', 'playwright.config.ts'],
     {
       cwd: directory,
       env: {
@@ -125,9 +151,14 @@ function runPlaywright(inherited: Stack): { runner: Stack; worker: Stack } {
         ...inherited,
       },
       encoding: 'utf8',
+      timeout: PLAYWRIGHT_RUN_DEADLINE_MS,
+      killSignal: 'SIGKILL',
     }
   )
-  expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
+  expect(
+    result.status,
+    `${result.error?.message ?? ''}\n${result.stdout}\n${result.stderr}`
+  ).toBe(0)
   const read = (name: string) =>
     JSON.parse(fs.readFileSync(record(name), 'utf8')) as Stack
   return { runner: read('runner'), worker: read('worker') }
@@ -174,41 +205,49 @@ describe('caller-owned environment keys survive the .env.local override', () => 
     )
   })
 
-  it('1.2b-ENV-03 keeps an isolated loopback stack in the runner, its workers and the launcher', () => {
-    const isolated: Stack = {
-      DATABASE_URL: CALLER_DATABASE_URL,
-      REDIS_URL: 'redis://127.0.0.1:56391',
-      SUPABASE_URL: 'http://127.0.0.1:55321',
-      SUPABASE_SERVICE_ROLE_KEY: 'isolated-service-role-key',
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'isolated-anon-key',
-    }
+  it(
+    '1.2b-ENV-03 keeps an isolated loopback stack in the runner, its workers and the launcher',
+    () => {
+      const isolated: Stack = {
+        DATABASE_URL: CALLER_DATABASE_URL,
+        REDIS_URL: 'redis://127.0.0.1:56391',
+        SUPABASE_URL: 'http://127.0.0.1:55321',
+        SUPABASE_SERVICE_ROLE_KEY: 'isolated-service-role-key',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'isolated-anon-key',
+      }
 
-    const { runner, worker } = runPlaywright(isolated)
-    expect(runner).toEqual(isolated)
-    expect(worker).toEqual(isolated)
-    const launcher = resolveLauncher(runner)
-    expect(launcher.stack).toEqual(isolated)
-    expect(launcher.owned).toEqual(expect.arrayContaining(Object.keys(isolated)))
-  })
+      const { runner, worker } = runPlaywright(isolated)
+      expect(runner).toEqual(isolated)
+      expect(worker).toEqual(isolated)
+      const launcher = resolveLauncher(runner)
+      expect(launcher.stack).toEqual(isolated)
+      expect(launcher.owned).toEqual(expect.arrayContaining(Object.keys(isolated)))
+    },
+    PLAYWRIGHT_TEST_BUDGET_MS
+  )
 
-  it('1.2b-ENV-04 lets .env.local replace a remote stack in the runner, its workers and the launcher', () => {
-    // The override exists for this: a shell that still holds a remote
-    // database or Supabase project must not leak into a local run, and the
-    // Supabase keys go with the URL they belong to.
-    const remote: Stack = {
-      DATABASE_URL:
-        'postgresql://postgres:secret@db.remote-ref.supabase.co:5432/postgres',
-      REDIS_URL: 'rediss://default:secret@remote-redis.example.com:6380',
-      SUPABASE_URL: 'https://remote-ref.supabase.co',
-      SUPABASE_SERVICE_ROLE_KEY: 'remote-service-role-key',
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'remote-anon-key',
-    }
+  it(
+    '1.2b-ENV-04 lets .env.local replace a remote stack in the runner, its workers and the launcher',
+    () => {
+      // The override exists for this: a shell that still holds a remote
+      // database or Supabase project must not leak into a local run, and the
+      // Supabase keys go with the URL they belong to.
+      const remote: Stack = {
+        DATABASE_URL:
+          'postgresql://postgres:secret@db.remote-ref.supabase.co:5432/postgres',
+        REDIS_URL: 'rediss://default:secret@remote-redis.example.com:6380',
+        SUPABASE_URL: 'https://remote-ref.supabase.co',
+        SUPABASE_SERVICE_ROLE_KEY: 'remote-service-role-key',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'remote-anon-key',
+      }
 
-    const { runner, worker } = runPlaywright(remote)
-    expect(runner).toEqual(ENV_LOCAL_STACK)
-    expect(worker).toEqual(ENV_LOCAL_STACK)
-    expect(resolveLauncher(runner).stack).toEqual(ENV_LOCAL_STACK)
-  })
+      const { runner, worker } = runPlaywright(remote)
+      expect(runner).toEqual(ENV_LOCAL_STACK)
+      expect(worker).toEqual(ENV_LOCAL_STACK)
+      expect(resolveLauncher(runner).stack).toEqual(ENV_LOCAL_STACK)
+    },
+    PLAYWRIGHT_TEST_BUDGET_MS
+  )
 
   it('1.2b-ENV-05 keeps the keys a caller above the launcher already listed as owned', () => {
     // The real-session harness settles its own ports and origins before it starts

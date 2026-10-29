@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "NSPhotoLibraryAddUsageDescription": "Consenti a CoutureCast di salvare la scheda approvata nelle tue foto.",
+    "NSPhotoLibraryUsageDescription": "Consenti a CoutureCast di scegliere le foto del tuo guardaroba."
+  }
+}

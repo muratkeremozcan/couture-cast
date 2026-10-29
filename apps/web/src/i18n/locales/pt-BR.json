@@ -684,6 +684,9 @@
       "save": "Salvar configurações",
       "saved": "Configurações salvas.",
       "failed": "Não foi possível salvar as configurações. Tente novamente.",
+      "loadFailed": "Não foi possível carregar as configurações. Tente novamente.",
+      "loadRetrying": "Não foi possível carregar as configurações. Tentando novamente em instantes.",
+      "retry": "Tentar novamente",
       "conflict": "As configurações foram alteradas em outro lugar. Confira os valores atuais e tente novamente.",
       "permission": "Permita notificações nas configurações do dispositivo e tente novamente.",
       "signin": "Entrar",
@@ -760,6 +763,49 @@
       "linkLabel_one": "Look em destaque em {{label}} de {{author}}, {{count}} reação. Abre Destaques da cidade.",
       "linkLabel_other": "Look em destaque em {{label}} de {{author}}, {{count}} reações. Abre Destaques da cidade.",
       "cta": "Ver em Destaques da cidade"
+    }
+  },
+  "shareCard": {
+    "launcher": "Criar meu cartão de look",
+    "sourceOutfit": "Look",
+    "sourceCommunity": "Look da comunidade",
+    "title": "Seu cartão",
+    "previewDescription": "Prévia do seu cartão CoutureCast",
+    "photoPrivacyHelp": "Sua foto permanece visível, incluindo nomes e placas na imagem. Confira a prévia antes de salvar.",
+    "preparing": "Preparando cartão",
+    "watermark": "Mostrar marca-d’água",
+    "save": "Salvar em Fotos",
+    "download": "Baixar PNG",
+    "saving": "Salvando",
+    "finishingSave": "Concluindo salvamento",
+    "saved": "Salvo em Fotos",
+    "downloadStarted": "Download iniciado",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "retry": "Tentar novamente",
+    "refresh": "Atualizar prévia",
+    "openSettings": "Abrir ajustes",
+    "nativeSaveUnavailable": "Atualize o aplicativo para salvar fotos.",
+    "permissionDenied": "Acesso às fotos negado. Tente novamente quando desejar.",
+    "permissionPermanent": "Permita salvar fotos nos ajustes.",
+    "sourceUnavailable": "Esta fonte está indisponível.",
+    "previewChanged": "O cartão mudou. Atualize a prévia antes de salvar.",
+    "offline": "Conecte-se à internet para preparar um cartão.",
+    "storage": "Não foi possível salvar. Confira o espaço disponível e tente novamente.",
+    "render": "Não foi possível preparar o cartão. Tente novamente.",
+    "unknown": "Ocorreu um erro. Tente novamente.",
+    "scenarios": {
+      "morning": "Manhã",
+      "midday": "Meio-dia",
+      "evening": "Noite"
+    },
+    "climateBands": {
+      "cold_dry": "Frio e seco",
+      "cold_wet": "Frio e úmido",
+      "temperate_dry": "Ameno e seco",
+      "temperate_wet": "Ameno e úmido",
+      "warm_dry": "Quente e seco",
+      "warm_wet": "Quente e úmido"
     }
   }
 }

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 3,
+  "eligible": {
+    "holdout-v6": {
+      "corpusVersion": "holdout-v6",
+      "sealedAt": "2026-10-28T17:05:57.585289+00:00",
+      "corpusSha256": "f5ac17f8dce28422821beef3d6d7c065c30c570d265f2a7304a970f06f60456e",
+      "locales": ["de", "en", "es", "fr", "it", "tr"]
+    },
+    "holdout-v8": {
+      "corpusVersion": "holdout-v8",
+      "sealedAt": "2026-10-29T00:00:00+00:00",
+      "corpusSha256": "d402f2c4491fd556671c520ab1d28e076720e6a160fcf72553937c1e53a2e7b4",
+      "locales": ["pt"]
+    }
+  },
+  "retired": {
+    "holdout-v1": "Superseded historical cohort; retained as history and ineligible for release evidence.",
+    "holdout-v2": "Superseded frozen historical cohort; retained as history and ineligible for release evidence.",
+    "holdout-v3": "Coordinator B9: non-independent fragment-bank corpus; historical evidence only.",
+    "holdout-v4": "Coordinator retirement after failed evaluation: released development data, disclosed to the builder.",
+    "holdout-v5": "Coordinator retirement after round-4 evaluation failed Italian at4/1000: development data; full false-positive handoff authorized only after this retirement is committed.",
+    "holdout-v7": {
+      "locales": ["pt"],
+      "reason": "Coordinator retirement after failed PT-only evaluation (14 of 2000, Wilson upper 1.1716 percent): development data; PT row-level handoff authorized only after this retirement is committed."
+    },
+    "holdout-v6": {
+      "locales": ["pt"],
+      "reason": "Coordinator retirement after failed PT evaluation of the sealed v6 holdout (16 of 2000, Wilson upper 1.2956 percent): spent, never decides acceptance; a fresh PT holdout decides it."
+    }
+  }
+}

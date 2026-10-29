@@ -1,0 +1,1695 @@
+{
+  "reviewer": "/root/edge_paths",
+  "locale": "pt",
+  "verdict": "READY",
+  "sourcePath": "/private/tmp/cc68-tea-holdout-v5/.cc68-tea-authoring/pt.tsv",
+  "sourceSha256": "a6517ae82b1507dcb6aae85282167fb620e7359536e528b6b3fd8b1f62a25d25",
+  "scope": {
+    "readOnly": true,
+    "reviewed": "Portuguese concept catalog and all500 captions; maximum-family definitions and memberships from author report and consolidation log; full paired texts for flagged boundaries, adjacent detachable components, handwriting and personal-memory motifs. This is a semantic boundary peer review, not a full Portuguese proofread.",
+    "sourceFiles": ["pt.tsv", "pt-concept-merges.json", "pt-author-review.json"],
+    "noTextOrAnnotationEdits": true,
+    "noScreeningOrPolicyRepairInspection": true,
+    "manifestOrSupplementOpened": false,
+    "builderContact": false,
+    "commits": false,
+    "additionalAgents": false
+  },
+  "findings": [
+    {
+      "id": "PT-SEM-1",
+      "status": "CONFIRMED_OVER_CAP",
+      "concept": "Removable wearable component changing its configuration",
+      "englishGloss": "An attached clothing part is detached to change the worn form.",
+      "minimumCount": 12,
+      "rows": [41, 42, 687, 688, 843, 844, 953, 954, 975, 976, 809, 810],
+      "evidence": [
+        {
+          "row": 41,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Retirei o painel de dentro e o mesmo casaco ficou bem mais leve."
+        },
+        {
+          "row": 42,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Um painel acolchoado destacado está estendido ao lado do casaco aberto."
+        },
+        {
+          "row": 687,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Desprendi as mangas para usar o mesmo vestido na tarde mais quente."
+        },
+        {
+          "row": 688,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "O vestido sem mangas apresenta encaixes expostos e duas peças removidas sobre a mesa."
+        },
+        {
+          "row": 843,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Desabotoei a gola extra para usar o casaco com a linha mais simples."
+        },
+        {
+          "row": 844,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Uma gola removível está ao lado do casaco com pequenos botões expostos."
+        },
+        {
+          "row": 953,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "A tira sai do punho quando quero usar a luva com menos volume."
+        },
+        {
+          "row": 954,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Os encaixes do punho estão vazios, com a tira removível apoiada junto à luva."
+        },
+        {
+          "row": 975,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Os zíperes soltam a parte inferior e deixam a calça pronta para o calor."
+        },
+        {
+          "row": 976,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "As partes inferiores removidas estão ao lado da calça encurtada por zíperes."
+        },
+        {
+          "row": 809,
+          "field": "caption",
+          "labels": ["saia-bolso-destacavel"],
+          "text": "O bolso se solta inteiro quando quero usar a saia com a frente lisa."
+        },
+        {
+          "row": 810,
+          "field": "altText",
+          "labels": ["saia-bolso-destacavel"],
+          "text": "Um bolso removido está ao lado da saia com pequenos botões de encaixe."
+        }
+      ],
+      "explanation": "The declared roupa-parte-removivel family already has10 members. Rows809/810 explicitly remove a skirt pocket to leave a smooth front, exactly the same component-detachment operation as removing an extra collar, cuff strip or sleeve. Pocket location does not establish an independent scenario.",
+      "requiredAmendment": "Consolidate809/810 with the existing removable-component family and individually author sufficient complete replacement items to bring the underlying family to10 or fewer. Review the adjacent candidates listed below before sealing so the cap is not achieved by label boundaries alone."
+    },
+    {
+      "id": "PT-SEM-2",
+      "status": "CONSERVATIVE_OVER_CAP",
+      "concept": "Plain flower or rosette decorating a wearable item",
+      "englishGloss": "A straightforward flower/petal/rosette motif used as garment or accessory decoration.",
+      "count": 12,
+      "rows": [561, 562, 573, 574, 741, 742, 835, 836, 877, 878, 925, 926],
+      "evidence": [
+        {
+          "row": 561,
+          "field": "caption",
+          "labels": ["saia-flor-recortada"],
+          "text": "As flores vazadas deixam a camada de baixo completar o desenho."
+        },
+        {
+          "row": 562,
+          "field": "altText",
+          "labels": ["saia-flor-recortada"],
+          "text": "Recortes florais revelam o tecido da camada inferior da saia."
+        },
+        {
+          "row": 573,
+          "field": "caption",
+          "labels": ["tecido-flor-sem-contorno"],
+          "text": "As flores aparecem como manchas de aquarela, sem linhas para fechá-las."
+        },
+        {
+          "row": 574,
+          "field": "altText",
+          "labels": ["tecido-flor-sem-contorno"],
+          "text": "Manchas suaves de tinta sugerem flores sobre o tecido claro."
+        },
+        {
+          "row": 741,
+          "field": "caption",
+          "labels": ["camiseta-bordado-manchinha"],
+          "text": "A pequena mancha virou o miolo da flor que bordei na camiseta."
+        },
+        {
+          "row": 742,
+          "field": "altText",
+          "labels": ["camiseta-bordado-manchinha"],
+          "text": "Pétalas bordadas circundam uma pequena marca no tecido da camiseta."
+        },
+        {
+          "row": 835,
+          "field": "caption",
+          "labels": ["presilha-petalas-feltro"],
+          "text": "As pétalas de feltro se sobrepõem sem cobrir o mecanismo da presilha."
+        },
+        {
+          "row": 836,
+          "field": "altText",
+          "labels": ["presilha-petalas-feltro"],
+          "text": "Pétalas macias em camadas circundam a base de uma presilha aberta."
+        },
+        {
+          "row": 877,
+          "field": "caption",
+          "labels": ["casaco-botoeira-flor"],
+          "text": "A flor passa pela botoeira sem precisar de uma agulha extra."
+        },
+        {
+          "row": 878,
+          "field": "altText",
+          "labels": ["casaco-botoeira-flor"],
+          "text": "Um pequeno ramo atravessa a casa do botão na lapela do casaco."
+        },
+        {
+          "row": 925,
+          "field": "caption",
+          "labels": ["sapato-laço-flor"],
+          "text": "Passei o cadarço em voltas pequenas para formar uma flor no sapato."
+        },
+        {
+          "row": 926,
+          "field": "altText",
+          "labels": ["sapato-laço-flor"],
+          "text": "Laçadas do cadarço formam pétalas sobre o peito do sapato."
+        }
+      ],
+      "explanation": "The simple floral motif is split across six pairs. Cut-out, painted, embroidered, felt and knotted representations vary technique or material; the floral motif remains visible in each. The stain-covering purpose at741 does not remove the flower motif. Rows877/878 describe a flower/branch in a buttonhole and are conservatively included as the same two-item scene. Surreal compound scenes such as flowers inside a lamp are excluded because their object relationship is substantive.",
+      "requiredAmendment": "Conservatively annotate the shared flower motif and individually replace at least one complete pair with a substantively different motif. Review the resulting full membership under the coordinator concept unit."
+    }
+  ],
+  "boundaryToResolve": [
+    {
+      "concept": "Handwritten material reproduced as textile decoration",
+      "rows": [757, 758, 917, 918],
+      "evidence": [
+        {
+          "row": 757,
+          "field": "caption",
+          "labels": ["bordado-memoria-pessoal"],
+          "text": "Bordei a letra do bilhete numa aplicação que agora acompanha minha camisa."
+        },
+        {
+          "row": 758,
+          "field": "altText",
+          "labels": ["bordado-memoria-pessoal"],
+          "text": "Uma pequena aplicação com escrita bordada está presa acima do bolso da camisa."
+        },
+        {
+          "row": 917,
+          "field": "caption",
+          "labels": ["lenço-estampa-notas"],
+          "text": "As notas escritas à mão viraram o desenho do lenço que pintei."
+        },
+        {
+          "row": 918,
+          "field": "altText",
+          "labels": ["lenço-estampa-notas"],
+          "text": "Linhas de escrita irregular cobrem o lenço com pequenas anotações ilustradas."
+        }
+      ],
+      "relationToMaximum": "757/758 already belong to the10-item bordado-memoria-pessoal family.917/918 reproduce handwritten notes as a painted scarf design.",
+      "judgment": "The two pairs share copying handwriting into textile decoration. If the maximum family is the broad written-memory/text motif,917/918 raise it to12. A stitch-versus-paint distinction alone does not establish independence. The caption at917 does not explicitly identify a commemorative memory, so the author must state a substantive motif distinction or consolidate and replace complete items.",
+      "existingMaximumRows": [553, 554, 757, 758, 759, 760, 761, 762, 955, 956]
+    }
+  ],
+  "adjacentRemovableComponentCandidates": [
+    {
+      "rows": [117, 118],
+      "evidence": [
+        {
+          "row": 117,
+          "field": "caption",
+          "labels": ["sapato-salto-trocavel"],
+          "text": "O salto mais baixo encaixa na mesma base para o caminho de volta."
+        },
+        {
+          "row": 118,
+          "field": "altText",
+          "labels": ["sapato-salto-trocavel"],
+          "text": "Dois saltos de alturas diferentes estão ao lado de um sapato com base de encaixe."
+        }
+      ],
+      "boundary": "Interchangeable shoe heel changes worn configuration; footwear category alone is insufficient to separate the component-detachment motif."
+    },
+    {
+      "rows": [647, 648],
+      "evidence": [
+        {
+          "row": 647,
+          "field": "caption",
+          "labels": ["bolsa-pochete-conversao"],
+          "text": "Tirei a alça comprida e passei o cinto pelas presilhas da bolsa."
+        },
+        {
+          "row": 648,
+          "field": "altText",
+          "labels": ["bolsa-pochete-conversao"],
+          "text": "Um cinto atravessa dois passantes na parte traseira da pequena bolsa."
+        }
+      ],
+      "boundary": "Long bag strap removed to convert carrying mode; accessory category should be addressed explicitly."
+    },
+    {
+      "rows": [665, 666],
+      "evidence": [
+        {
+          "row": 665,
+          "field": "caption",
+          "labels": ["anel-topo-trocavel"],
+          "text": "Retirei a parte decorada e ficou um aro simples para o dia."
+        },
+        {
+          "row": 666,
+          "field": "altText",
+          "labels": ["anel-topo-trocavel"],
+          "text": "Uma peça decorativa destacada está ao lado do aro com pequeno encaixe."
+        }
+      ],
+      "boundary": "Decorative ring top removed to change worn form; jewellery decoration is the detached component."
+    },
+    {
+      "rows": [899, 900],
+      "evidence": [
+        {
+          "row": 899,
+          "field": "caption",
+          "labels": ["pulseira-fitas-trocaveis"],
+          "text": "Troquei a fita sem mexer na peça central da pulseira."
+        },
+        {
+          "row": 900,
+          "field": "altText",
+          "labels": ["pulseira-fitas-trocaveis"],
+          "text": "Uma faixa destacada está ao lado da peça central com duas passagens laterais."
+        }
+      ],
+      "boundary": "Bracelet textile band detached and exchanged; the image and action are the same component exchange."
+    },
+    {
+      "rows": [981, 982],
+      "evidence": [
+        {
+          "row": 981,
+          "field": "caption",
+          "labels": ["camisa-painel-movel"],
+          "text": "O painel da frente solta de um lado para mudar a sobreposição da camisa."
+        },
+        {
+          "row": 982,
+          "field": "altText",
+          "labels": ["camisa-painel-movel"],
+          "text": "Uma aba frontal parcialmente destacada revela os encaixes na lateral da camisa."
+        }
+      ],
+      "boundary": "Shirt front panel unfastens on one side to change overlap. It remains partly attached, so completeness of detachment is a structural distinction requiring an explicit boundary judgment."
+    },
+    {
+      "rows": [103, 104, 183, 184, 363, 364, 871, 872, 995, 996],
+      "evidence": [
+        {
+          "row": 103,
+          "field": "caption",
+          "labels": ["luva-forro-retirado"],
+          "text": "Puxei o forro com cuidado para que a ponta dos dedos também secasse."
+        },
+        {
+          "row": 104,
+          "field": "altText",
+          "labels": ["luva-forro-retirado"],
+          "text": "O forro fino aparece parcialmente retirado de dentro dos dedos da luva."
+        },
+        {
+          "row": 183,
+          "field": "caption",
+          "labels": ["bolsa-cesto-organizador"],
+          "text": "O organizador sai inteiro quando quero trocar de bolsa rapidamente."
+        },
+        {
+          "row": 184,
+          "field": "altText",
+          "labels": ["bolsa-cesto-organizador"],
+          "text": "Um organizador com divisórias está suspenso acima do interior da bolsa."
+        },
+        {
+          "row": 363,
+          "field": "caption",
+          "labels": ["sapato-palmilha-removida"],
+          "text": "A palmilha sai inteira quando quero arejar o sapato depois do passeio."
+        },
+        {
+          "row": 364,
+          "field": "altText",
+          "labels": ["sapato-palmilha-removida"],
+          "text": "Uma palmilha está fora do sapato, apoiada ao lado da abertura."
+        },
+        {
+          "row": 871,
+          "field": "caption",
+          "labels": ["bolsa-fundo-destacavel"],
+          "text": "A base rígida sai quando preciso lavar a bolsa de tecido."
+        },
+        {
+          "row": 872,
+          "field": "altText",
+          "labels": ["bolsa-fundo-destacavel"],
+          "text": "Uma placa retangular removível está acima do fundo aberto da bolsa."
+        },
+        {
+          "row": 995,
+          "field": "caption",
+          "labels": ["gola-protetor-lavavel"],
+          "text": "O protetor fino sai da gola para lavar depois de cada uso."
+        },
+        {
+          "row": 996,
+          "field": "altText",
+          "labels": ["gola-protetor-lavavel"],
+          "text": "Uma tira removível está parcialmente solta do interior da gola do casaco."
+        }
+      ],
+      "boundary": "Lining, organiser, insole, bag base and collar-protector removal serve drying, cleaning or transfer. Their purpose differs from styling; assess whether the shared visual removal operation requires consolidation under the same conservative rule applied to Italian interior reveal."
+    }
+  ],
+  "languageNotes": {
+    "confirmedAdditionalErrors": [],
+    "limitations": "No full proofread claim. The source identity includes the author grammar edits at282/895/993."
+  },
+  "preservedSourceSha256": "cbf2aeedaf5d5b600fbdfa36c7163f4c59bb2787734c94260d482c6d571a8a59",
+  "italianSourceSha256AfterAuthorisedRevision": "c24f7ea97c32a18e8c8a36cd56665f6e40ae4c375f6115e4a2b825570ea6ee33",
+  "frenchSourceSha256": "a4ec9b979d77222c5e2c33d156d716fcc5f6198a8ebcdbcd0c831e6c352d7bd8",
+  "additionalComponentSweep": {
+    "evidenceSource": "Exact old-source wording copied from read-only tool output captured at verified SHA cbf2aeedaf5d5b600fbdfa36c7163f4c59bb2787734c94260d482c6d571a8a59. Initial peer note was already persisted before root revision. A subsequent attempt to reread old source stopped on a SHA assertion after root edits began; this supplement uses only previously inspected evidence.",
+    "alreadyDeclaredBase": {
+      "rows": [41, 42, 687, 688, 843, 844, 953, 954, 975, 976],
+      "count": 10,
+      "evidence": [
+        {
+          "row": 41,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Retirei o painel de dentro e o mesmo casaco ficou bem mais leve."
+        },
+        {
+          "row": 42,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Um painel acolchoado destacado está estendido ao lado do casaco aberto."
+        },
+        {
+          "row": 687,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Desprendi as mangas para usar o mesmo vestido na tarde mais quente."
+        },
+        {
+          "row": 688,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "O vestido sem mangas apresenta encaixes expostos e duas peças removidas sobre a mesa."
+        },
+        {
+          "row": 843,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Desabotoei a gola extra para usar o casaco com a linha mais simples."
+        },
+        {
+          "row": 844,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Uma gola removível está ao lado do casaco com pequenos botões expostos."
+        },
+        {
+          "row": 953,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "A tira sai do punho quando quero usar a luva com menos volume."
+        },
+        {
+          "row": 954,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Os encaixes do punho estão vazios, com a tira removível apoiada junto à luva."
+        },
+        {
+          "row": 975,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Os zíperes soltam a parte inferior e deixam a calça pronta para o calor."
+        },
+        {
+          "row": 976,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "As partes inferiores removidas estão ao lado da calça encurtada por zíperes."
+        }
+      ]
+    },
+    "definiteAdditionalSameModularOperation": {
+      "rows": [117, 118, 615, 616, 647, 648, 665, 666, 809, 810, 899, 900],
+      "count": 12,
+      "evidence": [
+        {
+          "row": 117,
+          "field": "caption",
+          "labels": ["sapato-salto-trocavel"],
+          "text": "O salto mais baixo encaixa na mesma base para o caminho de volta."
+        },
+        {
+          "row": 118,
+          "field": "altText",
+          "labels": ["sapato-salto-trocavel"],
+          "text": "Dois saltos de alturas diferentes estão ao lado de um sapato com base de encaixe."
+        },
+        {
+          "row": 615,
+          "field": "caption",
+          "labels": ["sapato-painel-cadarco"],
+          "text": "Soltei a peça de cima para mostrar como o cadarço passa por baixo."
+        },
+        {
+          "row": 616,
+          "field": "altText",
+          "labels": ["sapato-painel-cadarco"],
+          "text": "Um painel removível repousa ao lado do sapato com o cadarço exposto."
+        },
+        {
+          "row": 647,
+          "field": "caption",
+          "labels": ["bolsa-pochete-conversao"],
+          "text": "Tirei a alça comprida e passei o cinto pelas presilhas da bolsa."
+        },
+        {
+          "row": 648,
+          "field": "altText",
+          "labels": ["bolsa-pochete-conversao"],
+          "text": "Um cinto atravessa dois passantes na parte traseira da pequena bolsa."
+        },
+        {
+          "row": 665,
+          "field": "caption",
+          "labels": ["anel-topo-trocavel"],
+          "text": "Retirei a parte decorada e ficou um aro simples para o dia."
+        },
+        {
+          "row": 666,
+          "field": "altText",
+          "labels": ["anel-topo-trocavel"],
+          "text": "Uma peça decorativa destacada está ao lado do aro com pequeno encaixe."
+        },
+        {
+          "row": 809,
+          "field": "caption",
+          "labels": ["saia-bolso-destacavel"],
+          "text": "O bolso se solta inteiro quando quero usar a saia com a frente lisa."
+        },
+        {
+          "row": 810,
+          "field": "altText",
+          "labels": ["saia-bolso-destacavel"],
+          "text": "Um bolso removido está ao lado da saia com pequenos botões de encaixe."
+        },
+        {
+          "row": 899,
+          "field": "caption",
+          "labels": ["pulseira-fitas-trocaveis"],
+          "text": "Troquei a fita sem mexer na peça central da pulseira."
+        },
+        {
+          "row": 900,
+          "field": "altText",
+          "labels": ["pulseira-fitas-trocaveis"],
+          "text": "Uma faixa destacada está ao lado da peça central com duas passagens laterais."
+        }
+      ],
+      "reason": "Interchangeable shoe heel; removable shoe panel; detached bag strap; removable ring top; detachable skirt pocket; exchanged bracelet band. Carrier/category differences alone do not distinguish the removal/exchange operation."
+    },
+    "modularCoreCombinedLowerBound": {
+      "rows": [
+        41, 42, 117, 118, 615, 616, 647, 648, 665, 666, 687, 688, 809, 810, 843, 844, 899,
+        900, 953, 954, 975, 976
+      ],
+      "count": 22,
+      "evidence": [
+        {
+          "row": 41,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Retirei o painel de dentro e o mesmo casaco ficou bem mais leve."
+        },
+        {
+          "row": 42,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Um painel acolchoado destacado está estendido ao lado do casaco aberto."
+        },
+        {
+          "row": 117,
+          "field": "caption",
+          "labels": ["sapato-salto-trocavel"],
+          "text": "O salto mais baixo encaixa na mesma base para o caminho de volta."
+        },
+        {
+          "row": 118,
+          "field": "altText",
+          "labels": ["sapato-salto-trocavel"],
+          "text": "Dois saltos de alturas diferentes estão ao lado de um sapato com base de encaixe."
+        },
+        {
+          "row": 615,
+          "field": "caption",
+          "labels": ["sapato-painel-cadarco"],
+          "text": "Soltei a peça de cima para mostrar como o cadarço passa por baixo."
+        },
+        {
+          "row": 616,
+          "field": "altText",
+          "labels": ["sapato-painel-cadarco"],
+          "text": "Um painel removível repousa ao lado do sapato com o cadarço exposto."
+        },
+        {
+          "row": 647,
+          "field": "caption",
+          "labels": ["bolsa-pochete-conversao"],
+          "text": "Tirei a alça comprida e passei o cinto pelas presilhas da bolsa."
+        },
+        {
+          "row": 648,
+          "field": "altText",
+          "labels": ["bolsa-pochete-conversao"],
+          "text": "Um cinto atravessa dois passantes na parte traseira da pequena bolsa."
+        },
+        {
+          "row": 665,
+          "field": "caption",
+          "labels": ["anel-topo-trocavel"],
+          "text": "Retirei a parte decorada e ficou um aro simples para o dia."
+        },
+        {
+          "row": 666,
+          "field": "altText",
+          "labels": ["anel-topo-trocavel"],
+          "text": "Uma peça decorativa destacada está ao lado do aro com pequeno encaixe."
+        },
+        {
+          "row": 687,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Desprendi as mangas para usar o mesmo vestido na tarde mais quente."
+        },
+        {
+          "row": 688,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "O vestido sem mangas apresenta encaixes expostos e duas peças removidas sobre a mesa."
+        },
+        {
+          "row": 809,
+          "field": "caption",
+          "labels": ["saia-bolso-destacavel"],
+          "text": "O bolso se solta inteiro quando quero usar a saia com a frente lisa."
+        },
+        {
+          "row": 810,
+          "field": "altText",
+          "labels": ["saia-bolso-destacavel"],
+          "text": "Um bolso removido está ao lado da saia com pequenos botões de encaixe."
+        },
+        {
+          "row": 843,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Desabotoei a gola extra para usar o casaco com a linha mais simples."
+        },
+        {
+          "row": 844,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Uma gola removível está ao lado do casaco com pequenos botões expostos."
+        },
+        {
+          "row": 899,
+          "field": "caption",
+          "labels": ["pulseira-fitas-trocaveis"],
+          "text": "Troquei a fita sem mexer na peça central da pulseira."
+        },
+        {
+          "row": 900,
+          "field": "altText",
+          "labels": ["pulseira-fitas-trocaveis"],
+          "text": "Uma faixa destacada está ao lado da peça central com duas passagens laterais."
+        },
+        {
+          "row": 953,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "A tira sai do punho quando quero usar a luva com menos volume."
+        },
+        {
+          "row": 954,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Os encaixes do punho estão vazios, com a tira removível apoiada junto à luva."
+        },
+        {
+          "row": 975,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Os zíperes soltam a parte inferior e deixam a calça pronta para o calor."
+        },
+        {
+          "row": 976,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "As partes inferiores removidas estão ao lado da calça encurtada por zíperes."
+        }
+      ]
+    },
+    "relocatedOrPartiallyDetachedComponentCandidates": {
+      "rows": [613, 614, 981, 982],
+      "count": 4,
+      "evidence": [
+        {
+          "row": 613,
+          "field": "caption",
+          "labels": ["brinco-duas-posicoes"],
+          "text": "Mudei o pino de encaixe e a mesma peça ficou mais perto da orelha."
+        },
+        {
+          "row": 614,
+          "field": "altText",
+          "labels": ["brinco-duas-posicoes"],
+          "text": "Dois pequenos encaixes permitem prender o pino em posições diferentes do brinco."
+        },
+        {
+          "row": 981,
+          "field": "caption",
+          "labels": ["camisa-painel-movel"],
+          "text": "O painel da frente solta de um lado para mudar a sobreposição da camisa."
+        },
+        {
+          "row": 982,
+          "field": "altText",
+          "labels": ["camisa-painel-movel"],
+          "text": "Uma aba frontal parcialmente destacada revela os encaixes na lateral da camisa."
+        }
+      ],
+      "reason": "Relocated earring post and partly detached shirt panel change component attachment while retaining the wearable body. Partial attachment requires an explicit consistent structural boundary."
+    },
+    "removalForCareOrTransferCandidates": {
+      "rows": [103, 104, 183, 184, 363, 364, 871, 872, 995, 996],
+      "count": 10,
+      "evidence": [
+        {
+          "row": 103,
+          "field": "caption",
+          "labels": ["luva-forro-retirado"],
+          "text": "Puxei o forro com cuidado para que a ponta dos dedos também secasse."
+        },
+        {
+          "row": 104,
+          "field": "altText",
+          "labels": ["luva-forro-retirado"],
+          "text": "O forro fino aparece parcialmente retirado de dentro dos dedos da luva."
+        },
+        {
+          "row": 183,
+          "field": "caption",
+          "labels": ["bolsa-cesto-organizador"],
+          "text": "O organizador sai inteiro quando quero trocar de bolsa rapidamente."
+        },
+        {
+          "row": 184,
+          "field": "altText",
+          "labels": ["bolsa-cesto-organizador"],
+          "text": "Um organizador com divisórias está suspenso acima do interior da bolsa."
+        },
+        {
+          "row": 363,
+          "field": "caption",
+          "labels": ["sapato-palmilha-removida"],
+          "text": "A palmilha sai inteira quando quero arejar o sapato depois do passeio."
+        },
+        {
+          "row": 364,
+          "field": "altText",
+          "labels": ["sapato-palmilha-removida"],
+          "text": "Uma palmilha está fora do sapato, apoiada ao lado da abertura."
+        },
+        {
+          "row": 871,
+          "field": "caption",
+          "labels": ["bolsa-fundo-destacavel"],
+          "text": "A base rígida sai quando preciso lavar a bolsa de tecido."
+        },
+        {
+          "row": 872,
+          "field": "altText",
+          "labels": ["bolsa-fundo-destacavel"],
+          "text": "Uma placa retangular removível está acima do fundo aberto da bolsa."
+        },
+        {
+          "row": 995,
+          "field": "caption",
+          "labels": ["gola-protetor-lavavel"],
+          "text": "O protetor fino sai da gola para lavar depois de cada uso."
+        },
+        {
+          "row": 996,
+          "field": "altText",
+          "labels": ["gola-protetor-lavavel"],
+          "text": "Uma tira removível está parcialmente solta do interior da gola do casaco."
+        }
+      ],
+      "reason": "Lining; bag organiser; shoe insole; bag base; collar protector. Care/transfer purpose alone should not split a shared visual removal operation. The glove lining may remain attached, which is a genuine structural boundary to assess."
+    },
+    "repairReplacementCandidates": {
+      "rows": [
+        97, 98, 277, 278, 699, 700, 715, 716, 743, 744, 745, 746, 779, 780, 783, 784
+      ],
+      "count": 16,
+      "evidence": [
+        {
+          "row": 97,
+          "field": "caption",
+          "labels": ["oculos-corrente-argola"],
+          "text": "Troquei só as argolinhas e consegui usar minha corrente nos óculos novos."
+        },
+        {
+          "row": 98,
+          "field": "altText",
+          "labels": ["oculos-corrente-argola"],
+          "text": "Pequenas argolas flexíveis ligam a corrente às duas hastes dos óculos."
+        },
+        {
+          "row": 277,
+          "field": "caption",
+          "labels": ["goma-bico-entalhe"],
+          "text": "O cordão saiu pela abertura e consegui substituir o elástico gasto."
+        },
+        {
+          "row": 278,
+          "field": "altText",
+          "labels": ["goma-bico-entalhe"],
+          "text": "Uma pequena abertura no cós revela a extremidade do elástico interno."
+        },
+        {
+          "row": 699,
+          "field": "caption",
+          "labels": ["camisa-colarinho-substituido"],
+          "text": "O novo colarinho deixou minha camisa de tantos anos pronta para continuar."
+        },
+        {
+          "row": 700,
+          "field": "altText",
+          "labels": ["camisa-colarinho-substituido"],
+          "text": "Um colarinho recém-costurado se junta ao tecido mais gasto da camisa."
+        },
+        {
+          "row": 715,
+          "field": "caption",
+          "labels": ["casaco-forro-substituido"],
+          "text": "A parte de fora ficou, e o novo forro devolveu conforto ao casaco."
+        },
+        {
+          "row": 716,
+          "field": "altText",
+          "labels": ["casaco-forro-substituido"],
+          "text": "Um forro novo aparece dentro do casaco com tecido externo envelhecido."
+        },
+        {
+          "row": 743,
+          "field": "caption",
+          "labels": ["luva-punho-novo"],
+          "text": "Troquei só os punhos e mantive o resto das luvas que adoro."
+        },
+        {
+          "row": 744,
+          "field": "altText",
+          "labels": ["luva-punho-novo"],
+          "text": "Punhos de malha novos estão unidos ao corpo usado das luvas."
+        },
+        {
+          "row": 745,
+          "field": "caption",
+          "labels": ["sapato-tira-substituida"],
+          "text": "A tira nova conserva a sandália que já acompanha tantos verões."
+        },
+        {
+          "row": 746,
+          "field": "altText",
+          "labels": ["sapato-tira-substituida"],
+          "text": "Uma tira recém-colocada atravessa o peito da sandália de sola gasta."
+        },
+        {
+          "row": 779,
+          "field": "caption",
+          "labels": ["colar-fecho-trocado"],
+          "text": "O fecho maior facilitou usar o colar que ficava guardado havia meses."
+        },
+        {
+          "row": 780,
+          "field": "altText",
+          "labels": ["colar-fecho-trocado"],
+          "text": "Um fecho amplo está ligado às pequenas argolas nas extremidades do colar."
+        },
+        {
+          "row": 783,
+          "field": "caption",
+          "labels": ["chapeu-fita-recolocada"],
+          "text": "A fita nova cobriu a antiga marca sem alterar a forma da copa."
+        },
+        {
+          "row": 784,
+          "field": "altText",
+          "labels": ["chapeu-fita-recolocada"],
+          "text": "Uma faixa de fita limpa contorna a região marcada da copa do chapéu."
+        }
+      ],
+      "reason": "Glasses-chain rings; waistband elastic; shirt collar; coat lining; glove cuffs; sandal strap; necklace clasp; hat ribbon. Fixed sewn replacement versus reversible modular swapping may be a substantive mechanism boundary; apply consistently."
+    },
+    "salvageOrObjectTransformationCandidates": {
+      "rows": [717, 718, 721, 722, 725, 726, 749, 750],
+      "count": 8,
+      "evidence": [
+        {
+          "row": 717,
+          "field": "caption",
+          "labels": ["vestido-barra-bolsa"],
+          "text": "A faixa retirada da barra virou uma bolsa pequena para acompanhar o vestido."
+        },
+        {
+          "row": 718,
+          "field": "altText",
+          "labels": ["vestido-barra-bolsa"],
+          "text": "Uma bolsa de tecido igual está ao lado do vestido com bainha encurtada."
+        },
+        {
+          "row": 721,
+          "field": "caption",
+          "labels": ["sueter-manga-polaina"],
+          "text": "As mangas do suéter gasto ainda tinham bastante vida como polainas."
+        },
+        {
+          "row": 722,
+          "field": "altText",
+          "labels": ["sueter-manga-polaina"],
+          "text": "Dois tubos de malha com punhos formam polainas sobre as pernas."
+        },
+        {
+          "row": 725,
+          "field": "caption",
+          "labels": ["camisa-manga-bolso"],
+          "text": "A manga que retirei rendeu um bolso largo para minha sacola de trabalho."
+        },
+        {
+          "row": 726,
+          "field": "altText",
+          "labels": ["camisa-manga-bolso"],
+          "text": "Um pedaço de manga com punho forma um bolso na frente da sacola."
+        },
+        {
+          "row": 749,
+          "field": "caption",
+          "labels": ["bolsa-ziper-reaproveitado"],
+          "text": "Recuperei o zíper inteiro antes de desmontar a mochila que não usava mais."
+        },
+        {
+          "row": 750,
+          "field": "altText",
+          "labels": ["bolsa-ziper-reaproveitado"],
+          "text": "Um zíper reutilizado está preso por alinhavo à abertura da bolsa nova."
+        }
+      ],
+      "reason": "Dress hem; sweater sleeves; shirt sleeve; salvaged zipper. These produce another object/component. The transformed output is a possible substantive distinction from reversible component exchange; record the boundary explicitly."
+    },
+    "weakImplicitReplacementCandidates": {
+      "rows": [767, 768, 775, 776],
+      "count": 4,
+      "evidence": [
+        {
+          "row": 767,
+          "field": "caption",
+          "labels": ["sapato-cadarco-ponta-nova"],
+          "text": "As pontinhas novas fizeram o cadarço antigo passar de novo pelos ilhoses."
+        },
+        {
+          "row": 768,
+          "field": "altText",
+          "labels": ["sapato-cadarco-ponta-nova"],
+          "text": "Um terminal recém-aplicado comprime a ponta do cadarço junto ao sapato."
+        },
+        {
+          "row": 775,
+          "field": "caption",
+          "labels": ["calca-forro-bolso-refeito"],
+          "text": "O fundo novo do bolso impede que minhas chaves desapareçam no forro."
+        },
+        {
+          "row": 776,
+          "field": "altText",
+          "labels": ["calca-forro-bolso-refeito"],
+          "text": "Um pedaço de tecido novo fecha a base do bolso interno da calça."
+        }
+      ],
+      "reason": "New lace terminals and new pocket bottom could be additive rebuilding, with no discrete old component removed. Adjacent checks; actual modular removal is not established."
+    },
+    "notCountedWithoutActualRemovalEvidence": {
+      "rows": [625, 626, 639, 640],
+      "count": 4,
+      "evidence": [
+        {
+          "row": 625,
+          "field": "caption",
+          "labels": ["bolsa-alca-encaixe"],
+          "text": "A alça entra por duas aberturas e trava com um movimento curto."
+        },
+        {
+          "row": 626,
+          "field": "altText",
+          "labels": ["bolsa-alca-encaixe"],
+          "text": "As pontas da alça rígida atravessam ranhuras na estrutura da bolsa."
+        },
+        {
+          "row": 639,
+          "field": "caption",
+          "labels": ["camisa-laco-punho"],
+          "text": "Os laços substituem os botões nestes punhos largos que acabei de costurar."
+        },
+        {
+          "row": 640,
+          "field": "altText",
+          "labels": ["camisa-laco-punho"],
+          "text": "Um laço de fitas finas fecha a pequena abertura do punho da camisa."
+        }
+      ],
+      "reason": "Handle insertion/locking has no alternative component or removal stated. Tie closures in a newly sewn shirt do not establish that old buttons were removed. Generic fastening or assembly alone is insufficient."
+    },
+    "allExplicitCoreCareAndRepairCandidateRows": {
+      "rows": [
+        41, 42, 97, 98, 103, 104, 117, 118, 183, 184, 277, 278, 363, 364, 613, 614, 615,
+        616, 647, 648, 665, 666, 687, 688, 699, 700, 715, 716, 743, 744, 745, 746, 779,
+        780, 783, 784, 809, 810, 843, 844, 871, 872, 899, 900, 953, 954, 975, 976, 981,
+        982, 995, 996
+      ],
+      "count": 52,
+      "evidence": [
+        {
+          "row": 41,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Retirei o painel de dentro e o mesmo casaco ficou bem mais leve."
+        },
+        {
+          "row": 42,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Um painel acolchoado destacado está estendido ao lado do casaco aberto."
+        },
+        {
+          "row": 97,
+          "field": "caption",
+          "labels": ["oculos-corrente-argola"],
+          "text": "Troquei só as argolinhas e consegui usar minha corrente nos óculos novos."
+        },
+        {
+          "row": 98,
+          "field": "altText",
+          "labels": ["oculos-corrente-argola"],
+          "text": "Pequenas argolas flexíveis ligam a corrente às duas hastes dos óculos."
+        },
+        {
+          "row": 103,
+          "field": "caption",
+          "labels": ["luva-forro-retirado"],
+          "text": "Puxei o forro com cuidado para que a ponta dos dedos também secasse."
+        },
+        {
+          "row": 104,
+          "field": "altText",
+          "labels": ["luva-forro-retirado"],
+          "text": "O forro fino aparece parcialmente retirado de dentro dos dedos da luva."
+        },
+        {
+          "row": 117,
+          "field": "caption",
+          "labels": ["sapato-salto-trocavel"],
+          "text": "O salto mais baixo encaixa na mesma base para o caminho de volta."
+        },
+        {
+          "row": 118,
+          "field": "altText",
+          "labels": ["sapato-salto-trocavel"],
+          "text": "Dois saltos de alturas diferentes estão ao lado de um sapato com base de encaixe."
+        },
+        {
+          "row": 183,
+          "field": "caption",
+          "labels": ["bolsa-cesto-organizador"],
+          "text": "O organizador sai inteiro quando quero trocar de bolsa rapidamente."
+        },
+        {
+          "row": 184,
+          "field": "altText",
+          "labels": ["bolsa-cesto-organizador"],
+          "text": "Um organizador com divisórias está suspenso acima do interior da bolsa."
+        },
+        {
+          "row": 277,
+          "field": "caption",
+          "labels": ["goma-bico-entalhe"],
+          "text": "O cordão saiu pela abertura e consegui substituir o elástico gasto."
+        },
+        {
+          "row": 278,
+          "field": "altText",
+          "labels": ["goma-bico-entalhe"],
+          "text": "Uma pequena abertura no cós revela a extremidade do elástico interno."
+        },
+        {
+          "row": 363,
+          "field": "caption",
+          "labels": ["sapato-palmilha-removida"],
+          "text": "A palmilha sai inteira quando quero arejar o sapato depois do passeio."
+        },
+        {
+          "row": 364,
+          "field": "altText",
+          "labels": ["sapato-palmilha-removida"],
+          "text": "Uma palmilha está fora do sapato, apoiada ao lado da abertura."
+        },
+        {
+          "row": 613,
+          "field": "caption",
+          "labels": ["brinco-duas-posicoes"],
+          "text": "Mudei o pino de encaixe e a mesma peça ficou mais perto da orelha."
+        },
+        {
+          "row": 614,
+          "field": "altText",
+          "labels": ["brinco-duas-posicoes"],
+          "text": "Dois pequenos encaixes permitem prender o pino em posições diferentes do brinco."
+        },
+        {
+          "row": 615,
+          "field": "caption",
+          "labels": ["sapato-painel-cadarco"],
+          "text": "Soltei a peça de cima para mostrar como o cadarço passa por baixo."
+        },
+        {
+          "row": 616,
+          "field": "altText",
+          "labels": ["sapato-painel-cadarco"],
+          "text": "Um painel removível repousa ao lado do sapato com o cadarço exposto."
+        },
+        {
+          "row": 647,
+          "field": "caption",
+          "labels": ["bolsa-pochete-conversao"],
+          "text": "Tirei a alça comprida e passei o cinto pelas presilhas da bolsa."
+        },
+        {
+          "row": 648,
+          "field": "altText",
+          "labels": ["bolsa-pochete-conversao"],
+          "text": "Um cinto atravessa dois passantes na parte traseira da pequena bolsa."
+        },
+        {
+          "row": 665,
+          "field": "caption",
+          "labels": ["anel-topo-trocavel"],
+          "text": "Retirei a parte decorada e ficou um aro simples para o dia."
+        },
+        {
+          "row": 666,
+          "field": "altText",
+          "labels": ["anel-topo-trocavel"],
+          "text": "Uma peça decorativa destacada está ao lado do aro com pequeno encaixe."
+        },
+        {
+          "row": 687,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Desprendi as mangas para usar o mesmo vestido na tarde mais quente."
+        },
+        {
+          "row": 688,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "O vestido sem mangas apresenta encaixes expostos e duas peças removidas sobre a mesa."
+        },
+        {
+          "row": 699,
+          "field": "caption",
+          "labels": ["camisa-colarinho-substituido"],
+          "text": "O novo colarinho deixou minha camisa de tantos anos pronta para continuar."
+        },
+        {
+          "row": 700,
+          "field": "altText",
+          "labels": ["camisa-colarinho-substituido"],
+          "text": "Um colarinho recém-costurado se junta ao tecido mais gasto da camisa."
+        },
+        {
+          "row": 715,
+          "field": "caption",
+          "labels": ["casaco-forro-substituido"],
+          "text": "A parte de fora ficou, e o novo forro devolveu conforto ao casaco."
+        },
+        {
+          "row": 716,
+          "field": "altText",
+          "labels": ["casaco-forro-substituido"],
+          "text": "Um forro novo aparece dentro do casaco com tecido externo envelhecido."
+        },
+        {
+          "row": 743,
+          "field": "caption",
+          "labels": ["luva-punho-novo"],
+          "text": "Troquei só os punhos e mantive o resto das luvas que adoro."
+        },
+        {
+          "row": 744,
+          "field": "altText",
+          "labels": ["luva-punho-novo"],
+          "text": "Punhos de malha novos estão unidos ao corpo usado das luvas."
+        },
+        {
+          "row": 745,
+          "field": "caption",
+          "labels": ["sapato-tira-substituida"],
+          "text": "A tira nova conserva a sandália que já acompanha tantos verões."
+        },
+        {
+          "row": 746,
+          "field": "altText",
+          "labels": ["sapato-tira-substituida"],
+          "text": "Uma tira recém-colocada atravessa o peito da sandália de sola gasta."
+        },
+        {
+          "row": 779,
+          "field": "caption",
+          "labels": ["colar-fecho-trocado"],
+          "text": "O fecho maior facilitou usar o colar que ficava guardado havia meses."
+        },
+        {
+          "row": 780,
+          "field": "altText",
+          "labels": ["colar-fecho-trocado"],
+          "text": "Um fecho amplo está ligado às pequenas argolas nas extremidades do colar."
+        },
+        {
+          "row": 783,
+          "field": "caption",
+          "labels": ["chapeu-fita-recolocada"],
+          "text": "A fita nova cobriu a antiga marca sem alterar a forma da copa."
+        },
+        {
+          "row": 784,
+          "field": "altText",
+          "labels": ["chapeu-fita-recolocada"],
+          "text": "Uma faixa de fita limpa contorna a região marcada da copa do chapéu."
+        },
+        {
+          "row": 809,
+          "field": "caption",
+          "labels": ["saia-bolso-destacavel"],
+          "text": "O bolso se solta inteiro quando quero usar a saia com a frente lisa."
+        },
+        {
+          "row": 810,
+          "field": "altText",
+          "labels": ["saia-bolso-destacavel"],
+          "text": "Um bolso removido está ao lado da saia com pequenos botões de encaixe."
+        },
+        {
+          "row": 843,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Desabotoei a gola extra para usar o casaco com a linha mais simples."
+        },
+        {
+          "row": 844,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Uma gola removível está ao lado do casaco com pequenos botões expostos."
+        },
+        {
+          "row": 871,
+          "field": "caption",
+          "labels": ["bolsa-fundo-destacavel"],
+          "text": "A base rígida sai quando preciso lavar a bolsa de tecido."
+        },
+        {
+          "row": 872,
+          "field": "altText",
+          "labels": ["bolsa-fundo-destacavel"],
+          "text": "Uma placa retangular removível está acima do fundo aberto da bolsa."
+        },
+        {
+          "row": 899,
+          "field": "caption",
+          "labels": ["pulseira-fitas-trocaveis"],
+          "text": "Troquei a fita sem mexer na peça central da pulseira."
+        },
+        {
+          "row": 900,
+          "field": "altText",
+          "labels": ["pulseira-fitas-trocaveis"],
+          "text": "Uma faixa destacada está ao lado da peça central com duas passagens laterais."
+        },
+        {
+          "row": 953,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "A tira sai do punho quando quero usar a luva com menos volume."
+        },
+        {
+          "row": 954,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Os encaixes do punho estão vazios, com a tira removível apoiada junto à luva."
+        },
+        {
+          "row": 975,
+          "field": "caption",
+          "labels": ["roupa-parte-removivel"],
+          "text": "Os zíperes soltam a parte inferior e deixam a calça pronta para o calor."
+        },
+        {
+          "row": 976,
+          "field": "altText",
+          "labels": ["roupa-parte-removivel"],
+          "text": "As partes inferiores removidas estão ao lado da calça encurtada por zíperes."
+        },
+        {
+          "row": 981,
+          "field": "caption",
+          "labels": ["camisa-painel-movel"],
+          "text": "O painel da frente solta de um lado para mudar a sobreposição da camisa."
+        },
+        {
+          "row": 982,
+          "field": "altText",
+          "labels": ["camisa-painel-movel"],
+          "text": "Uma aba frontal parcialmente destacada revela os encaixes na lateral da camisa."
+        },
+        {
+          "row": 995,
+          "field": "caption",
+          "labels": ["gola-protetor-lavavel"],
+          "text": "O protetor fino sai da gola para lavar depois de cada uso."
+        },
+        {
+          "row": 996,
+          "field": "altText",
+          "labels": ["gola-protetor-lavavel"],
+          "text": "Uma tira removível está parcialmente solta do interior da gola do casaco."
+        }
+      ]
+    },
+    "externalStorageToolsExcluded": [
+      {
+        "rows": [55, 56],
+        "reason": "Hat packing form is an external storage support."
+      },
+      {
+        "rows": [303, 304, 993, 994],
+        "reason": "Shoe trees and inflatable boot supports are storage tools outside normal wear."
+      }
+    ]
+  },
+  "floralScopeSweep": {
+    "plainFlowerRows": [561, 562, 573, 574, 741, 742, 835, 836, 877, 878, 925, 926],
+    "additionalPlainFlowerMembersFound": [],
+    "compoundIllustrationRowsExcluded": [395, 396, 401, 402, 425, 426, 479, 480],
+    "inheritedLaceWithoutStatedFlowerShapeExcluded": [733, 734],
+    "reason": "Read-only floral/petal wording retrieval across both fields found no other plain floral pair. Compound bridge/umbrella/lamp/accordion-vase object relationships remain substantively different scenes."
+  },
+  "readyForAuthorRevisions": true,
+  "sourceFileChangedAfterInitialNote": true,
+  "currentSourceSha256ForCoordinationOnly": "136e8e591da1e9002560df3a6a523d5b789de0af6f101eee2b69495dbafbf0e9",
+  "initialSourceSha256": "cbf2aeedaf5d5b600fbdfa36c7163f4c59bb2787734c94260d482c6d571a8a59",
+  "historicalFindingsSourceSha256": "cbf2aeedaf5d5b600fbdfa36c7163f4c59bb2787734c94260d482c6d571a8a59",
+  "oldSourceEvidenceSnapshotVerified": {
+    "sourcePath": "/private/tmp/cc68-tea-holdout-v5/.cc68-tea-authoring/pt-before-peer.tsv",
+    "sha256": "cbf2aeedaf5d5b600fbdfa36c7163f4c59bb2787734c94260d482c6d571a8a59",
+    "quotedRows": 84,
+    "mismatches": []
+  },
+  "resolutionReview": {
+    "reviewedSourceSha256": "a6517ae82b1507dcb6aae85282167fb620e7359536e528b6b3fd8b1f62a25d25",
+    "verdict": "READY",
+    "unresolvedFindings": [],
+    "allSourceChangesExactlyMatchAuthorResolutionLog": true,
+    "completeTextReplacementCount": 40,
+    "completeTextReplacementRows": [
+      41, 42, 103, 104, 117, 118, 129, 130, 613, 614, 615, 616, 647, 648, 687, 688, 741,
+      742, 761, 762, 835, 836, 843, 844, 871, 872, 895, 896, 899, 900, 917, 918, 953, 954,
+      975, 976, 981, 982, 995, 996
+    ],
+    "allHistoricalFindingsResolvedAtThisSource": true,
+    "reviewedGroups": [
+      {
+        "concept": "componente-retirado-trocado",
+        "englishGloss": "A reversible component removed or exchanged from a garment or accessory for styling or care.",
+        "count": 8,
+        "rows": [183, 184, 363, 364, 665, 666, 809, 810],
+        "members": [
+          {
+            "row": 183,
+            "field": "caption"
+          },
+          {
+            "row": 184,
+            "field": "altText"
+          },
+          {
+            "row": 363,
+            "field": "caption"
+          },
+          {
+            "row": 364,
+            "field": "altText"
+          },
+          {
+            "row": 665,
+            "field": "caption"
+          },
+          {
+            "row": 666,
+            "field": "altText"
+          },
+          {
+            "row": 809,
+            "field": "caption"
+          },
+          {
+            "row": 810,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "ornamento-floral-simples",
+        "englishGloss": "A plain flower or rosette decorating a wearable item.",
+        "count": 8,
+        "rows": [561, 562, 573, 574, 877, 878, 925, 926],
+        "members": [
+          {
+            "row": 561,
+            "field": "caption"
+          },
+          {
+            "row": 562,
+            "field": "altText"
+          },
+          {
+            "row": 573,
+            "field": "caption"
+          },
+          {
+            "row": 574,
+            "field": "altText"
+          },
+          {
+            "row": 877,
+            "field": "caption"
+          },
+          {
+            "row": 878,
+            "field": "altText"
+          },
+          {
+            "row": 925,
+            "field": "caption"
+          },
+          {
+            "row": 926,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "bordado-memoria-pessoal",
+        "englishGloss": "Written personal memories embroidered on a wearable textile.",
+        "count": 8,
+        "rows": [553, 554, 757, 758, 759, 760, 955, 956],
+        "members": [
+          {
+            "row": 553,
+            "field": "caption"
+          },
+          {
+            "row": 554,
+            "field": "altText"
+          },
+          {
+            "row": 757,
+            "field": "caption"
+          },
+          {
+            "row": 758,
+            "field": "altText"
+          },
+          {
+            "row": 759,
+            "field": "caption"
+          },
+          {
+            "row": 760,
+            "field": "altText"
+          },
+          {
+            "row": 955,
+            "field": "caption"
+          },
+          {
+            "row": 956,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "texto-decorativo-tecido",
+        "englishGloss": "Readable personal marks or letters reproduced as textile decoration.",
+        "count": 10,
+        "rows": [553, 554, 583, 584, 757, 758, 759, 760, 955, 956],
+        "members": [
+          {
+            "row": 553,
+            "field": "caption"
+          },
+          {
+            "row": 554,
+            "field": "altText"
+          },
+          {
+            "row": 583,
+            "field": "caption"
+          },
+          {
+            "row": 584,
+            "field": "altText"
+          },
+          {
+            "row": 757,
+            "field": "caption"
+          },
+          {
+            "row": 758,
+            "field": "altText"
+          },
+          {
+            "row": 759,
+            "field": "caption"
+          },
+          {
+            "row": 760,
+            "field": "altText"
+          },
+          {
+            "row": 955,
+            "field": "caption"
+          },
+          {
+            "row": 956,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "tiras-tecido-entrelacadas",
+        "englishGloss": "Interlaced or braided textile strips forming a wearable surface.",
+        "count": 8,
+        "rows": [529, 530, 535, 536, 687, 688, 755, 756],
+        "members": [
+          {
+            "row": 529,
+            "field": "caption"
+          },
+          {
+            "row": 530,
+            "field": "altText"
+          },
+          {
+            "row": 535,
+            "field": "caption"
+          },
+          {
+            "row": 536,
+            "field": "altText"
+          },
+          {
+            "row": 687,
+            "field": "caption"
+          },
+          {
+            "row": 688,
+            "field": "altText"
+          },
+          {
+            "row": 755,
+            "field": "caption"
+          },
+          {
+            "row": 756,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "forma-espiral-helicoidal",
+        "englishGloss": "An explicit spiral or helix in a wearable form or compacted belt end.",
+        "count": 8,
+        "rows": [11, 12, 147, 148, 559, 560, 575, 576],
+        "members": [
+          {
+            "row": 11,
+            "field": "caption"
+          },
+          {
+            "row": 12,
+            "field": "altText"
+          },
+          {
+            "row": 147,
+            "field": "caption"
+          },
+          {
+            "row": 148,
+            "field": "altText"
+          },
+          {
+            "row": 559,
+            "field": "caption"
+          },
+          {
+            "row": 560,
+            "field": "altText"
+          },
+          {
+            "row": 575,
+            "field": "caption"
+          },
+          {
+            "row": 576,
+            "field": "altText"
+          }
+        ]
+      }
+    ],
+    "intermediateSpiralFinding": {
+      "sourceSha256": "136e8e591da1e9002560df3a6a523d5b789de0af6f101eee2b69495dbafbf0e9",
+      "rows": [11, 12, 129, 130, 559, 560, 575, 576, 615, 616, 895, 896],
+      "additionalConservativeBeltRows": [147, 148],
+      "status": "RESOLVED",
+      "resolution": "All14 former members counted conservatively; six complete items independently replaced, leaving8 current members."
+    },
+    "acceptedStructuralBoundaries": [
+      "Completed permanently sewn restoration retains a visible joined seam; reversible modular removal shows a free component or its exposed attachment interface. Inspected repair swaps do not cross this structural boundary.",
+      "Salvage through cutting/sewing produces a different functional object. That output and construction are substantive differences from reversible component exchange.",
+      "The strip-weaving family counts four cross-carrier pairs together. Disc braiding depicts production of a round cord with a different tool operation and construction geometry.",
+      "Simple flower representations count together; compound surreal illustrations retain substantive relationships among depicted objects. The final simple-flower family has8.",
+      "The spiral family conservatively includes compacted belt-end storage as well as deliberately coiled designs, eliminating the prior functional-purpose boundary."
+    ],
+    "newCompleteMotifsRead": "Read all40 final text replacements against original source, including the domino-fall scarf, solid inclined heel and miniature hanger earrings. The replacement motifs do not create a further identified over-cap family.",
+    "maximumConcepts": [
+      {
+        "concept": "texto-decorativo-tecido",
+        "englishGloss": "Readable personal marks or letters reproduced as textile decoration.",
+        "count": 10,
+        "rows": [553, 554, 583, 584, 757, 758, 759, 760, 955, 956],
+        "members": [
+          {
+            "row": 553,
+            "field": "caption"
+          },
+          {
+            "row": 554,
+            "field": "altText"
+          },
+          {
+            "row": 583,
+            "field": "caption"
+          },
+          {
+            "row": 584,
+            "field": "altText"
+          },
+          {
+            "row": 757,
+            "field": "caption"
+          },
+          {
+            "row": 758,
+            "field": "altText"
+          },
+          {
+            "row": 759,
+            "field": "caption"
+          },
+          {
+            "row": 760,
+            "field": "altText"
+          },
+          {
+            "row": 955,
+            "field": "caption"
+          },
+          {
+            "row": 956,
+            "field": "altText"
+          }
+        ]
+      }
+    ],
+    "mechanicalAudit": {
+      "path": "/private/tmp/cc68-tea-holdout-v5/.cc68-tea-authoring/peer-audits-edge_paths/pt-common-audit.json",
+      "total": 1000,
+      "fields": {
+        "caption": 500,
+        "altText": 500
+      },
+      "fiveWordAffected": 2,
+      "maximumConceptCount": 10,
+      "wholeTextDuplicates": [],
+      "historicalCollisions": [],
+      "historicalPathCount": 35,
+      "lengthViolations": 0
+    },
+    "sourceWasEditedByPeer": false,
+    "screeningOrExcludedMaterialInspected": false,
+    "scopeLimit": "Semantic peer review and mechanical common audit provide the stated evidence. No claim of exhaustive native-language proofreading or production behavior evaluation."
+  },
+  "finalSourceSha256": "a6517ae82b1507dcb6aae85282167fb620e7359536e528b6b3fd8b1f62a25d25",
+  "finalSourceBytesPreservedByPeer": true
+}

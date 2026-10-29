@@ -2,6 +2,7 @@
 import { ConflictException, Inject, Injectable } from '@nestjs/common'
 import { PrismaClient, Prisma, type PushToken } from '@prisma/client'
 import type { RegisterPushTokenInput } from '@couture/api-client/contracts/http'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 class BindingChanged extends Error {}
 export function projectRegistration(row: PushToken) {
@@ -59,7 +60,8 @@ export class PushRegistrationService {
       })
       const members = [...new Set([owner, ...discovered.map((r) => r.user_id)])]
       try {
-        return await this.prisma.$transaction(
+        return await interactiveTransaction(
+          this.prisma,
           async (tx) => {
             await tx.$executeRaw(
               Prisma.sql`SELECT community_privacy_guards(ARRAY[${Prisma.join(members)}]::text[],ARRAY[]::text[],true)`
@@ -168,7 +170,7 @@ export class PushRegistrationService {
   }
 
   async remove(owner: string, id: string, generation: number) {
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${owner}]::text[],ARRAY[]::text[],true)`
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${owner}))`
       const row = await tx.pushToken.findFirst({

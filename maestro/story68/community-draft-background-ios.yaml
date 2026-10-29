@@ -1,0 +1,89 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    when:
+      visible:
+        id: community-post-sheet-close
+    commands:
+      - tapOn:
+          id: community-post-sheet-close
+- runFlow:
+    when:
+      notVisible:
+        id: community-new-post-button
+    commands:
+      - tapOn:
+          id: tab-community
+- tapOn:
+    id: community-new-post-button
+- scrollUntilVisible:
+    element:
+      id: community-caption-input
+    direction: DOWN
+    centerElement: false
+    visibilityPercentage: 95
+- tapOn:
+    id: community-caption-input
+- inputText: A draft kept across background
+# iOS reports a failure when the simulator shows no software keyboard (run 40761149989);
+# the next scroll fails by its own name if the keyboard really stayed up.
+- hideKeyboard:
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: community-pick-image-button
+    direction: UP
+    centerElement: false
+# scrollUntilVisible stops once the button's frame is inside the screen, and a scroll view still
+# reports the frame of content that sits under the sheet header. Both failed runs (40927902095,
+# 40938852299) stopped with the button's top at 34 pt, its centre at 94 pt, under the header that
+# starts at about 87 pt: the tap reported COMPLETED, hit the header and opened nothing, four times
+# at the same spot. Each attempt pulls the sheet to its top first, as position-outfit-open.yaml
+# does, so the button sits below the header, and the tap repeats only while the picker's Cancel
+# is not up.
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: community-pick-image-button
+              enabled: true
+            notVisible: Cancel
+          commands:
+            - swipe:
+                start: 50%, 30%
+                end: 50%, 85%
+                duration: 300
+            - swipe:
+                start: 50%, 30%
+                end: 50%, 85%
+                duration: 300
+            - waitForAnimationToEnd
+            - tapOn:
+                id: community-pick-image-button
+      - extendedWaitUntil:
+          visible: Cancel
+          timeout: 8000
+- pressKey: Home
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    stopApp: false
+    clearState: false
+    # Preserve the current OS grants; Maestro otherwise pregrants every permission.
+    permissions: {}
+- extendedWaitUntil:
+    visible: Cancel
+    timeout: 15000
+- tapOn: Cancel
+- assertVisible:
+    id: community-post-sheet-content
+- scrollUntilVisible:
+    element:
+      id: community-caption-input
+    direction: DOWN
+    centerElement: false
+    visibilityPercentage: 95
+- assertVisible: A draft kept across background
+- tapOn:
+    id: community-post-sheet-close

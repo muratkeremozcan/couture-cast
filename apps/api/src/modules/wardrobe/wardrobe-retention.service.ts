@@ -8,6 +8,7 @@ import {
 } from '../personalization/ritual-cache'
 import { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
 import { lockCapsules, lockGarments, lockOwnerProfile } from './wardrobe-capsule.locks'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 const ABANDONED_UPLOAD_RETENTION_MS = 24 * 60 * 60 * 1000
 const CLEANUP_BATCH_SIZE = 100
@@ -42,7 +43,7 @@ export class WardrobeRetentionService {
      * these same locks, so an unlocked flip here would let a capsule be built
      * from a garment that is being deleted in the same instant.
      */
-    const claimed = await this.prisma.$transaction(async (tx) => {
+    const claimed = await interactiveTransaction(this.prisma, async (tx) => {
       await lockOwnerProfile(tx, userId)
 
       const affectedCapsules = await tx.outfitCapsule.findMany({
@@ -149,7 +150,7 @@ export class WardrobeRetentionService {
     }
 
     const completedAt = new Date()
-    await this.prisma.$transaction(async (tx) => {
+    await interactiveTransaction(this.prisma, async (tx) => {
       /**
        * Same lock order as every capsule mutation: owner profile, then affected
        * capsules by id, then the target garment. Acquiring capsules before the

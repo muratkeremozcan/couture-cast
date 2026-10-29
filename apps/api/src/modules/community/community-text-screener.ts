@@ -9,9 +9,10 @@
 // Three rules shape everything below.
 //
 // EVERY LANGUAGE RUNS AGAINST EVERY SUBMISSION. `locale` arrives from the
-// client on the publish request, so treating it as a routing key would make it a
-// one-field opt-out of the other six dictionaries. It selects nothing; it is
-// only reported back as provenance, and it is checked for a language this
+// client on the publish request, so treating it as a dictionary routing key would
+// make it a one-field opt-out. It scopes ordinary low/medium grammatical contexts;
+// every dictionary still runs. Reviewed high-term constructions require their
+// declared native language and exclude person-directed insult frames. It is also checked for a language this
 // screener holds no list for. A policy that set `allDictionariesAlwaysRun` to
 // false would be asking for exactly that bypass, so construction refuses it.
 //
@@ -33,6 +34,7 @@ import path from 'node:path'
 import { Filter } from 'bad-words'
 import { z } from 'zod'
 import { supportedLocales } from '@couture/api-client/contracts/http'
+import reviewedOccurrenceBank from '../../../policies/community-screening/reviewed-occurrence-constructions-v1.json'
 
 export const SCREENING_LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr'] as const
 
@@ -267,12 +269,254 @@ const termsFileSchema = z.object({
   entries: z.array(termEntrySchema).min(1),
 })
 
+const literalContextSchema = z
+  .object({
+    terms: z.array(z.string().regex(/^\p{Script=Latin}+$/u)).min(1),
+    objects: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    connectors: z.array(z.string().regex(/^\p{L}+$/u)),
+    maxDistance: z.number().int().min(1).max(6),
+    // Grammar evidence: the term also clears when one of these function words stands within
+    // evidenceRadius plain-space-joined tokens on either side, so a family of ordinary
+    // forms needs no enumerated object nouns.
+    evidence: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    evidenceRadius: z.number().int().min(1).max(4).default(1),
+    // Frames that veto the clearance: a word within vetoRadius tokens on either side
+    // (punctuation does not stop it), or anywhere in the text for textVetoes.
+    vetoes: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    vetoRadius: z.number().int().min(1).max(6).default(3),
+    textVetoes: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    // Word-for-word frames that hold the term and veto the clearance ("burro do chefe").
+    vetoFrames: z.array(z.string().regex(/^\p{L}+(?: \p{L}+){1,4}$/u)).default([]),
+    // Positive grammar: the term also clears directly after one of these noun heads, inside
+    // one of these word-for-word frames, or anywhere in a text that holds one of these cues.
+    adjacentBefore: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    clearFrames: z.array(z.string().regex(/^\p{L}+(?: \p{L}+){1,4}$/u)).default([]),
+    textEvidence: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    // An age mention (a number or numeral word before ano, anos or aninhos) within this many
+    // tokens of the term vetoes the clearance.
+    ageRadius: z.number().int().min(1).max(8).optional(),
+    ageNumerals: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+  })
+  .refine(
+    (context) =>
+      context.objects.length > 0 ||
+      context.evidence.length > 0 ||
+      context.adjacentBefore.length > 0 ||
+      context.clearFrames.length > 0 ||
+      context.textEvidence.length > 0
+  )
+
+// Coordinator-reviewed native-sense constructions. Each marks only its exact
+// target occurrence in raw contiguous words. High-term rules also require the
+// reviewed declared language and reject the reviewed insult-frame grammar.
+const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
+  .object({
+    version: z.literal(1),
+    provenance: z.string().min(20),
+    constructions: z
+      .array(
+        z
+          .object({
+            language: z.enum(SCREENING_LANGUAGES),
+            nativeLanguages: z.array(z.enum(SCREENING_LANGUAGES)).min(1),
+            target: z
+              .string()
+              .regex(/^\p{Script=Latin}+$/u)
+              .max(40),
+            phrases: z
+              .array(
+                z
+                  .string()
+                  .regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u)
+                  .max(120)
+              )
+              .min(1)
+              .max(4096),
+            reason: z.string().min(20),
+            requiredDeclaredLanguages: z
+              .array(z.enum(SCREENING_LANGUAGES))
+              .min(1)
+              .optional(),
+            // A phrase listed here needs these declared languages instead of the rule's
+            // own, so one target can be wider in one language than in another.
+            // The phrase clears only when it starts the text or a sentence
+            // (sentenceInitial) or directly follows one of these words.
+            precedingWords: z
+              .array(z.string().regex(/^\p{L}+$/u))
+              .min(1)
+              .optional(),
+            sentenceInitial: z.boolean().optional(),
+            // Right bound: after the phrase the whole remainder of the text must be these
+            // closed tails separated by spaces and punctuation, then the end of the text.
+            closedTails: z
+              .array(z.string().regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u))
+              .min(1)
+              .optional(),
+            // Left bound: all text before the phrase must be these closed opener phrases
+            // (no punctuation is read), so nothing unlisted can lead into the clearance.
+            openers: z
+              .array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u))
+              .min(1)
+              .optional(),
+            // The construction does not clear when the whole field text holds any of these
+            // words, whichever sentence or line they sit in.
+            textForbidden: z
+              .array(z.string().regex(/^\p{L}+$/u))
+              .min(1)
+              .optional(),
+            phraseRequiredDeclaredLanguages: z
+              .record(z.string(), z.array(z.enum(SCREENING_LANGUAGES)).min(1))
+              .optional(),
+            // Grammar-evidence phrases (a determiner or preposition beside the noun). They
+            // clear under their own declared languages and only inside a text of at least
+            // contextMinWords words, so a bare two or three word frame stays withheld.
+            contextPhrases: z
+              .array(
+                z
+                  .string()
+                  .regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u)
+                  .max(120)
+              )
+              .min(1)
+              .max(4096)
+              .optional(),
+            contextRequiredDeclaredLanguages: z
+              .array(z.enum(SCREENING_LANGUAGES))
+              .min(1)
+              .optional(),
+            contextMinWords: z.number().int().min(2).max(8).optional(),
+            // Letters the target's language never writes (French è ù û î ë ï ü œ ÿ for a
+            // Portuguese rug noun): one of them anywhere in the raw text refuses the clearance.
+            forbiddenLetters: z
+              .string()
+              .regex(/^\p{L}+$/u)
+              .max(40)
+              .optional(),
+            rejectedPrefixFrames: z
+              .array(z.string().regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u))
+              .min(1)
+              .optional(),
+            developmentEvidence: z
+              .array(
+                z
+                  .object({
+                    phrase: z.string(),
+                    source: z.string(),
+                    id: z.string(),
+                    baselineDisposition: z.enum(['review', 'block']),
+                    reasonCode: z.literal('text_policy_match'),
+                  })
+                  .strict()
+              )
+              .optional(),
+          })
+          .strict()
+          .refine(
+            (rule) =>
+              rule.nativeLanguages.includes(rule.language) &&
+              (rule.requiredDeclaredLanguages ?? []).every((language) =>
+                rule.nativeLanguages.includes(language)
+              ) &&
+              Object.entries(rule.phraseRequiredDeclaredLanguages ?? {}).every(
+                ([phrase, languages]) =>
+                  rule.phrases.includes(phrase) &&
+                  languages.every((language) => rule.nativeLanguages.includes(language))
+              ) &&
+              rule.target.toLowerCase() === rule.target &&
+              rule.phrases.every(
+                (phrase) =>
+                  phrase.split(/ +/).filter((word) => word === rule.target).length === 1
+              ) &&
+              (rule.contextPhrases === undefined ||
+                (rule.contextRequiredDeclaredLanguages !== undefined &&
+                  rule.contextMinWords !== undefined &&
+                  rule.contextRequiredDeclaredLanguages.every((language) =>
+                    rule.nativeLanguages.includes(language)
+                  ) &&
+                  rule.contextPhrases.every(
+                    (phrase) =>
+                      phrase.split(/ +/).filter((word) => word === rule.target).length ===
+                      1
+                  ))),
+            'reviewed occurrence must bind exactly one literal target in its native grammar'
+          )
+      )
+      .min(1),
+  })
+  .strict()
+  .parse(reviewedOccurrenceBank).constructions
+
+const occurrenceConstructionSchema = z
+  .object({
+    target: z.string().regex(/^\p{Script=Latin}+$/u),
+    phrases: z.array(z.string()),
+    contextPhrases: z.array(z.string()).optional(),
+  })
+  .strict()
+
 const allowFileSchema = z.object({
   language: z.enum(SCREENING_LANGUAGES),
   listVersion: z.string().trim().min(1),
   listType: z.literal('allowList'),
   provenance: provenanceSchema,
   entries: z.array(z.string().trim().min(1)),
+  // Head phrases cleared only when the declared locale resolves to this file's
+  // language AND the next word is one of the enumerated complements. They reach the
+  // short-token rejoin pass, which literal contexts cannot.
+  scopedWords: z.array(z.string().trim().min(1)).default([]),
+  // The sexual-violence family: its terms rejoin when cut into two or three words of any
+  // length, a half listed in reviewHalves routes the cut to review, and a term of any
+  // grade receives generated inflected forms.
+  cutFamily: z
+    .object({
+      terms: z.array(z.string().regex(/^\p{L}+$/u)),
+      reviewHalves: z.array(z.string().regex(/^\p{L}+$/u)),
+      copulas: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+      nameFollowers: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    })
+    .default({ terms: [], reviewHalves: [], copulas: [], nameFollowers: [] }),
+  // Reviewed two-word cuts of a high-severity term that stay clean, but only inside the
+  // enumerated frame: the word before the pair (or the text start) and the closed phrase
+  // after it must both be listed. Everything else about a cut keeps the high-severity block.
+  splitFrames: z
+    .array(
+      z.object({
+        pair: z.string().regex(/^\p{L}+ \p{L}+$/u),
+        atStart: z.boolean(),
+        before: z.array(z.string().regex(/^\p{L}+$/u)),
+        // Closed phrases that may precede the `before` word, and closed phrases that may
+        // follow the `after` phrase. The whole text outside the frame must be tiled by them.
+        leads: z.array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u)).default([]),
+        after: z.array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u)).min(1),
+        tails: z.array(z.string().regex(/^\p{L}+(?: \p{L}+)*$/u)).default([]),
+        // An ordinary pair outside its clearing frame routes to review instead of a hard
+        // block when the word before it is one of these and no word of the text is forbidden.
+        reviewBefore: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+        reviewForbidden: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+        // Violent verbs and hate nouns forbidden only within three words of the pair, and
+        // hate or removal phrases forbidden anywhere in the text.
+        reviewForbiddenNear: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+        reviewForbiddenPhrases: z
+          .array(z.string().regex(/^\p{L}+(?: \p{L}+)+$/u))
+          .default([]),
+      })
+    )
+    .default([]),
+  scopedPhrases: z
+    .array(
+      z.object({
+        phrase: z.string().trim().min(1),
+        complements: z.array(z.string().regex(/^\p{L}+$/u)).min(1),
+        // Words that clear the phrase when they stand directly before it ("ao pé de").
+        before: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+        // Words that refuse the left-evidence clearance when they follow the phrase (insult
+        // targets and person nouns).
+        refusedAfter: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+      })
+    )
+    .default([]),
+  literalContexts: z.array(literalContextSchema).default([]),
+  occurrenceConstructions: z.array(occurrenceConstructionSchema).default([]),
 })
 
 /**
@@ -282,6 +526,8 @@ const allowFileSchema = z.object({
  * two-letter one folds to English "am". Both are excluded by this floor.
  */
 const MIN_SINGLE_TERM_LENGTH = 4
+/** The most fragments of one word that are rejoined across symbols (f*a*g*g*o*t is six). */
+const MAX_CUT_FRAGMENTS = 12
 
 /**
  * Reviewed exceptions to {@link MIN_SINGLE_TERM_LENGTH}, kept visible on purpose
@@ -324,6 +570,97 @@ const JOINABLE_TOKEN_LENGTH = 2
 
 const IGNORABLE_PATTERN = /[\p{Default_Ignorable_Code_Point}\p{Cf}]/gu
 const COMBINING_MARK_PATTERN = /\p{M}/gu
+/**
+ * A combining mark that survived NFKC has no precomposed letter, so it is stray. Left in place
+ * it splits a token (v + U+0301 + iado), because marks are neither letters nor digits.
+ */
+const STRAY_MARK_PATTERN =
+  /([\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}\p{N}])\p{M}+/gu
+/**
+ * Letters drawn as emoji or tag characters that NFKC leaves alone: negative circled
+ * (U+1F150 to U+1F169), negative squared (U+1F170 to U+1F189), regional indicator letters
+ * (U+1F1E6 to U+1F1FF) and the tag characters (U+E0020 to U+E007E, which mirror ASCII and
+ * are otherwise stripped as invisible). Circled, squared and parenthesized letters are
+ * already compatibility characters. Each maps onto the Latin letter it shows.
+ *
+ * Two grammar bounds keep real flags clean. A run of regional indicators that is entirely
+ * valid flag pairs ("🇫🇷🇩🇪") is a row of flags and reads as a break. A black flag followed by
+ * the tag characters of England, Scotland or Wales (gbeng, gbsct, gbwls) and the cancel tag ("🏴󠁧󠁢󠁥󠁮󠁧󠁿") is a subdivision flag and reads as a break.
+ */
+const SUBDIVISION_FLAG_PATTERN =
+  /\u{1F3F4}(?:\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}|\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}|\u{E0067}\u{E0062}\u{E0077}\u{E006C}\u{E0073})\u{E007F}/gu
+const REGIONAL_RUN_PATTERN = /[\u{1F1E6}-\u{1F1FF}]+/gu
+const EMOJI_LETTER_PATTERN =
+  /[\u{1F150}-\u{1F169}\u{1F170}-\u{1F189}\u{E0020}-\u{E007E}]/gu
+
+/** ISO 3166-1 alpha-2 codes plus the reserved flag codes (AC CP DG EA EU IC TA UN XK). */
+export const REGIONAL_FLAG_CODES: ReadonlySet<string> = new Set(
+  (
+    'AC AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ ' +
+    'CA CC CD CF CG CH CI CK CL CM CN CO CP CR CU CV CW CX CY CZ DE DG DJ DK DM DO DZ EA EC EE EG EH ER ES ET EU ' +
+    'FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU IC ID IE IL IM IN IO IQ IR IS IT ' +
+    'JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ ' +
+    'NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW ' +
+    'SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TA TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ ' +
+    'UA UG UM UN US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW'
+  ).split(' ')
+)
+
+const regionalLetters = (run: string): string =>
+  [...run]
+    .map((glyph) => String.fromCharCode(97 + (glyph.codePointAt(0) as number) - 0x1f1e6))
+    .join('')
+
+/** A regional run that is entirely valid flag pairs is a row of flags and reads as a break. */
+function isFlagRun(letters: string): boolean {
+  if (letters.length % 2 !== 0) return false
+  for (let at = 0; at < letters.length; at += 2)
+    if (!REGIONAL_FLAG_CODES.has(letters.slice(at, at + 2).toUpperCase())) return false
+  return true
+}
+
+/**
+ * What a flag leaves behind in the literal form. A symbol, not a space: a flag spliced into a
+ * word separates its halves the way a smiley does, and the cut windows rejoin across symbols.
+ */
+const FLAG_SEPARATOR = '\u{1F600}'
+const MAX_REGIONAL_ALTERNATIVES = 256
+
+function defaultRegionalReading(letters: string): string {
+  return isFlagRun(letters) ? FLAG_SEPARATOR : letters
+}
+
+/**
+ * The readings of a regional run that is not a row of flags: all letters, and the letters with
+ * one or two valid flag pairs removed from anywhere in it ("🇷🇺🇸🇦🇵🇪🇩" is raped with the US flag
+ * spliced in after the first letter).
+ */
+function regionalReadings(letters: string): string[] {
+  const readings = new Set<string>([letters])
+  const removeOne = (value: string): string[] => {
+    const out: string[] = []
+    for (let at = 0; at + 1 < value.length; at += 1)
+      if (REGIONAL_FLAG_CODES.has(value.slice(at, at + 2).toUpperCase()))
+        out.push(value.slice(0, at) + value.slice(at + 2))
+    return out
+  }
+  const onces = removeOne(letters)
+  for (const once of onces) readings.add(once)
+  for (const once of onces) for (const twice of removeOne(once)) readings.add(twice)
+  return [...readings].slice(0, 48)
+}
+
+/** A regional letter run as it stands and with a valid flag pair peeled off either edge. */
+function edgeReadings(letters: string): string[] {
+  const readings = new Set<string>([letters])
+  const lead = REGIONAL_FLAG_CODES.has(letters.slice(0, 2).toUpperCase())
+  const trail = REGIONAL_FLAG_CODES.has(letters.slice(-2).toUpperCase())
+  if (lead) readings.add(letters.slice(2))
+  if (trail) readings.add(letters.slice(0, -2))
+  if (lead && trail && letters.length > 4) readings.add(letters.slice(2, -2))
+  return [...readings]
+}
+
 const TOKEN_SPLIT_PATTERN = /[^\p{L}\p{N}]+/u
 const LEET_TRIGGER_PATTERN = /[0-9!@$|+]/
 const REPEAT_PATTERN = /(.)\1+/gu
@@ -353,6 +690,47 @@ const FOLD_SINGLETONS: Readonly<Record<string, string>> = {
   ŋ: 'n',
   þ: 'th',
 }
+
+/**
+ * Letters of Latin Extended-A to D, IPA and the phonetic extensions that read as a-z (ɾ ɑ ƥ ɛ
+ * ɖ ƒ ɡ ɔ ƫ ...), generated from the Unicode character names (LATIN ... LETTER X WITH ...,
+ * TURNED, OPEN, BARRED, SCRIPT). Letters of the screened languages (ı ø đ ð ł ħ ŋ þ) and
+ * letters that decompose to a base letter plus a mark are handled elsewhere.
+ */
+const LATIN_EXTENDED_LOOKALIKES: Readonly<Record<string, string>> = {
+  a: 'ȺɐᶏⱥⱯɑɒ',
+  b: 'ƀƁƂƃɃɓᵬᶀꞖꞗ',
+  c: 'ƇƈȻȼɕꜾꜿꞒꞓꞔꟄ',
+  d: 'ƊƋƌȡɖɗᵭᶁᶑꟇꟈ',
+  e: 'ƎƐǝɆɇɘɛᶒᶓꬳꬴⱸ',
+  f: 'ƑƒʄᵮᶂꞘꞙɸ',
+  g: 'ƓǤǥɠɡᵷᶃꞠꞡꞬꬶ',
+  h: 'ɥɦʮʯꞍꞕꞪⱧⱨ',
+  i: 'ƗɨᴉᶖꞮɩ',
+  j: 'ȷɈɉɟʝꞲ',
+  k: 'ƘƙʞᶄꝀꝁꝂꝃꝄꝅꞢꞣꞰⱩⱪ',
+  l: 'ƚȴȽɫɬɭᶅꝈꝉꞀꞁꞎꞭꬷꬸꬹⱠⱡⱢ',
+  m: 'ƜɯɰɱᵯᶆꬺⱮ',
+  n: 'ƝƞȠȵɲɳᵰᶇꞐꞑꞤꞥꬻ',
+  o: 'ƆƟɔɵᶗꝊꝋꝌꝍꬿⱺ',
+  p: 'ƤƥᵱᵽᶈꝐꝑꝒꝓꝔꝕⱣ',
+  q: 'ɋʠꝖꝗꝘꝙ',
+  r: 'ɌɍɹɺɻɼɽɾɿᵲᵳᶉꞦꞧꭉꭋꭌꭨⱤⱹ',
+  s: 'ȿʂᵴᶊꞨꞩꟅꟉꟊⱾ',
+  t: 'ŦŧƫƬƭƮȶȾʇʈᵵꞱⱦ',
+  u: 'ᶙꞸꞹꭎꭒ',
+  v: 'ƲɅʋʌᶌꝞꝟⱱⱴ',
+  w: 'ʍⱲⱳ',
+  x: 'ᶍꭖꭗꭘꭙ',
+  y: 'ƳƴɎɏʎꭚ',
+  z: 'ƵƶȤȥɀʐʑᵶᶎꟆⱫⱬⱿ',
+}
+
+const LATIN_EXTENDED_MAP: ReadonlyMap<string, string> = new Map(
+  Object.entries(LATIN_EXTENDED_LOOKALIKES).flatMap(([letter, glyphs]) =>
+    [...glyphs].map((glyph): [string, string] => [glyph, letter])
+  )
+)
 
 /** Cyrillic and Greek letters that render as a Latin letter in most typefaces. */
 const CONFUSABLES: Readonly<Record<string, string>> = {
@@ -394,6 +772,31 @@ const CONFUSABLES: Readonly<Record<string, string>> = {
   γ: 'y',
   η: 'n',
   ζ: 'z',
+  // Latin small capitals render as the capital of the same letter in most typefaces.
+  ᴀ: 'a',
+  ʙ: 'b',
+  ᴄ: 'c',
+  ᴅ: 'd',
+  ᴇ: 'e',
+  ꜰ: 'f',
+  ɢ: 'g',
+  ʜ: 'h',
+  ɪ: 'i',
+  ᴊ: 'j',
+  ᴋ: 'k',
+  ʟ: 'l',
+  ᴍ: 'm',
+  ɴ: 'n',
+  ᴏ: 'o',
+  ᴘ: 'p',
+  ʀ: 'r',
+  ꜱ: 's',
+  ᴛ: 't',
+  ᴜ: 'u',
+  ᴠ: 'v',
+  ᴡ: 'w',
+  ʏ: 'y',
+  ᴢ: 'z',
 }
 
 /**
@@ -472,7 +875,27 @@ const SEVERITY_RANK: Readonly<Record<TextScreeningSeverity, number>> = {
  * `cono`, the Spanish word for cone, be allow-listed while `coño` still screens.
  */
 export function toLiteralForm(raw: string): string {
-  let value = raw.normalize('NFKC').replace(IGNORABLE_PATTERN, '').toLowerCase()
+  return toLiteralFormWith(raw, defaultRegionalReading)
+}
+
+/** The literal form with each regional indicator run read by `regional` (letters, run number). */
+function toLiteralFormWith(
+  raw: string,
+  regional: (letters: string, run: number) => string
+): string {
+  let runs = 0
+  let value = raw
+    .normalize('NFKC')
+    .replace(SUBDIVISION_FLAG_PATTERN, FLAG_SEPARATOR)
+    .replace(REGIONAL_RUN_PATTERN, (run) => regional(regionalLetters(run), runs++))
+    .replace(EMOJI_LETTER_PATTERN, (glyph) => {
+      const code = glyph.codePointAt(0) as number
+      if (code >= 0xe0020) return String.fromCharCode(code - 0xe0000)
+      return String.fromCharCode(97 + code - (code >= 0x1f170 ? 0x1f170 : 0x1f150))
+    })
+    .replace(IGNORABLE_PATTERN, '')
+    .replace(STRAY_MARK_PATTERN, '$1')
+    .toLowerCase()
   for (const [pattern, replacement] of LITERAL_EXPANSIONS) {
     value = value.replace(pattern, replacement)
   }
@@ -484,7 +907,11 @@ export function toFoldedForm(literal: string): string {
   const stripped = literal.normalize('NFD').replace(COMBINING_MARK_PATTERN, '')
   let folded = ''
   for (const character of stripped) {
-    folded += FOLD_SINGLETONS[character] ?? CONFUSABLES[character] ?? character
+    folded +=
+      FOLD_SINGLETONS[character] ??
+      CONFUSABLES[character] ??
+      LATIN_EXTENDED_MAP.get(character) ??
+      character
   }
   return folded.normalize('NFC')
 }
@@ -500,16 +927,555 @@ function collapseRepeats(value: string): string {
  * second collapse the two never met, and Story 6.2b's corpus found five such
  * leet spellings that published (`f r 3 5 s e`, `p 1 5 s e r`, `u n d r 3 5 s i n g`).
  */
-function toLeetClassForm(value: string): string {
+function toLeetRunForm(value: string): string {
   let classed = ''
   for (const character of value) {
     classed += LEET_CLASSES[character] ?? character
   }
-  return collapseRepeats(classed)
+  return classed
+}
+
+function toLeetClassForm(value: string): string {
+  return collapseRepeats(toLeetRunForm(value))
 }
 
 function tokenize(value: string): string[] {
   return value.split(TOKEN_SPLIT_PATTERN).filter(Boolean)
+}
+
+function connectedLiteralTokens(
+  literal: string,
+  spans: readonly RegExpMatchArray[],
+  at: number,
+  neighbor: number,
+  joiner: 'space' | 'space-or-hyphen' = 'space'
+): boolean {
+  const left = spans[Math.min(at, neighbor)]
+  const right = spans[Math.max(at, neighbor)]
+  if (!left || !right) return false
+  const gap = literal.slice((left.index ?? 0) + left[0].length, right.index)
+  if (/^[\p{Zs}\t]+$/u.test(gap)) return true
+  // A native hyphenated compound ("pé-de-galinha") joins the same words an ordinary
+  // phrase does. Only one plain hyphen-minus counts, so every other separator
+  // (dots, underscores, slashes, zero-width characters) keeps splitting a phrase.
+  return joiner === 'space-or-hyphen' && gap === '-'
+}
+
+/** Whether a veto word stands near the term or anywhere in the text. */
+function isVetoed(
+  tokens: readonly string[],
+  position: number,
+  context: {
+    vetoes: readonly string[]
+    vetoRadius: number
+    textVetoes: readonly string[]
+    vetoFrames: readonly string[]
+    ageRadius?: number
+    ageNumerals: readonly string[]
+  }
+): boolean {
+  if (context.textVetoes.length > 0 && tokens.some((t) => context.textVetoes.includes(t)))
+    return true
+  return (
+    hasVetoNear(tokens, position, context) ||
+    holdsFrame(tokens, position, context.vetoFrames) ||
+    mentionsAgeNear(tokens, position, context)
+  )
+}
+
+/** Whether "12 anos", "doze anos" or "aninhos" with a number stands near the term. */
+function mentionsAgeNear(
+  tokens: readonly string[],
+  position: number,
+  context: { ageRadius?: number; ageNumerals: readonly string[] }
+): boolean {
+  if (context.ageRadius === undefined) return false
+  const from = Math.max(0, position - context.ageRadius)
+  for (let at = from; at <= position + context.ageRadius; at += 1) {
+    if (!['ano', 'anos', 'aninho', 'aninhos'].includes(tokens[at] as string)) continue
+    const number = tokens[at - 1] ?? ''
+    if (/^\d+$/u.test(number) || context.ageNumerals.includes(number)) return true
+  }
+  return false
+}
+
+/** Whether any clearing rule of the context holds at the term's position. */
+function contextClears(
+  literal: string,
+  spans: readonly RegExpMatchArray[],
+  tokens: readonly string[],
+  position: number,
+  context: {
+    objects: readonly string[]
+    connectors: readonly string[]
+    maxDistance: number
+    evidence: readonly string[]
+    evidenceRadius: number
+    adjacentBefore: readonly string[]
+    clearFrames: readonly string[]
+    textEvidence: readonly string[]
+  }
+): boolean {
+  const before = tokens[position - 1]
+  return (
+    hasEvidenceNear(literal, spans, tokens, position, context) ||
+    hasObjectContext(literal, spans, tokens, position, context) ||
+    (before !== undefined &&
+      context.adjacentBefore.includes(before) &&
+      connectedLiteralTokens(literal, spans, position - 1, position)) ||
+    holdsFrame(tokens, position, context.clearFrames) ||
+    (context.textEvidence.length > 0 &&
+      tokens.some((token) => context.textEvidence.includes(token)))
+  )
+}
+
+function hasVetoNear(
+  tokens: readonly string[],
+  position: number,
+  context: { vetoes: readonly string[]; vetoRadius: number }
+): boolean {
+  if (context.vetoes.length === 0) return false
+  const from = Math.max(0, position - context.vetoRadius)
+  return tokens
+    .slice(from, position + context.vetoRadius + 1)
+    .some((token, index) => from + index !== position && context.vetoes.includes(token))
+}
+
+/** Whether the words around the term spell one of the frames exactly. */
+function holdsFrame(
+  tokens: readonly string[],
+  position: number,
+  frames: readonly string[]
+): boolean {
+  return frames.some((frame) => {
+    const words = frame.split(' ')
+    const at = words.indexOf(tokens[position] as string)
+    return at >= 0 && words.every((word, index) => tokens[position - at + index] === word)
+  })
+}
+
+/** Whether an object noun stands within the context's distance, joined through its connectors. */
+function hasObjectContext(
+  literal: string,
+  spans: readonly RegExpMatchArray[],
+  tokens: readonly string[],
+  position: number,
+  context: {
+    objects: readonly string[]
+    connectors: readonly string[]
+    maxDistance: number
+  }
+): boolean {
+  for (const direction of [-1, 1]) {
+    for (let distance = 1; distance <= context.maxDistance; distance++) {
+      const at = position + direction * distance
+      const token = tokens[at]
+      if (token === undefined) break
+      if (!connectedLiteralTokens(literal, spans, at, at - direction)) break
+      if (context.objects.includes(token)) {
+        // A preceding object needs an assembly connector ("fibbia da montare"); a bare verb
+        // after a noun is not that construction.
+        if (direction === 1 || distance > 1) return true
+        break
+      }
+      if (!context.connectors.includes(token)) break
+    }
+  }
+  return false
+}
+
+/** Whether a context's grammar evidence word stands within its radius, joined by plain spaces. */
+function hasEvidenceNear(
+  literal: string,
+  spans: readonly RegExpMatchArray[],
+  tokens: readonly string[],
+  position: number,
+  context: { evidence: readonly string[]; evidenceRadius: number }
+): boolean {
+  if (context.evidence.length === 0) return false
+  for (const direction of [-1, 1]) {
+    for (let distance = 1; distance <= context.evidenceRadius; distance++) {
+      const at = position + direction * distance
+      const token = tokens[at]
+      if (token === undefined) break
+      if (!connectedLiteralTokens(literal, spans, at, at - direction)) break
+      if (context.evidence.includes(token)) return true
+    }
+  }
+  return false
+}
+
+/** Whether any frame ending at the last of these words is a rejected prefix frame. */
+function rejectsPrefixFrame(
+  rejected: readonly string[],
+  words: readonly string[]
+): boolean {
+  let frame = ''
+  for (const word of words.slice(-32).toReversed()) {
+    frame = collapseRepeats(word + frame)
+    if (rejected.includes(frame)) return true
+    if (frame.length > 32) break
+  }
+  return false
+}
+
+/**
+ * Whether Portuguese grammar stands beside a scoped phrase at `start`: a listed function word
+ * directly before it, or a listed complement directly after it, each joined by plain spaces
+ * (the phrase's own words may also join by one hyphen).
+ */
+function scopedPhraseHasEvidence(
+  scoped: ScopedPhrase,
+  literal: string,
+  spans: readonly RegExpMatchArray[],
+  tokens: readonly string[],
+  start: number
+): boolean {
+  const size = scoped.tokens.length
+  const inner = Array.from({ length: size - 1 }, (_, offset) =>
+    connectedLiteralTokens(
+      literal,
+      spans,
+      start + offset,
+      start + offset + 1,
+      'space-or-hyphen'
+    )
+  ).every(Boolean)
+  if (!inner) return false
+  // A function word before the phrase clears it only when the next word follows on a plain
+  // space (no sentence break, symbol or line) and is not an insult target or a person.
+  const next = tokens[start + size]
+  const left =
+    start > 0 &&
+    next !== undefined &&
+    scoped.before.has(tokens[start - 1] as string) &&
+    connectedLiteralTokens(literal, spans, start - 1, start) &&
+    connectedLiteralTokens(literal, spans, start + size - 1, start + size) &&
+    !scoped.refusedAfter.has(next)
+  const right =
+    scoped.complements.has(next as string) &&
+    connectedLiteralTokens(
+      literal,
+      spans,
+      start + size - 1,
+      start + size,
+      'space-or-hyphen'
+    )
+  return left || right
+}
+
+function indexScopedPhrases(
+  lists: readonly {
+    language: ScreeningLanguage
+    scopedPhrases?: {
+      phrase: string
+      complements: string[]
+      before?: string[]
+      refusedAfter?: string[]
+    }[]
+  }[]
+): ReadonlyMap<ScreeningLanguage, readonly ScopedPhrase[]> {
+  const scoped = new Map<ScreeningLanguage, ScopedPhrase[]>()
+  for (const list of lists) {
+    for (const entry of list.scopedPhrases ?? []) {
+      const tokens = tokenize(toLiteralForm(entry.phrase))
+      if (tokens.length < 2)
+        throw new CommunityTextScreenerConfigError(
+          'a scoped allow phrase needs at least two words'
+        )
+      scoped.set(list.language, [
+        ...(scoped.get(list.language) ?? []),
+        {
+          tokens,
+          complements: new Set(entry.complements.map(toLiteralForm)),
+          before: new Set((entry.before ?? []).map(toLiteralForm)),
+          refusedAfter: new Set((entry.refusedAfter ?? []).map(toLiteralForm)),
+        },
+      ])
+    }
+  }
+  return scoped
+}
+
+interface SplitFrame {
+  readonly atStart: boolean
+  readonly before: readonly string[]
+  readonly leads: readonly (readonly string[])[]
+  readonly after: readonly (readonly string[])[]
+  readonly tails: readonly (readonly string[])[]
+  readonly reviewBefore: readonly string[]
+  readonly reviewForbidden: readonly string[]
+  readonly reviewForbiddenNear: readonly string[]
+  readonly reviewForbiddenPhrases: readonly (readonly string[])[]
+}
+
+/** The longest text outside a reviewed split frame that the closed-phrase tiling will consider. */
+const SPLIT_FRAME_MAX_OUTSIDE_TOKENS = 64
+
+/** Whether the tokens are exactly a concatenation of the listed phrases (empty counts). */
+function tiledByPhrases(
+  tokens: readonly string[],
+  phrases: readonly (readonly string[])[]
+): boolean {
+  if (tokens.length > SPLIT_FRAME_MAX_OUTSIDE_TOKENS) return false
+  const reachable = new Array<boolean>(tokens.length + 1).fill(false)
+  reachable[0] = true
+  for (let at = 0; at < tokens.length; at += 1) {
+    if (!reachable[at]) continue
+    for (const phrase of phrases) {
+      if (phrase.every((word, offset) => tokens[at + offset] === word))
+        reachable[at + phrase.length] = true
+    }
+  }
+  return reachable[tokens.length] as boolean
+}
+
+/** The reviewed split-pair frames of every language, keyed by the folded pair "you pin". */
+function indexSplitFrames(
+  lists: readonly { splitFrames?: z.input<typeof allowFileSchema>['splitFrames'] }[]
+): ReadonlyMap<string, readonly SplitFrame[]> {
+  const folded = (word: string): string => toFoldedForm(toLiteralForm(word))
+  const frames = new Map<string, SplitFrame[]>()
+  for (const list of lists) {
+    for (const frame of list.splitFrames ?? []) {
+      const key = frame.pair.split(' ').map(folded).join(' ')
+      frames.set(key, [
+        ...(frames.get(key) ?? []),
+        {
+          atStart: frame.atStart,
+          before: frame.before.map(folded),
+          leads: (frame.leads ?? []).map((phrase) => phrase.split(' ').map(folded)),
+          after: frame.after.map((phrase) => phrase.split(' ').map(folded)),
+          tails: (frame.tails ?? []).map((phrase) => phrase.split(' ').map(folded)),
+          reviewBefore: (frame.reviewBefore ?? []).map(folded),
+          reviewForbidden: (frame.reviewForbidden ?? []).map(folded),
+          reviewForbiddenNear: (frame.reviewForbiddenNear ?? []).map(folded),
+          reviewForbiddenPhrases: (frame.reviewForbiddenPhrases ?? []).map((phrase) =>
+            phrase.split(' ').map(folded)
+          ),
+        },
+      ])
+    }
+  }
+  return frames
+}
+
+/**
+ * The right bound: after the phrase, every remaining character of the text is a closed
+ * tail or a separator. A period, ellipsis or line break ends no clause for this check,
+ * so nothing unlisted can follow the clearance.
+ */
+function occurrenceLookahead(closedTails: readonly string[] | undefined): string {
+  if (!closedTails?.length) return ''
+  const tails = [...closedTails]
+    .sort((left, right) => right.length - left.length)
+    .map((tail) => tail.replaceAll(' ', ' +'))
+    .join('|')
+  return `(?=(?:[\\s,.;:!?…()]*(?:${tails})(?![\\p{L}\\p{N}]))*[\\s,.;:!?…()]*$)`
+}
+
+/** The position a verb-led construction may start at: a sentence start or after a listed word. */
+function occurrenceLookbehind(
+  precedingWords: readonly string[] | undefined,
+  sentenceInitial: boolean
+): string {
+  const alternatives = [
+    ...(sentenceInitial ? ['(?<=^\\s*)', '(?<=[.!?;:\\n]\\s*)'] : []),
+    ...(precedingWords?.length
+      ? [`(?<=(?<![\\p{L}\\p{N}])(?:${precedingWords.join('|')}) +)`]
+      : []),
+  ]
+  return alternatives.length ? `(?:${alternatives.join('|')})` : ''
+}
+
+/** Whether a construction's declared-language requirement, if any, is met. */
+function declaresRequiredLanguage(
+  required: readonly ScreeningLanguage[] | undefined,
+  language: ScreeningLanguage | null
+): boolean {
+  return !required || (language !== null && required.includes(language))
+}
+
+/** A thunk that computes its value on the first call and returns it ever after. */
+function memoized<T>(compute: () => T): () => T {
+  let value: T | undefined
+  return () => (value ??= compute())
+}
+
+/**
+ * One alternation per target and scope instead of one pattern per phrase: a bank with
+ * a thousand phrases would otherwise run a thousand scans on every screened text.
+ */
+function compileOccurrenceConstructions(
+  phrases: ReturnType<typeof reviewedOccurrencePhrases>
+): {
+  target: string
+  /** Compiled on first use: most texts never reach a construction's target word. */
+  pattern: () => RegExp
+  requiredDeclaredLanguages?: readonly ScreeningLanguage[]
+  rejectedPrefixFrames: readonly string[]
+  textForbidden: readonly string[]
+  openers: readonly (readonly string[])[]
+  minWords: number
+  forbiddenLetters: string
+}[] {
+  const groups = new Map<
+    string,
+    {
+      target: string
+      requiredDeclaredLanguages?: readonly ScreeningLanguage[]
+      rejectedPrefixFrames: readonly string[]
+      precedingWords?: readonly string[]
+      sentenceInitial: boolean
+      closedTails?: readonly string[]
+      textForbidden?: readonly string[]
+      openers?: readonly string[]
+      minWords: number
+      forbiddenLetters: string
+      phrases: string[]
+    }
+  >()
+  for (const entry of phrases) {
+    const rejectedPrefixFrames = (entry.rejectedPrefixFrames ?? []).map((frame) =>
+      toLeetClassForm(toFoldedForm(toLiteralForm(frame))).replaceAll(' ', '')
+    )
+    const key = JSON.stringify([
+      entry.target,
+      entry.requiredDeclaredLanguages ?? null,
+      rejectedPrefixFrames,
+      entry.precedingWords ?? null,
+      entry.sentenceInitial ?? false,
+      entry.closedTails ?? null,
+      entry.textForbidden ?? null,
+      entry.openers ?? null,
+      entry.minWords ?? 0,
+      entry.forbiddenLetters ?? '',
+    ])
+    const group = groups.get(key) ?? {
+      target: entry.target,
+      requiredDeclaredLanguages: entry.requiredDeclaredLanguages,
+      rejectedPrefixFrames,
+      precedingWords: entry.precedingWords,
+      sentenceInitial: entry.sentenceInitial ?? false,
+      closedTails: entry.closedTails,
+      textForbidden: entry.textForbidden,
+      openers: entry.openers,
+      minWords: entry.minWords ?? 0,
+      forbiddenLetters: entry.forbiddenLetters ?? '',
+      phrases: [],
+    }
+    group.phrases.push(entry.phrase)
+    groups.set(key, group)
+  }
+  return [...groups.values()].map((group) => ({
+    target: group.target,
+    minWords: group.minWords,
+    forbiddenLetters: group.forbiddenLetters,
+    requiredDeclaredLanguages: group.requiredDeclaredLanguages,
+    rejectedPrefixFrames: group.rejectedPrefixFrames,
+    openers: (group.openers ?? []).map((phrase) =>
+      tokenize(toFoldedForm(toLiteralForm(phrase)))
+    ),
+    textForbidden: (group.textForbidden ?? []).map((word) =>
+      collapseRepeats(toLeetClassForm(toFoldedForm(toLiteralForm(word))))
+    ),
+    pattern: memoized(
+      () =>
+        new RegExp(
+          `${occurrenceLookbehind(group.precedingWords, group.sentenceInitial)}(?<![\\p{L}\\p{N}])(?:${[
+            ...group.phrases,
+          ]
+            .sort((left, right) => right.length - left.length)
+            .map((phrase) => phrase.replaceAll(' ', ' +'))
+            .join('|')})(?![\\p{L}\\p{N}])${occurrenceLookahead(group.closedTails)}`,
+          'gu'
+        )
+    ),
+  }))
+}
+
+function reviewedOccurrencePhrases(
+  lists: readonly {
+    language: ScreeningLanguage
+    occurrenceConstructions?: z.infer<typeof occurrenceConstructionSchema>[]
+  }[]
+): {
+  target: string
+  phrase: string
+  requiredDeclaredLanguages?: readonly ScreeningLanguage[]
+  rejectedPrefixFrames?: readonly string[]
+  precedingWords?: readonly string[]
+  sentenceInitial?: boolean
+  closedTails?: readonly string[]
+  textForbidden?: readonly string[]
+  openers?: readonly string[]
+  minWords?: number
+  forbiddenLetters?: string
+}[] {
+  const phrases: {
+    target: string
+    phrase: string
+    requiredDeclaredLanguages?: readonly ScreeningLanguage[]
+    rejectedPrefixFrames?: readonly string[]
+    precedingWords?: readonly string[]
+    sentenceInitial?: boolean
+    closedTails?: readonly string[]
+    textForbidden?: readonly string[]
+    openers?: readonly string[]
+    minWords?: number
+    forbiddenLetters?: string
+  }[] = []
+  const targets = new Set<string>()
+  for (const list of lists) {
+    for (const rule of list.occurrenceConstructions ?? []) {
+      const reviewed = REVIEWED_OCCURRENCE_CONSTRUCTIONS.find(
+        (entry) => entry.target === rule.target && entry.language === list.language
+      )
+      if (
+        !reviewed ||
+        rule.phrases.length !== reviewed.phrases.length ||
+        !reviewed.phrases.every((phrase) => rule.phrases.includes(phrase)) ||
+        (rule.contextPhrases ?? []).length !== (reviewed.contextPhrases ?? []).length ||
+        !(reviewed.contextPhrases ?? []).every((phrase) =>
+          (rule.contextPhrases ?? []).includes(phrase)
+        )
+      )
+        throw new CommunityTextScreenerConfigError('unreviewed occurrence construction')
+      if (targets.has(rule.target))
+        throw new CommunityTextScreenerConfigError('duplicate occurrence construction')
+      targets.add(rule.target)
+      phrases.push(
+        ...rule.phrases.map((phrase) => ({
+          target: rule.target,
+          phrase,
+          requiredDeclaredLanguages:
+            reviewed.phraseRequiredDeclaredLanguages?.[phrase] ??
+            reviewed.requiredDeclaredLanguages,
+          rejectedPrefixFrames: reviewed.rejectedPrefixFrames,
+          precedingWords: reviewed.precedingWords,
+          sentenceInitial: reviewed.sentenceInitial,
+          closedTails: reviewed.closedTails,
+          textForbidden: reviewed.textForbidden,
+          openers: reviewed.openers,
+          forbiddenLetters: reviewed.forbiddenLetters,
+        })),
+        ...(reviewed.contextPhrases ?? []).map((phrase) => ({
+          target: rule.target,
+          phrase,
+          requiredDeclaredLanguages: reviewed.contextRequiredDeclaredLanguages,
+          rejectedPrefixFrames: reviewed.rejectedPrefixFrames,
+          precedingWords: reviewed.precedingWords,
+          sentenceInitial: reviewed.sentenceInitial,
+          closedTails: reviewed.closedTails,
+          textForbidden: reviewed.textForbidden,
+          openers: reviewed.openers,
+          minWords: reviewed.contextMinWords,
+          forbiddenLetters: reviewed.forbiddenLetters,
+        }))
+      )
+    }
+  }
+  return phrases
 }
 
 function observeScripts(literal: string): string[] {
@@ -526,6 +1492,26 @@ interface TermMeta {
   readonly severity: TextScreeningSeverity
 }
 
+type RunIndex = ReadonlyMap<string, TermMeta>
+
+function indexRun(index: Map<string, TermMeta>, form: string, meta: TermMeta): void {
+  const key = collapseRepeats(form)
+  const previous = index.get(key)
+  if (!previous || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[previous.severity])
+    index.set(key, meta)
+}
+
+function matchRun(index: RunIndex, candidate: string): TermMeta | undefined {
+  return index.get(collapseRepeats(candidate))
+}
+
+interface ScopedPhrase {
+  readonly tokens: readonly string[]
+  readonly complements: ReadonlySet<string>
+  readonly before: ReadonlySet<string>
+  readonly refusedAfter: ReadonlySet<string>
+}
+
 interface PhraseEntry {
   readonly tokens: readonly string[]
   readonly collapsed: readonly string[]
@@ -538,18 +1524,24 @@ interface LanguageIndex {
   readonly listVersion: string
   readonly longestSingleTerm: number
   readonly single: ReadonlyMap<string, TermMeta>
-  readonly singleCollapsed: ReadonlyMap<string, TermMeta>
-  readonly singleLeet: ReadonlyMap<string, TermMeta>
+  readonly singleCollapsed: RunIndex
+  readonly singleLeet: RunIndex
   readonly phrases: readonly PhraseEntry[]
   /**
    * Each phrase's repeat-collapsed concatenation, for the re-split pass: the
    * same letters as the phrase, cut into tokens at different places.
    */
-  readonly phraseConcatenations: ReadonlyMap<string, TermMeta>
+  readonly phraseConcatenations: RunIndex
   /** The same concatenations in leet-class form, for a re-split phrase written in leet. */
-  readonly phraseLeetConcatenations: ReadonlyMap<string, TermMeta>
+  readonly phraseLeetConcatenations: RunIndex
   /** Each phrase's own collapsed tokens joined by a space, which that pass skips. */
   readonly phraseForms: ReadonlySet<string>
+  /** The generated plural and inflected spellings of this language's high-severity terms. */
+  readonly generatedForms: readonly string[]
+  /** The single-word terms the list names itself, folded. */
+  readonly listedTerms: ReadonlySet<string>
+  /** Generated Turkish inflections whose suffix breaks vowel harmony with their stem. */
+  readonly disharmonicForms: ReadonlySet<string>
 }
 
 export interface CommunityTextScreenerOptions {
@@ -644,7 +1636,11 @@ function indexSingleTerm(
   singleCollapsed: Map<string, TermMeta>,
   singleLeet: Map<string, TermMeta>
 ): void {
-  single.set(term, meta)
+  // A generated inflection can meet a listed term of a lower grade (rape generates raping,
+  // which the English list grades medium); the higher grade stays.
+  const listed = single.get(term)
+  if (!listed || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[listed.severity])
+    single.set(term, meta)
   const collapsed = collapseRepeats(term)
   if (
     collapsed.length < MIN_SINGLE_TERM_LENGTH &&
@@ -655,14 +1651,553 @@ function indexSingleTerm(
       `${language} has a term that collapses to under ${MIN_SINGLE_TERM_LENGTH} characters, which needs that collapsed spelling on an allow list or a reviewed exception before it can be indexed`
     )
   }
-  singleCollapsed.set(collapsed, meta)
-  singleLeet.set(toLeetClassForm(collapsed), meta)
+  indexRun(singleCollapsed, term, meta)
+  indexRun(singleLeet, toLeetRunForm(term), meta)
+}
+
+/**
+ * Explicit plural and inflected spellings of a high-severity term, generated per language
+ * so that "wetbacks", "faggots" and "towelheads" meet the same term as the singular. The
+ * suffixes are listed, never stemmed: a form exists only when this table produces it.
+ * Final-vowel languages also swap the gender vowel. Forms are folded like the terms.
+ */
+const INFLECTION_SUFFIXES: Readonly<Record<ScreeningLanguage, readonly string[]>> = {
+  en: ['s', 'es'],
+  de: ['e', 'en', 'n', 's'],
+  es: ['s', 'es'],
+  pt: ['s', 'es'],
+  fr: ['s', 'e', 'es'],
+  it: [],
+  tr: [
+    'lar',
+    'ler',
+    'ı',
+    'i',
+    'u',
+    'ü',
+    'a',
+    'e',
+    'da',
+    'de',
+    'dan',
+    'den',
+    'ın',
+    'in',
+    'un',
+    'ün',
+    'ları',
+    'leri',
+  ],
+}
+
+/**
+ * Italian plurals replace the final vowel. Gender swaps are not generated: a swapped
+ * vowel spells ordinary words in the other six languages (bolero, zoccolo, fagoting).
+ */
+const ITALIAN_PLURALS: Readonly<Record<string, string>> = { o: 'i', a: 'e', e: 'i' }
+
+/** Verb forms of the reviewed violent terms, listed because a general verb suffix collides. */
+const VERB_FORMS: Readonly<
+  Partial<Record<ScreeningLanguage, Readonly<Record<string, readonly string[]>>>>
+> = {
+  en: { rape: ['raped', 'raping'] },
+}
+
+/**
+ * Every indexed spelling of a high-severity term, or of a sexual-violence family term of
+ * any grade, with each letter in turn replaced by "?" and classed like the leet index.
+ * A word censored with one symbol ("n*gger", "r_ped", "wh#re") meets its key.
+ */
+function buildCensorKeys(
+  indexes: readonly LanguageIndex[],
+  family: ReadonlySet<string>
+): ReadonlyMap<string, TermMeta> {
+  const keys = new Map<string, TermMeta>()
+  for (const index of indexes) {
+    for (const [term, meta] of index.single) {
+      if (meta.severity !== 'high' && !family.has(collapseRepeats(term))) continue
+      if (term.length < MIN_SINGLE_TERM_LENGTH || !/^\p{L}+$/u.test(term)) continue
+      const classed = toLeetRunForm(term)
+      for (let at = 0; at < classed.length; at += 1) {
+        const key = `${classed.slice(0, at)}?${classed.slice(at + 1)}`
+        const previous = keys.get(key)
+        if (!previous || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[previous.severity])
+          keys.set(key, meta)
+      }
+    }
+  }
+  return keys
+}
+
+/**
+ * Multi-letter censoring ("n*gg*r", "v**d*", "r*p*st", "h*r*ns*hn"): the symbols * _ #
+ * each stand for one letter. The first letter must stay visible, at least
+ * MULTI_CENSOR_MIN_VISIBLE letters and MULTI_CENSOR_MIN_VISIBLE_RATIO of the word must
+ * show, so a short run of symbols between a few letters cannot become a term by accident.
+ * Chosen by the collision sweep in the round 8e report: at 0.4 every shape in the frozen
+ * clean corpora and code snippets stays clear, and a ratio of 0.5 would miss v**d*.
+ */
+const MULTI_CENSOR_SYMBOLS = /[*_#.-]/gu
+const MULTI_CENSOR_MASKS = /[*_#]/u
+const MULTI_CENSOR_MIN_VISIBLE = 2
+const MULTI_CENSOR_MIN_VISIBLE_RATIO = 0.4
+
+interface MultiCensorEntry {
+  readonly classed: string
+  readonly word: string
+  readonly meta?: TermMeta
+}
+
+type MultiCensorBuckets = ReadonlyMap<string, readonly MultiCensorEntry[]>
+
+function addMultiCensorEntry(
+  buckets: Map<string, MultiCensorEntry[]>,
+  entry: MultiCensorEntry
+): void {
+  const key = `${entry.classed.length}:${entry.classed[0]}`
+  buckets.set(key, [...(buckets.get(key) ?? []), entry])
+}
+
+/** Every eligible term in leet-run form, bucketed by length and first letter. */
+function buildMultiCensorIndex(
+  indexes: readonly LanguageIndex[],
+  family: ReadonlySet<string>
+): MultiCensorBuckets {
+  const buckets = new Map<string, MultiCensorEntry[]>()
+  for (const index of indexes) {
+    for (const [term, meta] of index.single) {
+      if (meta.severity !== 'high' && !family.has(collapseRepeats(term))) continue
+      if (term.length < MIN_SINGLE_TERM_LENGTH || !/^\p{L}+$/u.test(term)) continue
+      addMultiCensorEntry(buckets, { classed: toLeetRunForm(term), word: term, meta })
+    }
+  }
+  return buckets
+}
+
+/** Every listed word of any severity and every allow-listed ordinary word, bucketed like the terms. */
+function buildMultiCensorMilderIndex(
+  indexes: readonly LanguageIndex[],
+  allowSingles: ReadonlySet<string>,
+  terms: MultiCensorBuckets
+): MultiCensorBuckets {
+  // A word that is itself an eligible term in some list is never the milder reading, even
+  // where another language grades it lower ("nigger" is medium in a list that carries it).
+  const eligible = new Set(
+    [...terms.values()].flatMap((entries) => entries.map((e) => e.word))
+  )
+  const buckets = new Map<string, MultiCensorEntry[]>()
+  const seen = new Set<string>()
+  const add = (word: string, meta?: TermMeta): void => {
+    if (word.length < MIN_SINGLE_TERM_LENGTH || !/^\p{L}+$/u.test(word)) return
+    if (eligible.has(word)) return
+    const key = `${word}|${meta?.severity ?? ''}`
+    if (seen.has(key)) return
+    seen.add(key)
+    addMultiCensorEntry(buckets, {
+      classed: toLeetRunForm(toFoldedForm(word)),
+      word,
+      meta,
+    })
+  }
+  for (const index of indexes) for (const [term, meta] of index.single) add(term, meta)
+  for (const word of allowSingles) add(word)
+  return buckets
+}
+
+/** The words of every high-severity phrase, bucketed like the terms. */
+function buildMultiCensorPhraseIndex(
+  indexes: readonly LanguageIndex[]
+): MultiCensorBuckets {
+  const buckets = new Map<string, MultiCensorEntry[]>()
+  const seen = new Set<string>()
+  for (const index of indexes)
+    for (const phrase of index.phrases) {
+      if (phrase.meta.severity !== 'high') continue
+      for (const word of phrase.tokens) {
+        if (word.length < MIN_SINGLE_TERM_LENGTH || !/^\p{L}+$/u.test(word)) continue
+        if (seen.has(word)) continue
+        seen.add(word)
+        addMultiCensorEntry(buckets, { classed: toLeetRunForm(word), word })
+      }
+    }
+  return buckets
+}
+
+/**
+ * Whether a whitespace run is a multi-letter censored word: at least two of * _ # . -
+ * with at least one of * _ # (a dot or hyphen alone is punctuation), and the symbols
+ * between letters and digits only.
+ */
+function isMultiCensorRun(core: string): boolean {
+  return (
+    /^[\p{L}\p{N}*_#.-]+$/u.test(core) &&
+    // A dot or hyphen beside a digit is a version, date, range or price, never a hidden letter.
+    !/\d[.-]|[.-]\d/u.test(core) &&
+    // A dot or hyphen followed only by masks to the end, or preceded only by masks from the
+    // start, is a separator before a regex or glob fragment ("Go.*", "hand.**", "CI.**").
+    !/[.-][*_#]*$|^[*_#]*[.-]/u.test(core) &&
+    MULTI_CENSOR_MASKS.test(core) &&
+    (core.match(MULTI_CENSOR_SYMBOLS)?.length ?? 0) >= 2
+  )
+}
+
+/** The most symbols of a wrapper that are peeled from either end of a run. */
+const MAX_WRAPPER_RUN = 4
+
+/**
+ * The readings of a censored run once a wrapper is peeled: markdown bold, italics, a hash or
+ * underscores around the word ("#n**ger", "**n**ger**", "_n*gger_"). The run as written stays a
+ * reading, because an edge symbol may be a hidden letter ("v**d*", "__f*tz*__"); a reading that
+ * starts with a symbol is dropped by the first-letter rule.
+ */
+function censorReadings(core: string, trailingWrapper = false): string[] {
+  if (!MULTI_CENSOR_MASKS.test(core)) return [core]
+  const opening = (/^[*_#]+/u.exec(core)?.[0] ?? '').slice(0, MAX_WRAPPER_RUN)
+  const closing = (/[*_#]+$/u.exec(core)?.[0] ?? '').slice(-MAX_WRAPPER_RUN)
+  const readings = new Set<string>([core])
+  const peel = (lead: number, trail: number): void => {
+    const reading = core.slice(lead, core.length - trail)
+    if (/[\p{L}\p{N}]/u.test(reading)) readings.add(reading)
+  }
+  if (opening && closing.endsWith(opening)) {
+    // The same marks on both ends are one wrapper ("_n*gger_", "**n**ger**", "__f*tz*__").
+    for (let k = 1; k <= opening.length; k += 1) peel(k, k)
+    return [...readings]
+  }
+  // An opening mark alone ("#n**ger", "#v**d*") is a wrapper; a closing run alone is read as
+  // hidden letters ("rapine**" is never "rapine" in bold), except for a word inside a phrase,
+  // where the opening mark stands on an earlier word.
+  for (let k = 1; k <= opening.length; k += 1) peel(k, 0)
+  if (trailingWrapper) for (let k = 1; k <= closing.length; k += 1) peel(0, k)
+  return [...readings]
+}
+
+/**
+ * The leet-class shape of a censored run when it clears the visibility floor, or undefined.
+ * The first letter shows, at least two real letters show (a digit is not a letter, so "18**"
+ * is never a term), and at least the ratio of all characters shows.
+ */
+function multiCensorShape(core: string): string | undefined {
+  if (core.length < MIN_SINGLE_TERM_LENGTH || !isMultiCensorRun(core)) return undefined
+  const folded = toFoldedForm(core.replaceAll(MULTI_CENSOR_SYMBOLS, '?'))
+  if (folded.length !== core.length || folded[0] === '?') return undefined
+  const letters = [...folded].filter((character) => /\p{L}/u.test(character)).length
+  const visible = folded.length - (folded.match(/\?/gu)?.length ?? 0)
+  if (
+    letters < MULTI_CENSOR_MIN_VISIBLE ||
+    visible < Math.ceil(folded.length * MULTI_CENSOR_MIN_VISIBLE_RATIO)
+  )
+    return undefined
+  return toLeetRunForm(folded)
+}
+
+function fillMultiCensor(
+  buckets: MultiCensorBuckets,
+  classed: string
+): readonly MultiCensorEntry[] {
+  return (buckets.get(`${classed.length}:${classed[0]}`) ?? []).filter((entry) =>
+    [...classed].every((letter, at) => letter === '?' || letter === entry.classed[at])
+  )
+}
+
+/** Every entry a censored run can spell under the visibility floor. */
+function multiCensorMatches(
+  buckets: MultiCensorBuckets,
+  core: string
+): readonly MultiCensorEntry[] {
+  const classed = multiCensorShape(core)
+  return classed === undefined ? [] : fillMultiCensor(buckets, classed)
+}
+
+/**
+ * The worst term a run with two or more censor symbols can spell, or undefined. A mask that
+ * a milder listed word or an allow-listed ordinary word also fills ("s**t" is shit as well as
+ * slut) follows the milder reading; a mask no such word fills ("n*gg*r") keeps the term.
+ */
+function matchMultiCensored(
+  buckets: MultiCensorBuckets,
+  milder: MultiCensorBuckets,
+  core: string
+): TermMeta | undefined {
+  const classed = multiCensorShape(core)
+  if (classed === undefined) return undefined
+  let worst: TermMeta | undefined
+  for (const { meta } of fillMultiCensor(buckets, classed)) {
+    if (meta && (!worst || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[worst.severity]))
+      worst = meta
+  }
+  if (!worst) return undefined
+  const top = SEVERITY_RANK[worst.severity]
+  const lower = fillMultiCensor(milder, classed).filter(
+    (entry) => !entry.meta || SEVERITY_RANK[entry.meta.severity] < top
+  )
+  if (lower.length === 0) return worst
+  let mild: TermMeta | undefined
+  for (const { meta } of lower)
+    if (meta && (!mild || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[mild.severity]))
+      mild = meta
+  // Only an allow-listed ordinary word fills it: the lowest grade that still withholds.
+  return mild ?? { category: worst.category, severity: 'low' }
+}
+
+/**
+ * Across plain whitespace a one- or two-letter word is a function word in most of the
+ * seven languages ("put a", "via do"), so only whole words of three letters or more
+ * rejoin there. Across a symbol every length rejoins, at review when a part is that short.
+ */
+function classifyCutGaps(
+  window: readonly string[],
+  plainGap: (gap: number) => boolean
+): 'whole' | 'short' | 'unusable' {
+  let result: 'whole' | 'short' = 'whole'
+  for (let gap = 0; gap < window.length - 1; gap += 1) {
+    const short =
+      (window[gap] as string).length <= JOINABLE_TOKEN_LENGTH ||
+      (window[gap + 1] as string).length <= JOINABLE_TOKEN_LENGTH
+    if (short && plainGap(gap)) return 'unusable'
+    if (short) result = 'short'
+  }
+  return result
+}
+
+/**
+ * The words of every high-severity phrase ("te voy a violar", "kill yourself", "heil
+ * hitler") with each letter in turn replaced by "?" and in leet-class form, so one censored
+ * or symbol-leet word inside a phrase can be put back before the phrase windows run.
+ */
+function buildPhraseWordKeys(indexes: readonly LanguageIndex[]): {
+  censored: ReadonlyMap<string, readonly string[]>
+  leet: ReadonlyMap<string, readonly string[]>
+} {
+  const censored = new Map<string, string[]>()
+  const leet = new Map<string, string[]>()
+  const add = (map: Map<string, string[]>, key: string, word: string): void => {
+    const words = map.get(key) ?? []
+    if (!words.includes(word)) map.set(key, [...words, word])
+  }
+  for (const index of indexes)
+    for (const phrase of index.phrases) {
+      if (phrase.meta.severity !== 'high') continue
+      for (const word of phrase.tokens) {
+        if (word.length < 3 || !/^\p{L}+$/u.test(word)) continue
+        const classed = toLeetRunForm(word)
+        add(leet, classed, word)
+        for (let at = 0; at < classed.length; at += 1)
+          add(censored, `${classed.slice(0, at)}?${classed.slice(at + 1)}`, word)
+      }
+    }
+  return { censored, leet }
+}
+
+/** Terms of this many letters or more have their one-letter typos indexed; shorter ones collide with ordinary words. */
+const TYPO_MIN_TERM_LENGTH = 8
+
+/**
+ * Every high-severity spelling of TYPO_MIN_TERM_LENGTH letters or more with one inner letter
+ * deleted, or two adjacent inner letters swapped: "schwanzlutscer", "kikeriki"-safe because
+ * the keys of a term never equal the term itself. Ordinary words that meet a key are cleared
+ * on the allow list.
+ */
+function buildTypoKeys(indexes: readonly LanguageIndex[]): ReadonlyMap<string, TermMeta> {
+  const keys = new Map<string, TermMeta>()
+  const add = (key: string, meta: TermMeta): void => {
+    const previous = keys.get(key)
+    if (!previous || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[previous.severity])
+      keys.set(key, meta)
+  }
+  for (const index of indexes) {
+    for (const [term, meta] of index.single) {
+      if (meta.severity !== 'high' || term.length < TYPO_MIN_TERM_LENGTH) continue
+      if (!/^\p{L}+$/u.test(term)) continue
+      // A generated Turkish inflection whose suffix breaks vowel harmony (cifit plus ler, for
+      // the back-vowel stem çıfıt) is a spelling nobody writes; one letter less is the ordinary
+      // front-vowel word çiftler. Only harmonic inflections are typo-checked, except the
+      // violence terms (tecavüz), whose forms are never released.
+      if (
+        index.disharmonicForms.has(term) &&
+        !index.listedTerms.has(term) &&
+        meta.category !== 'violence'
+      )
+        continue
+      for (let at = 1; at < term.length - 1; at += 1) {
+        add(`${term.slice(0, at)}${term.slice(at + 1)}`, meta)
+        if (at < term.length - 2 && term[at] !== term[at + 1])
+          add(`${term.slice(0, at)}${term[at + 1]}${term[at]}${term.slice(at + 2)}`, meta)
+      }
+    }
+  }
+  for (const [key] of keys)
+    if (indexes.some((index) => index.single.has(key))) keys.delete(key)
+  return keys
+}
+
+const EDIT_ONE_MIN_TERM_LENGTH = 6
+
+interface EditOneTerm {
+  readonly term: string
+  readonly meta: TermMeta
+}
+
+/** The word with each letter removed in turn. */
+function singleDeletes(word: string): string[] {
+  return Array.from(
+    { length: word.length },
+    (_, at) => word.slice(0, at) + word.slice(at + 1)
+  )
+}
+
+/** Whether two different words are one insertion, deletion, substitution or adjacent swap apart. */
+function isEditDistanceOne(a: string, b: string): boolean {
+  if (a === b || Math.abs(a.length - b.length) > 1) return false
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a]
+  let start = 0
+  while (start < short.length && short[start] === long[start]) start += 1
+  if (short.length === long.length) {
+    if (a.slice(start + 1) === b.slice(start + 1)) return true
+    return (
+      a[start] === b[start + 1] &&
+      a[start + 1] === b[start] &&
+      a.slice(start + 2) === b.slice(start + 2)
+    )
+  }
+  return short.slice(start) === long.slice(start + 1)
+}
+
+/**
+ * Every high-severity single-word term of six letters or more that the lists name, and every
+ * sexual-violence family term, found again with one letter added, dropped or changed, or two
+ * neighbours swapped ("hurex", "axrschficker"). The index is the deletion neighbourhood: a term
+ * is filed under itself and each of its deletions, a token is looked up under itself and each of
+ * its deletions, and a candidate is kept only at edit distance exactly one.
+ */
+function buildEditOneIndex(
+  indexes: readonly LanguageIndex[],
+  family: ReadonlySet<string>
+): ReadonlyMap<string, readonly EditOneTerm[]> {
+  const keys = new Map<string, EditOneTerm[]>()
+  const add = (key: string, entry: EditOneTerm): void => {
+    const bucket = keys.get(key)
+    if (!bucket) keys.set(key, [entry])
+    else if (!bucket.some((other) => other.term === entry.term)) bucket.push(entry)
+  }
+  // The spellings a list names and the plural and inflected spellings generated from its
+  // high-severity terms ("niggars" is one edit from the generated "niggers"). A generated
+  // Turkish inflection that breaks vowel harmony is left out, as in the typo index, except
+  // for violence terms.
+  // Turkish is left to the listed spellings: its suffix chains put ordinary words one edit
+  // from many generated forms (dikişi, one letter from the generated sikişi), and no spell
+  // checker is available to sweep them. Its inflected typos stay in the typo index.
+  for (const index of indexes)
+    for (const term of [
+      ...index.listedTerms,
+      ...index.generatedForms.filter(
+        (form) =>
+          index.language !== 'tr' || index.single.get(form)?.category === 'violence'
+      ),
+    ]) {
+      const meta = index.single.get(term)
+      if (!meta || term.length < EDIT_ONE_MIN_TERM_LENGTH || !/^\p{L}+$/u.test(term))
+        continue
+      if (meta.severity !== 'high' && !family.has(collapseRepeats(term))) continue
+      if (
+        index.disharmonicForms.has(term) &&
+        !index.listedTerms.has(term) &&
+        meta.category !== 'violence'
+      )
+        continue
+      const entry = { term, meta }
+      add(term, entry)
+      for (const deleted of singleDeletes(term)) add(deleted, entry)
+    }
+  return keys
+}
+
+/**
+ * The five-letter sexual-violence forms (raped, rapes, raper and the listed misspellings),
+ * which sit under the six-letter edit-distance-one floor. They are looked up with one letter
+ * appended or prepended only: a substitution or an insert of a five-letter word meets far too
+ * many ordinary words (rated, taped, rapid). The violence category is how the lists mark
+ * rape and tecavüz terms, and the sexual-violence family is English.
+ */
+function buildAffixTerms(
+  indexes: readonly LanguageIndex[],
+  family: ReadonlySet<string>
+): ReadonlyMap<string, TermMeta> {
+  const terms = new Map<string, TermMeta>()
+  for (const index of indexes)
+    for (const form of new Set([...index.listedTerms, ...index.generatedForms])) {
+      const meta = index.single.get(form)
+      if (
+        !meta ||
+        form.length !== EDIT_ONE_MIN_TERM_LENGTH - 1 ||
+        !/^\p{L}+$/u.test(form)
+      )
+        continue
+      if (
+        (meta.severity === 'high' && meta.category === 'violence') ||
+        family.has(collapseRepeats(form))
+      )
+        terms.set(form, meta)
+    }
+  return terms
+}
+
+/** Suffixes of INFLECTION_SUFFIXES.tr that agree with the last vowel of a stem. */
+const TURKISH_HARMONIC_SUFFIXES: Readonly<Record<string, ReadonlySet<string>>> = (() => {
+  const back = ['lar', 'a', 'da', 'dan', 'ları']
+  const front = ['ler', 'e', 'de', 'den', 'leri']
+  const sets: Record<string, string[]> = {
+    a: [...back, 'ı', 'ın'],
+    ı: [...back, 'ı', 'ın'],
+    o: [...back, 'u', 'un'],
+    u: [...back, 'u', 'un'],
+    e: [...front, 'i', 'in'],
+    i: [...front, 'i', 'in'],
+    ö: [...front, 'ü', 'ün'],
+    ü: [...front, 'ü', 'ün'],
+  }
+  return Object.fromEntries(
+    Object.entries(sets).map(([vowel, suffixes]) => [vowel, new Set(suffixes)])
+  )
+})()
+
+/**
+ * Whether a generated Turkish inflection pairs its stem with a suffix of the wrong vowel
+ * class: the stem's last vowel is read on the listed spelling (çıfıt ends in a back ı), not
+ * on the folded one, which has lost the dotless i.
+ */
+function breaksVowelHarmony(listed: string, form: string, foldedTerm: string): boolean {
+  const stem = toLiteralForm(listed)
+  const vowel = [...stem].reverse().find((letter) => 'aıoueiöü'.includes(letter))
+  const harmonic = vowel ? TURKISH_HARMONIC_SUFFIXES[vowel] : undefined
+  if (!harmonic) return false
+  // ı and i fold together, so a folded suffix can stand for two listed ones.
+  const suffix = form.slice(foldedTerm.length)
+  const spelled = INFLECTION_SUFFIXES.tr.filter(
+    (candidate) => toFoldedForm(candidate) === suffix
+  )
+  return spelled.length > 0 && spelled.every((candidate) => !harmonic.has(candidate))
+}
+
+export function inflectedForms(term: string, language: ScreeningLanguage): string[] {
+  const forms = new Set<string>(VERB_FORMS[language]?.[term] ?? [])
+  const last = term.at(-1) as string
+  for (const suffix of INFLECTION_SUFFIXES[language]) {
+    if (!(term.endsWith('e') && suffix.startsWith('e'))) forms.add(`${term}${suffix}`)
+  }
+  if (language === 'it' && ITALIAN_PLURALS[last])
+    forms.add(`${term.slice(0, -1)}${ITALIAN_PLURALS[last]}`)
+  if (language === 'it' && !'aeiou'.includes(last)) forms.add(`${term}i`)
+  if (language === 'en' && last === 'y') forms.add(`${term.slice(0, -1)}ies`)
+  forms.delete(term)
+  return [...forms].map((form) => toFoldedForm(toLiteralForm(form)))
 }
 
 function buildLanguageIndex(
   list: z.infer<typeof termsFileSchema>,
   policy: CommunityTextPolicy,
-  allowSingles: ReadonlySet<string>
+  allowSingles: ReadonlySet<string>,
+  familyTerms: ReadonlySet<string>
 ): LanguageIndex {
   const single = new Map<string, TermMeta>()
   const singleCollapsed = new Map<string, TermMeta>()
@@ -671,6 +2206,9 @@ function buildLanguageIndex(
   const phraseConcatenations = new Map<string, TermMeta>()
   const phraseLeetConcatenations = new Map<string, TermMeta>()
   const phraseForms = new Set<string>()
+  const generatedForms = new Set<string>()
+  const listedTerms = new Set<string>()
+  const disharmonicForms = new Set<string>()
 
   for (const entry of list.entries) {
     if (!policy.categories.includes(entry.category)) {
@@ -695,11 +2233,8 @@ function buildLanguageIndex(
         leet: collapsedTokens.map(toLeetClassForm),
         meta,
       })
-      phraseConcatenations.set(collapseRepeats(foldedTokens.join('')), meta)
-      phraseLeetConcatenations.set(
-        toLeetClassForm(collapseRepeats(foldedTokens.join(''))),
-        meta
-      )
+      indexRun(phraseConcatenations, foldedTokens.join(''), meta)
+      indexRun(phraseLeetConcatenations, toLeetRunForm(foldedTokens.join('')), meta)
       phraseForms.add(collapsedTokens.join(' '))
       // A phrase also has to be findable with its spaces gone. `killyourself`
       // written as one word, or spelled out letter by letter, arrives as a
@@ -718,10 +2253,34 @@ function buildLanguageIndex(
     }
 
     const term = foldedTokens[0] as string
+    listedTerms.add(term)
     if (term.length < MIN_SINGLE_TERM_LENGTH && !SHORT_TERM_EXCEPTIONS.has(term)) {
       throw new CommunityTextScreenerConfigError(
         `${list.language} has a single-word term under ${MIN_SINGLE_TERM_LENGTH} characters that is not a reviewed exception`
       )
+    }
+    if (
+      (entry.severity === 'high' || familyTerms.has(term)) &&
+      term.length >= MIN_SINGLE_TERM_LENGTH
+    ) {
+      // A derived form that collapses under the floor is skipped: only the reviewed root
+      // spelling may be guarded by an allow-list entry, never a generated one.
+      for (const form of inflectedForms(term, list.language).filter(
+        (candidate) => collapseRepeats(candidate).length >= MIN_SINGLE_TERM_LENGTH
+      )) {
+        generatedForms.add(form)
+        if (list.language === 'tr' && breaksVowelHarmony(entry.term, form, term))
+          disharmonicForms.add(form)
+        indexSingleTerm(
+          form,
+          meta,
+          list.language,
+          allowSingles,
+          single,
+          singleCollapsed,
+          singleLeet
+        )
+      }
     }
 
     indexSingleTerm(
@@ -746,6 +2305,9 @@ function buildLanguageIndex(
     phraseConcatenations,
     phraseLeetConcatenations,
     phraseForms,
+    generatedForms: [...generatedForms].toSorted(),
+    listedTerms,
+    disharmonicForms,
   }
 }
 
@@ -861,9 +2423,103 @@ export class CommunityTextScreener {
   private readonly indexes: readonly LanguageIndex[]
   private readonly allowSingles: ReadonlySet<string>
   private readonly allowPhrases: readonly string[][]
+  private readonly scopedAllowPhrases: ReadonlyMap<
+    ScreeningLanguage,
+    readonly ScopedPhrase[]
+  >
+  /** The generated plural and inflected spellings, as language:form, for the collision pin spec. */
+  generatedInflectionForms(): string[] {
+    return this.indexes.flatMap((index) =>
+      index.generatedForms.map((form) => `${index.language}:${form}`)
+    )
+  }
+
+  /** The generated Turkish inflections whose suffix breaks vowel harmony, as language:form. */
+  disharmonicInflectionForms(): string[] {
+    return this.indexes.flatMap((index) =>
+      [...index.disharmonicForms]
+        .filter(
+          (form) =>
+            !index.listedTerms.has(form) &&
+            index.single.get(form)?.category !== 'violence'
+        )
+        .map((form) => `${index.language}:${form}`)
+    )
+  }
+
+  /** The generated inflections the typo index reads: high severity, harmonic, not listed. */
+  typoIndexedInflectionForms(): string[] {
+    return this.indexes.flatMap((index) =>
+      index.generatedForms
+        .filter(
+          (form) =>
+            index.single.get(form)?.severity === 'high' &&
+            !index.listedTerms.has(form) &&
+            (!index.disharmonicForms.has(form) ||
+              index.single.get(form)?.category === 'violence')
+        )
+        .map((form) => `${index.language}:${form}`)
+    )
+  }
+
+  /** The generated inflections the edit-distance-one index reads, as language:form. */
+  editOneIndexedInflectionForms(): string[] {
+    const indexed = new Set<string>()
+    for (const bucket of this.editOneKeys.values())
+      for (const { term } of bucket) indexed.add(term)
+    return this.indexes.flatMap((index) =>
+      index.generatedForms
+        .filter((form) => indexed.has(form) && !index.listedTerms.has(form))
+        .map((form) => `${index.language}:${form}`)
+    )
+  }
+
+  /** The five-letter forms looked up with one letter appended or prepended. */
+  affixIndexedForms(): string[] {
+    return [...this.affixTerms.keys()].toSorted()
+  }
+
+  /** The scoped phrases of the language the current screen() call declared. */
+  private activeScopedPhrases: readonly ScopedPhrase[] = []
+  private readonly splitFrames: ReadonlyMap<string, readonly SplitFrame[]>
+  /** The sexual-violence family: repeat-collapsed terms that rejoin from short cuts. */
+  private readonly cutFamilyTerms: ReadonlySet<string>
+  private readonly cutFamilyReviewHalves: ReadonlySet<string>
+  /** Ordinary continuations of a review half: a copula after it, or a name after "ed". */
+  private readonly cutFamilyCopulas: ReadonlySet<string>
+  private readonly cutFamilyNameFollowers: ReadonlySet<string>
+  /** Each indexed high-severity or family form with one letter replaced by "?", in leet-class form. */
+  private censorKeys: ReadonlyMap<string, TermMeta> = new Map()
+  private multiCensorTerms: MultiCensorBuckets = new Map()
+  private multiCensorPhraseWords: MultiCensorBuckets = new Map()
+  private multiCensorMilder: MultiCensorBuckets = new Map()
+  /** One inner deletion or adjacent transposition of every long high-severity spelling. */
+  private typoKeys: ReadonlyMap<string, TermMeta> = new Map()
+  private editOneKeys: ReadonlyMap<string, readonly EditOneTerm[]> = new Map()
+  private affixTerms: ReadonlyMap<string, TermMeta> = new Map()
+  /** The words of high-severity phrases, keyed by their censored and leet spellings. */
+  private phraseWordCensorKeys: ReadonlyMap<string, readonly string[]> = new Map()
+  private phraseWordLeetKeys: ReadonlyMap<string, readonly string[]> = new Map()
+  private readonly scopedAllowWords: ReadonlyMap<ScreeningLanguage, ReadonlySet<string>>
+  /** Exact tokens cleared for the language the current screen() call declared. */
+  private activeScopedWords: ReadonlySet<string> = new Set()
+  private readonly literalContexts: readonly (z.infer<typeof literalContextSchema> & {
+    language: ScreeningLanguage
+  })[]
+  private readonly occurrenceConstructions: readonly {
+    target: string
+    minWords: number
+    forbiddenLetters: string
+    pattern: () => RegExp
+    requiredDeclaredLanguages?: readonly ScreeningLanguage[]
+    rejectedPrefixFrames: readonly string[]
+    textForbidden: readonly string[]
+    openers: readonly (readonly string[])[]
+  }[]
   private readonly listVersions: Readonly<Record<string, string>>
   private readonly loadedLanguages: readonly ScreeningLanguage[]
   private readonly englishFilter: Filter
+  private readonly englishProfane: ReadonlySet<string>
   private readonly fieldLimits: Readonly<Record<TextScreeningField, number>>
   private readonly longestTerm: number
 
@@ -936,11 +2592,103 @@ export class CommunityTextScreener {
     }
     this.allowSingles = allowSingles
     this.allowPhrases = allowPhrases
-
-    this.indexes = termLists.map((list) =>
-      buildLanguageIndex(list, this.policy, allowSingles)
+    this.scopedAllowPhrases = indexScopedPhrases(allowLists)
+    this.splitFrames = indexSplitFrames(allowLists)
+    this.scopedAllowWords = new Map(
+      allowLists.map((list) => [
+        list.language,
+        new Set((list.scopedWords ?? []).map(toLiteralForm)),
+      ])
     )
+    if (
+      allowLists.some((list) =>
+        list.entries.some((entry) =>
+          tokenize(toLeetRunForm(toFoldedForm(toLiteralForm(entry)))).some((token) =>
+            REVIEWED_OCCURRENCE_CONSTRUCTIONS.some(
+              (entry) =>
+                collapseRepeats(token) === toLeetClassForm(toFoldedForm(entry.target))
+            )
+          )
+        )
+      )
+    )
+      throw new CommunityTextScreenerConfigError(
+        'reviewed occurrence target cannot be globally allow-listed'
+      )
+    this.literalContexts = allowLists.flatMap((list) =>
+      (list.literalContexts ?? []).map((context) => ({
+        ...context,
+        objects: context.objects ?? [],
+        evidence: context.evidence ?? [],
+        evidenceRadius: context.evidenceRadius ?? 1,
+        vetoes: context.vetoes ?? [],
+        vetoRadius: context.vetoRadius ?? 3,
+        textVetoes: context.textVetoes ?? [],
+        vetoFrames: context.vetoFrames ?? [],
+        adjacentBefore: context.adjacentBefore ?? [],
+        clearFrames: context.clearFrames ?? [],
+        textEvidence: context.textEvidence ?? [],
+        ageNumerals: context.ageNumerals ?? [],
+        language: list.language,
+      }))
+    )
+    this.occurrenceConstructions = compileOccurrenceConstructions(
+      reviewedOccurrencePhrases(allowLists)
+    )
+
+    const familyForms = allowLists.flatMap((list) =>
+      (list.cutFamily?.terms ?? []).map((term) => toFoldedForm(toLiteralForm(term)))
+    )
+    this.cutFamilyTerms = new Set(familyForms.map(collapseRepeats))
+    this.cutFamilyReviewHalves = new Set(
+      allowLists.flatMap((list) =>
+        (list.cutFamily?.reviewHalves ?? []).map((word) =>
+          toFoldedForm(toLiteralForm(word))
+        )
+      )
+    )
+    const foldedWords = (
+      pick: (list: (typeof allowLists)[number]) => string[] | undefined
+    ) =>
+      new Set(
+        allowLists.flatMap((list) =>
+          (pick(list) ?? []).map((word) => toFoldedForm(toLiteralForm(word)))
+        )
+      )
+    this.cutFamilyCopulas = foldedWords((list) => list.cutFamily?.copulas)
+    this.cutFamilyNameFollowers = foldedWords((list) => list.cutFamily?.nameFollowers)
+    // A term whose collapsed spelling is only three letters is indexable once an ordinary
+    // word of that spelling is cleared, globally or under a declared language ("gok", the
+    // Turkish sky, against the English slur gook).
+    const indexable = new Set([
+      ...allowSingles,
+      ...[...this.scopedAllowWords.values()].flatMap((words) => [...words]),
+    ])
+    this.indexes = termLists.map((list) =>
+      buildLanguageIndex(list, this.policy, indexable, new Set(familyForms))
+    )
+    this.censorKeys = buildCensorKeys(this.indexes, this.cutFamilyTerms)
+    this.multiCensorTerms = buildMultiCensorIndex(this.indexes, this.cutFamilyTerms)
+    this.multiCensorPhraseWords = buildMultiCensorPhraseIndex(this.indexes)
+    this.multiCensorMilder = buildMultiCensorMilderIndex(
+      this.indexes,
+      this.allowSingles,
+      this.multiCensorTerms
+    )
+    this.typoKeys = buildTypoKeys(this.indexes)
+    this.editOneKeys = buildEditOneIndex(this.indexes, this.cutFamilyTerms)
+    this.affixTerms = buildAffixTerms(this.indexes, this.cutFamilyTerms)
+    const phraseWords = buildPhraseWordKeys(this.indexes)
+    this.phraseWordCensorKeys = phraseWords.censored
+    this.phraseWordLeetKeys = phraseWords.leet
+    for (const term of this.cutFamilyTerms) {
+      if (!this.indexes.some((index) => index.singleCollapsed.has(term)))
+        throw new CommunityTextScreenerConfigError(
+          `cut family term ${term} is not a listed term of any language`
+        )
+    }
     this.assertDeliberateReviewTerms()
+    this.assertContextTargets()
     this.longestTerm = Math.max(
       MIN_SINGLE_TERM_LENGTH,
       ...this.indexes.map((index) => index.longestSingleTerm)
@@ -960,12 +2708,31 @@ export class CommunityTextScreener {
     if (allowed.length > 0) {
       this.englishFilter.removeWords(...allowed)
     }
+    // The filter builds one regular expression per list word on every call and tests each
+    // word against the whole allow list first, so its cost grows with both lists. For a token
+    // of plain word characters the two reduce to set membership, which is what this holds.
+    const excluded = new Set(this.englishFilter.exclude)
+    this.englishProfane = new Set(
+      this.englishFilter.list
+        .map((word) => word.toLowerCase())
+        .filter((word) => /^\w+$/.test(word) && !excluded.has(word))
+    )
+  }
+
+  /** Whether the English backstop list holds the token, as `bad-words` would answer. */
+  private isEnglishProfane(token: string): boolean {
+    return /^\w+$/.test(token)
+      ? this.englishProfane.has(token)
+      : this.englishFilter.isProfane(token)
   }
 
   private assertDeliberateReviewTerms(): void {
     for (const entry of this.policy.deliberateReviewTerms ?? []) {
       const literal = toLiteralForm(entry.term)
-      if (this.allowSingles.has(literal)) {
+      if (
+        this.allowSingles.has(literal) ||
+        this.literalContexts.some((context) => context.terms.includes(literal))
+      ) {
         throw new CommunityTextScreenerConfigError(
           'a deliberate review term is allow-listed, which would silently reverse the policy decision'
         )
@@ -975,6 +2742,21 @@ export class CommunityTextScreener {
         throw new CommunityTextScreenerConfigError(
           'a deliberate review term is indexed by no list, so it would not route to review'
         )
+      }
+    }
+  }
+
+  private assertContextTargets(): void {
+    for (const context of this.literalContexts) {
+      for (const term of context.terms) {
+        const folded = toFoldedForm(toLiteralForm(term))
+        if (
+          this.worstAcross((index) => matchRun(index.singleCollapsed, folded))
+            ?.severity === 'high'
+        )
+          throw new CommunityTextScreenerConfigError(
+            'generic context targets a high-severity term'
+          )
       }
     }
   }
@@ -992,10 +2774,31 @@ export class CommunityTextScreener {
       verdict.flag(LOCALE_UNSCREENABLE_REASON, this.policy.unscreenableLocaleDisposition)
     }
 
+    const declaredLanguage = this.resolveLanguage(declaredLocale)
+    this.activeScopedWords = declaredLanguage
+      ? (this.scopedAllowWords.get(declaredLanguage) ?? new Set())
+      : new Set()
+    this.activeScopedPhrases = declaredLanguage
+      ? (this.scopedAllowPhrases.get(declaredLanguage) ?? [])
+      : []
+    try {
+      return this.screenWithVerdict(input, declaredLocale, verdict)
+    } finally {
+      this.activeScopedPhrases = []
+      this.activeScopedWords = new Set()
+    }
+  }
+
+  private screenWithVerdict(
+    input: CommunityTextScreeningInput,
+    declaredLocale: string | null,
+    verdict: Verdict
+  ): CommunityTextScreeningResult {
     const limit = this.fieldLimits[input.field]
     const raw = input.text ?? ''
     const overLength = raw.length > limit
-    const literal = toLiteralForm(overLength ? trimToLimit(raw, limit) : raw)
+    const boundedRaw = overLength ? trimToLimit(raw, limit) : raw
+    const literal = toLiteralForm(boundedRaw)
 
     const observedScripts = observeScripts(literal)
     this.applyScriptPolicy(observedScripts, verdict)
@@ -1008,18 +2811,42 @@ export class CommunityTextScreener {
     // for both let an ordinary word disable every phrase it appears in: clearing
     // `concha` (a shell) also cleared `concha de tu madre`.
     const phraseAllowed = literalTokens.map(() => false)
-    this.markAllowedPhrases(literalTokens, phraseAllowed)
+    this.markAllowedPhrases(literal, literalTokens, phraseAllowed)
     const allowed = literalTokens.map(
-      (token, index) => this.allowSingles.has(token) || (phraseAllowed[index] as boolean)
+      (token, index) =>
+        this.allowSingles.has(token) ||
+        this.activeScopedWords.has(token) ||
+        (phraseAllowed[index] as boolean)
     )
+    this.markLiteralContexts(literal, literalTokens, allowed, declaredLocale)
+    this.markOccurrenceConstructions(boundedRaw, literalTokens, allowed, declaredLocale)
 
     for (const outcome of this.collectMatches(
+      literal,
       literalTokens,
       foldedTokens,
       { allowed, phraseAllowed },
       budget
     )) {
       verdict.match(outcome, this.dispositionFor(outcome.meta.severity))
+    }
+
+    // Alternative readings of the text, run through the same passes with no allowances:
+    // a regional-letter spelling with a valid flag removed, and one obfuscated phrase word put back.
+    for (const alternative of [
+      ...this.regionalAlternatives(boundedRaw),
+      ...this.restorePhraseWords(literal),
+    ]) {
+      const tokens = this.foldTokens(alternative, budget)
+      const none = tokens.literalTokens.map(() => false)
+      for (const outcome of this.collectMatches(
+        alternative,
+        tokens.literalTokens,
+        tokens.foldedTokens,
+        { allowed: none, phraseAllowed: none },
+        budget
+      ))
+        verdict.match(outcome, this.dispositionFor(outcome.meta.severity))
     }
 
     const truncated = overLength || budget.exhausted
@@ -1094,13 +2921,44 @@ export class CommunityTextScreener {
     return SCREENING_LANGUAGES.find((candidate) => candidate === mapped) ?? null
   }
 
-  private markAllowedPhrases(literalTokens: string[], allowed: boolean[]): void {
+  /**
+   * Phrase allowances clear the words they cover only when the phrase is contiguous in the
+   * literal text: adjacent words are separated by plain spaces (a Portuguese native compound
+   * may also use one hyphen, in the scoped phrases only). A full stop, newline, emoji or any
+   * other separator between the words is a boundary, so an allowed tail appended to a
+   * reviewable word ("you are a dick. und weich") cannot clear it.
+   */
+  private markAllowedPhrases(
+    literal: string,
+    literalTokens: string[],
+    allowed: boolean[]
+  ): void {
+    const spans = [...literal.matchAll(/[\p{L}\p{N}]+/gu)]
+    const contiguous = (
+      start: number,
+      length: number,
+      joiner: 'space' | 'space-or-hyphen'
+    ): boolean =>
+      Array.from({ length: length - 1 }, (_, offset) =>
+        connectedLiteralTokens(literal, spans, start + offset, start + offset + 1, joiner)
+      ).every(Boolean)
+    for (const scoped of this.activeScopedPhrases) {
+      const { tokens: head } = scoped
+      for (let start = 0; start + head.length < literalTokens.length; start += 1) {
+        if (!head.every((token, offset) => literalTokens[start + offset] === token))
+          continue
+        if (!scopedPhraseHasEvidence(scoped, literal, spans, literalTokens, start))
+          continue
+        for (let offset = 0; offset < head.length; offset += 1)
+          allowed[start + offset] = true
+      }
+    }
     for (const phrase of this.allowPhrases) {
       for (let start = 0; start + phrase.length <= literalTokens.length; start += 1) {
         const matches = phrase.every(
           (token, offset) => literalTokens[start + offset] === token
         )
-        if (!matches) continue
+        if (!matches || !contiguous(start, phrase.length, 'space')) continue
         for (let offset = 0; offset < phrase.length; offset += 1) {
           allowed[start + offset] = true
         }
@@ -1108,7 +2966,111 @@ export class CommunityTextScreener {
     }
   }
 
+  /** Clear only an exact ordinary homograph within a bounded literal clause.
+   * Object and connector tokens remain screened, as do all multi-word terms.
+   */
+  private markLiteralContexts(
+    literal: string,
+    tokens: readonly string[],
+    allowed: boolean[],
+    declaredLocale: string | null
+  ): void {
+    const language = this.resolveLanguage(declaredLocale)
+    if (!language) return
+    const spans = [...literal.matchAll(/[\p{L}\p{N}]+/gu)]
+    for (let position = 0; position < tokens.length; position++) {
+      for (const context of this.literalContexts) {
+        if (context.language !== language) continue
+        if (!context.terms.includes(tokens[position] as string)) continue
+        if (isVetoed(tokens, position, context)) continue
+        if (contextClears(literal, spans, tokens, position, context))
+          allowed[position] = true
+      }
+    }
+  }
+
+  /**
+   * Whether the whole field text holds one of the forbidden words, in any spelling the
+   * folds merge, also when letters are spaced or separated ("crian ça"). Words of six
+   * letters or more are looked for in the text with every separator removed.
+   */
+  private textHoldsForbidden(exact: string, forbidden: readonly string[]): boolean {
+    const words = tokenize(toFoldedForm(toLiteralForm(exact)))
+    if (words.some((word) => forbidden.includes(collapseRepeats(toLeetClassForm(word)))))
+      return true
+    const squashed = collapseRepeats(toLeetClassForm(words.join('')))
+    return forbidden.some((word) => word.length >= 6 && squashed.includes(word))
+  }
+
+  private markOccurrenceConstructions(
+    raw: string,
+    tokens: readonly string[],
+    allowed: boolean[],
+    declaredLocale?: string | null
+  ): void {
+    const exact = raw.toLowerCase()
+    const language = this.resolveLanguage(declaredLocale)
+    for (const construction of this.occurrenceConstructions) {
+      // Every phrase holds the target word, so a text without it cannot match: skip the scan.
+      if (!exact.includes(construction.target)) continue
+      if (!declaresRequiredLanguage(construction.requiredDeclaredLanguages, language))
+        continue
+      if (
+        construction.forbiddenLetters &&
+        [...raw.normalize('NFC').toLowerCase()].some((letter) =>
+          construction.forbiddenLetters.includes(letter)
+        )
+      )
+        continue
+      for (const match of exact.matchAll(construction.pattern())) {
+        const prefix = exact.slice(0, match.index)
+        // Screening folds may only remove an exception here. The construction
+        // itself still requires exact raw spelling and ordinary spaces.
+        const prefixWords = tokenize(toLeetRunForm(toFoldedForm(toLiteralForm(prefix))))
+        // A frame may also run across the start of the matched phrase: the words before the
+        // target belong to it, so "espece" + "de tapete" is the rejected frame "espece de".
+        const phraseWords = match[0].split(/ +/)
+        const leadWords = tokenize(
+          toLeetRunForm(
+            toFoldedForm(
+              toLiteralForm(
+                phraseWords.slice(0, phraseWords.indexOf(construction.target)).join(' ')
+              )
+            )
+          )
+        )
+        if (
+          rejectsPrefixFrame(construction.rejectedPrefixFrames, prefixWords) ||
+          rejectsPrefixFrame(construction.rejectedPrefixFrames, [
+            ...prefixWords,
+            ...leadWords,
+          ])
+        )
+          continue
+        if (
+          construction.openers.length > 0 &&
+          !tiledByPhrases(
+            tokenize(toFoldedForm(toLiteralForm(prefix))),
+            construction.openers
+          )
+        )
+          continue
+        if (
+          construction.textForbidden.length > 0 &&
+          this.textHoldsForbidden(exact, construction.textForbidden)
+        )
+          continue
+        const words = phraseWords
+        const at = tokenize(toLiteralForm(prefix)).length
+        if (!words.every((word, index) => tokens[at + index] === word)) continue
+        if (tokens.length < construction.minWords) continue
+        allowed[at + words.indexOf(construction.target)] = true
+      }
+    }
+  }
+
   private collectMatches(
+    literal: string,
     literalTokens: readonly string[],
     foldedTokens: readonly string[],
     allowances: { allowed: readonly boolean[]; phraseAllowed: readonly boolean[] },
@@ -1130,10 +3092,7 @@ export class CommunityTextScreener {
         outcomes.push(outcome)
         continue
       }
-      if (
-        folded.length >= MIN_SINGLE_TERM_LENGTH &&
-        this.englishFilter.isProfane(folded)
-      ) {
+      if (folded.length >= MIN_SINGLE_TERM_LENGTH && this.isEnglishProfane(folded)) {
         outcomes.push({
           meta: { category: 'profanity', severity: 'low' },
           obfuscated: false,
@@ -1147,8 +3106,20 @@ export class CommunityTextScreener {
     outcomes.push(
       ...this.collectResplitPhraseMatches(foldedTokens, phraseAllowed, literalTokens)
     )
+    outcomes.push(
+      ...this.collectSplitHighTermMatches(literal, foldedTokens, literalTokens, allowed)
+    )
+    outcomes.push(...this.collectFamilyCutMatches(foldedTokens))
 
-    for (const candidate of this.buildJoinCandidates(literalTokens, budget)) {
+    for (const candidate of this.buildSymbolLeetCandidates(literal, budget)) {
+      const outcome = this.matchCandidate(toFoldedForm(candidate), true, budget)
+      if (outcome) outcomes.push({ meta: outcome.meta, obfuscated: true })
+    }
+
+    outcomes.push(...this.collectCensoredMatches(literal, budget))
+    outcomes.push(...this.collectTypoMatches(foldedTokens, allowed))
+
+    for (const candidate of this.buildJoinCandidates(literal, literalTokens, budget)) {
       const outcome = this.matchCandidate(
         toFoldedForm(candidate),
         LEET_TRIGGER_PATTERN.test(candidate),
@@ -1198,6 +3169,407 @@ export class CommunityTextScreener {
   }
 
   /**
+   * A high-severity single-word term cut in two ("tap ete") rejoins to the term. Two
+   * ordinary words that happen to spell a single-word term stay unflagged for lower
+   * severities, which is why the single-term passes never rejoin whole tokens; the
+   * hate, violence and self-harm tier is the exception, because a cut there is the
+   * cheapest disguise and the same two-way cut of a medium term only routes to review.
+   */
+  private collectSplitHighTermMatches(
+    literal: string,
+    foldedTokens: readonly string[],
+    literalTokens: readonly string[],
+    allowed: readonly boolean[]
+  ): MatchOutcome[] {
+    const outcomes: MatchOutcome[] = []
+    // An ordinary word the lists clear as a term on its own ("con") must not shield a
+    // cut of a high-severity term ("mari con"); only phrase and construction clearances do.
+    const cleared = (position: number): boolean =>
+      (allowed[position] as boolean) &&
+      !this.allowSingles.has(literalTokens[position] as string)
+    const spans = [...literal.matchAll(/[\p{L}\p{N}]+/gu)]
+    const aligned = spans.length === foldedTokens.length
+    // A gap of plain whitespace is a word break; anything else (a hyphen, dot, slash,
+    // asterisk, comma ...) inside a would-be word is a disguise.
+    const plainGap = (at: number): boolean => {
+      if (!aligned) return true
+      const left = spans[at] as RegExpMatchArray
+      const right = spans[at + 1] as RegExpMatchArray
+      return /^[\p{Zs}\t\r\n]+$/u.test(
+        literal.slice((left.index ?? 0) + left[0].length, right.index)
+      )
+    }
+    for (let start = 0; start + 1 < foldedTokens.length; start += 1) {
+      if (cleared(start)) continue
+      // A chain of fragments of any length rejoins (f*a*g*got). Everything that rules a window
+      // out is monotonic in its size, so the first window that cannot grow ends the chain.
+      for (
+        let size = 2;
+        size <= MAX_CUT_FRAGMENTS && start + size <= foldedTokens.length;
+        size += 1
+      ) {
+        const window = foldedTokens.slice(start, start + size)
+        if (cleared(start + size - 1)) break
+        const gaps = classifyCutGaps(window, (gap) => plainGap(start + gap))
+        if (gaps === 'unusable') break
+        const shortPart = gaps === 'short'
+        const joined = window.join('')
+        if (collapseRepeats(joined).length > this.longestTerm) break
+        if (joined.length < MIN_SINGLE_TERM_LENGTH) continue
+        // A cut of a hate or sexual term never passes on its own. Only a reviewed fashion
+        // pair inside its enumerated frame ("then you pin the hem") is left alone.
+        if (size === 2 && this.inReviewedSplitFrame(foldedTokens, start)) continue
+        const meta = this.worstAcross((index) => matchRun(index.singleCollapsed, joined))
+        if (meta?.severity !== 'high') continue
+        // Two ordinary words with an open frame are withheld for review, not hard-blocked;
+        // a slur-leading frame or a cut with a non-ordinary half keeps the block.
+        outcomes.push({
+          meta:
+            shortPart || (size === 2 && this.isOrdinaryOpenSplit(foldedTokens, start))
+              ? { ...meta, severity: 'medium' }
+              : meta,
+          obfuscated: true,
+        })
+      }
+    }
+    return outcomes
+  }
+
+  /**
+   * "El rap es genial", "il rap e musica", "Der Rap ist laut" and "rap Ed Hardy tee" are
+   * ordinary copy: the review half "rap", then a copula with a word after it, or "ed" with
+   * a listed surname after it.
+   */
+  private isOrdinaryFamilyContinuation(
+    foldedTokens: readonly string[],
+    start: number,
+    size: number
+  ): boolean {
+    if (size !== 2 || !this.cutFamilyReviewHalves.has(foldedTokens[start] as string))
+      return false
+    const second = foldedTokens[start + 1] as string
+    const next = foldedTokens[start + 2]
+    if (next === undefined) return false
+    return (
+      this.cutFamilyCopulas.has(second) ||
+      (second === 'ed' && this.cutFamilyNameFollowers.has(next))
+    )
+  }
+
+  /**
+   * A term of the sexual-violence family cut into two or three words of any length
+   * ("ra ped", "rap ed", "sa-ed her") rejoins at the term's own grade. The ordinary
+   * word "rap" as a half downgrades the cut to review.
+   */
+  private collectFamilyCutMatches(foldedTokens: readonly string[]): MatchOutcome[] {
+    if (this.cutFamilyTerms.size === 0) return []
+    const outcomes: MatchOutcome[] = []
+    for (let start = 0; start < foldedTokens.length; start += 1) {
+      for (
+        let size = 2;
+        size <= MAX_CUT_FRAGMENTS && start + size <= foldedTokens.length;
+        size += 1
+      ) {
+        const window = foldedTokens.slice(start, start + size)
+        const joined = window.join('')
+        if (collapseRepeats(joined).length > this.longestTerm) break
+        if (!this.cutFamilyTerms.has(collapseRepeats(joined))) continue
+        if (this.isOrdinaryFamilyContinuation(foldedTokens, start, size)) continue
+        const meta = this.worstAcross((index) => matchRun(index.singleCollapsed, joined))
+        if (!meta) continue
+        outcomes.push({
+          meta: window.some((word) => this.cutFamilyReviewHalves.has(word))
+            ? { ...meta, severity: 'medium' }
+            : meta,
+          obfuscated: true,
+        })
+      }
+    }
+    return outcomes
+  }
+
+  /** A long high-severity term with one inner letter missing or two swapped ("arschficer"). */
+  private collectTypoMatches(
+    foldedTokens: readonly string[],
+    allowed: readonly boolean[]
+  ): MatchOutcome[] {
+    const outcomes: MatchOutcome[] = []
+    for (const [at, token] of foldedTokens.entries()) {
+      if (allowed[at]) continue
+      if (token.length >= TYPO_MIN_TERM_LENGTH - 1) {
+        const meta = this.typoKeys.get(token)
+        if (meta) outcomes.push({ meta, obfuscated: true })
+      }
+      const near = this.editOneMatch(token)
+      if (near) outcomes.push(near)
+    }
+    return outcomes
+  }
+
+  /**
+   * A token one edit from a listed high-severity or sexual-violence term of six letters or
+   * more. A real word that sits one edit from a term is cleared by an allow entry; any other
+   * is withheld for review, the grade of a spelling that may be an ordinary word.
+   */
+  private editOneMatch(token: string): MatchOutcome | null {
+    if (
+      token.length < EDIT_ONE_MIN_TERM_LENGTH - 1 ||
+      token.length > this.longestTerm + 1
+    )
+      return null
+    // A listed spelling is matched as itself, whatever other term sits one edit from it.
+    if (this.indexes.some((index) => index.single.has(token))) return null
+    if (token.length === EDIT_ONE_MIN_TERM_LENGTH) {
+      const affixed =
+        this.affixTerms.get(token.slice(0, -1)) ?? this.affixTerms.get(token.slice(1))
+      if (affixed) return { meta: { ...affixed, severity: 'medium' }, obfuscated: true }
+    }
+    for (const key of [token, ...singleDeletes(token)])
+      for (const { term, meta } of this.editOneKeys.get(key) ?? [])
+        if (isEditDistanceOne(token, term))
+          return { meta: { ...meta, severity: 'medium' }, obfuscated: true }
+    return null
+  }
+
+  /**
+   * The other literal readings of regional indicator runs that are not rows of flags: with one
+   * or two valid flags removed from anywhere in the run. A real flag spliced into a spelling
+   * (or standing beside it) therefore does not hide the word. Capped at 16 texts.
+   */
+  private regionalAlternatives(raw: string): string[] {
+    const runs = [...raw.normalize('NFKC').matchAll(REGIONAL_RUN_PATTERN)].map((run) =>
+      regionalLetters(run[0])
+    )
+    // A text whose regional runs are all rows of flags ("Paris 🇫🇷 Berlin 🇩🇪") has nothing to
+    // peel: building alternatives for it would spend the work budget on clean captions.
+    if (runs.every((letters) => isFlagRun(letters))) return []
+    // A run read as its own word may also stand apart from Latin letters written against it.
+    const options = runs.map((letters) =>
+      isFlagRun(letters)
+        ? [FLAG_SEPARATOR]
+        : [
+            ...regionalReadings(letters).flatMap((reading) => [reading, ` ${reading} `]),
+            FLAG_SEPARATOR,
+          ]
+    )
+    // One run read differently at a time, then every run with a flag peeled off either edge
+    // (a flag glued to a word of a phrase), so a flag touching a term does not shield it.
+    const readings: string[][] = []
+    const base = options.map(() => 0)
+    options.forEach((choices, run) => {
+      for (let at = 1; at < choices.length; at += 1)
+        readings.push(base.map((_, i) => (i === run ? at : 0)).map(String))
+    })
+    const edges = runs.map((letters) =>
+      isFlagRun(letters) ? [FLAG_SEPARATOR] : [...edgeReadings(letters), FLAG_SEPARATOR]
+    )
+    let edgeCombos: string[][] = [[]]
+    for (const choices of edges)
+      edgeCombos = edgeCombos
+        .flatMap((combo) => choices.map((choice) => [...combo, choice]))
+        .slice(0, MAX_REGIONAL_ALTERNATIVES)
+    const chosen = readings.map((combo) =>
+      toLiteralFormWith(
+        raw,
+        (_letters, run) => (options[run] as string[])[Number(combo[run])] as string
+      )
+    )
+    const peeled = edgeCombos.map((combo) =>
+      toLiteralFormWith(raw, (letters, run) =>
+        isFlagRun(letters) ? FLAG_SEPARATOR : (combo[run] as string)
+      )
+    )
+    return [...chosen, ...peeled].slice(0, MAX_REGIONAL_ALTERNATIVES)
+  }
+
+  /**
+   * The phrase words a censored or symbol-leet run can restore to, with the part of the run
+   * that was read. A wrapper (#, **, _) and sentence punctuation (!) around the word are
+   * peeled before the censor read.
+   */
+  private restorableWords(
+    core: string
+  ): { reading: string; words: readonly string[] } | undefined {
+    if (core.length < 3) return undefined
+    const edgeFree = core.replace(/^[^\p{L}\p{N}*_#]+|[^\p{L}\p{N}*_#]+$/gu, '')
+    // Every reading can name a different word ("b*ing" is bring, "b*ing*" is bringe), so the
+    // candidates of all readings are offered, capped.
+    const candidates = new Set<string>()
+    for (const reading of new Set([
+      ...censorReadings(core, true),
+      ...censorReadings(edgeFree, true),
+    ])) {
+      if (/^[\p{L}\p{N}]*[*_#.-][\p{L}\p{N}]*$/u.test(reading)) {
+        const at = reading.search(/[*_#.-]/u)
+        const words = this.phraseWordCensorKeys.get(
+          toLeetRunForm(toFoldedForm(`${reading.slice(0, at)}?${reading.slice(at + 1)}`))
+        )
+        for (const word of words ?? []) candidates.add(word)
+      } else if (isMultiCensorRun(reading)) {
+        for (const entry of multiCensorMatches(
+          this.multiCensorPhraseWords,
+          reading
+        ).slice(0, 4))
+          candidates.add(entry.word)
+      }
+    }
+    if (candidates.size > 0) return { reading: core, words: [...candidates].slice(0, 6) }
+    if (/[@$!|+]/.test(core) && /^[\p{L}\p{N}@$!|+]+$/u.test(core)) {
+      const words = this.phraseWordLeetKeys.get(toLeetRunForm(toFoldedForm(core)))
+      if (words) return { reading: core, words }
+    }
+    return undefined
+  }
+
+  /**
+   * One word of a high-severity phrase written censored ("v*olar") or with a leet symbol
+   * ("viol@r") is put back, so the phrase windows can see "te voy a violar". Returns the
+   * rewritten text, or null when no word was restored.
+   */
+  private restorePhraseWords(literal: string): string[] {
+    if (this.phraseWordCensorKeys.size === 0) return []
+    // Each obfuscated chunk may restore to several phrase words ("?ang" is gang or hang),
+    // so the texts are the combinations, capped.
+    let texts: string[] = ['']
+    let changed = false
+    let cursor = 0
+    for (const chunk of literal.matchAll(/\S+/gu)) {
+      const raw = chunk[0]
+      const core = raw.replace(/^[^\p{L}\p{N}*_#@$!|+]+|[^\p{L}\p{N}*_#@$!|+]+$/gu, '')
+      const found = this.restorableWords(core)
+      const gap = literal.slice(cursor, chunk.index)
+      cursor = chunk.index + raw.length
+      const options = found ? found.words.map((word) => raw.replace(core, word)) : [raw]
+      if (found) changed = true
+      texts = texts
+        .flatMap((text) => options.map((option) => text + gap + option))
+        .slice(0, 16)
+    }
+    return changed ? texts : []
+  }
+
+  /**
+   * A word with one letter replaced by a censor symbol (* _ # . -) is one whitespace-bounded
+   * run that the tokenizer splits at the symbol. The run is read with the symbol as a
+   * wildcard against every high-severity spelling and every sexual-violence family term.
+   * A dot or hyphen at either edge is punctuation, never a censored letter.
+   */
+  private collectCensoredMatches(
+    literal: string,
+    budget: ExpansionBudget
+  ): MatchOutcome[] {
+    const outcomes: MatchOutcome[] = []
+    if (this.censorKeys.size === 0) return outcomes
+    for (const chunk of literal.matchAll(/\S+/gu)) {
+      // The run between whitespace, without surrounding punctuation. An asterisk, hash or
+      // underscore at an edge may be a censored letter; a dot or hyphen there is punctuation.
+      const core = chunk[0].replace(/^[^\p{L}\p{N}*_#]+|[^\p{L}\p{N}*_#]+$/gu, '')
+      for (const reading of censorReadings(core)) {
+        if (isMultiCensorRun(reading)) {
+          if (!budget.spend(reading)) return outcomes
+          const multi = matchMultiCensored(
+            this.multiCensorTerms,
+            this.multiCensorMilder,
+            reading
+          )
+          if (multi) outcomes.push({ meta: multi, obfuscated: true })
+        }
+        if (!/^[\p{L}\p{N}]*[*_#.-][\p{L}\p{N}]*$/u.test(reading)) continue
+        if (reading.length < MIN_SINGLE_TERM_LENGTH) continue
+        if (!budget.spend(reading)) return outcomes
+        const at = reading.search(/[*_#.-]/u)
+        const folded = toFoldedForm(`${reading.slice(0, at)}?${reading.slice(at + 1)}`)
+        const meta = this.censorKeys.get(toLeetRunForm(folded))
+        if (meta) outcomes.push({ meta, obfuscated: true })
+      }
+    }
+    return outcomes
+  }
+
+  /**
+   * A word written with a leet symbol inside it ("r@ped") is one
+   * whitespace-bounded run that the tokenizer splits at the symbol. The run, and the run
+   * without its edge symbols, are offered as candidates and matched in leet-class form.
+   */
+  private buildSymbolLeetCandidates(literal: string, budget: ExpansionBudget): string[] {
+    const candidates: string[] = []
+    for (const run of literal.matchAll(/[\p{L}\p{N}@$!|+]*[@$|+!][\p{L}\p{N}@$!|+]*/gu)) {
+      const whole = run[0]
+      const trimmed = whole.replace(/^[@$!|+]+|[@$!|+]+$/gu, '')
+      for (const candidate of new Set([whole, trimmed])) {
+        if (!/[\p{L}\p{N}]/u.test(candidate) || !/[@$!|+]/.test(candidate)) continue
+        if (
+          candidate.length < MIN_SINGLE_TERM_LENGTH &&
+          !SHORT_TERM_EXCEPTIONS.has(toLeetRunForm(toFoldedForm(candidate)))
+        )
+          continue
+        if (!budget.spend(candidate)) return candidates
+        candidates.push(candidate)
+      }
+    }
+    return candidates
+  }
+
+  /**
+   * A reviewed ordinary pair, led by a listed ordinary word, in a text with no forbidden
+   * word, no violent or hate word within three words of the pair and no forbidden phrase.
+   */
+  private isOrdinaryOpenSplit(foldedTokens: readonly string[], start: number): boolean {
+    const frames = this.splitFrames.get(
+      `${foldedTokens[start]} ${foldedTokens[start + 1]}`
+    )
+    if (!frames) return false
+    const outside = [...foldedTokens.slice(0, start), ...foldedTokens.slice(start + 2)]
+    const near = [
+      ...foldedTokens.slice(Math.max(0, start - 3), start),
+      ...foldedTokens.slice(start + 2, start + 5),
+    ]
+    return frames.some(
+      (frame) =>
+        (start === 0
+          ? frame.atStart
+          : frame.before.includes(foldedTokens[start - 1] as string) ||
+            frame.reviewBefore.includes(foldedTokens[start - 1] as string)) &&
+        !outside.some((word) => frame.reviewForbidden.includes(word)) &&
+        !near.some((word) => frame.reviewForbiddenNear.includes(word)) &&
+        !frame.reviewForbiddenPhrases.some((phrase) =>
+          foldedTokens.some((_, at) =>
+            phrase.every((word, offset) => foldedTokens[at + offset] === word)
+          )
+        )
+    )
+  }
+
+  /**
+   * Whether the pair at `start` sits inside a reviewed frame: the text before the listed
+   * word is empty or closed lead phrases, the closed `after` phrase follows, and the
+   * whole remainder of the text is closed tail phrases or empty. A clause break does not
+   * end the check, so nothing unlisted can ride on the clearance.
+   */
+  private inReviewedSplitFrame(foldedTokens: readonly string[], start: number): boolean {
+    const frames = this.splitFrames.get(
+      `${foldedTokens[start]} ${foldedTokens[start + 1]}`
+    )
+    if (!frames) return false
+    return frames.some((frame) => {
+      if (start === 0) {
+        if (!frame.atStart) return false
+      } else {
+        const before = foldedTokens[start - 1] as string
+        if (!frame.before.includes(before)) return false
+        const lead = foldedTokens.slice(0, start - 1)
+        const words = frame.before.map((word) => [word])
+        if (!tiledByPhrases(lead, [...frame.leads, ...words])) return false
+      }
+      return frame.after.some(
+        (phrase) =>
+          phrase.every((word, offset) => foldedTokens[start + 2 + offset] === word) &&
+          tiledByPhrases(foldedTokens.slice(start + 2 + phrase.length), frame.tails)
+      )
+    })
+  }
+
+  /**
    * A multi-word term whose letters arrive cut at different places: `vai-tefoder`
    * for `vai-te foder`, `kill yours elf`, `blo wjob`. The window pass compares
    * token for token, the concatenation index sees only a single joined token,
@@ -1229,20 +3601,22 @@ export class CommunityTextScreener {
         end += 1
       ) {
         if (allowed[end]) break
-        joined = collapseRepeats(joined + (collapsed[end] as string))
+        joined += foldedTokens[end] as string
         leetInWindow = leetInWindow || (carriesLeet[end] as boolean)
-        if (joined.length > this.longestTerm) break
+        if (collapseRepeats(joined).length > this.longestTerm) break
         if (end === start) continue
         // Story 6.2b review (EC5): `k1ll yours elf` and `bl0 wjob` published,
         // because the re-split pass compared repeat-collapsed letters only. The
         // leet-class comparison runs only when the window carries a digit or
         // symbol, the same gate the single-token pass uses.
-        const leetJoined = leetInWindow ? toLeetClassForm(joined) : null
+        const leetJoined = leetInWindow ? toLeetRunForm(joined) : null
         const meta =
-          this.worstAcross((index) => index.phraseConcatenations.get(joined)) ??
+          this.worstAcross((index) => matchRun(index.phraseConcatenations, joined)) ??
           (leetJoined === null
             ? null
-            : this.worstAcross((index) => index.phraseLeetConcatenations.get(leetJoined)))
+            : this.worstAcross((index) =>
+                matchRun(index.phraseLeetConcatenations, leetJoined)
+              ))
         if (!meta) continue
         const form = collapsed.slice(start, end + 1).join(' ')
         if (this.indexes.some((index) => index.phraseForms.has(form))) continue
@@ -1260,10 +3634,12 @@ export class CommunityTextScreener {
    * what keeps `off the shoulder` and `a line` out of this path.
    */
   private buildJoinCandidates(
+    literal: string,
     literalTokens: readonly string[],
     budget: ExpansionBudget
   ): string[] {
     const candidates: string[] = []
+    const spans = [...literal.matchAll(/[\p{L}\p{N}]+/gu)]
     let runStart = 0
 
     const flush = (endExclusive: number): void => {
@@ -1272,6 +3648,8 @@ export class CommunityTextScreener {
         const maxSize = Math.min(endExclusive - start, JOIN_WINDOW_CEILING)
         for (let size = 2; size <= maxSize; size += 1) {
           const joined = literalTokens.slice(start, start + size).join('')
+          if (this.isAllowedJoinedPhrase(literal, spans, literalTokens, start, size))
+            continue
           const folded = toFoldedForm(joined)
           if (collapseRepeats(folded).length > this.longestTerm) break
           // The length floor keeps three-character candidates out, because
@@ -1303,6 +3681,36 @@ export class CommunityTextScreener {
     return candidates
   }
 
+  private isAllowedJoinedPhrase(
+    literal: string,
+    spans: readonly RegExpMatchArray[],
+    tokens: readonly string[],
+    start: number,
+    size: number
+  ): boolean {
+    const contiguous = (joiner: 'space' | 'space-or-hyphen'): boolean =>
+      Array.from({ length: size - 1 }, (_, offset) =>
+        connectedLiteralTokens(literal, spans, start + offset, start + offset + 1, joiner)
+      ).every(Boolean)
+    // An ordinary complete phrase joins across plain spaces only ("lo-fa" is still lofa);
+    // the hyphen of a native Portuguese compound belongs to the scoped phrases alone.
+    if (
+      this.allowPhrases.some(
+        (phrase) =>
+          phrase.length === size &&
+          phrase.every((word, offset) => tokens[start + offset] === word)
+      ) &&
+      contiguous('space')
+    )
+      return true
+    return this.activeScopedPhrases.some(
+      (scoped) =>
+        scoped.tokens.length === size &&
+        scoped.tokens.every((word, offset) => tokens[start + offset] === word) &&
+        scopedPhraseHasEvidence(scoped, literal, spans, tokens, start)
+    )
+  }
+
   private matchCandidate(
     folded: string,
     hasLeetCharacter: boolean,
@@ -1313,15 +3721,24 @@ export class CommunityTextScreener {
 
     const collapsed = collapseRepeats(folded)
     if (!budget.spend(collapsed)) return null
-    const repeated = this.worstAcross((index) => index.singleCollapsed.get(collapsed))
+    const repeated = this.worstAcross((index) => matchRun(index.singleCollapsed, folded))
     if (repeated) return { meta: repeated, obfuscated: true }
 
     if (!hasLeetCharacter) return null
 
-    const classed = toLeetClassForm(collapsed)
+    const classed = toLeetRunForm(folded)
     if (!budget.spend(classed)) return null
-    const leet = this.worstAcross((index) => index.singleLeet.get(classed))
+    const leet = this.worstAcross((index) => matchRun(index.singleLeet, classed))
     if (leet) return { meta: leet, obfuscated: true }
+
+    // A nine is also a mirrored p (ra9ed); the g reading above covers the other.
+    if (folded.includes('9') && (folded.match(/\p{L}/gu)?.length ?? 0) >= 4) {
+      const mirrored = toLeetRunForm(folded.replaceAll('9', 'p'))
+      const mirroredMeta = this.worstAcross((index) =>
+        matchRun(index.singleLeet, mirrored)
+      )
+      if (mirroredMeta) return { meta: mirroredMeta, obfuscated: true }
+    }
 
     return null
   }

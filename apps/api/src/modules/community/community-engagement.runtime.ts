@@ -2,7 +2,8 @@ import { CommunityRetentionWorker } from './community-retention.worker.js'
 import { CommunityOperationalTelemetry } from './community-operational-telemetry.js'
 import type { AnalyticsClient } from '../../analytics/analytics.service.js'
 // Story 6.5 owner: independent bounded loops; dispatch is frozen until capability verification.
-import { PrismaClient } from '@prisma/client'
+import type { PrismaClient } from '@prisma/client'
+import { createPrismaClient } from '../../prisma/prisma-client.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { CommunityFlagEvaluationService } from '../feature-flags/community-flag-evaluation.service.js'
 import type { RemoteFeatureFlagProvider } from '../feature-flags/remote-feature-flag-provider.js'
@@ -133,7 +134,7 @@ async function startDispatch(
     url.searchParams.set('connection_limit', '36')
     url.searchParams.set('pool_timeout', '1')
     reason = 'capability_unavailable'
-    guardPool = new PrismaClient({ datasources: { db: { url: url.toString() } } })
+    guardPool = createPrismaClient({ datasources: { db: { url: url.toString() } } })
     const sender = new CommunitySendGuard(
       guardPool,
       new CommunityFlagEvaluationService(prisma, remote)

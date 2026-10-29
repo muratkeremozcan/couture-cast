@@ -10,6 +10,7 @@ const session = vi.hoisted(() => ({
 }))
 vi.mock('../../lib/web-session', () => ({
   webSessionIdentity: () => session.owner,
+  hasStoredWebSession: () => false,
   resolveWebSessionToken: session.token,
   signOutWebSession: session.logout,
 }))
@@ -104,7 +105,8 @@ describe('notification policy failures and ownership', () => {
         )
       )
       render(<NotificationSettingsPage />)
-      fireEvent.click(await screen.findByLabelText(label('enabled')))
+      await screen.findByRole('button', { name: label('save') })
+      fireEvent.click(screen.getByLabelText(label('enabled')))
       fireEvent.click(screen.getByRole('button', { name: label('save') }))
       await screen.findByText(label('failed'))
       expect(screen.getByLabelText(label('enabled'))).toBeChecked()
@@ -127,7 +129,8 @@ describe('notification policy failures and ownership', () => {
       )
     )
     render(<NotificationSettingsPage />)
-    fireEvent.click(await screen.findByLabelText(label('enabled')))
+    await screen.findByRole('button', { name: label('save') })
+    fireEvent.click(screen.getByLabelText(label('enabled')))
     fireEvent.click(screen.getByRole('button', { name: label('save') }))
     await screen.findByText(label('failed'))
     expect(screen.getByLabelText(label('enabled'))).toBeChecked()
@@ -146,7 +149,7 @@ describe('notification policy failures and ownership', () => {
     await screen.findByText(label('failed'))
     expect(screen.queryByLabelText(label('enabled'))).toBeNull()
     identify('member-b')
-    await screen.findByLabelText(label('enabled'))
+    await screen.findByRole('button', { name: label('save') })
     expect(screen.queryByText(label('failed'))).toBeNull()
   })
   it('ignores a token arriving after identity loss or unmount', async () => {
@@ -206,7 +209,8 @@ describe('notification policy failures and ownership', () => {
         })
       )
       render(<NotificationSettingsPage />)
-      fireEvent.click(await screen.findByLabelText(label('enabled')))
+      await screen.findByRole('button', { name: label('save') })
+      fireEvent.click(screen.getByLabelText(label('enabled')))
       fireEvent.click(screen.getByRole('button', { name: label('save') }))
       await waitFor(() => expect(started).toHaveBeenCalledOnce())
       expect(screen.getByRole('button', { name: label('save') })).toBeDisabled()

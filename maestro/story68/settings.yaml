@@ -1,0 +1,20 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: share-card-settings
+    text: ${MAESTRO_SETTINGS}
+# The OS Settings app must be in front; the harness reads it again before recording it.
+- runFlow:
+    when:
+      platform: iOS
+    file: wait-os-settings-ios.yaml
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: com.android.settings:id/.*
+          timeout: 15000
+- assertNotVisible:
+    id: share-card-title

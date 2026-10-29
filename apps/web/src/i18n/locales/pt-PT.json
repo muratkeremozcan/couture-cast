@@ -684,6 +684,9 @@
       "save": "Guardar definições",
       "saved": "Definições guardadas.",
       "failed": "Não foi possível guardar as definições. Tente novamente.",
+      "loadFailed": "Não foi possível carregar as definições. Tente novamente.",
+      "loadRetrying": "Não foi possível carregar as definições. Nova tentativa dentro de momentos.",
+      "retry": "Tentar novamente",
       "conflict": "As definições foram alteradas noutro local. Reveja os valores atuais e tente novamente.",
       "permission": "Permita notificações nas definições do dispositivo e tente novamente.",
       "signin": "Iniciar sessão",
@@ -760,6 +763,49 @@
       "linkLabel_one": "Visual em destaque em {{label}} de {{author}}, {{count}} reação. Abre os Destaques da cidade.",
       "linkLabel_other": "Visual em destaque em {{label}} de {{author}}, {{count}} reações. Abre os Destaques da cidade.",
       "cta": "Ver nos Destaques da cidade"
+    }
+  },
+  "shareCard": {
+    "launcher": "Criar o meu cartão de look",
+    "sourceOutfit": "Look",
+    "sourceCommunity": "Look da comunidade",
+    "title": "O seu cartão",
+    "previewDescription": "Pré-visualização do seu cartão CoutureCast",
+    "photoPrivacyHelp": "A sua fotografia permanece visível, incluindo nomes e matrículas na imagem. Verifique a pré-visualização antes de guardar.",
+    "preparing": "A preparar o cartão",
+    "watermark": "Mostrar marca de água",
+    "save": "Guardar nas Fotografias",
+    "download": "Transferir PNG",
+    "saving": "A guardar",
+    "finishingSave": "A concluir a gravação",
+    "saved": "Guardado nas Fotografias",
+    "downloadStarted": "Transferência iniciada",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "retry": "Tentar novamente",
+    "refresh": "Atualizar pré-visualização",
+    "openSettings": "Abrir definições",
+    "nativeSaveUnavailable": "Atualize a aplicação para guardar fotografias.",
+    "permissionDenied": "O acesso às fotografias foi negado. Tente novamente quando pretender.",
+    "permissionPermanent": "Permita guardar fotografias nas definições.",
+    "sourceUnavailable": "Esta fonte está indisponível.",
+    "previewChanged": "O cartão foi alterado. Atualize a pré-visualização antes de guardar.",
+    "offline": "Ligue-se à Internet para preparar um cartão.",
+    "storage": "Não foi possível guardar. Verifique o espaço disponível e tente novamente.",
+    "render": "Não foi possível preparar o cartão. Tente novamente.",
+    "unknown": "Ocorreu um erro. Tente novamente.",
+    "scenarios": {
+      "morning": "Manhã",
+      "midday": "Meio-dia",
+      "evening": "Noite"
+    },
+    "climateBands": {
+      "cold_dry": "Frio e seco",
+      "cold_wet": "Frio e húmido",
+      "temperate_dry": "Ameno e seco",
+      "temperate_wet": "Ameno e húmido",
+      "warm_dry": "Quente e seco",
+      "warm_wet": "Quente e húmido"
     }
   }
 }

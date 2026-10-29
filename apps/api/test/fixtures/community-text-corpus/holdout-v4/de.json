@@ -1,0 +1,5013 @@
+{
+  "language": "de",
+  "corpusVersion": "holdout-v4",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "517c05fbc7bb46189cc23c532e1acbf46a73342dd2a2a8976cb6a99ea065e434",
+    "languageAllowListSha256": "7f0a9548ddc645a189fc832cc16a815f4816e744c2f92e7f0ba9bd876ee95ea4"
+  },
+  "entries": [
+    {
+      "id": "de-holdout-v4-001",
+      "field": "caption",
+      "text": "Der schwere Saum lässt meinen Rock beim Gehen ruhig fallen."
+    },
+    {
+      "id": "de-holdout-v4-002",
+      "field": "caption",
+      "text": "Mit etwas Gewicht unten schwingt dieser Faltenrock besonders schön."
+    },
+    {
+      "id": "de-holdout-v4-003",
+      "field": "caption",
+      "text": "Heute mag ich, wie gleichmäßig der lange Rock mitschwingt."
+    },
+    {
+      "id": "de-holdout-v4-004",
+      "field": "altText",
+      "text": "Ein beschwerter Rocksaum bildet weiche Wellen über flachen Schuhen."
+    },
+    {
+      "id": "de-holdout-v4-005",
+      "field": "altText",
+      "text": "Beim Ausschreiten fällt ein weiter Rock in tiefen Falten."
+    },
+    {
+      "id": "de-holdout-v4-006",
+      "field": "caption",
+      "text": "Die kleine Brosche hält meinen offenen Kragen zusammen."
+    },
+    {
+      "id": "de-holdout-v4-007",
+      "field": "caption",
+      "text": "So bekommt das schlichte Hemd einen richtigen Mittelpunkt."
+    },
+    {
+      "id": "de-holdout-v4-008",
+      "field": "caption",
+      "text": "Meine alte Anstecknadel sitzt heute direkt am Kragensteg."
+    },
+    {
+      "id": "de-holdout-v4-009",
+      "field": "altText",
+      "text": "Eine blattförmige Brosche verbindet die Spitzen eines Hemdkragens."
+    },
+    {
+      "id": "de-holdout-v4-010",
+      "field": "altText",
+      "text": "Unter einem offenen Halsabschluss glänzt eine kleine ovale Nadel."
+    },
+    {
+      "id": "de-holdout-v4-011",
+      "field": "caption",
+      "text": "Den Zwickel sieht kaum jemand, meine Bewegungsfreiheit merke ich sofort."
+    },
+    {
+      "id": "de-holdout-v4-012",
+      "field": "caption",
+      "text": "Für den Schneidersitz ist diese weite Hose einfach herrlich."
+    },
+    {
+      "id": "de-holdout-v4-013",
+      "field": "caption",
+      "text": "Mein selbst genähter Einsatz macht die Lieblingshose wieder bequem."
+    },
+    {
+      "id": "de-holdout-v4-014",
+      "field": "altText",
+      "text": "Die locker fallende Hose hat einen rautenförmigen Einsatz im Schritt."
+    },
+    {
+      "id": "de-holdout-v4-015",
+      "field": "altText",
+      "text": "Beim Sitzen bleibt die Stoffhose dank zusätzlicher Weite entspannt."
+    },
+    {
+      "id": "de-holdout-v4-016",
+      "field": "caption",
+      "text": "Der Rückenriegel gibt meinem weiten Mantel etwas Form."
+    },
+    {
+      "id": "de-holdout-v4-017",
+      "field": "caption",
+      "text": "Hinten zusammengeknöpft trägt sich der Mantel heute überraschend leicht."
+    },
+    {
+      "id": "de-holdout-v4-018",
+      "field": "caption",
+      "text": "Ich habe den Riegel eine Stufe enger gestellt."
+    },
+    {
+      "id": "de-holdout-v4-019",
+      "field": "altText",
+      "text": "Ein kurzer Stoffriegel fasst den Mantel am unteren Rücken."
+    },
+    {
+      "id": "de-holdout-v4-020",
+      "field": "altText",
+      "text": "Zwei große Knöpfe befestigen die rückwärtige Taillenlasche."
+    },
+    {
+      "id": "de-holdout-v4-021",
+      "field": "caption",
+      "text": "Der breite Rippbund hält den Pulli genau auf Hüfthöhe."
+    },
+    {
+      "id": "de-holdout-v4-022",
+      "field": "caption",
+      "text": "Meine Ärmel bleiben dank der festen Bündchen oben."
+    },
+    {
+      "id": "de-holdout-v4-023",
+      "field": "caption",
+      "text": "Diese Rippenkante macht aus dem lockeren Strick eine klare Form."
+    },
+    {
+      "id": "de-holdout-v4-024",
+      "field": "altText",
+      "text": "Dichte Rippen schließen den bauschigen Pullover an den Handgelenken ab."
+    },
+    {
+      "id": "de-holdout-v4-025",
+      "field": "altText",
+      "text": "Ein kurzer Strickpulli endet in einem deutlich breiteren Bündchen."
+    },
+    {
+      "id": "de-holdout-v4-026",
+      "field": "caption",
+      "text": "Am kurzen Griff passt die Tasche gut zum langen Mantel."
+    },
+    {
+      "id": "de-holdout-v4-027",
+      "field": "caption",
+      "text": "Heute nehme ich den Schulterriemen ab und trage sie einfach so."
+    },
+    {
+      "id": "de-holdout-v4-028",
+      "field": "caption",
+      "text": "Zwei Griffhöhen machen meine Alltagstasche angenehm vielseitig."
+    },
+    {
+      "id": "de-holdout-v4-029",
+      "field": "altText",
+      "text": "Eine Henkeltasche besitzt zusätzlich einen abnehmbaren langen Trageriemen."
+    },
+    {
+      "id": "de-holdout-v4-030",
+      "field": "altText",
+      "text": "Der kurze Taschenbügel hängt locker über dem angewinkelten Unterarm."
+    },
+    {
+      "id": "de-holdout-v4-031",
+      "field": "caption",
+      "text": "Der gerollte Sockenrand schaut gerade aus meinen Halbschuhen."
+    },
+    {
+      "id": "de-holdout-v4-032",
+      "field": "caption",
+      "text": "Am Knöchel mag ich diesen weichen Abschluss besonders gern."
+    },
+    {
+      "id": "de-holdout-v4-033",
+      "field": "caption",
+      "text": "Meine handgestrickten Socken brauchen heute keinen Umschlag."
+    },
+    {
+      "id": "de-holdout-v4-034",
+      "field": "altText",
+      "text": "Oberhalb eines flachen Schnürschuhs liegt ein schmaler gerollter Sockenrand."
+    },
+    {
+      "id": "de-holdout-v4-035",
+      "field": "altText",
+      "text": "Weiche Strümpfe enden ohne Gummibund knapp über dem Knöchel."
+    },
+    {
+      "id": "de-holdout-v4-036",
+      "field": "caption",
+      "text": "Der kleine Kapuzenschirm hält die Tropfen heute von meiner Brille fern."
+    },
+    {
+      "id": "de-holdout-v4-037",
+      "field": "caption",
+      "text": "Meine Regenjacke hat vorne an der Kapuze eine biegsame Kante."
+    },
+    {
+      "id": "de-holdout-v4-038",
+      "field": "caption",
+      "text": "Den weichen Schirm kann ich zum Einpacken ganz flach drücken."
+    },
+    {
+      "id": "de-holdout-v4-039",
+      "field": "altText",
+      "text": "Eine kurze verstärkte Kante ragt vorne aus der Kapuzenöffnung heraus."
+    },
+    {
+      "id": "de-holdout-v4-040",
+      "field": "altText",
+      "text": "Über der Stirn wölbt sich der biegsame Schirm der Regenkapuze."
+    },
+    {
+      "id": "de-holdout-v4-041",
+      "field": "caption",
+      "text": "Die seitlichen Bänder lassen meiner Weste genug Platz über Strick."
+    },
+    {
+      "id": "de-holdout-v4-042",
+      "field": "caption",
+      "text": "Mit offenen Schleifen fällt die Weste heute etwas weiter."
+    },
+    {
+      "id": "de-holdout-v4-043",
+      "field": "caption",
+      "text": "An der Seite gebunden wirkt dieses alte Stück wieder frisch."
+    },
+    {
+      "id": "de-holdout-v4-044",
+      "field": "altText",
+      "text": "Seitliche Stoffbänder verbinden Vorderteil und Rücken einer offenen Weste."
+    },
+    {
+      "id": "de-holdout-v4-045",
+      "field": "altText",
+      "text": "Zwei lockere Schleifen sitzen neben dem Armausschnitt des Überziehers."
+    },
+    {
+      "id": "de-holdout-v4-046",
+      "field": "caption",
+      "text": "Ein langer Clip reicht mir heute als Schmuck."
+    },
+    {
+      "id": "de-holdout-v4-047",
+      "field": "caption",
+      "text": "Ich kombiniere absichtlich zwei unterschiedlich große Ohrclips."
+    },
+    {
+      "id": "de-holdout-v4-048",
+      "field": "caption",
+      "text": "Der einzelne Anhänger passt schön zur schrägen Knopfleiste."
+    },
+    {
+      "id": "de-holdout-v4-049",
+      "field": "altText",
+      "text": "Auf einer Seite hängt ein länglicher Ohrclip unter kurzem Haar."
+    },
+    {
+      "id": "de-holdout-v4-050",
+      "field": "altText",
+      "text": "Ein runder und ein stabförmiger Clip bilden ein ungleiches Paar."
+    },
+    {
+      "id": "de-holdout-v4-051",
+      "field": "caption",
+      "text": "Die sichtbare Naht erzählt jetzt von meiner Rockreparatur."
+    },
+    {
+      "id": "de-holdout-v4-052",
+      "field": "caption",
+      "text": "Ein paar Handstiche haben den aufgerissenen Saum gerettet."
+    },
+    {
+      "id": "de-holdout-v4-053",
+      "field": "caption",
+      "text": "Ich lasse die kleinen Reparaturstiche heute bewusst sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-054",
+      "field": "altText",
+      "text": "Helle Handstiche befestigen einen ausgebesserten Abschnitt am Rockabschluss."
+    },
+    {
+      "id": "de-holdout-v4-055",
+      "field": "altText",
+      "text": "Entlang des unteren Saums verläuft eine unregelmäßige kleine Reparaturnaht."
+    },
+    {
+      "id": "de-holdout-v4-056",
+      "field": "caption",
+      "text": "Die Rückenfalte macht dieses Hemd beim Radfahren bequem."
+    },
+    {
+      "id": "de-holdout-v4-057",
+      "field": "caption",
+      "text": "Von hinten gefällt mir die einzelne tiefe Falte am besten."
+    },
+    {
+      "id": "de-holdout-v4-058",
+      "field": "caption",
+      "text": "Unter der Passe hat mein Hemd richtig viel Bewegungsraum."
+    },
+    {
+      "id": "de-holdout-v4-059",
+      "field": "altText",
+      "text": "Mittig unter der Rückenpasse öffnet sich eine breite Kellerfalte."
+    },
+    {
+      "id": "de-holdout-v4-060",
+      "field": "altText",
+      "text": "Das Hemd fällt vom Schulterbereich in einer einzelnen senkrechten Falte."
+    },
+    {
+      "id": "de-holdout-v4-061",
+      "field": "caption",
+      "text": "Das lange Gürtelende stecke ich durch eine zweite Schlaufe."
+    },
+    {
+      "id": "de-holdout-v4-062",
+      "field": "caption",
+      "text": "Heute sitzt die Schnalle seitlich und das Ende bleibt ordentlich verstaut."
+    },
+    {
+      "id": "de-holdout-v4-063",
+      "field": "caption",
+      "text": "Die kleine Lederschlaufe hält meinen weichen Gürtel zusammen."
+    },
+    {
+      "id": "de-holdout-v4-064",
+      "field": "altText",
+      "text": "Ein schmales Gürtelende verschwindet unter einer zusätzlichen Halteschlaufe."
+    },
+    {
+      "id": "de-holdout-v4-065",
+      "field": "altText",
+      "text": "Neben der seitlichen Schnalle liegt das freie Lederband flach an."
+    },
+    {
+      "id": "de-holdout-v4-066",
+      "field": "caption",
+      "text": "Ein alter Ring hält mein Halstuch ganz ohne Knoten."
+    },
+    {
+      "id": "de-holdout-v4-067",
+      "field": "caption",
+      "text": "Durch den Schalring fällt das Tuch in zwei ruhigen Bahnen."
+    },
+    {
+      "id": "de-holdout-v4-068",
+      "field": "caption",
+      "text": "Mit dieser kleinen Spange sitzt mein Seidentuch den ganzen Vormittag."
+    },
+    {
+      "id": "de-holdout-v4-069",
+      "field": "altText",
+      "text": "Beide Enden eines schmalen Tuchs laufen durch einen runden Schalhalter."
+    },
+    {
+      "id": "de-holdout-v4-070",
+      "field": "altText",
+      "text": "Eine glänzende Spange bündelt das Halstuch unterhalb des Kragens."
+    },
+    {
+      "id": "de-holdout-v4-071",
+      "field": "caption",
+      "text": "Die große Taschenklappe ist mein liebstes Detail an diesem Rock."
+    },
+    {
+      "id": "de-holdout-v4-072",
+      "field": "caption",
+      "text": "Heute bleibt die Klappe offen und lockert die strenge Form auf."
+    },
+    {
+      "id": "de-holdout-v4-073",
+      "field": "caption",
+      "text": "Praktische Seitentaschen machen meinen schlichten Rock zum Dauerbegleiter."
+    },
+    {
+      "id": "de-holdout-v4-074",
+      "field": "altText",
+      "text": "Eine breite rechteckige Klappe bedeckt die seitlich aufgesetzte Rocktasche."
+    },
+    {
+      "id": "de-holdout-v4-075",
+      "field": "altText",
+      "text": "Am geraden Rock sitzt eine deutlich abstehende Taschenpatte."
+    },
+    {
+      "id": "de-holdout-v4-076",
+      "field": "caption",
+      "text": "Die Manschetten verbinde ich heute mit einer feinen Kette."
+    },
+    {
+      "id": "de-holdout-v4-077",
+      "field": "caption",
+      "text": "Meine geerbten Manschettenknöpfe dürfen endlich wieder aus der Schachtel."
+    },
+    {
+      "id": "de-holdout-v4-078",
+      "field": "caption",
+      "text": "Beim Hochheben der Tasse blitzt der kleine Ärmelverschluss auf."
+    },
+    {
+      "id": "de-holdout-v4-079",
+      "field": "altText",
+      "text": "Ein Kettenmanschettenknopf hält die doppelt gelegten Hemdabschlüsse zusammen."
+    },
+    {
+      "id": "de-holdout-v4-080",
+      "field": "altText",
+      "text": "Zwei kleine Metallplatten schließen eine umgeschlagene weiße Manschette."
+    },
+    {
+      "id": "de-holdout-v4-081",
+      "field": "caption",
+      "text": "Durch die kleinen Armschlitze bleibt mein Poncho beim Tragen an Ort."
+    },
+    {
+      "id": "de-holdout-v4-082",
+      "field": "caption",
+      "text": "Dieser Überwurf lässt die Hände frei und fällt trotzdem weit."
+    },
+    {
+      "id": "de-holdout-v4-083",
+      "field": "caption",
+      "text": "Ich mag die klare Schulterlinie meines geschlitzten Ponchos."
+    },
+    {
+      "id": "de-holdout-v4-084",
+      "field": "altText",
+      "text": "Aus zwei seitlichen Schlitzen eines weiten Überwurfs ragen die Unterarme."
+    },
+    {
+      "id": "de-holdout-v4-085",
+      "field": "altText",
+      "text": "Ein rechteckiger Poncho liegt über einem schmalen Langarmshirt."
+    },
+    {
+      "id": "de-holdout-v4-086",
+      "field": "caption",
+      "text": "Die Quasten bewegen sich bei jedem Schritt ein bisschen mit."
+    },
+    {
+      "id": "de-holdout-v4-087",
+      "field": "caption",
+      "text": "Meine alten Slipper bekommen heute wieder ihren großen Auftritt."
+    },
+    {
+      "id": "de-holdout-v4-088",
+      "field": "caption",
+      "text": "Vorne am Schuh reicht mir dieses kleine verspielte Detail."
+    },
+    {
+      "id": "de-holdout-v4-089",
+      "field": "altText",
+      "text": "Zwei kurze Lederquasten liegen auf dem Spann eines flachen Slippers."
+    },
+    {
+      "id": "de-holdout-v4-090",
+      "field": "altText",
+      "text": "Die Vorderkappe der Halbschuhe ist mit gebündelten Fransen verziert."
+    },
+    {
+      "id": "de-holdout-v4-091",
+      "field": "caption",
+      "text": "Die Knöpfe auf der Schulter geben meinem Pulli Charakter."
+    },
+    {
+      "id": "de-holdout-v4-092",
+      "field": "caption",
+      "text": "Diesen Ausschnitt kann ich zum Anziehen seitlich öffnen."
+    },
+    {
+      "id": "de-holdout-v4-093",
+      "field": "caption",
+      "text": "Heute bleiben die oberen Schulterknöpfe locker aufgeknöpft."
+    },
+    {
+      "id": "de-holdout-v4-094",
+      "field": "altText",
+      "text": "Drei flache Knöpfe verlaufen entlang einer Pullover-Schulternaht."
+    },
+    {
+      "id": "de-holdout-v4-095",
+      "field": "altText",
+      "text": "Eine kurze Knopfreihe öffnet den Strickausschnitt zur linken Schulter."
+    },
+    {
+      "id": "de-holdout-v4-096",
+      "field": "caption",
+      "text": "Beim Ärmelumschlag sieht man das karierte Jackenfutter."
+    },
+    {
+      "id": "de-holdout-v4-097",
+      "field": "caption",
+      "text": "Innen ist diese Jacke fast schöner als außen."
+    },
+    {
+      "id": "de-holdout-v4-098",
+      "field": "caption",
+      "text": "Ein kleiner Futterblitzer passt heute gut zu meinem schlichten Shirt."
+    },
+    {
+      "id": "de-holdout-v4-099",
+      "field": "altText",
+      "text": "Der umgekrempelte Jackenärmel zeigt eine schmale karierte Futterkante."
+    },
+    {
+      "id": "de-holdout-v4-100",
+      "field": "altText",
+      "text": "Am offenen Vorderteil wird ein gemustertes Innenfutter sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-101",
+      "field": "caption",
+      "text": "Meine Haarspange greift die Form der Taschenschnalle auf."
+    },
+    {
+      "id": "de-holdout-v4-102",
+      "field": "caption",
+      "text": "Die große Klammer hält das Haar vom hohen Kragen fern."
+    },
+    {
+      "id": "de-holdout-v4-103",
+      "field": "caption",
+      "text": "Für den lockeren Dutt nehme ich heute eine gebogene Spange."
+    },
+    {
+      "id": "de-holdout-v4-104",
+      "field": "altText",
+      "text": "Eine breite gebogene Haarspange fasst das Haar über dem Nacken."
+    },
+    {
+      "id": "de-holdout-v4-105",
+      "field": "altText",
+      "text": "Seitlich im Haar sitzt eine längliche Klammer mit gewellter Oberfläche."
+    },
+    {
+      "id": "de-holdout-v4-106",
+      "field": "caption",
+      "text": "In der Brusttasche meiner Latzhose steckt heute ein Stofftaschentuch."
+    },
+    {
+      "id": "de-holdout-v4-107",
+      "field": "caption",
+      "text": "Der kleine Latz macht mein einfaches Streifenshirt zum ganzen Outfit."
+    },
+    {
+      "id": "de-holdout-v4-108",
+      "field": "caption",
+      "text": "Ich trage die Latzhose heute mit locker eingestellten Trägern."
+    },
+    {
+      "id": "de-holdout-v4-109",
+      "field": "altText",
+      "text": "Eine rechteckige Brusttasche sitzt zwischen den beiden Latzhosenträgern."
+    },
+    {
+      "id": "de-holdout-v4-110",
+      "field": "altText",
+      "text": "Metallverschlüsse verbinden die breiten Träger mit einem niedrigen Hosenlatz."
+    },
+    {
+      "id": "de-holdout-v4-111",
+      "field": "caption",
+      "text": "Ein lockerer Knoten verkürzt das Hemd auf meine Rockhöhe."
+    },
+    {
+      "id": "de-holdout-v4-112",
+      "field": "caption",
+      "text": "Die beiden Hemdzipfel binde ich heute ganz entspannt zusammen."
+    },
+    {
+      "id": "de-holdout-v4-113",
+      "field": "caption",
+      "text": "Zum weiten Unterteil passt mein vorne geknotetes Hemd wunderbar."
+    },
+    {
+      "id": "de-holdout-v4-114",
+      "field": "altText",
+      "text": "Die unteren Enden eines offenen Hemds sind vor der Taille verknotet."
+    },
+    {
+      "id": "de-holdout-v4-115",
+      "field": "altText",
+      "text": "Über dem hohen Hosenbund sitzt ein flacher Knoten aus Hemdstoff."
+    },
+    {
+      "id": "de-holdout-v4-116",
+      "field": "caption",
+      "text": "Die kleinen Stepprauten geben meiner Jacke eine schöne Oberfläche."
+    },
+    {
+      "id": "de-holdout-v4-117",
+      "field": "caption",
+      "text": "An dieser Weste mag ich das gleichmäßige Rautenmuster besonders."
+    },
+    {
+      "id": "de-holdout-v4-118",
+      "field": "caption",
+      "text": "Heute kombiniere ich den weichen Steppstoff mit einer glatten Hose."
+    },
+    {
+      "id": "de-holdout-v4-119",
+      "field": "altText",
+      "text": "Diagonal verlaufende Nähte bilden kleine Rauten auf einer wattierten Jacke."
+    },
+    {
+      "id": "de-holdout-v4-120",
+      "field": "altText",
+      "text": "Die kurze Weste zeigt durchgehend ein fein abgestepptes Diamantmuster."
+    },
+    {
+      "id": "de-holdout-v4-121",
+      "field": "caption",
+      "text": "Beim Drehen öffnet sich mein Plisseerock wie ein Fächer."
+    },
+    {
+      "id": "de-holdout-v4-122",
+      "field": "caption",
+      "text": "Diese schmalen Falten bringen schon im Stehen Bewegung hinein."
+    },
+    {
+      "id": "de-holdout-v4-123",
+      "field": "caption",
+      "text": "Ein gerader Pulli lässt dem gefächerten Rock genug Raum."
+    },
+    {
+      "id": "de-holdout-v4-124",
+      "field": "altText",
+      "text": "Ein ausgestellter Rock öffnet seine schmalen Plisseefalten beim seitlichen Schritt."
+    },
+    {
+      "id": "de-holdout-v4-125",
+      "field": "altText",
+      "text": "Gleichmäßige vertikale Falten laufen vom Rockbund bis zum weiten Saum."
+    },
+    {
+      "id": "de-holdout-v4-126",
+      "field": "caption",
+      "text": "Der kleine Ärmelschlitz lässt mein Armband sichtbar werden."
+    },
+    {
+      "id": "de-holdout-v4-127",
+      "field": "caption",
+      "text": "Offene Abschlüsse machen diese schlichte Bluse schön luftig."
+    },
+    {
+      "id": "de-holdout-v4-128",
+      "field": "caption",
+      "text": "Heute trage ich die schmalen Ärmel ohne Verschluss."
+    },
+    {
+      "id": "de-holdout-v4-129",
+      "field": "altText",
+      "text": "Ein senkrechter Schlitz öffnet den Blusenärmel am Handgelenk."
+    },
+    {
+      "id": "de-holdout-v4-130",
+      "field": "altText",
+      "text": "Neben einem offenen Ärmelabschluss liegt ein schmales Metallarmband."
+    },
+    {
+      "id": "de-holdout-v4-131",
+      "field": "caption",
+      "text": "Unter dem Pulli schaut nur mein Spitzenkragen hervor."
+    },
+    {
+      "id": "de-holdout-v4-132",
+      "field": "caption",
+      "text": "Den losen Krageneinsatz habe ich lange vergessen und heute wiedergefunden."
+    },
+    {
+      "id": "de-holdout-v4-133",
+      "field": "caption",
+      "text": "Ein bisschen Spitze rahmt heute den ganz schlichten Ausschnitt."
+    },
+    {
+      "id": "de-holdout-v4-134",
+      "field": "altText",
+      "text": "Ein heller Spitzenkragen liegt über dem Rundhalsausschnitt eines Pullovers."
+    },
+    {
+      "id": "de-holdout-v4-135",
+      "field": "altText",
+      "text": "Gezackte Spitzenspitzen stehen oberhalb einer glatten Strickkante hervor."
+    },
+    {
+      "id": "de-holdout-v4-136",
+      "field": "caption",
+      "text": "Die groben Schlaufen gefallen mir an diesen schlichten Stiefeln."
+    },
+    {
+      "id": "de-holdout-v4-137",
+      "field": "caption",
+      "text": "Beim Anziehen bin ich jedes Mal dankbar für die Fersenlaschen."
+    },
+    {
+      "id": "de-holdout-v4-138",
+      "field": "caption",
+      "text": "Heute schaut die kleine Zugschlaufe hinten über meinem Hosensaum hervor."
+    },
+    {
+      "id": "de-holdout-v4-139",
+      "field": "altText",
+      "text": "Am hinteren Rand der Stiefelette steht eine breite Lederschlaufe hoch."
+    },
+    {
+      "id": "de-holdout-v4-140",
+      "field": "altText",
+      "text": "Zwei robuste Anziehschlaufen rahmen den elastischen Stiefelschaft."
+    },
+    {
+      "id": "de-holdout-v4-141",
+      "field": "caption",
+      "text": "Die kleine Stofffeder am Hutband ist selbst gemacht."
+    },
+    {
+      "id": "de-holdout-v4-142",
+      "field": "caption",
+      "text": "Mein schlichter Filzhut bekommt heute ein schmales Band dazu."
+    },
+    {
+      "id": "de-holdout-v4-143",
+      "field": "caption",
+      "text": "Ein seitlicher Knoten hält das neue Hutband zusammen."
+    },
+    {
+      "id": "de-holdout-v4-144",
+      "field": "altText",
+      "text": "Ein schmales Band mit textiler Feder läuft um eine runde Hutkrone."
+    },
+    {
+      "id": "de-holdout-v4-145",
+      "field": "altText",
+      "text": "Seitlich über der Krempe sitzt eine flach gebundene Bandschleife."
+    },
+    {
+      "id": "de-holdout-v4-146",
+      "field": "caption",
+      "text": "Meine Wickelbluse sitzt mit dem langen Seitenband ganz locker."
+    },
+    {
+      "id": "de-holdout-v4-147",
+      "field": "caption",
+      "text": "Die Schleife wandert heute vom Rücken an die Seite."
+    },
+    {
+      "id": "de-holdout-v4-148",
+      "field": "caption",
+      "text": "Ich lasse die Bindebänder der Bluse unterschiedlich lang hängen."
+    },
+    {
+      "id": "de-holdout-v4-149",
+      "field": "altText",
+      "text": "Lange Bindebänder schließen die überkreuzten Vorderteile einer Bluse."
+    },
+    {
+      "id": "de-holdout-v4-150",
+      "field": "altText",
+      "text": "An der seitlichen Taille fällt eine weiche Schleife auf die Hose."
+    },
+    {
+      "id": "de-holdout-v4-151",
+      "field": "caption",
+      "text": "Der runde Reißverschlussgriff ersetzt heute fast schon eine Kette."
+    },
+    {
+      "id": "de-holdout-v4-152",
+      "field": "caption",
+      "text": "Meine Jacke bleibt halb offen, damit der Ring schön sichtbar ist."
+    },
+    {
+      "id": "de-holdout-v4-153",
+      "field": "caption",
+      "text": "An diesem Pulli gefällt mir der große Metallgriff am besten."
+    },
+    {
+      "id": "de-holdout-v4-154",
+      "field": "altText",
+      "text": "Ein runder Metallring hängt am kurzen Reißverschluss eines Stehkragens."
+    },
+    {
+      "id": "de-holdout-v4-155",
+      "field": "altText",
+      "text": "Der halb geöffnete Zipper endet mit einem auffälligen kreisförmigen Griff."
+    },
+    {
+      "id": "de-holdout-v4-156",
+      "field": "caption",
+      "text": "Der abnehmbare Überrock macht meinen schlichten Rock abendtauglich."
+    },
+    {
+      "id": "de-holdout-v4-157",
+      "field": "caption",
+      "text": "Heute probiere ich die transparente Lage über meinem geraden Unterrock."
+    },
+    {
+      "id": "de-holdout-v4-158",
+      "field": "caption",
+      "text": "Zwei unterschiedlich lange Lagen bringen Bewegung in diesen Look."
+    },
+    {
+      "id": "de-holdout-v4-159",
+      "field": "altText",
+      "text": "Ein durchscheinender Überrock fällt länger als die blickdichte untere Lage."
+    },
+    {
+      "id": "de-holdout-v4-160",
+      "field": "altText",
+      "text": "Über einem schmalen Rock liegt ein separat gebundenes weites Stoffteil."
+    },
+    {
+      "id": "de-holdout-v4-161",
+      "field": "caption",
+      "text": "Die kontrastierende Naht gibt meinen schlichten Schuhen einen Rahmen."
+    },
+    {
+      "id": "de-holdout-v4-162",
+      "field": "caption",
+      "text": "Frisch geputzt sieht man die helle Sohlennaht wieder richtig gut."
+    },
+    {
+      "id": "de-holdout-v4-163",
+      "field": "caption",
+      "text": "Ich mag diese kleinen Stiche rund um den Schuh."
+    },
+    {
+      "id": "de-holdout-v4-164",
+      "field": "altText",
+      "text": "Eine deutlich helle Naht verläuft rings um die dunkle Schuhsohle."
+    },
+    {
+      "id": "de-holdout-v4-165",
+      "field": "altText",
+      "text": "Gleichmäßige grobe Stiche verbinden das Oberleder mit dem Sohlenrand."
+    },
+    {
+      "id": "de-holdout-v4-166",
+      "field": "caption",
+      "text": "Die Rückenschleife macht mein gerades Kleid etwas verspielter."
+    },
+    {
+      "id": "de-holdout-v4-167",
+      "field": "caption",
+      "text": "Hinten binde ich das Kleid nur ganz lose zusammen."
+    },
+    {
+      "id": "de-holdout-v4-168",
+      "field": "caption",
+      "text": "Von vorn schlicht und hinten meine liebste kleine Schleife."
+    },
+    {
+      "id": "de-holdout-v4-169",
+      "field": "altText",
+      "text": "Eine breite Stoffschleife sitzt mittig am Rücken eines geraden Kleides."
+    },
+    {
+      "id": "de-holdout-v4-170",
+      "field": "altText",
+      "text": "Zwei lange Bänder hängen unter einem rückwärtigen Bindeknoten herab."
+    },
+    {
+      "id": "de-holdout-v4-171",
+      "field": "caption",
+      "text": "Die kleine Stickerei auf der Brust habe ich selbst ergänzt."
+    },
+    {
+      "id": "de-holdout-v4-172",
+      "field": "caption",
+      "text": "Ein winziges gesticktes Blatt macht mein altes Hemd wieder besonders."
+    },
+    {
+      "id": "de-holdout-v4-173",
+      "field": "caption",
+      "text": "Heute darf die handgestickte Blume ganz ohne weitere Muster wirken."
+    },
+    {
+      "id": "de-holdout-v4-174",
+      "field": "altText",
+      "text": "Oberhalb der Brusttasche ist ein einzelnes stilisiertes Blatt eingestickt."
+    },
+    {
+      "id": "de-holdout-v4-175",
+      "field": "altText",
+      "text": "Eine kleine erhabene Blume ziert das sonst einfarbige Hemdvorderteil."
+    },
+    {
+      "id": "de-holdout-v4-176",
+      "field": "caption",
+      "text": "Die sichtbare Naht hinten passt heute zu meinen Riemchenschuhen."
+    },
+    {
+      "id": "de-holdout-v4-177",
+      "field": "caption",
+      "text": "Bei diesen Strümpfen richte ich die rückwärtige Linie sorgfältig aus."
+    },
+    {
+      "id": "de-holdout-v4-178",
+      "field": "caption",
+      "text": "Mein weiter Rock zeigt beim Gehen kurz die feine Strumpfnaht."
+    },
+    {
+      "id": "de-holdout-v4-179",
+      "field": "altText",
+      "text": "Eine schmale dunklere Linie verläuft hinten an den transparenten Strümpfen."
+    },
+    {
+      "id": "de-holdout-v4-180",
+      "field": "altText",
+      "text": "Über niedrigen Absatzschuhen ziehen sich gerade Strumpfnähte nach oben."
+    },
+    {
+      "id": "de-holdout-v4-181",
+      "field": "caption",
+      "text": "Die Sturmklappe legt eine zweite schöne Linie über meine Jacke."
+    },
+    {
+      "id": "de-holdout-v4-182",
+      "field": "caption",
+      "text": "Heute trage ich den Trench offen und lasse die Passe wirken."
+    },
+    {
+      "id": "de-holdout-v4-183",
+      "field": "caption",
+      "text": "Beim Wind zeigt sich, wie praktisch diese zusätzliche Stofflage ist."
+    },
+    {
+      "id": "de-holdout-v4-184",
+      "field": "altText",
+      "text": "Eine lose Stoffklappe liegt quer über dem oberen Mantelrücken."
+    },
+    {
+      "id": "de-holdout-v4-185",
+      "field": "altText",
+      "text": "Am Trenchcoat überlappt eine breite Passe den Brustbereich."
+    },
+    {
+      "id": "de-holdout-v4-186",
+      "field": "caption",
+      "text": "In meinen Häkelrand habe ich ein paar kleine Perlen eingearbeitet."
+    },
+    {
+      "id": "de-holdout-v4-187",
+      "field": "caption",
+      "text": "Der handgemachte Kragen darf heute über dem Shirt liegen."
+    },
+    {
+      "id": "de-holdout-v4-188",
+      "field": "caption",
+      "text": "Mit jeder Bewegung schimmern die Perlen an der Saumkante."
+    },
+    {
+      "id": "de-holdout-v4-189",
+      "field": "altText",
+      "text": "Kleine Perlen sitzen in den Schlaufen eines gehäkelten Kragenrands."
+    },
+    {
+      "id": "de-holdout-v4-190",
+      "field": "altText",
+      "text": "Ein offener Häkelabschluss ist gleichmäßig mit runden Perlen besetzt."
+    },
+    {
+      "id": "de-holdout-v4-191",
+      "field": "caption",
+      "text": "Mein Rollrucksack bleibt heute klein gefaltet und passt zur kurzen Jacke."
+    },
+    {
+      "id": "de-holdout-v4-192",
+      "field": "caption",
+      "text": "Oben eingerollt hat die Tasche eine schöne klare Form."
+    },
+    {
+      "id": "de-holdout-v4-193",
+      "field": "caption",
+      "text": "Für den leichten Tageslook reicht mir der schmale Rollverschluss."
+    },
+    {
+      "id": "de-holdout-v4-194",
+      "field": "altText",
+      "text": "Der obere Rand eines Stoffrucksacks ist mehrfach eingerollt und festgeschnallt."
+    },
+    {
+      "id": "de-holdout-v4-195",
+      "field": "altText",
+      "text": "Eine mittige Lasche hält den gefalteten Rucksackabschluss geschlossen."
+    },
+    {
+      "id": "de-holdout-v4-196",
+      "field": "caption",
+      "text": "Der hohe Gehschlitz macht meinen schmalen Rock alltagstauglich."
+    },
+    {
+      "id": "de-holdout-v4-197",
+      "field": "caption",
+      "text": "Beim schnellen Schritt öffnet sich der Rock hinten ganz leicht."
+    },
+    {
+      "id": "de-holdout-v4-198",
+      "field": "caption",
+      "text": "Zu flachen Schuhen mag ich diesen geraden Rock besonders."
+    },
+    {
+      "id": "de-holdout-v4-199",
+      "field": "altText",
+      "text": "Am rückwärtigen Saum des engen Rocks öffnet sich ein gerader Schlitz."
+    },
+    {
+      "id": "de-holdout-v4-200",
+      "field": "altText",
+      "text": "Der seitliche Rockschlitz gibt beim Ausschreiten einen Blick auf den Stiefel frei."
+    },
+    {
+      "id": "de-holdout-v4-201",
+      "field": "caption",
+      "text": "Die kleinen Haken schließen meine Weste ganz ohne Knöpfe."
+    },
+    {
+      "id": "de-holdout-v4-202",
+      "field": "caption",
+      "text": "Heute lasse ich den obersten Miederhaken offen."
+    },
+    {
+      "id": "de-holdout-v4-203",
+      "field": "caption",
+      "text": "An der vorderen Kante gefällt mir dieser schlichte Metallverschluss."
+    },
+    {
+      "id": "de-holdout-v4-204",
+      "field": "altText",
+      "text": "Eine Reihe kleiner Haken verbindet die beiden Westenhälften."
+    },
+    {
+      "id": "de-holdout-v4-205",
+      "field": "altText",
+      "text": "Die taillierte Weste wird vorne mit flachen Metallösen geschlossen."
+    },
+    {
+      "id": "de-holdout-v4-206",
+      "field": "caption",
+      "text": "Meine breite Hutkrempe wirft ein weiches Muster aufs Kleid."
+    },
+    {
+      "id": "de-holdout-v4-207",
+      "field": "caption",
+      "text": "Für den sonnigen Weg nehme ich den faltbaren Strohhut mit."
+    },
+    {
+      "id": "de-holdout-v4-208",
+      "field": "caption",
+      "text": "Die leicht gewellte Krempe passt zu meinem luftigen Sommerlook."
+    },
+    {
+      "id": "de-holdout-v4-209",
+      "field": "altText",
+      "text": "Eine breite Strohkrempe beschattet die Schultern des ärmellosen Kleides."
+    },
+    {
+      "id": "de-holdout-v4-210",
+      "field": "altText",
+      "text": "Der locker geflochtene Sonnenhut hat einen unregelmäßig gebogenen Rand."
+    },
+    {
+      "id": "de-holdout-v4-211",
+      "field": "caption",
+      "text": "Das breite Polster macht meinen schmalen Taschenriemen bequemer."
+    },
+    {
+      "id": "de-holdout-v4-212",
+      "field": "caption",
+      "text": "Heute sitzt die weiche Riemenauflage genau über meiner Schulter."
+    },
+    {
+      "id": "de-holdout-v4-213",
+      "field": "caption",
+      "text": "Ich habe dem alten Tragriemen ein kleines Stoffpolster genäht."
+    },
+    {
+      "id": "de-holdout-v4-214",
+      "field": "altText",
+      "text": "Ein gepolstertes Stoffstück umschließt den schmalen Riemen einer Schultertasche."
+    },
+    {
+      "id": "de-holdout-v4-215",
+      "field": "altText",
+      "text": "Auf Schulterhöhe wird das dünne Lederband von einer breiten Auflage eingefasst."
+    },
+    {
+      "id": "de-holdout-v4-216",
+      "field": "caption",
+      "text": "Das luftige Lochmuster trage ich über einem schlichten Trägertop."
+    },
+    {
+      "id": "de-holdout-v4-217",
+      "field": "caption",
+      "text": "Durch die gestrickten Blätter bekommt mein Oberteil eine feine Struktur."
+    },
+    {
+      "id": "de-holdout-v4-218",
+      "field": "caption",
+      "text": "Für heute reicht mir dieses eine offene Strickmuster völlig."
+    },
+    {
+      "id": "de-holdout-v4-219",
+      "field": "altText",
+      "text": "Blattförmige Öffnungen bilden ein regelmäßiges Muster im lockeren Strick."
+    },
+    {
+      "id": "de-holdout-v4-220",
+      "field": "altText",
+      "text": "Unter dem durchbrochenen Pullover liegt ein einfarbiges schmales Top."
+    },
+    {
+      "id": "de-holdout-v4-221",
+      "field": "caption",
+      "text": "Ein doppelter Umschlag bringt meine weite Hose auf die richtige Länge."
+    },
+    {
+      "id": "de-holdout-v4-222",
+      "field": "caption",
+      "text": "Heute dürfen die Socken unter der hochgekrempelten Hose sichtbar sein."
+    },
+    {
+      "id": "de-holdout-v4-223",
+      "field": "caption",
+      "text": "Mit dem festen Umschlag fällt das Hosenbein viel gerader."
+    },
+    {
+      "id": "de-holdout-v4-224",
+      "field": "altText",
+      "text": "Die breiten Hosenbeine enden in gleichmäßig umgelegten Stoffmanschetten."
+    },
+    {
+      "id": "de-holdout-v4-225",
+      "field": "altText",
+      "text": "Über den Schnürschuhen ist der Hosensaum zweimal nach außen geklappt."
+    },
+    {
+      "id": "de-holdout-v4-226",
+      "field": "caption",
+      "text": "Die runde Passe macht meine schlichte Bluse ein bisschen weicher."
+    },
+    {
+      "id": "de-holdout-v4-227",
+      "field": "caption",
+      "text": "Unter dem geschwungenen Einsatz fällt der Stoff ganz locker."
+    },
+    {
+      "id": "de-holdout-v4-228",
+      "field": "caption",
+      "text": "Heute mag ich die gekräuselte Weite dieser Bluse besonders."
+    },
+    {
+      "id": "de-holdout-v4-229",
+      "field": "altText",
+      "text": "Eine abgerundete Schulterpasse trifft auf fein gerafften Blusenstoff."
+    },
+    {
+      "id": "de-holdout-v4-230",
+      "field": "altText",
+      "text": "Unterhalb der Brust verläuft eine bogenförmige Naht mit kleinen Kräuselungen."
+    },
+    {
+      "id": "de-holdout-v4-231",
+      "field": "caption",
+      "text": "Meine gestrickten Stulpen verlängern heute die kurzen Jackenärmel."
+    },
+    {
+      "id": "de-holdout-v4-232",
+      "field": "caption",
+      "text": "Die Hände bleiben frei und die Handgelenke schön warm."
+    },
+    {
+      "id": "de-holdout-v4-233",
+      "field": "caption",
+      "text": "Zum weiten Mantel kombiniere ich schmale selbstgemachte Armwärmer."
+    },
+    {
+      "id": "de-holdout-v4-234",
+      "field": "altText",
+      "text": "Lange Strickstulpen reichen unter den Jackenärmeln bis zu den Fingeransätzen."
+    },
+    {
+      "id": "de-holdout-v4-235",
+      "field": "altText",
+      "text": "Eine Daumenöffnung hält den gerippten Handwärmer an Ort und Stelle."
+    },
+    {
+      "id": "de-holdout-v4-236",
+      "field": "caption",
+      "text": "Die gefaltete Tasche sieht leer fast wie ein Briefumschlag aus."
+    },
+    {
+      "id": "de-holdout-v4-237",
+      "field": "caption",
+      "text": "Für heute Abend nehme ich nur meine kleine Faltclutch mit."
+    },
+    {
+      "id": "de-holdout-v4-238",
+      "field": "caption",
+      "text": "Eine einzige große Falte gibt dieser Handtasche ihre Form."
+    },
+    {
+      "id": "de-holdout-v4-239",
+      "field": "altText",
+      "text": "Eine weiche Clutch wird durch eine diagonal eingeschlagene Kante geschlossen."
+    },
+    {
+      "id": "de-holdout-v4-240",
+      "field": "altText",
+      "text": "Die flache Abendtasche besitzt eine breite asymmetrisch gefaltete Vorderseite."
+    },
+    {
+      "id": "de-holdout-v4-241",
+      "field": "caption",
+      "text": "Die Holzenden an der Kapuzenkordel klappern ganz leise beim Gehen."
+    },
+    {
+      "id": "de-holdout-v4-242",
+      "field": "caption",
+      "text": "Ich habe die ausgefransten Kordelspitzen durch kleine Stopper ersetzt."
+    },
+    {
+      "id": "de-holdout-v4-243",
+      "field": "caption",
+      "text": "Zum schlichten Hoodie passen diese selbstgemachten Schnurabschlüsse prima."
+    },
+    {
+      "id": "de-holdout-v4-244",
+      "field": "altText",
+      "text": "Zwei hölzerne Abschlüsse sitzen an den herabhängenden Kapuzenbändern."
+    },
+    {
+      "id": "de-holdout-v4-245",
+      "field": "altText",
+      "text": "Die Kordel eines Sweatshirts endet in kurzen geriffelten Metallhülsen."
+    },
+    {
+      "id": "de-holdout-v4-246",
+      "field": "caption",
+      "text": "Der seitliche Falteneinsatz gibt meinem geraden Kleid überraschend viel Schwung."
+    },
+    {
+      "id": "de-holdout-v4-247",
+      "field": "caption",
+      "text": "Beim Gehen öffnet sich die versteckte Falte in meinem Kleid."
+    },
+    {
+      "id": "de-holdout-v4-248",
+      "field": "caption",
+      "text": "Heute gefällt mir die zusätzliche Weite nur auf einer Seite."
+    },
+    {
+      "id": "de-holdout-v4-249",
+      "field": "altText",
+      "text": "Seitlich im glatten Kleid öffnet sich ein keilförmiger Falteneinsatz."
+    },
+    {
+      "id": "de-holdout-v4-250",
+      "field": "altText",
+      "text": "Eine tiefe eingelegte Falte erweitert den unteren Teil des Kleides."
+    },
+    {
+      "id": "de-holdout-v4-251",
+      "field": "caption",
+      "text": "Ich habe meine Schuhe heute ganz gerade eingeschnürt."
+    },
+    {
+      "id": "de-holdout-v4-252",
+      "field": "caption",
+      "text": "Die flachen parallelen Schnürsenkel machen die Schuhe angenehm ruhig."
+    },
+    {
+      "id": "de-holdout-v4-253",
+      "field": "caption",
+      "text": "Mit der Leiterschnürung sieht mein altes Paar wieder ordentlich aus."
+    },
+    {
+      "id": "de-holdout-v4-254",
+      "field": "altText",
+      "text": "Gerade Schnürsenkelreihen verbinden die Ösen eines flachen Lederschuhs."
+    },
+    {
+      "id": "de-holdout-v4-255",
+      "field": "altText",
+      "text": "Die Schnürung bildet über der Zunge ein gleichmäßiges Leitermuster."
+    },
+    {
+      "id": "de-holdout-v4-256",
+      "field": "caption",
+      "text": "Ein einzelner Zopf läuft über die Schulter meines Pullovers."
+    },
+    {
+      "id": "de-holdout-v4-257",
+      "field": "caption",
+      "text": "Den kräftigen Strickzopf kombiniere ich heute ganz schlicht."
+    },
+    {
+      "id": "de-holdout-v4-258",
+      "field": "caption",
+      "text": "Meine Lieblingsstelle ist das breite Flechtmuster auf dem Ärmel."
+    },
+    {
+      "id": "de-holdout-v4-259",
+      "field": "altText",
+      "text": "Ein erhabenes Zopfmuster zieht sich über Schulter und oberen Ärmel."
+    },
+    {
+      "id": "de-holdout-v4-260",
+      "field": "altText",
+      "text": "Seitlich am Pullover liegt ein breiter geflochtener Strickstreifen."
+    },
+    {
+      "id": "de-holdout-v4-261",
+      "field": "caption",
+      "text": "Die Zugbänder geben meiner Beuteltasche heute eine runde Form."
+    },
+    {
+      "id": "de-holdout-v4-262",
+      "field": "caption",
+      "text": "Zum lockeren Strick nehme ich heute den weich zusammengezogenen Taschenbeutel."
+    },
+    {
+      "id": "de-holdout-v4-263",
+      "field": "caption",
+      "text": "Ich trage den kleinen Beutel heute an seinen langen Kordeln."
+    },
+    {
+      "id": "de-holdout-v4-264",
+      "field": "altText",
+      "text": "Ein runder Stoffbeutel wird oben mit zwei durchgezogenen Schnüren geschlossen."
+    },
+    {
+      "id": "de-holdout-v4-265",
+      "field": "altText",
+      "text": "Die gefältelte Taschenöffnung sitzt unter einem locker gezogenen Kordelzug."
+    },
+    {
+      "id": "de-holdout-v4-266",
+      "field": "caption",
+      "text": "Die seitlichen Schlitze lassen mein langes Hemd locker über die Hose fallen."
+    },
+    {
+      "id": "de-holdout-v4-267",
+      "field": "caption",
+      "text": "Vorne eingesteckt bleibt dieses Hemd an den Seiten schön frei."
+    },
+    {
+      "id": "de-holdout-v4-268",
+      "field": "caption",
+      "text": "Heute zeige ich die abgerundeten Ecken meines langen Hemdsaums."
+    },
+    {
+      "id": "de-holdout-v4-269",
+      "field": "altText",
+      "text": "Ein kurzer Seitenschlitz trennt den längeren Rücken vom vorderen Hemdteil."
+    },
+    {
+      "id": "de-holdout-v4-270",
+      "field": "altText",
+      "text": "Der gerundete Hemdabschluss öffnet sich seitlich über dem Hosenbund."
+    },
+    {
+      "id": "de-holdout-v4-271",
+      "field": "caption",
+      "text": "Der kleine Knopf hält meine Handschuhe am Handgelenk geschlossen."
+    },
+    {
+      "id": "de-holdout-v4-272",
+      "field": "caption",
+      "text": "Heute dürfen die alten Lederhandschuhe wieder zum Mantel mit."
+    },
+    {
+      "id": "de-holdout-v4-273",
+      "field": "caption",
+      "text": "An diesen Handschuhen mag ich die winzige Lasche besonders gern."
+    },
+    {
+      "id": "de-holdout-v4-274",
+      "field": "altText",
+      "text": "Eine schmale geknöpfte Lasche schließt den Handschuh oberhalb des Handgelenks."
+    },
+    {
+      "id": "de-holdout-v4-275",
+      "field": "altText",
+      "text": "Am kurzen Lederhandschuh sitzt ein einzelner kleiner Druckknopf."
+    },
+    {
+      "id": "de-holdout-v4-276",
+      "field": "caption",
+      "text": "Die Abnäher am Knie geben meiner Hose eine schöne Rundung."
+    },
+    {
+      "id": "de-holdout-v4-277",
+      "field": "caption",
+      "text": "Heute trage ich die gebogenen Hosenbeine zu einer geraden Jacke."
+    },
+    {
+      "id": "de-holdout-v4-278",
+      "field": "caption",
+      "text": "Diese geformte Hose bleibt auch ohne Gürtel angenehm locker."
+    },
+    {
+      "id": "de-holdout-v4-279",
+      "field": "altText",
+      "text": "Kurze Abnäher geben dem weiten Hosenbein auf Kniehöhe zusätzliches Volumen."
+    },
+    {
+      "id": "de-holdout-v4-280",
+      "field": "altText",
+      "text": "Die Hose zeigt eine nach außen gerundete seitliche Silhouette."
+    },
+    {
+      "id": "de-holdout-v4-281",
+      "field": "caption",
+      "text": "Über dem einfachen Unterkleid bringt das Netz ein spannendes Muster."
+    },
+    {
+      "id": "de-holdout-v4-282",
+      "field": "caption",
+      "text": "Heute probiere ich mein grobmaschiges Kleid als leichte obere Lage."
+    },
+    {
+      "id": "de-holdout-v4-283",
+      "field": "caption",
+      "text": "Das durchsichtige Überkleid lässt die klare Form darunter gut erkennen."
+    },
+    {
+      "id": "de-holdout-v4-284",
+      "field": "altText",
+      "text": "Ein grobmaschiges Netzkleid liegt über einem blickdichten schmalen Unterkleid."
+    },
+    {
+      "id": "de-holdout-v4-285",
+      "field": "altText",
+      "text": "Große offene Maschen bedecken ein gerades Kleid mit breiten Trägern."
+    },
+    {
+      "id": "de-holdout-v4-286",
+      "field": "caption",
+      "text": "Mein Brillenband trägt sich heute fast wie eine zweite Kette."
+    },
+    {
+      "id": "de-holdout-v4-287",
+      "field": "caption",
+      "text": "Die Brille hängt griffbereit an ihrer feinen Gliederkette."
+    },
+    {
+      "id": "de-holdout-v4-288",
+      "field": "caption",
+      "text": "Zum schlichten Hemd passt das alte Brillenkettchen erstaunlich gut."
+    },
+    {
+      "id": "de-holdout-v4-289",
+      "field": "altText",
+      "text": "Eine dünne Kette verbindet die Bügel der auf der Brust hängenden Brille."
+    },
+    {
+      "id": "de-holdout-v4-290",
+      "field": "altText",
+      "text": "Seitlich neben dem Kragen läuft ein schmales metallisches Brillenband."
+    },
+    {
+      "id": "de-holdout-v4-291",
+      "field": "caption",
+      "text": "Der hohe Regenkragen lässt meinem Hut genügend Platz."
+    },
+    {
+      "id": "de-holdout-v4-292",
+      "field": "caption",
+      "text": "Heute klappe ich den wasserdichten Kragen bis unters Kinn hoch."
+    },
+    {
+      "id": "de-holdout-v4-293",
+      "field": "caption",
+      "text": "Ohne Kapuze fällt meine Regenjacke hinten schön glatt."
+    },
+    {
+      "id": "de-holdout-v4-294",
+      "field": "altText",
+      "text": "Ein hoher geschlossener Stehkragen umschließt den Hals einer Regenjacke."
+    },
+    {
+      "id": "de-holdout-v4-295",
+      "field": "altText",
+      "text": "Die kapuzenlose Jacke besitzt einen breit umgelegten wasserfesten Kragen."
+    },
+    {
+      "id": "de-holdout-v4-296",
+      "field": "caption",
+      "text": "Die gerafften Knöchelbündchen machen meine weite Hose wunderbar praktisch."
+    },
+    {
+      "id": "de-holdout-v4-297",
+      "field": "caption",
+      "text": "Heute darf die lockere Pumphose über den Schuhen leicht bauschen."
+    },
+    {
+      "id": "de-holdout-v4-298",
+      "field": "caption",
+      "text": "Mit engen Abschlüssen bekommt das viele Stoffvolumen eine schöne Form."
+    },
+    {
+      "id": "de-holdout-v4-299",
+      "field": "altText",
+      "text": "Weite Hosenbeine sammeln sich in schmalen elastischen Knöchelbündchen."
+    },
+    {
+      "id": "de-holdout-v4-300",
+      "field": "altText",
+      "text": "Die Hose fällt bauschig über zwei eng anliegende Beinabschlüsse."
+    },
+    {
+      "id": "de-holdout-v4-301",
+      "field": "caption",
+      "text": "Das kleine Filzstielchen gehört für mich zur Baskenmütze dazu."
+    },
+    {
+      "id": "de-holdout-v4-302",
+      "field": "caption",
+      "text": "Heute sitzt die Baskenmütze weit nach hinten geschoben."
+    },
+    {
+      "id": "de-holdout-v4-303",
+      "field": "caption",
+      "text": "Mit schräg getragenem Barett fühle ich mich sofort angezogen."
+    },
+    {
+      "id": "de-holdout-v4-304",
+      "field": "altText",
+      "text": "Eine weiche flache Mütze besitzt mittig einen kurzen Filzsteg."
+    },
+    {
+      "id": "de-holdout-v4-305",
+      "field": "altText",
+      "text": "Die breite Baskenmütze liegt leicht geneigt über dem Haaransatz."
+    },
+    {
+      "id": "de-holdout-v4-306",
+      "field": "caption",
+      "text": "Mein Zweireiher bleibt heute offen und zeigt beide Knopfreihen."
+    },
+    {
+      "id": "de-holdout-v4-307",
+      "field": "caption",
+      "text": "Die versetzten Knöpfe geben der weiten Jacke einen klaren Rhythmus."
+    },
+    {
+      "id": "de-holdout-v4-308",
+      "field": "caption",
+      "text": "Für den Mantel habe ich passende alte Knöpfe zusammengesucht."
+    },
+    {
+      "id": "de-holdout-v4-309",
+      "field": "altText",
+      "text": "Zwei parallele Knopfreihen laufen über die überlappenden Jackenvorderteile."
+    },
+    {
+      "id": "de-holdout-v4-310",
+      "field": "altText",
+      "text": "Der breite Mantelverschluss zeigt sechs große gleichmäßig angeordnete Knöpfe."
+    },
+    {
+      "id": "de-holdout-v4-311",
+      "field": "caption",
+      "text": "Die kleinen Flügelärmel bewegen sich schön im warmen Wind."
+    },
+    {
+      "id": "de-holdout-v4-312",
+      "field": "caption",
+      "text": "Heute trage ich das lockere Top mit den kurzen flatternden Ärmeln."
+    },
+    {
+      "id": "de-holdout-v4-313",
+      "field": "caption",
+      "text": "An dieser Bluse gefallen mir die weichen Schulterkanten besonders."
+    },
+    {
+      "id": "de-holdout-v4-314",
+      "field": "altText",
+      "text": "Kurze halbkreisförmige Ärmel fallen locker über die Schultern."
+    },
+    {
+      "id": "de-holdout-v4-315",
+      "field": "altText",
+      "text": "Das Oberteil besitzt leicht ausgestellte flatternde Ärmelansätze."
+    },
+    {
+      "id": "de-holdout-v4-316",
+      "field": "caption",
+      "text": "Ein schmales Tuch schmückt heute den hinteren Taschenriemen."
+    },
+    {
+      "id": "de-holdout-v4-317",
+      "field": "caption",
+      "text": "Den kleinen Stoffstreifen habe ich um meinen Rucksackgurt gewickelt."
+    },
+    {
+      "id": "de-holdout-v4-318",
+      "field": "caption",
+      "text": "So finde ich meine schlichte Tasche am Garderobenhaken sofort wieder."
+    },
+    {
+      "id": "de-holdout-v4-319",
+      "field": "altText",
+      "text": "Ein schmaler gemusterter Stoffstreifen umwickelt einen Rucksackträger."
+    },
+    {
+      "id": "de-holdout-v4-320",
+      "field": "altText",
+      "text": "Am oberen Taschengriff ist ein kleines Tuch festgebunden."
+    },
+    {
+      "id": "de-holdout-v4-321",
+      "field": "caption",
+      "text": "Meine Kniepatches dürfen heute sichtbar bleiben und weitergetragen werden."
+    },
+    {
+      "id": "de-holdout-v4-322",
+      "field": "caption",
+      "text": "Die ausgebesserte Hose fühlt sich nach vielen Jahren richtig vertraut an."
+    },
+    {
+      "id": "de-holdout-v4-323",
+      "field": "caption",
+      "text": "Mit runden Flicken ist aus der alten Jeans mein Lieblingsstück geworden."
+    },
+    {
+      "id": "de-holdout-v4-324",
+      "field": "altText",
+      "text": "Zwei rund zugeschnittene Stoffflicken bedecken die Knie einer Jeans."
+    },
+    {
+      "id": "de-holdout-v4-325",
+      "field": "altText",
+      "text": "Auf einem Hosenbein sitzt ein sauber umnähter ovaler Reparaturflicken."
+    },
+    {
+      "id": "de-holdout-v4-326",
+      "field": "caption",
+      "text": "Das steigende Revers gibt meinem lockeren Blazer etwas Festliches."
+    },
+    {
+      "id": "de-holdout-v4-327",
+      "field": "caption",
+      "text": "Heute lasse ich die spitzen Reverskanten ganz für sich wirken."
+    },
+    {
+      "id": "de-holdout-v4-328",
+      "field": "caption",
+      "text": "Dieser Kragenschnitt gefällt mir zu meinem einfachen Rundhalsshirt."
+    },
+    {
+      "id": "de-holdout-v4-329",
+      "field": "altText",
+      "text": "Spitz zulaufende Reverskanten steigen seitlich zum Jackenkragen auf."
+    },
+    {
+      "id": "de-holdout-v4-330",
+      "field": "altText",
+      "text": "Der offene Blazer besitzt ein breites deutlich eingeschnittenes Revers."
+    },
+    {
+      "id": "de-holdout-v4-331",
+      "field": "caption",
+      "text": "Die unterste Rockstufe schwingt bei jedem Schritt extra mit."
+    },
+    {
+      "id": "de-holdout-v4-332",
+      "field": "caption",
+      "text": "Zum Stufenrock trage ich heute nur ein schmales schlichtes Oberteil."
+    },
+    {
+      "id": "de-holdout-v4-333",
+      "field": "caption",
+      "text": "Drei weiche Lagen machen diesen Rock zu meinem Sommerliebling."
+    },
+    {
+      "id": "de-holdout-v4-334",
+      "field": "altText",
+      "text": "Drei übereinander gesetzte Stoffstufen erweitern den langen Rock nach unten."
+    },
+    {
+      "id": "de-holdout-v4-335",
+      "field": "altText",
+      "text": "Ein breiter geraffter Volant bildet die unterste Lage des Rocks."
+    },
+    {
+      "id": "de-holdout-v4-336",
+      "field": "caption",
+      "text": "Mein kleiner Stoffanhänger hängt heute am Karabiner der Tasche."
+    },
+    {
+      "id": "de-holdout-v4-337",
+      "field": "caption",
+      "text": "Die Schlüssel bleiben innen und außen sitzt nur mein genähter Anhänger."
+    },
+    {
+      "id": "de-holdout-v4-338",
+      "field": "caption",
+      "text": "Ein bunter Stoffrest macht den schlichten Taschenverschluss freundlicher."
+    },
+    {
+      "id": "de-holdout-v4-339",
+      "field": "altText",
+      "text": "An einem metallischen Taschenkarabiner hängt ein kleiner textiler Anhänger."
+    },
+    {
+      "id": "de-holdout-v4-340",
+      "field": "altText",
+      "text": "Eine genähte Stofffigur baumelt neben dem seitlichen Taschenverschluss."
+    },
+    {
+      "id": "de-holdout-v4-341",
+      "field": "caption",
+      "text": "Der nach innen gezogene Saum gibt meinem Kleid viel Volumen."
+    },
+    {
+      "id": "de-holdout-v4-342",
+      "field": "caption",
+      "text": "Heute probiere ich die runde Ballonform mit ganz flachen Schuhen."
+    },
+    {
+      "id": "de-holdout-v4-343",
+      "field": "caption",
+      "text": "Beim Sitzen legt sich der bauschige Rockteil weich um mich."
+    },
+    {
+      "id": "de-holdout-v4-344",
+      "field": "altText",
+      "text": "Der Kleidersaum ist nach innen gerafft und bildet eine runde Silhouette."
+    },
+    {
+      "id": "de-holdout-v4-345",
+      "field": "altText",
+      "text": "Ein voluminöser Ballonrock endet knapp unterhalb der Knie."
+    },
+    {
+      "id": "de-holdout-v4-346",
+      "field": "caption",
+      "text": "Die großen Rauten erinnern mich an meinen ersten selbst gestrickten Pulli."
+    },
+    {
+      "id": "de-holdout-v4-347",
+      "field": "caption",
+      "text": "Heute lasse ich das Rautenmuster zum ruhigen Rest des Looks sprechen."
+    },
+    {
+      "id": "de-holdout-v4-348",
+      "field": "caption",
+      "text": "An diesem Pullunder mag ich die klaren ineinanderlaufenden Formen."
+    },
+    {
+      "id": "de-holdout-v4-349",
+      "field": "altText",
+      "text": "Große gestrickte Rauten überziehen die Vorderseite eines ärmellosen Pullovers."
+    },
+    {
+      "id": "de-holdout-v4-350",
+      "field": "altText",
+      "text": "Ein feines Liniengitter kreuzt die farblich abgesetzten Strickrauten."
+    },
+    {
+      "id": "de-holdout-v4-351",
+      "field": "caption",
+      "text": "Das Band läuft heute quer durch den Ausschnitt meiner Bluse."
+    },
+    {
+      "id": "de-holdout-v4-352",
+      "field": "caption",
+      "text": "Mit dem kleinen Durchzug kann ich die Ausschnittweite verändern."
+    },
+    {
+      "id": "de-holdout-v4-353",
+      "field": "caption",
+      "text": "Ich lasse die beiden schmalen Enden am Schlüsselbein locker hängen."
+    },
+    {
+      "id": "de-holdout-v4-354",
+      "field": "altText",
+      "text": "Ein schmales Band ist durch Ösen entlang des Blusenausschnitts gezogen."
+    },
+    {
+      "id": "de-holdout-v4-355",
+      "field": "altText",
+      "text": "Unterhalb des Halses endet ein textiler Durchzug in zwei freien Bändern."
+    },
+    {
+      "id": "de-holdout-v4-356",
+      "field": "caption",
+      "text": "Meine kleine Tasche bleibt dank des festen Bodens von allein stehen."
+    },
+    {
+      "id": "de-holdout-v4-357",
+      "field": "caption",
+      "text": "Heute gefällt mir die klare kastenförmige Form besonders gut."
+    },
+    {
+      "id": "de-holdout-v4-358",
+      "field": "caption",
+      "text": "Die winzigen Füßchen schützen den Boden meiner liebsten Ledertasche."
+    },
+    {
+      "id": "de-holdout-v4-359",
+      "field": "altText",
+      "text": "Vier kleine Metallfüße sitzen unter dem rechteckigen Taschenboden."
+    },
+    {
+      "id": "de-holdout-v4-360",
+      "field": "altText",
+      "text": "Eine aufrecht stehende Handtasche besitzt einen breiten stabilen Boden."
+    },
+    {
+      "id": "de-holdout-v4-361",
+      "field": "caption",
+      "text": "Die kurze Cape-Lage hält meine Schultern angenehm bedeckt."
+    },
+    {
+      "id": "de-holdout-v4-362",
+      "field": "caption",
+      "text": "Heute trage ich den Überwurf einfach über meinem geraden Kleid."
+    },
+    {
+      "id": "de-holdout-v4-363",
+      "field": "caption",
+      "text": "An diesem Mantel gefällt mir der frei schwingende Schulterteil."
+    },
+    {
+      "id": "de-holdout-v4-364",
+      "field": "altText",
+      "text": "Eine zweite kurze Stofflage liegt capeartig über den Mantelschultern."
+    },
+    {
+      "id": "de-holdout-v4-365",
+      "field": "altText",
+      "text": "Der runde Schulterüberwurf endet oberhalb der Ellenbogen."
+    },
+    {
+      "id": "de-holdout-v4-366",
+      "field": "caption",
+      "text": "Mein weicher Stiefelrand lässt sich heute einmal nach außen klappen."
+    },
+    {
+      "id": "de-holdout-v4-367",
+      "field": "caption",
+      "text": "Für den regennassen Weg passen die kurzen Gummistiefel zum Rock."
+    },
+    {
+      "id": "de-holdout-v4-368",
+      "field": "caption",
+      "text": "Die flexible Kante macht diese Regenstiefel richtig bequem."
+    },
+    {
+      "id": "de-holdout-v4-369",
+      "field": "altText",
+      "text": "Der obere Rand eines niedrigen Gummistiefels ist nach außen umgeschlagen."
+    },
+    {
+      "id": "de-holdout-v4-370",
+      "field": "altText",
+      "text": "Kurze wasserfeste Stiefel stehen unter einem schmalen knielangen Rock."
+    },
+    {
+      "id": "de-holdout-v4-371",
+      "field": "caption",
+      "text": "Der geflochtene Gürtel lässt sich genau an meiner Lieblingsstelle schließen."
+    },
+    {
+      "id": "de-holdout-v4-372",
+      "field": "caption",
+      "text": "Heute bündelt das breite Geflecht meinen langen Cardigan."
+    },
+    {
+      "id": "de-holdout-v4-373",
+      "field": "caption",
+      "text": "Die unregelmäßige Flechtung passt schön zur glatten Hose."
+    },
+    {
+      "id": "de-holdout-v4-374",
+      "field": "altText",
+      "text": "Ein breiter Flechtgürtel schließt über einem langen Strickoberteil."
+    },
+    {
+      "id": "de-holdout-v4-375",
+      "field": "altText",
+      "text": "Mehrere dünne Lederstreifen bilden ein dicht verflochtenes Gürtelband."
+    },
+    {
+      "id": "de-holdout-v4-376",
+      "field": "caption",
+      "text": "Die weit angesetzten Ärmel machen meinen Überwurf besonders luftig."
+    },
+    {
+      "id": "de-holdout-v4-377",
+      "field": "caption",
+      "text": "Heute brauche ich unter dieser großzügigen Jacke nur ein schlichtes Top."
+    },
+    {
+      "id": "de-holdout-v4-378",
+      "field": "caption",
+      "text": "Beim Armeheben fällt der rechteckige Ärmel schön in sich zusammen."
+    },
+    {
+      "id": "de-holdout-v4-379",
+      "field": "altText",
+      "text": "Breite rechteckige Ärmel sind tief am offenen Überwurf angesetzt."
+    },
+    {
+      "id": "de-holdout-v4-380",
+      "field": "altText",
+      "text": "Die weite Jacke besitzt gerade geschnittene locker hängende Ärmel."
+    },
+    {
+      "id": "de-holdout-v4-381",
+      "field": "caption",
+      "text": "Eine kurze Perlenkette liegt heute direkt auf meinem Hemdkragen."
+    },
+    {
+      "id": "de-holdout-v4-382",
+      "field": "caption",
+      "text": "Die ungleichen Perlen gefallen mir zum groben Strick besonders gut."
+    },
+    {
+      "id": "de-holdout-v4-383",
+      "field": "caption",
+      "text": "Meine selbst aufgefädelte Kette darf heute das ganze Outfit tragen."
+    },
+    {
+      "id": "de-holdout-v4-384",
+      "field": "altText",
+      "text": "Unregelmäßig geformte Perlen bilden eine kurze Kette über dem Kragen."
+    },
+    {
+      "id": "de-holdout-v4-385",
+      "field": "altText",
+      "text": "Eine einreihige Perlenkette liegt auf einem dichten Strickpullover."
+    },
+    {
+      "id": "de-holdout-v4-386",
+      "field": "caption",
+      "text": "Die lange Schluppe binde ich heute nur einmal ganz locker."
+    },
+    {
+      "id": "de-holdout-v4-387",
+      "field": "caption",
+      "text": "Zum geraden Rock lasse ich die schmalen Blusenbänder offen hängen."
+    },
+    {
+      "id": "de-holdout-v4-388",
+      "field": "caption",
+      "text": "Eine weiche Schleife ersetzt an dieser Bluse meinen üblichen Halsschmuck."
+    },
+    {
+      "id": "de-holdout-v4-389",
+      "field": "altText",
+      "text": "Zwei lange Stoffbänder gehen seitlich aus dem Blusenkragen hervor."
+    },
+    {
+      "id": "de-holdout-v4-390",
+      "field": "altText",
+      "text": "Am Halsabschluss der Bluse sitzt eine weich gebundene Schluppe."
+    },
+    {
+      "id": "de-holdout-v4-391",
+      "field": "caption",
+      "text": "Der breite Kragen liegt heute schön über meinem kurzen Jäckchen."
+    },
+    {
+      "id": "de-holdout-v4-392",
+      "field": "caption",
+      "text": "Die eckige Rückenform macht dieses Oberteil von hinten besonders."
+    },
+    {
+      "id": "de-holdout-v4-393",
+      "field": "caption",
+      "text": "Zum Matrosenkragen lasse ich alle anderen Accessoires ganz schlicht."
+    },
+    {
+      "id": "de-holdout-v4-394",
+      "field": "altText",
+      "text": "Ein breiter rechteckiger Matrosenkragen liegt auf dem oberen Rücken."
+    },
+    {
+      "id": "de-holdout-v4-395",
+      "field": "altText",
+      "text": "Drei schmale Streifen folgen der eckigen Kante des großen Kragens."
+    },
+    {
+      "id": "de-holdout-v4-396",
+      "field": "caption",
+      "text": "Meine glänzenden Schuhe bringen etwas Licht unter den matten Rock."
+    },
+    {
+      "id": "de-holdout-v4-397",
+      "field": "caption",
+      "text": "Frisch poliert dürfen die alten Lackschuhe wieder mit hinaus."
+    },
+    {
+      "id": "de-holdout-v4-398",
+      "field": "caption",
+      "text": "Heute reichen mir diese spiegelnden Schuhspitzen als kleiner Hingucker."
+    },
+    {
+      "id": "de-holdout-v4-399",
+      "field": "altText",
+      "text": "Das Licht spiegelt sich auf den glatten Lackkappen der flachen Schuhe."
+    },
+    {
+      "id": "de-holdout-v4-400",
+      "field": "altText",
+      "text": "Glänzende schwarze Halbschuhe stehen unter einem weich fallenden Stoffrock."
+    },
+    {
+      "id": "de-holdout-v4-401",
+      "field": "caption",
+      "text": "Die tief angesetzten Schultern lassen meinen Pulli wunderbar locker sitzen."
+    },
+    {
+      "id": "de-holdout-v4-402",
+      "field": "caption",
+      "text": "Heute darf der weite Strick ganz entspannt über die Oberarme fallen."
+    },
+    {
+      "id": "de-holdout-v4-403",
+      "field": "caption",
+      "text": "Meine Schulternaht sitzt bei diesem Pullover ein gutes Stück tiefer."
+    },
+    {
+      "id": "de-holdout-v4-404",
+      "field": "altText",
+      "text": "Die Schulternähte des weiten Pullovers verlaufen auf Höhe der Oberarme."
+    },
+    {
+      "id": "de-holdout-v4-405",
+      "field": "altText",
+      "text": "Ein locker geschnittenes Strickoberteil hat deutlich überschnittene Ärmelansätze."
+    },
+    {
+      "id": "de-holdout-v4-406",
+      "field": "caption",
+      "text": "Die halbmondförmige Tasche macht mein schlichtes Kleid besonders praktisch."
+    },
+    {
+      "id": "de-holdout-v4-407",
+      "field": "caption",
+      "text": "Meine Hände finden die runden Tascheneingriffe inzwischen von allein."
+    },
+    {
+      "id": "de-holdout-v4-408",
+      "field": "caption",
+      "text": "Heute lasse ich die geschwungenen Taschen als einziges Detail wirken."
+    },
+    {
+      "id": "de-holdout-v4-409",
+      "field": "altText",
+      "text": "Zwei halbkreisförmige Taschen sind vorne auf das einfache Kleid gesetzt."
+    },
+    {
+      "id": "de-holdout-v4-410",
+      "field": "altText",
+      "text": "Rund geschnittene Eingriffe öffnen die großen seitlichen Kleidertaschen."
+    },
+    {
+      "id": "de-holdout-v4-411",
+      "field": "caption",
+      "text": "Der feste Brusteinsatz macht mein Hemd schön klar geschnitten."
+    },
+    {
+      "id": "de-holdout-v4-412",
+      "field": "caption",
+      "text": "Heute trage ich den plissierten Hemdeinsatz ganz entspannt zur Jeans."
+    },
+    {
+      "id": "de-holdout-v4-413",
+      "field": "caption",
+      "text": "Die feinen Falten vorne brauchen für mich keine weitere Dekoration."
+    },
+    {
+      "id": "de-holdout-v4-414",
+      "field": "altText",
+      "text": "Ein rechteckiger plissierter Einsatz bedeckt die vordere Hemdbrust."
+    },
+    {
+      "id": "de-holdout-v4-415",
+      "field": "altText",
+      "text": "Dichte kleine Falten rahmen die mittlere Knopfleiste des Hemds."
+    },
+    {
+      "id": "de-holdout-v4-416",
+      "field": "caption",
+      "text": "Mit gezogenem Saum sitzt meine Jacke heute etwas kürzer."
+    },
+    {
+      "id": "de-holdout-v4-417",
+      "field": "caption",
+      "text": "Die seitlichen Stopper halten den unteren Jackenrand genau richtig."
+    },
+    {
+      "id": "de-holdout-v4-418",
+      "field": "caption",
+      "text": "Ein kleiner Zug an der Kordel verändert die ganze Form."
+    },
+    {
+      "id": "de-holdout-v4-419",
+      "field": "altText",
+      "text": "Der Jackensaum ist durch einen seitlich gestoppten Kordelzug zusammengezogen."
+    },
+    {
+      "id": "de-holdout-v4-420",
+      "field": "altText",
+      "text": "Zwei kurze Schnurenden hängen unter dem gerafften Blousonabschluss."
+    },
+    {
+      "id": "de-holdout-v4-421",
+      "field": "caption",
+      "text": "Die beiden Schnallen sitzen heute schön parallel über meinem Spann."
+    },
+    {
+      "id": "de-holdout-v4-422",
+      "field": "caption",
+      "text": "Meine alten Monkstraps passen überraschend gut zu der weiten Hose."
+    },
+    {
+      "id": "de-holdout-v4-423",
+      "field": "caption",
+      "text": "Zum Anziehen brauche ich bei diesem Paar keine Schnürsenkel."
+    },
+    {
+      "id": "de-holdout-v4-424",
+      "field": "altText",
+      "text": "Zwei seitliche Metallschnallen schließen die breiten Laschen eines Lederschuhs."
+    },
+    {
+      "id": "de-holdout-v4-425",
+      "field": "altText",
+      "text": "Über dem Schuhspann liegen zwei flache übereinander angeordnete Riemen."
+    },
+    {
+      "id": "de-holdout-v4-426",
+      "field": "caption",
+      "text": "Der lange Gehrock bildet heute eine ruhige Linie zur schmalen Hose."
+    },
+    {
+      "id": "de-holdout-v4-427",
+      "field": "caption",
+      "text": "Vorn offen getragen schwingt mein taillierter Mantel leicht nach hinten."
+    },
+    {
+      "id": "de-holdout-v4-428",
+      "field": "caption",
+      "text": "Heute darf mein alter Gehrock auch ohne besonderen Anlass hinaus."
+    },
+    {
+      "id": "de-holdout-v4-429",
+      "field": "altText",
+      "text": "Ein taillierter langer Gehrock reicht knapp bis oberhalb der Knie."
+    },
+    {
+      "id": "de-holdout-v4-430",
+      "field": "altText",
+      "text": "Die offenen Mantelschöße fallen seitlich einer schmalen Stoffhose herab."
+    },
+    {
+      "id": "de-holdout-v4-431",
+      "field": "caption",
+      "text": "Die langen Fransen meines Schals liegen heute frei über der Jacke."
+    },
+    {
+      "id": "de-holdout-v4-432",
+      "field": "caption",
+      "text": "Einmal umgelegt zeigt das Tuch seinen handgeknüpften Abschluss."
+    },
+    {
+      "id": "de-holdout-v4-433",
+      "field": "caption",
+      "text": "An kalten Tagen mag ich diese lockeren Knoten am Schalende."
+    },
+    {
+      "id": "de-holdout-v4-434",
+      "field": "altText",
+      "text": "Handgeknüpfte Fransen schließen den breiten gewebten Schal ab."
+    },
+    {
+      "id": "de-holdout-v4-435",
+      "field": "altText",
+      "text": "Mehrere lange Garnbündel hängen unter dem geraden Tuchrand."
+    },
+    {
+      "id": "de-holdout-v4-436",
+      "field": "caption",
+      "text": "Der gerade Schultersattel gibt meiner weiten Bluse einen festen Rahmen."
+    },
+    {
+      "id": "de-holdout-v4-437",
+      "field": "caption",
+      "text": "Unter der breiten Passe fällt die Bluse weich über den Rücken."
+    },
+    {
+      "id": "de-holdout-v4-438",
+      "field": "caption",
+      "text": "Heute trage ich meine weit geschnittene Sattelbluse ganz ungezwungen."
+    },
+    {
+      "id": "de-holdout-v4-439",
+      "field": "altText",
+      "text": "Eine breite gerade Passe reicht quer über den oberen Blusenrücken."
+    },
+    {
+      "id": "de-holdout-v4-440",
+      "field": "altText",
+      "text": "Unter dem festen Schulterstück fällt der Stoff in lockerer Weite."
+    },
+    {
+      "id": "de-holdout-v4-441",
+      "field": "caption",
+      "text": "Die abknöpfbare Stulpe macht meine Stiefel heute etwas höher."
+    },
+    {
+      "id": "de-holdout-v4-442",
+      "field": "caption",
+      "text": "Mit umgelegtem Schaft wirken meine alten Stiefel gleich gemütlicher."
+    },
+    {
+      "id": "de-holdout-v4-443",
+      "field": "caption",
+      "text": "Heute zeige ich die kleinen Knöpfe am breiten Stiefelumschlag."
+    },
+    {
+      "id": "de-holdout-v4-444",
+      "field": "altText",
+      "text": "Ein breiter angeknöpfter Umschlag liegt um den oberen Stiefelschaft."
+    },
+    {
+      "id": "de-holdout-v4-445",
+      "field": "altText",
+      "text": "Am hohen Stiefel ist die weiche obere Kante nach unten gefaltet."
+    },
+    {
+      "id": "de-holdout-v4-446",
+      "field": "caption",
+      "text": "Die breite Hüftpasse lässt meinen Rock erst etwas tiefer schwingen."
+    },
+    {
+      "id": "de-holdout-v4-447",
+      "field": "caption",
+      "text": "Heute stecke ich das Shirt hinein, damit die Passe sichtbar bleibt."
+    },
+    {
+      "id": "de-holdout-v4-448",
+      "field": "caption",
+      "text": "Am glatten oberen Rockteil gefällt mir die klare waagerechte Naht."
+    },
+    {
+      "id": "de-holdout-v4-449",
+      "field": "altText",
+      "text": "Unter einer breiten glatten Hüftpasse beginnt der ausgestellte Rockteil."
+    },
+    {
+      "id": "de-holdout-v4-450",
+      "field": "altText",
+      "text": "Eine horizontale Naht trennt den anliegenden oberen Bereich vom weiten Rock."
+    },
+    {
+      "id": "de-holdout-v4-451",
+      "field": "caption",
+      "text": "Drei schmale Armreifen dürfen heute gemeinsam klirren."
+    },
+    {
+      "id": "de-holdout-v4-452",
+      "field": "caption",
+      "text": "Meine ungleichen Reifen finden sich am Handgelenk zu einer kleinen Gruppe."
+    },
+    {
+      "id": "de-holdout-v4-453",
+      "field": "caption",
+      "text": "Zum kurzen Ärmel passt der Stapel alter Metallreifen prima."
+    },
+    {
+      "id": "de-holdout-v4-454",
+      "field": "altText",
+      "text": "Mehrere schmale unterschiedlich geformte Armreifen liegen übereinander am Handgelenk."
+    },
+    {
+      "id": "de-holdout-v4-455",
+      "field": "altText",
+      "text": "Zwischen zwei dünnen Metallreifen sitzt ein breiter glatt polierter Reif."
+    },
+    {
+      "id": "de-holdout-v4-456",
+      "field": "caption",
+      "text": "Die schrägen Raglannähte machen mein schlichtes Kleid angenehm beweglich."
+    },
+    {
+      "id": "de-holdout-v4-457",
+      "field": "caption",
+      "text": "Heute trage ich das weiche Kleid mit den weiten Schulterpartien."
+    },
+    {
+      "id": "de-holdout-v4-458",
+      "field": "caption",
+      "text": "An diesem Schnitt mag ich besonders den fließenden Übergang zum Ärmel."
+    },
+    {
+      "id": "de-holdout-v4-459",
+      "field": "altText",
+      "text": "Schräge Nähte laufen vom Kleiderausschnitt bis unter die Arme."
+    },
+    {
+      "id": "de-holdout-v4-460",
+      "field": "altText",
+      "text": "Die Ärmel des geraden Kleides gehen ohne waagerechte Schulternaht ins Oberteil über."
+    },
+    {
+      "id": "de-holdout-v4-461",
+      "field": "caption",
+      "text": "Mein gepolsterter Haarreifen greift heute die weichen Formen des Looks auf."
+    },
+    {
+      "id": "de-holdout-v4-462",
+      "field": "caption",
+      "text": "Das selbst bezogene Haarband hält die Stirn frei."
+    },
+    {
+      "id": "de-holdout-v4-463",
+      "field": "caption",
+      "text": "Zum offenen Kragen nehme ich meinen breiten Stoffreif dazu."
+    },
+    {
+      "id": "de-holdout-v4-464",
+      "field": "altText",
+      "text": "Ein breiter gepolsterter Haarreifen liegt über dem zurückgenommenen Haar."
+    },
+    {
+      "id": "de-holdout-v4-465",
+      "field": "altText",
+      "text": "Der bogenförmige Haarschmuck ist vollständig mit gewebtem Stoff bezogen."
+    },
+    {
+      "id": "de-holdout-v4-466",
+      "field": "caption",
+      "text": "Der schmale Durchzug formt mein langes Hemd nur ganz leicht."
+    },
+    {
+      "id": "de-holdout-v4-467",
+      "field": "caption",
+      "text": "Heute ziehe ich das Taillenband auf einer Seite etwas enger."
+    },
+    {
+      "id": "de-holdout-v4-468",
+      "field": "caption",
+      "text": "Mein Hemdkleid bekommt durch den Tunnelzug eine weiche Mitte."
+    },
+    {
+      "id": "de-holdout-v4-469",
+      "field": "altText",
+      "text": "Ein schmaler Tunnelzug verläuft auf Taillenhöhe durch das Hemdkleid."
+    },
+    {
+      "id": "de-holdout-v4-470",
+      "field": "altText",
+      "text": "Seitlich treten zwei Stoffbänder aus dem gerafften Hemdbereich heraus."
+    },
+    {
+      "id": "de-holdout-v4-471",
+      "field": "caption",
+      "text": "Nach dem Bürsten sieht mein Veloursrock wieder richtig samtig aus."
+    },
+    {
+      "id": "de-holdout-v4-472",
+      "field": "caption",
+      "text": "Je nach Blickwinkel verändert der weiche Flor seinen Schimmer."
+    },
+    {
+      "id": "de-holdout-v4-473",
+      "field": "caption",
+      "text": "Heute trage ich die gebürstete Oberfläche zur glatten Baumwollbluse."
+    },
+    {
+      "id": "de-holdout-v4-474",
+      "field": "altText",
+      "text": "Der kurze Veloursflor zeigt beim seitlichen Lichteinfall helle und dunkle Flächen."
+    },
+    {
+      "id": "de-holdout-v4-475",
+      "field": "altText",
+      "text": "Eine gebürstete matte Lederoberfläche bedeckt den geraden Rock."
+    },
+    {
+      "id": "de-holdout-v4-476",
+      "field": "caption",
+      "text": "Meine runde Häkeltasche bringt heute etwas Handarbeit in den Look."
+    },
+    {
+      "id": "de-holdout-v4-477",
+      "field": "caption",
+      "text": "Den festen Kreis habe ich aus übrig gebliebenem Garn gehäkelt."
+    },
+    {
+      "id": "de-holdout-v4-478",
+      "field": "caption",
+      "text": "Zur einfachen Leinenhose nehme ich meinen selbstgemachten Taschenkreis mit."
+    },
+    {
+      "id": "de-holdout-v4-479",
+      "field": "altText",
+      "text": "Eine kreisrunde Tasche zeigt dicht gehäkelte konzentrische Maschenreihen."
+    },
+    {
+      "id": "de-holdout-v4-480",
+      "field": "altText",
+      "text": "Zwei runde Häkelteile sind durch einen schmalen Taschenstreifen verbunden."
+    },
+    {
+      "id": "de-holdout-v4-481",
+      "field": "caption",
+      "text": "Die schräge Tasche gibt meinem schlichten Kleid ein unerwartetes Detail."
+    },
+    {
+      "id": "de-holdout-v4-482",
+      "field": "caption",
+      "text": "Heute probiere ich die asymmetrische Taschenlösung zum ersten Mal aus."
+    },
+    {
+      "id": "de-holdout-v4-483",
+      "field": "caption",
+      "text": "An diesem Kleid wandert mein Blick immer zum schrägen Eingriff."
+    },
+    {
+      "id": "de-holdout-v4-484",
+      "field": "altText",
+      "text": "Eine einzelne schräg angesetzte Tasche sitzt auf Hüfthöhe des Kleides."
+    },
+    {
+      "id": "de-holdout-v4-485",
+      "field": "altText",
+      "text": "Der asymmetrische Tascheneingriff verläuft diagonal über das vordere Kleidteil."
+    },
+    {
+      "id": "de-holdout-v4-486",
+      "field": "caption",
+      "text": "Die breite Nackenbindung trägt mein luftiges Oberteil ganz bequem."
+    },
+    {
+      "id": "de-holdout-v4-487",
+      "field": "caption",
+      "text": "Heute schließe ich den hohen Ausschnitt hinten mit einer flachen Schleife."
+    },
+    {
+      "id": "de-holdout-v4-488",
+      "field": "caption",
+      "text": "Zum offenen Schulterbereich passt für mich eine schlichte Hochsteckfrisur."
+    },
+    {
+      "id": "de-holdout-v4-489",
+      "field": "altText",
+      "text": "Breite Stoffbänder führen vom Oberteil hinter den Nacken."
+    },
+    {
+      "id": "de-holdout-v4-490",
+      "field": "altText",
+      "text": "Ein hoch geschlossenes Sommertop besitzt seitlich freie Schultern."
+    },
+    {
+      "id": "de-holdout-v4-491",
+      "field": "caption",
+      "text": "Die schmalen Rockbahnen öffnen sich unten zu einer weiten Glocke."
+    },
+    {
+      "id": "de-holdout-v4-492",
+      "field": "caption",
+      "text": "Heute genieße ich den Schwung meines aus vielen Bahnen genähten Rocks."
+    },
+    {
+      "id": "de-holdout-v4-493",
+      "field": "caption",
+      "text": "Zum ausgestellten Saum trage ich ein kurz geschnittenes Jäckchen."
+    },
+    {
+      "id": "de-holdout-v4-494",
+      "field": "altText",
+      "text": "Mehrere senkrechte Stoffbahnen erweitern sich zum glockenförmigen Rocksaum."
+    },
+    {
+      "id": "de-holdout-v4-495",
+      "field": "altText",
+      "text": "Der lange Rock liegt oben schmal an und wird unten deutlich weiter."
+    },
+    {
+      "id": "de-holdout-v4-496",
+      "field": "caption",
+      "text": "Die winzigen Blüten auf meinem Kleid erinnern mich an getrocknete Wiesen."
+    },
+    {
+      "id": "de-holdout-v4-497",
+      "field": "caption",
+      "text": "Heute darf mein kleinteilig geblümtes Kleid einfach allein wirken."
+    },
+    {
+      "id": "de-holdout-v4-498",
+      "field": "caption",
+      "text": "Zum ruhigen Schnitt passen die vielen verstreuten Blümchen wunderbar."
+    },
+    {
+      "id": "de-holdout-v4-499",
+      "field": "altText",
+      "text": "Dicht verteilte kleine Blüten bedecken das gesamte gerade Sommerkleid."
+    },
+    {
+      "id": "de-holdout-v4-500",
+      "field": "altText",
+      "text": "Ein feines Streublumenmuster zieht sich über Ärmel und Rockteil."
+    },
+    {
+      "id": "de-holdout-v4-501",
+      "field": "caption",
+      "text": "Aus Reststücken wurde meine neue Jacke mit den großen Stofffeldern."
+    },
+    {
+      "id": "de-holdout-v4-502",
+      "field": "caption",
+      "text": "Jedes der zusammengesetzten Rechtecke erinnert mich an ein früheres Nähprojekt."
+    },
+    {
+      "id": "de-holdout-v4-503",
+      "field": "altText",
+      "text": "Große unterschiedlich gemusterte Stoffrechtecke bilden eine kurze Jacke."
+    },
+    {
+      "id": "de-holdout-v4-504",
+      "field": "altText",
+      "text": "Deutliche Verbindungsnähte unterteilen das Oberteil in ungleiche Felder."
+    },
+    {
+      "id": "de-holdout-v4-505",
+      "field": "altText",
+      "text": "Die aufgesetzte Tasche überschneidet zwei kontrastierende Patchworkflächen."
+    },
+    {
+      "id": "de-holdout-v4-506",
+      "field": "caption",
+      "text": "Heute zeigt meine Wendejacke zum ersten Mal die glatte Seite."
+    },
+    {
+      "id": "de-holdout-v4-507",
+      "field": "caption",
+      "text": "Einmal umdrehen und die gefütterte Jacke passt zu einem anderen Look."
+    },
+    {
+      "id": "de-holdout-v4-508",
+      "field": "altText",
+      "text": "Die umgelegte Jackenkante zeigt eine vollständig anders gestaltete Rückseite."
+    },
+    {
+      "id": "de-holdout-v4-509",
+      "field": "altText",
+      "text": "Eine wendbare Jacke liegt mit zwei verschieden strukturierten Flächen offen."
+    },
+    {
+      "id": "de-holdout-v4-510",
+      "field": "altText",
+      "text": "Am umgestülpten Ärmel werden beide tragbaren Jackenseiten sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-511",
+      "field": "caption",
+      "text": "Die Ärmelstreifen laufen quer zum Muster auf dem Rumpf."
+    },
+    {
+      "id": "de-holdout-v4-512",
+      "field": "caption",
+      "text": "Heute spiele ich mit unterschiedlichen Streifenrichtungen innerhalb eines Oberteils."
+    },
+    {
+      "id": "de-holdout-v4-513",
+      "field": "altText",
+      "text": "Senkrechte Linien am Vorderteil treffen auf waagerecht gestreifte Ärmel."
+    },
+    {
+      "id": "de-holdout-v4-514",
+      "field": "altText",
+      "text": "Der schräg zugeschnittene Brusteinsatz unterbricht das gerade Streifenmuster."
+    },
+    {
+      "id": "de-holdout-v4-515",
+      "field": "altText",
+      "text": "An der Schulternaht wechseln die Streifen deutlich ihre Richtung."
+    },
+    {
+      "id": "de-holdout-v4-516",
+      "field": "caption",
+      "text": "Die großen Farbflächen geben meinem Mantel eine grafische Ruhe."
+    },
+    {
+      "id": "de-holdout-v4-517",
+      "field": "caption",
+      "text": "Heute hält ein einziges kräftiges Feld meinen ganzen Look zusammen."
+    },
+    {
+      "id": "de-holdout-v4-518",
+      "field": "altText",
+      "text": "Ein langer Mantel besteht aus drei klar getrennten Farbblöcken."
+    },
+    {
+      "id": "de-holdout-v4-519",
+      "field": "altText",
+      "text": "Ein breiter andersfarbiger Streifen nimmt die halbe Mantelfront ein."
+    },
+    {
+      "id": "de-holdout-v4-520",
+      "field": "altText",
+      "text": "Die Ärmel setzen sich als geschlossene Farbflächen vom Rumpf ab."
+    },
+    {
+      "id": "de-holdout-v4-521",
+      "field": "caption",
+      "text": "Die durchsichtigen Söckchen lassen nur ihre kleinen Punkte auffallen."
+    },
+    {
+      "id": "de-holdout-v4-522",
+      "field": "caption",
+      "text": "Heute trage ich hauchdünne Strümpfe zu meinen offenen Riemchenschuhen."
+    },
+    {
+      "id": "de-holdout-v4-523",
+      "field": "altText",
+      "text": "Transparente Knöchelsocken zeigen kleine eingewebte Punkte über den Schuhriemen."
+    },
+    {
+      "id": "de-holdout-v4-524",
+      "field": "altText",
+      "text": "Ein feiner heller Sockenabschluss liegt knapp oberhalb des Knöchels."
+    },
+    {
+      "id": "de-holdout-v4-525",
+      "field": "altText",
+      "text": "Durch das dünne Sockengewebe bleiben die Konturen des Fußes sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-526",
+      "field": "caption",
+      "text": "Meine kurze Schürze trage ich heute als zusätzliche Lage über der Hose."
+    },
+    {
+      "id": "de-holdout-v4-527",
+      "field": "caption",
+      "text": "Das vordere Bindeteil macht aus dem einfachen Zweiteiler etwas Eigenes."
+    },
+    {
+      "id": "de-holdout-v4-528",
+      "field": "altText",
+      "text": "Eine kurze gebundene Stoffschürze liegt über einer weit geschnittenen Hose."
+    },
+    {
+      "id": "de-holdout-v4-529",
+      "field": "altText",
+      "text": "Vorne überlappt ein rechteckiges Schürzenteil den hohen Hosenbund."
+    },
+    {
+      "id": "de-holdout-v4-530",
+      "field": "altText",
+      "text": "Die seitlichen Schürzenbänder sind locker über dem Oberteil geschlossen."
+    },
+    {
+      "id": "de-holdout-v4-531",
+      "field": "caption",
+      "text": "Meine Jacke schließt heute entlang einer leicht schrägen Linie."
+    },
+    {
+      "id": "de-holdout-v4-532",
+      "field": "caption",
+      "text": "Die versetzte Knopfleiste macht dieses einfache Oberteil überraschend lebendig."
+    },
+    {
+      "id": "de-holdout-v4-533",
+      "field": "altText",
+      "text": "Eine diagonale Reihe flacher Knöpfe läuft über das Jackenvorderteil."
+    },
+    {
+      "id": "de-holdout-v4-534",
+      "field": "altText",
+      "text": "Der asymmetrische Verschluss zieht vom Hals zur seitlichen Taille."
+    },
+    {
+      "id": "de-holdout-v4-535",
+      "field": "altText",
+      "text": "Die überlappenden Stoffkanten bilden eine schräg verlaufende Mittellinie."
+    },
+    {
+      "id": "de-holdout-v4-536",
+      "field": "caption",
+      "text": "Die Bügelfalte ist heute mein gerader Gegenpol zum weichen Pulli."
+    },
+    {
+      "id": "de-holdout-v4-537",
+      "field": "caption",
+      "text": "Frisch gebügelt fällt die alte Anzughose wieder richtig klar."
+    },
+    {
+      "id": "de-holdout-v4-538",
+      "field": "altText",
+      "text": "Eine scharf gebügelte Falte verläuft mittig über jedes Hosenbein."
+    },
+    {
+      "id": "de-holdout-v4-539",
+      "field": "altText",
+      "text": "Unter dem weichen Strickoberteil zeigen sich gerade vordere Bügelkanten."
+    },
+    {
+      "id": "de-holdout-v4-540",
+      "field": "altText",
+      "text": "Die Hosenbeine fallen mit einer deutlichen Mittelfalte bis zum Schuh."
+    },
+    {
+      "id": "de-holdout-v4-541",
+      "field": "caption",
+      "text": "Der feste Stoff hält den Rock auch ohne Unterrock schön weit."
+    },
+    {
+      "id": "de-holdout-v4-542",
+      "field": "caption",
+      "text": "Heute mag ich diese leicht abstehende Form an meinem kurzen Kleid."
+    },
+    {
+      "id": "de-holdout-v4-543",
+      "field": "altText",
+      "text": "Ein formstabiler Rock steht in einer gleichmäßigen Rundung vom Körper ab."
+    },
+    {
+      "id": "de-holdout-v4-544",
+      "field": "altText",
+      "text": "Die breite Kleidersaumkante behält eine klare bogenförmige Silhouette."
+    },
+    {
+      "id": "de-holdout-v4-545",
+      "field": "altText",
+      "text": "Dicker elastischer Stoff bildet den glatten ausgestellten Rockteil."
+    },
+    {
+      "id": "de-holdout-v4-546",
+      "field": "caption",
+      "text": "Mein dreieckiges Tuch liegt heute wie ein kleiner Schulterwärmer."
+    },
+    {
+      "id": "de-holdout-v4-547",
+      "field": "caption",
+      "text": "Die lange Spitze fällt hinten locker über den Strick."
+    },
+    {
+      "id": "de-holdout-v4-548",
+      "field": "altText",
+      "text": "Ein dreieckig gelegtes Tuch bedeckt die Schultern eines Pullovers."
+    },
+    {
+      "id": "de-holdout-v4-549",
+      "field": "altText",
+      "text": "Mittig über dem Rücken endet das umgelegte Tuch in einer langen Spitze."
+    },
+    {
+      "id": "de-holdout-v4-550",
+      "field": "altText",
+      "text": "Die beiden kurzen Tuchecken liegen lose vorne am Ausschnitt."
+    },
+    {
+      "id": "de-holdout-v4-551",
+      "field": "caption",
+      "text": "Meine halben Handschuhe sind beim Lesen unterwegs richtig angenehm."
+    },
+    {
+      "id": "de-holdout-v4-552",
+      "field": "caption",
+      "text": "Heute ergänzen die fingerfreien Lederhandschuhe meinen leichten Mantel."
+    },
+    {
+      "id": "de-holdout-v4-553",
+      "field": "altText",
+      "text": "Kurze Lederhandschuhe lassen sämtliche Fingerspitzen frei."
+    },
+    {
+      "id": "de-holdout-v4-554",
+      "field": "altText",
+      "text": "Der Handschuh endet knapp hinter den vorderen Fingergelenken."
+    },
+    {
+      "id": "de-holdout-v4-555",
+      "field": "altText",
+      "text": "Offene Fingerpartien und ein kleiner Handrückenausschnitt prägen die Handschuhe."
+    },
+    {
+      "id": "de-holdout-v4-556",
+      "field": "caption",
+      "text": "Der tropfenförmige Ausschnitt ist mein kleines Lieblingsdetail dieser Bluse."
+    },
+    {
+      "id": "de-holdout-v4-557",
+      "field": "caption",
+      "text": "Heute schließe ich den winzigen Knopf direkt über der Öffnung."
+    },
+    {
+      "id": "de-holdout-v4-558",
+      "field": "altText",
+      "text": "Unter dem runden Blusenkragen liegt eine kleine tropfenförmige Öffnung."
+    },
+    {
+      "id": "de-holdout-v4-559",
+      "field": "altText",
+      "text": "Ein einzelner Knopf hält den schmalen Stoffsteg über dem Ausschnitt zusammen."
+    },
+    {
+      "id": "de-holdout-v4-560",
+      "field": "altText",
+      "text": "Hinten am Nacken öffnet sich der Blusenstoff in einer abgerundeten Aussparung."
+    },
+    {
+      "id": "de-holdout-v4-561",
+      "field": "caption",
+      "text": "Schräg zugeschnitten fließt mein karierter Rock ganz anders."
+    },
+    {
+      "id": "de-holdout-v4-562",
+      "field": "caption",
+      "text": "Heute stehen die Karos als Rauten auf meinem weichen Midirock."
+    },
+    {
+      "id": "de-holdout-v4-563",
+      "field": "altText",
+      "text": "Das Karomuster des schräg geschnittenen Rocks bildet diagonale Rauten."
+    },
+    {
+      "id": "de-holdout-v4-564",
+      "field": "altText",
+      "text": "Über dem fließenden Rockteil verlaufen gekreuzte schräge Linien."
+    },
+    {
+      "id": "de-holdout-v4-565",
+      "field": "altText",
+      "text": "Der glatte Rock fällt ohne Falten im schrägen Fadenlauf."
+    },
+    {
+      "id": "de-holdout-v4-566",
+      "field": "caption",
+      "text": "Die kleinen Häkelquadrate habe ich über mehrere Winter gesammelt."
+    },
+    {
+      "id": "de-holdout-v4-567",
+      "field": "caption",
+      "text": "Heute trage ich meine zusammengesetzte Häkelweste zum ersten Mal draußen."
+    },
+    {
+      "id": "de-holdout-v4-568",
+      "field": "altText",
+      "text": "Viele einzeln gehäkelte Quadrate sind zu einer ärmellosen Weste verbunden."
+    },
+    {
+      "id": "de-holdout-v4-569",
+      "field": "altText",
+      "text": "Blütenförmige Maschenmotive sitzen jeweils in einem quadratischen Häkelrahmen."
+    },
+    {
+      "id": "de-holdout-v4-570",
+      "field": "altText",
+      "text": "Sichtbare Verbindungsreihen grenzen die bunten Häkelstücke voneinander ab."
+    },
+    {
+      "id": "de-holdout-v4-571",
+      "field": "caption",
+      "text": "In meiner plissierten Hose fühlt sich jeder Schritt heute angenehm luftig an."
+    },
+    {
+      "id": "de-holdout-v4-572",
+      "field": "caption",
+      "text": "Heute bewegt sich das plissierte Hosenbein fast wie ein Rock."
+    },
+    {
+      "id": "de-holdout-v4-573",
+      "field": "altText",
+      "text": "Eine sehr weit geschnittene Hose trägt durchgehend schmale Längsplissees."
+    },
+    {
+      "id": "de-holdout-v4-574",
+      "field": "altText",
+      "text": "Beim seitlichen Schritt fächern sich die gefältelten Hosenbeine auf."
+    },
+    {
+      "id": "de-holdout-v4-575",
+      "field": "altText",
+      "text": "Dicht liegende senkrechte Falten reichen vom Hosenbund bis zum Boden."
+    },
+    {
+      "id": "de-holdout-v4-576",
+      "field": "caption",
+      "text": "Die festen Schultern geben meinem weiten Blazer einen klaren Rahmen."
+    },
+    {
+      "id": "de-holdout-v4-577",
+      "field": "caption",
+      "text": "Heute kombiniere ich den kastigen Schulterbereich mit einem weichen Unterteil."
+    },
+    {
+      "id": "de-holdout-v4-578",
+      "field": "altText",
+      "text": "Breite gepolsterte Schultern formen die obere Linie des geraden Blazers."
+    },
+    {
+      "id": "de-holdout-v4-579",
+      "field": "altText",
+      "text": "Der Jackenärmel beginnt an einer deutlich kantigen Schulterpartie."
+    },
+    {
+      "id": "de-holdout-v4-580",
+      "field": "altText",
+      "text": "Eine ausgeprägte waagerechte Schulterlinie steht über der schmaleren Taille."
+    },
+    {
+      "id": "de-holdout-v4-581",
+      "field": "caption",
+      "text": "Im Stehen sieht meine Rockhose fast wie ein einziger weiter Rock aus."
+    },
+    {
+      "id": "de-holdout-v4-582",
+      "field": "caption",
+      "text": "Heute mag ich die vielen Falten meiner knielangen Culotte."
+    },
+    {
+      "id": "de-holdout-v4-583",
+      "field": "altText",
+      "text": "Eine knielange Rockhose besitzt zwei sehr breite in Falten gelegte Beine."
+    },
+    {
+      "id": "de-holdout-v4-584",
+      "field": "altText",
+      "text": "Beim Ausschreiten trennt sich die zunächst geschlossen wirkende Stoffweite."
+    },
+    {
+      "id": "de-holdout-v4-585",
+      "field": "altText",
+      "text": "Tiefe vordere Falten erweitern die wadenlange Hose."
+    },
+    {
+      "id": "de-holdout-v4-586",
+      "field": "caption",
+      "text": "Der kleine Tuchknoten sitzt heute seitlich unter meinem Ohr."
+    },
+    {
+      "id": "de-holdout-v4-587",
+      "field": "caption",
+      "text": "Zum offenen Rundhals passt das eng gebundene Halstuch überraschend gut."
+    },
+    {
+      "id": "de-holdout-v4-588",
+      "field": "altText",
+      "text": "Ein schmales gerolltes Tuch ist seitlich am Hals verknotet."
+    },
+    {
+      "id": "de-holdout-v4-589",
+      "field": "altText",
+      "text": "Zwei kurze Tuchenden stehen neben dem offenen Hemdkragen hervor."
+    },
+    {
+      "id": "de-holdout-v4-590",
+      "field": "altText",
+      "text": "Das kleine Seidentuch liegt dicht um den Hals und endet seitlich."
+    },
+    {
+      "id": "de-holdout-v4-591",
+      "field": "caption",
+      "text": "Die neuen Holzknöpfe habe ich aus meiner Knopfkiste zusammengesucht."
+    },
+    {
+      "id": "de-holdout-v4-592",
+      "field": "caption",
+      "text": "Mit ausgetauschten Knöpfen fühlt sich mein Cardigan wieder richtig nach mir an."
+    },
+    {
+      "id": "de-holdout-v4-593",
+      "field": "altText",
+      "text": "Große matte Holzknöpfe sitzen an der vorderen Strickjackenkante."
+    },
+    {
+      "id": "de-holdout-v4-594",
+      "field": "altText",
+      "text": "Die Knopfreihe zeigt natürliche Maserungen auf runden Holzscheiben."
+    },
+    {
+      "id": "de-holdout-v4-595",
+      "field": "altText",
+      "text": "An der alten Strickjacke wurden unterschiedlich große Holzknöpfe befestigt."
+    },
+    {
+      "id": "de-holdout-v4-596",
+      "field": "caption",
+      "text": "Die kleinen spiegelnden Plättchen fangen heute jeden Lichtstrahl ein."
+    },
+    {
+      "id": "de-holdout-v4-597",
+      "field": "caption",
+      "text": "Meine glitzernde Weste trage ich ganz entspannt über einem einfachen Shirt."
+    },
+    {
+      "id": "de-holdout-v4-598",
+      "field": "altText",
+      "text": "Flache reflektierende Pailletten bedecken die Vorderseite einer kurzen Weste."
+    },
+    {
+      "id": "de-holdout-v4-599",
+      "field": "altText",
+      "text": "Einzelne große Plättchen werfen helle Reflexe über das Oberteil."
+    },
+    {
+      "id": "de-holdout-v4-600",
+      "field": "altText",
+      "text": "Die offene Jackenkante ist mit dicht gesetzten spiegelnden Scheiben besetzt."
+    },
+    {
+      "id": "de-holdout-v4-601",
+      "field": "caption",
+      "text": "Der gebogene Saum macht mein schlichtes Shirt vorne etwas kürzer."
+    },
+    {
+      "id": "de-holdout-v4-602",
+      "field": "caption",
+      "text": "Heute lasse ich den langen Rückenbogen locker über der Hose liegen."
+    },
+    {
+      "id": "de-holdout-v4-603",
+      "field": "altText",
+      "text": "Der untere Shirtrand verläuft vorne und hinten in weichen Bögen."
+    },
+    {
+      "id": "de-holdout-v4-604",
+      "field": "altText",
+      "text": "Seitlich steigt der gerundete Saum eines langen Oberteils deutlich an."
+    },
+    {
+      "id": "de-holdout-v4-605",
+      "field": "altText",
+      "text": "Ein verlängertes Rückenteil endet unterhalb des vorderen Shirtabschlusses."
+    },
+    {
+      "id": "de-holdout-v4-606",
+      "field": "caption",
+      "text": "Meine Filztasche behält auch halb leer ihre schöne kantige Form."
+    },
+    {
+      "id": "de-holdout-v4-607",
+      "field": "caption",
+      "text": "Heute passt die grobe gefilzte Oberfläche gut zum glatten Mantel."
+    },
+    {
+      "id": "de-holdout-v4-608",
+      "field": "altText",
+      "text": "Eine stabile Tasche besteht aus dickem unverstärktem Wollfilz."
+    },
+    {
+      "id": "de-holdout-v4-609",
+      "field": "altText",
+      "text": "Die offen sichtbaren Filzkanten begrenzen eine rechteckige Henkeltasche."
+    },
+    {
+      "id": "de-holdout-v4-610",
+      "field": "altText",
+      "text": "Ein breiter ausgeschnittener Griff sitzt direkt im festen Taschenmaterial."
+    },
+    {
+      "id": "de-holdout-v4-611",
+      "field": "caption",
+      "text": "Die schrägen Streifen treffen vorne genau in einer Spitze zusammen."
+    },
+    {
+      "id": "de-holdout-v4-612",
+      "field": "caption",
+      "text": "Heute trage ich meinen Fischgrätrock mit einem ganz ruhigen Oberteil."
+    },
+    {
+      "id": "de-holdout-v4-613",
+      "field": "altText",
+      "text": "Diagonal geschnittene Streifen laufen in der vorderen Rockmitte spiegelbildlich zusammen."
+    },
+    {
+      "id": "de-holdout-v4-614",
+      "field": "altText",
+      "text": "Auf dem langen Rock bildet das Linienmuster eine deutliche V-Form."
+    },
+    {
+      "id": "de-holdout-v4-615",
+      "field": "altText",
+      "text": "Die mittlere Rocknaht verbindet zwei gegensinnig gestreifte Stoffbahnen."
+    },
+    {
+      "id": "de-holdout-v4-616",
+      "field": "caption",
+      "text": "Die kleinen Puffärmel geben meinem schlichten Kleid etwas Leichtigkeit."
+    },
+    {
+      "id": "de-holdout-v4-617",
+      "field": "caption",
+      "text": "Heute mag ich die rund gerafften Schultern zu meinem geraden Rock."
+    },
+    {
+      "id": "de-holdout-v4-618",
+      "field": "altText",
+      "text": "Kurze aufgebauschte Ärmel schließen mit schmalen Bändern am Oberarm ab."
+    },
+    {
+      "id": "de-holdout-v4-619",
+      "field": "altText",
+      "text": "Kräuselungen an der Schulter bilden zwei kleine runde Ärmelvolumen."
+    },
+    {
+      "id": "de-holdout-v4-620",
+      "field": "altText",
+      "text": "Das glatte Kleidoberteil wird von kugelig gerafften Ärmeln eingerahmt."
+    },
+    {
+      "id": "de-holdout-v4-621",
+      "field": "caption",
+      "text": "Die großen unteren Taschen geben meiner Arbeitsjacke eine schöne Aufteilung."
+    },
+    {
+      "id": "de-holdout-v4-622",
+      "field": "caption",
+      "text": "Heute bleiben die aufgesetzten Jackentaschen leer und liegen ganz flach."
+    },
+    {
+      "id": "de-holdout-v4-623",
+      "field": "altText",
+      "text": "Zwei große rechteckige Taschen sitzen nahe dem unteren Jackenrand."
+    },
+    {
+      "id": "de-holdout-v4-624",
+      "field": "altText",
+      "text": "Eine kurze Arbeitsjacke zeigt deutlich abgesteppt aufgesetzte Vordertaschen."
+    },
+    {
+      "id": "de-holdout-v4-625",
+      "field": "altText",
+      "text": "Breite Tascheneingriffe verlaufen parallel zum geraden Saum der Jacke."
+    },
+    {
+      "id": "de-holdout-v4-626",
+      "field": "caption",
+      "text": "Der kleine Fächerkragen ersetzt heute meinen üblichen Schmuck."
+    },
+    {
+      "id": "de-holdout-v4-627",
+      "field": "caption",
+      "text": "Feine gefaltete Kanten rahmen mein schlichtes Oberteil schön ein."
+    },
+    {
+      "id": "de-holdout-v4-628",
+      "field": "altText",
+      "text": "Ein schmal plissierter Stehkragen steht rund um den Hals."
+    },
+    {
+      "id": "de-holdout-v4-629",
+      "field": "altText",
+      "text": "Die gefältelte Kragenkante ragt über dem dunklen Strickausschnitt hervor."
+    },
+    {
+      "id": "de-holdout-v4-630",
+      "field": "altText",
+      "text": "Kleine dicht nebeneinander gelegte Stofffalten bilden einen aufrechten Kragen."
+    },
+    {
+      "id": "de-holdout-v4-631",
+      "field": "caption",
+      "text": "Die bestickten Gesäßtaschen bringen meine alte Jeans wieder ins Spiel."
+    },
+    {
+      "id": "de-holdout-v4-632",
+      "field": "caption",
+      "text": "Die handgenähten Taschenlinien hinten auf meiner Hose bekommen heute ihren Auftritt."
+    },
+    {
+      "id": "de-holdout-v4-633",
+      "field": "altText",
+      "text": "Schwungvolle Zierstiche verlaufen über beide rückwärtigen Jeanstaschen."
+    },
+    {
+      "id": "de-holdout-v4-634",
+      "field": "altText",
+      "text": "Auf einer Gesäßtasche ist ein kleines abstraktes Linienmotiv aufgestickt."
+    },
+    {
+      "id": "de-holdout-v4-635",
+      "field": "altText",
+      "text": "Eine doppelte Bogenstickerei folgt den unteren Kanten der Hosentaschen."
+    },
+    {
+      "id": "de-holdout-v4-636",
+      "field": "caption",
+      "text": "Das weiche Korkfußbett macht meine Sandalen zu richtigen Sommerbegleitern."
+    },
+    {
+      "id": "de-holdout-v4-637",
+      "field": "caption",
+      "text": "Heute kombiniere ich die breiten Sandalen mit einem luftigen Hosenbein."
+    },
+    {
+      "id": "de-holdout-v4-638",
+      "field": "altText",
+      "text": "Breite Lederriemen liegen über einem deutlich sichtbaren Korkfußbett."
+    },
+    {
+      "id": "de-holdout-v4-639",
+      "field": "altText",
+      "text": "Die offene Sandale besitzt eine dicke naturfarbene Korkzwischensohle."
+    },
+    {
+      "id": "de-holdout-v4-640",
+      "field": "altText",
+      "text": "Ein tiefer geformtes Fußbett wird von zwei verstellbaren Riemen gehalten."
+    },
+    {
+      "id": "de-holdout-v4-641",
+      "field": "caption",
+      "text": "Die gestickten Blüten sitzen nur ganz unten an meinem Rock."
+    },
+    {
+      "id": "de-holdout-v4-642",
+      "field": "caption",
+      "text": "Heute bringt die schmale Blumenbordüre ein bisschen Garten in den Look."
+    },
+    {
+      "id": "de-holdout-v4-643",
+      "field": "altText",
+      "text": "Eine Reihe kleiner gestickter Blumen verläuft entlang des Rocksaums."
+    },
+    {
+      "id": "de-holdout-v4-644",
+      "field": "altText",
+      "text": "Der einfarbige Rock endet in einer schmalen floralen Stickbordüre."
+    },
+    {
+      "id": "de-holdout-v4-645",
+      "field": "altText",
+      "text": "Über der unteren Stoffkante wachsen gestickte Stiele mit winzigen Blüten."
+    },
+    {
+      "id": "de-holdout-v4-646",
+      "field": "caption",
+      "text": "Die bezogenen Knöpfe verschwinden fast im Stoff meiner Bluse."
+    },
+    {
+      "id": "de-holdout-v4-647",
+      "field": "caption",
+      "text": "Heute mag ich die ruhige Oberfläche dieses durchgehend einheitlichen Oberteils."
+    },
+    {
+      "id": "de-holdout-v4-648",
+      "field": "altText",
+      "text": "Kleine runde Knöpfe sind mit dem gleichen Stoff wie die Bluse überzogen."
+    },
+    {
+      "id": "de-holdout-v4-649",
+      "field": "altText",
+      "text": "Die Verschlüsse bilden nur leichte Erhebungen entlang der Hemdmitte."
+    },
+    {
+      "id": "de-holdout-v4-650",
+      "field": "altText",
+      "text": "Eine Reihe stoffbezogener Kugelknöpfe schließt das glatte Kleidoberteil."
+    },
+    {
+      "id": "de-holdout-v4-651",
+      "field": "caption",
+      "text": "Die unversäuberte Wollkante gehört bei meiner Jacke ganz bewusst dazu."
+    },
+    {
+      "id": "de-holdout-v4-652",
+      "field": "caption",
+      "text": "Heute gefällt mir der offene Schnitt ohne zusätzliche Blenden besonders."
+    },
+    {
+      "id": "de-holdout-v4-653",
+      "field": "altText",
+      "text": "Die Vorderkante der Wolljacke endet offen ohne umgeschlagenen Saum."
+    },
+    {
+      "id": "de-holdout-v4-654",
+      "field": "altText",
+      "text": "Dichter gewalkter Stoff bildet eine klare roh geschnittene Jackenkante."
+    },
+    {
+      "id": "de-holdout-v4-655",
+      "field": "altText",
+      "text": "Die kurzen Ärmel zeigen die sichtbare Materialstärke an ihren Abschlüssen."
+    },
+    {
+      "id": "de-holdout-v4-656",
+      "field": "caption",
+      "text": "Der gerüschte Hosenbund bleibt heute über meinem Gürtel sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-657",
+      "field": "caption",
+      "text": "Mein eingestecktes Shirt gibt dem gerafften Bund genug Platz."
+    },
+    {
+      "id": "de-holdout-v4-658",
+      "field": "altText",
+      "text": "Oberhalb des Taillengürtels steht ein locker geraffter Hosenbund hervor."
+    },
+    {
+      "id": "de-holdout-v4-659",
+      "field": "altText",
+      "text": "Der hohe Stoffbund bildet kleine aufrechte Falten um die Taille."
+    },
+    {
+      "id": "de-holdout-v4-660",
+      "field": "altText",
+      "text": "Eine breite Bindeschleife fasst den gekräuselten oberen Hosenrand zusammen."
+    },
+    {
+      "id": "de-holdout-v4-661",
+      "field": "caption",
+      "text": "Mein Einkaufsnetz begleitet heute auch den Spaziergang im Sommerkleid."
+    },
+    {
+      "id": "de-holdout-v4-662",
+      "field": "caption",
+      "text": "Durch die großen Maschen sieht man den kleinen Stoffbeutel darin."
+    },
+    {
+      "id": "de-holdout-v4-663",
+      "field": "altText",
+      "text": "Ein grob geknüpftes Einkaufsnetz enthält eine blickdichte kleine Innentasche."
+    },
+    {
+      "id": "de-holdout-v4-664",
+      "field": "altText",
+      "text": "Weite rautenförmige Maschen bilden die flexible Form des Tragebeutels."
+    },
+    {
+      "id": "de-holdout-v4-665",
+      "field": "altText",
+      "text": "Zwei lange Netzhenkel hängen über dem Arm neben dem lockeren Kleid."
+    },
+    {
+      "id": "de-holdout-v4-666",
+      "field": "caption",
+      "text": "Die Knopfreihe hinten macht meine schlichte Bluse von jeder Seite interessant."
+    },
+    {
+      "id": "de-holdout-v4-667",
+      "field": "caption",
+      "text": "Heute brauche ich beim Schließen des oberen Rückenknopfs etwas Geduld."
+    },
+    {
+      "id": "de-holdout-v4-668",
+      "field": "altText",
+      "text": "Eine mittige Reihe kleiner Knöpfe läuft über den Rücken der Bluse."
+    },
+    {
+      "id": "de-holdout-v4-669",
+      "field": "altText",
+      "text": "Der rückwärtige Verschluss reicht vom Nacken bis zum geraden Saum."
+    },
+    {
+      "id": "de-holdout-v4-670",
+      "field": "altText",
+      "text": "Am Rücken des Oberteils überlappen zwei schmale geknöpfte Stoffleisten."
+    },
+    {
+      "id": "de-holdout-v4-671",
+      "field": "caption",
+      "text": "Die kleinen Punkte im Tüll geben meinem Überkleid eine leichte Struktur."
+    },
+    {
+      "id": "de-holdout-v4-672",
+      "field": "caption",
+      "text": "Heute liegt der gepunktete transparente Stoff locker über meinem Unterkleid."
+    },
+    {
+      "id": "de-holdout-v4-673",
+      "field": "altText",
+      "text": "Ein durchsichtiges Tüllkleid zeigt erhabene regelmäßig verteilte kleine Punkte."
+    },
+    {
+      "id": "de-holdout-v4-674",
+      "field": "altText",
+      "text": "Unter der punktierten Netzlage ist ein schlichtes blickdichtes Kleid sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-675",
+      "field": "altText",
+      "text": "Die durchscheinenden Ärmel tragen ein feines getupftes Muster."
+    },
+    {
+      "id": "de-holdout-v4-676",
+      "field": "caption",
+      "text": "Meine weiche Seidenhose bewegt sich schon beim kleinsten Schritt."
+    },
+    {
+      "id": "de-holdout-v4-677",
+      "field": "caption",
+      "text": "Heute mag ich den fließenden Stoff ganz ohne feste Bügelfalte."
+    },
+    {
+      "id": "de-holdout-v4-678",
+      "field": "altText",
+      "text": "Glatter glänzender Hosenstoff fällt in weichen senkrechten Wellen."
+    },
+    {
+      "id": "de-holdout-v4-679",
+      "field": "altText",
+      "text": "Die weit geschnittene Hose legt sich locker über den Schuhspann."
+    },
+    {
+      "id": "de-holdout-v4-680",
+      "field": "altText",
+      "text": "Leichter Seidenstoff bildet lange bewegliche Falten entlang der Beine."
+    },
+    {
+      "id": "de-holdout-v4-681",
+      "field": "caption",
+      "text": "Drei kleine Stoffblumen sitzen heute gemeinsam an meinem Revers."
+    },
+    {
+      "id": "de-holdout-v4-682",
+      "field": "caption",
+      "text": "Aus Resten habe ich mir einen kleinen Blumenanstecker gemacht."
+    },
+    {
+      "id": "de-holdout-v4-683",
+      "field": "altText",
+      "text": "Mehrere gefaltete Stoffblüten sind als Gruppe am Jackenrevers befestigt."
+    },
+    {
+      "id": "de-holdout-v4-684",
+      "field": "altText",
+      "text": "Ein kleiner textiler Blumenstrauß sitzt oberhalb der Brusttasche."
+    },
+    {
+      "id": "de-holdout-v4-685",
+      "field": "altText",
+      "text": "Übereinander gelegte Stoffblätter bilden eine weiche runde Ansteckblüte."
+    },
+    {
+      "id": "de-holdout-v4-686",
+      "field": "caption",
+      "text": "Die Knebel lassen sich selbst mit Handschuhen bequem schließen."
+    },
+    {
+      "id": "de-holdout-v4-687",
+      "field": "caption",
+      "text": "Heute trage ich meinen alten Dufflecoat mit den großen Holzverschlüssen."
+    },
+    {
+      "id": "de-holdout-v4-688",
+      "field": "altText",
+      "text": "Längliche Holzknebel stecken in kräftigen textilen Schlaufen auf der Mantelfront."
+    },
+    {
+      "id": "de-holdout-v4-689",
+      "field": "altText",
+      "text": "Drei große quer liegende Verschlüsse schließen den dicken Wollmantel."
+    },
+    {
+      "id": "de-holdout-v4-690",
+      "field": "altText",
+      "text": "Dunkle Lederdreiecke befestigen die Schlaufen der Knebelknöpfe."
+    },
+    {
+      "id": "de-holdout-v4-691",
+      "field": "caption",
+      "text": "Der gewellte Häkelabschluss macht mein einfaches Top ein bisschen verspielter."
+    },
+    {
+      "id": "de-holdout-v4-692",
+      "field": "caption",
+      "text": "Meine selbst gehäkelten Muschelbögen dürfen den Ausschnitt heute ganz allein schmücken."
+    },
+    {
+      "id": "de-holdout-v4-693",
+      "field": "altText",
+      "text": "Kleine muschelförmige Häkelbögen säumen den runden Ausschnitt des Tops."
+    },
+    {
+      "id": "de-holdout-v4-694",
+      "field": "altText",
+      "text": "Die Halskante endet in einer gleichmäßig wiederkehrenden Wellenlinie."
+    },
+    {
+      "id": "de-holdout-v4-695",
+      "field": "altText",
+      "text": "Ein fein gehäkelter Rand bildet kurze runde Spitzen am Ausschnitt."
+    },
+    {
+      "id": "de-holdout-v4-696",
+      "field": "caption",
+      "text": "Den Kiltverschluss trage ich heute seitlich mit zwei kleinen Riemen."
+    },
+    {
+      "id": "de-holdout-v4-697",
+      "field": "caption",
+      "text": "Mein gewickelter Faltenrock lässt vorne ein glattes Stofffeld stehen."
+    },
+    {
+      "id": "de-holdout-v4-698",
+      "field": "altText",
+      "text": "Ein gefalteter Wickelrock besitzt vorne einen glatten überlappenden Bereich."
+    },
+    {
+      "id": "de-holdout-v4-699",
+      "field": "altText",
+      "text": "Zwei kurze Lederriemen befestigen die seitliche Rocküberlappung."
+    },
+    {
+      "id": "de-holdout-v4-700",
+      "field": "altText",
+      "text": "Die dicht gelegten Falten öffnen sich unterhalb des Hüftbereichs."
+    },
+    {
+      "id": "de-holdout-v4-701",
+      "field": "caption",
+      "text": "Die lange Schuhspitze schaut heute unter meiner weiten Hose hervor."
+    },
+    {
+      "id": "de-holdout-v4-702",
+      "field": "caption",
+      "text": "Zu dem schmalen Rock passen meine spitzen flachen Schuhe schön."
+    },
+    {
+      "id": "de-holdout-v4-703",
+      "field": "altText",
+      "text": "Eine schmale spitz zulaufende Schuhkappe ragt unter dem Hosensaum hervor."
+    },
+    {
+      "id": "de-holdout-v4-704",
+      "field": "altText",
+      "text": "Die flachen Schuhe laufen vorne in eine deutliche Spitze aus."
+    },
+    {
+      "id": "de-holdout-v4-705",
+      "field": "altText",
+      "text": "Unter dem geraden Rock stehen zwei längliche schmal geschnittene Schuhe."
+    },
+    {
+      "id": "de-holdout-v4-706",
+      "field": "caption",
+      "text": "Die große Stoffrose sitzt heute seitlich an meinem Gürtel."
+    },
+    {
+      "id": "de-holdout-v4-707",
+      "field": "caption",
+      "text": "Ein gefalteter Stoffrest wurde zum auffälligen Mittelpunkt meines Kleides."
+    },
+    {
+      "id": "de-holdout-v4-708",
+      "field": "altText",
+      "text": "Eine große textile Rose ist auf einem schmalen Taillenband befestigt."
+    },
+    {
+      "id": "de-holdout-v4-709",
+      "field": "altText",
+      "text": "Gerollte Stofflagen bilden seitlich am Gürtel eine offene Blüte."
+    },
+    {
+      "id": "de-holdout-v4-710",
+      "field": "altText",
+      "text": "Neben der Kleidernaht sitzt eine runde dreidimensionale Stoffrosette."
+    },
+    {
+      "id": "de-holdout-v4-711",
+      "field": "caption",
+      "text": "Meine gewickelten Beinwärmer passen heute gut zu den kurzen Boots."
+    },
+    {
+      "id": "de-holdout-v4-712",
+      "field": "caption",
+      "text": "Die langen Strickbänder lege ich locker um meine Knöchel."
+    },
+    {
+      "id": "de-holdout-v4-713",
+      "field": "altText",
+      "text": "Breite gestrickte Bänder sind spiralförmig um die Unterschenkel gewickelt."
+    },
+    {
+      "id": "de-holdout-v4-714",
+      "field": "altText",
+      "text": "Mehrere weiche Stricklagen reichen vom Stiefelrand bis zur halben Wade."
+    },
+    {
+      "id": "de-holdout-v4-715",
+      "field": "altText",
+      "text": "Ein schmales Band befestigt die obere Kante des Beinwärmers."
+    },
+    {
+      "id": "de-holdout-v4-716",
+      "field": "caption",
+      "text": "Die erhabenen Waben geben meinem einfarbigen Oberteil genug Abwechslung."
+    },
+    {
+      "id": "de-holdout-v4-717",
+      "field": "caption",
+      "text": "Heute trage ich die gepolsterte Stoffstruktur zu einer glatten Hose."
+    },
+    {
+      "id": "de-holdout-v4-718",
+      "field": "altText",
+      "text": "Kleine erhabene Waben bedecken die Fläche des kurz geschnittenen Oberteils."
+    },
+    {
+      "id": "de-holdout-v4-719",
+      "field": "altText",
+      "text": "Das einfarbige Gewebe zeigt ein deutlich dreidimensionales regelmäßiges Muster."
+    },
+    {
+      "id": "de-holdout-v4-720",
+      "field": "altText",
+      "text": "Abgesteppte Vertiefungen grenzen rundliche gepolsterte Stoffbereiche voneinander ab."
+    },
+    {
+      "id": "de-holdout-v4-721",
+      "field": "caption",
+      "text": "Die runden Schnürsenkel ziehe ich heute durch alle oberen Haken."
+    },
+    {
+      "id": "de-holdout-v4-722",
+      "field": "caption",
+      "text": "Meine Wanderstiefel dürfen auch zur ganz alltäglichen Stoffhose mit."
+    },
+    {
+      "id": "de-holdout-v4-723",
+      "field": "altText",
+      "text": "Runde robuste Schnürsenkel laufen durch Metallhaken am hohen Stiefelschaft."
+    },
+    {
+      "id": "de-holdout-v4-724",
+      "field": "altText",
+      "text": "Die oberen Schnürhaken stehen seitlich an einem festen Wanderstiefel hervor."
+    },
+    {
+      "id": "de-holdout-v4-725",
+      "field": "altText",
+      "text": "Dicke Senkel kreuzen sich über einer breit gepolsterten Schuhzunge."
+    },
+    {
+      "id": "de-holdout-v4-726",
+      "field": "caption",
+      "text": "Die stark gebogenen Jeansbeine geben meinem schlichten Shirt einen neuen Rahmen."
+    },
+    {
+      "id": "de-holdout-v4-727",
+      "field": "caption",
+      "text": "Heute probiere ich meine runde Jeansform mit schmalen flachen Schuhen."
+    },
+    {
+      "id": "de-holdout-v4-728",
+      "field": "altText",
+      "text": "Die Jeansbeine wölben sich seitlich und werden am Knöchel wieder schmal."
+    },
+    {
+      "id": "de-holdout-v4-729",
+      "field": "altText",
+      "text": "Eine weit geschnittene Jeans zeigt stark gerundete äußere Beinnähte."
+    },
+    {
+      "id": "de-holdout-v4-730",
+      "field": "altText",
+      "text": "Der breite Hosenbereich verengt sich unterhalb der Wade deutlich."
+    },
+    {
+      "id": "de-holdout-v4-731",
+      "field": "caption",
+      "text": "Die langen textilen Ohrringe streifen heute meinen offenen Kragen."
+    },
+    {
+      "id": "de-holdout-v4-732",
+      "field": "caption",
+      "text": "Aus Restgarn habe ich mir zwei weiche Ohrquasten gebunden."
+    },
+    {
+      "id": "de-holdout-v4-733",
+      "field": "altText",
+      "text": "Lange feine Garnquasten hängen an kleinen runden Ohrhaken."
+    },
+    {
+      "id": "de-holdout-v4-734",
+      "field": "altText",
+      "text": "Zwei gebündelte textile Anhänger reichen bis knapp oberhalb des Kragens."
+    },
+    {
+      "id": "de-holdout-v4-735",
+      "field": "altText",
+      "text": "Die weichen Fäden der Ohranhänger fächern sich nach unten auf."
+    },
+    {
+      "id": "de-holdout-v4-736",
+      "field": "caption",
+      "text": "Mein Strickpolo verbindet heute den weichen Stoff mit einem ordentlichen Kragen."
+    },
+    {
+      "id": "de-holdout-v4-737",
+      "field": "caption",
+      "text": "Die kurze Knopfleiste lasse ich am lockeren Polo offen."
+    },
+    {
+      "id": "de-holdout-v4-738",
+      "field": "altText",
+      "text": "Ein fein strukturierter Strickpullover besitzt einen flach liegenden Polokragen."
+    },
+    {
+      "id": "de-holdout-v4-739",
+      "field": "altText",
+      "text": "Drei kleine Knöpfe sitzen unter dem weichen umgelegten Strickkragen."
+    },
+    {
+      "id": "de-holdout-v4-740",
+      "field": "altText",
+      "text": "Der offene Poloausschnitt bildet ein kleines V im waffelartigen Gewebe."
+    },
+    {
+      "id": "de-holdout-v4-741",
+      "field": "caption",
+      "text": "Der leichte Unterrock gibt meinem weiten Kleid heute extra Stand."
+    },
+    {
+      "id": "de-holdout-v4-742",
+      "field": "caption",
+      "text": "Ich probiere gerade aus, wie viel Volumen unter diesen Rock passt."
+    },
+    {
+      "id": "de-holdout-v4-743",
+      "field": "altText",
+      "text": "Ein stützender Unterrock hält den äußeren Rock in breiter Rundung."
+    },
+    {
+      "id": "de-holdout-v4-744",
+      "field": "altText",
+      "text": "Unter dem ausgestellten Kleid ist am Rand eine feste Unterlage sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-745",
+      "field": "altText",
+      "text": "Das bodennahe Kleid bildet eine gleichmäßig vom Körper abstehende Glocke."
+    },
+    {
+      "id": "de-holdout-v4-746",
+      "field": "caption",
+      "text": "Beim Kleidertausch habe ich diesen ungewöhnlichen Zweiteiler gefunden."
+    },
+    {
+      "id": "de-holdout-v4-747",
+      "field": "caption",
+      "text": "Mein mitgebrachtes Kleid hat beim Tauschnachmittag schon eine neue Besitzerin gefunden."
+    },
+    {
+      "id": "de-holdout-v4-748",
+      "field": "altText",
+      "text": "Auf einem Tauschtisch liegen gefaltete Kleidungsstücke neben zwei leeren Stofftaschen."
+    },
+    {
+      "id": "de-holdout-v4-749",
+      "field": "altText",
+      "text": "Mehrere unterschiedlich geschnittene Jacken hängen an einem einfachen Tauschständer."
+    },
+    {
+      "id": "de-holdout-v4-750",
+      "field": "altText",
+      "text": "Eine zusammengerollte Hose liegt neben einem für den Tausch bereitgelegten Kleid."
+    },
+    {
+      "id": "de-holdout-v4-751",
+      "field": "caption",
+      "text": "Die beiden Stoffproben helfen mir bei der Wahl meines nächsten Nähprojekts."
+    },
+    {
+      "id": "de-holdout-v4-752",
+      "field": "caption",
+      "text": "Heute halte ich die Muster ans fertige Oberteil und vergleiche den Fall."
+    },
+    {
+      "id": "de-holdout-v4-753",
+      "field": "altText",
+      "text": "Zwei kleine Stoffproben liegen auf dem Vorderteil einer schlichten Bluse."
+    },
+    {
+      "id": "de-holdout-v4-754",
+      "field": "altText",
+      "text": "Eine Hand hält ein Musterstück neben einen bereits genähten Ärmel."
+    },
+    {
+      "id": "de-holdout-v4-755",
+      "field": "altText",
+      "text": "Mehrere gewebte Probestücke sind entlang einer Jackenkante aufgelegt."
+    },
+    {
+      "id": "de-holdout-v4-756",
+      "field": "caption",
+      "text": "Für die Zugfahrt trage ich leichte Lagen, die in meine Tasche passen."
+    },
+    {
+      "id": "de-holdout-v4-757",
+      "field": "caption",
+      "text": "Mein Reiseoutfit lässt sich unterwegs schnell um einen dünnen Überwurf ergänzen."
+    },
+    {
+      "id": "de-holdout-v4-758",
+      "field": "altText",
+      "text": "Ein dünner Cardigan ist neben dem getragenen Top klein zusammengerollt."
+    },
+    {
+      "id": "de-holdout-v4-759",
+      "field": "altText",
+      "text": "Auf einer geöffneten Reisetasche liegen drei leichte miteinander kombinierbare Lagen."
+    },
+    {
+      "id": "de-holdout-v4-760",
+      "field": "altText",
+      "text": "Ein locker gefalteter Überwurf steckt halb in einer geräumigen Schultertasche."
+    },
+    {
+      "id": "de-holdout-v4-761",
+      "field": "caption",
+      "text": "Mein kleiner Rockclip hält den Saum beim Radfahren zusammen."
+    },
+    {
+      "id": "de-holdout-v4-762",
+      "field": "caption",
+      "text": "Heute kommt der weite Rock dank der Saumklammer sicher mit aufs Rad."
+    },
+    {
+      "id": "de-holdout-v4-763",
+      "field": "altText",
+      "text": "Eine kleine Klammer fasst den weiten Rockstoff seitlich unterhalb des Knies."
+    },
+    {
+      "id": "de-holdout-v4-764",
+      "field": "altText",
+      "text": "Der geraffte Rocksaum ist mit einem kompakten textilen Clip fixiert."
+    },
+    {
+      "id": "de-holdout-v4-765",
+      "field": "altText",
+      "text": "Neben dem Fahrradsattel ist ein zusammengehaltener Abschnitt des Rocksaums sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-766",
+      "field": "caption",
+      "text": "Die selbst genähte Schlaufe macht meine alte Jacke wieder garderobentauglich."
+    },
+    {
+      "id": "de-holdout-v4-767",
+      "field": "caption",
+      "text": "Heute hängt mein reparierter Mantel endlich wieder ordentlich am Haken."
+    },
+    {
+      "id": "de-holdout-v4-768",
+      "field": "altText",
+      "text": "Eine neu angenähte breite Stoffschlaufe sitzt innen unter dem Mantelkragen."
+    },
+    {
+      "id": "de-holdout-v4-769",
+      "field": "altText",
+      "text": "Der geöffnete Jackenkragen zeigt ein kräftiges textiles Aufhängeband."
+    },
+    {
+      "id": "de-holdout-v4-770",
+      "field": "altText",
+      "text": "Zwei kleine Kreuznähte sichern die Enden der rückwärtigen Hängeschlaufe."
+    },
+    {
+      "id": "de-holdout-v4-771",
+      "field": "caption",
+      "text": "Mein erster Probestrick liegt jetzt neben dem fertigen Ärmel."
+    },
+    {
+      "id": "de-holdout-v4-772",
+      "field": "caption",
+      "text": "Ich habe die Maschenweite geändert und mag den lockeren Fall viel lieber."
+    },
+    {
+      "id": "de-holdout-v4-773",
+      "field": "altText",
+      "text": "Ein kleines gestricktes Probefeld liegt neben einem gleichfarbigen Pulloverärmel."
+    },
+    {
+      "id": "de-holdout-v4-774",
+      "field": "altText",
+      "text": "Zwei Strickquadrate zeigen unterschiedlich große Maschen bei demselben Garn."
+    },
+    {
+      "id": "de-holdout-v4-775",
+      "field": "altText",
+      "text": "Auf der lockeren Strickprobe stecken zwei kurze hölzerne Stricknadeln."
+    },
+    {
+      "id": "de-holdout-v4-776",
+      "field": "caption",
+      "text": "Nach dem vorsichtigen Aufhängen fallen die Plisseefalten wieder schön ordentlich."
+    },
+    {
+      "id": "de-holdout-v4-777",
+      "field": "caption",
+      "text": "Mein feiner Faltenrock darf heute luftig auf dem Bügel ausruhen."
+    },
+    {
+      "id": "de-holdout-v4-778",
+      "field": "altText",
+      "text": "Ein plissierter Rock hängt gerade an zwei breiten gepolsterten Klammern."
+    },
+    {
+      "id": "de-holdout-v4-779",
+      "field": "altText",
+      "text": "Die dichten Falten des aufgehängten Rocks laufen gleichmäßig nach unten."
+    },
+    {
+      "id": "de-holdout-v4-780",
+      "field": "altText",
+      "text": "Der leichte Rock ist ohne zusätzliche Knicke auf einem Hosenbügel befestigt."
+    },
+    {
+      "id": "de-holdout-v4-781",
+      "field": "caption",
+      "text": "Für die Reise packe ich meine Schuhe in selbst genähte Stoffbeutel."
+    },
+    {
+      "id": "de-holdout-v4-782",
+      "field": "caption",
+      "text": "Die kleinen Hüllen halten meine frisch geputzten Schuhe im Koffer zusammen."
+    },
+    {
+      "id": "de-holdout-v4-783",
+      "field": "altText",
+      "text": "Ein Paar flache Schuhe liegt halb in zwei weichen Stoffhüllen."
+    },
+    {
+      "id": "de-holdout-v4-784",
+      "field": "altText",
+      "text": "Zwei schmale Zugbeutel stehen neben den gepackten Kleidungsstapeln."
+    },
+    {
+      "id": "de-holdout-v4-785",
+      "field": "altText",
+      "text": "Eine geöffnete textile Schuhhülle zeigt die runde Kappe eines Halbschuhs."
+    },
+    {
+      "id": "de-holdout-v4-786",
+      "field": "caption",
+      "text": "Mein erstes handgenähtes Knopfloch darf an der Weste sichtbar bleiben."
+    },
+    {
+      "id": "de-holdout-v4-787",
+      "field": "caption",
+      "text": "Die kleinen Schlingenstiche am Verschluss haben länger gebraucht als gedacht."
+    },
+    {
+      "id": "de-holdout-v4-788",
+      "field": "altText",
+      "text": "Dichte von Hand gelegte Stiche umranden einen länglichen Knopflochschlitz."
+    },
+    {
+      "id": "de-holdout-v4-789",
+      "field": "altText",
+      "text": "Neben dem Westenknopf ist ein sorgfältig eingefasstes handgearbeitetes Loch sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-790",
+      "field": "altText",
+      "text": "Eine Nahaufnahme zeigt kleine regelmäßige Schlingen an der Verschlussöffnung."
+    },
+    {
+      "id": "de-holdout-v4-791",
+      "field": "caption",
+      "text": "Heute nehme ich die abknöpfbaren Ärmel von meinem Kleid ab."
+    },
+    {
+      "id": "de-holdout-v4-792",
+      "field": "caption",
+      "text": "Mit kurzen Ärmeln trägt sich mein wandelbares Kleid gleich viel sommerlicher."
+    },
+    {
+      "id": "de-holdout-v4-793",
+      "field": "altText",
+      "text": "Ein abgetrennter langer Ärmel liegt neben dem passenden ärmellosen Kleid."
+    },
+    {
+      "id": "de-holdout-v4-794",
+      "field": "altText",
+      "text": "Kleine verdeckte Knöpfe verbinden den Ärmel mit dem Armausschnitt."
+    },
+    {
+      "id": "de-holdout-v4-795",
+      "field": "altText",
+      "text": "An beiden Schulterkanten des Kleides sind schmale Verbindungsschlaufen erkennbar."
+    },
+    {
+      "id": "de-holdout-v4-796",
+      "field": "caption",
+      "text": "Für unseren Chorauftritt habe ich mein schlichtes Oberteil mit einem Überteil ergänzt."
+    },
+    {
+      "id": "de-holdout-v4-797",
+      "field": "caption",
+      "text": "Der leichte Überwurf bewegt sich beim Singen schön mit."
+    },
+    {
+      "id": "de-holdout-v4-798",
+      "field": "altText",
+      "text": "Ein langes leichtes Oberteil liegt über einem schmalen einfarbigen Chorshirt."
+    },
+    {
+      "id": "de-holdout-v4-799",
+      "field": "altText",
+      "text": "Der transparente Bühnenüberwurf endet seitlich in zwei beweglichen Zipfeln."
+    },
+    {
+      "id": "de-holdout-v4-800",
+      "field": "altText",
+      "text": "Neben mehreren gleichen Chorblusen hängt ein individuell ergänzter langer Überwurf."
+    },
+    {
+      "id": "de-holdout-v4-801",
+      "field": "caption",
+      "text": "Meine kleine Handytasche trage ich heute unter der offenen Jacke."
+    },
+    {
+      "id": "de-holdout-v4-802",
+      "field": "caption",
+      "text": "Ein schmaler Stoffriemen hält die flache Tasche griffbereit vor mir."
+    },
+    {
+      "id": "de-holdout-v4-803",
+      "field": "altText",
+      "text": "Eine kleine rechteckige Handytasche hängt quer vor dem Oberkörper."
+    },
+    {
+      "id": "de-holdout-v4-804",
+      "field": "altText",
+      "text": "Der dünne verstellbare Taschengurt läuft diagonal unter dem offenen Mantel."
+    },
+    {
+      "id": "de-holdout-v4-805",
+      "field": "altText",
+      "text": "Eine flache Hülle mit Überschlag liegt auf Höhe des unteren Brustkorbs."
+    },
+    {
+      "id": "de-holdout-v4-806",
+      "field": "caption",
+      "text": "Mit den seitlichen Bändern kann ich mein Kleid vorne etwas raffen."
+    },
+    {
+      "id": "de-holdout-v4-807",
+      "field": "caption",
+      "text": "Heute trage ich den Rockteil links ein kleines Stück höher gezogen."
+    },
+    {
+      "id": "de-holdout-v4-808",
+      "field": "altText",
+      "text": "Zwei durchgezogene Bänder raffen den vorderen Kleiderstoff nach oben."
+    },
+    {
+      "id": "de-holdout-v4-809",
+      "field": "altText",
+      "text": "Seitlich am Kleid entstehen weiche senkrecht zusammengezogene Falten."
+    },
+    {
+      "id": "de-holdout-v4-810",
+      "field": "altText",
+      "text": "Der verstellbare Rocksaum bildet durch die Raffung eine ungleiche Linie."
+    },
+    {
+      "id": "de-holdout-v4-811",
+      "field": "caption",
+      "text": "Ich kombiniere heute mehrere Nuancen derselben Farbe mit ganz unterschiedlichen Oberflächen."
+    },
+    {
+      "id": "de-holdout-v4-812",
+      "field": "caption",
+      "text": "Mein monochromer Look lebt von den kleinen Helligkeitsunterschieden der einzelnen Teile."
+    },
+    {
+      "id": "de-holdout-v4-813",
+      "field": "altText",
+      "text": "Jacke und Hose zeigen benachbarte Farbtöne bei deutlich unterschiedlicher Stoffstruktur."
+    },
+    {
+      "id": "de-holdout-v4-814",
+      "field": "altText",
+      "text": "Ein dunkleres Oberteil liegt zwischen hellerem Mantel und ähnlich gefärbtem Schal."
+    },
+    {
+      "id": "de-holdout-v4-815",
+      "field": "altText",
+      "text": "Mehrere Kleidungsstücke bilden eine abgestufte einfarbige Zusammenstellung."
+    },
+    {
+      "id": "de-holdout-v4-816",
+      "field": "caption",
+      "text": "Nur meine Schuhe setzen heute einen kräftigen Farbpunkt im ruhigen Outfit."
+    },
+    {
+      "id": "de-holdout-v4-817",
+      "field": "caption",
+      "text": "Die auffälligen Schuhe machen aus meinen alltäglichen Sachen eine neue Kombination."
+    },
+    {
+      "id": "de-holdout-v4-818",
+      "field": "altText",
+      "text": "Ein kräftig gefärbtes Schuhpaar steht unter einem durchgehend neutralen Outfit."
+    },
+    {
+      "id": "de-holdout-v4-819",
+      "field": "altText",
+      "text": "Mantel und Hose bleiben gedeckt, während die flachen Schuhe deutlich leuchten."
+    },
+    {
+      "id": "de-holdout-v4-820",
+      "field": "altText",
+      "text": "Ein einzelner gesättigter Farbton erscheint ausschließlich an den Schuhen."
+    },
+    {
+      "id": "de-holdout-v4-821",
+      "field": "caption",
+      "text": "Grober Strick und zarter Stoff passen heute für mich wunderbar zusammen."
+    },
+    {
+      "id": "de-holdout-v4-822",
+      "field": "caption",
+      "text": "Über meinem feinen Kleid trage ich den schwersten Pullover aus dem Schrank."
+    },
+    {
+      "id": "de-holdout-v4-823",
+      "field": "altText",
+      "text": "Ein grobmaschiger Pullover liegt über einem fein gewebten fließenden Rock."
+    },
+    {
+      "id": "de-holdout-v4-824",
+      "field": "altText",
+      "text": "Dicke unregelmäßige Strickmaschen treffen auf eine glatte hauchdünne Stofflage."
+    },
+    {
+      "id": "de-holdout-v4-825",
+      "field": "altText",
+      "text": "Unter dem schweren Stricksaum fällt ein leichter weich beweglicher Kleiderteil hervor."
+    },
+    {
+      "id": "de-holdout-v4-826",
+      "field": "caption",
+      "text": "Heute schaut der große Hemdkragen über den kleineren Jackenkragen hinaus."
+    },
+    {
+      "id": "de-holdout-v4-827",
+      "field": "caption",
+      "text": "Mit zwei übereinanderliegenden Kragen bekommt mein Look einen schönen Rahmen."
+    },
+    {
+      "id": "de-holdout-v4-828",
+      "field": "altText",
+      "text": "Ein großer Hemdkragen liegt sichtbar über dem schmaleren Kragen der Jacke."
+    },
+    {
+      "id": "de-holdout-v4-829",
+      "field": "altText",
+      "text": "Zwei verschieden breite Kragenkanten sind am Hals übereinander geschichtet."
+    },
+    {
+      "id": "de-holdout-v4-830",
+      "field": "altText",
+      "text": "Die langen Hemdkragenspitzen reichen auf das äußere Jackenrevers."
+    },
+    {
+      "id": "de-holdout-v4-831",
+      "field": "caption",
+      "text": "Meine Wickelhose hat vorne überlappende Bahnen und hinten viel Bewegungsfreiheit."
+    },
+    {
+      "id": "de-holdout-v4-832",
+      "field": "caption",
+      "text": "Heute binde ich die weiten Hosenpaneele seitlich ganz locker zusammen."
+    },
+    {
+      "id": "de-holdout-v4-833",
+      "field": "altText",
+      "text": "Breite Stoffbahnen überlappen sich vor den Beinen einer Wickelhose."
+    },
+    {
+      "id": "de-holdout-v4-834",
+      "field": "altText",
+      "text": "Zwei seitliche Bindebänder halten die offenen Hosenlagen auf Taillenhöhe zusammen."
+    },
+    {
+      "id": "de-holdout-v4-835",
+      "field": "altText",
+      "text": "Beim Schritt trennen sich die vorderen überkreuzten Stoffteile der Hose."
+    },
+    {
+      "id": "de-holdout-v4-836",
+      "field": "caption",
+      "text": "Die dünne Steppweste passt heute ganz unsichtbar unter meinen weiten Mantel."
+    },
+    {
+      "id": "de-holdout-v4-837",
+      "field": "caption",
+      "text": "Für den kühlen Morgen ergänze ich meinen Look um eine leichte Wärmeschicht."
+    },
+    {
+      "id": "de-holdout-v4-838",
+      "field": "altText",
+      "text": "Unter dem offenen Wollmantel ist eine dünne eng sitzende Steppweste sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-839",
+      "field": "altText",
+      "text": "Eine kurze wattierte Weste liegt zwischen Hemd und lockerem Mantel."
+    },
+    {
+      "id": "de-holdout-v4-840",
+      "field": "altText",
+      "text": "Der niedrige Westenausschnitt bleibt vollständig unter dem Mantelrevers."
+    },
+    {
+      "id": "de-holdout-v4-841",
+      "field": "caption",
+      "text": "Große und winzige Punkte treffen sich heute in meiner Kombination."
+    },
+    {
+      "id": "de-holdout-v4-842",
+      "field": "caption",
+      "text": "Mit zwei verschiedenen Punktgrößen wird mein schlichtes Outfit ein bisschen fröhlicher."
+    },
+    {
+      "id": "de-holdout-v4-843",
+      "field": "altText",
+      "text": "Eine groß gepunktete Bluse trifft auf ein Tuch mit sehr kleinen Punkten."
+    },
+    {
+      "id": "de-holdout-v4-844",
+      "field": "altText",
+      "text": "Zwei unterschiedlich dichte Punktmuster liegen am Ausschnitt direkt nebeneinander."
+    },
+    {
+      "id": "de-holdout-v4-845",
+      "field": "altText",
+      "text": "Der Rock zeigt weite Tupfenabstände, das Oberteil ein fein gestreutes Punktbild."
+    },
+    {
+      "id": "de-holdout-v4-846",
+      "field": "caption",
+      "text": "Die gemusterte Hosenkante sieht fast wie ein kleiner Blumenrahmen aus."
+    },
+    {
+      "id": "de-holdout-v4-847",
+      "field": "caption",
+      "text": "Heute bleiben meine Schuhe schlicht, damit die Bordüre am Hosenbein auffällt."
+    },
+    {
+      "id": "de-holdout-v4-848",
+      "field": "altText",
+      "text": "Eine breite Blumenbordüre verläuft um beide unteren Hosenbeinabschlüsse."
+    },
+    {
+      "id": "de-holdout-v4-849",
+      "field": "altText",
+      "text": "Der sonst glatte Hosenstoff endet in einem dicht floralen Musterstreifen."
+    },
+    {
+      "id": "de-holdout-v4-850",
+      "field": "altText",
+      "text": "Unmittelbar über den Schuhen zeigen beide Hosenbeine eine umlaufende Zierkante."
+    },
+    {
+      "id": "de-holdout-v4-851",
+      "field": "caption",
+      "text": "Unter dem offenen Rücken trage ich heute ein schmales Kontrasttop."
+    },
+    {
+      "id": "de-holdout-v4-852",
+      "field": "caption",
+      "text": "Der große Rückenausschnitt bekommt mit der zweiten Lage eine neue Form."
+    },
+    {
+      "id": "de-holdout-v4-853",
+      "field": "altText",
+      "text": "Durch den tiefen Rückenausschnitt des Oberteils ist ein schmales Untertop sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-854",
+      "field": "altText",
+      "text": "Eine zweite Stofflage füllt einen breiten ovalen Ausschnitt am Rücken."
+    },
+    {
+      "id": "de-holdout-v4-855",
+      "field": "altText",
+      "text": "Die gekreuzten Träger des Untertops liegen innerhalb des offenen Kleidrückens."
+    },
+    {
+      "id": "de-holdout-v4-856",
+      "field": "caption",
+      "text": "Meine gedrehte Stoffkette ist aus den Resten dieses Kleides entstanden."
+    },
+    {
+      "id": "de-holdout-v4-857",
+      "field": "caption",
+      "text": "Heute probiere ich textilen Schmuck mit ganz wenig Gewicht aus."
+    },
+    {
+      "id": "de-holdout-v4-858",
+      "field": "altText",
+      "text": "Mehrere zusammengedrehte Stoffschläuche bilden eine weiche Halskette."
+    },
+    {
+      "id": "de-holdout-v4-859",
+      "field": "altText",
+      "text": "Ein spiralförmig gewickeltes Textilband liegt über einem glatten Ausschnitt."
+    },
+    {
+      "id": "de-holdout-v4-860",
+      "field": "altText",
+      "text": "Die breite Kette besteht aus ineinander verschlungenen schmalen Stoffsträngen."
+    },
+    {
+      "id": "de-holdout-v4-861",
+      "field": "caption",
+      "text": "Die Falten hinten geben meiner kurzen Jacke beim Strecken genug Platz."
+    },
+    {
+      "id": "de-holdout-v4-862",
+      "field": "caption",
+      "text": "Heute zeigt sich die kleine Bewegungsfalte neben dem hinteren Ärmelansatz."
+    },
+    {
+      "id": "de-holdout-v4-863",
+      "field": "altText",
+      "text": "Eine schmale eingelegte Falte verläuft beidseitig neben den rückwärtigen Armausschnitten."
+    },
+    {
+      "id": "de-holdout-v4-864",
+      "field": "altText",
+      "text": "Beim Vorstrecken der Arme öffnen sich zwei kleine seitliche Rückenfalten."
+    },
+    {
+      "id": "de-holdout-v4-865",
+      "field": "altText",
+      "text": "Die Jackenrückseite besitzt zusätzliche gefaltete Stoffweite unter den Schultern."
+    },
+    {
+      "id": "de-holdout-v4-866",
+      "field": "caption",
+      "text": "Mein verdrehtes Stirnband hält die Ohren warm und passt unter die Kapuze."
+    },
+    {
+      "id": "de-holdout-v4-867",
+      "field": "caption",
+      "text": "Den kleinen Twist vorne habe ich beim Nähen einfach mit eingeplant."
+    },
+    {
+      "id": "de-holdout-v4-868",
+      "field": "altText",
+      "text": "Ein breites Strickstirnband kreuzt seine Stofflagen mittig über der Stirn."
+    },
+    {
+      "id": "de-holdout-v4-869",
+      "field": "altText",
+      "text": "Die gedrehte Vorderpartie formt einen weichen Knoten im Haarband."
+    },
+    {
+      "id": "de-holdout-v4-870",
+      "field": "altText",
+      "text": "Ein gepolstertes Stirnband liegt flach um die Ohren und den Hinterkopf."
+    },
+    {
+      "id": "de-holdout-v4-871",
+      "field": "caption",
+      "text": "Meine bestickte Trachtenweste trage ich heute ganz entspannt zur Alltagsjeans."
+    },
+    {
+      "id": "de-holdout-v4-872",
+      "field": "caption",
+      "text": "Das geerbte Feststück passt überraschend gut in meine normale Garderobe."
+    },
+    {
+      "id": "de-holdout-v4-873",
+      "field": "altText",
+      "text": "Eine traditionell bestickte Weste liegt über einem einfachen Shirt und Jeans."
+    },
+    {
+      "id": "de-holdout-v4-874",
+      "field": "altText",
+      "text": "Metallknöpfe und kleine Rankenstickereien zieren die Vorderseite der kurzen Weste."
+    },
+    {
+      "id": "de-holdout-v4-875",
+      "field": "altText",
+      "text": "Die formelle gemusterte Weste wird mit einem schlichten alltäglichen Unterteil kombiniert."
+    },
+    {
+      "id": "de-holdout-v4-876",
+      "field": "caption",
+      "text": "Meine kleine Tasche habe ich innen mit einem überraschend fröhlichen Muster gefüttert."
+    },
+    {
+      "id": "de-holdout-v4-877",
+      "field": "caption",
+      "text": "Beim Öffnen entdecke ich jedes Mal wieder das schöne Innenleben."
+    },
+    {
+      "id": "de-holdout-v4-878",
+      "field": "altText",
+      "text": "Eine geöffnete schlichte Tasche zeigt ein dicht gemustertes buntes Innenfutter."
+    },
+    {
+      "id": "de-holdout-v4-879",
+      "field": "altText",
+      "text": "Der umgeklappte Taschenrand legt das kontrastreiche textile Futter frei."
+    },
+    {
+      "id": "de-holdout-v4-880",
+      "field": "altText",
+      "text": "Innen in der einfarbigen Handtasche liegt eine kleine gefütterte Seitentasche."
+    },
+    {
+      "id": "de-holdout-v4-881",
+      "field": "caption",
+      "text": "Mein Hoodie schaut heute ganz selbstverständlich aus dem weiten Blazer heraus."
+    },
+    {
+      "id": "de-holdout-v4-882",
+      "field": "caption",
+      "text": "Die weiche Kapuze nimmt meiner Jacke ein bisschen von ihrer Strenge."
+    },
+    {
+      "id": "de-holdout-v4-883",
+      "field": "altText",
+      "text": "Eine Sweatkapuze liegt außen über dem Revers eines geraden Blazers."
+    },
+    {
+      "id": "de-holdout-v4-884",
+      "field": "altText",
+      "text": "Unter der offenen Anzugjacke sind Kapuzenbänder und Sweatshirt sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-885",
+      "field": "altText",
+      "text": "Der weiche Kapuzenkragen ragt über den festeren Jackenkragen hinaus."
+    },
+    {
+      "id": "de-holdout-v4-886",
+      "field": "caption",
+      "text": "Die schmalen Unterärmel schauen heute deutlich unter meinem kurzen Strick hervor."
+    },
+    {
+      "id": "de-holdout-v4-887",
+      "field": "caption",
+      "text": "Mit dem dünnen Langarmshirt kann ich meinen Sommerpulli noch weitertragen."
+    },
+    {
+      "id": "de-holdout-v4-888",
+      "field": "altText",
+      "text": "Lange eng anliegende Shirtärmel reichen unter den kurzen Pulloverärmeln hervor."
+    },
+    {
+      "id": "de-holdout-v4-889",
+      "field": "altText",
+      "text": "Zwei verschieden lange Ärmellagen bilden einen klaren Kontrast am Unterarm."
+    },
+    {
+      "id": "de-holdout-v4-890",
+      "field": "altText",
+      "text": "Ein kurzärmeliges Strickoberteil liegt über einem feinen durchgehenden Langarmshirt."
+    },
+    {
+      "id": "de-holdout-v4-891",
+      "field": "caption",
+      "text": "Mein kragenloser Mantel braucht heute nur einen unsichtbaren Verschluss."
+    },
+    {
+      "id": "de-holdout-v4-892",
+      "field": "caption",
+      "text": "Die glatte Vorderseite gefällt mir ohne äußere Knöpfe besonders gut."
+    },
+    {
+      "id": "de-holdout-v4-893",
+      "field": "altText",
+      "text": "Die Mantelfront zeigt eine durchgehende glatte Fläche ohne sichtbare Verschlüsse."
+    },
+    {
+      "id": "de-holdout-v4-894",
+      "field": "altText",
+      "text": "Ein verdeckter Druckknopf sitzt hinter der innen umgelegten Mantelkante."
+    },
+    {
+      "id": "de-holdout-v4-895",
+      "field": "altText",
+      "text": "Der kragenlose Mantel schließt mit überlappenden schmalen Vorderteilen."
+    },
+    {
+      "id": "de-holdout-v4-896",
+      "field": "caption",
+      "text": "Die kleinen Ärmelhalter lassen meine hochgezogenen Hemdärmel ordentlich sitzen."
+    },
+    {
+      "id": "de-holdout-v4-897",
+      "field": "caption",
+      "text": "Heute befestige ich die gerollten Ärmel mit den angenähten Laschen."
+    },
+    {
+      "id": "de-holdout-v4-898",
+      "field": "altText",
+      "text": "Eine schmale knöpfbare Lasche hält den hochgerollten Hemdärmel fest."
+    },
+    {
+      "id": "de-holdout-v4-899",
+      "field": "altText",
+      "text": "Auf Ellenbogenhöhe ist der aufgeschlagene Ärmel mit einem Stoffband gesichert."
+    },
+    {
+      "id": "de-holdout-v4-900",
+      "field": "altText",
+      "text": "Ein einzelner Knopf verbindet den Ärmelumschlag mit seiner inneren Halteschlaufe."
+    },
+    {
+      "id": "de-holdout-v4-901",
+      "field": "caption",
+      "text": "Die kleinen Rüschen am Hals geben meinem schlichten Pullunder einen weichen Rahmen."
+    },
+    {
+      "id": "de-holdout-v4-902",
+      "field": "caption",
+      "text": "Heute lasse ich nur die gerüschte Kante aus dem Ausschnitt schauen."
+    },
+    {
+      "id": "de-holdout-v4-903",
+      "field": "altText",
+      "text": "Eine fein gerüschte Blusenkante ragt aus dem V-Ausschnitt eines Pullunders."
+    },
+    {
+      "id": "de-holdout-v4-904",
+      "field": "altText",
+      "text": "Am Hals legt sich ein schmaler geraffter Stoffstreifen in kleine Wellen."
+    },
+    {
+      "id": "de-holdout-v4-905",
+      "field": "altText",
+      "text": "Der hoch geschlossene Blusenkragen endet mit einem zarten kurzen Volant."
+    },
+    {
+      "id": "de-holdout-v4-906",
+      "field": "caption",
+      "text": "Die gekreuzten Riemen halten meine flachen Schuhe angenehm sicher."
+    },
+    {
+      "id": "de-holdout-v4-907",
+      "field": "caption",
+      "text": "Heute passen die feinen überkreuzten Bänder schön zu meinem weiten Rock."
+    },
+    {
+      "id": "de-holdout-v4-908",
+      "field": "altText",
+      "text": "Zwei schmale Schuhriemen kreuzen sich auf dem Fußrücken."
+    },
+    {
+      "id": "de-holdout-v4-909",
+      "field": "altText",
+      "text": "Eine kleine Seitenschnalle schließt die diagonal überlappenden Riemen."
+    },
+    {
+      "id": "de-holdout-v4-910",
+      "field": "altText",
+      "text": "Die offenen flachen Schuhe besitzen eine deutlich X-förmige Riemenführung."
+    },
+    {
+      "id": "de-holdout-v4-911",
+      "field": "caption",
+      "text": "Die breiten Kordrippen geben meinem schlichten Rock eine deutliche Struktur."
+    },
+    {
+      "id": "de-holdout-v4-912",
+      "field": "caption",
+      "text": "Heute streiche ich ständig über den weichen gerippten Stoff."
+    },
+    {
+      "id": "de-holdout-v4-913",
+      "field": "altText",
+      "text": "Breite samtige Längsrippen verlaufen über den geraden Kordrock."
+    },
+    {
+      "id": "de-holdout-v4-914",
+      "field": "altText",
+      "text": "Der feste Rockstoff zeigt regelmäßige erhabene senkrechte Bahnen."
+    },
+    {
+      "id": "de-holdout-v4-915",
+      "field": "altText",
+      "text": "Licht und Schatten heben die tiefen Rillen im Kordgewebe hervor."
+    },
+    {
+      "id": "de-holdout-v4-916",
+      "field": "caption",
+      "text": "Mein dünner Regenponcho verschwindet nach dem Schauer wieder in seiner eigenen Tasche."
+    },
+    {
+      "id": "de-holdout-v4-917",
+      "field": "caption",
+      "text": "Die integrierte Hülle macht den großen Überwurf angenehm klein zum Mitnehmen."
+    },
+    {
+      "id": "de-holdout-v4-918",
+      "field": "altText",
+      "text": "Ein weit ausgebreiteter Regenponcho besitzt vorne eine kleine integrierte Packtasche."
+    },
+    {
+      "id": "de-holdout-v4-919",
+      "field": "altText",
+      "text": "Die geöffnete Beuteltasche ist direkt in den wasserfesten Überwurf eingenäht."
+    },
+    {
+      "id": "de-holdout-v4-920",
+      "field": "altText",
+      "text": "Neben dem ausgefalteten Poncho liegt seine kompakt gepackte Stoffhülle."
+    },
+    {
+      "id": "de-holdout-v4-921",
+      "field": "caption",
+      "text": "Die gebogene Naht windet sich heute einmal rund um meinen Rock."
+    },
+    {
+      "id": "de-holdout-v4-922",
+      "field": "caption",
+      "text": "Mein selbst genähter Spiralrock fällt bei jeder Drehung ein bisschen anders."
+    },
+    {
+      "id": "de-holdout-v4-923",
+      "field": "altText",
+      "text": "Eine geschwungene Verbindungsnaht läuft spiralförmig um den ausgestellten Rock."
+    },
+    {
+      "id": "de-holdout-v4-924",
+      "field": "altText",
+      "text": "Die Rockbahn erweitert sich entlang einer langen diagonalen Kurve."
+    },
+    {
+      "id": "de-holdout-v4-925",
+      "field": "altText",
+      "text": "Ein umlaufender Stoffstreifen formt den schräg schwingenden Rocksaum."
+    },
+    {
+      "id": "de-holdout-v4-926",
+      "field": "caption",
+      "text": "Die kleine Paspel innen macht mir beim Anziehen jedes Mal Freude."
+    },
+    {
+      "id": "de-holdout-v4-927",
+      "field": "caption",
+      "text": "Heute zeige ich auch die sauber eingefasste Innenseite meiner Jacke."
+    },
+    {
+      "id": "de-holdout-v4-928",
+      "field": "altText",
+      "text": "Eine schmale kontrastierende Paspel folgt der inneren Jackenkante."
+    },
+    {
+      "id": "de-holdout-v4-929",
+      "field": "altText",
+      "text": "Das aufgeschlagene Vorderteil zeigt eine fein eingefasste Futterverbindung."
+    },
+    {
+      "id": "de-holdout-v4-930",
+      "field": "altText",
+      "text": "Zwischen Oberstoff und Futter verläuft eine gleichmäßige kleine Zierkante."
+    },
+    {
+      "id": "de-holdout-v4-931",
+      "field": "caption",
+      "text": "Der gesmokte Bereich lässt mein Sommerkleid bequem mit jeder Bewegung mitgehen."
+    },
+    {
+      "id": "de-holdout-v4-932",
+      "field": "caption",
+      "text": "Heute mag ich die kleinen elastischen Kräuselungen am Kleidoberteil besonders."
+    },
+    {
+      "id": "de-holdout-v4-933",
+      "field": "altText",
+      "text": "Dichte elastische Querreihen raffen das obere Kleidteil zu kleinen Waben."
+    },
+    {
+      "id": "de-holdout-v4-934",
+      "field": "altText",
+      "text": "Ein breiter gesmokter Bereich liegt zwischen Trägern und lockerem Rock."
+    },
+    {
+      "id": "de-holdout-v4-935",
+      "field": "altText",
+      "text": "Die dehnbaren Nähte bilden feine gleichmäßige Kräuselungen auf dem Oberteil."
+    },
+    {
+      "id": "de-holdout-v4-936",
+      "field": "caption",
+      "text": "Nur eine Seite meiner Jacke hat heute eine auffällige große Tasche."
+    },
+    {
+      "id": "de-holdout-v4-937",
+      "field": "caption",
+      "text": "Die ungleiche Taschenverteilung macht meinen schlichten Blazer für mich besonders."
+    },
+    {
+      "id": "de-holdout-v4-938",
+      "field": "altText",
+      "text": "Eine einzelne übergroße Tasche sitzt auf der linken Jackenhälfte."
+    },
+    {
+      "id": "de-holdout-v4-939",
+      "field": "altText",
+      "text": "Die andere Vorderseite bleibt neben der breiten Taschenklappe vollständig glatt."
+    },
+    {
+      "id": "de-holdout-v4-940",
+      "field": "altText",
+      "text": "Unterschiedlich hohe Tascheneingriffe unterbrechen die Symmetrie der Jacke."
+    },
+    {
+      "id": "de-holdout-v4-941",
+      "field": "caption",
+      "text": "Mein hauchdünner Schal bewegt sich heute wie ein kleines Segel."
+    },
+    {
+      "id": "de-holdout-v4-942",
+      "field": "caption",
+      "text": "Für den Abend lege ich mir den leichten Stoff nur über die Arme."
+    },
+    {
+      "id": "de-holdout-v4-943",
+      "field": "altText",
+      "text": "Ein sehr transparenter schmaler Schal liegt locker über beiden Unterarmen."
+    },
+    {
+      "id": "de-holdout-v4-944",
+      "field": "altText",
+      "text": "Die langen Chiffonenden schweben neben dem geraden Kleid herab."
+    },
+    {
+      "id": "de-holdout-v4-945",
+      "field": "altText",
+      "text": "Durch den dünnen Schal sind die darunterliegenden Ärmelkonturen klar sichtbar."
+    },
+    {
+      "id": "de-holdout-v4-946",
+      "field": "caption",
+      "text": "Die beweglichen Metallglieder fühlen sich an meiner kleinen Tasche fast wie Stoff an."
+    },
+    {
+      "id": "de-holdout-v4-947",
+      "field": "caption",
+      "text": "Heute ergänzt die kleine Netztasche mein schlichtes Abendkleid."
+    },
+    {
+      "id": "de-holdout-v4-948",
+      "field": "altText",
+      "text": "Eine kleine Clutch besteht aus dicht miteinander verbundenen Metallringen."
+    },
+    {
+      "id": "de-holdout-v4-949",
+      "field": "altText",
+      "text": "Das flexible glänzende Metallgewebe hängt unter einem festen Taschenbügel."
+    },
+    {
+      "id": "de-holdout-v4-950",
+      "field": "altText",
+      "text": "Ein runder Verschluss schließt die gliederartige kleine Abendtasche."
+    },
+    {
+      "id": "de-holdout-v4-951",
+      "field": "caption",
+      "text": "Die breiten Schleifenbänder geben meinen schlichten Sneakern heute etwas Verspieltes."
+    },
+    {
+      "id": "de-holdout-v4-952",
+      "field": "caption",
+      "text": "Ich habe die üblichen Senkel durch weiche Stoffbänder ersetzt."
+    },
+    {
+      "id": "de-holdout-v4-953",
+      "field": "altText",
+      "text": "Breite textile Bänder laufen durch die Ösen eines einfachen Sneakers."
+    },
+    {
+      "id": "de-holdout-v4-954",
+      "field": "altText",
+      "text": "Eine große flache Bandschleife liegt über der Turnschuhzunge."
+    },
+    {
+      "id": "de-holdout-v4-955",
+      "field": "altText",
+      "text": "Anstelle dünner Schnürsenkel schließen breite glatte Satinbänder den Schuh."
+    },
+    {
+      "id": "de-holdout-v4-956",
+      "field": "caption",
+      "text": "Der durchgehende Seitenstreifen streckt meine weite Hose optisch schön."
+    },
+    {
+      "id": "de-holdout-v4-957",
+      "field": "caption",
+      "text": "Heute kombiniere ich die sportliche Hosenkante mit meinem schlichten Hemd."
+    },
+    {
+      "id": "de-holdout-v4-958",
+      "field": "altText",
+      "text": "Ein breites kontrastierendes Band läuft außen an jedem Hosenbein entlang."
+    },
+    {
+      "id": "de-holdout-v4-959",
+      "field": "altText",
+      "text": "Die seitliche Zierbahn reicht vom Bund bis zum unteren Hosenabschluss."
+    },
+    {
+      "id": "de-holdout-v4-960",
+      "field": "altText",
+      "text": "Ein schmaler heller Galonstreifen setzt die glatte Stoffhose seitlich ab."
+    },
+    {
+      "id": "de-holdout-v4-961",
+      "field": "caption",
+      "text": "Die fehlenden Pailletten habe ich gestern einzeln wieder angenäht."
+    },
+    {
+      "id": "de-holdout-v4-962",
+      "field": "caption",
+      "text": "Mein repariertes Glitzertop ist bereit für seinen nächsten Tanzabend."
+    },
+    {
+      "id": "de-holdout-v4-963",
+      "field": "altText",
+      "text": "Eine kleine ergänzte Paillettenfläche schließt eine frühere Lücke am Oberteil."
+    },
+    {
+      "id": "de-holdout-v4-964",
+      "field": "altText",
+      "text": "Neben dem glänzenden Top liegen einzelne Plättchen und eine Nähnadel."
+    },
+    {
+      "id": "de-holdout-v4-965",
+      "field": "altText",
+      "text": "Feine neue Stiche befestigen mehrere runde Pailletten an einer Saumstelle."
+    },
+    {
+      "id": "de-holdout-v4-966",
+      "field": "caption",
+      "text": "Der geraffte Henkel macht meine einfache Stofftasche angenehm weich in der Hand."
+    },
+    {
+      "id": "de-holdout-v4-967",
+      "field": "caption",
+      "text": "Heute nehme ich den kleinen Beutel mit seinem bauschigen Griff mit."
+    },
+    {
+      "id": "de-holdout-v4-968",
+      "field": "altText",
+      "text": "Ein kurzer Taschenhenkel besteht aus dicht gerafftem gepolstertem Stoff."
+    },
+    {
+      "id": "de-holdout-v4-969",
+      "field": "altText",
+      "text": "Der breite weiche Griff wirft viele kleine Falten über der Taschenöffnung."
+    },
+    {
+      "id": "de-holdout-v4-970",
+      "field": "altText",
+      "text": "Ein elastisch umhüllter Tragebügel sitzt auf einem schlichten Stoffbeutel."
+    },
+    {
+      "id": "de-holdout-v4-971",
+      "field": "caption",
+      "text": "Die natürlichen Falten gehören für mich zu meinem sommerlichen Leinenanzug dazu."
+    },
+    {
+      "id": "de-holdout-v4-972",
+      "field": "caption",
+      "text": "Heute lasse ich die leichte Knitterstruktur einfach so, wie sie ist."
+    },
+    {
+      "id": "de-holdout-v4-973",
+      "field": "altText",
+      "text": "Feine natürliche Knitterlinien durchziehen Jacke und Hose aus leichtem Leinen."
+    },
+    {
+      "id": "de-holdout-v4-974",
+      "field": "altText",
+      "text": "Der matte Anzugstoff zeigt weiche unregelmäßige Falten an Ellenbogen und Knien."
+    },
+    {
+      "id": "de-holdout-v4-975",
+      "field": "altText",
+      "text": "Eine locker abgelegte Leinenjacke besitzt deutlich sichtbare kleine Stoffbrüche."
+    },
+    {
+      "id": "de-holdout-v4-976",
+      "field": "caption",
+      "text": "Der schmale Steg hält meinen weiten Rückenausschnitt in Form."
+    },
+    {
+      "id": "de-holdout-v4-977",
+      "field": "caption",
+      "text": "Heute mag ich die klare waagerechte Linie hinten an meinem Kleid."
+    },
+    {
+      "id": "de-holdout-v4-978",
+      "field": "altText",
+      "text": "Ein dünner Stoffsteg verbindet die Schulterpartien über dem offenen Rücken."
+    },
+    {
+      "id": "de-holdout-v4-979",
+      "field": "altText",
+      "text": "Quer durch den tiefen rückwärtigen Ausschnitt läuft ein schmales festes Band."
+    },
+    {
+      "id": "de-holdout-v4-980",
+      "field": "altText",
+      "text": "Die beiden äußeren Kleidkanten werden am oberen Rücken von einem Steg gehalten."
+    },
+    {
+      "id": "de-holdout-v4-981",
+      "field": "caption",
+      "text": "Die breiten eckigen Brillenbügel passen heute zur geraden Jackenform."
+    },
+    {
+      "id": "de-holdout-v4-982",
+      "field": "caption",
+      "text": "Meine alte Sonnenbrille bekommt mit dem schlichten Outfit viel Platz."
+    },
+    {
+      "id": "de-holdout-v4-983",
+      "field": "altText",
+      "text": "Eine Sonnenbrille mit kräftigem rechteckigem Rahmen liegt auf einem gefalteten Hemd."
+    },
+    {
+      "id": "de-holdout-v4-984",
+      "field": "altText",
+      "text": "Breite gerade Bügel schließen sich an zwei deutlich eckige Brillengläser an."
+    },
+    {
+      "id": "de-holdout-v4-985",
+      "field": "altText",
+      "text": "Der kantige Brillenrahmen bildet oberhalb des weichen Kragens eine klare Linie."
+    },
+    {
+      "id": "de-holdout-v4-986",
+      "field": "caption",
+      "text": "Meine selbst genähten Gamaschen geben den schlichten Schuhen heute einen neuen Rahmen."
+    },
+    {
+      "id": "de-holdout-v4-987",
+      "field": "caption",
+      "text": "Die kleinen Überzüge reichen genau bis über den Knöchel."
+    },
+    {
+      "id": "de-holdout-v4-988",
+      "field": "altText",
+      "text": "Zwei kurze textile Gamaschen bedecken den oberen Bereich flacher Schnürschuhe."
+    },
+    {
+      "id": "de-holdout-v4-989",
+      "field": "altText",
+      "text": "Seitliche kleine Knöpfe schließen die eng anliegenden Schuhüberzüge."
+    },
+    {
+      "id": "de-holdout-v4-990",
+      "field": "altText",
+      "text": "Ein schmaler Steg läuft unter der Sohle und hält den Stoffüberzug fest."
+    },
+    {
+      "id": "de-holdout-v4-991",
+      "field": "caption",
+      "text": "Heute nehme ich die unteren Anhänger von meinen wandelbaren Ohrringen ab."
+    },
+    {
+      "id": "de-holdout-v4-992",
+      "field": "caption",
+      "text": "Die kleinen Steckteile reichen mir für den schlichten Alltagslook völlig."
+    },
+    {
+      "id": "de-holdout-v4-993",
+      "field": "altText",
+      "text": "Ein Ohrstecker und sein abnehmbarer länglicher Anhänger liegen getrennt nebeneinander."
+    },
+    {
+      "id": "de-holdout-v4-994",
+      "field": "altText",
+      "text": "Eine kleine Öse verbindet zwei austauschbare Elemente des Ohrschmucks."
+    },
+    {
+      "id": "de-holdout-v4-995",
+      "field": "altText",
+      "text": "Das modulare Schmuckpaar zeigt eine kurze und eine verlängerte Tragevariante."
+    },
+    {
+      "id": "de-holdout-v4-996",
+      "field": "caption",
+      "text": "Heute sitzt meine Brosche überraschend hinten am schlichten Kleidausschnitt."
+    },
+    {
+      "id": "de-holdout-v4-997",
+      "field": "caption",
+      "text": "Die kleine Nadel hält den Rückenschlitz meines Oberteils geschlossen."
+    },
+    {
+      "id": "de-holdout-v4-998",
+      "field": "altText",
+      "text": "Eine feine Metallbrosche verbindet die oberen Kanten eines rückwärtigen Schlitzes."
+    },
+    {
+      "id": "de-holdout-v4-999",
+      "field": "altText",
+      "text": "Mittig im Nacken ist eine längliche durchbrochene Anstecknadel befestigt."
+    },
+    {
+      "id": "de-holdout-v4-1000",
+      "field": "altText",
+      "text": "Am hinteren Halsabschluss glänzt eine kleine blattförmige Brosche."
+    }
+  ]
+}

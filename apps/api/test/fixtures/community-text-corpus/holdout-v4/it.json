@@ -1,0 +1,5013 @@
+{
+  "language": "it",
+  "corpusVersion": "holdout-v4",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "b3a3510f8a33119b0c9d85c87909932c07a3fac2fb36a701855546f81faf5abf",
+    "languageAllowListSha256": "86ee53373d448d06216edd4eb3ad44b66404f585cf0fd54a80d06318c1bef7e6"
+  },
+  "entries": [
+    {
+      "id": "it-holdout-v4-001",
+      "field": "caption",
+      "text": "Questa scollatura morbida cade da sola, senza bisogno di sistemarla."
+    },
+    {
+      "id": "it-holdout-v4-002",
+      "field": "caption",
+      "text": "Mi piace il piccolo drappo che si forma davanti."
+    },
+    {
+      "id": "it-holdout-v4-003",
+      "field": "altText",
+      "text": "Lo scollo crea una piega morbida sotto il collo."
+    },
+    {
+      "id": "it-holdout-v4-004",
+      "field": "altText",
+      "text": "Il tessuto ricade formando un arco sul davanti della maglia."
+    },
+    {
+      "id": "it-holdout-v4-005",
+      "field": "caption",
+      "text": "Una spalla scoperta cambia tutto l'equilibrio di questo abito."
+    },
+    {
+      "id": "it-holdout-v4-006",
+      "field": "caption",
+      "text": "Ho raccolto i capelli sul lato della spallina larga."
+    },
+    {
+      "id": "it-holdout-v4-007",
+      "field": "altText",
+      "text": "L'abito presenta una sola spallina larga sul lato sinistro."
+    },
+    {
+      "id": "it-holdout-v4-008",
+      "field": "altText",
+      "text": "Il bordo superiore attraversa diagonalmente il busto verso una spalla."
+    },
+    {
+      "id": "it-holdout-v4-009",
+      "field": "caption",
+      "text": "Infilo lo scialle nell'anello e il drappo resta fermo."
+    },
+    {
+      "id": "it-holdout-v4-010",
+      "field": "caption",
+      "text": "Questo cerchio liscio raccoglie il tessuto senza fare nodi."
+    },
+    {
+      "id": "it-holdout-v4-011",
+      "field": "altText",
+      "text": "Un anello trattiene entrambe le estremità dello scialle davanti."
+    },
+    {
+      "id": "it-holdout-v4-012",
+      "field": "altText",
+      "text": "Il tessuto passa attraverso un cerchio posizionato vicino alla clavicola."
+    },
+    {
+      "id": "it-holdout-v4-013",
+      "field": "caption",
+      "text": "Le spalline si incontrano dietro il collo e liberano le spalle."
+    },
+    {
+      "id": "it-holdout-v4-014",
+      "field": "caption",
+      "text": "Oggi scelgo questa linea alta, con gli orecchini piccoli."
+    },
+    {
+      "id": "it-holdout-v4-015",
+      "field": "altText",
+      "text": "Il top si chiude alla nuca con le spalle libere."
+    },
+    {
+      "id": "it-holdout-v4-016",
+      "field": "altText",
+      "text": "Due fasce salgono dal corpetto e convergono dietro il collo."
+    },
+    {
+      "id": "it-holdout-v4-017",
+      "field": "caption",
+      "text": "La piega sulla schiena lascia spazio quando allungo le braccia."
+    },
+    {
+      "id": "it-holdout-v4-018",
+      "field": "caption",
+      "text": "Finalmente una camicia che accompagna bene i movimenti in avanti."
+    },
+    {
+      "id": "it-holdout-v4-019",
+      "field": "altText",
+      "text": "Una piega centrale amplia la parte posteriore della camicia."
+    },
+    {
+      "id": "it-holdout-v4-020",
+      "field": "altText",
+      "text": "Il soffietto sotto il carré si apre con le braccia tese."
+    },
+    {
+      "id": "it-holdout-v4-021",
+      "field": "caption",
+      "text": "Ho lasciato aperti i bottoncini lungo le maniche della giacca."
+    },
+    {
+      "id": "it-holdout-v4-022",
+      "field": "caption",
+      "text": "Quelle aperture laterali fanno intravedere la camicia mentre cammino."
+    },
+    {
+      "id": "it-holdout-v4-023",
+      "field": "altText",
+      "text": "Una fila di bottoni apre la manica dal polso al gomito."
+    },
+    {
+      "id": "it-holdout-v4-024",
+      "field": "altText",
+      "text": "I lati delle maniche presentano aperture lunghe parzialmente sbottonate."
+    },
+    {
+      "id": "it-holdout-v4-025",
+      "field": "caption",
+      "text": "Il polsino sagomato lascia vedere l'orologio anche con la giacca."
+    },
+    {
+      "id": "it-holdout-v4-026",
+      "field": "caption",
+      "text": "Questo piccolo incavo mi evita di tirare indietro la manica."
+    },
+    {
+      "id": "it-holdout-v4-027",
+      "field": "altText",
+      "text": "Un incavo arrotondato nel polsino lascia libero il quadrante."
+    },
+    {
+      "id": "it-holdout-v4-028",
+      "field": "altText",
+      "text": "La camicia presenta un'apertura sagomata sopra l'orologio indossato."
+    },
+    {
+      "id": "it-holdout-v4-029",
+      "field": "caption",
+      "text": "La baschina crea un piccolo volume appena sotto la vita."
+    },
+    {
+      "id": "it-holdout-v4-030",
+      "field": "caption",
+      "text": "Ho scelto pantaloni semplici per dare spazio a questa forma."
+    },
+    {
+      "id": "it-holdout-v4-031",
+      "field": "altText",
+      "text": "Una balza strutturata sporge sotto la cintura della giacca."
+    },
+    {
+      "id": "it-holdout-v4-032",
+      "field": "altText",
+      "text": "Il corpetto aderente termina con un volume svasato sui fianchi."
+    },
+    {
+      "id": "it-holdout-v4-033",
+      "field": "caption",
+      "text": "Tolgo la mantellina e il cappotto ritrova una linea essenziale."
+    },
+    {
+      "id": "it-holdout-v4-034",
+      "field": "caption",
+      "text": "Questa copertura rimovibile protegge bene la parte alta della schiena."
+    },
+    {
+      "id": "it-holdout-v4-035",
+      "field": "altText",
+      "text": "Una mantellina separata si aggancia sopra le spalle del cappotto."
+    },
+    {
+      "id": "it-holdout-v4-036",
+      "field": "altText",
+      "text": "Piccoli automatici fissano uno strato corto sul dorso esterno."
+    },
+    {
+      "id": "it-holdout-v4-037",
+      "field": "caption",
+      "text": "La cerniera attraversa la giacca in diagonale e ne disegna il davanti."
+    },
+    {
+      "id": "it-holdout-v4-038",
+      "field": "caption",
+      "text": "Porto il collo aperto per mostrare la linea obliqua della chiusura."
+    },
+    {
+      "id": "it-holdout-v4-039",
+      "field": "altText",
+      "text": "Una cerniera obliqua collega il fianco alla spalla opposta."
+    },
+    {
+      "id": "it-holdout-v4-040",
+      "field": "altText",
+      "text": "Il davanti della giacca si sovrappone lungo una chiusura diagonale."
+    },
+    {
+      "id": "it-holdout-v4-041",
+      "field": "caption",
+      "text": "Le cuciture verticali danno struttura al corpetto senza altri accessori."
+    },
+    {
+      "id": "it-holdout-v4-042",
+      "field": "caption",
+      "text": "Ho scelto una gonna morbida accanto a queste linee precise."
+    },
+    {
+      "id": "it-holdout-v4-043",
+      "field": "altText",
+      "text": "Canali verticali contenenti stecche modellano il busto del corpetto."
+    },
+    {
+      "id": "it-holdout-v4-044",
+      "field": "altText",
+      "text": "Il top strutturato mostra diverse linee rigide parallele sul davanti."
+    },
+    {
+      "id": "it-holdout-v4-045",
+      "field": "caption",
+      "text": "La gamba curva crea una silhouette che mi diverte molto."
+    },
+    {
+      "id": "it-holdout-v4-046",
+      "field": "caption",
+      "text": "Con una maglia corta si vede meglio la forma di questi pantaloni."
+    },
+    {
+      "id": "it-holdout-v4-047",
+      "field": "altText",
+      "text": "Le gambe dei pantaloni si incurvano verso l'esterno prima del fondo."
+    },
+    {
+      "id": "it-holdout-v4-048",
+      "field": "altText",
+      "text": "Una cucitura arcuata accompagna il volume laterale dei pantaloni."
+    },
+    {
+      "id": "it-holdout-v4-049",
+      "field": "caption",
+      "text": "Per la cerimonia porto un piccolo corsage fissato al polso."
+    },
+    {
+      "id": "it-holdout-v4-050",
+      "field": "caption",
+      "text": "Mi piace avere i fiori vicini mentre saluto le amiche."
+    },
+    {
+      "id": "it-holdout-v4-051",
+      "field": "altText",
+      "text": "Un piccolo gruppo di fiori è fissato a un bracciale."
+    },
+    {
+      "id": "it-holdout-v4-052",
+      "field": "altText",
+      "text": "Il corsage floreale poggia sopra il polso lasciando libera la mano."
+    },
+    {
+      "id": "it-holdout-v4-053",
+      "field": "caption",
+      "text": "Ho finalmente trovato un'occasione per indossare questi gemelli semplici."
+    },
+    {
+      "id": "it-holdout-v4-054",
+      "field": "caption",
+      "text": "Li chiudo con calma prima di infilare la giacca."
+    },
+    {
+      "id": "it-holdout-v4-055",
+      "field": "altText",
+      "text": "Due gemelli uniscono i lembi ripiegati dei polsini della camicia."
+    },
+    {
+      "id": "it-holdout-v4-056",
+      "field": "altText",
+      "text": "Un piccolo elemento metallico attraversa le asole del doppio polsino."
+    },
+    {
+      "id": "it-holdout-v4-057",
+      "field": "caption",
+      "text": "Lascio spuntare solo un angolo del fazzoletto dal taschino."
+    },
+    {
+      "id": "it-holdout-v4-058",
+      "field": "caption",
+      "text": "Una piega appena irregolare rende la giacca più personale."
+    },
+    {
+      "id": "it-holdout-v4-059",
+      "field": "altText",
+      "text": "Un fazzoletto piegato emerge dal taschino della giacca."
+    },
+    {
+      "id": "it-holdout-v4-060",
+      "field": "altText",
+      "text": "Tre piccole punte di tessuto sporgono sopra la tasca sul petto."
+    },
+    {
+      "id": "it-holdout-v4-061",
+      "field": "caption",
+      "text": "La spilla riunisce le due catene e diventa il centro della collana."
+    },
+    {
+      "id": "it-holdout-v4-062",
+      "field": "caption",
+      "text": "Ho montato questo piccolo gioiello su un filo di perle."
+    },
+    {
+      "id": "it-holdout-v4-063",
+      "field": "altText",
+      "text": "Una spilla decorativa collega due fili di perle sul petto."
+    },
+    {
+      "id": "it-holdout-v4-064",
+      "field": "altText",
+      "text": "Il centro della collana contiene un fermaglio più grande delle perle."
+    },
+    {
+      "id": "it-holdout-v4-065",
+      "field": "caption",
+      "text": "Gli alamari grandi si chiudono facilmente anche con i guanti."
+    },
+    {
+      "id": "it-holdout-v4-066",
+      "field": "caption",
+      "text": "Questo montgomery mi accompagna nelle mattine più fredde."
+    },
+    {
+      "id": "it-holdout-v4-067",
+      "field": "altText",
+      "text": "Elementi allungati passano attraverso grossi occhielli sul davanti del cappotto."
+    },
+    {
+      "id": "it-holdout-v4-068",
+      "field": "altText",
+      "text": "Le chiusure sporgenti del montgomery si alternano a lacci robusti."
+    },
+    {
+      "id": "it-holdout-v4-069",
+      "field": "caption",
+      "text": "Le tasche alte mi permettono di scaldare le mani senza piegarmi."
+    },
+    {
+      "id": "it-holdout-v4-070",
+      "field": "caption",
+      "text": "Mi piacciono le aperture vicine al petto di questa giacca."
+    },
+    {
+      "id": "it-holdout-v4-071",
+      "field": "altText",
+      "text": "Due tasche oblique sono collocate nella parte alta della giacca."
+    },
+    {
+      "id": "it-holdout-v4-072",
+      "field": "altText",
+      "text": "La persona infila le mani nelle aperture sopra la cintura."
+    },
+    {
+      "id": "it-holdout-v4-073",
+      "field": "caption",
+      "text": "Le grandi fibbie tonde disegnano due cerchi sopra i piedi."
+    },
+    {
+      "id": "it-holdout-v4-074",
+      "field": "caption",
+      "text": "Oggi parto dalle scarpe e riprendo quella curva nella borsa."
+    },
+    {
+      "id": "it-holdout-v4-075",
+      "field": "altText",
+      "text": "Una fibbia circolare larga occupa il davanti di ciascuna scarpa."
+    },
+    {
+      "id": "it-holdout-v4-076",
+      "field": "altText",
+      "text": "Due grandi cerchi metallici trattengono le fasce sopra il collo del piede."
+    },
+    {
+      "id": "it-holdout-v4-077",
+      "field": "caption",
+      "text": "Le strisce intrecciate lasciano passare l'aria mentre cammino."
+    },
+    {
+      "id": "it-holdout-v4-078",
+      "field": "caption",
+      "text": "Guardo sempre da vicino il lavoro di questi sandali."
+    },
+    {
+      "id": "it-holdout-v4-079",
+      "field": "altText",
+      "text": "Fasce intrecciate formano una trama aperta sulla parte superiore del sandalo."
+    },
+    {
+      "id": "it-holdout-v4-080",
+      "field": "altText",
+      "text": "La tomaia mostra un intreccio regolare sopra le dita."
+    },
+    {
+      "id": "it-holdout-v4-081",
+      "field": "caption",
+      "text": "L'apertura triangolare sulla schiena rende speciale questo vestito semplice."
+    },
+    {
+      "id": "it-holdout-v4-082",
+      "field": "caption",
+      "text": "Ho scelto capelli raccolti per lasciare visibile quel piccolo triangolo."
+    },
+    {
+      "id": "it-holdout-v4-083",
+      "field": "altText",
+      "text": "Un'apertura triangolare occupa il centro superiore della schiena."
+    },
+    {
+      "id": "it-holdout-v4-084",
+      "field": "altText",
+      "text": "Il tessuto circonda un triangolo vuoto sotto il collo posteriore."
+    },
+    {
+      "id": "it-holdout-v4-085",
+      "field": "caption",
+      "text": "Scelgo la seconda fila di asole per stringere un poco la camicia."
+    },
+    {
+      "id": "it-holdout-v4-086",
+      "field": "caption",
+      "text": "La chiusura regolabile cambia la larghezza senza aggiungere una cintura."
+    },
+    {
+      "id": "it-holdout-v4-087",
+      "field": "altText",
+      "text": "Due file parallele di asole permettono diverse chiusure della camicia."
+    },
+    {
+      "id": "it-holdout-v4-088",
+      "field": "altText",
+      "text": "Il bordo abbottonato può spostarsi verso l'interno del davanti."
+    },
+    {
+      "id": "it-holdout-v4-089",
+      "field": "caption",
+      "text": "Ho cucito una tasca a cuore sul mio grembiule da laboratorio."
+    },
+    {
+      "id": "it-holdout-v4-090",
+      "field": "caption",
+      "text": "Il cartamodello della tasca è nato da un disegno sul quaderno."
+    },
+    {
+      "id": "it-holdout-v4-091",
+      "field": "altText",
+      "text": "Una tasca sagomata a cuore decora la parte alta del grembiule."
+    },
+    {
+      "id": "it-holdout-v4-092",
+      "field": "altText",
+      "text": "Il bordo arrotondato della tasca termina in una punta centrale."
+    },
+    {
+      "id": "it-holdout-v4-093",
+      "field": "caption",
+      "text": "I pannelli laterali si aprono quando muovo le gambe."
+    },
+    {
+      "id": "it-holdout-v4-094",
+      "field": "caption",
+      "text": "Questi pantaloni hanno quasi il movimento di una gonna lunga."
+    },
+    {
+      "id": "it-holdout-v4-095",
+      "field": "altText",
+      "text": "Le gambe larghe presentano lunghe aperture sui lati esterni."
+    },
+    {
+      "id": "it-holdout-v4-096",
+      "field": "altText",
+      "text": "Il tessuto sovrapposto lascia intravedere una seconda gamba interna."
+    },
+    {
+      "id": "it-holdout-v4-097",
+      "field": "caption",
+      "text": "Il carré sagomato fa aderire bene il dietro dei jeans."
+    },
+    {
+      "id": "it-holdout-v4-098",
+      "field": "caption",
+      "text": "Oggi osservo questa cucitura a V che di solito passa inosservata."
+    },
+    {
+      "id": "it-holdout-v4-099",
+      "field": "altText",
+      "text": "Una cucitura a V separa la cintura dal retro dei jeans."
+    },
+    {
+      "id": "it-holdout-v4-100",
+      "field": "altText",
+      "text": "Il carré posteriore forma due diagonali sopra le tasche."
+    },
+    {
+      "id": "it-holdout-v4-101",
+      "field": "caption",
+      "text": "Abbasso i paraorecchie del berretto prima di uscire nel freddo."
+    },
+    {
+      "id": "it-holdout-v4-102",
+      "field": "caption",
+      "text": "I piccoli lembi restano sollevati quando torno al caldo."
+    },
+    {
+      "id": "it-holdout-v4-103",
+      "field": "altText",
+      "text": "Due lembi laterali del berretto coprono le orecchie."
+    },
+    {
+      "id": "it-holdout-v4-104",
+      "field": "altText",
+      "text": "Le protezioni ripiegabili sono fissate sopra la calotta con automatici."
+    },
+    {
+      "id": "it-holdout-v4-105",
+      "field": "caption",
+      "text": "La mia sciarpa ha una tasca per tenere vicino il biglietto."
+    },
+    {
+      "id": "it-holdout-v4-106",
+      "field": "caption",
+      "text": "Un piccolo spazio nascosto rende questo accessorio ancora più comodo."
+    },
+    {
+      "id": "it-holdout-v4-107",
+      "field": "altText",
+      "text": "Una tasca piatta è cucita vicino all'estremità della sciarpa."
+    },
+    {
+      "id": "it-holdout-v4-108",
+      "field": "altText",
+      "text": "La mano entra in un'apertura integrata nel tessuto avvolto al collo."
+    },
+    {
+      "id": "it-holdout-v4-109",
+      "field": "caption",
+      "text": "Una catenina collega l'orecchino al fermaglio della mia pettinatura."
+    },
+    {
+      "id": "it-holdout-v4-110",
+      "field": "caption",
+      "text": "Il piccolo arco brillante segue il profilo quando mi giro."
+    },
+    {
+      "id": "it-holdout-v4-111",
+      "field": "altText",
+      "text": "Una catena sottile unisce un orecchino a una forcina laterale."
+    },
+    {
+      "id": "it-holdout-v4-112",
+      "field": "altText",
+      "text": "Il gioiello forma un arco tra l'orecchio e i capelli raccolti."
+    },
+    {
+      "id": "it-holdout-v4-113",
+      "field": "caption",
+      "text": "Le aperture laterali lasciano uscire le braccia senza infilare le maniche."
+    },
+    {
+      "id": "it-holdout-v4-114",
+      "field": "caption",
+      "text": "Posso appoggiare questo cardigan come una coperta durante la pausa."
+    },
+    {
+      "id": "it-holdout-v4-115",
+      "field": "altText",
+      "text": "Le braccia passano attraverso fessure sotto le maniche del cardigan."
+    },
+    {
+      "id": "it-holdout-v4-116",
+      "field": "altText",
+      "text": "Le maniche vuote ricadono ai lati mentre le mani restano libere."
+    },
+    {
+      "id": "it-holdout-v4-117",
+      "field": "caption",
+      "text": "Le piccole pieghe partono dal centro e disegnano un ventaglio sul corpetto."
+    },
+    {
+      "id": "it-holdout-v4-118",
+      "field": "caption",
+      "text": "Questo arriccio radiale dà movimento anche alla parte alta dell'abito."
+    },
+    {
+      "id": "it-holdout-v4-119",
+      "field": "altText",
+      "text": "Pieghe sottili si irradiano da un punto al centro del corpetto."
+    },
+    {
+      "id": "it-holdout-v4-120",
+      "field": "altText",
+      "text": "Il tessuto converge in una piccola arricciatura sopra la vita."
+    },
+    {
+      "id": "it-holdout-v4-121",
+      "field": "caption",
+      "text": "Ripiego il cappuccio dentro il colletto quando torna il sereno."
+    },
+    {
+      "id": "it-holdout-v4-122",
+      "field": "caption",
+      "text": "Mi piace ritrovare una giacca essenziale dopo la pioggia."
+    },
+    {
+      "id": "it-holdout-v4-123",
+      "field": "altText",
+      "text": "Una zip nel colletto contiene un cappuccio ripiegato."
+    },
+    {
+      "id": "it-holdout-v4-124",
+      "field": "altText",
+      "text": "Il cappuccio sottile viene inserito nella tasca lungo il collo."
+    },
+    {
+      "id": "it-holdout-v4-125",
+      "field": "caption",
+      "text": "Le fasce si incrociano davanti e proseguono dritte sulla schiena."
+    },
+    {
+      "id": "it-holdout-v4-126",
+      "field": "caption",
+      "text": "Ho scelto questo abito per il disegno geometrico delle sue spalline."
+    },
+    {
+      "id": "it-holdout-v4-127",
+      "field": "altText",
+      "text": "Due fasce larghe formano una X sopra il corpetto."
+    },
+    {
+      "id": "it-holdout-v4-128",
+      "field": "altText",
+      "text": "L'incrocio delle spalline crea un piccolo rombo al centro."
+    },
+    {
+      "id": "it-holdout-v4-129",
+      "field": "caption",
+      "text": "Alzo il braccio e la maglia rivela tutta la sua ampiezza."
+    },
+    {
+      "id": "it-holdout-v4-130",
+      "field": "caption",
+      "text": "La manica parte bassa e mi lascia muovere senza tirare."
+    },
+    {
+      "id": "it-holdout-v4-131",
+      "field": "altText",
+      "text": "Un'ampia manica unisce il fianco al polso con una curva."
+    },
+    {
+      "id": "it-holdout-v4-132",
+      "field": "altText",
+      "text": "L'attacco basso della manica crea un volume continuo sotto il braccio."
+    },
+    {
+      "id": "it-holdout-v4-133",
+      "field": "caption",
+      "text": "Gli elastici incrociati tengono ferme le ballerine durante le commissioni."
+    },
+    {
+      "id": "it-holdout-v4-134",
+      "field": "caption",
+      "text": "Quel piccolo incrocio sul piede mi ricorda la lezione di danza."
+    },
+    {
+      "id": "it-holdout-v4-135",
+      "field": "altText",
+      "text": "Due elastici formano una X sulla parte superiore della ballerina."
+    },
+    {
+      "id": "it-holdout-v4-136",
+      "field": "altText",
+      "text": "Le ballerine presentano una X elastica tra i bordi laterali."
+    },
+    {
+      "id": "it-holdout-v4-137",
+      "field": "caption",
+      "text": "Le tasche diagonali aggiungono quattro piccoli segni metallici alla giacca."
+    },
+    {
+      "id": "it-holdout-v4-138",
+      "field": "caption",
+      "text": "Ho chiuso tutte le cerniere per mostrare il loro disegno simmetrico."
+    },
+    {
+      "id": "it-holdout-v4-139",
+      "field": "altText",
+      "text": "Quattro tasche con zip sono disposte simmetricamente sul busto."
+    },
+    {
+      "id": "it-holdout-v4-140",
+      "field": "altText",
+      "text": "Le cerniere inclinate formano due coppie ai lati della chiusura centrale."
+    },
+    {
+      "id": "it-holdout-v4-141",
+      "field": "caption",
+      "text": "Stacco la tracolla con il moschettone e la borsa diventa una pochette."
+    },
+    {
+      "id": "it-holdout-v4-142",
+      "field": "caption",
+      "text": "Mi porto dietro entrambe le possibilità per la serata."
+    },
+    {
+      "id": "it-holdout-v4-143",
+      "field": "altText",
+      "text": "Un moschettone aperto separa la tracolla dal corpo della borsa."
+    },
+    {
+      "id": "it-holdout-v4-144",
+      "field": "altText",
+      "text": "La borsa senza tracolla è tenuta sotto un braccio."
+    },
+    {
+      "id": "it-holdout-v4-145",
+      "field": "caption",
+      "text": "Questo piccolo collare di perle si chiude sopra la maglia."
+    },
+    {
+      "id": "it-holdout-v4-146",
+      "field": "caption",
+      "text": "Sembra un colletto, ma lo sposto facilmente tra abiti diversi."
+    },
+    {
+      "id": "it-holdout-v4-147",
+      "field": "altText",
+      "text": "File di perle formano un collare separato con chiusura posteriore."
+    },
+    {
+      "id": "it-holdout-v4-148",
+      "field": "altText",
+      "text": "Il gioiello sagomato copre la base del collo come un piccolo colletto."
+    },
+    {
+      "id": "it-holdout-v4-149",
+      "field": "caption",
+      "text": "La punta squadrata cambia la linea di questi mocassini morbidi."
+    },
+    {
+      "id": "it-holdout-v4-150",
+      "field": "caption",
+      "text": "Lascio il fondo dei pantaloni sollevato per mostrare quella forma."
+    },
+    {
+      "id": "it-holdout-v4-151",
+      "field": "altText",
+      "text": "Le scarpe terminano con una punta larga e squadrata."
+    },
+    {
+      "id": "it-holdout-v4-152",
+      "field": "altText",
+      "text": "Il bordo anteriore diritto distingue la sagoma dei mocassini."
+    },
+    {
+      "id": "it-holdout-v4-153",
+      "field": "caption",
+      "text": "I due spacchi dietro la giacca si aprono quando mi siedo."
+    },
+    {
+      "id": "it-holdout-v4-154",
+      "field": "caption",
+      "text": "Mi piace quel lembo centrale che resta ordinato sulla schiena."
+    },
+    {
+      "id": "it-holdout-v4-155",
+      "field": "altText",
+      "text": "Due spacchi verticali dividono il fondo posteriore della giacca."
+    },
+    {
+      "id": "it-holdout-v4-156",
+      "field": "altText",
+      "text": "Un pannello centrale rimane tra le aperture laterali sul retro."
+    },
+    {
+      "id": "it-holdout-v4-157",
+      "field": "caption",
+      "text": "L'apertura sulla spalla permette di infilare la maglia senza allargare il collo."
+    },
+    {
+      "id": "it-holdout-v4-158",
+      "field": "caption",
+      "text": "I piccoli automatici restano nascosti sotto il lembo superiore."
+    },
+    {
+      "id": "it-holdout-v4-159",
+      "field": "altText",
+      "text": "Una breve apertura con automatici segue la cucitura della spalla."
+    },
+    {
+      "id": "it-holdout-v4-160",
+      "field": "altText",
+      "text": "Il bordo del collo continua in una patta sovrapposta lateralmente."
+    },
+    {
+      "id": "it-holdout-v4-161",
+      "field": "caption",
+      "text": "La cintura traforata lascia passare la luce tra le piccole aperture."
+    },
+    {
+      "id": "it-holdout-v4-162",
+      "field": "caption",
+      "text": "Oggi scelgo il disegno dei fori come dettaglio principale."
+    },
+    {
+      "id": "it-holdout-v4-163",
+      "field": "altText",
+      "text": "Una fila di aperture decorative attraversa la cintura larga."
+    },
+    {
+      "id": "it-holdout-v4-164",
+      "field": "altText",
+      "text": "Piccoli fori geometrici formano un motivo ripetuto intorno alla vita."
+    },
+    {
+      "id": "it-holdout-v4-165",
+      "field": "caption",
+      "text": "Il secchiello mantiene la sua forma anche quando è quasi vuoto."
+    },
+    {
+      "id": "it-holdout-v4-166",
+      "field": "caption",
+      "text": "Mi piace appoggiarlo vicino alle scarpe per confrontare i volumi."
+    },
+    {
+      "id": "it-holdout-v4-167",
+      "field": "altText",
+      "text": "Una borsa cilindrica rigida presenta una base circolare piatta."
+    },
+    {
+      "id": "it-holdout-v4-168",
+      "field": "altText",
+      "text": "Il secchiello rimane verticale con il manico abbassato lateralmente."
+    },
+    {
+      "id": "it-holdout-v4-169",
+      "field": "caption",
+      "text": "La lunga zip dietro segue tutta la linea di questo vestito."
+    },
+    {
+      "id": "it-holdout-v4-170",
+      "field": "caption",
+      "text": "Un dettaglio funzionale diventa il disegno centrale della schiena."
+    },
+    {
+      "id": "it-holdout-v4-171",
+      "field": "altText",
+      "text": "Una cerniera visibile scende dalla nuca quasi fino all'orlo."
+    },
+    {
+      "id": "it-holdout-v4-172",
+      "field": "altText",
+      "text": "Il retro dell'abito presenta un'unica lunga linea metallica centrale."
+    },
+    {
+      "id": "it-holdout-v4-173",
+      "field": "caption",
+      "text": "Ho finito il piccolo paesaggio lavorato a maglia sul davanti."
+    },
+    {
+      "id": "it-holdout-v4-174",
+      "field": "caption",
+      "text": "Le casette del mio maglione sembrano allineate lungo una strada."
+    },
+    {
+      "id": "it-holdout-v4-175",
+      "field": "altText",
+      "text": "Un motivo a intarsio rappresenta diverse case sulla maglia."
+    },
+    {
+      "id": "it-holdout-v4-176",
+      "field": "altText",
+      "text": "Tetti e finestre compongono un paesaggio lavorato nel tessuto."
+    },
+    {
+      "id": "it-holdout-v4-177",
+      "field": "caption",
+      "text": "Ho ricamato un piccolo cielo sulla tasca della giacca."
+    },
+    {
+      "id": "it-holdout-v4-178",
+      "field": "caption",
+      "text": "Le stelle collegate sono il dettaglio che volevo da tempo."
+    },
+    {
+      "id": "it-holdout-v4-179",
+      "field": "altText",
+      "text": "Punti ricamati uniti da linee formano una costellazione sulla tasca."
+    },
+    {
+      "id": "it-holdout-v4-180",
+      "field": "altText",
+      "text": "Piccole stelle cucite occupano un angolo del davanti della giacca."
+    },
+    {
+      "id": "it-holdout-v4-181",
+      "field": "caption",
+      "text": "Questi limoni stampati portano un po' di allegria nel mio armadio."
+    },
+    {
+      "id": "it-holdout-v4-182",
+      "field": "caption",
+      "text": "Ho scelto accessori semplici per lasciare spazio ai frutti disegnati."
+    },
+    {
+      "id": "it-holdout-v4-183",
+      "field": "altText",
+      "text": "La gonna è coperta da limoni e foglie stilizzate."
+    },
+    {
+      "id": "it-holdout-v4-184",
+      "field": "altText",
+      "text": "Grandi frutti ovali si alternano a piccoli rami sul vestito."
+    },
+    {
+      "id": "it-holdout-v4-185",
+      "field": "caption",
+      "text": "Due pesci ricamati nuotano vicino all'orlo della mia camicia."
+    },
+    {
+      "id": "it-holdout-v4-186",
+      "field": "caption",
+      "text": "Mi piace questo piccolo motivo marino cucito a mano."
+    },
+    {
+      "id": "it-holdout-v4-187",
+      "field": "altText",
+      "text": "Due sagome di pesci sono ricamate lungo il bordo inferiore."
+    },
+    {
+      "id": "it-holdout-v4-188",
+      "field": "altText",
+      "text": "Fili lucidi delineano pinne e code su una camicia semplice."
+    },
+    {
+      "id": "it-holdout-v4-189",
+      "field": "caption",
+      "text": "La griglia si incurva e sembra muoversi mentre cammino."
+    },
+    {
+      "id": "it-holdout-v4-190",
+      "field": "caption",
+      "text": "Guardo il motivo da lontano per vedere il suo effetto ottico."
+    },
+    {
+      "id": "it-holdout-v4-191",
+      "field": "altText",
+      "text": "Una stampa a scacchi deformati crea onde sul tessuto."
+    },
+    {
+      "id": "it-holdout-v4-192",
+      "field": "altText",
+      "text": "Le caselle si allargano e si restringono formando un'illusione curva."
+    },
+    {
+      "id": "it-holdout-v4-193",
+      "field": "caption",
+      "text": "Una fila di farfalle attraversa il bordo della giacca."
+    },
+    {
+      "id": "it-holdout-v4-194",
+      "field": "caption",
+      "text": "Ognuna ha ali leggermente diverse, cucite durante sere diverse."
+    },
+    {
+      "id": "it-holdout-v4-195",
+      "field": "altText",
+      "text": "Farfalle ricamate seguono una linea obliqua sul davanti del capo."
+    },
+    {
+      "id": "it-holdout-v4-196",
+      "field": "altText",
+      "text": "Le ali cucite in rilievo si staccano leggermente dalla superficie."
+    },
+    {
+      "id": "it-holdout-v4-197",
+      "field": "caption",
+      "text": "Le bande alternate dell'orlo mi ricordano i tasti di un pianoforte."
+    },
+    {
+      "id": "it-holdout-v4-198",
+      "field": "caption",
+      "text": "Ho costruito il resto del look attorno a questo bordo grafico."
+    },
+    {
+      "id": "it-holdout-v4-199",
+      "field": "altText",
+      "text": "L'orlo del vestito presenta rettangoli alternati simili a tasti musicali."
+    },
+    {
+      "id": "it-holdout-v4-200",
+      "field": "altText",
+      "text": "Una fascia geometrica corre lungo tutto il fondo della gonna."
+    },
+    {
+      "id": "it-holdout-v4-201",
+      "field": "caption",
+      "text": "La spirale stampata sembra continuare quando avvolgo la gonna."
+    },
+    {
+      "id": "it-holdout-v4-202",
+      "field": "caption",
+      "text": "Scelgo un solo accessorio per lasciare protagonista questo vortice."
+    },
+    {
+      "id": "it-holdout-v4-203",
+      "field": "altText",
+      "text": "Una grande spirale parte dal fianco e attraversa il tessuto."
+    },
+    {
+      "id": "it-holdout-v4-204",
+      "field": "altText",
+      "text": "Linee concentriche curve compongono un vortice sul davanti dell'abito."
+    },
+    {
+      "id": "it-holdout-v4-205",
+      "field": "caption",
+      "text": "Una camicia piena di nuvole per questa mattina luminosa."
+    },
+    {
+      "id": "it-holdout-v4-206",
+      "field": "caption",
+      "text": "Il disegno del cielo mi mette subito di buonumore."
+    },
+    {
+      "id": "it-holdout-v4-207",
+      "field": "altText",
+      "text": "Piccole nuvole tonde sono sparse sulla superficie della camicia."
+    },
+    {
+      "id": "it-holdout-v4-208",
+      "field": "altText",
+      "text": "Il tessuto mostra un cielo stilizzato con forme soffici distanziate."
+    },
+    {
+      "id": "it-holdout-v4-209",
+      "field": "caption",
+      "text": "Questi riquadri mi ricordano una vetrata vista durante una passeggiata."
+    },
+    {
+      "id": "it-holdout-v4-210",
+      "field": "caption",
+      "text": "Mi piace come le linee scure separano ogni piccola forma."
+    },
+    {
+      "id": "it-holdout-v4-211",
+      "field": "altText",
+      "text": "Poligoni irregolari sono divisi da linee spesse sulla gonna."
+    },
+    {
+      "id": "it-holdout-v4-212",
+      "field": "altText",
+      "text": "La stampa ricorda una vetrata composta da tessere geometriche."
+    },
+    {
+      "id": "it-holdout-v4-213",
+      "field": "caption",
+      "text": "La mappa disegnata sul foulard non porta da nessuna parte precisa."
+    },
+    {
+      "id": "it-holdout-v4-214",
+      "field": "caption",
+      "text": "Mi perdo volentieri tra le strade inventate di questa stampa."
+    },
+    {
+      "id": "it-holdout-v4-215",
+      "field": "altText",
+      "text": "Linee sinuose formano una mappa immaginaria sul foulard aperto."
+    },
+    {
+      "id": "it-holdout-v4-216",
+      "field": "altText",
+      "text": "Un disegno di strade astratte copre il quadrato di tessuto."
+    },
+    {
+      "id": "it-holdout-v4-217",
+      "field": "caption",
+      "text": "Una piccola fila di api percorre la mia camicia nuova."
+    },
+    {
+      "id": "it-holdout-v4-218",
+      "field": "caption",
+      "text": "Le ali minuscole del motivo si vedono solo da vicino."
+    },
+    {
+      "id": "it-holdout-v4-219",
+      "field": "altText",
+      "text": "Api stilizzate si ripetono tra piccoli segni tratteggiati sulla camicia."
+    },
+    {
+      "id": "it-holdout-v4-220",
+      "field": "altText",
+      "text": "Il motivo mostra insetti alati distribuiti in direzioni diverse."
+    },
+    {
+      "id": "it-holdout-v4-221",
+      "field": "caption",
+      "text": "Il disegno intreccia nodi marinari senza aggiungere volume al tessuto."
+    },
+    {
+      "id": "it-holdout-v4-222",
+      "field": "caption",
+      "text": "Questa stampa mi fa venire voglia di una passeggiata al porto."
+    },
+    {
+      "id": "it-holdout-v4-223",
+      "field": "altText",
+      "text": "Corde stampate si intrecciano formando diversi nodi sul foulard."
+    },
+    {
+      "id": "it-holdout-v4-224",
+      "field": "altText",
+      "text": "Un reticolo di cime disegnate attraversa la superficie dell'accessorio."
+    },
+    {
+      "id": "it-holdout-v4-225",
+      "field": "caption",
+      "text": "Ho seguito con il dito il labirinto della mia borsa."
+    },
+    {
+      "id": "it-holdout-v4-226",
+      "field": "caption",
+      "text": "Questo percorso geometrico rende interessante anche un accessorio piccolo."
+    },
+    {
+      "id": "it-holdout-v4-227",
+      "field": "altText",
+      "text": "Linee ad angolo retto disegnano un labirinto sulla borsa."
+    },
+    {
+      "id": "it-holdout-v4-228",
+      "field": "altText",
+      "text": "Il pannello frontale presenta un percorso geometrico continuo e fitto."
+    },
+    {
+      "id": "it-holdout-v4-229",
+      "field": "caption",
+      "text": "La pioggia compare già nel piccolo motivo della mia gonna."
+    },
+    {
+      "id": "it-holdout-v4-230",
+      "field": "caption",
+      "text": "Porto questi ombrelli disegnati anche quando il cielo è sereno."
+    },
+    {
+      "id": "it-holdout-v4-231",
+      "field": "altText",
+      "text": "Piccoli ombrelli aperti si alternano sul tessuto della gonna."
+    },
+    {
+      "id": "it-holdout-v4-232",
+      "field": "altText",
+      "text": "Manici curvi e cupole colorate compongono un motivo ripetuto."
+    },
+    {
+      "id": "it-holdout-v4-233",
+      "field": "caption",
+      "text": "Gli uccelli stampati seguono tutti una direzione sul mio vestito."
+    },
+    {
+      "id": "it-holdout-v4-234",
+      "field": "caption",
+      "text": "Mi piace questo volo leggero vicino al bordo delle maniche."
+    },
+    {
+      "id": "it-holdout-v4-235",
+      "field": "altText",
+      "text": "Sagome di uccelli in volo attraversano diagonalmente l'abito."
+    },
+    {
+      "id": "it-holdout-v4-236",
+      "field": "altText",
+      "text": "Ali aperte si ripetono lungo una fascia vicino alle maniche."
+    },
+    {
+      "id": "it-holdout-v4-237",
+      "field": "caption",
+      "text": "Le macchie irregolari del motivo mi hanno convinta al primo sguardo."
+    },
+    {
+      "id": "it-holdout-v4-238",
+      "field": "caption",
+      "text": "Oggi abbino questa trama a pezzi dalle linee tranquille."
+    },
+    {
+      "id": "it-holdout-v4-239",
+      "field": "altText",
+      "text": "Poligoni irregolari separati da bordi chiari ricordano il manto della giraffa."
+    },
+    {
+      "id": "it-holdout-v4-240",
+      "field": "altText",
+      "text": "La borsa presenta una stampa a grandi macchie angolari."
+    },
+    {
+      "id": "it-holdout-v4-241",
+      "field": "caption",
+      "text": "Le righe mosse di questa gonna rendono vivace il completo."
+    },
+    {
+      "id": "it-holdout-v4-242",
+      "field": "caption",
+      "text": "Ho ripreso il movimento della stampa con una piccola onda nei capelli."
+    },
+    {
+      "id": "it-holdout-v4-243",
+      "field": "altText",
+      "text": "Strisce sinuose alternate coprono la gonna con un motivo zebrato."
+    },
+    {
+      "id": "it-holdout-v4-244",
+      "field": "altText",
+      "text": "La stampa presenta bande irregolari che si dividono in ramificazioni."
+    },
+    {
+      "id": "it-holdout-v4-245",
+      "field": "caption",
+      "text": "Le conchiglie disegnate mi ricordano quelle raccolte durante le vacanze."
+    },
+    {
+      "id": "it-holdout-v4-246",
+      "field": "caption",
+      "text": "Mi piace il bordo illustrato che corre lungo questo pareo."
+    },
+    {
+      "id": "it-holdout-v4-247",
+      "field": "altText",
+      "text": "Una sequenza di conchiglie stampate occupa il bordo del pareo."
+    },
+    {
+      "id": "it-holdout-v4-248",
+      "field": "altText",
+      "text": "Ventagli e spirali marine compongono una fascia decorativa sul tessuto."
+    },
+    {
+      "id": "it-holdout-v4-249",
+      "field": "caption",
+      "text": "Il motivo a gradini sale lungo il lato della giacca."
+    },
+    {
+      "id": "it-holdout-v4-250",
+      "field": "caption",
+      "text": "Queste forme mi ricordano un disegno fatto con i blocchi."
+    },
+    {
+      "id": "it-holdout-v4-251",
+      "field": "altText",
+      "text": "Una stampa a gradini attraversa un lato della giacca."
+    },
+    {
+      "id": "it-holdout-v4-252",
+      "field": "altText",
+      "text": "Rettangoli sfalsati compongono una sequenza crescente sul tessuto."
+    },
+    {
+      "id": "it-holdout-v4-253",
+      "field": "caption",
+      "text": "I melograni aperti della stampa mostrano tanti piccoli chicchi."
+    },
+    {
+      "id": "it-holdout-v4-254",
+      "field": "caption",
+      "text": "Questo disegno di frutta accompagna bene il pranzo in giardino."
+    },
+    {
+      "id": "it-holdout-v4-255",
+      "field": "altText",
+      "text": "Melograni interi e tagliati sono stampati sul davanti della gonna."
+    },
+    {
+      "id": "it-holdout-v4-256",
+      "field": "altText",
+      "text": "Piccoli punti riempiono le sagome dei frutti aperti sul tessuto."
+    },
+    {
+      "id": "it-holdout-v4-257",
+      "field": "caption",
+      "text": "Un ramo ricamato segue la cucitura dalla spalla alla manica."
+    },
+    {
+      "id": "it-holdout-v4-258",
+      "field": "caption",
+      "text": "Ho lasciato le foglie un poco sollevate per dare profondità."
+    },
+    {
+      "id": "it-holdout-v4-259",
+      "field": "altText",
+      "text": "Un ramo con foglie cucite si estende lungo la spalla."
+    },
+    {
+      "id": "it-holdout-v4-260",
+      "field": "altText",
+      "text": "Il ricamo vegetale prosegue dalla parte alta del busto al braccio."
+    },
+    {
+      "id": "it-holdout-v4-261",
+      "field": "caption",
+      "text": "Ho ricamato due piccole mani che quasi si incontrano."
+    },
+    {
+      "id": "it-holdout-v4-262",
+      "field": "caption",
+      "text": "Questo disegno sul polsino mi ricorda il piacere di creare insieme."
+    },
+    {
+      "id": "it-holdout-v4-263",
+      "field": "altText",
+      "text": "Due sagome di mani sono ricamate ai lati del polsino."
+    },
+    {
+      "id": "it-holdout-v4-264",
+      "field": "altText",
+      "text": "Le dita disegnate con il filo si avvicinano senza toccarsi."
+    },
+    {
+      "id": "it-holdout-v4-265",
+      "field": "caption",
+      "text": "Il funghetto ricamato è comparso ieri sera sulla mia salopette."
+    },
+    {
+      "id": "it-holdout-v4-266",
+      "field": "caption",
+      "text": "Mi mancava un piccolo dettaglio allegro vicino alla tasca."
+    },
+    {
+      "id": "it-holdout-v4-267",
+      "field": "altText",
+      "text": "Un fungo ricamato occupa l'angolo della pettorina della salopette."
+    },
+    {
+      "id": "it-holdout-v4-268",
+      "field": "altText",
+      "text": "Il cappello tondeggiante e il gambo sono delineati da punti fitti."
+    },
+    {
+      "id": "it-holdout-v4-269",
+      "field": "caption",
+      "text": "Le perline scendono come piccole gocce lungo il colletto."
+    },
+    {
+      "id": "it-holdout-v4-270",
+      "field": "caption",
+      "text": "Le ho cucite una alla volta durante un pomeriggio tranquillo."
+    },
+    {
+      "id": "it-holdout-v4-271",
+      "field": "altText",
+      "text": "Perline allungate pendono dal bordo del colletto della blusa."
+    },
+    {
+      "id": "it-holdout-v4-272",
+      "field": "altText",
+      "text": "Piccole gocce decorative si alternano lungo l'apertura superiore del capo."
+    },
+    {
+      "id": "it-holdout-v4-273",
+      "field": "caption",
+      "text": "Le stelle imbottite danno un po' di rilievo al mio gilet."
+    },
+    {
+      "id": "it-holdout-v4-274",
+      "field": "caption",
+      "text": "Sono morbide al tatto e mi fanno sorridere ogni volta."
+    },
+    {
+      "id": "it-holdout-v4-275",
+      "field": "altText",
+      "text": "Tre stelle leggermente imbottite sono applicate sul gilet aperto."
+    },
+    {
+      "id": "it-holdout-v4-276",
+      "field": "altText",
+      "text": "I motivi a cinque punte sporgono dalla superficie della maglia."
+    },
+    {
+      "id": "it-holdout-v4-277",
+      "field": "caption",
+      "text": "Ho trasformato le tasche del grembiule in due piccole nuvole."
+    },
+    {
+      "id": "it-holdout-v4-278",
+      "field": "caption",
+      "text": "Le forme irregolari mi piacciono più di due rettangoli perfetti."
+    },
+    {
+      "id": "it-holdout-v4-279",
+      "field": "altText",
+      "text": "Due tasche dal bordo ondulato ricordano nuvole sul grembiule."
+    },
+    {
+      "id": "it-holdout-v4-280",
+      "field": "altText",
+      "text": "Le aperture curve delle tasche sono poste ai lati dei fianchi."
+    },
+    {
+      "id": "it-holdout-v4-281",
+      "field": "caption",
+      "text": "Le pieghe del top si incastrano come carta ripiegata."
+    },
+    {
+      "id": "it-holdout-v4-282",
+      "field": "caption",
+      "text": "Ho tenuto i capelli semplici per far vedere questa costruzione."
+    },
+    {
+      "id": "it-holdout-v4-283",
+      "field": "altText",
+      "text": "Pieghe angolari sovrapposte creano un rilievo geometrico sul top."
+    },
+    {
+      "id": "it-holdout-v4-284",
+      "field": "altText",
+      "text": "Il busto è attraversato da lembi ripiegati in forme triangolari."
+    },
+    {
+      "id": "it-holdout-v4-285",
+      "field": "caption",
+      "text": "Il davanti e il dietro hanno scolli diversi, così posso scegliere."
+    },
+    {
+      "id": "it-holdout-v4-286",
+      "field": "caption",
+      "text": "Oggi porto davanti l'apertura più alta della mia canotta."
+    },
+    {
+      "id": "it-holdout-v4-287",
+      "field": "altText",
+      "text": "Una canotta mostra uno scollo tondo e uno più profondo."
+    },
+    {
+      "id": "it-holdout-v4-288",
+      "field": "altText",
+      "text": "Le due facce del top hanno aperture superiori di altezze differenti."
+    },
+    {
+      "id": "it-holdout-v4-289",
+      "field": "caption",
+      "text": "Le cuciture piatte rendono questa maglia comoda sotto lo zaino."
+    },
+    {
+      "id": "it-holdout-v4-290",
+      "field": "caption",
+      "text": "Ho cercato un capo che non creasse spessori sulle spalle."
+    },
+    {
+      "id": "it-holdout-v4-291",
+      "field": "altText",
+      "text": "Le giunzioni della maglia sono piatte e prive di rilievi."
+    },
+    {
+      "id": "it-holdout-v4-292",
+      "field": "altText",
+      "text": "Una cucitura larga ma sottile unisce il corpo alla manica."
+    },
+    {
+      "id": "it-holdout-v4-293",
+      "field": "caption",
+      "text": "I piccoli magneti mi permettono di chiudere la camicia facilmente."
+    },
+    {
+      "id": "it-holdout-v4-294",
+      "field": "caption",
+      "text": "Davanti sembrano bottoni normali, sotto c'è una chiusura diversa."
+    },
+    {
+      "id": "it-holdout-v4-295",
+      "field": "altText",
+      "text": "La camicia aperta rivela piccoli dischi magnetici sotto i bottoni."
+    },
+    {
+      "id": "it-holdout-v4-296",
+      "field": "altText",
+      "text": "Due patte si uniscono tramite calamite nascoste nel tessuto."
+    },
+    {
+      "id": "it-holdout-v4-297",
+      "field": "caption",
+      "text": "La zip fino alla suola lascia aprire bene questo stivale."
+    },
+    {
+      "id": "it-holdout-v4-298",
+      "field": "caption",
+      "text": "Posso sistemare il piede prima di richiudere tutta la parte laterale."
+    },
+    {
+      "id": "it-holdout-v4-299",
+      "field": "altText",
+      "text": "Una cerniera laterale apre lo stivale fino vicino alla suola."
+    },
+    {
+      "id": "it-holdout-v4-300",
+      "field": "altText",
+      "text": "Il lembo esterno della calzatura si allontana mostrando l'interno."
+    },
+    {
+      "id": "it-holdout-v4-301",
+      "field": "caption",
+      "text": "Gli inserti in vita seguono i movimenti senza stringere."
+    },
+    {
+      "id": "it-holdout-v4-302",
+      "field": "caption",
+      "text": "Questi piccoli pannelli danno agio ai miei pantaloni da viaggio."
+    },
+    {
+      "id": "it-holdout-v4-303",
+      "field": "altText",
+      "text": "Due inserti elastici interrompono la cintura sui fianchi."
+    },
+    {
+      "id": "it-holdout-v4-304",
+      "field": "altText",
+      "text": "Il bordo del pantalone presenta piccole sezioni arricciate ai lati."
+    },
+    {
+      "id": "it-holdout-v4-305",
+      "field": "caption",
+      "text": "Il pannello morbido sale sopra la cintura e resta comodo tutto il giorno."
+    },
+    {
+      "id": "it-holdout-v4-306",
+      "field": "caption",
+      "text": "Ho trovato jeans che accompagnano bene il cambiamento delle forme."
+    },
+    {
+      "id": "it-holdout-v4-307",
+      "field": "altText",
+      "text": "Un ampio pannello elastico sostituisce la parte alta dei jeans."
+    },
+    {
+      "id": "it-holdout-v4-308",
+      "field": "altText",
+      "text": "La fascia superiore si estende sopra l'addome senza bottoni visibili."
+    },
+    {
+      "id": "it-holdout-v4-309",
+      "field": "caption",
+      "text": "Il cappotto ha il davanti lungo e il dietro accorciato per sedermi."
+    },
+    {
+      "id": "it-holdout-v4-310",
+      "field": "caption",
+      "text": "Questa costruzione evita che il tessuto si accumuli sotto la schiena."
+    },
+    {
+      "id": "it-holdout-v4-311",
+      "field": "altText",
+      "text": "La giacca presenta un retro corto sopra una persona seduta."
+    },
+    {
+      "id": "it-holdout-v4-312",
+      "field": "altText",
+      "text": "I pannelli anteriori scendono sulle gambe mentre il dorso resta libero."
+    },
+    {
+      "id": "it-holdout-v4-313",
+      "field": "caption",
+      "text": "Il grembiule diviso segue le gambe quando lavoro al tornio."
+    },
+    {
+      "id": "it-holdout-v4-314",
+      "field": "caption",
+      "text": "Mi posso sedere senza spostare continuamente il tessuto davanti."
+    },
+    {
+      "id": "it-holdout-v4-315",
+      "field": "altText",
+      "text": "Il grembiule si divide in due pannelli separati sulle gambe."
+    },
+    {
+      "id": "it-holdout-v4-316",
+      "field": "altText",
+      "text": "Ogni coscia è coperta da un lembo distinto durante il lavoro."
+    },
+    {
+      "id": "it-holdout-v4-317",
+      "field": "caption",
+      "text": "La fascia riflettente si illumina quando passa la luce delle auto."
+    },
+    {
+      "id": "it-holdout-v4-318",
+      "field": "caption",
+      "text": "La indosso sopra il cappotto per il tragitto serale."
+    },
+    {
+      "id": "it-holdout-v4-319",
+      "field": "altText",
+      "text": "Una fascia riflettente attraversa il busto sopra la giacca scura."
+    },
+    {
+      "id": "it-holdout-v4-320",
+      "field": "altText",
+      "text": "Il fascio luminoso fa brillare una striscia sull'indumento esterno."
+    },
+    {
+      "id": "it-holdout-v4-321",
+      "field": "caption",
+      "text": "La tasca aderente tiene ferme le piccole cose durante la corsa."
+    },
+    {
+      "id": "it-holdout-v4-322",
+      "field": "caption",
+      "text": "Ho provato la cintura con una breve uscita di allenamento."
+    },
+    {
+      "id": "it-holdout-v4-323",
+      "field": "altText",
+      "text": "Una cintura elastica contiene piccoli oggetti in tasche aderenti."
+    },
+    {
+      "id": "it-holdout-v4-324",
+      "field": "altText",
+      "text": "Il marsupio sottile resta piatto sopra i pantaloncini sportivi."
+    },
+    {
+      "id": "it-holdout-v4-325",
+      "field": "caption",
+      "text": "La gonna nasconde un pantaloncino che mi lascia muovere liberamente."
+    },
+    {
+      "id": "it-holdout-v4-326",
+      "field": "caption",
+      "text": "Mi trovo bene con questa doppia struttura per le attività all'aperto."
+    },
+    {
+      "id": "it-holdout-v4-327",
+      "field": "altText",
+      "text": "Un pantaloncino aderente compare sotto una gonna sportiva corta."
+    },
+    {
+      "id": "it-holdout-v4-328",
+      "field": "altText",
+      "text": "La gamba sollevata rivela lo strato interno separato dalla gonna."
+    },
+    {
+      "id": "it-holdout-v4-329",
+      "field": "caption",
+      "text": "L'apertura coperta sulla schiena lascia uscire il calore mentre cammino."
+    },
+    {
+      "id": "it-holdout-v4-330",
+      "field": "caption",
+      "text": "Questo piccolo tetto di tessuto rende la giacca più fresca."
+    },
+    {
+      "id": "it-holdout-v4-331",
+      "field": "altText",
+      "text": "Un lembo orizzontale copre una fessura di ventilazione sul dorso."
+    },
+    {
+      "id": "it-holdout-v4-332",
+      "field": "altText",
+      "text": "Sotto il pannello posteriore si intravede una sezione a rete."
+    },
+    {
+      "id": "it-holdout-v4-333",
+      "field": "caption",
+      "text": "Stacco la parte bassa e i pantaloni diventano corti sul sentiero."
+    },
+    {
+      "id": "it-holdout-v4-334",
+      "field": "caption",
+      "text": "Le gambe removibili occupano poco spazio nel mio zaino."
+    },
+    {
+      "id": "it-holdout-v4-335",
+      "field": "altText",
+      "text": "Cerniere circolari separano i pantaloni in corrispondenza delle ginocchia."
+    },
+    {
+      "id": "it-holdout-v4-336",
+      "field": "altText",
+      "text": "Due sezioni inferiori staccate sono appoggiate accanto ai pantaloncini."
+    },
+    {
+      "id": "it-holdout-v4-337",
+      "field": "caption",
+      "text": "Il telo dietro il cappello ripara il collo durante la camminata."
+    },
+    {
+      "id": "it-holdout-v4-338",
+      "field": "caption",
+      "text": "Lo aggancio soltanto quando il sole resta alto a lungo."
+    },
+    {
+      "id": "it-holdout-v4-339",
+      "field": "altText",
+      "text": "Un telo rettangolare scende dal cappello dietro la nuca."
+    },
+    {
+      "id": "it-holdout-v4-340",
+      "field": "altText",
+      "text": "La protezione posteriore copre il collo lasciando visibile la visiera."
+    },
+    {
+      "id": "it-holdout-v4-341",
+      "field": "caption",
+      "text": "Ribalto la copertura delle dita per usare le chiavi."
+    },
+    {
+      "id": "it-holdout-v4-342",
+      "field": "caption",
+      "text": "Poi richiudo i guanti e torno a camminare al caldo."
+    },
+    {
+      "id": "it-holdout-v4-343",
+      "field": "altText",
+      "text": "La parte superiore del guanto si ripiega scoprendo le dita."
+    },
+    {
+      "id": "it-holdout-v4-344",
+      "field": "altText",
+      "text": "Un piccolo bottone trattiene la copertura sollevata sul dorso della mano."
+    },
+    {
+      "id": "it-holdout-v4-345",
+      "field": "caption",
+      "text": "Il poncho ha spazio anche per coprire lo zaino durante il temporale."
+    },
+    {
+      "id": "it-holdout-v4-346",
+      "field": "caption",
+      "text": "Cammino con entrambe le mani libere sotto questa copertura larga."
+    },
+    {
+      "id": "it-holdout-v4-347",
+      "field": "altText",
+      "text": "Il poncho forma un volume posteriore sopra uno zaino indossato."
+    },
+    {
+      "id": "it-holdout-v4-348",
+      "field": "altText",
+      "text": "La copertura impermeabile avvolge insieme persona e bagaglio sulle spalle."
+    },
+    {
+      "id": "it-holdout-v4-349",
+      "field": "caption",
+      "text": "La rotellina stringe le scarpe da bici senza lasciare lacci liberi."
+    },
+    {
+      "id": "it-holdout-v4-350",
+      "field": "caption",
+      "text": "Una piccola regolazione e sono pronta per il giro."
+    },
+    {
+      "id": "it-holdout-v4-351",
+      "field": "altText",
+      "text": "Una rotella laterale tende un cavetto sopra la scarpa sportiva."
+    },
+    {
+      "id": "it-holdout-v4-352",
+      "field": "altText",
+      "text": "Il sistema di chiusura circolare sostituisce i lacci tradizionali."
+    },
+    {
+      "id": "it-holdout-v4-353",
+      "field": "caption",
+      "text": "Il piccolo anello della cintura tiene il guinzaglio durante la passeggiata."
+    },
+    {
+      "id": "it-holdout-v4-354",
+      "field": "caption",
+      "text": "Posso sistemare il cappuccio senza spostare tutto da una mano all'altra."
+    },
+    {
+      "id": "it-holdout-v4-355",
+      "field": "altText",
+      "text": "Un moschettone collega il guinzaglio a un anello della cintura."
+    },
+    {
+      "id": "it-holdout-v4-356",
+      "field": "altText",
+      "text": "La cintura da passeggio presenta un attacco laterale robusto."
+    },
+    {
+      "id": "it-holdout-v4-357",
+      "field": "caption",
+      "text": "La pattina interna impedisce all'aria di passare attraverso la cerniera."
+    },
+    {
+      "id": "it-holdout-v4-358",
+      "field": "caption",
+      "text": "Si vede solo aprendo la giacca, ma si sente quando manca."
+    },
+    {
+      "id": "it-holdout-v4-359",
+      "field": "altText",
+      "text": "Una striscia di tessuto corre dietro la cerniera del giubbotto."
+    },
+    {
+      "id": "it-holdout-v4-360",
+      "field": "altText",
+      "text": "La chiusura aperta mostra una protezione interna lungo il busto."
+    },
+    {
+      "id": "it-holdout-v4-361",
+      "field": "caption",
+      "text": "Ripongo tutta la giacca nella sua tasca dopo la salita."
+    },
+    {
+      "id": "it-holdout-v4-362",
+      "field": "caption",
+      "text": "Ora diventa un piccolo pacchetto da agganciare allo zaino."
+    },
+    {
+      "id": "it-holdout-v4-363",
+      "field": "altText",
+      "text": "La giacca viene compressa dentro una tasca interna rovesciata."
+    },
+    {
+      "id": "it-holdout-v4-364",
+      "field": "altText",
+      "text": "Un piccolo pacchetto zippato contiene l'intero indumento ripiegato."
+    },
+    {
+      "id": "it-holdout-v4-365",
+      "field": "caption",
+      "text": "Fisso il pettorale alla cintura senza bucare la maglia."
+    },
+    {
+      "id": "it-holdout-v4-366",
+      "field": "caption",
+      "text": "Due piccoli ganci tengono il foglio fermo durante la corsetta."
+    },
+    {
+      "id": "it-holdout-v4-367",
+      "field": "altText",
+      "text": "Una cintura sottile trattiene un pettorale davanti ai pantaloncini."
+    },
+    {
+      "id": "it-holdout-v4-368",
+      "field": "altText",
+      "text": "Il foglio è fissato con due fermagli senza spille sul tessuto."
+    },
+    {
+      "id": "it-holdout-v4-369",
+      "field": "caption",
+      "text": "Le zone imbottite rendono questi calzini comodi dentro gli scarponi."
+    },
+    {
+      "id": "it-holdout-v4-370",
+      "field": "caption",
+      "text": "Ho scelto rinforzi dove il piede appoggia di più."
+    },
+    {
+      "id": "it-holdout-v4-371",
+      "field": "altText",
+      "text": "Il calzino rovesciato mostra zone più spesse sotto tallone e dita."
+    },
+    {
+      "id": "it-holdout-v4-372",
+      "field": "altText",
+      "text": "Piccoli cuscinetti lavorati nella maglia rinforzano la pianta del piede."
+    },
+    {
+      "id": "it-holdout-v4-373",
+      "field": "caption",
+      "text": "La clip tiene il cappello attaccato alla giacca durante il vento."
+    },
+    {
+      "id": "it-holdout-v4-374",
+      "field": "caption",
+      "text": "Preferisco questo piccolo laccio quando cammino vicino all'acqua."
+    },
+    {
+      "id": "it-holdout-v4-375",
+      "field": "altText",
+      "text": "Un cordino con due clip collega il cappello al colletto."
+    },
+    {
+      "id": "it-holdout-v4-376",
+      "field": "altText",
+      "text": "La tesa è assicurata alla giacca da un breve laccio laterale."
+    },
+    {
+      "id": "it-holdout-v4-377",
+      "field": "caption",
+      "text": "Il pannello davanti resta ben fermo mentre tiro su lo scaldacollo."
+    },
+    {
+      "id": "it-holdout-v4-378",
+      "field": "caption",
+      "text": "Questa forma sagomata copre il mento senza premere sulle orecchie."
+    },
+    {
+      "id": "it-holdout-v4-379",
+      "field": "altText",
+      "text": "Lo scaldacollo presenta un bordo sagomato sotto le guance."
+    },
+    {
+      "id": "it-holdout-v4-380",
+      "field": "altText",
+      "text": "La parte anteriore è più alta del retro e copre il mento."
+    },
+    {
+      "id": "it-holdout-v4-381",
+      "field": "caption",
+      "text": "Il polsino con taschina custodisce la chiave durante il giro al parco."
+    },
+    {
+      "id": "it-holdout-v4-382",
+      "field": "caption",
+      "text": "Mi basta una piccola cerniera per lasciare la borsa a casa."
+    },
+    {
+      "id": "it-holdout-v4-383",
+      "field": "altText",
+      "text": "Una polsiera larga presenta una minuscola tasca con cerniera."
+    },
+    {
+      "id": "it-holdout-v4-384",
+      "field": "altText",
+      "text": "La chiave entra in un compartimento piatto sopra il polso."
+    },
+    {
+      "id": "it-holdout-v4-385",
+      "field": "caption",
+      "text": "La tomaia elastica si allarga quando infilo il piede."
+    },
+    {
+      "id": "it-holdout-v4-386",
+      "field": "caption",
+      "text": "Queste scarpe hanno una linguetta continua, senza parti da sistemare."
+    },
+    {
+      "id": "it-holdout-v4-387",
+      "field": "altText",
+      "text": "Il bordo della scarpa forma un'unica apertura elastica continua."
+    },
+    {
+      "id": "it-holdout-v4-388",
+      "field": "altText",
+      "text": "La tomaia avvolgente è unita alla linguetta senza tagli laterali."
+    },
+    {
+      "id": "it-holdout-v4-389",
+      "field": "caption",
+      "text": "Il fermaglio sul petto nasconde un piccolo fischietto nello zaino."
+    },
+    {
+      "id": "it-holdout-v4-390",
+      "field": "caption",
+      "text": "Mi piace scoprire questi dettagli pratici prima di partire."
+    },
+    {
+      "id": "it-holdout-v4-391",
+      "field": "altText",
+      "text": "La fibbia della cinghia pettorale contiene un piccolo fischietto integrato."
+    },
+    {
+      "id": "it-holdout-v4-392",
+      "field": "altText",
+      "text": "Due spallacci sono uniti davanti da un fermaglio sagomato."
+    },
+    {
+      "id": "it-holdout-v4-393",
+      "field": "caption",
+      "text": "Le fasce alle caviglie brillano quando il flash le raggiunge."
+    },
+    {
+      "id": "it-holdout-v4-394",
+      "field": "caption",
+      "text": "Le aggiungo al completo per rendere più visibili i movimenti."
+    },
+    {
+      "id": "it-holdout-v4-395",
+      "field": "altText",
+      "text": "Due bande riflettenti circondano le caviglie sopra le scarpe."
+    },
+    {
+      "id": "it-holdout-v4-396",
+      "field": "altText",
+      "text": "La luce fa risaltare anelli luminosi sul fondo dei pantaloni."
+    },
+    {
+      "id": "it-holdout-v4-397",
+      "field": "caption",
+      "text": "Ho tolto l'etichetta seguendo la cucitura prevista, senza lasciare bordi duri."
+    },
+    {
+      "id": "it-holdout-v4-398",
+      "field": "caption",
+      "text": "Il collo della maglia ora resta comodo per tutta la giornata."
+    },
+    {
+      "id": "it-holdout-v4-399",
+      "field": "altText",
+      "text": "L'etichetta rimossa è appoggiata vicino al collo della maglia."
+    },
+    {
+      "id": "it-holdout-v4-400",
+      "field": "altText",
+      "text": "La cucitura interna mostra il punto da cui è stata staccata l'etichetta."
+    },
+    {
+      "id": "it-holdout-v4-401",
+      "field": "caption",
+      "text": "Ho legato il tessuto piegato prima di immergerlo nel colore."
+    },
+    {
+      "id": "it-holdout-v4-402",
+      "field": "caption",
+      "text": "Aprire i nodi è la parte più emozionante di questa prova."
+    },
+    {
+      "id": "it-holdout-v4-403",
+      "field": "altText",
+      "text": "Una maglietta legata con spago viene aperta dopo la tintura."
+    },
+    {
+      "id": "it-holdout-v4-404",
+      "field": "altText",
+      "text": "Linee chiare seguono le pieghe lasciate dai legacci sul tessuto."
+    },
+    {
+      "id": "it-holdout-v4-405",
+      "field": "caption",
+      "text": "Il piccolo timbro riempie la borsa con impronte tutte uniche."
+    },
+    {
+      "id": "it-holdout-v4-406",
+      "field": "caption",
+      "text": "Ogni pressione lascia una differenza che mi piace conservare."
+    },
+    {
+      "id": "it-holdout-v4-407",
+      "field": "altText",
+      "text": "Una mano preme un timbro sopra una borsa stesa."
+    },
+    {
+      "id": "it-holdout-v4-408",
+      "field": "altText",
+      "text": "Accanto al manico compaiono impronte fresche dello stesso piccolo timbro."
+    },
+    {
+      "id": "it-holdout-v4-409",
+      "field": "caption",
+      "text": "Sollevo il telaio e il disegno compare sulla maglietta."
+    },
+    {
+      "id": "it-holdout-v4-410",
+      "field": "caption",
+      "text": "La prima passata di serigrafia del pomeriggio è riuscita bene."
+    },
+    {
+      "id": "it-holdout-v4-411",
+      "field": "altText",
+      "text": "Un telaio serigrafico è sollevato sopra una maglietta stampata."
+    },
+    {
+      "id": "it-holdout-v4-412",
+      "field": "altText",
+      "text": "Una spatola distribuisce l'inchiostro attraverso il tessuto teso del telaio."
+    },
+    {
+      "id": "it-holdout-v4-413",
+      "field": "caption",
+      "text": "Il sole ha lasciato la sagoma delle foglie sul mio foulard."
+    },
+    {
+      "id": "it-holdout-v4-414",
+      "field": "caption",
+      "text": "Tolgo i rametti e guardo comparire il disegno della stampa solare."
+    },
+    {
+      "id": "it-holdout-v4-415",
+      "field": "altText",
+      "text": "Foglie vere sono disposte sopra un foulard durante l'esposizione solare."
+    },
+    {
+      "id": "it-holdout-v4-416",
+      "field": "altText",
+      "text": "Il tessuto mostra sagome chiare di foglie con nervature sottili."
+    },
+    {
+      "id": "it-holdout-v4-417",
+      "field": "caption",
+      "text": "Ho immerso solo il fondo per creare questa sfumatura lenta."
+    },
+    {
+      "id": "it-holdout-v4-418",
+      "field": "caption",
+      "text": "La gonna cambia intensità dal bordo verso la vita."
+    },
+    {
+      "id": "it-holdout-v4-419",
+      "field": "altText",
+      "text": "Il colore della gonna si schiarisce gradualmente verso la parte alta."
+    },
+    {
+      "id": "it-holdout-v4-420",
+      "field": "altText",
+      "text": "Il lembo inferiore del tessuto è immerso in una bacinella."
+    },
+    {
+      "id": "it-holdout-v4-421",
+      "field": "caption",
+      "text": "La piccola forma prende volume dopo tanti passaggi dell'ago."
+    },
+    {
+      "id": "it-holdout-v4-422",
+      "field": "caption",
+      "text": "Sto preparando una decorazione morbida da fissare alla mia borsa."
+    },
+    {
+      "id": "it-holdout-v4-423",
+      "field": "altText",
+      "text": "Un ago da infeltrimento lavora una piccola massa di lana."
+    },
+    {
+      "id": "it-holdout-v4-424",
+      "field": "altText",
+      "text": "Una forma compatta di feltro riposa su un supporto da lavoro."
+    },
+    {
+      "id": "it-holdout-v4-425",
+      "field": "caption",
+      "text": "Ho annodato una tracolla larga per distribuire meglio il peso."
+    },
+    {
+      "id": "it-holdout-v4-426",
+      "field": "caption",
+      "text": "Il ritmo dei nodi si vede bene sul fondo semplice della borsa."
+    },
+    {
+      "id": "it-holdout-v4-427",
+      "field": "altText",
+      "text": "Una tracolla a macramè è collegata agli anelli della borsa."
+    },
+    {
+      "id": "it-holdout-v4-428",
+      "field": "altText",
+      "text": "Nodi piatti e rombi compongono una fascia larga intrecciata."
+    },
+    {
+      "id": "it-holdout-v4-429",
+      "field": "caption",
+      "text": "Le perline entrano una riga alla volta nel mio bracciale."
+    },
+    {
+      "id": "it-holdout-v4-430",
+      "field": "caption",
+      "text": "Il disegno a scaletta comincia finalmente a essere visibile."
+    },
+    {
+      "id": "it-holdout-v4-431",
+      "field": "altText",
+      "text": "Un piccolo telaio mantiene tesi i fili di un bracciale."
+    },
+    {
+      "id": "it-holdout-v4-432",
+      "field": "altText",
+      "text": "Righe di perline sono intrecciate tra diversi fili paralleli."
+    },
+    {
+      "id": "it-holdout-v4-433",
+      "field": "caption",
+      "text": "L'ago magico riempie di piccoli anelli il pannello della borsa."
+    },
+    {
+      "id": "it-holdout-v4-434",
+      "field": "caption",
+      "text": "Sto mescolando altezze diverse per ottenere un rilievo morbido."
+    },
+    {
+      "id": "it-holdout-v4-435",
+      "field": "altText",
+      "text": "Un ago da punch needle attraversa il pannello teso nel cerchio."
+    },
+    {
+      "id": "it-holdout-v4-436",
+      "field": "altText",
+      "text": "La superficie della borsa presenta piccoli anelli di filo in rilievo."
+    },
+    {
+      "id": "it-holdout-v4-437",
+      "field": "caption",
+      "text": "Il mulinetto prepara il cordoncino per il prossimo dettaglio della maglia."
+    },
+    {
+      "id": "it-holdout-v4-438",
+      "field": "caption",
+      "text": "Giro la manovella e raccolgo una lunga spirale morbida."
+    },
+    {
+      "id": "it-holdout-v4-439",
+      "field": "altText",
+      "text": "Un cordoncino tubolare esce da un piccolo mulinetto da maglia."
+    },
+    {
+      "id": "it-holdout-v4-440",
+      "field": "altText",
+      "text": "La mano raccoglie il filo lavorato sotto l'apparecchio a manovella."
+    },
+    {
+      "id": "it-holdout-v4-441",
+      "field": "caption",
+      "text": "Le mattonelle all'uncinetto aspettano di diventare il mio gilet."
+    },
+    {
+      "id": "it-holdout-v4-442",
+      "field": "caption",
+      "text": "Le dispongo sul tavolo per trovare un ordine che mi convinca."
+    },
+    {
+      "id": "it-holdout-v4-443",
+      "field": "altText",
+      "text": "Quadrati all'uncinetto sono disposti nella forma di un gilet."
+    },
+    {
+      "id": "it-holdout-v4-444",
+      "field": "altText",
+      "text": "I moduli separati mostrano piccoli spazi tra un bordo e l'altro."
+    },
+    {
+      "id": "it-holdout-v4-445",
+      "field": "caption",
+      "text": "La cucitura collega la tomaia alla base di corda delle espadrillas."
+    },
+    {
+      "id": "it-holdout-v4-446",
+      "field": "caption",
+      "text": "Guardo con attenzione questo lavoro prima di provare il paio finito."
+    },
+    {
+      "id": "it-holdout-v4-447",
+      "field": "altText",
+      "text": "Punti larghi uniscono una tomaia alla suola di corda."
+    },
+    {
+      "id": "it-holdout-v4-448",
+      "field": "altText",
+      "text": "L'ago passa attraverso il bordo intrecciato di un'espadrilla."
+    },
+    {
+      "id": "it-holdout-v4-449",
+      "field": "caption",
+      "text": "Provo a formare pieghe uguali aiutandomi con una piccola forchetta."
+    },
+    {
+      "id": "it-holdout-v4-450",
+      "field": "caption",
+      "text": "La striscia arricciata servirà per il bordo della pochette."
+    },
+    {
+      "id": "it-holdout-v4-451",
+      "field": "altText",
+      "text": "Una forchetta guida piccole pieghe su una striscia di tessuto."
+    },
+    {
+      "id": "it-holdout-v4-452",
+      "field": "altText",
+      "text": "Il nastro pieghettato si accumula accanto alla macchina da cucire."
+    },
+    {
+      "id": "it-holdout-v4-453",
+      "field": "caption",
+      "text": "Sto incidendo un motivo semplice sulla cintura ancora da montare."
+    },
+    {
+      "id": "it-holdout-v4-454",
+      "field": "caption",
+      "text": "Le linee diventano più visibili quando inclino il lavoro."
+    },
+    {
+      "id": "it-holdout-v4-455",
+      "field": "altText",
+      "text": "Uno strumento sottile incide una striscia di cuoio distesa."
+    },
+    {
+      "id": "it-holdout-v4-456",
+      "field": "altText",
+      "text": "Segni geometrici in rilievo decorano una cintura priva di fibbia."
+    },
+    {
+      "id": "it-holdout-v4-457",
+      "field": "caption",
+      "text": "Aggiungo un foro per regolare meglio questa cintura che uso spesso."
+    },
+    {
+      "id": "it-holdout-v4-458",
+      "field": "caption",
+      "text": "Ho misurato la distanza prima di prendere la pinza."
+    },
+    {
+      "id": "it-holdout-v4-459",
+      "field": "altText",
+      "text": "Una pinza fustellatrice è allineata con i fori della cintura."
+    },
+    {
+      "id": "it-holdout-v4-460",
+      "field": "altText",
+      "text": "Un piccolo segno indica la posizione del prossimo foro."
+    },
+    {
+      "id": "it-holdout-v4-461",
+      "field": "caption",
+      "text": "Rivesto il manico consumato con un lavoro fitto all'uncinetto."
+    },
+    {
+      "id": "it-holdout-v4-462",
+      "field": "caption",
+      "text": "La borsa torna comoda da tenere durante le commissioni."
+    },
+    {
+      "id": "it-holdout-v4-463",
+      "field": "altText",
+      "text": "Un rivestimento all'uncinetto avvolge il manico di una borsa."
+    },
+    {
+      "id": "it-holdout-v4-464",
+      "field": "altText",
+      "text": "L'uncinetto completa una fascia lavorata intorno all'impugnatura rigida."
+    },
+    {
+      "id": "it-holdout-v4-465",
+      "field": "caption",
+      "text": "Taglio due sagome uguali per imbottire la mia spilla a pera."
+    },
+    {
+      "id": "it-holdout-v4-466",
+      "field": "caption",
+      "text": "Un piccolo frutto morbido accompagnerà il cappotto di tutti i giorni."
+    },
+    {
+      "id": "it-holdout-v4-467",
+      "field": "altText",
+      "text": "Due sagome di pera in feltro sono affiancate a un fermaglio."
+    },
+    {
+      "id": "it-holdout-v4-468",
+      "field": "altText",
+      "text": "Un ago unisce i bordi della decorazione imbottita a forma di pera."
+    },
+    {
+      "id": "it-holdout-v4-469",
+      "field": "caption",
+      "text": "Ho creato uno stampino per rifare un bottone mancante."
+    },
+    {
+      "id": "it-holdout-v4-470",
+      "field": "caption",
+      "text": "Il nuovo pezzo aspetta di asciugare accanto al suo modello."
+    },
+    {
+      "id": "it-holdout-v4-471",
+      "field": "altText",
+      "text": "Un bottone e il suo stampo sono posati sul piano di lavoro."
+    },
+    {
+      "id": "it-holdout-v4-472",
+      "field": "altText",
+      "text": "Una piccola forma circolare riproduce il rilievo del bottone originale."
+    },
+    {
+      "id": "it-holdout-v4-473",
+      "field": "caption",
+      "text": "Trasferisco il disegno con il foglio trasparente prima di ricamare."
+    },
+    {
+      "id": "it-holdout-v4-474",
+      "field": "caption",
+      "text": "Le linee guida mi aiutano a tenere il motivo centrato."
+    },
+    {
+      "id": "it-holdout-v4-475",
+      "field": "altText",
+      "text": "Un foglio trasparente disegnato copre il tessuto dentro il telaio."
+    },
+    {
+      "id": "it-holdout-v4-476",
+      "field": "altText",
+      "text": "La penna segue un contorno da trasferire sul pannello della borsa."
+    },
+    {
+      "id": "it-holdout-v4-477",
+      "field": "caption",
+      "text": "Preparo diverse spoline prima di cucire il mio completo."
+    },
+    {
+      "id": "it-holdout-v4-478",
+      "field": "caption",
+      "text": "Con il filo pronto posso dedicarmi alle cuciture senza interruzioni."
+    },
+    {
+      "id": "it-holdout-v4-479",
+      "field": "altText",
+      "text": "Piccole spoline riempite sono allineate vicino alla macchina da cucire."
+    },
+    {
+      "id": "it-holdout-v4-480",
+      "field": "altText",
+      "text": "Il filo passa dalla bobina al supporto di avvolgimento della spolina."
+    },
+    {
+      "id": "it-holdout-v4-481",
+      "field": "caption",
+      "text": "Appoggio la striscia in diagonale per ricavare uno sbieco continuo."
+    },
+    {
+      "id": "it-holdout-v4-482",
+      "field": "caption",
+      "text": "Questa bordura seguirà bene le curve del prossimo scollo."
+    },
+    {
+      "id": "it-holdout-v4-483",
+      "field": "altText",
+      "text": "Strisce diagonali sono segnate sul tessuto steso per il taglio."
+    },
+    {
+      "id": "it-holdout-v4-484",
+      "field": "altText",
+      "text": "Una lunga banda obliqua si separa dal quadrato di stoffa."
+    },
+    {
+      "id": "it-holdout-v4-485",
+      "field": "caption",
+      "text": "La rotella trasferisce i segni sul secondo strato del tessuto."
+    },
+    {
+      "id": "it-holdout-v4-486",
+      "field": "caption",
+      "text": "Sto copiando le pinces prima di togliere il modello."
+    },
+    {
+      "id": "it-holdout-v4-487",
+      "field": "altText",
+      "text": "Una rotella dentata segue il contorno di una pince sul cartamodello."
+    },
+    {
+      "id": "it-holdout-v4-488",
+      "field": "altText",
+      "text": "Piccoli punti allineati segnano il tessuto sotto il foglio del modello."
+    },
+    {
+      "id": "it-holdout-v4-489",
+      "field": "caption",
+      "text": "Provo il sopraggitto su uno scarto prima di iniziare la maglia."
+    },
+    {
+      "id": "it-holdout-v4-490",
+      "field": "caption",
+      "text": "La cucitura deve restare elastica quando allungo leggermente il campione."
+    },
+    {
+      "id": "it-holdout-v4-491",
+      "field": "altText",
+      "text": "Un campione cucito mostra un bordo rifinito con sopraggitto."
+    },
+    {
+      "id": "it-holdout-v4-492",
+      "field": "altText",
+      "text": "Le mani allungano una cucitura elastica eseguita su un ritaglio."
+    },
+    {
+      "id": "it-holdout-v4-493",
+      "field": "caption",
+      "text": "Il filo elastico crea le arricciature mentre cucio righe parallele."
+    },
+    {
+      "id": "it-holdout-v4-494",
+      "field": "caption",
+      "text": "Ho fatto una prova per controllare quanto si stringe il pannello."
+    },
+    {
+      "id": "it-holdout-v4-495",
+      "field": "altText",
+      "text": "Il tessuto si raccoglie dietro una serie di cuciture parallele."
+    },
+    {
+      "id": "it-holdout-v4-496",
+      "field": "altText",
+      "text": "Una spolina di filo elastico accompagna un campione arricciato."
+    },
+    {
+      "id": "it-holdout-v4-497",
+      "field": "caption",
+      "text": "Fisso il motivo con il ferro seguendo le istruzioni del produttore."
+    },
+    {
+      "id": "it-holdout-v4-498",
+      "field": "caption",
+      "text": "Aspetto che si raffreddi prima di sollevare il foglio protettivo."
+    },
+    {
+      "id": "it-holdout-v4-499",
+      "field": "altText",
+      "text": "Un ferro preme sopra un foglio che protegge una decorazione."
+    },
+    {
+      "id": "it-holdout-v4-500",
+      "field": "altText",
+      "text": "Il foglio sollevato rivela il motivo fissato sulla maglietta."
+    },
+    {
+      "id": "it-holdout-v4-501",
+      "field": "caption",
+      "text": "Disegno il profilo delle mie scarpe per studiarne le proporzioni."
+    },
+    {
+      "id": "it-holdout-v4-502",
+      "field": "caption",
+      "text": "Quel piccolo tacco cambia parecchio quando lo guardo sulla carta."
+    },
+    {
+      "id": "it-holdout-v4-503",
+      "field": "altText",
+      "text": "Un quaderno aperto mostra diversi profili di scarpe disegnati a matita."
+    },
+    {
+      "id": "it-holdout-v4-504",
+      "field": "altText",
+      "text": "La scarpa reale è posata accanto al suo schizzo laterale."
+    },
+    {
+      "id": "it-holdout-v4-505",
+      "field": "caption",
+      "text": "Il modello di cartone mi aiuta a capire quanto sarà capiente la borsa."
+    },
+    {
+      "id": "it-holdout-v4-506",
+      "field": "caption",
+      "text": "Prima di tagliare il tessuto verifico l'apertura con questa prova rigida."
+    },
+    {
+      "id": "it-holdout-v4-507",
+      "field": "altText",
+      "text": "Un prototipo di borsa in cartone è aperto sul tavolo."
+    },
+    {
+      "id": "it-holdout-v4-508",
+      "field": "altText",
+      "text": "Le pieghe del cartone riproducono il fondo e i lati di una borsa."
+    },
+    {
+      "id": "it-holdout-v4-509",
+      "field": "caption",
+      "text": "Controllo il filo dei bottoni prima di mettere via la giacca."
+    },
+    {
+      "id": "it-holdout-v4-510",
+      "field": "caption",
+      "text": "Un paio di giri in più rende saldo quello che si muoveva."
+    },
+    {
+      "id": "it-holdout-v4-511",
+      "field": "altText",
+      "text": "Una mano tende delicatamente un bottone ancora cucito alla giacca."
+    },
+    {
+      "id": "it-holdout-v4-512",
+      "field": "altText",
+      "text": "Il filo viene avvolto sotto il bottone per rinforzarne il gambo."
+    },
+    {
+      "id": "it-holdout-v4-513",
+      "field": "caption",
+      "text": "Tengo i campioni migliori come promemoria per i lavori futuri."
+    },
+    {
+      "id": "it-holdout-v4-514",
+      "field": "caption",
+      "text": "Questa pagina raccoglie i punti che uso più spesso."
+    },
+    {
+      "id": "it-holdout-v4-515",
+      "field": "altText",
+      "text": "Piccoli campioni cuciti sono fissati su una pagina di quaderno."
+    },
+    {
+      "id": "it-holdout-v4-516",
+      "field": "altText",
+      "text": "Ogni ritaglio mostra una diversa cucitura eseguita sul bordo."
+    },
+    {
+      "id": "it-holdout-v4-517",
+      "field": "caption",
+      "text": "Il cappello prende forma sulla base arrotondata mentre asciuga."
+    },
+    {
+      "id": "it-holdout-v4-518",
+      "field": "caption",
+      "text": "Aspetto prima di togliere il nastro che tiene fermo il bordo."
+    },
+    {
+      "id": "it-holdout-v4-519",
+      "field": "altText",
+      "text": "Un cappello umido è appoggiato su una forma arrotondata."
+    },
+    {
+      "id": "it-holdout-v4-520",
+      "field": "altText",
+      "text": "Un nastro trattiene la calotta contro il supporto da modisteria."
+    },
+    {
+      "id": "it-holdout-v4-521",
+      "field": "caption",
+      "text": "Una passata di levapelucchi riporta in ordine il mio maglione."
+    },
+    {
+      "id": "it-holdout-v4-522",
+      "field": "caption",
+      "text": "Lavoro piano sulle parti che sfregano più spesso contro la borsa."
+    },
+    {
+      "id": "it-holdout-v4-523",
+      "field": "altText",
+      "text": "Un levapelucchi passa sulla superficie di un maglione disteso."
+    },
+    {
+      "id": "it-holdout-v4-524",
+      "field": "altText",
+      "text": "Piccoli pallini rimossi sono raccolti vicino alla maglia trattata."
+    },
+    {
+      "id": "it-holdout-v4-525",
+      "field": "caption",
+      "text": "Stendo poca cera alla volta per rinnovare la giacca da pioggia."
+    },
+    {
+      "id": "it-holdout-v4-526",
+      "field": "caption",
+      "text": "La superficie torna uniforme dopo il lavoro con il panno."
+    },
+    {
+      "id": "it-holdout-v4-527",
+      "field": "altText",
+      "text": "Una mano applica cera sul pannello esterno di una giacca."
+    },
+    {
+      "id": "it-holdout-v4-528",
+      "field": "altText",
+      "text": "Il tessuto trattato appare più scuro accanto alla zona ancora asciutta."
+    },
+    {
+      "id": "it-holdout-v4-529",
+      "field": "caption",
+      "text": "Pretratto il collo della camicia prima del lavaggio delicato."
+    },
+    {
+      "id": "it-holdout-v4-530",
+      "field": "caption",
+      "text": "Un piccolo gesto di cura per il capo che porto più spesso."
+    },
+    {
+      "id": "it-holdout-v4-531",
+      "field": "altText",
+      "text": "Una saponetta viene passata sul bordo interno di un colletto."
+    },
+    {
+      "id": "it-holdout-v4-532",
+      "field": "altText",
+      "text": "Il collo della camicia è aperto sopra una piccola bacinella."
+    },
+    {
+      "id": "it-holdout-v4-533",
+      "field": "caption",
+      "text": "Confronto due solette per trovare l'appoggio più comodo nelle scarpe."
+    },
+    {
+      "id": "it-holdout-v4-534",
+      "field": "caption",
+      "text": "Le inserisco una alla volta e faccio qualche passo di prova."
+    },
+    {
+      "id": "it-holdout-v4-535",
+      "field": "altText",
+      "text": "Due solette estraibili sono posate accanto a un paio di scarpe."
+    },
+    {
+      "id": "it-holdout-v4-536",
+      "field": "altText",
+      "text": "Una mano inserisce una soletta sagomata nella calzatura aperta."
+    },
+    {
+      "id": "it-holdout-v4-537",
+      "field": "caption",
+      "text": "Ogni paio viaggia nel suo sacchetto per proteggere gli altri vestiti."
+    },
+    {
+      "id": "it-holdout-v4-538",
+      "field": "caption",
+      "text": "Lascio le stringhe sciolte prima di chiudere la custodia."
+    },
+    {
+      "id": "it-holdout-v4-539",
+      "field": "altText",
+      "text": "Due scarpe sono sistemate in sacchetti separati con coulisse."
+    },
+    {
+      "id": "it-holdout-v4-540",
+      "field": "altText",
+      "text": "Le custodie protettive aperte mostrano un solo paio di calzature."
+    },
+    {
+      "id": "it-holdout-v4-541",
+      "field": "caption",
+      "text": "Spazzolo il cappello seguendo sempre la stessa direzione."
+    },
+    {
+      "id": "it-holdout-v4-542",
+      "field": "caption",
+      "text": "La polvere sparisce e il bordo ritrova il suo aspetto."
+    },
+    {
+      "id": "it-holdout-v4-543",
+      "field": "altText",
+      "text": "Una spazzola morbida passa lungo la calotta del cappello."
+    },
+    {
+      "id": "it-holdout-v4-544",
+      "field": "altText",
+      "text": "La mano sostiene la tesa mentre la spazzola pulisce la superficie."
+    },
+    {
+      "id": "it-holdout-v4-545",
+      "field": "caption",
+      "text": "Tolgo i lacci prima di pulire bene le mie scarpe."
+    },
+    {
+      "id": "it-holdout-v4-546",
+      "field": "caption",
+      "text": "Le stringhe asciugano distese e aspettano di tornare al loro posto."
+    },
+    {
+      "id": "it-holdout-v4-547",
+      "field": "altText",
+      "text": "I lacci rimossi sono stesi accanto alle scarpe aperte."
+    },
+    {
+      "id": "it-holdout-v4-548",
+      "field": "altText",
+      "text": "Una piccola bacinella contiene le stringhe separate dalle calzature."
+    },
+    {
+      "id": "it-holdout-v4-549",
+      "field": "caption",
+      "text": "Svito il vecchio manico per montare quello nuovo sulla borsa."
+    },
+    {
+      "id": "it-holdout-v4-550",
+      "field": "caption",
+      "text": "La struttura è ancora buona e merita questa piccola sostituzione."
+    },
+    {
+      "id": "it-holdout-v4-551",
+      "field": "altText",
+      "text": "Un cacciavite allenta l'attacco del manico di una borsa rigida."
+    },
+    {
+      "id": "it-holdout-v4-552",
+      "field": "altText",
+      "text": "Il nuovo manico e le viti sono disposti vicino alla borsa."
+    },
+    {
+      "id": "it-holdout-v4-553",
+      "field": "caption",
+      "text": "Metto i salvatacchi per camminare sul prato senza affondare."
+    },
+    {
+      "id": "it-holdout-v4-554",
+      "field": "caption",
+      "text": "Un piccolo accessorio trasparente rende più serena la cerimonia fuori."
+    },
+    {
+      "id": "it-holdout-v4-555",
+      "field": "altText",
+      "text": "Supporti trasparenti allargano la base dei tacchi sottili."
+    },
+    {
+      "id": "it-holdout-v4-556",
+      "field": "altText",
+      "text": "Le estremità dei tacchi sono inserite in piccole basi protettive."
+    },
+    {
+      "id": "it-holdout-v4-557",
+      "field": "caption",
+      "text": "La retina sottile tiene raccolti i capelli durante la prova di danza."
+    },
+    {
+      "id": "it-holdout-v4-558",
+      "field": "caption",
+      "text": "Posso concentrarmi sui passi senza sistemare continuamente il chignon."
+    },
+    {
+      "id": "it-holdout-v4-559",
+      "field": "altText",
+      "text": "Una retina sottile avvolge completamente il chignon dietro la testa."
+    },
+    {
+      "id": "it-holdout-v4-560",
+      "field": "altText",
+      "text": "I capelli raccolti sono coperti da una rete quasi invisibile."
+    },
+    {
+      "id": "it-holdout-v4-561",
+      "field": "caption",
+      "text": "Le coperture proteggono le scarpe durante il tratto sotto la pioggia."
+    },
+    {
+      "id": "it-holdout-v4-562",
+      "field": "caption",
+      "text": "Le tolgo all'arrivo e ritrovo le calzature asciutte."
+    },
+    {
+      "id": "it-holdout-v4-563",
+      "field": "altText",
+      "text": "Due coperture impermeabili avvolgono le scarpe fino alle caviglie."
+    },
+    {
+      "id": "it-holdout-v4-564",
+      "field": "altText",
+      "text": "Una chiusura laterale sigilla il copriscarpa sopra la suola."
+    },
+    {
+      "id": "it-holdout-v4-565",
+      "field": "caption",
+      "text": "La fascia interna del cappello assorbe l'umidità durante la passeggiata."
+    },
+    {
+      "id": "it-holdout-v4-566",
+      "field": "caption",
+      "text": "La stacco per lavarla separatamente e lasciare il cappello pronto."
+    },
+    {
+      "id": "it-holdout-v4-567",
+      "field": "altText",
+      "text": "Una fascia assorbente rimovibile segue il bordo interno del cappello."
+    },
+    {
+      "id": "it-holdout-v4-568",
+      "field": "altText",
+      "text": "Piccoli attacchi fissano la banda interna sotto la calotta."
+    },
+    {
+      "id": "it-holdout-v4-569",
+      "field": "caption",
+      "text": "La clip tiene insieme i guanti mentre tengo in mano la borsa."
+    },
+    {
+      "id": "it-holdout-v4-570",
+      "field": "caption",
+      "text": "Finalmente riesco a portarli senza perderne uno durante gli acquisti."
+    },
+    {
+      "id": "it-holdout-v4-571",
+      "field": "altText",
+      "text": "Un fermaglio aggancia due guanti al manico della borsa."
+    },
+    {
+      "id": "it-holdout-v4-572",
+      "field": "altText",
+      "text": "I guanti piegati pendono da una piccola pinza metallica."
+    },
+    {
+      "id": "it-holdout-v4-573",
+      "field": "caption",
+      "text": "Gli scaldorecchie lasciano libera la sommità dei capelli."
+    },
+    {
+      "id": "it-holdout-v4-574",
+      "field": "caption",
+      "text": "Li scelgo quando voglio tenere la testa più leggera."
+    },
+    {
+      "id": "it-holdout-v4-575",
+      "field": "altText",
+      "text": "Due cuscinetti coprono le orecchie e sono uniti da un archetto."
+    },
+    {
+      "id": "it-holdout-v4-576",
+      "field": "altText",
+      "text": "L'archetto passa dietro la nuca sotto i capelli sciolti."
+    },
+    {
+      "id": "it-holdout-v4-577",
+      "field": "caption",
+      "text": "I piccoli punti sotto le calze mi danno presa durante gli esercizi."
+    },
+    {
+      "id": "it-holdout-v4-578",
+      "field": "caption",
+      "text": "Le uso sul tappetino per una pratica tranquilla in casa."
+    },
+    {
+      "id": "it-holdout-v4-579",
+      "field": "altText",
+      "text": "La pianta delle calze presenta numerosi puntini antiscivolo."
+    },
+    {
+      "id": "it-holdout-v4-580",
+      "field": "altText",
+      "text": "Un piede sollevato mostra il disegno aderente sotto il tallone."
+    },
+    {
+      "id": "it-holdout-v4-581",
+      "field": "caption",
+      "text": "Il gancio pieghevole tiene la mia borsa sollevata da terra."
+    },
+    {
+      "id": "it-holdout-v4-582",
+      "field": "caption",
+      "text": "Lo apro sul bordo del tavolo durante la pausa."
+    },
+    {
+      "id": "it-holdout-v4-583",
+      "field": "altText",
+      "text": "Una borsa pende da un gancio fissato al bordo del tavolo."
+    },
+    {
+      "id": "it-holdout-v4-584",
+      "field": "altText",
+      "text": "Il supporto ripiegabile sostiene il manico sotto il piano."
+    },
+    {
+      "id": "it-holdout-v4-585",
+      "field": "caption",
+      "text": "Appoggio un panno sul colletto mentre finisco di prepararmi."
+    },
+    {
+      "id": "it-holdout-v4-586",
+      "field": "caption",
+      "text": "Così il bordo della camicia rimane pulito fino all'uscita."
+    },
+    {
+      "id": "it-holdout-v4-587",
+      "field": "altText",
+      "text": "Un piccolo panno copre temporaneamente il colletto della camicia."
+    },
+    {
+      "id": "it-holdout-v4-588",
+      "field": "altText",
+      "text": "La protezione è appoggiata tra il collo del capo e il viso."
+    },
+    {
+      "id": "it-holdout-v4-589",
+      "field": "caption",
+      "text": "Il cuscinetto sulla tracolla rende più comoda la mia borsa piena."
+    },
+    {
+      "id": "it-holdout-v4-590",
+      "field": "caption",
+      "text": "Lo faccio scorrere finché appoggia esattamente sopra la spalla."
+    },
+    {
+      "id": "it-holdout-v4-591",
+      "field": "altText",
+      "text": "Un cuscinetto imbottito avvolge il tratto superiore della tracolla."
+    },
+    {
+      "id": "it-holdout-v4-592",
+      "field": "altText",
+      "text": "La protezione allargata poggia sulla spalla sotto una cinghia stretta."
+    },
+    {
+      "id": "it-holdout-v4-593",
+      "field": "caption",
+      "text": "La taschina interna tiene gli occhiali vicini senza lasciarli pendere."
+    },
+    {
+      "id": "it-holdout-v4-594",
+      "field": "caption",
+      "text": "Li ripongo appena entro e libero entrambe le mani."
+    },
+    {
+      "id": "it-holdout-v4-595",
+      "field": "altText",
+      "text": "Una tasca stretta dentro la giacca contiene un paio di occhiali."
+    },
+    {
+      "id": "it-holdout-v4-596",
+      "field": "altText",
+      "text": "Il bordo della montatura emerge da un compartimento interno verticale."
+    },
+    {
+      "id": "it-holdout-v4-597",
+      "field": "caption",
+      "text": "Le maniche hanno una ghetta interna che resta sopra il guanto."
+    },
+    {
+      "id": "it-holdout-v4-598",
+      "field": "caption",
+      "text": "Il bordo elasticizzato tiene fuori la neve quando gioco all'aperto."
+    },
+    {
+      "id": "it-holdout-v4-599",
+      "field": "altText",
+      "text": "Un polsino interno elasticizzato circonda il guanto sotto la manica."
+    },
+    {
+      "id": "it-holdout-v4-600",
+      "field": "altText",
+      "text": "La giacca aperta al polso rivela una seconda barriera aderente."
+    },
+    {
+      "id": "it-holdout-v4-601",
+      "field": "caption",
+      "text": "Le lanterne disegnate sembrano accendersi lungo il bordo della gonna."
+    },
+    {
+      "id": "it-holdout-v4-602",
+      "field": "caption",
+      "text": "Ho scelto questa stampa per la sua atmosfera da festa serale."
+    },
+    {
+      "id": "it-holdout-v4-603",
+      "field": "altText",
+      "text": "Piccole lanterne sospese compongono il motivo stampato sul tessuto."
+    },
+    {
+      "id": "it-holdout-v4-604",
+      "field": "altText",
+      "text": "Fili curvi collegano le sagome delle lanterne lungo l'orlo."
+    },
+    {
+      "id": "it-holdout-v4-605",
+      "field": "caption",
+      "text": "Due ciliegie unite tornano più volte sulla mia camicetta."
+    },
+    {
+      "id": "it-holdout-v4-606",
+      "field": "caption",
+      "text": "Mi piace il dettaglio del picciolo che disegna una piccola V."
+    },
+    {
+      "id": "it-holdout-v4-607",
+      "field": "altText",
+      "text": "Coppie di ciliegie con foglie sono stampate sulla camicetta."
+    },
+    {
+      "id": "it-holdout-v4-608",
+      "field": "altText",
+      "text": "Il motivo ripete frutti tondi collegati da due piccioli sottili."
+    },
+    {
+      "id": "it-holdout-v4-609",
+      "field": "caption",
+      "text": "La volpe ricamata si arrotola vicino al bordo della tasca."
+    },
+    {
+      "id": "it-holdout-v4-610",
+      "field": "caption",
+      "text": "Ho finito la coda ieri sera e oggi indosso il risultato."
+    },
+    {
+      "id": "it-holdout-v4-611",
+      "field": "altText",
+      "text": "Una volpe rannicchiata è ricamata sull'angolo della tasca."
+    },
+    {
+      "id": "it-holdout-v4-612",
+      "field": "altText",
+      "text": "La grande coda cucita circonda il corpo della piccola volpe."
+    },
+    {
+      "id": "it-holdout-v4-613",
+      "field": "caption",
+      "text": "Le fasi della luna seguono il bordo del mio foulard."
+    },
+    {
+      "id": "it-holdout-v4-614",
+      "field": "caption",
+      "text": "Lo apro tutto per mostrarvi la sequenza dei piccoli cerchi."
+    },
+    {
+      "id": "it-holdout-v4-615",
+      "field": "altText",
+      "text": "Una fila di fasi lunari è stampata vicino al bordo."
+    },
+    {
+      "id": "it-holdout-v4-616",
+      "field": "altText",
+      "text": "Falci e cerchi pieni si alternano lungo il perimetro del foulard."
+    },
+    {
+      "id": "it-holdout-v4-617",
+      "field": "caption",
+      "text": "Il gatto cucito guarda fuori da una finestrella disegnata."
+    },
+    {
+      "id": "it-holdout-v4-618",
+      "field": "caption",
+      "text": "Questo piccolo ricamo rende allegra la mia maglia più semplice."
+    },
+    {
+      "id": "it-holdout-v4-619",
+      "field": "altText",
+      "text": "Un gatto ricamato è seduto nel riquadro di una finestra."
+    },
+    {
+      "id": "it-holdout-v4-620",
+      "field": "altText",
+      "text": "La coda del gatto scende oltre il bordo del davanzale cucito."
+    },
+    {
+      "id": "it-holdout-v4-621",
+      "field": "caption",
+      "text": "I piccoli tram stampati sembrano attraversare la mia camicia."
+    },
+    {
+      "id": "it-holdout-v4-622",
+      "field": "caption",
+      "text": "Mi diverte vedere le finestrelle anche da una certa distanza."
+    },
+    {
+      "id": "it-holdout-v4-623",
+      "field": "altText",
+      "text": "Vagoni di tram stilizzati si ripetono sulla superficie della camicia."
+    },
+    {
+      "id": "it-holdout-v4-624",
+      "field": "altText",
+      "text": "Ogni piccolo veicolo stampato presenta ruote e finestre rettangolari."
+    },
+    {
+      "id": "it-holdout-v4-625",
+      "field": "caption",
+      "text": "Il disegno dei ponti crea una sequenza tranquilla sulla gonna."
+    },
+    {
+      "id": "it-holdout-v4-626",
+      "field": "caption",
+      "text": "Ho ripreso la curva degli archi con una borsa rotonda."
+    },
+    {
+      "id": "it-holdout-v4-627",
+      "field": "altText",
+      "text": "Ponti ad arco illustrati formano una fascia sul fondo della gonna."
+    },
+    {
+      "id": "it-holdout-v4-628",
+      "field": "altText",
+      "text": "Piccole arcate si ripetono sopra linee che rappresentano l'acqua."
+    },
+    {
+      "id": "it-holdout-v4-629",
+      "field": "caption",
+      "text": "Una ghianda ricamata sbuca accanto al bottone della mia giacca."
+    },
+    {
+      "id": "it-holdout-v4-630",
+      "field": "caption",
+      "text": "La cupoletta ha piccoli punti diversi dal resto del disegno."
+    },
+    {
+      "id": "it-holdout-v4-631",
+      "field": "altText",
+      "text": "Il ricamo di una ghianda occupa lo spazio vicino a un bottone."
+    },
+    {
+      "id": "it-holdout-v4-632",
+      "field": "altText",
+      "text": "Punti fitti distinguono la cupola dal corpo liscio della ghianda."
+    },
+    {
+      "id": "it-holdout-v4-633",
+      "field": "caption",
+      "text": "Gli aquiloni stampati hanno fili che si intrecciano sulla schiena."
+    },
+    {
+      "id": "it-holdout-v4-634",
+      "field": "caption",
+      "text": "Una camicia con un disegno pieno di aria e movimento."
+    },
+    {
+      "id": "it-holdout-v4-635",
+      "field": "altText",
+      "text": "Aquiloni a rombo con lunghe code coprono il retro della camicia."
+    },
+    {
+      "id": "it-holdout-v4-636",
+      "field": "altText",
+      "text": "Fili sottili disegnati collegano figure geometriche simili ad aquiloni."
+    },
+    {
+      "id": "it-holdout-v4-637",
+      "field": "caption",
+      "text": "Questi piccoli biscotti disegnati mi fanno pensare alla merenda."
+    },
+    {
+      "id": "it-holdout-v4-638",
+      "field": "caption",
+      "text": "Il motivo del grembiule accompagna il nostro pomeriggio in cucina."
+    },
+    {
+      "id": "it-holdout-v4-639",
+      "field": "altText",
+      "text": "Un grembiule presenta biscotti illustrati di forme diverse."
+    },
+    {
+      "id": "it-holdout-v4-640",
+      "field": "altText",
+      "text": "Sagome tonde e stellate sono sparse tra piccoli puntini stampati."
+    },
+    {
+      "id": "it-holdout-v4-641",
+      "field": "caption",
+      "text": "Le biciclette del foulard hanno cestini minuscoli davanti al manubrio."
+    },
+    {
+      "id": "it-holdout-v4-642",
+      "field": "caption",
+      "text": "L'ho scelto perché mi somiglia anche nei piccoli dettagli."
+    },
+    {
+      "id": "it-holdout-v4-643",
+      "field": "altText",
+      "text": "Biciclette con cestino si ripetono su un foulard disteso."
+    },
+    {
+      "id": "it-holdout-v4-644",
+      "field": "altText",
+      "text": "Ruote circolari e telai sottili compongono il motivo dell'accessorio."
+    },
+    {
+      "id": "it-holdout-v4-645",
+      "field": "caption",
+      "text": "La mia casetta ricamata ha una porta che si apre davvero."
+    },
+    {
+      "id": "it-holdout-v4-646",
+      "field": "caption",
+      "text": "Ho aggiunto un lembo minuscolo per rendere il disegno più giocoso."
+    },
+    {
+      "id": "it-holdout-v4-647",
+      "field": "altText",
+      "text": "Una piccola porta di tessuto si solleva sul ricamo di una casa."
+    },
+    {
+      "id": "it-holdout-v4-648",
+      "field": "altText",
+      "text": "Il motivo della casetta include una finestrella e un tetto cucito."
+    },
+    {
+      "id": "it-holdout-v4-649",
+      "field": "caption",
+      "text": "La coda del pavone si apre in un grande ventaglio sulla schiena."
+    },
+    {
+      "id": "it-holdout-v4-650",
+      "field": "caption",
+      "text": "Mi giro per mostrare il disegno completo di questa giacca."
+    },
+    {
+      "id": "it-holdout-v4-651",
+      "field": "altText",
+      "text": "Un pavone con la coda aperta occupa il retro della giacca."
+    },
+    {
+      "id": "it-holdout-v4-652",
+      "field": "altText",
+      "text": "Occhi decorativi si ripetono sulle piume stampate a raggiera."
+    },
+    {
+      "id": "it-holdout-v4-653",
+      "field": "caption",
+      "text": "I gomitoli disegnati sembrano lasciare fili lungo tutta la borsa."
+    },
+    {
+      "id": "it-holdout-v4-654",
+      "field": "caption",
+      "text": "È il motivo giusto per portare con me il lavoro a maglia."
+    },
+    {
+      "id": "it-holdout-v4-655",
+      "field": "altText",
+      "text": "Gomitoli e aghi illustrati decorano il pannello esterno della borsa."
+    },
+    {
+      "id": "it-holdout-v4-656",
+      "field": "altText",
+      "text": "Lunghi fili stampati collegano piccoli gomitoli sparsi sul tessuto."
+    },
+    {
+      "id": "it-holdout-v4-657",
+      "field": "caption",
+      "text": "Questo percorso rotondo termina al centro della mia maglietta."
+    },
+    {
+      "id": "it-holdout-v4-658",
+      "field": "caption",
+      "text": "Ho seguito tutte le curve per trovare l'uscita del disegno."
+    },
+    {
+      "id": "it-holdout-v4-659",
+      "field": "altText",
+      "text": "Un labirinto circolare è stampato al centro della maglietta."
+    },
+    {
+      "id": "it-holdout-v4-660",
+      "field": "altText",
+      "text": "Pareti curve concentriche lasciano piccoli passaggi nella stampa rotonda."
+    },
+    {
+      "id": "it-holdout-v4-661",
+      "field": "caption",
+      "text": "Due mani ricamate formano insieme la sagoma di un uccello."
+    },
+    {
+      "id": "it-holdout-v4-662",
+      "field": "caption",
+      "text": "Mi ricorda i giochi di ombre fatti da piccoli."
+    },
+    {
+      "id": "it-holdout-v4-663",
+      "field": "altText",
+      "text": "Sagome sovrapposte di mani creano un uccello sul davanti del top."
+    },
+    {
+      "id": "it-holdout-v4-664",
+      "field": "altText",
+      "text": "Il ricamo mostra dita aperte che compongono ali stilizzate."
+    },
+    {
+      "id": "it-holdout-v4-665",
+      "field": "caption",
+      "text": "I dadi della stampa mostrano facce diverse sulla mia gonna."
+    },
+    {
+      "id": "it-holdout-v4-666",
+      "field": "caption",
+      "text": "Un motivo geometrico con un piccolo ricordo dei giochi in famiglia."
+    },
+    {
+      "id": "it-holdout-v4-667",
+      "field": "altText",
+      "text": "Cubi illustrati con puntini sono distribuiti lungo la gonna."
+    },
+    {
+      "id": "it-holdout-v4-668",
+      "field": "altText",
+      "text": "Il motivo ripete dadi inclinati che mostrano diverse facce."
+    },
+    {
+      "id": "it-holdout-v4-669",
+      "field": "caption",
+      "text": "Piccoli libri aperti riempiono questa borsa da biblioteca."
+    },
+    {
+      "id": "it-holdout-v4-670",
+      "field": "caption",
+      "text": "Ho trovato un accessorio che racconta bene le mie pause preferite."
+    },
+    {
+      "id": "it-holdout-v4-671",
+      "field": "altText",
+      "text": "Libri illustrati aperti e chiusi decorano la borsa rettangolare."
+    },
+    {
+      "id": "it-holdout-v4-672",
+      "field": "altText",
+      "text": "Le pagine disegnate formano piccoli ventagli sulla superficie del tessuto."
+    },
+    {
+      "id": "it-holdout-v4-673",
+      "field": "caption",
+      "text": "Una gru di carta è diventata il soggetto del mio ricamo."
+    },
+    {
+      "id": "it-holdout-v4-674",
+      "field": "caption",
+      "text": "Le linee dritte del filo seguono le pieghe del modellino."
+    },
+    {
+      "id": "it-holdout-v4-675",
+      "field": "altText",
+      "text": "Il ricamo rappresenta una gru origami con ali triangolari."
+    },
+    {
+      "id": "it-holdout-v4-676",
+      "field": "altText",
+      "text": "Segmenti cuciti delineano le pieghe di un uccello di carta."
+    },
+    {
+      "id": "it-holdout-v4-677",
+      "field": "caption",
+      "text": "I raggi partono tutti dal bottone centrale del mio top."
+    },
+    {
+      "id": "it-holdout-v4-678",
+      "field": "caption",
+      "text": "Questa stampa a raggiera rende speciale una forma molto semplice."
+    },
+    {
+      "id": "it-holdout-v4-679",
+      "field": "altText",
+      "text": "Il centro del top è circondato da una raggiera di tratti stampati."
+    },
+    {
+      "id": "it-holdout-v4-680",
+      "field": "altText",
+      "text": "Un motivo a raggi copre il tessuto attorno alla chiusura."
+    },
+    {
+      "id": "it-holdout-v4-681",
+      "field": "caption",
+      "text": "Stacco il secondo modulo e gli orecchini diventano più corti."
+    },
+    {
+      "id": "it-holdout-v4-682",
+      "field": "caption",
+      "text": "Tengo i pendenti lunghi nella pochette per aggiungerli dopo."
+    },
+    {
+      "id": "it-holdout-v4-683",
+      "field": "altText",
+      "text": "Due parti rimovibili sono posate accanto agli orecchini corti."
+    },
+    {
+      "id": "it-holdout-v4-684",
+      "field": "altText",
+      "text": "Piccoli ganci collegano il modulo inferiore al gioiello principale."
+    },
+    {
+      "id": "it-holdout-v4-685",
+      "field": "caption",
+      "text": "Faccio scorrere la chiusura per cambiare la lunghezza dei due fili."
+    },
+    {
+      "id": "it-holdout-v4-686",
+      "field": "caption",
+      "text": "Oggi porto il pendente alto e lascio cadere il resto."
+    },
+    {
+      "id": "it-holdout-v4-687",
+      "field": "altText",
+      "text": "Una chiusura scorrevole regola due estremità pendenti della collana."
+    },
+    {
+      "id": "it-holdout-v4-688",
+      "field": "altText",
+      "text": "I fili passano attraverso un piccolo cursore sotto il collo."
+    },
+    {
+      "id": "it-holdout-v4-689",
+      "field": "caption",
+      "text": "Questo anello unisce due dita con un ponte sottile."
+    },
+    {
+      "id": "it-holdout-v4-690",
+      "field": "caption",
+      "text": "Mi piace il suo disegno lungo, quasi appoggiato sulla mano."
+    },
+    {
+      "id": "it-holdout-v4-691",
+      "field": "altText",
+      "text": "Un gioiello attraversa due dita tramite un elemento orizzontale."
+    },
+    {
+      "id": "it-holdout-v4-692",
+      "field": "altText",
+      "text": "Due anelli separati sono collegati da un ponte decorativo."
+    },
+    {
+      "id": "it-holdout-v4-693",
+      "field": "caption",
+      "text": "La catenina scende dal bracciale fino al piccolo anello."
+    },
+    {
+      "id": "it-holdout-v4-694",
+      "field": "caption",
+      "text": "Un solo gioiello disegna una linea sul dorso della mano."
+    },
+    {
+      "id": "it-holdout-v4-695",
+      "field": "altText",
+      "text": "Una catena sottile collega il bracciale a un anello indossato."
+    },
+    {
+      "id": "it-holdout-v4-696",
+      "field": "altText",
+      "text": "Il gioiello segue il centro della mano tra polso e dito."
+    },
+    {
+      "id": "it-holdout-v4-697",
+      "field": "caption",
+      "text": "Faccio passare il filo e regolo le due estremità degli orecchini."
+    },
+    {
+      "id": "it-holdout-v4-698",
+      "field": "caption",
+      "text": "Oggi le lascio di lunghezze quasi uguali ai lati del lobo."
+    },
+    {
+      "id": "it-holdout-v4-699",
+      "field": "altText",
+      "text": "Un orecchino a filo attraversa il lobo con due estremità libere."
+    },
+    {
+      "id": "it-holdout-v4-700",
+      "field": "altText",
+      "text": "La catenina sottile pende sia davanti sia dietro l'orecchio."
+    },
+    {
+      "id": "it-holdout-v4-701",
+      "field": "caption",
+      "text": "Attorciglio i fili prima di chiudere la collana dietro il collo."
+    },
+    {
+      "id": "it-holdout-v4-702",
+      "field": "caption",
+      "text": "Le perle formano una spirale morbida invece di restare separate."
+    },
+    {
+      "id": "it-holdout-v4-703",
+      "field": "altText",
+      "text": "Diversi fili di perle sono ritorti insieme attorno al collo."
+    },
+    {
+      "id": "it-holdout-v4-704",
+      "field": "altText",
+      "text": "La collana presenta una torsione regolare lungo la parte anteriore."
+    },
+    {
+      "id": "it-holdout-v4-705",
+      "field": "caption",
+      "text": "Le due sfere del bracciale si avvicinano senza toccarsi."
+    },
+    {
+      "id": "it-holdout-v4-706",
+      "field": "caption",
+      "text": "Lo infilo dal lato aperto e lo sistemo sul polso."
+    },
+    {
+      "id": "it-holdout-v4-707",
+      "field": "altText",
+      "text": "Un bracciale aperto termina con due sfere rivolte una verso l'altra."
+    },
+    {
+      "id": "it-holdout-v4-708",
+      "field": "altText",
+      "text": "Tra le estremità tonde del gioiello rimane un piccolo spazio."
+    },
+    {
+      "id": "it-holdout-v4-709",
+      "field": "caption",
+      "text": "Il medaglione si apre e rivela un piccolo fiore essiccato."
+    },
+    {
+      "id": "it-holdout-v4-710",
+      "field": "caption",
+      "text": "L'ho scelto per custodire un dettaglio minuscolo vicino al cuore."
+    },
+    {
+      "id": "it-holdout-v4-711",
+      "field": "altText",
+      "text": "Un pendente apribile contiene un fiore secco dietro una finestrella."
+    },
+    {
+      "id": "it-holdout-v4-712",
+      "field": "altText",
+      "text": "Il medaglione aperto mostra due metà unite da una cerniera."
+    },
+    {
+      "id": "it-holdout-v4-713",
+      "field": "caption",
+      "text": "Due spille piccole tengono una catenella curva sulla mia giacca."
+    },
+    {
+      "id": "it-holdout-v4-714",
+      "field": "caption",
+      "text": "Ho scelto altezze diverse per far scendere il filo in diagonale."
+    },
+    {
+      "id": "it-holdout-v4-715",
+      "field": "altText",
+      "text": "Una catena collega due spille fissate in punti distanti della giacca."
+    },
+    {
+      "id": "it-holdout-v4-716",
+      "field": "altText",
+      "text": "Tra i piccoli fermagli pende una catena leggermente incurvata."
+    },
+    {
+      "id": "it-holdout-v4-717",
+      "field": "caption",
+      "text": "Il piccolo sigillo inciso resta rivolto verso di me oggi."
+    },
+    {
+      "id": "it-holdout-v4-718",
+      "field": "caption",
+      "text": "Mi piace osservare il disegno piatto invece di aggiungere altri anelli."
+    },
+    {
+      "id": "it-holdout-v4-719",
+      "field": "altText",
+      "text": "Un anello presenta una superficie piatta incisa con un motivo geometrico."
+    },
+    {
+      "id": "it-holdout-v4-720",
+      "field": "altText",
+      "text": "La parte superiore larga del sigillo poggia sopra un dito."
+    },
+    {
+      "id": "it-holdout-v4-721",
+      "field": "caption",
+      "text": "La spirale metallica raccoglie una ciocca senza coprire tutta la pettinatura."
+    },
+    {
+      "id": "it-holdout-v4-722",
+      "field": "caption",
+      "text": "La avvito piano e lascio il disegno visibile sul lato."
+    },
+    {
+      "id": "it-holdout-v4-723",
+      "field": "altText",
+      "text": "Una forcina a spirale è inserita nella ciocca arrotolata."
+    },
+    {
+      "id": "it-holdout-v4-724",
+      "field": "altText",
+      "text": "Il metallo segue diversi giri circolari tra i capelli raccolti."
+    },
+    {
+      "id": "it-holdout-v4-725",
+      "field": "caption",
+      "text": "Il nastro entra nella treccia e ricompare a ogni intreccio."
+    },
+    {
+      "id": "it-holdout-v4-726",
+      "field": "caption",
+      "text": "Ho lasciato una piccola coda libera alla fine della pettinatura."
+    },
+    {
+      "id": "it-holdout-v4-727",
+      "field": "altText",
+      "text": "Un nastro attraversa una treccia mescolandosi alle ciocche di capelli."
+    },
+    {
+      "id": "it-holdout-v4-728",
+      "field": "altText",
+      "text": "La banda intrecciata segue tutta la lunghezza della treccia."
+    },
+    {
+      "id": "it-holdout-v4-729",
+      "field": "caption",
+      "text": "Un solo bastoncino tiene fermo il raccolto durante la giornata."
+    },
+    {
+      "id": "it-holdout-v4-730",
+      "field": "caption",
+      "text": "Ho imparato a incrociarlo sotto i capelli con un gesto semplice."
+    },
+    {
+      "id": "it-holdout-v4-731",
+      "field": "altText",
+      "text": "Un bastoncino attraversa un nodo di capelli arrotolati."
+    },
+    {
+      "id": "it-holdout-v4-732",
+      "field": "altText",
+      "text": "Le due estremità dell'accessorio sporgono ai lati del chignon."
+    },
+    {
+      "id": "it-holdout-v4-733",
+      "field": "caption",
+      "text": "Le forcine disegnano una piccola freccia sopra l'orecchio."
+    },
+    {
+      "id": "it-holdout-v4-734",
+      "field": "caption",
+      "text": "Mi sono divertita a comporre una forma con accessori semplicissimi."
+    },
+    {
+      "id": "it-holdout-v4-735",
+      "field": "altText",
+      "text": "Diverse forcine dritte sono disposte a freccia tra i capelli."
+    },
+    {
+      "id": "it-holdout-v4-736",
+      "field": "altText",
+      "text": "Gli accessori metallici convergono in un motivo angolare laterale."
+    },
+    {
+      "id": "it-holdout-v4-737",
+      "field": "caption",
+      "text": "Le perline alle estremità delle trecce accompagnano i movimenti della testa."
+    },
+    {
+      "id": "it-holdout-v4-738",
+      "field": "caption",
+      "text": "Ho scelto pochi elementi per non appesantire le ciocche."
+    },
+    {
+      "id": "it-holdout-v4-739",
+      "field": "altText",
+      "text": "Piccole perline chiudono le estremità di alcune trecce sottili."
+    },
+    {
+      "id": "it-holdout-v4-740",
+      "field": "altText",
+      "text": "I terminali decorati pendono liberi vicino alle spalle."
+    },
+    {
+      "id": "it-holdout-v4-741",
+      "field": "caption",
+      "text": "Le due placche si incontrano e formano una clessidra sulla vita."
+    },
+    {
+      "id": "it-holdout-v4-742",
+      "field": "caption",
+      "text": "La cintura è il punto centrale del completo di oggi."
+    },
+    {
+      "id": "it-holdout-v4-743",
+      "field": "altText",
+      "text": "Due placche metalliche curve compongono una fibbia a clessidra."
+    },
+    {
+      "id": "it-holdout-v4-744",
+      "field": "altText",
+      "text": "La chiusura larga si restringe al centro del davanti della cintura."
+    },
+    {
+      "id": "it-holdout-v4-745",
+      "field": "caption",
+      "text": "La catena doppia scende da un fianco con due curve diverse."
+    },
+    {
+      "id": "it-holdout-v4-746",
+      "field": "caption",
+      "text": "La porto morbida sopra la gonna, senza stringere la vita."
+    },
+    {
+      "id": "it-holdout-v4-747",
+      "field": "altText",
+      "text": "Due file di catena formano archi sovrapposti intorno ai fianchi."
+    },
+    {
+      "id": "it-holdout-v4-748",
+      "field": "altText",
+      "text": "La cintura metallica presenta una parte pendente sul lato sinistro."
+    },
+    {
+      "id": "it-holdout-v4-749",
+      "field": "caption",
+      "text": "La zip gira tutta intorno al collo e permette di staccarlo."
+    },
+    {
+      "id": "it-holdout-v4-750",
+      "field": "caption",
+      "text": "Metto il collo imbottito nella borsa quando non serve più."
+    },
+    {
+      "id": "it-holdout-v4-751",
+      "field": "altText",
+      "text": "Una cerniera circolare collega il collo alto alla giacca."
+    },
+    {
+      "id": "it-holdout-v4-752",
+      "field": "altText",
+      "text": "Il collo staccato è appoggiato accanto all'apertura superiore del capo."
+    },
+    {
+      "id": "it-holdout-v4-753",
+      "field": "caption",
+      "text": "La fascia larga si chiude in un attimo sopra il piede."
+    },
+    {
+      "id": "it-holdout-v4-754",
+      "field": "caption",
+      "text": "Ho scelto queste scarpe per i giorni pieni di spostamenti."
+    },
+    {
+      "id": "it-holdout-v4-755",
+      "field": "altText",
+      "text": "Una fascia con velcro attraversa la parte superiore della scarpa."
+    },
+    {
+      "id": "it-holdout-v4-756",
+      "field": "altText",
+      "text": "La chiusura sollevata mostra due superfici di aggancio sovrapposte."
+    },
+    {
+      "id": "it-holdout-v4-757",
+      "field": "caption",
+      "text": "Le nappine dei mocassini si muovono appena a ogni passo."
+    },
+    {
+      "id": "it-holdout-v4-758",
+      "field": "caption",
+      "text": "Mi piace questo dettaglio piccolo sotto i pantaloni dritti."
+    },
+    {
+      "id": "it-holdout-v4-759",
+      "field": "altText",
+      "text": "Due nappine pendono sul davanti di ciascun mocassino."
+    },
+    {
+      "id": "it-holdout-v4-760",
+      "field": "altText",
+      "text": "Piccoli ciuffi decorativi sono fissati sopra la linguetta della scarpa."
+    },
+    {
+      "id": "it-holdout-v4-761",
+      "field": "caption",
+      "text": "Le traforature disegnano una piccola ala sulla punta delle scarpe."
+    },
+    {
+      "id": "it-holdout-v4-762",
+      "field": "caption",
+      "text": "Le guardo da vicino prima di scegliere i calzini."
+    },
+    {
+      "id": "it-holdout-v4-763",
+      "field": "altText",
+      "text": "Fori decorativi formano un motivo ad ala sulla punta delle stringate."
+    },
+    {
+      "id": "it-holdout-v4-764",
+      "field": "altText",
+      "text": "Una sequenza di piccoli trafori segue le cuciture della tomaia."
+    },
+    {
+      "id": "it-holdout-v4-765",
+      "field": "caption",
+      "text": "I lacci arrivano quasi fino alle dita su queste scarpe."
+    },
+    {
+      "id": "it-holdout-v4-766",
+      "field": "caption",
+      "text": "Posso regolare bene tutta la parte davanti del piede."
+    },
+    {
+      "id": "it-holdout-v4-767",
+      "field": "altText",
+      "text": "La fila degli occhielli prosegue fino vicino alla punta della scarpa."
+    },
+    {
+      "id": "it-holdout-v4-768",
+      "field": "altText",
+      "text": "I lacci attraversano numerose coppie di fori lungo la tomaia."
+    },
+    {
+      "id": "it-holdout-v4-769",
+      "field": "caption",
+      "text": "L'anello per l'alluce tiene fermo il sandalo con pochissime fasce."
+    },
+    {
+      "id": "it-holdout-v4-770",
+      "field": "caption",
+      "text": "Oggi cerco una linea leggera per una passeggiata breve."
+    },
+    {
+      "id": "it-holdout-v4-771",
+      "field": "altText",
+      "text": "Un anello di cuoio circonda l'alluce sul sandalo aperto."
+    },
+    {
+      "id": "it-holdout-v4-772",
+      "field": "altText",
+      "text": "La fascia attraversa il sandalo lasciando liberi quasi tutti i lati."
+    },
+    {
+      "id": "it-holdout-v4-773",
+      "field": "caption",
+      "text": "Il tacco trasparente sembra alleggerire tutta la scarpa."
+    },
+    {
+      "id": "it-holdout-v4-774",
+      "field": "caption",
+      "text": "Lo lascio visibile sotto un orlo che termina alla caviglia."
+    },
+    {
+      "id": "it-holdout-v4-775",
+      "field": "altText",
+      "text": "Un tacco trasparente sostiene la parte posteriore della scarpa."
+    },
+    {
+      "id": "it-holdout-v4-776",
+      "field": "altText",
+      "text": "La luce attraversa il sostegno largo sotto il tallone."
+    },
+    {
+      "id": "it-holdout-v4-777",
+      "field": "caption",
+      "text": "L'impugnatura della borsa passa attraverso un cerchio rigido invece di cuciture."
+    },
+    {
+      "id": "it-holdout-v4-778",
+      "field": "caption",
+      "text": "Mi piace questa costruzione semplice che si capisce al primo sguardo."
+    },
+    {
+      "id": "it-holdout-v4-779",
+      "field": "altText",
+      "text": "Un manico circolare attraversa le asole del bordo superiore della borsa."
+    },
+    {
+      "id": "it-holdout-v4-780",
+      "field": "altText",
+      "text": "Il tessuto raccolto scorre intorno a un grande anello rigido."
+    },
+    {
+      "id": "it-holdout-v4-781",
+      "field": "caption",
+      "text": "Il lembo si chiude in due posizioni secondo quanto porto."
+    },
+    {
+      "id": "it-holdout-v4-782",
+      "field": "caption",
+      "text": "Oggi scelgo la chiusura più stretta per tenere tutto raccolto."
+    },
+    {
+      "id": "it-holdout-v4-783",
+      "field": "altText",
+      "text": "Due file di automatici regolano la patta superiore della borsa."
+    },
+    {
+      "id": "it-holdout-v4-784",
+      "field": "altText",
+      "text": "Il lembo ripiegato può agganciarsi a due altezze diverse."
+    },
+    {
+      "id": "it-holdout-v4-785",
+      "field": "caption",
+      "text": "Gli archi della borsa formano una piccola gabbia aperta."
+    },
+    {
+      "id": "it-holdout-v4-786",
+      "field": "caption",
+      "text": "Dentro tengo una pochette che posso togliere facilmente."
+    },
+    {
+      "id": "it-holdout-v4-787",
+      "field": "altText",
+      "text": "Elementi arcuati rigidi formano una borsa con grandi spazi aperti."
+    },
+    {
+      "id": "it-holdout-v4-788",
+      "field": "altText",
+      "text": "Una pochette chiusa occupa il centro della struttura a gabbia."
+    },
+    {
+      "id": "it-holdout-v4-789",
+      "field": "caption",
+      "text": "Il cerchio vuoto al centro diventa anche l'impugnatura della borsa."
+    },
+    {
+      "id": "it-holdout-v4-790",
+      "field": "caption",
+      "text": "Mi piace portarla infilando la mano direttamente nella sua forma."
+    },
+    {
+      "id": "it-holdout-v4-791",
+      "field": "altText",
+      "text": "Una borsa piatta presenta una grande apertura circolare centrale."
+    },
+    {
+      "id": "it-holdout-v4-792",
+      "field": "altText",
+      "text": "La mano attraversa il foro rotondo che sostituisce il manico."
+    },
+    {
+      "id": "it-holdout-v4-793",
+      "field": "caption",
+      "text": "La custodia sagomata sostiene le spalle dell'abito durante il viaggio."
+    },
+    {
+      "id": "it-holdout-v4-794",
+      "field": "caption",
+      "text": "Appendo il completo appena arrivo per lasciargli riprendere forma."
+    },
+    {
+      "id": "it-holdout-v4-795",
+      "field": "altText",
+      "text": "Una custodia lunga contiene un abito appeso a una gruccia sagomata."
+    },
+    {
+      "id": "it-holdout-v4-796",
+      "field": "altText",
+      "text": "Il portabiti aperto mostra il completo protetto durante il trasporto."
+    },
+    {
+      "id": "it-holdout-v4-797",
+      "field": "caption",
+      "text": "I piccoli bottoni sotto le punte tengono il colletto ordinato."
+    },
+    {
+      "id": "it-holdout-v4-798",
+      "field": "caption",
+      "text": "Rimangono nascosti, ma aiutano molto quando indosso il maglione."
+    },
+    {
+      "id": "it-holdout-v4-799",
+      "field": "altText",
+      "text": "Piccoli bottoni nascosti fissano le punte del colletto alla camicia."
+    },
+    {
+      "id": "it-holdout-v4-800",
+      "field": "altText",
+      "text": "Una punta sollevata rivela l'asola interna sotto il tessuto."
+    },
+    {
+      "id": "it-holdout-v4-801",
+      "field": "caption",
+      "text": "Le ancore minuscole riempiono il bordo della mia camicia."
+    },
+    {
+      "id": "it-holdout-v4-802",
+      "field": "caption",
+      "text": "Un motivo marinaro semplice per accompagnare i pantaloni larghi."
+    },
+    {
+      "id": "it-holdout-v4-803",
+      "field": "altText",
+      "text": "Piccole ancore stampate seguono il bordo inferiore della camicia."
+    },
+    {
+      "id": "it-holdout-v4-804",
+      "field": "altText",
+      "text": "Il disegno ripete ancore con anelli tondi e bracci curvi."
+    },
+    {
+      "id": "it-holdout-v4-805",
+      "field": "caption",
+      "text": "I ventagli disegnati si sovrappongono come squame sulla gonna."
+    },
+    {
+      "id": "it-holdout-v4-806",
+      "field": "caption",
+      "text": "Mi piace la regolarità delle curve in questa stampa."
+    },
+    {
+      "id": "it-holdout-v4-807",
+      "field": "altText",
+      "text": "Ventagli stilizzati sovrapposti compongono un motivo continuo sulla gonna."
+    },
+    {
+      "id": "it-holdout-v4-808",
+      "field": "altText",
+      "text": "Semicerchi rigati si ripetono in file sfalsate sul tessuto."
+    },
+    {
+      "id": "it-holdout-v4-809",
+      "field": "caption",
+      "text": "Due cavallucci marini si guardano al centro del foulard."
+    },
+    {
+      "id": "it-holdout-v4-810",
+      "field": "caption",
+      "text": "Lo indosso lasciando visibili quelle piccole code arrotolate."
+    },
+    {
+      "id": "it-holdout-v4-811",
+      "field": "altText",
+      "text": "Cavallucci marini speculari sono stampati al centro del foulard."
+    },
+    {
+      "id": "it-holdout-v4-812",
+      "field": "altText",
+      "text": "Le due figure presentano musi allungati e code avvolte a spirale."
+    },
+    {
+      "id": "it-holdout-v4-813",
+      "field": "caption",
+      "text": "Le vecchie chiavi illustrate rendono curiosa questa piccola borsa."
+    },
+    {
+      "id": "it-holdout-v4-814",
+      "field": "caption",
+      "text": "Cerco sempre di capire quale delle forme mi piace di più."
+    },
+    {
+      "id": "it-holdout-v4-815",
+      "field": "altText",
+      "text": "Chiavi stilizzate con impugnature diverse coprono il tessuto della borsa."
+    },
+    {
+      "id": "it-holdout-v4-816",
+      "field": "altText",
+      "text": "Denti rettangolari e anelli decorati distinguono le piccole chiavi stampate."
+    },
+    {
+      "id": "it-holdout-v4-817",
+      "field": "caption",
+      "text": "Ho aggiunto un vasetto ricamato sopra la tasca dei pantaloni."
+    },
+    {
+      "id": "it-holdout-v4-818",
+      "field": "caption",
+      "text": "Il cactus ha pochissimi punti, ma si riconosce subito."
+    },
+    {
+      "id": "it-holdout-v4-819",
+      "field": "altText",
+      "text": "Un cactus dentro un vaso è ricamato vicino alla tasca."
+    },
+    {
+      "id": "it-holdout-v4-820",
+      "field": "altText",
+      "text": "Piccoli trattini rappresentano le spine attorno alla sagoma della pianta."
+    },
+    {
+      "id": "it-holdout-v4-821",
+      "field": "caption",
+      "text": "La navicella sul retro sembra partire dalle pieghe del cappuccio."
+    },
+    {
+      "id": "it-holdout-v4-822",
+      "field": "caption",
+      "text": "Mi diverte il piccolo viaggio spaziale disegnato su questa felpa."
+    },
+    {
+      "id": "it-holdout-v4-823",
+      "field": "altText",
+      "text": "Una navicella illustrata occupa il retro della felpa."
+    },
+    {
+      "id": "it-holdout-v4-824",
+      "field": "altText",
+      "text": "Il disegno mostra un razzo circondato da piccoli pianeti."
+    },
+    {
+      "id": "it-holdout-v4-825",
+      "field": "caption",
+      "text": "Pennelli e matite disegnati accompagnano il mio grembiule da laboratorio."
+    },
+    {
+      "id": "it-holdout-v4-826",
+      "field": "caption",
+      "text": "Ho scelto questa fantasia perché racconta bene le mie giornate creative."
+    },
+    {
+      "id": "it-holdout-v4-827",
+      "field": "altText",
+      "text": "Pennelli e matite incrociati formano la stampa del grembiule."
+    },
+    {
+      "id": "it-holdout-v4-828",
+      "field": "altText",
+      "text": "Piccole gocce illustrate circondano gli strumenti da disegno sul tessuto."
+    },
+    {
+      "id": "it-holdout-v4-829",
+      "field": "caption",
+      "text": "La lumachina ricamata avanza piano vicino all'orlo della giacca."
+    },
+    {
+      "id": "it-holdout-v4-830",
+      "field": "caption",
+      "text": "Ho usato una spirale semplice per disegnare il suo guscio."
+    },
+    {
+      "id": "it-holdout-v4-831",
+      "field": "altText",
+      "text": "Una lumaca ricamata presenta un guscio a spirale vicino all'orlo."
+    },
+    {
+      "id": "it-holdout-v4-832",
+      "field": "altText",
+      "text": "Il corpo cucito si allunga sotto una conchiglia rotonda."
+    },
+    {
+      "id": "it-holdout-v4-833",
+      "field": "caption",
+      "text": "Le bustine di tè stampate hanno cartellini piccolissimi sul filo."
+    },
+    {
+      "id": "it-holdout-v4-834",
+      "field": "caption",
+      "text": "Questa maglietta mi sembra perfetta per la pausa del pomeriggio."
+    },
+    {
+      "id": "it-holdout-v4-835",
+      "field": "altText",
+      "text": "Piccole bustine di tè illustrate sono sparse sulla maglietta."
+    },
+    {
+      "id": "it-holdout-v4-836",
+      "field": "altText",
+      "text": "Ogni bustina stampata è collegata a un cartellino tramite una linea."
+    },
+    {
+      "id": "it-holdout-v4-837",
+      "field": "caption",
+      "text": "Il disegno riproduce gli anelli del legno su questa borsa rotonda."
+    },
+    {
+      "id": "it-holdout-v4-838",
+      "field": "caption",
+      "text": "Mi piace la piccola irregolarità delle linee concentriche."
+    },
+    {
+      "id": "it-holdout-v4-839",
+      "field": "altText",
+      "text": "Anelli irregolari concentrici ricordano la sezione di un tronco."
+    },
+    {
+      "id": "it-holdout-v4-840",
+      "field": "altText",
+      "text": "La faccia tonda della borsa mostra un motivo di venature circolari."
+    },
+    {
+      "id": "it-holdout-v4-841",
+      "field": "caption",
+      "text": "Le gocce allungate scendono in diagonale sul mio impermeabile."
+    },
+    {
+      "id": "it-holdout-v4-842",
+      "field": "caption",
+      "text": "Una pioggia disegnata per accompagnare anche le giornate asciutte."
+    },
+    {
+      "id": "it-holdout-v4-843",
+      "field": "altText",
+      "text": "Piccole gocce stampate formano righe diagonali sull'impermeabile."
+    },
+    {
+      "id": "it-holdout-v4-844",
+      "field": "altText",
+      "text": "Il motivo alterna segni allungati inclinati tutti nella stessa direzione."
+    },
+    {
+      "id": "it-holdout-v4-845",
+      "field": "caption",
+      "text": "Il grappolo ricamato vicino al collo è fatto con piccoli nodi."
+    },
+    {
+      "id": "it-holdout-v4-846",
+      "field": "caption",
+      "text": "Ho lasciato la foglia piatta per distinguerla dagli acini in rilievo."
+    },
+    {
+      "id": "it-holdout-v4-847",
+      "field": "altText",
+      "text": "Nodi ricamati formano un grappolo d'uva sotto una foglia piatta."
+    },
+    {
+      "id": "it-holdout-v4-848",
+      "field": "altText",
+      "text": "Piccole sfere di filo compongono gli acini sulla parte alta della blusa."
+    },
+    {
+      "id": "it-holdout-v4-849",
+      "field": "caption",
+      "text": "Queste grandi piume disegnate seguono la lunghezza della mia sciarpa."
+    },
+    {
+      "id": "it-holdout-v4-850",
+      "field": "caption",
+      "text": "La apro per far vedere la linea sottile di ogni penna."
+    },
+    {
+      "id": "it-holdout-v4-851",
+      "field": "altText",
+      "text": "Piume allungate sono stampate lungo una sciarpa distesa."
+    },
+    {
+      "id": "it-holdout-v4-852",
+      "field": "altText",
+      "text": "Sottili tratti laterali partono dal centro di ciascuna piuma illustrata."
+    },
+    {
+      "id": "it-holdout-v4-853",
+      "field": "caption",
+      "text": "I cerchi sembrano allargarsi come nell'acqua dopo una goccia."
+    },
+    {
+      "id": "it-holdout-v4-854",
+      "field": "caption",
+      "text": "Ho scelto questa stampa tranquilla per un completo dalle linee morbide."
+    },
+    {
+      "id": "it-holdout-v4-855",
+      "field": "altText",
+      "text": "Gruppi di cerchi concentrici si sovrappongono sul tessuto del top."
+    },
+    {
+      "id": "it-holdout-v4-856",
+      "field": "altText",
+      "text": "Il disegno ricorda onde circolari prodotte sulla superficie dell'acqua."
+    },
+    {
+      "id": "it-holdout-v4-857",
+      "field": "caption",
+      "text": "Le frecce sulla gonna vanno in direzioni diverse e creano movimento."
+    },
+    {
+      "id": "it-holdout-v4-858",
+      "field": "caption",
+      "text": "Oggi seguo il loro disegno con accessori piccoli e semplici."
+    },
+    {
+      "id": "it-holdout-v4-859",
+      "field": "altText",
+      "text": "Frecce stampate puntano in varie direzioni sulla gonna dritta."
+    },
+    {
+      "id": "it-holdout-v4-860",
+      "field": "altText",
+      "text": "Il motivo alterna aste lunghe e punte triangolari sul tessuto."
+    },
+    {
+      "id": "it-holdout-v4-861",
+      "field": "caption",
+      "text": "Un aeroplanino di carta lascia una scia cucita sulla felpa."
+    },
+    {
+      "id": "it-holdout-v4-862",
+      "field": "caption",
+      "text": "Il filo segue una curva larga prima di raggiungere la piccola punta."
+    },
+    {
+      "id": "it-holdout-v4-863",
+      "field": "altText",
+      "text": "Un aeroplanino stilizzato è ricamato sopra una scia curva."
+    },
+    {
+      "id": "it-holdout-v4-864",
+      "field": "altText",
+      "text": "Una linea tratteggiata di punti collega il bordo al piccolo velivolo."
+    },
+    {
+      "id": "it-holdout-v4-865",
+      "field": "caption",
+      "text": "Ogni quadrato ha un'ombra disegnata che lo fa sembrare sospeso."
+    },
+    {
+      "id": "it-holdout-v4-866",
+      "field": "caption",
+      "text": "Da lontano questo tessuto sembra avere tanti piccoli rilievi."
+    },
+    {
+      "id": "it-holdout-v4-867",
+      "field": "altText",
+      "text": "Quadrati stampati presentano ombre laterali che simulano profondità."
+    },
+    {
+      "id": "it-holdout-v4-868",
+      "field": "altText",
+      "text": "Il motivo geometrico produce l'illusione di piccoli blocchi sollevati."
+    },
+    {
+      "id": "it-holdout-v4-869",
+      "field": "caption",
+      "text": "Le note salgono e scendono lungo il bordo della mia sciarpa."
+    },
+    {
+      "id": "it-holdout-v4-870",
+      "field": "caption",
+      "text": "Un motivo musicale accompagna la giornata senza bisogno di altri dettagli."
+    },
+    {
+      "id": "it-holdout-v4-871",
+      "field": "altText",
+      "text": "Note musicali sono distribuite su cinque linee stampate lungo la sciarpa."
+    },
+    {
+      "id": "it-holdout-v4-872",
+      "field": "altText",
+      "text": "Il pentagramma corre sul bordo con piccoli simboli musicali alternati."
+    },
+    {
+      "id": "it-holdout-v4-873",
+      "field": "caption",
+      "text": "Le coccinelle stampate sembrano passeggiare tra i bottoni della camicia."
+    },
+    {
+      "id": "it-holdout-v4-874",
+      "field": "caption",
+      "text": "Mi piace il piccolo contrasto tra ali rotonde e zampe sottili."
+    },
+    {
+      "id": "it-holdout-v4-875",
+      "field": "altText",
+      "text": "Coccinelle stilizzate sono distribuite vicino alla chiusura della camicia."
+    },
+    {
+      "id": "it-holdout-v4-876",
+      "field": "altText",
+      "text": "Piccoli cerchi puntinati con antenne compongono la stampa del tessuto."
+    },
+    {
+      "id": "it-holdout-v4-877",
+      "field": "caption",
+      "text": "Ho ricamato una piccola valigia sul sacchetto dei vestiti da viaggio."
+    },
+    {
+      "id": "it-holdout-v4-878",
+      "field": "caption",
+      "text": "Le due cinghie disegnate mi ricordano i vecchi bagagli rigidi."
+    },
+    {
+      "id": "it-holdout-v4-879",
+      "field": "altText",
+      "text": "Una valigia rettangolare ricamata decora un sacchetto con coulisse."
+    },
+    {
+      "id": "it-holdout-v4-880",
+      "field": "altText",
+      "text": "Il piccolo bagaglio cucito presenta maniglia e due cinghie verticali."
+    },
+    {
+      "id": "it-holdout-v4-881",
+      "field": "caption",
+      "text": "La curva a cuore del corpetto si vede bene sotto la giacca aperta."
+    },
+    {
+      "id": "it-holdout-v4-882",
+      "field": "caption",
+      "text": "Mi piace quel piccolo incavo al centro della parte superiore."
+    },
+    {
+      "id": "it-holdout-v4-883",
+      "field": "altText",
+      "text": "Il bordo del corpetto forma due curve con un incavo centrale."
+    },
+    {
+      "id": "it-holdout-v4-884",
+      "field": "altText",
+      "text": "Una scollatura a cuore emerge sotto i revers della giacca."
+    },
+    {
+      "id": "it-holdout-v4-885",
+      "field": "caption",
+      "text": "Le due fasce si sovrappongono davanti e formano un collo alto."
+    },
+    {
+      "id": "it-holdout-v4-886",
+      "field": "caption",
+      "text": "Il piccolo incrocio dà movimento alla maglia senza aggiungere decorazioni."
+    },
+    {
+      "id": "it-holdout-v4-887",
+      "field": "altText",
+      "text": "Due lembi sovrapposti formano un collo alto con apertura obliqua."
+    },
+    {
+      "id": "it-holdout-v4-888",
+      "field": "altText",
+      "text": "Il bordo della maglia sale sul collo seguendo una diagonale."
+    },
+    {
+      "id": "it-holdout-v4-889",
+      "field": "caption",
+      "text": "I due petali della manica si sovrappongono senza chiudere tutto il braccio."
+    },
+    {
+      "id": "it-holdout-v4-890",
+      "field": "caption",
+      "text": "Questa piccola apertura rende leggera la mia camicetta."
+    },
+    {
+      "id": "it-holdout-v4-891",
+      "field": "altText",
+      "text": "Due lembi arrotondati sovrapposti compongono una manica corta."
+    },
+    {
+      "id": "it-holdout-v4-892",
+      "field": "altText",
+      "text": "La manica a tulipano presenta un'apertura morbida sul lato esterno."
+    },
+    {
+      "id": "it-holdout-v4-893",
+      "field": "caption",
+      "text": "La cucitura gira intorno alla gamba e sposta il disegno dei pantaloni."
+    },
+    {
+      "id": "it-holdout-v4-894",
+      "field": "caption",
+      "text": "Mi piace osservare quella linea mentre guardo il look di profilo."
+    },
+    {
+      "id": "it-holdout-v4-895",
+      "field": "altText",
+      "text": "Una cucitura avvolge diagonalmente ciascuna gamba dei pantaloni."
+    },
+    {
+      "id": "it-holdout-v4-896",
+      "field": "altText",
+      "text": "La linea laterale ruota verso il davanti vicino alla caviglia."
+    },
+    {
+      "id": "it-holdout-v4-897",
+      "field": "caption",
+      "text": "Il pannello rigido del vestito crea un angolo netto davanti."
+    },
+    {
+      "id": "it-holdout-v4-898",
+      "field": "caption",
+      "text": "Lascio il resto morbido per accompagnare questa piccola geometria."
+    },
+    {
+      "id": "it-holdout-v4-899",
+      "field": "altText",
+      "text": "Un pannello rettangolare sporge dal davanti del vestito."
+    },
+    {
+      "id": "it-holdout-v4-900",
+      "field": "altText",
+      "text": "La struttura piatta crea due angoli marcati sopra la gonna."
+    },
+    {
+      "id": "it-holdout-v4-901",
+      "field": "caption",
+      "text": "Il carré attraversa la schiena in diagonale invece di restare orizzontale."
+    },
+    {
+      "id": "it-holdout-v4-902",
+      "field": "caption",
+      "text": "È il dettaglio che mi ha fatto scegliere questa camicia."
+    },
+    {
+      "id": "it-holdout-v4-903",
+      "field": "altText",
+      "text": "La cucitura del carré scende obliquamente sul retro della camicia."
+    },
+    {
+      "id": "it-holdout-v4-904",
+      "field": "altText",
+      "text": "Un pannello inclinato divide il dorso della camicia in due sezioni."
+    },
+    {
+      "id": "it-holdout-v4-905",
+      "field": "caption",
+      "text": "La corda entra nel bordo alto e sostiene tutto il top."
+    },
+    {
+      "id": "it-holdout-v4-906",
+      "field": "caption",
+      "text": "Posso regolare l'ampiezza spostando il tessuto lungo il laccio."
+    },
+    {
+      "id": "it-holdout-v4-907",
+      "field": "altText",
+      "text": "Un laccio passa nella coulisse superiore del top senza spalline separate."
+    },
+    {
+      "id": "it-holdout-v4-908",
+      "field": "altText",
+      "text": "Il tessuto arricciato si distribuisce lungo una corda intorno al collo."
+    },
+    {
+      "id": "it-holdout-v4-909",
+      "field": "caption",
+      "text": "I bottoni seguono una curva che gira sul davanti del vestito."
+    },
+    {
+      "id": "it-holdout-v4-910",
+      "field": "caption",
+      "text": "Ho scelto bottoni piccoli per non interrompere il disegno della linea."
+    },
+    {
+      "id": "it-holdout-v4-911",
+      "field": "altText",
+      "text": "Una sequenza curva di bottoni attraversa il davanti dell'abito."
+    },
+    {
+      "id": "it-holdout-v4-912",
+      "field": "altText",
+      "text": "La chiusura segue una spirale larga dalla spalla verso il fianco."
+    },
+    {
+      "id": "it-holdout-v4-913",
+      "field": "caption",
+      "text": "Le tasche esterne sono agganciate alla cintura e restano separate dalla gonna."
+    },
+    {
+      "id": "it-holdout-v4-914",
+      "field": "caption",
+      "text": "Le tolgo quando voglio una linea più semplice sui fianchi."
+    },
+    {
+      "id": "it-holdout-v4-915",
+      "field": "altText",
+      "text": "Due tasche indipendenti pendono dalla cintura sopra la gonna."
+    },
+    {
+      "id": "it-holdout-v4-916",
+      "field": "altText",
+      "text": "Piccoli ganci sostengono i sacchetti laterali senza cucirli al capo."
+    },
+    {
+      "id": "it-holdout-v4-917",
+      "field": "caption",
+      "text": "Le pinces sulle ginocchia lasciano spazio quando piego le gambe."
+    },
+    {
+      "id": "it-holdout-v4-918",
+      "field": "caption",
+      "text": "La forma resta leggermente curva anche quando i pantaloni sono appesi."
+    },
+    {
+      "id": "it-holdout-v4-919",
+      "field": "altText",
+      "text": "Piccole pinces modellano la parte anteriore delle ginocchia dei pantaloni."
+    },
+    {
+      "id": "it-holdout-v4-920",
+      "field": "altText",
+      "text": "Le gambe appese mostrano una curvatura costruita all'altezza del ginocchio."
+    },
+    {
+      "id": "it-holdout-v4-921",
+      "field": "caption",
+      "text": "Le arricciature partono dal bordo del carré e aprono la camicia dietro."
+    },
+    {
+      "id": "it-holdout-v4-922",
+      "field": "caption",
+      "text": "Oggi porto questa ampiezza morbida sopra pantaloni stretti."
+    },
+    {
+      "id": "it-holdout-v4-923",
+      "field": "altText",
+      "text": "Piccole arricciature scendono da un carré orizzontale sul dorso."
+    },
+    {
+      "id": "it-holdout-v4-924",
+      "field": "altText",
+      "text": "Il tessuto abbondante si raccoglie sotto il pannello superiore della camicia."
+    },
+    {
+      "id": "it-holdout-v4-925",
+      "field": "caption",
+      "text": "La fibbia sul fianco permette di togliere il grembiule senza sciogliere nodi."
+    },
+    {
+      "id": "it-holdout-v4-926",
+      "field": "caption",
+      "text": "L'ho regolata una volta e ora resta della misura giusta."
+    },
+    {
+      "id": "it-holdout-v4-927",
+      "field": "altText",
+      "text": "Una fibbia a sgancio rapido chiude il grembiule sul lato."
+    },
+    {
+      "id": "it-holdout-v4-928",
+      "field": "altText",
+      "text": "La cinghia della vita termina in due parti di un fermaglio."
+    },
+    {
+      "id": "it-holdout-v4-929",
+      "field": "caption",
+      "text": "Un piccolo tubo interno sostiene il bordo e lo tiene arrotondato."
+    },
+    {
+      "id": "it-holdout-v4-930",
+      "field": "caption",
+      "text": "La gonna mantiene il suo volume anche quando resto ferma."
+    },
+    {
+      "id": "it-holdout-v4-931",
+      "field": "altText",
+      "text": "Il fondo della gonna forma un bordo rigido e tondeggiante."
+    },
+    {
+      "id": "it-holdout-v4-932",
+      "field": "altText",
+      "text": "Una struttura sottile dentro l'orlo mantiene aperta la circonferenza."
+    },
+    {
+      "id": "it-holdout-v4-933",
+      "field": "caption",
+      "text": "Il nastro interno regola il dietro senza mostrare la chiusura fuori."
+    },
+    {
+      "id": "it-holdout-v4-934",
+      "field": "caption",
+      "text": "Ho trovato la tensione giusta e il vestito cade meglio."
+    },
+    {
+      "id": "it-holdout-v4-935",
+      "field": "altText",
+      "text": "Un nastro nascosto regola l'ampiezza interna del dorso dell'abito."
+    },
+    {
+      "id": "it-holdout-v4-936",
+      "field": "altText",
+      "text": "Il lembo rovesciato mostra due piccoli lacci cuciti dentro la vita."
+    },
+    {
+      "id": "it-holdout-v4-937",
+      "field": "caption",
+      "text": "La balza gira intorno alla manica fino a raggiungere il polso."
+    },
+    {
+      "id": "it-holdout-v4-938",
+      "field": "caption",
+      "text": "Mi piace come quel bordo segue il movimento delle braccia."
+    },
+    {
+      "id": "it-holdout-v4-939",
+      "field": "altText",
+      "text": "Un volant continuo si avvolge a spirale intorno alla manica."
+    },
+    {
+      "id": "it-holdout-v4-940",
+      "field": "altText",
+      "text": "Il bordo arricciato compie diversi giri dalla spalla verso il polso."
+    },
+    {
+      "id": "it-holdout-v4-941",
+      "field": "caption",
+      "text": "Le punte del colletto restano sollevate come due piccole ali."
+    },
+    {
+      "id": "it-holdout-v4-942",
+      "field": "caption",
+      "text": "Le indosso con il gilet per lasciare visibile la loro forma."
+    },
+    {
+      "id": "it-holdout-v4-943",
+      "field": "altText",
+      "text": "Due punte rigide del colletto si ripiegano verso l'esterno."
+    },
+    {
+      "id": "it-holdout-v4-944",
+      "field": "altText",
+      "text": "Il colletto alto termina davanti con due piccole ali simmetriche."
+    },
+    {
+      "id": "it-holdout-v4-945",
+      "field": "caption",
+      "text": "La piccola apertura dietro si chiude con un solo bottone alla nuca."
+    },
+    {
+      "id": "it-holdout-v4-946",
+      "field": "caption",
+      "text": "Un dettaglio discreto rende più facile indossare il mio top."
+    },
+    {
+      "id": "it-holdout-v4-947",
+      "field": "altText",
+      "text": "Un bottone alla nuca chiude una piccola apertura a goccia."
+    },
+    {
+      "id": "it-holdout-v4-948",
+      "field": "altText",
+      "text": "Il retro del top presenta un foro allungato sotto la chiusura."
+    },
+    {
+      "id": "it-holdout-v4-949",
+      "field": "caption",
+      "text": "La cintura attraversa due passanti sovrapposti e disegna un intreccio piatto."
+    },
+    {
+      "id": "it-holdout-v4-950",
+      "field": "caption",
+      "text": "Ho lasciato la punta infilata dentro per tenere tutto ordinato."
+    },
+    {
+      "id": "it-holdout-v4-951",
+      "field": "altText",
+      "text": "La cintura passa due volte attraverso una fibbia rettangolare aperta."
+    },
+    {
+      "id": "it-holdout-v4-952",
+      "field": "altText",
+      "text": "Due tratti sovrapposti formano un piccolo intreccio sulla parte anteriore."
+    },
+    {
+      "id": "it-holdout-v4-953",
+      "field": "caption",
+      "text": "Le aperture seguono un disegno preciso senza cuciture ai bordi."
+    },
+    {
+      "id": "it-holdout-v4-954",
+      "field": "caption",
+      "text": "Metto sotto una canotta semplice per mostrare bene i trafori."
+    },
+    {
+      "id": "it-holdout-v4-955",
+      "field": "altText",
+      "text": "Fori geometrici dai margini netti compongono un pannello traforato."
+    },
+    {
+      "id": "it-holdout-v4-956",
+      "field": "altText",
+      "text": "La maglia sovrapposta lascia vedere la canotta attraverso piccole aperture."
+    },
+    {
+      "id": "it-holdout-v4-957",
+      "field": "caption",
+      "text": "I petali di tessuto scendono a strati sulla gonna."
+    },
+    {
+      "id": "it-holdout-v4-958",
+      "field": "caption",
+      "text": "Quando mi giro si sollevano appena, come piccole pagine."
+    },
+    {
+      "id": "it-holdout-v4-959",
+      "field": "altText",
+      "text": "Numerosi lembi arrotondati si sovrappongono sul davanti della gonna."
+    },
+    {
+      "id": "it-holdout-v4-960",
+      "field": "altText",
+      "text": "La superficie del vestito è coperta da applicazioni simili a petali."
+    },
+    {
+      "id": "it-holdout-v4-961",
+      "field": "caption",
+      "text": "La cucitura rialzata disegna il bordo della punta dei mocassini."
+    },
+    {
+      "id": "it-holdout-v4-962",
+      "field": "caption",
+      "text": "Mi piace vedere i punti grandi che tengono insieme la tomaia."
+    },
+    {
+      "id": "it-holdout-v4-963",
+      "field": "altText",
+      "text": "Una cucitura sporgente segue il perimetro superiore della punta."
+    },
+    {
+      "id": "it-holdout-v4-964",
+      "field": "altText",
+      "text": "Punti larghi uniscono due parti della tomaia sopra le dita."
+    },
+    {
+      "id": "it-holdout-v4-965",
+      "field": "caption",
+      "text": "I due pomelli si incontrano con il piccolo scatto della pochette."
+    },
+    {
+      "id": "it-holdout-v4-966",
+      "field": "caption",
+      "text": "Questa chiusura mi ricorda le borse viste da bambina."
+    },
+    {
+      "id": "it-holdout-v4-967",
+      "field": "altText",
+      "text": "Due pomelli metallici chiudono la cornice rigida della pochette."
+    },
+    {
+      "id": "it-holdout-v4-968",
+      "field": "altText",
+      "text": "La borsa aperta presenta una cerniera articolata lungo il bordo superiore."
+    },
+    {
+      "id": "it-holdout-v4-969",
+      "field": "caption",
+      "text": "Un grande quadrato avvolge gli oggetti e diventa la mia borsa."
+    },
+    {
+      "id": "it-holdout-v4-970",
+      "field": "caption",
+      "text": "Sciolgo i nodi e ritrovo subito un foulard intero."
+    },
+    {
+      "id": "it-holdout-v4-971",
+      "field": "altText",
+      "text": "Un telo quadrato è annodato attorno agli oggetti da trasportare."
+    },
+    {
+      "id": "it-holdout-v4-972",
+      "field": "altText",
+      "text": "Le estremità unite del tessuto formano due manici morbidi."
+    },
+    {
+      "id": "it-holdout-v4-973",
+      "field": "caption",
+      "text": "La ghetta si abbottona sopra la scarpa e cambia il profilo della caviglia."
+    },
+    {
+      "id": "it-holdout-v4-974",
+      "field": "caption",
+      "text": "Mi piace provare questo accessorio con le stringate più semplici."
+    },
+    {
+      "id": "it-holdout-v4-975",
+      "field": "altText",
+      "text": "Una ghetta separata copre la caviglia e la parte alta della scarpa."
+    },
+    {
+      "id": "it-holdout-v4-976",
+      "field": "altText",
+      "text": "Piccoli bottoni laterali chiudono l'accessorio sopra una calzatura bassa."
+    },
+    {
+      "id": "it-holdout-v4-977",
+      "field": "caption",
+      "text": "Tolgo le stecchette del colletto prima di lavare la camicia."
+    },
+    {
+      "id": "it-holdout-v4-978",
+      "field": "caption",
+      "text": "Le tengo nella scatolina insieme agli altri piccoli accessori utili."
+    },
+    {
+      "id": "it-holdout-v4-979",
+      "field": "altText",
+      "text": "Due stecchette sottili sono estratte dalle punte del colletto."
+    },
+    {
+      "id": "it-holdout-v4-980",
+      "field": "altText",
+      "text": "Una piccola tasca interna contiene il rinforzo removibile del collo."
+    },
+    {
+      "id": "it-holdout-v4-981",
+      "field": "caption",
+      "text": "La piega parte dalla spalla e si apre solo verso il busto."
+    },
+    {
+      "id": "it-holdout-v4-982",
+      "field": "caption",
+      "text": "Ho scelto questa costruzione per il suo volume discreto."
+    },
+    {
+      "id": "it-holdout-v4-983",
+      "field": "altText",
+      "text": "Una piega profonda scende dalla spalla verso il davanti dell'abito."
+    },
+    {
+      "id": "it-holdout-v4-984",
+      "field": "altText",
+      "text": "Il tessuto superiore forma una riserva nascosta vicino alla cucitura."
+    },
+    {
+      "id": "it-holdout-v4-985",
+      "field": "caption",
+      "text": "I lati del gilet restano aperti e si chiudono con due piccole fibbie."
+    },
+    {
+      "id": "it-holdout-v4-986",
+      "field": "caption",
+      "text": "Posso adattarne la larghezza anche sopra una camicia più ampia."
+    },
+    {
+      "id": "it-holdout-v4-987",
+      "field": "altText",
+      "text": "Il gilet presenta due pannelli uniti da cinghie laterali regolabili."
+    },
+    {
+      "id": "it-holdout-v4-988",
+      "field": "altText",
+      "text": "Uno spazio aperto separa il davanti dal retro sui fianchi."
+    },
+    {
+      "id": "it-holdout-v4-989",
+      "field": "caption",
+      "text": "I lacci laterali tengono vicino il fondo della maglia senza chiuderlo tutto."
+    },
+    {
+      "id": "it-holdout-v4-990",
+      "field": "caption",
+      "text": "Oggi li annodo larghi per lasciare morbida la silhouette."
+    },
+    {
+      "id": "it-holdout-v4-991",
+      "field": "altText",
+      "text": "Due coppie di lacci collegano i lembi laterali della maglia."
+    },
+    {
+      "id": "it-holdout-v4-992",
+      "field": "altText",
+      "text": "Piccoli nodi sui fianchi regolano le aperture del bordo inferiore."
+    },
+    {
+      "id": "it-holdout-v4-993",
+      "field": "caption",
+      "text": "Il taschino contiene una seconda tasca più stretta per la penna."
+    },
+    {
+      "id": "it-holdout-v4-994",
+      "field": "caption",
+      "text": "Il dettaglio si vede solo guardando dentro l'apertura superiore."
+    },
+    {
+      "id": "it-holdout-v4-995",
+      "field": "altText",
+      "text": "Una piccola tasca per penna è cucita dentro il taschino."
+    },
+    {
+      "id": "it-holdout-v4-996",
+      "field": "altText",
+      "text": "Il bordo sollevato rivela un compartimento stretto nella tasca sul petto."
+    },
+    {
+      "id": "it-holdout-v4-997",
+      "field": "caption",
+      "text": "Apro la zip sul fondo e la borsa guadagna un po' di spazio."
+    },
+    {
+      "id": "it-holdout-v4-998",
+      "field": "caption",
+      "text": "Il piccolo soffietto resta chiuso quando porto poche cose."
+    },
+    {
+      "id": "it-holdout-v4-999",
+      "field": "altText",
+      "text": "Una cerniera orizzontale libera un soffietto nella base della borsa."
+    },
+    {
+      "id": "it-holdout-v4-1000",
+      "field": "altText",
+      "text": "Il fondo espandibile mostra una fascia aggiuntiva sotto il corpo principale."
+    }
+  ]
+}

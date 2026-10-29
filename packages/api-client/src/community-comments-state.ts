@@ -90,6 +90,51 @@ function mergePage(
   }
 }
 
+/**
+ * A refresh re-reads a fixed number of root or reply pages. When a member loaded more of
+ * the same snapshot while it was reading, the cursor that follows those pages replaces
+ * the re-read page's and the comments beyond what the re-read reached are appended to
+ * it. A comment at or below the highest sequence the re-read page holds was inside the
+ * range the refresh read, so the refresh decides whether it still exists. A page the refresh
+ * read from another snapshot, or one reloaded from its start, has no cursor that
+ * continues the later replies, so the re-read page stands alone. A re-read that reached
+ * the end of the list does too, since the server holds nothing beyond it.
+ */
+function withLaterPages(
+  captured: CommunityCommentsPage | undefined,
+  current: CommunityCommentsPage | undefined,
+  refreshed: CommunityCommentsPage
+): CommunityCommentsPage {
+  if (
+    !captured ||
+    !current ||
+    current === captured ||
+    current.snapshot !== captured.snapshot ||
+    current.snapshot !== refreshed.snapshot ||
+    !captured.items.every((item) => current.items.some(({ id }) => id === item.id))
+  )
+    return refreshed
+  const seen = new Set(captured.items.map(({ id }) => id))
+  if (current.items.every(({ id }) => seen.has(id))) return refreshed
+  // A re-read that reached the end of the list leaves nothing beyond it to append.
+  if (refreshed.nextCursor === null) return refreshed
+  const known = new Set([...seen, ...refreshed.items.map(({ id }) => id)])
+  const ceiling = Math.max(
+    -Infinity,
+    ...refreshed.items.map(({ publicationSequence }) => publicationSequence)
+  )
+  const later = current.items.filter(
+    ({ id, publicationSequence }) => !known.has(id) && publicationSequence > ceiling
+  )
+  return {
+    ...refreshed,
+    items: [...refreshed.items, ...later].sort(
+      (a, b) => a.publicationSequence - b.publicationSequence
+    ),
+    nextCursor: current.nextCursor,
+  }
+}
+
 export class CommunityCommentsState {
   private realtimeHealthy = false
 
@@ -101,6 +146,11 @@ export class CommunityCommentsState {
   private readonly threads = new Map<string, CommentThreadState>()
   private readonly fences = new Map<string, number>()
   private readonly requests = new Map<string, number>()
+  /** Public loads that have not answered yet, so a discarded one can be read again. */
+  private readonly pendingLoads = new Map<
+    string,
+    { postId: string; parentId: string | null; append: boolean }
+  >()
   private readonly startCursors = new Map<string, string | undefined>()
   private readonly focusTargets = new Map<
     string,
@@ -302,6 +352,17 @@ export class CommunityCommentsState {
     }
   }
 
+  /** Records a public load until it answers; the returned function forgets this one only. */
+  private trackLoad(
+    key: string,
+    pending: { postId: string; parentId: string | null; append: boolean }
+  ): () => void {
+    this.pendingLoads.set(key, pending)
+    return () => {
+      if (this.pendingLoads.get(key) === pending) this.pendingLoads.delete(key)
+    }
+  }
+
   private invalidateReads(postId: string, includePrivate = true): void {
     for (const key of this.requests.keys())
       if (key.startsWith(`${postId}/`) && (includePrivate || key !== `${postId}/private`))
@@ -415,6 +476,7 @@ export class CommunityCommentsState {
     state.loading = true
     state.error = null
     this.emit()
+    const untrack = this.trackLoad(key, { postId, parentId, append })
     try {
       const page = await this.readPage(postId, parentId, current, append)
       if (!isCurrent()) return
@@ -428,11 +490,63 @@ export class CommunityCommentsState {
     } catch (error) {
       if (isCurrent()) this.failed(postId, state, error)
     } finally {
+      untrack()
       if (isCurrent()) {
         state.loading = false
         this.emit()
       }
     }
+  }
+
+  /**
+   * Swaps what a refresh re-read into the thread. A reply page expanded while the refresh
+   * was reading is newer than anything it could have captured, so it stays. Pages the
+   * refresh re-read replace their predecessors, keeping any later page a member loaded
+   * onto them meanwhile, root pages included. Pages whose parent left the new roots are
+   * dropped, kept or re-read. Comments the member loaded meanwhile are not news to them,
+   * so they count as seen.
+   */
+  private settleRefreshed(
+    state: CommentThreadState,
+    previousIds: Set<string>,
+    captured: {
+      roots: CommunityCommentsPage | null
+      replies: Map<string, CommunityCommentsPage>
+    },
+    reread: {
+      roots: CommunityCommentsPage
+      replies: (readonly [string, CommunityCommentsPage])[]
+    }
+  ): void {
+    const roots = withLaterPages(
+      captured.roots ?? undefined,
+      state.roots ?? undefined,
+      reread.roots
+    )
+    const rereadParents = new Set(reread.replies.map(([parent]) => parent))
+    const parents = new Set(roots.items.map((item) => item.id))
+    for (const { id } of state.roots?.items ?? []) previousIds.add(id)
+    for (const page of state.replies.values())
+      for (const { id } of page.items) previousIds.add(id)
+    state.roots = roots
+    state.replies = new Map([
+      ...[...state.replies].filter(
+        ([parent]) => !rereadParents.has(parent) && parents.has(parent)
+      ),
+      ...reread.replies
+        .filter(([parent]) => parents.has(parent))
+        .map(
+          ([parent, page]) =>
+            [
+              parent,
+              withLaterPages(
+                captured.replies.get(parent),
+                state.replies.get(parent),
+                page
+              ),
+            ] as const
+        ),
+    ])
   }
 
   async refresh(postId: string, signal?: AbortSignal): Promise<void> {
@@ -446,6 +560,8 @@ export class CommunityCommentsState {
     const rootsBound =
       this.publicPages.get(`${postId}/`) ??
       Math.max(1, Math.ceil((state.roots?.items.length ?? 0) / 20))
+    const capturedRoots = state.roots
+    const captured = new Map(state.replies)
     const replyBounds = new Map(
       [...state.replies].map(
         ([parent, page]) =>
@@ -470,8 +586,12 @@ export class CommunityCommentsState {
         )
       )
       if (!owns()) throw new CommunityRequestSuperseded()
-      state.roots = roots
-      state.replies = new Map(replies)
+      this.settleRefreshed(
+        state,
+        previousIds,
+        { roots: capturedRoots, replies: captured },
+        { roots, replies }
+      )
       state.error = null
       if ([...this.publicIds(state)].some((id) => !previousIds.has(id)))
         this.announce(state, 'community.realtime.newComments')
@@ -650,9 +770,20 @@ export class CommunityCommentsState {
     // A comment a live insert already shows publicly needs no "refresh to view" prompt;
     // that wording is only for the polling fallback, where it is not yet in the thread.
     const publicIds = this.publicIds(state)
+    // Invalidating drops the answer of every public read in flight, so those reads are
+    // issued again once the suppression is in place; otherwise the thread stays empty.
+    const discarded = [...this.pendingLoads.values()].filter(
+      (pending) => pending.postId === postId
+    )
+    let invalidated = false
     for (const item of collected) {
       if (['author_deleted', 'consent_suspended', 'erased'].includes(item.status)) {
-        this.invalidateReads(postId, false)
+        // Only a status that is new to the client drops reads in flight, so the same
+        // status arriving on every poll cannot keep discarding the reads issued again.
+        if (previous.get(item.id) !== item.status) {
+          this.invalidateReads(postId, false)
+          invalidated = true
+        }
         this.suppress(state, item.id)
       }
       if (
@@ -667,6 +798,10 @@ export class CommunityCommentsState {
     state.submissionsCursor = cursor ?? null
     this.statusPages.set(postId, append ? this.privatePageCount(postId) + pages : pages)
     this.emit()
+    if (invalidated) {
+      for (const { parentId, append: more } of discarded)
+        void this.load(postId, parentId, more)
+    }
   }
 
   private isDefinitiveRejection(error: unknown): boolean {

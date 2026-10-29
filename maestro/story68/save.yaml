@@ -1,0 +1,16 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    file: tap-save.yaml
+    env:
+      MAESTRO_SAVE_EFFECT: 'Allow|Allow Adding Photos|Allow Access to All Photos|Add Photos Only|${MAESTRO_SAVING}|${MAESTRO_SAVED}'
+- runFlow:
+    when:
+      visible: 'Allow|Allow Adding Photos|Allow Access to All Photos|Add Photos Only'
+    commands:
+      - tapOn: 'Allow|Allow Adding Photos|Allow Access to All Photos|Add Photos Only'
+- extendedWaitUntil:
+    visible: ${MAESTRO_SAVED}
+    timeout: 20000
+- assertVisible:
+    id: share-card-preview-loaded-.*

@@ -1,8 +1,10 @@
 'use client'
 import { useEffect } from 'react'
 import { startWebSession } from '../../lib/web-session'
+import { activateBrowserLocale } from '../../i18n'
 export function SessionBridge() {
   useEffect(() => {
+    activateBrowserLocale()
     let stopped = false
     let cleanup: (() => void) | undefined
     void startWebSession()

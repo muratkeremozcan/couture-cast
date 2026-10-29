@@ -30,17 +30,30 @@ beforeEach(() => {
 })
 afterEach(() => {
   window.history.replaceState(null, '', '/')
+  vi.restoreAllMocks()
   if (scroll) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', scroll)
   else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
 })
 
 function useNotificationAttempts(status: 200 | 503) {
   const starts: number[] = []
+  // Attempts are timed where the client sends them. The mock server sees a request only
+  // after any response delay the run injects, which would shift the later attempts.
+  const send = globalThis.fetch
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+    const url = input instanceof Request ? input.url : String(input)
+    if (
+      url.endsWith('/api/v1/community/targets/resolve') &&
+      typeof init?.body === 'string' &&
+      init.body.includes('"key":"notification"')
+    )
+      starts.push(performance.now())
+    return send(input, init)
+  })
   useMswHandlers(
     http.get(POST_PATH, () => HttpResponse.json({ data: item() })),
     http.post('/api/v1/community/targets/resolve', async ({ request }) => {
       const body = (await request.json()) as { targets: { key: string }[] }
-      if (body.targets[0]?.key === 'notification') starts.push(performance.now())
       if (status === 503)
         return HttpResponse.json(
           { statusCode: 503, error: 'Service Unavailable', message: 'Unavailable' },

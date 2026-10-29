@@ -763,9 +763,12 @@ describe('CommunityTextScreener word boundaries and allow lists (AC 4)', () => {
 
   it('clears an ordinary word a term collapses onto without losing the term', () => {
     // `gook` folds onto `gok`, the umlaut-less spelling Turkish writers use for
-    // "sky". The allow list clears the plain word; the slur stays indexed under
-    // its own spelling and under every stretched one.
-    expect(screenCaption('gok mavisi bir elbise').disposition).toBe('pass')
+    // "sky". The scoped allowance clears the plain word under a declared Turkish locale
+    // only (round 7t); the slur stays indexed under its own spelling and under every
+    // stretched one, and `gok` keeps screening in every other locale.
+    expect(screenCaption('gok mavisi bir elbise', 'tr-TR').disposition).toBe('pass')
+    expect(screenCaption('gok mavisi bir elbise').disposition).not.toBe('pass')
+    expect(screenCaption('gok mavisi bir elbise', null).disposition).not.toBe('pass')
     expect(screenCaption('you gook').categories).toContain('hate')
     expect(screenCaption('you gooook').categories).toContain('hate')
   })

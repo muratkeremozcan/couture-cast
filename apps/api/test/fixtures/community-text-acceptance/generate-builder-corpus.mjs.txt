@@ -1,0 +1,79 @@
+// Regenerates the clean acceptance corpus (cc68x-impl3). Run from the repo root:
+//   node /private/tmp/cc68x-round7/acceptance-input/gen-clean-corpus.mjs
+// Inputs: apps/mobile/assets/locales/*.json, markdown under _bmad-output/planning-artifacts,
+// _bmad-output/project-knowledge and docs, and source/config files under apps/mobile/src,
+// apps/web/src, scripts and .github. No holdout, fixture, corpus or test-artifact path is read,
+// and any line mentioning "holdout" is dropped.
+import { execFileSync } from 'node:child_process'
+import crypto from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
+
+const root = process.cwd()
+const out = path.dirname(new URL(import.meta.url).pathname)
+const skipDirs = new Set(['node_modules', '.next', 'dist', '.git', 'build', 'test-artifacts', 'holdout', 'fixtures', 'community-text-corpus', 'Pods', 'ios', 'android'])
+const forbidden = /holdout/i
+const sources = []
+const read = (p) => { sources.push(path.relative(root, p)); return fs.readFileSync(p, 'utf8') }
+const walk = (dir, accept, depth = 0, acc = []) => {
+  if (depth > 6 || !fs.existsSync(dir)) return acc
+  for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (skipDirs.has(e.name)) continue
+    const p = path.join(dir, e.name)
+    if (forbidden.test(p)) continue
+    if (e.isDirectory()) walk(p, accept, depth + 1, acc)
+    else if (accept(e.name, p)) acc.push(p)
+  }
+  return acc
+}
+const dedupe = (items) => [...new Set(items)]
+const write = (name, value) => fs.writeFileSync(path.join(out, name), JSON.stringify(value, null, 0) + '\n')
+const counts = {}
+
+// 1) App locale strings: key = locale of the file (the strings are in that language).
+const strings = (o, acc = []) => { if (typeof o === 'string') acc.push(o); else if (o && typeof o === 'object') for (const v of Object.values(o)) strings(v, acc); return acc }
+const localeDir = path.join(root, 'apps/mobile/assets/locales')
+const prose = {}
+for (const f of fs.readdirSync(localeDir).sort()) {
+  const loc = f.replace('.json', '')
+  prose[loc] = dedupe(strings(JSON.parse(read(path.join(localeDir, f)))).map((s) => s.slice(0, 280)).filter((s) => !forbidden.test(s)))
+}
+write('clean-prose-locale-strings.json', prose)
+counts['clean-prose-locale-strings.json'] = Object.fromEntries(Object.entries(prose).map(([k, v]) => [k, v.length]))
+
+// 2) Repo markdown sentences: English prose; declared locale alternates en-US and null by index (deterministic).
+const md = walk(root, () => false) // placeholder to keep walk signature simple
+const mdFiles = ['_bmad-output/planning-artifacts', '_bmad-output/project-knowledge', 'docs'].flatMap((d) => walk(path.join(root, d), (n) => n.endsWith('.md')))
+const sentences = []
+for (const f of mdFiles) for (const piece of read(f).split(/(?<=[.!?])\s+|\n+/)) { const t = piece.trim().slice(0, 280); if (t.length > 3 && !forbidden.test(t)) sentences.push(t) }
+const mdUnique = dedupe(sentences)
+const markdown = { 'en-US': mdUnique.filter((_, i) => i % 2 === 0), null: mdUnique.filter((_, i) => i % 2 === 1) }
+write('clean-prose-markdown-en.json', markdown)
+counts['clean-prose-markdown-en.json'] = { 'en-US': markdown['en-US'].length, null: markdown.null.length }
+
+// 3) Symbol-heavy retail copy in the seven languages (hand written) plus sampled code and config lines (declared en-US).
+const retail = {
+  'en-US': ['20% off + free shipping on orders over $50', 'Size 4XL / 3XS / XXL, fits true to size', 'Model no. RX-78 and A-1234, Air Max 90, 501 jeans', 'Contact hello@couture.com or @couture_cast #ootd #fit', 'Loved it :) <3 xD ;P :D', 'C++ developer wearing a size 42 EU', 'Only $19.99!!! 100% cotton | machine wash 30°C', 'B2B and 24/7 support, 5G ready, T-shirt for 2day', 'Rated A+ by 1,000+ buyers #1 seller', 'Sale: $$$ off, 50/50 blend, 3D print, 4K video'],
+  'fr-FR': ['20 % de réduction + livraison gratuite dès 50 €', 'Taille 4XL / 38-40, coupe ajustée', 'Réf. A-1234 et modèle 501, Air Max 90', 'Écrivez à bonjour@couture.fr ou @couture_cast #tenue', 'Super :) <3 xD ;P', 'Seulement 19,99 € !!! 100 % coton | lavage 30 °C'],
+  'es-ES': ['20% de descuento + envío gratis desde 50 €', 'Talla 4XL / 38-40, ajuste perfecto', 'Ref. A-1234 y modelo 501', 'Escríbenos a hola@couture.es o @couture_cast #outfit', 'Me encanta :) <3 xD', 'Solo 19,99 €!!! 100% algodón | lavado 30 °C'],
+  'pt-BR': ['20% de desconto + frete grátis acima de R$ 50', 'Tamanho 4XL / 38-40, caimento perfeito', 'Ref. A-1234 e modelo 501', 'Fale com oi@couture.com.br ou @couture_cast #look', 'Amei :) <3 kkk xD', 'Só R$ 19,99!!! 100% algodão | lavar a 30 °C'],
+  'de-DE': ['20 % Rabatt + kostenloser Versand ab 50 €', 'Größe 4XL / 38-40, perfekte Passform', 'Art.-Nr. A-1234 und Modell 501', 'Schreib uns an hallo@couture.de oder @couture_cast #outfit', 'Toll :) <3 xD', 'Nur 19,99 €!!! 100 % Baumwolle | Wäsche 30 °C'],
+  'it-IT': ['20% di sconto + spedizione gratuita sopra 50 €', 'Taglia 4XL / 38-40, vestibilità perfetta', 'Rif. A-1234 e modello 501', 'Scrivici a ciao@couture.it o @couture_cast #outfit', 'Bellissimo :) <3 xD', 'Solo 19,99 €!!! 100% cotone | lavaggio 30 °C'],
+  'tr-TR': ['%20 indirim + 500 TL üzeri ücretsiz kargo', 'Beden 4XL / 38-40, mükemmel kalıp', 'Ürün kodu A-1234 ve model 501', 'Bize yaz: merhaba@couture.com.tr veya @couture_cast #kombin', 'Harika :) <3 xD', 'Sadece 19,99 TL!!! %100 pamuk | 30 °C yıkama'],
+}
+let rng = 12345
+const rand = () => (rng = (rng * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
+const codeFiles = ['apps/mobile/src', 'apps/web/src', 'scripts', '.github'].flatMap((d) => walk(path.join(root, d), (n) => /\.(tsx?|mjs|json|ya?ml|sh|css)$/.test(n), 0).filter((p) => fs.statSync(p).size < 400_000))
+const rawCode = []
+for (const f of codeFiles) for (const l of read(f).split('\n')) if (l.trim().length > 6 && rand() < 0.08) { const t = l.trim().slice(0, 280); if (!forbidden.test(t)) rawCode.push(t) }
+const symbols = { ...retail, 'en-US': dedupe([...retail['en-US'], ...rawCode]) }
+write('clean-symbol-snippets.json', symbols)
+counts['clean-symbol-snippets.json'] = Object.fromEntries(Object.entries(symbols).map(([k, v]) => [k, v.length]))
+counts.rawCodeLinesBeforeDedupe = rawCode.length
+
+let head = 'unknown'
+try { head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim() } catch {}
+const hashes = Object.fromEntries(['clean-prose-locale-strings.json', 'clean-prose-markdown-en.json', 'clean-symbol-snippets.json'].map((f) => [f, crypto.createHash('sha256').update(fs.readFileSync(path.join(out, f))).digest('hex')]))
+write('MANIFEST.json', { generatedFromGitHead: head, counts, sha256: hashes, sourceFileCount: sources.length, sourcesSample: sources.slice(0, 5) })
+fs.writeFileSync(path.join(out, 'sources.txt'), sources.join('\n') + '\n')
+console.log(JSON.stringify({ head, counts }, null, 1))

@@ -1,8 +1,9 @@
 // Story 6.1: operator moderation actions (HIGH-7).
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
-import { NotFoundException } from '@nestjs/common'
+import { Logger, NotFoundException } from '@nestjs/common'
 import { CommunityModerationActionsService } from './community-moderation.actions'
+import { abortFirstRun } from '../../testing/pldbgapi2.js'
 
 describe('CommunityModerationActionsService', () => {
   const queryRaw = vi.fn()
@@ -424,6 +425,84 @@ describe('CommunityModerationActionsService', () => {
       ).resolves.toEqual({ resolved: false })
 
       expect(moderationEventCreate).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('a transaction re-run after the pldbgapi2 abort', () => {
+    // The first run executes every statement, then aborts and rolls back; the helper
+    // runs the callback again. Only the committed run may reach the operator log.
+    const rerun = () => {
+      prisma.$transaction.mockImplementationOnce(
+        abortFirstRun(() => prisma as unknown as PrismaClient)
+      )
+    }
+    const events = (spy: { mock: { calls: unknown[][] } }) =>
+      spy.mock.calls.map((call) => (call[0] as { event: string }).event)
+
+    it('logs a release once', async () => {
+      const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
+      // One read per run.
+      postFindUniqueOrThrow.mockResolvedValueOnce(post()).mockResolvedValueOnce(post())
+      rerun()
+      await expect(
+        createService().releaseFlaggedPost({
+          postId: 'post-1',
+          operatorId: 'operator-7',
+          reason: 'False positive',
+        })
+      ).resolves.toEqual({ released: true })
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+      expect(moderationEventCreate).toHaveBeenCalledTimes(2)
+      expect(events(warn)).toEqual(['community_moderation_operator_release'])
+      expect(warn.mock.calls[0]?.[0]).toMatchObject({
+        overriddenEngineVersion: 'adr013-text-v2.0;adr013-nsfw-v1.0',
+      })
+      warn.mockRestore()
+    })
+
+    it('logs a takedown once', async () => {
+      const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
+      postFindUniqueOrThrow
+        .mockResolvedValueOnce(post({ status: 'published' }))
+        .mockResolvedValueOnce(post({ status: 'published' }))
+      rerun()
+      await expect(
+        createService().takeDownPublishedPost({
+          postId: 'post-1',
+          operatorId: 'operator-7',
+          reason: 'Harassment',
+        })
+      ).resolves.toEqual({ takenDown: true })
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+      expect(events(warn)).toEqual(['community_moderation_operator_takedown'])
+      warn.mockRestore()
+    })
+
+    it('logs a resolution once', async () => {
+      const log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined)
+      const row = {
+        id: 'report-1',
+        post_id: 'post-1',
+        subject_alias: 'Style Explorer AABBCCDD',
+        image_object_path: null,
+        content_snapshot: null,
+        sla_due_at: new Date('2026-09-07T00:00:00.000Z'),
+      }
+      reportFindUniqueOrThrow.mockResolvedValueOnce(row).mockResolvedValueOnce(row)
+      rerun()
+      await expect(
+        createService().resolveReport({
+          reportId: 'report-1',
+          operatorId: 'operator-2',
+          resolution: 'Content removed',
+        })
+      ).resolves.toEqual({ resolved: true })
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+      expect(events(log)).toEqual(['community_moderation_report_resolved'])
+      expect(log.mock.calls[0]?.[0]).toMatchObject({
+        slaDueAt: '2026-09-07T00:00:00.000Z',
+      })
+      log.mockRestore()
     })
   })
 })

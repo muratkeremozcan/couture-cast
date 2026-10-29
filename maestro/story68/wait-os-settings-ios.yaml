@@ -1,0 +1,11 @@
+appId: com.apple.Preferences
+---
+# Maestro scopes a flow to its appId, so the Settings app is only visible to a flow of its own
+# (probed on iOS 26.1: the same wait under this app's appId fails while Settings is in front).
+# The status-bar breadcrumb is on every Settings screen opened from this app, the app pane or
+# the root, and its text names this app.
+- extendedWaitUntil:
+    visible:
+      id: breadcrumb
+      text: ".*CoutureCast Story68"
+    timeout: 15000

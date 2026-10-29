@@ -54,7 +54,10 @@ export function ignoredBuildExitCode(env, cwd = repoRoot) {
   return previewRequired(cwd, base) ? 1 : 0
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   if (process.argv[2] === '--ignore') {
     process.exitCode = ignoredBuildExitCode(process.env)
     console.log(

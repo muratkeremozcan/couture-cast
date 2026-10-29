@@ -1,6 +1,8 @@
 // Story 6.5 owner: privacy locks precede every existing engagement lock.
 import { Prisma, type PrismaClient } from '@prisma/client'
 import { ForbiddenException } from '@nestjs/common'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { postgresError } from '../../prisma/postgres-error.js'
 
 export async function assertCommunitySubjectAvailable(
   tx: Pick<Prisma.TransactionClient, 'communitySubject'>,
@@ -39,23 +41,28 @@ export async function forgetCommunitySubject(
   if (erase)
     await tx.communitySpotlightReadWindow.deleteMany({ where: { user_id: member } })
 }
+/**
+ * Erasure and the community maintenance transactions. interactiveTransaction already
+ * retries the pldbgapi2 stack error; this loop adds the serialization, deadlock and
+ * lock-timeout causes, which also roll the whole transaction back first.
+ */
 export async function communityPrivacyTransaction<T>(
   prisma: PrismaClient,
   work: (tx: Prisma.TransactionClient) => Promise<T>
 ): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await prisma.$transaction(work, {
+      return await interactiveTransaction(prisma, work, {
         isolationLevel: 'ReadCommitted',
         timeout: 7000,
         maxWait: 1000,
       })
     } catch (error) {
       const code = error instanceof Prisma.PrismaClientKnownRequestError ? error.code : ''
-      const sql =
-        error instanceof Prisma.PrismaClientKnownRequestError
-          ? String(error.meta?.code)
-          : ''
+      // A model operation raises 40P01 and 55P03 as unknown request errors; Prisma maps
+      // only 40001, to P2034. postgresError reads the state from either form.
+      const sql = postgresError(error)?.code ?? ''
+      // Three attempts in all, retried at once.
       if (attempt < 2 && (code === 'P2034' || ['40001', '40P01', '55P03'].includes(sql)))
         continue
       throw error

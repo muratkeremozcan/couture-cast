@@ -1,0 +1,26 @@
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.xpc","category":"connection","eventMessage":"[0x101805780] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.daemon"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.xpc","category":"connection","eventMessage":"[0x1018059a0] activating connection: mach=true listener=false peer=false name=com.apple.metal.simulator.SpringBoard"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.xpc","category":"connection","eventMessage":"[0x101805ae0] activating connection: mach=true listener=false peer=false name=com.apple.metal.simulator.SpringBoard"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.xpc","category":"connection","eventMessage":"[0x101c04af0] activating connection: mach=true listener=false peer=false name=com.apple.metal.simulator.SpringBoard"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.FileURL","category":"default","eventMessage":"kExcludedFromBackupXattrName set on path: /Users/runner/<path>"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.runningboard","category":"connection","eventMessage":"Initializing connection"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.runningboard","category":"process","eventMessage":"Removing all cached process handles"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.runningboard","category":"connection","eventMessage":"Sending handshake request attempt #1 to server"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.runningboard","category":"connection","eventMessage":"Creating connection to com.apple.runningboard"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.xpc","category":"connection","eventMessage":"[0x101b05020] activating connection: mach=true listener=false peer=false name=com.apple.runningboard"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.runningboard","category":"connection","eventMessage":"Handshake succeeded"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.runningboard","category":"connection","eventMessage":"Identity resolved as osservice<com.apple.SpringBoard>"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.xpc","category":"connection","eventMessage":"[0x101a06d80] readying connection: mach=true listener=true peer=false name=com.apple.frontboard.systemappservices"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.xpc","category":"connection","eventMessage":"[0x101806500] readying connection: mach=true listener=true peer=false name=com.apple.posterboardui.services"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.xpc","category":"connection","eventMessage":"[0x101a07120] readying connection: mach=true listener=true peer=false name=com.apple.siri.activation.service"}
+{"messageType":"Default","eventType":"logEvent","subsystem":"com.apple.xpc","category":"connection","eventMessage":"[0x101806f00] readying connection: mach=true listener=true peer=false name=com.apple.usernotifications.systemservice"}
+{"messageType":"Error","eventType":"logEvent","subsystem":"com.apple.ControlCenter","category":"ModuleSettings","eventMessage":"Could not load configuration file (NSPropertyListSerialization error) at file:///Users/runner/<path>"}
+{"messageType":"Error","eventType":"logEvent","subsystem":"com.apple.runningboard","category":"assertion","eventMessage":"Error acquiring assertion: <Error Domain=RBSAssertionErrorDomain Code=2 \"Specified target process 46789 does not exist\" "}
+{"messageType":"Error","eventType":"logEvent","subsystem":"com.apple.FrontBoard","category":"ProcessWorkspace","eventMessage":"failed to acquire restart assertion on 46789 : Error Domain=RBSAssertionErrorDomain Code=2 \"Specified target process 467"}
+{"messageType":"Error","eventType":"logEvent","subsystem":"com.apple.runningboard","category":"assertion","eventMessage":"Error acquiring assertion: <Error Domain=RBSAssertionErrorDomain Code=2 \"Specified target process 46653 does not exist\" "}
+{"messageType":"Error","eventType":"logEvent","subsystem":"com.apple.FrontBoard","category":"ProcessWorkspace","eventMessage":"failed to acquire restart assertion on 46653 : Error Domain=RBSAssertionErrorDomain Code=2 \"Specified target process 466"}
+{"messageType":"Error","eventType":"logEvent","subsystem":"com.apple.runningboard","category":"assertion","eventMessage":"Error acquiring assertion: <Error Domain=RBSAssertionErrorDomain Code=2 \"Specified target process 46659 does not exist\" "}
+{"messageType":"Fault","eventType":"logEvent","subsystem":"com.apple.locationd.Legacy","category":"Generic_deprecated","eventMessage":"could not read user kCFPreferencesCurrentUser uid/gid"}
+{"messageType":"Fault","eventType":"logEvent","subsystem":"com.apple.network","category":"","eventMessage":"tcp_fallback_watcher_fallback_inuse called with null watcher"}
+{"eventType":"activityCreateEvent","subsystem":"","category":"","eventMessage":"Loading Preferences From User Session CFPrefsD"}
+{"eventType":"activityCreateEvent","subsystem":"","category":"","eventMessage":"didChangeInheritances"}

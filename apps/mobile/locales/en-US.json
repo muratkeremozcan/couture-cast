@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "NSPhotoLibraryAddUsageDescription": "Allow CoutureCast to save the card you approve to your photos.",
+    "NSPhotoLibraryUsageDescription": "Allow CoutureCast to choose wardrobe photos."
+  }
+}

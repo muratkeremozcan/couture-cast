@@ -4,13 +4,14 @@ import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { getI18n } from '../../i18n'
-const session = vi.hoisted(() => ({ owner: null as string | null }))
+const session = vi.hoisted(() => ({ owner: null as string | null, stored: false }))
 vi.mock(
   '@couture/api-client',
   async () => import('../../../../../packages/api-client/src/index')
 )
 vi.mock('../../lib/web-session', () => ({
   webSessionIdentity: () => session.owner,
+  hasStoredWebSession: () => session.stored,
   resolveWebSessionToken: () =>
     Promise.resolve(session.owner ? `verified-${session.owner}` : undefined),
   signOutWebSession: vi.fn(),
@@ -29,6 +30,7 @@ const settings = (revision = 'revision-1') => ({
 const label = (key: string) => getI18n().t(`community.notifications.${key}`)
 beforeEach(async () => {
   session.owner = null
+  session.stored = false
   await getI18n().changeLanguage('en-US')
 })
 function identify(owner: string | null) {
@@ -88,8 +90,8 @@ describe('R11 verified settings journeys', () => {
     )
     session.owner = 'member-a'
     render(<NotificationSettingsPage />)
-    const enabled = await screen.findByLabelText(label('enabled'))
-    fireEvent.click(enabled)
+    await screen.findByRole('button', { name: label('save') })
+    fireEvent.click(screen.getByLabelText(label('enabled')))
     fireEvent.click(screen.getByRole('button', { name: label('save') }))
     await waitFor(() => expect(reads).toBe(2))
     await waitFor(() => expect(screen.getByLabelText(label('quiet'))).toBeChecked())
@@ -100,5 +102,65 @@ describe('R11 verified settings journeys', () => {
       { baseRevision: 'revision-1', enabled: true },
       { baseRevision: 'revision-2', enabled: true },
     ])
+  })
+  it('holds the form place, hidden and inert, while a stored session verifies and settings load', async () => {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    useMswHandlers(
+      http.get('*/api/v1/community/notification-preferences', async () => {
+        await held
+        return HttpResponse.json({ data: settings() })
+      })
+    )
+    session.stored = true
+    render(<NotificationSettingsPage />)
+    const placeholder = screen.getByTestId('notification-settings-loading')
+    expect(placeholder).toHaveAttribute('inert')
+    expect(placeholder).toHaveAttribute('aria-hidden', 'true')
+    expect(placeholder).toHaveClass('invisible')
+    expect(screen.queryByRole('button', { name: label('save') })).toBeNull()
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true')
+    identify('member-a')
+    expect(screen.getByTestId('notification-settings-loading')).toBe(placeholder)
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true')
+    release()
+    const save = await screen.findByRole('button', { name: label('save') })
+    expect(screen.getByRole('main')).not.toHaveAttribute('aria-busy')
+    expect(placeholder).toContainElement(save)
+    expect(placeholder).not.toHaveAttribute('inert')
+    expect(placeholder).not.toHaveAttribute('aria-hidden')
+    expect(placeholder).not.toHaveClass('invisible')
+    expect(screen.queryByTestId('notification-settings-loading')).toBeNull()
+  })
+  it('clears the busy state and the held place when preferences fail to load', async () => {
+    useMswHandlers(
+      http.get('*/api/v1/community/notification-preferences', () =>
+        HttpResponse.json({}, { status: 503 })
+      )
+    )
+    session.owner = 'member-a'
+    render(<NotificationSettingsPage />)
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true')
+    await screen.findByText(label('failed'))
+    expect(screen.getByRole('main')).not.toHaveAttribute('aria-busy')
+    expect(screen.queryByTestId('notification-settings-loading')).toBeNull()
+  })
+  it('releases the held place when a stored session verifies to no member', async () => {
+    session.stored = true
+    render(<NotificationSettingsPage />)
+    expect(screen.getByTestId('notification-settings-loading')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.queryByTestId('notification-settings-loading')).toBeNull()
+    )
+    expect(screen.getByRole('main')).not.toHaveAttribute('aria-busy')
+    expect(screen.queryByLabelText(label('timezone'))).toBeNull()
+  })
+  it('reserves nothing for a visitor without a stored session', () => {
+    render(<NotificationSettingsPage />)
+    expect(screen.getByRole('main')).not.toHaveAttribute('aria-busy')
+    expect(screen.queryByTestId('notification-settings-loading')).toBeNull()
+    expect(screen.queryByLabelText(label('timezone'))).toBeNull()
   })
 })

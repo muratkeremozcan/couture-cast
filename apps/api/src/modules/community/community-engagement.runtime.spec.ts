@@ -78,6 +78,8 @@ function databaseBoundary(capability: 'ready' | 'old-server' | 'bad-timeout' = '
     $transaction: vi.fn(async (work: (tx: unknown) => Promise<unknown>) => work(db)),
     $disconnect: vi.fn(() => Promise.resolve()),
   }
+  // createPrismaClient extends the constructed pool; the stand-in is its own extension.
+  Object.assign(db, { $extends: () => db })
   return { db, prisma: db as unknown as PrismaClient, queries }
 }
 
@@ -203,6 +205,36 @@ function dispatchQueries(primary: ReturnType<typeof databaseBoundary>) {
 }
 
 describe('T03 actual engagement runtime composition', () => {
+  it('retries a failed grouping sweep after 250 ms without overlapping passes', async () => {
+    let release!: () => void
+    const group = vi
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'group')
+      .mockRejectedValueOnce(new Error('expired grouping transaction'))
+      .mockImplementationOnce(
+        () =>
+          new Promise<number>((resolve) => {
+            release = () => resolve(1)
+          })
+      )
+      .mockResolvedValue(0)
+    try {
+      await start(databaseBoundary(), 'general')
+      await vi.advanceTimersByTimeAsync(250)
+      expect(group).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(249)
+      expect(group).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(group).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(group).toHaveBeenCalledTimes(2)
+      release()
+      await vi.advanceTimersByTimeAsync(250)
+      expect(group).toHaveBeenCalledTimes(3)
+    } finally {
+      group.mockRestore()
+    }
+  })
+
   it.each(['general', 'community'] as const)(
     'selects exactly one dispatch pool when %s owns both running roles',
     async (owner) => {

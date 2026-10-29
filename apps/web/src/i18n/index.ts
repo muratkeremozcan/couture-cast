@@ -114,10 +114,9 @@ let instance: I18nInstance | null = null
 
 /** Initializes once per browser session; safe to call from any client component. */
 export function getI18n(profileLocale?: string | null): I18nInstance {
-  const locale = resolveWebLocale({
-    profileLocale,
-    browserLanguages: typeof navigator !== 'undefined' ? navigator.languages : undefined,
-  })
+  // SSR and the first browser render share the same language. Browser detection runs
+  // in the mounted bridge, after React has hydrated the server markup.
+  const locale = resolveWebLocale({ profileLocale })
 
   if (!instance) {
     instance = createInstance()
@@ -131,8 +130,20 @@ export function getI18n(profileLocale?: string | null): I18nInstance {
     return instance
   }
 
-  if (instance.language !== locale) {
+  if (profileLocale !== undefined && instance.language !== locale) {
     void instance.changeLanguage(locale)
   }
   return instance
+}
+
+export function activateBrowserLocale(): void {
+  const locale = resolveWebLocale({
+    browserLanguages: typeof navigator !== 'undefined' ? navigator.languages : undefined,
+  })
+  void getI18n().changeLanguage(locale)
+}
+
+/** Read the mounted language without re-resolving browser defaults during a render. */
+export function currentI18n(): I18nInstance {
+  return instance ?? getI18n()
 }

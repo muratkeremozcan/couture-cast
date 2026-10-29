@@ -4,9 +4,14 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import { describe, expect, it, vi } from 'vitest'
 import { FEATURE_FLAG_KEYS } from '@couture/config'
+import type { PrismaClient } from '@prisma/client'
+import {
+  CommunityAuthorizationBudget,
+  CommunityUnavailableException,
+} from '../community/community-availability.js'
 
 import { FeatureFlagsService } from './feature-flags.service'
-import type { FeatureFlagsRepository } from './feature-flags.repository'
+import { FeatureFlagsRepository } from './feature-flags.repository'
 import type { RemoteFeatureFlagProvider } from './remote-feature-flag-provider'
 
 function createService({
@@ -35,6 +40,49 @@ function createService({
 }
 
 describe('FeatureFlagsService', () => {
+  it('keeps each fixture waiter deadline while sharing a cold flag read outside authorization transactions', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    vi.stubEnv('COMMUNITY_FLAG_FIXTURE_MODE', 'true')
+    vi.stubEnv('DATABASE_URL', 'postgresql://localhost/isolated_fixture')
+    // The budget reads performance.now() and arms setTimeout; both run on the fake clock.
+    vi.useFakeTimers({ toFake: ['performance', 'setTimeout', 'clearTimeout'] })
+    let release!: (value: { value: boolean }) => void
+    const held = new Promise<{ value: boolean }>((resolve) => {
+      release = resolve
+    })
+    const findUnique = vi.fn(() => held)
+    const $transaction = vi.fn()
+    const service = new FeatureFlagsService(
+      new FeatureFlagsRepository({
+        featureFlag: { findUnique },
+        $transaction,
+      } as unknown as PrismaClient),
+      { getFeatureFlagValue: vi.fn() }
+    )
+    try {
+      const expired = service.communityReadEvaluation(
+        'short-lived',
+        new CommunityAuthorizationBudget(performance.now() + 15)
+      )
+      const refused = expect(expired).rejects.toBeInstanceOf(
+        CommunityUnavailableException
+      )
+      const live = Array.from({ length: 100 }, (_, index) =>
+        service.communityReadEvaluation(`live-${index}`)
+      )
+      await vi.advanceTimersByTimeAsync(15)
+      await refused
+      release({ value: false })
+      expect((await Promise.all(live)).every((grant) => grant.value === false)).toBe(true)
+      expect(findUnique).toHaveBeenCalledOnce()
+      expect($transaction).not.toHaveBeenCalled()
+    } finally {
+      release({ value: false })
+      vi.useRealTimers()
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('returns the live PostHog value when available', async () => {
     const { service, findValue, getFeatureFlagValue } = createService({
       remoteValue: true,

@@ -1,0 +1,83 @@
+{
+  "corpusVersion": "holdout-v2",
+  "authorAndReviewer": "cc68-tea",
+  "frozenAt": "2026-10-26T03:55:16.254240+00:00",
+  "baseCommit": "1d7b98485485c224063b573207c7e78bace717be",
+  "aggregateRecipe": "SHA-256 over sorted UTF-8 lines: repository-relative-path + NUL + file-SHA-256 + LF",
+  "authoringPolicySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+  "files": [
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/de.json",
+      "sha256": "786ce564e27f0b83c9b7c5f3cfc8b0d536dcb342d9fe5b1abb16395c7687e27c",
+      "language": "de",
+      "total": 400,
+      "captions": 200,
+      "altTexts": 200,
+      "gatedClean": 400,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/en.json",
+      "sha256": "bad2e70e1df7d99ad98fb42bde1c3a78b669df37cf8936a187fa0329ca184a0e",
+      "language": "en",
+      "total": 400,
+      "captions": 200,
+      "altTexts": 200,
+      "gatedClean": 400,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/es.json",
+      "sha256": "89b42ec3572535e932cc6bcc61e6bad45e1288207c9fc44d05df64a92d49f3f7",
+      "language": "es",
+      "total": 400,
+      "captions": 200,
+      "altTexts": 200,
+      "gatedClean": 400,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/fr.json",
+      "sha256": "e1246971991f9752f10cae6e361db0083a15db9bc08857f407ab929cf7eb8f67",
+      "language": "fr",
+      "total": 400,
+      "captions": 200,
+      "altTexts": 200,
+      "gatedClean": 400,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/it.json",
+      "sha256": "e1f8c4c8bb4b4e6bcd09b9ff796cda705a02b24108bc66b11f7e6cac39ce5517",
+      "language": "it",
+      "total": 400,
+      "captions": 200,
+      "altTexts": 200,
+      "gatedClean": 400,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+      "sha256": "99a20bc130d3b9337e0169773ff3e873b0b5455555837d316d448c11380160cc",
+      "language": "pt",
+      "total": 400,
+      "captions": 200,
+      "altTexts": 200,
+      "gatedClean": 400,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/tr.json",
+      "sha256": "2ac13c0351d0e8cd2cb4f6ff30473962a32d3c31070a71cbf9e2d75f4bca9baf",
+      "language": "tr",
+      "total": 400,
+      "captions": 200,
+      "altTexts": 200,
+      "gatedClean": 400,
+      "expectedReview": 0
+    }
+  ],
+  "screeningRunBeforeFreeze": false,
+  "repairInspectedBeforeFreeze": false,
+  "corpusSha256": "3bd993bb4135ed1db8a3f1d21f652978373662459538d96ed16517900857bebf"
+}

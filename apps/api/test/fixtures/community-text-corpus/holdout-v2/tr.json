@@ -1,0 +1,2013 @@
+{
+  "language": "tr",
+  "corpusVersion": "holdout-v2",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "e87f504e9adeea7bbbcb9ce87516d937a636d579612c2448fe7853d282ef3547",
+    "languageAllowListSha256": "865b5547537e7a204ceb38cdc34be81ef68a11d6c99f694e0d2e8ad49bc2338e"
+  },
+  "entries": [
+    {
+      "id": "tr-holdout-v2-001",
+      "field": "caption",
+      "text": "Dün akşam kolları kısalttım."
+    },
+    {
+      "id": "tr-holdout-v2-002",
+      "field": "caption",
+      "text": "Bu yelek teyzemindi."
+    },
+    {
+      "id": "tr-holdout-v2-003",
+      "field": "caption",
+      "text": "Botların tabanları yenilendi."
+    },
+    {
+      "id": "tr-holdout-v2-004",
+      "field": "caption",
+      "text": "Koro provası için bir broş taktım."
+    },
+    {
+      "id": "tr-holdout-v2-005",
+      "field": "caption",
+      "text": "Etek yürürken dalgalanıyor."
+    },
+    {
+      "id": "tr-holdout-v2-006",
+      "field": "caption",
+      "text": "Paltonun düğmelerini değiştirdim."
+    },
+    {
+      "id": "tr-holdout-v2-007",
+      "field": "caption",
+      "text": "Atkıyı bir dokumacıdan aldım."
+    },
+    {
+      "id": "tr-holdout-v2-008",
+      "field": "caption",
+      "text": "Çantamda suluboya defterim var."
+    },
+    {
+      "id": "tr-holdout-v2-009",
+      "field": "caption",
+      "text": "Yemek yaparken kollarımı kıvırıyorum."
+    },
+    {
+      "id": "tr-holdout-v2-010",
+      "field": "caption",
+      "text": "Bu şapka uzun süredir bekliyordu."
+    },
+    {
+      "id": "tr-holdout-v2-011",
+      "field": "caption",
+      "text": "Ceket yeniden güzel oturuyor."
+    },
+    {
+      "id": "tr-holdout-v2-012",
+      "field": "caption",
+      "text": "İç tarafa bir cep diktim."
+    },
+    {
+      "id": "tr-holdout-v2-013",
+      "field": "caption",
+      "text": "Gömlek askıda kuruyor."
+    },
+    {
+      "id": "tr-holdout-v2-014",
+      "field": "caption",
+      "text": "Akşam dersi için kalın çoraplar."
+    },
+    {
+      "id": "tr-holdout-v2-015",
+      "field": "caption",
+      "text": "Bilekliğin küçük bir tokası var."
+    },
+    {
+      "id": "tr-holdout-v2-016",
+      "field": "caption",
+      "text": "Mavi astarı çok sevdim."
+    },
+    {
+      "id": "tr-holdout-v2-017",
+      "field": "caption",
+      "text": "Baharlık eldivenlerimi buldum."
+    },
+    {
+      "id": "tr-holdout-v2-018",
+      "field": "caption",
+      "text": "Okuma etkinliği için bol elbise."
+    },
+    {
+      "id": "tr-holdout-v2-019",
+      "field": "caption",
+      "text": "Yeni bağcıklar sağlam duruyor."
+    },
+    {
+      "id": "tr-holdout-v2-020",
+      "field": "caption",
+      "text": "Atkımı sonunda bitirdim."
+    },
+    {
+      "id": "tr-holdout-v2-021",
+      "field": "caption",
+      "text": "Şalı tren yolculuğuna götürüyorum."
+    },
+    {
+      "id": "tr-holdout-v2-022",
+      "field": "caption",
+      "text": "Kemeri elimle ördüm."
+    },
+    {
+      "id": "tr-holdout-v2-023",
+      "field": "caption",
+      "text": "Ayakkabılar tamirciden döndü."
+    },
+    {
+      "id": "tr-holdout-v2-024",
+      "field": "caption",
+      "text": "Eteğimin cepleri kocaman."
+    },
+    {
+      "id": "tr-holdout-v2-025",
+      "field": "caption",
+      "text": "Sergi için açık renk ceket."
+    },
+    {
+      "id": "tr-holdout-v2-026",
+      "field": "caption",
+      "text": "Yaka yerinde duruyor."
+    },
+    {
+      "id": "tr-holdout-v2-027",
+      "field": "caption",
+      "text": "Kola yapraklar işledim."
+    },
+    {
+      "id": "tr-holdout-v2-028",
+      "field": "caption",
+      "text": "Kasket çantama sığıyor."
+    },
+    {
+      "id": "tr-holdout-v2-029",
+      "field": "caption",
+      "text": "Bu pantolon otururken rahat."
+    },
+    {
+      "id": "tr-holdout-v2-030",
+      "field": "caption",
+      "text": "Küpeler yuvarlak yakaya yakıştı."
+    },
+    {
+      "id": "tr-holdout-v2-031",
+      "field": "caption",
+      "text": "Palto babamdan kaldı."
+    },
+    {
+      "id": "tr-holdout-v2-032",
+      "field": "caption",
+      "text": "Ekmek yapmak için önlük taktım."
+    },
+    {
+      "id": "tr-holdout-v2-033",
+      "field": "caption",
+      "text": "İki kolu da daralttım."
+    },
+    {
+      "id": "tr-holdout-v2-034",
+      "field": "caption",
+      "text": "Broş şalımı tutuyor."
+    },
+    {
+      "id": "tr-holdout-v2-035",
+      "field": "caption",
+      "text": "Sandaletlerin kayışları yenilendi."
+    },
+    {
+      "id": "tr-holdout-v2-036",
+      "field": "caption",
+      "text": "Gömlek yeleğin altına sığıyor."
+    },
+    {
+      "id": "tr-holdout-v2-037",
+      "field": "caption",
+      "text": "Pilelerin hareketini seviyorum."
+    },
+    {
+      "id": "tr-holdout-v2-038",
+      "field": "caption",
+      "text": "Vapur için bir çift eldiven."
+    },
+    {
+      "id": "tr-holdout-v2-039",
+      "field": "caption",
+      "text": "Bu çanta defterimi taşıyor."
+    },
+    {
+      "id": "tr-holdout-v2-040",
+      "field": "caption",
+      "text": "Bere kulaklarımı örtüyor."
+    },
+    {
+      "id": "tr-holdout-v2-041",
+      "field": "caption",
+      "text": "Montun fermuarını onardım."
+    },
+    {
+      "id": "tr-holdout-v2-042",
+      "field": "caption",
+      "text": "Kütüphane için bir atkı aldım."
+    },
+    {
+      "id": "tr-holdout-v2-043",
+      "field": "caption",
+      "text": "Bu kumaş kolay kırışıyor."
+    },
+    {
+      "id": "tr-holdout-v2-044",
+      "field": "caption",
+      "text": "Elbisenin askıları ayarlanabiliyor."
+    },
+    {
+      "id": "tr-holdout-v2-045",
+      "field": "caption",
+      "text": "Ayakkabılar parkede gıcırdıyor."
+    },
+    {
+      "id": "tr-holdout-v2-046",
+      "field": "caption",
+      "text": "Aynı renkte ip aldım."
+    },
+    {
+      "id": "tr-holdout-v2-047",
+      "field": "caption",
+      "text": "Şapkaya yeni kurdele taktım."
+    },
+    {
+      "id": "tr-holdout-v2-048",
+      "field": "caption",
+      "text": "Bu ceket kolay katlanıyor."
+    },
+    {
+      "id": "tr-holdout-v2-049",
+      "field": "caption",
+      "text": "Kemeri bitpazarından aldım."
+    },
+    {
+      "id": "tr-holdout-v2-050",
+      "field": "caption",
+      "text": "Yedek düğmeyi saklıyorum."
+    },
+    {
+      "id": "tr-holdout-v2-051",
+      "field": "caption",
+      "text": "Müze gezisi için bol pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-052",
+      "field": "caption",
+      "text": "Şortun belini daralttım."
+    },
+    {
+      "id": "tr-holdout-v2-053",
+      "field": "caption",
+      "text": "Çantanın astarı açık renk."
+    },
+    {
+      "id": "tr-holdout-v2-054",
+      "field": "caption",
+      "text": "Çoraplarımı sonunda yamadım."
+    },
+    {
+      "id": "tr-holdout-v2-055",
+      "field": "caption",
+      "text": "Annemin küpelerini takıyorum."
+    },
+    {
+      "id": "tr-holdout-v2-056",
+      "field": "caption",
+      "text": "Fular saçımı koruyor."
+    },
+    {
+      "id": "tr-holdout-v2-057",
+      "field": "caption",
+      "text": "Bu gömleğin dik yakası var."
+    },
+    {
+      "id": "tr-holdout-v2-058",
+      "field": "caption",
+      "text": "Bez ayakkabılarımı yıkadım."
+    },
+    {
+      "id": "tr-holdout-v2-059",
+      "field": "caption",
+      "text": "Akşam için yün etek."
+    },
+    {
+      "id": "tr-holdout-v2-060",
+      "field": "caption",
+      "text": "Hırka sandalyemde duruyor."
+    },
+    {
+      "id": "tr-holdout-v2-061",
+      "field": "caption",
+      "text": "Botlarla bütün düğünü geçirdim."
+    },
+    {
+      "id": "tr-holdout-v2-062",
+      "field": "caption",
+      "text": "Fulara farklı bir düğüm attım."
+    },
+    {
+      "id": "tr-holdout-v2-063",
+      "field": "caption",
+      "text": "Bel lastiğini değiştirdim."
+    },
+    {
+      "id": "tr-holdout-v2-064",
+      "field": "caption",
+      "text": "Bu elbise takastan geldi."
+    },
+    {
+      "id": "tr-holdout-v2-065",
+      "field": "caption",
+      "text": "Çantada örgü şişlerim duruyor."
+    },
+    {
+      "id": "tr-holdout-v2-066",
+      "field": "caption",
+      "text": "Pelerin ellerimi serbest bırakıyor."
+    },
+    {
+      "id": "tr-holdout-v2-067",
+      "field": "caption",
+      "text": "Kazak ceketin altına sığıyor."
+    },
+    {
+      "id": "tr-holdout-v2-068",
+      "field": "caption",
+      "text": "Eldivenler havluda kuruyor."
+    },
+    {
+      "id": "tr-holdout-v2-069",
+      "field": "caption",
+      "text": "Dik yaka üstüne bir kolye."
+    },
+    {
+      "id": "tr-holdout-v2-070",
+      "field": "caption",
+      "text": "Bu kemer elbisenin duruşunu değiştiriyor."
+    },
+    {
+      "id": "tr-holdout-v2-071",
+      "field": "caption",
+      "text": "Pantolonu ikinci el aldım."
+    },
+    {
+      "id": "tr-holdout-v2-072",
+      "field": "caption",
+      "text": "Bu bereyi teyzem ördü."
+    },
+    {
+      "id": "tr-holdout-v2-073",
+      "field": "caption",
+      "text": "Seramik dersi için bir önlük."
+    },
+    {
+      "id": "tr-holdout-v2-074",
+      "field": "caption",
+      "text": "Bu sabah yakayı ütüledim."
+    },
+    {
+      "id": "tr-holdout-v2-075",
+      "field": "caption",
+      "text": "Kollar bilekten ilikleniyor."
+    },
+    {
+      "id": "tr-holdout-v2-076",
+      "field": "caption",
+      "text": "Atkımın püskülleri uzun."
+    },
+    {
+      "id": "tr-holdout-v2-077",
+      "field": "caption",
+      "text": "Ceketin ahşap düğmeleri var."
+    },
+    {
+      "id": "tr-holdout-v2-078",
+      "field": "caption",
+      "text": "Konsere etekle gidiyorum."
+    },
+    {
+      "id": "tr-holdout-v2-079",
+      "field": "caption",
+      "text": "Cep yeniden sağlam oldu."
+    },
+    {
+      "id": "tr-holdout-v2-080",
+      "field": "caption",
+      "text": "Bu ayakkabılar az yer kaplıyor."
+    },
+    {
+      "id": "tr-holdout-v2-081",
+      "field": "caption",
+      "text": "Şal dokuma tezgâhından çıktı."
+    },
+    {
+      "id": "tr-holdout-v2-082",
+      "field": "caption",
+      "text": "Paltoya bir askı halkası ekledim."
+    },
+    {
+      "id": "tr-holdout-v2-083",
+      "field": "caption",
+      "text": "Dans dersi için kısa botlar."
+    },
+    {
+      "id": "tr-holdout-v2-084",
+      "field": "caption",
+      "text": "Gömleğin arkasında bir pili var."
+    },
+    {
+      "id": "tr-holdout-v2-085",
+      "field": "caption",
+      "text": "Elbisemin yakası kare."
+    },
+    {
+      "id": "tr-holdout-v2-086",
+      "field": "caption",
+      "text": "Çantaya uzun bir askı gerekiyor."
+    },
+    {
+      "id": "tr-holdout-v2-087",
+      "field": "caption",
+      "text": "Sade bir yüzük takıyorum."
+    },
+    {
+      "id": "tr-holdout-v2-088",
+      "field": "caption",
+      "text": "Kasket yürüyüşlerime eşlik ediyor."
+    },
+    {
+      "id": "tr-holdout-v2-089",
+      "field": "caption",
+      "text": "Çıkmadan önce düğmeyi diktim."
+    },
+    {
+      "id": "tr-holdout-v2-090",
+      "field": "caption",
+      "text": "Pantolon ütü çizgisini koruyor."
+    },
+    {
+      "id": "tr-holdout-v2-091",
+      "field": "caption",
+      "text": "Kulüp toplantısı için bir yelek."
+    },
+    {
+      "id": "tr-holdout-v2-092",
+      "field": "caption",
+      "text": "Etek dizimin altına geliyor."
+    },
+    {
+      "id": "tr-holdout-v2-093",
+      "field": "caption",
+      "text": "Ayakkabıların bağcıkları sarı."
+    },
+    {
+      "id": "tr-holdout-v2-094",
+      "field": "caption",
+      "text": "Bu bluz salopete yakışıyor."
+    },
+    {
+      "id": "tr-holdout-v2-095",
+      "field": "caption",
+      "text": "Kemerin tokasını temizledim."
+    },
+    {
+      "id": "tr-holdout-v2-096",
+      "field": "caption",
+      "text": "Palto birkaç katı örtüyor."
+    },
+    {
+      "id": "tr-holdout-v2-097",
+      "field": "caption",
+      "text": "Saçımı bir kurdele tutuyor."
+    },
+    {
+      "id": "tr-holdout-v2-098",
+      "field": "caption",
+      "text": "Şapkanın kenarı geniş."
+    },
+    {
+      "id": "tr-holdout-v2-099",
+      "field": "caption",
+      "text": "Bu atkı hediyeydi."
+    },
+    {
+      "id": "tr-holdout-v2-100",
+      "field": "caption",
+      "text": "Ceket kol askısının üstüne oluyor."
+    },
+    {
+      "id": "tr-holdout-v2-101",
+      "field": "caption",
+      "text": "Çantanın dikişini yeniledim."
+    },
+    {
+      "id": "tr-holdout-v2-102",
+      "field": "caption",
+      "text": "Piyano dinletisi için bir elbise."
+    },
+    {
+      "id": "tr-holdout-v2-103",
+      "field": "caption",
+      "text": "Bere kapüşonun altına sığıyor."
+    },
+    {
+      "id": "tr-holdout-v2-104",
+      "field": "caption",
+      "text": "Bu eldivenlerin bilekleri uzun."
+    },
+    {
+      "id": "tr-holdout-v2-105",
+      "field": "caption",
+      "text": "Bluzun yakasında işleme var."
+    },
+    {
+      "id": "tr-holdout-v2-106",
+      "field": "caption",
+      "text": "Fuları müzeden aldım."
+    },
+    {
+      "id": "tr-holdout-v2-107",
+      "field": "caption",
+      "text": "Cepte kalemim var."
+    },
+    {
+      "id": "tr-holdout-v2-108",
+      "field": "caption",
+      "text": "Tören için bir pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-109",
+      "field": "caption",
+      "text": "Yeleğin sırtı ayarlanıyor."
+    },
+    {
+      "id": "tr-holdout-v2-110",
+      "field": "caption",
+      "text": "Botlar girişte bekliyor."
+    },
+    {
+      "id": "tr-holdout-v2-111",
+      "field": "caption",
+      "text": "Pelerin boyundan kapanıyor."
+    },
+    {
+      "id": "tr-holdout-v2-112",
+      "field": "caption",
+      "text": "Dize bir destek parçası diktim."
+    },
+    {
+      "id": "tr-holdout-v2-113",
+      "field": "caption",
+      "text": "Öğle yemeği için keten etek."
+    },
+    {
+      "id": "tr-holdout-v2-114",
+      "field": "caption",
+      "text": "Palto omuzlarımda hafif duruyor."
+    },
+    {
+      "id": "tr-holdout-v2-115",
+      "field": "caption",
+      "text": "Bileklik kuzenimden geldi."
+    },
+    {
+      "id": "tr-holdout-v2-116",
+      "field": "caption",
+      "text": "Fotoğraf için maviyi seçtim."
+    },
+    {
+      "id": "tr-holdout-v2-117",
+      "field": "caption",
+      "text": "Sandaletlerim sonunda kurudu."
+    },
+    {
+      "id": "tr-holdout-v2-118",
+      "field": "caption",
+      "text": "Elbisenin yakası çıkarılabiliyor."
+    },
+    {
+      "id": "tr-holdout-v2-119",
+      "field": "caption",
+      "text": "Gömleğin düğmeleri sedef."
+    },
+    {
+      "id": "tr-holdout-v2-120",
+      "field": "caption",
+      "text": "Pazar için örgü çanta."
+    },
+    {
+      "id": "tr-holdout-v2-121",
+      "field": "caption",
+      "text": "Şapka rüzgârda sağlam duruyor."
+    },
+    {
+      "id": "tr-holdout-v2-122",
+      "field": "caption",
+      "text": "Önlüğün askısını kısalttım."
+    },
+    {
+      "id": "tr-holdout-v2-123",
+      "field": "caption",
+      "text": "Ceketin dirseğinde yama var."
+    },
+    {
+      "id": "tr-holdout-v2-124",
+      "field": "caption",
+      "text": "Kazak komşularla yaptığımız takastan geldi."
+    },
+    {
+      "id": "tr-holdout-v2-125",
+      "field": "caption",
+      "text": "Çoraplar pantolondan görünüyor."
+    },
+    {
+      "id": "tr-holdout-v2-126",
+      "field": "caption",
+      "text": "Elbisenin iki gizli cebi var."
+    },
+    {
+      "id": "tr-holdout-v2-127",
+      "field": "caption",
+      "text": "Tekne yolculuğu için bir fular."
+    },
+    {
+      "id": "tr-holdout-v2-128",
+      "field": "caption",
+      "text": "Yün bir kravat takıyorum."
+    },
+    {
+      "id": "tr-holdout-v2-129",
+      "field": "caption",
+      "text": "Çanta koltuğun altına sığıyor."
+    },
+    {
+      "id": "tr-holdout-v2-130",
+      "field": "caption",
+      "text": "Ayakkabılar yeniden yumuşadı."
+    },
+    {
+      "id": "tr-holdout-v2-131",
+      "field": "caption",
+      "text": "Paltonun astarını düzelttim."
+    },
+    {
+      "id": "tr-holdout-v2-132",
+      "field": "caption",
+      "text": "Şapkanın kurdelesine bir broş taktım."
+    },
+    {
+      "id": "tr-holdout-v2-133",
+      "field": "caption",
+      "text": "Bu eteğin boyu farklıydı."
+    },
+    {
+      "id": "tr-holdout-v2-134",
+      "field": "caption",
+      "text": "Yelek iki taraflı kullanılabiliyor."
+    },
+    {
+      "id": "tr-holdout-v2-135",
+      "field": "caption",
+      "text": "Eldivenlerim otobüste kaldı."
+    },
+    {
+      "id": "tr-holdout-v2-136",
+      "field": "caption",
+      "text": "Yürümek için mokasen seçtim."
+    },
+    {
+      "id": "tr-holdout-v2-137",
+      "field": "caption",
+      "text": "Elbisede küçük çiçek işlemeleri var."
+    },
+    {
+      "id": "tr-holdout-v2-138",
+      "field": "caption",
+      "text": "Baskı atölyesi için bol gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-139",
+      "field": "caption",
+      "text": "Pantolonun yan ayarları var."
+    },
+    {
+      "id": "tr-holdout-v2-140",
+      "field": "caption",
+      "text": "Atkı akşam ışığını yakalıyor."
+    },
+    {
+      "id": "tr-holdout-v2-141",
+      "field": "caption",
+      "text": "Beremi artık yünlerle ördüm."
+    },
+    {
+      "id": "tr-holdout-v2-142",
+      "field": "caption",
+      "text": "Ceket pencerenin yanında kuruyor."
+    },
+    {
+      "id": "tr-holdout-v2-143",
+      "field": "caption",
+      "text": "Çantaya bir halka ekledim."
+    },
+    {
+      "id": "tr-holdout-v2-144",
+      "field": "caption",
+      "text": "Akşam yemeği için gümüş küpeler."
+    },
+    {
+      "id": "tr-holdout-v2-145",
+      "field": "caption",
+      "text": "Paltonun çıtçıtları sağlam."
+    },
+    {
+      "id": "tr-holdout-v2-146",
+      "field": "caption",
+      "text": "Kemer köprülerden geçiyor."
+    },
+    {
+      "id": "tr-holdout-v2-147",
+      "field": "caption",
+      "text": "Etek yandan kapanıyor."
+    },
+    {
+      "id": "tr-holdout-v2-148",
+      "field": "caption",
+      "text": "Okuma salonu için bir şal."
+    },
+    {
+      "id": "tr-holdout-v2-149",
+      "field": "caption",
+      "text": "Botlarımın topukları alçak."
+    },
+    {
+      "id": "tr-holdout-v2-150",
+      "field": "caption",
+      "text": "Kolda görünen bir dikiş var."
+    },
+    {
+      "id": "tr-holdout-v2-151",
+      "field": "caption",
+      "text": "Mezuniyet takımımı giyiyorum."
+    },
+    {
+      "id": "tr-holdout-v2-152",
+      "field": "caption",
+      "text": "Bluzun omuzları büzgülü."
+    },
+    {
+      "id": "tr-holdout-v2-153",
+      "field": "caption",
+      "text": "Düğmeler küçük deniz kabuklarına benziyor."
+    },
+    {
+      "id": "tr-holdout-v2-154",
+      "field": "caption",
+      "text": "Fular yeşil cekete eşlik ediyor."
+    },
+    {
+      "id": "tr-holdout-v2-155",
+      "field": "caption",
+      "text": "Elbise bavula sığıyor."
+    },
+    {
+      "id": "tr-holdout-v2-156",
+      "field": "caption",
+      "text": "İki manşeti de daralttım."
+    },
+    {
+      "id": "tr-holdout-v2-157",
+      "field": "caption",
+      "text": "Kumaş parçalarından küçük bir kese."
+    },
+    {
+      "id": "tr-holdout-v2-158",
+      "field": "caption",
+      "text": "Bu pantolonla bisiklete binebiliyorum."
+    },
+    {
+      "id": "tr-holdout-v2-159",
+      "field": "caption",
+      "text": "Ayakkabılar yakındaki atölyeden geldi."
+    },
+    {
+      "id": "tr-holdout-v2-160",
+      "field": "caption",
+      "text": "Şapka askıda duruyor."
+    },
+    {
+      "id": "tr-holdout-v2-161",
+      "field": "caption",
+      "text": "Cep astarını yeniden diktim."
+    },
+    {
+      "id": "tr-holdout-v2-162",
+      "field": "caption",
+      "text": "Bilekliğin küçük bir kilidi var."
+    },
+    {
+      "id": "tr-holdout-v2-163",
+      "field": "caption",
+      "text": "Bu pelerin sırt çantamı örtüyor."
+    },
+    {
+      "id": "tr-holdout-v2-164",
+      "field": "caption",
+      "text": "Okuma gecesi için bir gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-165",
+      "field": "caption",
+      "text": "Sandaletlerin bantları geniş."
+    },
+    {
+      "id": "tr-holdout-v2-166",
+      "field": "caption",
+      "text": "Etek merdivenlerde adımlarıma uyuyor."
+    },
+    {
+      "id": "tr-holdout-v2-167",
+      "field": "caption",
+      "text": "Kazağın omuzları düşük."
+    },
+    {
+      "id": "tr-holdout-v2-168",
+      "field": "caption",
+      "text": "Kemeri maviye boyadım."
+    },
+    {
+      "id": "tr-holdout-v2-169",
+      "field": "caption",
+      "text": "Bu önlük kollarımı koruyor."
+    },
+    {
+      "id": "tr-holdout-v2-170",
+      "field": "caption",
+      "text": "Atkım sedir kokuyor."
+    },
+    {
+      "id": "tr-holdout-v2-171",
+      "field": "caption",
+      "text": "Ceketin cepleri derin."
+    },
+    {
+      "id": "tr-holdout-v2-172",
+      "field": "caption",
+      "text": "Çıkarılabilir yaka elbiseyi değiştiriyor."
+    },
+    {
+      "id": "tr-holdout-v2-173",
+      "field": "caption",
+      "text": "Bütün hafta bu broşu taktım."
+    },
+    {
+      "id": "tr-holdout-v2-174",
+      "field": "caption",
+      "text": "Eldivenler kutularına dönüyor."
+    },
+    {
+      "id": "tr-holdout-v2-175",
+      "field": "caption",
+      "text": "Çantanın tabanı güçlendirilmiş."
+    },
+    {
+      "id": "tr-holdout-v2-176",
+      "field": "caption",
+      "text": "Bu etek ablamdan geldi."
+    },
+    {
+      "id": "tr-holdout-v2-177",
+      "field": "caption",
+      "text": "Buluşma için yeni bir pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-178",
+      "field": "caption",
+      "text": "Berenin kıvrımı geniş."
+    },
+    {
+      "id": "tr-holdout-v2-179",
+      "field": "caption",
+      "text": "Gömleğimde küçük bir işleme var."
+    },
+    {
+      "id": "tr-holdout-v2-180",
+      "field": "caption",
+      "text": "Dün botlarımı cilaladım."
+    },
+    {
+      "id": "tr-holdout-v2-181",
+      "field": "caption",
+      "text": "Elbise yandan bağlanıyor."
+    },
+    {
+      "id": "tr-holdout-v2-182",
+      "field": "caption",
+      "text": "Ayakkabılar yeni tabanlarını bekliyor."
+    },
+    {
+      "id": "tr-holdout-v2-183",
+      "field": "caption",
+      "text": "Şapka için açık renk kurdele."
+    },
+    {
+      "id": "tr-holdout-v2-184",
+      "field": "caption",
+      "text": "Dedemin ceketini giydim."
+    },
+    {
+      "id": "tr-holdout-v2-185",
+      "field": "caption",
+      "text": "Bu kazak çizim yaparken benimle."
+    },
+    {
+      "id": "tr-holdout-v2-186",
+      "field": "caption",
+      "text": "Kemerin yuvarlak tokası var."
+    },
+    {
+      "id": "tr-holdout-v2-187",
+      "field": "caption",
+      "text": "Çantada katlanır baston var."
+    },
+    {
+      "id": "tr-holdout-v2-188",
+      "field": "caption",
+      "text": "Palto içeride açık kalıyor."
+    },
+    {
+      "id": "tr-holdout-v2-189",
+      "field": "caption",
+      "text": "Atkı yakadan görünüyor."
+    },
+    {
+      "id": "tr-holdout-v2-190",
+      "field": "caption",
+      "text": "Akşam yemeğinde el örgüsü çoraplar."
+    },
+    {
+      "id": "tr-holdout-v2-191",
+      "field": "caption",
+      "text": "Bluzun kumaşı serin tutuyor."
+    },
+    {
+      "id": "tr-holdout-v2-192",
+      "field": "caption",
+      "text": "Anvelop bir etek seçtim."
+    },
+    {
+      "id": "tr-holdout-v2-193",
+      "field": "caption",
+      "text": "Botların dikişleri kırmızı."
+    },
+    {
+      "id": "tr-holdout-v2-194",
+      "field": "caption",
+      "text": "Satranç dersi için bir yelek."
+    },
+    {
+      "id": "tr-holdout-v2-195",
+      "field": "caption",
+      "text": "Gömleğin çift manşeti var."
+    },
+    {
+      "id": "tr-holdout-v2-196",
+      "field": "caption",
+      "text": "Çantanın askısını güçlendirdim."
+    },
+    {
+      "id": "tr-holdout-v2-197",
+      "field": "caption",
+      "text": "Fular saçlarıma bağlanıyor."
+    },
+    {
+      "id": "tr-holdout-v2-198",
+      "field": "caption",
+      "text": "Paltoma yeni bir halka diktim."
+    },
+    {
+      "id": "tr-holdout-v2-199",
+      "field": "caption",
+      "text": "Elbise dikiş atölyesinden çıktı."
+    },
+    {
+      "id": "tr-holdout-v2-200",
+      "field": "caption",
+      "text": "Bu eldivenlerin astarı pamuklu."
+    },
+    {
+      "id": "tr-holdout-v2-201",
+      "field": "altText",
+      "text": "Yuvarlak yakalı mavi bluz."
+    },
+    {
+      "id": "tr-holdout-v2-202",
+      "field": "altText",
+      "text": "Sandalyede gri palto."
+    },
+    {
+      "id": "tr-holdout-v2-203",
+      "field": "altText",
+      "text": "Geniş pileli yeşil etek."
+    },
+    {
+      "id": "tr-holdout-v2-204",
+      "field": "altText",
+      "text": "Kapının önünde kahverengi botlar."
+    },
+    {
+      "id": "tr-holdout-v2-205",
+      "field": "altText",
+      "text": "Klapanın altında kırmızı atkı."
+    },
+    {
+      "id": "tr-holdout-v2-206",
+      "field": "altText",
+      "text": "Örgü bantlı açık renk şapka."
+    },
+    {
+      "id": "tr-holdout-v2-207",
+      "field": "altText",
+      "text": "Açık fayanslarda siyah ayakkabılar."
+    },
+    {
+      "id": "tr-holdout-v2-208",
+      "field": "altText",
+      "text": "Kare cepli kapitone yelek."
+    },
+    {
+      "id": "tr-holdout-v2-209",
+      "field": "altText",
+      "text": "Duvarın yanında sarı çanta."
+    },
+    {
+      "id": "tr-holdout-v2-210",
+      "field": "altText",
+      "text": "Bankın üstünde yün eldivenler."
+    },
+    {
+      "id": "tr-holdout-v2-211",
+      "field": "altText",
+      "text": "İşlemeli manşetli beyaz gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-212",
+      "field": "altText",
+      "text": "Paçası kıvrılmış mavi pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-213",
+      "field": "altText",
+      "text": "Ahşap tokalı yeşil pelerin."
+    },
+    {
+      "id": "tr-holdout-v2-214",
+      "field": "altText",
+      "text": "Bisikletin yanında pembe etek."
+    },
+    {
+      "id": "tr-holdout-v2-215",
+      "field": "altText",
+      "text": "Koyu bağcıklı açık renk spor ayakkabılar."
+    },
+    {
+      "id": "tr-holdout-v2-216",
+      "field": "altText",
+      "text": "Dik yakada gümüş kolye."
+    },
+    {
+      "id": "tr-holdout-v2-217",
+      "field": "altText",
+      "text": "Çapraz askılı kot önlük."
+    },
+    {
+      "id": "tr-holdout-v2-218",
+      "field": "altText",
+      "text": "Kenarı katlanmış gri bere."
+    },
+    {
+      "id": "tr-holdout-v2-219",
+      "field": "altText",
+      "text": "Oval tokalı kahverengi kemer."
+    },
+    {
+      "id": "tr-holdout-v2-220",
+      "field": "altText",
+      "text": "Kaplı düğmeli sarı elbise."
+    },
+    {
+      "id": "tr-holdout-v2-221",
+      "field": "altText",
+      "text": "Büyük cepli kısa ceket."
+    },
+    {
+      "id": "tr-holdout-v2-222",
+      "field": "altText",
+      "text": "İki omuzda bej şal."
+    },
+    {
+      "id": "tr-holdout-v2-223",
+      "field": "altText",
+      "text": "Yandan fermuarlı siyah botlar."
+    },
+    {
+      "id": "tr-holdout-v2-224",
+      "field": "altText",
+      "text": "Yeleğin altında kareli gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-225",
+      "field": "altText",
+      "text": "Korkuluğun üstünde mavi fular."
+    },
+    {
+      "id": "tr-holdout-v2-226",
+      "field": "altText",
+      "text": "Yuvarlak saplı örgü sepet."
+    },
+    {
+      "id": "tr-holdout-v2-227",
+      "field": "altText",
+      "text": "Yandan yırtmaçlı koyu etek."
+    },
+    {
+      "id": "tr-holdout-v2-228",
+      "field": "altText",
+      "text": "Manşetin yanında yeşil bileklik."
+    },
+    {
+      "id": "tr-holdout-v2-229",
+      "field": "altText",
+      "text": "Geniş yakalı kırmızı palto."
+    },
+    {
+      "id": "tr-holdout-v2-230",
+      "field": "altText",
+      "text": "Mokasenlerin üstünde gri çoraplar."
+    },
+    {
+      "id": "tr-holdout-v2-231",
+      "field": "altText",
+      "text": "Pencere yanında beyaz elbise."
+    },
+    {
+      "id": "tr-holdout-v2-232",
+      "field": "altText",
+      "text": "Katlanmış mendilli mavi ceket."
+    },
+    {
+      "id": "tr-holdout-v2-233",
+      "field": "altText",
+      "text": "Sırt çantasında kırmızı kasket."
+    },
+    {
+      "id": "tr-holdout-v2-234",
+      "field": "altText",
+      "text": "Tahtalar üzerinde kahverengi sandaletler."
+    },
+    {
+      "id": "tr-holdout-v2-235",
+      "field": "altText",
+      "text": "Bol kollu yeşil bluz."
+    },
+    {
+      "id": "tr-holdout-v2-236",
+      "field": "altText",
+      "text": "Küçük ilmekli örgü kravat."
+    },
+    {
+      "id": "tr-holdout-v2-237",
+      "field": "altText",
+      "text": "Önden pensli açık renk pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-238",
+      "field": "altText",
+      "text": "Gri yünde siyah eldivenler."
+    },
+    {
+      "id": "tr-holdout-v2-239",
+      "field": "altText",
+      "text": "Kısa askılı pembe çanta."
+    },
+    {
+      "id": "tr-holdout-v2-240",
+      "field": "altText",
+      "text": "Keten üstünde kumaş kemer."
+    },
+    {
+      "id": "tr-holdout-v2-241",
+      "field": "altText",
+      "text": "Beli büzgülü mavi etek."
+    },
+    {
+      "id": "tr-holdout-v2-242",
+      "field": "altText",
+      "text": "Kavisli cepli pembe gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-243",
+      "field": "altText",
+      "text": "Uzun kollar üstünde gri yelek."
+    },
+    {
+      "id": "tr-holdout-v2-244",
+      "field": "altText",
+      "text": "Kancada asılı kahverengi şapka."
+    },
+    {
+      "id": "tr-holdout-v2-245",
+      "field": "altText",
+      "text": "Bastonun yanında kırmızı ayakkabılar."
+    },
+    {
+      "id": "tr-holdout-v2-246",
+      "field": "altText",
+      "text": "Kapüşon altında desenli fular."
+    },
+    {
+      "id": "tr-holdout-v2-247",
+      "field": "altText",
+      "text": "Yandan bağlanan yeşil elbise."
+    },
+    {
+      "id": "tr-holdout-v2-248",
+      "field": "altText",
+      "text": "Mavi boncuklardan bir bileklik."
+    },
+    {
+      "id": "tr-holdout-v2-249",
+      "field": "altText",
+      "text": "Kolları kıvrılmış beyaz ceket."
+    },
+    {
+      "id": "tr-holdout-v2-250",
+      "field": "altText",
+      "text": "Açık puantiyeli koyu çoraplar."
+    },
+    {
+      "id": "tr-holdout-v2-251",
+      "field": "altText",
+      "text": "Ahşap düğmeli bej palto."
+    },
+    {
+      "id": "tr-holdout-v2-252",
+      "field": "altText",
+      "text": "Salopet altında çizgili bluz."
+    },
+    {
+      "id": "tr-holdout-v2-253",
+      "field": "altText",
+      "text": "Köşesi yamalı mavi çanta."
+    },
+    {
+      "id": "tr-holdout-v2-254",
+      "field": "altText",
+      "text": "Yan ayarlı gri pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-255",
+      "field": "altText",
+      "text": "Basamaklarda siyah botlar."
+    },
+    {
+      "id": "tr-holdout-v2-256",
+      "field": "altText",
+      "text": "Kalın örgülü sarı bere."
+    },
+    {
+      "id": "tr-holdout-v2-257",
+      "field": "altText",
+      "text": "Çapraz kapanan kahverengi etek."
+    },
+    {
+      "id": "tr-holdout-v2-258",
+      "field": "altText",
+      "text": "Askıda keten gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-259",
+      "field": "altText",
+      "text": "Broşla tutturulmuş kırmızı şal."
+    },
+    {
+      "id": "tr-holdout-v2-260",
+      "field": "altText",
+      "text": "İki geniş bantlı sandaletler."
+    },
+    {
+      "id": "tr-holdout-v2-261",
+      "field": "altText",
+      "text": "Lastik etek uçlu yeşil ceket."
+    },
+    {
+      "id": "tr-holdout-v2-262",
+      "field": "altText",
+      "text": "Büzgülü kollu mavi elbise."
+    },
+    {
+      "id": "tr-holdout-v2-263",
+      "field": "altText",
+      "text": "Dikdörtgen tokalı siyah kemer."
+    },
+    {
+      "id": "tr-holdout-v2-264",
+      "field": "altText",
+      "text": "Taş üstünde hasır şapka."
+    },
+    {
+      "id": "tr-holdout-v2-265",
+      "field": "altText",
+      "text": "Kitabın yanında pembe eldivenler."
+    },
+    {
+      "id": "tr-holdout-v2-266",
+      "field": "altText",
+      "text": "Dar klapalı gri ceket."
+    },
+    {
+      "id": "tr-holdout-v2-267",
+      "field": "altText",
+      "text": "Topuğu yamalı çorap."
+    },
+    {
+      "id": "tr-holdout-v2-268",
+      "field": "altText",
+      "text": "Altın rengi tokalı kahverengi çanta."
+    },
+    {
+      "id": "tr-holdout-v2-269",
+      "field": "altText",
+      "text": "Koyu ceket altında krem etek."
+    },
+    {
+      "id": "tr-holdout-v2-270",
+      "field": "altText",
+      "text": "Uzun püsküllü sarı atkı."
+    },
+    {
+      "id": "tr-holdout-v2-271",
+      "field": "altText",
+      "text": "Hakim yakalı mavi gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-272",
+      "field": "altText",
+      "text": "Takım üzerinde kareli pelerin."
+    },
+    {
+      "id": "tr-holdout-v2-273",
+      "field": "altText",
+      "text": "Cırt cırtlı beyaz spor ayakkabılar."
+    },
+    {
+      "id": "tr-holdout-v2-274",
+      "field": "altText",
+      "text": "Kumaş düğmeli pembe bluz."
+    },
+    {
+      "id": "tr-holdout-v2-275",
+      "field": "altText",
+      "text": "Derin cepli yeşil pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-276",
+      "field": "altText",
+      "text": "Kol altında gümüş saat."
+    },
+    {
+      "id": "tr-holdout-v2-277",
+      "field": "altText",
+      "text": "Çıkarılabilir kapüşonlu koyu palto."
+    },
+    {
+      "id": "tr-holdout-v2-278",
+      "field": "altText",
+      "text": "Kemerli keten elbise."
+    },
+    {
+      "id": "tr-holdout-v2-279",
+      "field": "altText",
+      "text": "Şemsiye yanında gri kasket."
+    },
+    {
+      "id": "tr-holdout-v2-280",
+      "field": "altText",
+      "text": "Ön cepli sarı önlük."
+    },
+    {
+      "id": "tr-holdout-v2-281",
+      "field": "altText",
+      "text": "Kapı yanında yeşil çanta."
+    },
+    {
+      "id": "tr-holdout-v2-282",
+      "field": "altText",
+      "text": "Yan cepli kırmızı etek."
+    },
+    {
+      "id": "tr-holdout-v2-283",
+      "field": "altText",
+      "text": "Dikişleri görünen deri botlar."
+    },
+    {
+      "id": "tr-holdout-v2-284",
+      "field": "altText",
+      "text": "Saç örgüsü desenli beyaz kazak."
+    },
+    {
+      "id": "tr-holdout-v2-285",
+      "field": "altText",
+      "text": "Düz yakalı koyu gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-286",
+      "field": "altText",
+      "text": "Kuş biçimli gümüş broş."
+    },
+    {
+      "id": "tr-holdout-v2-287",
+      "field": "altText",
+      "text": "Açık elbisede mavi kemer."
+    },
+    {
+      "id": "tr-holdout-v2-288",
+      "field": "altText",
+      "text": "Atkı üzerinde siyah bere."
+    },
+    {
+      "id": "tr-holdout-v2-289",
+      "field": "altText",
+      "text": "Dirsek yamalı kadife ceket."
+    },
+    {
+      "id": "tr-holdout-v2-290",
+      "field": "altText",
+      "text": "İskelede kırmızı sandaletler."
+    },
+    {
+      "id": "tr-holdout-v2-291",
+      "field": "altText",
+      "text": "Örgü yelek altında krem bluz."
+    },
+    {
+      "id": "tr-holdout-v2-292",
+      "field": "altText",
+      "text": "Belirgin ütü çizgili siyah pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-293",
+      "field": "altText",
+      "text": "Ahşap sandalyede mavi şal."
+    },
+    {
+      "id": "tr-holdout-v2-294",
+      "field": "altText",
+      "text": "Örgü bantlı yeşil şapka."
+    },
+    {
+      "id": "tr-holdout-v2-295",
+      "field": "altText",
+      "text": "Açık astarlı gri çanta."
+    },
+    {
+      "id": "tr-holdout-v2-296",
+      "field": "altText",
+      "text": "Kola tutturulmuş eldivenler."
+    },
+    {
+      "id": "tr-holdout-v2-297",
+      "field": "altText",
+      "text": "Ortası pileli sarı etek."
+    },
+    {
+      "id": "tr-holdout-v2-298",
+      "field": "altText",
+      "text": "Yağmur patlı mavi ceket."
+    },
+    {
+      "id": "tr-holdout-v2-299",
+      "field": "altText",
+      "text": "Kare yakalı pembe elbise."
+    },
+    {
+      "id": "tr-holdout-v2-300",
+      "field": "altText",
+      "text": "Yeni tabanlı kahverengi ayakkabılar."
+    },
+    {
+      "id": "tr-holdout-v2-301",
+      "field": "altText",
+      "text": "Bavul yanında çizgili gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-302",
+      "field": "altText",
+      "text": "Çıtçıtlı yeşil palto."
+    },
+    {
+      "id": "tr-holdout-v2-303",
+      "field": "altText",
+      "text": "İnce kenarlı gri fular."
+    },
+    {
+      "id": "tr-holdout-v2-304",
+      "field": "altText",
+      "text": "Belden bağlanan siyah önlük."
+    },
+    {
+      "id": "tr-holdout-v2-305",
+      "field": "altText",
+      "text": "Bilekte gümüş bileklik."
+    },
+    {
+      "id": "tr-holdout-v2-306",
+      "field": "altText",
+      "text": "Dantel kenarlı beyaz etek."
+    },
+    {
+      "id": "tr-holdout-v2-307",
+      "field": "altText",
+      "text": "Bankta mavi kasket."
+    },
+    {
+      "id": "tr-holdout-v2-308",
+      "field": "altText",
+      "text": "Alçak topuklu kahverengi botlar."
+    },
+    {
+      "id": "tr-holdout-v2-309",
+      "field": "altText",
+      "text": "Açık ceket altında kırmızı yelek."
+    },
+    {
+      "id": "tr-holdout-v2-310",
+      "field": "altText",
+      "text": "Perde yanında desenli elbise."
+    },
+    {
+      "id": "tr-holdout-v2-311",
+      "field": "altText",
+      "text": "Keçe çiçekli krem şapka."
+    },
+    {
+      "id": "tr-holdout-v2-312",
+      "field": "altText",
+      "text": "Minik düğmeli mavi bluz."
+    },
+    {
+      "id": "tr-holdout-v2-313",
+      "field": "altText",
+      "text": "Bej pantolonda örgü kemer."
+    },
+    {
+      "id": "tr-holdout-v2-314",
+      "field": "altText",
+      "text": "Düğümlü saplı kırmızı çanta."
+    },
+    {
+      "id": "tr-holdout-v2-315",
+      "field": "altText",
+      "text": "Rafta gri eldivenler."
+    },
+    {
+      "id": "tr-holdout-v2-316",
+      "field": "altText",
+      "text": "Saten yakalı siyah ceket."
+    },
+    {
+      "id": "tr-holdout-v2-317",
+      "field": "altText",
+      "text": "Siyah ayakkabılarda sarı çoraplar."
+    },
+    {
+      "id": "tr-holdout-v2-318",
+      "field": "altText",
+      "text": "Çift manşetli beyaz gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-319",
+      "field": "altText",
+      "text": "Yuvarlak etek uçlu yeşil etek."
+    },
+    {
+      "id": "tr-holdout-v2-320",
+      "field": "altText",
+      "text": "Sallanan sandalyede kahverengi şal."
+    },
+    {
+      "id": "tr-holdout-v2-321",
+      "field": "altText",
+      "text": "Çitin yanında pembe ceket."
+    },
+    {
+      "id": "tr-holdout-v2-322",
+      "field": "altText",
+      "text": "Yumuşak yakalı gri elbise."
+    },
+    {
+      "id": "tr-holdout-v2-323",
+      "field": "altText",
+      "text": "Kumaş kordonlu saat."
+    },
+    {
+      "id": "tr-holdout-v2-324",
+      "field": "altText",
+      "text": "Çanta sapında beyaz fular."
+    },
+    {
+      "id": "tr-holdout-v2-325",
+      "field": "altText",
+      "text": "Güçlendirilmiş dikişli mavi pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-326",
+      "field": "altText",
+      "text": "Açık çakılda uzun botlar."
+    },
+    {
+      "id": "tr-holdout-v2-327",
+      "field": "altText",
+      "text": "Geniş kıvrımlı yeşil bere."
+    },
+    {
+      "id": "tr-holdout-v2-328",
+      "field": "altText",
+      "text": "Gümüş fermuarlı siyah çanta."
+    },
+    {
+      "id": "tr-holdout-v2-329",
+      "field": "altText",
+      "text": "Koyu pantolonda işlemeli bluz."
+    },
+    {
+      "id": "tr-holdout-v2-330",
+      "field": "altText",
+      "text": "Boyundan kapanan mavi pelerin."
+    },
+    {
+      "id": "tr-holdout-v2-331",
+      "field": "altText",
+      "text": "Dize uzanan kareli etek."
+    },
+    {
+      "id": "tr-holdout-v2-332",
+      "field": "altText",
+      "text": "Arkası kemerli kahverengi palto."
+    },
+    {
+      "id": "tr-holdout-v2-333",
+      "field": "altText",
+      "text": "Merdiven yanında siyah sandaletler."
+    },
+    {
+      "id": "tr-holdout-v2-334",
+      "field": "altText",
+      "text": "Kolları kaldırılmış yeşil gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-335",
+      "field": "altText",
+      "text": "Baklava desenli beyaz yelek."
+    },
+    {
+      "id": "tr-holdout-v2-336",
+      "field": "altText",
+      "text": "Kenarı dikişli mavi şapka."
+    },
+    {
+      "id": "tr-holdout-v2-337",
+      "field": "altText",
+      "text": "Küçük tokalı kırmızı bileklik."
+    },
+    {
+      "id": "tr-holdout-v2-338",
+      "field": "altText",
+      "text": "Sandalyede file çanta."
+    },
+    {
+      "id": "tr-holdout-v2-339",
+      "field": "altText",
+      "text": "Etek altında gri ayakkabılar."
+    },
+    {
+      "id": "tr-holdout-v2-340",
+      "field": "altText",
+      "text": "Omuzdan bağlanan siyah elbise."
+    },
+    {
+      "id": "tr-holdout-v2-341",
+      "field": "altText",
+      "text": "Pencere yanında sarı bluz."
+    },
+    {
+      "id": "tr-holdout-v2-342",
+      "field": "altText",
+      "text": "Beli kordonlu keten pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-343",
+      "field": "altText",
+      "text": "Şalda kahverengi eldivenler."
+    },
+    {
+      "id": "tr-holdout-v2-344",
+      "field": "altText",
+      "text": "Düşük omuzlu yeşil kazak."
+    },
+    {
+      "id": "tr-holdout-v2-345",
+      "field": "altText",
+      "text": "Katlı paltoda siyah kasket."
+    },
+    {
+      "id": "tr-holdout-v2-346",
+      "field": "altText",
+      "text": "Metal halkalı kırmızı kemer."
+    },
+    {
+      "id": "tr-holdout-v2-347",
+      "field": "altText",
+      "text": "Çapraz dikişli pembe etek."
+    },
+    {
+      "id": "tr-holdout-v2-348",
+      "field": "altText",
+      "text": "Tulum altında mavi gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-349",
+      "field": "altText",
+      "text": "Kırmızı dikişli açık renk botlar."
+    },
+    {
+      "id": "tr-holdout-v2-350",
+      "field": "altText",
+      "text": "Güçlendirilmiş tabanlı bez çanta."
+    },
+    {
+      "id": "tr-holdout-v2-351",
+      "field": "altText",
+      "text": "Yakası kalkık beyaz palto."
+    },
+    {
+      "id": "tr-holdout-v2-352",
+      "field": "altText",
+      "text": "Cekette mor atkı."
+    },
+    {
+      "id": "tr-holdout-v2-353",
+      "field": "altText",
+      "text": "Gizli cepli kırmızı elbise."
+    },
+    {
+      "id": "tr-holdout-v2-354",
+      "field": "altText",
+      "text": "Halıda mavi ayakkabılar."
+    },
+    {
+      "id": "tr-holdout-v2-355",
+      "field": "altText",
+      "text": "Sırtı ayarlı kahverengi yelek."
+    },
+    {
+      "id": "tr-holdout-v2-356",
+      "field": "altText",
+      "text": "Sulama kabı yanında gri şapka."
+    },
+    {
+      "id": "tr-holdout-v2-357",
+      "field": "altText",
+      "text": "Balon kollu krem bluz."
+    },
+    {
+      "id": "tr-holdout-v2-358",
+      "field": "altText",
+      "text": "Kısa pelerin altında koyu pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-359",
+      "field": "altText",
+      "text": "Saat yanında örgü bileklik."
+    },
+    {
+      "id": "tr-holdout-v2-360",
+      "field": "altText",
+      "text": "Dikişleri görünen kot etek."
+    },
+    {
+      "id": "tr-holdout-v2-361",
+      "field": "altText",
+      "text": "Gri kazak altında pembe gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-362",
+      "field": "altText",
+      "text": "Askılıkta sarı çanta."
+    },
+    {
+      "id": "tr-holdout-v2-363",
+      "field": "altText",
+      "text": "Korkuluğu tutan yeşil eldivenler."
+    },
+    {
+      "id": "tr-holdout-v2-364",
+      "field": "altText",
+      "text": "Dirsekleri yamalı kahverengi ceket."
+    },
+    {
+      "id": "tr-holdout-v2-365",
+      "field": "altText",
+      "text": "Fular yanında kırmızı bere."
+    },
+    {
+      "id": "tr-holdout-v2-366",
+      "field": "altText",
+      "text": "Çiçek işlemeli beyaz elbise."
+    },
+    {
+      "id": "tr-holdout-v2-367",
+      "field": "altText",
+      "text": "Uzun paltoda siyah kemer."
+    },
+    {
+      "id": "tr-holdout-v2-368",
+      "field": "altText",
+      "text": "Fayansta açık renk sandaletler."
+    },
+    {
+      "id": "tr-holdout-v2-369",
+      "field": "altText",
+      "text": "Orta dikişli mavi önlük."
+    },
+    {
+      "id": "tr-holdout-v2-370",
+      "field": "altText",
+      "text": "Yakada yaprak broş."
+    },
+    {
+      "id": "tr-holdout-v2-371",
+      "field": "altText",
+      "text": "Derin pileli gri etek."
+    },
+    {
+      "id": "tr-holdout-v2-372",
+      "field": "altText",
+      "text": "Kancada mavi palto."
+    },
+    {
+      "id": "tr-holdout-v2-373",
+      "field": "altText",
+      "text": "Küçük yakalı bej gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-374",
+      "field": "altText",
+      "text": "Geniş bantlı beyaz ayakkabılar."
+    },
+    {
+      "id": "tr-holdout-v2-375",
+      "field": "altText",
+      "text": "Üçgen katlanmış yeşil fular."
+    },
+    {
+      "id": "tr-holdout-v2-376",
+      "field": "altText",
+      "text": "Bank yanında pembe çanta."
+    },
+    {
+      "id": "tr-holdout-v2-377",
+      "field": "altText",
+      "text": "Boynuz düğmeli koyu yelek."
+    },
+    {
+      "id": "tr-holdout-v2-378",
+      "field": "altText",
+      "text": "Masada sarı şapka."
+    },
+    {
+      "id": "tr-holdout-v2-379",
+      "field": "altText",
+      "text": "Anvelop kesimli kahverengi elbise."
+    },
+    {
+      "id": "tr-holdout-v2-380",
+      "field": "altText",
+      "text": "Manşette ahşap bileklik."
+    },
+    {
+      "id": "tr-holdout-v2-381",
+      "field": "altText",
+      "text": "Örgü manşetli kırmızı ceket."
+    },
+    {
+      "id": "tr-holdout-v2-382",
+      "field": "altText",
+      "text": "Omuzları büzgülü gri bluz."
+    },
+    {
+      "id": "tr-holdout-v2-383",
+      "field": "altText",
+      "text": "Yan cepli beyaz pantolon."
+    },
+    {
+      "id": "tr-holdout-v2-384",
+      "field": "altText",
+      "text": "Panelleri dikişli yeşil kasket."
+    },
+    {
+      "id": "tr-holdout-v2-385",
+      "field": "altText",
+      "text": "Sandık yanında siyah botlar."
+    },
+    {
+      "id": "tr-holdout-v2-386",
+      "field": "altText",
+      "text": "Uzun gömlekte kahverengi kemer."
+    },
+    {
+      "id": "tr-holdout-v2-387",
+      "field": "altText",
+      "text": "Kısa yelekte mavi etek."
+    },
+    {
+      "id": "tr-holdout-v2-388",
+      "field": "altText",
+      "text": "Yıldız işlemeli pembe atkı."
+    },
+    {
+      "id": "tr-holdout-v2-389",
+      "field": "altText",
+      "text": "Uzun saplı krem çanta."
+    },
+    {
+      "id": "tr-holdout-v2-390",
+      "field": "altText",
+      "text": "Katlanmış manşette koyu saat."
+    },
+    {
+      "id": "tr-holdout-v2-391",
+      "field": "altText",
+      "text": "Yuvarlak yakalı mavi kazak."
+    },
+    {
+      "id": "tr-holdout-v2-392",
+      "field": "altText",
+      "text": "Üstten cepli siyah palto."
+    },
+    {
+      "id": "tr-holdout-v2-393",
+      "field": "altText",
+      "text": "Küçük tokalı yeşil sandaletler."
+    },
+    {
+      "id": "tr-holdout-v2-394",
+      "field": "altText",
+      "text": "Keten pantolonda kırmızı gömlek."
+    },
+    {
+      "id": "tr-holdout-v2-395",
+      "field": "altText",
+      "text": "Kapı önünde kahverengi şapka."
+    },
+    {
+      "id": "tr-holdout-v2-396",
+      "field": "altText",
+      "text": "Mavi kadifede beyaz eldivenler."
+    },
+    {
+      "id": "tr-holdout-v2-397",
+      "field": "altText",
+      "text": "Sade bluzda sarı elbise."
+    },
+    {
+      "id": "tr-holdout-v2-398",
+      "field": "altText",
+      "text": "Dokuma askılı gri çanta."
+    },
+    {
+      "id": "tr-holdout-v2-399",
+      "field": "altText",
+      "text": "Duvar dibinde yeşil etek."
+    },
+    {
+      "id": "tr-holdout-v2-400",
+      "field": "altText",
+      "text": "Askıda krem fular."
+    }
+  ]
+}

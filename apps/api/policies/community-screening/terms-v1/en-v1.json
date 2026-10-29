@@ -14,12 +14,13 @@
     "generator": "scripts/verify-community-screening-lists.mjs",
     "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
     "upstreamFileSha256": "af851ecef1d5f212caba17339b12ac39cc2fef7d78c74876f67237644fcee8bd",
-    "overlaySha256": "ff63c12ab85fa38755bb56c747d5be6dc5d1629607e7181dbe7b6be3c51ff8a8",
-    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "overlaySha256": "b45106146f745312622e8ea7d4ffc3a75bad97a97013d279d1c971bc9169c5aa",
+    "allowListSha256": "b25c9043213ba09b2ca3f415ae05f79cd9222910c715eeda2100d748d5444613",
+    "reviewedOccurrenceSha256": "e5c93949c90d428f783d1e273c1abf0f97004dbde479663590011f4d2e5c23bf",
     "counts": {
       "upstreamLines": 403,
-      "overlayEntries": 46,
-      "entries": 400,
+      "overlayEntries": 64,
+      "entries": 418,
       "excludedUpstreamTerms": 18
     }
   },
@@ -983,6 +984,42 @@
       "source": "overlay+ldnoobw"
     },
     {
+      "term": "gangrape",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "gangraped",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "gangraper",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "gangrapers",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "gangrapes",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "gangraping",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
       "term": "gay sex",
       "category": "profanity",
       "severity": "medium",
@@ -1782,6 +1819,12 @@
       "source": "ldnoobw"
     },
     {
+      "term": "raepd",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
       "term": "raghead",
       "category": "profanity",
       "severity": "medium",
@@ -1794,22 +1837,83 @@
       "source": "ldnoobw"
     },
     {
+      "term": "rapd",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
       "term": "rape",
       "category": "violence",
       "severity": "high",
       "source": "overlay+ldnoobw"
     },
     {
+      "term": "rapeable",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "rapeing",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "raper",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "rapers",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "rapey",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "rapin",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
       "term": "raping",
-      "category": "profanity",
-      "severity": "medium",
-      "source": "ldnoobw"
+      "category": "violence",
+      "severity": "high",
+      "source": "ldnoobw",
+      "gradeFrom": "rapin"
+    },
+    {
+      "term": "rapings",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
     },
     {
       "term": "rapist",
       "category": "profanity",
       "severity": "medium",
       "source": "ldnoobw"
+    },
+    {
+      "term": "raype",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "rayped",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
     },
     {
       "term": "rectum",
@@ -1864,6 +1968,12 @@
       "category": "profanity",
       "severity": "medium",
       "source": "ldnoobw"
+    },
+    {
+      "term": "saed",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
     },
     {
       "term": "santorum",

@@ -4,13 +4,18 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 /* eslint-disable @typescript-eslint/await-thenable */
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
+import type * as ReactNativeModule from 'react-native'
 import React from 'react'
-import { screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, screen, fireEvent, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import { server } from '@/src/test-utils/msw/server'
 import { http, HttpResponse } from 'msw'
 import TabOneScreen from '@/app/(tabs)/index'
+import { AccessibilityInfo, NativeModules, Platform, findNodeHandle } from 'react-native'
+import { registerShareCardHeading } from '@/src/lib/share-card-focus'
+import { AndroidShareCardPresentation } from '@/components/android-share-card-presentation'
 import {
   setMobileAccessTokenResolver,
   setMobileApplicationUserId,
@@ -22,6 +27,7 @@ import {
 } from '@/src/lib/ritual-cache'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 import i18n, { initI18n } from '@/src/lib/i18n'
+import { failOnConsoleWarnOrError } from '@/src/test-utils/console-guard'
 
 const mockRouter = { setParams: vi.fn() }
 
@@ -37,6 +43,34 @@ vi.mock('expo-router', async () => ({
   ).useFocusEffect,
 }))
 
+// The Android case runs on react-native-web, whose findNodeHandle always throws. React
+// Native's Fabric renderer returns the native tag of a host instance instead, so the
+// simulated platform gets that behavior and safeFindNodeHandle runs unmocked.
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReactNativeModule>()
+  const tags = new WeakMap<object, number>()
+  let nextTag = 900
+  return {
+    ...actual,
+    findNodeHandle: (node: unknown) => {
+      if (!node || typeof node !== 'object') return null
+      if (!tags.has(node)) tags.set(node, nextTag++)
+      return tags.get(node) ?? null
+    },
+  }
+})
+
+// The Android case sends the ritual cache down its native file path. The real module
+// needs Expo's native globals, which a browser run lacks, so it is replaced here.
+vi.mock('expo-file-system/legacy', async () => {
+  const { nativeStorageMocks } = await import('../test-utils/persisted-writes.js')
+  return nativeStorageMocks.legacyFileSystem
+})
+
+vi.mock('@/src/lib/use-share-card-status-bar', () => ({
+  useShareCardStatusBar: () => true,
+}))
+
 const mockCapture = vi.fn()
 const mockGetDistinctId = vi.fn(() => 'test-user-id')
 vi.mock('@/src/analytics/mobile-analytics', () => ({
@@ -49,6 +83,32 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
 }))
 
 describe('Mobile Hero Experience (TabOneScreen)', () => {
+  failOnConsoleWarnOrError()
+
+  it('L8: the hero content adds no share-card heading of its own', async () => {
+    await render(<TabOneScreen />)
+    await screen.findByTestId('weather-header')
+    expect(
+      screen.queryByRole('heading', { name: i18n.t('shareCard.sourceOutfit') })
+    ).toBeNull()
+  })
+
+  it('L8: closing the composer without an invoker node focuses the registered navigation heading', async () => {
+    const setFocus = vi.spyOn(AccessibilityInfo, 'setAccessibilityFocus')
+    // The tab layout registers its title this way; 77 stands in for its native tag.
+    const unregister = registerShareCardHeading('outfit', () => 77)
+    try {
+      await render(<TabOneScreen />)
+      await userEvent.click(await screen.findByTestId('outfit-share-card-open'))
+      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      setFocus.mockClear()
+      await userEvent.click(screen.getByTestId('share-card-cancel'))
+      await waitFor(() => expect(setFocus).toHaveBeenCalledWith(77))
+    } finally {
+      unregister()
+    }
+  })
+
   beforeAll(async () => {
     process.env.EXPO_PUBLIC_API_BASE_URL =
       typeof window !== 'undefined' ? window.location.origin : 'https://mock-api.test'
@@ -67,6 +127,44 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     vi.clearAllMocks()
     clearRitualMemoryCache()
     localStorage.clear()
+  })
+
+  it('Android null-member token session opens the outfit share-card composer', async () => {
+    const previousPlatform = Platform.OS
+    Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+    // A real Android build ships the widget bridge the ritual cache publishes through.
+    const setWidgetData = vi.fn((_payload: string) => Promise.resolve())
+    NativeModules.WidgetSharedModule = { setWidgetData }
+    const setFocus = vi.spyOn(AccessibilityInfo, 'setAccessibilityFocus')
+    setMobileApplicationUserId(null)
+    try {
+      await render(
+        <AndroidShareCardPresentation pathname="/">
+          <TabOneScreen />
+        </AndroidShareCardPresentation>
+      )
+      const opener = await screen.findByTestId('outfit-share-card-open')
+      await userEvent.click(opener)
+      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      setFocus.mockClear()
+      await userEvent.click(screen.getByTestId('share-card-cancel'))
+      await waitFor(() =>
+        expect(screen.queryByTestId('share-card-title')).not.toBeInTheDocument()
+      )
+      // No heading is registered, so focus on the opener's tag proves the Cancel restore
+      // resolved it through the unmocked safeFindNodeHandle.
+      // react-native-web hands host refs out as DOM nodes, so the opener is its own host.
+      const openerTag = findNodeHandle(opener as never)
+      expect(openerTag).toEqual(expect.any(Number))
+      await waitFor(() => expect(setFocus).toHaveBeenLastCalledWith(openerTag))
+      await waitFor(() => expect(setWidgetData).toHaveBeenCalledOnce())
+    } finally {
+      delete NativeModules.WidgetSharedModule
+      Object.defineProperty(Platform, 'OS', {
+        value: previousPlatform,
+        configurable: true,
+      })
+    }
   })
 
   it('displays skeleton state while loading and then loads current weather, 48-hour ribbon, and morning outfit card', async () => {
@@ -198,13 +296,29 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     })
 
     const leatherJacketOption = screen.getByTestId('swap-option-leather-jacket')
-    fireEvent.click(leatherJacketOption)
+    // Focus returns on a 400 ms timer after the modal closes; fake time removes the race.
+    const focusReturnDelayMs = 400
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      fireEvent.click(leatherJacketOption)
 
-    expect(screen.queryByText('Classic Trench Coat')).toBeNull()
-    expect(screen.getByText('Leather Jacket')).toBeTruthy()
-    await waitFor(() => {
+      expect(screen.queryByText('Classic Trench Coat')).toBeNull()
+      expect(screen.getByText('Leather Jacket')).toBeTruthy()
+      // The modal leaves on its real exit animation; only the app's focus timer is faked.
+      await expect
+        .poll(() => screen.queryByTestId('garment-swap-modal'), { timeout: 5000 })
+        .toBeNull()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(focusReturnDelayMs - 1)
+      })
+      expect(screen.getByTestId('garment-tile-leather-jacket')).not.toHaveFocus()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1)
+      })
       expect(screen.getByTestId('garment-tile-leather-jacket')).toHaveFocus()
-    })
+    } finally {
+      vi.useRealTimers()
+    }
 
     expect(mockCapture).toHaveBeenLastCalledWith('hero_interaction', {
       interactionType: 'garment_swap',

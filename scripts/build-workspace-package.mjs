@@ -321,6 +321,7 @@ export const runBuild = async ({ argv = process.argv } = {}) => {
 // silently did nothing would exit 0.
 if (
   process.argv[1] &&
-  import.meta.url === pathToFileURL(fs.realpathSync(path.resolve(process.argv[1]))).href
+  import.meta.url ===
+    pathToFileURL(fs.realpathSync(fs.realpathSync(process.argv[1]))).href
 )
   await runBuild()

@@ -1,0 +1,49 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: share-card-(title|save|cancel|preview-loaded-.*)
+          commands:
+            - swipe:
+                start: 50%, 70%
+                end: 50%, 30%
+                duration: 500
+            - waitForAnimationToEnd
+            - scrollUntilVisible:
+                element:
+                  id: share-card-cancel
+                direction: DOWN
+                centerElement: false
+                visibilityPercentage: 95
+                timeout: 10000
+            - waitForAnimationToEnd
+            - tapOn:
+                id: share-card-cancel
+      - waitForAnimationToEnd
+      - assertNotVisible:
+          id: share-card-title
+      - assertNotVisible:
+          id: share-card-(title|save|cancel|preview-loaded-.*)
+      # A retry after a completed dismissal must establish the returned app screen.
+      - assertVisible:
+          id: tab-home
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: share-card-cancel
+          direction: DOWN
+          centerElement: false
+          visibilityPercentage: 95
+          timeout: 10000
+      - tapOn:
+          id: share-card-cancel
+      - assertNotVisible:
+          id: share-card-title

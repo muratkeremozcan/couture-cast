@@ -1,0 +1,5013 @@
+{
+  "language": "fr",
+  "corpusVersion": "holdout-v4",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "7aa19d35380523111ee2d4c6d0bad7db8e088a3df647afa18a5324ade6ce628d",
+    "languageAllowListSha256": "12fcaedef188405a7d6f9383bf312a16412b06bbefb54ce37349b5c9c5e0db7c"
+  },
+  "entries": [
+    {
+      "id": "fr-holdout-v4-001",
+      "field": "caption",
+      "text": "Mon foulard quitte le cou pour accompagner mes gestes."
+    },
+    {
+      "id": "fr-holdout-v4-002",
+      "field": "caption",
+      "text": "Petit nœud au poignet, grande envie de printemps."
+    },
+    {
+      "id": "fr-holdout-v4-003",
+      "field": "altText",
+      "text": "Un carré imprimé entoure le poignet gauche du modèle."
+    },
+    {
+      "id": "fr-holdout-v4-004",
+      "field": "altText",
+      "text": "Le foulard noué dépasse légèrement de la manche retroussée."
+    },
+    {
+      "id": "fr-holdout-v4-005",
+      "field": "caption",
+      "text": "J'ai décalé un bouton pour faire danser la chemise."
+    },
+    {
+      "id": "fr-holdout-v4-006",
+      "field": "caption",
+      "text": "Cette asymétrie volontaire donne du mouvement à mon haut."
+    },
+    {
+      "id": "fr-holdout-v4-007",
+      "field": "altText",
+      "text": "La chemise présente un pan plus bas après boutonnage décalé."
+    },
+    {
+      "id": "fr-holdout-v4-008",
+      "field": "altText",
+      "text": "Deux pans inégaux dessinent une diagonale devant le pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-009",
+      "field": "caption",
+      "text": "Deux pinces suffisent pour tester cette longueur avant couture."
+    },
+    {
+      "id": "fr-holdout-v4-010",
+      "field": "caption",
+      "text": "Essai d'ourlet du dimanche, vos avis sur les proportions ?"
+    },
+    {
+      "id": "fr-holdout-v4-011",
+      "field": "altText",
+      "text": "Des pinces de couture maintiennent le bas du pantalon replié."
+    },
+    {
+      "id": "fr-holdout-v4-012",
+      "field": "altText",
+      "text": "L'ourlet provisoire s'arrête juste au-dessus des mocassins portés."
+    },
+    {
+      "id": "fr-holdout-v4-013",
+      "field": "caption",
+      "text": "Une bande de soie remplace aujourd'hui ma ceinture habituelle."
+    },
+    {
+      "id": "fr-holdout-v4-014",
+      "field": "caption",
+      "text": "Je laisse tomber les pointes sur le côté du jean."
+    },
+    {
+      "id": "fr-holdout-v4-015",
+      "field": "altText",
+      "text": "Un foulard traverse les passants du jean puis se noue."
+    },
+    {
+      "id": "fr-holdout-v4-016",
+      "field": "altText",
+      "text": "Les extrémités imprimées pendent près de la poche droite."
+    },
+    {
+      "id": "fr-holdout-v4-017",
+      "field": "caption",
+      "text": "Manches retirées à midi, ma veste suit la température."
+    },
+    {
+      "id": "fr-holdout-v4-018",
+      "field": "caption",
+      "text": "J'aime ce vêtement qui change de silhouette sans changer d'esprit."
+    },
+    {
+      "id": "fr-holdout-v4-019",
+      "field": "altText",
+      "text": "Les manches zippées reposent près d'une veste devenue sans manches."
+    },
+    {
+      "id": "fr-holdout-v4-020",
+      "field": "altText",
+      "text": "Une fermeture circulaire souligne chaque emmanchure du vêtement transformable."
+    },
+    {
+      "id": "fr-holdout-v4-021",
+      "field": "caption",
+      "text": "La broche héritée trouve enfin sa place sur mon col."
+    },
+    {
+      "id": "fr-holdout-v4-022",
+      "field": "caption",
+      "text": "Un petit bijou suffit à réveiller cette chemise sobre."
+    },
+    {
+      "id": "fr-holdout-v4-023",
+      "field": "altText",
+      "text": "Une broche en forme de feuille ferme le col arrondi."
+    },
+    {
+      "id": "fr-holdout-v4-024",
+      "field": "altText",
+      "text": "Le bijou ancien réunit les pointes blanches de la chemise."
+    },
+    {
+      "id": "fr-holdout-v4-025",
+      "field": "caption",
+      "text": "Mes sandales prolongent leur saison avec des chaussettes côtelées."
+    },
+    {
+      "id": "fr-holdout-v4-026",
+      "field": "caption",
+      "text": "Ce duo me fait sourire chaque matin frais."
+    },
+    {
+      "id": "fr-holdout-v4-027",
+      "field": "altText",
+      "text": "Des chaussettes montantes apparaissent dans des sandales à brides larges."
+    },
+    {
+      "id": "fr-holdout-v4-028",
+      "field": "altText",
+      "text": "Les côtes des chaussettes restent visibles entre plusieurs lanières."
+    },
+    {
+      "id": "fr-holdout-v4-029",
+      "field": "caption",
+      "text": "Le revers révèle un envers que je cachais jusque-là."
+    },
+    {
+      "id": "fr-holdout-v4-030",
+      "field": "caption",
+      "text": "Je retrousse les manches pour montrer cette doublure inattendue."
+    },
+    {
+      "id": "fr-holdout-v4-031",
+      "field": "altText",
+      "text": "Les poignets retournés dévoilent une doublure contrastante du blazer."
+    },
+    {
+      "id": "fr-holdout-v4-032",
+      "field": "altText",
+      "text": "Un large revers expose l'intérieur imprimé de chaque manche."
+    },
+    {
+      "id": "fr-holdout-v4-033",
+      "field": "caption",
+      "text": "Mon pull tout simple accueille aujourd'hui un col amovible."
+    },
+    {
+      "id": "fr-holdout-v4-034",
+      "field": "caption",
+      "text": "Ce col chiné transforme plusieurs tenues avec douceur."
+    },
+    {
+      "id": "fr-holdout-v4-035",
+      "field": "altText",
+      "text": "Un col indépendant festonné repose sur une maille unie."
+    },
+    {
+      "id": "fr-holdout-v4-036",
+      "field": "altText",
+      "text": "Des liens fins attachent le col décoratif derrière la nuque."
+    },
+    {
+      "id": "fr-holdout-v4-037",
+      "field": "caption",
+      "text": "J'ai ajouté des poches assez grandes pour mes mains."
+    },
+    {
+      "id": "fr-holdout-v4-038",
+      "field": "caption",
+      "text": "Enfin une jupe qui garde mes petits objets près de moi."
+    },
+    {
+      "id": "fr-holdout-v4-039",
+      "field": "altText",
+      "text": "Deux poches carrées sont cousues sur le devant de la jupe."
+    },
+    {
+      "id": "fr-holdout-v4-040",
+      "field": "altText",
+      "text": "Les mains du modèle entrent dans de profondes poches rapportées."
+    },
+    {
+      "id": "fr-holdout-v4-041",
+      "field": "caption",
+      "text": "Je remonte les liens autour de la cheville, tranquillement."
+    },
+    {
+      "id": "fr-holdout-v4-042",
+      "field": "caption",
+      "text": "Ces rubans donnent une allure de danse à ma marche."
+    },
+    {
+      "id": "fr-holdout-v4-043",
+      "field": "altText",
+      "text": "Des rubans croisés entourent les chevilles au-dessus des ballerines."
+    },
+    {
+      "id": "fr-holdout-v4-044",
+      "field": "altText",
+      "text": "Le laçage forme plusieurs diagonales sur le bas des jambes."
+    },
+    {
+      "id": "fr-holdout-v4-045",
+      "field": "caption",
+      "text": "Le trou réparé devient le détail préféré de mon jean."
+    },
+    {
+      "id": "fr-holdout-v4-046",
+      "field": "caption",
+      "text": "J'ai choisi de montrer la réparation avec un joli point."
+    },
+    {
+      "id": "fr-holdout-v4-047",
+      "field": "altText",
+      "text": "Un empiècement rectangulaire recouvre une déchirure au genou gauche."
+    },
+    {
+      "id": "fr-holdout-v4-048",
+      "field": "altText",
+      "text": "Des points contrastés encadrent une pièce de tissu réparatrice."
+    },
+    {
+      "id": "fr-holdout-v4-049",
+      "field": "caption",
+      "text": "Ma robe courte retrouve une place grâce à ce pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-050",
+      "field": "caption",
+      "text": "Cette superposition me laisse bouger avec beaucoup de liberté."
+    },
+    {
+      "id": "fr-holdout-v4-051",
+      "field": "altText",
+      "text": "Une robe fendue se porte par-dessus un pantalon droit."
+    },
+    {
+      "id": "fr-holdout-v4-052",
+      "field": "altText",
+      "text": "Les jambes du pantalon dépassent sous un ourlet asymétrique."
+    },
+    {
+      "id": "fr-holdout-v4-053",
+      "field": "caption",
+      "text": "Le collier descend dans le dos pour accompagner cette encolure."
+    },
+    {
+      "id": "fr-holdout-v4-054",
+      "field": "caption",
+      "text": "Un petit éclat derrière l'épaule change toute ma tenue."
+    },
+    {
+      "id": "fr-holdout-v4-055",
+      "field": "altText",
+      "text": "Une chaîne fine descend au milieu d'un dos échancré."
+    },
+    {
+      "id": "fr-holdout-v4-056",
+      "field": "altText",
+      "text": "Le pendentif repose entre les omoplates sous la nuque dégagée."
+    },
+    {
+      "id": "fr-holdout-v4-057",
+      "field": "caption",
+      "text": "Je pose mon pull sur les épaules pour la promenade."
+    },
+    {
+      "id": "fr-holdout-v4-058",
+      "field": "caption",
+      "text": "Les manches nouées me gardent une couche à portée."
+    },
+    {
+      "id": "fr-holdout-v4-059",
+      "field": "altText",
+      "text": "Un pull est drapé sur les épaules d'une veste légère."
+    },
+    {
+      "id": "fr-holdout-v4-060",
+      "field": "altText",
+      "text": "Les manches du tricot se croisent devant le buste."
+    },
+    {
+      "id": "fr-holdout-v4-061",
+      "field": "caption",
+      "text": "Une capuche dépasse du manteau et adoucit sa ligne stricte."
+    },
+    {
+      "id": "fr-holdout-v4-062",
+      "field": "caption",
+      "text": "Aujourd'hui je mélange mon sweat familier avec une pièce habillée."
+    },
+    {
+      "id": "fr-holdout-v4-063",
+      "field": "altText",
+      "text": "La capuche du sweat repose sur le col du manteau."
+    },
+    {
+      "id": "fr-holdout-v4-064",
+      "field": "altText",
+      "text": "Un cordon de sweat apparaît entre les revers tailleur."
+    },
+    {
+      "id": "fr-holdout-v4-065",
+      "field": "caption",
+      "text": "J'ai desserré la cravate pour laisser respirer la chemise."
+    },
+    {
+      "id": "fr-holdout-v4-066",
+      "field": "caption",
+      "text": "Cette cravate chinée devient presque un ruban dans ma tenue."
+    },
+    {
+      "id": "fr-holdout-v4-067",
+      "field": "altText",
+      "text": "Une cravate souple se noue sous un col ouvert."
+    },
+    {
+      "id": "fr-holdout-v4-068",
+      "field": "altText",
+      "text": "Le nœud abaissé laisse voir le premier bouton défait."
+    },
+    {
+      "id": "fr-holdout-v4-069",
+      "field": "caption",
+      "text": "Mes mitaines réchauffent les mains pendant les trajets matinaux."
+    },
+    {
+      "id": "fr-holdout-v4-070",
+      "field": "caption",
+      "text": "Le tricot dépasse des manches, prêt pour l'air frais."
+    },
+    {
+      "id": "fr-holdout-v4-071",
+      "field": "altText",
+      "text": "Des mitaines longues couvrent les poignets et la base des doigts."
+    },
+    {
+      "id": "fr-holdout-v4-072",
+      "field": "altText",
+      "text": "Les manches s'arrêtent sur des poignets enveloppés de maille."
+    },
+    {
+      "id": "fr-holdout-v4-073",
+      "field": "caption",
+      "text": "Je laisse les bretelles visibles avec ce pantalon ample."
+    },
+    {
+      "id": "fr-holdout-v4-074",
+      "field": "caption",
+      "text": "Un accessoire pratique dessine aujourd'hui deux lignes sur ma chemise."
+    },
+    {
+      "id": "fr-holdout-v4-075",
+      "field": "altText",
+      "text": "Deux bretelles parallèles rejoignent la taille d'un pantalon plissé."
+    },
+    {
+      "id": "fr-holdout-v4-076",
+      "field": "altText",
+      "text": "Des attaches métalliques fixent les bretelles sur la ceinture."
+    },
+    {
+      "id": "fr-holdout-v4-077",
+      "field": "caption",
+      "text": "Mon carré devient un turban pour cette journée venteuse."
+    },
+    {
+      "id": "fr-holdout-v4-078",
+      "field": "caption",
+      "text": "J'ai ramené les pointes devant pour former un petit volume."
+    },
+    {
+      "id": "fr-holdout-v4-079",
+      "field": "altText",
+      "text": "Un foulard enveloppe les cheveux avec un nœud frontal."
+    },
+    {
+      "id": "fr-holdout-v4-080",
+      "field": "altText",
+      "text": "Des plis rayonnent autour du tissu croisé sur le front."
+    },
+    {
+      "id": "fr-holdout-v4-081",
+      "field": "caption",
+      "text": "Le pan croisé accompagne mes pas sans serrer la taille."
+    },
+    {
+      "id": "fr-holdout-v4-082",
+      "field": "caption",
+      "text": "J'aime pouvoir ajuster cette jupe après un long déjeuner."
+    },
+    {
+      "id": "fr-holdout-v4-083",
+      "field": "altText",
+      "text": "Un panneau enveloppant se ferme par un lien latéral."
+    },
+    {
+      "id": "fr-holdout-v4-084",
+      "field": "altText",
+      "text": "Le devant croisé de la jupe laisse une fente diagonale."
+    },
+    {
+      "id": "fr-holdout-v4-085",
+      "field": "caption",
+      "text": "Je rentre seulement l'avant de la chemise dans ma taille."
+    },
+    {
+      "id": "fr-holdout-v4-086",
+      "field": "caption",
+      "text": "Un geste rapide suffit à retrouver mes proportions préférées."
+    },
+    {
+      "id": "fr-holdout-v4-087",
+      "field": "altText",
+      "text": "Le devant de la chemise entre dans le pantalon ceinturé."
+    },
+    {
+      "id": "fr-holdout-v4-088",
+      "field": "altText",
+      "text": "L'arrière du chemisier reste libre au-dessus des poches."
+    },
+    {
+      "id": "fr-holdout-v4-089",
+      "field": "caption",
+      "text": "Un simple cordon de cuir rassemble mes cheveux aujourd'hui."
+    },
+    {
+      "id": "fr-holdout-v4-090",
+      "field": "caption",
+      "text": "Je garde une longue queue de cheval entourée de liens."
+    },
+    {
+      "id": "fr-holdout-v4-091",
+      "field": "altText",
+      "text": "Un cordon s'enroule plusieurs fois autour d'une queue de cheval."
+    },
+    {
+      "id": "fr-holdout-v4-092",
+      "field": "altText",
+      "text": "Les cheveux attachés portent une spirale de liens souples."
+    },
+    {
+      "id": "fr-holdout-v4-093",
+      "field": "caption",
+      "text": "Je replie davantage mon bonnet pour dégager les sourcils."
+    },
+    {
+      "id": "fr-holdout-v4-094",
+      "field": "caption",
+      "text": "Le gros revers équilibre bien le volume de mon écharpe."
+    },
+    {
+      "id": "fr-holdout-v4-095",
+      "field": "altText",
+      "text": "Un bonnet côtelé présente un revers épais au-dessus du front."
+    },
+    {
+      "id": "fr-holdout-v4-096",
+      "field": "altText",
+      "text": "Le bord roulé du bonnet laisse les oreilles partiellement visibles."
+    },
+    {
+      "id": "fr-holdout-v4-097",
+      "field": "caption",
+      "text": "Un pendentif oublié accompagne maintenant la boucle de ma ceinture."
+    },
+    {
+      "id": "fr-holdout-v4-098",
+      "field": "caption",
+      "text": "Je déplace mes bijoux pour les regarder autrement."
+    },
+    {
+      "id": "fr-holdout-v4-099",
+      "field": "altText",
+      "text": "Un petit pendentif est accroché à un passant de taille."
+    },
+    {
+      "id": "fr-holdout-v4-100",
+      "field": "altText",
+      "text": "Une chaîne courte rejoint la boucle et la poche avant."
+    },
+    {
+      "id": "fr-holdout-v4-101",
+      "field": "caption",
+      "text": "Ce volant dessine une jolie vague autour de mon visage."
+    },
+    {
+      "id": "fr-holdout-v4-102",
+      "field": "caption",
+      "text": "Je garde les accessoires discrets pour profiter de ce col."
+    },
+    {
+      "id": "fr-holdout-v4-103",
+      "field": "altText",
+      "text": "Un volant ondulé borde l'encolure haute du chemisier."
+    },
+    {
+      "id": "fr-holdout-v4-104",
+      "field": "altText",
+      "text": "Le tissu froncé entoure le cou sans couvrir le menton."
+    },
+    {
+      "id": "fr-holdout-v4-105",
+      "field": "caption",
+      "text": "Une pince discrète ajuste ma veste quand je la ferme."
+    },
+    {
+      "id": "fr-holdout-v4-106",
+      "field": "caption",
+      "text": "J'essaie une taille plus dessinée sur ce blazer ample."
+    },
+    {
+      "id": "fr-holdout-v4-107",
+      "field": "altText",
+      "text": "Une attache rapproche deux plis au dos de la veste."
+    },
+    {
+      "id": "fr-holdout-v4-108",
+      "field": "altText",
+      "text": "Le milieu du dos est resserré par une pince amovible."
+    },
+    {
+      "id": "fr-holdout-v4-109",
+      "field": "caption",
+      "text": "Ma robe d'été accueille un col roulé pour octobre."
+    },
+    {
+      "id": "fr-holdout-v4-110",
+      "field": "caption",
+      "text": "Cette encolure haute me permet de ressortir mes robes fines."
+    },
+    {
+      "id": "fr-holdout-v4-111",
+      "field": "altText",
+      "text": "Un sous-pull à col roulé dépasse sous une robe à bretelles."
+    },
+    {
+      "id": "fr-holdout-v4-112",
+      "field": "altText",
+      "text": "Les bras et le cou sont couverts sous le corsage ouvert."
+    },
+    {
+      "id": "fr-holdout-v4-113",
+      "field": "caption",
+      "text": "La chaîne de lunettes rejoint mes bijoux du quotidien."
+    },
+    {
+      "id": "fr-holdout-v4-114",
+      "field": "caption",
+      "text": "Je retrouve enfin mes lunettes sans fouiller mon sac."
+    },
+    {
+      "id": "fr-holdout-v4-115",
+      "field": "altText",
+      "text": "Une chaîne de petites perles relie les branches des lunettes."
+    },
+    {
+      "id": "fr-holdout-v4-116",
+      "field": "altText",
+      "text": "Les lunettes pendent devant la poitrine grâce à leur cordon."
+    },
+    {
+      "id": "fr-holdout-v4-117",
+      "field": "caption",
+      "text": "J'entoure la poignée du sac avec un carré déjà usé."
+    },
+    {
+      "id": "fr-holdout-v4-118",
+      "field": "caption",
+      "text": "Ce petit habillage protège l'anse et réveille mon vieux sac."
+    },
+    {
+      "id": "fr-holdout-v4-119",
+      "field": "altText",
+      "text": "Un foulard étroit recouvre la poignée rigide du sac."
+    },
+    {
+      "id": "fr-holdout-v4-120",
+      "field": "altText",
+      "text": "Le tissu enroulé laisse deux petites pointes près de l'anse."
+    },
+    {
+      "id": "fr-holdout-v4-121",
+      "field": "caption",
+      "text": "Deux gilets fins remplacent mon gros pull ce matin."
+    },
+    {
+      "id": "fr-holdout-v4-122",
+      "field": "caption",
+      "text": "Je joue avec deux ouvertures pour dessiner plusieurs profondeurs."
+    },
+    {
+      "id": "fr-holdout-v4-123",
+      "field": "altText",
+      "text": "Un gilet court apparaît sous un second gilet plus long."
+    },
+    {
+      "id": "fr-holdout-v4-124",
+      "field": "altText",
+      "text": "Deux rangées de boutons se décalent sur les couches superposées."
+    },
+    {
+      "id": "fr-holdout-v4-125",
+      "field": "caption",
+      "text": "Ces chaussures partagées en deux tons me donnent le sourire."
+    },
+    {
+      "id": "fr-holdout-v4-126",
+      "field": "caption",
+      "text": "Je construis la tenue autour du bout contrastant des souliers."
+    },
+    {
+      "id": "fr-holdout-v4-127",
+      "field": "altText",
+      "text": "Le bout des chaussures contraste nettement avec leur empeigne."
+    },
+    {
+      "id": "fr-holdout-v4-128",
+      "field": "altText",
+      "text": "Une séparation courbe distingue les deux parties des souliers."
+    },
+    {
+      "id": "fr-holdout-v4-129",
+      "field": "caption",
+      "text": "Les boutons marins remplacent la fermeture habituelle de mon pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-130",
+      "field": "caption",
+      "text": "Ce devant bien net accompagne une chemise toute simple."
+    },
+    {
+      "id": "fr-holdout-v4-131",
+      "field": "altText",
+      "text": "Deux rangées de boutons encadrent le panneau avant du pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-132",
+      "field": "altText",
+      "text": "Le pantalon à pont se ferme haut sur la taille."
+    },
+    {
+      "id": "fr-holdout-v4-133",
+      "field": "caption",
+      "text": "Je laisse les manches prendre toute leur place aujourd'hui."
+    },
+    {
+      "id": "fr-holdout-v4-134",
+      "field": "caption",
+      "text": "Ce volume arrondi donne un air joyeux à ma blouse."
+    },
+    {
+      "id": "fr-holdout-v4-135",
+      "field": "altText",
+      "text": "Des manches gonflées se resserrent dans de petits poignets boutonnés."
+    },
+    {
+      "id": "fr-holdout-v4-136",
+      "field": "altText",
+      "text": "Le tissu forme une courbe généreuse entre épaule et coude."
+    },
+    {
+      "id": "fr-holdout-v4-137",
+      "field": "caption",
+      "text": "Je porte mon gilet boutonné comme un haut à part entière."
+    },
+    {
+      "id": "fr-holdout-v4-138",
+      "field": "caption",
+      "text": "Quelques boutons et une belle encolure suffisent pour sortir."
+    },
+    {
+      "id": "fr-holdout-v4-139",
+      "field": "altText",
+      "text": "Un gilet ajusté se porte directement sur le buste."
+    },
+    {
+      "id": "fr-holdout-v4-140",
+      "field": "altText",
+      "text": "La rangée centrale de boutons ferme un haut sans manches."
+    },
+    {
+      "id": "fr-holdout-v4-141",
+      "field": "caption",
+      "text": "Mon écharpe passe sous la ceinture pour rester en place."
+    },
+    {
+      "id": "fr-holdout-v4-142",
+      "field": "caption",
+      "text": "Deux grands pans dessinent une nouvelle façade à mon manteau."
+    },
+    {
+      "id": "fr-holdout-v4-143",
+      "field": "altText",
+      "text": "Une ceinture retient l'écharpe déployée sur le devant du manteau."
+    },
+    {
+      "id": "fr-holdout-v4-144",
+      "field": "altText",
+      "text": "Les extrémités longues de l'écharpe tombent sous la taille serrée."
+    },
+    {
+      "id": "fr-holdout-v4-145",
+      "field": "caption",
+      "text": "Un petit revers laisse mes chevilles profiter du soleil."
+    },
+    {
+      "id": "fr-holdout-v4-146",
+      "field": "caption",
+      "text": "Je raccourcis ce jean sans ciseaux pour changer son allure."
+    },
+    {
+      "id": "fr-holdout-v4-147",
+      "field": "altText",
+      "text": "Le bas du jean est roulé deux fois sur chaque jambe."
+    },
+    {
+      "id": "fr-holdout-v4-148",
+      "field": "altText",
+      "text": "Les baskets laissent voir les chevilles dégagées par un double revers."
+    },
+    {
+      "id": "fr-holdout-v4-149",
+      "field": "caption",
+      "text": "Mes bagues se posent exceptionnellement sur des gants très fins."
+    },
+    {
+      "id": "fr-holdout-v4-150",
+      "field": "caption",
+      "text": "Un détail de fête qui brille jusque sur les mains."
+    },
+    {
+      "id": "fr-holdout-v4-151",
+      "field": "altText",
+      "text": "Deux bagues entourent les doigts couverts de gants transparents."
+    },
+    {
+      "id": "fr-holdout-v4-152",
+      "field": "altText",
+      "text": "Les anneaux métalliques reposent sur le tissu des gants."
+    },
+    {
+      "id": "fr-holdout-v4-153",
+      "field": "caption",
+      "text": "Cette bretelle se noue à la hauteur qui me convient."
+    },
+    {
+      "id": "fr-holdout-v4-154",
+      "field": "caption",
+      "text": "J'aime voir les rubans bouger au-dessus de mon épaule."
+    },
+    {
+      "id": "fr-holdout-v4-155",
+      "field": "altText",
+      "text": "Un grand nœud rassemble les liens de la bretelle droite."
+    },
+    {
+      "id": "fr-holdout-v4-156",
+      "field": "altText",
+      "text": "Les pointes du ruban descendent depuis le sommet de l'épaule."
+    },
+    {
+      "id": "fr-holdout-v4-157",
+      "field": "caption",
+      "text": "Le grand col marin me rappelle les tenues de vacances."
+    },
+    {
+      "id": "fr-holdout-v4-158",
+      "field": "caption",
+      "text": "Je porte ses lignes nettes avec un pantalon très souple."
+    },
+    {
+      "id": "fr-holdout-v4-159",
+      "field": "altText",
+      "text": "Un col carré rayé s'étale sur le haut du dos."
+    },
+    {
+      "id": "fr-holdout-v4-160",
+      "field": "altText",
+      "text": "Deux galons parallèles suivent le bord du col marin."
+    },
+    {
+      "id": "fr-holdout-v4-161",
+      "field": "caption",
+      "text": "Les franges dessinent le rythme quand je marche."
+    },
+    {
+      "id": "fr-holdout-v4-162",
+      "field": "caption",
+      "text": "Je choisis des chaussures tranquilles pour laisser bouger cette jupe."
+    },
+    {
+      "id": "fr-holdout-v4-163",
+      "field": "altText",
+      "text": "Une rangée de franges descend tout autour de l'ourlet."
+    },
+    {
+      "id": "fr-holdout-v4-164",
+      "field": "altText",
+      "text": "Les brins mobiles prolongent le bas de la jupe portée."
+    },
+    {
+      "id": "fr-holdout-v4-165",
+      "field": "caption",
+      "text": "Mon sac reste à la taille pendant la balade à vélo."
+    },
+    {
+      "id": "fr-holdout-v4-166",
+      "field": "caption",
+      "text": "Les mains libres, je profite mieux de ma promenade."
+    },
+    {
+      "id": "fr-holdout-v4-167",
+      "field": "altText",
+      "text": "Une petite pochette plate se fixe sur une ceinture large."
+    },
+    {
+      "id": "fr-holdout-v4-168",
+      "field": "altText",
+      "text": "Le sac repose contre la hanche sans bandoulière sur l'épaule."
+    },
+    {
+      "id": "fr-holdout-v4-169",
+      "field": "caption",
+      "text": "Je croise les liens pour ajuster ce haut à ma taille."
+    },
+    {
+      "id": "fr-holdout-v4-170",
+      "field": "caption",
+      "text": "L'encolure du cache-cœur accompagne joliment ce collier court."
+    },
+    {
+      "id": "fr-holdout-v4-171",
+      "field": "altText",
+      "text": "Le cache-cœur enveloppe le torse avec un lien noué latéralement."
+    },
+    {
+      "id": "fr-holdout-v4-172",
+      "field": "altText",
+      "text": "Un lien latéral maintient le haut enveloppant à la taille."
+    },
+    {
+      "id": "fr-holdout-v4-173",
+      "field": "caption",
+      "text": "Les petits jours des chaussettes apparaissent sous mon pantalon court."
+    },
+    {
+      "id": "fr-holdout-v4-174",
+      "field": "caption",
+      "text": "Je trouve ce détail ajouré parfait avec mes derbies."
+    },
+    {
+      "id": "fr-holdout-v4-175",
+      "field": "altText",
+      "text": "Des motifs ajourés parcourent les chaussettes visibles aux chevilles."
+    },
+    {
+      "id": "fr-holdout-v4-176",
+      "field": "altText",
+      "text": "Les chaussures basses découvrent une maille percée de petits losanges."
+    },
+    {
+      "id": "fr-holdout-v4-177",
+      "field": "caption",
+      "text": "Deux coudières sauvent ma veste préférée pour une autre saison."
+    },
+    {
+      "id": "fr-holdout-v4-178",
+      "field": "caption",
+      "text": "J'ai choisi des pièces ovales pour renforcer les manches fatiguées."
+    },
+    {
+      "id": "fr-holdout-v4-179",
+      "field": "altText",
+      "text": "Des empiècements ovales renforcent l'arrière des manches au coude."
+    },
+    {
+      "id": "fr-holdout-v4-180",
+      "field": "altText",
+      "text": "Une couture régulière entoure chaque coudière posée sur la veste."
+    },
+    {
+      "id": "fr-holdout-v4-181",
+      "field": "caption",
+      "text": "Je relève le col châle quand l'air devient frais."
+    },
+    {
+      "id": "fr-holdout-v4-182",
+      "field": "caption",
+      "text": "Cette courbe autour du cou rend mon manteau accueillant."
+    },
+    {
+      "id": "fr-holdout-v4-183",
+      "field": "altText",
+      "text": "Un col large roule sans angle autour de l'ouverture du manteau."
+    },
+    {
+      "id": "fr-holdout-v4-184",
+      "field": "altText",
+      "text": "Les revers arrondis se rejoignent près du bouton supérieur."
+    },
+    {
+      "id": "fr-holdout-v4-185",
+      "field": "caption",
+      "text": "Mon débardeur uni se devine sous cette maille en filet."
+    },
+    {
+      "id": "fr-holdout-v4-186",
+      "field": "caption",
+      "text": "J'aime ces couches légères qui laissent circuler l'air."
+    },
+    {
+      "id": "fr-holdout-v4-187",
+      "field": "altText",
+      "text": "Un haut à larges mailles se superpose à un débardeur."
+    },
+    {
+      "id": "fr-holdout-v4-188",
+      "field": "altText",
+      "text": "La structure en filet révèle une couche opaque en dessous."
+    },
+    {
+      "id": "fr-holdout-v4-189",
+      "field": "caption",
+      "text": "Chaque bracelet raconte une promenade différente de mon été."
+    },
+    {
+      "id": "fr-holdout-v4-190",
+      "field": "caption",
+      "text": "Je les réunis aujourd'hui pour entendre leur petit bruit familier."
+    },
+    {
+      "id": "fr-holdout-v4-191",
+      "field": "altText",
+      "text": "Plusieurs bracelets fins s'accumulent sur un seul avant-bras."
+    },
+    {
+      "id": "fr-holdout-v4-192",
+      "field": "altText",
+      "text": "Des joncs et des liens tressés entourent le même poignet."
+    },
+    {
+      "id": "fr-holdout-v4-193",
+      "field": "caption",
+      "text": "Les petits festons donnent de la douceur à cette veste."
+    },
+    {
+      "id": "fr-holdout-v4-194",
+      "field": "caption",
+      "text": "Je garde ce contour arrondi comme seul décor aujourd'hui."
+    },
+    {
+      "id": "fr-holdout-v4-195",
+      "field": "altText",
+      "text": "Le bord inférieur de la veste dessine une suite d'arrondis."
+    },
+    {
+      "id": "fr-holdout-v4-196",
+      "field": "altText",
+      "text": "De petits festons soulignent l'ouverture et les poches du vêtement."
+    },
+    {
+      "id": "fr-holdout-v4-197",
+      "field": "caption",
+      "text": "J'ajuste les liens derrière pour que le corsage reste confortable."
+    },
+    {
+      "id": "fr-holdout-v4-198",
+      "field": "caption",
+      "text": "Ce dos lacé mérite bien une photo de profil."
+    },
+    {
+      "id": "fr-holdout-v4-199",
+      "field": "altText",
+      "text": "Un lacet traverse des œillets sur l'ouverture arrière du corsage."
+    },
+    {
+      "id": "fr-holdout-v4-200",
+      "field": "altText",
+      "text": "Les liens croisés dessinent une échelle au milieu du dos."
+    },
+    {
+      "id": "fr-holdout-v4-201",
+      "field": "caption",
+      "text": "Cette jupe s'ouvre en éventail à chacun de mes pas."
+    },
+    {
+      "id": "fr-holdout-v4-202",
+      "field": "caption",
+      "text": "Je tourne doucement pour regarder vivre tous ces plis."
+    },
+    {
+      "id": "fr-holdout-v4-203",
+      "field": "altText",
+      "text": "Des plis réguliers couvrent la jupe de la taille aux genoux."
+    },
+    {
+      "id": "fr-holdout-v4-204",
+      "field": "altText",
+      "text": "Le mouvement écarte les plis étroits sur un côté."
+    },
+    {
+      "id": "fr-holdout-v4-205",
+      "field": "caption",
+      "text": "Un large ruban retient ma capeline quand le vent se lève."
+    },
+    {
+      "id": "fr-holdout-v4-206",
+      "field": "caption",
+      "text": "Je noue le chapeau sous le menton pour notre sortie."
+    },
+    {
+      "id": "fr-holdout-v4-207",
+      "field": "altText",
+      "text": "Une capeline à larges bords se ferme avec un ruban."
+    },
+    {
+      "id": "fr-holdout-v4-208",
+      "field": "altText",
+      "text": "Deux liens descendent du chapeau jusqu'à un nœud sous le visage."
+    },
+    {
+      "id": "fr-holdout-v4-209",
+      "field": "caption",
+      "text": "Je ferme ce veston croisé pour une silhouette bien dessinée."
+    },
+    {
+      "id": "fr-holdout-v4-210",
+      "field": "caption",
+      "text": "Les deux rangées de boutons font tout le travail."
+    },
+    {
+      "id": "fr-holdout-v4-211",
+      "field": "altText",
+      "text": "Un veston croisé présente six boutons sur le devant."
+    },
+    {
+      "id": "fr-holdout-v4-212",
+      "field": "altText",
+      "text": "Le pan extérieur se rabat au-delà du milieu du buste."
+    },
+    {
+      "id": "fr-holdout-v4-213",
+      "field": "caption",
+      "text": "Je resserre la coulisse pour créer quelques fronces sur le côté."
+    },
+    {
+      "id": "fr-holdout-v4-214",
+      "field": "caption",
+      "text": "Ce réglage change la longueur de ma robe en un geste."
+    },
+    {
+      "id": "fr-holdout-v4-215",
+      "field": "altText",
+      "text": "Un cordon latéral rassemble le tissu en fronces verticales."
+    },
+    {
+      "id": "fr-holdout-v4-216",
+      "field": "altText",
+      "text": "La robe remonte sur une hanche grâce à sa coulisse."
+    },
+    {
+      "id": "fr-holdout-v4-217",
+      "field": "caption",
+      "text": "Ce plastron brodé attire l'œil vers le haut du vêtement."
+    },
+    {
+      "id": "fr-holdout-v4-218",
+      "field": "caption",
+      "text": "Je découvre encore de nouveaux points dans cette blouse chinée."
+    },
+    {
+      "id": "fr-holdout-v4-219",
+      "field": "altText",
+      "text": "Des broderies géométriques remplissent le panneau central de la blouse."
+    },
+    {
+      "id": "fr-holdout-v4-220",
+      "field": "altText",
+      "text": "Un plastron travaillé descend du col jusqu'au milieu de la poitrine."
+    },
+    {
+      "id": "fr-holdout-v4-221",
+      "field": "caption",
+      "text": "La veste courte devant s'allonge derrière quand je me retourne."
+    },
+    {
+      "id": "fr-holdout-v4-222",
+      "field": "caption",
+      "text": "J'aime porter cette forme cérémonieuse avec mon jean quotidien."
+    },
+    {
+      "id": "fr-holdout-v4-223",
+      "field": "altText",
+      "text": "Deux pans longs prolongent le dos d'une veste cintrée."
+    },
+    {
+      "id": "fr-holdout-v4-224",
+      "field": "altText",
+      "text": "Le devant s'arrête à la taille tandis que le dos descend."
+    },
+    {
+      "id": "fr-holdout-v4-225",
+      "field": "caption",
+      "text": "La poche en filet garde mon petit carnet visible."
+    },
+    {
+      "id": "fr-holdout-v4-226",
+      "field": "caption",
+      "text": "Une poche transparente me rappelle ce que j'ai emporté."
+    },
+    {
+      "id": "fr-holdout-v4-227",
+      "field": "altText",
+      "text": "Une poche extérieure en filet laisse voir un carnet fermé."
+    },
+    {
+      "id": "fr-holdout-v4-228",
+      "field": "altText",
+      "text": "Le panneau ajouré est cousu sur le côté du sac."
+    },
+    {
+      "id": "fr-holdout-v4-229",
+      "field": "caption",
+      "text": "Ces manches fendues suivent mes bras comme une petite cape."
+    },
+    {
+      "id": "fr-holdout-v4-230",
+      "field": "caption",
+      "text": "Je profite de leur ouverture pour laisser voir mes bracelets."
+    },
+    {
+      "id": "fr-holdout-v4-231",
+      "field": "altText",
+      "text": "Les manches ouvertes retombent depuis les épaules sans entourer les bras."
+    },
+    {
+      "id": "fr-holdout-v4-232",
+      "field": "altText",
+      "text": "Deux pans flottants accompagnent les avant-bras dégagés du modèle."
+    },
+    {
+      "id": "fr-holdout-v4-233",
+      "field": "caption",
+      "text": "L'encolure froncée me permet de porter la blouse plus haut."
+    },
+    {
+      "id": "fr-holdout-v4-234",
+      "field": "caption",
+      "text": "Je replace la bordure élastique avant de partir travailler."
+    },
+    {
+      "id": "fr-holdout-v4-235",
+      "field": "altText",
+      "text": "Un bord élastiqué rassemble l'encolure large de la blouse."
+    },
+    {
+      "id": "fr-holdout-v4-236",
+      "field": "altText",
+      "text": "Les fronces entourent les épaules et le haut du buste."
+    },
+    {
+      "id": "fr-holdout-v4-237",
+      "field": "caption",
+      "text": "La petite charnière permet d'ouvrir mon bracelet sans le déformer."
+    },
+    {
+      "id": "fr-holdout-v4-238",
+      "field": "caption",
+      "text": "J'ai trouvé comment fermer ce jonc seule, avec son fermoir latéral."
+    },
+    {
+      "id": "fr-holdout-v4-239",
+      "field": "altText",
+      "text": "Un bracelet rigide ouvert montre une petite charnière sur le côté."
+    },
+    {
+      "id": "fr-holdout-v4-240",
+      "field": "altText",
+      "text": "Les deux moitiés du jonc pivotent autour d'une articulation discrète."
+    },
+    {
+      "id": "fr-holdout-v4-241",
+      "field": "caption",
+      "text": "Un col droit donne une ligne nette à ma veste ouverte."
+    },
+    {
+      "id": "fr-holdout-v4-242",
+      "field": "caption",
+      "text": "Je garde le haut déboutonné pour assouplir ce col officier."
+    },
+    {
+      "id": "fr-holdout-v4-243",
+      "field": "altText",
+      "text": "Le col court monte verticalement autour de la base du cou."
+    },
+    {
+      "id": "fr-holdout-v4-244",
+      "field": "altText",
+      "text": "La veste présente un petit col droit sans revers rabattus."
+    },
+    {
+      "id": "fr-holdout-v4-245",
+      "field": "caption",
+      "text": "Les godets se déploient quand je descends les marches."
+    },
+    {
+      "id": "fr-holdout-v4-246",
+      "field": "caption",
+      "text": "Cette jupe garde sa ligne près des hanches puis s'évase."
+    },
+    {
+      "id": "fr-holdout-v4-247",
+      "field": "altText",
+      "text": "Des panneaux triangulaires élargissent la partie basse de la jupe."
+    },
+    {
+      "id": "fr-holdout-v4-248",
+      "field": "altText",
+      "text": "L'ourlet ondulé provient de plusieurs godets insérés entre les coutures."
+    },
+    {
+      "id": "fr-holdout-v4-249",
+      "field": "caption",
+      "text": "Un volume sculpté sur la hanche change cette robe toute simple."
+    },
+    {
+      "id": "fr-holdout-v4-250",
+      "field": "caption",
+      "text": "J'aime cette poche qui devient presque une petite architecture."
+    },
+    {
+      "id": "fr-holdout-v4-251",
+      "field": "altText",
+      "text": "Une poche arrondie forme une saillie sur la hanche gauche."
+    },
+    {
+      "id": "fr-holdout-v4-252",
+      "field": "altText",
+      "text": "Le côté de la robe porte un grand volume creux."
+    },
+    {
+      "id": "fr-holdout-v4-253",
+      "field": "caption",
+      "text": "Je relève la traîne avec sa petite attache pour marcher."
+    },
+    {
+      "id": "fr-holdout-v4-254",
+      "field": "caption",
+      "text": "La fête continue avec une robe enfin libre de mes pas."
+    },
+    {
+      "id": "fr-holdout-v4-255",
+      "field": "altText",
+      "text": "Une attache remonte la traîne et forme un drapé derrière."
+    },
+    {
+      "id": "fr-holdout-v4-256",
+      "field": "altText",
+      "text": "Le bas arrière de la robe est fixé sous la taille."
+    },
+    {
+      "id": "fr-holdout-v4-257",
+      "field": "caption",
+      "text": "Les gants longs rejoignent les manches courtes de ma robe."
+    },
+    {
+      "id": "fr-holdout-v4-258",
+      "field": "caption",
+      "text": "J'essaie cette ligne continue des épaules jusqu'aux mains."
+    },
+    {
+      "id": "fr-holdout-v4-259",
+      "field": "altText",
+      "text": "Des gants montent au-dessus des coudes sous de petites manches."
+    },
+    {
+      "id": "fr-holdout-v4-260",
+      "field": "altText",
+      "text": "Une bande de peau apparaît entre le gant et l'emmanchure."
+    },
+    {
+      "id": "fr-holdout-v4-261",
+      "field": "caption",
+      "text": "Je tourne la grande ceinture autour de ma robe souple."
+    },
+    {
+      "id": "fr-holdout-v4-262",
+      "field": "caption",
+      "text": "Son nœud plat dessine une taille sans boucle métallique."
+    },
+    {
+      "id": "fr-holdout-v4-263",
+      "field": "altText",
+      "text": "Une large ceinture enveloppante se ferme avec de longs liens."
+    },
+    {
+      "id": "fr-holdout-v4-264",
+      "field": "altText",
+      "text": "Le tissu croisé forme un bandeau plat autour de la taille."
+    },
+    {
+      "id": "fr-holdout-v4-265",
+      "field": "caption",
+      "text": "Mes manches s'élargissent vers les mains pour une allure fluide."
+    },
+    {
+      "id": "fr-holdout-v4-266",
+      "field": "caption",
+      "text": "Je relève un peu les bras pour montrer leur joli tombé."
+    },
+    {
+      "id": "fr-holdout-v4-267",
+      "field": "altText",
+      "text": "Les manches ajustées aux épaules s'évasent largement aux poignets."
+    },
+    {
+      "id": "fr-holdout-v4-268",
+      "field": "altText",
+      "text": "Deux ouvertures en cloche entourent les mains laissées libres."
+    },
+    {
+      "id": "fr-holdout-v4-269",
+      "field": "caption",
+      "text": "Je noue la lavallière sans trop serrer pour garder du mouvement."
+    },
+    {
+      "id": "fr-holdout-v4-270",
+      "field": "caption",
+      "text": "Ses longs pans remplacent mon collier dans cette tenue."
+    },
+    {
+      "id": "fr-holdout-v4-271",
+      "field": "altText",
+      "text": "Un nœud souple ferme le col et descend sur le chemisier."
+    },
+    {
+      "id": "fr-holdout-v4-272",
+      "field": "altText",
+      "text": "Deux bandes de tissu prolongent l'encolure et se croisent devant."
+    },
+    {
+      "id": "fr-holdout-v4-273",
+      "field": "caption",
+      "text": "Les fentes du pantalon laissent apparaître mes chaussures en marchant."
+    },
+    {
+      "id": "fr-holdout-v4-274",
+      "field": "caption",
+      "text": "Ce petit décroché au bas des jambes change le tombé."
+    },
+    {
+      "id": "fr-holdout-v4-275",
+      "field": "altText",
+      "text": "Des fentes verticales ouvrent le devant du pantalon aux chevilles."
+    },
+    {
+      "id": "fr-holdout-v4-276",
+      "field": "altText",
+      "text": "Le tissu se partage au-dessus de chaque chaussure basse."
+    },
+    {
+      "id": "fr-holdout-v4-277",
+      "field": "caption",
+      "text": "J'ai remplacé le cordon fatigué par un lien plus large."
+    },
+    {
+      "id": "fr-holdout-v4-278",
+      "field": "caption",
+      "text": "Ce petit bricolage redonne du caractère à mon sweat fidèle."
+    },
+    {
+      "id": "fr-holdout-v4-279",
+      "field": "altText",
+      "text": "Un ruban plat traverse les œillets de la capuche."
+    },
+    {
+      "id": "fr-holdout-v4-280",
+      "field": "altText",
+      "text": "Les nouveaux liens larges pendent sur le devant du sweat."
+    },
+    {
+      "id": "fr-holdout-v4-281",
+      "field": "caption",
+      "text": "Ma pochette à livre devient mon sac pour la lecture dehors."
+    },
+    {
+      "id": "fr-holdout-v4-282",
+      "field": "caption",
+      "text": "Juste de quoi emporter le roman et mes lunettes."
+    },
+    {
+      "id": "fr-holdout-v4-283",
+      "field": "altText",
+      "text": "Un sac étroit épouse la forme d'un livre relié."
+    },
+    {
+      "id": "fr-holdout-v4-284",
+      "field": "altText",
+      "text": "La couverture du livre dépasse d'une pochette à petite anse."
+    },
+    {
+      "id": "fr-holdout-v4-285",
+      "field": "caption",
+      "text": "Le collier suit exactement la courbe du col rond."
+    },
+    {
+      "id": "fr-holdout-v4-286",
+      "field": "caption",
+      "text": "J'aime cet effet de bordure brillante autour de mon pull."
+    },
+    {
+      "id": "fr-holdout-v4-287",
+      "field": "altText",
+      "text": "Un collier plat repose au bord d'une encolure arrondie."
+    },
+    {
+      "id": "fr-holdout-v4-288",
+      "field": "altText",
+      "text": "Les maillons courts dessinent un demi-cercle sur la maille."
+    },
+    {
+      "id": "fr-holdout-v4-289",
+      "field": "caption",
+      "text": "J'ai troqué les lacets contre des élastiques pour partir vite."
+    },
+    {
+      "id": "fr-holdout-v4-290",
+      "field": "caption",
+      "text": "Mes baskets deviennent plus faciles à enfiler chaque matin."
+    },
+    {
+      "id": "fr-holdout-v4-291",
+      "field": "altText",
+      "text": "Des bandes élastiques remplacent les lacets entre les œillets."
+    },
+    {
+      "id": "fr-holdout-v4-292",
+      "field": "altText",
+      "text": "Les baskets fermées présentent de petits liens droits sans nœud."
+    },
+    {
+      "id": "fr-holdout-v4-293",
+      "field": "caption",
+      "text": "Quelques boutons ouverts donnent plus d'aisance à cette jupe."
+    },
+    {
+      "id": "fr-holdout-v4-294",
+      "field": "caption",
+      "text": "Je règle la fente selon mes chaussures et la journée."
+    },
+    {
+      "id": "fr-holdout-v4-295",
+      "field": "altText",
+      "text": "Plusieurs boutons forment une fermeture latérale le long de la jupe."
+    },
+    {
+      "id": "fr-holdout-v4-296",
+      "field": "altText",
+      "text": "Les derniers boutons défaits créent une ouverture près du genou."
+    },
+    {
+      "id": "fr-holdout-v4-297",
+      "field": "caption",
+      "text": "J'ai retourné la poche pour découvrir sa doublure à fleurs."
+    },
+    {
+      "id": "fr-holdout-v4-298",
+      "field": "caption",
+      "text": "Petit détail caché de mon manteau, photographié avant de sortir."
+    },
+    {
+      "id": "fr-holdout-v4-299",
+      "field": "altText",
+      "text": "Une poche retournée expose sa doublure imprimée hors du manteau."
+    },
+    {
+      "id": "fr-holdout-v4-300",
+      "field": "altText",
+      "text": "Le sac de poche dépasse et montre des motifs floraux."
+    },
+    {
+      "id": "fr-holdout-v4-301",
+      "field": "caption",
+      "text": "Ces petites ailettes soulignent les épaules sans ajouter de manches."
+    },
+    {
+      "id": "fr-holdout-v4-302",
+      "field": "caption",
+      "text": "Je trouve ce bord plissé assez beau pour rester sans bijou."
+    },
+    {
+      "id": "fr-holdout-v4-303",
+      "field": "altText",
+      "text": "De courtes bandes plissées prolongent les épaules de la robe."
+    },
+    {
+      "id": "fr-holdout-v4-304",
+      "field": "altText",
+      "text": "Les emmanchures sont bordées de petites ailettes dressées."
+    },
+    {
+      "id": "fr-holdout-v4-305",
+      "field": "caption",
+      "text": "Les plis tournés vers l'extérieur donnent du relief à ma taille."
+    },
+    {
+      "id": "fr-holdout-v4-306",
+      "field": "caption",
+      "text": "J'apprends à reconnaître les détails de coupe en portant ce pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-307",
+      "field": "altText",
+      "text": "Deux pinces orientées vers les hanches structurent le devant du pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-308",
+      "field": "altText",
+      "text": "Le tissu se replie vers l'extérieur de chaque côté de la braguette."
+    },
+    {
+      "id": "fr-holdout-v4-309",
+      "field": "caption",
+      "text": "La voilette rend ce bonnet étonnamment habillé pour ma sortie."
+    },
+    {
+      "id": "fr-holdout-v4-310",
+      "field": "caption",
+      "text": "Je mélange le tricot familier avec un peu d'esprit cérémonie."
+    },
+    {
+      "id": "fr-holdout-v4-311",
+      "field": "altText",
+      "text": "Un voile à mailles fines descend du bonnet sur le front."
+    },
+    {
+      "id": "fr-holdout-v4-312",
+      "field": "altText",
+      "text": "La petite résille fixée au bord couvre le haut du visage."
+    },
+    {
+      "id": "fr-holdout-v4-313",
+      "field": "caption",
+      "text": "Ces longues pointes dépassent franchement des revers de ma veste."
+    },
+    {
+      "id": "fr-holdout-v4-314",
+      "field": "caption",
+      "text": "Je laisse le grand col raconter son époque dans cette tenue."
+    },
+    {
+      "id": "fr-holdout-v4-315",
+      "field": "altText",
+      "text": "Un col très allongé repose sur les revers du blazer."
+    },
+    {
+      "id": "fr-holdout-v4-316",
+      "field": "altText",
+      "text": "Les pointes de chemise descendent presque jusqu'au premier bouton."
+    },
+    {
+      "id": "fr-holdout-v4-317",
+      "field": "caption",
+      "text": "Les larges bretelles croisées me rappellent les tabliers d'atelier."
+    },
+    {
+      "id": "fr-holdout-v4-318",
+      "field": "caption",
+      "text": "Cette robe me laisse choisir une chemise différente chaque fois."
+    },
+    {
+      "id": "fr-holdout-v4-319",
+      "field": "altText",
+      "text": "Une robe à bavette se superpose à une chemise boutonnée."
+    },
+    {
+      "id": "fr-holdout-v4-320",
+      "field": "altText",
+      "text": "Deux bretelles larges se croisent dans le dos du vêtement."
+    },
+    {
+      "id": "fr-holdout-v4-321",
+      "field": "caption",
+      "text": "La couture suit l'épaule puis descend doucement sur mon bras."
+    },
+    {
+      "id": "fr-holdout-v4-322",
+      "field": "caption",
+      "text": "J'aime cette construction qui donne de l'aisance à ma veste."
+    },
+    {
+      "id": "fr-holdout-v4-323",
+      "field": "altText",
+      "text": "Une pièce étroite prolonge l'encolure jusqu'au sommet de la manche."
+    },
+    {
+      "id": "fr-holdout-v4-324",
+      "field": "altText",
+      "text": "Les coutures encadrent les épaules avec une bande allongée."
+    },
+    {
+      "id": "fr-holdout-v4-325",
+      "field": "caption",
+      "text": "Je remonte le petit zip pour protéger mon cou au retour."
+    },
+    {
+      "id": "fr-holdout-v4-326",
+      "field": "caption",
+      "text": "Ouvert, ce col laisse respirer mon pull pendant la marche."
+    },
+    {
+      "id": "fr-holdout-v4-327",
+      "field": "altText",
+      "text": "Une fermeture courte ouvre le col montant du chandail."
+    },
+    {
+      "id": "fr-holdout-v4-328",
+      "field": "altText",
+      "text": "Le zip du chandail descend depuis le col jusqu'au sternum."
+    },
+    {
+      "id": "fr-holdout-v4-329",
+      "field": "caption",
+      "text": "La sangle se règle exactement où ma veste en a besoin."
+    },
+    {
+      "id": "fr-holdout-v4-330",
+      "field": "caption",
+      "text": "Je garde l'extrémité longue pour sa ligne verticale sur le pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-331",
+      "field": "altText",
+      "text": "Une ceinture en sangle passe dans une boucle à serrage."
+    },
+    {
+      "id": "fr-holdout-v4-332",
+      "field": "altText",
+      "text": "La partie libre de la sangle descend devant une jambe."
+    },
+    {
+      "id": "fr-holdout-v4-333",
+      "field": "caption",
+      "text": "Je replie le haut des bottes pour changer leur hauteur."
+    },
+    {
+      "id": "fr-holdout-v4-334",
+      "field": "caption",
+      "text": "Ce revers souple crée une jolie pause sous ma jupe."
+    },
+    {
+      "id": "fr-holdout-v4-335",
+      "field": "altText",
+      "text": "Le haut de chaque botte est rabattu en large revers."
+    },
+    {
+      "id": "fr-holdout-v4-336",
+      "field": "altText",
+      "text": "Les tiges retournées s'arrêtent sous les genoux du modèle."
+    },
+    {
+      "id": "fr-holdout-v4-337",
+      "field": "caption",
+      "text": "La surprise de cette robe, ce sont ses poches invisibles."
+    },
+    {
+      "id": "fr-holdout-v4-338",
+      "field": "caption",
+      "text": "Je peux poser les mains sans casser les lignes du devant."
+    },
+    {
+      "id": "fr-holdout-v4-339",
+      "field": "altText",
+      "text": "Les mains entrent dans des poches dissimulées aux coutures latérales."
+    },
+    {
+      "id": "fr-holdout-v4-340",
+      "field": "altText",
+      "text": "La robe garde un devant lisse malgré ses poches profondes."
+    },
+    {
+      "id": "fr-holdout-v4-341",
+      "field": "caption",
+      "text": "Cette tresse de tissu tient mes cheveux pendant la journée."
+    },
+    {
+      "id": "fr-holdout-v4-342",
+      "field": "caption",
+      "text": "Un peu de volume au sommet équilibre mon manteau ample."
+    },
+    {
+      "id": "fr-holdout-v4-343",
+      "field": "altText",
+      "text": "Un serre-tête rembourré forme une tresse au-dessus des cheveux."
+    },
+    {
+      "id": "fr-holdout-v4-344",
+      "field": "altText",
+      "text": "Plusieurs bandes entrelacées composent l'accessoire posé sur la tête."
+    },
+    {
+      "id": "fr-holdout-v4-345",
+      "field": "caption",
+      "text": "Je glisse les bras sous le poncho pour attraper mon sac."
+    },
+    {
+      "id": "fr-holdout-v4-346",
+      "field": "caption",
+      "text": "Une seule grande pièce me tient chaud sans serrer les épaules."
+    },
+    {
+      "id": "fr-holdout-v4-347",
+      "field": "altText",
+      "text": "Un poncho ouvert sur les côtés descend sur les bras."
+    },
+    {
+      "id": "fr-holdout-v4-348",
+      "field": "altText",
+      "text": "Les bords du vêtement flottent librement autour du buste."
+    },
+    {
+      "id": "fr-holdout-v4-349",
+      "field": "caption",
+      "text": "Les liserés suivent la veste comme les traits d'un dessin."
+    },
+    {
+      "id": "fr-holdout-v4-350",
+      "field": "caption",
+      "text": "Je choisis des pièces calmes pour montrer ce contour graphique."
+    },
+    {
+      "id": "fr-holdout-v4-351",
+      "field": "altText",
+      "text": "Un fin galon contrastant borde les revers et les poches."
+    },
+    {
+      "id": "fr-holdout-v4-352",
+      "field": "altText",
+      "text": "Les contours de la veste sont soulignés par une ligne continue."
+    },
+    {
+      "id": "fr-holdout-v4-353",
+      "field": "caption",
+      "text": "Mon bracelet de cheville retrouve sa place avec ces chaussures basses."
+    },
+    {
+      "id": "fr-holdout-v4-354",
+      "field": "caption",
+      "text": "Un léger éclat accompagne le bas de ma tenue."
+    },
+    {
+      "id": "fr-holdout-v4-355",
+      "field": "altText",
+      "text": "Une chaîne délicate entoure la cheville au-dessus du soulier."
+    },
+    {
+      "id": "fr-holdout-v4-356",
+      "field": "altText",
+      "text": "De petites breloques pendent entre le pantalon court et la chaussure."
+    },
+    {
+      "id": "fr-holdout-v4-357",
+      "field": "caption",
+      "text": "Je glisse les pouces dans les manches pendant le trajet frais."
+    },
+    {
+      "id": "fr-holdout-v4-358",
+      "field": "caption",
+      "text": "Ces ouvertures gardent mes poignets couverts quand je bouge."
+    },
+    {
+      "id": "fr-holdout-v4-359",
+      "field": "altText",
+      "text": "Le pouce passe dans une fente au bout de la manche."
+    },
+    {
+      "id": "fr-holdout-v4-360",
+      "field": "altText",
+      "text": "Les poignets prolongés couvrent une partie du dos des mains."
+    },
+    {
+      "id": "fr-holdout-v4-361",
+      "field": "caption",
+      "text": "Les boutons dépareillés font le charme de ce gilet réparé."
+    },
+    {
+      "id": "fr-holdout-v4-362",
+      "field": "caption",
+      "text": "J'ai pioché dans ma boîte pour lui donner plusieurs petits éclats."
+    },
+    {
+      "id": "fr-holdout-v4-363",
+      "field": "altText",
+      "text": "Chaque bouton du gilet présente une forme décorative différente."
+    },
+    {
+      "id": "fr-holdout-v4-364",
+      "field": "altText",
+      "text": "Des boutons ronds, carrés et floraux ferment la même maille."
+    },
+    {
+      "id": "fr-holdout-v4-365",
+      "field": "caption",
+      "text": "Une pochette intérieure garde mes affaires discrètes dans le filet."
+    },
+    {
+      "id": "fr-holdout-v4-366",
+      "field": "caption",
+      "text": "Je glisse un petit sac fermé dans mon grand panier ajouré."
+    },
+    {
+      "id": "fr-holdout-v4-367",
+      "field": "altText",
+      "text": "Une pochette opaque se trouve à l'intérieur d'un sac en filet."
+    },
+    {
+      "id": "fr-holdout-v4-368",
+      "field": "altText",
+      "text": "Le filet extérieur laisse voir les contours d'une doublure indépendante."
+    },
+    {
+      "id": "fr-holdout-v4-369",
+      "field": "caption",
+      "text": "Je tire sur les liens pour relever les côtés de ma jupe."
+    },
+    {
+      "id": "fr-holdout-v4-370",
+      "field": "caption",
+      "text": "Ce volume irrégulier me plaît beaucoup avec un haut près du corps."
+    },
+    {
+      "id": "fr-holdout-v4-371",
+      "field": "altText",
+      "text": "Deux coulisses latérales remontent l'ourlet en créant des drapés."
+    },
+    {
+      "id": "fr-holdout-v4-372",
+      "field": "altText",
+      "text": "La jupe forme des plis serrés au-dessus de chaque genou."
+    },
+    {
+      "id": "fr-holdout-v4-373",
+      "field": "caption",
+      "text": "La fermeture cachée laisse toute la place à la belle coupe."
+    },
+    {
+      "id": "fr-holdout-v4-374",
+      "field": "caption",
+      "text": "J'aime ce devant net qui accompagne facilement mes accessoires."
+    },
+    {
+      "id": "fr-holdout-v4-375",
+      "field": "altText",
+      "text": "Une patte de tissu recouvre les boutons de la chemise."
+    },
+    {
+      "id": "fr-holdout-v4-376",
+      "field": "altText",
+      "text": "Le milieu du chemisier montre une bande lisse sans boutons apparents."
+    },
+    {
+      "id": "fr-holdout-v4-377",
+      "field": "caption",
+      "text": "Je porte mes chaussures comme de petites sculptures aujourd'hui."
+    },
+    {
+      "id": "fr-holdout-v4-378",
+      "field": "caption",
+      "text": "Le talon courbe mérite un pantalon qui le laisse visible."
+    },
+    {
+      "id": "fr-holdout-v4-379",
+      "field": "altText",
+      "text": "Un talon recourbé soutient l'arrière de chaque chaussure."
+    },
+    {
+      "id": "fr-holdout-v4-380",
+      "field": "altText",
+      "text": "Les souliers présentent des talons ajourés en forme d'arche."
+    },
+    {
+      "id": "fr-holdout-v4-381",
+      "field": "caption",
+      "text": "Une grande épingle retient mon châle pendant la promenade."
+    },
+    {
+      "id": "fr-holdout-v4-382",
+      "field": "caption",
+      "text": "Je décale l'attache pour que le drapé tombe sur une épaule."
+    },
+    {
+      "id": "fr-holdout-v4-383",
+      "field": "altText",
+      "text": "Une épingle traverse les deux bords d'un châle enveloppant."
+    },
+    {
+      "id": "fr-holdout-v4-384",
+      "field": "altText",
+      "text": "Le châle se ferme sur le côté par une attache allongée."
+    },
+    {
+      "id": "fr-holdout-v4-385",
+      "field": "caption",
+      "text": "La manche chemisier dépasse du tricot pour un peu de contraste."
+    },
+    {
+      "id": "fr-holdout-v4-386",
+      "field": "caption",
+      "text": "Je laisse les poignets visibles, même quand le pull est ample."
+    },
+    {
+      "id": "fr-holdout-v4-387",
+      "field": "altText",
+      "text": "Les poignets boutonnés de la chemise dépassent des manches du pull."
+    },
+    {
+      "id": "fr-holdout-v4-388",
+      "field": "altText",
+      "text": "Une bande de chemise apparaît au bout de chaque bras."
+    },
+    {
+      "id": "fr-holdout-v4-389",
+      "field": "caption",
+      "text": "Ce pli central s'ouvre juste assez quand je m'assois."
+    },
+    {
+      "id": "fr-holdout-v4-390",
+      "field": "caption",
+      "text": "Une ligne discrète cache une belle réserve de mouvement."
+    },
+    {
+      "id": "fr-holdout-v4-391",
+      "field": "altText",
+      "text": "Un large pli creux structure le milieu devant de la jupe."
+    },
+    {
+      "id": "fr-holdout-v4-392",
+      "field": "altText",
+      "text": "Deux plis rentrants se rejoignent sous la ceinture ajustée."
+    },
+    {
+      "id": "fr-holdout-v4-393",
+      "field": "caption",
+      "text": "Mon écharpe se transforme en capuche au premier courant d'air."
+    },
+    {
+      "id": "fr-holdout-v4-394",
+      "field": "caption",
+      "text": "J'entoure la tête puis le cou avec ce grand rectangle."
+    },
+    {
+      "id": "fr-holdout-v4-395",
+      "field": "altText",
+      "text": "Une écharpe large couvre les cheveux puis entoure le cou."
+    },
+    {
+      "id": "fr-holdout-v4-396",
+      "field": "altText",
+      "text": "Les pans du tissu se croisent sous une tête enveloppée."
+    },
+    {
+      "id": "fr-holdout-v4-397",
+      "field": "caption",
+      "text": "Ces clips donnent un air de fête à mes chaussures usuelles."
+    },
+    {
+      "id": "fr-holdout-v4-398",
+      "field": "caption",
+      "text": "Je peux déplacer les boucles brillantes selon mon envie."
+    },
+    {
+      "id": "fr-holdout-v4-399",
+      "field": "altText",
+      "text": "Un clip décoratif est fixé sur le devant de chaque chaussure."
+    },
+    {
+      "id": "fr-holdout-v4-400",
+      "field": "altText",
+      "text": "De petites boucles à facettes ornent les empeignes des souliers."
+    },
+    {
+      "id": "fr-holdout-v4-401",
+      "field": "caption",
+      "text": "Je bâtis les épaules avant de choisir la ligne définitive."
+    },
+    {
+      "id": "fr-holdout-v4-402",
+      "field": "caption",
+      "text": "Premier essayage devant le miroir, encore quelques points à reprendre."
+    },
+    {
+      "id": "fr-holdout-v4-403",
+      "field": "altText",
+      "text": "Un bâti provisoire souligne les coutures d'épaule durant l'essayage."
+    },
+    {
+      "id": "fr-holdout-v4-404",
+      "field": "altText",
+      "text": "Le vêtement essayé porte des repères de couture temporaires."
+    },
+    {
+      "id": "fr-holdout-v4-405",
+      "field": "caption",
+      "text": "Je roule mes tenues pour voir toute la semaine d'un regard."
+    },
+    {
+      "id": "fr-holdout-v4-406",
+      "field": "caption",
+      "text": "Ma petite valise part avec des vêtements qui vont ensemble."
+    },
+    {
+      "id": "fr-holdout-v4-407",
+      "field": "altText",
+      "text": "Des vêtements roulés occupent des rangées dans une valise ouverte."
+    },
+    {
+      "id": "fr-holdout-v4-408",
+      "field": "altText",
+      "text": "Plusieurs rouleaux de linge sont disposés autour d'une paire de chaussures."
+    },
+    {
+      "id": "fr-holdout-v4-409",
+      "field": "caption",
+      "text": "Je regroupe mes cintres par usage pour simplifier les matins."
+    },
+    {
+      "id": "fr-holdout-v4-410",
+      "field": "caption",
+      "text": "Le portant retrouve de l'espace après notre tri du week-end."
+    },
+    {
+      "id": "fr-holdout-v4-411",
+      "field": "altText",
+      "text": "Un portant rassemble quelques tenues espacées sur des cintres identiques."
+    },
+    {
+      "id": "fr-holdout-v4-412",
+      "field": "altText",
+      "text": "Des séparateurs distinguent plusieurs ensembles suspendus dans la penderie."
+    },
+    {
+      "id": "fr-holdout-v4-413",
+      "field": "caption",
+      "text": "Cette veste trouve une nouvelle vie lors de notre échange."
+    },
+    {
+      "id": "fr-holdout-v4-414",
+      "field": "caption",
+      "text": "Je repars avec une belle pièce et une histoire de quartier."
+    },
+    {
+      "id": "fr-holdout-v4-415",
+      "field": "altText",
+      "text": "Deux personnes se présentent des vêtements devant une table d'échange."
+    },
+    {
+      "id": "fr-holdout-v4-416",
+      "field": "altText",
+      "text": "Des habits pliés et des cintres occupent un stand collectif."
+    },
+    {
+      "id": "fr-holdout-v4-417",
+      "field": "caption",
+      "text": "Je compare le patron à ma chemise préférée avant de couper."
+    },
+    {
+      "id": "fr-holdout-v4-418",
+      "field": "caption",
+      "text": "Les lignes sur le papier commencent à devenir une vraie tenue."
+    },
+    {
+      "id": "fr-holdout-v4-419",
+      "field": "altText",
+      "text": "Un patron de chemise est étalé à côté du vêtement modèle."
+    },
+    {
+      "id": "fr-holdout-v4-420",
+      "field": "altText",
+      "text": "Des pièces en papier découpé recouvrent une grande surface de tissu."
+    },
+    {
+      "id": "fr-holdout-v4-421",
+      "field": "caption",
+      "text": "J'hésite entre ces boutons pour terminer mon cardigan fait main."
+    },
+    {
+      "id": "fr-holdout-v4-422",
+      "field": "caption",
+      "text": "Le dernier détail attend encore votre regard de couturières."
+    },
+    {
+      "id": "fr-holdout-v4-423",
+      "field": "altText",
+      "text": "Plusieurs boutons sont alignés sur une bande de maille tricotée."
+    },
+    {
+      "id": "fr-holdout-v4-424",
+      "field": "altText",
+      "text": "Une main compare deux boutons près de la boutonnière ouverte."
+    },
+    {
+      "id": "fr-holdout-v4-425",
+      "field": "caption",
+      "text": "Un moment de soin et mes souliers sont prêts à repartir."
+    },
+    {
+      "id": "fr-holdout-v4-426",
+      "field": "caption",
+      "text": "Je profite du dimanche pour nourrir le cuir tranquillement."
+    },
+    {
+      "id": "fr-holdout-v4-427",
+      "field": "altText",
+      "text": "Une brosse et un chiffon entourent deux chaussures entretenues."
+    },
+    {
+      "id": "fr-holdout-v4-428",
+      "field": "altText",
+      "text": "Une main polit l'avant du soulier avec un chiffon doux."
+    },
+    {
+      "id": "fr-holdout-v4-429",
+      "field": "caption",
+      "text": "Mon pull sèche à plat pour garder sa jolie forme."
+    },
+    {
+      "id": "fr-holdout-v4-430",
+      "field": "caption",
+      "text": "Je prends soin de cette maille que je porte souvent."
+    },
+    {
+      "id": "fr-holdout-v4-431",
+      "field": "altText",
+      "text": "Un pull humide repose à plat sur une serviette absorbante."
+    },
+    {
+      "id": "fr-holdout-v4-432",
+      "field": "altText",
+      "text": "Les manches du tricot sont étendues sur une surface horizontale."
+    },
+    {
+      "id": "fr-holdout-v4-433",
+      "field": "caption",
+      "text": "La dernière maille vient de tomber de mes aiguilles."
+    },
+    {
+      "id": "fr-holdout-v4-434",
+      "field": "caption",
+      "text": "Je porte enfin l'écharpe commencée pendant les soirées d'hiver."
+    },
+    {
+      "id": "fr-holdout-v4-435",
+      "field": "altText",
+      "text": "Une écharpe encore reliée aux aiguilles repose sur les genoux."
+    },
+    {
+      "id": "fr-holdout-v4-436",
+      "field": "altText",
+      "text": "Une pelote rejoint le bord d'une longue bande tricotée."
+    },
+    {
+      "id": "fr-holdout-v4-437",
+      "field": "caption",
+      "text": "Je laisse la robe sur le mannequin pour regarder son équilibre."
+    },
+    {
+      "id": "fr-holdout-v4-438",
+      "field": "caption",
+      "text": "Ce drapé prend forme à force de déplacer quelques épingles."
+    },
+    {
+      "id": "fr-holdout-v4-439",
+      "field": "altText",
+      "text": "Une robe inachevée est épinglée sur un mannequin de couture."
+    },
+    {
+      "id": "fr-holdout-v4-440",
+      "field": "altText",
+      "text": "Des plis de tissu sont maintenus autour du buste factice."
+    },
+    {
+      "id": "fr-holdout-v4-441",
+      "field": "caption",
+      "text": "J'observe ma silhouette en contre-jour pour mieux voir les volumes."
+    },
+    {
+      "id": "fr-holdout-v4-442",
+      "field": "caption",
+      "text": "La lumière derrière moi fait ressortir la ligne de cette cape."
+    },
+    {
+      "id": "fr-holdout-v4-443",
+      "field": "altText",
+      "text": "Une silhouette sombre se détache devant une grande fenêtre lumineuse."
+    },
+    {
+      "id": "fr-holdout-v4-444",
+      "field": "altText",
+      "text": "Le contre-jour révèle le contour évasé du vêtement porté."
+    },
+    {
+      "id": "fr-holdout-v4-445",
+      "field": "caption",
+      "text": "Je pose mes accessoires autour du tissu pour choisir une harmonie."
+    },
+    {
+      "id": "fr-holdout-v4-446",
+      "field": "caption",
+      "text": "Petit atelier de couleurs avant de m'habiller ce matin."
+    },
+    {
+      "id": "fr-holdout-v4-447",
+      "field": "altText",
+      "text": "Des accessoires entourent un échantillon près d'un cercle chromatique."
+    },
+    {
+      "id": "fr-holdout-v4-448",
+      "field": "altText",
+      "text": "Une main rapproche un foulard de plusieurs teintes disposées en roue."
+    },
+    {
+      "id": "fr-holdout-v4-449",
+      "field": "caption",
+      "text": "Je prépare mes bijoux la veille pour profiter du matin."
+    },
+    {
+      "id": "fr-holdout-v4-450",
+      "field": "caption",
+      "text": "Ces petites pièces attendent leur tour dans une coupelle."
+    },
+    {
+      "id": "fr-holdout-v4-451",
+      "field": "altText",
+      "text": "Une paire de boucles et plusieurs bagues reposent dans une coupelle."
+    },
+    {
+      "id": "fr-holdout-v4-452",
+      "field": "altText",
+      "text": "Un plateau compartimenté contient les bijoux d'une tenue préparée."
+    },
+    {
+      "id": "fr-holdout-v4-453",
+      "field": "caption",
+      "text": "Je raccourcis les bretelles pour retrouver une encolure confortable."
+    },
+    {
+      "id": "fr-holdout-v4-454",
+      "field": "caption",
+      "text": "Quelques points à la main rendent cette robe plus facile à porter."
+    },
+    {
+      "id": "fr-holdout-v4-455",
+      "field": "altText",
+      "text": "Une épingle marque la nouvelle longueur sur une bretelle repliée."
+    },
+    {
+      "id": "fr-holdout-v4-456",
+      "field": "altText",
+      "text": "Une main coud la jonction entre bretelle et corsage."
+    },
+    {
+      "id": "fr-holdout-v4-457",
+      "field": "caption",
+      "text": "Mes bottines reviennent du cordonnier avec une semelle toute neuve."
+    },
+    {
+      "id": "fr-holdout-v4-458",
+      "field": "caption",
+      "text": "Leur histoire continue, et mes pieds retrouvent leur confort."
+    },
+    {
+      "id": "fr-holdout-v4-459",
+      "field": "altText",
+      "text": "Des bottines retournées montrent une semelle remplacée et ses coutures."
+    },
+    {
+      "id": "fr-holdout-v4-460",
+      "field": "altText",
+      "text": "Une nouvelle couche de semelle contraste avec le cuir déjà patiné."
+    },
+    {
+      "id": "fr-holdout-v4-461",
+      "field": "caption",
+      "text": "J'ajuste la bande intérieure pour que le chapeau reste bien posé."
+    },
+    {
+      "id": "fr-holdout-v4-462",
+      "field": "caption",
+      "text": "Le bon maintien change vraiment le plaisir de le porter."
+    },
+    {
+      "id": "fr-holdout-v4-463",
+      "field": "altText",
+      "text": "Une bande de réglage est visible à l'intérieur du chapeau."
+    },
+    {
+      "id": "fr-holdout-v4-464",
+      "field": "altText",
+      "text": "Les mains resserrent une petite attache sous le bandeau intérieur."
+    },
+    {
+      "id": "fr-holdout-v4-465",
+      "field": "caption",
+      "text": "La photo en marchant montre mieux comment tombe ce manteau."
+    },
+    {
+      "id": "fr-holdout-v4-466",
+      "field": "caption",
+      "text": "J'aime regarder mes vêtements vivre entre deux pas."
+    },
+    {
+      "id": "fr-holdout-v4-467",
+      "field": "altText",
+      "text": "Le modèle marche et le bas de son manteau s'ouvre."
+    },
+    {
+      "id": "fr-holdout-v4-468",
+      "field": "altText",
+      "text": "Une jambe avance tandis que les pans du vêtement accompagnent le mouvement."
+    },
+    {
+      "id": "fr-holdout-v4-469",
+      "field": "caption",
+      "text": "Le vent révèle toute l'ampleur de ma jupe pendant la balade."
+    },
+    {
+      "id": "fr-holdout-v4-470",
+      "field": "caption",
+      "text": "Je tiens mon chapeau et laisse le tissu prendre l'air."
+    },
+    {
+      "id": "fr-holdout-v4-471",
+      "field": "altText",
+      "text": "Une rafale soulève le bord d'une jupe largement évasée."
+    },
+    {
+      "id": "fr-holdout-v4-472",
+      "field": "altText",
+      "text": "Le tissu part sur le côté tandis que la personne retient son chapeau."
+    },
+    {
+      "id": "fr-holdout-v4-473",
+      "field": "caption",
+      "text": "Les reflets du trottoir accompagnent mes bottes de pluie."
+    },
+    {
+      "id": "fr-holdout-v4-474",
+      "field": "caption",
+      "text": "Une sortie humide reste jolie avec une tenue bien préparée."
+    },
+    {
+      "id": "fr-holdout-v4-475",
+      "field": "altText",
+      "text": "Des bottes se reflètent dans une flaque sous un imperméable."
+    },
+    {
+      "id": "fr-holdout-v4-476",
+      "field": "altText",
+      "text": "Le bas du manteau apparaît au-dessus de chaussures sur le sol mouillé."
+    },
+    {
+      "id": "fr-holdout-v4-477",
+      "field": "caption",
+      "text": "Je protège mon pantalon avec une pince avant d'enfourcher le vélo."
+    },
+    {
+      "id": "fr-holdout-v4-478",
+      "field": "caption",
+      "text": "Ce petit accessoire évite au tissu de rencontrer la chaîne."
+    },
+    {
+      "id": "fr-holdout-v4-479",
+      "field": "altText",
+      "text": "Une pince entoure la cheville droite d'un pantalon près d'un vélo."
+    },
+    {
+      "id": "fr-holdout-v4-480",
+      "field": "altText",
+      "text": "Le bas de jambe resserré reste éloigné du pédalier."
+    },
+    {
+      "id": "fr-holdout-v4-481",
+      "field": "caption",
+      "text": "Je choisis une coiffure basse pour poser mon casque confortablement."
+    },
+    {
+      "id": "fr-holdout-v4-482",
+      "field": "caption",
+      "text": "La tenue du trajet commence aussi par cette petite préparation."
+    },
+    {
+      "id": "fr-holdout-v4-483",
+      "field": "altText",
+      "text": "Le casque couvre la tête tandis que les cheveux restent attachés bas."
+    },
+    {
+      "id": "fr-holdout-v4-484",
+      "field": "altText",
+      "text": "Les cheveux attachés passent sous la partie arrière du casque."
+    },
+    {
+      "id": "fr-holdout-v4-485",
+      "field": "caption",
+      "text": "Je change les chaussures après le travail pour rejoindre la fête."
+    },
+    {
+      "id": "fr-holdout-v4-486",
+      "field": "caption",
+      "text": "Même base, quelques accessoires choisis dans mon petit sac."
+    },
+    {
+      "id": "fr-holdout-v4-487",
+      "field": "altText",
+      "text": "Deux paires de chaussures sont posées près d'une tenue préparée."
+    },
+    {
+      "id": "fr-holdout-v4-488",
+      "field": "altText",
+      "text": "Une pochette de soirée accompagne un ensemble encore porté avec des baskets."
+    },
+    {
+      "id": "fr-holdout-v4-489",
+      "field": "caption",
+      "text": "J'emporte cette veste chez la couturière pour ajuster les épaules."
+    },
+    {
+      "id": "fr-holdout-v4-490",
+      "field": "caption",
+      "text": "Une petite retouche permettra de porter longtemps cette trouvaille."
+    },
+    {
+      "id": "fr-holdout-v4-491",
+      "field": "altText",
+      "text": "Une veste pend près d'un miroir avec des repères aux épaules."
+    },
+    {
+      "id": "fr-holdout-v4-492",
+      "field": "altText",
+      "text": "Un ruban de mesure suit la largeur du dos du blazer."
+    },
+    {
+      "id": "fr-holdout-v4-493",
+      "field": "caption",
+      "text": "L'angle de trois quarts montre enfin le volume du col."
+    },
+    {
+      "id": "fr-holdout-v4-494",
+      "field": "caption",
+      "text": "Je me tourne légèrement pour partager le tombé de cette veste."
+    },
+    {
+      "id": "fr-holdout-v4-495",
+      "field": "altText",
+      "text": "La personne pose de trois quarts et dégage le col sculpté."
+    },
+    {
+      "id": "fr-holdout-v4-496",
+      "field": "altText",
+      "text": "Un léger pivot révèle simultanément le devant et le côté du vêtement."
+    },
+    {
+      "id": "fr-holdout-v4-497",
+      "field": "caption",
+      "text": "Je vérifie aussi ma tenue assise, là où je passe la journée."
+    },
+    {
+      "id": "fr-holdout-v4-498",
+      "field": "caption",
+      "text": "La bonne longueur reste confortable une fois installée sur la chaise."
+    },
+    {
+      "id": "fr-holdout-v4-499",
+      "field": "altText",
+      "text": "Une personne assise montre le tombé de sa jupe sur les genoux."
+    },
+    {
+      "id": "fr-holdout-v4-500",
+      "field": "altText",
+      "text": "Les plis du pantalon s'ouvrent au niveau des hanches sur la chaise."
+    },
+    {
+      "id": "fr-holdout-v4-501",
+      "field": "caption",
+      "text": "Je photographie mes accessoires du dessus avant de les enfiler."
+    },
+    {
+      "id": "fr-holdout-v4-502",
+      "field": "caption",
+      "text": "Cette vue me permet de comparer les proportions de chaque pièce."
+    },
+    {
+      "id": "fr-holdout-v4-503",
+      "field": "altText",
+      "text": "Une tenue complète est photographiée à plat depuis le dessus."
+    },
+    {
+      "id": "fr-holdout-v4-504",
+      "field": "altText",
+      "text": "Des chaussures encadrent le bas d'un pantalon disposé sur une surface."
+    },
+    {
+      "id": "fr-holdout-v4-505",
+      "field": "caption",
+      "text": "Je vérifie l'espace devant les orteils avant de garder ces chaussures."
+    },
+    {
+      "id": "fr-holdout-v4-506",
+      "field": "caption",
+      "text": "Le confort compte aussi pendant l'essayage, même pour un coup de cœur."
+    },
+    {
+      "id": "fr-holdout-v4-507",
+      "field": "altText",
+      "text": "Une main presse légèrement le bout d'une chaussure portée."
+    },
+    {
+      "id": "fr-holdout-v4-508",
+      "field": "altText",
+      "text": "La personne essaie les deux chaussures en restant debout."
+    },
+    {
+      "id": "fr-holdout-v4-509",
+      "field": "caption",
+      "text": "Je couds les derniers points de ce revers devant la fenêtre."
+    },
+    {
+      "id": "fr-holdout-v4-510",
+      "field": "caption",
+      "text": "Finir à la main me permet de garder le tissu souple."
+    },
+    {
+      "id": "fr-holdout-v4-511",
+      "field": "altText",
+      "text": "Une aiguille traverse le bord intérieur d'un revers tenu entre les doigts."
+    },
+    {
+      "id": "fr-holdout-v4-512",
+      "field": "altText",
+      "text": "Le fil dépasse d'un ourlet cousu par petits points discrets."
+    },
+    {
+      "id": "fr-holdout-v4-513",
+      "field": "caption",
+      "text": "Je reporte cette association parce que je m'y sens vraiment bien."
+    },
+    {
+      "id": "fr-holdout-v4-514",
+      "field": "caption",
+      "text": "Ma tenue familière revient dans le journal du mois."
+    },
+    {
+      "id": "fr-holdout-v4-515",
+      "field": "altText",
+      "text": "Deux photographies côte à côte montrent le même ensemble porté."
+    },
+    {
+      "id": "fr-holdout-v4-516",
+      "field": "altText",
+      "text": "Un carnet ouvert présente plusieurs images d'une tenue réutilisée."
+    },
+    {
+      "id": "fr-holdout-v4-517",
+      "field": "caption",
+      "text": "J'emprunte cette veste pour une occasion, puis elle retrouvera sa propriétaire."
+    },
+    {
+      "id": "fr-holdout-v4-518",
+      "field": "caption",
+      "text": "Partager nos vêtements donne de nouvelles idées à notre petit groupe."
+    },
+    {
+      "id": "fr-holdout-v4-519",
+      "field": "altText",
+      "text": "Une veste passe des mains d'une personne à celles d'une autre."
+    },
+    {
+      "id": "fr-holdout-v4-520",
+      "field": "altText",
+      "text": "Deux personnes comparent la longueur d'une veste devant un miroir."
+    },
+    {
+      "id": "fr-holdout-v4-521",
+      "field": "caption",
+      "text": "Mes pièces délicates rejoignent leur filet avant la lessive."
+    },
+    {
+      "id": "fr-holdout-v4-522",
+      "field": "caption",
+      "text": "Un petit soin simple garde mes détails préférés en bon état."
+    },
+    {
+      "id": "fr-holdout-v4-523",
+      "field": "altText",
+      "text": "Un vêtement fin est placé dans un filet de lavage zippé."
+    },
+    {
+      "id": "fr-holdout-v4-524",
+      "field": "altText",
+      "text": "Le sac de protection contient une blouse à ornements délicats."
+    },
+    {
+      "id": "fr-holdout-v4-525",
+      "field": "caption",
+      "text": "Je laisse mes chaussures sécher avec leurs embauchoirs après la pluie."
+    },
+    {
+      "id": "fr-holdout-v4-526",
+      "field": "caption",
+      "text": "Elles reprendront tranquillement leur forme avant la prochaine sortie."
+    },
+    {
+      "id": "fr-holdout-v4-527",
+      "field": "altText",
+      "text": "Des embauchoirs occupent une paire de chaussures posée à sécher."
+    },
+    {
+      "id": "fr-holdout-v4-528",
+      "field": "altText",
+      "text": "Les chaussures ouvertes reposent loin du radiateur sur un tapis."
+    },
+    {
+      "id": "fr-holdout-v4-529",
+      "field": "caption",
+      "text": "Ma veste revient de l'atelier avec une doublure réparée."
+    },
+    {
+      "id": "fr-holdout-v4-530",
+      "field": "caption",
+      "text": "Quel plaisir de retrouver cette pièce prête pour d'autres saisons."
+    },
+    {
+      "id": "fr-holdout-v4-531",
+      "field": "altText",
+      "text": "La veste ouverte montre une couture réparée dans sa doublure."
+    },
+    {
+      "id": "fr-holdout-v4-532",
+      "field": "altText",
+      "text": "Un pan intérieur est retourné pour présenter la réparation terminée."
+    },
+    {
+      "id": "fr-holdout-v4-533",
+      "field": "caption",
+      "text": "Je zoome sur les finitions qui m'ont fait choisir cette pièce."
+    },
+    {
+      "id": "fr-holdout-v4-534",
+      "field": "caption",
+      "text": "Parfois une petite couture raconte mieux le vêtement qu'une pose entière."
+    },
+    {
+      "id": "fr-holdout-v4-535",
+      "field": "altText",
+      "text": "Un gros plan montre les surpiqûres régulières autour d'une poche."
+    },
+    {
+      "id": "fr-holdout-v4-536",
+      "field": "altText",
+      "text": "Le cadrage rapproché révèle le bord cousu d'une boutonnière."
+    },
+    {
+      "id": "fr-holdout-v4-537",
+      "field": "caption",
+      "text": "Je teste la longueur en montant quelques marches avant de partir."
+    },
+    {
+      "id": "fr-holdout-v4-538",
+      "field": "caption",
+      "text": "Pouvoir bouger facilement reste mon meilleur critère de tenue."
+    },
+    {
+      "id": "fr-holdout-v4-539",
+      "field": "altText",
+      "text": "Une personne monte une marche en relevant légèrement sa jupe."
+    },
+    {
+      "id": "fr-holdout-v4-540",
+      "field": "altText",
+      "text": "Le pied posé sur la marche montre l'aisance du pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-541",
+      "field": "caption",
+      "text": "Je regarde ce tissu près de la fenêtre pour comprendre ses reflets."
+    },
+    {
+      "id": "fr-holdout-v4-542",
+      "field": "caption",
+      "text": "La lumière naturelle révèle des nuances que je n'avais pas vues."
+    },
+    {
+      "id": "fr-holdout-v4-543",
+      "field": "altText",
+      "text": "Un morceau de tissu est tenu devant une fenêtre éclairée."
+    },
+    {
+      "id": "fr-holdout-v4-544",
+      "field": "altText",
+      "text": "Une main incline le textile pour montrer son reflet changeant."
+    },
+    {
+      "id": "fr-holdout-v4-545",
+      "field": "caption",
+      "text": "Je compare les volumes du sac et des chaussures avant de choisir."
+    },
+    {
+      "id": "fr-holdout-v4-546",
+      "field": "caption",
+      "text": "Leur forme arrondie crée un petit lien dans ma tenue."
+    },
+    {
+      "id": "fr-holdout-v4-547",
+      "field": "altText",
+      "text": "Un sac arrondi est posé près de souliers aux bouts ronds."
+    },
+    {
+      "id": "fr-holdout-v4-548",
+      "field": "altText",
+      "text": "Deux accessoires de tailles différentes présentent une courbe semblable."
+    },
+    {
+      "id": "fr-holdout-v4-549",
+      "field": "caption",
+      "text": "L'étiquette cousue raconte l'âge de cette jolie trouvaille."
+    },
+    {
+      "id": "fr-holdout-v4-550",
+      "field": "caption",
+      "text": "Je découvre le nom de l'atelier dans ma veste chinée."
+    },
+    {
+      "id": "fr-holdout-v4-551",
+      "field": "altText",
+      "text": "Le col retourné révèle une ancienne étiquette cousue à sa base."
+    },
+    {
+      "id": "fr-holdout-v4-552",
+      "field": "altText",
+      "text": "Le vêtement retourné laisse voir une marque d'atelier tissée."
+    },
+    {
+      "id": "fr-holdout-v4-553",
+      "field": "caption",
+      "text": "Cette vitrine me donne une idée d'association pour demain."
+    },
+    {
+      "id": "fr-holdout-v4-554",
+      "field": "caption",
+      "text": "Je retiens surtout les proportions entre la veste et la jupe."
+    },
+    {
+      "id": "fr-holdout-v4-555",
+      "field": "altText",
+      "text": "Un mannequin de vitrine porte une veste courte sur une jupe longue."
+    },
+    {
+      "id": "fr-holdout-v4-556",
+      "field": "altText",
+      "text": "La silhouette exposée réunit des couches de longueurs très différentes."
+    },
+    {
+      "id": "fr-holdout-v4-557",
+      "field": "caption",
+      "text": "Je m'entraîne aux petits points avant de réparer mon pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-558",
+      "field": "caption",
+      "text": "La répétition du geste devient presque une pause dans ma journée."
+    },
+    {
+      "id": "fr-holdout-v4-559",
+      "field": "altText",
+      "text": "Une aiguille suit une grille tracée sur un carré d'essai."
+    },
+    {
+      "id": "fr-holdout-v4-560",
+      "field": "altText",
+      "text": "De petites lignes de points forment un motif de réparation géométrique."
+    },
+    {
+      "id": "fr-holdout-v4-561",
+      "field": "caption",
+      "text": "Je garde quelques couches chaudes accessibles pendant ce changement de saison."
+    },
+    {
+      "id": "fr-holdout-v4-562",
+      "field": "caption",
+      "text": "Mon portant mélange encore les vêtements légers et les premiers tricots."
+    },
+    {
+      "id": "fr-holdout-v4-563",
+      "field": "altText",
+      "text": "Un portant réunit une robe légère, des gilets et un manteau."
+    },
+    {
+      "id": "fr-holdout-v4-564",
+      "field": "altText",
+      "text": "Des pièces de plusieurs épaisseurs sont suspendues ensemble pour la transition."
+    },
+    {
+      "id": "fr-holdout-v4-565",
+      "field": "caption",
+      "text": "Les nouveaux boutons rendent ma vieille veste plus facile à fermer."
+    },
+    {
+      "id": "fr-holdout-v4-566",
+      "field": "caption",
+      "text": "J'ai terminé ce remplacement hier soir avec du fil bien solide."
+    },
+    {
+      "id": "fr-holdout-v4-567",
+      "field": "altText",
+      "text": "Une main montre les boutons neufs cousus sur une veste usée."
+    },
+    {
+      "id": "fr-holdout-v4-568",
+      "field": "altText",
+      "text": "Les anciens boutons reposent à côté du vêtement remis en état."
+    },
+    {
+      "id": "fr-holdout-v4-569",
+      "field": "caption",
+      "text": "Je garde un petit cabas plié pour les trouvailles du marché."
+    },
+    {
+      "id": "fr-holdout-v4-570",
+      "field": "caption",
+      "text": "Cette pochette cache un sac bien plus grand qu'elle."
+    },
+    {
+      "id": "fr-holdout-v4-571",
+      "field": "altText",
+      "text": "Un cabas léger est partiellement sorti de sa poche de rangement."
+    },
+    {
+      "id": "fr-holdout-v4-572",
+      "field": "altText",
+      "text": "Le sac déplié se trouve près d'une petite pochette assortie."
+    },
+    {
+      "id": "fr-holdout-v4-573",
+      "field": "caption",
+      "text": "Je réunis les paires de boucles avant de préparer mes tenues."
+    },
+    {
+      "id": "fr-holdout-v4-574",
+      "field": "caption",
+      "text": "Les petits compartiments me permettent de retrouver les fermoirs facilement."
+    },
+    {
+      "id": "fr-holdout-v4-575",
+      "field": "altText",
+      "text": "Des boucles d'oreilles sont rangées par paires dans des cases."
+    },
+    {
+      "id": "fr-holdout-v4-576",
+      "field": "altText",
+      "text": "Une main dépose deux fermoirs près de leurs pendants assortis."
+    },
+    {
+      "id": "fr-holdout-v4-577",
+      "field": "caption",
+      "text": "Je termine par le col pour garder la chemise bien nette."
+    },
+    {
+      "id": "fr-holdout-v4-578",
+      "field": "caption",
+      "text": "Un passage de fer et ma tenue prend sa forme."
+    },
+    {
+      "id": "fr-holdout-v4-579",
+      "field": "altText",
+      "text": "Un fer repose près du col étalé sur la planche."
+    },
+    {
+      "id": "fr-holdout-v4-580",
+      "field": "altText",
+      "text": "La manche de chemise est disposée à plat avant repassage."
+    },
+    {
+      "id": "fr-holdout-v4-581",
+      "field": "caption",
+      "text": "L'ombre de mon chapeau dessine un autre motif sur la veste."
+    },
+    {
+      "id": "fr-holdout-v4-582",
+      "field": "caption",
+      "text": "Le soleil transforme ma veste avec ce dessin éphémère."
+    },
+    {
+      "id": "fr-holdout-v4-583",
+      "field": "altText",
+      "text": "Le bord du chapeau projette une ombre courbe sur l'épaule."
+    },
+    {
+      "id": "fr-holdout-v4-584",
+      "field": "altText",
+      "text": "Une silhouette de feuillage se dessine sur le devant du vêtement."
+    },
+    {
+      "id": "fr-holdout-v4-585",
+      "field": "caption",
+      "text": "Je transforme mon petit dessin en broderie sur une poche."
+    },
+    {
+      "id": "fr-holdout-v4-586",
+      "field": "caption",
+      "text": "Un motif inventé suffit à rendre cette pièce familière."
+    },
+    {
+      "id": "fr-holdout-v4-587",
+      "field": "altText",
+      "text": "Une broderie abstraite décore l'angle supérieur d'une poche plaquée."
+    },
+    {
+      "id": "fr-holdout-v4-588",
+      "field": "altText",
+      "text": "Le fil suit un dessin sinueux sans texte sur le vêtement."
+    },
+    {
+      "id": "fr-holdout-v4-589",
+      "field": "caption",
+      "text": "Mon nécessaire de couture reste dans le sac pour les petits imprévus."
+    },
+    {
+      "id": "fr-holdout-v4-590",
+      "field": "caption",
+      "text": "Une aiguille, du fil et quelques épingles me rassurent en voyage."
+    },
+    {
+      "id": "fr-holdout-v4-591",
+      "field": "altText",
+      "text": "Une trousse ouverte contient bobines, aiguilles et petits ciseaux."
+    },
+    {
+      "id": "fr-holdout-v4-592",
+      "field": "altText",
+      "text": "Le nécessaire de réparation est disposé près d'un bouton décousu."
+    },
+    {
+      "id": "fr-holdout-v4-593",
+      "field": "caption",
+      "text": "Je redonne de la tenue aux plis avec un peu de vapeur."
+    },
+    {
+      "id": "fr-holdout-v4-594",
+      "field": "caption",
+      "text": "Cette préparation fait ressortir la construction de ma jupe préférée."
+    },
+    {
+      "id": "fr-holdout-v4-595",
+      "field": "altText",
+      "text": "Un défroisseur passe devant les plis suspendus d'une jupe."
+    },
+    {
+      "id": "fr-holdout-v4-596",
+      "field": "altText",
+      "text": "La vapeur se dirige vers une rangée de plis verticaux."
+    },
+    {
+      "id": "fr-holdout-v4-597",
+      "field": "caption",
+      "text": "Une petite reprise prolonge la vie de mes chaussettes chaudes."
+    },
+    {
+      "id": "fr-holdout-v4-598",
+      "field": "caption",
+      "text": "Je prends un fil solide pour réparer le talon usé."
+    },
+    {
+      "id": "fr-holdout-v4-599",
+      "field": "altText",
+      "text": "Une chaussette est tendue sur un œuf à repriser."
+    },
+    {
+      "id": "fr-holdout-v4-600",
+      "field": "altText",
+      "text": "Des points croisés recouvrent une zone usée près du talon."
+    },
+    {
+      "id": "fr-holdout-v4-601",
+      "field": "caption",
+      "text": "Mon parapluie transparent laisse voir le col malgré la pluie."
+    },
+    {
+      "id": "fr-holdout-v4-602",
+      "field": "caption",
+      "text": "Je garde un peu de lumière au-dessus de ma tenue."
+    },
+    {
+      "id": "fr-holdout-v4-603",
+      "field": "altText",
+      "text": "La personne porte un parapluie transparent au-dessus de son manteau."
+    },
+    {
+      "id": "fr-holdout-v4-604",
+      "field": "altText",
+      "text": "Le col demeure visible à travers la toile claire tendue."
+    },
+    {
+      "id": "fr-holdout-v4-605",
+      "field": "caption",
+      "text": "Ce point change d'aspect quand je retourne mon écharpe."
+    },
+    {
+      "id": "fr-holdout-v4-606",
+      "field": "caption",
+      "text": "Je vous montre les deux faces de ma dernière maille."
+    },
+    {
+      "id": "fr-holdout-v4-607",
+      "field": "altText",
+      "text": "Deux faces d'une écharpe retournée présentent des reliefs différents."
+    },
+    {
+      "id": "fr-holdout-v4-608",
+      "field": "altText",
+      "text": "Une extrémité repliée dévoile l'envers du point tricoté."
+    },
+    {
+      "id": "fr-holdout-v4-609",
+      "field": "caption",
+      "text": "Le long ruban dans le dos accompagne ma robe de cérémonie."
+    },
+    {
+      "id": "fr-holdout-v4-610",
+      "field": "caption",
+      "text": "Je laisse les liens libres pour profiter de leur mouvement."
+    },
+    {
+      "id": "fr-holdout-v4-611",
+      "field": "altText",
+      "text": "Deux rubans descendent depuis la nuque jusqu'au bas du dos."
+    },
+    {
+      "id": "fr-holdout-v4-612",
+      "field": "altText",
+      "text": "Les liens arrière prolongent le col sans fermer la taille."
+    },
+    {
+      "id": "fr-holdout-v4-613",
+      "field": "caption",
+      "text": "J'ai assemblé les chutes de plusieurs projets pour cette veste."
+    },
+    {
+      "id": "fr-holdout-v4-614",
+      "field": "caption",
+      "text": "Chaque panneau me rappelle une autre pièce déjà cousue."
+    },
+    {
+      "id": "fr-holdout-v4-615",
+      "field": "altText",
+      "text": "Une veste est construite avec des panneaux irréguliers assemblés."
+    },
+    {
+      "id": "fr-holdout-v4-616",
+      "field": "altText",
+      "text": "Des coutures visibles relient plusieurs fragments textiles sur le devant."
+    },
+    {
+      "id": "fr-holdout-v4-617",
+      "field": "caption",
+      "text": "Je montre volontairement les marges de couture sur ce haut."
+    },
+    {
+      "id": "fr-holdout-v4-618",
+      "field": "caption",
+      "text": "Les assemblages deviennent le décor principal de ma tenue."
+    },
+    {
+      "id": "fr-holdout-v4-619",
+      "field": "altText",
+      "text": "Les marges apparentes dépassent le long des coutures du vêtement."
+    },
+    {
+      "id": "fr-holdout-v4-620",
+      "field": "altText",
+      "text": "Le haut présente ses assemblages sur la face extérieure."
+    },
+    {
+      "id": "fr-holdout-v4-621",
+      "field": "caption",
+      "text": "Ces chaussures séparent le gros orteil et changent ma silhouette."
+    },
+    {
+      "id": "fr-holdout-v4-622",
+      "field": "caption",
+      "text": "J'ai choisi des chaussettes adaptées pour cet essayage tranquille."
+    },
+    {
+      "id": "fr-holdout-v4-623",
+      "field": "altText",
+      "text": "Le bout des chaussures présente une séparation pour le gros orteil."
+    },
+    {
+      "id": "fr-holdout-v4-624",
+      "field": "altText",
+      "text": "Une fente divise l'avant de chaque soulier en deux parties."
+    },
+    {
+      "id": "fr-holdout-v4-625",
+      "field": "caption",
+      "text": "Je porte une longue boucle et une petite puce aujourd'hui."
+    },
+    {
+      "id": "fr-holdout-v4-626",
+      "field": "caption",
+      "text": "Ce déséquilibre choisi accompagne bien ma coiffure sur le côté."
+    },
+    {
+      "id": "fr-holdout-v4-627",
+      "field": "altText",
+      "text": "Une oreille porte un pendant long et l'autre une puce."
+    },
+    {
+      "id": "fr-holdout-v4-628",
+      "field": "altText",
+      "text": "Deux boucles de tailles différentes encadrent le visage photographié."
+    },
+    {
+      "id": "fr-holdout-v4-629",
+      "field": "caption",
+      "text": "La boucle passe dans mon dos pour laisser le devant tranquille."
+    },
+    {
+      "id": "fr-holdout-v4-630",
+      "field": "caption",
+      "text": "Je retourne simplement la ceinture pour changer son dessin sur la robe."
+    },
+    {
+      "id": "fr-holdout-v4-631",
+      "field": "altText",
+      "text": "La fermeture de la ceinture est placée derrière la taille."
+    },
+    {
+      "id": "fr-holdout-v4-632",
+      "field": "altText",
+      "text": "Le devant de la robe montre une bande sans boucle apparente."
+    },
+    {
+      "id": "fr-holdout-v4-633",
+      "field": "caption",
+      "text": "Je garde le bord brut sur cette veste cousue récemment."
+    },
+    {
+      "id": "fr-holdout-v4-634",
+      "field": "caption",
+      "text": "Le tissu laisse une tranche nette sans ourlet ajouté."
+    },
+    {
+      "id": "fr-holdout-v4-635",
+      "field": "altText",
+      "text": "Les bords de la veste se terminent par une coupe franche."
+    },
+    {
+      "id": "fr-holdout-v4-636",
+      "field": "altText",
+      "text": "Aucun repli ne recouvre la tranche visible autour des revers."
+    },
+    {
+      "id": "fr-holdout-v4-637",
+      "field": "caption",
+      "text": "Les brides sous les pieds gardent le pantalon bien tendu."
+    },
+    {
+      "id": "fr-holdout-v4-638",
+      "field": "caption",
+      "text": "Je retrouve cette ligne fuselée avec des chaussures ouvertes derrière."
+    },
+    {
+      "id": "fr-holdout-v4-639",
+      "field": "altText",
+      "text": "Des brides passent sous les pieds et prolongent le pantalon ajusté."
+    },
+    {
+      "id": "fr-holdout-v4-640",
+      "field": "altText",
+      "text": "Le bas de jambe reste tendu grâce à une bande sous la voûte."
+    },
+    {
+      "id": "fr-holdout-v4-641",
+      "field": "caption",
+      "text": "Le grand col couvre presque mes épaules comme une petite cape."
+    },
+    {
+      "id": "fr-holdout-v4-642",
+      "field": "caption",
+      "text": "Je choisis une coiffure relevée pour montrer ce cercle de tissu."
+    },
+    {
+      "id": "fr-holdout-v4-643",
+      "field": "altText",
+      "text": "Un col circulaire s'étend largement autour des épaules du manteau."
+    },
+    {
+      "id": "fr-holdout-v4-644",
+      "field": "altText",
+      "text": "Le vêtement porte une seconde couche courte au niveau du cou."
+    },
+    {
+      "id": "fr-holdout-v4-645",
+      "field": "caption",
+      "text": "Ces manches s'arrêtent au coude, juste où mon bracelet apparaît."
+    },
+    {
+      "id": "fr-holdout-v4-646",
+      "field": "caption",
+      "text": "Une longueur intermédiaire rend cette veste agréable au printemps."
+    },
+    {
+      "id": "fr-holdout-v4-647",
+      "field": "altText",
+      "text": "Les manches du blazer s'arrêtent à la pliure du coude."
+    },
+    {
+      "id": "fr-holdout-v4-648",
+      "field": "altText",
+      "text": "De grands poignets ouverts dégagent les avant-bras du modèle."
+    },
+    {
+      "id": "fr-holdout-v4-649",
+      "field": "caption",
+      "text": "Le sac se ferme avec son propre tissu noué au sommet."
+    },
+    {
+      "id": "fr-holdout-v4-650",
+      "field": "caption",
+      "text": "J'aime cette anse qui disparaît dans un gros nœud souple."
+    },
+    {
+      "id": "fr-holdout-v4-651",
+      "field": "altText",
+      "text": "Les deux anses du sac se nouent ensemble au-dessus de l'ouverture."
+    },
+    {
+      "id": "fr-holdout-v4-652",
+      "field": "altText",
+      "text": "Un nœud volumineux ferme la pochette tenue à la main."
+    },
+    {
+      "id": "fr-holdout-v4-653",
+      "field": "caption",
+      "text": "Les plis rayonnent depuis la taille quand je déploie cette jupe."
+    },
+    {
+      "id": "fr-holdout-v4-654",
+      "field": "caption",
+      "text": "Sa coupe presque ronde m'invite à marcher plus lentement."
+    },
+    {
+      "id": "fr-holdout-v4-655",
+      "field": "altText",
+      "text": "Les plis s'élargissent progressivement en descendant vers l'ourlet circulaire."
+    },
+    {
+      "id": "fr-holdout-v4-656",
+      "field": "altText",
+      "text": "Le tissu plissé forme un éventail autour des jambes écartées."
+    },
+    {
+      "id": "fr-holdout-v4-657",
+      "field": "caption",
+      "text": "Les longues découpes dessinent cette robe sans ceinture à la taille."
+    },
+    {
+      "id": "fr-holdout-v4-658",
+      "field": "caption",
+      "text": "Je découvre combien les coutures peuvent guider toute une silhouette."
+    },
+    {
+      "id": "fr-holdout-v4-659",
+      "field": "altText",
+      "text": "Des découpes verticales suivent le buste puis s'évasent vers l'ourlet."
+    },
+    {
+      "id": "fr-holdout-v4-660",
+      "field": "altText",
+      "text": "La robe est ajustée par des coutures continues sous la poitrine."
+    },
+    {
+      "id": "fr-holdout-v4-661",
+      "field": "caption",
+      "text": "Quelques petits clous soulignent les pointes de mon col."
+    },
+    {
+      "id": "fr-holdout-v4-662",
+      "field": "caption",
+      "text": "Je porte ce détail métallique avec une maille très douce."
+    },
+    {
+      "id": "fr-holdout-v4-663",
+      "field": "altText",
+      "text": "De petits clous décoratifs bordent les deux pointes du col."
+    },
+    {
+      "id": "fr-holdout-v4-664",
+      "field": "altText",
+      "text": "Le col de chemise présente une rangée de rivets réguliers."
+    },
+    {
+      "id": "fr-holdout-v4-665",
+      "field": "caption",
+      "text": "Je découvre les revers cousus de cette chemise d'atelier."
+    },
+    {
+      "id": "fr-holdout-v4-666",
+      "field": "caption",
+      "text": "Les manches gardent leur pli même après une journée active."
+    },
+    {
+      "id": "fr-holdout-v4-667",
+      "field": "altText",
+      "text": "Un revers fixe termine chaque manche courte de la chemise."
+    },
+    {
+      "id": "fr-holdout-v4-668",
+      "field": "altText",
+      "text": "Des points discrets maintiennent les bords retournés au-dessus des coudes."
+    },
+    {
+      "id": "fr-holdout-v4-669",
+      "field": "caption",
+      "text": "Une jupe transparente prolonge ma petite jupe opaque."
+    },
+    {
+      "id": "fr-holdout-v4-670",
+      "field": "caption",
+      "text": "Les deux longueurs composent un jeu de couches léger."
+    },
+    {
+      "id": "fr-holdout-v4-671",
+      "field": "altText",
+      "text": "Une jupe opaque courte apparaît sous un voile plus long."
+    },
+    {
+      "id": "fr-holdout-v4-672",
+      "field": "altText",
+      "text": "Le jupon intérieur s'arrête avant la couche extérieure transparente."
+    },
+    {
+      "id": "fr-holdout-v4-673",
+      "field": "caption",
+      "text": "Les petites pattes gardent les épaules de la veste bien dessinées."
+    },
+    {
+      "id": "fr-holdout-v4-674",
+      "field": "caption",
+      "text": "Je laisse ces détails d'uniforme dialoguer avec mon pantalon souple."
+    },
+    {
+      "id": "fr-holdout-v4-675",
+      "field": "altText",
+      "text": "Des pattes boutonnées reposent sur le dessus des épaules."
+    },
+    {
+      "id": "fr-holdout-v4-676",
+      "field": "altText",
+      "text": "Deux languettes étroites relient le col aux coutures d'emmanchure."
+    },
+    {
+      "id": "fr-holdout-v4-677",
+      "field": "caption",
+      "text": "Je glisse mes chaussures pliables dans le sac pour le retour."
+    },
+    {
+      "id": "fr-holdout-v4-678",
+      "field": "caption",
+      "text": "Une deuxième paire légère m'accompagne quand la journée s'allonge."
+    },
+    {
+      "id": "fr-holdout-v4-679",
+      "field": "altText",
+      "text": "Deux ballerines pliées tiennent dans une petite housse ouverte."
+    },
+    {
+      "id": "fr-holdout-v4-680",
+      "field": "altText",
+      "text": "Une chaussure souple est repliée en deux près d'un sac."
+    },
+    {
+      "id": "fr-holdout-v4-681",
+      "field": "caption",
+      "text": "Je passe un ruban entre les jours du col brodé."
+    },
+    {
+      "id": "fr-holdout-v4-682",
+      "field": "caption",
+      "text": "Ce détail permet de changer l'allure sans toucher à la blouse."
+    },
+    {
+      "id": "fr-holdout-v4-683",
+      "field": "altText",
+      "text": "Un ruban traverse une rangée d'œillets autour du col."
+    },
+    {
+      "id": "fr-holdout-v4-684",
+      "field": "altText",
+      "text": "De petites ouvertures brodées laissent passer un lien décoratif."
+    },
+    {
+      "id": "fr-holdout-v4-685",
+      "field": "caption",
+      "text": "La petite visière de ma capuche garde mon visage dégagé."
+    },
+    {
+      "id": "fr-holdout-v4-686",
+      "field": "caption",
+      "text": "Je peux regarder devant malgré cette pluie de travers."
+    },
+    {
+      "id": "fr-holdout-v4-687",
+      "field": "altText",
+      "text": "Une visière rigide prolonge le bord avant de la capuche."
+    },
+    {
+      "id": "fr-holdout-v4-688",
+      "field": "altText",
+      "text": "Le bord avancé protège le front sous la capuche fermée."
+    },
+    {
+      "id": "fr-holdout-v4-689",
+      "field": "caption",
+      "text": "Les soufflets de mon sac s'ouvrent selon ce que j'emporte."
+    },
+    {
+      "id": "fr-holdout-v4-690",
+      "field": "caption",
+      "text": "J'aime retrouver chaque chose dans son petit compartiment."
+    },
+    {
+      "id": "fr-holdout-v4-691",
+      "field": "altText",
+      "text": "Le sac ouvert révèle plusieurs soufflets séparant les compartiments."
+    },
+    {
+      "id": "fr-holdout-v4-692",
+      "field": "altText",
+      "text": "Les côtés plissés se déploient autour de plusieurs poches intérieures."
+    },
+    {
+      "id": "fr-holdout-v4-693",
+      "field": "caption",
+      "text": "Deux boucles ferment mes souliers à la place des lacets."
+    },
+    {
+      "id": "fr-holdout-v4-694",
+      "field": "caption",
+      "text": "Le petit reflet du métal accompagne bien ce pantalon raccourci."
+    },
+    {
+      "id": "fr-holdout-v4-695",
+      "field": "altText",
+      "text": "Chaque chaussure possède deux brides fermées par des boucles."
+    },
+    {
+      "id": "fr-holdout-v4-696",
+      "field": "altText",
+      "text": "Des sangles parallèles traversent le dessus des souliers sans lacets."
+    },
+    {
+      "id": "fr-holdout-v4-697",
+      "field": "caption",
+      "text": "Le boutonnage passe derrière sur cette blouse toute simple devant."
+    },
+    {
+      "id": "fr-holdout-v4-698",
+      "field": "caption",
+      "text": "Je me retourne pour vous montrer les petits boutons de la nuque."
+    },
+    {
+      "id": "fr-holdout-v4-699",
+      "field": "altText",
+      "text": "Une rangée de boutons descend depuis la nuque du chemisier."
+    },
+    {
+      "id": "fr-holdout-v4-700",
+      "field": "altText",
+      "text": "Le dos boutonné contraste avec le devant sans ouverture apparente."
+    },
+    {
+      "id": "fr-holdout-v4-701",
+      "field": "caption",
+      "text": "Les grandes poches se gonflent quand j'y range mes petits objets."
+    },
+    {
+      "id": "fr-holdout-v4-702",
+      "field": "caption",
+      "text": "Ma veste de promenade garde une place pour chaque chose."
+    },
+    {
+      "id": "fr-holdout-v4-703",
+      "field": "altText",
+      "text": "La veste utilitaire présente quatre poches saillantes à soufflet."
+    },
+    {
+      "id": "fr-holdout-v4-704",
+      "field": "altText",
+      "text": "Les plis latéraux donnent de la profondeur aux poches fermées."
+    },
+    {
+      "id": "fr-holdout-v4-705",
+      "field": "caption",
+      "text": "J'ai renforcé les deux genoux pour continuer nos promenades sans souci."
+    },
+    {
+      "id": "fr-holdout-v4-706",
+      "field": "caption",
+      "text": "Les coutures de réparation dessinent maintenant un paysage sur mon jean."
+    },
+    {
+      "id": "fr-holdout-v4-707",
+      "field": "altText",
+      "text": "Des lignes de reprise croisées renforcent les genoux d'un jean."
+    },
+    {
+      "id": "fr-holdout-v4-708",
+      "field": "altText",
+      "text": "Le tissu usé est recouvert d'un réseau de points serrés."
+    },
+    {
+      "id": "fr-holdout-v4-709",
+      "field": "caption",
+      "text": "Le bijou remplace la tirette cassée de ma veste."
+    },
+    {
+      "id": "fr-holdout-v4-710",
+      "field": "caption",
+      "text": "Une boucle retrouvée dans ma boîte sert maintenant chaque matin."
+    },
+    {
+      "id": "fr-holdout-v4-711",
+      "field": "altText",
+      "text": "Une petite breloque est attachée au curseur de la fermeture éclair."
+    },
+    {
+      "id": "fr-holdout-v4-712",
+      "field": "altText",
+      "text": "Le zip se tire grâce à un pendentif accroché à son extrémité."
+    },
+    {
+      "id": "fr-holdout-v4-713",
+      "field": "caption",
+      "text": "Je croise les pans avant de rentrer la chemise dans la jupe."
+    },
+    {
+      "id": "fr-holdout-v4-714",
+      "field": "caption",
+      "text": "Cette façon de fermer le haut donne une jolie diagonale."
+    },
+    {
+      "id": "fr-holdout-v4-715",
+      "field": "altText",
+      "text": "Les pans déboutonnés de la chemise se croisent à la taille."
+    },
+    {
+      "id": "fr-holdout-v4-716",
+      "field": "altText",
+      "text": "Le tissu rentré forme une ligne oblique au-dessus de la jupe."
+    },
+    {
+      "id": "fr-holdout-v4-717",
+      "field": "caption",
+      "text": "Une petite bride maintient ma manche pendant que je bouge."
+    },
+    {
+      "id": "fr-holdout-v4-718",
+      "field": "caption",
+      "text": "J'aime ce lien discret entre la manche et la main."
+    },
+    {
+      "id": "fr-holdout-v4-719",
+      "field": "altText",
+      "text": "Une fine bride relie le bord de manche au majeur."
+    },
+    {
+      "id": "fr-holdout-v4-720",
+      "field": "altText",
+      "text": "Un anneau de tissu maintient la pointe de manche sur la main."
+    },
+    {
+      "id": "fr-holdout-v4-721",
+      "field": "caption",
+      "text": "Le passepoil suit chaque découpe et révèle la construction de ma veste."
+    },
+    {
+      "id": "fr-holdout-v4-722",
+      "field": "caption",
+      "text": "Je regarde ces petites lignes en relief comme un dessin textile."
+    },
+    {
+      "id": "fr-holdout-v4-723",
+      "field": "altText",
+      "text": "Un cordon recouvert souligne les coutures courbes de la veste."
+    },
+    {
+      "id": "fr-holdout-v4-724",
+      "field": "altText",
+      "text": "Le passepoil dessine un relief fin entre plusieurs panneaux cousus."
+    },
+    {
+      "id": "fr-holdout-v4-725",
+      "field": "caption",
+      "text": "Les pointes de mon poncho descendent en diagonale sur les jambes."
+    },
+    {
+      "id": "fr-holdout-v4-726",
+      "field": "caption",
+      "text": "Je l'oriente autrement pour déplacer la grande pointe devant."
+    },
+    {
+      "id": "fr-holdout-v4-727",
+      "field": "altText",
+      "text": "Un poncho forme une longue pointe devant et une autre derrière."
+    },
+    {
+      "id": "fr-holdout-v4-728",
+      "field": "altText",
+      "text": "Les bords obliques dessinent un losange autour du buste couvert."
+    },
+    {
+      "id": "fr-holdout-v4-729",
+      "field": "caption",
+      "text": "Mon petit porte-monnaie se porte au cou pendant la promenade."
+    },
+    {
+      "id": "fr-holdout-v4-730",
+      "field": "caption",
+      "text": "Je garde juste l'essentiel dans cette poche suspendue."
+    },
+    {
+      "id": "fr-holdout-v4-731",
+      "field": "altText",
+      "text": "Une petite poche fermée pend à un cordon autour du cou."
+    },
+    {
+      "id": "fr-holdout-v4-732",
+      "field": "altText",
+      "text": "Le porte-monnaie repose au milieu du buste sous le manteau ouvert."
+    },
+    {
+      "id": "fr-holdout-v4-733",
+      "field": "caption",
+      "text": "Le bord dentelé dépasse juste assez sous mon pantalon court."
+    },
+    {
+      "id": "fr-holdout-v4-734",
+      "field": "caption",
+      "text": "Un détail de chaussette change l'allure de mes chaussures sages."
+    },
+    {
+      "id": "fr-holdout-v4-735",
+      "field": "altText",
+      "text": "Le bord ondulé des chaussettes apparaît entre pantalon et chaussures."
+    },
+    {
+      "id": "fr-holdout-v4-736",
+      "field": "altText",
+      "text": "De petits festons entourent les chevilles sous l'ourlet raccourci."
+    },
+    {
+      "id": "fr-holdout-v4-737",
+      "field": "caption",
+      "text": "Je retourne la veste pour montrer sa seconde face pendant la sortie."
+    },
+    {
+      "id": "fr-holdout-v4-738",
+      "field": "caption",
+      "text": "Deux ambiances voyagent dans la même pièce de ma valise."
+    },
+    {
+      "id": "fr-holdout-v4-739",
+      "field": "altText",
+      "text": "Une veste retournée expose sa face intérieure entièrement finie."
+    },
+    {
+      "id": "fr-holdout-v4-740",
+      "field": "altText",
+      "text": "La manche repliée montre les deux côtés portables du vêtement."
+    },
+    {
+      "id": "fr-holdout-v4-741",
+      "field": "caption",
+      "text": "La grande fermeture me permet d'enfiler la combinaison sans effort."
+    },
+    {
+      "id": "fr-holdout-v4-742",
+      "field": "caption",
+      "text": "Une seule pièce et plusieurs poches pour ma journée d'atelier."
+    },
+    {
+      "id": "fr-holdout-v4-743",
+      "field": "altText",
+      "text": "Une combinaison se ferme par un long zip central."
+    },
+    {
+      "id": "fr-holdout-v4-744",
+      "field": "altText",
+      "text": "Les poches poitrine et les jambes droites composent une tenue d'un seul tenant."
+    },
+    {
+      "id": "fr-holdout-v4-745",
+      "field": "caption",
+      "text": "Ces petits bandeaux retiennent mes manches pendant le travail manuel."
+    },
+    {
+      "id": "fr-holdout-v4-746",
+      "field": "caption",
+      "text": "Je remonte le tissu sans perdre le joli volume du haut."
+    },
+    {
+      "id": "fr-holdout-v4-747",
+      "field": "altText",
+      "text": "Des élastiques de manche maintiennent le tissu au-dessus des poignets."
+    },
+    {
+      "id": "fr-holdout-v4-748",
+      "field": "altText",
+      "text": "Les manches sont rassemblées par deux anneaux portés aux avant-bras."
+    },
+    {
+      "id": "fr-holdout-v4-749",
+      "field": "caption",
+      "text": "Le plissé irrégulier garde une allure vivante même posé à plat."
+    },
+    {
+      "id": "fr-holdout-v4-750",
+      "field": "caption",
+      "text": "Je porte ces reliefs froissés sans chercher une ligne parfaite."
+    },
+    {
+      "id": "fr-holdout-v4-751",
+      "field": "altText",
+      "text": "Le haut présente une multitude de petits plis irréguliers."
+    },
+    {
+      "id": "fr-holdout-v4-752",
+      "field": "altText",
+      "text": "Une texture froissée couvre le vêtement avec des reliefs changeants."
+    },
+    {
+      "id": "fr-holdout-v4-753",
+      "field": "caption",
+      "text": "Cette broche tient mes lunettes lorsque je les enlève."
+    },
+    {
+      "id": "fr-holdout-v4-754",
+      "field": "caption",
+      "text": "Un anneau discret sur la veste me rend bien service."
+    },
+    {
+      "id": "fr-holdout-v4-755",
+      "field": "altText",
+      "text": "Une branche de lunettes passe dans un anneau fixé au revers."
+    },
+    {
+      "id": "fr-holdout-v4-756",
+      "field": "altText",
+      "text": "Les lunettes reposent contre la poche grâce à une broche porteuse."
+    },
+    {
+      "id": "fr-holdout-v4-757",
+      "field": "caption",
+      "text": "Je retire la surjupe après la cérémonie pour danser plus librement."
+    },
+    {
+      "id": "fr-holdout-v4-758",
+      "field": "caption",
+      "text": "Une même base accompagne les deux moments de la journée."
+    },
+    {
+      "id": "fr-holdout-v4-759",
+      "field": "altText",
+      "text": "Une longue surjupe détachable est posée près de la robe courte."
+    },
+    {
+      "id": "fr-holdout-v4-760",
+      "field": "altText",
+      "text": "Des attaches à la taille relient une couche supplémentaire à la robe."
+    },
+    {
+      "id": "fr-holdout-v4-761",
+      "field": "caption",
+      "text": "Deux contours de col se superposent sur ma blouse du jour."
+    },
+    {
+      "id": "fr-holdout-v4-762",
+      "field": "caption",
+      "text": "Je découvre un second contour quand je regarde l'encolure de près."
+    },
+    {
+      "id": "fr-holdout-v4-763",
+      "field": "altText",
+      "text": "Deux cols arrondis de tailles différentes encadrent l'encolure."
+    },
+    {
+      "id": "fr-holdout-v4-764",
+      "field": "altText",
+      "text": "Une seconde bordure dépasse sous le col supérieur du chemisier."
+    },
+    {
+      "id": "fr-holdout-v4-765",
+      "field": "caption",
+      "text": "La semelle continue me donne de la hauteur sans changer ma démarche."
+    },
+    {
+      "id": "fr-holdout-v4-766",
+      "field": "caption",
+      "text": "Je profite de ces volumes avec une jupe qui dégage les pieds."
+    },
+    {
+      "id": "fr-holdout-v4-767",
+      "field": "altText",
+      "text": "Une semelle épaisse monte progressivement vers l'arrière des chaussures."
+    },
+    {
+      "id": "fr-holdout-v4-768",
+      "field": "altText",
+      "text": "Le dessous plein relie le talon à l'avant du soulier."
+    },
+    {
+      "id": "fr-holdout-v4-769",
+      "field": "caption",
+      "text": "Le panneau froncé suit mes mouvements sans ceinture ajoutée."
+    },
+    {
+      "id": "fr-holdout-v4-770",
+      "field": "caption",
+      "text": "J'aime cette élasticité douce au dos de ma robe."
+    },
+    {
+      "id": "fr-holdout-v4-771",
+      "field": "altText",
+      "text": "Un panneau smocké rassemble le tissu à l'arrière du corsage."
+    },
+    {
+      "id": "fr-holdout-v4-772",
+      "field": "altText",
+      "text": "De fines lignes élastiques forment un relief serré au dos."
+    },
+    {
+      "id": "fr-holdout-v4-773",
+      "field": "caption",
+      "text": "Deux chaussettes différentes accompagnent mon humeur joueuse du matin."
+    },
+    {
+      "id": "fr-holdout-v4-774",
+      "field": "caption",
+      "text": "Je garde la paire dépareillée que j'avais assemblée par hasard."
+    },
+    {
+      "id": "fr-holdout-v4-775",
+      "field": "altText",
+      "text": "Les pieds portent deux chaussettes dont les motifs diffèrent."
+    },
+    {
+      "id": "fr-holdout-v4-776",
+      "field": "altText",
+      "text": "Une chaussette rayée fait face à une autre à pois."
+    },
+    {
+      "id": "fr-holdout-v4-777",
+      "field": "caption",
+      "text": "Cette ouverture carrée encadre joliment mon petit collier rond."
+    },
+    {
+      "id": "fr-holdout-v4-778",
+      "field": "caption",
+      "text": "Je trouve l'angle du col très doux avec les manches gonflées."
+    },
+    {
+      "id": "fr-holdout-v4-779",
+      "field": "altText",
+      "text": "Une encolure carrée dessine deux angles au-dessus du corsage."
+    },
+    {
+      "id": "fr-holdout-v4-780",
+      "field": "altText",
+      "text": "Le bord horizontal du décolleté rejoint des bretelles larges."
+    },
+    {
+      "id": "fr-holdout-v4-781",
+      "field": "caption",
+      "text": "Le grand panneau avant donne une allure de jupe à ce pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-782",
+      "field": "caption",
+      "text": "Je peux marcher largement tout en gardant cette ligne enveloppante."
+    },
+    {
+      "id": "fr-holdout-v4-783",
+      "field": "altText",
+      "text": "Un panneau plat recouvre partiellement les deux jambes du pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-784",
+      "field": "altText",
+      "text": "Le vêtement paraît fermé devant mais les jambes restent séparées."
+    },
+    {
+      "id": "fr-holdout-v4-785",
+      "field": "caption",
+      "text": "Mon chapeau se replie dans sa poche pendant le trajet."
+    },
+    {
+      "id": "fr-holdout-v4-786",
+      "field": "caption",
+      "text": "Je le déploie à l'arrivée sans lui demander une forme rigide."
+    },
+    {
+      "id": "fr-holdout-v4-787",
+      "field": "altText",
+      "text": "Un chapeau souple plié tient à l'intérieur d'une poche zippée."
+    },
+    {
+      "id": "fr-holdout-v4-788",
+      "field": "altText",
+      "text": "Le bord écrasable se replie autour de la calotte souple."
+    },
+    {
+      "id": "fr-holdout-v4-789",
+      "field": "caption",
+      "text": "Je décale les longueurs pour que chaque pendentif trouve sa place."
+    },
+    {
+      "id": "fr-holdout-v4-790",
+      "field": "caption",
+      "text": "Trois chaînes légères accompagnent aujourd'hui mon col ouvert."
+    },
+    {
+      "id": "fr-holdout-v4-791",
+      "field": "altText",
+      "text": "Trois colliers de longueurs différentes descendent en étages sur le buste."
+    },
+    {
+      "id": "fr-holdout-v4-792",
+      "field": "altText",
+      "text": "Chaque pendentif repose à une hauteur distincte entre les revers."
+    },
+    {
+      "id": "fr-holdout-v4-793",
+      "field": "caption",
+      "text": "Le tissu coupé en biais suit le mouvement sans beaucoup de coutures."
+    },
+    {
+      "id": "fr-holdout-v4-794",
+      "field": "caption",
+      "text": "Je laisse cette robe glisser naturellement sur la silhouette."
+    },
+    {
+      "id": "fr-holdout-v4-795",
+      "field": "altText",
+      "text": "La robe souple tombe en diagonales fines autour des hanches."
+    },
+    {
+      "id": "fr-holdout-v4-796",
+      "field": "altText",
+      "text": "Un léger pli oblique traverse la jupe coupée dans le biais."
+    },
+    {
+      "id": "fr-holdout-v4-797",
+      "field": "caption",
+      "text": "Le talon reste libre avec ces souliers ouverts derrière."
+    },
+    {
+      "id": "fr-holdout-v4-798",
+      "field": "caption",
+      "text": "Je les enfile pour une sortie courte et tranquille."
+    },
+    {
+      "id": "fr-holdout-v4-799",
+      "field": "altText",
+      "text": "Des mules couvrent l'avant des pieds et laissent les talons découverts."
+    },
+    {
+      "id": "fr-holdout-v4-800",
+      "field": "altText",
+      "text": "L'arrière des chaussures s'arrête avant le talon du pied."
+    },
+    {
+      "id": "fr-holdout-v4-801",
+      "field": "caption",
+      "text": "Ces grands pois espacés laissent beaucoup de place au fond uni."
+    },
+    {
+      "id": "fr-holdout-v4-802",
+      "field": "caption",
+      "text": "Je reprends la rondeur du motif avec mes petites boucles."
+    },
+    {
+      "id": "fr-holdout-v4-803",
+      "field": "altText",
+      "text": "De grands pois régulièrement espacés couvrent la robe évasée."
+    },
+    {
+      "id": "fr-holdout-v4-804",
+      "field": "altText",
+      "text": "Le chemisier présente des cercles pleins séparés par de larges intervalles."
+    },
+    {
+      "id": "fr-holdout-v4-805",
+      "field": "caption",
+      "text": "Les rayures se rejoignent enfin après plusieurs essais de couture."
+    },
+    {
+      "id": "fr-holdout-v4-806",
+      "field": "caption",
+      "text": "Je suis contente du raccord discret entre les deux pans."
+    },
+    {
+      "id": "fr-holdout-v4-807",
+      "field": "altText",
+      "text": "Les rayures horizontales se prolongent de part et d'autre du boutonnage."
+    },
+    {
+      "id": "fr-holdout-v4-808",
+      "field": "altText",
+      "text": "La poche cousue respecte l'alignement du motif rayé de la chemise."
+    },
+    {
+      "id": "fr-holdout-v4-809",
+      "field": "caption",
+      "text": "Les carreaux passent en diagonale sur ce panneau de jupe."
+    },
+    {
+      "id": "fr-holdout-v4-810",
+      "field": "caption",
+      "text": "Un changement d'orientation donne du relief à ce tissu familier."
+    },
+    {
+      "id": "fr-holdout-v4-811",
+      "field": "altText",
+      "text": "Des carreaux inclinés composent un réseau de losanges sur le devant."
+    },
+    {
+      "id": "fr-holdout-v4-812",
+      "field": "altText",
+      "text": "Le panneau central présente son quadrillage tourné par rapport aux côtés."
+    },
+    {
+      "id": "fr-holdout-v4-813",
+      "field": "caption",
+      "text": "Le petit motif brisé anime ce tailleur sans prendre toute la place."
+    },
+    {
+      "id": "fr-holdout-v4-814",
+      "field": "caption",
+      "text": "Je découvre les formes du pied-de-poule en regardant ma manche."
+    },
+    {
+      "id": "fr-holdout-v4-815",
+      "field": "altText",
+      "text": "Le tissu du tailleur porte de petits carreaux aux contours brisés."
+    },
+    {
+      "id": "fr-holdout-v4-816",
+      "field": "altText",
+      "text": "Un gros plan révèle un motif régulier de pied-de-poule."
+    },
+    {
+      "id": "fr-holdout-v4-817",
+      "field": "caption",
+      "text": "Les chevrons dessinent une ligne discrète sur mon manteau."
+    },
+    {
+      "id": "fr-holdout-v4-818",
+      "field": "caption",
+      "text": "Je vois mieux ce tissage lorsque la lumière arrive de côté."
+    },
+    {
+      "id": "fr-holdout-v4-819",
+      "field": "altText",
+      "text": "Des chevrons parallèles parcourent le tissu épais du manteau."
+    },
+    {
+      "id": "fr-holdout-v4-820",
+      "field": "altText",
+      "text": "Le tissage forme de petits zigzags réguliers près du revers."
+    },
+    {
+      "id": "fr-holdout-v4-821",
+      "field": "caption",
+      "text": "Les motifs en goutte se mêlent doucement sur ma longue écharpe."
+    },
+    {
+      "id": "fr-holdout-v4-822",
+      "field": "caption",
+      "text": "Je porte ce dessin cachemire avec une veste sans motif."
+    },
+    {
+      "id": "fr-holdout-v4-823",
+      "field": "altText",
+      "text": "Une écharpe déployée porte de grandes gouttes courbes ornementées."
+    },
+    {
+      "id": "fr-holdout-v4-824",
+      "field": "altText",
+      "text": "Des motifs cachemire s'entrelacent sur les pans suspendus du foulard."
+    },
+    {
+      "id": "fr-holdout-v4-825",
+      "field": "caption",
+      "text": "La fleur imprimée tombe exactement sur l'épaule de cette robe."
+    },
+    {
+      "id": "fr-holdout-v4-826",
+      "field": "caption",
+      "text": "Ce placement du dessin me plaît autant que la coupe."
+    },
+    {
+      "id": "fr-holdout-v4-827",
+      "field": "altText",
+      "text": "Une grande fleur imprimée occupe l'épaule droite du corsage."
+    },
+    {
+      "id": "fr-holdout-v4-828",
+      "field": "altText",
+      "text": "Le motif floral est centré sur une seule partie du vêtement."
+    },
+    {
+      "id": "fr-holdout-v4-829",
+      "field": "caption",
+      "text": "Les rayures se rejoignent en pointe au milieu de ma jupe."
+    },
+    {
+      "id": "fr-holdout-v4-830",
+      "field": "caption",
+      "text": "J'aime cette rencontre des lignes qui accompagne chaque mouvement."
+    },
+    {
+      "id": "fr-holdout-v4-831",
+      "field": "altText",
+      "text": "Deux panneaux rayés se rencontrent en formant un motif en V."
+    },
+    {
+      "id": "fr-holdout-v4-832",
+      "field": "altText",
+      "text": "Les lignes obliques convergent sur la couture centrale de la jupe."
+    },
+    {
+      "id": "fr-holdout-v4-833",
+      "field": "caption",
+      "text": "La jupe s'arrondit dès la taille comme une petite corolle."
+    },
+    {
+      "id": "fr-holdout-v4-834",
+      "field": "caption",
+      "text": "Je garde le haut ajusté pour profiter de cette ampleur."
+    },
+    {
+      "id": "fr-holdout-v4-835",
+      "field": "altText",
+      "text": "Une jupe courte forme un volume arrondi autour des hanches."
+    },
+    {
+      "id": "fr-holdout-v4-836",
+      "field": "altText",
+      "text": "Le bas évasé reste éloigné des jambes grâce à sa structure."
+    },
+    {
+      "id": "fr-holdout-v4-837",
+      "field": "caption",
+      "text": "Ce petit bibi tient sur le côté sans cacher ma coiffure."
+    },
+    {
+      "id": "fr-holdout-v4-838",
+      "field": "caption",
+      "text": "J'essaie sa position devant le miroir avant la cérémonie."
+    },
+    {
+      "id": "fr-holdout-v4-839",
+      "field": "altText",
+      "text": "Un petit chapeau incliné est fixé au-dessus d'une oreille."
+    },
+    {
+      "id": "fr-holdout-v4-840",
+      "field": "altText",
+      "text": "Le bibi repose sur le côté de la tête grâce à un peigne."
+    },
+    {
+      "id": "fr-holdout-v4-841",
+      "field": "caption",
+      "text": "La petite manchette d'oreille accompagne ma boucle habituelle."
+    },
+    {
+      "id": "fr-holdout-v4-842",
+      "field": "caption",
+      "text": "J'aime ce détail qui se pose sans changer mes habitudes."
+    },
+    {
+      "id": "fr-holdout-v4-843",
+      "field": "altText",
+      "text": "Un anneau décoratif se fixe sur le bord supérieur de l'oreille."
+    },
+    {
+      "id": "fr-holdout-v4-844",
+      "field": "altText",
+      "text": "La manchette métallique entoure le cartilage au-dessus d'une petite boucle."
+    },
+    {
+      "id": "fr-holdout-v4-845",
+      "field": "caption",
+      "text": "Mon peigne retrouvé tient le chignon pour la soirée."
+    },
+    {
+      "id": "fr-holdout-v4-846",
+      "field": "caption",
+      "text": "Je laisse dépasser ses petites fleurs au-dessus des cheveux relevés."
+    },
+    {
+      "id": "fr-holdout-v4-847",
+      "field": "altText",
+      "text": "Un peigne ornementé est glissé dans un chignon bas."
+    },
+    {
+      "id": "fr-holdout-v4-848",
+      "field": "altText",
+      "text": "Les dents du peigne disparaissent sous les cheveux attachés."
+    },
+    {
+      "id": "fr-holdout-v4-849",
+      "field": "caption",
+      "text": "L'épingle garde ma cravate en place pendant la journée."
+    },
+    {
+      "id": "fr-holdout-v4-850",
+      "field": "caption",
+      "text": "Un trait métallique souligne ce détail de ma chemise."
+    },
+    {
+      "id": "fr-holdout-v4-851",
+      "field": "altText",
+      "text": "Une barrette horizontale fixe la cravate à la chemise."
+    },
+    {
+      "id": "fr-holdout-v4-852",
+      "field": "altText",
+      "text": "La pince métallique traverse la cravate juste sous la poitrine."
+    },
+    {
+      "id": "fr-holdout-v4-853",
+      "field": "caption",
+      "text": "Mon éventail rejoint les accessoires pour cette cérémonie au soleil."
+    },
+    {
+      "id": "fr-holdout-v4-854",
+      "field": "caption",
+      "text": "Je le garde plié dans ma pochette jusqu'aux heures chaudes."
+    },
+    {
+      "id": "fr-holdout-v4-855",
+      "field": "altText",
+      "text": "Une personne tient un éventail ouvert près de sa robe."
+    },
+    {
+      "id": "fr-holdout-v4-856",
+      "field": "altText",
+      "text": "L'éventail fermé dépasse d'une petite pochette de cérémonie."
+    },
+    {
+      "id": "fr-holdout-v4-857",
+      "field": "caption",
+      "text": "Une fleur en tissu s'accroche au revers pour notre repas dehors."
+    },
+    {
+      "id": "fr-holdout-v4-858",
+      "field": "caption",
+      "text": "J'ai fabriqué ce petit bouton fleuri avec une chute."
+    },
+    {
+      "id": "fr-holdout-v4-859",
+      "field": "altText",
+      "text": "Une fleur textile en relief est fixée sur un revers de veste."
+    },
+    {
+      "id": "fr-holdout-v4-860",
+      "field": "altText",
+      "text": "Des pétales de tissu entourent le centre de la boutonnière décorative."
+    },
+    {
+      "id": "fr-holdout-v4-861",
+      "field": "caption",
+      "text": "Cette semelle crantée donne du relief à mes souliers très simples."
+    },
+    {
+      "id": "fr-holdout-v4-862",
+      "field": "caption",
+      "text": "Je retrouve une bonne accroche pour les chemins humides."
+    },
+    {
+      "id": "fr-holdout-v4-863",
+      "field": "altText",
+      "text": "De gros crans apparaissent sous la semelle des chaussures."
+    },
+    {
+      "id": "fr-holdout-v4-864",
+      "field": "altText",
+      "text": "La chaussure inclinée montre des reliefs profonds sur son dessous."
+    },
+    {
+      "id": "fr-holdout-v4-865",
+      "field": "caption",
+      "text": "Les attaches tressées remplacent les boutons sur ma veste courte."
+    },
+    {
+      "id": "fr-holdout-v4-866",
+      "field": "caption",
+      "text": "Je regarde ces petits nœuds comme un travail de patience."
+    },
+    {
+      "id": "fr-holdout-v4-867",
+      "field": "altText",
+      "text": "Des attaches en passementerie ferment le devant de la veste."
+    },
+    {
+      "id": "fr-holdout-v4-868",
+      "field": "altText",
+      "text": "Une boucle tressée entoure un bouton recouvert de cordon."
+    },
+    {
+      "id": "fr-holdout-v4-869",
+      "field": "caption",
+      "text": "Mon panier se ferme avec un petit couvercle pour la sortie."
+    },
+    {
+      "id": "fr-holdout-v4-870",
+      "field": "caption",
+      "text": "J'y garde mes affaires sans cacher son joli tressage."
+    },
+    {
+      "id": "fr-holdout-v4-871",
+      "field": "altText",
+      "text": "Un panier rigide possède un couvercle articulé sous son anse."
+    },
+    {
+      "id": "fr-holdout-v4-872",
+      "field": "altText",
+      "text": "Une petite attache retient le dessus fermé du sac tressé."
+    },
+    {
+      "id": "fr-holdout-v4-873",
+      "field": "caption",
+      "text": "Le bord du col dessine de petites pointes régulières."
+    },
+    {
+      "id": "fr-holdout-v4-874",
+      "field": "caption",
+      "text": "Ce contour graphique me donne envie de garder le reste simple."
+    },
+    {
+      "id": "fr-holdout-v4-875",
+      "field": "altText",
+      "text": "Des pointes triangulaires découpent le bord extérieur du col."
+    },
+    {
+      "id": "fr-holdout-v4-876",
+      "field": "altText",
+      "text": "L'encolure porte une bordure régulière en dents de scie."
+    },
+    {
+      "id": "fr-holdout-v4-877",
+      "field": "caption",
+      "text": "Une seule attache ferme mon gilet juste sous le col."
+    },
+    {
+      "id": "fr-holdout-v4-878",
+      "field": "caption",
+      "text": "Les pans restent ouverts et montrent la chemise en dessous."
+    },
+    {
+      "id": "fr-holdout-v4-879",
+      "field": "altText",
+      "text": "Le gilet se ferme par un petit crochet près du cou."
+    },
+    {
+      "id": "fr-holdout-v4-880",
+      "field": "altText",
+      "text": "Deux pans libres descendent depuis l'unique attache supérieure."
+    },
+    {
+      "id": "fr-holdout-v4-881",
+      "field": "caption",
+      "text": "Les petites pièces aux côtés renforcent ma chemise préférée."
+    },
+    {
+      "id": "fr-holdout-v4-882",
+      "field": "caption",
+      "text": "Je vous montre les hirondelles de renfort avant de rentrer le bas."
+    },
+    {
+      "id": "fr-holdout-v4-883",
+      "field": "altText",
+      "text": "Un triangle de tissu renforce la jonction des coutures latérales."
+    },
+    {
+      "id": "fr-holdout-v4-884",
+      "field": "altText",
+      "text": "Le bas de chemise présente un petit renfort entre ses deux pans."
+    },
+    {
+      "id": "fr-holdout-v4-885",
+      "field": "caption",
+      "text": "Le plissé apparaît seulement lorsque le panneau de ma robe s'ouvre."
+    },
+    {
+      "id": "fr-holdout-v4-886",
+      "field": "caption",
+      "text": "Une réserve de plis accompagne mes pas sur le côté."
+    },
+    {
+      "id": "fr-holdout-v4-887",
+      "field": "altText",
+      "text": "Un panneau latéral plissé s'insère dans une robe autrement lisse."
+    },
+    {
+      "id": "fr-holdout-v4-888",
+      "field": "altText",
+      "text": "La fente de la robe laisse voir une bande de plis serrés."
+    },
+    {
+      "id": "fr-holdout-v4-889",
+      "field": "caption",
+      "text": "Le poignet se prolonge pour former une petite ouverture verticale."
+    },
+    {
+      "id": "fr-holdout-v4-890",
+      "field": "caption",
+      "text": "Je trouve ce bout de manche très joli vu de profil."
+    },
+    {
+      "id": "fr-holdout-v4-891",
+      "field": "altText",
+      "text": "Un long poignet droit remonte depuis la base de la main."
+    },
+    {
+      "id": "fr-holdout-v4-892",
+      "field": "altText",
+      "text": "Le bord de manche rigide garde une forme tubulaire évasée."
+    },
+    {
+      "id": "fr-holdout-v4-893",
+      "field": "caption",
+      "text": "La taille froncée dépasse au-dessus de ma ceinture aujourd'hui."
+    },
+    {
+      "id": "fr-holdout-v4-894",
+      "field": "caption",
+      "text": "Je rentre le haut pour montrer ce petit volume de papier."
+    },
+    {
+      "id": "fr-holdout-v4-895",
+      "field": "altText",
+      "text": "Le pantalon porte une taille haute froncée au-dessus du lien."
+    },
+    {
+      "id": "fr-holdout-v4-896",
+      "field": "altText",
+      "text": "Un bord plissé se dresse au-dessus de la ceinture nouée."
+    },
+    {
+      "id": "fr-holdout-v4-897",
+      "field": "caption",
+      "text": "Je relève les verres teintés en entrant dans la boutique."
+    },
+    {
+      "id": "fr-holdout-v4-898",
+      "field": "caption",
+      "text": "Mes lunettes passent de l'ombre à la lumière en un geste."
+    },
+    {
+      "id": "fr-holdout-v4-899",
+      "field": "altText",
+      "text": "Une seconde paire de verres est relevée au-dessus de la monture."
+    },
+    {
+      "id": "fr-holdout-v4-900",
+      "field": "altText",
+      "text": "Les verres solaires basculants restent attachés au bord des lunettes."
+    },
+    {
+      "id": "fr-holdout-v4-901",
+      "field": "caption",
+      "text": "Un anneau réunit les deux pans de la robe à la taille."
+    },
+    {
+      "id": "fr-holdout-v4-902",
+      "field": "caption",
+      "text": "J'aime ce point central qui organise tout le drapé."
+    },
+    {
+      "id": "fr-holdout-v4-903",
+      "field": "altText",
+      "text": "Un anneau circulaire relie deux morceaux de tissu à la taille."
+    },
+    {
+      "id": "fr-holdout-v4-904",
+      "field": "altText",
+      "text": "Les plis de la robe convergent vers une attache ronde."
+    },
+    {
+      "id": "fr-holdout-v4-905",
+      "field": "caption",
+      "text": "Les panneaux élastiques facilitent l'enfilage de mes bottines du matin."
+    },
+    {
+      "id": "fr-holdout-v4-906",
+      "field": "caption",
+      "text": "Je les choisis pour leurs lignes nettes et leur souplesse."
+    },
+    {
+      "id": "fr-holdout-v4-907",
+      "field": "altText",
+      "text": "Des empiècements élastiques verticaux occupent les côtés des bottines."
+    },
+    {
+      "id": "fr-holdout-v4-908",
+      "field": "altText",
+      "text": "La languette arrière dépasse derrière une tige sans fermeture éclair."
+    },
+    {
+      "id": "fr-holdout-v4-909",
+      "field": "caption",
+      "text": "Une plume suit la courbe du chapeau sans monter trop haut."
+    },
+    {
+      "id": "fr-holdout-v4-910",
+      "field": "caption",
+      "text": "Je retrouve ce détail ancien dans une tenue très quotidienne."
+    },
+    {
+      "id": "fr-holdout-v4-911",
+      "field": "altText",
+      "text": "Une plume courbée est glissée sous le ruban du chapeau."
+    },
+    {
+      "id": "fr-holdout-v4-912",
+      "field": "altText",
+      "text": "Le côté du chapeau présente une plume allongée contre la calotte."
+    },
+    {
+      "id": "fr-holdout-v4-913",
+      "field": "caption",
+      "text": "Deux miroirs me permettent de vérifier l'arrière de ma tenue."
+    },
+    {
+      "id": "fr-holdout-v4-914",
+      "field": "caption",
+      "text": "Je découvre le tombé du dos sans me contorsionner."
+    },
+    {
+      "id": "fr-holdout-v4-915",
+      "field": "altText",
+      "text": "Le reflet d'un second miroir montre le dos du vêtement porté."
+    },
+    {
+      "id": "fr-holdout-v4-916",
+      "field": "altText",
+      "text": "Deux surfaces réfléchissantes présentent simultanément l'avant et l'arrière de la tenue."
+    },
+    {
+      "id": "fr-holdout-v4-917",
+      "field": "caption",
+      "text": "Je lève les bras pour voir si cette veste suit mon mouvement."
+    },
+    {
+      "id": "fr-holdout-v4-918",
+      "field": "caption",
+      "text": "L'aisance se vérifie aussi au-dessus des épaules."
+    },
+    {
+      "id": "fr-holdout-v4-919",
+      "field": "altText",
+      "text": "La personne lève les deux bras avec sa veste boutonnée."
+    },
+    {
+      "id": "fr-holdout-v4-920",
+      "field": "altText",
+      "text": "Les emmanchures restent souples pendant un mouvement vers le haut."
+    },
+    {
+      "id": "fr-holdout-v4-921",
+      "field": "caption",
+      "text": "Je trace la future longueur avec une craie avant de décider."
+    },
+    {
+      "id": "fr-holdout-v4-922",
+      "field": "caption",
+      "text": "La ligne provisoire me permet de comparer deux options d'ourlet."
+    },
+    {
+      "id": "fr-holdout-v4-923",
+      "field": "altText",
+      "text": "Deux traits de craie horizontaux marquent le bas du pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-924",
+      "field": "altText",
+      "text": "Une ligne claire indique une nouvelle longueur sur une jambe."
+    },
+    {
+      "id": "fr-holdout-v4-925",
+      "field": "caption",
+      "text": "La boutonnière cousue à la main termine ce petit projet."
+    },
+    {
+      "id": "fr-holdout-v4-926",
+      "field": "caption",
+      "text": "J'ai pris mon temps pour que le bord reste régulier."
+    },
+    {
+      "id": "fr-holdout-v4-927",
+      "field": "altText",
+      "text": "Des points serrés bordent une boutonnière ouverte dans le tissu."
+    },
+    {
+      "id": "fr-holdout-v4-928",
+      "field": "altText",
+      "text": "Une aiguille travaille autour d'une petite ouverture destinée au bouton."
+    },
+    {
+      "id": "fr-holdout-v4-929",
+      "field": "caption",
+      "text": "Je compare deux hauteurs de chaussettes avec cette même jupe."
+    },
+    {
+      "id": "fr-holdout-v4-930",
+      "field": "caption",
+      "text": "La proportion change beaucoup quand la chaussette monte davantage."
+    },
+    {
+      "id": "fr-holdout-v4-931",
+      "field": "altText",
+      "text": "Une jambe porte une chaussette courte et l'autre une montante."
+    },
+    {
+      "id": "fr-holdout-v4-932",
+      "field": "altText",
+      "text": "Deux hauteurs de chaussettes sont comparées sous une jupe identique."
+    },
+    {
+      "id": "fr-holdout-v4-933",
+      "field": "caption",
+      "text": "La nouvelle boucle permet enfin de reprendre mon vieux sac."
+    },
+    {
+      "id": "fr-holdout-v4-934",
+      "field": "caption",
+      "text": "Le cuir avait encore beaucoup de sorties devant lui."
+    },
+    {
+      "id": "fr-holdout-v4-935",
+      "field": "altText",
+      "text": "Une boucle neuve relie la bandoulière au corps du sac."
+    },
+    {
+      "id": "fr-holdout-v4-936",
+      "field": "altText",
+      "text": "L'attache remplacée est présentée près de l'ancienne pièce cassée."
+    },
+    {
+      "id": "fr-holdout-v4-937",
+      "field": "caption",
+      "text": "Je rassemble des formes de cols pour mon prochain projet."
+    },
+    {
+      "id": "fr-holdout-v4-938",
+      "field": "caption",
+      "text": "Ce petit collage m'aide à préciser l'allure que je cherche."
+    },
+    {
+      "id": "fr-holdout-v4-939",
+      "field": "altText",
+      "text": "Une planche réunit des images découpées de vêtements et d'accessoires."
+    },
+    {
+      "id": "fr-holdout-v4-940",
+      "field": "altText",
+      "text": "Des échantillons textiles accompagnent plusieurs croquis épinglés sur un panneau."
+    },
+    {
+      "id": "fr-holdout-v4-941",
+      "field": "caption",
+      "text": "Le soleil revenu, je porte mon manteau plié sur le bras."
+    },
+    {
+      "id": "fr-holdout-v4-942",
+      "field": "caption",
+      "text": "Sa doublure apparaît pendant que la journée se réchauffe."
+    },
+    {
+      "id": "fr-holdout-v4-943",
+      "field": "altText",
+      "text": "Un manteau plié repose sur l'avant-bras de la personne debout."
+    },
+    {
+      "id": "fr-holdout-v4-944",
+      "field": "altText",
+      "text": "La doublure du vêtement retourné est visible près du coude."
+    },
+    {
+      "id": "fr-holdout-v4-945",
+      "field": "caption",
+      "text": "Une brosse douce retire la poussière après notre balade."
+    },
+    {
+      "id": "fr-holdout-v4-946",
+      "field": "caption",
+      "text": "Je nettoie les coutures avant de ranger mes chaussures."
+    },
+    {
+      "id": "fr-holdout-v4-947",
+      "field": "altText",
+      "text": "Une brosse fine passe le long des coutures d'une chaussure."
+    },
+    {
+      "id": "fr-holdout-v4-948",
+      "field": "altText",
+      "text": "Des traces de poussière restent sur un soulier posé près d'une brosse."
+    },
+    {
+      "id": "fr-holdout-v4-949",
+      "field": "caption",
+      "text": "Je déplace le tissu sur le mannequin pour essayer un nouveau drapé."
+    },
+    {
+      "id": "fr-holdout-v4-950",
+      "field": "caption",
+      "text": "La forme arrive doucement sans patron dessiné au départ."
+    },
+    {
+      "id": "fr-holdout-v4-951",
+      "field": "altText",
+      "text": "Une large pièce de tissu est drapée librement sur un mannequin."
+    },
+    {
+      "id": "fr-holdout-v4-952",
+      "field": "altText",
+      "text": "Des épingles retiennent un pli oblique près de l'épaule factice."
+    },
+    {
+      "id": "fr-holdout-v4-953",
+      "field": "caption",
+      "text": "Deux barrettes parallèles dégagent mon visage pour montrer les boucles."
+    },
+    {
+      "id": "fr-holdout-v4-954",
+      "field": "caption",
+      "text": "Je garde cette petite ligne brillante sur le côté des cheveux."
+    },
+    {
+      "id": "fr-holdout-v4-955",
+      "field": "altText",
+      "text": "Deux barrettes sont fixées parallèlement au-dessus de l'oreille gauche."
+    },
+    {
+      "id": "fr-holdout-v4-956",
+      "field": "altText",
+      "text": "Les cheveux sont maintenus sur un côté par deux attaches fines."
+    },
+    {
+      "id": "fr-holdout-v4-957",
+      "field": "caption",
+      "text": "Le ruban intérieur donne une finition propre à mon pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-958",
+      "field": "caption",
+      "text": "Je retourne le bas pour partager ce détail de couture."
+    },
+    {
+      "id": "fr-holdout-v4-959",
+      "field": "altText",
+      "text": "Une bande de ruban recouvre l'intérieur de l'ourlet retourné."
+    },
+    {
+      "id": "fr-holdout-v4-960",
+      "field": "altText",
+      "text": "Le bord brut du pantalon disparaît sous une ganse intérieure."
+    },
+    {
+      "id": "fr-holdout-v4-961",
+      "field": "caption",
+      "text": "J'ai cousu le col et les manchettes avec la même petite chute."
+    },
+    {
+      "id": "fr-holdout-v4-962",
+      "field": "caption",
+      "text": "Ces trois touches relient les extrémités de ma tenue."
+    },
+    {
+      "id": "fr-holdout-v4-963",
+      "field": "altText",
+      "text": "Le col et les poignets portent le même motif miniature."
+    },
+    {
+      "id": "fr-holdout-v4-964",
+      "field": "altText",
+      "text": "Des détails assortis encadrent le visage et les mains du modèle."
+    },
+    {
+      "id": "fr-holdout-v4-965",
+      "field": "caption",
+      "text": "Le dos du pull descend légèrement plus bas grâce aux rangs raccourcis."
+    },
+    {
+      "id": "fr-holdout-v4-966",
+      "field": "caption",
+      "text": "J'apprécie cette courbe discrète lorsque je porte le tricot dehors."
+    },
+    {
+      "id": "fr-holdout-v4-967",
+      "field": "altText",
+      "text": "L'ourlet du pull dessine une courbe plus longue derrière."
+    },
+    {
+      "id": "fr-holdout-v4-968",
+      "field": "altText",
+      "text": "La vue de profil montre un dos tricoté descendant sous le devant."
+    },
+    {
+      "id": "fr-holdout-v4-969",
+      "field": "caption",
+      "text": "J'ouvre le manteau par le bas pour m'asseoir plus facilement."
+    },
+    {
+      "id": "fr-holdout-v4-970",
+      "field": "caption",
+      "text": "Les deux curseurs permettent de régler l'ouverture selon le trajet."
+    },
+    {
+      "id": "fr-holdout-v4-971",
+      "field": "altText",
+      "text": "La fermeture du manteau est ouverte à sa partie inférieure."
+    },
+    {
+      "id": "fr-holdout-v4-972",
+      "field": "altText",
+      "text": "Deux curseurs occupent la même fermeture éclair verticale."
+    },
+    {
+      "id": "fr-holdout-v4-973",
+      "field": "caption",
+      "text": "Le bouton intérieur retient le premier pan pendant que je noue la robe."
+    },
+    {
+      "id": "fr-holdout-v4-974",
+      "field": "caption",
+      "text": "Ce petit détail caché rend l'habillage plus simple."
+    },
+    {
+      "id": "fr-holdout-v4-975",
+      "field": "altText",
+      "text": "Un bouton intérieur fixe le pan inférieur de la robe croisée."
+    },
+    {
+      "id": "fr-holdout-v4-976",
+      "field": "altText",
+      "text": "La robe ouverte révèle une attache cachée près de la taille."
+    },
+    {
+      "id": "fr-holdout-v4-977",
+      "field": "caption",
+      "text": "Je réunis les chaussettes par paires dès qu'elles sèchent."
+    },
+    {
+      "id": "fr-holdout-v4-978",
+      "field": "caption",
+      "text": "Cette petite habitude simplifie le rangement de mon tiroir."
+    },
+    {
+      "id": "fr-holdout-v4-979",
+      "field": "altText",
+      "text": "Des chaussettes sèchent par paires sur un petit étendoir."
+    },
+    {
+      "id": "fr-holdout-v4-980",
+      "field": "altText",
+      "text": "Chaque pince retient deux chaussettes assorties côte à côte."
+    },
+    {
+      "id": "fr-holdout-v4-981",
+      "field": "caption",
+      "text": "La poche cachée garde mes petites affaires à l'abri dans ce cabas."
+    },
+    {
+      "id": "fr-holdout-v4-982",
+      "field": "caption",
+      "text": "Je retrouve toujours ce compartiment au même endroit contre la doublure."
+    },
+    {
+      "id": "fr-holdout-v4-983",
+      "field": "altText",
+      "text": "Une poche zippée apparaît dans la doublure intérieure du cabas."
+    },
+    {
+      "id": "fr-holdout-v4-984",
+      "field": "altText",
+      "text": "Le sac ouvert montre un compartiment plat contre sa paroi."
+    },
+    {
+      "id": "fr-holdout-v4-985",
+      "field": "caption",
+      "text": "La fente arrière laisse ma jupe droite suivre mes grands pas."
+    },
+    {
+      "id": "fr-holdout-v4-986",
+      "field": "caption",
+      "text": "Je vérifie son ouverture pendant une petite marche d'essai."
+    },
+    {
+      "id": "fr-holdout-v4-987",
+      "field": "altText",
+      "text": "Une fente verticale ouvre le milieu arrière d'une jupe droite."
+    },
+    {
+      "id": "fr-holdout-v4-988",
+      "field": "altText",
+      "text": "Le bas du vêtement s'écarte derrière les jambes en mouvement."
+    },
+    {
+      "id": "fr-holdout-v4-989",
+      "field": "caption",
+      "text": "Je serre le bas de la veste pour garder sa forme arrondie."
+    },
+    {
+      "id": "fr-holdout-v4-990",
+      "field": "caption",
+      "text": "La coulisse fait remonter légèrement l'ourlet autour de ma taille."
+    },
+    {
+      "id": "fr-holdout-v4-991",
+      "field": "altText",
+      "text": "Un cordon resserre le bord inférieur d'une veste courte."
+    },
+    {
+      "id": "fr-holdout-v4-992",
+      "field": "altText",
+      "text": "Un bas resserré fait blouser la veste juste avant la taille."
+    },
+    {
+      "id": "fr-holdout-v4-993",
+      "field": "caption",
+      "text": "L'ouverture en biais suit naturellement le geste de ma main."
+    },
+    {
+      "id": "fr-holdout-v4-994",
+      "field": "caption",
+      "text": "Ces poches rendent mon pantalon agréable pendant les attentes debout."
+    },
+    {
+      "id": "fr-holdout-v4-995",
+      "field": "altText",
+      "text": "La main entre dans une poche oblique sous la ceinture."
+    },
+    {
+      "id": "fr-holdout-v4-996",
+      "field": "altText",
+      "text": "Deux ouvertures inclinées dessinent les poches avant du pantalon."
+    },
+    {
+      "id": "fr-holdout-v4-997",
+      "field": "caption",
+      "text": "La grande languette dépasse et dessine un petit revers sur mes chaussures."
+    },
+    {
+      "id": "fr-holdout-v4-998",
+      "field": "caption",
+      "text": "Je laisse ce détail se poser librement au-dessus des lacets."
+    },
+    {
+      "id": "fr-holdout-v4-999",
+      "field": "altText",
+      "text": "Une languette longue se rabat sur le laçage de la chaussure."
+    },
+    {
+      "id": "fr-holdout-v4-1000",
+      "field": "altText",
+      "text": "Le dessus du soulier présente un large rabat découpé."
+    }
+  ]
+}

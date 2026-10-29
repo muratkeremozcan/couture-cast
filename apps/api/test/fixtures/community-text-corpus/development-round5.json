@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "provenance": "Coordinator-authorized retired-v5 development handoff after retirement commit11dda5768f1f2463876b7245e7eb8deb7a458e0d. Every case is development regression data; fresh independent release evidence remains separate.",
+  "entries": [
+    {
+      "language": "en",
+      "locale": "en-US",
+      "id": "en-holdout-v5-375",
+      "field": "altText",
+      "text": "An alpaca stands beside a basket containing several balls of yarn.",
+      "expectedDisposition": "pass",
+      "actualDisposition": "review",
+      "reasonCodes": ["text_policy_match"]
+    },
+    {
+      "language": "en",
+      "locale": "en-US",
+      "id": "en-holdout-v5-449",
+      "field": "caption",
+      "text": "The stoat on this shirt pulls a sled loaded with wool balls.",
+      "expectedDisposition": "pass",
+      "actualDisposition": "review",
+      "reasonCodes": ["text_policy_match"]
+    },
+    {
+      "language": "en",
+      "locale": "en-US",
+      "id": "en-holdout-v5-451",
+      "field": "altText",
+      "text": "A stoat pulls a small sled carrying several balls of wool.",
+      "expectedDisposition": "pass",
+      "actualDisposition": "review",
+      "reasonCodes": ["text_policy_match"]
+    },
+    {
+      "language": "it",
+      "locale": "it-IT",
+      "id": "it-holdout-v5-178",
+      "field": "caption",
+      "text": "Ho messo una toppa discreta dietro la chiusura per conservare il bordo originale.",
+      "expectedDisposition": "pass",
+      "actualDisposition": "review",
+      "reasonCodes": ["text_policy_match"]
+    },
+    {
+      "language": "it",
+      "locale": "it-IT",
+      "id": "it-holdout-v5-179",
+      "field": "altText",
+      "text": "Una toppa interna rinforza il tessuto dietro la fibbia della cintura.",
+      "expectedDisposition": "pass",
+      "actualDisposition": "review",
+      "reasonCodes": ["text_policy_match"]
+    },
+    {
+      "language": "it",
+      "locale": "it-IT",
+      "id": "it-holdout-v5-770",
+      "field": "caption",
+      "text": "Ho lasciato visibile il bordo della toppa perché racconta bene la riparazione.",
+      "expectedDisposition": "pass",
+      "actualDisposition": "review",
+      "reasonCodes": ["text_policy_match"]
+    },
+    {
+      "language": "it",
+      "locale": "it-IT",
+      "id": "it-holdout-v5-771",
+      "field": "altText",
+      "text": "Una toppa sul ginocchio è circondata da una fila larga di punti.",
+      "expectedDisposition": "pass",
+      "actualDisposition": "review",
+      "reasonCodes": ["text_policy_match"]
+    },
+    {
+      "language": "tr",
+      "locale": "tr-TR",
+      "id": "tr-holdout-v5-557",
+      "field": "caption",
+      "text": "Bale ayakkabımın bilek kurdelelerini bu kez arkadaşım çapraz bağladı.",
+      "expectedDisposition": "pass",
+      "actualDisposition": "review",
+      "reasonCodes": ["text_policy_match"]
+    },
+    {
+      "language": "tr",
+      "locale": "tr-TR",
+      "id": "tr-holdout-v5-560",
+      "field": "altText",
+      "text": "Yumuşak bale ayakkabısının uzun şeritleri bilekte düzgün bir düğümle bitiyor.",
+      "expectedDisposition": "pass",
+      "actualDisposition": "review",
+      "reasonCodes": ["text_policy_match"]
+    },
+    {
+      "language": "tr",
+      "locale": "tr-TR",
+      "id": "tr-holdout-v5-732",
+      "field": "altText",
+      "text": "Tişört baskısı, kısa ayaklı metal yüzeyde pişen geniş yuvarlak ekmeği gösteriyor.",
+      "expectedDisposition": "pass",
+      "actualDisposition": "review",
+      "reasonCodes": ["text_policy_match"]
+    }
+  ]
+}

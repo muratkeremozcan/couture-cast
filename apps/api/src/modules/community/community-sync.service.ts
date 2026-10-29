@@ -24,6 +24,7 @@ import {
   communityDependency,
   CommunityUnavailableException,
 } from './community-availability.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 type Scope = { mode: CommunityFeedMode; band: ClimateBand | null }
 import { PUBLICLY_VISIBLE_POST_WHERE } from './community.repository.js'
 import { assertCommunitySubjectAvailable } from './community-privacy.js'
@@ -70,14 +71,15 @@ export class CommunitySyncService {
     return communityDependency(() =>
       budget.run(async () => {
         // Erasure is a primary-backed terminal denial, including when its cache row is gone.
-        await this.prisma.$transaction(
+        await interactiveTransaction(
+          this.prisma,
           async (tx) => {
             await tx.$executeRawUnsafe(
               `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
             )
             await assertCommunitySubjectAvailable(tx, member)
           },
-          { timeout: budget.remaining(), maxWait: budget.remaining() }
+          () => ({ timeout: budget.remaining(), maxWait: budget.remaining() })
         )
         let grant = await this.access.authorize(member, budget)
         const scope = await this.community.syncScope(member, mode)
@@ -90,7 +92,8 @@ export class CommunitySyncService {
             .finally(() => {
               this.assistance = undefined
             })
-        const captured = await this.prisma.$transaction(
+        const captured = await interactiveTransaction(
+          this.prisma,
           async (tx) => {
             const heads = await tx.communityStreamHead.findMany({
               where: { OR: [{ id: 'public' }, { owner_id: member }] },
@@ -123,11 +126,11 @@ export class CommunitySyncService {
             )
             return { next, events, hasMore }
           },
-          {
+          () => ({
             isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
             timeout: budget.remaining(),
             maxWait: budget.remaining(),
-          }
+          })
         )
         // A fresh primary visibility check happens after ending the captured snapshot.
         const events = await this.serializeEvents(captured.events, member, scope)

@@ -1,0 +1,124 @@
+{
+  "corpusVersion": "holdout-v3",
+  "authorAndReviewer": "cc68-tea",
+  "frozenAt": "2026-10-26T04:18:18.084889+00:00",
+  "baseCommit": "1d7b98485485c224063b573207c7e78bace717be",
+  "gatePreregisteredCommit": "621bd3fa0ce191344e2a727968676eadbf6c695f",
+  "aggregateRecipe": "SHA-256 over sorted UTF-8 lines: repository-relative-path + NUL + file-SHA-256 + LF",
+  "authoringPolicySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+  "screeningRunBeforeFreeze": false,
+  "newRepairInspectedBeforeFreeze": false,
+  "previouslyKnownContext": "Prior v2 outcomes and its released repair were known. No round-2 repair was inspected before this seal. Fresh neutral sentence banks and a fixed seed supplied all v3 text.",
+  "construction": "50 new outfit pairs per locale; 30 caption occasions; 20 caption endings; 30 visual backgrounds; 20 visual observations. Ten seeded distinct combinations per outfit per field. Shared fragments are disclosed.",
+  "files": [
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/de.json",
+      "sha256": "6ddaf4d73601a91d7f39258fa3850304aeedb76ed2af3108073007243af2b774",
+      "language": "de",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/en.json",
+      "sha256": "6f116c4f70ec4890cb7eb7f0699a4f6d00c03bc9397d692dfa17400f93d8e8a4",
+      "language": "en",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/es.json",
+      "sha256": "61ca685bcf56362752c18cfbe554f79a00c9b08bb10a5f709336cbc1ccdf508a",
+      "language": "es",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/fr.json",
+      "sha256": "862b76f1c1e1a76548f5983788ff27c4817a0353c2397bc87f68e3a983243af2",
+      "language": "fr",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/it.json",
+      "sha256": "95454c0b089068d8810b6f9bcb4cb178e04649733a983a3628621cc9b05aac86",
+      "language": "it",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/pt.json",
+      "sha256": "f9f57979e3a7395150b324a638ba3bcd09a70a58e8a70b5fa6d63e3979465c0b",
+      "language": "pt",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/tr.json",
+      "sha256": "d599d94f4c80eb014c7db1129e78edcbd341660fbf76f5f51bbfb09df01460b6",
+      "language": "tr",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    }
+  ],
+  "authoringSources": [
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/authoring/authoring-plan.json",
+      "sha256": "656fa95c56da9c905077329658ef27a8614c5e6a488f26c86534b537d3e365d3"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/authoring/de.txt",
+      "sha256": "1cd81e32b974b4f934325cf978101f9e6631ca670a0202d2723c226d607a0e01"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/authoring/en.txt",
+      "sha256": "42ec2bdb58d91076bccd5e931a23fd1fe3ad3402ef5dfd9a6536c3ef02785ef1"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/authoring/es.txt",
+      "sha256": "84f107388e215d339edfa8cd43b4705cfe086cd7118bec90d7ccae4508e0cbb9"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/authoring/fr.txt",
+      "sha256": "18071b1d8b147468d4d7fb29a348c63e2db74bcbf7938f9ad475332c77efbbac"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/authoring/generate-inputs.py",
+      "sha256": "1846b6331c5a908c154e26be0704456947d198fa32452f3f594aaf4b7dfc6a5f"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/authoring/it.txt",
+      "sha256": "9e7be37184cc44f54dc0ef18ece228ca1e8921dd8076ad3f3c586b7884ddb9f5"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/authoring/pt.txt",
+      "sha256": "1dcf80d4dd259abf633285be8f05057c190b4b08bb5d4536d209f55b8bb8c054"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/authoring/tr.txt",
+      "sha256": "853491f1099c05a1aa20edffb91ec2356c9651c5987285ee81ffafed163fef78"
+    }
+  ],
+  "corpusSha256": "f987d152ca6d3c04d99a54bf7d7fb8008d966030ecdac2d550e32bf3d0663ada"
+}

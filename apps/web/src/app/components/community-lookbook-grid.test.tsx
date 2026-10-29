@@ -523,8 +523,11 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       await user.click(screen.getByTestId('community-filter-warm_dry'))
 
       expect(onTabChange).toHaveBeenCalledWith('warm_dry')
-      expect(screen.getByTestId('community-live-region')).toHaveTextContent(
-        'Showing Warm and dry looks.'
+      // The announcement follows the feed read for the chosen filter.
+      await waitFor(() =>
+        expect(screen.getByTestId('community-live-region')).toHaveTextContent(
+          'Showing Warm and dry looks.'
+        )
       )
     })
 

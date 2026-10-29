@@ -1,0 +1,5 @@
+appId: ${MAESTRO_APP_ID}
+---
+- assertNotVisible:
+    id: share-card-title
+- assertNotVisible: ${MAESTRO_SAVED}

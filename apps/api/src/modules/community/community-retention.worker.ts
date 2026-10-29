@@ -1,6 +1,7 @@
 // Story 6.5 owner: bounded deletion of inactive bindings/cache and terminal detail.
 import { Prisma, type PrismaClient } from '@prisma/client'
 import type { PushTokenRepository } from '../notifications/push-token.repository.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 export class CommunityRetentionWorker {
   constructor(
@@ -24,7 +25,8 @@ export class CommunityRetentionWorker {
       }))
     )
     await this.retainFlags()
-    await this.prisma.$transaction(
+    await interactiveTransaction(
+      this.prisma,
       async (tx) => {
         await tx.$executeRawUnsafe("SET LOCAL transaction_timeout = '2s'")
         const groups = await tx.communityNotificationGroup.findMany({
@@ -132,7 +134,8 @@ export class CommunityRetentionWorker {
     })
     if (!rows.length) return
     const members = [...new Set(rows.map((row) => row.member_id))]
-    await this.prisma.$transaction(
+    await interactiveTransaction(
+      this.prisma,
       async (tx) => {
         await tx.$executeRawUnsafe("SET LOCAL transaction_timeout = '2s'")
         await tx.$executeRaw(

@@ -1,0 +1,5013 @@
+{
+  "language": "es",
+  "corpusVersion": "holdout-v5",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "0dda50c51821e455569501da8651f1a2a8be929318fc2bbd4d61be0fd8d7a1ee",
+    "languageAllowListSha256": "058a7744b9407e5e0c26f3e0c6a885c86925e996bbff4ba2ae267acde0521b44"
+  },
+  "entries": [
+    {
+      "id": "es-holdout-v5-001",
+      "field": "caption",
+      "text": "El cuello deja una abertura rectangular que cambia toda esta blusa sencilla."
+    },
+    {
+      "id": "es-holdout-v5-002",
+      "field": "caption",
+      "text": "Hoy recogí el pelo para que se vea ese pequeño marco."
+    },
+    {
+      "id": "es-holdout-v5-003",
+      "field": "caption",
+      "text": "Me gustó cómo quedan los extremos separados sobre la camiseta interior."
+    },
+    {
+      "id": "es-holdout-v5-004",
+      "field": "altText",
+      "text": "Dos extremos rectos del cuello rodean una abertura rectangular en el frente."
+    },
+    {
+      "id": "es-holdout-v5-005",
+      "field": "altText",
+      "text": "La blusa presenta un cuello elevado que queda abierto sobre el pecho."
+    },
+    {
+      "id": "es-holdout-v5-006",
+      "field": "caption",
+      "text": "La costura dibuja un óvalo grande a cada lado del pantalón."
+    },
+    {
+      "id": "es-holdout-v5-007",
+      "field": "caption",
+      "text": "Con una blusa corta se aprecia mejor esta forma tan redondeada."
+    },
+    {
+      "id": "es-holdout-v5-008",
+      "field": "caption",
+      "text": "Me probé el pantalón caminando para entender el volumen de las piernas."
+    },
+    {
+      "id": "es-holdout-v5-009",
+      "field": "altText",
+      "text": "Las perneras se ensanchan lateralmente y vuelven a cerrarse cerca del tobillo."
+    },
+    {
+      "id": "es-holdout-v5-010",
+      "field": "altText",
+      "text": "Una costura curva forma un panel ovalado en el costado de cada pierna."
+    },
+    {
+      "id": "es-holdout-v5-011",
+      "field": "caption",
+      "text": "Las puntas de esta falda quedan a distintas alturas cuando estoy quieta."
+    },
+    {
+      "id": "es-holdout-v5-012",
+      "field": "caption",
+      "text": "Al girar se nota que cada panel termina en su propia esquina."
+    },
+    {
+      "id": "es-holdout-v5-013",
+      "field": "caption",
+      "text": "Elegí zapatos discretos para darle espacio al movimiento del bajo."
+    },
+    {
+      "id": "es-holdout-v5-014",
+      "field": "altText",
+      "text": "Varios paneles terminan en puntas triangulares a diferentes alturas de la falda."
+    },
+    {
+      "id": "es-holdout-v5-015",
+      "field": "altText",
+      "text": "El borde inferior presenta una secuencia irregular de esquinas largas y cortas."
+    },
+    {
+      "id": "es-holdout-v5-016",
+      "field": "caption",
+      "text": "La manga da una vuelta antes de llegar al puño."
+    },
+    {
+      "id": "es-holdout-v5-017",
+      "field": "caption",
+      "text": "Ese pequeño giro hace que la tela forme pliegues alrededor del brazo."
+    },
+    {
+      "id": "es-holdout-v5-018",
+      "field": "caption",
+      "text": "Quise mostrar el costado porque de frente casi se pierde el detalle."
+    },
+    {
+      "id": "es-holdout-v5-019",
+      "field": "altText",
+      "text": "La manga se retuerce suavemente entre el codo y el puño ajustado."
+    },
+    {
+      "id": "es-holdout-v5-020",
+      "field": "altText",
+      "text": "Una costura helicoidal guía los pliegues alrededor del antebrazo."
+    },
+    {
+      "id": "es-holdout-v5-021",
+      "field": "caption",
+      "text": "El panel redondo del frente parece una pieza apoyada sobre el vestido."
+    },
+    {
+      "id": "es-holdout-v5-022",
+      "field": "caption",
+      "text": "Me quedé mirando cómo continúa la tela por debajo de ese círculo."
+    },
+    {
+      "id": "es-holdout-v5-023",
+      "field": "caption",
+      "text": "Unos aretes pequeños acompañan bien este detalle de volumen en el torso."
+    },
+    {
+      "id": "es-holdout-v5-024",
+      "field": "altText",
+      "text": "Un panel circular sobresale ligeramente del frente superior del vestido."
+    },
+    {
+      "id": "es-holdout-v5-025",
+      "field": "altText",
+      "text": "El borde redondo queda separado de la tela por una sombra estrecha."
+    },
+    {
+      "id": "es-holdout-v5-026",
+      "field": "caption",
+      "text": "La pinza del codo deja que la manga acompañe el brazo doblado."
+    },
+    {
+      "id": "es-holdout-v5-027",
+      "field": "caption",
+      "text": "Probé esta camisa escribiendo un rato antes de decidir la talla."
+    },
+    {
+      "id": "es-holdout-v5-028",
+      "field": "caption",
+      "text": "Agradezco esos pequeños espacios extra cuando paso el día en movimiento."
+    },
+    {
+      "id": "es-holdout-v5-029",
+      "field": "altText",
+      "text": "Una pinza corta modela la manga justo sobre el codo flexionado."
+    },
+    {
+      "id": "es-holdout-v5-030",
+      "field": "altText",
+      "text": "El tejido del brazo presenta un pequeño pliegue estructural en la articulación."
+    },
+    {
+      "id": "es-holdout-v5-031",
+      "field": "caption",
+      "text": "El bolsillo se abre como un pequeño abanico cuando meto la mano."
+    },
+    {
+      "id": "es-holdout-v5-032",
+      "field": "caption",
+      "text": "Su forma aparece mejor con la falda extendida sobre la mesa."
+    },
+    {
+      "id": "es-holdout-v5-033",
+      "field": "caption",
+      "text": "Me gustan las prendas que guardan espacio dentro de sus pliegues."
+    },
+    {
+      "id": "es-holdout-v5-034",
+      "field": "altText",
+      "text": "Pliegues radiales amplían la abertura de un bolsillo lateral de la falda."
+    },
+    {
+      "id": "es-holdout-v5-035",
+      "field": "altText",
+      "text": "El bolsillo desplegado muestra varios dobleces que parten de un punto inferior."
+    },
+    {
+      "id": "es-holdout-v5-036",
+      "field": "caption",
+      "text": "La solapa cruza por encima del hombro y se abrocha atrás."
+    },
+    {
+      "id": "es-holdout-v5-037",
+      "field": "caption",
+      "text": "Tuve que tomar otra foto para enseñar dónde termina la abertura."
+    },
+    {
+      "id": "es-holdout-v5-038",
+      "field": "caption",
+      "text": "La línea del frente queda muy limpia con este cierre tan desplazado."
+    },
+    {
+      "id": "es-holdout-v5-039",
+      "field": "altText",
+      "text": "Una solapa ancha continúa desde el frente hasta un botón detrás del hombro."
+    },
+    {
+      "id": "es-holdout-v5-040",
+      "field": "altText",
+      "text": "La abertura diagonal atraviesa el pecho y termina en la espalda superior."
+    },
+    {
+      "id": "es-holdout-v5-041",
+      "field": "caption",
+      "text": "Las tiras de dentro permiten recoger un poco el largo de la camiseta."
+    },
+    {
+      "id": "es-holdout-v5-042",
+      "field": "caption",
+      "text": "Hoy las sujeté solo de un lado para cambiar el contorno."
+    },
+    {
+      "id": "es-holdout-v5-043",
+      "field": "caption",
+      "text": "Se puede soltar todo otra vez cuando quiero llevarla más larga."
+    },
+    {
+      "id": "es-holdout-v5-044",
+      "field": "altText",
+      "text": "Dos cintas internas sujetan el borde doblado de la camiseta con pequeños botones."
+    },
+    {
+      "id": "es-holdout-v5-045",
+      "field": "altText",
+      "text": "Un lado del bajo queda elevado mientras el otro cae libremente."
+    },
+    {
+      "id": "es-holdout-v5-046",
+      "field": "caption",
+      "text": "Una pequeña capa nace en la cintura y cae sobre la falda."
+    },
+    {
+      "id": "es-holdout-v5-047",
+      "field": "caption",
+      "text": "Al moverme se separan las dos piezas que parecen una sola de frente."
+    },
+    {
+      "id": "es-holdout-v5-048",
+      "field": "caption",
+      "text": "Dejé los accesorios simples para disfrutar ese vuelo corto."
+    },
+    {
+      "id": "es-holdout-v5-049",
+      "field": "altText",
+      "text": "Una capa corta de tela rodea la cintura por encima de la falda."
+    },
+    {
+      "id": "es-holdout-v5-050",
+      "field": "altText",
+      "text": "El vestido combina una falda recta con un panel superior flotante."
+    },
+    {
+      "id": "es-holdout-v5-051",
+      "field": "caption",
+      "text": "Las puntadas dibujan un arco largo desde la cadera hasta la rodilla."
+    },
+    {
+      "id": "es-holdout-v5-052",
+      "field": "caption",
+      "text": "Me encantan estos detalles que se descubren cuando miras la prenda de cerca."
+    },
+    {
+      "id": "es-holdout-v5-053",
+      "field": "caption",
+      "text": "La costura curva me ayudó a elegir la forma de la blusa."
+    },
+    {
+      "id": "es-holdout-v5-054",
+      "field": "altText",
+      "text": "Un pespunte ancho forma un arco sobre la cara exterior del pantalón."
+    },
+    {
+      "id": "es-holdout-v5-055",
+      "field": "altText",
+      "text": "La línea cosida baja desde la cadera y termina junto a la rodilla."
+    },
+    {
+      "id": "es-holdout-v5-056",
+      "field": "caption",
+      "text": "El nudo queda junto a la cadera y recoge todo el costado."
+    },
+    {
+      "id": "es-holdout-v5-057",
+      "field": "caption",
+      "text": "Lo ajusté con poca tensión para que la tela conserve movimiento."
+    },
+    {
+      "id": "es-holdout-v5-058",
+      "field": "caption",
+      "text": "Hoy quería un detalle suelto cerca de la cintura."
+    },
+    {
+      "id": "es-holdout-v5-059",
+      "field": "altText",
+      "text": "Un nudo grande reúne dos extensiones del borde lateral de la blusa."
+    },
+    {
+      "id": "es-holdout-v5-060",
+      "field": "altText",
+      "text": "La tela cae en pliegues diagonales hacia un amarre junto a la cadera."
+    },
+    {
+      "id": "es-holdout-v5-061",
+      "field": "caption",
+      "text": "Una pequeña banda une las dos puntas del cuello por debajo."
+    },
+    {
+      "id": "es-holdout-v5-062",
+      "field": "caption",
+      "text": "El puente deja un espacio que me parece bonito sin collar."
+    },
+    {
+      "id": "es-holdout-v5-063",
+      "field": "caption",
+      "text": "Tomé la foto desde arriba para que se entienda la unión."
+    },
+    {
+      "id": "es-holdout-v5-064",
+      "field": "altText",
+      "text": "Una tira horizontal conecta las puntas separadas del cuello de la camisa."
+    },
+    {
+      "id": "es-holdout-v5-065",
+      "field": "altText",
+      "text": "El cuello forma una abertura central por encima de una banda estrecha."
+    },
+    {
+      "id": "es-holdout-v5-066",
+      "field": "caption",
+      "text": "Dos recorridos en forma de ese atraviesan la tela con curvas enfrentadas."
+    },
+    {
+      "id": "es-holdout-v5-067",
+      "field": "caption",
+      "text": "Me gusta que las curvas sigan visibles incluso cuando la tela se mueve."
+    },
+    {
+      "id": "es-holdout-v5-068",
+      "field": "caption",
+      "text": "Una parte superior lisa deja respirar este dibujo hecho con recortes."
+    },
+    {
+      "id": "es-holdout-v5-069",
+      "field": "altText",
+      "text": "Dos costuras curvas dibujan formas de S invertidas en la falda."
+    },
+    {
+      "id": "es-holdout-v5-070",
+      "field": "altText",
+      "text": "Los paneles centrales se unen mediante líneas sinuosas que se acercan en la cintura."
+    },
+    {
+      "id": "es-holdout-v5-071",
+      "field": "caption",
+      "text": "Dos piezas estrechas sostienen la falda y dejan pequeños espacios en los lados."
+    },
+    {
+      "id": "es-holdout-v5-072",
+      "field": "caption",
+      "text": "Elegí este vestido por la forma tan precisa de su unión en la cintura."
+    },
+    {
+      "id": "es-holdout-v5-073",
+      "field": "caption",
+      "text": "Los recortes se mantienen en su sitio aunque levante los brazos."
+    },
+    {
+      "id": "es-holdout-v5-074",
+      "field": "altText",
+      "text": "Dos bandas verticales conectan el cuerpo del vestido con la falda."
+    },
+    {
+      "id": "es-holdout-v5-075",
+      "field": "altText",
+      "text": "Pequeñas aberturas laterales separan las piezas alrededor de la cintura."
+    },
+    {
+      "id": "es-holdout-v5-076",
+      "field": "caption",
+      "text": "La espalda del chaleco tiene una ventana larga atravesada por dos bandas."
+    },
+    {
+      "id": "es-holdout-v5-077",
+      "field": "caption",
+      "text": "Lo llevo sobre una camiseta lisa para mostrar el recorte completo."
+    },
+    {
+      "id": "es-holdout-v5-078",
+      "field": "caption",
+      "text": "De frente nadie se imagina el dibujo que aparece al darme vuelta."
+    },
+    {
+      "id": "es-holdout-v5-079",
+      "field": "altText",
+      "text": "Una abertura rectangular ocupa la espalda del chaleco y contiene dos bandas horizontales."
+    },
+    {
+      "id": "es-holdout-v5-080",
+      "field": "altText",
+      "text": "La camiseta interior queda visible entre los bordes de una ventana alargada."
+    },
+    {
+      "id": "es-holdout-v5-081",
+      "field": "caption",
+      "text": "Un panel ancho se abrocha sobre una pierna como un pequeño delantal."
+    },
+    {
+      "id": "es-holdout-v5-082",
+      "field": "caption",
+      "text": "Puedo retirarlo y dejar el pantalón con sus dos bolsillos normales."
+    },
+    {
+      "id": "es-holdout-v5-083",
+      "field": "caption",
+      "text": "Hoy aproveché ese espacio extra para llevar el cuaderno de bocetos."
+    },
+    {
+      "id": "es-holdout-v5-084",
+      "field": "altText",
+      "text": "Un panel desmontable cubre la parte superior de una pernera del pantalón."
+    },
+    {
+      "id": "es-holdout-v5-085",
+      "field": "altText",
+      "text": "Pequeños broches sujetan una pieza rectangular junto al costado de la cintura."
+    },
+    {
+      "id": "es-holdout-v5-086",
+      "field": "caption",
+      "text": "Cada puño cierra con una fila de pequeños puentes de tela."
+    },
+    {
+      "id": "es-holdout-v5-087",
+      "field": "caption",
+      "text": "Las aberturas dejan ver el dibujo completo cuando doblo la muñeca."
+    },
+    {
+      "id": "es-holdout-v5-088",
+      "field": "caption",
+      "text": "Me tomé unos minutos para acomodar todos los lazos antes de salir."
+    },
+    {
+      "id": "es-holdout-v5-089",
+      "field": "altText",
+      "text": "Tiras cortas conectan los dos bordes de una abertura larga en el puño."
+    },
+    {
+      "id": "es-holdout-v5-090",
+      "field": "altText",
+      "text": "Los pequeños puentes paralelos forman una escalera sobre la muñeca."
+    },
+    {
+      "id": "es-holdout-v5-091",
+      "field": "caption",
+      "text": "La pieza del frente se desplaza un poco al caminar sobre la falda."
+    },
+    {
+      "id": "es-holdout-v5-092",
+      "field": "caption",
+      "text": "Solo está unida arriba, así que conserva bastante libertad de movimiento."
+    },
+    {
+      "id": "es-holdout-v5-093",
+      "field": "caption",
+      "text": "Quería enseñar cómo aparece la capa de abajo entre un paso y otro."
+    },
+    {
+      "id": "es-holdout-v5-094",
+      "field": "altText",
+      "text": "Un panel largo cuelga desde la cintura sobre el centro de la falda."
+    },
+    {
+      "id": "es-holdout-v5-095",
+      "field": "altText",
+      "text": "La pieza superpuesta se separa lateralmente y descubre la capa inferior."
+    },
+    {
+      "id": "es-holdout-v5-096",
+      "field": "caption",
+      "text": "Un pliegue profundo nace junto a la sisa y se abre hacia la falda."
+    },
+    {
+      "id": "es-holdout-v5-097",
+      "field": "caption",
+      "text": "La tela encuentra espacio alrededor del cuerpo sin una cintura marcada."
+    },
+    {
+      "id": "es-holdout-v5-098",
+      "field": "caption",
+      "text": "Hoy preferí que la forma del vestido hiciera todo el trabajo."
+    },
+    {
+      "id": "es-holdout-v5-099",
+      "field": "altText",
+      "text": "Un pliegue ancho baja desde la sisa hacia el costado del vestido."
+    },
+    {
+      "id": "es-holdout-v5-100",
+      "field": "altText",
+      "text": "La tela sobrante forma una reserva profunda cerca de la abertura del brazo."
+    },
+    {
+      "id": "es-holdout-v5-101",
+      "field": "caption",
+      "text": "La barra corre por dos guías y deja la tapa bien sujeta."
+    },
+    {
+      "id": "es-holdout-v5-102",
+      "field": "caption",
+      "text": "Me gustó entender el mecanismo antes de guardar mis cosas."
+    },
+    {
+      "id": "es-holdout-v5-103",
+      "field": "caption",
+      "text": "Ese pequeño movimiento lateral es mi detalle favorito del bolso."
+    },
+    {
+      "id": "es-holdout-v5-104",
+      "field": "altText",
+      "text": "Una barra metálica se desliza por dos guías en la tapa del bolso."
+    },
+    {
+      "id": "es-holdout-v5-105",
+      "field": "altText",
+      "text": "El cierre queda atravesado sobre una abertura rectangular de la solapa."
+    },
+    {
+      "id": "es-holdout-v5-106",
+      "field": "caption",
+      "text": "Los aretes tienen dos mitades separadas que parecen una cápsula abierta."
+    },
+    {
+      "id": "es-holdout-v5-107",
+      "field": "caption",
+      "text": "Al girar muestran el espacio vacío que queda entre las piezas."
+    },
+    {
+      "id": "es-holdout-v5-108",
+      "field": "caption",
+      "text": "Hoy los acompañé con el pelo detrás de las orejas."
+    },
+    {
+      "id": "es-holdout-v5-109",
+      "field": "altText",
+      "text": "Dos mitades alargadas forman cada arete dejando un espacio entre ellas."
+    },
+    {
+      "id": "es-holdout-v5-110",
+      "field": "altText",
+      "text": "Las piezas curvas se unen arriba y quedan abiertas en la parte inferior."
+    },
+    {
+      "id": "es-holdout-v5-111",
+      "field": "caption",
+      "text": "Cada cuenta tiene una funda pequeña que puedo cambiar de posición."
+    },
+    {
+      "id": "es-holdout-v5-112",
+      "field": "caption",
+      "text": "Me entretuve acomodando las cubiertas antes de elegir la blusa."
+    },
+    {
+      "id": "es-holdout-v5-113",
+      "field": "caption",
+      "text": "Algunas esferas quedan descubiertas y otras se asoman por un costado."
+    },
+    {
+      "id": "es-holdout-v5-114",
+      "field": "altText",
+      "text": "Varias cuentas redondas están parcialmente cubiertas por pequeñas fundas móviles."
+    },
+    {
+      "id": "es-holdout-v5-115",
+      "field": "altText",
+      "text": "Las cubiertas se desplazan sobre las esferas dejando visibles distintos sectores."
+    },
+    {
+      "id": "es-holdout-v5-116",
+      "field": "caption",
+      "text": "Dos cintas rodean el brazo y se reúnen en una sola pieza central."
+    },
+    {
+      "id": "es-holdout-v5-117",
+      "field": "caption",
+      "text": "Las dos bandas dejan una franja descubierta alrededor de mi muñeca."
+    },
+    {
+      "id": "es-holdout-v5-118",
+      "field": "caption",
+      "text": "La acomodé un poco más arriba para que se vea completa."
+    },
+    {
+      "id": "es-holdout-v5-119",
+      "field": "altText",
+      "text": "Dos bandas paralelas forman una pulsera unida por una placa central."
+    },
+    {
+      "id": "es-holdout-v5-120",
+      "field": "altText",
+      "text": "Un espacio estrecho separa las cintas que rodean la muñeca."
+    },
+    {
+      "id": "es-holdout-v5-121",
+      "field": "caption",
+      "text": "El asa larga pasa bajo el brazo y la corta queda apoyada al frente."
+    },
+    {
+      "id": "es-holdout-v5-122",
+      "field": "caption",
+      "text": "Me gusta poder elegir dónde sujetarlo según lo que llevo adentro."
+    },
+    {
+      "id": "es-holdout-v5-123",
+      "field": "caption",
+      "text": "Las dos alturas se entienden mejor con el bolso colgado."
+    },
+    {
+      "id": "es-holdout-v5-124",
+      "field": "altText",
+      "text": "El bolso tiene dos asas de distinta longitud sujetas a los mismos costados."
+    },
+    {
+      "id": "es-holdout-v5-125",
+      "field": "altText",
+      "text": "Una correa larga queda por encima de una pequeña asa frontal."
+    },
+    {
+      "id": "es-holdout-v5-126",
+      "field": "caption",
+      "text": "Las guayabas abiertas del dibujo muestran un montón de semillas pequeñitas."
+    },
+    {
+      "id": "es-holdout-v5-127",
+      "field": "caption",
+      "text": "Elegí una blusa sencilla para acompañar estas frutas sobre la falda."
+    },
+    {
+      "id": "es-holdout-v5-128",
+      "field": "caption",
+      "text": "De cerca se distingue el contorno irregular de cada mitad."
+    },
+    {
+      "id": "es-holdout-v5-129",
+      "field": "altText",
+      "text": "Mitades de guayaba ilustradas muestran un centro lleno de semillas redondas."
+    },
+    {
+      "id": "es-holdout-v5-130",
+      "field": "altText",
+      "text": "La falda presenta frutas enteras y cortadas entre hojas pequeñas."
+    },
+    {
+      "id": "es-holdout-v5-131",
+      "field": "caption",
+      "text": "Las pitayas del estampado tienen sus hojitas puntiagudas saliendo por los lados."
+    },
+    {
+      "id": "es-holdout-v5-132",
+      "field": "caption",
+      "text": "Me encantó encontrar este dibujo tan particular para mi bolsa del diario."
+    },
+    {
+      "id": "es-holdout-v5-133",
+      "field": "caption",
+      "text": "Las rebanadas dejan ver todos esos puntitos que parecen puestos a mano."
+    },
+    {
+      "id": "es-holdout-v5-134",
+      "field": "altText",
+      "text": "Pitayas ilustradas combinan cáscaras puntiagudas con mitades de pulpa llena de puntos."
+    },
+    {
+      "id": "es-holdout-v5-135",
+      "field": "altText",
+      "text": "El panel de la bolsa muestra frutas ovaladas rodeadas de extensiones curvas."
+    },
+    {
+      "id": "es-holdout-v5-136",
+      "field": "caption",
+      "text": "Las mazorcas de cacao quedan abiertas justo al frente de esta camisa."
+    },
+    {
+      "id": "es-holdout-v5-137",
+      "field": "caption",
+      "text": "Me gustaron las pequeñas almendras dibujadas dentro de cada fruto."
+    },
+    {
+      "id": "es-holdout-v5-138",
+      "field": "caption",
+      "text": "Dejé la camisa suelta para mostrar completa la secuencia del estampado."
+    },
+    {
+      "id": "es-holdout-v5-139",
+      "field": "altText",
+      "text": "Vainas de cacao ilustradas aparecen abiertas junto a sus semillas agrupadas."
+    },
+    {
+      "id": "es-holdout-v5-140",
+      "field": "altText",
+      "text": "Las frutas alargadas presentan surcos longitudinales en la superficie dibujada."
+    },
+    {
+      "id": "es-holdout-v5-141",
+      "field": "caption",
+      "text": "Los granitos del dibujo forman hileras muy parejas en cada mazorca."
+    },
+    {
+      "id": "es-holdout-v5-142",
+      "field": "caption",
+      "text": "Este estampado me recordó las hojas que quedan abiertas alrededor del elote."
+    },
+    {
+      "id": "es-holdout-v5-143",
+      "field": "caption",
+      "text": "Las sandalias de hoy dejan despejado el dibujo de las mazorcas cerca del borde."
+    },
+    {
+      "id": "es-holdout-v5-144",
+      "field": "altText",
+      "text": "Mazorcas de maíz ilustradas presentan filas de granos y hojas abiertas."
+    },
+    {
+      "id": "es-holdout-v5-145",
+      "field": "altText",
+      "text": "El dibujo repite óvalos pequeños sobre cuerpos largos rodeados de hojas."
+    },
+    {
+      "id": "es-holdout-v5-146",
+      "field": "caption",
+      "text": "Las vainas curvas se reparten por la blusa sin seguir filas exactas."
+    },
+    {
+      "id": "es-holdout-v5-147",
+      "field": "caption",
+      "text": "Me gustó la forma abultada que tiene cada tamarindo del dibujo."
+    },
+    {
+      "id": "es-holdout-v5-148",
+      "field": "caption",
+      "text": "Hoy lo combiné con accesorios lisos para que se vean esas curvas."
+    },
+    {
+      "id": "es-holdout-v5-149",
+      "field": "altText",
+      "text": "Vainas de tamarindo ilustradas forman curvas segmentadas sobre la blusa."
+    },
+    {
+      "id": "es-holdout-v5-150",
+      "field": "altText",
+      "text": "Pequeños estrechamientos separan los bultos redondos de cada fruto dibujado."
+    },
+    {
+      "id": "es-holdout-v5-151",
+      "field": "caption",
+      "text": "Los higos cortados parecen pequeñas flores llenas de líneas en el centro."
+    },
+    {
+      "id": "es-holdout-v5-152",
+      "field": "caption",
+      "text": "La bolsa tiene un dibujo distinto cuando la miro de cerca."
+    },
+    {
+      "id": "es-holdout-v5-153",
+      "field": "caption",
+      "text": "Las mitades de higo muestran detalles que quedan escondidos en las frutas enteras."
+    },
+    {
+      "id": "es-holdout-v5-154",
+      "field": "altText",
+      "text": "Higos enteros y partidos muestran formas de gota sobre la tela del bolso."
+    },
+    {
+      "id": "es-holdout-v5-155",
+      "field": "altText",
+      "text": "Las mitades ilustradas contienen líneas finas que parten de un centro estrecho."
+    },
+    {
+      "id": "es-holdout-v5-156",
+      "field": "caption",
+      "text": "Los nopales del vestido crecen en paletas redondas una encima de otra."
+    },
+    {
+      "id": "es-holdout-v5-157",
+      "field": "caption",
+      "text": "Las pequeñas espinas dibujadas se notan cuando acerco la cámara."
+    },
+    {
+      "id": "es-holdout-v5-158",
+      "field": "caption",
+      "text": "Quería una estampa con formas grandes para esta silueta tan suelta."
+    },
+    {
+      "id": "es-holdout-v5-159",
+      "field": "altText",
+      "text": "Nopales ilustrados presentan paletas ovaladas conectadas en distintas direcciones."
+    },
+    {
+      "id": "es-holdout-v5-160",
+      "field": "altText",
+      "text": "Pequeños trazos cortos rodean los bordes de las figuras vegetales."
+    },
+    {
+      "id": "es-holdout-v5-161",
+      "field": "caption",
+      "text": "Las hojas grandes dejan huecos que se mezclan con el fondo de la falda."
+    },
+    {
+      "id": "es-holdout-v5-162",
+      "field": "caption",
+      "text": "Me gusta seguir los cortes de cada hoja cuando extiendo la tela."
+    },
+    {
+      "id": "es-holdout-v5-163",
+      "field": "caption",
+      "text": "Un top liso me dejó disfrutar este dibujo sin añadir demasiado."
+    },
+    {
+      "id": "es-holdout-v5-164",
+      "field": "altText",
+      "text": "Hojas de monstera ilustradas muestran recortes profundos y perforaciones interiores."
+    },
+    {
+      "id": "es-holdout-v5-165",
+      "field": "altText",
+      "text": "Las formas vegetales se superponen con grandes aberturas entre sus lóbulos."
+    },
+    {
+      "id": "es-holdout-v5-166",
+      "field": "caption",
+      "text": "Los grupos de bugambilias parecen flotar separados sobre la camisa."
+    },
+    {
+      "id": "es-holdout-v5-167",
+      "field": "caption",
+      "text": "El dibujo deja unas hojitas diminutas dentro de cada grupo de pétalos."
+    },
+    {
+      "id": "es-holdout-v5-168",
+      "field": "caption",
+      "text": "Hoy tenía ganas de usar algo con flores pequeñas y bastante espacio alrededor."
+    },
+    {
+      "id": "es-holdout-v5-169",
+      "field": "altText",
+      "text": "Grupos de brácteas de bugambilia se repiten entre tallos finos en la camisa."
+    },
+    {
+      "id": "es-holdout-v5-170",
+      "field": "altText",
+      "text": "Cada conjunto floral presenta tres formas delgadas alrededor de un centro pequeño."
+    },
+    {
+      "id": "es-holdout-v5-171",
+      "field": "caption",
+      "text": "Las hojas de ginkgo abren su abanico por todo el pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-172",
+      "field": "caption",
+      "text": "Las dos partes redondeadas de cada hoja hacen un dibujo precioso."
+    },
+    {
+      "id": "es-holdout-v5-173",
+      "field": "caption",
+      "text": "Lo llevé extendido sobre los hombros para mostrar los tallos tan finitos."
+    },
+    {
+      "id": "es-holdout-v5-174",
+      "field": "altText",
+      "text": "Hojas en forma de abanico presentan una pequeña división en el borde superior."
+    },
+    {
+      "id": "es-holdout-v5-175",
+      "field": "altText",
+      "text": "Tallos estrechos sostienen las hojas bilobuladas ilustradas sobre el pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-176",
+      "field": "caption",
+      "text": "Las magnolias abiertas ocupan casi todo el frente de mi vestido."
+    },
+    {
+      "id": "es-holdout-v5-177",
+      "field": "caption",
+      "text": "Me gustó que los pétalos fueran largos y quedaran bien separados."
+    },
+    {
+      "id": "es-holdout-v5-178",
+      "field": "caption",
+      "text": "Con el vestido colgado se aprecia mejor el tamaño completo de las flores."
+    },
+    {
+      "id": "es-holdout-v5-179",
+      "field": "altText",
+      "text": "Grandes magnolias ilustradas tienen pétalos alargados distribuidos alrededor de centros compactos."
+    },
+    {
+      "id": "es-holdout-v5-180",
+      "field": "altText",
+      "text": "Las flores del estampado se superponen a ramas cortas junto a los costados."
+    },
+    {
+      "id": "es-holdout-v5-181",
+      "field": "caption",
+      "text": "Los racimos de semillas cuelgan entre las hojas del estampado."
+    },
+    {
+      "id": "es-holdout-v5-182",
+      "field": "caption",
+      "text": "Elegí este pañuelo por ese detalle que casi siempre pasa desapercibido."
+    },
+    {
+      "id": "es-holdout-v5-183",
+      "field": "caption",
+      "text": "Me gusta cómo las bolitas del dibujo llenan las curvas de las ramas."
+    },
+    {
+      "id": "es-holdout-v5-184",
+      "field": "altText",
+      "text": "Racimos de semillas redondas cuelgan bajo hojas largas de palmera ilustradas."
+    },
+    {
+      "id": "es-holdout-v5-185",
+      "field": "altText",
+      "text": "El pañuelo combina arcos de hojas con grupos compactos de pequeños frutos."
+    },
+    {
+      "id": "es-holdout-v5-186",
+      "field": "caption",
+      "text": "Las torres dibujadas tienen campanas diminutas dentro de sus ventanas."
+    },
+    {
+      "id": "es-holdout-v5-187",
+      "field": "caption",
+      "text": "La camisa parece una colección de campanarios de un pueblo inventado."
+    },
+    {
+      "id": "es-holdout-v5-188",
+      "field": "caption",
+      "text": "Abro el cuello y aparece completa la torre que había quedado doblada."
+    },
+    {
+      "id": "es-holdout-v5-189",
+      "field": "altText",
+      "text": "Campanarios ilustrados presentan aberturas altas con pequeñas campanas en el interior."
+    },
+    {
+      "id": "es-holdout-v5-190",
+      "field": "altText",
+      "text": "Torres de varios tamaños se repiten con techos puntiagudos sobre la camisa."
+    },
+    {
+      "id": "es-holdout-v5-191",
+      "field": "caption",
+      "text": "Los portales dibujados recorren la orilla inferior sin dejar ningún tramo vacío."
+    },
+    {
+      "id": "es-holdout-v5-192",
+      "field": "caption",
+      "text": "Me gustó esa sensación de caminar bajo arcos aunque el dibujo sea pequeño."
+    },
+    {
+      "id": "es-holdout-v5-193",
+      "field": "caption",
+      "text": "La secuencia se completa cuando junto las dos costuras laterales."
+    },
+    {
+      "id": "es-holdout-v5-194",
+      "field": "altText",
+      "text": "Columnas delgadas sostienen arcos consecutivos junto al borde inferior de la falda."
+    },
+    {
+      "id": "es-holdout-v5-195",
+      "field": "altText",
+      "text": "Las aberturas dibujadas forman un corredor continuo sobre la tela."
+    },
+    {
+      "id": "es-holdout-v5-196",
+      "field": "caption",
+      "text": "La fuente del dibujo queda rodeada de macetas y pequeños azulejos."
+    },
+    {
+      "id": "es-holdout-v5-197",
+      "field": "caption",
+      "text": "Me pareció una escena tranquila para la bolsa que llevo a todas partes."
+    },
+    {
+      "id": "es-holdout-v5-198",
+      "field": "caption",
+      "text": "Los chorritos dibujados se ven mejor cuando la bolsa está vacía y plana."
+    },
+    {
+      "id": "es-holdout-v5-199",
+      "field": "altText",
+      "text": "Una fuente redonda ilustrada ocupa el centro de un patio con macetas."
+    },
+    {
+      "id": "es-holdout-v5-200",
+      "field": "altText",
+      "text": "Pequeños cuadros representan baldosas alrededor del agua dibujada en el bolso."
+    },
+    {
+      "id": "es-holdout-v5-201",
+      "field": "caption",
+      "text": "Las casitas del estampado suben unas sobre otras como en una ladera."
+    },
+    {
+      "id": "es-holdout-v5-202",
+      "field": "caption",
+      "text": "Cada techo tiene una inclinación distinta dentro de esta ciudad imaginada."
+    },
+    {
+      "id": "es-holdout-v5-203",
+      "field": "caption",
+      "text": "Dejé la camisa por fuera para mostrar los escalones del dibujo completo."
+    },
+    {
+      "id": "es-holdout-v5-204",
+      "field": "altText",
+      "text": "Casas ilustradas se agrupan en niveles sobre una pendiente imaginaria."
+    },
+    {
+      "id": "es-holdout-v5-205",
+      "field": "altText",
+      "text": "Las construcciones presentan puertas pequeñas y techos inclinados a distintas alturas."
+    },
+    {
+      "id": "es-holdout-v5-206",
+      "field": "caption",
+      "text": "Los rieles dibujados continúan por encima de los arcos del puente."
+    },
+    {
+      "id": "es-holdout-v5-207",
+      "field": "caption",
+      "text": "La escena de trenes es pequeña, pero llena de líneas que se cruzan."
+    },
+    {
+      "id": "es-holdout-v5-208",
+      "field": "caption",
+      "text": "Me gustó llevar este paisaje inventado en una falda tan sencilla."
+    },
+    {
+      "id": "es-holdout-v5-209",
+      "field": "altText",
+      "text": "Un puente ferroviario ilustrado sostiene vías sobre varios arcos altos."
+    },
+    {
+      "id": "es-holdout-v5-210",
+      "field": "altText",
+      "text": "Un tren pequeño aparece cruzando la estructura dibujada junto al borde inferior."
+    },
+    {
+      "id": "es-holdout-v5-211",
+      "field": "caption",
+      "text": "Los puestitos de flores tienen toldos rayados y cubetas dibujadas al frente."
+    },
+    {
+      "id": "es-holdout-v5-212",
+      "field": "caption",
+      "text": "El mercado del pañuelo se va descubriendo cuando lo abro entero."
+    },
+    {
+      "id": "es-holdout-v5-213",
+      "field": "caption",
+      "text": "Hoy escogí esta escena por el montón de ramos pequeños que aparecen."
+    },
+    {
+      "id": "es-holdout-v5-214",
+      "field": "altText",
+      "text": "Puestos de flores ilustrados muestran toldos abiertos y recipientes llenos de tallos."
+    },
+    {
+      "id": "es-holdout-v5-215",
+      "field": "altText",
+      "text": "Ramos pequeños se alinean en mesas ilustradas bajo los toldos del mercado."
+    },
+    {
+      "id": "es-holdout-v5-216",
+      "field": "caption",
+      "text": "Las escaleras metálicas forman diagonales sobre las fachadas del dibujo."
+    },
+    {
+      "id": "es-holdout-v5-217",
+      "field": "caption",
+      "text": "Me gustó ese contraste entre las ventanas rectas y los tramos inclinados."
+    },
+    {
+      "id": "es-holdout-v5-218",
+      "field": "caption",
+      "text": "La estampa de edificios ocupa solo un lado de mi camiseta."
+    },
+    {
+      "id": "es-holdout-v5-219",
+      "field": "altText",
+      "text": "Escaleras exteriores ilustradas conectan varias ventanas sobre una fachada alta."
+    },
+    {
+      "id": "es-holdout-v5-220",
+      "field": "altText",
+      "text": "Las plataformas horizontales se unen mediante tramos diagonales en el estampado."
+    },
+    {
+      "id": "es-holdout-v5-221",
+      "field": "caption",
+      "text": "El quiosco del dibujo tiene un techo amplio sostenido por columnas delgadas."
+    },
+    {
+      "id": "es-holdout-v5-222",
+      "field": "caption",
+      "text": "Quería enseñar los instrumentos diminutos que aparecen dentro de la escena."
+    },
+    {
+      "id": "es-holdout-v5-223",
+      "field": "caption",
+      "text": "El bolso se volvió mi pequeño recuerdo de las tardes en la plaza."
+    },
+    {
+      "id": "es-holdout-v5-224",
+      "field": "altText",
+      "text": "Un quiosco ilustrado presenta columnas delgadas y músicos pequeños bajo el techo."
+    },
+    {
+      "id": "es-holdout-v5-225",
+      "field": "altText",
+      "text": "La estructura octagonal ocupa el panel del bolso sobre una línea de escalones."
+    },
+    {
+      "id": "es-holdout-v5-226",
+      "field": "caption",
+      "text": "Las aspas dibujadas se ven detrás de las rejillas de cada ventilador."
+    },
+    {
+      "id": "es-holdout-v5-227",
+      "field": "caption",
+      "text": "Me hizo gracia encontrar esta colección de aparatos en una camisa."
+    },
+    {
+      "id": "es-holdout-v5-228",
+      "field": "caption",
+      "text": "Unos tienen base redonda y otros parecen estar colgados de la pared."
+    },
+    {
+      "id": "es-holdout-v5-229",
+      "field": "altText",
+      "text": "Ventiladores ilustrados muestran aspas protegidas por rejillas circulares sobre la camisa."
+    },
+    {
+      "id": "es-holdout-v5-230",
+      "field": "altText",
+      "text": "Los aparatos dibujados combinan bases altas y soportes cortos en el estampado."
+    },
+    {
+      "id": "es-holdout-v5-231",
+      "field": "caption",
+      "text": "Los candados tienen forma de corazón y sus llavecitas quedan cerca."
+    },
+    {
+      "id": "es-holdout-v5-232",
+      "field": "caption",
+      "text": "Me gustó el arco ancho que se repite sobre cada figura pequeña."
+    },
+    {
+      "id": "es-holdout-v5-233",
+      "field": "caption",
+      "text": "Dejé el pañuelo sin nudo para mostrar todos los cierres dibujados."
+    },
+    {
+      "id": "es-holdout-v5-234",
+      "field": "altText",
+      "text": "Candados ilustrados con cuerpo de corazón aparecen junto a pequeñas llaves."
+    },
+    {
+      "id": "es-holdout-v5-235",
+      "field": "altText",
+      "text": "Los arcos metálicos dibujados sobresalen de figuras simétricas sobre el pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-236",
+      "field": "caption",
+      "text": "Los patines dibujados llevan cordones tan largos que casi unen unos con otros."
+    },
+    {
+      "id": "es-holdout-v5-237",
+      "field": "caption",
+      "text": "Me gustaron las ruedas redondas que quedan bien visibles bajo cada bota."
+    },
+    {
+      "id": "es-holdout-v5-238",
+      "field": "caption",
+      "text": "Esta camiseta tiene una energía de paseo que me contagia al ponérmela."
+    },
+    {
+      "id": "es-holdout-v5-239",
+      "field": "altText",
+      "text": "Patines de cuatro ruedas ilustrados muestran botas altas y cordones largos."
+    },
+    {
+      "id": "es-holdout-v5-240",
+      "field": "altText",
+      "text": "Dos pares de ruedas aparecen debajo de cada calzado dibujado en la camiseta."
+    },
+    {
+      "id": "es-holdout-v5-241",
+      "field": "caption",
+      "text": "Los abanicos están cerrados y parecen pequeñas varitas unidas por cintas."
+    },
+    {
+      "id": "es-holdout-v5-242",
+      "field": "caption",
+      "text": "Me fijé en las bisagras redondas del extremo de cada dibujo."
+    },
+    {
+      "id": "es-holdout-v5-243",
+      "field": "caption",
+      "text": "El estampado deja bastante espacio vacío y eso me gustó para esta blusa."
+    },
+    {
+      "id": "es-holdout-v5-244",
+      "field": "altText",
+      "text": "Abanicos cerrados ilustrados presentan varillas estrechas reunidas en un extremo circular."
+    },
+    {
+      "id": "es-holdout-v5-245",
+      "field": "altText",
+      "text": "Cintas dibujadas pasan entre varias figuras largas sobre la tela de la blusa."
+    },
+    {
+      "id": "es-holdout-v5-246",
+      "field": "caption",
+      "text": "Las rueditas de hilar del dibujo tienen pedales y correas minúsculas."
+    },
+    {
+      "id": "es-holdout-v5-247",
+      "field": "caption",
+      "text": "Elegí esta bolsa para guardar los materiales de mis proyectos tranquilos."
+    },
+    {
+      "id": "es-holdout-v5-248",
+      "field": "caption",
+      "text": "De cerca se alcanza a ver el hilo que conecta cada parte."
+    },
+    {
+      "id": "es-holdout-v5-249",
+      "field": "altText",
+      "text": "Ruecas ilustradas combinan ruedas grandes con pedales y soportes verticales."
+    },
+    {
+      "id": "es-holdout-v5-250",
+      "field": "altText",
+      "text": "Una línea fina representa el hilo que recorre el mecanismo dibujado."
+    },
+    {
+      "id": "es-holdout-v5-251",
+      "field": "caption",
+      "text": "Las muñequitas del estampado aparecen abiertas y muestran otra figura dentro."
+    },
+    {
+      "id": "es-holdout-v5-252",
+      "field": "caption",
+      "text": "Me gustó que cada cara tuviera una expresión ligeramente distinta."
+    },
+    {
+      "id": "es-holdout-v5-253",
+      "field": "caption",
+      "text": "Hoy dejé la blusa por fuera para que se vean todas las figuras."
+    },
+    {
+      "id": "es-holdout-v5-254",
+      "field": "altText",
+      "text": "Muñecas anidadas ilustradas presentan cuerpos abiertos con figuras menores en el interior."
+    },
+    {
+      "id": "es-holdout-v5-255",
+      "field": "altText",
+      "text": "Las formas redondeadas muestran rostros pequeños bajo pañuelos dibujados."
+    },
+    {
+      "id": "es-holdout-v5-256",
+      "field": "caption",
+      "text": "Los rectángulos calados parecen colgar de un hilo en la falda."
+    },
+    {
+      "id": "es-holdout-v5-257",
+      "field": "caption",
+      "text": "Las perforaciones dibujadas forman flores y pequeñas figuras geométricas."
+    },
+    {
+      "id": "es-holdout-v5-258",
+      "field": "caption",
+      "text": "Este diseño me recordó los adornos que llenan las plazas en las fiestas."
+    },
+    {
+      "id": "es-holdout-v5-259",
+      "field": "altText",
+      "text": "Banderines rectangulares de papel picado ilustrado cuelgan de una línea curva."
+    },
+    {
+      "id": "es-holdout-v5-260",
+      "field": "altText",
+      "text": "El dibujo presenta recortes simétricos y bordes dentados dentro de cada rectángulo."
+    },
+    {
+      "id": "es-holdout-v5-261",
+      "field": "caption",
+      "text": "Los molinillos de chocolate tienen anillos distintos en cada extremo."
+    },
+    {
+      "id": "es-holdout-v5-262",
+      "field": "caption",
+      "text": "Me gustó encontrar un utensilio tan familiar en el dibujo de esta camisa."
+    },
+    {
+      "id": "es-holdout-v5-263",
+      "field": "caption",
+      "text": "Las rayitas del mango siguen visibles aunque la tela se doble."
+    },
+    {
+      "id": "es-holdout-v5-264",
+      "field": "altText",
+      "text": "Molinillos ilustrados presentan mangos largos y cabezas formadas por anillos superpuestos."
+    },
+    {
+      "id": "es-holdout-v5-265",
+      "field": "altText",
+      "text": "Los mangos dibujados apuntan en direcciones alternas entre las figuras de molinillos."
+    },
+    {
+      "id": "es-holdout-v5-266",
+      "field": "caption",
+      "text": "Las figuras fantásticas mezclan alas grandes con colas que terminan en espiral."
+    },
+    {
+      "id": "es-holdout-v5-267",
+      "field": "caption",
+      "text": "Me quedé mirando las patitas y los pequeños cuernos de cada dibujo."
+    },
+    {
+      "id": "es-holdout-v5-268",
+      "field": "caption",
+      "text": "Preferí accesorios discretos para dejar que estas criaturas ocupen toda la atención."
+    },
+    {
+      "id": "es-holdout-v5-269",
+      "field": "altText",
+      "text": "Criaturas fantásticas ilustradas combinan alas, cuernos y colas curvadas sobre el vestido."
+    },
+    {
+      "id": "es-holdout-v5-270",
+      "field": "altText",
+      "text": "Los animales imaginarios presentan superficies decoradas con puntos y líneas cortas."
+    },
+    {
+      "id": "es-holdout-v5-271",
+      "field": "caption",
+      "text": "Las calaveritas dibujadas tienen flores pequeñas alrededor de los ojos."
+    },
+    {
+      "id": "es-holdout-v5-272",
+      "field": "caption",
+      "text": "Los pétalos forman un marco delicado dentro de cada figura redonda."
+    },
+    {
+      "id": "es-holdout-v5-273",
+      "field": "caption",
+      "text": "Hoy quise mostrar el diseño completo del pañuelo extendido."
+    },
+    {
+      "id": "es-holdout-v5-274",
+      "field": "altText",
+      "text": "Calaveras decorativas ilustradas presentan flores y hojas alrededor de las órbitas."
+    },
+    {
+      "id": "es-holdout-v5-275",
+      "field": "altText",
+      "text": "Pequeñas formas florales llenan los contornos redondeados del estampado."
+    },
+    {
+      "id": "es-holdout-v5-276",
+      "field": "caption",
+      "text": "Cada trompo lleva su cuerda enrollada como una pequeña falda alrededor."
+    },
+    {
+      "id": "es-holdout-v5-277",
+      "field": "caption",
+      "text": "Me gustó la punta diminuta que se asoma debajo del dibujo."
+    },
+    {
+      "id": "es-holdout-v5-278",
+      "field": "caption",
+      "text": "La camisa tiene varios juguetes colocados de perfil para mostrar su forma."
+    },
+    {
+      "id": "es-holdout-v5-279",
+      "field": "altText",
+      "text": "Trompos ilustrados muestran cuerdas enrolladas alrededor de sus cuerpos redondeados."
+    },
+    {
+      "id": "es-holdout-v5-280",
+      "field": "altText",
+      "text": "Puntas estrechas sobresalen debajo de los juguetes dibujados entre lazos de cuerda."
+    },
+    {
+      "id": "es-holdout-v5-281",
+      "field": "caption",
+      "text": "Los yoyos del estampado quedan suspendidos de hilos largos entre la tela."
+    },
+    {
+      "id": "es-holdout-v5-282",
+      "field": "caption",
+      "text": "Uno está abierto y deja ver el eje que sostiene las dos mitades."
+    },
+    {
+      "id": "es-holdout-v5-283",
+      "field": "caption",
+      "text": "Escogí esta playera por la mezcla de círculos grandes y líneas delgadas."
+    },
+    {
+      "id": "es-holdout-v5-284",
+      "field": "altText",
+      "text": "Yoyos ilustrados cuelgan de cuerdas y presentan dos discos unidos por un eje."
+    },
+    {
+      "id": "es-holdout-v5-285",
+      "field": "altText",
+      "text": "Un dibujo abierto del juguete permite ver la separación entre sus dos mitades."
+    },
+    {
+      "id": "es-holdout-v5-286",
+      "field": "caption",
+      "text": "Los rehiletes parecen doblados desde las esquinas de pequeños cuadrados."
+    },
+    {
+      "id": "es-holdout-v5-287",
+      "field": "caption",
+      "text": "Me gusta cómo las cuatro puntas se encuentran en cada centro dibujado."
+    },
+    {
+      "id": "es-holdout-v5-288",
+      "field": "caption",
+      "text": "El pañuelo tiene bastante movimiento aunque los molinitos sean solo una estampa."
+    },
+    {
+      "id": "es-holdout-v5-289",
+      "field": "altText",
+      "text": "Rehiletes ilustrados muestran cuatro puntas dobladas hacia un pequeño centro circular."
+    },
+    {
+      "id": "es-holdout-v5-290",
+      "field": "altText",
+      "text": "Cada molino de papel aparece sujeto sobre un palito recto."
+    },
+    {
+      "id": "es-holdout-v5-291",
+      "field": "caption",
+      "text": "Los baleros dibujados tienen el vasito separado del mango por una cuerda."
+    },
+    {
+      "id": "es-holdout-v5-292",
+      "field": "caption",
+      "text": "Me acordé de los intentos que hacía para encajar las dos piezas."
+    },
+    {
+      "id": "es-holdout-v5-293",
+      "field": "caption",
+      "text": "El dibujo pequeño funciona muy bien sobre una bolsa de forma sencilla."
+    },
+    {
+      "id": "es-holdout-v5-294",
+      "field": "altText",
+      "text": "Baleros ilustrados presentan piezas huecas conectadas por cuerdas a mangos estrechos."
+    },
+    {
+      "id": "es-holdout-v5-295",
+      "field": "altText",
+      "text": "Los juguetes aparecen separados y encajados en distintas partes del estampado."
+    },
+    {
+      "id": "es-holdout-v5-296",
+      "field": "caption",
+      "text": "Las dos conchas de cada castañuela se ven unidas por su cordón."
+    },
+    {
+      "id": "es-holdout-v5-297",
+      "field": "caption",
+      "text": "Algunas castañuelas dibujadas dejan sus dos mitades separadas por un espacio pequeño."
+    },
+    {
+      "id": "es-holdout-v5-298",
+      "field": "caption",
+      "text": "Me gustó ese detalle de manos dibujadas sujetando algunos de los instrumentos."
+    },
+    {
+      "id": "es-holdout-v5-299",
+      "field": "altText",
+      "text": "Castañuelas ilustradas muestran dos placas curvas enlazadas mediante cordones pequeños."
+    },
+    {
+      "id": "es-holdout-v5-300",
+      "field": "altText",
+      "text": "Varias piezas aparecen abiertas con sus superficies interiores enfrentadas."
+    },
+    {
+      "id": "es-holdout-v5-301",
+      "field": "caption",
+      "text": "Las maracas del dibujo tienen mangos larguísimos y cabezas de tamaños distintos."
+    },
+    {
+      "id": "es-holdout-v5-302",
+      "field": "caption",
+      "text": "Algunas aparecen cruzadas como si alguien las hubiera dejado sobre la mesa."
+    },
+    {
+      "id": "es-holdout-v5-303",
+      "field": "caption",
+      "text": "La blusa se siente alegre con esta mezcla de formas redondas."
+    },
+    {
+      "id": "es-holdout-v5-304",
+      "field": "altText",
+      "text": "Maracas ilustradas combinan cabezas ovaladas y mangos largos en el estampado."
+    },
+    {
+      "id": "es-holdout-v5-305",
+      "field": "altText",
+      "text": "Pares de instrumentos dibujados se cruzan entre figuras individuales sobre la tela."
+    },
+    {
+      "id": "es-holdout-v5-306",
+      "field": "caption",
+      "text": "Las cuerdas del tambor forman diagonales alrededor de todo el cuerpo."
+    },
+    {
+      "id": "es-holdout-v5-307",
+      "field": "caption",
+      "text": "Me gustaron los pequeños nudos dibujados junto al aro superior."
+    },
+    {
+      "id": "es-holdout-v5-308",
+      "field": "caption",
+      "text": "Hoy elegí esta bolsa para acompañar una ropa sin demasiados detalles."
+    },
+    {
+      "id": "es-holdout-v5-309",
+      "field": "altText",
+      "text": "Tambores ilustrados presentan cuerdas cruzadas que unen sus aros superiores e inferiores."
+    },
+    {
+      "id": "es-holdout-v5-310",
+      "field": "altText",
+      "text": "Los cuerpos cilíndricos dibujados muestran tramas diagonales tensadas por pequeños nudos."
+    },
+    {
+      "id": "es-holdout-v5-311",
+      "field": "caption",
+      "text": "Los tubitos de la zampoña bajan de tamaño como una pequeña escalera."
+    },
+    {
+      "id": "es-holdout-v5-312",
+      "field": "caption",
+      "text": "La atadura que los une se ve preciosa en el centro del dibujo."
+    },
+    {
+      "id": "es-holdout-v5-313",
+      "field": "caption",
+      "text": "Dejé el pañuelo abierto para que aparezca el instrumento entero."
+    },
+    {
+      "id": "es-holdout-v5-314",
+      "field": "altText",
+      "text": "Zampoñas ilustradas presentan tubos paralelos de longitudes progresivamente menores."
+    },
+    {
+      "id": "es-holdout-v5-315",
+      "field": "altText",
+      "text": "Una banda tejida dibujada mantiene juntos los pequeños tubos del instrumento."
+    },
+    {
+      "id": "es-holdout-v5-316",
+      "field": "caption",
+      "text": "Los charanguitos tienen una caja redonda y un mástil bien estrecho."
+    },
+    {
+      "id": "es-holdout-v5-317",
+      "field": "caption",
+      "text": "Me fijé en las cuerdas finas que aparecen dentro del estampado."
+    },
+    {
+      "id": "es-holdout-v5-318",
+      "field": "caption",
+      "text": "Una camisa cómoda para llevar este dibujo a mi día de descanso."
+    },
+    {
+      "id": "es-holdout-v5-319",
+      "field": "altText",
+      "text": "Charangos ilustrados muestran cajas pequeñas redondeadas y mástiles largos con cuerdas."
+    },
+    {
+      "id": "es-holdout-v5-320",
+      "field": "altText",
+      "text": "Las figuras musicales se repiten inclinadas entre clavijas y puentes dibujados."
+    },
+    {
+      "id": "es-holdout-v5-321",
+      "field": "caption",
+      "text": "Las ocarinas de la falda parecen pequeñas formas redondas llenas de agujeritos."
+    },
+    {
+      "id": "es-holdout-v5-322",
+      "field": "caption",
+      "text": "Me gustó la boquilla que sale a un lado de cada instrumento."
+    },
+    {
+      "id": "es-holdout-v5-323",
+      "field": "caption",
+      "text": "El dibujo deja suficiente espacio para que se aprecien todas las perforaciones."
+    },
+    {
+      "id": "es-holdout-v5-324",
+      "field": "altText",
+      "text": "Ocarinas ilustradas presentan cuerpos ovalados con varios orificios y una boquilla lateral."
+    },
+    {
+      "id": "es-holdout-v5-325",
+      "field": "altText",
+      "text": "Pequeños círculos oscuros se distribuyen sobre las formas curvas de los instrumentos."
+    },
+    {
+      "id": "es-holdout-v5-326",
+      "field": "caption",
+      "text": "Las arpas dibujadas tienen una curva alta que rodea todas las cuerdas."
+    },
+    {
+      "id": "es-holdout-v5-327",
+      "field": "caption",
+      "text": "Las cuerdas finitas ocupan todo el interior de esos marcos de arpa tan anchos."
+    },
+    {
+      "id": "es-holdout-v5-328",
+      "field": "caption",
+      "text": "Cuando camino, las arpas de la tela aparecen enteras cerca de mis zapatos."
+    },
+    {
+      "id": "es-holdout-v5-329",
+      "field": "altText",
+      "text": "Arpas ilustradas presentan marcos triangulares curvados alrededor de cuerdas verticales."
+    },
+    {
+      "id": "es-holdout-v5-330",
+      "field": "altText",
+      "text": "Las bases cortas sostienen estructuras arqueadas repetidas cerca del borde del vestido."
+    },
+    {
+      "id": "es-holdout-v5-331",
+      "field": "caption",
+      "text": "Los pequeños telares del estampado conservan sus hilos bien alineados."
+    },
+    {
+      "id": "es-holdout-v5-332",
+      "field": "caption",
+      "text": "Esta bolsa me pareció perfecta para guardar las madejas que voy usando."
+    },
+    {
+      "id": "es-holdout-v5-333",
+      "field": "caption",
+      "text": "El dibujo incluye la lanzadera cruzando por el centro de cada marco."
+    },
+    {
+      "id": "es-holdout-v5-334",
+      "field": "altText",
+      "text": "Telares ilustrados muestran hilos paralelos tensados dentro de marcos rectangulares."
+    },
+    {
+      "id": "es-holdout-v5-335",
+      "field": "altText",
+      "text": "Una pequeña lanzadera dibujada atraviesa las líneas verticales de cada telar."
+    },
+    {
+      "id": "es-holdout-v5-336",
+      "field": "caption",
+      "text": "Los rollitos dibujados dejan ver varias capas en sus extremos."
+    },
+    {
+      "id": "es-holdout-v5-337",
+      "field": "caption",
+      "text": "Me gustó esta estampa tranquila de textiles atados con cintas pequeñas."
+    },
+    {
+      "id": "es-holdout-v5-338",
+      "field": "caption",
+      "text": "Hoy llevé el pañuelo bien extendido para mostrar los círculos de cada rollo."
+    },
+    {
+      "id": "es-holdout-v5-339",
+      "field": "altText",
+      "text": "Mantas ilustradas están enrolladas y sujetas mediante cintas alrededor del centro."
+    },
+    {
+      "id": "es-holdout-v5-340",
+      "field": "altText",
+      "text": "Los extremos circulares muestran capas concéntricas dentro de los pequeños rollos."
+    },
+    {
+      "id": "es-holdout-v5-341",
+      "field": "caption",
+      "text": "Los canastos del dibujo tienen tapas levantadas y asas muy redondas."
+    },
+    {
+      "id": "es-holdout-v5-342",
+      "field": "caption",
+      "text": "Se alcanzan a ver los cruces del tejido dentro de cada figura."
+    },
+    {
+      "id": "es-holdout-v5-343",
+      "field": "caption",
+      "text": "Quise una camisa holgada para dejar que los canastos se vean completos."
+    },
+    {
+      "id": "es-holdout-v5-344",
+      "field": "altText",
+      "text": "Canastos ilustrados presentan tapas abiertas sobre cuerpos de trama entrecruzada."
+    },
+    {
+      "id": "es-holdout-v5-345",
+      "field": "altText",
+      "text": "Asas curvas se elevan sobre varias figuras tejidas dibujadas en la camisa."
+    },
+    {
+      "id": "es-holdout-v5-346",
+      "field": "caption",
+      "text": "Las estrellas del estampado vuelan sujetas a cordones que se enredan entre sí."
+    },
+    {
+      "id": "es-holdout-v5-347",
+      "field": "caption",
+      "text": "Me gustaron esas puntas largas que ocupan casi todo el ancho del pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-348",
+      "field": "caption",
+      "text": "Hoy dejé una esquina suelta para mostrar la cola de cada papalote."
+    },
+    {
+      "id": "es-holdout-v5-349",
+      "field": "altText",
+      "text": "Papalotes en forma de estrella están conectados a cordones largos con pequeñas colas."
+    },
+    {
+      "id": "es-holdout-v5-350",
+      "field": "altText",
+      "text": "Varias figuras puntiagudas se cruzan sobre líneas curvas dibujadas en el pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-351",
+      "field": "caption",
+      "text": "Las piraguas dibujadas llevan remos apoyados de lado a lado."
+    },
+    {
+      "id": "es-holdout-v5-352",
+      "field": "caption",
+      "text": "Me gusta la forma larga y estrecha que se repite por toda la falda."
+    },
+    {
+      "id": "es-holdout-v5-353",
+      "field": "caption",
+      "text": "Unos pequeños trazos representan el agua alrededor de cada embarcación."
+    },
+    {
+      "id": "es-holdout-v5-354",
+      "field": "altText",
+      "text": "Piraguas ilustradas muestran cascos estrechos con remos atravesados sobre la abertura."
+    },
+    {
+      "id": "es-holdout-v5-355",
+      "field": "altText",
+      "text": "Líneas cortas rodean las embarcaciones dibujadas para sugerir movimiento sobre el agua."
+    },
+    {
+      "id": "es-holdout-v5-356",
+      "field": "caption",
+      "text": "Los sombreros del dibujo cuelgan de una cuerda como si estuvieran secándose."
+    },
+    {
+      "id": "es-holdout-v5-357",
+      "field": "caption",
+      "text": "Me gustaron las alas dobladas que cambian el perfil de cada pieza."
+    },
+    {
+      "id": "es-holdout-v5-358",
+      "field": "caption",
+      "text": "La bolsa muestra la cuerda entera cuando queda extendida."
+    },
+    {
+      "id": "es-holdout-v5-359",
+      "field": "altText",
+      "text": "Sombreros ilustrados cuelgan de broches sobre una línea horizontal."
+    },
+    {
+      "id": "es-holdout-v5-360",
+      "field": "altText",
+      "text": "Las alas curvas de los sombreros presentan pliegues distintos en cada figura."
+    },
+    {
+      "id": "es-holdout-v5-361",
+      "field": "caption",
+      "text": "Las puertas del estampado tienen marcos llenos de pequeñas formas talladas."
+    },
+    {
+      "id": "es-holdout-v5-362",
+      "field": "caption",
+      "text": "Quería enseñar los picaportes redondos que quedan en el centro de cada dibujo."
+    },
+    {
+      "id": "es-holdout-v5-363",
+      "field": "caption",
+      "text": "Elegí esta camisa por esa colección de entradas que parecen todas diferentes."
+    },
+    {
+      "id": "es-holdout-v5-364",
+      "field": "altText",
+      "text": "Puertas ilustradas presentan paneles geométricos y picaportes redondos dentro de marcos decorados."
+    },
+    {
+      "id": "es-holdout-v5-365",
+      "field": "altText",
+      "text": "Los contornos dibujados alternan arcos y dinteles rectos sobre la tela."
+    },
+    {
+      "id": "es-holdout-v5-366",
+      "field": "caption",
+      "text": "Las barandas dibujadas tienen espirales pequeñas que se juntan en el centro."
+    },
+    {
+      "id": "es-holdout-v5-367",
+      "field": "caption",
+      "text": "Me gusta mirar la tela como si recorriera una calle llena de balcones."
+    },
+    {
+      "id": "es-holdout-v5-368",
+      "field": "caption",
+      "text": "La falda muestra cada barandal completo cuando doy un paso largo."
+    },
+    {
+      "id": "es-holdout-v5-369",
+      "field": "altText",
+      "text": "Balcones ilustrados presentan barandales de hierro con espirales simétricas."
+    },
+    {
+      "id": "es-holdout-v5-370",
+      "field": "altText",
+      "text": "Ventanas altas dibujadas quedan detrás de las pequeñas plataformas curvas."
+    },
+    {
+      "id": "es-holdout-v5-371",
+      "field": "caption",
+      "text": "Las celosías del dibujo dejan pequeñas estrellas entre las piezas que se cruzan."
+    },
+    {
+      "id": "es-holdout-v5-372",
+      "field": "caption",
+      "text": "El fondo aparece por los huecos y parece formar otra estampa."
+    },
+    {
+      "id": "es-holdout-v5-373",
+      "field": "caption",
+      "text": "Hoy llevé esta blusa con accesorios sencillos para aprovechar las líneas."
+    },
+    {
+      "id": "es-holdout-v5-374",
+      "field": "altText",
+      "text": "Paneles de celosía ilustrados forman una trama geométrica con aberturas estrelladas."
+    },
+    {
+      "id": "es-holdout-v5-375",
+      "field": "altText",
+      "text": "Las bandas cruzadas rodean pequeños espacios simétricos repetidos sobre la blusa."
+    },
+    {
+      "id": "es-holdout-v5-376",
+      "field": "caption",
+      "text": "La abertura de adelante deja ver un poco del pie sin cambiar la forma del botín."
+    },
+    {
+      "id": "es-holdout-v5-377",
+      "field": "caption",
+      "text": "Hoy elegí un pantalón corto para que se aprecie todo el empeine."
+    },
+    {
+      "id": "es-holdout-v5-378",
+      "field": "caption",
+      "text": "Me gustó cómo el borde redondo continúa hasta la punta abierta."
+    },
+    {
+      "id": "es-holdout-v5-379",
+      "field": "altText",
+      "text": "El botín presenta una abertura redondeada en la zona de los dedos."
+    },
+    {
+      "id": "es-holdout-v5-380",
+      "field": "altText",
+      "text": "La pieza del empeine se extiende hasta los lados de una punta descubierta."
+    },
+    {
+      "id": "es-holdout-v5-381",
+      "field": "caption",
+      "text": "La trenza ancha sostiene el pie con un solo cruce grande."
+    },
+    {
+      "id": "es-holdout-v5-382",
+      "field": "caption",
+      "text": "El relieve de las tiras se ve mejor cuando la sandalia queda de lado."
+    },
+    {
+      "id": "es-holdout-v5-383",
+      "field": "caption",
+      "text": "Las llevé con un vestido sencillo para repetir esa sensación de líneas suaves."
+    },
+    {
+      "id": "es-holdout-v5-384",
+      "field": "altText",
+      "text": "Una trenza gruesa cruza el empeine sobre la base de la sandalia."
+    },
+    {
+      "id": "es-holdout-v5-385",
+      "field": "altText",
+      "text": "Tres bandas acolchadas se entrelazan formando una única tira ancha."
+    },
+    {
+      "id": "es-holdout-v5-386",
+      "field": "caption",
+      "text": "El borde de estos zapatos hace una onda que deja más abierto un costado."
+    },
+    {
+      "id": "es-holdout-v5-387",
+      "field": "caption",
+      "text": "Me gustó esa curva continua que rodea todo el empeine."
+    },
+    {
+      "id": "es-holdout-v5-388",
+      "field": "caption",
+      "text": "Tomé la foto con los pies juntos para mostrar cómo se corresponden las ondas."
+    },
+    {
+      "id": "es-holdout-v5-389",
+      "field": "altText",
+      "text": "El borde superior del zapato dibuja una línea ondulada alrededor del empeine."
+    },
+    {
+      "id": "es-holdout-v5-390",
+      "field": "altText",
+      "text": "Un lado del calzado queda más abierto por el recorte curvo de la pala."
+    },
+    {
+      "id": "es-holdout-v5-391",
+      "field": "caption",
+      "text": "Los dos compartimentos del bolso se separan por un espacio visible en medio."
+    },
+    {
+      "id": "es-holdout-v5-392",
+      "field": "caption",
+      "text": "Me gusta que cada lado abra por su cuenta y guarde cosas distintas."
+    },
+    {
+      "id": "es-holdout-v5-393",
+      "field": "caption",
+      "text": "Separé los compartimentos vacíos para enseñar el pequeño puente que los conecta abajo."
+    },
+    {
+      "id": "es-holdout-v5-394",
+      "field": "altText",
+      "text": "Dos cuerpos rectangulares forman un bolso unidos por una pieza estrecha inferior."
+    },
+    {
+      "id": "es-holdout-v5-395",
+      "field": "altText",
+      "text": "Un espacio vertical separa los compartimentos que cuelgan de la misma asa."
+    },
+    {
+      "id": "es-holdout-v5-396",
+      "field": "caption",
+      "text": "Cada arete abre sus pétalos hacia afuera y deja el centro despejado."
+    },
+    {
+      "id": "es-holdout-v5-397",
+      "field": "caption",
+      "text": "El dibujo de la flor se entiende mejor cuando me recojo el pelo."
+    },
+    {
+      "id": "es-holdout-v5-398",
+      "field": "caption",
+      "text": "Preferí llevar solo este par y guardar el collar para otro día."
+    },
+    {
+      "id": "es-holdout-v5-399",
+      "field": "altText",
+      "text": "Varios pétalos rígidos forman un círculo abierto alrededor del centro del arete."
+    },
+    {
+      "id": "es-holdout-v5-400",
+      "field": "altText",
+      "text": "Las piezas curvas se separan ligeramente hacia los extremos de cada flor."
+    },
+    {
+      "id": "es-holdout-v5-401",
+      "field": "caption",
+      "text": "Los dos aros quedan a distinta altura y se conectan en un costado."
+    },
+    {
+      "id": "es-holdout-v5-402",
+      "field": "caption",
+      "text": "Me gusta el huequito que aparece al mirar la mano de perfil."
+    },
+    {
+      "id": "es-holdout-v5-403",
+      "field": "caption",
+      "text": "Lo acomodé para que la unión quede hacia el dedo de al lado."
+    },
+    {
+      "id": "es-holdout-v5-404",
+      "field": "altText",
+      "text": "Dos aros desplazados se unen por una pequeña pieza lateral en el anillo."
+    },
+    {
+      "id": "es-holdout-v5-405",
+      "field": "altText",
+      "text": "Un espacio inclinado separa las bandas que rodean el mismo dedo."
+    },
+    {
+      "id": "es-holdout-v5-406",
+      "field": "caption",
+      "text": "Las cuentas bajan desde un mismo hilo en pequeñas filas de largos distintos."
+    },
+    {
+      "id": "es-holdout-v5-407",
+      "field": "caption",
+      "text": "La curva que forman las puntas queda justo encima del escote."
+    },
+    {
+      "id": "es-holdout-v5-408",
+      "field": "caption",
+      "text": "El collar se mueve bastante cuando queda sobre una prenda de tela lisa."
+    },
+    {
+      "id": "es-holdout-v5-409",
+      "field": "altText",
+      "text": "Filas cortas de cuentas cuelgan de una cadena y forman un borde curvo."
+    },
+    {
+      "id": "es-holdout-v5-410",
+      "field": "altText",
+      "text": "El centro del collar presenta tiras más largas que las de sus extremos."
+    },
+    {
+      "id": "es-holdout-v5-411",
+      "field": "caption",
+      "text": "La pulsera se abre justo en el centro de la pieza decorativa."
+    },
+    {
+      "id": "es-holdout-v5-412",
+      "field": "caption",
+      "text": "Me sorprendió encontrar la unión dentro del dibujo del broche."
+    },
+    {
+      "id": "es-holdout-v5-413",
+      "field": "caption",
+      "text": "La cierro antes de acomodar las mangas para que quede bien visible."
+    },
+    {
+      "id": "es-holdout-v5-414",
+      "field": "altText",
+      "text": "Una bisagra divide la pieza central de una pulsera rígida en dos mitades."
+    },
+    {
+      "id": "es-holdout-v5-415",
+      "field": "altText",
+      "text": "El brazalete abierto muestra una articulación integrada dentro del adorno frontal."
+    },
+    {
+      "id": "es-holdout-v5-416",
+      "field": "caption",
+      "text": "Las asas forman dos ventanas altas que continúan el cuerpo del bolso."
+    },
+    {
+      "id": "es-holdout-v5-417",
+      "field": "caption",
+      "text": "Las aberturas de la propia bolsa se convierten en asas de bordes continuos."
+    },
+    {
+      "id": "es-holdout-v5-418",
+      "field": "caption",
+      "text": "Lo sostuve desde arriba para enseñar las aberturas alargadas."
+    },
+    {
+      "id": "es-holdout-v5-419",
+      "field": "altText",
+      "text": "Dos recortes verticales forman asas integradas en las paredes superiores del bolso."
+    },
+    {
+      "id": "es-holdout-v5-420",
+      "field": "altText",
+      "text": "Las aberturas estrechas dejan pasar los dedos sin piezas añadidas."
+    },
+    {
+      "id": "es-holdout-v5-421",
+      "field": "caption",
+      "text": "Cada placa descansa parcialmente encima de la siguiente y acompaña la curva de mi cintura."
+    },
+    {
+      "id": "es-holdout-v5-422",
+      "field": "caption",
+      "text": "Cuando lo cierro, cada pieza encuentra su lugar sin dejar huecos grandes."
+    },
+    {
+      "id": "es-holdout-v5-423",
+      "field": "caption",
+      "text": "Hoy lo usé sobre una prenda lisa para mostrar toda la secuencia."
+    },
+    {
+      "id": "es-holdout-v5-424",
+      "field": "altText",
+      "text": "Placas rígidas superpuestas forman una banda articulada alrededor de la cintura."
+    },
+    {
+      "id": "es-holdout-v5-425",
+      "field": "altText",
+      "text": "Cada placa cubre parcialmente el borde de la siguiente sobre el cinturón."
+    },
+    {
+      "id": "es-holdout-v5-426",
+      "field": "caption",
+      "text": "El broche parece una pequeña pajarita hecha con dobleces de papel."
+    },
+    {
+      "id": "es-holdout-v5-427",
+      "field": "caption",
+      "text": "Me gustaron las puntas que quedan levantadas sobre la tela."
+    },
+    {
+      "id": "es-holdout-v5-428",
+      "field": "caption",
+      "text": "El broche dibuja una sombra pequeña cuando lo coloco junto al hombro."
+    },
+    {
+      "id": "es-holdout-v5-429",
+      "field": "altText",
+      "text": "Un broche angular tiene forma de ave de papel con alas plegadas."
+    },
+    {
+      "id": "es-holdout-v5-430",
+      "field": "altText",
+      "text": "Las puntas triangulares del adorno se elevan ligeramente sobre la prenda."
+    },
+    {
+      "id": "es-holdout-v5-431",
+      "field": "caption",
+      "text": "El peinecito queda escondido detrás del adorno que sujeta el pelo."
+    },
+    {
+      "id": "es-holdout-v5-432",
+      "field": "caption",
+      "text": "Probé colocarlo de lado para que acompañe la forma del recogido."
+    },
+    {
+      "id": "es-holdout-v5-433",
+      "field": "caption",
+      "text": "Las puntas entran despacio entre las mechas y todo queda en su sitio."
+    },
+    {
+      "id": "es-holdout-v5-434",
+      "field": "altText",
+      "text": "Un pequeño peine sostiene un adorno alargado dentro del cabello recogido."
+    },
+    {
+      "id": "es-holdout-v5-435",
+      "field": "altText",
+      "text": "Los dientes del accesorio desaparecen bajo las mechas junto a la nuca."
+    },
+    {
+      "id": "es-holdout-v5-436",
+      "field": "caption",
+      "text": "El cilindro gira sobre sí mismo para liberar la tira del bolso."
+    },
+    {
+      "id": "es-holdout-v5-437",
+      "field": "caption",
+      "text": "Me entretuve viendo cómo queda escondido el cierre dentro de esa forma lisa."
+    },
+    {
+      "id": "es-holdout-v5-438",
+      "field": "caption",
+      "text": "La pequeña pieza horizontal hace juego con el perfil recto de la tapa."
+    },
+    {
+      "id": "es-holdout-v5-439",
+      "field": "altText",
+      "text": "Un cilindro horizontal gira dentro de dos soportes sobre la solapa del bolso."
+    },
+    {
+      "id": "es-holdout-v5-440",
+      "field": "altText",
+      "text": "La tira frontal queda atrapada bajo la pieza redonda cuando el cierre baja."
+    },
+    {
+      "id": "es-holdout-v5-441",
+      "field": "caption",
+      "text": "Las colitas de los aretes se mueven debajo de unos rombos pequeños."
+    },
+    {
+      "id": "es-holdout-v5-442",
+      "field": "caption",
+      "text": "Hoy quise dejar ese movimiento cerca del rostro y llevar el resto sencillo."
+    },
+    {
+      "id": "es-holdout-v5-443",
+      "field": "caption",
+      "text": "Los pequeños nudos de la cadena parecen lazos de una cometa."
+    },
+    {
+      "id": "es-holdout-v5-444",
+      "field": "altText",
+      "text": "Aretes en forma de cometa combinan rombos rígidos con colas de cadenas finas."
+    },
+    {
+      "id": "es-holdout-v5-445",
+      "field": "altText",
+      "text": "Pequeñas piezas anudadas aparecen a intervalos sobre los extremos colgantes."
+    },
+    {
+      "id": "es-holdout-v5-446",
+      "field": "caption",
+      "text": "Los huecos de las esferas dejan pasar la cadena por distintos puntos."
+    },
+    {
+      "id": "es-holdout-v5-447",
+      "field": "caption",
+      "text": "Me gustó mirar el interior de cada cuenta antes de acomodarlo."
+    },
+    {
+      "id": "es-holdout-v5-448",
+      "field": "caption",
+      "text": "El collar parece grande, pero los espacios abiertos aligeran mucho su dibujo."
+    },
+    {
+      "id": "es-holdout-v5-449",
+      "field": "altText",
+      "text": "Esferas huecas con ventanas redondas están ensartadas en una cadena gruesa."
+    },
+    {
+      "id": "es-holdout-v5-450",
+      "field": "altText",
+      "text": "Las cuentas abiertas dejan ver el hilo que cruza por su interior."
+    },
+    {
+      "id": "es-holdout-v5-451",
+      "field": "caption",
+      "text": "Las pequeñas pestañas se montan sobre el borde de cada zapato."
+    },
+    {
+      "id": "es-holdout-v5-452",
+      "field": "caption",
+      "text": "Me gustó la sombra que dejan esas piezas cuando se ve el par de lado."
+    },
+    {
+      "id": "es-holdout-v5-453",
+      "field": "caption",
+      "text": "Hoy elegí un largo de pantalón que no esconda el detalle."
+    },
+    {
+      "id": "es-holdout-v5-454",
+      "field": "altText",
+      "text": "Pestañas cortas superpuestas cubren el borde externo de los zapatos."
+    },
+    {
+      "id": "es-holdout-v5-455",
+      "field": "altText",
+      "text": "Cada pieza delgada se levanta levemente sobre la superficie del calzado."
+    },
+    {
+      "id": "es-holdout-v5-456",
+      "field": "caption",
+      "text": "El fondo se despliega y deja que la bolsa crezca hacia abajo."
+    },
+    {
+      "id": "es-holdout-v5-457",
+      "field": "caption",
+      "text": "Vacía queda bastante plana y puedo guardarla entre dos cuadernos."
+    },
+    {
+      "id": "es-holdout-v5-458",
+      "field": "caption",
+      "text": "Me gustó probar el movimiento antes de llevar mis cosas."
+    },
+    {
+      "id": "es-holdout-v5-459",
+      "field": "altText",
+      "text": "Pliegues profundos en la base permiten expandir la altura inferior de la bolsa."
+    },
+    {
+      "id": "es-holdout-v5-460",
+      "field": "altText",
+      "text": "El fondo plegado presenta varias capas alineadas como un pequeño acordeón."
+    },
+    {
+      "id": "es-holdout-v5-461",
+      "field": "caption",
+      "text": "El amarre queda lejos del centro y deja la parte frontal despejada."
+    },
+    {
+      "id": "es-holdout-v5-462",
+      "field": "caption",
+      "text": "Las puntas cortas cuelgan junto a la cadera sin tocar el bolsillo."
+    },
+    {
+      "id": "es-holdout-v5-463",
+      "field": "caption",
+      "text": "Hoy me gustó llevar la cintura marcada con una línea bastante suave."
+    },
+    {
+      "id": "es-holdout-v5-464",
+      "field": "altText",
+      "text": "Un cinturón de tela se anuda sobre un costado dejando el frente liso."
+    },
+    {
+      "id": "es-holdout-v5-465",
+      "field": "altText",
+      "text": "Las dos puntas del amarre caen juntas al lado de la cadera."
+    },
+    {
+      "id": "es-holdout-v5-466",
+      "field": "caption",
+      "text": "Dos marcos cuadrados quedan suspendidos a distintas alturas en cada arete."
+    },
+    {
+      "id": "es-holdout-v5-467",
+      "field": "caption",
+      "text": "Me gusta que el espacio vacío sea casi todo el dibujo del accesorio."
+    },
+    {
+      "id": "es-holdout-v5-468",
+      "field": "caption",
+      "text": "Los acomodé bien separados del pelo para enseñar cómo se cruzan."
+    },
+    {
+      "id": "es-holdout-v5-469",
+      "field": "altText",
+      "text": "Dos marcos cuadrados abiertos forman cada arete y quedan desplazados entre sí."
+    },
+    {
+      "id": "es-holdout-v5-470",
+      "field": "altText",
+      "text": "Las piezas geométricas se cruzan en una esquina bajo un gancho pequeño."
+    },
+    {
+      "id": "es-holdout-v5-471",
+      "field": "caption",
+      "text": "La media luna de la tapa cubre solo el centro del bolso."
+    },
+    {
+      "id": "es-holdout-v5-472",
+      "field": "caption",
+      "text": "La curva de la tapa suaviza el perfil rectangular que tiene el bolso."
+    },
+    {
+      "id": "es-holdout-v5-473",
+      "field": "caption",
+      "text": "Con la bolsa vacía puedo enseñar las esquinas que sobresalen junto a la tapa."
+    },
+    {
+      "id": "es-holdout-v5-474",
+      "field": "altText",
+      "text": "Una tapa semicircular cae sobre el centro de un bolso rectangular."
+    },
+    {
+      "id": "es-holdout-v5-475",
+      "field": "altText",
+      "text": "Las dos esquinas superiores permanecen descubiertas junto al borde semicircular de la tapa."
+    },
+    {
+      "id": "es-holdout-v5-476",
+      "field": "caption",
+      "text": "Los triangulitos apuntan hacia abajo y forman un borde continuo sobre la blusa."
+    },
+    {
+      "id": "es-holdout-v5-477",
+      "field": "caption",
+      "text": "Algunos se giran y dejan ver la cara lisa que tienen detrás."
+    },
+    {
+      "id": "es-holdout-v5-478",
+      "field": "caption",
+      "text": "Hoy quise repetir las puntas del collar en el escote sencillo."
+    },
+    {
+      "id": "es-holdout-v5-479",
+      "field": "altText",
+      "text": "Una secuencia de triángulos pequeños cuelga de una cadena alrededor del cuello."
+    },
+    {
+      "id": "es-holdout-v5-480",
+      "field": "altText",
+      "text": "Las piezas puntiagudas forman una curva con extremos orientados hacia abajo."
+    },
+    {
+      "id": "es-holdout-v5-481",
+      "field": "caption",
+      "text": "El corte del brazalete dibuja una línea quebrada que queda abierta sobre el brazo."
+    },
+    {
+      "id": "es-holdout-v5-482",
+      "field": "caption",
+      "text": "Las dos puntas se corresponden aunque conservan un espacio estrecho entre ellas."
+    },
+    {
+      "id": "es-holdout-v5-483",
+      "field": "caption",
+      "text": "Lo acomodé con la abertura arriba para mostrar el dibujo en zigzag."
+    },
+    {
+      "id": "es-holdout-v5-484",
+      "field": "altText",
+      "text": "Un brazalete rígido presenta una abertura formada por dos bordes en zigzag."
+    },
+    {
+      "id": "es-holdout-v5-485",
+      "field": "altText",
+      "text": "Las puntas angulares de la pulsera quedan enfrentadas sin llegar a tocarse."
+    },
+    {
+      "id": "es-holdout-v5-486",
+      "field": "caption",
+      "text": "Las esquinas se doblan hacia adentro y cambian el ancho del bolso."
+    },
+    {
+      "id": "es-holdout-v5-487",
+      "field": "caption",
+      "text": "Abrí una sola para mostrar cómo desaparece el pliegue cuando necesito espacio."
+    },
+    {
+      "id": "es-holdout-v5-488",
+      "field": "caption",
+      "text": "Me gustó llevarlo recogido mientras solo cargaba lo esencial."
+    },
+    {
+      "id": "es-holdout-v5-489",
+      "field": "altText",
+      "text": "Las esquinas superiores del bolso se pliegan hacia el interior con pequeños broches."
+    },
+    {
+      "id": "es-holdout-v5-490",
+      "field": "altText",
+      "text": "Un lado desplegado deja el bolso más ancho que el costado todavía doblado."
+    },
+    {
+      "id": "es-holdout-v5-491",
+      "field": "caption",
+      "text": "El pequeño remolino del arete queda suspendido debajo de una línea curva larga."
+    },
+    {
+      "id": "es-holdout-v5-492",
+      "field": "caption",
+      "text": "Se ve como un trazo continuo cuando llevo el pelo recogido."
+    },
+    {
+      "id": "es-holdout-v5-493",
+      "field": "caption",
+      "text": "Hoy preferí ese dibujo fino junto a una camisa de cuello amplio."
+    },
+    {
+      "id": "es-holdout-v5-494",
+      "field": "altText",
+      "text": "Un tallo metálico se curva bajo el lóbulo antes de enrollarse sobre su extremo."
+    },
+    {
+      "id": "es-holdout-v5-495",
+      "field": "altText",
+      "text": "La línea metálica dibuja una curva larga antes de enrollarse en su extremo."
+    },
+    {
+      "id": "es-holdout-v5-496",
+      "field": "caption",
+      "text": "Las láminas dobladas forman celdas pequeñas que parecen un panal alrededor del cuello."
+    },
+    {
+      "id": "es-holdout-v5-497",
+      "field": "caption",
+      "text": "Me gustó mirar las paredes finitas que conectan una abertura con la siguiente."
+    },
+    {
+      "id": "es-holdout-v5-498",
+      "field": "caption",
+      "text": "Hoy acompañé el relieve del collar con una blusa de escote sencillo."
+    },
+    {
+      "id": "es-holdout-v5-499",
+      "field": "altText",
+      "text": "Láminas delgadas dobladas forman varias celdas hexagonales unidas en el collar."
+    },
+    {
+      "id": "es-holdout-v5-500",
+      "field": "altText",
+      "text": "Las aberturas del accesorio dejan ver pequeños compartimentos vacíos con paredes estrechas."
+    },
+    {
+      "id": "es-holdout-v5-501",
+      "field": "caption",
+      "text": "Las flores tubulares cuelgan en racimos pequeños sobre el vestido."
+    },
+    {
+      "id": "es-holdout-v5-502",
+      "field": "caption",
+      "text": "Me gustó que algunos pétalos aparezcan sueltos entre las ramas dibujadas."
+    },
+    {
+      "id": "es-holdout-v5-503",
+      "field": "altText",
+      "text": "Racimos ilustrados de jacaranda presentan flores alargadas con extremos abiertos."
+    },
+    {
+      "id": "es-holdout-v5-504",
+      "field": "altText",
+      "text": "Las ramas finas conectan varios grupos florales sobre la tela del vestido."
+    },
+    {
+      "id": "es-holdout-v5-505",
+      "field": "altText",
+      "text": "Pequeñas flores caídas ocupan los espacios libres entre los racimos estampados."
+    },
+    {
+      "id": "es-holdout-v5-506",
+      "field": "caption",
+      "text": "Las heliconias forman una escalera de puntas que alternan a cada lado."
+    },
+    {
+      "id": "es-holdout-v5-507",
+      "field": "caption",
+      "text": "Hoy quise llevar esas formas grandes con una camisa de corte recto."
+    },
+    {
+      "id": "es-holdout-v5-508",
+      "field": "altText",
+      "text": "Heliconias ilustradas presentan piezas puntiagudas alternadas sobre tallos verticales."
+    },
+    {
+      "id": "es-holdout-v5-509",
+      "field": "altText",
+      "text": "Los elementos vegetales forman columnas ligeramente inclinadas en el estampado."
+    },
+    {
+      "id": "es-holdout-v5-510",
+      "field": "altText",
+      "text": "Hojas largas acompañan las estructuras escalonadas que se repiten sobre la camisa."
+    },
+    {
+      "id": "es-holdout-v5-511",
+      "field": "caption",
+      "text": "Los cortes de las hojas hacen que la tela de fondo también participe del dibujo."
+    },
+    {
+      "id": "es-holdout-v5-512",
+      "field": "caption",
+      "text": "Me gustó la vena central tan marcada que divide cada figura grande."
+    },
+    {
+      "id": "es-holdout-v5-513",
+      "field": "altText",
+      "text": "Hojas de platanera ilustradas muestran venas paralelas y bordes parcialmente rasgados."
+    },
+    {
+      "id": "es-holdout-v5-514",
+      "field": "altText",
+      "text": "Una línea central divide las hojas largas que atraviesan la falda."
+    },
+    {
+      "id": "es-holdout-v5-515",
+      "field": "altText",
+      "text": "Pequeñas separaciones interrumpen el contorno de las grandes formas vegetales."
+    },
+    {
+      "id": "es-holdout-v5-516",
+      "field": "caption",
+      "text": "Las semillitas se alejan del círculo como si acabaran de soplarlas."
+    },
+    {
+      "id": "es-holdout-v5-517",
+      "field": "caption",
+      "text": "El dibujo queda casi suspendido sobre la tela de mi pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-518",
+      "field": "altText",
+      "text": "Una esfera de semillas ilustrada pierde pequeños filamentos que vuelan hacia un lado."
+    },
+    {
+      "id": "es-holdout-v5-519",
+      "field": "altText",
+      "text": "Tallos finos sostienen círculos formados por muchas líneas radiales."
+    },
+    {
+      "id": "es-holdout-v5-520",
+      "field": "altText",
+      "text": "Semillas sueltas con pequeñas coronas de filamentos ocupan el borde del pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-521",
+      "field": "caption",
+      "text": "Las piñitas del pino muestran sus pequeñas escamas abiertas en el dibujo."
+    },
+    {
+      "id": "es-holdout-v5-522",
+      "field": "caption",
+      "text": "Me gustaron las ramas de agujas finas que rodean cada figura."
+    },
+    {
+      "id": "es-holdout-v5-523",
+      "field": "altText",
+      "text": "Piñas de pino ilustradas presentan hileras de escamas superpuestas sobre la camisa."
+    },
+    {
+      "id": "es-holdout-v5-524",
+      "field": "altText",
+      "text": "Ramas cortas con agujas delgadas se alternan entre los frutos dibujados."
+    },
+    {
+      "id": "es-holdout-v5-525",
+      "field": "altText",
+      "text": "Las figuras ovaladas muestran pequeñas sombras debajo de cada escama abierta."
+    },
+    {
+      "id": "es-holdout-v5-526",
+      "field": "caption",
+      "text": "Las hojitas redondas se alinean de dos en dos en el estampado."
+    },
+    {
+      "id": "es-holdout-v5-527",
+      "field": "caption",
+      "text": "Elegí una caída suave para que los tallos del dibujo sigan su curva."
+    },
+    {
+      "id": "es-holdout-v5-528",
+      "field": "altText",
+      "text": "Ramas de eucalipto ilustradas muestran pares de hojas redondas sobre tallos delgados."
+    },
+    {
+      "id": "es-holdout-v5-529",
+      "field": "altText",
+      "text": "Las hojas redondas se hacen menores junto a la punta de cada ramita ilustrada."
+    },
+    {
+      "id": "es-holdout-v5-530",
+      "field": "altText",
+      "text": "Los tallos del estampado se encuentran formando ángulos abiertos entre las hojas."
+    },
+    {
+      "id": "es-holdout-v5-531",
+      "field": "caption",
+      "text": "Los pétalos abiertos parecen papel muy delgado alrededor de cada centro oscuro."
+    },
+    {
+      "id": "es-holdout-v5-532",
+      "field": "caption",
+      "text": "Me gusta que los tallos se inclinen en varias direcciones por la blusa."
+    },
+    {
+      "id": "es-holdout-v5-533",
+      "field": "altText",
+      "text": "Amapolas ilustradas muestran pétalos amplios alrededor de centros pequeños y compactos."
+    },
+    {
+      "id": "es-holdout-v5-534",
+      "field": "altText",
+      "text": "Tallos curvados sostienen flores abiertas y capullos cerrados en el estampado."
+    },
+    {
+      "id": "es-holdout-v5-535",
+      "field": "altText",
+      "text": "Algunos bordes de los pétalos presentan pliegues dibujados sobre la tela."
+    },
+    {
+      "id": "es-holdout-v5-536",
+      "field": "caption",
+      "text": "La hoja enrollada forma una copa larga alrededor del centro de cada flor."
+    },
+    {
+      "id": "es-holdout-v5-537",
+      "field": "caption",
+      "text": "El dibujo me gustó por sus líneas que suben sin abrirse demasiado."
+    },
+    {
+      "id": "es-holdout-v5-538",
+      "field": "altText",
+      "text": "Alcatraces ilustrados presentan envolturas largas alrededor de una espiga central."
+    },
+    {
+      "id": "es-holdout-v5-539",
+      "field": "altText",
+      "text": "Las formas florales se curvan junto a hojas amplias sobre el pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-540",
+      "field": "altText",
+      "text": "Los tallos rectos conectan las flores abiertas con la parte inferior del diseño."
+    },
+    {
+      "id": "es-holdout-v5-541",
+      "field": "caption",
+      "text": "El centro del girasol tiene tantos puntitos que parece bordado de lejos."
+    },
+    {
+      "id": "es-holdout-v5-542",
+      "field": "caption",
+      "text": "Hoy elegí una falda amplia para que las flores queden enteras."
+    },
+    {
+      "id": "es-holdout-v5-543",
+      "field": "altText",
+      "text": "Girasoles ilustrados presentan anillos de pétalos alrededor de grandes centros punteados."
+    },
+    {
+      "id": "es-holdout-v5-544",
+      "field": "altText",
+      "text": "Varias flores se superponen con hojas anchas en el dibujo de la falda."
+    },
+    {
+      "id": "es-holdout-v5-545",
+      "field": "altText",
+      "text": "Los centros redondos contienen pequeñas marcas distribuidas en filas curvas."
+    },
+    {
+      "id": "es-holdout-v5-546",
+      "field": "caption",
+      "text": "Los pétalos puntiagudos se acomodan en muchas capas dentro de cada flor."
+    },
+    {
+      "id": "es-holdout-v5-547",
+      "field": "caption",
+      "text": "Me gustó la forma casi redonda que ocupa la parte frontal de la camisa."
+    },
+    {
+      "id": "es-holdout-v5-548",
+      "field": "altText",
+      "text": "Dalias ilustradas muestran numerosas capas de pétalos estrechos orientados hacia afuera."
+    },
+    {
+      "id": "es-holdout-v5-549",
+      "field": "altText",
+      "text": "Las flores forman círculos densos entre pequeños grupos de hojas estampadas."
+    },
+    {
+      "id": "es-holdout-v5-550",
+      "field": "altText",
+      "text": "Las puntas de los pétalos se superponen alrededor de centros poco visibles."
+    },
+    {
+      "id": "es-holdout-v5-551",
+      "field": "caption",
+      "text": "Las flores tienen una pequeña columna que sale por delante de los pétalos."
+    },
+    {
+      "id": "es-holdout-v5-552",
+      "field": "caption",
+      "text": "Extiendo la camisa y las grandes flores de hibisco recuperan su forma completa."
+    },
+    {
+      "id": "es-holdout-v5-553",
+      "field": "altText",
+      "text": "Hibiscos ilustrados presentan cinco pétalos amplios y una columna central saliente."
+    },
+    {
+      "id": "es-holdout-v5-554",
+      "field": "altText",
+      "text": "Pequeños círculos aparecen sobre los extremos de las columnas florales dibujadas."
+    },
+    {
+      "id": "es-holdout-v5-555",
+      "field": "altText",
+      "text": "Las flores abiertas se mezclan con hojas dentadas sobre el tejido."
+    },
+    {
+      "id": "es-holdout-v5-556",
+      "field": "caption",
+      "text": "Los frutos del café se agrupan junto a hojas con una vena bien marcada."
+    },
+    {
+      "id": "es-holdout-v5-557",
+      "field": "caption",
+      "text": "Los frutos redondos se acomodan entre hojas estrechas y alargadas en esta camisa."
+    },
+    {
+      "id": "es-holdout-v5-558",
+      "field": "altText",
+      "text": "Ramas de café ilustradas muestran grupos de frutos redondos y hojas alargadas."
+    },
+    {
+      "id": "es-holdout-v5-559",
+      "field": "altText",
+      "text": "Los frutos se alinean cerca de las uniones entre hojas y tallos."
+    },
+    {
+      "id": "es-holdout-v5-560",
+      "field": "altText",
+      "text": "Venas curvas aparecen dibujadas dentro de cada hoja del estampado."
+    },
+    {
+      "id": "es-holdout-v5-561",
+      "field": "caption",
+      "text": "Las cadenas del dibujo terminan en gotitas de tamaños distintos sobre el vestido."
+    },
+    {
+      "id": "es-holdout-v5-562",
+      "field": "caption",
+      "text": "Me gustó la línea irregular que forman todas las puntas juntas."
+    },
+    {
+      "id": "es-holdout-v5-563",
+      "field": "altText",
+      "text": "Cadenas ilustradas cuelgan verticalmente y terminan en pequeñas gotas decorativas."
+    },
+    {
+      "id": "es-holdout-v5-564",
+      "field": "altText",
+      "text": "Las figuras suspendidas crean un borde ondulado a mitad del vestido."
+    },
+    {
+      "id": "es-holdout-v5-565",
+      "field": "altText",
+      "text": "Los eslabones finos se repiten con longitudes desiguales sobre la tela."
+    },
+    {
+      "id": "es-holdout-v5-566",
+      "field": "caption",
+      "text": "Las piezas del mosaico se van acomodando hasta formar una espiral grande."
+    },
+    {
+      "id": "es-holdout-v5-567",
+      "field": "caption",
+      "text": "Dejé esta bolsa vacía para mostrar el recorrido completo del dibujo."
+    },
+    {
+      "id": "es-holdout-v5-568",
+      "field": "altText",
+      "text": "Pequeños fragmentos poligonales forman una espiral sobre el panel del bolso."
+    },
+    {
+      "id": "es-holdout-v5-569",
+      "field": "altText",
+      "text": "El mosaico reúne fragmentos pequeños cerca del centro y piezas mayores en las vueltas exteriores."
+    },
+    {
+      "id": "es-holdout-v5-570",
+      "field": "altText",
+      "text": "Líneas estrechas separan los fragmentos que componen la curva estampada."
+    },
+    {
+      "id": "es-holdout-v5-571",
+      "field": "caption",
+      "text": "Las puntas del estampado descienden como si colgaran de una cueva dibujada."
+    },
+    {
+      "id": "es-holdout-v5-572",
+      "field": "caption",
+      "text": "Me gustó esa mezcla de formas largas y cortas junto al escote."
+    },
+    {
+      "id": "es-holdout-v5-573",
+      "field": "altText",
+      "text": "Formas alargadas semejantes a estalactitas cuelgan desde una franja superior de la blusa."
+    },
+    {
+      "id": "es-holdout-v5-574",
+      "field": "altText",
+      "text": "Formas puntiagudas de largos desiguales cuelgan desde la franja superior del estampado."
+    },
+    {
+      "id": "es-holdout-v5-575",
+      "field": "altText",
+      "text": "Pequeñas líneas longitudinales dan textura a las figuras suspendidas del estampado."
+    },
+    {
+      "id": "es-holdout-v5-576",
+      "field": "caption",
+      "text": "Las geodas abiertas muestran anillos que se hacen pequeños hacia el centro."
+    },
+    {
+      "id": "es-holdout-v5-577",
+      "field": "caption",
+      "text": "Las piedras abiertas conservan un contorno áspero que hace especial el dibujo."
+    },
+    {
+      "id": "es-holdout-v5-578",
+      "field": "altText",
+      "text": "Geodas ilustradas presentan contornos rugosos alrededor de varias bandas concéntricas."
+    },
+    {
+      "id": "es-holdout-v5-579",
+      "field": "altText",
+      "text": "Los centros de las piedras dibujadas contienen figuras pequeñas semejantes a cristales."
+    },
+    {
+      "id": "es-holdout-v5-580",
+      "field": "altText",
+      "text": "Distintas formas ovaladas se distribuyen entre espacios amplios sobre el pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-581",
+      "field": "caption",
+      "text": "Los cristales del dibujo tienen caras planas que terminan en pequeñas puntas."
+    },
+    {
+      "id": "es-holdout-v5-582",
+      "field": "caption",
+      "text": "La estampa me gustó por el contraste entre grupos altos y piezas cortitas."
+    },
+    {
+      "id": "es-holdout-v5-583",
+      "field": "altText",
+      "text": "Grupos de cristales ilustrados muestran prismas alargados con extremos puntiagudos."
+    },
+    {
+      "id": "es-holdout-v5-584",
+      "field": "altText",
+      "text": "Líneas rectas separan las caras estrechas de cada figura cristalina."
+    },
+    {
+      "id": "es-holdout-v5-585",
+      "field": "altText",
+      "text": "Los conjuntos geométricos se repiten sobre el tejido de la camisa."
+    },
+    {
+      "id": "es-holdout-v5-586",
+      "field": "caption",
+      "text": "Las terrazas dibujadas suben por la ladera en pequeñas franjas curvas."
+    },
+    {
+      "id": "es-holdout-v5-587",
+      "field": "caption",
+      "text": "Elegí esta falda por la calma que me daba mirar todas esas líneas."
+    },
+    {
+      "id": "es-holdout-v5-588",
+      "field": "altText",
+      "text": "Una ladera ilustrada presenta terrazas de cultivo escalonadas en curvas amplias."
+    },
+    {
+      "id": "es-holdout-v5-589",
+      "field": "altText",
+      "text": "Pequeños trazos verticales sugieren plantas distribuidas sobre cada nivel del terreno."
+    },
+    {
+      "id": "es-holdout-v5-590",
+      "field": "altText",
+      "text": "Las franjas de la montaña siguen una secuencia ascendente cerca del borde de la falda."
+    },
+    {
+      "id": "es-holdout-v5-591",
+      "field": "caption",
+      "text": "Los estanques del dibujo forman una red de rectángulos separados por caminos finos."
+    },
+    {
+      "id": "es-holdout-v5-592",
+      "field": "caption",
+      "text": "Me gustó esa vista desde arriba para una camisa de líneas sencillas."
+    },
+    {
+      "id": "es-holdout-v5-593",
+      "field": "altText",
+      "text": "Estanques rectangulares ilustrados están separados por senderos estrechos en una vista superior."
+    },
+    {
+      "id": "es-holdout-v5-594",
+      "field": "altText",
+      "text": "El patrón muestra una cuadrícula irregular de superficies planas sobre la camisa."
+    },
+    {
+      "id": "es-holdout-v5-595",
+      "field": "altText",
+      "text": "Pequeñas líneas dobles rodean cada estanque dibujado y conectan las esquinas."
+    },
+    {
+      "id": "es-holdout-v5-596",
+      "field": "caption",
+      "text": "El río del estampado hace vueltas amplias antes de desaparecer bajo el pliegue."
+    },
+    {
+      "id": "es-holdout-v5-597",
+      "field": "caption",
+      "text": "Abrí el pañuelo entero para seguir las vueltas del río hasta su último tramo."
+    },
+    {
+      "id": "es-holdout-v5-598",
+      "field": "altText",
+      "text": "Un río ilustrado forma curvas amplias entre dos orillas sinuosas."
+    },
+    {
+      "id": "es-holdout-v5-599",
+      "field": "altText",
+      "text": "El recorrido del agua atraviesa el pañuelo sin seguir una dirección recta."
+    },
+    {
+      "id": "es-holdout-v5-600",
+      "field": "altText",
+      "text": "Pequeñas islas alargadas aparecen dentro de algunas curvas del cauce dibujado."
+    },
+    {
+      "id": "es-holdout-v5-601",
+      "field": "caption",
+      "text": "Las dunas están dibujadas con puntitos que se juntan en las zonas de sombra."
+    },
+    {
+      "id": "es-holdout-v5-602",
+      "field": "caption",
+      "text": "Me gustó que los bordes quedaran suaves en esta tela tan ligera."
+    },
+    {
+      "id": "es-holdout-v5-603",
+      "field": "altText",
+      "text": "Dunas ilustradas se forman mediante concentraciones variables de puntos pequeños."
+    },
+    {
+      "id": "es-holdout-v5-604",
+      "field": "altText",
+      "text": "Los puntos se agrupan bajo las curvas que representan crestas de arena."
+    },
+    {
+      "id": "es-holdout-v5-605",
+      "field": "altText",
+      "text": "El dibujo crea suaves cambios de profundidad sobre el pañuelo abierto."
+    },
+    {
+      "id": "es-holdout-v5-606",
+      "field": "caption",
+      "text": "Las raíces del árbol dibujado ocupan tanto espacio como las ramas de arriba."
+    },
+    {
+      "id": "es-holdout-v5-607",
+      "field": "caption",
+      "text": "Elegí esta camiseta por la forma completa del dibujo bajo la tierra imaginaria."
+    },
+    {
+      "id": "es-holdout-v5-608",
+      "field": "altText",
+      "text": "Un árbol ilustrado muestra ramas arriba y raíces extendidas debajo de una línea horizontal."
+    },
+    {
+      "id": "es-holdout-v5-609",
+      "field": "altText",
+      "text": "Las raíces se bifurcan en trazos delgados dentro de la mitad inferior del diseño."
+    },
+    {
+      "id": "es-holdout-v5-610",
+      "field": "altText",
+      "text": "El tronco central conecta dos redes de líneas sobre la camiseta."
+    },
+    {
+      "id": "es-holdout-v5-611",
+      "field": "caption",
+      "text": "Los corales del estampado parecen pequeños árboles con puntas redondeadas."
+    },
+    {
+      "id": "es-holdout-v5-612",
+      "field": "caption",
+      "text": "Me gustó el espacio que queda entre las ramas de cada figura."
+    },
+    {
+      "id": "es-holdout-v5-613",
+      "field": "altText",
+      "text": "Corales ilustrados presentan ramas cortas con extremos redondeados sobre la falda."
+    },
+    {
+      "id": "es-holdout-v5-614",
+      "field": "altText",
+      "text": "Las figuras se abren desde bases pequeñas hacia varias puntas de distinto largo."
+    },
+    {
+      "id": "es-holdout-v5-615",
+      "field": "altText",
+      "text": "Las pequeñas ramas de coral quedan aisladas dentro de espacios amplios del fondo."
+    },
+    {
+      "id": "es-holdout-v5-616",
+      "field": "caption",
+      "text": "La cuadrícula se dobla en ondas como si la tela estuviera siempre en movimiento."
+    },
+    {
+      "id": "es-holdout-v5-617",
+      "field": "caption",
+      "text": "Me gusta mirar el dibujo de lejos para ver las curvas más grandes."
+    },
+    {
+      "id": "es-holdout-v5-618",
+      "field": "altText",
+      "text": "Las intersecciones de una cuadrícula se desplazan para crear un relieve ondulado dibujado."
+    },
+    {
+      "id": "es-holdout-v5-619",
+      "field": "altText",
+      "text": "Las líneas horizontales y verticales se curvan juntas sin perder sus intersecciones."
+    },
+    {
+      "id": "es-holdout-v5-620",
+      "field": "altText",
+      "text": "Las celdas del patrón se estrechan en unas zonas y se ensanchan en otras."
+    },
+    {
+      "id": "es-holdout-v5-621",
+      "field": "caption",
+      "text": "Los círculos de red se superponen y dejan ver la trama que comparten."
+    },
+    {
+      "id": "es-holdout-v5-622",
+      "field": "caption",
+      "text": "El detalle de cada nudo se alcanza a ver cuando acerco la bolsa."
+    },
+    {
+      "id": "es-holdout-v5-623",
+      "field": "altText",
+      "text": "Redes ilustradas forman círculos de trama fina superpuestos sobre el bolso."
+    },
+    {
+      "id": "es-holdout-v5-624",
+      "field": "altText",
+      "text": "Líneas radiales y curvas concéntricas crean pequeñas celdas dentro de cada red."
+    },
+    {
+      "id": "es-holdout-v5-625",
+      "field": "altText",
+      "text": "Los bordes de los círculos se cruzan dejando ver sus capas dibujadas."
+    },
+    {
+      "id": "es-holdout-v5-626",
+      "field": "caption",
+      "text": "El chaleco termina en varios triángulos cortos que rodean la cintura."
+    },
+    {
+      "id": "es-holdout-v5-627",
+      "field": "caption",
+      "text": "Me gustó ver esas puntas pequeñas sobre una camisa bastante larga."
+    },
+    {
+      "id": "es-holdout-v5-628",
+      "field": "altText",
+      "text": "El borde inferior del chaleco presenta una sucesión de puntas triangulares cortas."
+    },
+    {
+      "id": "es-holdout-v5-629",
+      "field": "altText",
+      "text": "Las piezas angulares se separan ligeramente encima de la camisa interior."
+    },
+    {
+      "id": "es-holdout-v5-630",
+      "field": "altText",
+      "text": "El chaleco abrochado deja visibles varias esquinas alrededor del contorno de la cintura."
+    },
+    {
+      "id": "es-holdout-v5-631",
+      "field": "caption",
+      "text": "La pieza exterior corta permite ver una franja larga de la falda que queda debajo."
+    },
+    {
+      "id": "es-holdout-v5-632",
+      "field": "caption",
+      "text": "Me gusta la línea horizontal que divide las dos alturas de la falda."
+    },
+    {
+      "id": "es-holdout-v5-633",
+      "field": "altText",
+      "text": "Una sobrefalda recta cubre parcialmente una falda interior más larga."
+    },
+    {
+      "id": "es-holdout-v5-634",
+      "field": "altText",
+      "text": "Dos bordes horizontales quedan separados por una franja visible de tela."
+    },
+    {
+      "id": "es-holdout-v5-635",
+      "field": "altText",
+      "text": "La capa exterior cae sin abrirse sobre la parte inferior del vestido."
+    },
+    {
+      "id": "es-holdout-v5-636",
+      "field": "caption",
+      "text": "Los puños se cruzan formando una pequeña curva encima de la muñeca."
+    },
+    {
+      "id": "es-holdout-v5-637",
+      "field": "caption",
+      "text": "Elegí esta camisa por el contorno suave de sus dos extremos."
+    },
+    {
+      "id": "es-holdout-v5-638",
+      "field": "altText",
+      "text": "Los extremos redondeados del puño se superponen junto a un botón pequeño."
+    },
+    {
+      "id": "es-holdout-v5-639",
+      "field": "altText",
+      "text": "Una abertura curva queda visible debajo del cierre de cada manga."
+    },
+    {
+      "id": "es-holdout-v5-640",
+      "field": "altText",
+      "text": "El borde del puño forma un arco continuo alrededor de la muñeca."
+    },
+    {
+      "id": "es-holdout-v5-641",
+      "field": "caption",
+      "text": "La solapa cae sobre la parte de arriba y esconde la abertura del pantalón."
+    },
+    {
+      "id": "es-holdout-v5-642",
+      "field": "caption",
+      "text": "La levanté para enseñar dónde se guarda el pequeño cierre."
+    },
+    {
+      "id": "es-holdout-v5-643",
+      "field": "altText",
+      "text": "Una solapa ancha se dobla sobre la abertura frontal del pantalón."
+    },
+    {
+      "id": "es-holdout-v5-644",
+      "field": "altText",
+      "text": "El panel superior cubre la zona central de la cintura sin botones visibles."
+    },
+    {
+      "id": "es-holdout-v5-645",
+      "field": "altText",
+      "text": "La pieza levantada descubre un cierre corto debajo de la tela."
+    },
+    {
+      "id": "es-holdout-v5-646",
+      "field": "caption",
+      "text": "El panel ovalado se sostiene arriba y cae separado de la base de mi blusa."
+    },
+    {
+      "id": "es-holdout-v5-647",
+      "field": "caption",
+      "text": "De lado se nota el pequeño espacio que separa las dos capas."
+    },
+    {
+      "id": "es-holdout-v5-648",
+      "field": "altText",
+      "text": "Una pieza ovalada se une por su parte superior al frente de la blusa."
+    },
+    {
+      "id": "es-holdout-v5-649",
+      "field": "altText",
+      "text": "El panel exterior se aleja ligeramente de la superficie de la prenda."
+    },
+    {
+      "id": "es-holdout-v5-650",
+      "field": "altText",
+      "text": "Una sombra estrecha dibuja el contorno inferior del óvalo superpuesto."
+    },
+    {
+      "id": "es-holdout-v5-651",
+      "field": "caption",
+      "text": "Los botones recorren la falda en una diagonal que empieza junto a la cadera."
+    },
+    {
+      "id": "es-holdout-v5-652",
+      "field": "caption",
+      "text": "Dejé los de abajo abiertos para dar un poco más de paso."
+    },
+    {
+      "id": "es-holdout-v5-653",
+      "field": "altText",
+      "text": "Botones alineados sobre una abertura inclinada conectan la cintura con una esquina inferior de la falda."
+    },
+    {
+      "id": "es-holdout-v5-654",
+      "field": "altText",
+      "text": "Los extremos inferiores de la abertura se separan por debajo de los últimos botones."
+    },
+    {
+      "id": "es-holdout-v5-655",
+      "field": "altText",
+      "text": "El panel frontal se superpone siguiendo una línea inclinada sobre las piernas."
+    },
+    {
+      "id": "es-holdout-v5-656",
+      "field": "caption",
+      "text": "Las mangas dejan una pequeña hendidura larga que muestra el brazo al moverme."
+    },
+    {
+      "id": "es-holdout-v5-657",
+      "field": "caption",
+      "text": "El borde queda sujeto en los extremos y conserva el dibujo abierto."
+    },
+    {
+      "id": "es-holdout-v5-658",
+      "field": "altText",
+      "text": "Una abertura estrecha recorre el exterior de cada manga corta."
+    },
+    {
+      "id": "es-holdout-v5-659",
+      "field": "altText",
+      "text": "Dos pequeños puntos de unión mantienen cerrados los extremos de la hendidura."
+    },
+    {
+      "id": "es-holdout-v5-660",
+      "field": "altText",
+      "text": "La piel del brazo queda visible por una línea alargada entre las piezas de tela."
+    },
+    {
+      "id": "es-holdout-v5-661",
+      "field": "caption",
+      "text": "Las dos bandas dobladas se encuentran y forman un cruce plano en el pecho."
+    },
+    {
+      "id": "es-holdout-v5-662",
+      "field": "caption",
+      "text": "Me gustó ese detalle limpio para llevarlo con el pelo suelto."
+    },
+    {
+      "id": "es-holdout-v5-663",
+      "field": "altText",
+      "text": "Dos pliegues anchos se cruzan en el centro superior del vestido."
+    },
+    {
+      "id": "es-holdout-v5-664",
+      "field": "altText",
+      "text": "Las bandas dobladas forman una X plana sobre una base de tela continua."
+    },
+    {
+      "id": "es-holdout-v5-665",
+      "field": "altText",
+      "text": "Los extremos de los pliegues desaparecen dentro de las costuras laterales."
+    },
+    {
+      "id": "es-holdout-v5-666",
+      "field": "caption",
+      "text": "El canesú hace una curva amplia que baja hacia el centro de la espalda."
+    },
+    {
+      "id": "es-holdout-v5-667",
+      "field": "caption",
+      "text": "Tomé otra foto para mostrar esa costura que casi nunca veo al vestirme."
+    },
+    {
+      "id": "es-holdout-v5-668",
+      "field": "altText",
+      "text": "Un canesú curvo separa la parte superior de la espalda en la camisa."
+    },
+    {
+      "id": "es-holdout-v5-669",
+      "field": "altText",
+      "text": "La costura del panel desciende suavemente en el centro y sube junto a los hombros."
+    },
+    {
+      "id": "es-holdout-v5-670",
+      "field": "altText",
+      "text": "La pieza superior tiene un borde inferior redondeado sobre la tela más suelta."
+    },
+    {
+      "id": "es-holdout-v5-671",
+      "field": "caption",
+      "text": "Los recortes forman esquinas grandes sobre el frente de cada pierna."
+    },
+    {
+      "id": "es-holdout-v5-672",
+      "field": "caption",
+      "text": "Me gustó repetir esas líneas con una blusa de bordes rectos."
+    },
+    {
+      "id": "es-holdout-v5-673",
+      "field": "altText",
+      "text": "Paneles angulares se unen mediante costuras visibles en las piernas del pantalón."
+    },
+    {
+      "id": "es-holdout-v5-674",
+      "field": "altText",
+      "text": "Las líneas cosidas forman esquinas amplias a distintas alturas de las perneras."
+    },
+    {
+      "id": "es-holdout-v5-675",
+      "field": "altText",
+      "text": "El diseño combina superficies lisas con encuentros geométricos cerca de las rodillas."
+    },
+    {
+      "id": "es-holdout-v5-676",
+      "field": "caption",
+      "text": "Los círculos quedan cosidos solo en una parte y se levantan al mover los brazos."
+    },
+    {
+      "id": "es-holdout-v5-677",
+      "field": "caption",
+      "text": "Quise mostrar cómo las piezas siguen sueltas sobre la chaqueta."
+    },
+    {
+      "id": "es-holdout-v5-678",
+      "field": "altText",
+      "text": "Aplicaciones circulares cubren la chaqueta sujetas por pequeños segmentos de su borde."
+    },
+    {
+      "id": "es-holdout-v5-679",
+      "field": "altText",
+      "text": "Varias piezas redondas se separan de la superficie y producen sombras cortas."
+    },
+    {
+      "id": "es-holdout-v5-680",
+      "field": "altText",
+      "text": "Los discos de tela aparecen distribuidos sin formar filas sobre el frente."
+    },
+    {
+      "id": "es-holdout-v5-681",
+      "field": "caption",
+      "text": "Los flecos dibujan ondas porque están sujetos a una línea que sube y baja."
+    },
+    {
+      "id": "es-holdout-v5-682",
+      "field": "caption",
+      "text": "Me gustó cómo se mueve cada tramo por separado cuando camino."
+    },
+    {
+      "id": "es-holdout-v5-683",
+      "field": "altText",
+      "text": "Una fila de flecos sigue una costura ondulada sobre la falda."
+    },
+    {
+      "id": "es-holdout-v5-684",
+      "field": "altText",
+      "text": "Los hilos colgantes crean alturas desiguales bajo una línea de curvas amplias."
+    },
+    {
+      "id": "es-holdout-v5-685",
+      "field": "altText",
+      "text": "La base lisa de la falda queda visible entre los tramos de flecos."
+    },
+    {
+      "id": "es-holdout-v5-686",
+      "field": "caption",
+      "text": "Los pliegues del hombro forman un lazo ancho sin añadir una cinta aparte."
+    },
+    {
+      "id": "es-holdout-v5-687",
+      "field": "caption",
+      "text": "Hoy dejé ese lado del pelo recogido para que se aprecie la forma."
+    },
+    {
+      "id": "es-holdout-v5-688",
+      "field": "altText",
+      "text": "La tela del hombro se dobla formando dos bucles amplios sobre la blusa."
+    },
+    {
+      "id": "es-holdout-v5-689",
+      "field": "altText",
+      "text": "El centro del lazo queda integrado en la costura superior de la prenda."
+    },
+    {
+      "id": "es-holdout-v5-690",
+      "field": "altText",
+      "text": "Dos extremos anchos del mismo tejido caen desde el adorno del hombro."
+    },
+    {
+      "id": "es-holdout-v5-691",
+      "field": "caption",
+      "text": "Los bolsillos parecen dos círculos completos apoyados sobre el vestido."
+    },
+    {
+      "id": "es-holdout-v5-692",
+      "field": "caption",
+      "text": "La abertura queda arriba y casi se esconde entre los bordes redondos."
+    },
+    {
+      "id": "es-holdout-v5-693",
+      "field": "altText",
+      "text": "Un bolsillo redondo ocupa cada lateral del vestido sobre la falda lisa."
+    },
+    {
+      "id": "es-holdout-v5-694",
+      "field": "altText",
+      "text": "Las aberturas siguen un tramo corto de la curva superior de cada bolsillo."
+    },
+    {
+      "id": "es-holdout-v5-695",
+      "field": "altText",
+      "text": "El pespunte rodea las piezas redondas sobre una superficie lisa de tela."
+    },
+    {
+      "id": "es-holdout-v5-696",
+      "field": "caption",
+      "text": "Los botones del costado permiten abrir la camisa sin tocar el frente."
+    },
+    {
+      "id": "es-holdout-v5-697",
+      "field": "caption",
+      "text": "Abrí los últimos para que la prenda acompañe mejor mis pasos."
+    },
+    {
+      "id": "es-holdout-v5-698",
+      "field": "altText",
+      "text": "Botones pequeños recorren las dos costuras laterales de una camisa larga."
+    },
+    {
+      "id": "es-holdout-v5-699",
+      "field": "altText",
+      "text": "La parte inferior queda abierta a un lado dejando separar los paneles."
+    },
+    {
+      "id": "es-holdout-v5-700",
+      "field": "altText",
+      "text": "Los cierres laterales dejan una superficie frontal continua en la camisa."
+    },
+    {
+      "id": "es-holdout-v5-701",
+      "field": "caption",
+      "text": "El borde de la cintura sube y baja con una curva suave alrededor."
+    },
+    {
+      "id": "es-holdout-v5-702",
+      "field": "caption",
+      "text": "Lo llevé con la blusa metida para mostrar esa línea poco usual."
+    },
+    {
+      "id": "es-holdout-v5-703",
+      "field": "altText",
+      "text": "La cintura del pantalón presenta un borde ondulado con dos elevaciones frontales."
+    },
+    {
+      "id": "es-holdout-v5-704",
+      "field": "altText",
+      "text": "La banda superior sigue una curva continua sobre la parte alta de la prenda."
+    },
+    {
+      "id": "es-holdout-v5-705",
+      "field": "altText",
+      "text": "Pequeños pasadores rectos se distribuyen entre las ondulaciones de la cintura."
+    },
+    {
+      "id": "es-holdout-v5-706",
+      "field": "caption",
+      "text": "Las bolsitas cuelgan del borde del chaleco y se mueven con bastante libertad."
+    },
+    {
+      "id": "es-holdout-v5-707",
+      "field": "caption",
+      "text": "Hoy dejé dos vacías para mostrar cómo se aplastan cuando no guardan nada."
+    },
+    {
+      "id": "es-holdout-v5-708",
+      "field": "altText",
+      "text": "Varias bolsas pequeñas están sujetas al borde inferior del chaleco por tiras cortas."
+    },
+    {
+      "id": "es-holdout-v5-709",
+      "field": "altText",
+      "text": "Los compartimentos quedan separados del cuerpo principal y cuelgan sobre la cintura."
+    },
+    {
+      "id": "es-holdout-v5-710",
+      "field": "altText",
+      "text": "Cada bolsa presenta una abertura superior con un pequeño cierre individual."
+    },
+    {
+      "id": "es-holdout-v5-711",
+      "field": "caption",
+      "text": "Las puntas del cuello se separan de la blusa y dejan un pequeño hueco debajo."
+    },
+    {
+      "id": "es-holdout-v5-712",
+      "field": "caption",
+      "text": "Me gustó ese relieve discreto al mirar la prenda de perfil."
+    },
+    {
+      "id": "es-holdout-v5-713",
+      "field": "altText",
+      "text": "El cuello mantiene sus extremos triangulares suspendidos ligeramente por encima de la tela."
+    },
+    {
+      "id": "es-holdout-v5-714",
+      "field": "altText",
+      "text": "Un espacio corto separa cada extremo triangular de la tela inferior."
+    },
+    {
+      "id": "es-holdout-v5-715",
+      "field": "altText",
+      "text": "El cuello está sujeto cerca de la nuca y mantiene su volumen en el frente."
+    },
+    {
+      "id": "es-holdout-v5-716",
+      "field": "caption",
+      "text": "Un solo pliegue ancho reúne la tela junto a una cadera."
+    },
+    {
+      "id": "es-holdout-v5-717",
+      "field": "caption",
+      "text": "El resto de la falda queda bastante liso alrededor del cuerpo."
+    },
+    {
+      "id": "es-holdout-v5-718",
+      "field": "altText",
+      "text": "Un pliegue profundo queda concentrado sobre el costado izquierdo de la falda."
+    },
+    {
+      "id": "es-holdout-v5-719",
+      "field": "altText",
+      "text": "La reserva de tela forma dos líneas verticales cerca de una cadera."
+    },
+    {
+      "id": "es-holdout-v5-720",
+      "field": "altText",
+      "text": "Un costado de la falda queda completamente plano al lado del pliegue profundo."
+    },
+    {
+      "id": "es-holdout-v5-721",
+      "field": "caption",
+      "text": "La abertura del cierre hace un ángulo recto antes de subir por el pecho."
+    },
+    {
+      "id": "es-holdout-v5-722",
+      "field": "caption",
+      "text": "Me gustó cómo esa esquina cambia la distribución de los bolsillos."
+    },
+    {
+      "id": "es-holdout-v5-723",
+      "field": "altText",
+      "text": "Una cremallera recorre un tramo horizontal y gira hacia arriba en la chaqueta."
+    },
+    {
+      "id": "es-holdout-v5-724",
+      "field": "altText",
+      "text": "El cierre forma una esquina visible en el panel frontal de la prenda."
+    },
+    {
+      "id": "es-holdout-v5-725",
+      "field": "altText",
+      "text": "Dos secciones de tela se superponen alrededor de la abertura angular."
+    },
+    {
+      "id": "es-holdout-v5-726",
+      "field": "caption",
+      "text": "Una pieza corta rodea el escote y cae suelta sobre los hombros."
+    },
+    {
+      "id": "es-holdout-v5-727",
+      "field": "caption",
+      "text": "El borde de esa capa se levanta un poquito cuando giro la cabeza."
+    },
+    {
+      "id": "es-holdout-v5-728",
+      "field": "altText",
+      "text": "Un panel corto rodea el cuello y se extiende libremente sobre los hombros."
+    },
+    {
+      "id": "es-holdout-v5-729",
+      "field": "altText",
+      "text": "El panel corto del escote acaba sobre los hombros dejando libres las mangas."
+    },
+    {
+      "id": "es-holdout-v5-730",
+      "field": "altText",
+      "text": "Dos bordes separados se distinguen alrededor de la abertura del cuello."
+    },
+    {
+      "id": "es-holdout-v5-731",
+      "field": "caption",
+      "text": "El cordón recoge el bajo del vestido y crea una curva hacia adentro."
+    },
+    {
+      "id": "es-holdout-v5-732",
+      "field": "caption",
+      "text": "Lo ajusté apenas para mantener suficiente espacio al caminar."
+    },
+    {
+      "id": "es-holdout-v5-733",
+      "field": "altText",
+      "text": "Un cordón atraviesa la jareta del bajo y recoge el borde del vestido."
+    },
+    {
+      "id": "es-holdout-v5-734",
+      "field": "altText",
+      "text": "La tela forma pequeños frunces alrededor de una abertura inferior ajustable."
+    },
+    {
+      "id": "es-holdout-v5-735",
+      "field": "altText",
+      "text": "Dos cabos del cordón salen por una abertura lateral del ruedo."
+    },
+    {
+      "id": "es-holdout-v5-736",
+      "field": "caption",
+      "text": "Las solapas de los bolsillos terminan en curvas que casi parecen sonrisas."
+    },
+    {
+      "id": "es-holdout-v5-737",
+      "field": "caption",
+      "text": "Elegí esta camisa por ese detalle pequeño que cambia todo el frente."
+    },
+    {
+      "id": "es-holdout-v5-738",
+      "field": "altText",
+      "text": "Dos bolsillos delanteros presentan solapas con bordes inferiores curvados hacia arriba."
+    },
+    {
+      "id": "es-holdout-v5-739",
+      "field": "altText",
+      "text": "Un botón sujeta el centro de cada tapa redondeada sobre la camisa."
+    },
+    {
+      "id": "es-holdout-v5-740",
+      "field": "altText",
+      "text": "Los bordes de las solapas dejan ver pequeñas esquinas del bolsillo debajo."
+    },
+    {
+      "id": "es-holdout-v5-741",
+      "field": "caption",
+      "text": "La pieza del tobillo parece un puño separado alrededor de la pierna."
+    },
+    {
+      "id": "es-holdout-v5-742",
+      "field": "caption",
+      "text": "Me gustó el huequito que se forma cuando la pernera se mueve."
+    },
+    {
+      "id": "es-holdout-v5-743",
+      "field": "altText",
+      "text": "Una banda ancha rodea cada tobillo por debajo del borde del pantalón."
+    },
+    {
+      "id": "es-holdout-v5-744",
+      "field": "altText",
+      "text": "Pequeñas tiras conectan la pernera con el puño inferior separado."
+    },
+    {
+      "id": "es-holdout-v5-745",
+      "field": "altText",
+      "text": "Un espacio horizontal queda visible entre el pantalón y la banda del tobillo."
+    },
+    {
+      "id": "es-holdout-v5-746",
+      "field": "caption",
+      "text": "Las dos capas se encuentran por un borde quebrado que atraviesa el frente."
+    },
+    {
+      "id": "es-holdout-v5-747",
+      "field": "caption",
+      "text": "Me gustó ese dibujo angular junto a una parte superior muy simple."
+    },
+    {
+      "id": "es-holdout-v5-748",
+      "field": "altText",
+      "text": "Un panel de falda se superpone a otro siguiendo un borde en zigzag."
+    },
+    {
+      "id": "es-holdout-v5-749",
+      "field": "altText",
+      "text": "Las esquinas de la capa exterior dejan ver sectores triangulares de la tela inferior."
+    },
+    {
+      "id": "es-holdout-v5-750",
+      "field": "altText",
+      "text": "La cintura lisa sostiene dos piezas cruzadas con puntas alternadas."
+    },
+    {
+      "id": "es-holdout-v5-751",
+      "field": "caption",
+      "text": "Los hexágonos quedan incompletos y dejan que el fondo conecte unas figuras con otras."
+    },
+    {
+      "id": "es-holdout-v5-752",
+      "field": "caption",
+      "text": "Me gusta mirar el patrón de lejos para descubrir las líneas que parecen continuar."
+    },
+    {
+      "id": "es-holdout-v5-753",
+      "field": "altText",
+      "text": "Hexágonos abiertos presentan uno de sus lados interrumpido en la estampa de la blusa."
+    },
+    {
+      "id": "es-holdout-v5-754",
+      "field": "altText",
+      "text": "Pequeños espacios separan algunos segmentos de las figuras geométricas."
+    },
+    {
+      "id": "es-holdout-v5-755",
+      "field": "altText",
+      "text": "Las figuras geométricas quedan separadas por franjas amplias de fondo visible."
+    },
+    {
+      "id": "es-holdout-v5-756",
+      "field": "caption",
+      "text": "Cada círculo contiene otro que se desplaza un poquito hacia un lado."
+    },
+    {
+      "id": "es-holdout-v5-757",
+      "field": "caption",
+      "text": "El dibujo parece tener movimiento aunque la falda esté extendida."
+    },
+    {
+      "id": "es-holdout-v5-758",
+      "field": "altText",
+      "text": "Círculos pequeños quedan desplazados dentro de contornos redondos más grandes."
+    },
+    {
+      "id": "es-holdout-v5-759",
+      "field": "altText",
+      "text": "Los espacios entre los anillos cambian de ancho a lo largo del patrón."
+    },
+    {
+      "id": "es-holdout-v5-760",
+      "field": "altText",
+      "text": "La estampa repite parejas de formas circulares con centros distintos."
+    },
+    {
+      "id": "es-holdout-v5-761",
+      "field": "caption",
+      "text": "Las rayas se cortan y vuelven a empezar unos centímetros más arriba."
+    },
+    {
+      "id": "es-holdout-v5-762",
+      "field": "caption",
+      "text": "El patrón desplazado le da un toque inesperado a esta camisa de siempre."
+    },
+    {
+      "id": "es-holdout-v5-763",
+      "field": "altText",
+      "text": "Rayas horizontales quedan interrumpidas por pequeños desplazamientos verticales en la camisa."
+    },
+    {
+      "id": "es-holdout-v5-764",
+      "field": "altText",
+      "text": "Los trazos se cortan en segmentos horizontales conectados mediante pequeños escalones."
+    },
+    {
+      "id": "es-holdout-v5-765",
+      "field": "altText",
+      "text": "Los huecos del patrón dejan ver una franja lisa entre las partes dibujadas."
+    },
+    {
+      "id": "es-holdout-v5-766",
+      "field": "caption",
+      "text": "Los rombos tienen un hueco largo en medio que se repite por todo el vestido."
+    },
+    {
+      "id": "es-holdout-v5-767",
+      "field": "caption",
+      "text": "De cerca parecen pequeños marcos acostados sobre la tela."
+    },
+    {
+      "id": "es-holdout-v5-768",
+      "field": "altText",
+      "text": "Rombos ilustrados rodean aberturas geométricas estrechas dentro de cada figura."
+    },
+    {
+      "id": "es-holdout-v5-769",
+      "field": "altText",
+      "text": "Los marcos angulares se alternan de punta a punta sobre el vestido."
+    },
+    {
+      "id": "es-holdout-v5-770",
+      "field": "altText",
+      "text": "Las líneas dobles del estampado delimitan centros vacíos alargados."
+    },
+    {
+      "id": "es-holdout-v5-771",
+      "field": "caption",
+      "text": "Los cuadritos de cada abanico se estrechan al acercarse al punto donde parten sus radios."
+    },
+    {
+      "id": "es-holdout-v5-772",
+      "field": "caption",
+      "text": "La estampa me gustó porque mezcla curvas grandes con líneas pequeñitas."
+    },
+    {
+      "id": "es-holdout-v5-773",
+      "field": "altText",
+      "text": "Abanicos semicirculares contienen una cuadrícula que se estrecha cerca de su base."
+    },
+    {
+      "id": "es-holdout-v5-774",
+      "field": "altText",
+      "text": "Las figuras abiertas se distribuyen inclinadas sobre el pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-775",
+      "field": "altText",
+      "text": "Los radios del diseño dividen pequeñas celdas entre varios arcos concéntricos."
+    },
+    {
+      "id": "es-holdout-v5-776",
+      "field": "caption",
+      "text": "Los cubitos están dibujados solo con sus bordes y se montan unos sobre otros."
+    },
+    {
+      "id": "es-holdout-v5-777",
+      "field": "caption",
+      "text": "Elegí esta bolsa por los espacios que dejan esas figuras transparentes."
+    },
+    {
+      "id": "es-holdout-v5-778",
+      "field": "altText",
+      "text": "Contornos de cubos se superponen formando una red de líneas sobre el bolso."
+    },
+    {
+      "id": "es-holdout-v5-779",
+      "field": "altText",
+      "text": "Las figuras geométricas muestran sus aristas delanteras y posteriores en el mismo dibujo."
+    },
+    {
+      "id": "es-holdout-v5-780",
+      "field": "altText",
+      "text": "El fondo queda visible dentro de cada cubo trazado con líneas finas."
+    },
+    {
+      "id": "es-holdout-v5-781",
+      "field": "caption",
+      "text": "Las gotas alternan sus puntas para crear una especie de cadena vertical."
+    },
+    {
+      "id": "es-holdout-v5-782",
+      "field": "caption",
+      "text": "Me gustó cómo queda el dibujo al centro de una falda tan lisa."
+    },
+    {
+      "id": "es-holdout-v5-783",
+      "field": "altText",
+      "text": "Gotas alargadas se alternan orientadas hacia arriba y hacia abajo en una franja vertical."
+    },
+    {
+      "id": "es-holdout-v5-784",
+      "field": "altText",
+      "text": "Las puntas estrechas de las figuras casi se encuentran sobre la tela."
+    },
+    {
+      "id": "es-holdout-v5-785",
+      "field": "altText",
+      "text": "Gotas de extremos alternados componen una franja estrecha sobre el panel delantero."
+    },
+    {
+      "id": "es-holdout-v5-786",
+      "field": "caption",
+      "text": "Los caminos se cruzan hechos de pequeños puntos que conservan sus espacios."
+    },
+    {
+      "id": "es-holdout-v5-787",
+      "field": "caption",
+      "text": "La camisa parece tranquila de lejos y llena de detalles cuando la acerco."
+    },
+    {
+      "id": "es-holdout-v5-788",
+      "field": "altText",
+      "text": "Líneas formadas por puntos pequeños atraviesan la camisa en varias direcciones."
+    },
+    {
+      "id": "es-holdout-v5-789",
+      "field": "altText",
+      "text": "Los cruces del patrón mantienen separadas las marcas redondas del dibujo."
+    },
+    {
+      "id": "es-holdout-v5-790",
+      "field": "altText",
+      "text": "Los trazos punteados combinan curvas largas y recorridos casi rectos."
+    },
+    {
+      "id": "es-holdout-v5-791",
+      "field": "caption",
+      "text": "Cada cuadrado tiene una pequeña entrada que casi parece una puerta."
+    },
+    {
+      "id": "es-holdout-v5-792",
+      "field": "caption",
+      "text": "Dejé el bolso plano para mostrar las distintas posiciones de esas aberturas."
+    },
+    {
+      "id": "es-holdout-v5-793",
+      "field": "altText",
+      "text": "Cuadrados de borde grueso presentan una interrupción corta en uno de sus lados."
+    },
+    {
+      "id": "es-holdout-v5-794",
+      "field": "altText",
+      "text": "Las aberturas aparecen orientadas de forma diferente entre las figuras del bolso."
+    },
+    {
+      "id": "es-holdout-v5-795",
+      "field": "altText",
+      "text": "El patrón combina contornos cerrados y segmentos separados por huecos pequeños."
+    },
+    {
+      "id": "es-holdout-v5-796",
+      "field": "caption",
+      "text": "Dos líneas quebradas se acompañan y dejan una franja delgada entre ellas."
+    },
+    {
+      "id": "es-holdout-v5-797",
+      "field": "caption",
+      "text": "Me gustó repetir esas diagonales con un accesorio de bordes rectos."
+    },
+    {
+      "id": "es-holdout-v5-798",
+      "field": "altText",
+      "text": "Parejas de líneas en zigzag forman franjas verticales sobre la falda."
+    },
+    {
+      "id": "es-holdout-v5-799",
+      "field": "altText",
+      "text": "Una separación uniforme queda entre los dos trazos de cada franja quebrada."
+    },
+    {
+      "id": "es-holdout-v5-800",
+      "field": "altText",
+      "text": "Las puntas del dibujo se repiten en direcciones opuestas a lo largo de la tela."
+    },
+    {
+      "id": "es-holdout-v5-801",
+      "field": "caption",
+      "text": "Los contornos se van metiendo unos dentro de otros sin formar una figura exacta."
+    },
+    {
+      "id": "es-holdout-v5-802",
+      "field": "caption",
+      "text": "El pañuelo parece tener profundidad aunque sus líneas sean muy sencillas."
+    },
+    {
+      "id": "es-holdout-v5-803",
+      "field": "altText",
+      "text": "Formas irregulares quedan rodeadas por varios contornos paralelos sobre el pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-804",
+      "field": "altText",
+      "text": "Los contornos cerrados guardan espacios parejos entre una curva dibujada y la siguiente."
+    },
+    {
+      "id": "es-holdout-v5-805",
+      "field": "altText",
+      "text": "Pequeñas agrupaciones de curvas cerradas llenan distintas zonas del estampado."
+    },
+    {
+      "id": "es-holdout-v5-806",
+      "field": "caption",
+      "text": "Las puntas de las medias lunas se enlazan para dibujar una fila sinuosa."
+    },
+    {
+      "id": "es-holdout-v5-807",
+      "field": "caption",
+      "text": "Hoy preferí que el dibujo de la blusa fuera el único detalle grande."
+    },
+    {
+      "id": "es-holdout-v5-808",
+      "field": "altText",
+      "text": "Medias lunas ilustradas se conectan por sus puntas en filas curvas sobre la blusa."
+    },
+    {
+      "id": "es-holdout-v5-809",
+      "field": "altText",
+      "text": "Las figuras repetidas dejan huecos alargados entre sus lados cóncavos."
+    },
+    {
+      "id": "es-holdout-v5-810",
+      "field": "altText",
+      "text": "El patrón presenta cadenas de arcos que se doblan suavemente hacia los costados."
+    },
+    {
+      "id": "es-holdout-v5-811",
+      "field": "caption",
+      "text": "Las ventanas dibujadas van subiendo de altura como una escalera pequeña."
+    },
+    {
+      "id": "es-holdout-v5-812",
+      "field": "caption",
+      "text": "Me gustó el contraste de los marcos rectos con los espacios amplios entre ellos."
+    },
+    {
+      "id": "es-holdout-v5-813",
+      "field": "altText",
+      "text": "Marcos rectangulares ilustrados aparecen en una secuencia de alturas crecientes."
+    },
+    {
+      "id": "es-holdout-v5-814",
+      "field": "altText",
+      "text": "Cada figura presenta una división central que recuerda una ventana estrecha."
+    },
+    {
+      "id": "es-holdout-v5-815",
+      "field": "altText",
+      "text": "Los rectángulos quedan separados por espacios uniformes sobre el bolso."
+    },
+    {
+      "id": "es-holdout-v5-816",
+      "field": "caption",
+      "text": "Los triángulos tienen lados curvos y parecen pequeños pétalos puntiagudos."
+    },
+    {
+      "id": "es-holdout-v5-817",
+      "field": "caption",
+      "text": "La mezcla de ángulos y curvas fue lo que me hizo elegir esta tela."
+    },
+    {
+      "id": "es-holdout-v5-818",
+      "field": "altText",
+      "text": "Formas de tres puntas curvas se agrupan sobre el tejido del vestido."
+    },
+    {
+      "id": "es-holdout-v5-819",
+      "field": "altText",
+      "text": "Las formas puntiagudas se agrupan alrededor de espacios redondos vacíos."
+    },
+    {
+      "id": "es-holdout-v5-820",
+      "field": "altText",
+      "text": "Los bordes arqueados crean pequeñas sombras dibujadas dentro de cada figura."
+    },
+    {
+      "id": "es-holdout-v5-821",
+      "field": "caption",
+      "text": "Las rueditas del dibujo tienen muchos radios alrededor de un hueco redondo."
+    },
+    {
+      "id": "es-holdout-v5-822",
+      "field": "caption",
+      "text": "Me gustó la combinación de líneas finas con ese vacío que queda adentro."
+    },
+    {
+      "id": "es-holdout-v5-823",
+      "field": "altText",
+      "text": "Radios pequeños ocupan el espacio entre dos anillos que rodean una abertura central."
+    },
+    {
+      "id": "es-holdout-v5-824",
+      "field": "altText",
+      "text": "Las ruedas ilustradas alternan diámetros grandes y pequeños en varias zonas del pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-825",
+      "field": "altText",
+      "text": "Pequeños segmentos rectos conectan los contornos exterior e interior de las ruedas."
+    },
+    {
+      "id": "es-holdout-v5-826",
+      "field": "caption",
+      "text": "La fila de puntos se va abriendo mientras gira sobre mi camisa."
+    },
+    {
+      "id": "es-holdout-v5-827",
+      "field": "caption",
+      "text": "Me gusta que cada vuelta quede un poco más separada que la anterior."
+    },
+    {
+      "id": "es-holdout-v5-828",
+      "field": "altText",
+      "text": "Marcas redondas siguen un recorrido espiral amplio que termina cerca de una costura lateral."
+    },
+    {
+      "id": "es-holdout-v5-829",
+      "field": "altText",
+      "text": "Las marcas redondas aumentan su separación hacia el extremo exterior del diseño."
+    },
+    {
+      "id": "es-holdout-v5-830",
+      "field": "altText",
+      "text": "El centro del dibujo concentra varios puntos pequeños en un espacio reducido."
+    },
+    {
+      "id": "es-holdout-v5-831",
+      "field": "caption",
+      "text": "Las esquinas se enganchan unas con otras y dejan pequeños rombos entre los trazos."
+    },
+    {
+      "id": "es-holdout-v5-832",
+      "field": "caption",
+      "text": "Apoyé el bolso sin contenido para seguir cada esquina de la trama dibujada."
+    },
+    {
+      "id": "es-holdout-v5-833",
+      "field": "altText",
+      "text": "Líneas en ángulo recto se entrelazan formando aberturas con forma de rombo."
+    },
+    {
+      "id": "es-holdout-v5-834",
+      "field": "altText",
+      "text": "Los segmentos del patrón se superponen mediante pequeños cambios de grosor dibujados."
+    },
+    {
+      "id": "es-holdout-v5-835",
+      "field": "altText",
+      "text": "La red geométrica cubre todo el panel exterior de la bolsa."
+    },
+    {
+      "id": "es-holdout-v5-836",
+      "field": "caption",
+      "text": "Los semicírculos se apilan y dejan una franja recta entre cada curva."
+    },
+    {
+      "id": "es-holdout-v5-837",
+      "field": "caption",
+      "text": "Me gustó la calma de este patrón para una prenda de corte amplio."
+    },
+    {
+      "id": "es-holdout-v5-838",
+      "field": "altText",
+      "text": "Semicírculos ilustrados se colocan uno sobre otro en columnas verticales."
+    },
+    {
+      "id": "es-holdout-v5-839",
+      "field": "altText",
+      "text": "Las bases horizontales separan las curvas que se repiten en el vestido."
+    },
+    {
+      "id": "es-holdout-v5-840",
+      "field": "altText",
+      "text": "Cada columna conserva curvas de ancho uniforme desde su principio hasta el final."
+    },
+    {
+      "id": "es-holdout-v5-841",
+      "field": "caption",
+      "text": "Las estrellas parecen abrirse por una línea central en dos piezas distintas."
+    },
+    {
+      "id": "es-holdout-v5-842",
+      "field": "caption",
+      "text": "Me gustó la pequeña sombra que da volumen a ese dibujo plano."
+    },
+    {
+      "id": "es-holdout-v5-843",
+      "field": "altText",
+      "text": "Estrellas ilustradas presentan mitades desplazadas alrededor de una línea central."
+    },
+    {
+      "id": "es-holdout-v5-844",
+      "field": "altText",
+      "text": "Una sombra estrecha separa las dos partes de cada figura puntiaguda."
+    },
+    {
+      "id": "es-holdout-v5-845",
+      "field": "altText",
+      "text": "Las estrellas abiertas se inclinan en ángulos diversos dentro del patrón."
+    },
+    {
+      "id": "es-holdout-v5-846",
+      "field": "caption",
+      "text": "Las sombras del estampado hacen que la tela parezca papel arrugado."
+    },
+    {
+      "id": "es-holdout-v5-847",
+      "field": "caption",
+      "text": "Al tocarla vuelve a sorprenderme lo lisa que está la superficie."
+    },
+    {
+      "id": "es-holdout-v5-848",
+      "field": "altText",
+      "text": "Pliegues y sombras impresos simulan papel arrugado sobre una tela lisa."
+    },
+    {
+      "id": "es-holdout-v5-849",
+      "field": "altText",
+      "text": "Líneas angulares se cruzan formando zonas claras y oscuras en el bolso."
+    },
+    {
+      "id": "es-holdout-v5-850",
+      "field": "altText",
+      "text": "La superficie plana contiene un dibujo que aparenta pequeños volúmenes irregulares."
+    },
+    {
+      "id": "es-holdout-v5-851",
+      "field": "caption",
+      "text": "Los anillos se quedan abiertos de un lado y parecen girar alrededor del fondo."
+    },
+    {
+      "id": "es-holdout-v5-852",
+      "field": "caption",
+      "text": "Hoy me gustó acompañar ese movimiento con una falda sin otros adornos."
+    },
+    {
+      "id": "es-holdout-v5-853",
+      "field": "altText",
+      "text": "Anillos de distintos tamaños presentan aberturas orientadas hacia varias direcciones."
+    },
+    {
+      "id": "es-holdout-v5-854",
+      "field": "altText",
+      "text": "Las curvas gruesas se repiten sobre la tela sin cerrar sus círculos."
+    },
+    {
+      "id": "es-holdout-v5-855",
+      "field": "altText",
+      "text": "Pequeños espacios separan los extremos de cada contorno redondeado."
+    },
+    {
+      "id": "es-holdout-v5-856",
+      "field": "caption",
+      "text": "Los bloques del dibujo suben de manera irregular y hacen pequeñas torres."
+    },
+    {
+      "id": "es-holdout-v5-857",
+      "field": "caption",
+      "text": "Los bloques de arriba parecen quedar en equilibrio sobre las piezas inferiores."
+    },
+    {
+      "id": "es-holdout-v5-858",
+      "field": "altText",
+      "text": "Rectángulos ilustrados se apilan formando torres de alturas diferentes."
+    },
+    {
+      "id": "es-holdout-v5-859",
+      "field": "altText",
+      "text": "Las piezas superiores sobresalen parcialmente del bloque que tienen debajo."
+    },
+    {
+      "id": "es-holdout-v5-860",
+      "field": "altText",
+      "text": "El patrón conserva espacios amplios entre las construcciones geométricas del bolso."
+    },
+    {
+      "id": "es-holdout-v5-861",
+      "field": "caption",
+      "text": "Las líneas se apartan cuando llegan al óvalo y vuelven a juntarse después."
+    },
+    {
+      "id": "es-holdout-v5-862",
+      "field": "caption",
+      "text": "Ese pequeño desvío en medio de la tela fue lo que más me gustó."
+    },
+    {
+      "id": "es-holdout-v5-863",
+      "field": "altText",
+      "text": "Rayas paralelas se curvan alrededor de una forma ovalada central."
+    },
+    {
+      "id": "es-holdout-v5-864",
+      "field": "altText",
+      "text": "El patrón recupera líneas rectas a ambos lados del óvalo vacío."
+    },
+    {
+      "id": "es-holdout-v5-865",
+      "field": "altText",
+      "text": "Las curvas se concentran cerca del centro de la camiseta."
+    },
+    {
+      "id": "es-holdout-v5-866",
+      "field": "caption",
+      "text": "Los cuadritos parecen haberse deslizado dejando pequeñas franjas vacías entre ellos."
+    },
+    {
+      "id": "es-holdout-v5-867",
+      "field": "caption",
+      "text": "Me gustó este dibujo para cambiar un poco la camisa de siempre."
+    },
+    {
+      "id": "es-holdout-v5-868",
+      "field": "altText",
+      "text": "Filas de cuadrados se desplazan lateralmente y dejan huecos estrechos en el patrón."
+    },
+    {
+      "id": "es-holdout-v5-869",
+      "field": "altText",
+      "text": "Las figuras mantienen sus bordes rectos aunque cambian de posición entre las filas."
+    },
+    {
+      "id": "es-holdout-v5-870",
+      "field": "altText",
+      "text": "Pequeños rectángulos de fondo separan algunos bloques sobre la tela."
+    },
+    {
+      "id": "es-holdout-v5-871",
+      "field": "caption",
+      "text": "Las bandas del estampado forman recorridos triangulares con dobleces en sus tres esquinas."
+    },
+    {
+      "id": "es-holdout-v5-872",
+      "field": "caption",
+      "text": "Las vueltas triangulares rodean pequeños espacios vacíos que dejan respirar el estampado."
+    },
+    {
+      "id": "es-holdout-v5-873",
+      "field": "altText",
+      "text": "Cintas ilustradas se pliegan en ángulos para formar triángulos conectados."
+    },
+    {
+      "id": "es-holdout-v5-874",
+      "field": "altText",
+      "text": "Pequeñas sombras muestran el lado inferior de las bandas dibujadas."
+    },
+    {
+      "id": "es-holdout-v5-875",
+      "field": "altText",
+      "text": "El patrón combina tramos rectos con puntas que se repiten sobre el pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-876",
+      "field": "caption",
+      "text": "Las cafeteras dibujadas tienen sus lados marcados como pequeñas caras de un prisma."
+    },
+    {
+      "id": "es-holdout-v5-877",
+      "field": "caption",
+      "text": "Me gustó la tapita inclinada sobre cada una de las figuras de la camisa."
+    },
+    {
+      "id": "es-holdout-v5-878",
+      "field": "altText",
+      "text": "Cafeteras moka ilustradas muestran cuerpos angulares, asas curvas y tapas pequeñas."
+    },
+    {
+      "id": "es-holdout-v5-879",
+      "field": "altText",
+      "text": "Las bases anchas se estrechan hacia una unión central antes de abrirse arriba."
+    },
+    {
+      "id": "es-holdout-v5-880",
+      "field": "altText",
+      "text": "Picos cortos sobresalen frente a las asas dibujadas en cada cafetera."
+    },
+    {
+      "id": "es-holdout-v5-881",
+      "field": "caption",
+      "text": "Los pequeños exprimidores tienen un cono rayado en medio de su plato redondo."
+    },
+    {
+      "id": "es-holdout-v5-882",
+      "field": "caption",
+      "text": "Me hizo gracia encontrar un objeto de cocina tan sencillo en esta bolsa."
+    },
+    {
+      "id": "es-holdout-v5-883",
+      "field": "altText",
+      "text": "Exprimidores manuales ilustrados presentan conos acanalados sobre platos circulares."
+    },
+    {
+      "id": "es-holdout-v5-884",
+      "field": "altText",
+      "text": "Pequeños picos de vertido sobresalen de los recipientes dibujados."
+    },
+    {
+      "id": "es-holdout-v5-885",
+      "field": "altText",
+      "text": "La estampa alterna vistas superiores y laterales de los utensilios."
+    },
+    {
+      "id": "es-holdout-v5-886",
+      "field": "caption",
+      "text": "Las puertas redondas de los hornitos parecen pequeñas entradas dentro de una cúpula."
+    },
+    {
+      "id": "es-holdout-v5-887",
+      "field": "caption",
+      "text": "Me gustó esa forma tan simple para una estampa de objetos cotidianos."
+    },
+    {
+      "id": "es-holdout-v5-888",
+      "field": "altText",
+      "text": "Hornos de barro ilustrados presentan cúpulas redondeadas con aberturas frontales en arco."
+    },
+    {
+      "id": "es-holdout-v5-889",
+      "field": "altText",
+      "text": "Pequeñas bases rectangulares sostienen las formas curvas sobre el tejido."
+    },
+    {
+      "id": "es-holdout-v5-890",
+      "field": "altText",
+      "text": "Algunas figuras muestran chimeneas cortas elevadas junto a la parte posterior."
+    },
+    {
+      "id": "es-holdout-v5-891",
+      "field": "caption",
+      "text": "Las maquinitas de coser tienen una rueda enorme y un cajoncito debajo."
+    },
+    {
+      "id": "es-holdout-v5-892",
+      "field": "caption",
+      "text": "Elegí esta estampa para la bolsa donde guardo mis proyectos sin terminar."
+    },
+    {
+      "id": "es-holdout-v5-893",
+      "field": "altText",
+      "text": "Máquinas de coser antiguas ilustradas presentan grandes ruedas laterales y pequeñas plataformas."
+    },
+    {
+      "id": "es-holdout-v5-894",
+      "field": "altText",
+      "text": "Una manivela sobresale de cada rueda dibujada junto al cuerpo de la máquina."
+    },
+    {
+      "id": "es-holdout-v5-895",
+      "field": "altText",
+      "text": "Las bases rectangulares contienen pequeños cajones ilustrados bajo el mecanismo superior."
+    },
+    {
+      "id": "es-holdout-v5-896",
+      "field": "caption",
+      "text": "Los frascos del estampado tienen tapas cubiertas con cuadritos de tela dibujada."
+    },
+    {
+      "id": "es-holdout-v5-897",
+      "field": "caption",
+      "text": "Me gustó que cada moñito quedara distinto alrededor de las pequeñas tapas."
+    },
+    {
+      "id": "es-holdout-v5-898",
+      "field": "altText",
+      "text": "Frascos ilustrados presentan tapas cubiertas por cuadrados de tela atados con cordones."
+    },
+    {
+      "id": "es-holdout-v5-899",
+      "field": "altText",
+      "text": "Los bordes de las cubiertas dibujadas caen en puntas sobre los recipientes."
+    },
+    {
+      "id": "es-holdout-v5-900",
+      "field": "altText",
+      "text": "Pequeñas cintas rodean los cuellos de los frascos repetidos en el pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-901",
+      "field": "caption",
+      "text": "Las jarras quedan inclinadas y dejan caer chorritos dibujados sobre pequeños vasos."
+    },
+    {
+      "id": "es-holdout-v5-902",
+      "field": "caption",
+      "text": "Me gustó el movimiento que crean esas líneas curvas en una camisa tan simple."
+    },
+    {
+      "id": "es-holdout-v5-903",
+      "field": "altText",
+      "text": "Jarras ilustradas se inclinan para verter líneas curvas hacia vasos pequeños."
+    },
+    {
+      "id": "es-holdout-v5-904",
+      "field": "altText",
+      "text": "Asas grandes aparecen en el lado opuesto a los picos de cada jarra."
+    },
+    {
+      "id": "es-holdout-v5-905",
+      "field": "altText",
+      "text": "Las figuras de los vasos quedan alineadas debajo de los chorros dibujados."
+    },
+    {
+      "id": "es-holdout-v5-906",
+      "field": "caption",
+      "text": "Las cajitas se ven abiertas y enseñan sus hileras de palitos en el dibujo."
+    },
+    {
+      "id": "es-holdout-v5-907",
+      "field": "caption",
+      "text": "Me gustó la forma rectangular que se repite con pequeñas esquinas desplazadas."
+    },
+    {
+      "id": "es-holdout-v5-908",
+      "field": "altText",
+      "text": "Cajas de cerillos ilustradas presentan bandejas parcialmente abiertas con palitos alineados."
+    },
+    {
+      "id": "es-holdout-v5-909",
+      "field": "altText",
+      "text": "Las cubiertas rectangulares quedan desplazadas respecto a los compartimentos interiores."
+    },
+    {
+      "id": "es-holdout-v5-910",
+      "field": "altText",
+      "text": "Pequeños extremos redondos aparecen en las puntas de los palitos dibujados."
+    },
+    {
+      "id": "es-holdout-v5-911",
+      "field": "caption",
+      "text": "Los candelabros del pañuelo abren tres brazos curvos hacia arriba."
+    },
+    {
+      "id": "es-holdout-v5-912",
+      "field": "caption",
+      "text": "Me gustaron las gotitas de cera dibujadas junto a cada vela."
+    },
+    {
+      "id": "es-holdout-v5-913",
+      "field": "altText",
+      "text": "Candelabros ilustrados presentan tres brazos con velas largas en sus extremos."
+    },
+    {
+      "id": "es-holdout-v5-914",
+      "field": "altText",
+      "text": "Las bases anchas sostienen tallos que se dividen en curvas simétricas."
+    },
+    {
+      "id": "es-holdout-v5-915",
+      "field": "altText",
+      "text": "Pequeñas llamas dibujadas aparecen encima de las velas del estampado."
+    },
+    {
+      "id": "es-holdout-v5-916",
+      "field": "caption",
+      "text": "Las mecedoras dibujadas tienen patas curvas que casi parecen dos sonrisas largas."
+    },
+    {
+      "id": "es-holdout-v5-917",
+      "field": "caption",
+      "text": "Me gustó esa escena de objetos tranquilos para una camiseta del fin de semana."
+    },
+    {
+      "id": "es-holdout-v5-918",
+      "field": "altText",
+      "text": "Mecedoras ilustradas muestran asientos tejidos sobre dos soportes curvos inferiores."
+    },
+    {
+      "id": "es-holdout-v5-919",
+      "field": "altText",
+      "text": "Los respaldos altos presentan barras verticales y apoyabrazos redondeados."
+    },
+    {
+      "id": "es-holdout-v5-920",
+      "field": "altText",
+      "text": "Las figuras aparecen de perfil con sus bases arqueadas extendidas hacia ambos lados."
+    },
+    {
+      "id": "es-holdout-v5-921",
+      "field": "caption",
+      "text": "El fondo aparece entre los pequeños listones que componen cada banca dibujada."
+    },
+    {
+      "id": "es-holdout-v5-922",
+      "field": "caption",
+      "text": "Me gustaron las curvas de los apoyabrazos dentro de una estampa tan ordenada."
+    },
+    {
+      "id": "es-holdout-v5-923",
+      "field": "altText",
+      "text": "Bancas ilustradas presentan asientos y respaldos formados por listones separados."
+    },
+    {
+      "id": "es-holdout-v5-924",
+      "field": "altText",
+      "text": "Dos soportes curvos sostienen los extremos de cada banca dibujada."
+    },
+    {
+      "id": "es-holdout-v5-925",
+      "field": "altText",
+      "text": "Las figuras alargadas se alternan con vistas de perfil sobre la tela."
+    },
+    {
+      "id": "es-holdout-v5-926",
+      "field": "caption",
+      "text": "Los molinillos tienen una manivela larga que sobresale por encima de la caja."
+    },
+    {
+      "id": "es-holdout-v5-927",
+      "field": "caption",
+      "text": "Me gustó el cajoncito pequeño que aparece al frente de cada dibujo."
+    },
+    {
+      "id": "es-holdout-v5-928",
+      "field": "altText",
+      "text": "Molinos de café ilustrados combinan cajas pequeñas con manivelas superiores curvadas."
+    },
+    {
+      "id": "es-holdout-v5-929",
+      "field": "altText",
+      "text": "Un recipiente abierto queda debajo del eje de cada manivela dibujada."
+    },
+    {
+      "id": "es-holdout-v5-930",
+      "field": "altText",
+      "text": "Las cajas presentan pequeños tiradores redondos en sus cajones frontales."
+    },
+    {
+      "id": "es-holdout-v5-931",
+      "field": "caption",
+      "text": "Los émbolos dibujados quedan a distintas alturas dentro de cada jarrita."
+    },
+    {
+      "id": "es-holdout-v5-932",
+      "field": "caption",
+      "text": "Las varillas se ven dentro de las prensas dibujadas y bajan a distintas alturas."
+    },
+    {
+      "id": "es-holdout-v5-933",
+      "field": "altText",
+      "text": "Prensas de café ilustradas muestran recipientes transparentes con émbolos verticales en su interior."
+    },
+    {
+      "id": "es-holdout-v5-934",
+      "field": "altText",
+      "text": "Las tapas redondas sostienen varillas terminadas en pequeñas perillas superiores."
+    },
+    {
+      "id": "es-holdout-v5-935",
+      "field": "altText",
+      "text": "Discos dibujados dentro de las jarras aparecen a diferentes alturas sobre sus bases."
+    },
+    {
+      "id": "es-holdout-v5-936",
+      "field": "caption",
+      "text": "Los terrarios de la estampa guardan plantas pequeñitas dentro de figuras de vidrio."
+    },
+    {
+      "id": "es-holdout-v5-937",
+      "field": "caption",
+      "text": "Los terrarios reúnen paredes geométricas con plantas que crecen libremente en su interior."
+    },
+    {
+      "id": "es-holdout-v5-938",
+      "field": "altText",
+      "text": "Terrarios ilustrados presentan paredes geométricas transparentes alrededor de plantas pequeñas."
+    },
+    {
+      "id": "es-holdout-v5-939",
+      "field": "altText",
+      "text": "Líneas finas dibujan las uniones entre paneles de vidrio sobre la tela."
+    },
+    {
+      "id": "es-holdout-v5-940",
+      "field": "altText",
+      "text": "Capas de piedras y tierra aparecen bajo las plantas dentro de cada recipiente."
+    },
+    {
+      "id": "es-holdout-v5-941",
+      "field": "caption",
+      "text": "Los aparatos dibujados tienen una antena larga y un botón grande al costado."
+    },
+    {
+      "id": "es-holdout-v5-942",
+      "field": "caption",
+      "text": "Me gustaron los agujeritos del altavoz que se alcanzan a ver de cerca."
+    },
+    {
+      "id": "es-holdout-v5-943",
+      "field": "altText",
+      "text": "Radios portátiles ilustrados presentan antenas extensibles y altavoces cubiertos de puntos."
+    },
+    {
+      "id": "es-holdout-v5-944",
+      "field": "altText",
+      "text": "Una perilla redonda sobresale junto a la pantalla estrecha de cada aparato."
+    },
+    {
+      "id": "es-holdout-v5-945",
+      "field": "altText",
+      "text": "Las figuras rectangulares tienen asas pequeñas encima de sus cuerpos dibujados."
+    },
+    {
+      "id": "es-holdout-v5-946",
+      "field": "caption",
+      "text": "Los carritos de helado tienen tapas redondas y ruedas enormes en el dibujo."
+    },
+    {
+      "id": "es-holdout-v5-947",
+      "field": "caption",
+      "text": "Me gustó el pequeño techo que aparece sobre algunos de los puestos móviles."
+    },
+    {
+      "id": "es-holdout-v5-948",
+      "field": "altText",
+      "text": "Carritos de helado ilustrados muestran cajas rectangulares sobre dos ruedas grandes."
+    },
+    {
+      "id": "es-holdout-v5-949",
+      "field": "altText",
+      "text": "Pequeñas tapas circulares se distribuyen encima de los compartimentos dibujados."
+    },
+    {
+      "id": "es-holdout-v5-950",
+      "field": "altText",
+      "text": "Un toldo estrecho queda sujeto por varillas delgadas sobre uno de los carros."
+    },
+    {
+      "id": "es-holdout-v5-951",
+      "field": "caption",
+      "text": "Las cajas de los camiones dibujados están llenas de pequeños bultos atados."
+    },
+    {
+      "id": "es-holdout-v5-952",
+      "field": "caption",
+      "text": "Me gustó que se vieran las cuerdas cruzadas sobre la carga de cada figura."
+    },
+    {
+      "id": "es-holdout-v5-953",
+      "field": "altText",
+      "text": "Camiones ilustrados transportan paquetes sujetos por cuerdas sobre plataformas abiertas."
+    },
+    {
+      "id": "es-holdout-v5-954",
+      "field": "altText",
+      "text": "Cabinas pequeñas quedan delante de cajas largas con varias ruedas debajo."
+    },
+    {
+      "id": "es-holdout-v5-955",
+      "field": "altText",
+      "text": "Las cargas dibujadas sobresalen por encima de los bordes laterales de los vehículos."
+    },
+    {
+      "id": "es-holdout-v5-956",
+      "field": "caption",
+      "text": "Las carretillas del estampado llevan macetas inclinadas junto a pequeñas herramientas."
+    },
+    {
+      "id": "es-holdout-v5-957",
+      "field": "caption",
+      "text": "Me gustó el dibujo de la rueda única que sostiene cada carga al frente."
+    },
+    {
+      "id": "es-holdout-v5-958",
+      "field": "altText",
+      "text": "Carretillas ilustradas presentan una rueda delantera y dos mangos largos posteriores."
+    },
+    {
+      "id": "es-holdout-v5-959",
+      "field": "altText",
+      "text": "Macetas y herramientas dibujadas ocupan los recipientes inclinados de los carros."
+    },
+    {
+      "id": "es-holdout-v5-960",
+      "field": "altText",
+      "text": "Dos soportes cortos mantienen cada carretilla elevada sobre la tela del diseño."
+    },
+    {
+      "id": "es-holdout-v5-961",
+      "field": "caption",
+      "text": "Los panecitos del dibujo tienen una cubierta marcada en curvas como pequeñas conchas."
+    },
+    {
+      "id": "es-holdout-v5-962",
+      "field": "caption",
+      "text": "Me gustó el detalle de las viseras pequeñas encima de cada círculo."
+    },
+    {
+      "id": "es-holdout-v5-963",
+      "field": "altText",
+      "text": "Panes redondos ilustrados presentan una cubierta segmentada con líneas curvas sobre la bolsa."
+    },
+    {
+      "id": "es-holdout-v5-964",
+      "field": "altText",
+      "text": "Las cajas alargadas se sostienen en postes curvos dentro del estampado."
+    },
+    {
+      "id": "es-holdout-v5-965",
+      "field": "altText",
+      "text": "Algunas figuras muestran sus paneles de frente y otras quedan dibujadas de lado."
+    },
+    {
+      "id": "es-holdout-v5-966",
+      "field": "caption",
+      "text": "Las paletas dibujadas asoman sus palitos por debajo de bloques que parecen fruta helada."
+    },
+    {
+      "id": "es-holdout-v5-967",
+      "field": "caption",
+      "text": "Me gustó esta colección de objetos de calle sobre una tela tan sencilla."
+    },
+    {
+      "id": "es-holdout-v5-968",
+      "field": "altText",
+      "text": "Paletas heladas ilustradas muestran formas rectangulares y redondeadas sujetas a palitos cortos."
+    },
+    {
+      "id": "es-holdout-v5-969",
+      "field": "altText",
+      "text": "Pequeñas ventanas curvas ocupan la parte alta de las figuras dibujadas."
+    },
+    {
+      "id": "es-holdout-v5-970",
+      "field": "altText",
+      "text": "Las ranuras estrechas aparecen debajo de los indicadores semicirculares del diseño."
+    },
+    {
+      "id": "es-holdout-v5-971",
+      "field": "caption",
+      "text": "Las gelatinas del estampado conservan los gajos del molde alrededor de cada círculo."
+    },
+    {
+      "id": "es-holdout-v5-972",
+      "field": "caption",
+      "text": "Me gustó cómo las barras se cruzan sin que la estampa se vuelva pesada."
+    },
+    {
+      "id": "es-holdout-v5-973",
+      "field": "altText",
+      "text": "Postres ilustrados presentan cuerpos translúcidos acanalados sobre platos pequeños."
+    },
+    {
+      "id": "es-holdout-v5-974",
+      "field": "altText",
+      "text": "Las estructuras quedan apoyadas en soportes rectangulares sobre el estampado."
+    },
+    {
+      "id": "es-holdout-v5-975",
+      "field": "altText",
+      "text": "Los brazos dibujados apuntan en diferentes direcciones desde cada centro metálico."
+    },
+    {
+      "id": "es-holdout-v5-976",
+      "field": "caption",
+      "text": "Los barquillos del dibujo se agrupan en atados con sus puntas abiertas mirando al frente."
+    },
+    {
+      "id": "es-holdout-v5-977",
+      "field": "caption",
+      "text": "Me gustó el espacio blanco que queda alrededor de los números dibujados con círculos."
+    },
+    {
+      "id": "es-holdout-v5-978",
+      "field": "altText",
+      "text": "Tubos de barquillo ilustrados muestran espirales diagonales y aberturas circulares en sus extremos."
+    },
+    {
+      "id": "es-holdout-v5-979",
+      "field": "altText",
+      "text": "Pequeños círculos se agrupan en cantidades diferentes dentro de cada ficha rectangular."
+    },
+    {
+      "id": "es-holdout-v5-980",
+      "field": "altText",
+      "text": "Algunas piezas aparecen acostadas y otras inclinadas sobre el pañuelo."
+    },
+    {
+      "id": "es-holdout-v5-981",
+      "field": "caption",
+      "text": "Las empanadas dibujadas tienen un borde repulgado que se distingue hasta en las figuras pequeñas."
+    },
+    {
+      "id": "es-holdout-v5-982",
+      "field": "caption",
+      "text": "Me gustó ese dibujo pequeño para el bolsillo de la camisa."
+    },
+    {
+      "id": "es-holdout-v5-983",
+      "field": "altText",
+      "text": "Empanadas semicirculares ilustradas presentan pliegues regulares alrededor de su borde curvo."
+    },
+    {
+      "id": "es-holdout-v5-984",
+      "field": "altText",
+      "text": "Las esquinas visibles presentan pequeños símbolos geométricos sobre cada carta."
+    },
+    {
+      "id": "es-holdout-v5-985",
+      "field": "altText",
+      "text": "El patrón alterna grupos abiertos y tarjetas individuales junto al bolsillo."
+    },
+    {
+      "id": "es-holdout-v5-986",
+      "field": "caption",
+      "text": "Los tortilleros del dibujo abren la tapa y dejan ver varias capas redondas adentro."
+    },
+    {
+      "id": "es-holdout-v5-987",
+      "field": "caption",
+      "text": "Las fichas redondas descansan al final de varios triángulos largos del tablero."
+    },
+    {
+      "id": "es-holdout-v5-988",
+      "field": "altText",
+      "text": "Recipientes redondos ilustrados guardan discos apilados debajo de tapas parcialmente levantadas."
+    },
+    {
+      "id": "es-holdout-v5-989",
+      "field": "altText",
+      "text": "Fichas redondas se apilan en los extremos de algunas figuras puntiagudas."
+    },
+    {
+      "id": "es-holdout-v5-990",
+      "field": "altText",
+      "text": "Una banda central separa las dos mitades del tablero estampado sobre la bolsa."
+    },
+    {
+      "id": "es-holdout-v5-991",
+      "field": "caption",
+      "text": "Las cazuelitas estampadas tienen dos orejitas que cambian un poco en cada figura."
+    },
+    {
+      "id": "es-holdout-v5-992",
+      "field": "caption",
+      "text": "Me gustó cómo se agrupan formando un triángulo en esta camiseta."
+    },
+    {
+      "id": "es-holdout-v5-993",
+      "field": "altText",
+      "text": "Pequeñas cazuelas ilustradas muestran recipientes bajos con dos asas laterales opuestas."
+    },
+    {
+      "id": "es-holdout-v5-994",
+      "field": "altText",
+      "text": "Pequeños discos claros contienen marcas numéricas en las superficies redondas del dibujo."
+    },
+    {
+      "id": "es-holdout-v5-995",
+      "field": "altText",
+      "text": "Una figura alargada semejante a un taco aparece junto al grupo de bolas."
+    },
+    {
+      "id": "es-holdout-v5-996",
+      "field": "caption",
+      "text": "La piedra inclinada del dibujo descansa sobre tres patas y lleva un rodillo encima."
+    },
+    {
+      "id": "es-holdout-v5-997",
+      "field": "caption",
+      "text": "Las escaleras del juego se meten entre las curvas grandes de las serpientes dibujadas."
+    },
+    {
+      "id": "es-holdout-v5-998",
+      "field": "altText",
+      "text": "Un metate ilustrado presenta una superficie inclinada sostenida por patas junto a una piedra alargada."
+    },
+    {
+      "id": "es-holdout-v5-999",
+      "field": "altText",
+      "text": "Las figuras sinuosas cruzan varias casillas entre pequeños tramos de peldaños rectos."
+    },
+    {
+      "id": "es-holdout-v5-1000",
+      "field": "altText",
+      "text": "El tablero estampado ocupa una zona rectangular sobre el panel delantero de la falda."
+    }
+  ]
+}

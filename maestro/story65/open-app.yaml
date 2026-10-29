@@ -7,6 +7,21 @@ appId: ${MAESTRO_APP_ID}
 - retry:
     maxRetries: 3
     commands:
+      # An Android "isn't responding" dialog takes window focus, so the driver sees the dialog and
+      # not the app behind it. Run 40908968432 (interaction lane, first flow): the failed step's
+      # screen is the system dialog (android-anr, buttons "Close app" and "Wait") and tab-home was
+      # never visible. A starved process on the runner raises it, not the app under test, and
+      # maestro/subflows/open-app.yaml dismisses the same dialog for the mobile suite. "Wait" keeps
+      # every process alive; "Close app" would kill one.
+      - runFlow:
+          when:
+            platform: Android
+            visible:
+              id: 'android:id/aerr_wait'
+          commands:
+            - tapOn:
+                id: 'android:id/aerr_wait'
+                label: 'Dismiss an Android application-not-responding dialog'
       - extendedWaitUntil:
           visible: 'Open in .*|This is the developer menu.*|Connected to:'
           timeout: 10000
@@ -40,6 +55,7 @@ appId: ${MAESTRO_APP_ID}
                   visible: 'Navigate up'
                 commands:
                   - tapOn: 'Navigate up'
+                  - waitForAnimationToEnd
             - runFlow:
                 when:
                   visible:
@@ -47,6 +63,7 @@ appId: ${MAESTRO_APP_ID}
                 commands:
                   - tapOn:
                       id: 'BackButton'
+                  - waitForAnimationToEnd
             - runFlow:
                 when:
                   visible:
@@ -54,6 +71,31 @@ appId: ${MAESTRO_APP_ID}
                 commands:
                   - tapOn:
                       id: 'comments-close'
+                  - waitForAnimationToEnd
+            # iOS 18 exposes the native stack back item by its localized label only (no
+            # BackButton id); the runner supplies the app locale's common.back.
+            - runFlow:
+                when:
+                  platform: iOS
+                  visible: ${MAESTRO_BACK}
+                commands:
+                  - tapOn: ${MAESTRO_BACK}
+                  - waitForAnimationToEnd
+      # An Android "isn't responding" dialog takes window focus, so the driver sees the dialog and
+      # not the app behind it. Run 40908968432 (interaction lane, first flow): the failed step's
+      # screen is the system dialog (android-anr, buttons "Close app" and "Wait") and tab-home was
+      # never visible. A starved process on the runner raises it, not the app under test, and
+      # maestro/subflows/open-app.yaml dismisses the same dialog for the mobile suite. "Wait" keeps
+      # every process alive; "Close app" would kill one.
+      - runFlow:
+          when:
+            platform: Android
+            visible:
+              id: 'android:id/aerr_wait'
+          commands:
+            - tapOn:
+                id: 'android:id/aerr_wait'
+                label: 'Dismiss an Android application-not-responding dialog'
       - extendedWaitUntil:
           visible:
             id: 'tab-home'

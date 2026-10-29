@@ -23,6 +23,7 @@ import {
   CommunityAuthorizationBudget,
   communityDependency,
 } from './community-availability.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 const publicStatuses = [
   'published',
   'author_deleted',
@@ -126,13 +127,14 @@ export class CommunityTargetsService {
     objectPaths: Map<string, string | null>,
     retry = false
   ): Promise<ReturnType<typeof resolvedCommunityTargetSchema.parse>[]> {
-    const snapshot = await this.prisma.$transaction(
+    const snapshot = await interactiveTransaction(
+      this.prisma,
       (tx) => this.captureTargets(tx, member, targets),
-      {
+      () => ({
         isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
         timeout: budget.remaining(),
         maxWait: budget.remaining(),
-      }
+      })
     )
     const projected = new Map(
       (

@@ -725,9 +725,11 @@ describe('PremiumThemeSection', () => {
     signIn()
     const gate = deferred<void>()
     const aborted = deferred<void>()
+    const started = deferred<void>()
     useMswHandlers(
       http.get(THEME_PATH, async ({ request }) => {
         request.signal.addEventListener('abort', () => aborted.resolve())
+        started.resolve()
         await gate.promise
         return HttpResponse.json(themeBody())
       })
@@ -740,6 +742,8 @@ describe('PremiumThemeSection', () => {
         'true'
       )
     )
+    // Unmounting before the request reaches the handler would abort it unseen.
+    await started.promise
 
     view.unmount()
     await aborted.promise
@@ -771,10 +775,12 @@ describe('PremiumThemeSection', () => {
     signIn()
     const gate = deferred<void>()
     const aborted = deferred<void>()
+    const started = deferred<void>()
     useMswHandlers(
       getHandler({ theme: null }),
       http.put(THEME_PATH, async ({ request }) => {
         request.signal.addEventListener('abort', () => aborted.resolve())
+        started.resolve()
         await gate.promise
         return HttpResponse.json(themeBody({ theme: 'winter_metallic' }))
       })
@@ -786,6 +792,8 @@ describe('PremiumThemeSection', () => {
     await waitFor(() =>
       expect(card('winter_metallic')).toHaveAttribute('aria-busy', 'true')
     )
+    // Unmounting before the request reaches the handler would abort it unseen.
+    await started.promise
 
     view.unmount()
     gate.resolve()

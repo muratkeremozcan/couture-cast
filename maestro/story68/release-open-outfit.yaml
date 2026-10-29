@@ -1,0 +1,26 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: tab-home
+# Home can keep an earlier scroll offset. Start every search from the top of Home.
+- scrollUntilVisible:
+    element:
+      id: weather-header(-skeleton)?
+    direction: UP
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: outfit-share-card-open
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+# Home renders one primary outfit card. Fail if a second opener ever appears.
+- assertNotVisible:
+    id: outfit-share-card-open
+    index: 1
+- tapOn:
+    id: outfit-share-card-open
+- extendedWaitUntil:
+    visible:
+      id: share-card-preview-loaded
+    timeout: 20000

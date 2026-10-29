@@ -212,6 +212,11 @@
       "severity": "high"
     },
     {
+      "term": "tecavüzcü",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
       "term": "gebertirim",
       "category": "violence",
       "severity": "high"

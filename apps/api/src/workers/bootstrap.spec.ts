@@ -12,8 +12,8 @@
 // and nothing failed when it did not.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkerShutdownResources } from './shutdown-resources'
-import type * as BootstrapModule from './bootstrap.js'
 import type * as WeatherConfigModule from '../modules/weather/providers/weather.config'
+import { createWorkerProcessState, performShutdown, startWorkers } from './bootstrap.js'
 
 const harness = vi.hoisted(() => ({
   exit: vi.fn(),
@@ -107,14 +107,16 @@ vi.mock('./shutdown-resources', () => ({
 }))
 
 /**
- * Imported fresh per test. `bootstrap.ts` keeps its worker, queue and closeable
- * lists at module scope, so a second `startWorkers()` in the same module
- * instance would append to the first one's lists and make a length assertion
- * meaningless.
+ * A fresh process per test. The module is imported once, while the file is
+ * collected, so no test pays for loading the worker graph inside its own time
+ * budget; each test gets its own worker, queue and closeable lists.
  */
-async function loadBootstrap(): Promise<typeof BootstrapModule> {
-  vi.resetModules()
-  return import('./bootstrap.js')
+function freshProcess() {
+  const state = createWorkerProcessState()
+  return {
+    startWorkers: () => startWorkers(state),
+    performShutdown: () => performShutdown(state),
+  }
 }
 
 describe('general worker bootstrap', () => {
@@ -152,7 +154,7 @@ describe('general worker bootstrap', () => {
     harness.engagement.mockRejectedValueOnce(
       new Error('Community dispatch capability unavailable')
     )
-    const bootstrap = await loadBootstrap()
+    const bootstrap = freshProcess()
     await bootstrap.startWorkers()
     expect(harness.createCommunityWorkerRuntime).toHaveBeenCalledTimes(1)
     expect(harness.exit).not.toHaveBeenCalled()
@@ -160,7 +162,7 @@ describe('general worker bootstrap', () => {
   })
 
   it('waits for community readiness before it has a consumer to shut down', async () => {
-    const bootstrap = await loadBootstrap()
+    const bootstrap = freshProcess()
 
     await bootstrap.startWorkers()
 
@@ -168,7 +170,7 @@ describe('general worker bootstrap', () => {
   })
 
   it('closes the community runtime on shutdown', async () => {
-    const bootstrap = await loadBootstrap()
+    const bootstrap = freshProcess()
 
     await bootstrap.startWorkers()
     await bootstrap.performShutdown()
@@ -182,7 +184,7 @@ describe('general worker bootstrap', () => {
   })
 
   it('force-disconnects the community runtime when the deadline expires', async () => {
-    const bootstrap = await loadBootstrap()
+    const bootstrap = freshProcess()
 
     await bootstrap.startWorkers()
     await bootstrap.performShutdown()
@@ -194,7 +196,7 @@ describe('general worker bootstrap', () => {
   })
 
   it('still hands over the six BullMQ queues it created', async () => {
-    const bootstrap = await loadBootstrap()
+    const bootstrap = freshProcess()
 
     await bootstrap.startWorkers()
     await bootstrap.performShutdown()

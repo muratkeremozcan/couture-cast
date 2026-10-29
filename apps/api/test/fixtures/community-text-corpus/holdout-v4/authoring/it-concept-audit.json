@@ -1,0 +1,107 @@
+{
+  "author": "/root/general_review",
+  "locale": "it",
+  "scope": "All 1000 individually authored rows; semantic consolidation across caption and altText.",
+  "consolidations": [
+    {
+      "concept": "nuvole-visuali",
+      "formerLabels": ["stampa-nuvole", "applicazioni-nuvole-tasche"],
+      "rows": [205, 206, 207, 208, 277, 278, 279, 280],
+      "reason": "Sagome di nuvole; la diversa applicazione non basta a separare il motivo.",
+      "englishGloss": "Cloud shapes printed on clothing or embodied as shaped pockets."
+    },
+    {
+      "concept": "labirinto-geometrico",
+      "formerLabels": ["stampa-labirinto", "stampa-labirinto-circolare"],
+      "rows": [225, 226, 227, 228, 657, 658, 659, 660],
+      "reason": "Percorso a labirinto, con geometria rettilinea o circolare.",
+      "englishGloss": "Printed labyrinths with rectangular or circular paths."
+    },
+    {
+      "concept": "mani-ricamate",
+      "formerLabels": ["ricamo-mani", "ricamo-ombre-mani"],
+      "rows": [261, 262, 263, 264, 661, 662, 663, 664],
+      "reason": "Mani ricamate, inclusa la composizione di ombre con le dita.",
+      "englishGloss": "Embroidered hands, including a hand-shadow bird composition."
+    },
+    {
+      "concept": "bande-riflettenti-indossate",
+      "formerLabels": ["fascia-riflettente", "caviglia-catarifrangente"],
+      "rows": [317, 318, 319, 320, 393, 394, 395, 396],
+      "reason": "Bande che diventano luminose; la posizione sul corpo non crea un concetto nuovo.",
+      "englishGloss": "Reflective bands worn on the torso or ankles."
+    },
+    {
+      "concept": "origami-illustrato",
+      "formerLabels": ["ricamo-gru-origami", "ricamo-aeroplanino"],
+      "rows": [673, 674, 675, 676, 861, 862, 863, 864],
+      "reason": "Oggetti di carta piegata illustrati con ricamo.",
+      "englishGloss": "Illustrations of folded-paper objects, including a crane and aeroplane."
+    },
+    {
+      "concept": "foglie-impronta-ricamo",
+      "formerLabels": ["cianotipia-foglie", "ricamo-ramo-spalla"],
+      "rows": [257, 258, 259, 260, 413, 414, 415, 416],
+      "reason": "Fogliame come motivo visivo, pur con processi artigianali diversi.",
+      "englishGloss": "Foliage depicted through solar printing or embroidered branches."
+    },
+    {
+      "concept": "radiale-sul-busto",
+      "formerLabels": ["abito-arriccio-petto", "stampa-sunburst"],
+      "rows": [117, 118, 119, 120, 677, 678, 679, 680],
+      "reason": "Linee che convergono o si irradiano da un punto sul busto.",
+      "englishGloss": "Lines radiating from a point on the upper body, as folds or printed rays."
+    }
+  ],
+  "distinctions": [
+    "A structural closure and a printed shape remain separate when their functional scenario differs; colour, material and incidental place alone do not justify separation.",
+    "Paper origami depictions are consolidated across different pictured objects.",
+    "A cityscape made of repeated houses and an interactive single house with an opening door remain separate compositions.",
+    "Different familiar animals or objects in prints denote distinct depicted visual motifs, not material or colour variants."
+  ],
+  "unmergedConceptSize": 4,
+  "maximumConceptGroups": [
+    {
+      "concept": "bande-riflettenti-indossate",
+      "englishGloss": "Reflective bands worn on the torso or ankles.",
+      "count": 8,
+      "rows": [317, 318, 319, 320, 393, 394, 395, 396]
+    },
+    {
+      "concept": "foglie-impronta-ricamo",
+      "englishGloss": "Foliage depicted through solar printing or embroidered branches.",
+      "count": 8,
+      "rows": [257, 258, 259, 260, 413, 414, 415, 416]
+    },
+    {
+      "concept": "labirinto-geometrico",
+      "englishGloss": "Printed labyrinths with rectangular or circular paths.",
+      "count": 8,
+      "rows": [225, 226, 227, 228, 657, 658, 659, 660]
+    },
+    {
+      "concept": "mani-ricamate",
+      "englishGloss": "Embroidered hands, including a hand-shadow bird composition.",
+      "count": 8,
+      "rows": [261, 262, 263, 264, 661, 662, 663, 664]
+    },
+    {
+      "concept": "nuvole-visuali",
+      "englishGloss": "Cloud shapes printed on clothing or embodied as shaped pockets.",
+      "count": 8,
+      "rows": [205, 206, 207, 208, 277, 278, 279, 280]
+    },
+    {
+      "concept": "origami-illustrato",
+      "englishGloss": "Illustrations of folded-paper objects, including a crane and aeroplane.",
+      "count": 8,
+      "rows": [673, 674, 675, 676, 861, 862, 863, 864]
+    },
+    {
+      "concept": "radiale-sul-busto",
+      "englishGloss": "Lines radiating from a point on the upper body, as folds or printed rays.",
+      "count": 8,
+      "rows": [117, 118, 119, 120, 677, 678, 679, 680]
+    }
+  ]
+}

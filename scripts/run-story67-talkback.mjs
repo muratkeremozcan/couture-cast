@@ -28,6 +28,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
+import { talkbackFlowStrings } from './lib/story67-talkback-env.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const flows = path.join(root, 'maestro', 'story67')
@@ -104,20 +105,7 @@ function ensureReverses() {
     adb('reverse', `tcp:${port}`, `tcp:${port}`)
 }
 
-function strings() {
-  const n = english.community.notifications
-  return {
-    MAESTRO_TITLE: n.title,
-    MAESTRO_SIGNIN: n.signin,
-    MAESTRO_SEND: n.sendCode,
-    MAESTRO_VERIFY: n.verify,
-    MAESTRO_CODE_SENT: n.codeSent,
-    MAESTRO_EMAIL_LABEL: n.email,
-    MAESTRO_CODE_LABEL: n.code,
-    MAESTRO_ENABLED: n.enabled,
-    MAESTRO_SIGNOUT: n.signout,
-  }
-}
+const strings = () => talkbackFlowStrings(english)
 
 function checkMaestro() {
   const version = run(maestroPath, ['--version']).stdout.trim().split('\n').pop()

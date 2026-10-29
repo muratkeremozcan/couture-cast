@@ -4,6 +4,7 @@ import { type Prisma, type PrismaClient, type SilhouetteProfile } from '@prisma/
 import { createBaseLogger } from '../../logger/pino.config'
 import type { SilhouettePhotoModerationEngine } from './silhouette-photo-moderation.engine'
 import type { WardrobeStorage } from './wardrobe-storage.adapter'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 type ProcessableSilhouetteProfile = SilhouetteProfile & { my_form_object_path: string }
 
@@ -86,7 +87,7 @@ export class SilhouettePhotoProcessor {
         ? await this.loadGuardianNotificationContext(profile)
         : null
 
-    const applied = await this.prisma.$transaction(async (tx) => {
+    const applied = await interactiveTransaction(this.prisma, async (tx) => {
       const result = await tx.silhouetteProfile.updateMany({
         where: this.processingGuard(profile),
         data: {

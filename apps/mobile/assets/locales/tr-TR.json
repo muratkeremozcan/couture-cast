@@ -847,6 +847,9 @@
       "save": "Ayarları kaydet",
       "saved": "Ayarlar kaydedildi.",
       "failed": "Ayarlar kaydedilemedi. Yeniden deneyin.",
+      "loadFailed": "Ayarlar yüklenemedi. Yeniden deneyin.",
+      "loadRetrying": "Ayarlar yüklenemedi. Birazdan yeniden denenecek.",
+      "retry": "Yeniden dene",
       "conflict": "Ayarlar başka bir yerde değiştirildi. Güncel değerleri kontrol edip yeniden deneyin.",
       "permission": "Cihaz ayarlarından bildirimlere izin verip yeniden deneyin.",
       "signin": "Oturum aç",
@@ -942,6 +945,49 @@
       "linkLabel_one": "{{label}} öne çıkan kombini, {{author}} tarafından, {{count}} tepki. Şehir Vitrini açılır.",
       "linkLabel_other": "{{label}} öne çıkan kombini, {{author}} tarafından, {{count}} tepki. Şehir Vitrini açılır.",
       "cta": "Şehir Vitrininde gör"
+    }
+  },
+  "shareCard": {
+    "launcher": "Kombin kartımı oluştur",
+    "sourceOutfit": "Kombin",
+    "sourceCommunity": "Topluluk kombini",
+    "title": "Paylaşım kartın",
+    "previewDescription": "CoutureCast kartının önizlemesi",
+    "photoPrivacyHelp": "Fotoğrafındaki adlar ve yazılar görünür kalır. Kaydetmeden önce bu önizlemeyi kontrol et.",
+    "preparing": "Kart hazırlanıyor",
+    "watermark": "Filigranı göster",
+    "save": "Fotoğraflara kaydet",
+    "download": "PNG indir",
+    "saving": "Kaydediliyor",
+    "finishingSave": "Kayıt tamamlanıyor",
+    "saved": "Fotoğraflara kaydedildi",
+    "downloadStarted": "İndirme başladı",
+    "cancel": "İptal",
+    "close": "Kapat",
+    "retry": "Tekrar dene",
+    "refresh": "Önizlemeyi yenile",
+    "openSettings": "Ayarları aç",
+    "nativeSaveUnavailable": "Fotoğraf kaydetmek için uygulamayı güncelle.",
+    "permissionDenied": "Fotoğraf erişimi reddedildi. Hazır olduğunda tekrar dene.",
+    "permissionPermanent": "Ayarlarda fotoğraf kaydetmeye izin ver.",
+    "sourceUnavailable": "Bu kaynak kullanılamıyor.",
+    "previewChanged": "Kart değişti. Kaydetmeden önce önizlemeyi yenile.",
+    "offline": "Kart hazırlamak için internete bağlan.",
+    "storage": "Kaydedilemedi. Depolama alanını kontrol edip tekrar dene.",
+    "render": "Kart hazırlanamadı. Tekrar dene.",
+    "unknown": "Bir hata oluştu. Tekrar dene.",
+    "scenarios": {
+      "morning": "Sabah",
+      "midday": "Öğle",
+      "evening": "Akşam"
+    },
+    "climateBands": {
+      "cold_dry": "Soğuk ve kuru",
+      "cold_wet": "Soğuk ve nemli",
+      "temperate_dry": "Ilıman ve kuru",
+      "temperate_wet": "Ilıman ve nemli",
+      "warm_dry": "Sıcak ve kuru",
+      "warm_wet": "Sıcak ve nemli"
     }
   }
 }

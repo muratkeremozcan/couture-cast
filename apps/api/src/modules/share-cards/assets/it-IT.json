@@ -1,0 +1,26 @@
+{
+  "outfit": "Outfit",
+  "community": "Look della community",
+  "scenarios": {
+    "morning": "Mattina",
+    "midday": "Mezzogiorno",
+    "evening": "Sera"
+  },
+  "categories": {
+    "top": "Parte superiore",
+    "bottom": "Parte inferiore",
+    "outerwear": "Capospalla",
+    "dress": "Vestito",
+    "shoes": "Scarpe",
+    "accessory": "Accessorio"
+  },
+  "climateBands": {
+    "cold_dry": "Freddo e secco",
+    "cold_wet": "Freddo e umido",
+    "temperate_dry": "Temperato e secco",
+    "temperate_wet": "Temperato e umido",
+    "warm_dry": "Caldo e secco",
+    "warm_wet": "Caldo e umido"
+  },
+  "watermarkRole": "Filigrana"
+}

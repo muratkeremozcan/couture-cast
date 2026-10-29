@@ -1,0 +1,114 @@
+{
+  "phase": "V5",
+  "author": "/root/general_review",
+  "language": "en",
+  "source": "/tmp/cc68-tea-holdout-v5/.cc68-tea-authoring/en.tsv",
+  "authoredRowRange": [1, 1000],
+  "captionItemRange": [1, 500],
+  "altTextItemRange": [1, 500],
+  "counts": {
+    "caption": 500,
+    "altText": 500
+  },
+  "sourceSha256": "712f13d228c8f5d3e1314aec760b46c35942678a7bbf3f60ce6ade74fb054565",
+  "fiveWordAffectedItems": [],
+  "unicodeCategoryCrosscheckAgrees": true,
+  "conceptCount": 240,
+  "largestConceptCount": 8,
+  "allTiedMaximumConcepts": [
+    {
+      "concept": "handmade-button-loops",
+      "formerLabels": ["corded-button-loops", "thread-chain-loop"],
+      "englishGloss": "Small handmade flexible loops used to fasten garment buttons.",
+      "rows": [509, 510, 511, 512, 977, 978, 979, 980],
+      "count": 8,
+      "reason": "Covered cord and chained thread are different constructions of the same button-loop scenario."
+    },
+    {
+      "concept": "raised-button-thread-shank",
+      "formerLabels": ["button-woven-shank", "button-foot-spacer"],
+      "englishGloss": "Creating a raised thread shank beneath a sewn button.",
+      "rows": [109, 110, 111, 112, 945, 946, 947, 948],
+      "count": 8,
+      "reason": "Wrapping the stem and using a temporary spacer both depict formation of a raised button attachment."
+    },
+    {
+      "concept": "weighted-scarf-edge",
+      "formerLabels": ["scarf-corner-weights", "scarf-chain-channel"],
+      "englishGloss": "Weights inside scarf corners or edge channels controlling its fall.",
+      "rows": [117, 118, 119, 120, 157, 158, 159, 160],
+      "count": 8,
+      "reason": "Beads and concealed chain do not create separate weighted-fabric drape motifs."
+    },
+    {
+      "concept": "detachable-shoe-lace-cover",
+      "formerLabels": ["wingtip-lace-guard", "shoe-removable-tongue"],
+      "englishGloss": "A removable panel covering the front lacing of a shoe.",
+      "rows": [61, 62, 63, 64, 93, 94, 95, 96],
+      "count": 8,
+      "reason": "Different panel shapes retain the same detachable shoe-front cover scenario."
+    },
+    {
+      "concept": "narrow-loom-strap-work",
+      "formerLabels": ["weaving-selvedge", "loom-warp-comb"],
+      "englishGloss": "Setting up and weaving a narrow strap on a loom.",
+      "rows": [257, 258, 259, 260, 261, 262, 263, 264],
+      "count": 8,
+      "reason": "The edge and thread-spacing views are conservatively consolidated as one narrow-band weaving scene."
+    },
+    {
+      "concept": "pressure-flattened-seam",
+      "formerLabels": ["seam-roller", "wooden-clapper-seam"],
+      "englishGloss": "A seam flattened with a handheld pressure tool.",
+      "rows": [249, 250, 251, 252, 909, 910, 911, 912],
+      "count": 8,
+      "reason": "A rolling cylinder and a flat wooden block change the tool, while retaining the seam-flattening scenario."
+    },
+    {
+      "concept": "trimmed-curved-seam-allowance",
+      "formerLabels": ["seam-curve-clipping", "outer-curve-notches"],
+      "englishGloss": "Trimming curved seam allowances so the turned edge can spread or lie flat.",
+      "rows": [625, 626, 627, 628, 629, 630, 631, 632],
+      "count": 8,
+      "reason": "Straight clips and triangular notches are consolidated across the two curve directions."
+    },
+    {
+      "concept": "hand-stitched-folded-hem",
+      "formerLabels": ["blind-hem-sample", "catchstitch-hem"],
+      "englishGloss": "A folded garment hem attached with small hand stitches.",
+      "rows": [933, 934, 935, 936, 941, 942, 943, 944],
+      "count": 8,
+      "reason": "The stitch shape alone does not separate the shared hand-finished hem scene."
+    },
+    {
+      "concept": "button-layout-guide",
+      "formerLabels": ["button-spacing-gauge", "button-jig-alignment"],
+      "englishGloss": "A guide aligning or spacing the buttons along a garment front.",
+      "rows": [653, 654, 655, 656, 993, 994, 995, 996],
+      "count": 8,
+      "reason": "Spacing and button-hole orientation are grouped as button-row layout rather than separate styling motifs."
+    },
+    {
+      "concept": "enclosed-tote-interior-seam",
+      "formerLabels": ["covered-seam-binding", "french-seam-tote"],
+      "englishGloss": "An enclosed interior tote seam with no raw edge exposed.",
+      "rows": [289, 290, 291, 292, 985, 986, 987, 988],
+      "count": 8,
+      "reason": "Binding and a doubled seam provide the same clean enclosed bag-interior finish and are grouped together."
+    }
+  ],
+  "historicalLocaleFilesChecked": 35,
+  "historicalFullTextCollisions": [],
+  "wholeTextDuplicates": [],
+  "lengthViolations": [],
+  "wordCounts": {
+    "minimum": 8,
+    "median": 11.0,
+    "maximum": 14,
+    "fewerThanFiveWords": 0
+  },
+  "authorshipMethod": "Every complete item individually authored directly in English; literal batches and complete-sentence revisions serialized without text generation.",
+  "blindness": "Only the 35 explicit historical locale JSON files were loaded for mechanical equality. No repair, policy, screener or development corpus inspection; no screening evaluation; no builder contact.",
+  "status": "English complete and ready for common audit/import. No source changes after handoff without explicit revision request.",
+  "nextAssignedWork": "Spanish rows1–1000 remains unauthored; wait for the root continuation. Turkish follows in a separate turn."
+}

@@ -2,7 +2,9 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-7-ci-and-cd-automated-quality-gates
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 
 const repoRoot = path.resolve(__dirname, '../../..')
 
@@ -17,6 +19,12 @@ const previewReadyWorkflow = path.join(
   '.github',
   'workflows',
   'rwf-vercel-preview-ready.yml'
+)
+const vercelWaitWorkflow = path.join(
+  repoRoot,
+  '.github',
+  'workflows',
+  'vercel-wait-for-deployment.yml'
 )
 const manualE2eWorkflow = path.join(
   repoRoot,
@@ -49,21 +57,35 @@ const reserveSupabasePortsAction = path.join(
 const startLocalSupabaseUse = 'uses: ./.github/actions/start-local-supabase'
 const reservePortsUse = 'uses: ./.github/actions/reserve-supabase-ports'
 
-/** Each job's steps in order, as the raw text of each `- ` step entry. */
+/**
+ * Each job's steps in order, as the raw text of each `- ` step entry. A job whose
+ * `steps:` key is a YAML anchor (`&name`) or alias (`*name`) gets the anchored list, so
+ * jobs that reuse one step list are checked like any other.
+ */
 function jobSteps(workflow: string): Map<string, string[]> {
   const jobs = new Map<string, string[]>()
+  const anchored = new Map<string, string[]>()
+  const aliases: [string, string][] = []
   const body = workflow.slice(workflow.search(/^jobs:\s*$/m))
   for (const block of body.split(/^(?= {2}[A-Za-z0-9_-]+:\s*$)/m).slice(1)) {
     const name = block.slice(2, block.indexOf(':'))
-    const stepsAt = block.search(/^ {4}steps:\s*$/m)
-    if (stepsAt === -1) continue
-    jobs.set(
-      name,
-      block
-        .slice(stepsAt)
-        .split(/^ {6}- /m)
-        .slice(1)
-    )
+    const header = /^ {4}steps:(?: ([&*])([A-Za-z0-9_-]+))?\s*$/m.exec(block)
+    if (!header) continue
+    if (header[1] === '*') {
+      aliases.push([name, header[2] as string])
+      continue
+    }
+    const steps = block
+      .slice(header.index)
+      .split(/^ {6}- /m)
+      .slice(1)
+    jobs.set(name, steps)
+    if (header[1] === '&') anchored.set(header[2] as string, steps)
+  }
+  for (const [name, anchor] of aliases) {
+    const steps = anchored.get(anchor)
+    expect(steps, `${name} aliases an unknown steps anchor ${anchor}`).toBeDefined()
+    jobs.set(name, steps as string[])
   }
   return jobs
 }
@@ -81,6 +103,72 @@ describe('deployment workflows', () => {
     expect(
       ready.match(/uses: \.\/\.github\/workflows\/vercel-wait-for-deployment\.yml/g)
     ).toHaveLength(2)
+  })
+
+  it('the web preview wait outlasts the slowest observed web build', () => {
+    const ready = fs.readFileSync(previewReadyWorkflow, 'utf8')
+    const wait = fs.readFileSync(vercelWaitWorkflow, 'utf8')
+    const webCall = /wait-web:[\s\S]*?retries: (\d+)\s+sleep_seconds: (\d+)/.exec(ready)
+    expect(webCall).not.toBeNull()
+    const budgetSeconds = Number(webCall?.[1]) * Number(webCall?.[2])
+    // Run 40728198560: the web build outlived 20 x 30s (10 minutes) by seconds.
+    expect(budgetSeconds).toBeGreaterThanOrEqual(1200)
+    // A hung connection must not stall an attempt: every fetch carries a hard limit.
+    const fetchLimit = Number(/curl -sS -L --max-time (\d+) /.exec(wait)?.[1])
+    expect(fetchLimit).toBeGreaterThan(0)
+    expect(fetchLimit).toBeLessThanOrEqual(30)
+    // Worst case every attempt hangs to its fetch limit, plus the final verification fetch.
+    const sleep = Number(webCall?.[2])
+    const worstCaseSeconds = Number(webCall?.[1]) * (sleep + fetchLimit) + fetchLimit
+    const limitMinutes = Number(/timeout-minutes: (\d+)/.exec(wait)?.[1])
+    expect(limitMinutes * 60).toBeGreaterThanOrEqual(worstCaseSeconds)
+  })
+
+  it('the wait fetch uses a hard time limit so a hung connection cannot stall polling', () => {
+    const wait = fs.readFileSync(vercelWaitWorkflow, 'utf8')
+    const fetches = wait.match(/^\s*curl .*$/gm) ?? []
+    expect(fetches).toHaveLength(1)
+    expect(fetches[0]).toMatch(/--max-time \d+/)
+  })
+
+  it('the wait step names the HTML page it received and the elapsed time per attempt', () => {
+    const wait = fs.readFileSync(vercelWaitWorkflow, 'utf8')
+    const script = /run: \|\n((?: {10}.*\n|\n)+)/.exec(wait)?.[1]?.replace(/^ {10}/gm, '')
+    expect(script).toBeDefined()
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-wait-'))
+    try {
+      fs.writeFileSync(
+        path.join(directory, 'curl'),
+        "#!/bin/bash\nprintf '<!DOCTYPE html><html><head><title>Login - Vercel</title></head></html>\\n__STATUS__:200'\n",
+        { mode: 0o700 }
+      )
+      const run = spawnSync('/bin/bash', ['-e', '-c', script as string], {
+        encoding: 'utf8',
+        env: {
+          PATH: `${directory}:${process.env.PATH ?? ''}`,
+          GITHUB_OUTPUT: path.join(directory, 'out'),
+          HEALTH_URL: 'https://preview.invalid/api/health',
+          EXPECTED_SHA: 'a'.repeat(40),
+          RETRIES: '2',
+          SLEEP_SECONDS: '0',
+          VERCEL_BYPASS_SECRET: 'unit-test-value',
+        },
+      })
+      expect(run.status).toBe(1)
+      expect(run.stdout).toMatch(
+        /Response is not valid JSON \(attempt 1\/2, http=200, elapsed=\d+s\)/
+      )
+      expect(run.stdout).toMatch(
+        /Response is not valid JSON \(attempt 2\/2, http=200, elapsed=\d+s\)/
+      )
+      expect(run.stdout).toContain("HTML page title: 'Login - Vercel'")
+      expect(run.stdout).toMatch(
+        /failed to become healthy after waiting \(elapsed=\d+s, last page title: 'Login/
+      )
+      expect(run.stdout).not.toContain('unit-test-value')
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
   })
 
   it('manual preview e2e runs only after both previews serve the dispatched commit', () => {
@@ -163,6 +251,7 @@ describe('deployment workflows', () => {
       'k6-smoke-prs.yml',
       'pr-mobile-e2e.yml',
       'pr-pw-e2e-local.yml',
+      'pr-share-card-native.yml',
       'rwf-burn-in.yml',
       'rwf-e2e.yml',
     ])
@@ -188,7 +277,39 @@ describe('deployment workflows', () => {
         expect(reserve, `${file} ${job}`).toBeLessThan(start)
       }
     }
-    expect(startingJobs).toBe(6)
+    // pr-share-card-native.yml starts it in five jobs: the API32 original-resource job, the
+    // browser lane and the three Android 36 partitions (two of them reuse the first one's
+    // anchored steps). The iOS shards start Supabase from scripts/ci/native-supabase.mjs.
+    expect(startingJobs).toBe(11)
+  })
+
+  it('the share-card native workflow runs only the browser lane on pull requests', () => {
+    const content = fs.readFileSync(
+      path.join(repoRoot, '.github', 'workflows', 'pr-share-card-native.yml'),
+      'utf8'
+    )
+    expect(content).toMatch(/on:\s*\n\s*pull_request:/)
+    expect(content).toMatch(/schedule:\s*\n\s*- cron: '[^']+'/)
+    const body = content.slice(content.search(/^jobs:\s*$/m))
+    const jobs = body.split(/^(?= {2}[A-Za-z0-9_-]+:\s*$)/m).slice(1)
+    const ifOf = (block: string) => /^ {4}if: (.+)$/m.exec(block)?.[1]
+    const skipped = new Set<string>()
+    for (const block of jobs) {
+      const name = block.slice(2, block.indexOf(':'))
+      const condition = ifOf(block)
+      if (condition?.includes("github.event_name != 'pull_request'")) skipped.add(name)
+      else expect(['browser-acceptance', 'share-card-lanes-gate'], name).toContain(name)
+    }
+    // Seven device lanes take over an hour each; a pull request would wait on all of them.
+    expect([...skipped].sort()).toEqual([
+      'android36-interaction',
+      'android36-native-matrix',
+      'android36-original',
+      'ios-build',
+      'ios-evidence',
+      'ios-shard',
+      'original-resource',
+    ])
   })
 
   it('local Supabase starts from the image cache with its host ports guarded', () => {

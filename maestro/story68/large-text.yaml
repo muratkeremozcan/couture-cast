@@ -1,0 +1,29 @@
+appId: ${MAESTRO_APP_ID}
+---
+- assertVisible:
+    id: share-card-title
+- scrollUntilVisible:
+    element:
+      id: share-card-save
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    id: share-card-save
+- scrollUntilVisible:
+    element:
+      id: share-card-cancel
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      # Expose controls inside the clipped list/ScrollView, above the native bottom bar.
+      - swipe:
+          start: 50%, 70%
+          end: 50%, 30%
+          duration: 500
+- assertVisible:
+    id: share-card-cancel

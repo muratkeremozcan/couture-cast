@@ -847,6 +847,9 @@
       "save": "Guardar ajustes",
       "saved": "Ajustes guardados.",
       "failed": "No se pudieron guardar los ajustes. Inténtalo de nuevo.",
+      "loadFailed": "No se pudieron cargar los ajustes. Inténtalo de nuevo.",
+      "loadRetrying": "No se pudieron cargar los ajustes. Reintentando en un momento.",
+      "retry": "Intentar de nuevo",
       "conflict": "Los ajustes cambiaron en otro dispositivo. Revisa los valores y vuelve a intentarlo.",
       "permission": "Permite las notificaciones en los ajustes del dispositivo y vuelve a intentarlo.",
       "signin": "Iniciar sesión",
@@ -942,6 +945,49 @@
       "linkLabel_one": "Look destacado en {{label}} de {{author}}, {{count}} reacción. Abre Destacados de la ciudad.",
       "linkLabel_other": "Look destacado en {{label}} de {{author}}, {{count}} reacciones. Abre Destacados de la ciudad.",
       "cta": "Ver en Destacados de la ciudad"
+    }
+  },
+  "shareCard": {
+    "launcher": "Crear mi tarjeta de conjunto",
+    "sourceOutfit": "Conjunto",
+    "sourceCommunity": "Look de la comunidad",
+    "title": "Tu tarjeta",
+    "previewDescription": "Vista previa de tu tarjeta CoutureCast",
+    "photoPrivacyHelp": "Tu foto sigue visible, incluidos los nombres y carteles que contiene. Revisa esta vista previa antes de guardar.",
+    "preparing": "Preparando tarjeta",
+    "watermark": "Mostrar marca de agua",
+    "save": "Guardar en fotos",
+    "download": "Descargar PNG",
+    "saving": "Guardando",
+    "finishingSave": "Terminando de guardar",
+    "saved": "Guardado en fotos",
+    "downloadStarted": "Descarga iniciada",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "retry": "Reintentar",
+    "refresh": "Actualizar vista previa",
+    "openSettings": "Abrir ajustes",
+    "nativeSaveUnavailable": "Para guardar fotos, actualiza la aplicación.",
+    "permissionDenied": "Se denegó el acceso a fotos. Puedes reintentarlo.",
+    "permissionPermanent": "Permite guardar fotos en Ajustes.",
+    "sourceUnavailable": "Esta fuente no está disponible.",
+    "previewChanged": "La tarjeta ha cambiado. Actualiza la vista previa antes de guardar.",
+    "offline": "Conéctate a internet para preparar una tarjeta.",
+    "storage": "No se pudo guardar. Comprueba el espacio disponible y reintenta.",
+    "render": "No se pudo preparar la tarjeta. Reintenta.",
+    "unknown": "Se produjo un error. Reintenta.",
+    "scenarios": {
+      "morning": "Mañana",
+      "midday": "Mediodía",
+      "evening": "Noche"
+    },
+    "climateBands": {
+      "cold_dry": "Frío y seco",
+      "cold_wet": "Frío y húmedo",
+      "temperate_dry": "Templado y seco",
+      "temperate_wet": "Templado y húmedo",
+      "warm_dry": "Cálido y seco",
+      "warm_wet": "Cálido y húmedo"
     }
   }
 }

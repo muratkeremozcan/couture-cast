@@ -54,3 +54,16 @@ export * from './community-notification-settings'
 export * from './request-deadline'
 export * from './community-unavailable-retry'
 export * from './community-spotlight-teaser-state'
+
+export {
+  SHARE_CARD_MAX_BYTES,
+  shareCardSourceSchema,
+  shareCardDigestSchema,
+  prepareShareCardInputSchema,
+  preparedShareCardSchema,
+  prepareShareCardResponseSchema,
+  registerShareCardsContracts,
+} from './contracts/http/share-cards'
+export type { ShareCardSource, PreparedShareCard } from './contracts/http/share-cards'
+export * from './share-cards-client'
+export * from './share-card-png'

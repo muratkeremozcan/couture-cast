@@ -44,6 +44,77 @@ const allowListPath = path.join(policyRoot, 'allow-list-v1.json')
 const policyPath = path.join(policyRoot, 'policy-v2.json')
 
 export const LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr']
+const reviewedOccurrencePath = path.join(
+  policyRoot,
+  'reviewed-occurrence-constructions-v1.json'
+)
+const REVIEWED_OCCURRENCE_CONSTRUCTIONS = readJson(reviewedOccurrencePath).constructions
+
+function sameBankScope(rule, reviewed) {
+  const same = (key, fallback) =>
+    JSON.stringify(rule[key] ?? fallback) === JSON.stringify(reviewed[key] ?? fallback)
+  return (
+    same('requiredDeclaredLanguages', []) &&
+    same('rejectedPrefixFrames', []) &&
+    same('phraseRequiredDeclaredLanguages', {}) &&
+    same('precedingWords', []) &&
+    same('sentenceInitial', false) &&
+    same('closedTails', []) &&
+    same('textForbidden', []) &&
+    same('openers', []) &&
+    same('contextPhrases', []) &&
+    same('contextRequiredDeclaredLanguages', []) &&
+    same('contextMinWords', 0) &&
+    same('forbiddenLetters', '')
+  )
+}
+
+export function occurrenceConstructionProblems(rules) {
+  if (!Array.isArray(rules) || rules.length > REVIEWED_OCCURRENCE_CONSTRUCTIONS.length)
+    return ['unreviewed occurrence construction bank']
+  const targets = new Set()
+  return rules.every((rule) => {
+    if (!rule || targets.has(rule.target)) return false
+    targets.add(rule.target)
+    const reviewed = REVIEWED_OCCURRENCE_CONSTRUCTIONS.find(
+      (entry) => entry.language === rule.language && entry.target === rule.target
+    )
+    return (
+      reviewed &&
+      sameBankScope(rule, reviewed) &&
+      typeof rule.reason === 'string' &&
+      rule.reason.length >= 20 &&
+      Array.isArray(rule.phrases) &&
+      rule.phrases.length === reviewed.phrases.length &&
+      reviewed.phrases.every((phrase) => rule.phrases.includes(phrase))
+    )
+  })
+    ? []
+    : ['unreviewed occurrence construction bank']
+}
+
+function contextTargetProblems(terms, deliberateTerms, highKeys) {
+  if (!Array.isArray(terms)) return []
+  const problems = []
+  if (
+    terms.some((term) => typeof term !== 'string' || !/^\p{Script=Latin}+$/u.test(term))
+  )
+    problems.push('literal context targets must use literal Latin letters')
+  if (
+    terms.some(
+      (term) => typeof term === 'string' && deliberateTerms.includes(toLiteral(term))
+    )
+  )
+    problems.push('a literal context clears a deliberate review term')
+  if (
+    terms.some(
+      (term) =>
+        typeof term === 'string' && highKeys.has(collapse(toFolded(toLiteral(term))))
+    )
+  )
+    problems.push('generic context targets a high-severity term')
+  return problems
+}
 
 /**
  * Mirrors the screener's own floor and reviewed exceptions in
@@ -157,6 +228,249 @@ export function unindexableReason(literal, allowSingles) {
   return null
 }
 
+function validLiteralTokens(values, required) {
+  return (
+    Array.isArray(values) &&
+    (!required || values.length > 0) &&
+    values.every(
+      (value) =>
+        typeof value === 'string' && /^\p{L}+$/u.test(value) && value === toLiteral(value)
+    ) &&
+    new Set(values).size === values.length
+  )
+}
+
+function invalidFrames(context, key) {
+  if (!(key in context)) return false
+  const frames = context[key]
+  return (
+    !Array.isArray(frames) ||
+    frames.some(
+      (frame) =>
+        typeof frame !== 'string' ||
+        !/^\p{L}+(?: \p{L}+){1,4}$/u.test(frame) ||
+        frame !== toLiteral(frame) ||
+        frame.split(' ').filter((word) => (context.terms ?? []).includes(word)).length !==
+          1
+    )
+  )
+}
+
+function boundedInteger(context, key, min, max) {
+  return (
+    !(key in context) ||
+    (Number.isInteger(context[key]) && context[key] >= min && context[key] <= max)
+  )
+}
+
+function contextVetoProblems(context) {
+  const problems = []
+  for (const key of [
+    'vetoes',
+    'textVetoes',
+    'adjacentBefore',
+    'textEvidence',
+    'ageNumerals',
+  ])
+    if (key in context && !validLiteralTokens(context[key], false))
+      problems.push(`a literal context has invalid ${key}`)
+  for (const key of ['vetoFrames', 'clearFrames'])
+    if (invalidFrames(context, key)) problems.push(`a literal context has invalid ${key}`)
+  if (!boundedInteger(context, 'ageRadius', 1, 8))
+    problems.push('a literal context must bound ageRadius to 1..8 tokens')
+  if (!boundedInteger(context, 'vetoRadius', 1, 6))
+    problems.push('a literal context must bound vetoRadius to 1..6 tokens')
+  return problems
+}
+
+function contextTokenProblems(context) {
+  const problems = []
+  const hasEvidence = ['evidence', 'adjacentBefore', 'clearFrames', 'textEvidence'].some(
+    (key) => Array.isArray(context[key]) && context[key].length > 0
+  )
+  for (const key of ['terms', 'objects', 'connectors']) {
+    const required = key === 'terms' || (key === 'objects' && !hasEvidence)
+    if (!validLiteralTokens(context[key], required))
+      problems.push(`a literal context has invalid ${key}`)
+  }
+  if (
+    'evidence' in context &&
+    (!validLiteralTokens(context.evidence, true) ||
+      !Number.isInteger(context.evidenceRadius) ||
+      context.evidenceRadius < 1 ||
+      context.evidenceRadius > 4)
+  )
+    problems.push('a literal context has invalid evidence or evidenceRadius')
+  problems.push(...contextVetoProblems(context))
+  return problems
+}
+
+export function literalContextProblems(contexts, deliberateTerms = [], highTerms = []) {
+  const problems = []
+  const highKeys = new Set(
+    highTerms.map((term) => collapse(tokenize(toFolded(toLiteral(term))).join('')))
+  )
+  if (!Array.isArray(contexts)) return ['literal contexts must be an array']
+  for (const context of contexts) {
+    if (!context || typeof context !== 'object') {
+      problems.push('a literal context must be an object')
+      continue
+    }
+    if (
+      !LANGUAGES.includes(context.language) ||
+      typeof context.reason !== 'string' ||
+      context.reason.trim().length < 20
+    )
+      problems.push('a literal context has no valid language or reason')
+    problems.push(...contextTokenProblems(context))
+    problems.push(...contextTargetProblems(context.terms, deliberateTerms, highKeys))
+    if (
+      !Number.isInteger(context.maxDistance) ||
+      context.maxDistance < 1 ||
+      context.maxDistance > 6
+    )
+      problems.push('a literal context must bound distance to 1..6 tokens')
+  }
+  return problems
+}
+
+function occurrenceAlias(value) {
+  const leet = {
+    0: 'o',
+    1: 'l',
+    i: 'l',
+    '!': 'l',
+    '|': 'l',
+    2: 'z',
+    3: 'e',
+    4: 'a',
+    '@': 'a',
+    5: 's',
+    $: 's',
+    6: 'g',
+    9: 'g',
+    7: 't',
+    '+': 't',
+    8: 'b',
+  }
+  return [...toFolded(toLiteral(value))].map((letter) => leet[letter] ?? letter).join('')
+}
+export function globallyAllowsOccurrenceTarget(value) {
+  return tokenize(occurrenceAlias(value)).some((token) =>
+    REVIEWED_OCCURRENCE_CONSTRUCTIONS.some(
+      (entry) => collapse(token) === collapse(occurrenceAlias(entry.target))
+    )
+  )
+}
+
+function scopedWordProblems(scopedWords) {
+  return scopedWords.flatMap((scoped) => {
+    const literal = toLiteral(scoped.entry ?? '')
+    return !LANGUAGES.includes(scoped.language) ||
+      tokenize(literal).length !== 1 ||
+      typeof scoped.reason !== 'string' ||
+      scoped.reason.length < 20
+      ? [`scoped allow word "${scoped.entry}" needs a language, one word and a reason`]
+      : []
+  })
+}
+
+function isLetterWords(words) {
+  return Array.isArray(words) && words.every((word) => /^\p{L}+$/u.test(toLiteral(word)))
+}
+
+function isPhraseList(phrases) {
+  return (
+    Array.isArray(phrases) &&
+    phrases.every((phrase) => tokenize(toLiteral(phrase)).length > 0)
+  )
+}
+
+function splitPairShapeValid(frame) {
+  return (
+    LANGUAGES.includes(frame.language) &&
+    tokenize(toLiteral(frame.entry ?? '')).length === 2 &&
+    typeof frame.atStart === 'boolean' &&
+    isLetterWords(frame.before) &&
+    (frame.atStart || frame.before.length > 0) &&
+    isPhraseList(frame.after) &&
+    frame.after.length > 0
+  )
+}
+
+function splitPairListsValid(frame) {
+  return (
+    isPhraseList(frame.leads) &&
+    isPhraseList(frame.tails) &&
+    isLetterWords(frame.reviewBefore) &&
+    isLetterWords(frame.reviewForbidden) &&
+    isLetterWords(frame.reviewForbiddenNear) &&
+    isPhraseList(frame.reviewForbiddenPhrases) &&
+    typeof frame.reason === 'string' &&
+    frame.reason.length >= 20
+  )
+}
+
+function splitPairProblems(pairs) {
+  return pairs.flatMap((frame) =>
+    splitPairShapeValid(frame) && splitPairListsValid(frame)
+      ? []
+      : [
+          `reviewed split pair "${frame.entry}" needs a language, two words, a bounded before, closed leads, after, tails and review lists, and a reason`,
+        ]
+  )
+}
+
+function cutFamilyProblems(families) {
+  return families.flatMap((family) => {
+    const valid =
+      LANGUAGES.includes(family.language) &&
+      isLetterWords(family.terms) &&
+      family.terms.length > 0 &&
+      isLetterWords(family.reviewHalves) &&
+      isLetterWords(family.copulas ?? []) &&
+      isLetterWords(family.nameFollowers ?? []) &&
+      typeof family.reason === 'string' &&
+      family.reason.length >= 20
+    return valid
+      ? []
+      : [`cut family for ${family.language} needs letter-only terms, halves and a reason`]
+  })
+}
+
+export function scopedPhraseProblems(scopedPhrases) {
+  const problems = []
+  for (const scoped of scopedPhrases) {
+    const literal = toLiteral(scoped.entry ?? '')
+    if (
+      !LANGUAGES.includes(scoped.language) ||
+      tokenize(literal).length < 2 ||
+      !Array.isArray(scoped.complements) ||
+      scoped.complements.length === 0 ||
+      typeof scoped.reason !== 'string' ||
+      scoped.reason.length < 20
+    )
+      problems.push(
+        `scoped allow phrase "${scoped.entry}" needs a language, two words, complements and a reason`
+      )
+    for (const key of ['before', 'refusedAfter'])
+      if (key in scoped && !validLiteralTokens(scoped[key], false))
+        problems.push(`scoped allow phrase "${scoped.entry}" has invalid ${key}`)
+    if (globallyAllowsOccurrenceTarget(literal))
+      problems.push('reviewed occurrence target cannot be globally allow-listed')
+  }
+  return problems
+}
+
+function scopedAndSplitProblems(allow) {
+  return [
+    ...scopedPhraseProblems(allow.scopedPhrases ?? []),
+    ...scopedWordProblems(allow.scopedWords ?? []),
+    ...splitPairProblems(allow.reviewedSplitPairs ?? []),
+    ...cutFamilyProblems(allow.cutFamilies ?? []),
+  ]
+}
+
 function loadAllowList() {
   const allow = readJson(allowListPath)
   const problems = []
@@ -175,7 +489,21 @@ function loadAllowList() {
     if (seen.has(literal))
       problems.push(`allow-list entry "${entry.entry}" is listed twice`)
     seen.add(literal)
+    if (globallyAllowsOccurrenceTarget(literal))
+      problems.push('reviewed occurrence target cannot be globally allow-listed')
   }
+  problems.push(
+    ...literalContextProblems(
+      allow.literalContexts ?? [],
+      (readJson(policyPath).text.deliberateReviewTerms ?? []).map((entry) =>
+        toLiteral(entry.term)
+      )
+    )
+  )
+  problems.push(...scopedAndSplitProblems(allow))
+  if ('occurrenceConstructions' in allow)
+    problems.push('reviewed constructions must use the authoritative bank')
+  problems.push(...occurrenceConstructionProblems(REVIEWED_OCCURRENCE_CONSTRUCTIONS))
   const singles = new Set(
     [...seen]
       .map((literal) => tokenize(literal))
@@ -281,6 +609,7 @@ function buildTermsFile(language, allowState, hashes) {
       upstreamFileSha256: hashes.vendor[language],
       overlaySha256: sha256(fs.readFileSync(path.join(overlayDir, `${language}.json`))),
       allowListSha256: hashes.allowList,
+      reviewedOccurrenceSha256: hashes.reviewedOccurrence,
       counts: {
         upstreamLines: upstream.length,
         overlayEntries: overlay.entries.length,
@@ -305,16 +634,99 @@ function buildAllowFile(language, allowState, hashes) {
       retrievedAt: RETRIEVED_AT,
       curator: CURATOR,
       notes:
-        'GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it.',
+        'GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it. Literal contexts clear only their exact target token within bounded grammatical object context; other tokens and unsafe phrases remain screened.',
     },
     generated: {
       generator: 'scripts/verify-community-screening-lists.mjs',
       allowListSha256: hashes.allowList,
+      reviewedOccurrenceSha256: hashes.reviewedOccurrence,
     },
     entries: allowState.allow.entries
       .filter((entry) => entry.language === language)
       .map((entry) => toLiteral(entry.entry))
       .toSorted(),
+    splitFrames: (allowState.allow.reviewedSplitPairs ?? [])
+      .filter((entry) => entry.language === language)
+      .map((entry) => ({
+        pair: toLiteral(entry.entry),
+        atStart: entry.atStart,
+        before: entry.before.map(toLiteral),
+        leads: entry.leads.map(toLiteral),
+        after: entry.after.map(toLiteral),
+        tails: entry.tails.map(toLiteral),
+        reviewBefore: entry.reviewBefore.map(toLiteral),
+        reviewForbidden: entry.reviewForbidden.map(toLiteral),
+        reviewForbiddenNear: entry.reviewForbiddenNear.map(toLiteral),
+        reviewForbiddenPhrases: entry.reviewForbiddenPhrases.map(toLiteral),
+      })),
+    cutFamily: {
+      terms: (allowState.allow.cutFamilies ?? [])
+        .filter((family) => family.language === language)
+        .flatMap((family) => family.terms.map(toLiteral)),
+      reviewHalves: (allowState.allow.cutFamilies ?? [])
+        .filter((family) => family.language === language)
+        .flatMap((family) => family.reviewHalves.map(toLiteral)),
+      copulas: (allowState.allow.cutFamilies ?? [])
+        .filter((family) => family.language === language)
+        .flatMap((family) => (family.copulas ?? []).map(toLiteral)),
+      nameFollowers: (allowState.allow.cutFamilies ?? [])
+        .filter((family) => family.language === language)
+        .flatMap((family) => (family.nameFollowers ?? []).map(toLiteral)),
+    },
+    scopedWords: (allowState.allow.scopedWords ?? [])
+      .filter((entry) => entry.language === language)
+      .map((entry) => toLiteral(entry.entry)),
+    scopedPhrases: (allowState.allow.scopedPhrases ?? [])
+      .filter((entry) => entry.language === language)
+      .map((entry) => ({
+        phrase: toLiteral(entry.entry),
+        complements: entry.complements.map(toLiteral),
+        ...(entry.before?.length ? { before: entry.before.map(toLiteral) } : {}),
+        ...(entry.refusedAfter?.length
+          ? { refusedAfter: entry.refusedAfter.map(toLiteral) }
+          : {}),
+      })),
+    literalContexts: (allowState.allow.literalContexts ?? [])
+      .filter((context) => context.language === language)
+      .map(
+        ({
+          terms,
+          objects,
+          connectors,
+          maxDistance,
+          evidence,
+          evidenceRadius,
+          vetoes,
+          vetoRadius,
+          textVetoes,
+          vetoFrames,
+          adjacentBefore,
+          clearFrames,
+          textEvidence,
+          ageRadius,
+          ageNumerals,
+        }) => ({
+          terms,
+          objects,
+          connectors,
+          maxDistance,
+          ...(evidence?.length ? { evidence, evidenceRadius } : {}),
+          ...(vetoes?.length ? { vetoes, vetoRadius } : {}),
+          ...(textVetoes?.length ? { textVetoes } : {}),
+          ...(vetoFrames?.length ? { vetoFrames } : {}),
+          ...(adjacentBefore?.length ? { adjacentBefore } : {}),
+          ...(clearFrames?.length ? { clearFrames } : {}),
+          ...(textEvidence?.length ? { textEvidence } : {}),
+          ...(ageRadius ? { ageRadius, ageNumerals: ageNumerals ?? [] } : {}),
+        })
+      ),
+    occurrenceConstructions: REVIEWED_OCCURRENCE_CONSTRUCTIONS.filter(
+      (rule) => rule.language === language
+    ).map(({ target, phrases, contextPhrases }) => ({
+      target,
+      phrases,
+      ...(contextPhrases?.length ? { contextPhrases } : {}),
+    })),
   }
 }
 
@@ -489,6 +901,7 @@ async function main() {
   if (remote) await verifyRemote(source, problems)
 
   const allowState = loadAllowList()
+  if (allowState.problems.length) throw new Error(allowState.problems.join('; '))
   problems.push(...allowState.problems)
 
   const hashes = {
@@ -496,11 +909,23 @@ async function main() {
     upstreamSource: source.source,
     vendor,
     allowList: sha256(fs.readFileSync(allowListPath)),
+    reviewedOccurrence: sha256(fs.readFileSync(reviewedOccurrencePath)),
     terms: {},
     allowFiles: {},
   }
 
   const languages = {}
+  const highTerms = LANGUAGES.flatMap(
+    (language) => buildTermsFile(language, allowState, hashes).entries
+  )
+    .filter((entry) => entry.severity === 'high')
+    .map((entry) => entry.term)
+  const highProblems = literalContextProblems(
+    allowState.allow.literalContexts ?? [],
+    [],
+    highTerms
+  )
+  if (highProblems.length) throw new Error(highProblems.join('; '))
   for (const language of LANGUAGES) {
     languages[language] = await processLanguage(language, {
       allowState,
@@ -525,7 +950,7 @@ async function main() {
 }
 
 const invokedDirectly =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
 if (invokedDirectly) {
   main().catch((error) => {
     console.error('Community screening list verification error:', error)

@@ -1,0 +1,1073 @@
+{
+  "author": "cc68-tea (/root)",
+  "phase": "pre-seal independent semantic peer findings resolved",
+  "oldSourceSha256": "cbf2aeedaf5d5b600fbdfa36c7163f4c59bb2787734c94260d482c6d571a8a59",
+  "sourceSha256": "a6517ae82b1507dcb6aae85282167fb620e7359536e528b6b3fd8b1f62a25d25",
+  "peerFindings": "pt-peer-review-edge_paths.json",
+  "wholeItemsIndividuallyReauthored": [
+    41, 42, 103, 104, 117, 118, 129, 130, 613, 614, 615, 616, 647, 648, 687, 688, 741,
+    742, 761, 762, 835, 836, 843, 844, 871, 872, 895, 896, 899, 900, 917, 918, 953, 954,
+    975, 976, 981, 982, 995, 996
+  ],
+  "wholeItemRewriteCount": 40,
+  "textChangesUseScreeningOrRepairInformation": false,
+  "resolution": {
+    "PT-SEM-1": "Conservatively consolidated all36 clothing/accessory removal or interchange candidates, including cleaning/transfer and partial-front detachment. Fourteen complete pairs individually replaced by new substantive motifs, leaving8 items in the shared removal/interchange family.",
+    "PT-SEM-2": "Consolidated all12 simple floral representations. Two complete pairs individually replaced, leaving8.",
+    "handwriting": "Consolidated the painted handwriting with written-memory motifs, then independently replaced both a date-embroidery pair and the handwritten-note pair, leaving8 written-memory items. An additional typography boundary label conservatively groups these8 with2 printed overlapping-letter items, total10.",
+    "wovenStrips": "An additional cross-carrier label counts woven/plaited fabric-strip construction across four pairs, total8.",
+    "spiralBoundary": "Peer found12 helical design items, plus2 coiled belt-end storage items. All14 were conservatively consolidated; three entire pairs were individually reauthored as falling dominoes, a forward-inclined solid heel and miniature hanger earrings, leaving8 coil/helix items including belt storage."
+  },
+  "addedConceptGlosses": {
+    "componente-retirado-trocado": "A component removed or exchanged from a garment or accessory for styling, cleaning, drying or transfer.",
+    "ornamento-floral-simples": "A plain flower or rosette decorates a wearable item across painted, cut-out, living or knotted representations.",
+    "tiras-tecido-entrelacadas": "Interlaced or braided fabric strips forming a wearable panel, belt or bracelet.",
+    "texto-decorativo-tecido": "Readable personal marks or letters reproduced as textile decoration, consolidated across stitching and printing.",
+    "forma-espiral-helicoidal": "A coil, helix or spiral form on a wearable item, including both designed ornament and coiled belt-end storage."
+  },
+  "changes": [
+    {
+      "row": 11,
+      "before": {
+        "concepts": "colar-mola-visivel",
+        "field": "caption",
+        "text": "A mola aparente é justamente a parte que mais gosto neste colar."
+      },
+      "after": {
+        "concepts": "colar-mola-visivel,forma-espiral-helicoidal",
+        "field": "caption",
+        "text": "A mola aparente é justamente a parte que mais gosto neste colar."
+      }
+    },
+    {
+      "row": 12,
+      "before": {
+        "concepts": "colar-mola-visivel",
+        "field": "altText",
+        "text": "Uma espiral metálica flexível une duas partes do colar dianteiro."
+      },
+      "after": {
+        "concepts": "colar-mola-visivel,forma-espiral-helicoidal",
+        "field": "altText",
+        "text": "Uma espiral metálica flexível une duas partes do colar dianteiro."
+      }
+    },
+    {
+      "row": 41,
+      "before": {
+        "concepts": "roupa-parte-removivel",
+        "field": "caption",
+        "text": "Retirei o painel de dentro e o mesmo casaco ficou bem mais leve."
+      },
+      "after": {
+        "concepts": "broche-piramide-janelas",
+        "field": "caption",
+        "text": "A pirâmide do meu broche tem pequenas janelas em todas as faces."
+      }
+    },
+    {
+      "row": 42,
+      "before": {
+        "concepts": "roupa-parte-removivel",
+        "field": "altText",
+        "text": "Um painel acolchoado destacado está estendido ao lado do casaco aberto."
+      },
+      "after": {
+        "concepts": "broche-piramide-janelas",
+        "field": "altText",
+        "text": "Um broche piramidal apresenta aberturas quadradas distribuídas nas faces inclinadas."
+      }
+    },
+    {
+      "row": 103,
+      "before": {
+        "concepts": "luva-forro-retirado",
+        "field": "caption",
+        "text": "Puxei o forro com cuidado para que a ponta dos dedos também secasse."
+      },
+      "after": {
+        "concepts": "malha-manga-morcego",
+        "field": "caption",
+        "text": "A manga ampla se une perto da cintura e abre um espaço enorme sob o braço."
+      }
+    },
+    {
+      "row": 104,
+      "before": {
+        "concepts": "luva-forro-retirado",
+        "field": "altText",
+        "text": "O forro fino aparece parcialmente retirado de dentro dos dedos da luva."
+      },
+      "after": {
+        "concepts": "malha-manga-morcego",
+        "field": "altText",
+        "text": "Uma manga de malha larga desce do ombro até uma junção próxima à cintura."
+      }
+    },
+    {
+      "row": 117,
+      "before": {
+        "concepts": "sapato-salto-trocavel",
+        "field": "caption",
+        "text": "O salto mais baixo encaixa na mesma base para o caminho de volta."
+      },
+      "after": {
+        "concepts": "estampa-relampago-chave",
+        "field": "caption",
+        "text": "As pequenas chaves desenham um raio que atravessa a frente da camiseta."
+      }
+    },
+    {
+      "row": 118,
+      "before": {
+        "concepts": "sapato-salto-trocavel",
+        "field": "altText",
+        "text": "Dois saltos de alturas diferentes estão ao lado de um sapato com base de encaixe."
+      },
+      "after": {
+        "concepts": "estampa-relampago-chave",
+        "field": "altText",
+        "text": "Chaves ilustradas se alinham num percurso angular semelhante a um relâmpago."
+      }
+    },
+    {
+      "row": 129,
+      "before": {
+        "concepts": "lenço-espiral-pintada",
+        "field": "caption",
+        "text": "Pintei a espiral sem levantar o pincel e deixei o traço irregular."
+      },
+      "after": {
+        "concepts": "lenço-domino-tombando",
+        "field": "caption",
+        "text": "Pintei peças de dominó tombando uma depois da outra no meu lenço."
+      }
+    },
+    {
+      "row": 130,
+      "before": {
+        "concepts": "lenço-espiral-pintada",
+        "field": "altText",
+        "text": "Uma linha contínua em espiral ocupa o centro do lenço pintado."
+      },
+      "after": {
+        "concepts": "lenço-domino-tombando",
+        "field": "altText",
+        "text": "Peças ilustradas de dominó se inclinam sucessivamente ao longo do lenço."
+      }
+    },
+    {
+      "row": 147,
+      "before": {
+        "concepts": "cinto-ponta-enrolada",
+        "field": "caption",
+        "text": "Enrolei a sobra do cinto numa pequena espiral junto à fivela."
+      },
+      "after": {
+        "concepts": "cinto-ponta-enrolada,forma-espiral-helicoidal",
+        "field": "caption",
+        "text": "Enrolei a sobra do cinto numa pequena espiral junto à fivela."
+      }
+    },
+    {
+      "row": 148,
+      "before": {
+        "concepts": "cinto-ponta-enrolada",
+        "field": "altText",
+        "text": "A ponta livre do cinto forma uma espiral presa sob a faixa principal."
+      },
+      "after": {
+        "concepts": "cinto-ponta-enrolada,forma-espiral-helicoidal",
+        "field": "altText",
+        "text": "A ponta livre do cinto forma uma espiral presa sob a faixa principal."
+      }
+    },
+    {
+      "row": 183,
+      "before": {
+        "concepts": "bolsa-cesto-organizador",
+        "field": "caption",
+        "text": "O organizador sai inteiro quando quero trocar de bolsa rapidamente."
+      },
+      "after": {
+        "concepts": "bolsa-cesto-organizador,componente-retirado-trocado",
+        "field": "caption",
+        "text": "O organizador sai inteiro quando quero trocar de bolsa rapidamente."
+      }
+    },
+    {
+      "row": 184,
+      "before": {
+        "concepts": "bolsa-cesto-organizador",
+        "field": "altText",
+        "text": "Um organizador com divisórias está suspenso acima do interior da bolsa."
+      },
+      "after": {
+        "concepts": "bolsa-cesto-organizador,componente-retirado-trocado",
+        "field": "altText",
+        "text": "Um organizador com divisórias está suspenso acima do interior da bolsa."
+      }
+    },
+    {
+      "row": 363,
+      "before": {
+        "concepts": "sapato-palmilha-removida",
+        "field": "caption",
+        "text": "A palmilha sai inteira quando quero arejar o sapato depois do passeio."
+      },
+      "after": {
+        "concepts": "sapato-palmilha-removida,componente-retirado-trocado",
+        "field": "caption",
+        "text": "A palmilha sai inteira quando quero arejar o sapato depois do passeio."
+      }
+    },
+    {
+      "row": 364,
+      "before": {
+        "concepts": "sapato-palmilha-removida",
+        "field": "altText",
+        "text": "Uma palmilha está fora do sapato, apoiada ao lado da abertura."
+      },
+      "after": {
+        "concepts": "sapato-palmilha-removida,componente-retirado-trocado",
+        "field": "altText",
+        "text": "Uma palmilha está fora do sapato, apoiada ao lado da abertura."
+      }
+    },
+    {
+      "row": 529,
+      "before": {
+        "concepts": "tranca-tecido-aro",
+        "field": "caption",
+        "text": "Trancei tiras macias ao redor do aro até cobrir toda a base."
+      },
+      "after": {
+        "concepts": "tranca-tecido-aro,tiras-tecido-entrelacadas",
+        "field": "caption",
+        "text": "Trancei tiras macias ao redor do aro até cobrir toda a base."
+      }
+    },
+    {
+      "row": 530,
+      "before": {
+        "concepts": "tranca-tecido-aro",
+        "field": "altText",
+        "text": "Tiras de tecido entrelaçadas recobrem um aro de pulseira."
+      },
+      "after": {
+        "concepts": "tranca-tecido-aro,tiras-tecido-entrelacadas",
+        "field": "altText",
+        "text": "Tiras de tecido entrelaçadas recobrem um aro de pulseira."
+      }
+    },
+    {
+      "row": 535,
+      "before": {
+        "concepts": "saia-tiras-entretecidas",
+        "field": "caption",
+        "text": "As tiras se cruzam no painel da saia como num cesto aberto."
+      },
+      "after": {
+        "concepts": "saia-tiras-entretecidas,tiras-tecido-entrelacadas",
+        "field": "caption",
+        "text": "As tiras se cruzam no painel da saia como num cesto aberto."
+      }
+    },
+    {
+      "row": 536,
+      "before": {
+        "concepts": "saia-tiras-entretecidas",
+        "field": "altText",
+        "text": "Tiras largas se entrelaçam perpendicularmente num painel da saia."
+      },
+      "after": {
+        "concepts": "saia-tiras-entretecidas,tiras-tecido-entrelacadas",
+        "field": "altText",
+        "text": "Tiras largas se entrelaçam perpendicularmente num painel da saia."
+      }
+    },
+    {
+      "row": 553,
+      "before": {
+        "concepts": "bordado-memoria-pessoal",
+        "field": "caption",
+        "text": "Bordei as coordenadas da nossa primeira casa no lado de dentro da bolsa."
+      },
+      "after": {
+        "concepts": "bordado-memoria-pessoal,texto-decorativo-tecido",
+        "field": "caption",
+        "text": "Bordei as coordenadas da nossa primeira casa no lado de dentro da bolsa."
+      }
+    },
+    {
+      "row": 554,
+      "before": {
+        "concepts": "bordado-memoria-pessoal",
+        "field": "altText",
+        "text": "Números e sinais bordados formam uma linha curta no forro da bolsa."
+      },
+      "after": {
+        "concepts": "bordado-memoria-pessoal,texto-decorativo-tecido",
+        "field": "altText",
+        "text": "Números e sinais bordados formam uma linha curta no forro da bolsa."
+      }
+    },
+    {
+      "row": 559,
+      "before": {
+        "concepts": "malha-canelado-espiral",
+        "field": "caption",
+        "text": "O canelado gira pelo punho como uma pequena hélice."
+      },
+      "after": {
+        "concepts": "malha-canelado-espiral,forma-espiral-helicoidal",
+        "field": "caption",
+        "text": "O canelado gira pelo punho como uma pequena hélice."
+      }
+    },
+    {
+      "row": 560,
+      "before": {
+        "concepts": "malha-canelado-espiral",
+        "field": "altText",
+        "text": "Colunas de pontos em relevo seguem diagonais ao redor do punho."
+      },
+      "after": {
+        "concepts": "malha-canelado-espiral,forma-espiral-helicoidal",
+        "field": "altText",
+        "text": "Colunas de pontos em relevo seguem diagonais ao redor do punho."
+      }
+    },
+    {
+      "row": 561,
+      "before": {
+        "concepts": "saia-flor-recortada",
+        "field": "caption",
+        "text": "As flores vazadas deixam a camada de baixo completar o desenho."
+      },
+      "after": {
+        "concepts": "saia-flor-recortada,ornamento-floral-simples",
+        "field": "caption",
+        "text": "As flores vazadas deixam a camada de baixo completar o desenho."
+      }
+    },
+    {
+      "row": 562,
+      "before": {
+        "concepts": "saia-flor-recortada",
+        "field": "altText",
+        "text": "Recortes florais revelam o tecido da camada inferior da saia."
+      },
+      "after": {
+        "concepts": "saia-flor-recortada,ornamento-floral-simples",
+        "field": "altText",
+        "text": "Recortes florais revelam o tecido da camada inferior da saia."
+      }
+    },
+    {
+      "row": 573,
+      "before": {
+        "concepts": "tecido-flor-sem-contorno",
+        "field": "caption",
+        "text": "As flores aparecem como manchas de aquarela, sem linhas para fechá-las."
+      },
+      "after": {
+        "concepts": "tecido-flor-sem-contorno,ornamento-floral-simples",
+        "field": "caption",
+        "text": "As flores aparecem como manchas de aquarela, sem linhas para fechá-las."
+      }
+    },
+    {
+      "row": 574,
+      "before": {
+        "concepts": "tecido-flor-sem-contorno",
+        "field": "altText",
+        "text": "Manchas suaves de tinta sugerem flores sobre o tecido claro."
+      },
+      "after": {
+        "concepts": "tecido-flor-sem-contorno,ornamento-floral-simples",
+        "field": "altText",
+        "text": "Manchas suaves de tinta sugerem flores sobre o tecido claro."
+      }
+    },
+    {
+      "row": 575,
+      "before": {
+        "concepts": "chapéu-fita-espiral",
+        "field": "caption",
+        "text": "Enrolei a fita ao redor da copa seguindo uma subida bem suave."
+      },
+      "after": {
+        "concepts": "chapéu-fita-espiral,forma-espiral-helicoidal",
+        "field": "caption",
+        "text": "Enrolei a fita ao redor da copa seguindo uma subida bem suave."
+      }
+    },
+    {
+      "row": 576,
+      "before": {
+        "concepts": "chapéu-fita-espiral",
+        "field": "altText",
+        "text": "Uma fita estreita percorre a copa do chapéu em espiral."
+      },
+      "after": {
+        "concepts": "chapéu-fita-espiral,forma-espiral-helicoidal",
+        "field": "altText",
+        "text": "Uma fita estreita percorre a copa do chapéu em espiral."
+      }
+    },
+    {
+      "row": 583,
+      "before": {
+        "concepts": "camisa-letra-sobreposta",
+        "field": "caption",
+        "text": "As letras sobrepostas viraram um desenho quase abstrato na minha camisa."
+      },
+      "after": {
+        "concepts": "camisa-letra-sobreposta,texto-decorativo-tecido",
+        "field": "caption",
+        "text": "As letras sobrepostas viraram um desenho quase abstrato na minha camisa."
+      }
+    },
+    {
+      "row": 584,
+      "before": {
+        "concepts": "camisa-letra-sobreposta",
+        "field": "altText",
+        "text": "Caracteres grandes de diferentes orientações se sobrepõem na estampa da camisa."
+      },
+      "after": {
+        "concepts": "camisa-letra-sobreposta,texto-decorativo-tecido",
+        "field": "altText",
+        "text": "Caracteres grandes de diferentes orientações se sobrepõem na estampa da camisa."
+      }
+    },
+    {
+      "row": 613,
+      "before": {
+        "concepts": "brinco-duas-posicoes",
+        "field": "caption",
+        "text": "Mudei o pino de encaixe e a mesma peça ficou mais perto da orelha."
+      },
+      "after": {
+        "concepts": "brinco-onda-quadrada",
+        "field": "caption",
+        "text": "Dobrei o fio em pequenos degraus para desenhar este brinco comprido."
+      }
+    },
+    {
+      "row": 614,
+      "before": {
+        "concepts": "brinco-duas-posicoes",
+        "field": "altText",
+        "text": "Dois pequenos encaixes permitem prender o pino em posições diferentes do brinco."
+      },
+      "after": {
+        "concepts": "brinco-onda-quadrada",
+        "field": "altText",
+        "text": "Um fio metálico forma ângulos retos sucessivos num brinco vertical."
+      }
+    },
+    {
+      "row": 615,
+      "before": {
+        "concepts": "sapato-painel-cadarco",
+        "field": "caption",
+        "text": "Soltei a peça de cima para mostrar como o cadarço passa por baixo."
+      },
+      "after": {
+        "concepts": "sapato-salto-inclinado",
+        "field": "caption",
+        "text": "O salto se inclina para a frente e muda o perfil inteiro do sapato."
+      }
+    },
+    {
+      "row": 616,
+      "before": {
+        "concepts": "sapato-painel-cadarco",
+        "field": "altText",
+        "text": "Um painel removível repousa ao lado do sapato com o cadarço exposto."
+      },
+      "after": {
+        "concepts": "sapato-salto-inclinado",
+        "field": "altText",
+        "text": "Um salto estreito e reto está inclinado em direção à parte dianteira do sapato."
+      }
+    },
+    {
+      "row": 647,
+      "before": {
+        "concepts": "bolsa-pochete-conversao",
+        "field": "caption",
+        "text": "Tirei a alça comprida e passei o cinto pelas presilhas da bolsa."
+      },
+      "after": {
+        "concepts": "bolsa-tampa-telhado",
+        "field": "caption",
+        "text": "A tampa da bolsa se ergue em duas águas como um pequeno telhado."
+      }
+    },
+    {
+      "row": 648,
+      "before": {
+        "concepts": "bolsa-pochete-conversao",
+        "field": "altText",
+        "text": "Um cinto atravessa dois passantes na parte traseira da pequena bolsa."
+      },
+      "after": {
+        "concepts": "bolsa-tampa-telhado",
+        "field": "altText",
+        "text": "Duas faces inclinadas se encontram numa aresta no topo da bolsa rígida."
+      }
+    },
+    {
+      "row": 665,
+      "before": {
+        "concepts": "anel-topo-trocavel",
+        "field": "caption",
+        "text": "Retirei a parte decorada e ficou um aro simples para o dia."
+      },
+      "after": {
+        "concepts": "anel-topo-trocavel,componente-retirado-trocado",
+        "field": "caption",
+        "text": "Retirei a parte decorada e ficou um aro simples para o dia."
+      }
+    },
+    {
+      "row": 666,
+      "before": {
+        "concepts": "anel-topo-trocavel",
+        "field": "altText",
+        "text": "Uma peça decorativa destacada está ao lado do aro com pequeno encaixe."
+      },
+      "after": {
+        "concepts": "anel-topo-trocavel,componente-retirado-trocado",
+        "field": "altText",
+        "text": "Uma peça decorativa destacada está ao lado do aro com pequeno encaixe."
+      }
+    },
+    {
+      "row": 687,
+      "before": {
+        "concepts": "roupa-parte-removivel",
+        "field": "caption",
+        "text": "Desprendi as mangas para usar o mesmo vestido na tarde mais quente."
+      },
+      "after": {
+        "concepts": "vestido-lateral-entrelacada,tiras-tecido-entrelacadas",
+        "field": "caption",
+        "text": "As tiras cruzadas formam o painel que liga a frente às costas do vestido."
+      }
+    },
+    {
+      "row": 688,
+      "before": {
+        "concepts": "roupa-parte-removivel",
+        "field": "altText",
+        "text": "O vestido sem mangas apresenta encaixes expostos e duas peças removidas sobre a mesa."
+      },
+      "after": {
+        "concepts": "vestido-lateral-entrelacada,tiras-tecido-entrelacadas",
+        "field": "altText",
+        "text": "Tiras largas entrelaçadas compõem um painel lateral entre duas partes do vestido."
+      }
+    },
+    {
+      "row": 741,
+      "before": {
+        "concepts": "camiseta-bordado-manchinha",
+        "field": "caption",
+        "text": "A pequena mancha virou o miolo da flor que bordei na camiseta."
+      },
+      "after": {
+        "concepts": "camiseta-manchinha-cometa",
+        "field": "caption",
+        "text": "A manchinha ganhou uma cauda bordada e virou um cometa na minha camiseta."
+      }
+    },
+    {
+      "row": 742,
+      "before": {
+        "concepts": "camiseta-bordado-manchinha",
+        "field": "altText",
+        "text": "Pétalas bordadas circundam uma pequena marca no tecido da camiseta."
+      },
+      "after": {
+        "concepts": "camiseta-manchinha-cometa",
+        "field": "altText",
+        "text": "Linhas bordadas se alongam a partir de uma pequena marca arredondada na camiseta."
+      }
+    },
+    {
+      "row": 755,
+      "before": {
+        "concepts": "cinto-retalho-trancado",
+        "field": "caption",
+        "text": "Trancei tiras das sobras para montar um cinto sem emenda escondida."
+      },
+      "after": {
+        "concepts": "cinto-retalho-trancado,tiras-tecido-entrelacadas",
+        "field": "caption",
+        "text": "Trancei tiras das sobras para montar um cinto sem emenda escondida."
+      }
+    },
+    {
+      "row": 756,
+      "before": {
+        "concepts": "cinto-retalho-trancado",
+        "field": "altText",
+        "text": "Tiras de diferentes tecidos se entrelaçam ao longo de um cinto flexível."
+      },
+      "after": {
+        "concepts": "cinto-retalho-trancado,tiras-tecido-entrelacadas",
+        "field": "altText",
+        "text": "Tiras de diferentes tecidos se entrelaçam ao longo de um cinto flexível."
+      }
+    },
+    {
+      "row": 757,
+      "before": {
+        "concepts": "bordado-memoria-pessoal",
+        "field": "caption",
+        "text": "Bordei a letra do bilhete numa aplicação que agora acompanha minha camisa."
+      },
+      "after": {
+        "concepts": "bordado-memoria-pessoal,texto-decorativo-tecido",
+        "field": "caption",
+        "text": "Bordei a letra do bilhete numa aplicação que agora acompanha minha camisa."
+      }
+    },
+    {
+      "row": 758,
+      "before": {
+        "concepts": "bordado-memoria-pessoal",
+        "field": "altText",
+        "text": "Uma pequena aplicação com escrita bordada está presa acima do bolso da camisa."
+      },
+      "after": {
+        "concepts": "bordado-memoria-pessoal,texto-decorativo-tecido",
+        "field": "altText",
+        "text": "Uma pequena aplicação com escrita bordada está presa acima do bolso da camisa."
+      }
+    },
+    {
+      "row": 759,
+      "before": {
+        "concepts": "bordado-memoria-pessoal",
+        "field": "caption",
+        "text": "Cada retalho representa um lugar por onde esta saia já passou comigo."
+      },
+      "after": {
+        "concepts": "bordado-memoria-pessoal,texto-decorativo-tecido",
+        "field": "caption",
+        "text": "Cada retalho representa um lugar por onde esta saia já passou comigo."
+      }
+    },
+    {
+      "row": 760,
+      "before": {
+        "concepts": "bordado-memoria-pessoal",
+        "field": "altText",
+        "text": "Pequenos retalhos bordados com nomes de lugares se distribuem pela saia."
+      },
+      "after": {
+        "concepts": "bordado-memoria-pessoal,texto-decorativo-tecido",
+        "field": "altText",
+        "text": "Pequenos retalhos bordados com nomes de lugares se distribuem pela saia."
+      }
+    },
+    {
+      "row": 761,
+      "before": {
+        "concepts": "bordado-memoria-pessoal",
+        "field": "caption",
+        "text": "A data da primeira aula está bordada no avesso da bolsa que fiz naquele dia."
+      },
+      "after": {
+        "concepts": "bolsa-bordado-lince",
+        "field": "caption",
+        "text": "Bordei um lince deitado sobre um tronco na frente da minha bolsa."
+      }
+    },
+    {
+      "row": 762,
+      "before": {
+        "concepts": "bordado-memoria-pessoal",
+        "field": "altText",
+        "text": "Uma sequência curta de números bordados aparece perto da costura interna da bolsa."
+      },
+      "after": {
+        "concepts": "bolsa-bordado-lince",
+        "field": "altText",
+        "text": "Um lince bordado repousa com as patas dianteiras sobre um tronco horizontal."
+      }
+    },
+    {
+      "row": 809,
+      "before": {
+        "concepts": "saia-bolso-destacavel",
+        "field": "caption",
+        "text": "O bolso se solta inteiro quando quero usar a saia com a frente lisa."
+      },
+      "after": {
+        "concepts": "saia-bolso-destacavel,componente-retirado-trocado",
+        "field": "caption",
+        "text": "O bolso se solta inteiro quando quero usar a saia com a frente lisa."
+      }
+    },
+    {
+      "row": 810,
+      "before": {
+        "concepts": "saia-bolso-destacavel",
+        "field": "altText",
+        "text": "Um bolso removido está ao lado da saia com pequenos botões de encaixe."
+      },
+      "after": {
+        "concepts": "saia-bolso-destacavel,componente-retirado-trocado",
+        "field": "altText",
+        "text": "Um bolso removido está ao lado da saia com pequenos botões de encaixe."
+      }
+    },
+    {
+      "row": 835,
+      "before": {
+        "concepts": "presilha-petalas-feltro",
+        "field": "caption",
+        "text": "As pétalas de feltro se sobrepõem sem cobrir o mecanismo da presilha."
+      },
+      "after": {
+        "concepts": "presilha-seta",
+        "field": "caption",
+        "text": "A presilha em forma de seta acompanha a direção da minha trança."
+      }
+    },
+    {
+      "row": 836,
+      "before": {
+        "concepts": "presilha-petalas-feltro",
+        "field": "altText",
+        "text": "Pétalas macias em camadas circundam a base de uma presilha aberta."
+      },
+      "after": {
+        "concepts": "presilha-seta",
+        "field": "altText",
+        "text": "Uma seta metálica alongada repousa sobre a parte superior da trança."
+      }
+    },
+    {
+      "row": 843,
+      "before": {
+        "concepts": "roupa-parte-removivel",
+        "field": "caption",
+        "text": "Desabotoei a gola extra para usar o casaco com a linha mais simples."
+      },
+      "after": {
+        "concepts": "casaco-lapela-degrau",
+        "field": "caption",
+        "text": "O recorte em degrau interrompe a linha comprida da lapela do meu casaco."
+      }
+    },
+    {
+      "row": 844,
+      "before": {
+        "concepts": "roupa-parte-removivel",
+        "field": "altText",
+        "text": "Uma gola removível está ao lado do casaco com pequenos botões expostos."
+      },
+      "after": {
+        "concepts": "casaco-lapela-degrau",
+        "field": "altText",
+        "text": "Um ângulo em degrau marca a borda da lapela larga do casaco."
+      }
+    },
+    {
+      "row": 871,
+      "before": {
+        "concepts": "bolsa-fundo-destacavel",
+        "field": "caption",
+        "text": "A base rígida sai quando preciso lavar a bolsa de tecido."
+      },
+      "after": {
+        "concepts": "bolsa-bordado-favo",
+        "field": "caption",
+        "text": "Os pequenos hexágonos bordados lembram um pedaço de favo na minha bolsa."
+      }
+    },
+    {
+      "row": 872,
+      "before": {
+        "concepts": "bolsa-fundo-destacavel",
+        "field": "altText",
+        "text": "Uma placa retangular removível está acima do fundo aberto da bolsa."
+      },
+      "after": {
+        "concepts": "bolsa-bordado-favo",
+        "field": "altText",
+        "text": "Hexágonos contíguos bordados formam um painel semelhante a favo no tecido da bolsa."
+      }
+    },
+    {
+      "row": 877,
+      "before": {
+        "concepts": "casaco-botoeira-flor",
+        "field": "caption",
+        "text": "A flor passa pela botoeira sem precisar de uma agulha extra."
+      },
+      "after": {
+        "concepts": "casaco-botoeira-flor,ornamento-floral-simples",
+        "field": "caption",
+        "text": "A flor passa pela botoeira sem precisar de uma agulha extra."
+      }
+    },
+    {
+      "row": 878,
+      "before": {
+        "concepts": "casaco-botoeira-flor",
+        "field": "altText",
+        "text": "Um pequeno ramo atravessa a casa do botão na lapela do casaco."
+      },
+      "after": {
+        "concepts": "casaco-botoeira-flor,ornamento-floral-simples",
+        "field": "altText",
+        "text": "Um pequeno ramo atravessa a casa do botão na lapela do casaco."
+      }
+    },
+    {
+      "row": 895,
+      "before": {
+        "concepts": "brinco-caracol-vazado",
+        "field": "caption",
+        "text": "A espiral do brinco deixa bastante espaço entre uma volta e outra."
+      },
+      "after": {
+        "concepts": "brinco-mini-cabide",
+        "field": "caption",
+        "text": "Os pequenos cabides de arame viraram meus brincos favoritos para a oficina."
+      }
+    },
+    {
+      "row": 896,
+      "before": {
+        "concepts": "brinco-caracol-vazado",
+        "field": "altText",
+        "text": "Uma tira metálica em espiral forma um brinco com centro aberto."
+      },
+      "after": {
+        "concepts": "brinco-mini-cabide",
+        "field": "altText",
+        "text": "Contornos metálicos de cabides formam dois brincos com pequenos ganchos superiores."
+      }
+    },
+    {
+      "row": 899,
+      "before": {
+        "concepts": "pulseira-fitas-trocaveis",
+        "field": "caption",
+        "text": "Troquei a fita sem mexer na peça central da pulseira."
+      },
+      "after": {
+        "concepts": "pulseira-alavanca",
+        "field": "caption",
+        "text": "A pequena alavanca abaixa e mantém a pulseira fechada ao redor do pulso."
+      }
+    },
+    {
+      "row": 900,
+      "before": {
+        "concepts": "pulseira-fitas-trocaveis",
+        "field": "altText",
+        "text": "Uma faixa destacada está ao lado da peça central com duas passagens laterais."
+      },
+      "after": {
+        "concepts": "pulseira-alavanca",
+        "field": "altText",
+        "text": "Uma barra articulada está abaixada sobre o encaixe do fecho da pulseira."
+      }
+    },
+    {
+      "row": 917,
+      "before": {
+        "concepts": "lenço-estampa-notas",
+        "field": "caption",
+        "text": "As notas escritas à mão viraram o desenho do lenço que pintei."
+      },
+      "after": {
+        "concepts": "lenço-casas-invertidas",
+        "field": "caption",
+        "text": "As casas de cabeça para baixo deixam meu lenço parecer um bairro refletido."
+      }
+    },
+    {
+      "row": 918,
+      "before": {
+        "concepts": "lenço-estampa-notas",
+        "field": "altText",
+        "text": "Linhas de escrita irregular cobrem o lenço com pequenas anotações ilustradas."
+      },
+      "after": {
+        "concepts": "lenço-casas-invertidas",
+        "field": "altText",
+        "text": "Casas ilustradas com telhados voltados para baixo formam fileiras no lenço."
+      }
+    },
+    {
+      "row": 925,
+      "before": {
+        "concepts": "sapato-laço-flor",
+        "field": "caption",
+        "text": "Passei o cadarço em voltas pequenas para formar uma flor no sapato."
+      },
+      "after": {
+        "concepts": "sapato-laço-flor,ornamento-floral-simples",
+        "field": "caption",
+        "text": "Passei o cadarço em voltas pequenas para formar uma flor no sapato."
+      }
+    },
+    {
+      "row": 926,
+      "before": {
+        "concepts": "sapato-laço-flor",
+        "field": "altText",
+        "text": "Laçadas do cadarço formam pétalas sobre o peito do sapato."
+      },
+      "after": {
+        "concepts": "sapato-laço-flor,ornamento-floral-simples",
+        "field": "altText",
+        "text": "Laçadas do cadarço formam pétalas sobre o peito do sapato."
+      }
+    },
+    {
+      "row": 953,
+      "before": {
+        "concepts": "roupa-parte-removivel",
+        "field": "caption",
+        "text": "A tira sai do punho quando quero usar a luva com menos volume."
+      },
+      "after": {
+        "concepts": "luva-dorso-triangular",
+        "field": "caption",
+        "text": "O painel triangular acompanha o dorso da luva sem chegar aos dedos."
+      }
+    },
+    {
+      "row": 954,
+      "before": {
+        "concepts": "roupa-parte-removivel",
+        "field": "altText",
+        "text": "Os encaixes do punho estão vazios, com a tira removível apoiada junto à luva."
+      },
+      "after": {
+        "concepts": "luva-dorso-triangular",
+        "field": "altText",
+        "text": "Um recorte triangular de tecido ocupa o centro do dorso da luva."
+      }
+    },
+    {
+      "row": 955,
+      "before": {
+        "concepts": "bordado-memoria-pessoal",
+        "field": "caption",
+        "text": "As iniciais ficaram no avesso para eu lembrar de quem fez o cachecol."
+      },
+      "after": {
+        "concepts": "bordado-memoria-pessoal,texto-decorativo-tecido",
+        "field": "caption",
+        "text": "As iniciais ficaram no avesso para eu lembrar de quem fez o cachecol."
+      }
+    },
+    {
+      "row": 956,
+      "before": {
+        "concepts": "bordado-memoria-pessoal",
+        "field": "altText",
+        "text": "Duas pequenas letras bordadas aparecem na face interna da ponta do cachecol."
+      },
+      "after": {
+        "concepts": "bordado-memoria-pessoal,texto-decorativo-tecido",
+        "field": "altText",
+        "text": "Duas pequenas letras bordadas aparecem na face interna da ponta do cachecol."
+      }
+    },
+    {
+      "row": 975,
+      "before": {
+        "concepts": "roupa-parte-removivel",
+        "field": "caption",
+        "text": "Os zíperes soltam a parte inferior e deixam a calça pronta para o calor."
+      },
+      "after": {
+        "concepts": "calca-vincos-duplos",
+        "field": "caption",
+        "text": "Os dois vincos próximos desenham uma faixa estreita na frente da calça."
+      }
+    },
+    {
+      "row": 976,
+      "before": {
+        "concepts": "roupa-parte-removivel",
+        "field": "altText",
+        "text": "As partes inferiores removidas estão ao lado da calça encurtada por zíperes."
+      },
+      "after": {
+        "concepts": "calca-vincos-duplos",
+        "field": "altText",
+        "text": "Duas dobras prensadas paralelas percorrem cada perna da calça."
+      }
+    },
+    {
+      "row": 981,
+      "before": {
+        "concepts": "camisa-painel-movel",
+        "field": "caption",
+        "text": "O painel da frente solta de um lado para mudar a sobreposição da camisa."
+      },
+      "after": {
+        "concepts": "camisa-gola-quadrada",
+        "field": "caption",
+        "text": "As pontas retas da gola formam um contorno quase quadrado em volta do pescoço."
+      }
+    },
+    {
+      "row": 982,
+      "before": {
+        "concepts": "camisa-painel-movel",
+        "field": "altText",
+        "text": "Uma aba frontal parcialmente destacada revela os encaixes na lateral da camisa."
+      },
+      "after": {
+        "concepts": "camisa-gola-quadrada",
+        "field": "altText",
+        "text": "Uma gola de bordas retas apresenta quatro cantos definidos junto ao decote."
+      }
+    },
+    {
+      "row": 995,
+      "before": {
+        "concepts": "gola-protetor-lavavel",
+        "field": "caption",
+        "text": "O protetor fino sai da gola para lavar depois de cada uso."
+      },
+      "after": {
+        "concepts": "cachecol-recorte-fechadura",
+        "field": "caption",
+        "text": "As pequenas aberturas do cachecol lembram fechaduras vistas de longe."
+      }
+    },
+    {
+      "row": 996,
+      "before": {
+        "concepts": "gola-protetor-lavavel",
+        "field": "altText",
+        "text": "Uma tira removível está parcialmente solta do interior da gola do casaco."
+      },
+      "after": {
+        "concepts": "cachecol-recorte-fechadura",
+        "field": "altText",
+        "text": "Aberturas com topo circular e base estreita percorrem o tecido do cachecol."
+      }
+    }
+  ],
+  "screeningRun": false,
+  "round3Or4RepairInspection": false,
+  "fullOldSourceReconstructionVerified": true
+}

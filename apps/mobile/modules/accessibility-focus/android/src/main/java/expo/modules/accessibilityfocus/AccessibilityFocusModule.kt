@@ -34,7 +34,10 @@ class AccessibilityFocusModule : Module() {
 
     AsyncFunction("focus") { tag: Int, promise: Promise ->
       mainHandler.post {
-        promise.resolve(observer.moveFocus(decorView(), tag))
+        // React Native Modal lives in a Dialog window, outside the Activity decor.
+        // Resolve its real React view before choosing the window to focus within.
+        val view = runCatching { appContext.findView<View>(tag) }.getOrNull()
+        promise.resolve(observer.moveFocus(view?.rootView ?: decorView(), tag))
       }
     }
 

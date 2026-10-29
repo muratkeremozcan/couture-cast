@@ -14,12 +14,13 @@
     "generator": "scripts/verify-community-screening-lists.mjs",
     "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
     "upstreamFileSha256": "6c7ae03baee0f3fdc22eed169030567669005dad9a1923e0b571c4bd4f2f2ab5",
-    "overlaySha256": "d5bdf19a6efa86e4a221c4d5897964629e4484249af934f3114d96327ef533a2",
-    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "overlaySha256": "669522be36299d6981ea9a56e5eb8f421dc6ebf8a8ef24e8d6c36d1b028e5023",
+    "allowListSha256": "b25c9043213ba09b2ca3f415ae05f79cd9222910c715eeda2100d748d5444613",
+    "reviewedOccurrenceSha256": "e5c93949c90d428f783d1e273c1abf0f97004dbde479663590011f4d2e5c23bf",
     "counts": {
       "upstreamLines": 142,
-      "overlayEntries": 46,
-      "entries": 178,
+      "overlayEntries": 47,
+      "entries": 179,
       "excludedUpstreamTerms": 4
     }
   },
@@ -967,6 +968,12 @@
     },
     {
       "term": "tecavüz",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "tecavüzcü",
       "category": "violence",
       "severity": "high",
       "source": "overlay"

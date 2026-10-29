@@ -684,6 +684,9 @@
       "save": "Save settings",
       "saved": "Settings saved.",
       "failed": "Settings could not be saved. Try again.",
+      "loadFailed": "Settings could not be loaded. Try again.",
+      "loadRetrying": "Settings could not be loaded. Retrying shortly.",
+      "retry": "Try again",
       "conflict": "Settings changed elsewhere. Review the current values and try again.",
       "permission": "Allow notifications in your device settings, then try again.",
       "signin": "Sign in",
@@ -760,6 +763,49 @@
       "linkLabel_one": "Standout look in {{label}} by {{author}}, {{count}} reaction. Opens the City Spotlight.",
       "linkLabel_other": "Standout look in {{label}} by {{author}}, {{count}} reactions. Opens the City Spotlight.",
       "cta": "See it in the City Spotlight"
+    }
+  },
+  "shareCard": {
+    "launcher": "Create my outfit card",
+    "sourceOutfit": "Outfit",
+    "sourceCommunity": "Community look",
+    "title": "Your share card",
+    "previewDescription": "Preview of your CoutureCast card",
+    "photoPrivacyHelp": "Your own photo stays visible, including any names or signs in the photo. Check this preview before saving.",
+    "preparing": "Preparing card",
+    "watermark": "Show watermark",
+    "save": "Save to photos",
+    "download": "Download PNG",
+    "saving": "Saving",
+    "finishingSave": "Finishing save",
+    "saved": "Saved to photos",
+    "downloadStarted": "Download started",
+    "cancel": "Cancel",
+    "close": "Close",
+    "retry": "Try again",
+    "refresh": "Refresh preview",
+    "openSettings": "Open settings",
+    "nativeSaveUnavailable": "Update the app to save photos.",
+    "permissionDenied": "Photo access was denied. Try again when ready.",
+    "permissionPermanent": "Allow photo saving in Settings.",
+    "sourceUnavailable": "This source is unavailable.",
+    "previewChanged": "This card changed. Refresh the preview before saving.",
+    "offline": "Connect to the internet to prepare a card.",
+    "storage": "Unable to save. Check available storage and try again.",
+    "render": "Unable to prepare this card. Try again.",
+    "unknown": "Something went wrong. Try again.",
+    "scenarios": {
+      "morning": "Morning",
+      "midday": "Midday",
+      "evening": "Evening"
+    },
+    "climateBands": {
+      "cold_dry": "Cold and dry",
+      "cold_wet": "Cold and wet",
+      "temperate_dry": "Temperate and dry",
+      "temperate_wet": "Temperate and wet",
+      "warm_dry": "Warm and dry",
+      "warm_wet": "Warm and wet"
     }
   }
 }

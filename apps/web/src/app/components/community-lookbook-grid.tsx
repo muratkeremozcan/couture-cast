@@ -25,6 +25,13 @@
 //   every banner in the new language.
 'use client'
 
+import {
+  CommunityShareCardControl,
+  ShareCardDialog,
+  ShareCardHostContext,
+  type ShareCardHost,
+} from './share-card-dialog'
+
 import { CommunityComments } from './community-comments'
 import {
   ResponseError,
@@ -81,6 +88,7 @@ import {
 } from './community-spotlight'
 
 import React, {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -116,6 +124,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
+import { useDetailOpener } from './detail-opener'
 import { CHIP_NAVIGATION_HEIGHT_PX, type ChipCategory } from './chip-navigation'
 
 /**
@@ -449,7 +458,11 @@ export function LookbookFilterNav({
       style={{ top: CHIP_NAVIGATION_HEIGHT_PX }}
       className="sticky z-10 flex flex-col gap-3 border-b border-[color:var(--theme-card-border)] bg-white/95 py-3 backdrop-blur"
     >
-      <h2 className="lookbook-display text-2xl font-semibold text-[color:var(--theme-primary)]">
+      <h2
+        tabIndex={-1}
+        data-share-card-focus-fallback="community"
+        className="lookbook-display text-2xl font-semibold text-[color:var(--theme-primary)]"
+      >
         {t('community.heading')}
       </h2>
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
@@ -772,6 +785,12 @@ function LookbookCardContent({
         )}
       </div>
 
+      {canAct &&
+        item.author.isSelf &&
+        item.status === 'published' &&
+        item.publishedAt !== null && (
+          <CommunityShareCardControl postId={item.id} scope={scope} />
+        )}
       {canAct && (
         <CommunityReactions item={item} controls={reactionControls} scope={scope} />
       )}
@@ -979,6 +998,8 @@ interface LookbookDetailDialogProps {
   canAct: boolean
   sponsored: SponsoredCtaHost
   t: Translate
+  /** Where focus goes after close when the control that opened the detail is gone. */
+  restoreFocus: { opener: string | undefined; final: string }
   onClose: () => void
 }
 
@@ -1000,6 +1021,7 @@ function LookbookDetailDialog({
   canAct,
   sponsored,
   t,
+  restoreFocus,
   onClose,
   reactionControls,
   commentTarget,
@@ -1014,9 +1036,17 @@ function LookbookDetailDialog({
       title={t('community.card.label', { author: authorName })}
       surface="theme"
       titleId="community-detail-title"
+      fallbackFocusSelector={restoreFocus.opener}
+      finalFocusSelector={restoreFocus.final}
       closeLabel={t('community.card.detailClose')}
     >
       <div data-testid="community-detail" className="flex flex-col gap-4">
+        {canAct &&
+          item.author.isSelf &&
+          item.status === 'published' &&
+          item.publishedAt !== null && (
+            <CommunityShareCardControl postId={item.id} scope="detail-" />
+          )}
         <CommunityReactions item={item} controls={reactionControls} />
         <div
           role="status"
@@ -2053,6 +2083,8 @@ export function CommunityLookbookGrid({
   >()
   const [focusComments, setFocusComments] = useState(false)
   const [openedItem, setOpenedItem] = useState<CommunityFeedItem | null>(null)
+  const detailOpener = useDetailOpener(openedItem)
+  const clearDetailOpener = detailOpener.clear
   const openedItemRef = useRef(openedItem)
   openedItemRef.current = openedItem
   /**
@@ -2138,7 +2170,32 @@ export function CommunityLookbookGrid({
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [feedError, setFeedError] = useState<Message | null>(null)
-  const [announcement, setAnnouncement] = useState<Message | null>(null)
+  // What the one live region holds, in the order it happened. A message replaces the list,
+  // except the feed's own completion message, which follows anything announced while that
+  // same read was in flight (see announceFeed).
+  const [announcements, setAnnouncements] = useState<Message[]>([])
+  /** Monotonic request id, so a late response for an abandoned filter is dropped. */
+  const feedGenerationRef = useRef(0)
+  const announcedDuringReadRef = useRef<number | null>(null)
+  const setAnnouncement = useCallback((message: Message | null) => {
+    announcedDuringReadRef.current = feedGenerationRef.current
+    setAnnouncements(message ? [message] : [])
+  }, [])
+  /**
+   * The feed's own messages. The loading message always starts a fresh list; the completion
+   * message joins the list when something else was announced during the same read, a
+   * deep-link focus for one, so a polite region speaks both instead of dropping the first.
+   */
+  const announceFeed = useCallback(
+    (message: Message, generation: number, join: boolean) => {
+      setAnnouncements((previous) =>
+        join && announcedDuringReadRef.current === generation && previous.length > 0
+          ? [...previous, message]
+          : [message]
+      )
+    },
+    []
+  )
   const [reactionFeedback, setReactionFeedback] = useState<{
     key: string
     id: number
@@ -2255,8 +2312,6 @@ export function CommunityLookbookGrid({
 
   const feedControllerRef = useRef<AbortController | null>(null)
   const actionControllerRef = useRef<AbortController | null>(null)
-  /** Monotonic request id, so a late response for an abandoned filter is dropped. */
-  const feedGenerationRef = useRef(0)
   const modeRef = useRef<FilterCategory>(currentMode)
   const languageRef = useRef(i18n.language)
   const failedImagesRef = useRef(failedImages)
@@ -2271,7 +2326,7 @@ export function CommunityLookbookGrid({
   const detailGenerationRef = useRef(0)
   const notificationIntentRef = useRef(0)
   const realtimeSyncRef = useRef<CommunitySyncState | null>(null)
-  const hasLoadedFeedRef = useRef(false)
+  const feedReadsStartedRef = useRef(0)
 
   useEffect(() => {
     modeRef.current = currentMode
@@ -2370,6 +2425,9 @@ export function CommunityLookbookGrid({
       feedControllerRef.current = controller
       const generation = feedGenerationRef.current + 1
       feedGenerationRef.current = generation
+      // The deep-link effect resolves the highlighted target for the first feed read. A read
+      // started after it supersedes that one, finished or not, so it revalidates the target.
+      const isFirstRead = feedReadsStartedRef.current++ === 0
 
       if (append) {
         setIsLoadingMore(true)
@@ -2377,7 +2435,7 @@ export function CommunityLookbookGrid({
         setIsLoading(true)
         setFeedError(null)
         setNextCursor(null)
-        setAnnouncement({ key: 'community.feed.loading' })
+        announceFeed({ key: 'community.feed.loading' }, generation, false)
       }
 
       const stamp = liveSponsorships.begin()
@@ -2421,31 +2479,34 @@ export function CommunityLookbookGrid({
             live(reactionState.current(post))
           )
         )
-        setAnnouncement({
-          key:
-            append && !restarted
-              ? 'community.feed.announceLoadedMore'
-              : 'community.feed.announceLoaded',
-          params: {
-            filterMode: feed.mode,
-            count:
+        announceFeed(
+          {
+            key:
               append && !restarted
-                ? merged.length - itemsRef.current.length
-                : page.length,
+                ? 'community.feed.announceLoadedMore'
+                : 'community.feed.announceLoaded',
+            params: {
+              filterMode: feed.mode,
+              count:
+                append && !restarted
+                  ? merged.length - itemsRef.current.length
+                  : page.length,
+            },
           },
-        })
+          generation,
+          true
+        )
         await revalidateHighlighted(
           detailRevalidationTargets(
             highlightedIdRef.current,
             openedItemRef.current,
-            hasLoadedFeedRef.current
+            !isFirstRead
           ),
           readTicket,
           controller.signal,
           generation,
           loadedIds
         )
-        hasLoadedFeedRef.current = true
       } catch (error: unknown) {
         if (controller.signal.aborted || generation !== feedGenerationRef.current) {
           return
@@ -2464,7 +2525,14 @@ export function CommunityLookbookGrid({
         }
       }
     },
-    [applyLiveSponsorship, liveSponsorships, reactionState, revalidateHighlighted]
+    [
+      announceFeed,
+      applyLiveSponsorship,
+      liveSponsorships,
+      reactionState,
+      revalidateHighlighted,
+      setAnnouncement,
+    ]
   )
 
   useEffect(() => {
@@ -2623,8 +2691,13 @@ export function CommunityLookbookGrid({
 
       const existing = new Set(itemsRef.current.map((item) => item.id))
       const incoming = page.items.filter((item) => !existing.has(item.id))
-      if (!itemsRef.current.length) setItems(() => page.items.map(live))
-      else if (incoming.length) {
+      if (!itemsRef.current.length) {
+        // Bootstrap validates targets as soon as this rebuild returns. React may
+        // commit the queued render later, so publish its feed snapshot now.
+        const rebuilt = page.items.map(live)
+        itemsRef.current = rebuilt
+        setItems(rebuilt)
+      } else if (incoming.length) {
         const buffered = mergeFeedPages(incoming, newLooksRef.current).map(live)
         newLooksRef.current = buffered
         setNewLooks(buffered)
@@ -2785,6 +2858,7 @@ export function CommunityLookbookGrid({
     applySpotlight,
     resetSpotlight,
     captureScroll,
+    setAnnouncement,
   ])
 
   useEffect(
@@ -2961,6 +3035,7 @@ export function CommunityLookbookGrid({
         const post = reactionState.read(target.post, readTicket)
         if (!post) return
         setDetailSurface('community_feed')
+        clearDetailOpener()
         // A resolve copy: it takes the latest live answer for its post.
         setOpenedItem(() => withLiveSponsorship(post, liveSponsorships))
         if (focus)
@@ -2996,7 +3071,14 @@ export function CommunityLookbookGrid({
       active = false
       controller.abort()
     }
-  }, [sessionScope, highlightedCardId, reactionState, comments, liveSponsorships])
+  }, [
+    sessionScope,
+    highlightedCardId,
+    reactionState,
+    comments,
+    liveSponsorships,
+    clearDetailOpener,
+  ])
 
   /**
    * The rows on screen: the loaded pages, with a deep-link target that is not
@@ -3025,7 +3107,7 @@ export function CommunityLookbookGrid({
       cardElement.focus()
       setAnnouncement({ key: 'community.feed.announceFocused' })
     }
-  }, [highlightedCardId, displayedItems])
+  }, [highlightedCardId, displayedItems, setAnnouncement])
 
   const handleModeChange = (mode: FilterCategory) => {
     setCurrentMode(mode)
@@ -3065,6 +3147,7 @@ export function CommunityLookbookGrid({
   ) => {
     notificationIntentRef.current++
     setDetailSurface(surface)
+    detailOpener.record(surface, commentsFocus, item.id)
     setFocusComments(commentsFocus)
     setAnnouncement(null)
     setReactionFeedback(null)
@@ -3387,6 +3470,7 @@ export function CommunityLookbookGrid({
     spotlightItems,
     spotlightLevel,
     spotlightStatus,
+    setAnnouncement,
   ])
 
   const presentation = communityPresentation(
@@ -3404,217 +3488,240 @@ export function CommunityLookbookGrid({
     restoreScroll(presentation.items)
   }, [communityAvailable, presentation.items, restoreScroll])
 
+  const { shareHost, shareDialog } = useCommunityShareHost(
+    presentation.items,
+    presentation.detail,
+    spotlight.state.items,
+    presentation.canAct
+  )
+
   return (
-    <aside aria-label={t('community.sectionLabel')} className="flex flex-col gap-6">
-      <SpotlightFocusNotice notice={spotlightNotice} t={t} />
-      <CommunitySpotlightSection
-        state={spotlight.state}
-        available={communityAvailable}
-        isMobilePreview={isMobilePreview}
-        t={t}
-        onLoadMore={() => {
-          void spotlight.loadMore()
-        }}
-        onRetry={() => {
-          void spotlight.retry()
-        }}
-        onFocused={spotlight.clearFocusTarget}
-        renderCard={(item) => (
-          <LookbookCard
-            scope={SPOTLIGHT_CARD_SCOPE}
-            reactionControls={reactionState.controls(item.id)}
-            item={item}
-            isHighlighted={false}
-            isFailedImage={failedImages.spotlight[item.id]?.url === item.imageAccess.url}
-            isReported={reportedPostIds.has(item.id)}
-            canAct={presentation.canAct}
+    <ShareCardHostContext.Provider value={shareHost}>
+      <aside aria-label={t('community.sectionLabel')} className="flex flex-col gap-6">
+        <SpotlightFocusNotice notice={spotlightNotice} t={t} />
+        <CommunitySpotlightSection
+          state={spotlight.state}
+          available={communityAvailable}
+          isMobilePreview={isMobilePreview}
+          t={t}
+          onLoadMore={() => {
+            void spotlight.loadMore()
+          }}
+          onRetry={() => {
+            void spotlight.retry()
+          }}
+          onFocused={spotlight.clearFocusTarget}
+          renderCard={(item) => (
+            <LookbookCard
+              scope={SPOTLIGHT_CARD_SCOPE}
+              reactionControls={reactionState.controls(item.id)}
+              item={item}
+              isHighlighted={false}
+              isFailedImage={
+                failedImages.spotlight[item.id]?.url === item.imageAccess.url
+              }
+              isReported={reportedPostIds.has(item.id)}
+              canAct={presentation.canAct}
+              t={t}
+              sponsored={sponsoredHost('community_spotlight')}
+              onImageError={handleSpotlightImageError}
+              onImageRetry={handleSpotlightImageRetry}
+              onOpen={() => {
+                handleOpenSpotlightCard(item)
+              }}
+              onComments={(post) => handleOpenCard(post, true, 'community_spotlight')}
+              onReport={(postId) => {
+                setReportError(null)
+                setReportingPostId(postId)
+              }}
+              onWithdraw={(postId) => {
+                void handleWithdrawPost(postId)
+              }}
+            />
+          )}
+        />
+
+        {showFilterNav && (
+          <LookbookFilterNav
+            activeTab={displayedMode}
+            isMobilePreview={isMobilePreview}
+            onTabChange={handleModeChange}
+            viewerBand={viewerBand}
+          />
+        )}
+
+        <Link
+          href={presentation.settingsHref}
+          className="min-h-12 self-start py-3 underline"
+        >
+          {t(presentation.settingsLabel)}
+        </Link>
+        <CommunityHeader canShare={presentation.canAct} onShare={openCreateModal} t={t} />
+
+        <CommunityNotices
+          bandUnresolvedReason={bandNoticeReason}
+          canAddLocation={hasSession}
+          notice={notice}
+          noticeText={renderMessage(notice?.message ?? null, t, viewerBand)}
+          t={t}
+        />
+
+        {activeChallenge && (
+          <WeeklyChallengeBanner
+            challenge={activeChallenge}
+            language={i18n.language}
             t={t}
-            sponsored={sponsoredHost('community_spotlight')}
-            onImageError={handleSpotlightImageError}
-            onImageRetry={handleSpotlightImageRetry}
-            onOpen={() => {
-              handleOpenSpotlightCard(item)
+            onParticipate={openCreateModal}
+          />
+        )}
+
+        <CommunityFeedStates
+          isLoading={isLoading}
+          errorText={renderMessage(feedError, t, viewerBand)}
+          itemCount={displayedItems.length}
+          gridColumns={gridColumns}
+          canShare={presentation.canAct}
+          onRetry={handleRetry}
+          onShare={openCreateModal}
+          t={t}
+        />
+
+        <div
+          ref={gridRef}
+          data-testid="community-card-grid"
+          data-chip-category={chipCategory}
+          aria-busy={isLoading || isLoadingMore}
+          className={`grid gap-6 ${gridColumns}`}
+        >
+          {presentation.items.map((item) => (
+            <LookbookCard
+              reactionControls={reactionState.controls(item.id)}
+              key={item.id}
+              item={item}
+              isHighlighted={item.id === highlightedCardId}
+              isFailedImage={failedImages.feed[item.id]?.url === item.imageAccess.url}
+              isReported={reportedPostIds.has(item.id)}
+              canAct={presentation.canAct}
+              t={t}
+              sponsored={sponsoredHost('community_feed')}
+              onImageError={handleImageError}
+              onImageRetry={handleImageRetry}
+              onOpen={handleOpenCard}
+              onComments={(item) => handleOpenCard(item, true)}
+              onReport={(postId) => {
+                setReportError(null)
+                setReportingPostId(postId)
+              }}
+              onWithdraw={(postId) => {
+                void handleWithdrawPost(postId)
+              }}
+            />
+          ))}
+        </div>
+
+        {presentation.showNewLooks && (
+          <button
+            type="button"
+            className="rounded-full border px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
+            disabled={isInsertingLooks}
+            onClick={() => {
+              void insertNewLooks()
             }}
-            onComments={(post) => handleOpenCard(post, true, 'community_spotlight')}
-            onReport={(postId) => {
-              setReportError(null)
-              setReportingPostId(postId)
-            }}
-            onWithdraw={(postId) => {
-              void handleWithdrawPost(postId)
+          >
+            {t('community.realtime.showNewLooks', { count: newLooks.length })}
+          </button>
+        )}
+        <AuthorStatesSection states={presentation.authorStates} t={t} />
+
+        <LoadMoreControl
+          nextCursor={presentation.nextCursor}
+          isLoading={isLoading}
+          isLoadingMore={isLoadingMore}
+          onLoadMore={handleLoadMore}
+          t={t}
+        />
+
+        {/* The one polite live region on this surface. */}
+        <div
+          aria-live="polite"
+          role="status"
+          data-testid="community-live-region"
+          className="sr-only"
+        >
+          {announcements.map((message, index) => (
+            <Fragment
+              key={
+                index === 0
+                  ? `current-${message.announcementId ?? ''}`
+                  : `queued-${index}`
+              }
+            >
+              {/* A space between messages, so the region reads as separate sentences. */}
+              {index > 0 ? ' ' : null}
+              <span>{openedItem ? null : renderMessage(message, t, viewerBand)}</span>
+            </Fragment>
+          ))}
+        </div>
+
+        {presentation.detail && (
+          <LookbookDetailDialog
+            suspended={!communityAvailable}
+            comments={comments}
+            focusComments={focusComments}
+            commentTarget={
+              presentation.detail.id === highlightedCardId ? commentTarget : undefined
+            }
+            reactionControls={reactionState.controls(presentation.detail.id)}
+            reactionFeedback={reactionFeedback}
+            item={presentation.detail}
+            canAct={presentation.canAct}
+            sponsored={sponsoredHost(detailSurface)}
+            t={t}
+            restoreFocus={detailOpener.restoreFocus}
+            onClose={() => {
+              notificationIntentRef.current++
+              comments.retireFocus(presentation.detail!.id)
+              setCommentTarget(undefined)
+              setOpenedItem(null)
             }}
           />
         )}
-      />
 
-      {showFilterNav && (
-        <LookbookFilterNav
-          activeTab={displayedMode}
-          isMobilePreview={isMobilePreview}
-          onTabChange={handleModeChange}
-          viewerBand={viewerBand}
-        />
-      )}
-
-      <Link
-        href={presentation.settingsHref}
-        className="min-h-12 self-start py-3 underline"
-      >
-        {t(presentation.settingsLabel)}
-      </Link>
-      <CommunityHeader canShare={presentation.canAct} onShare={openCreateModal} t={t} />
-
-      <CommunityNotices
-        bandUnresolvedReason={bandNoticeReason}
-        canAddLocation={hasSession}
-        notice={notice}
-        noticeText={renderMessage(notice?.message ?? null, t, viewerBand)}
-        t={t}
-      />
-
-      {activeChallenge && (
-        <WeeklyChallengeBanner
-          challenge={activeChallenge}
-          language={i18n.language}
-          t={t}
-          onParticipate={openCreateModal}
-        />
-      )}
-
-      <CommunityFeedStates
-        isLoading={isLoading}
-        errorText={renderMessage(feedError, t, viewerBand)}
-        itemCount={displayedItems.length}
-        gridColumns={gridColumns}
-        canShare={presentation.canAct}
-        onRetry={handleRetry}
-        onShare={openCreateModal}
-        t={t}
-      />
-
-      <div
-        ref={gridRef}
-        data-testid="community-card-grid"
-        data-chip-category={chipCategory}
-        aria-busy={isLoading || isLoadingMore}
-        className={`grid gap-6 ${gridColumns}`}
-      >
-        {presentation.items.map((item) => (
-          <LookbookCard
-            reactionControls={reactionState.controls(item.id)}
-            key={item.id}
-            item={item}
-            isHighlighted={item.id === highlightedCardId}
-            isFailedImage={failedImages.feed[item.id]?.url === item.imageAccess.url}
-            isReported={reportedPostIds.has(item.id)}
-            canAct={presentation.canAct}
+        {reportingPostId !== null && (
+          <CommunityReportModal
+            suspended={!communityAvailable}
+            onClose={closeReportModal}
+            onSubmit={(reason, details) => {
+              void handleReportSubmit(reason, details)
+            }}
+            isSubmitting={isSubmittingReport}
+            errorMessage={renderMessage(reportError, t, viewerBand)}
             t={t}
-            sponsored={sponsoredHost('community_feed')}
-            onImageError={handleImageError}
-            onImageRetry={handleImageRetry}
-            onOpen={handleOpenCard}
-            onComments={(item) => handleOpenCard(item, true)}
-            onReport={(postId) => {
-              setReportError(null)
-              setReportingPostId(postId)
-            }}
-            onWithdraw={(postId) => {
-              void handleWithdrawPost(postId)
-            }}
           />
-        ))}
-      </div>
+        )}
 
-      {presentation.showNewLooks && (
-        <button
-          type="button"
-          className="rounded-full border px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
-          disabled={isInsertingLooks}
-          onClick={() => {
-            void insertNewLooks()
-          }}
-        >
-          {t('community.realtime.showNewLooks', { count: newLooks.length })}
-        </button>
-      )}
-      <AuthorStatesSection states={presentation.authorStates} t={t} />
-
-      <LoadMoreControl
-        nextCursor={presentation.nextCursor}
-        isLoading={isLoading}
-        isLoadingMore={isLoadingMore}
-        onLoadMore={handleLoadMore}
-        t={t}
-      />
-
-      {/* The one polite live region on this surface. */}
-      <div
-        aria-live="polite"
-        role="status"
-        data-testid="community-live-region"
-        className="sr-only"
-      >
-        <span key={announcement?.announcementId}>
-          {openedItem ? null : renderMessage(announcement, t, viewerBand)}
-        </span>
-      </div>
-
-      {presentation.detail && (
-        <LookbookDetailDialog
-          suspended={!communityAvailable}
-          comments={comments}
-          focusComments={focusComments}
-          commentTarget={
-            presentation.detail.id === highlightedCardId ? commentTarget : undefined
-          }
-          reactionControls={reactionState.controls(presentation.detail.id)}
-          reactionFeedback={reactionFeedback}
-          item={presentation.detail}
-          canAct={presentation.canAct}
-          sponsored={sponsoredHost(detailSurface)}
-          t={t}
-          onClose={() => {
-            notificationIntentRef.current++
-            comments.retireFocus(presentation.detail!.id)
-            setCommentTarget(undefined)
-            setOpenedItem(null)
-          }}
-        />
-      )}
-
-      {reportingPostId !== null && (
-        <CommunityReportModal
-          suspended={!communityAvailable}
-          onClose={closeReportModal}
-          onSubmit={(reason, details) => {
-            void handleReportSubmit(reason, details)
-          }}
-          isSubmitting={isSubmittingReport}
-          errorMessage={renderMessage(reportError, t, viewerBand)}
-          t={t}
-        />
-      )}
-
-      {isCreateModalOpen && (
-        <PostCreationModal
-          suspended={!communityAvailable}
-          onClose={closeCreateModal}
-          onSelectPhoto={(file) => {
-            void handleSelectPhoto(file)
-          }}
-          onPublish={(params) => {
-            void handlePublishPost(params)
-          }}
-          photoPreview={photoPreview}
-          altTextSuggestion={altTextSuggestion}
-          isPreparing={isPreparingPhoto}
-          isPublishing={isPublishing}
-          activeChallenge={activeChallenge}
-          errorMessage={renderMessage(composeError, t, viewerBand)}
-          t={t}
-        />
-      )}
-    </aside>
+        {isCreateModalOpen && (
+          <PostCreationModal
+            suspended={!communityAvailable}
+            onClose={closeCreateModal}
+            onSelectPhoto={(file) => {
+              void handleSelectPhoto(file)
+            }}
+            onPublish={(params) => {
+              void handlePublishPost(params)
+            }}
+            photoPreview={photoPreview}
+            altTextSuggestion={altTextSuggestion}
+            isPreparing={isPreparingPhoto}
+            isPublishing={isPublishing}
+            activeChallenge={activeChallenge}
+            errorMessage={renderMessage(composeError, t, viewerBand)}
+            t={t}
+          />
+        )}
+        {shareDialog}
+      </aside>
+    </ShareCardHostContext.Provider>
   )
 }
 
@@ -3642,6 +3749,60 @@ function mergeFeedPages(
 ): CommunityFeedItem[] {
   const seen = new Set(previous.map((item) => item.id))
   return [...previous, ...page.filter((item) => !seen.has(item.id))]
+}
+
+/**
+ * The community share dialog lives above the cards: hiding content while access is
+ * re-verified unmounts every card, and the member's composition must survive that.
+ * The dialog shows only while its own post is eligible and the viewer can act.
+ */
+function useCommunityShareHost(
+  items: readonly CommunityFeedItem[],
+  detail: CommunityFeedItem | null,
+  spotlightItems: readonly CommunityFeedItem[],
+  canAct: boolean
+) {
+  const [share, setShare] = useState<{ postId: string; open: boolean } | null>(null)
+  const opener = useRef<HTMLElement | null>(null)
+  const invokingSurface = useRef<{ postId: string; scope: string } | null>(null)
+  const shareHost = useMemo<ShareCardHost>(
+    () => ({
+      open: (target, scope, element) => {
+        invokingSurface.current = { postId: target, scope }
+        opener.current = element
+        setShare({ postId: target, open: true })
+      },
+      register: (target, scope, element) => {
+        // The feed, spotlight and detail may all render this post. Rebind only
+        // the invoking surface when access re-verification remounts its button.
+        if (
+          element &&
+          target === invokingSurface.current?.postId &&
+          scope === invokingSurface.current.scope
+        )
+          opener.current = element
+      },
+    }),
+    []
+  )
+  const item = share
+    ? (items.find((candidate) => candidate.id === share.postId) ??
+      (detail?.id === share.postId ? detail : null) ??
+      spotlightItems.find((candidate) => candidate.id === share.postId))
+    : null
+  const eligible = Boolean(
+    item?.author.isSelf && item.status === 'published' && item.publishedAt !== null
+  )
+  const shareDialog = share && (
+    <ShareCardDialog
+      key={share.postId}
+      source={{ kind: 'community_post', postId: share.postId }}
+      open={share.open && canAct && eligible}
+      onClose={() => setShare((current) => current && { ...current, open: false })}
+      opener={opener}
+    />
+  )
+  return { shareHost, shareDialog }
 }
 
 /** Drops image failures whose signed URL the server has since replaced. */

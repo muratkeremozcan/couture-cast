@@ -40,12 +40,12 @@ type Connection = {
  */
 const revalidationInterval = () => 4000 + Math.random() * 2000
 /**
- * Concurrent member authorizations per instance, across handshakes and ticks. Each one is a
- * pool transaction with a 100 ms acquisition wait; unbounded, a herd of sockets waited past
- * the 2 s budget and healthy members were told the service was unavailable. Time spent
- * queued here still counts against each request's own budget.
+ * Concurrent member authorizations per instance, across handshakes and ticks. Match the
+ * five-connection bounded pool used by the reconnect regression. Three slots left two
+ * connections idle while cold flag transactions consumed queued handshakes' budgets.
+ * Keep work bounded and count queue time against the original authorization deadline.
  */
-const AUTHORIZATION_CONCURRENCY = 3
+const AUTHORIZATION_CONCURRENCY = 5
 function concurrencyLimit(limit: number) {
   let active = 0
   const waiting: (() => void)[] = []

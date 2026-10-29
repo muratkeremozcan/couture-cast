@@ -6,7 +6,7 @@
 // member, a second instance waiting on another owner's refresh, and a caller that joined
 // a shorter-lived flight.
 import 'reflect-metadata'
-import { PrismaClient, type Prisma } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { createUser, persistUser } from '@couture/testing'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
@@ -59,6 +59,67 @@ function heldRemote() {
 }
 
 describe('community flag evaluation claims', () => {
+  it.each([true, false])(
+    'returns the committed %s refresh without a redundant cache-read transaction',
+    async (value) => {
+      const id = await member()
+      let transactions = 0
+      const observed = new Proxy(prisma, {
+        get(target, key, receiver) {
+          if (key === '$transaction')
+            return (
+              work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+              options?: { timeout?: number; maxWait?: number }
+            ) => {
+              transactions++
+              return target.$transaction(work, options)
+            }
+          return Reflect.get(target, key, receiver) as unknown
+        },
+      })
+      const provider = { getFeatureFlagValue: vi.fn(() => Promise.resolve(value)) }
+      const grant = await new CommunityFlagEvaluationService(observed, provider).evaluate(
+        id
+      )
+      const row = await prisma.communityFlagEvaluation.findUniqueOrThrow({
+        where: {
+          member_id_flag_key: { member_id: id, flag_key: 'community_read_enabled' },
+        },
+      })
+      expect(grant.value).toBe(value)
+      expect(grant.expiresAt).toEqual(row.expires_at)
+      expect(grant.validUntil).toBeGreaterThan(performance.now())
+      expect(row.expires_at!.getTime() - row.remote_evaluated_at!.getTime()).toBe(60_000)
+      expect(provider.getFeatureFlagValue).toHaveBeenCalledOnce()
+      expect(transactions).toBe(3) // Initial read, guarded claim, committed refresh returning its row.
+    }
+  )
+
+  it('cannot return a refreshed grant after the subject generation changes during the provider call', async () => {
+    const id = await member()
+    const remote = heldRemote()
+    const service = new CommunityFlagEvaluationService(prisma, remote.provider)
+    const result = service.evaluate(id)
+    const outcome = expect(result).rejects.toBeInstanceOf(CommunityUnavailableException)
+    await until(
+      () => Promise.resolve(remote.calls()),
+      (count) => count === 1
+    )
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${id}]::text[],ARRAY[]::text[],true)`
+      await tx.communitySubject.update({
+        where: { member_id: id },
+        data: { generation: { increment: 1 } },
+      })
+      await tx.communityFlagEvaluation.deleteMany({ where: { member_id: id } })
+    })
+    remote.release(true)
+    await outcome
+    expect(await prisma.communityFlagEvaluation.count({ where: { member_id: id } })).toBe(
+      0
+    )
+  })
+
   it('reports an unknown member as unavailable with the default retry, without a remote call', async () => {
     const remote = heldRemote()
     const service = new CommunityFlagEvaluationService(prisma, remote.provider)
@@ -237,9 +298,75 @@ describe('Story 6.5 remote-only shared flag cache', () => {
   it('6.5-INT-010: cold requests across instances join one claim and keep its original expiry', async () => {
     const id = await member()
     remote.getFeatureFlagValue.mockClear().mockResolvedValue(true)
-    const results = await Promise.all(
-      Array.from({ length: 20 }, (_, i) => (i % 2 ? a : b).evaluate(id))
-    )
+    const transactions: {
+      elapsedMs: number
+      timeout?: number
+      maxWait?: number
+      outcome: string
+      prismaCode?: string
+      sqlState?: string
+    }[] = []
+    const observed = new Proxy(prisma, {
+      get(target, key, receiver) {
+        if (key === '$transaction')
+          return async (
+            work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+            options?: { timeout?: number; maxWait?: number }
+          ) => {
+            const started = performance.now()
+            try {
+              const result = await target.$transaction(work, options)
+              transactions.push({
+                elapsedMs: Math.round(performance.now() - started),
+                ...options,
+                outcome: 'fulfilled',
+              })
+              return result
+            } catch (error) {
+              transactions.push({
+                elapsedMs: Math.round(performance.now() - started),
+                ...options,
+                outcome:
+                  error instanceof Prisma.PrismaClientKnownRequestError
+                    ? 'PrismaClientKnownRequestError'
+                    : 'other_transaction_error',
+                ...(error instanceof Prisma.PrismaClientKnownRequestError
+                  ? {
+                      prismaCode: error.code,
+                      sqlState:
+                        typeof error.meta?.code === 'string' &&
+                        /^[A-Z0-9]{5}$/.test(error.meta.code)
+                          ? error.meta.code
+                          : undefined,
+                    }
+                  : {}),
+              })
+              throw error
+            }
+          }
+        return Reflect.get(target, key, receiver) as unknown
+      },
+    })
+    const instances = [
+      new CommunityFlagEvaluationService(observed, remote),
+      new CommunityFlagEvaluationService(observed, remote),
+    ]
+    const started = performance.now()
+    let results: Awaited<ReturnType<CommunityFlagEvaluationService['evaluate']>>[] = []
+    try {
+      results = await Promise.all(
+        Array.from({ length: 20 }, (_, i) => instances[i % 2]!.evaluate(id))
+      )
+    } finally {
+      console.info(
+        'cold_flag_transaction_diagnostics',
+        JSON.stringify({
+          elapsedMs: Math.round(performance.now() - started),
+          remoteCalls: remote.getFeatureFlagValue.mock.calls.length,
+          transactions,
+        })
+      )
+    }
     expect(results.every((r) => r.value)).toBe(true)
     expect(remote.getFeatureFlagValue).toHaveBeenCalledTimes(1)
     const row = await prisma.communityFlagEvaluation.findUniqueOrThrow({
@@ -249,6 +376,224 @@ describe('Story 6.5 remote-only shared flag cache', () => {
     })
     expect(row.expires_at!.getTime() - row.remote_evaluated_at!.getTime()).toBe(60_000)
     expect(row.next_claim_at.getTime() - row.remote_evaluated_at!.getTime()).toBe(45_000)
+  })
+
+  it('INT010-CONTENTION: a waiter lock-times-out on a real uncommitted claim insert, then re-resolves the committed claim', async () => {
+    const id = await member()
+    const provider = { getFeatureFlagValue: vi.fn(() => Promise.resolve(true)) }
+    let held = false
+    const errors: { prismaCode: string; sqlState: unknown }[] = []
+    // The first claim INSERT stays uncommitted until the other instance's INSERT has
+    // hit the real 100 ms lock_timeout. Every transaction started after that waits
+    // for the held claim to settle, so the retry meets the committed row.
+    let lockTimedOut!: () => void
+    const contended = new Promise<void>((resolve) => {
+      lockTimedOut = resolve
+    })
+    let claimSettled!: () => void
+    const holderSettled = new Promise<void>((resolve) => {
+      claimSettled = resolve
+    })
+    const observed = new Proxy(prisma, {
+      get(target, key, receiver) {
+        if (key === '$transaction')
+          return async (
+            work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+            options?: { timeout?: number; maxWait?: number }
+          ) => {
+            if (errors.length) await holderSettled
+            let holding = false
+            try {
+              return await target.$transaction(
+                (connection) =>
+                  work(
+                    new Proxy(connection, {
+                      get(tx, property, txReceiver) {
+                        if (property === '$executeRaw')
+                          return async (
+                            query: TemplateStringsArray | Prisma.Sql,
+                            ...values: unknown[]
+                          ) => {
+                            const result = await tx.$executeRaw(query, ...values)
+                            if (
+                              !held &&
+                              Array.isArray(query) &&
+                              query
+                                .join('')
+                                .includes('INSERT INTO "CommunityFlagEvaluation"')
+                            ) {
+                              held = true
+                              holding = true
+                              await contended
+                            }
+                            return result
+                          }
+                        return Reflect.get(tx, property, txReceiver) as unknown
+                      },
+                    })
+                  ),
+                options
+              )
+            } catch (error) {
+              if (error instanceof Prisma.PrismaClientKnownRequestError) {
+                errors.push({ prismaCode: error.code, sqlState: error.meta?.code })
+                if (error.meta?.code === '55P03') lockTimedOut()
+              }
+              throw error
+            } finally {
+              if (holding) claimSettled()
+            }
+          }
+        return Reflect.get(target, key, receiver) as unknown
+      },
+    })
+    const instances = [
+      new CommunityFlagEvaluationService(observed, provider),
+      new CommunityFlagEvaluationService(observed, provider),
+    ]
+    try {
+      const results = await Promise.all(
+        Array.from({ length: 20 }, (_, index) => instances[index % 2]!.evaluate(id))
+      )
+      expect(held).toBe(true)
+      expect(errors).toEqual([{ prismaCode: 'P2010', sqlState: '55P03' }])
+      expect(results.every((result) => result.value)).toBe(true)
+      expect(provider.getFeatureFlagValue).toHaveBeenCalledOnce()
+      const row = await prisma.communityFlagEvaluation.findUniqueOrThrow({
+        where: {
+          member_id_flag_key: { member_id: id, flag_key: 'community_read_enabled' },
+        },
+      })
+      const subject = await prisma.communitySubject.findUniqueOrThrow({
+        where: { member_id: id },
+      })
+      expect(row.subject_generation).toBe(subject.generation)
+      expect(row.expires_at!.getTime() - row.remote_evaluated_at!.getTime()).toBe(60_000)
+      expect(row.next_claim_at.getTime() - row.remote_evaluated_at!.getTime()).toBe(
+        45_000
+      )
+    } finally {
+      lockTimedOut()
+      console.info('flag_claim_contention', JSON.stringify({ errors }))
+    }
+  })
+
+  it('INT010-BOUNDED: persistent real INSERT contention stops after three attempts without a remote call', async () => {
+    const id = await member()
+    let inserted!: () => void
+    const ready = new Promise<void>((resolve) => {
+      inserted = resolve
+    })
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`
+        INSERT INTO "CommunityFlagEvaluation" (member_id,flag_key,subject_generation)
+        SELECT member_id,'community_read_enabled',generation FROM "CommunitySubject" WHERE member_id=${id}
+      `
+        inserted()
+        await held
+      },
+      { timeout: 3000 }
+    )
+    await ready
+    let lockTimeouts = 0
+    const observed = new Proxy(prisma, {
+      get(target, key, receiver) {
+        if (key === '$transaction')
+          return async (
+            work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+            options?: { timeout?: number; maxWait?: number }
+          ) => {
+            try {
+              return await target.$transaction(work, options)
+            } catch (error) {
+              if (
+                error instanceof Prisma.PrismaClientKnownRequestError &&
+                error.meta?.code === '55P03'
+              )
+                lockTimeouts++
+              throw error
+            }
+          }
+        return Reflect.get(target, key, receiver) as unknown
+      },
+    })
+    const provider = { getFeatureFlagValue: vi.fn(() => Promise.resolve(true)) }
+    try {
+      await expect(
+        new CommunityFlagEvaluationService(observed, provider).evaluate(id)
+      ).rejects.toBeInstanceOf(CommunityUnavailableException)
+      // Three attempts, then refusal. An unbounded retry would keep timing out until
+      // the 1950 ms budget ran out, far past three.
+      expect(lockTimeouts).toBe(3)
+      expect(provider.getFeatureFlagValue).not.toHaveBeenCalled()
+    } finally {
+      release()
+      await holder
+    }
+    const row = await prisma.communityFlagEvaluation.findUniqueOrThrow({
+      where: {
+        member_id_flag_key: { member_id: id, flag_key: 'community_read_enabled' },
+      },
+    })
+    expect(row).toMatchObject({
+      remote_value: null,
+      refresh_owner: null,
+      expires_at: null,
+    })
+  })
+
+  it('INT010-PRIVACY: an exclusive privacy guard lock fails closed without retry or provider access', async () => {
+    const id = await member()
+    let locked!: () => void
+    const ready = new Promise<void>((resolve) => {
+      locked = resolve
+    })
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${id}]::text[],ARRAY[]::text[],true)`
+        locked()
+        await held
+      },
+      { timeout: 3000 }
+    )
+    await ready
+    const provider = { getFeatureFlagValue: vi.fn(() => Promise.resolve(true)) }
+    let transactions = 0
+    const observed = new Proxy(prisma, {
+      get(target, key, receiver) {
+        if (key === '$transaction')
+          return (
+            work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+            options?: { timeout?: number; maxWait?: number }
+          ) => {
+            transactions++
+            return target.$transaction(work, options)
+          }
+        return Reflect.get(target, key, receiver) as unknown
+      },
+    })
+    try {
+      await expect(
+        new CommunityFlagEvaluationService(observed, provider).evaluate(id)
+      ).rejects.toBeInstanceOf(CommunityUnavailableException)
+      expect(transactions).toBe(2) // Initial read and exactly one guarded claim.
+      expect(provider.getFeatureFlagValue).not.toHaveBeenCalled()
+    } finally {
+      release()
+      await holder
+    }
+    expect(await prisma.communityFlagEvaluation.count({ where: { member_id: id } })).toBe(
+      0
+    )
   })
 
   it('6.5-INT-011: successful false denies, outage cannot consume synthetic fallback or extend expiry', async () => {

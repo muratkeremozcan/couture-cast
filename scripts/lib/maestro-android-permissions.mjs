@@ -157,6 +157,7 @@ export function withExplicitLaunchPermissions(yamlText, permissions, label) {
  */
 export function prepareAndroidFlowTree({ sourceDir, targetDir, permissions, skip = [] }) {
   fs.rmSync(targetDir, { recursive: true, force: true })
+  const omitted = new Set(['artifacts', ...skip])
   let files = 0
   let rewritten = 0
   const copy = (from, to) => {
@@ -165,7 +166,7 @@ export function prepareAndroidFlowTree({ sourceDir, targetDir, permissions, skip
       const source = path.join(from, entry.name)
       const target = path.join(to, entry.name)
       if (entry.isDirectory()) {
-        if (from === sourceDir && skip.includes(entry.name)) continue
+        if (omitted.has(entry.name)) continue
         // The copy may live inside the tree it copies (under the artifact output).
         if (path.resolve(source) === path.resolve(targetDir)) continue
         copy(source, target)

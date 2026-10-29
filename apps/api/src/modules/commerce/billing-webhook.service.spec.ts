@@ -1,6 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type Stripe from 'stripe'
+import type { PrismaClient } from '@prisma/client'
+import { abortFirstRun } from '../../testing/pldbgapi2.js'
+import type { PremiumEntitlementService } from './premium-entitlement.service.js'
+import type { RevenueCatClient } from './revenuecat-client.js'
+import type { SubscriptionService } from './subscription.service.js'
 import {
+  BillingWebhookService,
   buildTestOnlyRevenueCatWebhookAuth,
   buildTestOnlyStripeWebhookSecret,
   mapRevenueCatStore,
@@ -245,5 +251,118 @@ describe('secret resolution (Decision 10: point of use, test-only fallbacks)', (
 
     expect(resolveStripeWebhookSecret()).toBeNull()
     expect(resolveRevenueCatWebhookAuth()).toBeNull()
+  })
+})
+
+describe('TRANSFER after a pldbgapi2 re-run (repeat safety)', () => {
+  const savedRc = process.env.REVENUECAT_WEBHOOK_AUTH
+  afterEach(() => {
+    if (savedRc === undefined) delete process.env.REVENUECAT_WEBHOOK_AUTH
+    else process.env.REVENUECAT_WEBHOOK_AUTH = savedRc
+  })
+
+  it('reports only the transitions the committed attempt made', async () => {
+    delete process.env.REVENUECAT_WEBHOOK_AUTH
+    // The aborted first attempt finds the loser's row and applies both sides; by the
+    // committed second attempt the row is gone, so neither side transitions.
+    const losingRow = {
+      store: 'app_store',
+      product_id: 'premium_monthly',
+      current_period_end: new Date('2026-12-01T00:00:00.000Z'),
+    }
+    const tx = {
+      billingEvent: { create: vi.fn().mockResolvedValue({}) },
+      premiumEntitlement: {
+        findUnique: vi.fn().mockResolvedValueOnce(losingRow).mockResolvedValueOnce(null),
+      },
+    }
+    const prisma = {
+      billingEvent: { findUnique: vi.fn().mockResolvedValue(null) },
+      user: {
+        findUnique: vi.fn(({ where }: { where: { id: string } }) =>
+          Promise.resolve({ id: where.id })
+        ),
+      },
+      $transaction: vi.fn(abortFirstRun(() => tx)),
+    }
+    const applyLedgerEvent = vi
+      .fn()
+      .mockResolvedValueOnce({ from: 'active', to: 'revoked' })
+      .mockResolvedValueOnce({ from: 'none', to: 'active' })
+    const emitTransition = vi.fn()
+    const service = new BillingWebhookService(
+      prisma as unknown as PrismaClient,
+      { applyLedgerEvent } as unknown as PremiumEntitlementService,
+      { emitTransition } as unknown as SubscriptionService,
+      {} as RevenueCatClient
+    )
+    const warn = vi
+      .spyOn((service as unknown as { logger: { warn: () => void } }).logger, 'warn')
+      .mockImplementation(() => undefined)
+    const body = {
+      event: rcEvent({
+        type: 'TRANSFER',
+        app_user_id: null,
+        product_id: null,
+        expiration_at_ms: null,
+        store: null,
+        transferred_from: ['loser'],
+        transferred_to: ['gainer'],
+      }),
+    }
+
+    await service.handleRevenueCatWebhook({
+      authorization: buildTestOnlyRevenueCatWebhookAuth(),
+      rawBody: Buffer.from(JSON.stringify(body)),
+    })
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+    expect(applyLedgerEvent).toHaveBeenCalledTimes(2)
+    expect(emitTransition).not.toHaveBeenCalled()
+    // The committed attempt skipped the gain, and only it reaches the log.
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
+  it('logs a gain skipped by both runs once, after commit', async () => {
+    delete process.env.REVENUECAT_WEBHOOK_AUTH
+    const tx = {
+      billingEvent: { create: vi.fn().mockResolvedValue({}) },
+      premiumEntitlement: { findUnique: vi.fn().mockResolvedValue(null) },
+    }
+    const prisma = {
+      billingEvent: { findUnique: vi.fn().mockResolvedValue(null) },
+      user: {
+        findUnique: vi.fn(({ where }: { where: { id: string } }) =>
+          Promise.resolve({ id: where.id })
+        ),
+      },
+      $transaction: vi.fn(abortFirstRun(() => tx)),
+    }
+    const service = new BillingWebhookService(
+      prisma as unknown as PrismaClient,
+      { applyLedgerEvent: vi.fn() } as unknown as PremiumEntitlementService,
+      { emitTransition: vi.fn() } as unknown as SubscriptionService,
+      {} as RevenueCatClient
+    )
+    const warn = vi
+      .spyOn((service as unknown as { logger: { warn: () => void } }).logger, 'warn')
+      .mockImplementation(() => undefined)
+    const body = {
+      event: rcEvent({
+        type: 'TRANSFER',
+        app_user_id: null,
+        product_id: null,
+        expiration_at_ms: null,
+        store: null,
+        transferred_from: ['loser'],
+        transferred_to: ['gainer'],
+      }),
+    }
+    await service.handleRevenueCatWebhook({
+      authorization: buildTestOnlyRevenueCatWebhookAuth(),
+      rawBody: Buffer.from(JSON.stringify(body)),
+    })
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+    expect(warn).toHaveBeenCalledTimes(1)
   })
 })

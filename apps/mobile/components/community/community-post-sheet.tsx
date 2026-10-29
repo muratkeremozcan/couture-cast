@@ -251,6 +251,7 @@ function ComposePhotoSection({
 }
 
 export interface CommunityPostSheetProps {
+  /** Pause new server actions during access revalidation; retain this owned draft and native host. */
   suspended?: boolean
   visible: boolean
   /** Active weekly challenge, when the feed carries one. */
@@ -291,6 +292,12 @@ export function CommunityPostSheet({
   // the scroll frame the keyboard shrinks (see `compose-field-reveal.ts`).
   const reveal = useComposeFieldReveal()
   const controllerRef = useRef<AbortController | null>(null)
+  const access = useRef({ visible, suspended })
+  access.current = { visible, suspended }
+  const verificationWaiters = useRef(new Set<() => void>())
+  useEffect(() => {
+    if (!suspended) verificationWaiters.current.forEach((resume) => resume())
+  }, [suspended])
   // One key per attempt, reused across allocate, upload, publish and any retry of
   // that attempt, so a retry replays the first session instead of allocating a second.
   const idempotencyKeyRef = useRef<string | null>(null)
@@ -359,6 +366,7 @@ export function CommunityPostSheet({
   }, [onClose, resetState])
 
   const handlePickImage = useCallback(async () => {
+    if (access.current.suspended || !access.current.visible) return
     setErrorMessage(null)
     setIsBusy(true)
     controllerRef.current?.abort()
@@ -375,6 +383,28 @@ export function CommunityPostSheet({
       setAltText('')
       setAltTextConfirmed(false)
 
+      // PHPicker can foreground the app before eligibility verification settles.
+      // Keep the explicit selection locally while the current host is suspended.
+      while (access.current.suspended) {
+        await new Promise<void>((resolve, reject) => {
+          const cleanup = () => {
+            verificationWaiters.current.delete(resume)
+            controller.signal.removeEventListener('abort', cancel)
+          }
+          const resume = () => {
+            cleanup()
+            resolve()
+          }
+          const cancel = () => {
+            cleanup()
+            reject(new Error('cancelled'))
+          }
+          verificationWaiters.current.add(resume)
+          controller.signal.addEventListener('abort', cancel, { once: true })
+          if (controller.signal.aborted) cancel()
+        })
+      }
+      if (controller.signal.aborted || !access.current.visible) return
       const idempotencyKey = generateIdempotencyKey()
       idempotencyKeyRef.current = idempotencyKey
 
@@ -414,7 +444,7 @@ export function CommunityPostSheet({
         setIsBusy(false)
       }
     }
-  }, [locale, t])
+  }, [locale, suspended, t])
 
   /**
    * Why publishing is blocked, as a catalog key, or `null` when it is not.
@@ -436,9 +466,10 @@ export function CommunityPostSheet({
     return null
   }, [allocated, altText, altTextConfirmed, asset, captionErrorKey])
 
-  const isPublishDisabled = publishBlockerKey !== null || isBusy
+  const isPublishDisabled = publishBlockerKey !== null || isBusy || suspended
 
   const handlePublish = useCallback(async () => {
+    if (suspended) return
     const session = allocated
     const idempotencyKey = idempotencyKeyRef.current
     // One guard, reading the same predicate the disabled state reads. It used to
@@ -501,6 +532,7 @@ export function CommunityPostSheet({
     locale,
     onPublished,
     publishBlockerKey,
+    suspended,
     t,
   ])
 
@@ -512,7 +544,7 @@ export function CommunityPostSheet({
   return (
     <EdgeToEdgeModal
       testID="community-post-sheet"
-      visible={visible && !suspended}
+      visible={visible}
       animationType="slide"
       onRequestClose={handleClose}
       scrim="rgba(0, 0, 0, 0.6)"
@@ -560,7 +592,7 @@ export function CommunityPostSheet({
             <ComposePhotoSection
               onLayout={reveal.sectionLayout('photo')}
               asset={asset}
-              isBusy={isBusy}
+              isBusy={isBusy || suspended}
               onPick={() => {
                 void handlePickImage()
               }}
@@ -696,39 +728,74 @@ export function CommunityPostSheet({
             />
           ) : null}
 
-          <View style={styles.footer}>
-            <TouchableOpacity
-              testID="community-publish-button"
-              style={[
-                styles.publishButton,
-                { backgroundColor: ACCENT_GOLD },
-                isPublishDisabled && styles.publishButtonDisabled,
-              ]}
-              disabled={isPublishDisabled}
-              onPress={() => {
-                void handlePublish()
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t('community.compose.publish')}
-              // Why the control is dead, spoken rather than implied by dimming.
-              accessibilityHint={publishBlockerKey ? t(publishBlockerKey) : undefined}
-              accessibilityState={{ disabled: isPublishDisabled, busy: isBusy }}
-              // react-native-web 0.21 drops `accessibilityState.busy`; the aria
-              // mirror is what reaches the DOM.
-              aria-busy={isBusy}
-            >
-              {isBusy ? (
-                <ActivityIndicator size="small" color={ON_ACCENT} />
-              ) : (
-                <Text style={[styles.publishButtonText, { color: ON_ACCENT }]}>
-                  {t('community.compose.publish')}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          <ComposeActions
+            disabled={isPublishDisabled}
+            busy={isBusy}
+            suspended={suspended}
+            blocker={publishBlockerKey}
+            publish={() => {
+              void handlePublish()
+            }}
+          />
         </View>
       </View>
     </EdgeToEdgeModal>
+  )
+}
+
+function ComposeActions({
+  disabled,
+  busy,
+  suspended,
+  blocker,
+  publish,
+}: {
+  disabled: boolean
+  busy: boolean
+  suspended: boolean
+  blocker: string | null
+  publish: () => void
+}) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  return (
+    <View style={styles.footer}>
+      {suspended && (
+        <Text
+          testID="community-compose-verifying"
+          accessibilityLiveRegion="polite"
+          style={[styles.helperText, { color: palette.mutedText }]}
+        >
+          {t('community.realtime.unavailable')}
+        </Text>
+      )}
+      <TouchableOpacity
+        testID="community-publish-button"
+        style={[
+          styles.publishButton,
+          { backgroundColor: ACCENT_GOLD },
+          disabled && styles.publishButtonDisabled,
+        ]}
+        disabled={disabled}
+        onPress={publish}
+        accessibilityRole="button"
+        accessibilityLabel={t('community.compose.publish')}
+        // Why the control is dead, spoken rather than implied by dimming.
+        accessibilityHint={blocker ? t(blocker) : undefined}
+        accessibilityState={{ disabled: disabled, busy: busy }}
+        // react-native-web 0.21 drops `accessibilityState.busy`; the aria
+        // mirror is what reaches the DOM.
+        aria-busy={busy}
+      >
+        {busy ? (
+          <ActivityIndicator size="small" color={ON_ACCENT} />
+        ) : (
+          <Text style={[styles.publishButtonText, { color: ON_ACCENT }]}>
+            {t('community.compose.publish')}
+          </Text>
+        )}
+      </TouchableOpacity>
+    </View>
   )
 }
 

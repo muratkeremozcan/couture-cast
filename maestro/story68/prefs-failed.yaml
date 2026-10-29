@@ -1,0 +1,10 @@
+# Story 6.8 native evidence: with the isolated build's prefs_unavailable fixture mode the
+# notification settings load fails, the bounded retries run out and the Try again control
+# appears. The flow leaves that screen open; the runner screenshots it in both color schemes.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: ../story65/open-notification-settings.yaml
+- extendedWaitUntil:
+    visible: ${MAESTRO_PREFS_RETRY}
+    timeout: 40000
+- assertVisible: ${MAESTRO_LOAD_FAILED}

@@ -27,6 +27,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { NATIVE_MAESTRO_FLOWS } from './lib/native-maestro-flows.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -65,6 +66,7 @@ const discoverFullSuite = () =>
     .readdirSync(path.join(projectRoot, 'maestro'), { withFileTypes: true })
     .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
     .filter((entry) => entry.name !== 'config.yaml')
+    .filter((entry) => !NATIVE_MAESTRO_FLOWS.has(entry.name))
     .map((entry) => entry.name)
     .sort()
 

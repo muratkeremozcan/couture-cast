@@ -7,16 +7,20 @@ import { FeatureFlagsRepository } from './feature-flags.repository'
 
 const createRepository = () => {
   const findUnique = vi.fn()
+  // Separate delegates: a write on the root client would land outside the transaction.
   const upsert = vi.fn((args: unknown) => args)
-  const $transaction = vi.fn().mockResolvedValue([])
+  const outsideUpsert = vi.fn((args: unknown) => args)
+  const tx = { featureFlag: { upsert } }
+  const $transaction = vi.fn((work: (client: typeof tx) => Promise<unknown>) => work(tx))
   const prisma = {
-    featureFlag: { findUnique, upsert },
+    featureFlag: { findUnique, upsert: outsideUpsert },
     $transaction,
   } as unknown as PrismaClient
 
   return {
     findUnique,
     upsert,
+    outsideUpsert,
     $transaction,
     repository: new FeatureFlagsRepository(prisma),
   }
@@ -24,6 +28,50 @@ const createRepository = () => {
 
 describe('FeatureFlagsRepository', () => {
   describe('findValue', () => {
+    it('shares one in-flight database read per key across 100 cold waiters', async () => {
+      const { findUnique, repository } = createRepository()
+      let release!: () => void
+      const held = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      findUnique.mockImplementation(async ({ where }: { where: { key: string } }) => {
+        await held
+        return { key: where.key, value: where.key === 'community_read_enabled' }
+      })
+      const reads = Array.from({ length: 100 }, () =>
+        Promise.all([
+          repository.findValue('community_read_enabled'),
+          repository.findValue('color_analysis_enabled'),
+        ])
+      )
+      await Promise.resolve()
+      expect(findUnique).toHaveBeenCalledTimes(2)
+      release()
+      expect(await Promise.all(reads)).toEqual(
+        Array.from({ length: 100 }, () => [true, false])
+      )
+      await repository.findValue('community_read_enabled')
+      expect(findUnique).toHaveBeenCalledTimes(3)
+    })
+
+    it('rejects every waiter on a failed shared read and allows a fresh read afterward', async () => {
+      const { findUnique, repository } = createRepository()
+      const failure = new Error('database unavailable')
+      findUnique.mockRejectedValueOnce(failure)
+      const reads = Array.from({ length: 100 }, () =>
+        repository.findValue('community_read_enabled')
+      )
+      expect(
+        (await Promise.allSettled(reads)).every(
+          (result) => result.status === 'rejected' && result.reason === failure
+        )
+      ).toBe(true)
+      expect(findUnique).toHaveBeenCalledOnce()
+      findUnique.mockResolvedValueOnce({ value: false })
+      await expect(repository.findValue('community_read_enabled')).resolves.toBe(false)
+      expect(findUnique).toHaveBeenCalledTimes(2)
+    })
+
     it('returns the cached value for a known flag key', async () => {
       const { findUnique, repository } = createRepository()
       findUnique.mockResolvedValue({ key: 'ritual_v2', value: { enabled: true } })
@@ -52,7 +100,7 @@ describe('FeatureFlagsRepository', () => {
 
   describe('upsertMany', () => {
     it('writes every flag in a single transaction so the cache stays consistent', async () => {
-      const { $transaction, upsert, repository } = createRepository()
+      const { $transaction, upsert, outsideUpsert, repository } = createRepository()
       const flags = [
         { key: 'ritual_v2', value: { enabled: true } },
         { key: 'capsule_beta', value: { enabled: false } },
@@ -61,14 +109,13 @@ describe('FeatureFlagsRepository', () => {
       await repository.upsertMany(flags)
 
       expect($transaction).toHaveBeenCalledOnce()
+      expect(outsideUpsert).not.toHaveBeenCalled()
       expect(upsert).toHaveBeenCalledTimes(2)
       expect(upsert).toHaveBeenNthCalledWith(1, {
         where: { key: 'ritual_v2' },
         create: { key: 'ritual_v2', value: { enabled: true } },
         update: { value: { enabled: true } },
       })
-      // The batch is handed to $transaction as one array of operations.
-      expect($transaction.mock.calls[0]?.[0]).toHaveLength(2)
     })
 
     it('still opens a transaction when there is nothing to sync', async () => {
@@ -77,7 +124,7 @@ describe('FeatureFlagsRepository', () => {
       await expect(repository.upsertMany([])).resolves.toBeUndefined()
 
       expect(upsert).not.toHaveBeenCalled()
-      expect($transaction).toHaveBeenCalledWith([])
+      expect($transaction).toHaveBeenCalledOnce()
     })
   })
 })

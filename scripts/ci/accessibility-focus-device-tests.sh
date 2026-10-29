@@ -32,11 +32,11 @@ rm -rf "${results:?}"
 bash "$here/android-talkback.sh" enable || exit 1
 
 echo "== Instrumentation tests with TalkBack"
-run positive
+run positive -Pandroid.testInstrumentationRunnerArguments.class=expo.modules.accessibilityfocus.AccessibilityFocusTalkBackTest
 positive_status=$?
 
 echo "== Suppressed-focus control (must fail on the OS focus report)"
-run suppressed -Pandroid.testInstrumentationRunnerArguments.suppressFocus=true
+run suppressed -Pandroid.testInstrumentationRunnerArguments.class=expo.modules.accessibilityfocus.AccessibilityFocusTalkBackTest -Pandroid.testInstrumentationRunnerArguments.suppressFocus=true
 suppressed_status=$?
 
 bash "$here/android-talkback.sh" disable || true

@@ -4,7 +4,7 @@
 // as a bare "FAILURE". The runner script classifies each failed workspace from its
 // output, and the PR comment and step summary name the cause and link this job.
 
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, realpathSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 // eslint-disable-next-line no-control-regex
@@ -107,7 +107,8 @@ export function summaryLines(env = process.env) {
 }
 
 if (
-  import.meta.url === pathToFileURL(process.argv[1] ?? '').href &&
+  import.meta.url ===
+    pathToFileURL(process.argv[1] ? realpathSync(process.argv[1]) : '').href &&
   process.argv[2] === 'summary'
 ) {
   try {

@@ -17772,6 +17772,254 @@
           "data"
         ],
         "additionalProperties": false
+      },
+      "PrepareShareCardInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "outfit"
+                        ]
+                      },
+                      "recommendationId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "recommendationId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "community_post"
+                        ]
+                      },
+                      "postId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "postId"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en-US",
+                  "en-CA",
+                  "es-419",
+                  "fr-CA",
+                  "fr-FR",
+                  "tr-TR",
+                  "de-DE",
+                  "it-IT",
+                  "pt-BR",
+                  "pt-PT"
+                ]
+              },
+              "watermark": {
+                "type": "boolean"
+              },
+              "purpose": {
+                "type": "string",
+                "enum": [
+                  "preview"
+                ]
+              }
+            },
+            "required": [
+              "source",
+              "locale",
+              "watermark",
+              "purpose"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "outfit"
+                        ]
+                      },
+                      "recommendationId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "recommendationId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "community_post"
+                        ]
+                      },
+                      "postId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "postId"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en-US",
+                  "en-CA",
+                  "es-419",
+                  "fr-CA",
+                  "fr-FR",
+                  "tr-TR",
+                  "de-DE",
+                  "it-IT",
+                  "pt-BR",
+                  "pt-PT"
+                ]
+              },
+              "watermark": {
+                "type": "boolean"
+              },
+              "purpose": {
+                "type": "string",
+                "enum": [
+                  "save"
+                ]
+              },
+              "expectedSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "source",
+              "locale",
+              "watermark",
+              "purpose",
+              "expectedSha256"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PrepareShareCardResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "pngBase64": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4194304,
+                "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+              },
+              "accessibilityLabel": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024,
+                "pattern": "^[^\\p{Cc}]+$"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "width": {
+                "type": "number",
+                "enum": [
+                  1080
+                ]
+              },
+              "height": {
+                "type": "number",
+                "enum": [
+                  1350
+                ]
+              },
+              "mimeType": {
+                "type": "string",
+                "enum": [
+                  "image/png"
+                ]
+              },
+              "filename": {
+                "type": "string",
+                "enum": [
+                  "couturecast-card.png"
+                ]
+              },
+              "templateVersion": {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              }
+            },
+            "required": [
+              "pngBase64",
+              "accessibilityLabel",
+              "sha256",
+              "width",
+              "height",
+              "mimeType",
+              "filename",
+              "templateVersion"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -27570,6 +27818,302 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/share-cards/prepare": {
+      "post": {
+        "operationId": "prepareShareCard",
+        "tags": [
+          "share-cards"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Prepare an authorized deterministic branded PNG",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "source": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "outfit"
+                                ]
+                              },
+                              "recommendationId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9_-]+$"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "recommendationId"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "community_post"
+                                ]
+                              },
+                              "postId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9_-]+$"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "postId"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "locale": {
+                        "type": "string",
+                        "enum": [
+                          "en-US",
+                          "en-CA",
+                          "es-419",
+                          "fr-CA",
+                          "fr-FR",
+                          "tr-TR",
+                          "de-DE",
+                          "it-IT",
+                          "pt-BR",
+                          "pt-PT"
+                        ]
+                      },
+                      "watermark": {
+                        "type": "boolean"
+                      },
+                      "purpose": {
+                        "type": "string",
+                        "enum": [
+                          "preview"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "locale",
+                      "watermark",
+                      "purpose"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "source": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "outfit"
+                                ]
+                              },
+                              "recommendationId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9_-]+$"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "recommendationId"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "community_post"
+                                ]
+                              },
+                              "postId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9_-]+$"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "postId"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "locale": {
+                        "type": "string",
+                        "enum": [
+                          "en-US",
+                          "en-CA",
+                          "es-419",
+                          "fr-CA",
+                          "fr-FR",
+                          "tr-TR",
+                          "de-DE",
+                          "it-IT",
+                          "pt-BR",
+                          "pt-PT"
+                        ]
+                      },
+                      "watermark": {
+                        "type": "boolean"
+                      },
+                      "purpose": {
+                        "type": "string",
+                        "enum": [
+                          "save"
+                        ]
+                      },
+                      "expectedSha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "locale",
+                      "watermark",
+                      "purpose",
+                      "expectedSha256"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exact preview bytes or fresh save authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "pngBase64": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4194304,
+                          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+                        },
+                        "accessibilityLabel": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1024,
+                          "pattern": "^[^\\p{Cc}]+$"
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "width": {
+                          "type": "number",
+                          "enum": [
+                            1080
+                          ]
+                        },
+                        "height": {
+                          "type": "number",
+                          "enum": [
+                            1350
+                          ]
+                        },
+                        "mimeType": {
+                          "type": "string",
+                          "enum": [
+                            "image/png"
+                          ]
+                        },
+                        "filename": {
+                          "type": "string",
+                          "enum": [
+                            "couturecast-card.png"
+                          ]
+                        },
+                        "templateVersion": {
+                          "type": "number",
+                          "enum": [
+                            1
+                          ]
+                        }
+                      },
+                      "required": [
+                        "pngBase64",
+                        "accessibilityLabel",
+                        "sha256",
+                        "width",
+                        "height",
+                        "mimeType",
+                        "filename",
+                        "templateVersion"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "404": {
+            "description": "source_unavailable"
+          },
+          "409": {
+            "description": "preview_changed"
+          },
+          "503": {
+            "description": "Preparation unavailable"
           }
         }
       }

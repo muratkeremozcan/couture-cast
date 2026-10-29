@@ -1,0 +1,47 @@
+{
+  "reviewer": "cc68-tea (/root)",
+  "locale": "es",
+  "phase": "pre-seal semantic boundary check",
+  "sourceSha256": "898668be68401f674b4d7b4c4773a37dd9b092f70d5f85242f2a83f98718be55",
+  "scope": "Complete memberships of all eight tied maximum groups, source fields/texts, author consolidation glosses and reasons.",
+  "maximumCount": 10,
+  "reviewedGroups": [
+    {
+      "concept": "bajo-puntas-triangulares",
+      "items": [11, 12, 13, 14, 15, 626, 627, 628, 629, 630]
+    },
+    {
+      "concept": "estampa-abanicos",
+      "items": [241, 242, 243, 244, 245, 771, 772, 773, 774, 775]
+    },
+    {
+      "concept": "estampa-arcos-abiertos",
+      "items": [806, 807, 808, 809, 810, 851, 852, 853, 854, 855]
+    },
+    {
+      "concept": "estampa-bloques-desplazados",
+      "items": [761, 762, 763, 764, 765, 866, 867, 868, 869, 870]
+    },
+    {
+      "concept": "estampa-cafeteras-manuales",
+      "items": [876, 877, 878, 879, 880, 931, 932, 933, 934, 935]
+    },
+    {
+      "concept": "estampa-espiral-composicion",
+      "items": [566, 567, 568, 569, 570, 826, 827, 828, 829, 830]
+    },
+    {
+      "concept": "estampa-marcos-poligonales-abiertos",
+      "items": [751, 752, 753, 754, 755, 791, 792, 793, 794, 795]
+    },
+    {
+      "concept": "panel-redondeado-flotante",
+      "items": [21, 22, 23, 24, 25, 646, 647, 648, 649, 650]
+    }
+  ],
+  "rationale": "Conservative groups cross garment type for projecting triangular hems and floating upper-front panels. Printed open arcs, open polygon frames, offset rectilinear blocks, spiral compositions, folding fans and coffee makers are consolidated across their material/form variants. No additional over-cap group identified in the reviewed boundaries.",
+  "verdict": "READY for seal subject to final common audit",
+  "sourceModified": false,
+  "screeningRun": false,
+  "round3Or4Inspection": false
+}

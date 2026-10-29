@@ -1,3 +1,4 @@
+import { modalRenders } from '@/src/test-utils/edge-to-edge-modal'
 import { press } from '@/src/test-utils/press'
 /* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.5: actual screen, coordinator and generated HTTP wrappers. Socket trigger is controlled.
@@ -366,6 +367,74 @@ export function registerCommunityRealtimeCases() {
     )
     expect(calls).toBe(1)
   })
+  it('R09-PRESENTATION: actual foreground revalidation keeps the draft modal host until verified and closes on denial', async () => {
+    modalRenders.length = 0
+    const lifecycle: ((state: string) => void)[] = []
+    vi.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      lifecycle.push(listener as (state: string) => void)
+      return { remove: () => undefined }
+    })
+    const recover = recoveryCoordinator()
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-post-card-post-a')
+    await act(recover)
+    press(screen.getByTestId('community-new-post-button'))
+    const host = await screen.findByTestId('community-post-sheet')
+    fireEvent.change(screen.getByTestId('community-caption-input'), {
+      target: { value: 'Retain my own draft across foreground' },
+    })
+    const release = holdEvents()
+    let pending!: Promise<void>
+    try {
+      await act(() => {
+        lifecycle.forEach((listener) => listener('background'))
+        lifecycle.forEach((listener) => listener('active'))
+        pending = recover.sync().catchUp()
+      })
+      expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+      expect(
+        modalRenders.filter((props) => props.testID === 'community-post-sheet').at(-1)
+          ?.visible
+      ).toBe(true)
+      expect(screen.getByTestId('community-post-sheet')).toBe(host)
+      expect(screen.getByTestId<HTMLInputElement>('community-caption-input').value).toBe(
+        'Retain my own draft across foreground'
+      )
+      expect(
+        screen.getByTestId('community-pick-image-button').getAttribute('aria-disabled')
+      ).toBe('true')
+      expect(
+        screen.getByTestId('community-publish-button').getAttribute('aria-disabled')
+      ).toBe('true')
+    } finally {
+      release()
+      await act(() => pending)
+    }
+    expect(screen.getByTestId('community-post-sheet')).toBe(host)
+    expect(screen.getByTestId<HTMLInputElement>('community-caption-input').value).toBe(
+      'Retain my own draft across foreground'
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('community-pick-image-button').getAttribute('aria-disabled')
+      ).not.toBe('true')
+    )
+    server.use(
+      http.get('*/api/v1/community/events', () =>
+        HttpResponse.json(
+          { statusCode: 403, code: 'community_access_denied', message: 'Denied' },
+          { status: 403 }
+        )
+      )
+    )
+    await act(async () => {
+      recover.sync().foreground()
+      await recover.sync().catchUp()
+    })
+    await waitFor(() => expect(screen.queryByTestId('community-post-sheet')).toBeNull())
+    expect(screen.queryByDisplayValue('Retain my own draft across foreground')).toBeNull()
+  })
+
   it('R09 foreground recovery preserves an in-flight same-owner OS photo picker', async () => {
     const recover = recoveryCoordinator()
     let release!: () => void

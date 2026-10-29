@@ -1,0 +1,5013 @@
+{
+  "language": "es",
+  "corpusVersion": "holdout-v4",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "0dda50c51821e455569501da8651f1a2a8be929318fc2bbd4d61be0fd8d7a1ee",
+    "languageAllowListSha256": "058a7744b9407e5e0c26f3e0c6a885c86925e996bbff4ba2ae267acde0521b44"
+  },
+  "entries": [
+    {
+      "id": "es-holdout-v4-001",
+      "field": "caption",
+      "text": "Mi abanico cabe justo en el bolsillo del bolso."
+    },
+    {
+      "id": "es-holdout-v4-002",
+      "field": "caption",
+      "text": "Hoy llevo el abanico sujeto con una cinta bonita."
+    },
+    {
+      "id": "es-holdout-v4-003",
+      "field": "caption",
+      "text": "Este pequeño accesorio acompaña mis vestidos de verano."
+    },
+    {
+      "id": "es-holdout-v4-004",
+      "field": "altText",
+      "text": "Un abanico plegado sobresale de un bolso estrecho."
+    },
+    {
+      "id": "es-holdout-v4-005",
+      "field": "altText",
+      "text": "La cinta del abanico rodea el asa de la cartera."
+    },
+    {
+      "id": "es-holdout-v4-006",
+      "field": "caption",
+      "text": "Rescaté este chaleco cambiando toda la tela de atrás."
+    },
+    {
+      "id": "es-holdout-v4-007",
+      "field": "caption",
+      "text": "El nuevo respaldo le devuelve vida a mi chaleco."
+    },
+    {
+      "id": "es-holdout-v4-008",
+      "field": "caption",
+      "text": "Me encanta aprovechar la parte buena de una prenda."
+    },
+    {
+      "id": "es-holdout-v4-009",
+      "field": "altText",
+      "text": "El respaldo del chaleco combina con su frente antiguo."
+    },
+    {
+      "id": "es-holdout-v4-010",
+      "field": "altText",
+      "text": "Una costura vertical une las dos telas posteriores."
+    },
+    {
+      "id": "es-holdout-v4-011",
+      "field": "caption",
+      "text": "Mi falda lleva un imperdible grande en la esquina."
+    },
+    {
+      "id": "es-holdout-v4-012",
+      "field": "caption",
+      "text": "Hoy el cierre metálico queda visible sobre la tela."
+    },
+    {
+      "id": "es-holdout-v4-013",
+      "field": "caption",
+      "text": "Ese alfiler sostiene el cruce cuando sopla viento."
+    },
+    {
+      "id": "es-holdout-v4-014",
+      "field": "altText",
+      "text": "Un imperdible ancho sujeta la esquina de una falda."
+    },
+    {
+      "id": "es-holdout-v4-015",
+      "field": "altText",
+      "text": "El alfiler atraviesa las dos capas superpuestas del tejido."
+    },
+    {
+      "id": "es-holdout-v4-016",
+      "field": "caption",
+      "text": "Estos pendientes de arcilla los hice un domingo tranquilo."
+    },
+    {
+      "id": "es-holdout-v4-017",
+      "field": "caption",
+      "text": "Las marcas de mis dedos quedaron en las piezas."
+    },
+    {
+      "id": "es-holdout-v4-018",
+      "field": "caption",
+      "text": "Hoy estreno mis pequeños pendientes hechos a mano."
+    },
+    {
+      "id": "es-holdout-v4-019",
+      "field": "altText",
+      "text": "Dos pendientes irregulares muestran pequeñas huellas en su superficie."
+    },
+    {
+      "id": "es-holdout-v4-020",
+      "field": "altText",
+      "text": "Unas piezas de arcilla cuelgan de ganchos sencillos."
+    },
+    {
+      "id": "es-holdout-v4-021",
+      "field": "caption",
+      "text": "Agrupé los botones de esta camisa de tres en tres."
+    },
+    {
+      "id": "es-holdout-v4-022",
+      "field": "caption",
+      "text": "Los espacios entre los botones cambian toda la camisa."
+    },
+    {
+      "id": "es-holdout-v4-023",
+      "field": "caption",
+      "text": "Hoy me apetecía un cierre un poco diferente."
+    },
+    {
+      "id": "es-holdout-v4-024",
+      "field": "altText",
+      "text": "Grupos de tres botones recorren el centro de la camisa."
+    },
+    {
+      "id": "es-holdout-v4-025",
+      "field": "altText",
+      "text": "Las pequeñas agrupaciones dejan amplios espacios de tela lisa."
+    },
+    {
+      "id": "es-holdout-v4-026",
+      "field": "caption",
+      "text": "La cesta pequeña se ha convertido en mi bolso diario."
+    },
+    {
+      "id": "es-holdout-v4-027",
+      "field": "caption",
+      "text": "Hoy estreno el forro que cosí para mi cesta."
+    },
+    {
+      "id": "es-holdout-v4-028",
+      "field": "caption",
+      "text": "Las asas rígidas van muy bien con este vestido amplio."
+    },
+    {
+      "id": "es-holdout-v4-029",
+      "field": "altText",
+      "text": "Una cesta trenzada lleva un forro ajustado con cordón."
+    },
+    {
+      "id": "es-holdout-v4-030",
+      "field": "altText",
+      "text": "Dos asas rígidas rematan un pequeño bolso de mimbre."
+    },
+    {
+      "id": "es-holdout-v4-031",
+      "field": "caption",
+      "text": "Hoy he combinado cordones distintos en el mismo par."
+    },
+    {
+      "id": "es-holdout-v4-032",
+      "field": "caption",
+      "text": "Una zapatilla lleva cinta ancha y la otra cordón fino."
+    },
+    {
+      "id": "es-holdout-v4-033",
+      "field": "caption",
+      "text": "Mis zapatos gemelos se permiten una pequeña diferencia."
+    },
+    {
+      "id": "es-holdout-v4-034",
+      "field": "altText",
+      "text": "Los zapatos iguales muestran cordones de dos estilos diferentes."
+    },
+    {
+      "id": "es-holdout-v4-035",
+      "field": "altText",
+      "text": "Un lazo ancho contrasta con una lazada fina contigua."
+    },
+    {
+      "id": "es-holdout-v4-036",
+      "field": "caption",
+      "text": "El cuello barco deja espacio para mi collar corto."
+    },
+    {
+      "id": "es-holdout-v4-037",
+      "field": "caption",
+      "text": "Hoy llevo el escote ancho con el pelo recogido."
+    },
+    {
+      "id": "es-holdout-v4-038",
+      "field": "caption",
+      "text": "La línea horizontal del vestido me resulta muy elegante."
+    },
+    {
+      "id": "es-holdout-v4-039",
+      "field": "altText",
+      "text": "Un escote ancho y poco profundo une ambos hombros."
+    },
+    {
+      "id": "es-holdout-v4-040",
+      "field": "altText",
+      "text": "La abertura del vestido forma una línea casi recta."
+    },
+    {
+      "id": "es-holdout-v4-041",
+      "field": "caption",
+      "text": "Las coderas de ante han alargado la vida de mi chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-042",
+      "field": "caption",
+      "text": "Elegí parches grandes para reforzar los dos codos."
+    },
+    {
+      "id": "es-holdout-v4-043",
+      "field": "caption",
+      "text": "Hoy vuelve conmigo la americana que arreglé en casa."
+    },
+    {
+      "id": "es-holdout-v4-044",
+      "field": "altText",
+      "text": "Unos parches ovalados cubren los codos de la americana."
+    },
+    {
+      "id": "es-holdout-v4-045",
+      "field": "altText",
+      "text": "Las coderas contrastan con el tejido fino de las mangas."
+    },
+    {
+      "id": "es-holdout-v4-046",
+      "field": "caption",
+      "text": "El bolsillo interior tiene otro bolsillo para mis auriculares."
+    },
+    {
+      "id": "es-holdout-v4-047",
+      "field": "caption",
+      "text": "Me gusta que las cosas pequeñas tengan su sitio."
+    },
+    {
+      "id": "es-holdout-v4-048",
+      "field": "caption",
+      "text": "Hoy enseño el bolsillo diminuto que añadí al abrigo."
+    },
+    {
+      "id": "es-holdout-v4-049",
+      "field": "altText",
+      "text": "Un bolsillo pequeño está cosido dentro de otro mayor."
+    },
+    {
+      "id": "es-holdout-v4-050",
+      "field": "altText",
+      "text": "La vista interior del abrigo muestra dos compartimentos superpuestos."
+    },
+    {
+      "id": "es-holdout-v4-051",
+      "field": "caption",
+      "text": "Los ojales grandes dibujan una línea junto al bajo."
+    },
+    {
+      "id": "es-holdout-v4-052",
+      "field": "caption",
+      "text": "Hoy combino mi falda perforada con medias lisas."
+    },
+    {
+      "id": "es-holdout-v4-053",
+      "field": "caption",
+      "text": "Cada abertura deja ver un poquito del color interior."
+    },
+    {
+      "id": "es-holdout-v4-054",
+      "field": "altText",
+      "text": "Una fila de ojales metálicos bordea la falda."
+    },
+    {
+      "id": "es-holdout-v4-055",
+      "field": "altText",
+      "text": "Pequeñas aberturas circulares muestran la tela que hay debajo."
+    },
+    {
+      "id": "es-holdout-v4-056",
+      "field": "caption",
+      "text": "Mi jersey tiene los costados unidos con cintas largas."
+    },
+    {
+      "id": "es-holdout-v4-057",
+      "field": "caption",
+      "text": "Hoy dejo los laterales algo sueltos sobre la camisa."
+    },
+    {
+      "id": "es-holdout-v4-058",
+      "field": "caption",
+      "text": "Puedo ajustar este punto sin que pierda su forma."
+    },
+    {
+      "id": "es-holdout-v4-059",
+      "field": "altText",
+      "text": "Una lazada une los bordes abiertos del jersey."
+    },
+    {
+      "id": "es-holdout-v4-060",
+      "field": "altText",
+      "text": "Varias cintas cruzadas recorren los laterales de la prenda."
+    },
+    {
+      "id": "es-holdout-v4-061",
+      "field": "caption",
+      "text": "Hice este vestido uniendo dos pañuelos que ya tenía."
+    },
+    {
+      "id": "es-holdout-v4-062",
+      "field": "caption",
+      "text": "Las esquinas de los pañuelos forman un bajo irregular."
+    },
+    {
+      "id": "es-holdout-v4-063",
+      "field": "caption",
+      "text": "Hoy llevo estampados que antes guardaba en un cajón."
+    },
+    {
+      "id": "es-holdout-v4-064",
+      "field": "altText",
+      "text": "Dos pañuelos estampados forman un vestido de puntas desiguales."
+    },
+    {
+      "id": "es-holdout-v4-065",
+      "field": "altText",
+      "text": "El dibujo enmarcado del pañuelo sigue visible en el vestido."
+    },
+    {
+      "id": "es-holdout-v4-066",
+      "field": "caption",
+      "text": "La lengüeta acolchada queda por fuera de los cordones."
+    },
+    {
+      "id": "es-holdout-v4-067",
+      "field": "caption",
+      "text": "Hoy llevo mis zapatillas altas con la lengüeta desplegada."
+    },
+    {
+      "id": "es-holdout-v4-068",
+      "field": "caption",
+      "text": "Me gusta cómo asoma esa pieza sobre el tobillo."
+    },
+    {
+      "id": "es-holdout-v4-069",
+      "field": "altText",
+      "text": "La lengüeta ancha sobresale sobre una zapatilla alta."
+    },
+    {
+      "id": "es-holdout-v4-070",
+      "field": "altText",
+      "text": "Los cordones rodean una pieza central acolchada y larga."
+    },
+    {
+      "id": "es-holdout-v4-071",
+      "field": "caption",
+      "text": "El ribete del cuello recupera el color de las mangas."
+    },
+    {
+      "id": "es-holdout-v4-072",
+      "field": "caption",
+      "text": "Hoy estreno una camiseta con pequeños bordes a contraste."
+    },
+    {
+      "id": "es-holdout-v4-073",
+      "field": "caption",
+      "text": "Dos líneas finas bastan para cambiar esta camiseta sencilla."
+    },
+    {
+      "id": "es-holdout-v4-074",
+      "field": "altText",
+      "text": "Un ribete estrecho rodea cuello y mangas de la camiseta."
+    },
+    {
+      "id": "es-holdout-v4-075",
+      "field": "altText",
+      "text": "Los bordes contrastan con la parte central de algodón."
+    },
+    {
+      "id": "es-holdout-v4-076",
+      "field": "caption",
+      "text": "Encontré esta piedra y la convertí en un colgante."
+    },
+    {
+      "id": "es-holdout-v4-077",
+      "field": "caption",
+      "text": "La forma irregular queda bien sobre mi blusa lisa."
+    },
+    {
+      "id": "es-holdout-v4-078",
+      "field": "caption",
+      "text": "Hoy llevo un recuerdo de paseo sujeto con hilo."
+    },
+    {
+      "id": "es-holdout-v4-079",
+      "field": "altText",
+      "text": "Una piedra irregular cuelga de un cordón anudado."
+    },
+    {
+      "id": "es-holdout-v4-080",
+      "field": "altText",
+      "text": "El pequeño guijarro descansa sobre una blusa sin estampado."
+    },
+    {
+      "id": "es-holdout-v4-081",
+      "field": "caption",
+      "text": "Las mangas se abren mucho al llegar a las muñecas."
+    },
+    {
+      "id": "es-holdout-v4-082",
+      "field": "caption",
+      "text": "Hoy combino los puños amplios con varios anillos pequeños."
+    },
+    {
+      "id": "es-holdout-v4-083",
+      "field": "caption",
+      "text": "Mi blusa se mueve casi como una campana."
+    },
+    {
+      "id": "es-holdout-v4-084",
+      "field": "altText",
+      "text": "Las mangas ajustadas terminan en grandes aberturas acampanadas."
+    },
+    {
+      "id": "es-holdout-v4-085",
+      "field": "altText",
+      "text": "Unos puños anchos caen en pliegues alrededor de las manos."
+    },
+    {
+      "id": "es-holdout-v4-086",
+      "field": "caption",
+      "text": "Dentro del bolso transparente llevo una funda de tela."
+    },
+    {
+      "id": "es-holdout-v4-087",
+      "field": "caption",
+      "text": "Cambio la bolsita interior y el bolso parece otro."
+    },
+    {
+      "id": "es-holdout-v4-088",
+      "field": "caption",
+      "text": "Hoy me apetecía ver el estampado a través del plástico."
+    },
+    {
+      "id": "es-holdout-v4-089",
+      "field": "altText",
+      "text": "Un bolso transparente contiene una funda textil con cierre."
+    },
+    {
+      "id": "es-holdout-v4-090",
+      "field": "altText",
+      "text": "El estampado de la bolsa interior queda totalmente visible."
+    },
+    {
+      "id": "es-holdout-v4-091",
+      "field": "caption",
+      "text": "Las costuras largas dan forma a este vestido sencillo."
+    },
+    {
+      "id": "es-holdout-v4-092",
+      "field": "caption",
+      "text": "Hoy sigo con los dedos las líneas curvas del cuerpo."
+    },
+    {
+      "id": "es-holdout-v4-093",
+      "field": "caption",
+      "text": "Este corte se ajusta sin necesitar cinturón ni pinzas cortas."
+    },
+    {
+      "id": "es-holdout-v4-094",
+      "field": "altText",
+      "text": "Costuras curvas bajan desde los hombros hasta la cintura."
+    },
+    {
+      "id": "es-holdout-v4-095",
+      "field": "altText",
+      "text": "Varias piezas estrechas forman el cuerpo entallado del vestido."
+    },
+    {
+      "id": "es-holdout-v4-096",
+      "field": "caption",
+      "text": "Mi reloj sin números acompaña hoy las formas sencillas del conjunto."
+    },
+    {
+      "id": "es-holdout-v4-097",
+      "field": "caption",
+      "text": "La esfera limpia queda muy bien junto al puño."
+    },
+    {
+      "id": "es-holdout-v4-098",
+      "field": "caption",
+      "text": "Hoy dejo que este reloj pequeño sea todo el adorno."
+    },
+    {
+      "id": "es-holdout-v4-099",
+      "field": "altText",
+      "text": "Un reloj de esfera lisa aparece bajo la manga."
+    },
+    {
+      "id": "es-holdout-v4-100",
+      "field": "altText",
+      "text": "Dos agujas finas recorren una superficie sin cifras visibles."
+    },
+    {
+      "id": "es-holdout-v4-101",
+      "field": "caption",
+      "text": "Mi camisola larga se abre al caminar sobre los pantalones."
+    },
+    {
+      "id": "es-holdout-v4-102",
+      "field": "caption",
+      "text": "Hoy dejo sin cerrar la mitad inferior de la túnica."
+    },
+    {
+      "id": "es-holdout-v4-103",
+      "field": "caption",
+      "text": "La abertura larga muestra el movimiento del pantalón ancho."
+    },
+    {
+      "id": "es-holdout-v4-104",
+      "field": "altText",
+      "text": "Una túnica abierta desde la cintura cae sobre pantalones."
+    },
+    {
+      "id": "es-holdout-v4-105",
+      "field": "altText",
+      "text": "Los dos faldones delanteros se separan durante el paso."
+    },
+    {
+      "id": "es-holdout-v4-106",
+      "field": "caption",
+      "text": "La pulsera del tobillo mantiene mis sandalias bien sujetas."
+    },
+    {
+      "id": "es-holdout-v4-107",
+      "field": "caption",
+      "text": "Hoy llevo el vestido corto para mostrar la tira ancha."
+    },
+    {
+      "id": "es-holdout-v4-108",
+      "field": "caption",
+      "text": "La hebilla lateral queda justo sobre el hueso del tobillo."
+    },
+    {
+      "id": "es-holdout-v4-109",
+      "field": "altText",
+      "text": "Una tira ancha rodea el tobillo sobre la sandalia."
+    },
+    {
+      "id": "es-holdout-v4-110",
+      "field": "altText",
+      "text": "La hebilla pequeña cierra el aro superior del calzado."
+    },
+    {
+      "id": "es-holdout-v4-111",
+      "field": "caption",
+      "text": "Un broche mantiene el chal cruzado sobre mi pecho."
+    },
+    {
+      "id": "es-holdout-v4-112",
+      "field": "caption",
+      "text": "Hoy llevo la punta del chal hacia un costado."
+    },
+    {
+      "id": "es-holdout-v4-113",
+      "field": "caption",
+      "text": "Con un cierre pequeño puedo usar mi chal sin sujetarlo."
+    },
+    {
+      "id": "es-holdout-v4-114",
+      "field": "altText",
+      "text": "Un chal triangular cruza el cuerpo y queda prendido."
+    },
+    {
+      "id": "es-holdout-v4-115",
+      "field": "altText",
+      "text": "Una aguja decorativa sujeta dos capas de lana cruzadas."
+    },
+    {
+      "id": "es-holdout-v4-116",
+      "field": "caption",
+      "text": "Acorté los vaqueros y dejé los hilos sueltos del bajo."
+    },
+    {
+      "id": "es-holdout-v4-117",
+      "field": "caption",
+      "text": "La orilla deshilachada queda justo por encima de mis zapatos."
+    },
+    {
+      "id": "es-holdout-v4-118",
+      "field": "caption",
+      "text": "Hoy llevo el corte reciente sin doblar ni rematar."
+    },
+    {
+      "id": "es-holdout-v4-119",
+      "field": "altText",
+      "text": "Hilos cortos sobresalen de los bajos recortados del pantalón."
+    },
+    {
+      "id": "es-holdout-v4-120",
+      "field": "altText",
+      "text": "La tela vaquera termina en un borde crudo irregular."
+    },
+    {
+      "id": "es-holdout-v4-121",
+      "field": "caption",
+      "text": "Mi bufanda tiene dos bolsillos donde esconder las manos."
+    },
+    {
+      "id": "es-holdout-v4-122",
+      "field": "caption",
+      "text": "Hoy llevo el cuello abrigado y las manos descansando abajo."
+    },
+    {
+      "id": "es-holdout-v4-123",
+      "field": "caption",
+      "text": "Los bolsillos cosidos al final hacen esta bufanda muy cómoda."
+    },
+    {
+      "id": "es-holdout-v4-124",
+      "field": "altText",
+      "text": "Dos bolsillos cuadrados ocupan los extremos de una bufanda."
+    },
+    {
+      "id": "es-holdout-v4-125",
+      "field": "altText",
+      "text": "Las manos entran en compartimentos tejidos junto al abrigo."
+    },
+    {
+      "id": "es-holdout-v4-126",
+      "field": "caption",
+      "text": "Una manga lisa acompaña a otra completamente plisada."
+    },
+    {
+      "id": "es-holdout-v4-127",
+      "field": "caption",
+      "text": "Hoy llevo mi blusa de mangas distintas sin añadir estampados."
+    },
+    {
+      "id": "es-holdout-v4-128",
+      "field": "caption",
+      "text": "Me gusta que cada lado tenga una caída diferente."
+    },
+    {
+      "id": "es-holdout-v4-129",
+      "field": "altText",
+      "text": "La blusa combina una manga lisa con otra plegada."
+    },
+    {
+      "id": "es-holdout-v4-130",
+      "field": "altText",
+      "text": "Los dos brazos muestran texturas claramente diferentes en la prenda."
+    },
+    {
+      "id": "es-holdout-v4-131",
+      "field": "caption",
+      "text": "La capucha corta se queda justo sobre el cuello."
+    },
+    {
+      "id": "es-holdout-v4-132",
+      "field": "caption",
+      "text": "Hoy me acompaña esta chaqueta con capucha casi redonda."
+    },
+    {
+      "id": "es-holdout-v4-133",
+      "field": "caption",
+      "text": "Al bajarla parece un pequeño cuello acolchado."
+    },
+    {
+      "id": "es-holdout-v4-134",
+      "field": "altText",
+      "text": "Una capucha poco profunda forma un volumen redondeado."
+    },
+    {
+      "id": "es-holdout-v4-135",
+      "field": "altText",
+      "text": "La capucha plegada queda recogida junto a la nuca."
+    },
+    {
+      "id": "es-holdout-v4-136",
+      "field": "caption",
+      "text": "La hebilla forrada hace juego con todo el vestido."
+    },
+    {
+      "id": "es-holdout-v4-137",
+      "field": "caption",
+      "text": "Hoy llevo el cinturón original que venía con esta prenda."
+    },
+    {
+      "id": "es-holdout-v4-138",
+      "field": "caption",
+      "text": "El cierre desaparece entre los cuadros cuando ajusto la cintura."
+    },
+    {
+      "id": "es-holdout-v4-139",
+      "field": "altText",
+      "text": "Una hebilla rectangular está cubierta por la tela del cinturón."
+    },
+    {
+      "id": "es-holdout-v4-140",
+      "field": "altText",
+      "text": "El mismo estampado continúa por vestido, banda y cierre."
+    },
+    {
+      "id": "es-holdout-v4-141",
+      "field": "caption",
+      "text": "El asa de mi bolso se cierra pasando una parte dentro de otra."
+    },
+    {
+      "id": "es-holdout-v4-142",
+      "field": "caption",
+      "text": "Hoy llevo el pequeño bolso de nudo que terminé ayer."
+    },
+    {
+      "id": "es-holdout-v4-143",
+      "field": "caption",
+      "text": "Un asa corta sostiene la larga sin necesitar cremallera."
+    },
+    {
+      "id": "es-holdout-v4-144",
+      "field": "altText",
+      "text": "Un asa textil atraviesa otra y cierra la bolsa."
+    },
+    {
+      "id": "es-holdout-v4-145",
+      "field": "altText",
+      "text": "La parte superior del bolso forma un nudo ancho."
+    },
+    {
+      "id": "es-holdout-v4-146",
+      "field": "caption",
+      "text": "Mi vestido se cruza por detrás como un delantal."
+    },
+    {
+      "id": "es-holdout-v4-147",
+      "field": "caption",
+      "text": "Hoy lo pongo sobre una camiseta de mangas cortas."
+    },
+    {
+      "id": "es-holdout-v4-148",
+      "field": "caption",
+      "text": "Los tirantes anchos se sostienen sin botones ni hebillas."
+    },
+    {
+      "id": "es-holdout-v4-149",
+      "field": "altText",
+      "text": "Dos tirantes amplios se cruzan sobre la espalda del vestido."
+    },
+    {
+      "id": "es-holdout-v4-150",
+      "field": "altText",
+      "text": "El vestido tipo delantal deja ver la camiseta interior."
+    },
+    {
+      "id": "es-holdout-v4-151",
+      "field": "caption",
+      "text": "Mi chaqueta tiene un pequeño fuelle justo bajo el cuello."
+    },
+    {
+      "id": "es-holdout-v4-152",
+      "field": "caption",
+      "text": "Al extender los brazos aparece una tela distinta atrás."
+    },
+    {
+      "id": "es-holdout-v4-153",
+      "field": "caption",
+      "text": "Hoy agradezco el espacio extra para mover los hombros."
+    },
+    {
+      "id": "es-holdout-v4-154",
+      "field": "altText",
+      "text": "Un fuelle triangular se abre en el centro posterior."
+    },
+    {
+      "id": "es-holdout-v4-155",
+      "field": "altText",
+      "text": "Bajo la nuca aparece una pieza interior de contraste."
+    },
+    {
+      "id": "es-holdout-v4-156",
+      "field": "caption",
+      "text": "Las piezas planas del collar descansan bien sobre mi camiseta."
+    },
+    {
+      "id": "es-holdout-v4-157",
+      "field": "caption",
+      "text": "Hoy pruebo este collar ancho sobre un cuello sencillo."
+    },
+    {
+      "id": "es-holdout-v4-158",
+      "field": "caption",
+      "text": "Cada pieza de madera tiene una silueta diferente."
+    },
+    {
+      "id": "es-holdout-v4-159",
+      "field": "altText",
+      "text": "Láminas de madera unidas forman un collar ancho."
+    },
+    {
+      "id": "es-holdout-v4-160",
+      "field": "altText",
+      "text": "Varias figuras planas rodean el escote sin superponerse."
+    },
+    {
+      "id": "es-holdout-v4-161",
+      "field": "caption",
+      "text": "La falda corta me gusta hoy sobre leggings gruesos."
+    },
+    {
+      "id": "es-holdout-v4-162",
+      "field": "caption",
+      "text": "Con esta capa interior puedo seguir usando mi minifalda."
+    },
+    {
+      "id": "es-holdout-v4-163",
+      "field": "caption",
+      "text": "El conjunto resulta cómodo para pasar el día caminando."
+    },
+    {
+      "id": "es-holdout-v4-164",
+      "field": "altText",
+      "text": "Una falda corta cae sobre leggings lisos ajustados."
+    },
+    {
+      "id": "es-holdout-v4-165",
+      "field": "altText",
+      "text": "La capa oscura interior continúa desde la falda al calzado."
+    },
+    {
+      "id": "es-holdout-v4-166",
+      "field": "caption",
+      "text": "Hoy mi gorro de pescador muestra la cara estampada."
+    },
+    {
+      "id": "es-holdout-v4-167",
+      "field": "caption",
+      "text": "Le doy la vuelta al sombrero según el conjunto."
+    },
+    {
+      "id": "es-holdout-v4-168",
+      "field": "caption",
+      "text": "El pequeño borde deja asomar la tela del reverso."
+    },
+    {
+      "id": "es-holdout-v4-169",
+      "field": "altText",
+      "text": "Un sombrero flexible muestra dos telas en su ala."
+    },
+    {
+      "id": "es-holdout-v4-170",
+      "field": "altText",
+      "text": "El ala vuelta descubre la segunda cara del gorro."
+    },
+    {
+      "id": "es-holdout-v4-171",
+      "field": "caption",
+      "text": "Tapé el pequeño agujero con una pieza en forma de corazón."
+    },
+    {
+      "id": "es-holdout-v4-172",
+      "field": "caption",
+      "text": "El jersey reparado tiene ahora un detalle que me hace sonreír."
+    },
+    {
+      "id": "es-holdout-v4-173",
+      "field": "caption",
+      "text": "Hoy llevo mi remiendo de lana bien a la vista."
+    },
+    {
+      "id": "es-holdout-v4-174",
+      "field": "altText",
+      "text": "Un corazón de tela cubre un agujero del jersey."
+    },
+    {
+      "id": "es-holdout-v4-175",
+      "field": "altText",
+      "text": "Puntadas visibles rodean el remiendo colocado sobre el pecho."
+    },
+    {
+      "id": "es-holdout-v4-176",
+      "field": "caption",
+      "text": "Mi mono de tirantes sigue funcionando con un cuello alto debajo."
+    },
+    {
+      "id": "es-holdout-v4-177",
+      "field": "caption",
+      "text": "Hoy rescato el mono veraniego con una capa interior calentita."
+    },
+    {
+      "id": "es-holdout-v4-178",
+      "field": "caption",
+      "text": "Los tirantes quedan muy definidos sobre el punto fino."
+    },
+    {
+      "id": "es-holdout-v4-179",
+      "field": "altText",
+      "text": "Un mono de tirantes se lleva sobre un jersey fino."
+    },
+    {
+      "id": "es-holdout-v4-180",
+      "field": "altText",
+      "text": "El cuello alto sobresale por encima del escote cuadrado."
+    },
+    {
+      "id": "es-holdout-v4-181",
+      "field": "caption",
+      "text": "El bolso se recoge delante como una pequeña cortina."
+    },
+    {
+      "id": "es-holdout-v4-182",
+      "field": "caption",
+      "text": "Hoy llevo la bolsa con su frunce central bien ajustado."
+    },
+    {
+      "id": "es-holdout-v4-183",
+      "field": "caption",
+      "text": "Una cinta cambia el tamaño de mi bolso blando."
+    },
+    {
+      "id": "es-holdout-v4-184",
+      "field": "altText",
+      "text": "El frente de la bolsa está recogido mediante una cinta."
+    },
+    {
+      "id": "es-holdout-v4-185",
+      "field": "altText",
+      "text": "Pliegues verticales se reúnen en el centro del bolso."
+    },
+    {
+      "id": "es-holdout-v4-186",
+      "field": "caption",
+      "text": "El cierre lateral deja limpia la parte delantera del pantalón."
+    },
+    {
+      "id": "es-holdout-v4-187",
+      "field": "caption",
+      "text": "Hoy llevo mi pantalón sin trabillas con la blusa dentro."
+    },
+    {
+      "id": "es-holdout-v4-188",
+      "field": "caption",
+      "text": "La cremallera escondida ayuda a mantener la cintura lisa."
+    },
+    {
+      "id": "es-holdout-v4-189",
+      "field": "altText",
+      "text": "Una cremallera discreta cierra el pantalón por el costado."
+    },
+    {
+      "id": "es-holdout-v4-190",
+      "field": "altText",
+      "text": "La parte frontal de la cintura no tiene cierres visibles."
+    },
+    {
+      "id": "es-holdout-v4-191",
+      "field": "caption",
+      "text": "Hoy coloqué una flor de tela en el ojal de la solapa."
+    },
+    {
+      "id": "es-holdout-v4-192",
+      "field": "caption",
+      "text": "La pequeña flor acompaña la americana que uso a diario."
+    },
+    {
+      "id": "es-holdout-v4-193",
+      "field": "caption",
+      "text": "Este detalle sencillo me recuerda los trajes antiguos."
+    },
+    {
+      "id": "es-holdout-v4-194",
+      "field": "altText",
+      "text": "Una flor textil atraviesa el ojal de una solapa."
+    },
+    {
+      "id": "es-holdout-v4-195",
+      "field": "altText",
+      "text": "Un tallo corto queda oculto detrás del cuello de la chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-196",
+      "field": "caption",
+      "text": "Los pliegues salen del hombro y se abren sobre el pecho."
+    },
+    {
+      "id": "es-holdout-v4-197",
+      "field": "caption",
+      "text": "Hoy llevo mi blusa con pequeños abanicos en los hombros."
+    },
+    {
+      "id": "es-holdout-v4-198",
+      "field": "caption",
+      "text": "Las líneas diagonales dan movimiento al frente liso."
+    },
+    {
+      "id": "es-holdout-v4-199",
+      "field": "altText",
+      "text": "Tres pliegues parten de cada costura superior de la blusa."
+    },
+    {
+      "id": "es-holdout-v4-200",
+      "field": "altText",
+      "text": "La tela se abre en abanico desde ambos hombros."
+    },
+    {
+      "id": "es-holdout-v4-201",
+      "field": "caption",
+      "text": "Bordé unas margaritas pequeñas cerca del borde del calcetín."
+    },
+    {
+      "id": "es-holdout-v4-202",
+      "field": "caption",
+      "text": "Hoy mis zapatos dejan ver las flores que cosí ayer."
+    },
+    {
+      "id": "es-holdout-v4-203",
+      "field": "caption",
+      "text": "Es un detalle diminuto que alegra mi ropa diaria."
+    },
+    {
+      "id": "es-holdout-v4-204",
+      "field": "altText",
+      "text": "Una flor bordada decora el lateral del calcetín."
+    },
+    {
+      "id": "es-holdout-v4-205",
+      "field": "altText",
+      "text": "Pequeños pétalos de hilo aparecen encima del zapato bajo."
+    },
+    {
+      "id": "es-holdout-v4-206",
+      "field": "caption",
+      "text": "La capa corta de mi abrigo se puede quitar entera."
+    },
+    {
+      "id": "es-holdout-v4-207",
+      "field": "caption",
+      "text": "Hoy llevo el abrigo con la pieza superior abrochada."
+    },
+    {
+      "id": "es-holdout-v4-208",
+      "field": "caption",
+      "text": "Me gusta poder variar la silueta según la temperatura."
+    },
+    {
+      "id": "es-holdout-v4-209",
+      "field": "altText",
+      "text": "Botones pequeños sujetan una capa corta sobre el abrigo."
+    },
+    {
+      "id": "es-holdout-v4-210",
+      "field": "altText",
+      "text": "Una pieza desmontable cubre la parte superior de las mangas."
+    },
+    {
+      "id": "es-holdout-v4-211",
+      "field": "caption",
+      "text": "El cierre del pecho evita que se muevan los tirantes."
+    },
+    {
+      "id": "es-holdout-v4-212",
+      "field": "caption",
+      "text": "Hoy ajusté la mochila para llevar las manos libres cómodamente."
+    },
+    {
+      "id": "es-holdout-v4-213",
+      "field": "caption",
+      "text": "La cinta frontal queda discreta sobre mi chaqueta lisa."
+    },
+    {
+      "id": "es-holdout-v4-214",
+      "field": "altText",
+      "text": "Una cinta estrecha une los tirantes de la mochila."
+    },
+    {
+      "id": "es-holdout-v4-215",
+      "field": "altText",
+      "text": "Una hebilla central cierra la pequeña correa sobre el pecho."
+    },
+    {
+      "id": "es-holdout-v4-216",
+      "field": "caption",
+      "text": "La banda superior de mi falda se dobla hacia abajo."
+    },
+    {
+      "id": "es-holdout-v4-217",
+      "field": "caption",
+      "text": "Hoy ajusto la altura doblando una vez la cintura."
+    },
+    {
+      "id": "es-holdout-v4-218",
+      "field": "caption",
+      "text": "Me gusta poder cambiar el largo sin tocar el bajo."
+    },
+    {
+      "id": "es-holdout-v4-219",
+      "field": "altText",
+      "text": "Una banda alta de punto está doblada sobre la cintura."
+    },
+    {
+      "id": "es-holdout-v4-220",
+      "field": "altText",
+      "text": "La cinturilla flexible forma una doble capa alrededor del cuerpo."
+    },
+    {
+      "id": "es-holdout-v4-221",
+      "field": "caption",
+      "text": "Las mangas se cierran con lazos largos en las muñecas."
+    },
+    {
+      "id": "es-holdout-v4-222",
+      "field": "caption",
+      "text": "Hoy anudo los puños flojitos para que no tiren."
+    },
+    {
+      "id": "es-holdout-v4-223",
+      "field": "caption",
+      "text": "Los extremos finos acompañan cada movimiento de las manos."
+    },
+    {
+      "id": "es-holdout-v4-224",
+      "field": "altText",
+      "text": "Dos cintas estrechas sustituyen los botones de cada puño."
+    },
+    {
+      "id": "es-holdout-v4-225",
+      "field": "altText",
+      "text": "Una lazada blanda cierra la manga alrededor de la muñeca."
+    },
+    {
+      "id": "es-holdout-v4-226",
+      "field": "caption",
+      "text": "La cuña de esparto me resulta cómoda para mis paseos."
+    },
+    {
+      "id": "es-holdout-v4-227",
+      "field": "caption",
+      "text": "Hoy estreno mis alpargatas con el vestido más ligero."
+    },
+    {
+      "id": "es-holdout-v4-228",
+      "field": "caption",
+      "text": "Las vueltas de cuerda hacen bonito bajo el tejido."
+    },
+    {
+      "id": "es-holdout-v4-229",
+      "field": "altText",
+      "text": "La suela elevada está recubierta de cuerda de esparto."
+    },
+    {
+      "id": "es-holdout-v4-230",
+      "field": "altText",
+      "text": "Una alpargata de cuña muestra varias capas de fibra trenzada."
+    },
+    {
+      "id": "es-holdout-v4-231",
+      "field": "caption",
+      "text": "Los delanteros del chaleco caen formando dos ondas largas."
+    },
+    {
+      "id": "es-holdout-v4-232",
+      "field": "caption",
+      "text": "Hoy dejo mi chaleco abierto sin recoger ninguna punta."
+    },
+    {
+      "id": "es-holdout-v4-233",
+      "field": "caption",
+      "text": "El cuello blando cambia de forma cada vez que me muevo."
+    },
+    {
+      "id": "es-holdout-v4-234",
+      "field": "altText",
+      "text": "Dos paneles fluidos caen a ambos lados del chaleco."
+    },
+    {
+      "id": "es-holdout-v4-235",
+      "field": "altText",
+      "text": "El cuello sin cierre forma una cascada de tela."
+    },
+    {
+      "id": "es-holdout-v4-236",
+      "field": "caption",
+      "text": "Convertí una bobina pequeña en un broche para mi chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-237",
+      "field": "caption",
+      "text": "Mi solapa lleva hoy un diminuto recuerdo del taller de costura."
+    },
+    {
+      "id": "es-holdout-v4-238",
+      "field": "caption",
+      "text": "El hilo enrollado le da una textura que me encanta."
+    },
+    {
+      "id": "es-holdout-v4-239",
+      "field": "altText",
+      "text": "Una bobina diminuta está prendida al frente de una chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-240",
+      "field": "altText",
+      "text": "El pequeño broche conserva el hilo enrollado en su centro."
+    },
+    {
+      "id": "es-holdout-v4-241",
+      "field": "caption",
+      "text": "La cremallera abierta deja el cuello del jersey bien extendido."
+    },
+    {
+      "id": "es-holdout-v4-242",
+      "field": "caption",
+      "text": "Hoy lo cierro hasta arriba para el aire fresco."
+    },
+    {
+      "id": "es-holdout-v4-243",
+      "field": "caption",
+      "text": "Me gusta alternar entre el cuello alto y la abertura amplia."
+    },
+    {
+      "id": "es-holdout-v4-244",
+      "field": "altText",
+      "text": "Un cierre corto divide el cuello alto del jersey."
+    },
+    {
+      "id": "es-holdout-v4-245",
+      "field": "altText",
+      "text": "El cuello abierto cae hacia los lados sobre los hombros."
+    },
+    {
+      "id": "es-holdout-v4-246",
+      "field": "caption",
+      "text": "El asa está recortada directamente en la forma del bolso."
+    },
+    {
+      "id": "es-holdout-v4-247",
+      "field": "caption",
+      "text": "Hoy llevo este bolso plano como una pequeña carpeta redonda."
+    },
+    {
+      "id": "es-holdout-v4-248",
+      "field": "caption",
+      "text": "La abertura superior me permite sujetarlo sin ninguna correa."
+    },
+    {
+      "id": "es-holdout-v4-249",
+      "field": "altText",
+      "text": "Un agujero ovalado forma el asa del bolso circular."
+    },
+    {
+      "id": "es-holdout-v4-250",
+      "field": "altText",
+      "text": "La pieza redonda y rígida tiene un único hueco superior."
+    },
+    {
+      "id": "es-holdout-v4-251",
+      "field": "caption",
+      "text": "Las pequeñas tablas del pecho le dan relieve a la blusa."
+    },
+    {
+      "id": "es-holdout-v4-252",
+      "field": "caption",
+      "text": "Hoy planché cada pliegue para recuperar el dibujo original."
+    },
+    {
+      "id": "es-holdout-v4-253",
+      "field": "caption",
+      "text": "Me gusta el orden de esas líneas estrechas delante."
+    },
+    {
+      "id": "es-holdout-v4-254",
+      "field": "altText",
+      "text": "Varias tablas pequeñas recorren verticalmente el frente de la blusa."
+    },
+    {
+      "id": "es-holdout-v4-255",
+      "field": "altText",
+      "text": "Dos grupos de pliegues enmarcan la botonadura central."
+    },
+    {
+      "id": "es-holdout-v4-256",
+      "field": "caption",
+      "text": "Los rombos de las medias asoman debajo de mi falda."
+    },
+    {
+      "id": "es-holdout-v4-257",
+      "field": "caption",
+      "text": "Hoy el dibujo está en las piernas y arriba llevo liso."
+    },
+    {
+      "id": "es-holdout-v4-258",
+      "field": "caption",
+      "text": "Estas medias le dan otra vida a mis zapatos habituales."
+    },
+    {
+      "id": "es-holdout-v4-259",
+      "field": "altText",
+      "text": "Un patrón de rombos cubre unas medias opacas."
+    },
+    {
+      "id": "es-holdout-v4-260",
+      "field": "altText",
+      "text": "Las líneas diagonales forman figuras grandes sobre las piernas."
+    },
+    {
+      "id": "es-holdout-v4-261",
+      "field": "caption",
+      "text": "El dibujo de espiga se aprecia mejor con luz natural."
+    },
+    {
+      "id": "es-holdout-v4-262",
+      "field": "caption",
+      "text": "Hoy mi abrigo de tejido espigado vuelve a salir."
+    },
+    {
+      "id": "es-holdout-v4-263",
+      "field": "caption",
+      "text": "Las pequeñas líneas quebradas me gustan con prendas sin dibujo."
+    },
+    {
+      "id": "es-holdout-v4-264",
+      "field": "altText",
+      "text": "El paño del abrigo muestra una trama de pequeñas espigas."
+    },
+    {
+      "id": "es-holdout-v4-265",
+      "field": "altText",
+      "text": "Hileras diagonales alternadas forman el dibujo del tejido grueso."
+    },
+    {
+      "id": "es-holdout-v4-266",
+      "field": "caption",
+      "text": "La doble capa del canesú hace más firme mi camisa."
+    },
+    {
+      "id": "es-holdout-v4-267",
+      "field": "caption",
+      "text": "Hoy enseño la parte interior que normalmente queda escondida."
+    },
+    {
+      "id": "es-holdout-v4-268",
+      "field": "caption",
+      "text": "La espalda conserva su forma incluso con el cuello abierto."
+    },
+    {
+      "id": "es-holdout-v4-269",
+      "field": "altText",
+      "text": "El canesú interior está formado por dos capas superpuestas."
+    },
+    {
+      "id": "es-holdout-v4-270",
+      "field": "altText",
+      "text": "Una vista del revés muestra las costuras encerradas del hombro."
+    },
+    {
+      "id": "es-holdout-v4-271",
+      "field": "caption",
+      "text": "El cordón fino da tres vueltas alrededor de mi cintura."
+    },
+    {
+      "id": "es-holdout-v4-272",
+      "field": "caption",
+      "text": "Hoy uso una cuerda suave para recoger el vestido."
+    },
+    {
+      "id": "es-holdout-v4-273",
+      "field": "caption",
+      "text": "Me gusta dejar los extremos largos a diferentes alturas."
+    },
+    {
+      "id": "es-holdout-v4-274",
+      "field": "altText",
+      "text": "Tres vueltas de cordón rodean la cintura del vestido."
+    },
+    {
+      "id": "es-holdout-v4-275",
+      "field": "altText",
+      "text": "Un nudo lateral sujeta varios tramos paralelos de cuerda."
+    },
+    {
+      "id": "es-holdout-v4-276",
+      "field": "caption",
+      "text": "Estas hojas pequeñas están protegidas dentro de mis pendientes."
+    },
+    {
+      "id": "es-holdout-v4-277",
+      "field": "caption",
+      "text": "Hoy llevo unas hojitas prensadas que conservan todos sus nervios."
+    },
+    {
+      "id": "es-holdout-v4-278",
+      "field": "caption",
+      "text": "El acabado transparente deja pasar la luz por el dibujo."
+    },
+    {
+      "id": "es-holdout-v4-279",
+      "field": "altText",
+      "text": "Pequeñas hojas prensadas quedan dentro de dos piezas transparentes."
+    },
+    {
+      "id": "es-holdout-v4-280",
+      "field": "altText",
+      "text": "Los nervios vegetales son visibles en los colgantes de resina."
+    },
+    {
+      "id": "es-holdout-v4-281",
+      "field": "caption",
+      "text": "Las bandas elásticas hacen que mis botines entren fácilmente."
+    },
+    {
+      "id": "es-holdout-v4-282",
+      "field": "caption",
+      "text": "Hoy llevo los pantalones cortos de bajo sobre mis botas."
+    },
+    {
+      "id": "es-holdout-v4-283",
+      "field": "caption",
+      "text": "La forma limpia de estos botines combina con casi todo."
+    },
+    {
+      "id": "es-holdout-v4-284",
+      "field": "altText",
+      "text": "Paneles elásticos ocupan los laterales de unos botines bajos."
+    },
+    {
+      "id": "es-holdout-v4-285",
+      "field": "altText",
+      "text": "El calzado carece de cordones y termina sobre el tobillo."
+    },
+    {
+      "id": "es-holdout-v4-286",
+      "field": "caption",
+      "text": "El cuello redondeado convierte mi vestido en algo muy dulce."
+    },
+    {
+      "id": "es-holdout-v4-287",
+      "field": "caption",
+      "text": "Hoy estreno las dos piezas curvas que cosí al escote."
+    },
+    {
+      "id": "es-holdout-v4-288",
+      "field": "caption",
+      "text": "Ese cuello pequeño se lleva toda la atención del conjunto."
+    },
+    {
+      "id": "es-holdout-v4-289",
+      "field": "altText",
+      "text": "Dos piezas redondeadas forman el cuello del vestido."
+    },
+    {
+      "id": "es-holdout-v4-290",
+      "field": "altText",
+      "text": "Un cuello plano con bordes curvos rodea la garganta."
+    },
+    {
+      "id": "es-holdout-v4-291",
+      "field": "caption",
+      "text": "Este bolso salió de un retal de tapicería resistente."
+    },
+    {
+      "id": "es-holdout-v4-292",
+      "field": "caption",
+      "text": "Hoy estreno las flores grandes que antes eran una muestra."
+    },
+    {
+      "id": "es-holdout-v4-293",
+      "field": "caption",
+      "text": "El tejido grueso mantiene bien la forma sin entretela."
+    },
+    {
+      "id": "es-holdout-v4-294",
+      "field": "altText",
+      "text": "Un bolso rígido presenta grandes motivos tejidos de tapicería."
+    },
+    {
+      "id": "es-holdout-v4-295",
+      "field": "altText",
+      "text": "La superficie gruesa muestra flores entrelazadas en su trama."
+    },
+    {
+      "id": "es-holdout-v4-296",
+      "field": "caption",
+      "text": "La falda se abre entera desde la cintura al bajo."
+    },
+    {
+      "id": "es-holdout-v4-297",
+      "field": "caption",
+      "text": "Hoy dejo cerrada toda la fila de botones delanteros."
+    },
+    {
+      "id": "es-holdout-v4-298",
+      "field": "caption",
+      "text": "El cierre largo dibuja una línea sencilla en el centro."
+    },
+    {
+      "id": "es-holdout-v4-299",
+      "field": "altText",
+      "text": "Una fila continua de botones recorre toda la falda."
+    },
+    {
+      "id": "es-holdout-v4-300",
+      "field": "altText",
+      "text": "El delantero abrochado llega desde la cinturilla hasta el borde."
+    },
+    {
+      "id": "es-holdout-v4-301",
+      "field": "caption",
+      "text": "Reconstruí una zona del jersey siguiendo las mismas vueltas de punto."
+    },
+    {
+      "id": "es-holdout-v4-302",
+      "field": "caption",
+      "text": "La reparación quedó como un pequeño cuadrado de otra textura."
+    },
+    {
+      "id": "es-holdout-v4-303",
+      "field": "caption",
+      "text": "Hoy llevo el jersey remendado con mucha más tranquilidad."
+    },
+    {
+      "id": "es-holdout-v4-304",
+      "field": "altText",
+      "text": "Un cuadrado de punto nuevo ocupa una zona del jersey."
+    },
+    {
+      "id": "es-holdout-v4-305",
+      "field": "altText",
+      "text": "La reparación tejida conserva las columnas de las mallas originales."
+    },
+    {
+      "id": "es-holdout-v4-306",
+      "field": "caption",
+      "text": "Mis guantes de rejilla dejan ver los anillos debajo."
+    },
+    {
+      "id": "es-holdout-v4-307",
+      "field": "caption",
+      "text": "Hoy añado una textura ligera a mi vestido sencillo."
+    },
+    {
+      "id": "es-holdout-v4-308",
+      "field": "caption",
+      "text": "La malla elástica cubre las manos sin sentirse pesada."
+    },
+    {
+      "id": "es-holdout-v4-309",
+      "field": "altText",
+      "text": "Una malla abierta cubre dedos y dorso de las manos."
+    },
+    {
+      "id": "es-holdout-v4-310",
+      "field": "altText",
+      "text": "Los pequeños rombos del guante permiten ver la piel."
+    },
+    {
+      "id": "es-holdout-v4-311",
+      "field": "caption",
+      "text": "Hoy sujeto un cuello largo a mi jersey de siempre."
+    },
+    {
+      "id": "es-holdout-v4-312",
+      "field": "caption",
+      "text": "La pieza independiente cambia el escote sin añadir otra camisa."
+    },
+    {
+      "id": "es-holdout-v4-313",
+      "field": "caption",
+      "text": "Guardo este cuello aparte para combinarlo con varios vestidos."
+    },
+    {
+      "id": "es-holdout-v4-314",
+      "field": "altText",
+      "text": "Un cuello desmontable termina en dos puntas muy alargadas."
+    },
+    {
+      "id": "es-holdout-v4-315",
+      "field": "altText",
+      "text": "La pieza de cuello aparece colocada sobre un jersey liso."
+    },
+    {
+      "id": "es-holdout-v4-316",
+      "field": "caption",
+      "text": "Los pliegues de las rodillas facilitan mucho subir escalones."
+    },
+    {
+      "id": "es-holdout-v4-317",
+      "field": "caption",
+      "text": "Hoy llevo pantalones con rodillas articuladas y una camisa suave."
+    },
+    {
+      "id": "es-holdout-v4-318",
+      "field": "caption",
+      "text": "Me gusta que este corte acompañe mis movimientos cotidianos."
+    },
+    {
+      "id": "es-holdout-v4-319",
+      "field": "altText",
+      "text": "Dos costuras curvas dan volumen a las rodillas del pantalón."
+    },
+    {
+      "id": "es-holdout-v4-320",
+      "field": "altText",
+      "text": "Las piezas delanteras forman una ligera curvatura a media pierna."
+    },
+    {
+      "id": "es-holdout-v4-321",
+      "field": "caption",
+      "text": "El panel lateral cae más largo que el resto del vestido."
+    },
+    {
+      "id": "es-holdout-v4-322",
+      "field": "caption",
+      "text": "Hoy llevo la pieza suelta sin anudar para que se mueva."
+    },
+    {
+      "id": "es-holdout-v4-323",
+      "field": "caption",
+      "text": "Una sola tira ancha cambia toda la caída del conjunto."
+    },
+    {
+      "id": "es-holdout-v4-324",
+      "field": "altText",
+      "text": "Un panel largo cuelga del costado de un vestido recto."
+    },
+    {
+      "id": "es-holdout-v4-325",
+      "field": "altText",
+      "text": "La pieza lateral llega por debajo del bajo principal."
+    },
+    {
+      "id": "es-holdout-v4-326",
+      "field": "caption",
+      "text": "Bordé un pequeño sol sobre mi boina lisa."
+    },
+    {
+      "id": "es-holdout-v4-327",
+      "field": "caption",
+      "text": "Hoy mi gorro lleva el dibujo que cosí durante el viaje."
+    },
+    {
+      "id": "es-holdout-v4-328",
+      "field": "caption",
+      "text": "El bordado queda ligeramente inclinado cuando me pongo la boina."
+    },
+    {
+      "id": "es-holdout-v4-329",
+      "field": "altText",
+      "text": "Un pequeño sol bordado adorna el lateral de una boina."
+    },
+    {
+      "id": "es-holdout-v4-330",
+      "field": "altText",
+      "text": "Puntadas radiales forman una figura circular sobre el fieltro."
+    },
+    {
+      "id": "es-holdout-v4-331",
+      "field": "caption",
+      "text": "Mi chaleco sale de un solo círculo grande de tela."
+    },
+    {
+      "id": "es-holdout-v4-332",
+      "field": "caption",
+      "text": "Hoy el borde redondo forma el cuello sin añadir piezas."
+    },
+    {
+      "id": "es-holdout-v4-333",
+      "field": "caption",
+      "text": "Las dos aberturas para los brazos ordenan toda la caída."
+    },
+    {
+      "id": "es-holdout-v4-334",
+      "field": "altText",
+      "text": "Un círculo de tela con dos aberturas forma el chaleco."
+    },
+    {
+      "id": "es-holdout-v4-335",
+      "field": "altText",
+      "text": "El borde exterior continuo cae redondeado desde el cuello."
+    },
+    {
+      "id": "es-holdout-v4-336",
+      "field": "caption",
+      "text": "Estampé esta camiseta con un sello que tallé a mano."
+    },
+    {
+      "id": "es-holdout-v4-337",
+      "field": "caption",
+      "text": "Los bordes imperfectos hacen que cada impresión sea un poco distinta."
+    },
+    {
+      "id": "es-holdout-v4-338",
+      "field": "caption",
+      "text": "Hoy llevo mis primeras pruebas de estampación sobre tela."
+    },
+    {
+      "id": "es-holdout-v4-339",
+      "field": "altText",
+      "text": "Formas impresas con bordes irregulares decoran una camiseta sencilla."
+    },
+    {
+      "id": "es-holdout-v4-340",
+      "field": "altText",
+      "text": "Un sello de madera descansa junto al motivo estampado."
+    },
+    {
+      "id": "es-holdout-v4-341",
+      "field": "caption",
+      "text": "Los bolsillos de fuelle permiten llevar mi libreta sin deformarse."
+    },
+    {
+      "id": "es-holdout-v4-342",
+      "field": "caption",
+      "text": "Hoy combino los bolsillos grandes con un jersey corto."
+    },
+    {
+      "id": "es-holdout-v4-343",
+      "field": "caption",
+      "text": "El volumen de los laterales me gusta en este pantalón."
+    },
+    {
+      "id": "es-holdout-v4-344",
+      "field": "altText",
+      "text": "Bolsillos con pliegues laterales sobresalen sobre los muslos."
+    },
+    {
+      "id": "es-holdout-v4-345",
+      "field": "altText",
+      "text": "Unas tapas rectas cubren los bolsillos amplios del pantalón cargo."
+    },
+    {
+      "id": "es-holdout-v4-346",
+      "field": "caption",
+      "text": "La punta de mis bailarinas repite el tono del bolso."
+    },
+    {
+      "id": "es-holdout-v4-347",
+      "field": "caption",
+      "text": "Hoy llevo el calzado sencillo con una pequeña zona brillante."
+    },
+    {
+      "id": "es-holdout-v4-348",
+      "field": "caption",
+      "text": "El contraste en la puntera hace que parezcan más cortitas."
+    },
+    {
+      "id": "es-holdout-v4-349",
+      "field": "altText",
+      "text": "Una pieza de distinto material cubre la punta de las bailarinas."
+    },
+    {
+      "id": "es-holdout-v4-350",
+      "field": "altText",
+      "text": "Las punteras oscuras contrastan con el resto del zapato claro."
+    },
+    {
+      "id": "es-holdout-v4-351",
+      "field": "caption",
+      "text": "El encaje solo aparece cuando la falda se mueve."
+    },
+    {
+      "id": "es-holdout-v4-352",
+      "field": "caption",
+      "text": "Hoy dejo asomar el borde antiguo bajo mi vestido."
+    },
+    {
+      "id": "es-holdout-v4-353",
+      "field": "caption",
+      "text": "La puntilla añade un poquito de delicadeza al conjunto."
+    },
+    {
+      "id": "es-holdout-v4-354",
+      "field": "altText",
+      "text": "Una banda de encaje sobresale debajo del borde de la falda."
+    },
+    {
+      "id": "es-holdout-v4-355",
+      "field": "altText",
+      "text": "Pequeñas ondas caladas forman la terminación de la prenda."
+    },
+    {
+      "id": "es-holdout-v4-356",
+      "field": "caption",
+      "text": "El bolero termina justo antes de la cintura del vestido."
+    },
+    {
+      "id": "es-holdout-v4-357",
+      "field": "caption",
+      "text": "Hoy cubro los hombros con esta chaqueta muy cortita."
+    },
+    {
+      "id": "es-holdout-v4-358",
+      "field": "caption",
+      "text": "Los bordes redondeados dejan despejada toda la parte central."
+    },
+    {
+      "id": "es-holdout-v4-359",
+      "field": "altText",
+      "text": "Una chaqueta corta presenta delanteros con curvas pronunciadas."
+    },
+    {
+      "id": "es-holdout-v4-360",
+      "field": "altText",
+      "text": "El bolero cubre los brazos y deja visible el cuerpo del vestido."
+    },
+    {
+      "id": "es-holdout-v4-361",
+      "field": "caption",
+      "text": "Una tira de puntilla se convirtió en mi collar de hoy."
+    },
+    {
+      "id": "es-holdout-v4-362",
+      "field": "caption",
+      "text": "El cierre pequeño queda escondido debajo del pelo."
+    },
+    {
+      "id": "es-holdout-v4-363",
+      "field": "caption",
+      "text": "Me gusta llevar este encaje antiguo pegado al cuello."
+    },
+    {
+      "id": "es-holdout-v4-364",
+      "field": "altText",
+      "text": "Una banda estrecha de encaje rodea la base del cuello."
+    },
+    {
+      "id": "es-holdout-v4-365",
+      "field": "altText",
+      "text": "El collar textil muestra un dibujo calado de pequeñas hojas."
+    },
+    {
+      "id": "es-holdout-v4-366",
+      "field": "caption",
+      "text": "La cremallera de doble cursor hace cómodo este mono amplio."
+    },
+    {
+      "id": "es-holdout-v4-367",
+      "field": "caption",
+      "text": "Hoy abro un poquito la parte superior del cierre."
+    },
+    {
+      "id": "es-holdout-v4-368",
+      "field": "caption",
+      "text": "Los dos tiradores permiten cambiar el escote sin tocar el resto."
+    },
+    {
+      "id": "es-holdout-v4-369",
+      "field": "altText",
+      "text": "Dos cursores ocupan el cierre delantero de un mono."
+    },
+    {
+      "id": "es-holdout-v4-370",
+      "field": "altText",
+      "text": "La cremallera central está parcialmente abierta por el extremo superior."
+    },
+    {
+      "id": "es-holdout-v4-371",
+      "field": "caption",
+      "text": "La pieza transparente del hombro deja entrar un poco de luz."
+    },
+    {
+      "id": "es-holdout-v4-372",
+      "field": "caption",
+      "text": "Hoy llevo una blusa con una pequeña ventana de tejido fino."
+    },
+    {
+      "id": "es-holdout-v4-373",
+      "field": "caption",
+      "text": "El canesú ligero contrasta con el cuerpo opaco de la prenda."
+    },
+    {
+      "id": "es-holdout-v4-374",
+      "field": "altText",
+      "text": "Un canesú transparente deja visibles ambos hombros."
+    },
+    {
+      "id": "es-holdout-v4-375",
+      "field": "altText",
+      "text": "El canesú fino deja ver los tirantes de la capa interior."
+    },
+    {
+      "id": "es-holdout-v4-376",
+      "field": "caption",
+      "text": "Mi bolso se cierra con el pequeño clic de la boquilla."
+    },
+    {
+      "id": "es-holdout-v4-377",
+      "field": "caption",
+      "text": "Hoy saco la cartera antigua de marco metálico."
+    },
+    {
+      "id": "es-holdout-v4-378",
+      "field": "caption",
+      "text": "Las dos bolitas del cierre siguen funcionando de maravilla."
+    },
+    {
+      "id": "es-holdout-v4-379",
+      "field": "altText",
+      "text": "Un marco metálico remata la abertura de un bolso pequeño."
+    },
+    {
+      "id": "es-holdout-v4-380",
+      "field": "altText",
+      "text": "Dos esferas se cruzan sobre el cierre rígido de la cartera."
+    },
+    {
+      "id": "es-holdout-v4-381",
+      "field": "caption",
+      "text": "El pelo corto de la chaqueta queda hoy hacia dentro."
+    },
+    {
+      "id": "es-holdout-v4-382",
+      "field": "caption",
+      "text": "Me gusta elegir qué textura dejar al aire cada mañana."
+    },
+    {
+      "id": "es-holdout-v4-383",
+      "field": "caption",
+      "text": "La vuelta de la manga revela el lado más suave."
+    },
+    {
+      "id": "es-holdout-v4-384",
+      "field": "altText",
+      "text": "El interior de pelo corto aparece en el puño doblado."
+    },
+    {
+      "id": "es-holdout-v4-385",
+      "field": "altText",
+      "text": "Una chaqueta muestra una cara lisa y otra mullida."
+    },
+    {
+      "id": "es-holdout-v4-386",
+      "field": "caption",
+      "text": "Una pequeña costura mantiene el cuello doblado siempre igual."
+    },
+    {
+      "id": "es-holdout-v4-387",
+      "field": "caption",
+      "text": "Hoy se nota la línea suave de mi cuello vuelto."
+    },
+    {
+      "id": "es-holdout-v4-388",
+      "field": "caption",
+      "text": "Me gusta que esta prenda conserve su doblez sin arreglarlo."
+    },
+    {
+      "id": "es-holdout-v4-389",
+      "field": "altText",
+      "text": "Una puntada discreta sujeta el borde del cuello vuelto."
+    },
+    {
+      "id": "es-holdout-v4-390",
+      "field": "altText",
+      "text": "La tela del cuello queda plegada en una banda uniforme."
+    },
+    {
+      "id": "es-holdout-v4-391",
+      "field": "caption",
+      "text": "La cadena ligera sustituye al cordón de mi sombrero."
+    },
+    {
+      "id": "es-holdout-v4-392",
+      "field": "caption",
+      "text": "Hoy dejo la cadenita suelta bajo la barbilla."
+    },
+    {
+      "id": "es-holdout-v4-393",
+      "field": "caption",
+      "text": "Mi sombrero de ala corta lleva un detalle metálico."
+    },
+    {
+      "id": "es-holdout-v4-394",
+      "field": "altText",
+      "text": "Una cadena fina une ambos lados del sombrero."
+    },
+    {
+      "id": "es-holdout-v4-395",
+      "field": "altText",
+      "text": "La cadenilla cae libre por debajo del ala estrecha."
+    },
+    {
+      "id": "es-holdout-v4-396",
+      "field": "caption",
+      "text": "La costura alta deja caer el vestido con mucha libertad."
+    },
+    {
+      "id": "es-holdout-v4-397",
+      "field": "caption",
+      "text": "Hoy llevo un vestido que se recoge justo bajo el pecho."
+    },
+    {
+      "id": "es-holdout-v4-398",
+      "field": "caption",
+      "text": "Ese corte me resulta cómodo para una tarde tranquila."
+    },
+    {
+      "id": "es-holdout-v4-399",
+      "field": "altText",
+      "text": "Una costura horizontal alta separa el cuerpo de la falda."
+    },
+    {
+      "id": "es-holdout-v4-400",
+      "field": "altText",
+      "text": "El tejido amplio cae desde debajo del pecho hasta los tobillos."
+    },
+    {
+      "id": "es-holdout-v4-401",
+      "field": "caption",
+      "text": "La raya vertical del calcetín asoma al cruzar las piernas."
+    },
+    {
+      "id": "es-holdout-v4-402",
+      "field": "caption",
+      "text": "Hoy mis calcetines lisos tienen una sola línea lateral."
+    },
+    {
+      "id": "es-holdout-v4-403",
+      "field": "caption",
+      "text": "Ese pequeño detalle acompaña bien a los zapatos más sencillos."
+    },
+    {
+      "id": "es-holdout-v4-404",
+      "field": "altText",
+      "text": "Una franja estrecha recorre el lateral de cada calcetín."
+    },
+    {
+      "id": "es-holdout-v4-405",
+      "field": "altText",
+      "text": "La línea vertical continúa desde el puño hasta el talón."
+    },
+    {
+      "id": "es-holdout-v4-406",
+      "field": "caption",
+      "text": "Los tirantes se abrochan a botones dentro de la cintura."
+    },
+    {
+      "id": "es-holdout-v4-407",
+      "field": "caption",
+      "text": "Hoy llevo los tirantes antiguos sobre una camisa ligera."
+    },
+    {
+      "id": "es-holdout-v4-408",
+      "field": "caption",
+      "text": "Me gusta cómo se cruzan las dos bandas detrás."
+    },
+    {
+      "id": "es-holdout-v4-409",
+      "field": "altText",
+      "text": "Dos tirantes se sujetan mediante pequeñas presillas y botones."
+    },
+    {
+      "id": "es-holdout-v4-410",
+      "field": "altText",
+      "text": "Las bandas forman una X sobre la espalda de la camisa."
+    },
+    {
+      "id": "es-holdout-v4-411",
+      "field": "caption",
+      "text": "Las mangas amplias se recogen en unos puños muy largos."
+    },
+    {
+      "id": "es-holdout-v4-412",
+      "field": "caption",
+      "text": "Hoy dejo que el volumen de la blusa se concentre abajo."
+    },
+    {
+      "id": "es-holdout-v4-413",
+      "field": "caption",
+      "text": "Los puños estrechos hacen que las mangas parezcan más redondas."
+    },
+    {
+      "id": "es-holdout-v4-414",
+      "field": "altText",
+      "text": "Una manga abundante se reúne en un puño ajustado."
+    },
+    {
+      "id": "es-holdout-v4-415",
+      "field": "altText",
+      "text": "La tela forma un volumen blando encima de la muñeca."
+    },
+    {
+      "id": "es-holdout-v4-416",
+      "field": "caption",
+      "text": "Mi cartera plana lleva lo justo para una reunión tranquila."
+    },
+    {
+      "id": "es-holdout-v4-417",
+      "field": "caption",
+      "text": "Hoy cambio el bolso grande por una carpeta de tela."
+    },
+    {
+      "id": "es-holdout-v4-418",
+      "field": "caption",
+      "text": "El cierre envolvente mantiene sus esquinas bien recogidas."
+    },
+    {
+      "id": "es-holdout-v4-419",
+      "field": "altText",
+      "text": "Una cartera rectangular y plana queda bajo el brazo."
+    },
+    {
+      "id": "es-holdout-v4-420",
+      "field": "altText",
+      "text": "La solapa triangular se pliega sobre el frente de la funda."
+    },
+    {
+      "id": "es-holdout-v4-421",
+      "field": "caption",
+      "text": "El punto elástico acompaña la forma sin necesitar ningún cierre."
+    },
+    {
+      "id": "es-holdout-v4-422",
+      "field": "caption",
+      "text": "Hoy mi vestido más cómodo solo pide zapatos bajos."
+    },
+    {
+      "id": "es-holdout-v4-423",
+      "field": "caption",
+      "text": "Me gusta la caída suave de este tubo de punto."
+    },
+    {
+      "id": "es-holdout-v4-424",
+      "field": "altText",
+      "text": "Un vestido tubular de punto cae desde los hombros."
+    },
+    {
+      "id": "es-holdout-v4-425",
+      "field": "altText",
+      "text": "La superficie elástica presenta pequeñas columnas de mallas uniformes."
+    },
+    {
+      "id": "es-holdout-v4-426",
+      "field": "caption",
+      "text": "La trenza ancha del cinturón recoge mi camisa grande."
+    },
+    {
+      "id": "es-holdout-v4-427",
+      "field": "caption",
+      "text": "Hoy ajusto la hebilla entre dos tiras entrelazadas."
+    },
+    {
+      "id": "es-holdout-v4-428",
+      "field": "caption",
+      "text": "El dibujo del cuero añade textura a un conjunto liso."
+    },
+    {
+      "id": "es-holdout-v4-429",
+      "field": "altText",
+      "text": "Varias tiras de piel forman un cinturón trenzado."
+    },
+    {
+      "id": "es-holdout-v4-430",
+      "field": "altText",
+      "text": "La hebilla entra entre las lazadas del tejido de cuero."
+    },
+    {
+      "id": "es-holdout-v4-431",
+      "field": "caption",
+      "text": "Las ondas grandes están cosidas directamente sobre mi falda."
+    },
+    {
+      "id": "es-holdout-v4-432",
+      "field": "caption",
+      "text": "Hoy llevo un dibujo de líneas curvas que casi parece moverse."
+    },
+    {
+      "id": "es-holdout-v4-433",
+      "field": "caption",
+      "text": "Una cinta fina recorre el tejido formando eses largas."
+    },
+    {
+      "id": "es-holdout-v4-434",
+      "field": "altText",
+      "text": "Cordones aplicados dibujan curvas continuas sobre la falda."
+    },
+    {
+      "id": "es-holdout-v4-435",
+      "field": "altText",
+      "text": "La decoración en relieve forma ondas verticales de gran tamaño."
+    },
+    {
+      "id": "es-holdout-v4-436",
+      "field": "caption",
+      "text": "Al quitar las mangas mi chaqueta se vuelve un chaleco."
+    },
+    {
+      "id": "es-holdout-v4-437",
+      "field": "caption",
+      "text": "Hoy llevo las cremalleras de los hombros completamente cerradas."
+    },
+    {
+      "id": "es-holdout-v4-438",
+      "field": "caption",
+      "text": "Esta prenda ocupa poco y me da dos posibilidades."
+    },
+    {
+      "id": "es-holdout-v4-439",
+      "field": "altText",
+      "text": "Una cremallera circular une la manga con el cuerpo de la chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-440",
+      "field": "altText",
+      "text": "La manga desmontada está colocada junto al chaleco resultante."
+    },
+    {
+      "id": "es-holdout-v4-441",
+      "field": "caption",
+      "text": "Los eslabones grandes pesan mucho menos de lo que parecen."
+    },
+    {
+      "id": "es-holdout-v4-442",
+      "field": "caption",
+      "text": "Hoy dejo el cuello libre y llevo pendientes largos."
+    },
+    {
+      "id": "es-holdout-v4-443",
+      "field": "caption",
+      "text": "Tres piezas enlazadas se balancean con cada paso."
+    },
+    {
+      "id": "es-holdout-v4-444",
+      "field": "altText",
+      "text": "Tres eslabones ovalados forman cada pendiente colgante."
+    },
+    {
+      "id": "es-holdout-v4-445",
+      "field": "altText",
+      "text": "Las piezas huecas enlazadas llegan cerca de la mandíbula."
+    },
+    {
+      "id": "es-holdout-v4-446",
+      "field": "caption",
+      "text": "El bolsillo de malla deja ver lo que llevo dentro."
+    },
+    {
+      "id": "es-holdout-v4-447",
+      "field": "caption",
+      "text": "Hoy me gusta ese pequeño cuadrado abierto sobre la camisa."
+    },
+    {
+      "id": "es-holdout-v4-448",
+      "field": "caption",
+      "text": "La tela ligera del bolsillo cambia la textura del frente."
+    },
+    {
+      "id": "es-holdout-v4-449",
+      "field": "altText",
+      "text": "Un bolsillo rectangular de malla está aplicado sobre algodón opaco."
+    },
+    {
+      "id": "es-holdout-v4-450",
+      "field": "altText",
+      "text": "La trama del bolsillo permite ver una tarjeta lisa dentro."
+    },
+    {
+      "id": "es-holdout-v4-451",
+      "field": "caption",
+      "text": "Hoy llevo los talones libres con el pantalón al tobillo."
+    },
+    {
+      "id": "es-holdout-v4-452",
+      "field": "caption",
+      "text": "La tira trasera mantiene mis zapatos cómodamente sujetos."
+    },
+    {
+      "id": "es-holdout-v4-453",
+      "field": "caption",
+      "text": "Mis zapatos abiertos detrás vuelven a acompañar este vestido."
+    },
+    {
+      "id": "es-holdout-v4-454",
+      "field": "altText",
+      "text": "Una tira estrecha rodea el talón del zapato abierto."
+    },
+    {
+      "id": "es-holdout-v4-455",
+      "field": "altText",
+      "text": "El calzado cubre la punta y deja descubierta la parte posterior."
+    },
+    {
+      "id": "es-holdout-v4-456",
+      "field": "caption",
+      "text": "Recorté el cuello siguiendo una línea de ondas pequeñas."
+    },
+    {
+      "id": "es-holdout-v4-457",
+      "field": "caption",
+      "text": "Hoy el borde festoneado le da otro aire a mi camisa."
+    },
+    {
+      "id": "es-holdout-v4-458",
+      "field": "caption",
+      "text": "Las curvas suaves sustituyen a las puntas habituales."
+    },
+    {
+      "id": "es-holdout-v4-459",
+      "field": "altText",
+      "text": "El cuello de la camisa termina en pequeños arcos sucesivos."
+    },
+    {
+      "id": "es-holdout-v4-460",
+      "field": "altText",
+      "text": "Una línea festoneada recorre ambas piezas del cuello plano."
+    },
+    {
+      "id": "es-holdout-v4-461",
+      "field": "caption",
+      "text": "La hebilla grande queda a un lado de mi bolso."
+    },
+    {
+      "id": "es-holdout-v4-462",
+      "field": "caption",
+      "text": "Hoy llevo la solapa cruzada con su cierre descentrado."
+    },
+    {
+      "id": "es-holdout-v4-463",
+      "field": "caption",
+      "text": "El cierre asimétrico cambia la forma de esta cartera sencilla."
+    },
+    {
+      "id": "es-holdout-v4-464",
+      "field": "altText",
+      "text": "Una hebilla ancha cierra el bolso cerca de un costado."
+    },
+    {
+      "id": "es-holdout-v4-465",
+      "field": "altText",
+      "text": "La solapa termina con una tira desplazada hacia la derecha."
+    },
+    {
+      "id": "es-holdout-v4-466",
+      "field": "caption",
+      "text": "Los tirantes anchos dejan sitio para mi camiseta interior."
+    },
+    {
+      "id": "es-holdout-v4-467",
+      "field": "caption",
+      "text": "Hoy llevo el escote cuadrado con los hombros despejados."
+    },
+    {
+      "id": "es-holdout-v4-468",
+      "field": "caption",
+      "text": "Las bandas firmes sostienen bien la forma del cuerpo."
+    },
+    {
+      "id": "es-holdout-v4-469",
+      "field": "altText",
+      "text": "Dos tirantes amplios enmarcan un escote completamente cuadrado."
+    },
+    {
+      "id": "es-holdout-v4-470",
+      "field": "altText",
+      "text": "Los laterales del vestido ascienden en bandas rectas sobre los hombros."
+    },
+    {
+      "id": "es-holdout-v4-471",
+      "field": "caption",
+      "text": "Mi blusa presenta un relieve continuo de volantes diminutos."
+    },
+    {
+      "id": "es-holdout-v4-472",
+      "field": "caption",
+      "text": "Hoy llevo una prenda lisa que tiene muchísimo relieve."
+    },
+    {
+      "id": "es-holdout-v4-473",
+      "field": "caption",
+      "text": "El tejido parece ondular incluso cuando estoy quieta."
+    },
+    {
+      "id": "es-holdout-v4-474",
+      "field": "altText",
+      "text": "Pequeños volantes paralelos cubren la parte delantera de la blusa."
+    },
+    {
+      "id": "es-holdout-v4-475",
+      "field": "altText",
+      "text": "Cada fila estrecha forma una ondulación horizontal sobre el tejido."
+    },
+    {
+      "id": "es-holdout-v4-476",
+      "field": "caption",
+      "text": "La costura de mi chaqueta baja bastante por el brazo."
+    },
+    {
+      "id": "es-holdout-v4-477",
+      "field": "caption",
+      "text": "Hoy me apetecía una forma amplia sin el hombro marcado."
+    },
+    {
+      "id": "es-holdout-v4-478",
+      "field": "caption",
+      "text": "El corte suelto deja espacio para una capa gruesa."
+    },
+    {
+      "id": "es-holdout-v4-479",
+      "field": "altText",
+      "text": "La unión de la manga queda debajo del hombro natural."
+    },
+    {
+      "id": "es-holdout-v4-480",
+      "field": "altText",
+      "text": "Una chaqueta ancha presenta mangas caídas y sisa baja."
+    },
+    {
+      "id": "es-holdout-v4-481",
+      "field": "caption",
+      "text": "El botón escondido mantiene mi falda cruzada en su sitio."
+    },
+    {
+      "id": "es-holdout-v4-482",
+      "field": "caption",
+      "text": "Hoy ajusté el cierre interior para dejar un poco más de holgura."
+    },
+    {
+      "id": "es-holdout-v4-483",
+      "field": "caption",
+      "text": "La capa exterior cae limpia sobre el pequeño broche."
+    },
+    {
+      "id": "es-holdout-v4-484",
+      "field": "altText",
+      "text": "Un botón interior sujeta la primera capa de una falda cruzada."
+    },
+    {
+      "id": "es-holdout-v4-485",
+      "field": "altText",
+      "text": "La tela exterior tapa por completo el cierre de la cintura."
+    },
+    {
+      "id": "es-holdout-v4-486",
+      "field": "caption",
+      "text": "Hoy llevo un pañuelo pequeño como pulsera de tela."
+    },
+    {
+      "id": "es-holdout-v4-487",
+      "field": "caption",
+      "text": "El nudo suave queda en la parte interior de mi muñeca."
+    },
+    {
+      "id": "es-holdout-v4-488",
+      "field": "caption",
+      "text": "Me gusta este trocito estampado junto a la manga lisa."
+    },
+    {
+      "id": "es-holdout-v4-489",
+      "field": "altText",
+      "text": "Un pañuelo doblado rodea una muñeca y termina en dos puntas."
+    },
+    {
+      "id": "es-holdout-v4-490",
+      "field": "altText",
+      "text": "Una lazada textil descansa junto al puño de la camisa."
+    },
+    {
+      "id": "es-holdout-v4-491",
+      "field": "caption",
+      "text": "Las cuentas del bolso forman un dibujo de ramas pequeñas."
+    },
+    {
+      "id": "es-holdout-v4-492",
+      "field": "caption",
+      "text": "Hoy dejo que mi cartera bordada destaque junto al vestido sencillo."
+    },
+    {
+      "id": "es-holdout-v4-493",
+      "field": "caption",
+      "text": "Cada detalle lo cosí despacio durante varias tardes."
+    },
+    {
+      "id": "es-holdout-v4-494",
+      "field": "altText",
+      "text": "Pequeñas cuentas cosidas dibujan ramas sobre una cartera textil."
+    },
+    {
+      "id": "es-holdout-v4-495",
+      "field": "altText",
+      "text": "La superficie del bolso muestra un relieve fino de abalorios."
+    },
+    {
+      "id": "es-holdout-v4-496",
+      "field": "caption",
+      "text": "El borde oscuro dibuja toda la silueta de mi capa."
+    },
+    {
+      "id": "es-holdout-v4-497",
+      "field": "caption",
+      "text": "Hoy llevo el ribete ancho sobre una base clara."
+    },
+    {
+      "id": "es-holdout-v4-498",
+      "field": "caption",
+      "text": "Una sola línea continua une cuello, delanteros y bajo."
+    },
+    {
+      "id": "es-holdout-v4-499",
+      "field": "altText",
+      "text": "Una banda contrastada sigue el contorno completo de la capa."
+    },
+    {
+      "id": "es-holdout-v4-500",
+      "field": "altText",
+      "text": "El ribete ancho pasa desde el cuello hasta los extremos inferiores."
+    },
+    {
+      "id": "es-holdout-v4-501",
+      "field": "caption",
+      "text": "La trenza del asa es lo que más me gusta de este bolso."
+    },
+    {
+      "id": "es-holdout-v4-502",
+      "field": "caption",
+      "text": "Hoy llevo la cartera con el mango de cuero entrelazado."
+    },
+    {
+      "id": "es-holdout-v4-503",
+      "field": "altText",
+      "text": "Tiras de cuero entrelazadas forman el asa corta del bolso."
+    },
+    {
+      "id": "es-holdout-v4-504",
+      "field": "altText",
+      "text": "El mango grueso presenta una trenza redonda muy apretada."
+    },
+    {
+      "id": "es-holdout-v4-505",
+      "field": "altText",
+      "text": "La piel trenzada contrasta con el frente completamente liso."
+    },
+    {
+      "id": "es-holdout-v4-506",
+      "field": "caption",
+      "text": "La pechera sale entera y me deja otro escote."
+    },
+    {
+      "id": "es-holdout-v4-507",
+      "field": "caption",
+      "text": "Hoy añado la pieza delantera para cambiar mi vestido."
+    },
+    {
+      "id": "es-holdout-v4-508",
+      "field": "altText",
+      "text": "Una pieza rectangular independiente cubre el escote del vestido."
+    },
+    {
+      "id": "es-holdout-v4-509",
+      "field": "altText",
+      "text": "Pequeños botones interiores sujetan una pechera de tela fina."
+    },
+    {
+      "id": "es-holdout-v4-510",
+      "field": "altText",
+      "text": "La prenda muestra una abertura frontal parcialmente cubierta."
+    },
+    {
+      "id": "es-holdout-v4-511",
+      "field": "caption",
+      "text": "Este collar se enrolla alrededor del cuello sin cerrar."
+    },
+    {
+      "id": "es-holdout-v4-512",
+      "field": "caption",
+      "text": "Hoy llevo la espiral abierta sobre un jersey sencillo."
+    },
+    {
+      "id": "es-holdout-v4-513",
+      "field": "altText",
+      "text": "Una banda metálica curva da dos vueltas incompletas al cuello."
+    },
+    {
+      "id": "es-holdout-v4-514",
+      "field": "altText",
+      "text": "Los extremos redondeados quedan separados sobre el pecho."
+    },
+    {
+      "id": "es-holdout-v4-515",
+      "field": "altText",
+      "text": "La pieza rígida forma una espiral de distinto diámetro."
+    },
+    {
+      "id": "es-holdout-v4-516",
+      "field": "caption",
+      "text": "La costura frontal sustituye hoy a la raya de planchado."
+    },
+    {
+      "id": "es-holdout-v4-517",
+      "field": "caption",
+      "text": "Mis pantalones tienen una línea cosida en cada pierna."
+    },
+    {
+      "id": "es-holdout-v4-518",
+      "field": "altText",
+      "text": "Una costura estrecha recorre el centro de ambos pantalones."
+    },
+    {
+      "id": "es-holdout-v4-519",
+      "field": "altText",
+      "text": "La línea frontal llega desde el muslo hasta el bajo."
+    },
+    {
+      "id": "es-holdout-v4-520",
+      "field": "altText",
+      "text": "Un pequeño relieve vertical divide cada pernera por delante."
+    },
+    {
+      "id": "es-holdout-v4-521",
+      "field": "caption",
+      "text": "Un solo botón grande cierra esta chaqueta pequeña."
+    },
+    {
+      "id": "es-holdout-v4-522",
+      "field": "caption",
+      "text": "Hoy el cierre de cerámica es el protagonista del conjunto."
+    },
+    {
+      "id": "es-holdout-v4-523",
+      "field": "altText",
+      "text": "Un botón de cerámica ocupa el centro de la chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-524",
+      "field": "altText",
+      "text": "La abertura se sujeta con un único cierre redondo."
+    },
+    {
+      "id": "es-holdout-v4-525",
+      "field": "altText",
+      "text": "La superficie irregular del botón resalta sobre la tela lisa."
+    },
+    {
+      "id": "es-holdout-v4-526",
+      "field": "caption",
+      "text": "Los puños tienen una esquina cortada que me encanta."
+    },
+    {
+      "id": "es-holdout-v4-527",
+      "field": "caption",
+      "text": "Hoy dejo visibles los extremos angulares de las mangas."
+    },
+    {
+      "id": "es-holdout-v4-528",
+      "field": "altText",
+      "text": "El puño termina en dos ángulos marcados y desiguales."
+    },
+    {
+      "id": "es-holdout-v4-529",
+      "field": "altText",
+      "text": "Una esquina diagonal recorta la banda inferior de la manga."
+    },
+    {
+      "id": "es-holdout-v4-530",
+      "field": "altText",
+      "text": "El cierre lateral deja una punta corta junto a la muñeca."
+    },
+    {
+      "id": "es-holdout-v4-531",
+      "field": "caption",
+      "text": "Las capas rectas se superponen sin añadir vuelo."
+    },
+    {
+      "id": "es-holdout-v4-532",
+      "field": "caption",
+      "text": "Hoy llevo una falda de paneles horizontales muy limpios."
+    },
+    {
+      "id": "es-holdout-v4-533",
+      "field": "altText",
+      "text": "Tres capas lisas se superponen sobre una falda recta."
+    },
+    {
+      "id": "es-holdout-v4-534",
+      "field": "altText",
+      "text": "Cada panel horizontal termina antes del siguiente borde."
+    },
+    {
+      "id": "es-holdout-v4-535",
+      "field": "altText",
+      "text": "La falda presenta escalones planos sin frunces ni ondas."
+    },
+    {
+      "id": "es-holdout-v4-536",
+      "field": "caption",
+      "text": "Convertí una cinta tejida en un broche largo."
+    },
+    {
+      "id": "es-holdout-v4-537",
+      "field": "caption",
+      "text": "Hoy llevo el antiguo marcapáginas prendido del abrigo."
+    },
+    {
+      "id": "es-holdout-v4-538",
+      "field": "altText",
+      "text": "Una cinta tejida cuelga verticalmente de una pequeña aguja."
+    },
+    {
+      "id": "es-holdout-v4-539",
+      "field": "altText",
+      "text": "Un remate textil alargado decora la parte alta del abrigo."
+    },
+    {
+      "id": "es-holdout-v4-540",
+      "field": "altText",
+      "text": "La estrecha banda bordada termina junto al bolsillo superior."
+    },
+    {
+      "id": "es-holdout-v4-541",
+      "field": "caption",
+      "text": "La abertura posterior evita que mi capa tire al sentarme."
+    },
+    {
+      "id": "es-holdout-v4-542",
+      "field": "caption",
+      "text": "Hoy las dos mitades de la espalda caen por separado."
+    },
+    {
+      "id": "es-holdout-v4-543",
+      "field": "altText",
+      "text": "Un corte vertical divide la zona posterior de la capa."
+    },
+    {
+      "id": "es-holdout-v4-544",
+      "field": "altText",
+      "text": "Dos paneles largos se separan debajo de la nuca."
+    },
+    {
+      "id": "es-holdout-v4-545",
+      "field": "altText",
+      "text": "La espalda abierta deja ver el jersey que queda debajo."
+    },
+    {
+      "id": "es-holdout-v4-546",
+      "field": "caption",
+      "text": "Las puntas metálicas cambian mis botas más sencillas."
+    },
+    {
+      "id": "es-holdout-v4-547",
+      "field": "caption",
+      "text": "Hoy dejo que brillen solo los extremos del calzado."
+    },
+    {
+      "id": "es-holdout-v4-548",
+      "field": "altText",
+      "text": "Una pequeña cubierta metálica protege cada punta de la bota."
+    },
+    {
+      "id": "es-holdout-v4-549",
+      "field": "altText",
+      "text": "El borde brillante sigue la curva de la puntera."
+    },
+    {
+      "id": "es-holdout-v4-550",
+      "field": "altText",
+      "text": "Las botas oscuras muestran dos remates delanteros reflectantes."
+    },
+    {
+      "id": "es-holdout-v4-551",
+      "field": "caption",
+      "text": "Las pequeñas aberturas de los hombros ventilan mi blusa."
+    },
+    {
+      "id": "es-holdout-v4-552",
+      "field": "caption",
+      "text": "Hoy llevo manga larga con dos huecos discretos arriba."
+    },
+    {
+      "id": "es-holdout-v4-553",
+      "field": "altText",
+      "text": "Una abertura ovalada descubre la parte superior de cada hombro."
+    },
+    {
+      "id": "es-holdout-v4-554",
+      "field": "altText",
+      "text": "Las mangas siguen unidas al escote por tiras anchas."
+    },
+    {
+      "id": "es-holdout-v4-555",
+      "field": "altText",
+      "text": "Dos espacios simétricos separan las mangas del cuerpo central."
+    },
+    {
+      "id": "es-holdout-v4-556",
+      "field": "caption",
+      "text": "El dibujo del jersey forma una estrella en cada hombro."
+    },
+    {
+      "id": "es-holdout-v4-557",
+      "field": "caption",
+      "text": "Hoy el motivo del punto se concentra justo arriba."
+    },
+    {
+      "id": "es-holdout-v4-558",
+      "field": "altText",
+      "text": "Dos estrellas tejidas ocupan la zona superior de las mangas."
+    },
+    {
+      "id": "es-holdout-v4-559",
+      "field": "altText",
+      "text": "El jersey liso tiene motivos geométricos junto al cuello."
+    },
+    {
+      "id": "es-holdout-v4-560",
+      "field": "altText",
+      "text": "Pequeñas puntas radiales se extienden desde ambas costuras del hombro."
+    },
+    {
+      "id": "es-holdout-v4-561",
+      "field": "caption",
+      "text": "Las costuras exteriores muestran cómo está construido mi bolso."
+    },
+    {
+      "id": "es-holdout-v4-562",
+      "field": "caption",
+      "text": "Hoy estreno la bolsa con los márgenes cosidos hacia fuera."
+    },
+    {
+      "id": "es-holdout-v4-563",
+      "field": "altText",
+      "text": "Los márgenes laterales sobresalen del cuerpo de la bolsa."
+    },
+    {
+      "id": "es-holdout-v4-564",
+      "field": "altText",
+      "text": "Una costura gruesa recorre las uniones exteriores del bolso."
+    },
+    {
+      "id": "es-holdout-v4-565",
+      "field": "altText",
+      "text": "Las dos piezas principales muestran sus bordes enfrentados al aire."
+    },
+    {
+      "id": "es-holdout-v4-566",
+      "field": "caption",
+      "text": "La espalda del vestido se cierra con dos paneles cruzados."
+    },
+    {
+      "id": "es-holdout-v4-567",
+      "field": "caption",
+      "text": "Hoy llevo un cruce amplio que se abre un poquito al moverme."
+    },
+    {
+      "id": "es-holdout-v4-568",
+      "field": "altText",
+      "text": "Dos paneles diagonales se superponen en la espalda del vestido."
+    },
+    {
+      "id": "es-holdout-v4-569",
+      "field": "altText",
+      "text": "Las capas posteriores forman una V baja en el centro."
+    },
+    {
+      "id": "es-holdout-v4-570",
+      "field": "altText",
+      "text": "El cruce de tela deja una pequeña abertura triangular."
+    },
+    {
+      "id": "es-holdout-v4-571",
+      "field": "caption",
+      "text": "Mis zapatos se cierran con una tira ancha muy práctica."
+    },
+    {
+      "id": "es-holdout-v4-572",
+      "field": "caption",
+      "text": "Hoy voy con cierres cómodos y una falda ligera."
+    },
+    {
+      "id": "es-holdout-v4-573",
+      "field": "altText",
+      "text": "Una banda ancha de velcro cruza el empeine del zapato."
+    },
+    {
+      "id": "es-holdout-v4-574",
+      "field": "altText",
+      "text": "El extremo rectangular de la tira queda ajustado lateralmente."
+    },
+    {
+      "id": "es-holdout-v4-575",
+      "field": "altText",
+      "text": "Dos zapatos bajos presentan cierres textiles de contacto."
+    },
+    {
+      "id": "es-holdout-v4-576",
+      "field": "caption",
+      "text": "La camisa tiene una pieza suelta que parece un segundo dorso."
+    },
+    {
+      "id": "es-holdout-v4-577",
+      "field": "caption",
+      "text": "Hoy dejo la capa trasera abierta para mostrar su construcción."
+    },
+    {
+      "id": "es-holdout-v4-578",
+      "field": "altText",
+      "text": "La camisa tiene una segunda pieza corta sobre su espalda."
+    },
+    {
+      "id": "es-holdout-v4-579",
+      "field": "altText",
+      "text": "La capa superior termina libre por encima del bajo principal."
+    },
+    {
+      "id": "es-holdout-v4-580",
+      "field": "altText",
+      "text": "Dos bordes horizontales separados aparecen en el reverso de la prenda."
+    },
+    {
+      "id": "es-holdout-v4-581",
+      "field": "caption",
+      "text": "Mi chaleco se abrocha atrás con tres botones grandes."
+    },
+    {
+      "id": "es-holdout-v4-582",
+      "field": "caption",
+      "text": "Hoy enseño el cierre que queda escondido bajo mi chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-583",
+      "field": "altText",
+      "text": "Tres botones grandes cierran el centro posterior del chaleco."
+    },
+    {
+      "id": "es-holdout-v4-584",
+      "field": "altText",
+      "text": "Las dos piezas de espalda se unen mediante una banda abrochada."
+    },
+    {
+      "id": "es-holdout-v4-585",
+      "field": "altText",
+      "text": "El delantero permanece liso mientras el cierre aparece detrás."
+    },
+    {
+      "id": "es-holdout-v4-586",
+      "field": "caption",
+      "text": "Los cuadros grandes se encuentran con otros diminutos en mi falda."
+    },
+    {
+      "id": "es-holdout-v4-587",
+      "field": "caption",
+      "text": "Hoy llevo dos escalas del mismo dibujo en una prenda."
+    },
+    {
+      "id": "es-holdout-v4-588",
+      "field": "altText",
+      "text": "La falda une paneles de cuadros grandes y pequeños."
+    },
+    {
+      "id": "es-holdout-v4-589",
+      "field": "altText",
+      "text": "Una franja de cuadrícula fina atraviesa el estampado amplio."
+    },
+    {
+      "id": "es-holdout-v4-590",
+      "field": "altText",
+      "text": "Las dos escalas de cuadros comparten tonos muy parecidos."
+    },
+    {
+      "id": "es-holdout-v4-591",
+      "field": "caption",
+      "text": "Paso el pañuelo por las trabillas como un cinturón suave."
+    },
+    {
+      "id": "es-holdout-v4-592",
+      "field": "caption",
+      "text": "Hoy las puntas estampadas caen junto al bolsillo del pantalón."
+    },
+    {
+      "id": "es-holdout-v4-593",
+      "field": "altText",
+      "text": "Un pañuelo estrecho atraviesa las trabillas de un pantalón."
+    },
+    {
+      "id": "es-holdout-v4-594",
+      "field": "altText",
+      "text": "La tela estampada se anuda en el lateral de la cintura."
+    },
+    {
+      "id": "es-holdout-v4-595",
+      "field": "altText",
+      "text": "Dos puntas de seda cuelgan desde un nudo pequeño."
+    },
+    {
+      "id": "es-holdout-v4-596",
+      "field": "caption",
+      "text": "El acolchado redondo hace que mi bolso parezca una almohada."
+    },
+    {
+      "id": "es-holdout-v4-597",
+      "field": "caption",
+      "text": "Hoy llevo la bolsa blandita con una chaqueta de líneas rectas."
+    },
+    {
+      "id": "es-holdout-v4-598",
+      "field": "altText",
+      "text": "Un bolso acolchado presenta varios volúmenes redondeados."
+    },
+    {
+      "id": "es-holdout-v4-599",
+      "field": "altText",
+      "text": "La tela rellena forma una silueta suave y abultada."
+    },
+    {
+      "id": "es-holdout-v4-600",
+      "field": "altText",
+      "text": "El asa también está cubierta por una capa de acolchado."
+    },
+    {
+      "id": "es-holdout-v4-601",
+      "field": "caption",
+      "text": "La punta del escote termina en una pequeña muesca."
+    },
+    {
+      "id": "es-holdout-v4-602",
+      "field": "caption",
+      "text": "Hoy me gusta la abertura mínima de mi blusa cerrada."
+    },
+    {
+      "id": "es-holdout-v4-603",
+      "field": "altText",
+      "text": "Una pequeña muesca en V corta el centro del escote."
+    },
+    {
+      "id": "es-holdout-v4-604",
+      "field": "altText",
+      "text": "El borde redondo se interrumpe con una abertura estrecha."
+    },
+    {
+      "id": "es-holdout-v4-605",
+      "field": "altText",
+      "text": "La blusa muestra un corte angular corto bajo la garganta."
+    },
+    {
+      "id": "es-holdout-v4-606",
+      "field": "caption",
+      "text": "Un pliegue sale del hombro y cruza todo mi vestido."
+    },
+    {
+      "id": "es-holdout-v4-607",
+      "field": "caption",
+      "text": "Hoy llevo una línea diagonal que recoge la tela suavemente."
+    },
+    {
+      "id": "es-holdout-v4-608",
+      "field": "altText",
+      "text": "Un pliegue ancho cruza diagonalmente el cuerpo del vestido."
+    },
+    {
+      "id": "es-holdout-v4-609",
+      "field": "altText",
+      "text": "La tela queda recogida desde un hombro hasta la cadera opuesta."
+    },
+    {
+      "id": "es-holdout-v4-610",
+      "field": "altText",
+      "text": "Una sola línea doblada atraviesa la superficie lisa del vestido."
+    },
+    {
+      "id": "es-holdout-v4-611",
+      "field": "caption",
+      "text": "El nudo corredizo permite ajustar mi pulsera sin ayuda."
+    },
+    {
+      "id": "es-holdout-v4-612",
+      "field": "caption",
+      "text": "Hoy llevo las pequeñas cuerdas que anudé en vacaciones."
+    },
+    {
+      "id": "es-holdout-v4-613",
+      "field": "altText",
+      "text": "Dos extremos de cordón atraviesan un nudo corredizo central."
+    },
+    {
+      "id": "es-holdout-v4-614",
+      "field": "altText",
+      "text": "La pulsera de hilo termina en pequeñas puntas anudadas."
+    },
+    {
+      "id": "es-holdout-v4-615",
+      "field": "altText",
+      "text": "Varios nudos planos decoran la banda textil de la muñeca."
+    },
+    {
+      "id": "es-holdout-v4-616",
+      "field": "caption",
+      "text": "El cuello triangular de mi chaqueta parece un pañuelo cosido."
+    },
+    {
+      "id": "es-holdout-v4-617",
+      "field": "caption",
+      "text": "Hoy llevo las dos puntas del cuello extendidas delante."
+    },
+    {
+      "id": "es-holdout-v4-618",
+      "field": "altText",
+      "text": "Dos piezas triangulares amplias forman el cuello de la chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-619",
+      "field": "altText",
+      "text": "La parte posterior del cuello termina en una punta central."
+    },
+    {
+      "id": "es-holdout-v4-620",
+      "field": "altText",
+      "text": "El cuello ancho cae como un pequeño pañuelo sobre los hombros."
+    },
+    {
+      "id": "es-holdout-v4-621",
+      "field": "caption",
+      "text": "Mi bolsa de tela se guarda dentro de una flor pequeña."
+    },
+    {
+      "id": "es-holdout-v4-622",
+      "field": "caption",
+      "text": "Hoy llevo la funda floral enganchada al bolso habitual."
+    },
+    {
+      "id": "es-holdout-v4-623",
+      "field": "altText",
+      "text": "Una bolsa desplegada tiene una funda pequeña con forma floral."
+    },
+    {
+      "id": "es-holdout-v4-624",
+      "field": "altText",
+      "text": "Los pétalos textiles rodean la abertura del bolsillo de guardado."
+    },
+    {
+      "id": "es-holdout-v4-625",
+      "field": "altText",
+      "text": "La bolsa comprimida forma un pequeño bulto redondo de tela."
+    },
+    {
+      "id": "es-holdout-v4-626",
+      "field": "caption",
+      "text": "Até una tira bordada al cierre de mi blusa."
+    },
+    {
+      "id": "es-holdout-v4-627",
+      "field": "caption",
+      "text": "Hoy la pequeña cinta hace más fácil abrir el cuello."
+    },
+    {
+      "id": "es-holdout-v4-628",
+      "field": "altText",
+      "text": "Una cinta corta cuelga del cursor de la cremallera."
+    },
+    {
+      "id": "es-holdout-v4-629",
+      "field": "altText",
+      "text": "Una cinta bordada sirve como tirador del cierre superior."
+    },
+    {
+      "id": "es-holdout-v4-630",
+      "field": "altText",
+      "text": "Dos puntadas sujetan un tirador textil al aro metálico."
+    },
+    {
+      "id": "es-holdout-v4-631",
+      "field": "caption",
+      "text": "La abertura de la falda esconde un tejido completamente distinto."
+    },
+    {
+      "id": "es-holdout-v4-632",
+      "field": "caption",
+      "text": "Hoy al caminar aparece un color que estaba plegado dentro."
+    },
+    {
+      "id": "es-holdout-v4-633",
+      "field": "altText",
+      "text": "Un pliegue profundo contiene una tela de color contrastado."
+    },
+    {
+      "id": "es-holdout-v4-634",
+      "field": "altText",
+      "text": "Al abrirse el paso aparece un panel interior estampado."
+    },
+    {
+      "id": "es-holdout-v4-635",
+      "field": "altText",
+      "text": "La falda lisa muestra una cuña distinta dentro de su abertura."
+    },
+    {
+      "id": "es-holdout-v4-636",
+      "field": "caption",
+      "text": "El broche de los zapatos se puede quitar en un segundo."
+    },
+    {
+      "id": "es-holdout-v4-637",
+      "field": "caption",
+      "text": "Hoy añado dos pequeñas piezas brillantes a mis bailarinas."
+    },
+    {
+      "id": "es-holdout-v4-638",
+      "field": "altText",
+      "text": "Un adorno desmontable está sujeto sobre cada punta del zapato."
+    },
+    {
+      "id": "es-holdout-v4-639",
+      "field": "altText",
+      "text": "La pinza del broche queda oculta bajo el borde del calzado."
+    },
+    {
+      "id": "es-holdout-v4-640",
+      "field": "altText",
+      "text": "Dos piezas decorativas sueltas descansan junto al par de bailarinas."
+    },
+    {
+      "id": "es-holdout-v4-641",
+      "field": "caption",
+      "text": "Los puños del vestido se doblan para mostrar el reverso."
+    },
+    {
+      "id": "es-holdout-v4-642",
+      "field": "caption",
+      "text": "Hoy las mangas enseñan una segunda textura en sus extremos."
+    },
+    {
+      "id": "es-holdout-v4-643",
+      "field": "altText",
+      "text": "Los puños anchos están doblados una vez hacia fuera."
+    },
+    {
+      "id": "es-holdout-v4-644",
+      "field": "altText",
+      "text": "El reverso estampado aparece alrededor de ambas muñecas."
+    },
+    {
+      "id": "es-holdout-v4-645",
+      "field": "altText",
+      "text": "Una manga lisa termina en una banda de tela contrastada."
+    },
+    {
+      "id": "es-holdout-v4-646",
+      "field": "caption",
+      "text": "La abertura elástica permite llevar el cuello sobre un hombro."
+    },
+    {
+      "id": "es-holdout-v4-647",
+      "field": "caption",
+      "text": "Hoy estiro ligeramente el escote para cambiar la forma del jersey."
+    },
+    {
+      "id": "es-holdout-v4-648",
+      "field": "altText",
+      "text": "El cuello ancho de punto cae hacia un lado."
+    },
+    {
+      "id": "es-holdout-v4-649",
+      "field": "altText",
+      "text": "Un borde elástico rodea la abertura amplia del jersey."
+    },
+    {
+      "id": "es-holdout-v4-650",
+      "field": "altText",
+      "text": "La tela se desplaza y deja visible la línea de un hombro."
+    },
+    {
+      "id": "es-holdout-v4-651",
+      "field": "caption",
+      "text": "Pinté una línea junto a las costuras de mi camiseta."
+    },
+    {
+      "id": "es-holdout-v4-652",
+      "field": "caption",
+      "text": "Hoy llevo los pequeños trazos que añadí con pincel."
+    },
+    {
+      "id": "es-holdout-v4-653",
+      "field": "altText",
+      "text": "Una línea pintada a mano acompaña la costura lateral."
+    },
+    {
+      "id": "es-holdout-v4-654",
+      "field": "altText",
+      "text": "Pequeños trazos irregulares bordean los hombros de la camiseta."
+    },
+    {
+      "id": "es-holdout-v4-655",
+      "field": "altText",
+      "text": "La pintura textil forma un contorno suave alrededor del cuello."
+    },
+    {
+      "id": "es-holdout-v4-656",
+      "field": "caption",
+      "text": "Un aro pequeño sostiene otro mucho más grande."
+    },
+    {
+      "id": "es-holdout-v4-657",
+      "field": "caption",
+      "text": "Hoy llevo círculos enlazados con el pelo despejado."
+    },
+    {
+      "id": "es-holdout-v4-658",
+      "field": "altText",
+      "text": "Dos aros de tamaños distintos forman cada pendiente."
+    },
+    {
+      "id": "es-holdout-v4-659",
+      "field": "altText",
+      "text": "El círculo mayor cuelga libre desde un pequeño aro superior."
+    },
+    {
+      "id": "es-holdout-v4-660",
+      "field": "altText",
+      "text": "Los pendientes muestran dos contornos circulares parcialmente superpuestos."
+    },
+    {
+      "id": "es-holdout-v4-661",
+      "field": "caption",
+      "text": "La cinturilla se cruza dejando una pequeña punta delante."
+    },
+    {
+      "id": "es-holdout-v4-662",
+      "field": "caption",
+      "text": "Hoy enseño el doblez asimétrico de mi pantalón favorito."
+    },
+    {
+      "id": "es-holdout-v4-663",
+      "field": "altText",
+      "text": "La banda superior del pantalón se superpone en diagonal."
+    },
+    {
+      "id": "es-holdout-v4-664",
+      "field": "altText",
+      "text": "Una punta de cinturilla queda libre junto al botón lateral."
+    },
+    {
+      "id": "es-holdout-v4-665",
+      "field": "altText",
+      "text": "El cierre desplazado forma un pequeño cruce sobre la cintura."
+    },
+    {
+      "id": "es-holdout-v4-666",
+      "field": "caption",
+      "text": "Una capa diminuta cubre solo la parte superior de mi blusa."
+    },
+    {
+      "id": "es-holdout-v4-667",
+      "field": "caption",
+      "text": "Hoy el tejido suelto se mueve sobre las mangas."
+    },
+    {
+      "id": "es-holdout-v4-668",
+      "field": "altText",
+      "text": "Una segunda pieza corta cubre los hombros de la blusa."
+    },
+    {
+      "id": "es-holdout-v4-669",
+      "field": "altText",
+      "text": "La pequeña capa acaba por encima de los codos."
+    },
+    {
+      "id": "es-holdout-v4-670",
+      "field": "altText",
+      "text": "La capa exterior descansa libre sobre el cuerpo principal."
+    },
+    {
+      "id": "es-holdout-v4-671",
+      "field": "caption",
+      "text": "Hoy llevo la riñonera cruzada sobre el pecho."
+    },
+    {
+      "id": "es-holdout-v4-672",
+      "field": "caption",
+      "text": "La correa corta mantiene el bolso cerca del cuerpo."
+    },
+    {
+      "id": "es-holdout-v4-673",
+      "field": "altText",
+      "text": "Una riñonera se lleva en diagonal sobre el torso."
+    },
+    {
+      "id": "es-holdout-v4-674",
+      "field": "altText",
+      "text": "El cierre frontal del bolso queda bajo un hombro."
+    },
+    {
+      "id": "es-holdout-v4-675",
+      "field": "altText",
+      "text": "Una correa ancha cruza la espalda y sostiene la bolsa."
+    },
+    {
+      "id": "es-holdout-v4-676",
+      "field": "caption",
+      "text": "Las cintas de la espalda se ajustan de arriba abajo."
+    },
+    {
+      "id": "es-holdout-v4-677",
+      "field": "caption",
+      "text": "Hoy cierro mi vestido con una lazada pequeña al final."
+    },
+    {
+      "id": "es-holdout-v4-678",
+      "field": "altText",
+      "text": "Un cordón cruza varias presillas por la espalda del vestido."
+    },
+    {
+      "id": "es-holdout-v4-679",
+      "field": "altText",
+      "text": "Las lazadas forman un zigzag entre dos bordes abiertos."
+    },
+    {
+      "id": "es-holdout-v4-680",
+      "field": "altText",
+      "text": "El ajuste termina con un lazo bajo la cintura."
+    },
+    {
+      "id": "es-holdout-v4-681",
+      "field": "caption",
+      "text": "Los flecos aparecen únicamente a los lados de mi jersey."
+    },
+    {
+      "id": "es-holdout-v4-682",
+      "field": "caption",
+      "text": "Hoy se mueven las tiras largas junto a mis brazos."
+    },
+    {
+      "id": "es-holdout-v4-683",
+      "field": "altText",
+      "text": "Flecos de lana cuelgan de las costuras laterales del jersey."
+    },
+    {
+      "id": "es-holdout-v4-684",
+      "field": "altText",
+      "text": "Las tiras largas se concentran debajo de ambas sisas."
+    },
+    {
+      "id": "es-holdout-v4-685",
+      "field": "altText",
+      "text": "El centro del pulóver permanece liso entre los flecos laterales."
+    },
+    {
+      "id": "es-holdout-v4-686",
+      "field": "caption",
+      "text": "La pequeña presilla permite sujetar un pañuelo a la manga."
+    },
+    {
+      "id": "es-holdout-v4-687",
+      "field": "caption",
+      "text": "Hoy llevo la cinta decorativa colgada del brazo de mi chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-688",
+      "field": "altText",
+      "text": "Una presilla estrecha sobresale de la parte alta de la manga."
+    },
+    {
+      "id": "es-holdout-v4-689",
+      "field": "altText",
+      "text": "Una tira textil atraviesa el pequeño lazo cosido al brazo."
+    },
+    {
+      "id": "es-holdout-v4-690",
+      "field": "altText",
+      "text": "La manga presenta una hebilla de tela que sostiene un pañuelo."
+    },
+    {
+      "id": "es-holdout-v4-691",
+      "field": "caption",
+      "text": "El panel delantero deja ver una capa más larga debajo."
+    },
+    {
+      "id": "es-holdout-v4-692",
+      "field": "caption",
+      "text": "Hoy llevo una falda con dos largos claramente diferentes."
+    },
+    {
+      "id": "es-holdout-v4-693",
+      "field": "altText",
+      "text": "La falda lleva una sobreposición frontal rectangular bastante corta."
+    },
+    {
+      "id": "es-holdout-v4-694",
+      "field": "altText",
+      "text": "El tejido inferior continúa varios centímetros bajo la capa frontal."
+    },
+    {
+      "id": "es-holdout-v4-695",
+      "field": "altText",
+      "text": "La superposición forma un escalón ancho en el centro delantero."
+    },
+    {
+      "id": "es-holdout-v4-696",
+      "field": "caption",
+      "text": "Los pequeños flecos rodean la abertura de mi capucha."
+    },
+    {
+      "id": "es-holdout-v4-697",
+      "field": "caption",
+      "text": "Hoy llevo un borde suave que casi parece un flequillo."
+    },
+    {
+      "id": "es-holdout-v4-698",
+      "field": "altText",
+      "text": "Flecos cortos siguen todo el contorno de la capucha."
+    },
+    {
+      "id": "es-holdout-v4-699",
+      "field": "altText",
+      "text": "La abertura del abrigo está rematada con pequeñas tiras textiles."
+    },
+    {
+      "id": "es-holdout-v4-700",
+      "field": "altText",
+      "text": "Un borde desflecado enmarca la cara dentro de la capucha."
+    },
+    {
+      "id": "es-holdout-v4-701",
+      "field": "caption",
+      "text": "La pieza redonda del collar cae justo sobre el esternón."
+    },
+    {
+      "id": "es-holdout-v4-702",
+      "field": "caption",
+      "text": "Hoy llevo un disco sencillo con una cadena muy fina."
+    },
+    {
+      "id": "es-holdout-v4-703",
+      "field": "altText",
+      "text": "Un disco metálico sin grabado cuelga de una cadena."
+    },
+    {
+      "id": "es-holdout-v4-704",
+      "field": "altText",
+      "text": "La pequeña pieza circular descansa sobre una camiseta lisa."
+    },
+    {
+      "id": "es-holdout-v4-705",
+      "field": "altText",
+      "text": "El colgante plano refleja la luz sobre el centro del pecho."
+    },
+    {
+      "id": "es-holdout-v4-706",
+      "field": "caption",
+      "text": "La costura de mis medias marca una línea de otro tono."
+    },
+    {
+      "id": "es-holdout-v4-707",
+      "field": "caption",
+      "text": "Hoy dejo ese detalle visible bajo un vestido corto."
+    },
+    {
+      "id": "es-holdout-v4-708",
+      "field": "altText",
+      "text": "Una costura contrastada recorre la parte posterior de las medias."
+    },
+    {
+      "id": "es-holdout-v4-709",
+      "field": "altText",
+      "text": "La línea fina sube desde el talón hasta debajo de la falda."
+    },
+    {
+      "id": "es-holdout-v4-710",
+      "field": "altText",
+      "text": "Dos trazos verticales destacan sobre la malla transparente."
+    },
+    {
+      "id": "es-holdout-v4-711",
+      "field": "caption",
+      "text": "La cremallera del pecho recorre casi toda la chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-712",
+      "field": "caption",
+      "text": "Hoy llevo el cierre transversal completamente cerrado."
+    },
+    {
+      "id": "es-holdout-v4-713",
+      "field": "altText",
+      "text": "Una larga cremallera horizontal cruza el frente de la chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-714",
+      "field": "altText",
+      "text": "El tirador queda junto a la costura lateral del pecho."
+    },
+    {
+      "id": "es-holdout-v4-715",
+      "field": "altText",
+      "text": "La línea del cierre divide la prenda en dos paneles."
+    },
+    {
+      "id": "es-holdout-v4-716",
+      "field": "caption",
+      "text": "Los ribetes deportivos cambian el carácter de mi vestido recto."
+    },
+    {
+      "id": "es-holdout-v4-717",
+      "field": "caption",
+      "text": "Hoy llevo cuello y puños de canalé sobre tela fluida."
+    },
+    {
+      "id": "es-holdout-v4-718",
+      "field": "altText",
+      "text": "El vestido tiene bandas de canalé en cuello y mangas."
+    },
+    {
+      "id": "es-holdout-v4-719",
+      "field": "altText",
+      "text": "Dos rayas finas decoran los remates elásticos de la prenda."
+    },
+    {
+      "id": "es-holdout-v4-720",
+      "field": "altText",
+      "text": "El tejido suave termina en puños ajustados de aire deportivo."
+    },
+    {
+      "id": "es-holdout-v4-721",
+      "field": "caption",
+      "text": "Estampé mi bolsa con una pantalla que preparé en clase."
+    },
+    {
+      "id": "es-holdout-v4-722",
+      "field": "caption",
+      "text": "Hoy saco a pasear mi primera impresión sobre algodón."
+    },
+    {
+      "id": "es-holdout-v4-723",
+      "field": "altText",
+      "text": "Un dibujo de formas abstractas cubre el frente de una bolsa."
+    },
+    {
+      "id": "es-holdout-v4-724",
+      "field": "altText",
+      "text": "La tinta presenta una capa uniforme sobre el tejido crudo."
+    },
+    {
+      "id": "es-holdout-v4-725",
+      "field": "altText",
+      "text": "Varias figuras superpuestas decoran una bolsa sencilla de asas largas."
+    },
+    {
+      "id": "es-holdout-v4-726",
+      "field": "caption",
+      "text": "Solo el lado izquierdo del cuello lleva pequeñas perlas."
+    },
+    {
+      "id": "es-holdout-v4-727",
+      "field": "caption",
+      "text": "Hoy me gusta ese detalle asimétrico sobre la blusa sencilla."
+    },
+    {
+      "id": "es-holdout-v4-728",
+      "field": "altText",
+      "text": "Una mitad del cuello presenta varias perlas cosidas."
+    },
+    {
+      "id": "es-holdout-v4-729",
+      "field": "altText",
+      "text": "El lado opuesto del cuello permanece completamente liso."
+    },
+    {
+      "id": "es-holdout-v4-730",
+      "field": "altText",
+      "text": "Pequeñas cuentas claras se agrupan junto a una punta del cuello."
+    },
+    {
+      "id": "es-holdout-v4-731",
+      "field": "caption",
+      "text": "El tejido lleva un hilo brillante casi escondido."
+    },
+    {
+      "id": "es-holdout-v4-732",
+      "field": "caption",
+      "text": "Hoy la falda solo destella cuando cambia la luz."
+    },
+    {
+      "id": "es-holdout-v4-733",
+      "field": "altText",
+      "text": "Hilos finos reflectantes atraviesan la trama mate de la falda."
+    },
+    {
+      "id": "es-holdout-v4-734",
+      "field": "altText",
+      "text": "Pequeños destellos aparecen dispersos sobre la superficie del tejido."
+    },
+    {
+      "id": "es-holdout-v4-735",
+      "field": "altText",
+      "text": "El borde plegado muestra una hebra metálica entre las fibras."
+    },
+    {
+      "id": "es-holdout-v4-736",
+      "field": "caption",
+      "text": "Un aro pequeño recoge la tela al lado de mi camiseta."
+    },
+    {
+      "id": "es-holdout-v4-737",
+      "field": "caption",
+      "text": "Hoy transformo la caída con este sencillo pasador lateral."
+    },
+    {
+      "id": "es-holdout-v4-738",
+      "field": "altText",
+      "text": "La tela de la camiseta pasa por un aro lateral."
+    },
+    {
+      "id": "es-holdout-v4-739",
+      "field": "altText",
+      "text": "Un pequeño círculo recoge varios pliegues junto a la cintura."
+    },
+    {
+      "id": "es-holdout-v4-740",
+      "field": "altText",
+      "text": "El bajo queda ligeramente levantado donde está colocado el pasador."
+    },
+    {
+      "id": "es-holdout-v4-741",
+      "field": "caption",
+      "text": "La solapa con flecos cubre la parte alta de mis zapatos."
+    },
+    {
+      "id": "es-holdout-v4-742",
+      "field": "caption",
+      "text": "Hoy recupero este par con su pequeña cortina de cuero."
+    },
+    {
+      "id": "es-holdout-v4-743",
+      "field": "altText",
+      "text": "Una solapa recortada en flecos cae sobre el empeine."
+    },
+    {
+      "id": "es-holdout-v4-744",
+      "field": "altText",
+      "text": "Los zapatos muestran una pieza delantera con tiras cortas."
+    },
+    {
+      "id": "es-holdout-v4-745",
+      "field": "altText",
+      "text": "Pequeños cortes paralelos forman el borde de la lengüeta decorativa."
+    },
+    {
+      "id": "es-holdout-v4-746",
+      "field": "caption",
+      "text": "El cinturón solo recoge la parte delantera de mi abrigo."
+    },
+    {
+      "id": "es-holdout-v4-747",
+      "field": "caption",
+      "text": "Hoy la espalda queda suelta mientras marco un poco la cintura."
+    },
+    {
+      "id": "es-holdout-v4-748",
+      "field": "altText",
+      "text": "Una banda cruza los delanteros del abrigo sin rodear la espalda."
+    },
+    {
+      "id": "es-holdout-v4-749",
+      "field": "altText",
+      "text": "El cinturón entra por dos aberturas próximas a los costados."
+    },
+    {
+      "id": "es-holdout-v4-750",
+      "field": "altText",
+      "text": "La parte posterior del abrigo cae libre y amplia."
+    },
+    {
+      "id": "es-holdout-v4-751",
+      "field": "caption",
+      "text": "Una pajarita enorme recoge toda la tela frontal de mi bolso."
+    },
+    {
+      "id": "es-holdout-v4-752",
+      "field": "caption",
+      "text": "Hoy llevo una cartera cuyo adorno también sirve de asa."
+    },
+    {
+      "id": "es-holdout-v4-753",
+      "field": "altText",
+      "text": "Un lazo grande atraviesa el centro de una cartera blanda."
+    },
+    {
+      "id": "es-holdout-v4-754",
+      "field": "altText",
+      "text": "Dos alas textiles forman el adorno frontal del bolso."
+    },
+    {
+      "id": "es-holdout-v4-755",
+      "field": "altText",
+      "text": "La tela queda pinzada en el centro mediante una banda estrecha."
+    },
+    {
+      "id": "es-holdout-v4-756",
+      "field": "caption",
+      "text": "El bordado geométrico recorre los hombros de mi vestido."
+    },
+    {
+      "id": "es-holdout-v4-757",
+      "field": "caption",
+      "text": "Hoy llevo pequeños triángulos cosidos sobre una tela lisa."
+    },
+    {
+      "id": "es-holdout-v4-758",
+      "field": "altText",
+      "text": "Una hilera de triángulos bordados sigue la línea del escote."
+    },
+    {
+      "id": "es-holdout-v4-759",
+      "field": "altText",
+      "text": "El canesú presenta un patrón pequeño de figuras angulares."
+    },
+    {
+      "id": "es-holdout-v4-760",
+      "field": "altText",
+      "text": "Puntadas de varios grosores forman rombos sobre la parte superior."
+    },
+    {
+      "id": "es-holdout-v4-761",
+      "field": "caption",
+      "text": "Las entradas verticales dejan las manos muy cómodas."
+    },
+    {
+      "id": "es-holdout-v4-762",
+      "field": "caption",
+      "text": "Hoy llevo mi chaleco con los bolsillos casi escondidos."
+    },
+    {
+      "id": "es-holdout-v4-763",
+      "field": "altText",
+      "text": "Dos aberturas verticales aparecen cerca de los costados del chaleco."
+    },
+    {
+      "id": "es-holdout-v4-764",
+      "field": "altText",
+      "text": "Los bolsillos están integrados sin tapas en las piezas delanteras."
+    },
+    {
+      "id": "es-holdout-v4-765",
+      "field": "altText",
+      "text": "Un ribete estrecho enmarca cada entrada vertical para las manos."
+    },
+    {
+      "id": "es-holdout-v4-766",
+      "field": "caption",
+      "text": "Estos pendientes conservan los pliegues del papel original."
+    },
+    {
+      "id": "es-holdout-v4-767",
+      "field": "caption",
+      "text": "Hoy estreno mis pequeñas figuras plegadas con cuidado."
+    },
+    {
+      "id": "es-holdout-v4-768",
+      "field": "altText",
+      "text": "Dos figuras geométricas de papel cuelgan de ganchos finos."
+    },
+    {
+      "id": "es-holdout-v4-769",
+      "field": "altText",
+      "text": "Los pendientes muestran varias caras angulares formadas por dobleces."
+    },
+    {
+      "id": "es-holdout-v4-770",
+      "field": "altText",
+      "text": "Una capa protectora da brillo suave al papel doblado."
+    },
+    {
+      "id": "es-holdout-v4-771",
+      "field": "caption",
+      "text": "La tapeta cubre todos los botones de mi chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-772",
+      "field": "caption",
+      "text": "Hoy llevo un frente liso con el cierre completamente escondido."
+    },
+    {
+      "id": "es-holdout-v4-773",
+      "field": "altText",
+      "text": "Una banda vertical de tela tapa la botonadura de la chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-774",
+      "field": "altText",
+      "text": "El cierre delantero solo se ve al levantar la tapeta."
+    },
+    {
+      "id": "es-holdout-v4-775",
+      "field": "altText",
+      "text": "La superficie frontal carece de botones expuestos entre los bolsillos."
+    },
+    {
+      "id": "es-holdout-v4-776",
+      "field": "caption",
+      "text": "El bolsillo pequeño sigue dentro del bolsillo grande de mis vaqueros."
+    },
+    {
+      "id": "es-holdout-v4-777",
+      "field": "caption",
+      "text": "Hoy se nota el pequeño remache junto a la cintura."
+    },
+    {
+      "id": "es-holdout-v4-778",
+      "field": "altText",
+      "text": "Un bolsillo monedero pequeño está encajado dentro de otro mayor."
+    },
+    {
+      "id": "es-holdout-v4-779",
+      "field": "altText",
+      "text": "Dos remaches marcan las esquinas de la abertura pequeña."
+    },
+    {
+      "id": "es-holdout-v4-780",
+      "field": "altText",
+      "text": "La parte delantera del vaquero muestra bolsillos de dos tamaños."
+    },
+    {
+      "id": "es-holdout-v4-781",
+      "field": "caption",
+      "text": "Un único volante recorre el hombro de mi blusa."
+    },
+    {
+      "id": "es-holdout-v4-782",
+      "field": "caption",
+      "text": "Hoy llevo todo el volumen concentrado en un lado."
+    },
+    {
+      "id": "es-holdout-v4-783",
+      "field": "altText",
+      "text": "Un volante ancho cubre solamente el hombro derecho."
+    },
+    {
+      "id": "es-holdout-v4-784",
+      "field": "altText",
+      "text": "El adorno de tela cae por un costado del escote."
+    },
+    {
+      "id": "es-holdout-v4-785",
+      "field": "altText",
+      "text": "La otra mitad de la blusa conserva una línea lisa."
+    },
+    {
+      "id": "es-holdout-v4-786",
+      "field": "caption",
+      "text": "Los lunares grandes se ven muy bien con mis zapatos bajos."
+    },
+    {
+      "id": "es-holdout-v4-787",
+      "field": "caption",
+      "text": "Hoy pruebo medias con un dibujo mucho más visible."
+    },
+    {
+      "id": "es-holdout-v4-788",
+      "field": "altText",
+      "text": "Grandes círculos opacos se distribuyen sobre unas medias finas."
+    },
+    {
+      "id": "es-holdout-v4-789",
+      "field": "altText",
+      "text": "El patrón de lunares mantiene espacios amplios entre las figuras."
+    },
+    {
+      "id": "es-holdout-v4-790",
+      "field": "altText",
+      "text": "Los puntos oscuros destacan sobre una malla transparente."
+    },
+    {
+      "id": "es-holdout-v4-791",
+      "field": "caption",
+      "text": "Las asas pasan por debajo y sostienen toda la bolsa."
+    },
+    {
+      "id": "es-holdout-v4-792",
+      "field": "caption",
+      "text": "Hoy llevo el bolso con correas continuas muy resistentes."
+    },
+    {
+      "id": "es-holdout-v4-793",
+      "field": "altText",
+      "text": "Dos cintas largas rodean la base y forman las asas."
+    },
+    {
+      "id": "es-holdout-v4-794",
+      "field": "altText",
+      "text": "Las correas atraviesan verticalmente ambas caras del bolso."
+    },
+    {
+      "id": "es-holdout-v4-795",
+      "field": "altText",
+      "text": "La bolsa de tela queda sostenida por bandas exteriores continuas."
+    },
+    {
+      "id": "es-holdout-v4-796",
+      "field": "caption",
+      "text": "Los pequeños huecos del bordado dejan respirar la camisa."
+    },
+    {
+      "id": "es-holdout-v4-797",
+      "field": "caption",
+      "text": "Hoy llevo algodón con flores caladas alrededor del cuello."
+    },
+    {
+      "id": "es-holdout-v4-798",
+      "field": "altText",
+      "text": "Pequeños agujeros bordados forman flores en la camisa."
+    },
+    {
+      "id": "es-holdout-v4-799",
+      "field": "altText",
+      "text": "Cada abertura está rodeada por puntadas densas y claras."
+    },
+    {
+      "id": "es-holdout-v4-800",
+      "field": "altText",
+      "text": "La pechera presenta un dibujo calado de hojas y pétalos."
+    },
+    {
+      "id": "es-holdout-v4-801",
+      "field": "caption",
+      "text": "Un broche recoge parte de la falda a un costado."
+    },
+    {
+      "id": "es-holdout-v4-802",
+      "field": "caption",
+      "text": "Hoy cambio el largo del vestido con un pequeño cierre."
+    },
+    {
+      "id": "es-holdout-v4-803",
+      "field": "altText",
+      "text": "Una pieza metálica sujeta un pliegue del vestido lateralmente."
+    },
+    {
+      "id": "es-holdout-v4-804",
+      "field": "altText",
+      "text": "La falda forma ondas diagonales alrededor del broche."
+    },
+    {
+      "id": "es-holdout-v4-805",
+      "field": "altText",
+      "text": "El borde queda más alto en el punto donde está recogido."
+    },
+    {
+      "id": "es-holdout-v4-806",
+      "field": "caption",
+      "text": "La chorrera pequeña sigue la línea de los botones."
+    },
+    {
+      "id": "es-holdout-v4-807",
+      "field": "caption",
+      "text": "Hoy mi camisa tiene un relieve fino justo en el centro."
+    },
+    {
+      "id": "es-holdout-v4-808",
+      "field": "altText",
+      "text": "Un volante estrecho acompaña la botonadura de la camisa."
+    },
+    {
+      "id": "es-holdout-v4-809",
+      "field": "altText",
+      "text": "Dos filas de ondas pequeñas flanquean los botones centrales."
+    },
+    {
+      "id": "es-holdout-v4-810",
+      "field": "altText",
+      "text": "El adorno frontal termina antes de llegar a la cintura."
+    },
+    {
+      "id": "es-holdout-v4-811",
+      "field": "caption",
+      "text": "Mi collar está tejido con pequeñas cuentas cuadradas."
+    },
+    {
+      "id": "es-holdout-v4-812",
+      "field": "caption",
+      "text": "Hoy llevo un dibujo geométrico muy pegado al cuello."
+    },
+    {
+      "id": "es-holdout-v4-813",
+      "field": "altText",
+      "text": "Cuentas pequeñas forman una banda cuadriculada alrededor del cuello."
+    },
+    {
+      "id": "es-holdout-v4-814",
+      "field": "altText",
+      "text": "La gargantilla presenta filas de abalorios ajustadas entre sí."
+    },
+    {
+      "id": "es-holdout-v4-815",
+      "field": "altText",
+      "text": "Un patrón de cuadrados alternos recorre la pieza de cuentas."
+    },
+    {
+      "id": "es-holdout-v4-816",
+      "field": "caption",
+      "text": "Los bolsillos triangulares cambian la silueta de mi chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-817",
+      "field": "caption",
+      "text": "Hoy las puntas de las tapas miran hacia abajo."
+    },
+    {
+      "id": "es-holdout-v4-818",
+      "field": "altText",
+      "text": "Dos tapas triangulares cubren los bolsillos frontales de la chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-819",
+      "field": "altText",
+      "text": "El bolsillo aplicado termina en una punta bien definida."
+    },
+    {
+      "id": "es-holdout-v4-820",
+      "field": "altText",
+      "text": "Las piezas angulares contrastan con el bajo recto de la prenda."
+    },
+    {
+      "id": "es-holdout-v4-821",
+      "field": "caption",
+      "text": "El dobladillo ancho le da peso a mi falda ligera."
+    },
+    {
+      "id": "es-holdout-v4-822",
+      "field": "caption",
+      "text": "Hoy enseño el acabado interior que cosí sin prisa."
+    },
+    {
+      "id": "es-holdout-v4-823",
+      "field": "altText",
+      "text": "Una banda doblada amplia recorre el interior del bajo."
+    },
+    {
+      "id": "es-holdout-v4-824",
+      "field": "altText",
+      "text": "El borde de la falda muestra varios centímetros de tela vuelta."
+    },
+    {
+      "id": "es-holdout-v4-825",
+      "field": "altText",
+      "text": "Una puntada discreta sujeta la parte superior del dobladillo."
+    },
+    {
+      "id": "es-holdout-v4-826",
+      "field": "caption",
+      "text": "El pañuelo protege el asa de cuero que más uso."
+    },
+    {
+      "id": "es-holdout-v4-827",
+      "field": "caption",
+      "text": "Hoy envolví el mango entero con una tira de seda."
+    },
+    {
+      "id": "es-holdout-v4-828",
+      "field": "altText",
+      "text": "Un pañuelo estrecho cubre completamente el asa de cuero."
+    },
+    {
+      "id": "es-holdout-v4-829",
+      "field": "altText",
+      "text": "La seda está enrollada en espiral alrededor del mango."
+    },
+    {
+      "id": "es-holdout-v4-830",
+      "field": "altText",
+      "text": "Dos puntas cortas salen junto a los extremos del asa."
+    },
+    {
+      "id": "es-holdout-v4-831",
+      "field": "caption",
+      "text": "La doble hilera de botones recuerda a los pantalones marineros."
+    },
+    {
+      "id": "es-holdout-v4-832",
+      "field": "caption",
+      "text": "Hoy llevo el frente abotonado con una camiseta sencilla."
+    },
+    {
+      "id": "es-holdout-v4-833",
+      "field": "altText",
+      "text": "Dos filas de botones enmarcan el delantero del pantalón."
+    },
+    {
+      "id": "es-holdout-v4-834",
+      "field": "altText",
+      "text": "Una pieza frontal rectangular cierra mediante botones laterales."
+    },
+    {
+      "id": "es-holdout-v4-835",
+      "field": "altText",
+      "text": "La cintura alta muestra seis botones grandes en paralelo."
+    },
+    {
+      "id": "es-holdout-v4-836",
+      "field": "caption",
+      "text": "El cuello del vestido se enrolla suavemente sobre sí mismo."
+    },
+    {
+      "id": "es-holdout-v4-837",
+      "field": "caption",
+      "text": "Hoy llevo la tela floja formando un pequeño cuello caído."
+    },
+    {
+      "id": "es-holdout-v4-838",
+      "field": "altText",
+      "text": "Una banda amplia de tela cae alrededor del cuello."
+    },
+    {
+      "id": "es-holdout-v4-839",
+      "field": "altText",
+      "text": "El tejido forma varias curvas blandas bajo la garganta."
+    },
+    {
+      "id": "es-holdout-v4-840",
+      "field": "altText",
+      "text": "El cuello drapeado queda unido al cuerpo del vestido."
+    },
+    {
+      "id": "es-holdout-v4-841",
+      "field": "caption",
+      "text": "Mi bolso cilíndrico cabe justo debajo del brazo."
+    },
+    {
+      "id": "es-holdout-v4-842",
+      "field": "caption",
+      "text": "Hoy llevo la cartera alargada con sus extremos redondos."
+    },
+    {
+      "id": "es-holdout-v4-843",
+      "field": "altText",
+      "text": "Un bolso tubular tiene dos bases laterales circulares."
+    },
+    {
+      "id": "es-holdout-v4-844",
+      "field": "altText",
+      "text": "La cremallera recorre la parte superior del cilindro textil."
+    },
+    {
+      "id": "es-holdout-v4-845",
+      "field": "altText",
+      "text": "Una correa corta sostiene el bolso horizontal junto al cuerpo."
+    },
+    {
+      "id": "es-holdout-v4-846",
+      "field": "caption",
+      "text": "Las rayas del jersey cambian de tono poco a poco."
+    },
+    {
+      "id": "es-holdout-v4-847",
+      "field": "caption",
+      "text": "Hoy llevo un degradado tejido desde el cuello al bajo."
+    },
+    {
+      "id": "es-holdout-v4-848",
+      "field": "altText",
+      "text": "Bandas horizontales cambian gradualmente de intensidad sobre el jersey."
+    },
+    {
+      "id": "es-holdout-v4-849",
+      "field": "altText",
+      "text": "Las franjas superiores son más claras que las inferiores."
+    },
+    {
+      "id": "es-holdout-v4-850",
+      "field": "altText",
+      "text": "El punto muestra una transición suave entre tonos cercanos."
+    },
+    {
+      "id": "es-holdout-v4-851",
+      "field": "caption",
+      "text": "Una hebilla de madera cierra mi capa cerca del hombro."
+    },
+    {
+      "id": "es-holdout-v4-852",
+      "field": "caption",
+      "text": "Hoy llevo el cierre grande un poquito desplazado."
+    },
+    {
+      "id": "es-holdout-v4-853",
+      "field": "altText",
+      "text": "Una hebilla ovalada de madera une dos partes de la capa."
+    },
+    {
+      "id": "es-holdout-v4-854",
+      "field": "altText",
+      "text": "El cierre se coloca al lado del cuello elevado."
+    },
+    {
+      "id": "es-holdout-v4-855",
+      "field": "altText",
+      "text": "La veta natural aparece en la superficie pulida de la hebilla."
+    },
+    {
+      "id": "es-holdout-v4-856",
+      "field": "caption",
+      "text": "La goma interior recoge mi chaqueta sin necesidad de cinturón."
+    },
+    {
+      "id": "es-holdout-v4-857",
+      "field": "caption",
+      "text": "Hoy llevo el blusón ligeramente fruncido en la cintura."
+    },
+    {
+      "id": "es-holdout-v4-858",
+      "field": "altText",
+      "text": "Una banda elástica interior reúne la tela en pequeños pliegues."
+    },
+    {
+      "id": "es-holdout-v4-859",
+      "field": "altText",
+      "text": "La chaqueta se estrecha suavemente a media altura."
+    },
+    {
+      "id": "es-holdout-v4-860",
+      "field": "altText",
+      "text": "El tejido forma ondas cortas alrededor de la cintura."
+    },
+    {
+      "id": "es-holdout-v4-861",
+      "field": "caption",
+      "text": "La pieza delantera de mi falda queda como un pequeño escudo."
+    },
+    {
+      "id": "es-holdout-v4-862",
+      "field": "caption",
+      "text": "Hoy pruebo una sobreposición de bordes angulares sobre la falda."
+    },
+    {
+      "id": "es-holdout-v4-863",
+      "field": "altText",
+      "text": "Un panel con punta central cubre el frente de la falda."
+    },
+    {
+      "id": "es-holdout-v4-864",
+      "field": "altText",
+      "text": "La sobreposición plana tiene dos bordes oblicuos simétricos."
+    },
+    {
+      "id": "es-holdout-v4-865",
+      "field": "altText",
+      "text": "La tela adicional termina a media altura del muslo."
+    },
+    {
+      "id": "es-holdout-v4-866",
+      "field": "caption",
+      "text": "Las pequeñas conchas conservan sus marcas naturales."
+    },
+    {
+      "id": "es-holdout-v4-867",
+      "field": "caption",
+      "text": "Hoy llevo unos pendientes que parecen dos espirales diminutas."
+    },
+    {
+      "id": "es-holdout-v4-868",
+      "field": "altText",
+      "text": "Dos pequeñas conchas espirales cuelgan de ganchos metálicos."
+    },
+    {
+      "id": "es-holdout-v4-869",
+      "field": "altText",
+      "text": "Las superficies nacaradas muestran líneas curvas naturales."
+    },
+    {
+      "id": "es-holdout-v4-870",
+      "field": "altText",
+      "text": "Unas bases sencillas sostienen las piezas marinas sin taparlas."
+    },
+    {
+      "id": "es-holdout-v4-871",
+      "field": "caption",
+      "text": "El cuello se mantiene de pie aunque dejo el botón abierto."
+    },
+    {
+      "id": "es-holdout-v4-872",
+      "field": "caption",
+      "text": "Hoy llevo una pequeña abertura bajo la garganta."
+    },
+    {
+      "id": "es-holdout-v4-873",
+      "field": "altText",
+      "text": "Un cuello corto vertical queda abierto en el centro delantero."
+    },
+    {
+      "id": "es-holdout-v4-874",
+      "field": "altText",
+      "text": "Dos bordes rectos enmarcan la parte superior del escote."
+    },
+    {
+      "id": "es-holdout-v4-875",
+      "field": "altText",
+      "text": "El botón del cuello está suelto encima de la botonadura."
+    },
+    {
+      "id": "es-holdout-v4-876",
+      "field": "caption",
+      "text": "Las dos solapas del bolso se cierran en direcciones opuestas."
+    },
+    {
+      "id": "es-holdout-v4-877",
+      "field": "caption",
+      "text": "Las dos tapas superpuestas hacen especial la cartera que elegí hoy."
+    },
+    {
+      "id": "es-holdout-v4-878",
+      "field": "altText",
+      "text": "Dos solapas triangulares se cruzan sobre el frente del bolso."
+    },
+    {
+      "id": "es-holdout-v4-879",
+      "field": "altText",
+      "text": "Cada tapa tiene un botón independiente cerca de su punta."
+    },
+    {
+      "id": "es-holdout-v4-880",
+      "field": "altText",
+      "text": "La cartera muestra un cierre exterior formado por dos capas."
+    },
+    {
+      "id": "es-holdout-v4-881",
+      "field": "caption",
+      "text": "Las cintas del bajo se cruzan alrededor de los tobillos."
+    },
+    {
+      "id": "es-holdout-v4-882",
+      "field": "caption",
+      "text": "Hoy recojo mi pantalón ancho con sus tiras largas."
+    },
+    {
+      "id": "es-holdout-v4-883",
+      "field": "altText",
+      "text": "Dos bandas de tela rodean cada tobillo varias veces."
+    },
+    {
+      "id": "es-holdout-v4-884",
+      "field": "altText",
+      "text": "El pantalón amplio termina recogido mediante una lazada cruzada."
+    },
+    {
+      "id": "es-holdout-v4-885",
+      "field": "altText",
+      "text": "Las cintas salen directamente de los extremos de las perneras."
+    },
+    {
+      "id": "es-holdout-v4-886",
+      "field": "caption",
+      "text": "El tejido abierto de la blusa muestra mi top liso."
+    },
+    {
+      "id": "es-holdout-v4-887",
+      "field": "caption",
+      "text": "Hoy combino la textura aireada con una capa muy sencilla."
+    },
+    {
+      "id": "es-holdout-v4-888",
+      "field": "altText",
+      "text": "Una blusa de trama abierta deja ver el top interior."
+    },
+    {
+      "id": "es-holdout-v4-889",
+      "field": "altText",
+      "text": "Los hilos gruesos forman pequeños espacios rectangulares."
+    },
+    {
+      "id": "es-holdout-v4-890",
+      "field": "altText",
+      "text": "El tejido semitransparente cae suelto sobre una prenda ajustada."
+    },
+    {
+      "id": "es-holdout-v4-891",
+      "field": "caption",
+      "text": "Las aberturas para los pulgares mantienen mis mangas en su sitio."
+    },
+    {
+      "id": "es-holdout-v4-892",
+      "field": "caption",
+      "text": "Hoy llevo los puños largos cubriendo parte de las manos."
+    },
+    {
+      "id": "es-holdout-v4-893",
+      "field": "altText",
+      "text": "Un agujero lateral deja salir el pulgar del puño largo."
+    },
+    {
+      "id": "es-holdout-v4-894",
+      "field": "altText",
+      "text": "La manga de punto cubre parcialmente el dorso de la mano."
+    },
+    {
+      "id": "es-holdout-v4-895",
+      "field": "altText",
+      "text": "Los extremos alargados del jersey quedan sujetos mediante los pulgares."
+    },
+    {
+      "id": "es-holdout-v4-896",
+      "field": "caption",
+      "text": "El vestido cortado al bies se mueve sin pliegues marcados."
+    },
+    {
+      "id": "es-holdout-v4-897",
+      "field": "caption",
+      "text": "Hoy llevo una tela fluida que cae con pequeñas ondas."
+    },
+    {
+      "id": "es-holdout-v4-898",
+      "field": "altText",
+      "text": "El vestido presenta una caída diagonal suave sobre las caderas."
+    },
+    {
+      "id": "es-holdout-v4-899",
+      "field": "altText",
+      "text": "La tela lisa forma ondas naturales junto al bajo."
+    },
+    {
+      "id": "es-holdout-v4-900",
+      "field": "altText",
+      "text": "Un corte al bies permite que la superficie siga el movimiento."
+    },
+    {
+      "id": "es-holdout-v4-901",
+      "field": "caption",
+      "text": "Las esquinas recortadas le dan otra forma a mi bolso rígido."
+    },
+    {
+      "id": "es-holdout-v4-902",
+      "field": "caption",
+      "text": "Hoy llevo una cartera que casi parece una pequeña caja."
+    },
+    {
+      "id": "es-holdout-v4-903",
+      "field": "altText",
+      "text": "Un bolso rígido tiene las cuatro esquinas cortadas en diagonal."
+    },
+    {
+      "id": "es-holdout-v4-904",
+      "field": "altText",
+      "text": "La silueta rectangular se transforma en un contorno octogonal."
+    },
+    {
+      "id": "es-holdout-v4-905",
+      "field": "altText",
+      "text": "El cierre superior sigue una línea recta entre dos biseles."
+    },
+    {
+      "id": "es-holdout-v4-906",
+      "field": "caption",
+      "text": "El interior de la tapeta aparece al dejar la camisa abierta."
+    },
+    {
+      "id": "es-holdout-v4-907",
+      "field": "caption",
+      "text": "Hoy enseño una pequeña franja de color escondida junto a los botones."
+    },
+    {
+      "id": "es-holdout-v4-908",
+      "field": "altText",
+      "text": "La cara interior de la tapeta tiene un tono distinto."
+    },
+    {
+      "id": "es-holdout-v4-909",
+      "field": "altText",
+      "text": "Una banda contrastada queda visible al abrir dos botones."
+    },
+    {
+      "id": "es-holdout-v4-910",
+      "field": "altText",
+      "text": "El borde doblado descubre un tejido diferente bajo el cuello."
+    },
+    {
+      "id": "es-holdout-v4-911",
+      "field": "caption",
+      "text": "Mi falda está hecha con piezas curvas que encajan entre sí."
+    },
+    {
+      "id": "es-holdout-v4-912",
+      "field": "caption",
+      "text": "Hoy se notan las costuras redondeadas de este proyecto."
+    },
+    {
+      "id": "es-holdout-v4-913",
+      "field": "altText",
+      "text": "Paneles curvos forman un dibujo de círculos parciales en la falda."
+    },
+    {
+      "id": "es-holdout-v4-914",
+      "field": "altText",
+      "text": "Las uniones onduladas separan varias zonas de tela lisa."
+    },
+    {
+      "id": "es-holdout-v4-915",
+      "field": "altText",
+      "text": "Una costura semicircular pasa por encima de la rodilla."
+    },
+    {
+      "id": "es-holdout-v4-916",
+      "field": "caption",
+      "text": "El pañuelo rodea la coleta y cae sobre mi espalda."
+    },
+    {
+      "id": "es-holdout-v4-917",
+      "field": "caption",
+      "text": "Hoy sustituyo la goma visible por un pequeño lazo estampado."
+    },
+    {
+      "id": "es-holdout-v4-918",
+      "field": "altText",
+      "text": "Un pañuelo anudado envuelve la base de la coleta."
+    },
+    {
+      "id": "es-holdout-v4-919",
+      "field": "altText",
+      "text": "Dos extremos de tela cuelgan junto al pelo recogido."
+    },
+    {
+      "id": "es-holdout-v4-920",
+      "field": "altText",
+      "text": "El estampado del pañuelo destaca sobre el cuello de la blusa."
+    },
+    {
+      "id": "es-holdout-v4-921",
+      "field": "caption",
+      "text": "El cuello de canalé contrasta con el tejido liso de la chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-922",
+      "field": "caption",
+      "text": "Hoy llevo ese borde elástico levantado junto a la nuca."
+    },
+    {
+      "id": "es-holdout-v4-923",
+      "field": "altText",
+      "text": "Un cuello de punto acanalado remata una chaqueta lisa."
+    },
+    {
+      "id": "es-holdout-v4-924",
+      "field": "altText",
+      "text": "El canalé forma estrías menudas alrededor de la nuca."
+    },
+    {
+      "id": "es-holdout-v4-925",
+      "field": "altText",
+      "text": "La banda elástica queda un poco más alta que la chaqueta."
+    },
+    {
+      "id": "es-holdout-v4-926",
+      "field": "caption",
+      "text": "Los ojales grandes dejan pasar mis cintas más anchas."
+    },
+    {
+      "id": "es-holdout-v4-927",
+      "field": "caption",
+      "text": "Hoy llevo una lazada suave sobre el zapato de cuero."
+    },
+    {
+      "id": "es-holdout-v4-928",
+      "field": "altText",
+      "text": "Ojales metálicos grandes sujetan una cinta ancha en el zapato."
+    },
+    {
+      "id": "es-holdout-v4-929",
+      "field": "altText",
+      "text": "La tela pasa por cuatro aros redondos sobre el empeine."
+    },
+    {
+      "id": "es-holdout-v4-930",
+      "field": "altText",
+      "text": "Una lazada plana cubre la abertura central del calzado."
+    },
+    {
+      "id": "es-holdout-v4-931",
+      "field": "caption",
+      "text": "Las costuras exteriores dibujan el vestido sin añadir estampado."
+    },
+    {
+      "id": "es-holdout-v4-932",
+      "field": "caption",
+      "text": "Hoy dejo visibles las líneas que normalmente irían por dentro."
+    },
+    {
+      "id": "es-holdout-v4-933",
+      "field": "altText",
+      "text": "Las costuras sobresalen sobre la superficie exterior del vestido."
+    },
+    {
+      "id": "es-holdout-v4-934",
+      "field": "altText",
+      "text": "Los relieves cosidos perfilan cintura y costados del vestido."
+    },
+    {
+      "id": "es-holdout-v4-935",
+      "field": "altText",
+      "text": "Un pespunte contrastado destaca las uniones del tejido."
+    },
+    {
+      "id": "es-holdout-v4-936",
+      "field": "caption",
+      "text": "Los parches del bolso son recuerdos textiles de distintos talleres."
+    },
+    {
+      "id": "es-holdout-v4-937",
+      "field": "caption",
+      "text": "Hoy añadí otra pequeña pieza a mi bolsa de siempre."
+    },
+    {
+      "id": "es-holdout-v4-938",
+      "field": "altText",
+      "text": "Varios parches de formas distintas cubren una bolsa de tela."
+    },
+    {
+      "id": "es-holdout-v4-939",
+      "field": "altText",
+      "text": "Los pequeños recuadros cosidos muestran dibujos sin letras."
+    },
+    {
+      "id": "es-holdout-v4-940",
+      "field": "altText",
+      "text": "Una esquina del bolso está decorada con un parche ovalado."
+    },
+    {
+      "id": "es-holdout-v4-941",
+      "field": "caption",
+      "text": "Mi collar está hecho de tiras de camiseta trenzadas."
+    },
+    {
+      "id": "es-holdout-v4-942",
+      "field": "caption",
+      "text": "Hoy llevo un accesorio suave que hice con retales."
+    },
+    {
+      "id": "es-holdout-v4-943",
+      "field": "altText",
+      "text": "Tiras de algodón anudadas forman un collar voluminoso."
+    },
+    {
+      "id": "es-holdout-v4-944",
+      "field": "altText",
+      "text": "Los nudos textiles se agrupan en la zona delantera del cuello."
+    },
+    {
+      "id": "es-holdout-v4-945",
+      "field": "altText",
+      "text": "Varios cordones blandos de tela se entrelazan sobre el pecho."
+    },
+    {
+      "id": "es-holdout-v4-946",
+      "field": "caption",
+      "text": "La abertura del codo permite doblar la manga sin tirones."
+    },
+    {
+      "id": "es-holdout-v4-947",
+      "field": "caption",
+      "text": "Hoy mi blusa tiene dos pequeños cortes bien colocados."
+    },
+    {
+      "id": "es-holdout-v4-948",
+      "field": "altText",
+      "text": "Una abertura horizontal cruza la parte trasera del codo."
+    },
+    {
+      "id": "es-holdout-v4-949",
+      "field": "altText",
+      "text": "Los bordes de la manga se separan ligeramente al doblar el brazo."
+    },
+    {
+      "id": "es-holdout-v4-950",
+      "field": "altText",
+      "text": "El corte estrecho está rematado con una cinta fina."
+    },
+    {
+      "id": "es-holdout-v4-951",
+      "field": "caption",
+      "text": "Los bolsillos redondos hacen distinto este pantalón sencillo."
+    },
+    {
+      "id": "es-holdout-v4-952",
+      "field": "caption",
+      "text": "Hoy llevo las manos en unas entradas casi circulares."
+    },
+    {
+      "id": "es-holdout-v4-953",
+      "field": "altText",
+      "text": "Dos bolsillos delanteros presentan amplias entradas redondeadas."
+    },
+    {
+      "id": "es-holdout-v4-954",
+      "field": "altText",
+      "text": "Una costura circular rodea cada abertura del pantalón."
+    },
+    {
+      "id": "es-holdout-v4-955",
+      "field": "altText",
+      "text": "El bolsillo muestra una curva profunda junto a la cadera."
+    },
+    {
+      "id": "es-holdout-v4-956",
+      "field": "caption",
+      "text": "La bufanda sale del mismo cuello de mi jersey."
+    },
+    {
+      "id": "es-holdout-v4-957",
+      "field": "caption",
+      "text": "Hoy envuelvo la tira tejida una vez alrededor del cuello."
+    },
+    {
+      "id": "es-holdout-v4-958",
+      "field": "altText",
+      "text": "Una banda larga de punto nace del cuello del jersey."
+    },
+    {
+      "id": "es-holdout-v4-959",
+      "field": "altText",
+      "text": "El extremo tejido se cruza sobre el pecho y vuelve hacia atrás."
+    },
+    {
+      "id": "es-holdout-v4-960",
+      "field": "altText",
+      "text": "La bufanda integrada comparte la misma trama que el pulóver."
+    },
+    {
+      "id": "es-holdout-v4-961",
+      "field": "caption",
+      "text": "Dos cintas recorren mi vestido desde los hombros hasta el bajo."
+    },
+    {
+      "id": "es-holdout-v4-962",
+      "field": "caption",
+      "text": "Hoy las líneas largas ayudan a ordenar el conjunto."
+    },
+    {
+      "id": "es-holdout-v4-963",
+      "field": "altText",
+      "text": "Dos bandas estrechas descienden por el frente del vestido."
+    },
+    {
+      "id": "es-holdout-v4-964",
+      "field": "altText",
+      "text": "Las cintas paralelas terminan unos centímetros después del borde inferior."
+    },
+    {
+      "id": "es-holdout-v4-965",
+      "field": "altText",
+      "text": "Una pareja de tiras divide visualmente el cuerpo de la prenda."
+    },
+    {
+      "id": "es-holdout-v4-966",
+      "field": "caption",
+      "text": "El pequeño gancho permite cambiar la orientación de la correa."
+    },
+    {
+      "id": "es-holdout-v4-967",
+      "field": "caption",
+      "text": "Hoy engancho el asa corta para llevar el bolso en la mano."
+    },
+    {
+      "id": "es-holdout-v4-968",
+      "field": "altText",
+      "text": "Un mosquetón giratorio une la correa al lateral del bolso."
+    },
+    {
+      "id": "es-holdout-v4-969",
+      "field": "altText",
+      "text": "El herraje presenta una base redonda que permite girar el asa."
+    },
+    {
+      "id": "es-holdout-v4-970",
+      "field": "altText",
+      "text": "Una correa desmontada descansa junto al cierre metálico del bolso."
+    },
+    {
+      "id": "es-holdout-v4-971",
+      "field": "caption",
+      "text": "Las pinzas cortas forman un pequeño abanico cerca de la cintura."
+    },
+    {
+      "id": "es-holdout-v4-972",
+      "field": "caption",
+      "text": "Hoy se aprecia bien el relieve que cosí en la blusa."
+    },
+    {
+      "id": "es-holdout-v4-973",
+      "field": "altText",
+      "text": "Tres pinzas pequeñas parten de un punto junto a la cintura."
+    },
+    {
+      "id": "es-holdout-v4-974",
+      "field": "altText",
+      "text": "Los dobleces cortos abren la tela en direcciones diferentes."
+    },
+    {
+      "id": "es-holdout-v4-975",
+      "field": "altText",
+      "text": "Un grupo de líneas cosidas da forma al costado de la blusa."
+    },
+    {
+      "id": "es-holdout-v4-976",
+      "field": "caption",
+      "text": "El borde de mi falda dibuja curvas grandes y regulares."
+    },
+    {
+      "id": "es-holdout-v4-977",
+      "field": "caption",
+      "text": "Hoy llevo una silueta sencilla terminada en medias lunas."
+    },
+    {
+      "id": "es-holdout-v4-978",
+      "field": "altText",
+      "text": "El bajo está cortado en arcos amplios y repetidos."
+    },
+    {
+      "id": "es-holdout-v4-979",
+      "field": "altText",
+      "text": "Varias curvas redondas forman el contorno inferior de la falda."
+    },
+    {
+      "id": "es-holdout-v4-980",
+      "field": "altText",
+      "text": "Cada onda tiene un remate fino que conserva su forma."
+    },
+    {
+      "id": "es-holdout-v4-981",
+      "field": "caption",
+      "text": "La pequeña cinta permite cerrar el cuello cuando refresca."
+    },
+    {
+      "id": "es-holdout-v4-982",
+      "field": "caption",
+      "text": "Hoy dejo el cuello sujeto con su botón lateral."
+    },
+    {
+      "id": "es-holdout-v4-983",
+      "field": "altText",
+      "text": "La chaqueta tiene una cinta transversal bajo su cuello levantado."
+    },
+    {
+      "id": "es-holdout-v4-984",
+      "field": "altText",
+      "text": "Un botón lateral sujeta la presilla bajo la garganta."
+    },
+    {
+      "id": "es-holdout-v4-985",
+      "field": "altText",
+      "text": "El cuello queda cerrado mediante una pequeña banda abrochada."
+    },
+    {
+      "id": "es-holdout-v4-986",
+      "field": "caption",
+      "text": "Las piezas de cerámica forman una curva alrededor del cuello."
+    },
+    {
+      "id": "es-holdout-v4-987",
+      "field": "caption",
+      "text": "Hoy llevo mi collar de pequeños tubos esmaltados."
+    },
+    {
+      "id": "es-holdout-v4-988",
+      "field": "altText",
+      "text": "Tubos cortos de cerámica están ensartados en un cordón."
+    },
+    {
+      "id": "es-holdout-v4-989",
+      "field": "altText",
+      "text": "Los segmentos esmaltados forman una banda semicircular."
+    },
+    {
+      "id": "es-holdout-v4-990",
+      "field": "altText",
+      "text": "Pequeños espacios separan las piezas rígidas del collar."
+    },
+    {
+      "id": "es-holdout-v4-991",
+      "field": "caption",
+      "text": "El forro independiente también lo uso como vestido ligero."
+    },
+    {
+      "id": "es-holdout-v4-992",
+      "field": "caption",
+      "text": "Hoy preparo las dos capas antes de salir."
+    },
+    {
+      "id": "es-holdout-v4-993",
+      "field": "altText",
+      "text": "Un vestido ligero y su forro separado cuelgan juntos."
+    },
+    {
+      "id": "es-holdout-v4-994",
+      "field": "altText",
+      "text": "La capa interior tiene tirantes finos y un bajo recto."
+    },
+    {
+      "id": "es-holdout-v4-995",
+      "field": "altText",
+      "text": "Pequeñas presillas unen temporalmente el forro al vestido exterior."
+    },
+    {
+      "id": "es-holdout-v4-996",
+      "field": "caption",
+      "text": "Mi bolso tiene una forma de corazón muy sencilla."
+    },
+    {
+      "id": "es-holdout-v4-997",
+      "field": "caption",
+      "text": "Hoy lo combino con prendas lisas y zapatos cómodos."
+    },
+    {
+      "id": "es-holdout-v4-998",
+      "field": "altText",
+      "text": "Una bolsa plana presenta dos curvas superiores y una punta inferior."
+    },
+    {
+      "id": "es-holdout-v4-999",
+      "field": "altText",
+      "text": "La cremallera sigue uno de los arcos del bolso corazón."
+    },
+    {
+      "id": "es-holdout-v4-1000",
+      "field": "altText",
+      "text": "Una correa fina nace de los lados de la figura textil."
+    }
+  ]
+}

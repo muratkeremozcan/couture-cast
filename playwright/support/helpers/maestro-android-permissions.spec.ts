@@ -198,6 +198,42 @@ describe('prepared Android flow tree', () => {
     )
   })
 
+  it('6.8-HARNESS excludes large preexisting artifacts when output lives outside the flow tree', () => {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-copy-'))
+    const source = path.join(directory, 'maestro')
+    fs.mkdirSync(path.join(source, 'artifacts'), { recursive: true })
+    fs.mkdirSync(path.join(source, 'subflows'), { recursive: true })
+    const sentinel = path.join(source, 'artifacts', 'large-old-video.mp4')
+    const handle = fs.openSync(sentinel, 'w')
+    fs.ftruncateSync(handle, 1024 * 1024 * 1024)
+    fs.closeSync(handle)
+    fs.writeFileSync(
+      path.join(source, 'flow.yaml'),
+      'appId: a\n---\n- runFlow: subflows/open.yaml\n'
+    )
+    fs.writeFileSync(
+      path.join(source, 'subflows', 'open.yaml'),
+      'appId: a\n---\n- launchApp:\n    appId: a\n'
+    )
+    const target = path.join(directory, 'runtime-owned', 'android-flows')
+    expect(
+      prepareAndroidFlowTree({
+        sourceDir: source,
+        targetDir: target,
+        permissions: PERMISSIONS,
+        skip: ['runtime-owned'],
+      })
+    ).toEqual({ files: 2, rewritten: 1 })
+    expect(fs.existsSync(path.join(target, 'artifacts'))).toBe(false)
+    expect(fs.statSync(sentinel).size).toBe(1024 * 1024 * 1024)
+    expect(fs.readFileSync(path.join(target, 'flow.yaml'), 'utf8')).toContain(
+      'subflows/open.yaml'
+    )
+    expect(
+      launchApps(fs.readFileSync(path.join(target, 'subflows/open.yaml'), 'utf8'))[0]
+    ).toMatchObject({ permissions: { 'android.permission.CAMERA': 'allow' } })
+  })
+
   it('6.7b-R18-07 leaves no repo launchApp for Maestro to resolve by pulling the APK', () => {
     // The repo's own flows rely on the default `all: allow`, which is the pull.
     const permissionless = (root: string) =>

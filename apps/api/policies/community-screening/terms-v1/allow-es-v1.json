@@ -8,23 +8,125 @@
     "licence": "UNLICENSED (repository-owned)",
     "retrievedAt": "2026-10-16",
     "curator": "couture-cast repository owner",
-    "notes": "GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it."
+    "notes": "GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it. Literal contexts clear only their exact target token within bounded grammatical object context; other tokens and unsafe phrases remain screened."
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256"
+    "allowListSha256": "b25c9043213ba09b2ca3f415ae05f79cd9222910c715eeda2100d748d5444613",
+    "reviewedOccurrenceSha256": "e5c93949c90d428f783d1e273c1abf0f97004dbde479663590011f4d2e5c23bf"
   },
   "entries": [
+    "atate",
+    "blusa es mona",
+    "bolsera",
+    "bolseras",
+    "borra",
+    "collera",
+    "colleras",
     "comer",
     "con",
     "concha",
     "cono",
+    "falda mona",
     "heroína",
     "infierno",
     "mamá",
+    "maracas",
+    "marca",
+    "marcas",
+    "marcá",
+    "marida",
+    "marinas",
+    "marisca",
+    "matute",
+    "matutes",
+    "metates",
+    "mollera",
+    "molleras",
+    "negras",
+    "negrita",
+    "negritas",
     "negro",
+    "negros",
+    "ollera",
+    "olleras",
+    "pollera",
+    "polleras",
     "pon",
+    "queda mona",
+    "rapera",
+    "rapero",
     "saco",
-    "sacó"
+    "sacó",
+    "sudaba",
+    "sudabas",
+    "sudada",
+    "sudadas",
+    "sudara",
+    "sudaras",
+    "terrones",
+    "vacias",
+    "vacías"
+  ],
+  "splitFrames": [],
+  "cutFamily": {
+    "terms": [],
+    "reviewHalves": [],
+    "copulas": [],
+    "nameFollowers": []
+  },
+  "scopedWords": [],
+  "scopedPhrases": [],
+  "literalContexts": [
+    {
+      "terms": ["burro"],
+      "objects": [
+        "ropa",
+        "camisa",
+        "camisas",
+        "chaqueta",
+        "chaquetas",
+        "percha",
+        "perchas",
+        "abrigo",
+        "abrigos"
+      ],
+      "connectors": ["de", "del", "la", "las", "los", "para", "con", "en"],
+      "maxDistance": 5
+    }
+  ],
+  "occurrenceConstructions": [
+    {
+      "target": "bolera",
+      "phrases": [
+        "chaqueta bolera",
+        "chaquetilla bolera",
+        "cazadora bolera",
+        "americana bolera",
+        "blusa bolera",
+        "camisa bolera",
+        "falda bolera",
+        "prenda bolera",
+        "pieza bolera",
+        "vestido bolera",
+        "chaleco bolera"
+      ]
+    },
+    {
+      "target": "boleras",
+      "phrases": [
+        "chaquetas boleras",
+        "chaquetillas boleras",
+        "cazadoras boleras",
+        "americanas boleras",
+        "blusas boleras",
+        "camisas boleras",
+        "faldas boleras",
+        "prendas boleras",
+        "piezas boleras",
+        "vestidos boleras",
+        "chalecos boleras"
+      ]
+    }
   ]
 }

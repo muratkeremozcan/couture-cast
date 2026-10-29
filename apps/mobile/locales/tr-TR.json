@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "NSPhotoLibraryAddUsageDescription": "CoutureCast’in onayladığın kartı fotoğraflarına kaydetmesine izin ver.",
+    "NSPhotoLibraryUsageDescription": "CoutureCast’in gardırobunuz için fotoğraf seçmesine izin verin."
+  }
+}

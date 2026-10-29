@@ -41,7 +41,7 @@ const ROUTE = '/api/v1/commerce/premium/palette'
 const IDEMPOTENCY_KEY = '11111111-1111-4111-8111-111111111111'
 
 function createPrismaStub() {
-  return {
+  const prisma = {
     paletteProfile: {
       findUnique: vi.fn().mockResolvedValue(null),
       update: vi.fn(),
@@ -55,10 +55,10 @@ function createPrismaStub() {
     },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
     $executeRaw: vi.fn().mockResolvedValue(undefined),
-    $transaction: vi.fn((arg: unknown) =>
-      Array.isArray(arg) ? Promise.all(arg) : (arg as (tx: unknown) => unknown)(undefined)
-    ),
+    // Every transaction is interactive; the stub is its own transaction client.
+    $transaction: vi.fn((work: (tx: unknown) => unknown) => work(prisma)),
   }
+  return prisma
 }
 
 /**

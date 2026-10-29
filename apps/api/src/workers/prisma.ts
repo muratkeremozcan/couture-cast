@@ -1,11 +1,12 @@
-import { PrismaClient } from '@prisma/client'
+import type { PrismaClient } from '@prisma/client'
+import { createPrismaClient } from '../prisma/prisma-client.js'
 
 // Singleton Prisma client for worker processes
 let prisma: PrismaClient | null = null
 
 export function getPrismaClient(): PrismaClient {
   if (!prisma) {
-    prisma = new PrismaClient()
+    prisma = createPrismaClient()
   }
   return prisma
 }

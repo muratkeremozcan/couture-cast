@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 2,
+  "locales": {
+    "de": "holdout-v6",
+    "en": "holdout-v6",
+    "es": "holdout-v6",
+    "fr": "holdout-v6",
+    "it": "holdout-v6",
+    "tr": "holdout-v6",
+    "pt": "holdout-v8"
+  }
+}

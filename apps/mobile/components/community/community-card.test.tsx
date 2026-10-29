@@ -141,6 +141,37 @@ function renderCard(props: Partial<React.ComponentProps<typeof CommunityCard>> =
 }
 
 describe('CommunityCard (Story 6.1)', () => {
+  it.each(['pending_review', 'flagged', 'withdrawn'] as const)(
+    'M2: own %s detail has no export action',
+    (status) => {
+      renderCard({
+        item: item({ status, author: { displayName: 'Me', isSelf: true } }),
+        onExport: vi.fn(),
+      })
+      expect(
+        screen.queryByTestId('community-share-card-open-post-a')
+      ).not.toBeInTheDocument()
+    }
+  )
+  it('M2: own published detail without a publication time has no export action', () => {
+    renderCard({
+      item: item({ publishedAt: null, author: { displayName: 'Me', isSelf: true } }),
+      onExport: vi.fn(),
+    })
+    expect(
+      screen.queryByTestId('community-share-card-open-post-a')
+    ).not.toBeInTheDocument()
+  })
+  it('L8: an own published export control describes its action', () => {
+    renderCard({
+      item: item({ author: { displayName: 'Me', isSelf: true } }),
+      onExport: vi.fn(),
+    })
+    expect(screen.getByTestId('community-share-card-open-post-a')).toHaveAccessibleName(
+      enUS.shareCard.launcher
+    )
+  })
+
   beforeAll(async () => {
     await initI18n()
     await i18n.changeLanguage('en-US')

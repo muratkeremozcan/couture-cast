@@ -1,11 +1,13 @@
 // Story 3.5 Task 1 step 1 owner: orchestrate responsive grid breakpoints and hero/community panels in apps/web/src/app/components/lookbook-prism-layout.tsx
 'use client'
 
+import { RitualShareCardLauncher } from './ritual-share-card-launcher'
+
 import React, { useEffect, useRef, useState } from 'react'
 import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
 import type { ClimateBand } from '@couture/api-client/contracts/http'
 import posthog from 'posthog-js'
-import { I18nextProvider } from 'react-i18next'
+import { I18nextProvider, useTranslation } from 'react-i18next'
 import { getI18n } from '../../i18n'
 import { processWebDeepLink } from '../lib/deep-link-handler'
 import { LayoutControls } from './layout-controls'
@@ -162,14 +164,7 @@ function PlannerOverlaySlot({
 }
 
 export function LookbookPrismLayout() {
-  // Not `useTranslation()`: this route (`/`, via `page.tsx`) mounts no
-  // `I18nextProvider` -- unlike `/settings`, `/palette`, etc. -- and the two
-  // providers this file does render are scoped to the planner slots only
-  // (see `DesktopPlannerRailSlot`/`PlannerOverlaySlot` above), not an
-  // ancestor of this component's own render. `getI18n()` directly, matching
-  // the old locked-panel code this replaces, for the two "Plan week" labels
-  // below.
-  const i18n = getI18n()
+  const { i18n } = useTranslation(undefined, { i18n: getI18n() })
   const containerRef = useRef<HTMLDivElement>(null)
   const alertRef = useRef<HTMLDivElement>(null)
   const [isComparisonMode, setIsComparisonMode] = useState(false)
@@ -479,13 +474,19 @@ export function LookbookPrismLayout() {
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="lookbook-metrics text-xs uppercase tracking-widest text-[#8A691F]">
+            <h2
+              tabIndex={-1}
+              data-share-card-focus-fallback="hero"
+              className="lookbook-metrics text-xs uppercase tracking-widest text-[#8A691F]"
+            >
               Daily Hero Ritual
-            </span>
+            </h2>
             <span className="lookbook-metrics rounded-full border border-[#E6E6ED] bg-[#FFFFFF] px-3 py-1 text-xs text-[#111111]">
               08:30 AM • NYC
             </span>
           </div>
+
+          <RitualShareCardLauncher />
 
           {/* Weather Numerical Banner */}
           <div className="flex items-baseline gap-4">

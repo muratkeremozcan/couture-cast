@@ -1,0 +1,16 @@
+appId: ${MAESTRO_APP_ID}
+---
+- assertVisible:
+    id: share-card-title
+- pressKey: Home
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    stopApp: false
+    clearState: false
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: share-card-title
+    timeout: 20000
+- assertVisible:
+    id: share-card-preview-loaded-.*

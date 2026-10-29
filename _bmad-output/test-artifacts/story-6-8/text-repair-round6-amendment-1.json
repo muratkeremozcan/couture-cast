@@ -1,0 +1,49 @@
+{
+  "amends": "text-repair-round6-frozen-files.json",
+  "manifestSha256": "7b33f73895622ce85b6900cb965406ebba04de2533d1cb94997727218ce57201",
+  "entries": [
+    {
+      "path": "scripts/verify-community-screening-lists.test.mjs",
+      "oldSha256": "747a06adff8a656a4d3e554a2718c7742caf2c318105ef70114f5b61441383a0",
+      "newSha256": "2d4bb806ec0f663723477aaff497e7b5cfa7fa7be9c2516ca22a2b40b7a20793",
+      "reason": "Coordinator-granted test-review exception: the Round5 occurrence-bank test now asserts its policy filter selects exactly balls, toppa, bale and pişen before looping (H3), and the suite is grouped into describe blocks (M4). Only the test file changed; the verifier, policies, terms and corpus files are untouched.",
+      "commit": "7ebcbd5d66c995a22db2e902a3cd6918d090ff3a"
+    },
+    {
+      "path": "apps/api/integration/community-text-round3-development.integration.spec.ts",
+      "oldSha256": "2368ec8f24b0882796842b85fd7e5e43bb24fefa6126f033436b62bb28504932",
+      "newSha256": "cceb244837f0140784162883f73940c85515b215b3e04c1f412f7dbec0345e83",
+      "reason": "Coordinator-granted test-review exception: the round3 v4 regression case now asserts all 15 named rows are selected before checking them, so a renamed ID can no longer drop a case silently. Only the test file changed; no screening module, list, table or corpus file is touched.",
+      "commit": "6315e899cb27a5647920eef8969c66b59c1178a7"
+    },
+    {
+      "path": "apps/api/integration/community-text-round4-development.integration.spec.ts",
+      "oldSha256": "7a3b3614ef7dd847871654cfbe428c2206e459e18aa0c4f9b9d80a5754df215b",
+      "newSha256": "d958d16a4a68d9259021c38525e2d30aaa5ad046b59db3e9a8e2cebba90d201c",
+      "reason": "Coordinator-granted test-review exception: the round4 hidden-row check now requires a 200 comment list before asserting the row is absent, so an error response can no longer pass it. Only the test file changed; no screening module, list, table or corpus file is touched.",
+      "commit": "4747b91e28e0ac622a5f35d3c17311120c7aa01d"
+    },
+    {
+      "path": "apps/api/src/modules/community/community-text-round3-development.spec.ts",
+      "oldSha256": "7a01aa0bbdacf5138b5e1c2a4afed5b26e4e8e191241e46b35d1dc9cb0612b7f",
+      "newSha256": "64d235c156167fe45d58c14697a460badbb8819f16de0d389edfb5cc072e9d06",
+      "reason": "Coordinator-granted test-review exception: every round3 fixture loop now asserts its exact non-zero set size first, so an empty fixture can no longer pass vacuously. Sizes were read as entry counts only. Only the test file changed; no screening module, list, table or corpus file is touched.",
+      "commit": "8f8699f22d3e6e289d38e4a6627853b90f73fde3"
+    },
+    {
+      "path": "apps/api/src/modules/community/community-text-round3-development.spec.ts",
+      "oldSha256": "64d235c156167fe45d58c14697a460badbb8819f16de0d389edfb5cc072e9d06",
+      "newSha256": "120477566c31d4de7274c1656f873699e81ddfc536b9cb706dfdb9d0f8306f9e",
+      "reason": "Coordinator-granted test-only change, second amendment of this path (chains from its first entry): the one-time screener warm-up moves into a beforeAll with its own measured 10 s hook timeout, so a slow setup fails the hook by name instead of the first locale case. No assertion, screening module, list, table or corpus file changes.",
+      "commit": "7a8e9d312c6eec782d9d564f7763dd8c6187c42c"
+    },
+    {
+      "path": "apps/api/src/modules/community/community-text-round5-development.spec.ts",
+      "oldSha256": "e16eec08927c23c89cacaa8422d8564bd4f66a767b25f25888a29f8552d7784e",
+      "newSha256": "913d5dea9f8144ae395cb9c05ed6af946f7bbdd3b75d5548700e6587c4848757",
+      "reason": "Coordinator-granted test-only change: the one-time screener warm-up moves into a beforeAll with its own measured 10 s hook timeout, so a slow setup fails the hook by name instead of the first locale case. No assertion, screening module, list, table or corpus file changes.",
+      "commit": "dbb679afbce64a54689247ea02ba5c37cdab88fc"
+    }
+  ],
+  "chaining": "Entries for one path apply in order: the first oldSha256 equals the manifest entry, each later oldSha256 equals the previous newSha256, and the last newSha256 equals the committed file."
+}

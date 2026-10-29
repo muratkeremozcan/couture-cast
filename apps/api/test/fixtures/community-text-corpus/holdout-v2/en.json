@@ -1,0 +1,2013 @@
+{
+  "language": "en",
+  "corpusVersion": "holdout-v2",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "6f1aed8d5bdaeeedb4c01e4904e43aaa414de1829468120a4593ad4b7508bbac",
+    "languageAllowListSha256": "bebf551640dcbf64b3887736083f2a1f798fc0fe2f86f793cc54a00979abbdd3"
+  },
+  "entries": [
+    {
+      "id": "en-holdout-v2-001",
+      "field": "caption",
+      "text": "Repaired the pocket before breakfast."
+    },
+    {
+      "id": "en-holdout-v2-002",
+      "field": "caption",
+      "text": "These trousers finally fit properly."
+    },
+    {
+      "id": "en-holdout-v2-003",
+      "field": "caption",
+      "text": "Borrowed a scarf from Mum."
+    },
+    {
+      "id": "en-holdout-v2-004",
+      "field": "caption",
+      "text": "Trying a shorter jacket today."
+    },
+    {
+      "id": "en-holdout-v2-005",
+      "field": "caption",
+      "text": "My favourite cardigan has returned."
+    },
+    {
+      "id": "en-holdout-v2-006",
+      "field": "caption",
+      "text": "Wore grandad's watch to lunch."
+    },
+    {
+      "id": "en-holdout-v2-007",
+      "field": "caption",
+      "text": "The new laces feel sturdy."
+    },
+    {
+      "id": "en-holdout-v2-008",
+      "field": "caption",
+      "text": "Keeping this shirt for years."
+    },
+    {
+      "id": "en-holdout-v2-009",
+      "field": "caption",
+      "text": "Found a button in the drawer."
+    },
+    {
+      "id": "en-holdout-v2-010",
+      "field": "caption",
+      "text": "Made room for winter layers."
+    },
+    {
+      "id": "en-holdout-v2-011",
+      "field": "caption",
+      "text": "Coffee spilled on my cuff."
+    },
+    {
+      "id": "en-holdout-v2-012",
+      "field": "caption",
+      "text": "Taking the velvet shoes out."
+    },
+    {
+      "id": "en-holdout-v2-013",
+      "field": "caption",
+      "text": "The lining needs another stitch."
+    },
+    {
+      "id": "en-holdout-v2-014",
+      "field": "caption",
+      "text": "Rolled my sleeves for painting."
+    },
+    {
+      "id": "en-holdout-v2-015",
+      "field": "caption",
+      "text": "Still learning to tie this."
+    },
+    {
+      "id": "en-holdout-v2-016",
+      "field": "caption",
+      "text": "Silver earrings for a quiet Tuesday."
+    },
+    {
+      "id": "en-holdout-v2-017",
+      "field": "caption",
+      "text": "Wearing stripes to the library."
+    },
+    {
+      "id": "en-holdout-v2-018",
+      "field": "caption",
+      "text": "Packed slippers for the train."
+    },
+    {
+      "id": "en-holdout-v2-019",
+      "field": "caption",
+      "text": "This belt belonged to my aunt."
+    },
+    {
+      "id": "en-holdout-v2-020",
+      "field": "caption",
+      "text": "Fresh socks make such a difference."
+    },
+    {
+      "id": "en-holdout-v2-021",
+      "field": "caption",
+      "text": "Took the wool skirt dancing."
+    },
+    {
+      "id": "en-holdout-v2-022",
+      "field": "caption",
+      "text": "A neighbour knitted this hat."
+    },
+    {
+      "id": "en-holdout-v2-023",
+      "field": "caption",
+      "text": "Trying the jacket with pleats."
+    },
+    {
+      "id": "en-holdout-v2-024",
+      "field": "caption",
+      "text": "My collar kept folding upwards."
+    },
+    {
+      "id": "en-holdout-v2-025",
+      "field": "caption",
+      "text": "Finally cleaned these canvas shoes."
+    },
+    {
+      "id": "en-holdout-v2-026",
+      "field": "caption",
+      "text": "Lemon yellow brightened the commute."
+    },
+    {
+      "id": "en-holdout-v2-027",
+      "field": "caption",
+      "text": "A long scarf for the ferry."
+    },
+    {
+      "id": "en-holdout-v2-028",
+      "field": "caption",
+      "text": "The waist needs taking in."
+    },
+    {
+      "id": "en-holdout-v2-029",
+      "field": "caption",
+      "text": "Bought thread to match the hem."
+    },
+    {
+      "id": "en-holdout-v2-030",
+      "field": "caption",
+      "text": "My mended jeans are back."
+    },
+    {
+      "id": "en-holdout-v2-031",
+      "field": "caption",
+      "text": "Chose flat shoes for rehearsals."
+    },
+    {
+      "id": "en-holdout-v2-032",
+      "field": "caption",
+      "text": "That coat survived another winter."
+    },
+    {
+      "id": "en-holdout-v2-033",
+      "field": "caption",
+      "text": "Nothing beats deep jacket pockets."
+    },
+    {
+      "id": "en-holdout-v2-034",
+      "field": "caption",
+      "text": "Changed the buttons to wooden ones."
+    },
+    {
+      "id": "en-holdout-v2-035",
+      "field": "caption",
+      "text": "Wearing the dress I made."
+    },
+    {
+      "id": "en-holdout-v2-036",
+      "field": "caption",
+      "text": "Practising a different scarf knot."
+    },
+    {
+      "id": "en-holdout-v2-037",
+      "field": "caption",
+      "text": "The cuffs dried before sunset."
+    },
+    {
+      "id": "en-holdout-v2-038",
+      "field": "caption",
+      "text": "Found my old school satchel."
+    },
+    {
+      "id": "en-holdout-v2-039",
+      "field": "caption",
+      "text": "A cardigan for the reading room."
+    },
+    {
+      "id": "en-holdout-v2-040",
+      "field": "caption",
+      "text": "Polished the buckle last night."
+    },
+    {
+      "id": "en-holdout-v2-041",
+      "field": "caption",
+      "text": "First outing for this waistcoat."
+    },
+    {
+      "id": "en-holdout-v2-042",
+      "field": "caption",
+      "text": "The tiny bag fits my keys."
+    },
+    {
+      "id": "en-holdout-v2-043",
+      "field": "caption",
+      "text": "Wrapped a shawl round my shoulders."
+    },
+    {
+      "id": "en-holdout-v2-044",
+      "field": "caption",
+      "text": "I embroidered leaves on the pocket."
+    },
+    {
+      "id": "en-holdout-v2-045",
+      "field": "caption",
+      "text": "The shoes squeak on this floor."
+    },
+    {
+      "id": "en-holdout-v2-046",
+      "field": "caption",
+      "text": "Blue trousers for the choir concert."
+    },
+    {
+      "id": "en-holdout-v2-047",
+      "field": "caption",
+      "text": "A linen apron for pottery."
+    },
+    {
+      "id": "en-holdout-v2-048",
+      "field": "caption",
+      "text": "My gloves stayed on the bus."
+    },
+    {
+      "id": "en-holdout-v2-049",
+      "field": "caption",
+      "text": "Keeping the spare button safely."
+    },
+    {
+      "id": "en-holdout-v2-050",
+      "field": "caption",
+      "text": "This jumper deserves another season."
+    },
+    {
+      "id": "en-holdout-v2-051",
+      "field": "caption",
+      "text": "Tried the coat without its belt."
+    },
+    {
+      "id": "en-holdout-v2-052",
+      "field": "caption",
+      "text": "Felt hat from a village fair."
+    },
+    {
+      "id": "en-holdout-v2-053",
+      "field": "caption",
+      "text": "The zip runs smoothly again."
+    },
+    {
+      "id": "en-holdout-v2-054",
+      "field": "caption",
+      "text": "Matching socks was today's small achievement."
+    },
+    {
+      "id": "en-holdout-v2-055",
+      "field": "caption",
+      "text": "Wore a silk scarf as a belt."
+    },
+    {
+      "id": "en-holdout-v2-056",
+      "field": "caption",
+      "text": "The red lining surprised me."
+    },
+    {
+      "id": "en-holdout-v2-057",
+      "field": "caption",
+      "text": "Shortened these sleeves by hand."
+    },
+    {
+      "id": "en-holdout-v2-058",
+      "field": "caption",
+      "text": "Choosing comfortable shoes for volunteering."
+    },
+    {
+      "id": "en-holdout-v2-059",
+      "field": "caption",
+      "text": "Packed a collarless shirt for tomorrow."
+    },
+    {
+      "id": "en-holdout-v2-060",
+      "field": "caption",
+      "text": "Bought this brooch secondhand."
+    },
+    {
+      "id": "en-holdout-v2-061",
+      "field": "caption",
+      "text": "The tailor fixed the shoulder seam."
+    },
+    {
+      "id": "en-holdout-v2-062",
+      "field": "caption",
+      "text": "Denim overshirt for an early delivery."
+    },
+    {
+      "id": "en-holdout-v2-063",
+      "field": "caption",
+      "text": "A warm vest under my shirt."
+    },
+    {
+      "id": "en-holdout-v2-064",
+      "field": "caption",
+      "text": "I like how the pleats move."
+    },
+    {
+      "id": "en-holdout-v2-065",
+      "field": "caption",
+      "text": "Wore the green dress to brunch."
+    },
+    {
+      "id": "en-holdout-v2-066",
+      "field": "caption",
+      "text": "Tucked my scarf inside the coat."
+    },
+    {
+      "id": "en-holdout-v2-067",
+      "field": "caption",
+      "text": "These boots need a softer insole."
+    },
+    {
+      "id": "en-holdout-v2-068",
+      "field": "caption",
+      "text": "A checked shirt for the allotment."
+    },
+    {
+      "id": "en-holdout-v2-069",
+      "field": "caption",
+      "text": "Sewing patches while the kettle boils."
+    },
+    {
+      "id": "en-holdout-v2-070",
+      "field": "caption",
+      "text": "Taking the rain cape cycling."
+    },
+    {
+      "id": "en-holdout-v2-071",
+      "field": "caption",
+      "text": "The cardigan smells of cedar."
+    },
+    {
+      "id": "en-holdout-v2-072",
+      "field": "caption",
+      "text": "This jacket folds into my tote."
+    },
+    {
+      "id": "en-holdout-v2-073",
+      "field": "caption",
+      "text": "A simple outfit for piano lessons."
+    },
+    {
+      "id": "en-holdout-v2-074",
+      "field": "caption",
+      "text": "Felt slippers after a long walk."
+    },
+    {
+      "id": "en-holdout-v2-075",
+      "field": "caption",
+      "text": "Brought a spare pair of tights."
+    },
+    {
+      "id": "en-holdout-v2-076",
+      "field": "caption",
+      "text": "Ironed the collar before leaving."
+    },
+    {
+      "id": "en-holdout-v2-077",
+      "field": "caption",
+      "text": "My cousin made this bracelet."
+    },
+    {
+      "id": "en-holdout-v2-078",
+      "field": "caption",
+      "text": "Rediscovered a box of hair clips."
+    },
+    {
+      "id": "en-holdout-v2-079",
+      "field": "caption",
+      "text": "A narrow belt changes the shape."
+    },
+    {
+      "id": "en-holdout-v2-080",
+      "field": "caption",
+      "text": "The old trench still works."
+    },
+    {
+      "id": "en-holdout-v2-081",
+      "field": "caption",
+      "text": "Warm trousers for the evening class."
+    },
+    {
+      "id": "en-holdout-v2-082",
+      "field": "caption",
+      "text": "Put new soles on old boots."
+    },
+    {
+      "id": "en-holdout-v2-083",
+      "field": "caption",
+      "text": "The fabric drapes beautifully when seated."
+    },
+    {
+      "id": "en-holdout-v2-084",
+      "field": "caption",
+      "text": "Trying rust and cream together."
+    },
+    {
+      "id": "en-holdout-v2-085",
+      "field": "caption",
+      "text": "My shopping bag became a project bag."
+    },
+    {
+      "id": "en-holdout-v2-086",
+      "field": "caption",
+      "text": "The shirt dried on a hanger."
+    },
+    {
+      "id": "en-holdout-v2-087",
+      "field": "caption",
+      "text": "Buttoned the coat against the wind."
+    },
+    {
+      "id": "en-holdout-v2-088",
+      "field": "caption",
+      "text": "A reversible vest earns its space."
+    },
+    {
+      "id": "en-holdout-v2-089",
+      "field": "caption",
+      "text": "Wore my wedding earrings again."
+    },
+    {
+      "id": "en-holdout-v2-090",
+      "field": "caption",
+      "text": "Comfortable layers for the museum."
+    },
+    {
+      "id": "en-holdout-v2-091",
+      "field": "caption",
+      "text": "Left the jacket open indoors."
+    },
+    {
+      "id": "en-holdout-v2-092",
+      "field": "caption",
+      "text": "My hat stayed dry under the hood."
+    },
+    {
+      "id": "en-holdout-v2-093",
+      "field": "caption",
+      "text": "The shoes match the copper clasp."
+    },
+    {
+      "id": "en-holdout-v2-094",
+      "field": "caption",
+      "text": "Brushed the dust off this blazer."
+    },
+    {
+      "id": "en-holdout-v2-095",
+      "field": "caption",
+      "text": "A long skirt for storytelling night."
+    },
+    {
+      "id": "en-holdout-v2-096",
+      "field": "caption",
+      "text": "My scarf caught the afternoon light."
+    },
+    {
+      "id": "en-holdout-v2-097",
+      "field": "caption",
+      "text": "Replaced the elastic in these shorts."
+    },
+    {
+      "id": "en-holdout-v2-098",
+      "field": "caption",
+      "text": "A padded coat for stargazing."
+    },
+    {
+      "id": "en-holdout-v2-099",
+      "field": "caption",
+      "text": "Bought a thimble with this coat."
+    },
+    {
+      "id": "en-holdout-v2-100",
+      "field": "caption",
+      "text": "Learning to fold the pocket square."
+    },
+    {
+      "id": "en-holdout-v2-101",
+      "field": "caption",
+      "text": "The trousers have hidden side tabs."
+    },
+    {
+      "id": "en-holdout-v2-102",
+      "field": "caption",
+      "text": "Trying a square neckline this week."
+    },
+    {
+      "id": "en-holdout-v2-103",
+      "field": "caption",
+      "text": "Darned both heels during the match."
+    },
+    {
+      "id": "en-holdout-v2-104",
+      "field": "caption",
+      "text": "A wool tie for the ceremony."
+    },
+    {
+      "id": "en-holdout-v2-105",
+      "field": "caption",
+      "text": "This bag carries my sketchbook."
+    },
+    {
+      "id": "en-holdout-v2-106",
+      "field": "caption",
+      "text": "Wore the tunic to the workshop."
+    },
+    {
+      "id": "en-holdout-v2-107",
+      "field": "caption",
+      "text": "The yellow socks are peeking out."
+    },
+    {
+      "id": "en-holdout-v2-108",
+      "field": "caption",
+      "text": "A loose shirt after swimming."
+    },
+    {
+      "id": "en-holdout-v2-109",
+      "field": "caption",
+      "text": "My friend crocheted this collar."
+    },
+    {
+      "id": "en-holdout-v2-110",
+      "field": "caption",
+      "text": "Made a pouch from fabric scraps."
+    },
+    {
+      "id": "en-holdout-v2-111",
+      "field": "caption",
+      "text": "The cape leaves my hands free."
+    },
+    {
+      "id": "en-holdout-v2-112",
+      "field": "caption",
+      "text": "Soft denim for a long journey."
+    },
+    {
+      "id": "en-holdout-v2-113",
+      "field": "caption",
+      "text": "Added a ribbon to the hat."
+    },
+    {
+      "id": "en-holdout-v2-114",
+      "field": "caption",
+      "text": "A bright jacket for school pickup."
+    },
+    {
+      "id": "en-holdout-v2-115",
+      "field": "caption",
+      "text": "The repaired strap feels secure."
+    },
+    {
+      "id": "en-holdout-v2-116",
+      "field": "caption",
+      "text": "Wearing an old concert tee."
+    },
+    {
+      "id": "en-holdout-v2-117",
+      "field": "caption",
+      "text": "My coat fits over the sling."
+    },
+    {
+      "id": "en-holdout-v2-118",
+      "field": "caption",
+      "text": "A knitted vest for chess club."
+    },
+    {
+      "id": "en-holdout-v2-119",
+      "field": "caption",
+      "text": "Tried the wrap skirt with boots."
+    },
+    {
+      "id": "en-holdout-v2-120",
+      "field": "caption",
+      "text": "The cuff links were a gift."
+    },
+    {
+      "id": "en-holdout-v2-121",
+      "field": "caption",
+      "text": "I keep folding these sleeves unevenly."
+    },
+    {
+      "id": "en-holdout-v2-122",
+      "field": "caption",
+      "text": "Took a beaded bag to dinner."
+    },
+    {
+      "id": "en-holdout-v2-123",
+      "field": "caption",
+      "text": "The corduroy jacket feels like autumn."
+    },
+    {
+      "id": "en-holdout-v2-124",
+      "field": "caption",
+      "text": "A cotton dress for the greenhouse."
+    },
+    {
+      "id": "en-holdout-v2-125",
+      "field": "caption",
+      "text": "Wore trainers to the dance studio."
+    },
+    {
+      "id": "en-holdout-v2-126",
+      "field": "caption",
+      "text": "My scarf doubles as a blanket."
+    },
+    {
+      "id": "en-holdout-v2-127",
+      "field": "caption",
+      "text": "A cardigan borrowed for the office."
+    },
+    {
+      "id": "en-holdout-v2-128",
+      "field": "caption",
+      "text": "These pockets hold my knitting needles."
+    },
+    {
+      "id": "en-holdout-v2-129",
+      "field": "caption",
+      "text": "Choosing navy for the family photo."
+    },
+    {
+      "id": "en-holdout-v2-130",
+      "field": "caption",
+      "text": "A silk blouse under overalls."
+    },
+    {
+      "id": "en-holdout-v2-131",
+      "field": "caption",
+      "text": "The shawl pin stays put."
+    },
+    {
+      "id": "en-holdout-v2-132",
+      "field": "caption",
+      "text": "Wore a bright suit to celebrate."
+    },
+    {
+      "id": "en-holdout-v2-133",
+      "field": "caption",
+      "text": "A detachable collar changed this dress."
+    },
+    {
+      "id": "en-holdout-v2-134",
+      "field": "caption",
+      "text": "These shorts came from old trousers."
+    },
+    {
+      "id": "en-holdout-v2-135",
+      "field": "caption",
+      "text": "My bag strap needs one stitch."
+    },
+    {
+      "id": "en-holdout-v2-136",
+      "field": "caption",
+      "text": "New insoles saved the walking shoes."
+    },
+    {
+      "id": "en-holdout-v2-137",
+      "field": "caption",
+      "text": "The lace edging is handmade."
+    },
+    {
+      "id": "en-holdout-v2-138",
+      "field": "caption",
+      "text": "A striped apron for breadmaking."
+    },
+    {
+      "id": "en-holdout-v2-139",
+      "field": "caption",
+      "text": "My coat has room for layers."
+    },
+    {
+      "id": "en-holdout-v2-140",
+      "field": "caption",
+      "text": "The rain trousers finally dried."
+    },
+    {
+      "id": "en-holdout-v2-141",
+      "field": "caption",
+      "text": "Wore the same earrings all week."
+    },
+    {
+      "id": "en-holdout-v2-142",
+      "field": "caption",
+      "text": "This buckle came from a flea market."
+    },
+    {
+      "id": "en-holdout-v2-143",
+      "field": "caption",
+      "text": "A pleated skirt for a recital."
+    },
+    {
+      "id": "en-holdout-v2-144",
+      "field": "caption",
+      "text": "The shirt has mother of pearl buttons."
+    },
+    {
+      "id": "en-holdout-v2-145",
+      "field": "caption",
+      "text": "Tried a knitted tie with denim."
+    },
+    {
+      "id": "en-holdout-v2-146",
+      "field": "caption",
+      "text": "My shoes lasted the whole wedding."
+    },
+    {
+      "id": "en-holdout-v2-147",
+      "field": "caption",
+      "text": "Mended the elbow with matching wool."
+    },
+    {
+      "id": "en-holdout-v2-148",
+      "field": "caption",
+      "text": "A collar pin from my uncle."
+    },
+    {
+      "id": "en-holdout-v2-149",
+      "field": "caption",
+      "text": "The linen creases are settling in."
+    },
+    {
+      "id": "en-holdout-v2-150",
+      "field": "caption",
+      "text": "Keeping the cuffs loose for comfort."
+    },
+    {
+      "id": "en-holdout-v2-151",
+      "field": "caption",
+      "text": "Added a patch behind the knee."
+    },
+    {
+      "id": "en-holdout-v2-152",
+      "field": "caption",
+      "text": "The hood fits over my headphones."
+    },
+    {
+      "id": "en-holdout-v2-153",
+      "field": "caption",
+      "text": "A long cardigan for the bookshop."
+    },
+    {
+      "id": "en-holdout-v2-154",
+      "field": "caption",
+      "text": "Wore a neckerchief on the boat."
+    },
+    {
+      "id": "en-holdout-v2-155",
+      "field": "caption",
+      "text": "The dress has adjustable shoulder ties."
+    },
+    {
+      "id": "en-holdout-v2-156",
+      "field": "caption",
+      "text": "Testing my handmade fabric belt."
+    },
+    {
+      "id": "en-holdout-v2-157",
+      "field": "caption",
+      "text": "A dark suit for the graduation."
+    },
+    {
+      "id": "en-holdout-v2-158",
+      "field": "caption",
+      "text": "These mittens have separate inner gloves."
+    },
+    {
+      "id": "en-holdout-v2-159",
+      "field": "caption",
+      "text": "A checked skirt for the reunion."
+    },
+    {
+      "id": "en-holdout-v2-160",
+      "field": "caption",
+      "text": "The bag lining is pale blue."
+    },
+    {
+      "id": "en-holdout-v2-161",
+      "field": "caption",
+      "text": "My brother handed down this coat."
+    },
+    {
+      "id": "en-holdout-v2-162",
+      "field": "caption",
+      "text": "A knitted dress for film night."
+    },
+    {
+      "id": "en-holdout-v2-163",
+      "field": "caption",
+      "text": "The sandals have new straps."
+    },
+    {
+      "id": "en-holdout-v2-164",
+      "field": "caption",
+      "text": "This shirt fits my changing shoulders."
+    },
+    {
+      "id": "en-holdout-v2-165",
+      "field": "caption",
+      "text": "A silver chain beside a plain collar."
+    },
+    {
+      "id": "en-holdout-v2-166",
+      "field": "caption",
+      "text": "Used the leftover yarn for cuffs."
+    },
+    {
+      "id": "en-holdout-v2-167",
+      "field": "caption",
+      "text": "Wore white trousers to the gallery."
+    },
+    {
+      "id": "en-holdout-v2-168",
+      "field": "caption",
+      "text": "A broad brim for the garden."
+    },
+    {
+      "id": "en-holdout-v2-169",
+      "field": "caption",
+      "text": "The buttonholes took all afternoon."
+    },
+    {
+      "id": "en-holdout-v2-170",
+      "field": "caption",
+      "text": "These shoes pack almost flat."
+    },
+    {
+      "id": "en-holdout-v2-171",
+      "field": "caption",
+      "text": "The cotton lining feels cooler."
+    },
+    {
+      "id": "en-holdout-v2-172",
+      "field": "caption",
+      "text": "A burgundy jumper for the journey."
+    },
+    {
+      "id": "en-holdout-v2-173",
+      "field": "caption",
+      "text": "My scarf is woven locally."
+    },
+    {
+      "id": "en-holdout-v2-174",
+      "field": "caption",
+      "text": "Bought the trousers a size longer."
+    },
+    {
+      "id": "en-holdout-v2-175",
+      "field": "caption",
+      "text": "A quilted jacket for the station."
+    },
+    {
+      "id": "en-holdout-v2-176",
+      "field": "caption",
+      "text": "The bracelet closes with a toggle."
+    },
+    {
+      "id": "en-holdout-v2-177",
+      "field": "caption",
+      "text": "Wore my hair in a ribbon."
+    },
+    {
+      "id": "en-holdout-v2-178",
+      "field": "caption",
+      "text": "The skirt moves freely on stairs."
+    },
+    {
+      "id": "en-holdout-v2-179",
+      "field": "caption",
+      "text": "A canvas bag for the tool library."
+    },
+    {
+      "id": "en-holdout-v2-180",
+      "field": "caption",
+      "text": "The new buttons look like shells."
+    },
+    {
+      "id": "en-holdout-v2-181",
+      "field": "caption",
+      "text": "Borrowed a waistcoat for the portrait."
+    },
+    {
+      "id": "en-holdout-v2-182",
+      "field": "caption",
+      "text": "A wool cape for a crisp morning."
+    },
+    {
+      "id": "en-holdout-v2-183",
+      "field": "caption",
+      "text": "My trainers need another wash."
+    },
+    {
+      "id": "en-holdout-v2-184",
+      "field": "caption",
+      "text": "The top has adjustable side ties."
+    },
+    {
+      "id": "en-holdout-v2-185",
+      "field": "caption",
+      "text": "Wore the brooch on my hat."
+    },
+    {
+      "id": "en-holdout-v2-186",
+      "field": "caption",
+      "text": "A bright lining makes me smile."
+    },
+    {
+      "id": "en-holdout-v2-187",
+      "field": "caption",
+      "text": "Finished hemming the dress at midnight."
+    },
+    {
+      "id": "en-holdout-v2-188",
+      "field": "caption",
+      "text": "The shoulder strap sits more comfortably."
+    },
+    {
+      "id": "en-holdout-v2-189",
+      "field": "caption",
+      "text": "A roomy blouse for printmaking."
+    },
+    {
+      "id": "en-holdout-v2-190",
+      "field": "caption",
+      "text": "Kept the fabric label for repairs."
+    },
+    {
+      "id": "en-holdout-v2-191",
+      "field": "caption",
+      "text": "The sweater fits beneath my jacket."
+    },
+    {
+      "id": "en-holdout-v2-192",
+      "field": "caption",
+      "text": "A woven belt for summer trousers."
+    },
+    {
+      "id": "en-holdout-v2-193",
+      "field": "caption",
+      "text": "My boots came back from repair."
+    },
+    {
+      "id": "en-holdout-v2-194",
+      "field": "caption",
+      "text": "Tried small hoops with this collar."
+    },
+    {
+      "id": "en-holdout-v2-195",
+      "field": "caption",
+      "text": "A knitted hat for the canal walk."
+    },
+    {
+      "id": "en-holdout-v2-196",
+      "field": "caption",
+      "text": "The sleeves unbutton at the wrist."
+    },
+    {
+      "id": "en-holdout-v2-197",
+      "field": "caption",
+      "text": "Wearing handmade socks to supper."
+    },
+    {
+      "id": "en-holdout-v2-198",
+      "field": "caption",
+      "text": "A scarf from the textile museum."
+    },
+    {
+      "id": "en-holdout-v2-199",
+      "field": "caption",
+      "text": "The bag holds a folding walking stick."
+    },
+    {
+      "id": "en-holdout-v2-200",
+      "field": "caption",
+      "text": "My old jacket has a new life."
+    },
+    {
+      "id": "en-holdout-v2-201",
+      "field": "altText",
+      "text": "Ivory blouse with a rounded collar."
+    },
+    {
+      "id": "en-holdout-v2-202",
+      "field": "altText",
+      "text": "Wide trousers beside a wooden bench."
+    },
+    {
+      "id": "en-holdout-v2-203",
+      "field": "altText",
+      "text": "Green coat hanging by the door."
+    },
+    {
+      "id": "en-holdout-v2-204",
+      "field": "altText",
+      "text": "Blue scarf folded on a stool."
+    },
+    {
+      "id": "en-holdout-v2-205",
+      "field": "altText",
+      "text": "Brown shoes beneath a pleated hem."
+    },
+    {
+      "id": "en-holdout-v2-206",
+      "field": "altText",
+      "text": "Striped jumper with ribbed cuffs."
+    },
+    {
+      "id": "en-holdout-v2-207",
+      "field": "altText",
+      "text": "Silver brooch on a navy lapel."
+    },
+    {
+      "id": "en-holdout-v2-208",
+      "field": "altText",
+      "text": "A canvas tote against a brick wall."
+    },
+    {
+      "id": "en-holdout-v2-209",
+      "field": "altText",
+      "text": "Red mittens clipped to a sleeve."
+    },
+    {
+      "id": "en-holdout-v2-210",
+      "field": "altText",
+      "text": "Cream socks above black loafers."
+    },
+    {
+      "id": "en-holdout-v2-211",
+      "field": "altText",
+      "text": "A checked waistcoat over cotton."
+    },
+    {
+      "id": "en-holdout-v2-212",
+      "field": "altText",
+      "text": "Copper buttons on a wool jacket."
+    },
+    {
+      "id": "en-holdout-v2-213",
+      "field": "altText",
+      "text": "Purple skirt beside a blue bicycle."
+    },
+    {
+      "id": "en-holdout-v2-214",
+      "field": "altText",
+      "text": "White trainers on a tiled floor."
+    },
+    {
+      "id": "en-holdout-v2-215",
+      "field": "altText",
+      "text": "A straw hat with green ribbon."
+    },
+    {
+      "id": "en-holdout-v2-216",
+      "field": "altText",
+      "text": "Grey trousers with turned cuffs."
+    },
+    {
+      "id": "en-holdout-v2-217",
+      "field": "altText",
+      "text": "Denim apron over a plain tee."
+    },
+    {
+      "id": "en-holdout-v2-218",
+      "field": "altText",
+      "text": "A leather satchel with brass buckles."
+    },
+    {
+      "id": "en-holdout-v2-219",
+      "field": "altText",
+      "text": "Orange scarf tucked beneath a collar."
+    },
+    {
+      "id": "en-holdout-v2-220",
+      "field": "altText",
+      "text": "Black boots with rounded toes."
+    },
+    {
+      "id": "en-holdout-v2-221",
+      "field": "altText",
+      "text": "Loose sleeves gathered at the wrist."
+    },
+    {
+      "id": "en-holdout-v2-222",
+      "field": "altText",
+      "text": "A quilted vest with square pockets."
+    },
+    {
+      "id": "en-holdout-v2-223",
+      "field": "altText",
+      "text": "A pink cardigan with wooden buttons."
+    },
+    {
+      "id": "en-holdout-v2-224",
+      "field": "altText",
+      "text": "A linen dress with a waist tie."
+    },
+    {
+      "id": "en-holdout-v2-225",
+      "field": "altText",
+      "text": "A knitted bag on a park bench."
+    },
+    {
+      "id": "en-holdout-v2-226",
+      "field": "altText",
+      "text": "Yellow laces threaded through dark shoes."
+    },
+    {
+      "id": "en-holdout-v2-227",
+      "field": "altText",
+      "text": "A velvet collar on a camel coat."
+    },
+    {
+      "id": "en-holdout-v2-228",
+      "field": "altText",
+      "text": "A folded shawl beside a book."
+    },
+    {
+      "id": "en-holdout-v2-229",
+      "field": "altText",
+      "text": "A patterned belt through denim loops."
+    },
+    {
+      "id": "en-holdout-v2-230",
+      "field": "altText",
+      "text": "Brown gloves on a marble ledge."
+    },
+    {
+      "id": "en-holdout-v2-231",
+      "field": "altText",
+      "text": "A navy cap with stitched panels."
+    },
+    {
+      "id": "en-holdout-v2-232",
+      "field": "altText",
+      "text": "A cotton tunic with side slits."
+    },
+    {
+      "id": "en-holdout-v2-233",
+      "field": "altText",
+      "text": "A checked scarf across both shoulders."
+    },
+    {
+      "id": "en-holdout-v2-234",
+      "field": "altText",
+      "text": "A long raincoat over cropped trousers."
+    },
+    {
+      "id": "en-holdout-v2-235",
+      "field": "altText",
+      "text": "A bracelet made of blue beads."
+    },
+    {
+      "id": "en-holdout-v2-236",
+      "field": "altText",
+      "text": "A woven basket with cloth lining."
+    },
+    {
+      "id": "en-holdout-v2-237",
+      "field": "altText",
+      "text": "A waistcoat with an adjustable back."
+    },
+    {
+      "id": "en-holdout-v2-238",
+      "field": "altText",
+      "text": "Red socks above polished brogues."
+    },
+    {
+      "id": "en-holdout-v2-239",
+      "field": "altText",
+      "text": "A pale coat with patch pockets."
+    },
+    {
+      "id": "en-holdout-v2-240",
+      "field": "altText",
+      "text": "A headband beside a pair of glasses."
+    },
+    {
+      "id": "en-holdout-v2-241",
+      "field": "altText",
+      "text": "A black suit with a narrow tie."
+    },
+    {
+      "id": "en-holdout-v2-242",
+      "field": "altText",
+      "text": "A wool skirt below the knee."
+    },
+    {
+      "id": "en-holdout-v2-243",
+      "field": "altText",
+      "text": "A shirt with rolled sleeves."
+    },
+    {
+      "id": "en-holdout-v2-244",
+      "field": "altText",
+      "text": "A sleeveless vest beneath a jacket."
+    },
+    {
+      "id": "en-holdout-v2-245",
+      "field": "altText",
+      "text": "A yellow skirt with front pleats."
+    },
+    {
+      "id": "en-holdout-v2-246",
+      "field": "altText",
+      "text": "A round bag with a woven handle."
+    },
+    {
+      "id": "en-holdout-v2-247",
+      "field": "altText",
+      "text": "A grey hoodie under an overshirt."
+    },
+    {
+      "id": "en-holdout-v2-248",
+      "field": "altText",
+      "text": "A boot with a side zip."
+    },
+    {
+      "id": "en-holdout-v2-249",
+      "field": "altText",
+      "text": "A belt with a rectangular buckle."
+    },
+    {
+      "id": "en-holdout-v2-250",
+      "field": "altText",
+      "text": "A shawl secured by a wooden pin."
+    },
+    {
+      "id": "en-holdout-v2-251",
+      "field": "altText",
+      "text": "A blue dress with puffed sleeves."
+    },
+    {
+      "id": "en-holdout-v2-252",
+      "field": "altText",
+      "text": "A knitted collar over a sweatshirt."
+    },
+    {
+      "id": "en-holdout-v2-253",
+      "field": "altText",
+      "text": "A coat with a removable hood."
+    },
+    {
+      "id": "en-holdout-v2-254",
+      "field": "altText",
+      "text": "A tote with a reinforced bottom."
+    },
+    {
+      "id": "en-holdout-v2-255",
+      "field": "altText",
+      "text": "A striped shirt under dungarees."
+    },
+    {
+      "id": "en-holdout-v2-256",
+      "field": "altText",
+      "text": "A necklace against a high neckline."
+    },
+    {
+      "id": "en-holdout-v2-257",
+      "field": "altText",
+      "text": "A wool hat with folded brim."
+    },
+    {
+      "id": "en-holdout-v2-258",
+      "field": "altText",
+      "text": "A brown jacket with elbow patches."
+    },
+    {
+      "id": "en-holdout-v2-259",
+      "field": "altText",
+      "text": "A scarf tied around a ponytail."
+    },
+    {
+      "id": "en-holdout-v2-260",
+      "field": "altText",
+      "text": "A pair of sandals with broad straps."
+    },
+    {
+      "id": "en-holdout-v2-261",
+      "field": "altText",
+      "text": "A green apron with flour marks."
+    },
+    {
+      "id": "en-holdout-v2-262",
+      "field": "altText",
+      "text": "A dress with embroidered flower stems."
+    },
+    {
+      "id": "en-holdout-v2-263",
+      "field": "altText",
+      "text": "A silver ring beside a cuff."
+    },
+    {
+      "id": "en-holdout-v2-264",
+      "field": "altText",
+      "text": "A long cardigan with open front."
+    },
+    {
+      "id": "en-holdout-v2-265",
+      "field": "altText",
+      "text": "A tailored jacket on a hanger."
+    },
+    {
+      "id": "en-holdout-v2-266",
+      "field": "altText",
+      "text": "A denim skirt with visible topstitching."
+    },
+    {
+      "id": "en-holdout-v2-267",
+      "field": "altText",
+      "text": "A cream vest with cable patterns."
+    },
+    {
+      "id": "en-holdout-v2-268",
+      "field": "altText",
+      "text": "A pair of boots on stone steps."
+    },
+    {
+      "id": "en-holdout-v2-269",
+      "field": "altText",
+      "text": "A knitted scarf with uneven fringes."
+    },
+    {
+      "id": "en-holdout-v2-270",
+      "field": "altText",
+      "text": "A checked bag beside a suitcase."
+    },
+    {
+      "id": "en-holdout-v2-271",
+      "field": "altText",
+      "text": "A navy blouse with fabric buttons."
+    },
+    {
+      "id": "en-holdout-v2-272",
+      "field": "altText",
+      "text": "A coat draped across a chair."
+    },
+    {
+      "id": "en-holdout-v2-273",
+      "field": "altText",
+      "text": "A pleated sleeve seen from the side."
+    },
+    {
+      "id": "en-holdout-v2-274",
+      "field": "altText",
+      "text": "A narrow ribbon through a braid."
+    },
+    {
+      "id": "en-holdout-v2-275",
+      "field": "altText",
+      "text": "A shirt pocket holding a pencil."
+    },
+    {
+      "id": "en-holdout-v2-276",
+      "field": "altText",
+      "text": "A brown belt over a loose dress."
+    },
+    {
+      "id": "en-holdout-v2-277",
+      "field": "altText",
+      "text": "A fleece jacket with contrasting zip."
+    },
+    {
+      "id": "en-holdout-v2-278",
+      "field": "altText",
+      "text": "A cap resting on a folded coat."
+    },
+    {
+      "id": "en-holdout-v2-279",
+      "field": "altText",
+      "text": "A sock with a neatly darned heel."
+    },
+    {
+      "id": "en-holdout-v2-280",
+      "field": "altText",
+      "text": "A jacket with a scalloped edge."
+    },
+    {
+      "id": "en-holdout-v2-281",
+      "field": "altText",
+      "text": "A red rain cape over a backpack."
+    },
+    {
+      "id": "en-holdout-v2-282",
+      "field": "altText",
+      "text": "A dark skirt with a centre fold."
+    },
+    {
+      "id": "en-holdout-v2-283",
+      "field": "altText",
+      "text": "A cotton vest with narrow straps."
+    },
+    {
+      "id": "en-holdout-v2-284",
+      "field": "altText",
+      "text": "A silk scarf on a white blouse."
+    },
+    {
+      "id": "en-holdout-v2-285",
+      "field": "altText",
+      "text": "A green satchel against a doorway."
+    },
+    {
+      "id": "en-holdout-v2-286",
+      "field": "altText",
+      "text": "A pair of earrings shaped like leaves."
+    },
+    {
+      "id": "en-holdout-v2-287",
+      "field": "altText",
+      "text": "A cream coat with a standing collar."
+    },
+    {
+      "id": "en-holdout-v2-288",
+      "field": "altText",
+      "text": "A blue jumper under a pinafore."
+    },
+    {
+      "id": "en-holdout-v2-289",
+      "field": "altText",
+      "text": "A mesh shopping bag with long handles."
+    },
+    {
+      "id": "en-holdout-v2-290",
+      "field": "altText",
+      "text": "A pair of shoes with fresh soles."
+    },
+    {
+      "id": "en-holdout-v2-291",
+      "field": "altText",
+      "text": "A black apron tied at the waist."
+    },
+    {
+      "id": "en-holdout-v2-292",
+      "field": "altText",
+      "text": "A striped dress beside a window."
+    },
+    {
+      "id": "en-holdout-v2-293",
+      "field": "altText",
+      "text": "A knitted tie over a chambray shirt."
+    },
+    {
+      "id": "en-holdout-v2-294",
+      "field": "altText",
+      "text": "A silver watch beneath a turned cuff."
+    },
+    {
+      "id": "en-holdout-v2-295",
+      "field": "altText",
+      "text": "A checked cape with fringe."
+    },
+    {
+      "id": "en-holdout-v2-296",
+      "field": "altText",
+      "text": "A pink shirt with a chest pocket."
+    },
+    {
+      "id": "en-holdout-v2-297",
+      "field": "altText",
+      "text": "A padded vest over a long sleeve."
+    },
+    {
+      "id": "en-holdout-v2-298",
+      "field": "altText",
+      "text": "A canvas shoe with cream laces."
+    },
+    {
+      "id": "en-holdout-v2-299",
+      "field": "altText",
+      "text": "A woven hat on a stone wall."
+    },
+    {
+      "id": "en-holdout-v2-300",
+      "field": "altText",
+      "text": "A blue skirt with a curved hem."
+    },
+    {
+      "id": "en-holdout-v2-301",
+      "field": "altText",
+      "text": "A burgundy coat with large buttons."
+    },
+    {
+      "id": "en-holdout-v2-302",
+      "field": "altText",
+      "text": "A white collar over a dark dress."
+    },
+    {
+      "id": "en-holdout-v2-303",
+      "field": "altText",
+      "text": "A fabric belt tied at the side."
+    },
+    {
+      "id": "en-holdout-v2-304",
+      "field": "altText",
+      "text": "A grey suit beside a railing."
+    },
+    {
+      "id": "en-holdout-v2-305",
+      "field": "altText",
+      "text": "A yellow bag with a short handle."
+    },
+    {
+      "id": "en-holdout-v2-306",
+      "field": "altText",
+      "text": "A denim jacket with a repaired elbow."
+    },
+    {
+      "id": "en-holdout-v2-307",
+      "field": "altText",
+      "text": "A pair of felt slippers by a chair."
+    },
+    {
+      "id": "en-holdout-v2-308",
+      "field": "altText",
+      "text": "A black scarf with embroidered stars."
+    },
+    {
+      "id": "en-holdout-v2-309",
+      "field": "altText",
+      "text": "A green jumper with dropped shoulders."
+    },
+    {
+      "id": "en-holdout-v2-310",
+      "field": "altText",
+      "text": "A skirt with deep side pockets."
+    },
+    {
+      "id": "en-holdout-v2-311",
+      "field": "altText",
+      "text": "A cream blouse beneath a knitted vest."
+    },
+    {
+      "id": "en-holdout-v2-312",
+      "field": "altText",
+      "text": "A red coat on a wooden hook."
+    },
+    {
+      "id": "en-holdout-v2-313",
+      "field": "altText",
+      "text": "A leather boot with stitched panels."
+    },
+    {
+      "id": "en-holdout-v2-314",
+      "field": "altText",
+      "text": "A dark shirt with a mandarin collar."
+    },
+    {
+      "id": "en-holdout-v2-315",
+      "field": "altText",
+      "text": "A bracelet with a small clasp."
+    },
+    {
+      "id": "en-holdout-v2-316",
+      "field": "altText",
+      "text": "A wide brim casting shade."
+    },
+    {
+      "id": "en-holdout-v2-317",
+      "field": "altText",
+      "text": "A pink scarf over a grey shoulder."
+    },
+    {
+      "id": "en-holdout-v2-318",
+      "field": "altText",
+      "text": "A blue jacket with a storm flap."
+    },
+    {
+      "id": "en-holdout-v2-319",
+      "field": "altText",
+      "text": "A pair of trousers with front darts."
+    },
+    {
+      "id": "en-holdout-v2-320",
+      "field": "altText",
+      "text": "A folded pocket square in a blazer."
+    },
+    {
+      "id": "en-holdout-v2-321",
+      "field": "altText",
+      "text": "A silk skirt with a soft sheen."
+    },
+    {
+      "id": "en-holdout-v2-322",
+      "field": "altText",
+      "text": "A linen shirt beside a suitcase."
+    },
+    {
+      "id": "en-holdout-v2-323",
+      "field": "altText",
+      "text": "A green dress with covered buttons."
+    },
+    {
+      "id": "en-holdout-v2-324",
+      "field": "altText",
+      "text": "A brown hat with a braided band."
+    },
+    {
+      "id": "en-holdout-v2-325",
+      "field": "altText",
+      "text": "A pair of gloves with knitted cuffs."
+    },
+    {
+      "id": "en-holdout-v2-326",
+      "field": "altText",
+      "text": "A pale suit with a double vent."
+    },
+    {
+      "id": "en-holdout-v2-327",
+      "field": "altText",
+      "text": "A denim bag with a patched corner."
+    },
+    {
+      "id": "en-holdout-v2-328",
+      "field": "altText",
+      "text": "A red shoe beside a walking stick."
+    },
+    {
+      "id": "en-holdout-v2-329",
+      "field": "altText",
+      "text": "A checked blouse with a gathered yoke."
+    },
+    {
+      "id": "en-holdout-v2-330",
+      "field": "altText",
+      "text": "A cape fastened at the neck."
+    },
+    {
+      "id": "en-holdout-v2-331",
+      "field": "altText",
+      "text": "A grey skirt with box pleats."
+    },
+    {
+      "id": "en-holdout-v2-332",
+      "field": "altText",
+      "text": "A cotton jacket with large pockets."
+    },
+    {
+      "id": "en-holdout-v2-333",
+      "field": "altText",
+      "text": "A patterned scarf beneath a hood."
+    },
+    {
+      "id": "en-holdout-v2-334",
+      "field": "altText",
+      "text": "A black dress with a square neckline."
+    },
+    {
+      "id": "en-holdout-v2-335",
+      "field": "altText",
+      "text": "A silver hair clip above an ear."
+    },
+    {
+      "id": "en-holdout-v2-336",
+      "field": "altText",
+      "text": "A wool overshirt with horn buttons."
+    },
+    {
+      "id": "en-holdout-v2-337",
+      "field": "altText",
+      "text": "A pair of tights with a dot pattern."
+    },
+    {
+      "id": "en-holdout-v2-338",
+      "field": "altText",
+      "text": "A blue apron with crossed straps."
+    },
+    {
+      "id": "en-holdout-v2-339",
+      "field": "altText",
+      "text": "A brown coat folded over an arm."
+    },
+    {
+      "id": "en-holdout-v2-340",
+      "field": "altText",
+      "text": "A canvas belt through pale trousers."
+    },
+    {
+      "id": "en-holdout-v2-341",
+      "field": "altText",
+      "text": "A yellow vest with diamond quilting."
+    },
+    {
+      "id": "en-holdout-v2-342",
+      "field": "altText",
+      "text": "A white shirt with embroidered cuffs."
+    },
+    {
+      "id": "en-holdout-v2-343",
+      "field": "altText",
+      "text": "A dark hat against a green wall."
+    },
+    {
+      "id": "en-holdout-v2-344",
+      "field": "altText",
+      "text": "A patterned cardigan over plain trousers."
+    },
+    {
+      "id": "en-holdout-v2-345",
+      "field": "altText",
+      "text": "A pink bag beside a wooden door."
+    },
+    {
+      "id": "en-holdout-v2-346",
+      "field": "altText",
+      "text": "A pair of ankle boots with low heels."
+    },
+    {
+      "id": "en-holdout-v2-347",
+      "field": "altText",
+      "text": "A linen skirt with a drawstring waist."
+    },
+    {
+      "id": "en-holdout-v2-348",
+      "field": "altText",
+      "text": "A scarf looped through a bag handle."
+    },
+    {
+      "id": "en-holdout-v2-349",
+      "field": "altText",
+      "text": "A navy coat with a wide lapel."
+    },
+    {
+      "id": "en-holdout-v2-350",
+      "field": "altText",
+      "text": "A brooch shaped like a small bird."
+    },
+    {
+      "id": "en-holdout-v2-351",
+      "field": "altText",
+      "text": "A red jumper with a crew neck."
+    },
+    {
+      "id": "en-holdout-v2-352",
+      "field": "altText",
+      "text": "A cream dress under a denim shirt."
+    },
+    {
+      "id": "en-holdout-v2-353",
+      "field": "altText",
+      "text": "A green glove holding a rail."
+    },
+    {
+      "id": "en-holdout-v2-354",
+      "field": "altText",
+      "text": "A checked blazer with matching trousers."
+    },
+    {
+      "id": "en-holdout-v2-355",
+      "field": "altText",
+      "text": "A knitted pouch on a table."
+    },
+    {
+      "id": "en-holdout-v2-356",
+      "field": "altText",
+      "text": "A pair of trainers with two straps."
+    },
+    {
+      "id": "en-holdout-v2-357",
+      "field": "altText",
+      "text": "A blue coat with a back pleat."
+    },
+    {
+      "id": "en-holdout-v2-358",
+      "field": "altText",
+      "text": "A narrow tie with tiny dots."
+    },
+    {
+      "id": "en-holdout-v2-359",
+      "field": "altText",
+      "text": "A striped sock beneath a trouser cuff."
+    },
+    {
+      "id": "en-holdout-v2-360",
+      "field": "altText",
+      "text": "A wool shawl over a rocking chair."
+    },
+    {
+      "id": "en-holdout-v2-361",
+      "field": "altText",
+      "text": "A black jacket with a satin collar."
+    },
+    {
+      "id": "en-holdout-v2-362",
+      "field": "altText",
+      "text": "A grey cap beside an umbrella."
+    },
+    {
+      "id": "en-holdout-v2-363",
+      "field": "altText",
+      "text": "A cotton blouse with a peplum."
+    },
+    {
+      "id": "en-holdout-v2-364",
+      "field": "altText",
+      "text": "A brown skirt with a wrap fastening."
+    },
+    {
+      "id": "en-holdout-v2-365",
+      "field": "altText",
+      "text": "A silver chain over a cream top."
+    },
+    {
+      "id": "en-holdout-v2-366",
+      "field": "altText",
+      "text": "A blue belt with a circular buckle."
+    },
+    {
+      "id": "en-holdout-v2-367",
+      "field": "altText",
+      "text": "A pair of tall boots beside stairs."
+    },
+    {
+      "id": "en-holdout-v2-368",
+      "field": "altText",
+      "text": "A rain hat with a stitched brim."
+    },
+    {
+      "id": "en-holdout-v2-369",
+      "field": "altText",
+      "text": "A red vest over a checked shirt."
+    },
+    {
+      "id": "en-holdout-v2-370",
+      "field": "altText",
+      "text": "A jacket with contrasting pocket flaps."
+    },
+    {
+      "id": "en-holdout-v2-371",
+      "field": "altText",
+      "text": "A green scarf folded into a triangle."
+    },
+    {
+      "id": "en-holdout-v2-372",
+      "field": "altText",
+      "text": "A pale jumper with textured sleeves."
+    },
+    {
+      "id": "en-holdout-v2-373",
+      "field": "altText",
+      "text": "A shirt with a double cuff."
+    },
+    {
+      "id": "en-holdout-v2-374",
+      "field": "altText",
+      "text": "A canvas backpack with leather tabs."
+    },
+    {
+      "id": "en-holdout-v2-375",
+      "field": "altText",
+      "text": "A cream skirt below a dark jacket."
+    },
+    {
+      "id": "en-holdout-v2-376",
+      "field": "altText",
+      "text": "A pair of sandals on a wooden deck."
+    },
+    {
+      "id": "en-holdout-v2-377",
+      "field": "altText",
+      "text": "A navy tunic with a curved side seam."
+    },
+    {
+      "id": "en-holdout-v2-378",
+      "field": "altText",
+      "text": "A coat with a belt at the back."
+    },
+    {
+      "id": "en-holdout-v2-379",
+      "field": "altText",
+      "text": "A watch with a brown woven strap."
+    },
+    {
+      "id": "en-holdout-v2-380",
+      "field": "altText",
+      "text": "A blue cardigan with shell buttons."
+    },
+    {
+      "id": "en-holdout-v2-381",
+      "field": "altText",
+      "text": "A yellow raincoat beside a brick arch."
+    },
+    {
+      "id": "en-holdout-v2-382",
+      "field": "altText",
+      "text": "A white tee under a wool waistcoat."
+    },
+    {
+      "id": "en-holdout-v2-383",
+      "field": "altText",
+      "text": "A purple bag with a knotted strap."
+    },
+    {
+      "id": "en-holdout-v2-384",
+      "field": "altText",
+      "text": "A grey dress with a soft collar."
+    },
+    {
+      "id": "en-holdout-v2-385",
+      "field": "altText",
+      "text": "A pair of loafers beside a doorway."
+    },
+    {
+      "id": "en-holdout-v2-386",
+      "field": "altText",
+      "text": "A linen jacket with turned sleeves."
+    },
+    {
+      "id": "en-holdout-v2-387",
+      "field": "altText",
+      "text": "A brown scarf with narrow stripes."
+    },
+    {
+      "id": "en-holdout-v2-388",
+      "field": "altText",
+      "text": "A black skirt with a silver zip."
+    },
+    {
+      "id": "en-holdout-v2-389",
+      "field": "altText",
+      "text": "A woven bracelet beside a shirt cuff."
+    },
+    {
+      "id": "en-holdout-v2-390",
+      "field": "altText",
+      "text": "A red cap on a canvas bag."
+    },
+    {
+      "id": "en-holdout-v2-391",
+      "field": "altText",
+      "text": "A cream hat with a felt flower."
+    },
+    {
+      "id": "en-holdout-v2-392",
+      "field": "altText",
+      "text": "A navy dress with a side tie."
+    },
+    {
+      "id": "en-holdout-v2-393",
+      "field": "altText",
+      "text": "A green jacket with ribbed hem."
+    },
+    {
+      "id": "en-holdout-v2-394",
+      "field": "altText",
+      "text": "A pair of gloves on a folded shawl."
+    },
+    {
+      "id": "en-holdout-v2-395",
+      "field": "altText",
+      "text": "A blue shirt with a curved pocket."
+    },
+    {
+      "id": "en-holdout-v2-396",
+      "field": "altText",
+      "text": "A wool belt over a long cardigan."
+    },
+    {
+      "id": "en-holdout-v2-397",
+      "field": "altText",
+      "text": "A pink coat beside a wooden fence."
+    },
+    {
+      "id": "en-holdout-v2-398",
+      "field": "altText",
+      "text": "A dark scarf caught beneath a lapel."
+    },
+    {
+      "id": "en-holdout-v2-399",
+      "field": "altText",
+      "text": "A pair of boots with red stitching."
+    },
+    {
+      "id": "en-holdout-v2-400",
+      "field": "altText",
+      "text": "A patched denim vest hanging outside."
+    }
+  ]
+}

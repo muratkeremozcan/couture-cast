@@ -23,6 +23,7 @@ import {
   type AnalyticsClient,
 } from '../../analytics/analytics.service.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 /** The strong entity tag this API issues and accepts: `"onboarding:<userId>:<revision>"`. */
 export function formatOnboardingETag(userId: string, revision: number): string {
@@ -206,7 +207,7 @@ export class WardrobeOnboardingService {
   ): Promise<AdvanceResult> {
     const expectedRevision = parseOnboardingIfMatchHeader(ifMatchHeader, userId)
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('wardrobe_onboarding:' || ${userId}))`
 
       const existing = await tx.wardrobeOnboardingState.findUnique({

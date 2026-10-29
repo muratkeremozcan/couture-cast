@@ -29,7 +29,13 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.couturecast.app",
-      "versionCode": 6
+      "versionCode": 6,
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.ACCESS_MEDIA_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -50,7 +56,24 @@
           "defaultChannel": "community"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow CoutureCast to choose wardrobe photos.",
+          "savePhotosPermission": "Allow CoutureCast to save the card you approve to your photos.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": []
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow CoutureCast to choose wardrobe photos.",
+          "cameraPermission": "Allow CoutureCast to photograph wardrobe items.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -60,6 +83,18 @@
       "eas": {
         "projectId": "340f5908-84cd-492e-bc59-2909fca66e9e"
       }
+    },
+    "locales": {
+      "de-DE": "./locales/de-DE.json",
+      "en-CA": "./locales/en-CA.json",
+      "en-US": "./locales/en-US.json",
+      "es-419": "./locales/es-419.json",
+      "fr-CA": "./locales/fr-CA.json",
+      "fr-FR": "./locales/fr-FR.json",
+      "it-IT": "./locales/it-IT.json",
+      "pt-BR": "./locales/pt-BR.json",
+      "pt-PT": "./locales/pt-PT.json",
+      "tr-TR": "./locales/tr-TR.json"
     }
   }
 }

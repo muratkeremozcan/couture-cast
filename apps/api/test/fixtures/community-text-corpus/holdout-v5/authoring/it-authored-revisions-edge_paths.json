@@ -1,0 +1,1046 @@
+{
+  "author": "/root/edge_paths",
+  "preCopyeditSha256": "eb4a663fdf28ec9f02a551d142114f599759efd6d8235f05340a0d1b29c5a13f",
+  "revisions": [
+    {
+      "row": 111,
+      "field": "altText",
+      "concept": "Jacket shoulder line compared in mirror",
+      "previousText": "Lo specchio mostra di profilo la cucitura della spalla della giacca.",
+      "authoredReplacement": "Nella vista laterale riflessa, la linea della spalla termina prima del braccio.",
+      "reason": "Complete individually authored Italian copyedit; mechanical phrase overlap"
+    },
+    {
+      "row": 971,
+      "field": "altText",
+      "concept": "Bag lining corner secured with thread chain",
+      "previousText": "Una breve catenella di filo collega l'angolo della fodera al fondo della borsa.",
+      "authoredReplacement": "All'interno della borsa, alcuni punti a catenella trattengono un angolo della fodera.",
+      "reason": "Complete individually authored Italian copyedit; mechanical phrase overlap"
+    },
+    {
+      "row": 403,
+      "field": "altText",
+      "concept": "Jacket colour blocks meeting at waist",
+      "previousText": "Il cambio di colore della giacca coincide con il bordo superiore della gonna.",
+      "authoredReplacement": "La giacca passa da un colore all'altro all'altezza della vita della gonna.",
+      "reason": "Complete individually authored Italian copyedit; mechanical phrase overlap"
+    },
+    {
+      "row": 859,
+      "field": "altText",
+      "concept": "Cardigan hem length compared seated",
+      "previousText": "Il cardigan cade ai lati del bacino durante una prova da seduti.",
+      "authoredReplacement": "Il bordo del cardigan scende lungo i fianchi della persona seduta sulla sedia.",
+      "reason": "Complete individually authored Italian copyedit; mechanical phrase overlap"
+    },
+    {
+      "row": 332,
+      "field": "altText",
+      "concept": "Knitted cuff replaced with woven strip",
+      "previousText": "La cucitura circolare segna il punto in cui il vecchio polsino è stato sostituito.",
+      "authoredReplacement": "La nuova striscia di tessuto è unita alla manica mediante una cucitura ad anello.",
+      "reason": "Complete individually authored Italian copyedit; mechanical phrase overlap"
+    },
+    {
+      "row": 817,
+      "field": "caption",
+      "concept": "Shoes paired by removable cloth clip",
+      "previousText": "La piccola molletta di stoffa tiene vicine le scarpe quando le porto al cambio stagione.",
+      "authoredReplacement": "Al cambio di stagione riunisco ogni paio di scarpe usando una molletta rivestita di stoffa.",
+      "reason": "Complete individually authored Italian copyedit; mechanical phrase overlap"
+    },
+    {
+      "row": 955,
+      "field": "altText",
+      "concept": "Dress straps crossed with small ring",
+      "previousText": "Le spalline dell'abito si incontrano in un piccolo anello al centro della schiena.",
+      "authoredReplacement": "Sulla schiena, l'incrocio delle due spalline passa attraverso un anellino.",
+      "reason": "Complete individually authored Italian copyedit; mechanical phrase overlap"
+    },
+    {
+      "row": 530,
+      "field": "caption",
+      "concept": "Trouser seams checked under side light",
+      "previousText": "Ho guardato il pantalone vicino alla finestra prima di rifinire l'ultima giunzione.",
+      "authoredReplacement": "La luce radente mi aiuta a vedere se le cuciture del pantalone hanno qualche piccola onda.",
+      "reason": "Complete individually authored Italian copyedit; mechanical phrase overlap"
+    },
+    {
+      "row": 995,
+      "field": "altText",
+      "concept": "Hat held flat in travel sleeve",
+      "previousText": "Il cappello piegato è inserito in una custodia piatta nella valigia.",
+      "authoredReplacement": "Una busta piatta contiene il cappello ripiegato e occupa il lato interno della valigia.",
+      "reason": "Complete individually authored Italian copyedit; mechanical phrase overlap"
+    },
+    {
+      "row": 327,
+      "field": "altText",
+      "concept": "Dress bodice pressed on folded towel",
+      "previousText": "Il corpetto della gonna poggia su un asciugamano piegato durante la stiratura.",
+      "authoredReplacement": "Un asciugamano ripiegato sostiene il corpetto dell'abito sotto il ferro da stiro.",
+      "reason": "Complete individually authored Italian lexical correction"
+    },
+    {
+      "row": 365,
+      "field": "caption",
+      "concept": "Neck scarf layered inside coat hood",
+      "previousText": "Il foulard resta all'interno della capucha e crea un bordo morbido intorno al viso.",
+      "authoredReplacement": "Sistemo il foulard dentro il cappuccio, lasciando una piega soffice accanto alle guance.",
+      "reason": "Complete individually authored Italian lexical correction"
+    },
+    {
+      "row": 559,
+      "field": "altText",
+      "concept": "Wristwatch band covering shirt button",
+      "previousText": "Il cinturino della mostra copre parzialmente il bottone del polsino della camicia.",
+      "authoredReplacement": "Il cinturino dell'orologio passa sopra il bottone sul polsino della camicia.",
+      "reason": "Complete individually authored Italian lexical correction"
+    },
+    {
+      "row": 97,
+      "field": "caption",
+      "previousConcept": "Wide collar folded into narrow band",
+      "previousText": "Ho arrotolato il collo ampio fino a ottenere una fascia più piccola vicino al viso.",
+      "authoredConcept": "Striped pocket set diagonally across horizontal shirt lines",
+      "authoredReplacement": "La tasca gira in diagonale e interrompe le righe orizzontali della camicia con un piccolo rombo.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 98,
+      "field": "caption",
+      "previousConcept": "Wide collar folded into narrow band",
+      "previousText": "La maglia cambia proporzioni semplicemente ripiegando due volte il bordo superiore.",
+      "authoredConcept": "Striped pocket set diagonally across horizontal shirt lines",
+      "authoredReplacement": "Ho lasciato il resto molto semplice per mostrare quel disegno inclinato sul petto.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 99,
+      "field": "altText",
+      "previousConcept": "Wide collar folded into narrow band",
+      "previousText": "Il collo largo della maglia è ripiegato in una banda stretta.",
+      "authoredConcept": "Striped pocket set diagonally across horizontal shirt lines",
+      "authoredReplacement": "Le righe della tasca applicata attraversano in diagonale quelle orizzontali della camicia.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 100,
+      "field": "altText",
+      "previousConcept": "Wide collar folded into narrow band",
+      "previousText": "Diversi strati di tessuto formano un piccolo anello intorno alla base del collo.",
+      "authoredConcept": "Striped pocket set diagonally across horizontal shirt lines",
+      "authoredReplacement": "Il pannello sul petto forma un rombo visivo contro le linee dritte del busto.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 105,
+      "field": "caption",
+      "previousConcept": "Bag strap woven through outer loops",
+      "previousText": "La tracolla passa in una serie di asole esterne e può seguire percorsi diversi.",
+      "authoredConcept": "Bag handles cut directly into body panels",
+      "authoredReplacement": "Il manico è ritagliato nella parete della borsa e continua nella stessa superficie morbida.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 106,
+      "field": "caption",
+      "previousConcept": "Bag strap woven through outer loops",
+      "previousText": "Ho cambiato il giro della cinghia per portare la borsa più vicina al corpo.",
+      "authoredConcept": "Bag handles cut directly into body panels",
+      "authoredReplacement": "Mi piace infilare la mano in questa apertura tonda, senza cercare una tracolla separata.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 107,
+      "field": "altText",
+      "previousConcept": "Bag strap woven through outer loops",
+      "previousText": "Una cinghia attraversa diverse asole cucite sul lato esterno della borsa.",
+      "authoredConcept": "Bag handles cut directly into body panels",
+      "authoredReplacement": "Due aperture circolari ricavate nei pannelli superiori formano i manici della borsa.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 108,
+      "field": "altText",
+      "previousConcept": "Bag strap woven through outer loops",
+      "previousText": "Il percorso della tracolla alterna tratti visibili e passaggi sotto i piccoli anelli tessili.",
+      "authoredConcept": "Bag handles cut directly into body panels",
+      "authoredReplacement": "Il bordo arrotondato dell'impugnatura appartiene allo stesso pezzo di tessuto del contenitore.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 141,
+      "field": "caption",
+      "previousConcept": "Trousers hem turned inward without crease",
+      "previousText": "L'orlo ripiegato all'interno accorcia appena il pantalone senza mostrare un risvolto esterno.",
+      "authoredConcept": "Trousers supported by button-on braces",
+      "authoredReplacement": "Le bretelle si agganciano ai bottoni interni del pantalone e restano piatte sulle spalle.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 142,
+      "field": "caption",
+      "previousConcept": "Trousers hem turned inward without crease",
+      "previousText": "Per oggi ho fermato il bordo con pochi punti facili da togliere.",
+      "authoredConcept": "Trousers supported by button-on braces",
+      "authoredReplacement": "Ho regolato i due nastri prima di infilare la giacca, lasciando la vita comoda.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 143,
+      "field": "altText",
+      "previousConcept": "Trousers hem turned inward without crease",
+      "previousText": "Il pantalone presenta un bordo interno ripiegato e fissato provvisoriamente.",
+      "authoredConcept": "Trousers supported by button-on braces",
+      "authoredReplacement": "Le estremità delle bretelle sono fissate ai piccoli bottoni dentro la cintura del pantalone.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 144,
+      "field": "altText",
+      "previousConcept": "Trousers hem turned inward without crease",
+      "previousText": "All'esterno la gamba resta liscia fino alla nuova altezza dell'orlo.",
+      "authoredConcept": "Trousers supported by button-on braces",
+      "authoredReplacement": "Due fasce salgono dal bordo della vita e passano sulle spalle sopra la camicia.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 153,
+      "field": "caption",
+      "previousConcept": "Ribbed sock cuff folded outward",
+      "previousText": "Ho piegato il bordo a coste una sola volta per lasciare il calzino all'altezza giusta.",
+      "authoredConcept": "Socks reversed to keep toe seam outside",
+      "authoredReplacement": "Porto queste calze al rovescio per lasciare la cucitura della punta lontana dalle dita.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 154,
+      "field": "caption",
+      "previousConcept": "Ribbed sock cuff folded outward",
+      "previousText": "Il piccolo risvolto si appoggia sopra la scarpa e mantiene la caviglia comoda.",
+      "authoredConcept": "Socks reversed to keep toe seam outside",
+      "authoredReplacement": "La piccola riga di filo adesso sta fuori e il piede trova una superficie più liscia.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 155,
+      "field": "altText",
+      "previousConcept": "Ribbed sock cuff folded outward",
+      "previousText": "Il bordo a coste del calzino è ripiegato verso l'esterno.",
+      "authoredConcept": "Socks reversed to keep toe seam outside",
+      "authoredReplacement": "La calza rovesciata mostra il rilievo della cucitura sopra le dita del piede.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 156,
+      "field": "altText",
+      "previousConcept": "Ribbed sock cuff folded outward",
+      "previousText": "Una fascia doppia di maglia forma un anello basso sopra il collo della scarpa.",
+      "authoredConcept": "Socks reversed to keep toe seam outside",
+      "authoredReplacement": "Il margine cucito della punta rimane sulla superficie esterna della calza indossata.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 225,
+      "field": "caption",
+      "previousConcept": "Trouser cuffs matched by shoe sole",
+      "previousText": "Uso la suola come riferimento per dare ai due risvolti la stessa altezza.",
+      "authoredConcept": "Trouser stirrups passing under shoe arches",
+      "authoredReplacement": "Le staffe elastiche tengono il pantalone disteso passando sotto l'arco della scarpa.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 226,
+      "field": "caption",
+      "previousConcept": "Trouser cuffs matched by shoe sole",
+      "previousText": "Ho controllato le pieghe con le scarpe indossate e poi le ho fermate bene.",
+      "authoredConcept": "Trouser stirrups passing under shoe arches",
+      "authoredReplacement": "Ho sistemato ogni fascia tra suola e tacco, dove rimane ben visibile anche di lato.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 227,
+      "field": "altText",
+      "previousConcept": "Trouser cuffs matched by shoe sole",
+      "previousText": "I risvolti del pantalone terminano alla stessa distanza dalle suole delle scarpe.",
+      "authoredConcept": "Trouser stirrups passing under shoe arches",
+      "authoredReplacement": "Una fascia elastica scende dal pantalone e attraversa l'incavo sotto la scarpa con tacco.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 228,
+      "field": "altText",
+      "previousConcept": "Trouser cuffs matched by shoe sole",
+      "previousText": "Una mano confronta l'altezza dei due bordi ripiegati durante la prova.",
+      "authoredConcept": "Trouser stirrups passing under shoe arches",
+      "authoredReplacement": "Il bordo della gamba resta teso grazie alla staffa che passa sotto il piede.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 233,
+      "field": "caption",
+      "previousConcept": "Bag strap clipped to second anchor",
+      "previousText": "Il secondo anello cambia l'inclinazione della borsa quando la porto a tracolla.",
+      "authoredConcept": "Bag carried in elbow crook beside bouquet",
+      "authoredReplacement": "Porto la borsa nell'incavo del gomito per lasciare la mano libera ai fiori.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 234,
+      "field": "caption",
+      "previousConcept": "Bag strap clipped to second anchor",
+      "previousText": "Ho provato i due attacchi e scelto quello che lascia libera la cerniera.",
+      "authoredConcept": "Bag carried in elbow crook beside bouquet",
+      "authoredReplacement": "Il manico rigido resta comodo sul braccio mentre sistemo il piccolo mazzo che ho scelto.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 235,
+      "field": "altText",
+      "previousConcept": "Bag strap clipped to second anchor",
+      "previousText": "Il moschettone della tracolla è collegato a un anello laterale più basso.",
+      "authoredConcept": "Bag carried in elbow crook beside bouquet",
+      "authoredReplacement": "Una borsa dal manico rigido è appesa al braccio piegato accanto a un mazzo di fiori.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 236,
+      "field": "altText",
+      "previousConcept": "Bag strap clipped to second anchor",
+      "previousText": "Due punti di attacco sulla borsa permettono percorsi diversi della cinghia.",
+      "authoredConcept": "Bag carried in elbow crook beside bouquet",
+      "authoredReplacement": "L'impugnatura poggia nell'incavo del gomito mentre la mano sostiene alcuni steli.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 429,
+      "field": "caption",
+      "previousConcept": "Vest front pinned asymmetrically",
+      "previousText": "Un fermo laterale porta un lembo del gilet sopra l'altro e cambia il centro della figura.",
+      "authoredConcept": "Waistcoat fronts connected by horizontal ladder lacing",
+      "authoredReplacement": "Il laccio passa da un bordo all'altro del gilet formando una piccola scala sul davanti.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 430,
+      "field": "caption",
+      "previousConcept": "Vest front pinned asymmetrically",
+      "previousText": "Ho provato una chiusura obliqua con questa maglia che normalmente porto aperta.",
+      "authoredConcept": "Waistcoat fronts connected by horizontal ladder lacing",
+      "authoredReplacement": "Ho tenuto i passaggi paralleli e lasciato visibile la camicia tra i due lembi.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 431,
+      "field": "altText",
+      "previousConcept": "Vest front pinned asymmetrically",
+      "previousText": "I due davanti del gilet si sovrappongono verso un fianco.",
+      "authoredConcept": "Waistcoat fronts connected by horizontal ladder lacing",
+      "authoredReplacement": "Un cordoncino collega i due davanti del gilet con passaggi orizzontali sovrapposti.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 432,
+      "field": "altText",
+      "previousConcept": "Vest front pinned asymmetrically",
+      "previousText": "Una piccola spilla ferma il pannello esterno lontano dalla linea centrale.",
+      "authoredConcept": "Waistcoat fronts connected by horizontal ladder lacing",
+      "authoredReplacement": "Gli anelli ai margini sostengono una serie di tratti paralleli sopra la camicia.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 481,
+      "field": "caption",
+      "previousConcept": "Necklace clasp held by large ring",
+      "previousText": "L'anello più grande mi aiuta a chiudere la collana senza cercare il punto minuscolo.",
+      "authoredConcept": "Reflective cord outlining bag at dusk",
+      "authoredReplacement": "Al crepuscolo il cordino riflettente disegna il bordo dello zaino nella luce del portone.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 482,
+      "field": "caption",
+      "previousConcept": "Necklace clasp held by large ring",
+      "previousText": "Ho cambiato soltanto la parte finale della catena e il gesto è diventato più facile.",
+      "authoredConcept": "Reflective cord outlining bag at dusk",
+      "authoredReplacement": "Quel piccolo contorno luminoso segue tutta la tasca e mi piace anche sul tessuto scuro.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 483,
+      "field": "altText",
+      "previousConcept": "Necklace clasp held by large ring",
+      "previousText": "Un anello ampio è collegato all'estremità della catena vicino al gancio.",
+      "authoredConcept": "Reflective cord outlining bag at dusk",
+      "authoredReplacement": "Un cordino riflettente appare luminoso intorno alla tasca dello zaino su uno sfondo in penombra.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 484,
+      "field": "altText",
+      "previousConcept": "Necklace clasp held by large ring",
+      "previousText": "La chiusura della collana si aggancia al cerchio più grande aggiunto sul retro.",
+      "authoredConcept": "Reflective cord outlining bag at dusk",
+      "authoredReplacement": "La luce mette in risalto una linea continua lungo il margine esterno della borsa scura.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 589,
+      "field": "caption",
+      "previousConcept": "Cardigan elbow shape checked seated",
+      "previousText": "Da seduta noto se la manica conserva abbastanza larghezza quando il gomito è piegato.",
+      "authoredConcept": "Cardigan decorated with crocheted cherries",
+      "authoredReplacement": "Ho cucito due ciliegine all'uncinetto sul cardigan che metto nelle mattine più fresche.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 590,
+      "field": "caption",
+      "previousConcept": "Cardigan elbow shape checked seated",
+      "previousText": "Ho provato questa posizione prima di fermare la cucitura della nuova manica.",
+      "authoredConcept": "Cardigan decorated with crocheted cherries",
+      "authoredReplacement": "I piccoli frutti sporgono appena e danno alla maglia un dettaglio allegro vicino alla tasca.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 591,
+      "field": "altText",
+      "previousConcept": "Cardigan elbow shape checked seated",
+      "previousText": "Il braccio piegato appoggia sul tavolo mostrando il volume della manica al gomito.",
+      "authoredConcept": "Cardigan decorated with crocheted cherries",
+      "authoredReplacement": "Due ciliegie lavorate all'uncinetto sono applicate sul davanti del cardigan.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 592,
+      "field": "altText",
+      "previousConcept": "Cardigan elbow shape checked seated",
+      "previousText": "La maglia resta morbida attorno all'articolazione durante una prova da seduti.",
+      "authoredConcept": "Cardigan decorated with crocheted cherries",
+      "authoredReplacement": "I frutti imbottiti hanno steli di filo uniti a una fogliolina sopra la tasca.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 705,
+      "field": "caption",
+      "previousConcept": "Cardigan worn with unequal button gaps",
+      "previousText": "Ho chiuso due bottoni vicini e lasciato un intervallo più grande al centro.",
+      "authoredConcept": "Loafer tassels moving above shoe vamp",
+      "authoredReplacement": "Le nappine dei mocassini saltellano a ogni passo e rendono più vivace questa coppia semplice.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 706,
+      "field": "caption",
+      "previousConcept": "Cardigan worn with unequal button gaps",
+      "previousText": "La maglia cade in modo diverso quando cambio i punti che tengono insieme i due lati.",
+      "authoredConcept": "Loafer tassels moving above shoe vamp",
+      "authoredReplacement": "Nella foto ho aspettato che i piccoli ciuffi ricadessero sul davanti della scarpa.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 707,
+      "field": "altText",
+      "previousConcept": "Cardigan worn with unequal button gaps",
+      "previousText": "Il cardigan è abbottonato in due punti ravvicinati sopra un'apertura più larga.",
+      "authoredConcept": "Loafer tassels moving above shoe vamp",
+      "authoredReplacement": "Due nappine di pelle pendono sopra la mascherina di ciascun mocassino.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 708,
+      "field": "altText",
+      "previousConcept": "Cardigan worn with unequal button gaps",
+      "previousText": "Le parti chiuse si alternano a tratti di bordo libero lungo il davanti.",
+      "authoredConcept": "Loafer tassels moving above shoe vamp",
+      "authoredReplacement": "I piccoli ciuffi si sollevano dalla tomaia mentre il piede compie un passo.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 713,
+      "field": "caption",
+      "previousConcept": "Shawl secured with long wooden pin",
+      "previousText": "Lo spillone di legno attraversa le pieghe dello scialle senza aggiungere troppo peso.",
+      "authoredConcept": "Shawl fringe tied into a diamond lattice",
+      "authoredReplacement": "Ho annodato le frange a coppie fino a disegnare una rete di piccoli rombi.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 714,
+      "field": "caption",
+      "previousConcept": "Shawl secured with long wooden pin",
+      "previousText": "Ho raccolto i due lembi sulla spalla e lasciato il grande bastoncino ben visibile.",
+      "authoredConcept": "Shawl fringe tied into a diamond lattice",
+      "authoredReplacement": "Il bordo dello scialle ora lascia passare la luce tra i nodi disposti su più file.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 715,
+      "field": "altText",
+      "previousConcept": "Shawl secured with long wooden pin",
+      "previousText": "Uno spillone lungo di legno passa attraverso due strati dello scialle.",
+      "authoredConcept": "Shawl fringe tied into a diamond lattice",
+      "authoredReplacement": "Le frange dello scialle sono unite da nodi che formano una griglia di rombi.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 716,
+      "field": "altText",
+      "previousConcept": "Shawl secured with long wooden pin",
+      "previousText": "Il bastoncino chiude le pieghe vicino alla spalla sopra il tessuto morbido.",
+      "authoredConcept": "Shawl fringe tied into a diamond lattice",
+      "authoredReplacement": "Tre file di piccoli incroci collegano i fili liberi sotto il margine del tessuto.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 761,
+      "field": "caption",
+      "previousConcept": "Coat pocket warmed with removable lining",
+      "previousText": "La fodera morbida delle tasche si può estrarre per farla asciugare bene.",
+      "authoredConcept": "Coat pockets opening beneath front yoke",
+      "authoredReplacement": "Le tasche si aprono proprio sotto lo sprone e le mani entrano dall'alto con naturalezza.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 762,
+      "field": "caption",
+      "previousConcept": "Coat pocket warmed with removable lining",
+      "previousText": "Ho aggiunto due piccoli sacchetti interni che restano agganciati sotto il bordo.",
+      "authoredConcept": "Coat pockets opening beneath front yoke",
+      "authoredReplacement": "Mi piace quella linea unica sul petto che nasconde due aperture separate nel cappotto.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 763,
+      "field": "altText",
+      "previousConcept": "Coat pocket warmed with removable lining",
+      "previousText": "Una tasca del cappotto mostra il suo sacchetto interno parzialmente estratto.",
+      "authoredConcept": "Coat pockets opening beneath front yoke",
+      "authoredReplacement": "Due tasche del cappotto hanno l'apertura nascosta sotto il bordo dello sprone anteriore.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 764,
+      "field": "altText",
+      "previousConcept": "Coat pocket warmed with removable lining",
+      "previousText": "Piccole pressioni fissano la fodera rimovibile vicino all'apertura della tasca.",
+      "authoredConcept": "Coat pockets opening beneath front yoke",
+      "authoredReplacement": "Una mano solleva il lembo orizzontale sul petto per mostrare l'ingresso della tasca.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 809,
+      "field": "caption",
+      "previousConcept": "Borrowed dress marked with removable ribbon",
+      "previousText": "Un nastrino sul sacchetto mi ricorda quale abito devo restituire dopo la festa.",
+      "authoredConcept": "Dress covered with raised fabric bobbles",
+      "authoredReplacement": "I piccoli pallini di stoffa danno rilievo al vestito anche con una luce molto morbida.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 810,
+      "field": "caption",
+      "previousConcept": "Borrowed dress marked with removable ribbon",
+      "previousText": "Ho tenuto insieme il vestito e la sua cintura nella custodia che mi è stata prestata.",
+      "authoredConcept": "Dress covered with raised fabric bobbles",
+      "authoredReplacement": "Passando la mano sento ogni minuscola cupola cucita sul tessuto, una trama tutta da scoprire.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 811,
+      "field": "altText",
+      "previousConcept": "Borrowed dress marked with removable ribbon",
+      "previousText": "Un abito e la cintura coordinata sono riposti nella stessa custodia chiusa con un nastro.",
+      "authoredConcept": "Dress covered with raised fabric bobbles",
+      "authoredReplacement": "La superficie dell'abito è coperta da piccoli rigonfiamenti rotondi dello stesso tessuto.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 812,
+      "field": "altText",
+      "previousConcept": "Borrowed dress marked with removable ribbon",
+      "previousText": "Il piccolo segno tessile distingue il vestito prestato dagli altri capi appesi.",
+      "authoredConcept": "Dress covered with raised fabric bobbles",
+      "authoredReplacement": "File irregolari di pallini in rilievo creano ombre minute sul corpetto del vestito.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 821,
+      "field": "caption",
+      "previousConcept": "Sash twisted to reveal reverse stripe",
+      "previousText": "La fascia fa mezzo giro sul fianco e mostra una striscia del rovescio.",
+      "authoredConcept": "Sash finished with small coin charms",
+      "authoredReplacement": "Quattro monetine decorano le punte della fascia e si sentono appena quando cammino.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 822,
+      "field": "caption",
+      "previousConcept": "Sash twisted to reveal reverse stripe",
+      "previousText": "Ho lasciato la torsione ben aperta per rendere visibili le due superfici del nastro.",
+      "authoredConcept": "Sash finished with small coin charms",
+      "authoredReplacement": "Ho lasciato il nodo sul fianco perché i piccoli dischi possano muoversi senza toccare la fibbia.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 823,
+      "field": "altText",
+      "previousConcept": "Sash twisted to reveal reverse stripe",
+      "previousText": "La cintura tessile presenta una torsione che espone il lato interno.",
+      "authoredConcept": "Sash finished with small coin charms",
+      "authoredReplacement": "Piccoli ciondoli a moneta sono fissati alle due estremità della fascia annodata.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 824,
+      "field": "altText",
+      "previousConcept": "Sash twisted to reveal reverse stripe",
+      "previousText": "Due superfici diverse si incontrano dove la fascia ruota sopra l'anca.",
+      "authoredConcept": "Sash finished with small coin charms",
+      "authoredReplacement": "I dischi metallici pendono da brevi anelli sotto le punte del nastro in vita.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 909,
+      "field": "caption",
+      "previousConcept": "Bag flap lined with contrasting stripes",
+      "previousText": "Aprendo la patta si vede una piccola sorpresa a righe dentro la borsa.",
+      "authoredConcept": "Bag base lifted by small metal feet",
+      "authoredReplacement": "I piedini tengono il fondo della borsa sollevato quando la appoggio accanto alla sedia.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 910,
+      "field": "caption",
+      "previousConcept": "Bag flap lined with contrasting stripes",
+      "previousText": "Ho lasciato il motivo nascosto fino al momento di aprire la chiusura.",
+      "authoredConcept": "Bag base lifted by small metal feet",
+      "authoredReplacement": "Ho scoperto questi piccoli sostegni girandola per pulire bene tutti gli angoli.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 911,
+      "field": "altText",
+      "previousConcept": "Bag flap lined with contrasting stripes",
+      "previousText": "La patta sollevata mostra una fodera a righe diversa dal corpo della borsa.",
+      "authoredConcept": "Bag base lifted by small metal feet",
+      "authoredReplacement": "Quattro piedini metallici sporgono dagli angoli inferiori della borsa.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 912,
+      "field": "altText",
+      "previousConcept": "Bag flap lined with contrasting stripes",
+      "previousText": "Il tessuto stampato resta visibile sulla parte interna del lembo aperto.",
+      "authoredConcept": "Bag base lifted by small metal feet",
+      "authoredReplacement": "La base rimane leggermente sollevata dal tavolo grazie ai piccoli supporti rotondi.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 937,
+      "field": "caption",
+      "previousConcept": "Shirt shoulder seam covered by ribbon",
+      "previousText": "Un nastrino interno tiene insieme i margini della spalla e rende la camicia più ordinata dentro.",
+      "authoredConcept": "Shoe heel taps heard on wooden floor",
+      "authoredReplacement": "Sul pavimento di legno questi tacchi fanno un suono leggero che accompagna il mio passo.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 938,
+      "field": "caption",
+      "previousConcept": "Shirt shoulder seam covered by ribbon",
+      "previousText": "Ho rifinito solo quella cucitura perché rimaneva sempre aperta dopo il lavaggio.",
+      "authoredConcept": "Shoe heel taps heard on wooden floor",
+      "authoredReplacement": "Ho registrato qualche secondo mentre camminavo per ricordare anche la voce di queste scarpe.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 939,
+      "field": "altText",
+      "previousConcept": "Shirt shoulder seam covered by ribbon",
+      "previousText": "Un nastro sottile ricopre la cucitura interna della spalla della camicia.",
+      "authoredConcept": "Shoe heel taps heard on wooden floor",
+      "authoredReplacement": "Due scarpe con piccoli tacchi attraversano un pavimento formato da assi di legno.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 940,
+      "field": "altText",
+      "previousConcept": "Shirt shoulder seam covered by ribbon",
+      "previousText": "I margini di stoffa sono racchiusi sotto una fascia piatta sul rovescio del capo.",
+      "authoredConcept": "Shoe heel taps heard on wooden floor",
+      "authoredReplacement": "Il tallone di una scarpa tocca il parquet mentre l'altro piede rimane sollevato.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 977,
+      "field": "caption",
+      "previousConcept": "Beanie brim unfolded to cover ears",
+      "previousText": "Ho aperto il risvolto della cuffia per portarlo più basso sulle orecchie.",
+      "authoredConcept": "Beanie decorated with one oversized knitted cable",
+      "authoredReplacement": "La treccia grande sale dalla fronte alla cima e basta da sola a decorare il berretto.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 978,
+      "field": "caption",
+      "previousConcept": "Beanie brim unfolded to cover ears",
+      "previousText": "La maglia cambia lunghezza senza bisogno di aggiungere un altro accessorio.",
+      "authoredConcept": "Beanie decorated with one oversized knitted cable",
+      "authoredReplacement": "Ho lasciato i lati a maglia liscia per dare tutto lo spazio a quell'intreccio centrale.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 979,
+      "field": "altText",
+      "previousConcept": "Beanie brim unfolded to cover ears",
+      "previousText": "Il bordo della cuffia è completamente disteso sopra le orecchie.",
+      "authoredConcept": "Beanie decorated with one oversized knitted cable",
+      "authoredReplacement": "Una treccia lavorata a maglia percorre verticalmente il centro del berretto.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 980,
+      "field": "altText",
+      "previousConcept": "Beanie brim unfolded to cover ears",
+      "previousText": "La piega abituale rimane leggermente visibile sulla fascia allungata del berretto.",
+      "authoredConcept": "Beanie decorated with one oversized knitted cable",
+      "authoredReplacement": "Due fasce di maglie si incrociano sopra la fronte tra pannelli laterali lisci.",
+      "reason": "Complete individually authored new scenario during conservative semantic boundary review; preserve caption/altText split"
+    },
+    {
+      "row": 45,
+      "field": "caption",
+      "previousConcept": "Shirt collar button left under pendant",
+      "previousText": "Il pendente arriva esattamente davanti all'ultimo bottone chiuso e sembra fatto apposta.",
+      "authoredConcept": "Decorative necklace clasp worn at front",
+      "authoredReplacement": "La chiusura decorata della collana resta sul davanti e diventa il dettaglio principale del gioiello.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 46,
+      "field": "caption",
+      "previousConcept": "Shirt collar button left under pendant",
+      "previousText": "Ho regolato la catena finché il ciondolo ha trovato posto al centro della camicia.",
+      "authoredConcept": "Decorative necklace clasp worn at front",
+      "authoredReplacement": "Ho girato la catena finché il piccolo fermaglio inciso si è posato sotto la clavicola.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 47,
+      "field": "altText",
+      "previousConcept": "Shirt collar button left under pendant",
+      "previousText": "Un piccolo pendente copre parzialmente il bottone superiore della camicia chiusa.",
+      "authoredConcept": "Decorative necklace clasp worn at front",
+      "authoredReplacement": "Il fermaglio ornamentale della collana è visibile davanti al collo sopra la camicia.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 48,
+      "field": "altText",
+      "previousConcept": "Shirt collar button left under pendant",
+      "previousText": "La catena forma una curva simmetrica sopra la fila verticale dei bottoni.",
+      "authoredConcept": "Decorative necklace clasp worn at front",
+      "authoredReplacement": "La catena entra ai due lati di una chiusura incisa posta al centro del petto.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 745,
+      "field": "caption",
+      "previousConcept": "Gloves rolled from fingertips inward",
+      "previousText": "Arrotolo i guanti dalle dita per tenerli piccoli nella tasca senza piegare i polsini.",
+      "authoredConcept": "Glove fingertip stitched with conductive thread",
+      "authoredReplacement": "Ho cucito qualche punto di filo conduttivo sul guanto e riesco a usare il telefono durante la passeggiata.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 746,
+      "field": "caption",
+      "previousConcept": "Gloves rolled from fingertips inward",
+      "previousText": "La coppia diventa un pacchetto ordinato che ritrovo subito sotto il cappotto.",
+      "authoredConcept": "Glove fingertip stitched with conductive thread",
+      "authoredReplacement": "La piccola spirale sul dito indice quasi scompare nella trama quando lascio la mano rilassata.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 747,
+      "field": "altText",
+      "previousConcept": "Gloves rolled from fingertips inward",
+      "previousText": "I guanti sono arrotolati partendo dalle estremità delle dita verso il polso.",
+      "authoredConcept": "Glove fingertip stitched with conductive thread",
+      "authoredReplacement": "Una spirale di filo metallico sottile è cucita sulla punta dell'indice del guanto.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 748,
+      "field": "altText",
+      "previousConcept": "Gloves rolled from fingertips inward",
+      "previousText": "Due piccoli cilindri di tessuto riposano insieme nella tasca aperta.",
+      "authoredConcept": "Glove fingertip stitched with conductive thread",
+      "authoredReplacement": "Il dito del guanto tocca lo schermo del telefono attraverso la zona ricamata.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 989,
+      "field": "caption",
+      "previousConcept": "Skirt edge finished with narrow lace",
+      "previousText": "La piccola punta di pizzo segue il fondo della gonna senza allungarlo troppo.",
+      "authoredConcept": "Skirt supported by separate petticoat",
+      "authoredReplacement": "La sottogonna sostiene il tessuto e dà all'abito una forma larga che rimane leggera.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 990,
+      "field": "caption",
+      "previousConcept": "Skirt edge finished with narrow lace",
+      "previousText": "Ho scelto un bordo leggero che si vede soprattutto quando faccio un passo.",
+      "authoredConcept": "Skirt supported by separate petticoat",
+      "authoredReplacement": "Ho scelto un modello separato per cambiare il volume del vestito nelle occasioni in cui mi va.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 991,
+      "field": "altText",
+      "previousConcept": "Skirt edge finished with narrow lace",
+      "previousText": "Una fascia di pizzo sottile completa l'orlo della gonna.",
+      "authoredConcept": "Skirt supported by separate petticoat",
+      "authoredReplacement": "Una sottogonna ampia sostiene la gonna esterna creando una sagoma arrotondata.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 992,
+      "field": "altText",
+      "previousConcept": "Skirt edge finished with narrow lace",
+      "previousText": "Il bordo traforato forma piccole punte sotto il tessuto opaco del capo.",
+      "authoredConcept": "Skirt supported by separate petticoat",
+      "authoredReplacement": "Il bordo del sottogonna appare sotto il tessuto sollevato vicino al ginocchio.",
+      "reason": "Complete individually authored scenario replacement after semantic boundary review"
+    },
+    {
+      "row": 145,
+      "field": "caption",
+      "previousConcept": "Hat decoration balanced away from brim",
+      "previousText": "Ho spostato il piccolo fiore più in alto per non appesantire la falda morbida.",
+      "authoredConcept": "Hat care label tucked beneath sweatband",
+      "authoredReplacement": "Ho infilato l'etichetta sotto la fascia interna del cappello per tenerla lontana dalla fronte.",
+      "reason": "Complete individually authored scenario replacement after semantic consolidation"
+    },
+    {
+      "row": 146,
+      "field": "caption",
+      "previousConcept": "Hat decoration balanced away from brim",
+      "previousText": "La decorazione ora resta sulla calotta e il bordo cade libero intorno al viso.",
+      "authoredConcept": "Hat care label tucked beneath sweatband",
+      "authoredReplacement": "Adesso il piccolo rettangolo resta nascosto mentre il bordo morbido appoggia sulla pelle.",
+      "reason": "Complete individually authored scenario replacement after semantic consolidation"
+    },
+    {
+      "row": 147,
+      "field": "altText",
+      "previousConcept": "Hat decoration balanced away from brim",
+      "previousText": "Un fiore decorativo è fissato sulla calotta sopra la base della falda.",
+      "authoredConcept": "Hat care label tucked beneath sweatband",
+      "authoredReplacement": "L'etichetta del cappello è ripiegata sotto la fascia che circonda l'interno della calotta.",
+      "reason": "Complete individually authored scenario replacement after semantic consolidation"
+    },
+    {
+      "row": 148,
+      "field": "altText",
+      "previousConcept": "Hat decoration balanced away from brim",
+      "previousText": "Il bordo del cappello resta privo di ornamenti e mantiene la sua curva morbida.",
+      "authoredConcept": "Hat care label tucked beneath sweatband",
+      "authoredReplacement": "Un lembo di stoffa nasconde il cartellino cucito vicino al bordo del copricapo.",
+      "reason": "Complete individually authored scenario replacement after semantic consolidation"
+    },
+    {
+      "row": 789,
+      "field": "caption",
+      "previousConcept": "Hat lining loosely caught at crown",
+      "previousText": "Pochi punti mantengono la fodera sul fondo del cappello senza tenderla troppo.",
+      "authoredConcept": "Hat crown ventilated by open mesh panel",
+      "authoredReplacement": "Il pannello traforato lascia passare l'aria proprio sulla parte alta del cappello.",
+      "reason": "Complete individually authored scenario replacement after semantic consolidation"
+    },
+    {
+      "row": 790,
+      "field": "caption",
+      "previousConcept": "Hat lining loosely caught at crown",
+      "previousText": "Ho lasciato un piccolo gioco per conservare la forma morbida della calotta.",
+      "authoredConcept": "Hat crown ventilated by open mesh panel",
+      "authoredReplacement": "Mi piace vedere il cielo attraverso quella piccola griglia quando tengo il copricapo in mano.",
+      "reason": "Complete individually authored scenario replacement after semantic consolidation"
+    },
+    {
+      "row": 791,
+      "field": "altText",
+      "previousConcept": "Hat lining loosely caught at crown",
+      "previousText": "La fodera interna è fissata con pochi punti distanziati nella parte alta del cappello.",
+      "authoredConcept": "Hat crown ventilated by open mesh panel",
+      "authoredReplacement": "Un inserto a rete occupa la sommità della calotta del cappello.",
+      "reason": "Complete individually authored scenario replacement after semantic consolidation"
+    },
+    {
+      "row": 792,
+      "field": "altText",
+      "previousConcept": "Hat lining loosely caught at crown",
+      "previousText": "Il tessuto leggero rimane vicino alla calotta senza essere stirato tra le cuciture.",
+      "authoredConcept": "Hat crown ventilated by open mesh panel",
+      "authoredReplacement": "Piccole aperture regolari attraversano il pannello superiore tra le parti laterali compatte.",
+      "reason": "Complete individually authored scenario replacement after semantic consolidation"
+    },
+    {
+      "row": 174,
+      "field": "caption",
+      "concept": "Cropped sleeve compared with long glove",
+      "previousText": "Ho scelto la lunghezza dei guanti guardando dove finisce il braccio della giacca.",
+      "authoredReplacement": "Ho scelto i guanti confrontando la loro lunghezza con il punto in cui termina la manica.",
+      "reason": "Complete individually authored Italian copyedit"
+    },
+    {
+      "row": 841,
+      "field": "caption",
+      "concept": "Dress sleeve fold caught with tiny snap",
+      "previousText": "La piccola pressione mantiene il risvolto della manica senza lasciare punti visibili fuori.",
+      "authoredReplacement": "Il bottone automatico nascosto tiene fermo il risvolto della manica per tutta la giornata.",
+      "reason": "Complete individually authored Italian copyedit"
+    },
+    {
+      "row": 843,
+      "field": "altText",
+      "concept": "Dress sleeve fold caught with tiny snap",
+      "previousText": "Una piccola pressione nascosta tiene il bordo della manica ripiegato.",
+      "authoredReplacement": "Un piccolo automatico nascosto all'interno fissa la piega sul bordo della manica.",
+      "reason": "Complete individually authored Italian copyedit"
+    },
+    {
+      "row": 844,
+      "field": "altText",
+      "concept": "Dress sleeve fold caught with tiny snap",
+      "previousText": "La parte interna del risvolto mostra due minuscoli elementi di chiusura.",
+      "authoredReplacement": "Sul rovescio del risvolto si vedono le due parti del bottone a pressione.",
+      "reason": "Complete individually authored Italian copyedit"
+    },
+    {
+      "row": 992,
+      "field": "altText",
+      "concept": "Skirt supported by separate petticoat",
+      "previousText": "Il bordo del sottogonna appare sotto il tessuto sollevato vicino al ginocchio.",
+      "authoredReplacement": "Il tessuto esterno sollevato lascia vedere la sottogonna vicino al ginocchio.",
+      "reason": "Complete individually authored Italian copyedit"
+    },
+    {
+      "row": 66,
+      "field": "caption",
+      "concept": "Cardigan buttons alternated by size",
+      "previousText": "La scatola dei bottoni mi ha suggerito questa sequenza invece del solito abbinamento perfetto.",
+      "authoredReplacement": "Dalla scatola dei bottoni ho scelto una sequenza di dischi grandi e piccoli per questa maglia.",
+      "reason": "Complete individually authored final copyedit after mechanical overlap review"
+    },
+    {
+      "row": 145,
+      "field": "caption",
+      "concept": "Hat care label tucked beneath sweatband",
+      "previousText": "Ho infilato l'etichetta sotto la fascia interna del cappello per tenerla lontana dalla fronte.",
+      "authoredReplacement": "Il cartellino cucito ora si nasconde dietro il bordo morbido che appoggia sulla fronte.",
+      "reason": "Complete individually authored final copyedit after mechanical overlap review"
+    },
+    {
+      "row": 147,
+      "field": "altText",
+      "concept": "Hat care label tucked beneath sweatband",
+      "previousText": "L'etichetta del cappello è ripiegata sotto la fascia che circonda l'interno della calotta.",
+      "authoredReplacement": "L'etichetta è piegata dietro il nastro che riveste la base interna del cappello.",
+      "reason": "Complete individually authored final copyedit after mechanical overlap review"
+    },
+    {
+      "row": 715,
+      "field": "altText",
+      "concept": "Shawl fringe tied into a diamond lattice",
+      "previousText": "Le frange dello scialle sono unite da nodi che formano una griglia di rombi.",
+      "authoredReplacement": "Nodi disposti in diagonale collegano i fili dello scialle in una rete di piccoli rombi.",
+      "reason": "Complete individually authored final copyedit after mechanical overlap review"
+    },
+    {
+      "row": 713,
+      "field": "caption",
+      "concept": "Shawl fringe tied into a diamond lattice",
+      "previousText": "Ho annodato le frange a coppie fino a disegnare una rete di piccoli rombi.",
+      "authoredReplacement": "Ogni nodino del bordo è fatto a mano: alla fine le frange formano un reticolo di losanghe.",
+      "reason": "Complete individually authored final phrase-overlap copyedit"
+    },
+    {
+      "row": 249,
+      "field": "caption",
+      "previousConcept": "Lining turned outward for inspection or cleaning",
+      "previousText": "Ho tirato fuori la fodera per pulire anche gli angoli che si nascondono in fondo.",
+      "authoredConcept": "Bag clipped to bicycle rear rack",
+      "authoredReplacement": "La borsa si aggancia al portapacchi e lascia libere le spalle durante il tragitto in bicicletta.",
+      "reason": "Coordinator-authorized pre-seal amendment: conservative interior-reveal family would exceed10 including turned linings and contrasting reverse cuffs; independently authored complete new scenario"
+    },
+    {
+      "row": 250,
+      "field": "caption",
+      "previousConcept": "Lining turned outward for inspection or cleaning",
+      "previousText": "La parte interna esce quasi tutta e torna al suo posto con un gesto.",
+      "authoredConcept": "Bag clipped to bicycle rear rack",
+      "authoredReplacement": "Ho chiuso i due ganci prima di partire, tenendo la tracolla raccolta lontano dalla ruota.",
+      "reason": "Coordinator-authorized pre-seal amendment: conservative interior-reveal family would exceed10 including turned linings and contrasting reverse cuffs; independently authored complete new scenario"
+    },
+    {
+      "row": 251,
+      "field": "altText",
+      "previousConcept": "Lining turned outward for inspection or cleaning",
+      "previousText": "La fodera della borsa è estratta oltre l'apertura per mostrare gli angoli interni.",
+      "authoredConcept": "Bag clipped to bicycle rear rack",
+      "authoredReplacement": "Due ganci fissano una borsa al lato del portapacchi posteriore della bicicletta.",
+      "reason": "Coordinator-authorized pre-seal amendment: conservative interior-reveal family would exceed10 including turned linings and contrasting reverse cuffs; independently authored complete new scenario"
+    },
+    {
+      "row": 252,
+      "field": "altText",
+      "previousConcept": "Lining turned outward for inspection or cleaning",
+      "previousText": "Il sacco interno rovesciato resta collegato al bordo della borsa aperta.",
+      "authoredConcept": "Bag clipped to bicycle rear rack",
+      "authoredReplacement": "La borsa pende parallela alla ruota con la tracolla riposta sopra il bordo superiore.",
+      "reason": "Coordinator-authorized pre-seal amendment: conservative interior-reveal family would exceed10 including turned linings and contrasting reverse cuffs; independently authored complete new scenario"
+    },
+    {
+      "row": 689,
+      "field": "caption",
+      "previousConcept": "Sleeve edge folded into a cuff,Contrasting inside surface exposed",
+      "previousText": "Il rovescio della manica mostra un'altra superficie quando faccio il piccolo risvolto.",
+      "authoredConcept": "Shirt cuff extended by a thumb loop",
+      "authoredReplacement": "Il passante per il pollice tiene la manica vicina alla mano mentre indosso la giacca.",
+      "reason": "Coordinator-authorized pre-seal amendment: conservative interior-reveal family would exceed10 including turned linings and contrasting reverse cuffs; independently authored complete new scenario"
+    },
+    {
+      "row": 690,
+      "field": "caption",
+      "previousConcept": "Sleeve edge folded into a cuff,Contrasting inside surface exposed",
+      "previousText": "Ho tenuto la piega uguale sui due lati per lasciare una fascia ordinata sui polsi.",
+      "authoredConcept": "Shirt cuff extended by a thumb loop",
+      "authoredReplacement": "Infilo prima il dito nel piccolo anello e poi sistemo il tessuto lungo il polso.",
+      "reason": "Coordinator-authorized pre-seal amendment: conservative interior-reveal family would exceed10 including turned linings and contrasting reverse cuffs; independently authored complete new scenario"
+    },
+    {
+      "row": 691,
+      "field": "altText",
+      "previousConcept": "Sleeve edge folded into a cuff,Contrasting inside surface exposed",
+      "previousText": "Il bordo della manica è ripiegato mostrando un lato diverso del tessuto.",
+      "authoredConcept": "Shirt cuff extended by a thumb loop",
+      "authoredReplacement": "Un piccolo passante sul bordo della manica circonda il pollice della mano.",
+      "reason": "Coordinator-authorized pre-seal amendment: conservative interior-reveal family would exceed10 including turned linings and contrasting reverse cuffs; independently authored complete new scenario"
+    },
+    {
+      "row": 692,
+      "field": "altText",
+      "previousConcept": "Sleeve edge folded into a cuff,Contrasting inside surface exposed",
+      "previousText": "Una fascia contrastante circonda entrambi i polsi della camicia.",
+      "authoredConcept": "Shirt cuff extended by a thumb loop",
+      "authoredReplacement": "La manica prosegue sul dorso della mano ed è trattenuta da un anello tessile laterale.",
+      "reason": "Coordinator-authorized pre-seal amendment: conservative interior-reveal family would exceed10 including turned linings and contrasting reverse cuffs; independently authored complete new scenario"
+    }
+  ]
+}

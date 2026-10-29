@@ -6,6 +6,10 @@
 # OS focus report. The full Home teaser flow under TalkBack is local evidence
 # (scripts/run-story67-talkback.mjs). PR Gate makes every job that runs here
 # required.
+#
+# The release iOS app build takes about 21 minutes alone, over the 20 minute PR
+# job limit, so it runs on pushes to main, nightly and on demand. PRs keep the
+# XCTest module tests, the Android module tests and build, and the TalkBack run.
 name: Accessibility focus module
 
 on:
@@ -42,6 +46,8 @@ on:
       - 'scripts/ci/check-accessibility-focus-builds.sh'
       - 'scripts/run-story67-talkback.mjs'
       - '.github/workflows/pr-accessibility-focus.yml'
+  schedule:
+    - cron: '17 4 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -82,6 +88,17 @@ jobs:
         with:
           packages: platform-tools
 
+      # The release build below consumes this project. Generating it in its own step
+      # lets that build run when the Robolectric tests fail. The test script repeats
+      # the prebuild, which leaves an already generated project unchanged.
+      - name: Generate the Android project
+        id: android_project
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npx expo prebuild --platform android --no-install
+
       - name: Robolectric tests for the focus observer
         working-directory: apps/mobile
         env:
@@ -92,20 +109,23 @@ jobs:
       # The release app must keep React Native's native libraries, which the
       # module's build.gradle leaves out of its own androidTest APK only.
       - name: Build the release app and the module's test APK
+        id: apk_build
+        if: ${{ !cancelled() && steps.android_project.outcome == 'success' }}
         working-directory: apps/mobile/android
         env:
           NODE_ENV: production
         run: ./gradlew :app:assembleRelease :accessibility-focus:assembleDebugAndroidTest -PreactNativeArchitectures=x86_64 --console=plain
 
       - name: Check what each APK carries
+        if: ${{ !cancelled() && steps.apk_build.outcome == 'success' }}
         run: |
           bash scripts/ci/check-accessibility-focus-builds.sh android-app apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           bash scripts/ci/check-accessibility-focus-builds.sh android-test apps/mobile/modules/accessibility-focus/android/build/outputs/apk/androidTest/debug/accessibility-focus-debug-androidTest.apk
 
   ios:
-    name: iOS module tests and app build
+    name: iOS module tests
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -116,18 +136,34 @@ jobs:
           echo "Simulator: $device"
           xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device"
 
+  # Not on pull requests: the release build alone takes about 21 minutes.
+  ios-app-build:
+    name: iOS app build
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        id: checkout
+
       - name: Setup Node
+        id: node
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: npm
 
       - name: Install dependencies
+        id: deps
+        if: ${{ !cancelled() && steps.node.outcome == 'success' }}
         run: npm ci
 
-      # The SwiftPM target above leaves out AccessibilityFocusModule.swift, which
+      # The XCTest target in the ios job leaves out AccessibilityFocusModule.swift, which
       # needs ExpoModulesCore; the app build compiles it with its Expo dependency.
       - name: Generate the iOS project
+        id: ios_project
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         working-directory: apps/mobile
         env:
           CI: '1'
@@ -135,6 +171,8 @@ jobs:
         run: npx expo prebuild --platform ios
 
       - name: Build the release simulator app
+        id: app_build
+        if: ${{ !cancelled() && steps.ios_project.outcome == 'success' }}
         working-directory: apps/mobile/ios
         env:
           NODE_ENV: production
@@ -148,6 +186,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO build
 
       - name: Check the app links and registers the module
+        if: ${{ !cancelled() && steps.app_build.outcome == 'success' }}
         run: |
           bash scripts/ci/check-accessibility-focus-builds.sh ios-app \
             "apps/mobile/ios/build/Build/Products/Release-iphonesimulator/$scheme.app/$scheme" apps/mobile/ios

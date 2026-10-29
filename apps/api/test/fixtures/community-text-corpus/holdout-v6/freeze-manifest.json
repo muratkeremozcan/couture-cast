@@ -1,0 +1,85 @@
+{
+  "corpusVersion": "holdout-v6",
+  "sealedAt": "2026-10-28T17:05:57.585289+00:00",
+  "authoringBaseCommit": "8b98ad63177f05df11f72694ffbcfc244ad75f4d",
+  "gatePreregisteredCommit": "621bd3fa0ce191344e2a727968676eadbf6c695f",
+  "independencePreregisteredCommit": "406b3e13b6b788bb81d57be4677bb5ee3132976a",
+  "retirementEligibilityCommit": "b02e82022731b963366306b9c4eecb4c89da1fa1",
+  "aggregateRecipe": "SHA-256 over sorted UTF-8 lines: repository-relative-path + NUL + file-SHA-256 + LF",
+  "corpusSha256": "f5ac17f8dce28422821beef3d6d7c065c30c570d265f2a7304a970f06f60456e",
+  "sealedTextSetAggregateSha256": "ade26a6cab7213bf647dbebdec5f60922cbefd96ef0a9bed7fe488f5f09d73b4",
+  "sealedTextSetAggregateRecipe": "SEAL MANIFEST candidate v6 (awaiting owner manifest verification and release). Aggregate = SHA-256 of the UTF-8 text of lines '<locale> <corpus-json-sha256> <items>' sorted by locale, newline-joined with a trailing newline.",
+  "sealedTextSetEquivalence": "Importer output texts and fields are identical, in order, to the sealed per-locale corpus JSON (FINAL-v6/holdout-v6-<locale>.json, coordinator-verified aggregate ade26a6cab7213bf647dbebdec5f60922cbefd96ef0a9bed7fe488f5f09d73b4); importer IDs are <locale>-holdout-v6-001..2000 in the same order as sealed IDs <locale>-holdout-v6-0001..2000.",
+  "construction": "14000 complete items individually composed and persisted literally by authors; no banks, templates, combinatorial assembly or text-generating program. Tools copy complete items unchanged and measure them. Seven locales x 2000 (1000 captions, 1000 altTexts).",
+  "independenceRequirements": {
+    "maximumFiveWordAffectedItemsPerLocale": 20,
+    "primaryScenarioMaximum": 1,
+    "conceptCapPerScenarioOrMotif": 20,
+    "semanticAcceptanceRemainsReviewable": true,
+    "productionRandomSamplingEstablished": false
+  },
+  "sealManifest": "FINAL-v6/SEAL-MANIFEST.json (authoring root, backed up under _wt/cc68-tea-v6-resume-2026-10-26/FINAL-v6)",
+  "files": [
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v6/de.json",
+      "sha256": "8b9630db75fc7fa3a72d5c6e544123e71dd60d6fdfe211875ba6cf8cd8aff0e2",
+      "language": "de",
+      "total": 2000,
+      "captions": 1000,
+      "altTexts": 1000,
+      "gatedClean": 2000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v6/en.json",
+      "sha256": "38344c5c801cbbded2d71d22e6cd273cfc95d57375f3457dfb5075459b396d92",
+      "language": "en",
+      "total": 2000,
+      "captions": 1000,
+      "altTexts": 1000,
+      "gatedClean": 1999,
+      "expectedReview": 1
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v6/es.json",
+      "sha256": "28ea4441b3d20b9e13287b619171e67dd946455e6b53831aceadcc672d66236d",
+      "language": "es",
+      "total": 2000,
+      "captions": 1000,
+      "altTexts": 1000,
+      "gatedClean": 2000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v6/fr.json",
+      "sha256": "713a3ae8e9be3b7464f28b93568fc6b50bc83449f9ef4bc77279b09c6fffdcd9",
+      "language": "fr",
+      "total": 2000,
+      "captions": 1000,
+      "altTexts": 1000,
+      "gatedClean": 2000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v6/it.json",
+      "sha256": "40526dff24bd6b7c2a43a0c9f97ab99813f3a5e7651dd6facb97b276c6c7d66e",
+      "language": "it",
+      "total": 2000,
+      "captions": 1000,
+      "altTexts": 1000,
+      "gatedClean": 2000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v6/tr.json",
+      "sha256": "d4bca1e4be1019cbba02d20c8294ce74335dd1c2a17361bd7a95c158b78f5a21",
+      "language": "tr",
+      "total": 2000,
+      "captions": 1000,
+      "altTexts": 1000,
+      "gatedClean": 2000,
+      "expectedReview": 0
+    }
+  ],
+  "sixLocaleNote": "This directory holds de, en, es, fr, it and tr only. The Portuguese v6 file is not part of it: PT v6 failed its evaluation (16 of 2000, later 10 of 2000 on the round 7 policy), is spent and is retired for pt in the ledger. corpusSha256 aggregates these six listed files. The seven-locale sealed text-set aggregate ade26a6c above is the original seal record and is unchanged; its per-locale corpus JSON hashes remain in FINAL-v6/SEAL-MANIFEST.json. The six files are the bytes released and first evaluated, with the allow-list and term pins they were frozen against before repair inspection; a re-import on the current policy yields identical entries and newer pins, so the sealed bytes are kept."
+}

@@ -6,6 +6,7 @@ import type { PrismaClient } from '@prisma/client'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import type { CommunityModerationQueue } from './community-moderation.queue.js'
 import type { CommunityCommentsProcessor } from './community-comments.processor.js'
+import { singleRunTransaction } from '../../prisma/prisma-client.js'
 
 export class CommunityCommentsOutbox {
   private readonly logger = createBaseLogger().child({ feature: 'community-comments' })
@@ -128,7 +129,9 @@ export class CommunityCommentsOutbox {
       const row = rows[0]
       if (!row) break
       try {
-        await this.prisma.$transaction(
+        // The analytics capture happens before settlement commits; a re-run would resend it.
+        await singleRunTransaction(
+          this.prisma,
           async (tx) => {
             await tx.$executeRaw`SET LOCAL lock_timeout = '1000ms'`
             // Erasure deletes this subject. Keep its key live until delivery and settlement finish.

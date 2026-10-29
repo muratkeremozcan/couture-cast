@@ -1,0 +1,37 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runScript:
+    file: rapid-watermark-control.js
+    env:
+      MAESTRO_RAPID_ACTION: acquire
+# rapid-ready-outfit.yaml proved this opener unique on this same screen just before the
+# hold, so index 0 is that single opener. The whole flow must fit the 12 s hold.
+- tapOn:
+    id: outfit-share-card-open
+    index: 0
+- assertVisible: ${MAESTRO_PREPARING}
+- assertNotVisible:
+    id: share-card-preview-loaded-.*
+- assertVisible:
+    id: share-card-watermark
+    checked: true
+- tapOn:
+    id: share-card-watermark
+- assertVisible:
+    id: share-card-watermark
+    checked: false
+- assertVisible: ${MAESTRO_PREPARING}
+- assertNotVisible:
+    id: share-card-preview-loaded-.*
+- tapOn:
+    id: share-card-watermark
+- assertVisible:
+    id: share-card-watermark
+    checked: true
+- assertVisible: ${MAESTRO_PREPARING}
+- assertNotVisible:
+    id: share-card-preview-loaded-.*
+- runScript:
+    file: rapid-watermark-control.js
+    env:
+      MAESTRO_RAPID_ACTION: release

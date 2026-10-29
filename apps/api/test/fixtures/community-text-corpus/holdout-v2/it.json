@@ -1,0 +1,2013 @@
+{
+  "language": "it",
+  "corpusVersion": "holdout-v2",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "b3a3510f8a33119b0c9d85c87909932c07a3fac2fb36a701855546f81faf5abf",
+    "languageAllowListSha256": "86ee53373d448d06216edd4eb3ad44b66404f585cf0fd54a80d06318c1bef7e6"
+  },
+  "entries": [
+    {
+      "id": "it-holdout-v2-001",
+      "field": "caption",
+      "text": "Ho accorciato le maniche ieri."
+    },
+    {
+      "id": "it-holdout-v2-002",
+      "field": "caption",
+      "text": "Questo gilet era di mia zia."
+    },
+    {
+      "id": "it-holdout-v2-003",
+      "field": "caption",
+      "text": "Gli stivali hanno suole nuove."
+    },
+    {
+      "id": "it-holdout-v2-004",
+      "field": "caption",
+      "text": "Una spilla per la prova del coro."
+    },
+    {
+      "id": "it-holdout-v2-005",
+      "field": "caption",
+      "text": "La gonna si muove mentre cammino."
+    },
+    {
+      "id": "it-holdout-v2-006",
+      "field": "caption",
+      "text": "Ho cambiato i bottoni del cappotto."
+    },
+    {
+      "id": "it-holdout-v2-007",
+      "field": "caption",
+      "text": "La sciarpa viene da una tessitrice."
+    },
+    {
+      "id": "it-holdout-v2-008",
+      "field": "caption",
+      "text": "La borsa contiene i miei acquerelli."
+    },
+    {
+      "id": "it-holdout-v2-009",
+      "field": "caption",
+      "text": "Rimbocco le maniche per cucinare."
+    },
+    {
+      "id": "it-holdout-v2-010",
+      "field": "caption",
+      "text": "Questo cappello aspettava da tempo."
+    },
+    {
+      "id": "it-holdout-v2-011",
+      "field": "caption",
+      "text": "La giacca ha ritrovato la forma."
+    },
+    {
+      "id": "it-holdout-v2-012",
+      "field": "caption",
+      "text": "Ho cucito una tasca interna."
+    },
+    {
+      "id": "it-holdout-v2-013",
+      "field": "caption",
+      "text": "La camicia asciuga sulla gruccia."
+    },
+    {
+      "id": "it-holdout-v2-014",
+      "field": "caption",
+      "text": "Calze spesse per la lezione serale."
+    },
+    {
+      "id": "it-holdout-v2-015",
+      "field": "caption",
+      "text": "Il bracciale ha un piccolo fermaglio."
+    },
+    {
+      "id": "it-holdout-v2-016",
+      "field": "caption",
+      "text": "Mi piace questa fodera azzurra."
+    },
+    {
+      "id": "it-holdout-v2-017",
+      "field": "caption",
+      "text": "Ho ritrovato i guanti primaverili."
+    },
+    {
+      "id": "it-holdout-v2-018",
+      "field": "caption",
+      "text": "Un vestito ampio per la lettura."
+    },
+    {
+      "id": "it-holdout-v2-019",
+      "field": "caption",
+      "text": "I lacci nuovi tengono bene."
+    },
+    {
+      "id": "it-holdout-v2-020",
+      "field": "caption",
+      "text": "Ho finalmente finito la sciarpa."
+    },
+    {
+      "id": "it-holdout-v2-021",
+      "field": "caption",
+      "text": "Porto lo scialle sul treno."
+    },
+    {
+      "id": "it-holdout-v2-022",
+      "field": "caption",
+      "text": "La cintura è intrecciata a mano."
+    },
+    {
+      "id": "it-holdout-v2-023",
+      "field": "caption",
+      "text": "Le scarpe tornano dal calzolaio."
+    },
+    {
+      "id": "it-holdout-v2-024",
+      "field": "caption",
+      "text": "La gonna ha tasche grandi."
+    },
+    {
+      "id": "it-holdout-v2-025",
+      "field": "caption",
+      "text": "Una giacca chiara per la mostra."
+    },
+    {
+      "id": "it-holdout-v2-026",
+      "field": "caption",
+      "text": "Il colletto rimane al suo posto."
+    },
+    {
+      "id": "it-holdout-v2-027",
+      "field": "caption",
+      "text": "Ho ricamato foglie sulla manica."
+    },
+    {
+      "id": "it-holdout-v2-028",
+      "field": "caption",
+      "text": "Il berretto entra nella borsa."
+    },
+    {
+      "id": "it-holdout-v2-029",
+      "field": "caption",
+      "text": "Questi pantaloni sono comodi da seduta."
+    },
+    {
+      "id": "it-holdout-v2-030",
+      "field": "caption",
+      "text": "Gli orecchini accompagnano il collo rotondo."
+    },
+    {
+      "id": "it-holdout-v2-031",
+      "field": "caption",
+      "text": "Il cappotto apparteneva a mio padre."
+    },
+    {
+      "id": "it-holdout-v2-032",
+      "field": "caption",
+      "text": "Un grembiule per fare il pane."
+    },
+    {
+      "id": "it-holdout-v2-033",
+      "field": "caption",
+      "text": "Ho ripreso entrambe le maniche."
+    },
+    {
+      "id": "it-holdout-v2-034",
+      "field": "caption",
+      "text": "La spilla tiene fermo lo scialle."
+    },
+    {
+      "id": "it-holdout-v2-035",
+      "field": "caption",
+      "text": "I sandali hanno cinturini nuovi."
+    },
+    {
+      "id": "it-holdout-v2-036",
+      "field": "caption",
+      "text": "La camicia entra sotto il gilet."
+    },
+    {
+      "id": "it-holdout-v2-037",
+      "field": "caption",
+      "text": "Mi piace il movimento delle pieghe."
+    },
+    {
+      "id": "it-holdout-v2-038",
+      "field": "caption",
+      "text": "Un paio di guanti per il traghetto."
+    },
+    {
+      "id": "it-holdout-v2-039",
+      "field": "caption",
+      "text": "Questa borsa porta il mio quaderno."
+    },
+    {
+      "id": "it-holdout-v2-040",
+      "field": "caption",
+      "text": "Il berretto copre le orecchie."
+    },
+    {
+      "id": "it-holdout-v2-041",
+      "field": "caption",
+      "text": "Ho riparato la cerniera del giubbotto."
+    },
+    {
+      "id": "it-holdout-v2-042",
+      "field": "caption",
+      "text": "Una sciarpa per la biblioteca."
+    },
+    {
+      "id": "it-holdout-v2-043",
+      "field": "caption",
+      "text": "Il tessuto si stropiccia facilmente."
+    },
+    {
+      "id": "it-holdout-v2-044",
+      "field": "caption",
+      "text": "L'abito ha spalline regolabili."
+    },
+    {
+      "id": "it-holdout-v2-045",
+      "field": "caption",
+      "text": "Le scarpe scricchiolano sul parquet."
+    },
+    {
+      "id": "it-holdout-v2-046",
+      "field": "caption",
+      "text": "Ho comprato il filo abbinato."
+    },
+    {
+      "id": "it-holdout-v2-047",
+      "field": "caption",
+      "text": "Il cappello ha un nastro nuovo."
+    },
+    {
+      "id": "it-holdout-v2-048",
+      "field": "caption",
+      "text": "La giacca si piega facilmente."
+    },
+    {
+      "id": "it-holdout-v2-049",
+      "field": "caption",
+      "text": "La cintura viene dal mercatino."
+    },
+    {
+      "id": "it-holdout-v2-050",
+      "field": "caption",
+      "text": "Conservo questo bottone di ricambio."
+    },
+    {
+      "id": "it-holdout-v2-051",
+      "field": "caption",
+      "text": "Pantaloni larghi per il museo."
+    },
+    {
+      "id": "it-holdout-v2-052",
+      "field": "caption",
+      "text": "Ho stretto la vita dei pantaloncini."
+    },
+    {
+      "id": "it-holdout-v2-053",
+      "field": "caption",
+      "text": "La fodera della borsa è chiara."
+    },
+    {
+      "id": "it-holdout-v2-054",
+      "field": "caption",
+      "text": "Ho finalmente rammendato le calze."
+    },
+    {
+      "id": "it-holdout-v2-055",
+      "field": "caption",
+      "text": "Porto gli orecchini di mamma."
+    },
+    {
+      "id": "it-holdout-v2-056",
+      "field": "caption",
+      "text": "Il foulard protegge i capelli."
+    },
+    {
+      "id": "it-holdout-v2-057",
+      "field": "caption",
+      "text": "La camicia ha un collo alla coreana."
+    },
+    {
+      "id": "it-holdout-v2-058",
+      "field": "caption",
+      "text": "Ho lavato le scarpe di tela."
+    },
+    {
+      "id": "it-holdout-v2-059",
+      "field": "caption",
+      "text": "Una gonna di lana per stasera."
+    },
+    {
+      "id": "it-holdout-v2-060",
+      "field": "caption",
+      "text": "Il cardigan rimane sulla sedia."
+    },
+    {
+      "id": "it-holdout-v2-061",
+      "field": "caption",
+      "text": "Gli stivali hanno attraversato tutta la festa."
+    },
+    {
+      "id": "it-holdout-v2-062",
+      "field": "caption",
+      "text": "Un nodo diverso per il foulard."
+    },
+    {
+      "id": "it-holdout-v2-063",
+      "field": "caption",
+      "text": "Ho sostituito l'elastico in vita."
+    },
+    {
+      "id": "it-holdout-v2-064",
+      "field": "caption",
+      "text": "Questo vestito viene da uno scambio."
+    },
+    {
+      "id": "it-holdout-v2-065",
+      "field": "caption",
+      "text": "La borsa custodisce i ferri da maglia."
+    },
+    {
+      "id": "it-holdout-v2-066",
+      "field": "caption",
+      "text": "La mantella lascia libere le mani."
+    },
+    {
+      "id": "it-holdout-v2-067",
+      "field": "caption",
+      "text": "Il maglione entra sotto la giacca."
+    },
+    {
+      "id": "it-holdout-v2-068",
+      "field": "caption",
+      "text": "I guanti asciugano su un asciugamano."
+    },
+    {
+      "id": "it-holdout-v2-069",
+      "field": "caption",
+      "text": "Una collana sul collo alto."
+    },
+    {
+      "id": "it-holdout-v2-070",
+      "field": "caption",
+      "text": "La cintura cambia la linea dell'abito."
+    },
+    {
+      "id": "it-holdout-v2-071",
+      "field": "caption",
+      "text": "I pantaloni vengono dal negozio dell'usato."
+    },
+    {
+      "id": "it-holdout-v2-072",
+      "field": "caption",
+      "text": "Mia zia ha lavorato questo berretto."
+    },
+    {
+      "id": "it-holdout-v2-073",
+      "field": "caption",
+      "text": "Un grembiule per il corso di ceramica."
+    },
+    {
+      "id": "it-holdout-v2-074",
+      "field": "caption",
+      "text": "Ho stirato il colletto stamattina."
+    },
+    {
+      "id": "it-holdout-v2-075",
+      "field": "caption",
+      "text": "Le maniche si chiudono al polso."
+    },
+    {
+      "id": "it-holdout-v2-076",
+      "field": "caption",
+      "text": "La sciarpa ha frange lunghe."
+    },
+    {
+      "id": "it-holdout-v2-077",
+      "field": "caption",
+      "text": "La giacca ha bottoni di legno."
+    },
+    {
+      "id": "it-holdout-v2-078",
+      "field": "caption",
+      "text": "Porto una gonna al concerto."
+    },
+    {
+      "id": "it-holdout-v2-079",
+      "field": "caption",
+      "text": "La tasca è di nuovo resistente."
+    },
+    {
+      "id": "it-holdout-v2-080",
+      "field": "caption",
+      "text": "Queste scarpe occupano poco spazio."
+    },
+    {
+      "id": "it-holdout-v2-081",
+      "field": "caption",
+      "text": "Lo scialle arriva dal telaio."
+    },
+    {
+      "id": "it-holdout-v2-082",
+      "field": "caption",
+      "text": "Ho aggiunto un passante al cappotto."
+    },
+    {
+      "id": "it-holdout-v2-083",
+      "field": "caption",
+      "text": "Stivaletti per il corso di ballo."
+    },
+    {
+      "id": "it-holdout-v2-084",
+      "field": "caption",
+      "text": "La camicia ha una piega dietro."
+    },
+    {
+      "id": "it-holdout-v2-085",
+      "field": "caption",
+      "text": "Il vestito ha uno scollo quadrato."
+    },
+    {
+      "id": "it-holdout-v2-086",
+      "field": "caption",
+      "text": "Alla borsa serve una tracolla lunga."
+    },
+    {
+      "id": "it-holdout-v2-087",
+      "field": "caption",
+      "text": "Porto un anello molto semplice."
+    },
+    {
+      "id": "it-holdout-v2-088",
+      "field": "caption",
+      "text": "Il berretto accompagna le passeggiate."
+    },
+    {
+      "id": "it-holdout-v2-089",
+      "field": "caption",
+      "text": "Ho cucito il bottone prima di uscire."
+    },
+    {
+      "id": "it-holdout-v2-090",
+      "field": "caption",
+      "text": "I pantaloni mantengono la piega."
+    },
+    {
+      "id": "it-holdout-v2-091",
+      "field": "caption",
+      "text": "Un gilet per la riunione del circolo."
+    },
+    {
+      "id": "it-holdout-v2-092",
+      "field": "caption",
+      "text": "La gonna arriva sotto il ginocchio."
+    },
+    {
+      "id": "it-holdout-v2-093",
+      "field": "caption",
+      "text": "Le scarpe hanno lacci gialli."
+    },
+    {
+      "id": "it-holdout-v2-094",
+      "field": "caption",
+      "text": "La blusa accompagna la salopette."
+    },
+    {
+      "id": "it-holdout-v2-095",
+      "field": "caption",
+      "text": "Ho pulito la fibbia della cintura."
+    },
+    {
+      "id": "it-holdout-v2-096",
+      "field": "caption",
+      "text": "Il cappotto copre diversi strati."
+    },
+    {
+      "id": "it-holdout-v2-097",
+      "field": "caption",
+      "text": "Un nastro tiene i capelli."
+    },
+    {
+      "id": "it-holdout-v2-098",
+      "field": "caption",
+      "text": "Il cappello ha una tesa larga."
+    },
+    {
+      "id": "it-holdout-v2-099",
+      "field": "caption",
+      "text": "Questa sciarpa era un regalo."
+    },
+    {
+      "id": "it-holdout-v2-100",
+      "field": "caption",
+      "text": "La giacca entra sopra il tutore."
+    },
+    {
+      "id": "it-holdout-v2-101",
+      "field": "caption",
+      "text": "Ho ripreso la cucitura della borsa."
+    },
+    {
+      "id": "it-holdout-v2-102",
+      "field": "caption",
+      "text": "Un abito per il saggio di pianoforte."
+    },
+    {
+      "id": "it-holdout-v2-103",
+      "field": "caption",
+      "text": "Il berretto entra sotto il cappuccio."
+    },
+    {
+      "id": "it-holdout-v2-104",
+      "field": "caption",
+      "text": "I guanti hanno polsini lunghi."
+    },
+    {
+      "id": "it-holdout-v2-105",
+      "field": "caption",
+      "text": "La camicetta è ricamata sul collo."
+    },
+    {
+      "id": "it-holdout-v2-106",
+      "field": "caption",
+      "text": "Ho comprato il foulard al museo."
+    },
+    {
+      "id": "it-holdout-v2-107",
+      "field": "caption",
+      "text": "La tasca contiene la mia matita."
+    },
+    {
+      "id": "it-holdout-v2-108",
+      "field": "caption",
+      "text": "Un paio di pantaloni per la cerimonia."
+    },
+    {
+      "id": "it-holdout-v2-109",
+      "field": "caption",
+      "text": "Il gilet ha il retro regolabile."
+    },
+    {
+      "id": "it-holdout-v2-110",
+      "field": "caption",
+      "text": "Gli stivali aspettano nell'ingresso."
+    },
+    {
+      "id": "it-holdout-v2-111",
+      "field": "caption",
+      "text": "La mantella si chiude al collo."
+    },
+    {
+      "id": "it-holdout-v2-112",
+      "field": "caption",
+      "text": "Ho cucito un rinforzo sul ginocchio."
+    },
+    {
+      "id": "it-holdout-v2-113",
+      "field": "caption",
+      "text": "Una gonna di lino per pranzo."
+    },
+    {
+      "id": "it-holdout-v2-114",
+      "field": "caption",
+      "text": "Il cappotto pesa poco sulle spalle."
+    },
+    {
+      "id": "it-holdout-v2-115",
+      "field": "caption",
+      "text": "Il bracciale viene da mia cugina."
+    },
+    {
+      "id": "it-holdout-v2-116",
+      "field": "caption",
+      "text": "Ho scelto il blu per la foto."
+    },
+    {
+      "id": "it-holdout-v2-117",
+      "field": "caption",
+      "text": "I sandali sono finalmente asciutti."
+    },
+    {
+      "id": "it-holdout-v2-118",
+      "field": "caption",
+      "text": "Il colletto si stacca dal vestito."
+    },
+    {
+      "id": "it-holdout-v2-119",
+      "field": "caption",
+      "text": "La camicia ha bottoni di madreperla."
+    },
+    {
+      "id": "it-holdout-v2-120",
+      "field": "caption",
+      "text": "Una borsa intrecciata per il mercato."
+    },
+    {
+      "id": "it-holdout-v2-121",
+      "field": "caption",
+      "text": "Il cappello resiste bene al vento."
+    },
+    {
+      "id": "it-holdout-v2-122",
+      "field": "caption",
+      "text": "Ho accorciato la bretella del grembiule."
+    },
+    {
+      "id": "it-holdout-v2-123",
+      "field": "caption",
+      "text": "La giacca ha un gomito riparato."
+    },
+    {
+      "id": "it-holdout-v2-124",
+      "field": "caption",
+      "text": "Il maglione arriva dallo scambio condominiale."
+    },
+    {
+      "id": "it-holdout-v2-125",
+      "field": "caption",
+      "text": "Le calze spuntano dai pantaloni."
+    },
+    {
+      "id": "it-holdout-v2-126",
+      "field": "caption",
+      "text": "Il vestito nasconde due tasche."
+    },
+    {
+      "id": "it-holdout-v2-127",
+      "field": "caption",
+      "text": "Un foulard per il viaggio in barca."
+    },
+    {
+      "id": "it-holdout-v2-128",
+      "field": "caption",
+      "text": "Porto una cravatta di lana."
+    },
+    {
+      "id": "it-holdout-v2-129",
+      "field": "caption",
+      "text": "La borsa entra sotto il sedile."
+    },
+    {
+      "id": "it-holdout-v2-130",
+      "field": "caption",
+      "text": "Le scarpe sono tornate morbide."
+    },
+    {
+      "id": "it-holdout-v2-131",
+      "field": "caption",
+      "text": "Ho sistemato la fodera del cappotto."
+    },
+    {
+      "id": "it-holdout-v2-132",
+      "field": "caption",
+      "text": "Una spilla sul nastro del cappello."
+    },
+    {
+      "id": "it-holdout-v2-133",
+      "field": "caption",
+      "text": "Questa gonna aveva un'altra lunghezza."
+    },
+    {
+      "id": "it-holdout-v2-134",
+      "field": "caption",
+      "text": "Il gilet è reversibile."
+    },
+    {
+      "id": "it-holdout-v2-135",
+      "field": "caption",
+      "text": "I guanti sono rimasti sull'autobus."
+    },
+    {
+      "id": "it-holdout-v2-136",
+      "field": "caption",
+      "text": "Ho scelto i mocassini per camminare."
+    },
+    {
+      "id": "it-holdout-v2-137",
+      "field": "caption",
+      "text": "Il vestito ha piccoli fiori ricamati."
+    },
+    {
+      "id": "it-holdout-v2-138",
+      "field": "caption",
+      "text": "Una camicia ampia per incidere."
+    },
+    {
+      "id": "it-holdout-v2-139",
+      "field": "caption",
+      "text": "I pantaloni hanno linguette laterali."
+    },
+    {
+      "id": "it-holdout-v2-140",
+      "field": "caption",
+      "text": "La sciarpa prende la luce serale."
+    },
+    {
+      "id": "it-holdout-v2-141",
+      "field": "caption",
+      "text": "Il berretto nasce dagli avanzi di lana."
+    },
+    {
+      "id": "it-holdout-v2-142",
+      "field": "caption",
+      "text": "La giacca asciuga vicino alla finestra."
+    },
+    {
+      "id": "it-holdout-v2-143",
+      "field": "caption",
+      "text": "Ho aggiunto un anello alla borsa."
+    },
+    {
+      "id": "it-holdout-v2-144",
+      "field": "caption",
+      "text": "Orecchini argentati per la cena."
+    },
+    {
+      "id": "it-holdout-v2-145",
+      "field": "caption",
+      "text": "Il cappotto ha automatici robusti."
+    },
+    {
+      "id": "it-holdout-v2-146",
+      "field": "caption",
+      "text": "La cintura passa negli appositi anelli."
+    },
+    {
+      "id": "it-holdout-v2-147",
+      "field": "caption",
+      "text": "La gonna ha una chiusura laterale."
+    },
+    {
+      "id": "it-holdout-v2-148",
+      "field": "caption",
+      "text": "Uno scialle per la sala lettura."
+    },
+    {
+      "id": "it-holdout-v2-149",
+      "field": "caption",
+      "text": "Gli stivaletti hanno un tacco basso."
+    },
+    {
+      "id": "it-holdout-v2-150",
+      "field": "caption",
+      "text": "La manica conserva una cucitura visibile."
+    },
+    {
+      "id": "it-holdout-v2-151",
+      "field": "caption",
+      "text": "Porto il completo della laurea."
+    },
+    {
+      "id": "it-holdout-v2-152",
+      "field": "caption",
+      "text": "La blusa ha le spalle arricciate."
+    },
+    {
+      "id": "it-holdout-v2-153",
+      "field": "caption",
+      "text": "I bottoni sembrano piccole conchiglie."
+    },
+    {
+      "id": "it-holdout-v2-154",
+      "field": "caption",
+      "text": "Il foulard accompagna la giacca verde."
+    },
+    {
+      "id": "it-holdout-v2-155",
+      "field": "caption",
+      "text": "Il vestito entra nella valigia."
+    },
+    {
+      "id": "it-holdout-v2-156",
+      "field": "caption",
+      "text": "Ho ripreso entrambi i polsini."
+    },
+    {
+      "id": "it-holdout-v2-157",
+      "field": "caption",
+      "text": "Una bustina fatta con ritagli di stoffa."
+    },
+    {
+      "id": "it-holdout-v2-158",
+      "field": "caption",
+      "text": "I pantaloni permettono di pedalare."
+    },
+    {
+      "id": "it-holdout-v2-159",
+      "field": "caption",
+      "text": "Le scarpe vengono dalla bottega vicina."
+    },
+    {
+      "id": "it-holdout-v2-160",
+      "field": "caption",
+      "text": "Il cappello riposa sul gancio."
+    },
+    {
+      "id": "it-holdout-v2-161",
+      "field": "caption",
+      "text": "Ho ricucito la fodera della tasca."
+    },
+    {
+      "id": "it-holdout-v2-162",
+      "field": "caption",
+      "text": "Il bracciale ha una chiusura discreta."
+    },
+    {
+      "id": "it-holdout-v2-163",
+      "field": "caption",
+      "text": "La mantella copre il mio zaino."
+    },
+    {
+      "id": "it-holdout-v2-164",
+      "field": "caption",
+      "text": "Una camicia per la serata di letture."
+    },
+    {
+      "id": "it-holdout-v2-165",
+      "field": "caption",
+      "text": "I sandali hanno fasce larghe."
+    },
+    {
+      "id": "it-holdout-v2-166",
+      "field": "caption",
+      "text": "La gonna segue i passi sulle scale."
+    },
+    {
+      "id": "it-holdout-v2-167",
+      "field": "caption",
+      "text": "Il maglione ha spalle scese."
+    },
+    {
+      "id": "it-holdout-v2-168",
+      "field": "caption",
+      "text": "Ho tinto la cintura di blu."
+    },
+    {
+      "id": "it-holdout-v2-169",
+      "field": "caption",
+      "text": "Il grembiule protegge le maniche."
+    },
+    {
+      "id": "it-holdout-v2-170",
+      "field": "caption",
+      "text": "La sciarpa profuma di cedro."
+    },
+    {
+      "id": "it-holdout-v2-171",
+      "field": "caption",
+      "text": "La giacca ha tasche profonde."
+    },
+    {
+      "id": "it-holdout-v2-172",
+      "field": "caption",
+      "text": "Un colletto removibile cambia il vestito."
+    },
+    {
+      "id": "it-holdout-v2-173",
+      "field": "caption",
+      "text": "Ho portato la spilla tutta la settimana."
+    },
+    {
+      "id": "it-holdout-v2-174",
+      "field": "caption",
+      "text": "I guanti tornano nella scatola."
+    },
+    {
+      "id": "it-holdout-v2-175",
+      "field": "caption",
+      "text": "La borsa ha un fondo rinforzato."
+    },
+    {
+      "id": "it-holdout-v2-176",
+      "field": "caption",
+      "text": "Questa gonna viene da mia sorella."
+    },
+    {
+      "id": "it-holdout-v2-177",
+      "field": "caption",
+      "text": "Pantaloni nuovi per la rimpatriata."
+    },
+    {
+      "id": "it-holdout-v2-178",
+      "field": "caption",
+      "text": "Il berretto ha un ampio risvolto."
+    },
+    {
+      "id": "it-holdout-v2-179",
+      "field": "caption",
+      "text": "La camicia presenta un piccolo ricamo."
+    },
+    {
+      "id": "it-holdout-v2-180",
+      "field": "caption",
+      "text": "Ho lucidato gli stivali ieri."
+    },
+    {
+      "id": "it-holdout-v2-181",
+      "field": "caption",
+      "text": "Il vestito si annoda di lato."
+    },
+    {
+      "id": "it-holdout-v2-182",
+      "field": "caption",
+      "text": "Le scarpe aspettano la nuova suola."
+    },
+    {
+      "id": "it-holdout-v2-183",
+      "field": "caption",
+      "text": "Un nastro chiaro per il cappello."
+    },
+    {
+      "id": "it-holdout-v2-184",
+      "field": "caption",
+      "text": "Ho indossato la giacca del nonno."
+    },
+    {
+      "id": "it-holdout-v2-185",
+      "field": "caption",
+      "text": "Questo maglione accompagna il mio disegno."
+    },
+    {
+      "id": "it-holdout-v2-186",
+      "field": "caption",
+      "text": "La cintura ha una fibbia rotonda."
+    },
+    {
+      "id": "it-holdout-v2-187",
+      "field": "caption",
+      "text": "La borsa contiene un bastone pieghevole."
+    },
+    {
+      "id": "it-holdout-v2-188",
+      "field": "caption",
+      "text": "Il cappotto rimane aperto al chiuso."
+    },
+    {
+      "id": "it-holdout-v2-189",
+      "field": "caption",
+      "text": "La sciarpa spunta dal colletto."
+    },
+    {
+      "id": "it-holdout-v2-190",
+      "field": "caption",
+      "text": "Calze fatte a mano per cena."
+    },
+    {
+      "id": "it-holdout-v2-191",
+      "field": "caption",
+      "text": "Il tessuto della blusa rimane fresco."
+    },
+    {
+      "id": "it-holdout-v2-192",
+      "field": "caption",
+      "text": "Ho scelto una gonna a portafoglio."
+    },
+    {
+      "id": "it-holdout-v2-193",
+      "field": "caption",
+      "text": "Gli stivali hanno cuciture rosse."
+    },
+    {
+      "id": "it-holdout-v2-194",
+      "field": "caption",
+      "text": "Un gilet per il corso di scacchi."
+    },
+    {
+      "id": "it-holdout-v2-195",
+      "field": "caption",
+      "text": "La camicia ha polsini doppi."
+    },
+    {
+      "id": "it-holdout-v2-196",
+      "field": "caption",
+      "text": "Ho rinforzato la tracolla della borsa."
+    },
+    {
+      "id": "it-holdout-v2-197",
+      "field": "caption",
+      "text": "Il foulard si annoda nei capelli."
+    },
+    {
+      "id": "it-holdout-v2-198",
+      "field": "caption",
+      "text": "Il cappotto ha una nuova asola."
+    },
+    {
+      "id": "it-holdout-v2-199",
+      "field": "caption",
+      "text": "Il vestito esce dal laboratorio sartoriale."
+    },
+    {
+      "id": "it-holdout-v2-200",
+      "field": "caption",
+      "text": "Questi guanti sono foderati di cotone."
+    },
+    {
+      "id": "it-holdout-v2-201",
+      "field": "altText",
+      "text": "Blusa blu con colletto tondo."
+    },
+    {
+      "id": "it-holdout-v2-202",
+      "field": "altText",
+      "text": "Cappotto grigio su una sedia."
+    },
+    {
+      "id": "it-holdout-v2-203",
+      "field": "altText",
+      "text": "Gonna verde con pieghe ampie."
+    },
+    {
+      "id": "it-holdout-v2-204",
+      "field": "altText",
+      "text": "Stivali marroni davanti alla porta."
+    },
+    {
+      "id": "it-holdout-v2-205",
+      "field": "altText",
+      "text": "Sciarpa rossa sotto un risvolto."
+    },
+    {
+      "id": "it-holdout-v2-206",
+      "field": "altText",
+      "text": "Cappello chiaro con nastro intrecciato."
+    },
+    {
+      "id": "it-holdout-v2-207",
+      "field": "altText",
+      "text": "Scarpe nere su piastrelle chiare."
+    },
+    {
+      "id": "it-holdout-v2-208",
+      "field": "altText",
+      "text": "Gilet trapuntato con tasche quadrate."
+    },
+    {
+      "id": "it-holdout-v2-209",
+      "field": "altText",
+      "text": "Borsa gialla contro un muro."
+    },
+    {
+      "id": "it-holdout-v2-210",
+      "field": "altText",
+      "text": "Guanti di lana su una panca."
+    },
+    {
+      "id": "it-holdout-v2-211",
+      "field": "altText",
+      "text": "Camicia bianca con polsini ricamati."
+    },
+    {
+      "id": "it-holdout-v2-212",
+      "field": "altText",
+      "text": "Pantaloni blu con risvolto."
+    },
+    {
+      "id": "it-holdout-v2-213",
+      "field": "altText",
+      "text": "Mantella verde con fermaglio di legno."
+    },
+    {
+      "id": "it-holdout-v2-214",
+      "field": "altText",
+      "text": "Gonna rosa accanto alla bicicletta."
+    },
+    {
+      "id": "it-holdout-v2-215",
+      "field": "altText",
+      "text": "Scarpe chiare con lacci scuri."
+    },
+    {
+      "id": "it-holdout-v2-216",
+      "field": "altText",
+      "text": "Collana argentata su collo alto."
+    },
+    {
+      "id": "it-holdout-v2-217",
+      "field": "altText",
+      "text": "Grembiule di jeans con bretelle incrociate."
+    },
+    {
+      "id": "it-holdout-v2-218",
+      "field": "altText",
+      "text": "Berretto grigio con bordo ripiegato."
+    },
+    {
+      "id": "it-holdout-v2-219",
+      "field": "altText",
+      "text": "Cintura marrone con fibbia ovale."
+    },
+    {
+      "id": "it-holdout-v2-220",
+      "field": "altText",
+      "text": "Abito giallo con bottoni rivestiti."
+    },
+    {
+      "id": "it-holdout-v2-221",
+      "field": "altText",
+      "text": "Giacca corta con tasche grandi."
+    },
+    {
+      "id": "it-holdout-v2-222",
+      "field": "altText",
+      "text": "Scialle beige su entrambe le spalle."
+    },
+    {
+      "id": "it-holdout-v2-223",
+      "field": "altText",
+      "text": "Stivaletti neri con cerniera laterale."
+    },
+    {
+      "id": "it-holdout-v2-224",
+      "field": "altText",
+      "text": "Camicia a quadri sotto un gilet."
+    },
+    {
+      "id": "it-holdout-v2-225",
+      "field": "altText",
+      "text": "Foulard blu sopra una ringhiera."
+    },
+    {
+      "id": "it-holdout-v2-226",
+      "field": "altText",
+      "text": "Cestino intrecciato con manico tondo."
+    },
+    {
+      "id": "it-holdout-v2-227",
+      "field": "altText",
+      "text": "Gonna scura con spacco laterale."
+    },
+    {
+      "id": "it-holdout-v2-228",
+      "field": "altText",
+      "text": "Bracciale verde accanto al polsino."
+    },
+    {
+      "id": "it-holdout-v2-229",
+      "field": "altText",
+      "text": "Cappotto rosso con collo ampio."
+    },
+    {
+      "id": "it-holdout-v2-230",
+      "field": "altText",
+      "text": "Calze grigie sopra i mocassini."
+    },
+    {
+      "id": "it-holdout-v2-231",
+      "field": "altText",
+      "text": "Vestito bianco vicino alla finestra."
+    },
+    {
+      "id": "it-holdout-v2-232",
+      "field": "altText",
+      "text": "Giacca blu con fazzoletto piegato."
+    },
+    {
+      "id": "it-holdout-v2-233",
+      "field": "altText",
+      "text": "Berretto rosso sopra uno zaino."
+    },
+    {
+      "id": "it-holdout-v2-234",
+      "field": "altText",
+      "text": "Sandali marroni su assi di legno."
+    },
+    {
+      "id": "it-holdout-v2-235",
+      "field": "altText",
+      "text": "Blusa verde con maniche ampie."
+    },
+    {
+      "id": "it-holdout-v2-236",
+      "field": "altText",
+      "text": "Cravatta lavorata a piccoli punti."
+    },
+    {
+      "id": "it-holdout-v2-237",
+      "field": "altText",
+      "text": "Pantaloni chiari con pinces davanti."
+    },
+    {
+      "id": "it-holdout-v2-238",
+      "field": "altText",
+      "text": "Guanti neri sulla lana grigia."
+    },
+    {
+      "id": "it-holdout-v2-239",
+      "field": "altText",
+      "text": "Borsa rosa con tracolla corta."
+    },
+    {
+      "id": "it-holdout-v2-240",
+      "field": "altText",
+      "text": "Cintura di stoffa sul lino."
+    },
+    {
+      "id": "it-holdout-v2-241",
+      "field": "altText",
+      "text": "Gonna blu con vita arricciata."
+    },
+    {
+      "id": "it-holdout-v2-242",
+      "field": "altText",
+      "text": "Camicia rosa con taschino curvo."
+    },
+    {
+      "id": "it-holdout-v2-243",
+      "field": "altText",
+      "text": "Gilet grigio su maniche lunghe."
+    },
+    {
+      "id": "it-holdout-v2-244",
+      "field": "altText",
+      "text": "Cappello marrone appeso a un gancio."
+    },
+    {
+      "id": "it-holdout-v2-245",
+      "field": "altText",
+      "text": "Scarpe rosse accanto al bastone."
+    },
+    {
+      "id": "it-holdout-v2-246",
+      "field": "altText",
+      "text": "Foulard stampato sotto un cappuccio."
+    },
+    {
+      "id": "it-holdout-v2-247",
+      "field": "altText",
+      "text": "Vestito verde con laccio laterale."
+    },
+    {
+      "id": "it-holdout-v2-248",
+      "field": "altText",
+      "text": "Bracciale di perline blu."
+    },
+    {
+      "id": "it-holdout-v2-249",
+      "field": "altText",
+      "text": "Giacca bianca con maniche rimboccate."
+    },
+    {
+      "id": "it-holdout-v2-250",
+      "field": "altText",
+      "text": "Calze scure con pois chiari."
+    },
+    {
+      "id": "it-holdout-v2-251",
+      "field": "altText",
+      "text": "Cappotto beige con bottoni di legno."
+    },
+    {
+      "id": "it-holdout-v2-252",
+      "field": "altText",
+      "text": "Blusa rigata sotto la salopette."
+    },
+    {
+      "id": "it-holdout-v2-253",
+      "field": "altText",
+      "text": "Borsa blu con angolo rammendato."
+    },
+    {
+      "id": "it-holdout-v2-254",
+      "field": "altText",
+      "text": "Pantaloni grigi con regolazione laterale."
+    },
+    {
+      "id": "it-holdout-v2-255",
+      "field": "altText",
+      "text": "Stivali neri sopra i gradini."
+    },
+    {
+      "id": "it-holdout-v2-256",
+      "field": "altText",
+      "text": "Berretto giallo a maglia spessa."
+    },
+    {
+      "id": "it-holdout-v2-257",
+      "field": "altText",
+      "text": "Gonna marrone con chiusura incrociata."
+    },
+    {
+      "id": "it-holdout-v2-258",
+      "field": "altText",
+      "text": "Camicia di lino su una gruccia."
+    },
+    {
+      "id": "it-holdout-v2-259",
+      "field": "altText",
+      "text": "Scialle rosso fermato da una spilla."
+    },
+    {
+      "id": "it-holdout-v2-260",
+      "field": "altText",
+      "text": "Sandali con due fasce larghe."
+    },
+    {
+      "id": "it-holdout-v2-261",
+      "field": "altText",
+      "text": "Giacca verde con bordo elastico."
+    },
+    {
+      "id": "it-holdout-v2-262",
+      "field": "altText",
+      "text": "Abito blu con maniche arricciate."
+    },
+    {
+      "id": "it-holdout-v2-263",
+      "field": "altText",
+      "text": "Cintura nera con fibbia rettangolare."
+    },
+    {
+      "id": "it-holdout-v2-264",
+      "field": "altText",
+      "text": "Cappello di paglia sulla pietra."
+    },
+    {
+      "id": "it-holdout-v2-265",
+      "field": "altText",
+      "text": "Guanti rosa vicino a un libro."
+    },
+    {
+      "id": "it-holdout-v2-266",
+      "field": "altText",
+      "text": "Giacca grigia con risvolti stretti."
+    },
+    {
+      "id": "it-holdout-v2-267",
+      "field": "altText",
+      "text": "Calza con tallone rammendato."
+    },
+    {
+      "id": "it-holdout-v2-268",
+      "field": "altText",
+      "text": "Borsa marrone con fibbie dorate."
+    },
+    {
+      "id": "it-holdout-v2-269",
+      "field": "altText",
+      "text": "Gonna crema sotto giacca scura."
+    },
+    {
+      "id": "it-holdout-v2-270",
+      "field": "altText",
+      "text": "Sciarpa gialla con frange lunghe."
+    },
+    {
+      "id": "it-holdout-v2-271",
+      "field": "altText",
+      "text": "Camicia blu con collo alla coreana."
+    },
+    {
+      "id": "it-holdout-v2-272",
+      "field": "altText",
+      "text": "Mantella a quadri sopra un completo."
+    },
+    {
+      "id": "it-holdout-v2-273",
+      "field": "altText",
+      "text": "Scarpe bianche con chiusure a strappo."
+    },
+    {
+      "id": "it-holdout-v2-274",
+      "field": "altText",
+      "text": "Blusa rosa con bottoni di stoffa."
+    },
+    {
+      "id": "it-holdout-v2-275",
+      "field": "altText",
+      "text": "Pantaloni verdi con tasche profonde."
+    },
+    {
+      "id": "it-holdout-v2-276",
+      "field": "altText",
+      "text": "Orologio argentato sotto una manica."
+    },
+    {
+      "id": "it-holdout-v2-277",
+      "field": "altText",
+      "text": "Cappotto scuro con cappuccio removibile."
+    },
+    {
+      "id": "it-holdout-v2-278",
+      "field": "altText",
+      "text": "Abito di lino con cintura."
+    },
+    {
+      "id": "it-holdout-v2-279",
+      "field": "altText",
+      "text": "Berretto grigio vicino all'ombrello."
+    },
+    {
+      "id": "it-holdout-v2-280",
+      "field": "altText",
+      "text": "Grembiule giallo con tasca frontale."
+    },
+    {
+      "id": "it-holdout-v2-281",
+      "field": "altText",
+      "text": "Borsa verde accanto alla porta."
+    },
+    {
+      "id": "it-holdout-v2-282",
+      "field": "altText",
+      "text": "Gonna rossa con tasche laterali."
+    },
+    {
+      "id": "it-holdout-v2-283",
+      "field": "altText",
+      "text": "Stivali di pelle con cuciture visibili."
+    },
+    {
+      "id": "it-holdout-v2-284",
+      "field": "altText",
+      "text": "Maglione bianco con trecce."
+    },
+    {
+      "id": "it-holdout-v2-285",
+      "field": "altText",
+      "text": "Camicia scura con collo dritto."
+    },
+    {
+      "id": "it-holdout-v2-286",
+      "field": "altText",
+      "text": "Spilla argentata a forma di uccello."
+    },
+    {
+      "id": "it-holdout-v2-287",
+      "field": "altText",
+      "text": "Cintura blu su un vestito chiaro."
+    },
+    {
+      "id": "it-holdout-v2-288",
+      "field": "altText",
+      "text": "Berretto nero sopra una sciarpa."
+    },
+    {
+      "id": "it-holdout-v2-289",
+      "field": "altText",
+      "text": "Giacca di velluto con toppe ai gomiti."
+    },
+    {
+      "id": "it-holdout-v2-290",
+      "field": "altText",
+      "text": "Sandali rossi sopra un pontile."
+    },
+    {
+      "id": "it-holdout-v2-291",
+      "field": "altText",
+      "text": "Blusa crema sotto gilet lavorato."
+    },
+    {
+      "id": "it-holdout-v2-292",
+      "field": "altText",
+      "text": "Pantaloni neri con piega marcata."
+    },
+    {
+      "id": "it-holdout-v2-293",
+      "field": "altText",
+      "text": "Scialle blu sulla sedia di legno."
+    },
+    {
+      "id": "it-holdout-v2-294",
+      "field": "altText",
+      "text": "Cappello verde con fascia intrecciata."
+    },
+    {
+      "id": "it-holdout-v2-295",
+      "field": "altText",
+      "text": "Borsa grigia con fodera chiara."
+    },
+    {
+      "id": "it-holdout-v2-296",
+      "field": "altText",
+      "text": "Guanti fissati a una manica."
+    },
+    {
+      "id": "it-holdout-v2-297",
+      "field": "altText",
+      "text": "Gonna gialla con piega centrale."
+    },
+    {
+      "id": "it-holdout-v2-298",
+      "field": "altText",
+      "text": "Giacca blu con patta antipioggia."
+    },
+    {
+      "id": "it-holdout-v2-299",
+      "field": "altText",
+      "text": "Abito rosa con scollo quadrato."
+    },
+    {
+      "id": "it-holdout-v2-300",
+      "field": "altText",
+      "text": "Scarpe marroni con suole nuove."
+    },
+    {
+      "id": "it-holdout-v2-301",
+      "field": "altText",
+      "text": "Camicia rigata accanto alla valigia."
+    },
+    {
+      "id": "it-holdout-v2-302",
+      "field": "altText",
+      "text": "Cappotto verde con bottoni automatici."
+    },
+    {
+      "id": "it-holdout-v2-303",
+      "field": "altText",
+      "text": "Foulard grigio con bordo sottile."
+    },
+    {
+      "id": "it-holdout-v2-304",
+      "field": "altText",
+      "text": "Grembiule nero annodato in vita."
+    },
+    {
+      "id": "it-holdout-v2-305",
+      "field": "altText",
+      "text": "Bracciale argentato attorno al polso."
+    },
+    {
+      "id": "it-holdout-v2-306",
+      "field": "altText",
+      "text": "Gonna bianca con bordo di pizzo."
+    },
+    {
+      "id": "it-holdout-v2-307",
+      "field": "altText",
+      "text": "Berretto blu su una panchina."
+    },
+    {
+      "id": "it-holdout-v2-308",
+      "field": "altText",
+      "text": "Stivaletti marroni con tacco basso."
+    },
+    {
+      "id": "it-holdout-v2-309",
+      "field": "altText",
+      "text": "Gilet rosso sotto una giacca aperta."
+    },
+    {
+      "id": "it-holdout-v2-310",
+      "field": "altText",
+      "text": "Abito stampato vicino alla tenda."
+    },
+    {
+      "id": "it-holdout-v2-311",
+      "field": "altText",
+      "text": "Cappello crema con fiore di feltro."
+    },
+    {
+      "id": "it-holdout-v2-312",
+      "field": "altText",
+      "text": "Blusa blu con bottoni minuscoli."
+    },
+    {
+      "id": "it-holdout-v2-313",
+      "field": "altText",
+      "text": "Cintura intrecciata su pantaloni beige."
+    },
+    {
+      "id": "it-holdout-v2-314",
+      "field": "altText",
+      "text": "Borsa rossa con manico annodato."
+    },
+    {
+      "id": "it-holdout-v2-315",
+      "field": "altText",
+      "text": "Guanti grigi sopra una mensola."
+    },
+    {
+      "id": "it-holdout-v2-316",
+      "field": "altText",
+      "text": "Giacca nera con collo di raso."
+    },
+    {
+      "id": "it-holdout-v2-317",
+      "field": "altText",
+      "text": "Calze gialle sopra scarpe nere."
+    },
+    {
+      "id": "it-holdout-v2-318",
+      "field": "altText",
+      "text": "Camicia bianca con doppi polsini."
+    },
+    {
+      "id": "it-holdout-v2-319",
+      "field": "altText",
+      "text": "Gonna verde con orlo arrotondato."
+    },
+    {
+      "id": "it-holdout-v2-320",
+      "field": "altText",
+      "text": "Scialle marrone sulla sedia a dondolo."
+    },
+    {
+      "id": "it-holdout-v2-321",
+      "field": "altText",
+      "text": "Giacca rosa vicino alla staccionata."
+    },
+    {
+      "id": "it-holdout-v2-322",
+      "field": "altText",
+      "text": "Abito grigio con collo morbido."
+    },
+    {
+      "id": "it-holdout-v2-323",
+      "field": "altText",
+      "text": "Orologio con cinturino di stoffa."
+    },
+    {
+      "id": "it-holdout-v2-324",
+      "field": "altText",
+      "text": "Foulard bianco attorno al manico."
+    },
+    {
+      "id": "it-holdout-v2-325",
+      "field": "altText",
+      "text": "Pantaloni blu con cucitura rinforzata."
+    },
+    {
+      "id": "it-holdout-v2-326",
+      "field": "altText",
+      "text": "Stivali alti sulla ghiaia chiara."
+    },
+    {
+      "id": "it-holdout-v2-327",
+      "field": "altText",
+      "text": "Berretto verde con risvolto ampio."
+    },
+    {
+      "id": "it-holdout-v2-328",
+      "field": "altText",
+      "text": "Borsa nera con cerniera argentata."
+    },
+    {
+      "id": "it-holdout-v2-329",
+      "field": "altText",
+      "text": "Blusa ricamata sopra pantaloni scuri."
+    },
+    {
+      "id": "it-holdout-v2-330",
+      "field": "altText",
+      "text": "Mantella blu chiusa al collo."
+    },
+    {
+      "id": "it-holdout-v2-331",
+      "field": "altText",
+      "text": "Gonna a quadri fino al ginocchio."
+    },
+    {
+      "id": "it-holdout-v2-332",
+      "field": "altText",
+      "text": "Cappotto marrone con cintura dietro."
+    },
+    {
+      "id": "it-holdout-v2-333",
+      "field": "altText",
+      "text": "Sandali neri accanto alla scala."
+    },
+    {
+      "id": "it-holdout-v2-334",
+      "field": "altText",
+      "text": "Camicia verde con maniche rialzate."
+    },
+    {
+      "id": "it-holdout-v2-335",
+      "field": "altText",
+      "text": "Gilet bianco con disegno a rombi."
+    },
+    {
+      "id": "it-holdout-v2-336",
+      "field": "altText",
+      "text": "Cappello blu con tesa impunturata."
+    },
+    {
+      "id": "it-holdout-v2-337",
+      "field": "altText",
+      "text": "Bracciale rosso con piccolo fermaglio."
+    },
+    {
+      "id": "it-holdout-v2-338",
+      "field": "altText",
+      "text": "Borsa a rete sopra una sedia."
+    },
+    {
+      "id": "it-holdout-v2-339",
+      "field": "altText",
+      "text": "Scarpe grigie sotto una gonna."
+    },
+    {
+      "id": "it-holdout-v2-340",
+      "field": "altText",
+      "text": "Abito nero con laccio sulla spalla."
+    },
+    {
+      "id": "it-holdout-v2-341",
+      "field": "altText",
+      "text": "Blusa gialla accanto alla finestra."
+    },
+    {
+      "id": "it-holdout-v2-342",
+      "field": "altText",
+      "text": "Pantaloni di lino con coulisse."
+    },
+    {
+      "id": "it-holdout-v2-343",
+      "field": "altText",
+      "text": "Guanti marroni sopra uno scialle."
+    },
+    {
+      "id": "it-holdout-v2-344",
+      "field": "altText",
+      "text": "Maglione verde con spalle scese."
+    },
+    {
+      "id": "it-holdout-v2-345",
+      "field": "altText",
+      "text": "Berretto nero sul cappotto piegato."
+    },
+    {
+      "id": "it-holdout-v2-346",
+      "field": "altText",
+      "text": "Cintura rossa con anello metallico."
+    },
+    {
+      "id": "it-holdout-v2-347",
+      "field": "altText",
+      "text": "Gonna rosa con cucitura diagonale."
+    },
+    {
+      "id": "it-holdout-v2-348",
+      "field": "altText",
+      "text": "Camicia blu sotto una tuta."
+    },
+    {
+      "id": "it-holdout-v2-349",
+      "field": "altText",
+      "text": "Stivali chiari con cuciture rosse."
+    },
+    {
+      "id": "it-holdout-v2-350",
+      "field": "altText",
+      "text": "Borsa di tela con fondo rinforzato."
+    },
+    {
+      "id": "it-holdout-v2-351",
+      "field": "altText",
+      "text": "Cappotto bianco con collo alzato."
+    },
+    {
+      "id": "it-holdout-v2-352",
+      "field": "altText",
+      "text": "Sciarpa viola sopra una giacca."
+    },
+    {
+      "id": "it-holdout-v2-353",
+      "field": "altText",
+      "text": "Abito rosso con tasca nascosta."
+    },
+    {
+      "id": "it-holdout-v2-354",
+      "field": "altText",
+      "text": "Scarpe blu sopra un tappeto."
+    },
+    {
+      "id": "it-holdout-v2-355",
+      "field": "altText",
+      "text": "Gilet marrone con retro regolabile."
+    },
+    {
+      "id": "it-holdout-v2-356",
+      "field": "altText",
+      "text": "Cappello grigio accanto all'annaffiatoio."
+    },
+    {
+      "id": "it-holdout-v2-357",
+      "field": "altText",
+      "text": "Blusa crema con maniche a sbuffo."
+    },
+    {
+      "id": "it-holdout-v2-358",
+      "field": "altText",
+      "text": "Pantaloni scuri sotto mantella corta."
+    },
+    {
+      "id": "it-holdout-v2-359",
+      "field": "altText",
+      "text": "Bracciale intrecciato accanto all'orologio."
+    },
+    {
+      "id": "it-holdout-v2-360",
+      "field": "altText",
+      "text": "Gonna di jeans con impunture visibili."
+    },
+    {
+      "id": "it-holdout-v2-361",
+      "field": "altText",
+      "text": "Camicia rosa sotto maglione grigio."
+    },
+    {
+      "id": "it-holdout-v2-362",
+      "field": "altText",
+      "text": "Borsa gialla sull'attaccapanni."
+    },
+    {
+      "id": "it-holdout-v2-363",
+      "field": "altText",
+      "text": "Guanti verdi appoggiati alla ringhiera."
+    },
+    {
+      "id": "it-holdout-v2-364",
+      "field": "altText",
+      "text": "Giacca marrone con gomiti rammendati."
+    },
+    {
+      "id": "it-holdout-v2-365",
+      "field": "altText",
+      "text": "Berretto rosso vicino al foulard."
+    },
+    {
+      "id": "it-holdout-v2-366",
+      "field": "altText",
+      "text": "Abito bianco con ricami floreali."
+    },
+    {
+      "id": "it-holdout-v2-367",
+      "field": "altText",
+      "text": "Cintura nera sopra cappotto lungo."
+    },
+    {
+      "id": "it-holdout-v2-368",
+      "field": "altText",
+      "text": "Sandali chiari sulle piastrelle."
+    },
+    {
+      "id": "it-holdout-v2-369",
+      "field": "altText",
+      "text": "Grembiule blu con cucitura centrale."
+    },
+    {
+      "id": "it-holdout-v2-370",
+      "field": "altText",
+      "text": "Spilla a foglia sopra un colletto."
+    },
+    {
+      "id": "it-holdout-v2-371",
+      "field": "altText",
+      "text": "Gonna grigia con pieghe a cannoncino."
+    },
+    {
+      "id": "it-holdout-v2-372",
+      "field": "altText",
+      "text": "Cappotto blu sopra un gancio."
+    },
+    {
+      "id": "it-holdout-v2-373",
+      "field": "altText",
+      "text": "Camicia beige con colletto piccolo."
+    },
+    {
+      "id": "it-holdout-v2-374",
+      "field": "altText",
+      "text": "Scarpe bianche con fasce larghe."
+    },
+    {
+      "id": "it-holdout-v2-375",
+      "field": "altText",
+      "text": "Foulard verde piegato a triangolo."
+    },
+    {
+      "id": "it-holdout-v2-376",
+      "field": "altText",
+      "text": "Borsa rosa accanto alla panca."
+    },
+    {
+      "id": "it-holdout-v2-377",
+      "field": "altText",
+      "text": "Gilet scuro con bottoni di corno."
+    },
+    {
+      "id": "it-holdout-v2-378",
+      "field": "altText",
+      "text": "Cappello giallo sopra un tavolo."
+    },
+    {
+      "id": "it-holdout-v2-379",
+      "field": "altText",
+      "text": "Abito marrone a portafoglio."
+    },
+    {
+      "id": "it-holdout-v2-380",
+      "field": "altText",
+      "text": "Bracciale di legno accanto al polsino."
+    },
+    {
+      "id": "it-holdout-v2-381",
+      "field": "altText",
+      "text": "Giacca rossa con polsini lavorati."
+    },
+    {
+      "id": "it-holdout-v2-382",
+      "field": "altText",
+      "text": "Blusa grigia con spalle arricciate."
+    },
+    {
+      "id": "it-holdout-v2-383",
+      "field": "altText",
+      "text": "Pantaloni bianchi con tasche laterali."
+    },
+    {
+      "id": "it-holdout-v2-384",
+      "field": "altText",
+      "text": "Berretto verde a pannelli cuciti."
+    },
+    {
+      "id": "it-holdout-v2-385",
+      "field": "altText",
+      "text": "Stivali neri accanto a un baule."
+    },
+    {
+      "id": "it-holdout-v2-386",
+      "field": "altText",
+      "text": "Cintura marrone su camicia lunga."
+    },
+    {
+      "id": "it-holdout-v2-387",
+      "field": "altText",
+      "text": "Gonna blu sotto gilet corto."
+    },
+    {
+      "id": "it-holdout-v2-388",
+      "field": "altText",
+      "text": "Sciarpa rosa con stelle ricamate."
+    },
+    {
+      "id": "it-holdout-v2-389",
+      "field": "altText",
+      "text": "Borsa crema con manici lunghi."
+    },
+    {
+      "id": "it-holdout-v2-390",
+      "field": "altText",
+      "text": "Orologio scuro sotto polsino ripiegato."
+    },
+    {
+      "id": "it-holdout-v2-391",
+      "field": "altText",
+      "text": "Maglione blu con scollo rotondo."
+    },
+    {
+      "id": "it-holdout-v2-392",
+      "field": "altText",
+      "text": "Cappotto nero con tasche applicate."
+    },
+    {
+      "id": "it-holdout-v2-393",
+      "field": "altText",
+      "text": "Sandali verdi con piccola fibbia."
+    },
+    {
+      "id": "it-holdout-v2-394",
+      "field": "altText",
+      "text": "Camicia rossa sopra pantaloni di lino."
+    },
+    {
+      "id": "it-holdout-v2-395",
+      "field": "altText",
+      "text": "Cappello marrone davanti alla porta."
+    },
+    {
+      "id": "it-holdout-v2-396",
+      "field": "altText",
+      "text": "Guanti bianchi sopra velluto blu."
+    },
+    {
+      "id": "it-holdout-v2-397",
+      "field": "altText",
+      "text": "Abito giallo sopra una blusa semplice."
+    },
+    {
+      "id": "it-holdout-v2-398",
+      "field": "altText",
+      "text": "Borsa grigia con tracolla tessuta."
+    },
+    {
+      "id": "it-holdout-v2-399",
+      "field": "altText",
+      "text": "Gonna verde accanto al muretto."
+    },
+    {
+      "id": "it-holdout-v2-400",
+      "field": "altText",
+      "text": "Foulard crema sopra una gruccia."
+    }
+  ]
+}

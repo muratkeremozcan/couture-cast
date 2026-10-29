@@ -1,0 +1,24 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    file: tap-save.yaml
+    env:
+      MAESTRO_SAVE_EFFECT: "Don.t allow|Don’t Allow|Don't Allow|${MAESTRO_PERMANENT}|${MAESTRO_SAVING}"
+# The prompt used to arrive after a lazy expo-media-library bundle built mid-flow (13.8 s in
+# CI run 40726798107). With lazy bundling off on iOS the wait stayed under 1 s (run
+# 40737120864), so 15 s is a generous bound. Wait for either the prompt or the
+# permanent-denial message instead of probing once.
+- extendedWaitUntil:
+    visible: "Don.t allow|Don’t Allow|Don't Allow|${MAESTRO_PERMANENT}"
+    timeout: 15000
+- runFlow:
+    when:
+      visible: "Don.t allow|Don’t Allow|Don't Allow"
+    commands:
+      - tapOn: "Don.t allow|Don’t Allow|Don't Allow"
+- extendedWaitUntil:
+    visible: ${MAESTRO_PERMANENT}
+    timeout: 10000
+- assertVisible: ${MAESTRO_SETTINGS}
+- assertVisible:
+    id: share-card-preview-loaded-.*

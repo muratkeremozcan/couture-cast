@@ -1,0 +1,31 @@
+name: ShareCardFallback
+options:
+  deploymentTarget:
+    iOS: '17.0'
+targets:
+  ShareCardFallbackUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - ShareCardHeaderSemantics.swift
+      - ShareCardHeaderQuery.swift
+      - ShareCardFallbackUITests.swift
+      - path: fallback-fixture.json
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.couturecast.story68.fallbacktests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: '5.0'
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
+        CODE_SIGN_IDENTITY: '-'
+        CODE_SIGNING_ALLOWED: YES
+        CODE_SIGNING_REQUIRED: NO
+schemes:
+  ShareCardFallback:
+    build:
+      targets:
+        ShareCardFallbackUITests: all
+    test:
+      targets:
+        - ShareCardFallbackUITests

@@ -19,6 +19,9 @@ let verification: VerificationFlight | undefined
 let localSignedOut = false
 const authStorageKey = 'couturecast.auth-session'
 export const webSessionIdentity = () => member
+/** A stored session that verification has not yet named a member for, or cleared. */
+export const hasStoredWebSession = () =>
+  !localSignedOut && window.localStorage.getItem(authStorageKey) !== null
 /**
  * Why sign-in failed, in terms a person can act on: `denied` means this address has no
  * CoutureCast account that can sign in (retrying will not help); `code_invalid` means the

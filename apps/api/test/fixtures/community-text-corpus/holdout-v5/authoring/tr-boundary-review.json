@@ -1,0 +1,328 @@
+{
+  "status": "APPLIED_COORDINATOR_AUTHORIZED_PRE_SEAL_REVISION",
+  "authorIdentity": "/root/general_review",
+  "sourceSha256": "ba60813f73ca4f4380c55e950b86d1e9723b1ec039e21534a38d3c8ff0e3a64e",
+  "sourceTextAndLabelsUnchanged": false,
+  "instruction": "Pre-seal flower and botanical boundary check; preserve wording; report membership above ten and propose complete revisions before making them.",
+  "candidateSimpleFlowerGroup": {
+    "concept": "basit-cicek",
+    "englishGloss": "Unspecified small or plain flowers used as a decorative visual motif",
+    "count": 13,
+    "limit": 10,
+    "items": [86, 87, 88, 408, 412, 416, 500, 653, 654, 655, 656, 662, 664],
+    "itemRationales": [
+      {
+        "row": 86,
+        "field": "caption",
+        "currentConcepts": ["igne-oya-kenar"],
+        "text": "Bu yazmayı bağlamadan önce çiçek oyalarının yönünü tek tek düzelttim.",
+        "rationale": "Flower-shaped edging explicitly named."
+      },
+      {
+        "row": 87,
+        "field": "altText",
+        "currentConcepts": ["igne-oya-kenar"],
+        "text": "Omuz boyunca yayılan yemeninin kenarında üç boyutlu küçük oya çiçekleri bulunuyor.",
+        "rationale": "Small three-dimensional lace flowers explicitly described."
+      },
+      {
+        "row": 88,
+        "field": "altText",
+        "currentConcepts": ["igne-oya-kenar"],
+        "text": "Eller, başörtüsünün çiçekli iğne oyası bordürünü düz bir çizgide açıyor.",
+        "rationale": "Floral lace border explicitly described."
+      },
+      {
+        "row": 408,
+        "field": "altText",
+        "currentConcepts": ["suzene"],
+        "text": "Yakalık kenarında sık aralıklı halka dikişleriyle yapılmış çiçekler bulunuyor.",
+        "rationale": "Flowers made from chain stitches are explicitly described."
+      },
+      {
+        "row": 412,
+        "field": "altText",
+        "currentConcepts": ["kabartma-sirma-bitki"],
+        "text": "Omuzluktaki çiçekler, yoğun sırma sargılarıyla kumaştan yukarı kabarıyor.",
+        "rationale": "Raised gilt flowers are explicitly described."
+      },
+      {
+        "row": 416,
+        "field": "altText",
+        "currentConcepts": ["kasnak-golgesi"],
+        "text": "İki el, yarım kalmış çiçek işlemesini taşıyan ahşap kasnağı kaldırıyor.",
+        "rationale": "An unfinished flower embroidery is the hoop subject."
+      },
+      {
+        "row": 500,
+        "field": "altText",
+        "currentConcepts": ["richelieu"],
+        "text": "Kumaştan kesilen çiçek içleri, nakışla desteklenmiş delikli bir yüzey oluşturuyor.",
+        "rationale": "Flower-shaped cutouts are explicitly described."
+      },
+      {
+        "row": 653,
+        "field": "caption",
+        "currentConcepts": ["kekik-cicek"],
+        "text": "Kekik çiçeklerinin minicik kümelerini mendile sığdırmak için ince iplik seçtim.",
+        "rationale": "Tiny thyme flower clusters have no specific distinguishing floral anatomy in the item."
+      },
+      {
+        "row": 654,
+        "field": "caption",
+        "currentConcepts": ["kekik-cicek"],
+        "text": "Bu fuların deseninde küçük yapraklı dalların uçları pembe noktalarla dolu.",
+        "rationale": "Terminal pink dots were authored to depict the same ordinary thyme flower heads; count conservatively."
+      },
+      {
+        "row": 655,
+        "field": "altText",
+        "currentConcepts": ["kekik-cicek"],
+        "text": "Mendil nakışında küçük oval yapraklı kekik dalları, sık çiçek kümeleri taşıyor.",
+        "rationale": "Small flowers on oval-leaved thyme branches retain the ordinary clustered-flower motif."
+      },
+      {
+        "row": 656,
+        "field": "altText",
+        "currentConcepts": ["kekik-cicek"],
+        "text": "Fular yüzeyinde yere yayılan ince dallar ve pembe kekik çiçekleri bulunuyor.",
+        "rationale": "Pink thyme flowers on spreading stems retain ordinary small blossoms."
+      },
+      {
+        "row": 662,
+        "field": "caption",
+        "currentConcepts": ["biberiye"],
+        "text": "Fuların ucundaki biberiye nakşını bitirince araya iki küçük çiçek ekledim.",
+        "rationale": "Two unspecified small flowers are substantively added to the rosemary embroidery."
+      },
+      {
+        "row": 664,
+        "field": "altText",
+        "currentConcepts": ["biberiye"],
+        "text": "Fular ucunda ince yapraklı dal ve soluk renkli küçük çiçekler işlenmiş.",
+        "rationale": "The item explicitly describes unspecified small flowers with a thin-leaved branch."
+      }
+    ],
+    "groupingRule": "Shared plain-flower motif crosses lace, chain embroidery, raised metallic work, hoop photography and cutwork. Technique, textile, garment location and named herbs without distinct flower anatomy do not split it."
+  },
+  "counterpartChecks": [
+    {
+      "rows": [85, 441, 442, 443, 444],
+      "result": "Oya or geometric lace borders without substantive flowers; triangle points and an open knot network remain non-floral."
+    },
+    {
+      "rows": [405, 406, 407],
+      "result": "Branch, chain-stitch lines or stitch loops are described; no flower shape is substantively expressed."
+    },
+    {
+      "rows": [89, 90, 91, 92, 409, 410, 411],
+      "result": "Branches, general vegetal work, garment history or unspecified raised ornament are expressed; a plain flower is not asserted by these individual texts."
+    },
+    {
+      "rows": [413, 414, 415],
+      "result": "Hoop, shadow and a general work-in-progress view; no flower motif is expressed."
+    },
+    {
+      "rows": [497, 498, 499],
+      "result": "Cutwork openings and bridges are expressed without a specified flower shape."
+    }
+  ],
+  "botanicalTaxaBoundaryReview": [
+    {
+      "candidateAdditionalConcept": "kadeh-cicek",
+      "englishGloss": "Upright cup-shaped flowers, including tulip and crocus",
+      "items": [417, 419, 609, 610, 611, 612],
+      "count": 6,
+      "reason": "Tulip and crocus may share a cup-flower silhouette; named taxa alone do not split that morphology. This is a conservative extra label across their independent print-making and plant motifs. Generic block-printing counterparts 418/420 express no flower."
+    },
+    {
+      "candidateAdditionalConcept": "dar-yaprakli-dal",
+      "englishGloss": "A slender branch carrying narrow leaves",
+      "items": [625, 626, 627, 628, 661, 662, 663, 664],
+      "count": 8,
+      "reason": "Conservative shared branch architecture across olive and rosemary. Olive fruit and rosemary needle references remain other substantive details; the shared leaf-bearing branch can carry a second label."
+    },
+    {
+      "existingConcept": "disli-karsilikli-yaprak",
+      "items": [665, 666, 667, 668, 689, 690, 691, 692],
+      "result": "Existing conservative mint/nettle merge retained, count eight."
+    },
+    {
+      "concepts": ["ters-lale", "kardelen"],
+      "items": [601, 602, 603, 604, 605, 606, 607, 608],
+      "result": "An elevated whorl/crown of hanging bells with a leafy crest differs structurally from a solitary nodding snowdrop on a curved stalk with three long petals."
+    },
+    {
+      "concepts": ["lavanta-demet", "ihlamur-kanat"],
+      "items": [649, 650, 651, 652, 657, 658, 659, 660],
+      "result": "Bound narrow flower spikes differ from a hanging flower cluster attached to a long linden bract. The bract and spike architecture support distinct botanical motifs."
+    },
+    {
+      "concept": "buz-cicegi",
+      "items": [325, 326, 327, 328],
+      "result": "Frost crystallization and branching ice geometry express a non-botanical motif."
+    },
+    {
+      "concepts": ["asma-cardak", "cilek-surgun", "ipekbocegi-yaprak"],
+      "items": [617, 618, 619, 620, 669, 670, 671, 672, 837, 838, 839, 840],
+      "result": "Grapevine climbing a frame, strawberry runners producing another rooted plant, and silkworms eating a leaf are compound narratives; generic foliage alone does not equate those scenarios."
+    }
+  ],
+  "existingEightConservativeMergesPreserved": true,
+  "completeRevisionProposal": {
+    "status": "APPLIED_AFTER_EXPLICIT_AUTHORIZATION",
+    "items": [
+      {
+        "row": 653,
+        "newConcept": "hashas-kapsul",
+        "field": "caption",
+        "completeProposedText": "Haşhaş kapsülü biçimli broşun tepesindeki düz yıldız, bütün kıyafetin küçük sürprizi."
+      },
+      {
+        "row": 654,
+        "newConcept": "hashas-kapsul",
+        "field": "caption",
+        "completeProposedText": "Bu fuların kuru kapsüllerinden dökülen minik tohumlar desenin boşluklarına dağılıyor."
+      },
+      {
+        "row": 655,
+        "newConcept": "hashas-kapsul",
+        "field": "altText",
+        "completeProposedText": "Broşta yuvarlak tohum kapsülünün tepesinde, kenarları ışınsal düz bir taç bulunuyor."
+      },
+      {
+        "row": 656,
+        "newConcept": "hashas-kapsul",
+        "field": "altText",
+        "completeProposedText": "Fular baskısında açılmış kapsül deliklerinden dökülen küçük siyah tohumlar görülüyor."
+      }
+    ],
+    "reason": "Four independently authored poppy seed-capsule items replace the generic thyme-flower set with a crowned seed pod and dispersing seeds. This removes four members from the thirteen-item candidate while keeping the caption/alt split and 1,000 total unchanged.",
+    "resultingSimpleFlowerItems": [86, 87, 88, 408, 412, 416, 500, 662, 664],
+    "resultingSimpleFlowerCount": 9,
+    "subsequentWorkAfterAuthorization": "Apply only the approved complete revisions, add the three conservative cross-concept labels, rerun permitted mechanical audits, and update source SHA, exact memberships, maximum glosses and final attestations."
+  },
+  "blindness": "Only own Turkish source and existing own audit metadata inspected in this boundary check. No repair, policies, screening, new cases or development inspection.",
+  "previousSourceSha256": "d18d33640236d6d71d27def4a6c4d758c4c76e2e50e1855a1fd33d7a14a21454",
+  "authorization": "Root explicitly accepted the conservative thirteen-item flower union and authorized complete individual replacements of rows 653 through 656 before sealing, with all other wording unchanged. Original boundary instruction authorizes conservative cross-concept label annotations within the ten-member cap.",
+  "seedCapsuleBoundaryCheck": {
+    "checkedExistingGroups": [
+      {
+        "concept": "cekirdek-kabuk",
+        "items": [189, 190, 191, 192],
+        "distinction": "Loose striped sunflower achenes and split shells differ from an intact crowned seed capsule with dispensing pores."
+      },
+      {
+        "concepts": ["palamut-sapka", "findik-cotanak", "kestane-diken"],
+        "items": [629, 630, 631, 632, 641, 642, 643, 644, 645, 646, 647, 648],
+        "distinction": "A scaly cup around one acorn, leafy nut husks, and an open spiny chestnut burr have distinct outer structures from a smooth poppy capsule with a flat radiating crown and dispersing tiny seeds."
+      },
+      {
+        "concepts": ["cekirdekli-meyve-yarim", "ayva-dilim", "nar-acik"],
+        "items": [
+          621, 622, 623, 624, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688
+        ],
+        "distinction": "Cut fleshy fruits display an internal pit or seed chambers. The new motif is an exterior dry capsule with crown and seed-release holes; its star is on the capsule top, unlike the internal pome core."
+      },
+      {
+        "concepts": ["ipek-koza", "kelebek-cikis"],
+        "items": [473, 474, 475, 476, 825, 826, 827, 828],
+        "distinction": "Fibrous insect cocoons and an emerging butterfly are separate biological structures and narratives."
+      }
+    ],
+    "result": "Distinctive seed-capsule scenario; no existing capsule morphology or seed-release narrative duplicated or split."
+  },
+  "appliedRevisions": [
+    {
+      "row": 653,
+      "old": {
+        "concepts": ["kekik-cicek"],
+        "field": "caption",
+        "text": "Kekik çiçeklerinin minicik kümelerini mendile sığdırmak için ince iplik seçtim."
+      },
+      "new": {
+        "concepts": ["hashas-kapsul"],
+        "field": "caption",
+        "text": "Haşhaş kapsülü biçimli broşun tepesindeki düz yıldız, bütün kıyafetin küçük sürprizi."
+      }
+    },
+    {
+      "row": 654,
+      "old": {
+        "concepts": ["kekik-cicek"],
+        "field": "caption",
+        "text": "Bu fuların deseninde küçük yapraklı dalların uçları pembe noktalarla dolu."
+      },
+      "new": {
+        "concepts": ["hashas-kapsul"],
+        "field": "caption",
+        "text": "Bu fuların kuru kapsüllerinden dökülen minik tohumlar desenin boşluklarına dağılıyor."
+      }
+    },
+    {
+      "row": 655,
+      "old": {
+        "concepts": ["kekik-cicek"],
+        "field": "altText",
+        "text": "Mendil nakışında küçük oval yapraklı kekik dalları, sık çiçek kümeleri taşıyor."
+      },
+      "new": {
+        "concepts": ["hashas-kapsul"],
+        "field": "altText",
+        "text": "Broşta yuvarlak tohum kapsülünün tepesinde, kenarları ışınsal düz bir taç bulunuyor."
+      }
+    },
+    {
+      "row": 656,
+      "old": {
+        "concepts": ["kekik-cicek"],
+        "field": "altText",
+        "text": "Fular yüzeyinde yere yayılan ince dallar ve pembe kekik çiçekleri bulunuyor."
+      },
+      "new": {
+        "concepts": ["hashas-kapsul"],
+        "field": "altText",
+        "text": "Fular baskısında açılmış kapsül deliklerinden dökülen küçük siyah tohumlar görülüyor."
+      }
+    }
+  ],
+  "appliedAdditionalAnnotations": [
+    {
+      "concept": "basit-cicek",
+      "items": [86, 87, 88, 408, 412, 416, 500, 662, 664],
+      "englishGloss": "Unspecified small or plain flowers used as a decorative visual motif"
+    },
+    {
+      "concept": "kadeh-cicek",
+      "items": [417, 419, 609, 610, 611, 612],
+      "englishGloss": "Upright cup-shaped flowers, including tulip and crocus"
+    },
+    {
+      "concept": "dar-yaprakli-dal",
+      "items": [625, 626, 627, 628, 661, 662, 663, 664],
+      "englishGloss": "A slender branch carrying narrow leaves"
+    }
+  ],
+  "finalSimpleFlowerItems": [86, 87, 88, 408, 412, 416, 500, 662, 664],
+  "finalSimpleFlowerCount": 9,
+  "allOtherTextWordingUnchanged": true,
+  "previousSourceBackup": "/tmp/cc68-tea-holdout-v5/.cc68-tea-authoring/tr-pre-boundary-source.tsv",
+  "finalAudit": {
+    "sourceSha256": "ba60813f73ca4f4380c55e950b86d1e9723b1ec039e21534a38d3c8ff0e3a64e",
+    "total": 1000,
+    "fields": {
+      "caption": 500,
+      "altText": 500
+    },
+    "conceptCount": 245,
+    "largestConceptCount": 9,
+    "fiveWordAffectedCount": 0,
+    "independentUnicodeAffectedCount": 0,
+    "duplicateCount": 0,
+    "historicalCollisionCount": 0,
+    "historicalFiles": 35,
+    "lengthViolationCount": 0,
+    "existingEightMergesUnchanged": true,
+    "allOtherTextUnchanged": true
+  }
+}

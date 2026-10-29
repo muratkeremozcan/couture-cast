@@ -4,7 +4,7 @@
 // worker builds it from the loaded policy:
 //
 //   - clean copy: at least 200 ordinary fashion captions and alt texts in the
-//     frozen holdout (holdout-v1/<lang>.json), and the Wilson 95% upper bound on
+//     frozen holdout (selected by active-holdout.json), and the Wilson 95% upper bound on
 //     the share withheld must be at or below 1%. The holdout was written after
 //     the allow list froze and nothing was tuned against it (Story 6.2b review,
 //     BH10). The clean half the allow list was built against is still measured
@@ -18,8 +18,20 @@
 // made it. Failure messages carry case ids and reason codes and never the text
 // or a matched term, which keeps raw terms out of logs and evidence.
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import {
+  CLEAN_HOLDOUT_UPPER_BOUND_MAXIMUM,
+  passesCleanHoldoutGate,
+  wilsonInterval,
+} from './community-text-corpus-gate.js'
+import { assertLocaleFileSealed } from './community-text-holdout-eligibility.js'
+import {
+  assertVersionDirectorySealed,
+  describeCleanGates,
+  loadActiveHoldouts,
+} from './community-text-holdout-selection.mjs'
 import { loadCommunityScreeningPolicy } from './community-screening-policy.js'
 import {
   CommunityTextScreener,
@@ -37,6 +49,12 @@ async function currentInputSetHash(): Promise<string> {
 }
 
 const corpusDir = path.resolve(__dirname, '../../../test/fixtures/community-text-corpus')
+// Each locale names its own active holdout version; every one must be eligible for that
+// locale with a registered seal before any corpus file is read.
+const { holdouts, manifests } = loadActiveHoldouts(corpusDir)
+const holdoutVersion = (language: string): string => holdouts[language]?.version ?? ''
+const holdoutPath = (language: string): string =>
+  path.join(corpusDir, holdoutVersion(language), `${language}.json`)
 
 const LANGUAGE_LOCALE: Record<string, string> = {
   de: 'de-DE',
@@ -50,7 +68,7 @@ const LANGUAGE_LOCALE: Record<string, string> = {
 
 const MINIMUM_CLEAN = 200
 const MINIMUM_DISALLOWED = 100
-const CLEAN_UPPER_BOUND_GATE = 0.01
+const CLEAN_UPPER_BOUND_GATE = CLEAN_HOLDOUT_UPPER_BOUND_MAXIMUM
 const REQUIRED_FAMILIES = [
   'nfkc-fullwidth',
   'case-mixing',
@@ -87,22 +105,6 @@ interface Holdout {
   entries: CorpusEntry[]
 }
 
-/** Wilson score interval at 95% confidence. */
-function wilsonInterval(successes: number, trials: number): [number, number] {
-  if (trials === 0) return [0, 1]
-  const z = 1.959963984540054
-  const proportion = successes / trials
-  const denominator = 1 + (z * z) / trials
-  const centre = (proportion + (z * z) / (2 * trials)) / denominator
-  const half =
-    (z *
-      Math.sqrt(
-        (proportion * (1 - proportion)) / trials + (z * z) / (4 * trials * trials)
-      )) /
-    denominator
-  return [Math.max(0, centre - half), Math.min(1, centre + half)]
-}
-
 const loaded = loadCommunityScreeningPolicy()
 const screener = new CommunityTextScreener({
   policy: loaded.policy.text,
@@ -116,9 +118,7 @@ function readCorpus(language: string): Corpus {
 }
 
 function readHoldout(language: string): Holdout {
-  return JSON.parse(
-    fs.readFileSync(path.join(corpusDir, 'holdout-v1', `${language}.json`), 'utf8')
-  ) as Holdout
+  return JSON.parse(fs.readFileSync(holdoutPath(language), 'utf8')) as Holdout
 }
 
 interface CleanResult {
@@ -259,12 +259,29 @@ describe.each(languages)('text corpus: %s', (language) => {
 
   it('holds a frozen holdout disjoint from the clean half it was not tuned on', () => {
     expect(holdout.language).toBe(language)
-    expect(holdout.corpusVersion).toBe('holdout-v1')
+    expect(holdout.corpusVersion).toBe(holdoutVersion(language))
     expect(holdout.entries.length).toBeGreaterThanOrEqual(MINIMUM_CLEAN)
     const ids = holdout.entries.map((entry) => entry.id)
     expect(new Set(ids).size).toBe(ids.length)
     const inSample = new Set(corpus.clean.entries.map((entry) => entry.text))
     expect(holdout.entries.filter((entry) => inSample.has(entry.text))).toEqual([])
+  })
+
+  it('matches the independent corpus seal recorded before repair inspection', () => {
+    const version = holdoutVersion(language)
+    const manifest = manifests.get(version)
+    assertLocaleFileSealed({
+      version,
+      locale: language,
+      file: holdout,
+      fileSha256: createHash('sha256')
+        .update(fs.readFileSync(holdoutPath(language)))
+        .digest('hex'),
+      manifest,
+    })
+    expect(manifest?.files.find((file) => file.language === language)?.path).toBe(
+      `apps/api/test/fixtures/community-text-corpus/${version}/${language}.json`
+    )
   })
 
   // The holdout is the release gate, so it is asserted by the release command
@@ -275,12 +292,11 @@ describe.each(languages)('text corpus: %s', (language) => {
   it.runIf(RELEASE_RUN)(
     'keeps the Wilson 95% upper bound on withheld holdout copy at or below 1%',
     () => {
-      expect(
-        result.clean.withheldIds,
-        `${language}: ${result.clean.withheld} of ${result.clean.total} holdout entries withheld`
-      ).toEqual([])
       expect(result.clean.total).toBeGreaterThanOrEqual(MINIMUM_CLEAN)
-      expect(result.clean.wilson95[1]).toBeLessThanOrEqual(CLEAN_UPPER_BOUND_GATE)
+      expect(
+        passesCleanHoldoutGate(result.clean.withheld, result.clean.total),
+        `${language}: ${result.clean.withheld} of ${result.clean.total} holdout entries withheld; Wilson 95% upper bound ${result.clean.wilson95[1]}`
+      ).toBe(true)
     }
   )
 
@@ -310,6 +326,19 @@ describe.each(languages)('text corpus: %s', (language) => {
 })
 
 describe('text corpus run product', () => {
+  it('seals every version directory by exactly the locale files it holds', () => {
+    for (const [version, manifest] of manifests) {
+      assertVersionDirectorySealed(corpusDir, version, manifest)
+      const named = Object.entries(holdouts)
+        .filter(([, holdout]) => holdout.version === version)
+        .map(([language]) => language)
+      expect(manifest.files.map((file) => file.language)).toEqual(
+        expect.arrayContaining(named)
+      )
+    }
+    expect(Object.keys(holdouts).toSorted()).toEqual(languages.toSorted())
+  })
+
   it('writes the measurement the readiness evidence consumes, when asked to', async () => {
     const outDir = process.env.COMMUNITY_SCREENING_RUN_PRODUCT_DIR?.trim()
     if (!outDir) return
@@ -326,7 +355,7 @@ describe('text corpus run product', () => {
             (entry) => ({ reason: entry.reason })
           ),
           gates: {
-            cleanGatedOn: 'holdout-v1',
+            ...describeCleanGates(holdouts),
             cleanWilson95UpperBoundMaximum: CLEAN_UPPER_BOUND_GATE,
             disallowedBypassesMaximum: 0,
             minimumClean: MINIMUM_CLEAN,

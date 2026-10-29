@@ -23,6 +23,12 @@ import { defineConfig } from 'vitest/config'
  * trap; see `_bmad-output/test-artifacts/maestro-suite-repair-handoff.md` and its
  * standing rule: never resolve a test database URL through that variable.
  *
+ * CI's integration database is stock postgres:17-alpine. Local Supabase preloads
+ * extensions CI does not, among them plpgsql_check, whose pldbgapi2 hooks have aborted
+ * an ordinary nested PL/pgSQL call with XX000 "cannot find parent statement on
+ * pldbgapi2 call stack". `node scripts/integration-postgres.mjs start` starts the CI
+ * database locally and prints its URL for INTEGRATION_TEST_DATABASE_URL.
+ *
  * This config is evaluated before any test module, and therefore before that dotenv
  * load can run, so the value below is the one the shell or CI actually chose. Pinning
  * it into `test.env` also makes it win afterwards, because dotenv never overwrites a
@@ -85,6 +91,11 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
+      // This wall-clock proof has its own mandatory CI job and configuration.
+      // The measured cold-simulator/native-build replay drove SELECT 1 from
+      // sub-3 ms to p95 72.8 ms and exhausted the unchanged authorization budget.
+      // Run it on an idle service pair, with one worker and no package builds.
+      '**/community-realtime-revalidation.integration.spec.ts',
       ...(process.env.RUN_GARMENT_TAGGING_SMOKE === 'true'
         ? []
         : ['**/garment-tagging.smoke.spec.ts']),
@@ -99,6 +110,23 @@ export default defineConfig({
       ...(process.env.RUN_COMMUNITY_SCREENING_READINESS === 'true'
         ? []
         : ['**/community-content-screening.readiness.spec.ts']),
+      // The seven-locale text corpus evaluation and the two heaviest corpus
+      // development specs run only in pr-checks' community corpus job, which sets
+      // RUN_COMMUNITY_TEXT_CORPUS and gates exact test counts. Their per-locale
+      // loops screen 400 to 1000 rows each and are pure data checks, so coverage
+      // instrumentation measures nothing there while adding a quarter to a half of
+      // their CPU time (measured 2026-10-27: round3 60.8 s plain, 75.6 s covered;
+      // round5 17.2 s plain, 25.4 s covered). Inside the shared coverage run that
+      // pushed single cases to 5.9-23.8 s on the 4 vCPU runner and past their
+      // budgets, and the evaluation spec's retired-holdout refusal masked every
+      // other failure in the quality gate.
+      ...(process.env.RUN_COMMUNITY_TEXT_CORPUS === 'true'
+        ? []
+        : [
+            '**/community-text-corpus.evaluation.spec.ts',
+            '**/community-text-round3-development.spec.ts',
+            '**/community-text-round5-development.spec.ts',
+          ]),
       // Story 6.2b, AC 4: loads the real model and reads licensed photographs
       // that live outside Git, so it runs only through its own release command.
       ...(process.env.RUN_COMMUNITY_SAFE_CORPUS_EVALUATION === 'true'

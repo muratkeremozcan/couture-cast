@@ -1,0 +1,155 @@
+[outfits]
+Llevo una túnica ciruela con pantalón avena.|Túnica ciruela sobre pantalón avena.
+Combiné una sobrecamisa a cuadros con culottes índigo.|Sobrecamisa a cuadros y culottes índigo.
+Elegí una blusa cobriza y una falda carbón.|Blusa cobriza sobre falda carbón.
+Mi chaqueta verde va sobre un vestido rayado.|Chaqueta verde sobre vestido rayado.
+Probé un polo crema con pantalón ancho de pana.|Polo crema con pantalón ancho de pana.
+Llevo un suéter sin mangas sobre una bata blanca.|Suéter sin mangas sobre bata blanca.
+Combiné una capa mostaza con mallas marrones.|Capa mostaza con mallas marrones.
+Hoy llevo camisa frambuesa con jeans grises.|Camisa frambuesa metida en jeans grises.
+Puse un cárdigan turquesa sobre un enterizo de puntos.|Cárdigan turquesa sobre enterizo de puntos.
+Elegí un blazer arena y una falda azul cruzada.|Blazer arena sobre falda azul cruzada.
+Me puse un chaleco óxido con pantalón marfil.|Chaleco óxido con pantalón marfil.
+Llevo una túnica rayada con pantalón de franela.|Túnica rayada sobre pantalón de franela.
+Hoy combiné blusa durazno y culottes de mezclilla.|Blusa durazno con culottes de mezclilla.
+Agregué un bolero violeta a un vestido de lino.|Bolero violeta sobre vestido de lino.
+Pruebo un suéter musgo con una falda escocesa.|Suéter musgo sobre falda escocesa.
+Mi sobrecamisa camel acompaña un peto crema.|Sobrecamisa camel sobre peto crema.
+Elegí una camiseta rayada con pantalón morado.|Camiseta rayada con pantalón morado.
+Llevo chaqueta cacao sobre vestido azafrán.|Chaqueta cacao sobre vestido azafrán.
+Combiné una sudadera azul con shorts de pliegues.|Sudadera azul sobre shorts de pliegues.
+Elegí una camisa jade y una falda piedra.|Camisa jade sobre falda color piedra.
+Puse una chaqueta acolchada con pantalón de algodón.|Chaqueta acolchada con pantalón de algodón.
+Llevo un poncho tejido sobre vestido acanalado.|Poncho tejido sobre vestido acanalado.
+Elegí una blusa borgoña con jeans claros.|Blusa borgoña con jeans claros.
+Agregué un chaleco corto a una túnica floral.|Chaleco corto sobre túnica floral.
+Mi suéter avena acompaña un pantalón terracota.|Suéter avena sobre pantalón terracota.
+Elegí una bata de mezclilla y una falda de lino.|Bata de mezclilla sobre falda de lino.
+Puse una camiseta tejida sobre un vestido camisero.|Camiseta tejida sobre vestido camisero.
+Llevo un cortavientos coral con pantalón marino.|Cortavientos coral con pantalón marino.
+Probé una chaqueta tiza con shorts verde botella.|Chaqueta tiza con shorts verde botella.
+Elegí una camisa lila y culottes de tweed.|Camisa lila sobre culottes de tweed.
+Me puse una capa a cuadros sobre enterizo gris.|Capa a cuadros sobre enterizo gris.
+Elegí una blusa salvia y mallas canela.|Blusa salvia sobre mallas canela.
+Llevo túnica marina con pantalón rayado.|Túnica marina sobre pantalón rayado.
+Puse un abrigo crema sobre un pichi ciruela.|Abrigo crema sobre pichi ciruela.
+Mi suéter amarillo acompaña un pantalón de pana.|Suéter amarillo sobre pantalón de pana.
+Combiné una sobrecamisa jade con falda crema.|Sobrecamisa jade sobre falda crema.
+Elegí una blusa malva y culottes pizarra.|Blusa malva con culottes pizarra.
+Probé un chaleco caramelo sobre vestido índigo.|Chaleco caramelo sobre vestido índigo.
+Llevo un polo a cuadros con shorts sencillos.|Polo a cuadros con shorts de algodón.
+Combiné un cárdigan ladrillo con enterizo beige.|Cárdigan ladrillo sobre enterizo beige.
+Me puse camisa de seda con falda de lana.|Camisa de seda sobre falda midi de lana.
+Llevo chaqueta de mezclilla lavada y pantalón oliva.|Chaqueta de mezclilla lavada con pantalón oliva.
+Elegí un top acanalado con falda cruzada cobriza.|Top acanalado sobre falda cruzada cobriza.
+Mi bata estampada acompaña unas mallas azules.|Bata estampada sobre mallas azules.
+Elegí poncho corto y vestido gris con tirantes.|Poncho corto sobre vestido gris con tirantes.
+Combiné una camisa coral con falda marrón plisada.|Camisa coral con falda marrón plisada.
+Llevo un chaleco tejido sobre un mono azul.|Chaleco tejido sobre mono azul.
+Probé un abrigo salvia con vestido negro de mezclilla.|Abrigo salvia sobre vestido negro de mezclilla.
+Elegí una sudadera crema y shorts ciruela.|Sudadera crema sobre shorts ciruela.
+Combiné una blusa marrón con pantalón rayado.|Blusa marrón sobre pantalón rayado.
+[moments]
+Me preparo para intercambiar juegos de mesa.
+Voy al estudio de la radio comunitaria.
+Hoy ayudo en la biblioteca de semillas.
+Salgo a escuchar un ensayo de cámara.
+Quedé con mi prima en el observatorio.
+El plan incluye una feria de grabado.
+Ayudo a ordenar sillas para el club de poesía.
+Visito la sala restaurada de la estación.
+Camino hacia una clase inicial de caligrafía.
+Voy al archivo botánico de la ciudad.
+Hoy asisto a una charla de historia local.
+Paso la tarde en el teatro de títeres.
+Voy a recoger nuestros álbumes familiares.
+Paso por el café de reparaciones del barrio.
+Nos espera una noche de música acústica.
+Quedé con una amiga junto al invernadero.
+Ayudo en el intercambio escolar de disfraces.
+Me preparo para una exposición de cerámica.
+Llevo mi libreta al círculo de lectura.
+Hoy hacemos una visita guiada al faro.
+Empieza el taller de encuadernación del fin de semana.
+Voy a ver una demostración de tejido.
+El paseo incluye una charla de astronomía.
+Cruzo el puente peatonal hacia el cineclub.
+Visito la venta de plantas de interior.
+El coro organiza un picnic hoy.
+Preparamos la noche familiar de relatos.
+Voy al intercambio de muebles de la cooperativa.
+Hoy conozco al nuevo equipo de la biblioteca.
+Tomo el tren local hacia el archivo de diseño.
+[captionEndings]
+Las proporciones se ven equilibradas hoy.
+Puedo sentarme y moverme con comodidad.
+Mantengo sencillos los accesorios.
+La textura luce mejor con luz natural.
+Esta combinación cabe en mi pequeño guardarropa.
+Me gusta el contraste entre los tejidos.
+Las capas se mueven con facilidad.
+Los colores me recuerdan una pintura.
+También llevo una bolsa de tela.
+Una combinación práctica para una tarde larga.
+Mis llaves ya ocupan los bolsillos.
+Pruebo esta silueta por primera vez.
+La tela se siente suave en las muñecas.
+Me gusta cómo la gola enmarca el cuello.
+Guardo otra capa en la bolsa.
+Es suficientemente cómodo para el trayecto.
+Recogí mi cabello para despejar el cuello.
+Todo el conjunto fue fácil de empacar.
+Queda espacio para agregar una bufanda.
+El corte holgado funciona al sentarse.
+[backgrounds]
+Detrás hay un arco de piedra clara.
+Un biombo de madera queda al fondo.
+El fondo es una pared terracota.
+Una cerca baja cruza el fondo.
+A la izquierda aparece una puerta estrecha.
+Una cortina lisa cuelga detrás.
+El suelo está cubierto de grava clara.
+Hay macetas alineadas junto al muro.
+Una puerta azul queda cerca.
+El piso tiene baldosas cuadradas pequeñas.
+A la derecha aparece un pilar de ladrillo.
+Una tapia baja forma el fondo.
+Detrás de la figura hay un banco de madera.
+La escena es un corredor cubierto.
+Una escalera de piedra queda detrás.
+El fondo incluye una entrada de vidrio.
+Una puerta oscura contrasta con la ropa.
+Una baranda sencilla atraviesa la imagen.
+Hay un separador tejido detrás.
+El lugar tiene piso de concreto liso.
+Una puerta blanca de jardín queda lejos.
+Una ventana ancha ocupa el fondo.
+Detrás hay una pared de madera natural.
+Un borde de piedra pasa detrás de la figura.
+A un lado se ve una puerta amarilla.
+La escena incluye una baranda curva.
+Detrás se ve un patio con plantas.
+Una ventana alta de vidrio esmerilado queda cerca.
+El pavimento tiene piedras rectangulares estrechas.
+Un fondo gris liso ocupa la imagen.
+[light]
+Se ven ambas mangas.
+Los dobladillos inferiores están a la vista.
+La tela recibe luz lateral.
+El conjunto se muestra de frente.
+Los colores tienen una iluminación suave.
+Se ve toda la silueta.
+Hay pequeños pliegues en los codos.
+La luz entra por una ventana cercana.
+La ropa ocupa casi toda la imagen.
+La cámara está a la altura de la cintura.
+Una sombra suave cae al suelo.
+Las costuras se ven con luz natural.
+La figura está ligeramente de lado.
+El escote se distingue con claridad.
+La tela cae en pliegues sueltos.
+Los hombros se muestran de perfil.
+La luz diurna ilumina el lado izquierdo.
+Las prendas tienen acabado mate.
+La vista incluye cintura y piernas.
+Se distinguen los bordes de las capas.

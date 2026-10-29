@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common'
 import { PrismaClient, type LookbookPost } from '@prisma/client'
 import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 /**
  * The operator half of moderation: resolving a report, releasing a post the
@@ -85,7 +86,8 @@ export class CommunityModerationActionsService {
       throw new ServiceUnavailableException('Community publication is unavailable.')
     const releasedAt = new Date()
 
-    return this.prisma.$transaction(async (tx) => {
+    // Logged after commit, so a re-run transaction logs the release once.
+    const outcome = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${source.user_id}))`
       const post = await this.lockPost(tx, postId)
 
@@ -95,13 +97,13 @@ export class CommunityModerationActionsService {
         post.erasure_requested_at ||
         post.anonymized_at
       ) {
-        return { released: false }
+        return { released: false as const }
       }
 
       try {
         await assertCommunityDatabaseAccess(tx, post.user_id)
       } catch (error) {
-        if (error instanceof ForbiddenException) return { released: false }
+        if (error instanceof ForbiddenException) return { released: false as const }
         throw error
       }
 
@@ -134,18 +136,19 @@ export class CommunityModerationActionsService {
         },
       })
 
+      return { released: true as const, engineVersion: post.moderation_engine_version }
+    })
+    if (outcome.released)
       this.logger.warn(
         {
           event: 'community_moderation_operator_release',
           postId,
           operatorId,
-          overriddenEngineVersion: post.moderation_engine_version,
+          overriddenEngineVersion: outcome.engineVersion,
         },
         'Operator released a post the automated screener had flagged'
       )
-
-      return { released: true }
-    })
+    return { released: outcome.released }
   }
 
   /**
@@ -167,7 +170,8 @@ export class CommunityModerationActionsService {
     if (!source) throw new NotFoundException('COMMUNITY_POST_NOT_FOUND')
     const takenDownAt = new Date()
 
-    return this.prisma.$transaction(async (tx) => {
+    // Logged after commit, so a re-run transaction logs the takedown once.
+    const outcome = await interactiveTransaction(this.prisma, async (tx) => {
       await guardCommunityPost(tx, postId)
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${source.user_id}))`
       const post = await this.lockPost(tx, postId)
@@ -196,6 +200,9 @@ export class CommunityModerationActionsService {
         },
       })
 
+      return { takenDown: true }
+    })
+    if (outcome.takenDown)
       this.logger.warn(
         {
           event: 'community_moderation_operator_takedown',
@@ -204,9 +211,7 @@ export class CommunityModerationActionsService {
         },
         'Operator took down a published post'
       )
-
-      return { takenDown: true }
-    })
+    return outcome
   }
 
   /**
@@ -231,14 +236,15 @@ export class CommunityModerationActionsService {
     const { reportId, operatorId, resolution } = params
     const resolvedAt = new Date()
 
-    return this.prisma.$transaction(async (tx) => {
+    // Logged after commit, so a re-run transaction logs the resolution once.
+    const outcome = await interactiveTransaction(this.prisma, async (tx) => {
       const updated = await tx.communityPostReport.updateMany({
         where: { id: reportId, resolved_at: null },
         data: { resolved_at: resolvedAt },
       })
 
       if (updated.count !== 1) {
-        return { resolved: false }
+        return { resolved: false as const }
       }
 
       const report = await tx.communityPostReport.findUniqueOrThrow({
@@ -260,20 +266,21 @@ export class CommunityModerationActionsService {
         },
       })
 
+      return { resolved: true as const, slaDueAt: report.sla_due_at }
+    })
+    if (outcome.resolved)
       this.logger.log(
         {
           event: 'community_moderation_report_resolved',
           reportId,
           operatorId,
-          slaDueAt: report.sla_due_at.toISOString(),
+          slaDueAt: outcome.slaDueAt.toISOString(),
           resolvedAt: resolvedAt.toISOString(),
-          withinSla: resolvedAt <= report.sla_due_at,
+          withinSla: resolvedAt <= outcome.slaDueAt,
         },
         'Operator resolved a community post report'
       )
-
-      return { resolved: true }
-    })
+    return { resolved: outcome.resolved }
   }
 
   /**

@@ -1,0 +1,155 @@
+[outfits]
+Uso uma túnica ameixa com calça aveia.|Túnica ameixa sobre calça aveia.
+Combinei uma sobrecamisa xadrez com pantalona índigo.|Sobrecamisa xadrez com pantalona índigo.
+Escolhi uma blusa cobre e uma saia chumbo.|Blusa cobre sobre saia chumbo.
+Minha jaqueta verde cobre um vestido listrado.|Jaqueta verde sobre vestido listrado.
+Experimento uma polo creme com calça larga de veludo.|Polo creme com calça larga de veludo.
+Um suéter sem mangas cobre minha bata branca.|Suéter sem mangas sobre bata branca.
+Combinei uma capa mostarda com legging marrom.|Capa mostarda com legging marrom.
+Hoje uso camisa framboesa com jeans cinza.|Camisa framboesa por dentro do jeans cinza.
+Coloquei um cardigã turquesa sobre macacão de bolinhas.|Cardigã turquesa sobre macacão de bolinhas.
+Escolhi um blazer areia e uma saia azul transpassada.|Blazer areia sobre saia azul transpassada.
+Uso um colete ferrugem com calça marfim.|Colete ferrugem com calça marfim.
+Minha túnica listrada acompanha calça de flanela.|Túnica listrada sobre calça de flanela.
+Escolhi uma blusa pêssego e pantacourt jeans.|Blusa pêssego com pantacourt jeans.
+Um bolero violeta acompanha meu vestido de linho.|Bolero violeta sobre vestido de linho.
+Experimento suéter musgo com saia escocesa.|Suéter musgo sobre saia escocesa.
+Minha sobrecamisa caramelo acompanha jardineira creme.|Sobrecamisa caramelo sobre jardineira creme.
+Escolhi uma regata listrada com calça roxa.|Regata listrada com calça roxa.
+Uso jaqueta cacau sobre vestido açafrão.|Jaqueta cacau sobre vestido açafrão.
+Combinei um moletom azul com shorts de pregas.|Moletom azul sobre shorts de pregas.
+Escolhi uma camisa jade e uma saia cinza-pedra.|Camisa jade sobre saia cinza-pedra.
+Coloquei uma jaqueta acolchoada com calça de algodão.|Jaqueta acolchoada com calça de algodão.
+Uso um poncho tecido sobre vestido canelado.|Poncho tecido sobre vestido canelado.
+Escolhi uma blusa bordô com jeans claro.|Blusa bordô com jeans claro.
+Um colete curto acompanha minha túnica floral.|Colete curto sobre túnica floral.
+Meu suéter aveia acompanha calça terracota.|Suéter aveia sobre calça terracota.
+Uso uma bata jeans e uma saia de linho escuro.|Bata jeans sobre saia de linho escuro.
+Coloquei uma regata de tricô sobre vestido-camisa.|Regata de tricô sobre vestido-camisa.
+Meu corta-vento coral acompanha calça marinho.|Corta-vento coral com calça marinho.
+Experimento uma jaqueta clara com shorts verde-garrafa.|Jaqueta clara com shorts verde-garrafa.
+Escolhi camisa lilás e pantacourt de tweed.|Camisa lilás sobre pantacourt de tweed.
+Minha capa xadrez cobre um macacão cinza.|Capa xadrez sobre macacão cinza.
+Uso blusa sálvia e legging canela.|Blusa sálvia sobre legging canela.
+Combinei uma túnica marinho com calça listrada.|Túnica marinho sobre calça listrada.
+Coloquei um casaco creme sobre jardineira de saia ameixa.|Casaco creme sobre jardineira de saia ameixa.
+Meu suéter amarelo acompanha calça marrom de veludo.|Suéter amarelo sobre calça marrom de veludo.
+Combinei uma sobrecamisa jade com saia creme.|Sobrecamisa jade sobre saia creme.
+Escolhi uma blusa malva e pantacourt cinza-ardósia.|Blusa malva com pantacourt cinza-ardósia.
+Experimento um colete caramelo sobre vestido índigo.|Colete caramelo sobre vestido índigo.
+Uso polo xadrez com shorts simples.|Polo xadrez com shorts de algodão.
+Um cardigã tijolo acompanha meu macacão bege.|Cardigã tijolo sobre macacão bege.
+Coloquei camisa de seda com saia midi de lã.|Camisa de seda sobre saia midi de lã.
+Uso jaqueta jeans desbotada com calça oliva.|Jaqueta jeans desbotada com calça oliva.
+Escolhi um top canelado e saia cobre transpassada.|Top canelado sobre saia cobre transpassada.
+Minha bata estampada acompanha legging azul-escura.|Bata estampada sobre legging azul-escura.
+Escolhi poncho curto e jardineira de saia cinza.|Poncho curto sobre jardineira de saia cinza.
+Combinei camisa coral com saia marrom plissada.|Camisa coral com saia marrom plissada.
+Uso colete tecido sobre macacão azul.|Colete tecido sobre macacão azul.
+Experimento casaco sálvia com vestido jeans preto.|Casaco sálvia sobre vestido jeans preto.
+Escolhi um moletom creme e shorts ameixa.|Moletom creme sobre shorts ameixa.
+Combinei uma blusa marrom macia com calça listrada.|Blusa marrom sobre calça listrada.
+[moments]
+Vou participar da troca de jogos de tabuleiro.
+Estou a caminho do estúdio da rádio comunitária.
+Hoje ajudo na biblioteca de sementes.
+Saio para ouvir um ensaio de música de câmara.
+Encontro minha prima no observatório.
+O programa inclui uma pequena feira de gravura.
+Arrumo as cadeiras para o círculo de poesia.
+Visito a sala de espera restaurada da estação.
+Caminho até minha primeira aula de caligrafia.
+Vou ao arquivo botânico da cidade.
+Hoje assisto a uma palestra de história local.
+Passo a tarde no teatro de bonecos.
+Vou buscar nossos velhos álbuns de família.
+Passo pelo café de consertos do bairro.
+Uma noite de música acústica nos espera.
+Encontro uma amiga perto da estufa municipal.
+Ajudo na troca de fantasias da escola.
+Estou me preparando para uma exposição de cerâmica.
+Levo meu caderno ao grupo de leitura.
+Hoje visitamos o farol com um guia.
+A oficina de encadernação começa neste fim de semana.
+Vou assistir a uma demonstração de tecelagem.
+O passeio inclui uma palestra de astronomia.
+Cruzo a passarela a caminho do cineclube.
+Visito uma venda de plantas de interior.
+O coral organiza um piquenique hoje.
+Preparamos a noite de histórias da família.
+Vou à troca de móveis da cooperativa.
+Hoje conheço os novos voluntários da biblioteca.
+Pego o trem local até o arquivo de design.
+[captionEndings]
+As proporções parecem equilibradas hoje.
+Posso sentar e me mover com conforto.
+Mantenho os acessórios bem simples.
+A textura aparece melhor na luz natural.
+Esta combinação cabe no meu pequeno guarda-roupa.
+Gosto do contraste entre os tecidos.
+As camadas se movem com facilidade.
+As cores me lembram uma pintura.
+Também trouxe uma sacola de tecido.
+Uma combinação prática para uma tarde longa.
+As chaves já ocupam os bolsos.
+Experimento esta silhueta pela primeira vez.
+O tecido é macio nos punhos.
+Gosto de como a gola emoldura o decote.
+Guardo uma camada extra na bolsa.
+Está confortável para o trajeto.
+Prendi o cabelo acima da gola.
+O conjunto todo foi fácil de arrumar na mala.
+Ainda sobra espaço para um cachecol.
+O corte solto também funciona ao sentar.
+[backgrounds]
+Há um arco de pedra clara atrás.
+Um biombo de madeira fica ao fundo.
+O fundo é uma parede terracota.
+Uma cerca baixa atravessa o fundo.
+Uma porta estreita aparece à esquerda.
+Uma cortina lisa está pendurada atrás.
+O chão é coberto de cascalho claro.
+Há vasos alinhados junto ao muro.
+Um portão azul fica por perto.
+O piso tem ladrilhos quadrados pequenos.
+Uma coluna de tijolos aparece à direita.
+Um muro baixo de jardim forma o fundo.
+Um banco de madeira fica atrás da figura.
+A cena mostra uma passagem coberta.
+Uma escada de pedra aparece atrás.
+O fundo inclui uma entrada de vidro.
+Uma porta escura contrasta com as roupas.
+Uma grade simples atravessa a imagem.
+Uma divisória trançada fica atrás.
+O lugar tem piso de concreto liso.
+Um portão branco de jardim aparece ao longe.
+Uma janela larga ocupa o fundo.
+Há uma parede de madeira natural atrás.
+Uma borda de pedra passa atrás da figura.
+Uma porta amarela aparece ao lado.
+A cena inclui um corrimão de metal curvo.
+Um pátio arborizado aparece atrás.
+Uma janela alta de vidro fosco fica perto.
+O pavimento tem pedras retangulares estreitas.
+Um fundo cinza liso preenche a imagem.
+[light]
+As duas mangas estão visíveis.
+As barras inferiores aparecem no quadro.
+O tecido recebe luz lateral.
+O conjunto é mostrado de frente.
+As cores têm iluminação suave.
+A silhueta inteira aparece.
+Há pequenas dobras nos cotovelos.
+A luz entra por uma janela próxima.
+As roupas ocupam quase toda a imagem.
+A câmera está na altura da cintura.
+Uma sombra suave cai no chão.
+As costuras aparecem na luz natural.
+A figura está ligeiramente de lado.
+O decote é claramente visível.
+O tecido cai em dobras soltas.
+Os ombros aparecem de perfil.
+A luz do dia ilumina o lado esquerdo.
+As peças têm acabamento fosco.
+A vista inclui cintura e pernas.
+As bordas das camadas estão visíveis.

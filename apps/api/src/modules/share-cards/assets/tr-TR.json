@@ -1,0 +1,26 @@
+{
+  "outfit": "Kombin",
+  "community": "Topluluk kombini",
+  "scenarios": {
+    "morning": "Sabah",
+    "midday": "Öğle",
+    "evening": "Akşam"
+  },
+  "categories": {
+    "top": "Üst",
+    "bottom": "Alt",
+    "outerwear": "Dış giyim",
+    "dress": "Elbise",
+    "shoes": "Ayakkabı",
+    "accessory": "Aksesuar"
+  },
+  "climateBands": {
+    "cold_dry": "Soğuk ve kuru",
+    "cold_wet": "Soğuk ve nemli",
+    "temperate_dry": "Ilıman ve kuru",
+    "temperate_wet": "Ilıman ve nemli",
+    "warm_dry": "Sıcak ve kuru",
+    "warm_wet": "Sıcak ve nemli"
+  },
+  "watermarkRole": "Filigran"
+}

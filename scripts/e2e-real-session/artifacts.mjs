@@ -171,7 +171,10 @@ export function verifyArtifacts(directory) {
   return { ok: true, files: names.size }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   const [command] = process.argv.slice(2)
   if (command !== 'verify') {
     console.error('Usage: artifacts.mjs verify')

@@ -313,4 +313,5 @@ jobs:
       # the job summary. Reads the shards' psp-record-* artifacts and the jobs
       # API, which is why this job keeps actions: read.
       - name: Check shard coverage and timing
+        if: ${{ !cancelled() }}
         uses: muratkeremozcan/playwright-smart-parallelization/finish@v1

@@ -1,0 +1,5013 @@
+{
+  "language": "en",
+  "corpusVersion": "holdout-v4",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "6f1aed8d5bdaeeedb4c01e4904e43aaa414de1829468120a4593ad4b7508bbac",
+    "languageAllowListSha256": "bebf551640dcbf64b3887736083f2a1f798fc0fe2f86f793cc54a00979abbdd3"
+  },
+  "entries": [
+    {
+      "id": "en-holdout-v4-001",
+      "field": "caption",
+      "text": "The repaired elbow has become my favourite detail."
+    },
+    {
+      "id": "en-holdout-v4-002",
+      "field": "caption",
+      "text": "Platform wind convinced me to button this coat fully."
+    },
+    {
+      "id": "en-holdout-v4-003",
+      "field": "caption",
+      "text": "Clay dust is why my studio apron has deep pockets."
+    },
+    {
+      "id": "en-holdout-v4-004",
+      "field": "caption",
+      "text": "Grandad's cufflinks finally have an outing at our reunion."
+    },
+    {
+      "id": "en-holdout-v4-005",
+      "field": "caption",
+      "text": "Rolled hems kept my trousers clear of the chain."
+    },
+    {
+      "id": "en-holdout-v4-006",
+      "field": "caption",
+      "text": "I left the dangling bracelets home for bookbinding class."
+    },
+    {
+      "id": "en-holdout-v4-007",
+      "field": "caption",
+      "text": "A hook by the door is rescuing yesterday's raincoat."
+    },
+    {
+      "id": "en-holdout-v4-008",
+      "field": "caption",
+      "text": "This shortened cardigan now works beautifully with high-waisted skirts."
+    },
+    {
+      "id": "en-holdout-v4-009",
+      "field": "caption",
+      "text": "Cotton gloves and soft sleeves for the archive appointment."
+    },
+    {
+      "id": "en-holdout-v4-010",
+      "field": "caption",
+      "text": "Sketched this silhouette before finding the pieces in my wardrobe."
+    },
+    {
+      "id": "en-holdout-v4-011",
+      "field": "caption",
+      "text": "My basket doubles as a bag on market mornings."
+    },
+    {
+      "id": "en-holdout-v4-012",
+      "field": "caption",
+      "text": "Changing three buttons gave this old waistcoat fresh character."
+    },
+    {
+      "id": "en-holdout-v4-013",
+      "field": "caption",
+      "text": "Reflective piping makes my walk home after work brighter."
+    },
+    {
+      "id": "en-holdout-v4-014",
+      "field": "caption",
+      "text": "Soft soles were the right choice for the reading room."
+    },
+    {
+      "id": "en-holdout-v4-015",
+      "field": "caption",
+      "text": "Dressed for a matinee and an unhurried slice of cake."
+    },
+    {
+      "id": "en-holdout-v4-016",
+      "field": "caption",
+      "text": "The linen arrived crisp and acquired a whole afternoon's creases."
+    },
+    {
+      "id": "en-holdout-v4-017",
+      "field": "caption",
+      "text": "Reinforced knees earned their place during today's seed planting."
+    },
+    {
+      "id": "en-holdout-v4-018",
+      "field": "caption",
+      "text": "Everything for the weekend fits flat around this folded jacket."
+    },
+    {
+      "id": "en-holdout-v4-019",
+      "field": "caption",
+      "text": "These rust tones remind me of the old station tiles."
+    },
+    {
+      "id": "en-holdout-v4-020",
+      "field": "caption",
+      "text": "Trying an exposed seam where I usually hide every stitch."
+    },
+    {
+      "id": "en-holdout-v4-021",
+      "field": "caption",
+      "text": "Small bag today because the museum lockers are tiny."
+    },
+    {
+      "id": "en-holdout-v4-022",
+      "field": "caption",
+      "text": "A borrowed brooch stopped my scarf slipping on the ferry."
+    },
+    {
+      "id": "en-holdout-v4-023",
+      "field": "caption",
+      "text": "Collected these boots with fresh heels and another season ahead."
+    },
+    {
+      "id": "en-holdout-v4-024",
+      "field": "caption",
+      "text": "Our neighbourhood swap supplied the missing piece of this outfit."
+    },
+    {
+      "id": "en-holdout-v4-025",
+      "field": "caption",
+      "text": "Tested the waistband through a long seated afternoon; very comfortable."
+    },
+    {
+      "id": "en-holdout-v4-026",
+      "field": "caption",
+      "text": "My smallest pocket now has a permanent pair of earplugs."
+    },
+    {
+      "id": "en-holdout-v4-027",
+      "field": "caption",
+      "text": "I tucked a tiny initial inside the collar while embroidering."
+    },
+    {
+      "id": "en-holdout-v4-028",
+      "field": "caption",
+      "text": "A flexible wire lets me reshape the edge of this collar."
+    },
+    {
+      "id": "en-holdout-v4-029",
+      "field": "caption",
+      "text": "My sister styled this jacket completely differently; borrowing her idea."
+    },
+    {
+      "id": "en-holdout-v4-030",
+      "field": "caption",
+      "text": "Slip-on shoes made an early airport queue easier to manage."
+    },
+    {
+      "id": "en-holdout-v4-031",
+      "field": "caption",
+      "text": "I chose trousers that could handle a picnic on rough grass."
+    },
+    {
+      "id": "en-holdout-v4-032",
+      "field": "caption",
+      "text": "Taking a loose buckle to our repair cafe this afternoon."
+    },
+    {
+      "id": "en-holdout-v4-033",
+      "field": "caption",
+      "text": "One colour left room for all these different textures."
+    },
+    {
+      "id": "en-holdout-v4-034",
+      "field": "caption",
+      "text": "Found my school photo and tried that oversized collar again."
+    },
+    {
+      "id": "en-holdout-v4-035",
+      "field": "caption",
+      "text": "The fabric necklace doubles as a bookmark while I practise."
+    },
+    {
+      "id": "en-holdout-v4-036",
+      "field": "caption",
+      "text": "Trying clip-on braces with these high-waisted trousers."
+    },
+    {
+      "id": "en-holdout-v4-037",
+      "field": "caption",
+      "text": "A small shoulder alteration helped this secondhand blazer settle properly."
+    },
+    {
+      "id": "en-holdout-v4-038",
+      "field": "caption",
+      "text": "Mittens won against the frost on this morning's riverside walk."
+    },
+    {
+      "id": "en-holdout-v4-039",
+      "field": "caption",
+      "text": "Reading the care label saved this borrowed silk shirt."
+    },
+    {
+      "id": "en-holdout-v4-040",
+      "field": "caption",
+      "text": "Closed shoes and tied sleeves for our community kitchen shift."
+    },
+    {
+      "id": "en-holdout-v4-041",
+      "field": "caption",
+      "text": "Pairing a tiny check with a sweeping floral print today."
+    },
+    {
+      "id": "en-holdout-v4-042",
+      "field": "caption",
+      "text": "The magnetic clasp makes fastening this necklace manageable one-handed."
+    },
+    {
+      "id": "en-holdout-v4-043",
+      "field": "caption",
+      "text": "This skirt fastens at the side with two little toggles."
+    },
+    {
+      "id": "en-holdout-v4-044",
+      "field": "caption",
+      "text": "Soft trousers made the overnight train feel almost like home."
+    },
+    {
+      "id": "en-holdout-v4-045",
+      "field": "caption",
+      "text": "A fabric strap has made my old watch comfortable again."
+    },
+    {
+      "id": "en-holdout-v4-046",
+      "field": "caption",
+      "text": "These broad steps are a useful place to photograph a hem."
+    },
+    {
+      "id": "en-holdout-v4-047",
+      "field": "caption",
+      "text": "Learning who wove this cloth made wearing it feel personal."
+    },
+    {
+      "id": "en-holdout-v4-048",
+      "field": "caption",
+      "text": "Warm socks are my favourite part of dressing after a swim."
+    },
+    {
+      "id": "en-holdout-v4-049",
+      "field": "caption",
+      "text": "The festival field persuaded me to bring washable shoes."
+    },
+    {
+      "id": "en-holdout-v4-050",
+      "field": "caption",
+      "text": "Turned the jacket inside out and found a second outfit."
+    },
+    {
+      "id": "en-holdout-v4-051",
+      "field": "caption",
+      "text": "A few chalk marks are helping me picture a shorter sleeve."
+    },
+    {
+      "id": "en-holdout-v4-052",
+      "field": "caption",
+      "text": "Choosing earrings that leave comfortable space around my hearing device."
+    },
+    {
+      "id": "en-holdout-v4-053",
+      "field": "caption",
+      "text": "A breeze off the canal gave this long vest movement."
+    },
+    {
+      "id": "en-holdout-v4-054",
+      "field": "caption",
+      "text": "Close-fitting cuffs stayed clear while I used the workshop tools."
+    },
+    {
+      "id": "en-holdout-v4-055",
+      "field": "caption",
+      "text": "Each patch carries a scrap from a past sewing project."
+    },
+    {
+      "id": "en-holdout-v4-056",
+      "field": "caption",
+      "text": "A quick blotting saved my cuff after an enthusiastic tea pour."
+    },
+    {
+      "id": "en-holdout-v4-057",
+      "field": "caption",
+      "text": "Brushing salt from my coat after a windy coastal weekend."
+    },
+    {
+      "id": "en-holdout-v4-058",
+      "field": "caption",
+      "text": "My folded map fits perfectly in the jacket's inside pocket."
+    },
+    {
+      "id": "en-holdout-v4-059",
+      "field": "caption",
+      "text": "Trying an airy woven shirt for a warm office afternoon."
+    },
+    {
+      "id": "en-holdout-v4-060",
+      "field": "caption",
+      "text": "Wearing the same suit to another lovely family wedding."
+    },
+    {
+      "id": "en-holdout-v4-061",
+      "field": "caption",
+      "text": "A friend pinned the hem while I stood on a stool."
+    },
+    {
+      "id": "en-holdout-v4-062",
+      "field": "caption",
+      "text": "Waited out the shower and watched this water-resistant fabric bead."
+    },
+    {
+      "id": "en-holdout-v4-063",
+      "field": "caption",
+      "text": "The handmade edging deserved a closer look before I left."
+    },
+    {
+      "id": "en-holdout-v4-064",
+      "field": "caption",
+      "text": "An early bakery run became an excuse for cheerful stripes."
+    },
+    {
+      "id": "en-holdout-v4-065",
+      "field": "caption",
+      "text": "Leaving spare things at home made my shoulder bag noticeably lighter."
+    },
+    {
+      "id": "en-holdout-v4-066",
+      "field": "caption",
+      "text": "A careful press brought the folds back into this skirt."
+    },
+    {
+      "id": "en-holdout-v4-067",
+      "field": "caption",
+      "text": "My folding fan echoes the pleats in this bag."
+    },
+    {
+      "id": "en-holdout-v4-068",
+      "field": "caption",
+      "text": "My crossbody bag leaves a hand free for my cane."
+    },
+    {
+      "id": "en-holdout-v4-069",
+      "field": "caption",
+      "text": "The portrait session convinced me to try an open neckline."
+    },
+    {
+      "id": "en-holdout-v4-070",
+      "field": "caption",
+      "text": "Bought this belt directly from its weaver at the craft fair."
+    },
+    {
+      "id": "en-holdout-v4-071",
+      "field": "caption",
+      "text": "A breathable cover is ready for my coat's summer rest."
+    },
+    {
+      "id": "en-holdout-v4-072",
+      "field": "caption",
+      "text": "A spill-proof cup and wide jacket pockets improved the morning."
+    },
+    {
+      "id": "en-holdout-v4-073",
+      "field": "caption",
+      "text": "Short errands are helping these new loafers soften gradually."
+    },
+    {
+      "id": "en-holdout-v4-074",
+      "field": "caption",
+      "text": "Tracing a favourite shirt helped me understand its unusual shape."
+    },
+    {
+      "id": "en-holdout-v4-075",
+      "field": "caption",
+      "text": "Clipped my volunteer badge where it won't pull the knit."
+    },
+    {
+      "id": "en-holdout-v4-076",
+      "field": "caption",
+      "text": "Sturdy boots suited the uneven orchard paths this weekend."
+    },
+    {
+      "id": "en-holdout-v4-077",
+      "field": "caption",
+      "text": "This folded sleeve changes shape every time I lift an arm."
+    },
+    {
+      "id": "en-holdout-v4-078",
+      "field": "caption",
+      "text": "My friend arrived in the same pattern by complete coincidence."
+    },
+    {
+      "id": "en-holdout-v4-079",
+      "field": "caption",
+      "text": "Added a tactile tag to tell two similar scarves apart."
+    },
+    {
+      "id": "en-holdout-v4-080",
+      "field": "caption",
+      "text": "The fountain reflected little flashes across my metallic shoes."
+    },
+    {
+      "id": "en-holdout-v4-081",
+      "field": "caption",
+      "text": "A tin of family buttons supplied this cardigan's mismatched finishing touch."
+    },
+    {
+      "id": "en-holdout-v4-082",
+      "field": "caption",
+      "text": "Tied my hat securely before stepping onto the ferry deck."
+    },
+    {
+      "id": "en-holdout-v4-083",
+      "field": "caption",
+      "text": "Clipped a small light to my backpack for the evening ride."
+    },
+    {
+      "id": "en-holdout-v4-084",
+      "field": "caption",
+      "text": "An old folding trick made this square scarf sit neatly."
+    },
+    {
+      "id": "en-holdout-v4-085",
+      "field": "caption",
+      "text": "Easy-to-remove layers helped with today's overheated meeting room."
+    },
+    {
+      "id": "en-holdout-v4-086",
+      "field": "caption",
+      "text": "I checked each belt loop before buying these secondhand trousers."
+    },
+    {
+      "id": "en-holdout-v4-087",
+      "field": "caption",
+      "text": "Bunched cuffs keep these generous sleeves out of my lunch."
+    },
+    {
+      "id": "en-holdout-v4-088",
+      "field": "caption",
+      "text": "A brush lifted chalk from my coat after the drawing workshop."
+    },
+    {
+      "id": "en-holdout-v4-089",
+      "field": "caption",
+      "text": "Chose something I could move in for the storytelling stage."
+    },
+    {
+      "id": "en-holdout-v4-090",
+      "field": "caption",
+      "text": "Waxed the seams before taking these boots through wet woodland."
+    },
+    {
+      "id": "en-holdout-v4-091",
+      "field": "caption",
+      "text": "Unclipped the long strap and carried this bag by its handle."
+    },
+    {
+      "id": "en-holdout-v4-092",
+      "field": "caption",
+      "text": "Found last spring's seed packet tucked into my gardening jacket."
+    },
+    {
+      "id": "en-holdout-v4-093",
+      "field": "caption",
+      "text": "Washing the denim separately protected the pale pieces beside it."
+    },
+    {
+      "id": "en-holdout-v4-094",
+      "field": "caption",
+      "text": "The skirt has enough room for a slow dance after dinner."
+    },
+    {
+      "id": "en-holdout-v4-095",
+      "field": "caption",
+      "text": "That softly brushed finish was the reason I kept this overshirt."
+    },
+    {
+      "id": "en-holdout-v4-096",
+      "field": "caption",
+      "text": "A faded seaside postcard inspired today's muted colour combination."
+    },
+    {
+      "id": "en-holdout-v4-097",
+      "field": "caption",
+      "text": "Reunited my gloves after finding one inside a coat sleeve."
+    },
+    {
+      "id": "en-holdout-v4-098",
+      "field": "caption",
+      "text": "Standing through the exhibition opening put these cushioned shoes to work."
+    },
+    {
+      "id": "en-holdout-v4-099",
+      "field": "caption",
+      "text": "Photographing combinations helps me remember them on rushed weekday mornings."
+    },
+    {
+      "id": "en-holdout-v4-100",
+      "field": "caption",
+      "text": "Used contrasting thread so I can enjoy the repair itself."
+    },
+    {
+      "id": "en-holdout-v4-101",
+      "field": "caption",
+      "text": "Filled a pocket with fallen chestnuts on the way home."
+    },
+    {
+      "id": "en-holdout-v4-102",
+      "field": "caption",
+      "text": "This soft collar sits comfortably against the car headrest."
+    },
+    {
+      "id": "en-holdout-v4-103",
+      "field": "caption",
+      "text": "The old label helped me date a much-loved thrifted coat."
+    },
+    {
+      "id": "en-holdout-v4-104",
+      "field": "caption",
+      "text": "Shorter trousers made all those station stairs easier today."
+    },
+    {
+      "id": "en-holdout-v4-105",
+      "field": "caption",
+      "text": "Layered lace over a plain slip to bring out its pattern."
+    },
+    {
+      "id": "en-holdout-v4-106",
+      "field": "caption",
+      "text": "My washable overshirt survived another watercolour class beautifully."
+    },
+    {
+      "id": "en-holdout-v4-107",
+      "field": "caption",
+      "text": "Borrowed a tie and asked its owner to teach me the knot."
+    },
+    {
+      "id": "en-holdout-v4-108",
+      "field": "caption",
+      "text": "Freshly aired clothes felt right for today's scent-free gathering."
+    },
+    {
+      "id": "en-holdout-v4-109",
+      "field": "caption",
+      "text": "Stitched a narrow pocket just wide enough for my library card."
+    },
+    {
+      "id": "en-holdout-v4-110",
+      "field": "caption",
+      "text": "Steam helped the hat regain its shape after being packed."
+    },
+    {
+      "id": "en-holdout-v4-111",
+      "field": "caption",
+      "text": "A fitted top balances the generous shape of these trousers."
+    },
+    {
+      "id": "en-holdout-v4-112",
+      "field": "caption",
+      "text": "Chose a familiar jacket to feel settled before my talk."
+    },
+    {
+      "id": "en-holdout-v4-113",
+      "field": "caption",
+      "text": "Kept the woven edge visible when finishing this simple wrap."
+    },
+    {
+      "id": "en-holdout-v4-114",
+      "field": "caption",
+      "text": "Laid everything out last night; this morning required very little thought."
+    },
+    {
+      "id": "en-holdout-v4-115",
+      "field": "caption",
+      "text": "The bag's padded surface echoes a quilt I grew up with."
+    },
+    {
+      "id": "en-holdout-v4-116",
+      "field": "caption",
+      "text": "A smooth collar keeps my hair from catching at the neck."
+    },
+    {
+      "id": "en-holdout-v4-117",
+      "field": "caption",
+      "text": "Old waterproof trousers earned another muddy river cleanup badge."
+    },
+    {
+      "id": "en-holdout-v4-118",
+      "field": "caption",
+      "text": "The smallest sewing offcut became a useful hair tie."
+    },
+    {
+      "id": "en-holdout-v4-119",
+      "field": "caption",
+      "text": "A tiny enamel pin marks the first trip I took alone."
+    },
+    {
+      "id": "en-holdout-v4-120",
+      "field": "caption",
+      "text": "The tiled hallway made an unexpected partner for my checked trousers."
+    },
+    {
+      "id": "en-holdout-v4-121",
+      "field": "caption",
+      "text": "A little polish revived the faded toes on these shoes."
+    },
+    {
+      "id": "en-holdout-v4-122",
+      "field": "caption",
+      "text": "A removable corsage clips to the brim of my hat."
+    },
+    {
+      "id": "en-holdout-v4-123",
+      "field": "caption",
+      "text": "A needle threader made replacing this sleeve button much easier."
+    },
+    {
+      "id": "en-holdout-v4-124",
+      "field": "caption",
+      "text": "Letting the beret dry around a plate restored its round shape."
+    },
+    {
+      "id": "en-holdout-v4-125",
+      "field": "caption",
+      "text": "The cuff opens along a concealed row of press studs."
+    },
+    {
+      "id": "en-holdout-v4-126",
+      "field": "caption",
+      "text": "Real pockets changed how often I reach for this skirt."
+    },
+    {
+      "id": "en-holdout-v4-127",
+      "field": "caption",
+      "text": "Asked for a walking photograph to show how the fabric moves."
+    },
+    {
+      "id": "en-holdout-v4-128",
+      "field": "caption",
+      "text": "I can loosen the waistband with its hidden sliding tab."
+    },
+    {
+      "id": "en-holdout-v4-129",
+      "field": "caption",
+      "text": "The handmade ring has an uneven glaze I keep noticing."
+    },
+    {
+      "id": "en-holdout-v4-130",
+      "field": "caption",
+      "text": "A side view in the mirror revealed the adjustment I needed."
+    },
+    {
+      "id": "en-holdout-v4-131",
+      "field": "caption",
+      "text": "Smooth beach stones filled my jacket pockets by the end."
+    },
+    {
+      "id": "en-holdout-v4-132",
+      "field": "caption",
+      "text": "Thin gloves took the chill off our early bicycle ride."
+    },
+    {
+      "id": "en-holdout-v4-133",
+      "field": "caption",
+      "text": "Practising buttonholes on spare cloth before tackling the real jacket."
+    },
+    {
+      "id": "en-holdout-v4-134",
+      "field": "caption",
+      "text": "A colourful crossing became the backdrop for my plain outfit."
+    },
+    {
+      "id": "en-holdout-v4-135",
+      "field": "caption",
+      "text": "This is the first skirt I made that feels completely mine."
+    },
+    {
+      "id": "en-holdout-v4-136",
+      "field": "caption",
+      "text": "A pencil tucked behind my ear matched the day's errands."
+    },
+    {
+      "id": "en-holdout-v4-137",
+      "field": "caption",
+      "text": "One removable collar has refreshed several familiar pieces this week."
+    },
+    {
+      "id": "en-holdout-v4-138",
+      "field": "caption",
+      "text": "Pulled my hair clear of the collar in today's humidity."
+    },
+    {
+      "id": "en-holdout-v4-139",
+      "field": "caption",
+      "text": "Three reliable pieces make dressing for early shifts feel straightforward."
+    },
+    {
+      "id": "en-holdout-v4-140",
+      "field": "caption",
+      "text": "Kept my coat beside me for lunch overlooking the harbour."
+    },
+    {
+      "id": "en-holdout-v4-141",
+      "field": "caption",
+      "text": "An outgrown shirt became a neatly bound shopping bag."
+    },
+    {
+      "id": "en-holdout-v4-142",
+      "field": "caption",
+      "text": "Restrung the necklace while keeping its original uneven bead order."
+    },
+    {
+      "id": "en-holdout-v4-143",
+      "field": "caption",
+      "text": "My sketchbook disappears into this surprisingly roomy tote."
+    },
+    {
+      "id": "en-holdout-v4-144",
+      "field": "caption",
+      "text": "The washing line threw stripes across everything I had just dried."
+    },
+    {
+      "id": "en-holdout-v4-145",
+      "field": "caption",
+      "text": "Good tread helped me cross the wet cobbles without rushing."
+    },
+    {
+      "id": "en-holdout-v4-146",
+      "field": "caption",
+      "text": "A collarless jacket sits smoothly above this roll-neck knit."
+    },
+    {
+      "id": "en-holdout-v4-147",
+      "field": "caption",
+      "text": "Comfortable trainers lasted through every turn around the fairground."
+    },
+    {
+      "id": "en-holdout-v4-148",
+      "field": "caption",
+      "text": "The bangle was carved from a branch the maker found locally."
+    },
+    {
+      "id": "en-holdout-v4-149",
+      "field": "caption",
+      "text": "Pinned the patch in several places before choosing the shoulder."
+    },
+    {
+      "id": "en-holdout-v4-150",
+      "field": "caption",
+      "text": "Adjusted the backpack straps so they sit clear of my scarf."
+    },
+    {
+      "id": "en-holdout-v4-151",
+      "field": "caption",
+      "text": "Reflective trim appears quietly when the street lights come on."
+    },
+    {
+      "id": "en-holdout-v4-152",
+      "field": "caption",
+      "text": "A fine layer under my shirt helped with the first frost."
+    },
+    {
+      "id": "en-holdout-v4-153",
+      "field": "caption",
+      "text": "An old favourite jacket came along to the school reunion."
+    },
+    {
+      "id": "en-holdout-v4-154",
+      "field": "caption",
+      "text": "Fastened the cuffs tightly enough to leave the sleeves bloused."
+    },
+    {
+      "id": "en-holdout-v4-155",
+      "field": "caption",
+      "text": "Paused on a gallery bench to admire these woven shoe straps."
+    },
+    {
+      "id": "en-holdout-v4-156",
+      "field": "caption",
+      "text": "The yarn I spun unevenly gives this little hat its character."
+    },
+    {
+      "id": "en-holdout-v4-157",
+      "field": "caption",
+      "text": "Wore the bulkiest layer to keep my carry-on manageable."
+    },
+    {
+      "id": "en-holdout-v4-158",
+      "field": "caption",
+      "text": "Flat seams make this shirt comfortable on a sensitive-skin day."
+    },
+    {
+      "id": "en-holdout-v4-159",
+      "field": "caption",
+      "text": "Dressed for the ballet with warm socks hidden inside my boots."
+    },
+    {
+      "id": "en-holdout-v4-160",
+      "field": "caption",
+      "text": "My apron pockets carried the last tomatoes from the balcony."
+    },
+    {
+      "id": "en-holdout-v4-161",
+      "field": "caption",
+      "text": "Rows of running stitches strengthened this thinning denim beautifully."
+    },
+    {
+      "id": "en-holdout-v4-162",
+      "field": "caption",
+      "text": "A shop window showed the full outfit before I reached work."
+    },
+    {
+      "id": "en-holdout-v4-163",
+      "field": "caption",
+      "text": "Brushing the velvet in one direction brought back its depth."
+    },
+    {
+      "id": "en-holdout-v4-164",
+      "field": "caption",
+      "text": "Rediscovered a tiny coin purse made from an old necktie."
+    },
+    {
+      "id": "en-holdout-v4-165",
+      "field": "caption",
+      "text": "A quietly rustling skirt accompanied an afternoon organ recital."
+    },
+    {
+      "id": "en-holdout-v4-166",
+      "field": "caption",
+      "text": "The repaired handle means this dependable bag can keep going."
+    },
+    {
+      "id": "en-holdout-v4-167",
+      "field": "caption",
+      "text": "Wore the washable dungarees for a very untidy studio cleanup."
+    },
+    {
+      "id": "en-holdout-v4-168",
+      "field": "caption",
+      "text": "Held the thread against daylight to choose the closest match."
+    },
+    {
+      "id": "en-holdout-v4-169",
+      "field": "caption",
+      "text": "Contrast piping traces the outline of these trouser pockets."
+    },
+    {
+      "id": "en-holdout-v4-170",
+      "field": "caption",
+      "text": "Blocking straightened the edges of my freshly finished scarf."
+    },
+    {
+      "id": "en-holdout-v4-171",
+      "field": "caption",
+      "text": "Lowering the camera finally showed the unusual trouser shape clearly."
+    },
+    {
+      "id": "en-holdout-v4-172",
+      "field": "caption",
+      "text": "This roomy overshirt travels between several people in our household."
+    },
+    {
+      "id": "en-holdout-v4-173",
+      "field": "caption",
+      "text": "A long coat kept the afternoon chess game comfortable."
+    },
+    {
+      "id": "en-holdout-v4-174",
+      "field": "caption",
+      "text": "The bag looks richer where years of handling darkened the leather."
+    },
+    {
+      "id": "en-holdout-v4-175",
+      "field": "caption",
+      "text": "A small darn underneath has returned these socks to regular rotation."
+    },
+    {
+      "id": "en-holdout-v4-176",
+      "field": "caption",
+      "text": "Dressed for a day exploring the restored railway workshops."
+    },
+    {
+      "id": "en-holdout-v4-177",
+      "field": "caption",
+      "text": "A loose front tuck shows the belt without hiding every fold."
+    },
+    {
+      "id": "en-holdout-v4-178",
+      "field": "caption",
+      "text": "Carrying fewer supplies left room for an extra layer in my tote."
+    },
+    {
+      "id": "en-holdout-v4-179",
+      "field": "caption",
+      "text": "Used the hat's chin cord when the hillside wind picked up."
+    },
+    {
+      "id": "en-holdout-v4-180",
+      "field": "caption",
+      "text": "The oversized zip is the detail that makes this plain jacket."
+    },
+    {
+      "id": "en-holdout-v4-181",
+      "field": "caption",
+      "text": "The previous owner told me where this coat had travelled."
+    },
+    {
+      "id": "en-holdout-v4-182",
+      "field": "caption",
+      "text": "Tiny weights help the lightweight hem fall evenly when I walk."
+    },
+    {
+      "id": "en-holdout-v4-183",
+      "field": "caption",
+      "text": "Easy-clean boots made sense for our visit to the smallholding."
+    },
+    {
+      "id": "en-holdout-v4-184",
+      "field": "caption",
+      "text": "A piece of my old uniform now lines this little pouch."
+    },
+    {
+      "id": "en-holdout-v4-185",
+      "field": "caption",
+      "text": "Enjoying the quiet contrast between matte wool and polished shoes."
+    },
+    {
+      "id": "en-holdout-v4-186",
+      "field": "caption",
+      "text": "A new zip has saved the coat I wear every winter."
+    },
+    {
+      "id": "en-holdout-v4-187",
+      "field": "caption",
+      "text": "Brought fingerless gloves so I could turn pages in the park."
+    },
+    {
+      "id": "en-holdout-v4-188",
+      "field": "caption",
+      "text": "Drafting my own pocket changed the whole balance of this shirt."
+    },
+    {
+      "id": "en-holdout-v4-189",
+      "field": "caption",
+      "text": "Pinned back the sleeves before our neighbourhood cooking club began."
+    },
+    {
+      "id": "en-holdout-v4-190",
+      "field": "caption",
+      "text": "Careful stitches closed the tear without losing the lace pattern."
+    },
+    {
+      "id": "en-holdout-v4-191",
+      "field": "caption",
+      "text": "We agreed on comfortable clothes for this year's family portrait."
+    },
+    {
+      "id": "en-holdout-v4-192",
+      "field": "caption",
+      "text": "A leftover ribbon made a fresh band for my straw hat."
+    },
+    {
+      "id": "en-holdout-v4-193",
+      "field": "caption",
+      "text": "Elastic at the back makes these tailored trousers good travelling companions."
+    },
+    {
+      "id": "en-holdout-v4-194",
+      "field": "caption",
+      "text": "Shorter laces stopped the loops brushing against the pavement."
+    },
+    {
+      "id": "en-holdout-v4-195",
+      "field": "caption",
+      "text": "Found this scarf while sorting a box from my first flat."
+    },
+    {
+      "id": "en-holdout-v4-196",
+      "field": "caption",
+      "text": "Dark washable layers worked well for helping backstage this afternoon."
+    },
+    {
+      "id": "en-holdout-v4-197",
+      "field": "caption",
+      "text": "Turning the stripe across the pocket changed the shirt's rhythm."
+    },
+    {
+      "id": "en-holdout-v4-198",
+      "field": "caption",
+      "text": "An hour outside freshened the wool after a crowded tram journey."
+    },
+    {
+      "id": "en-holdout-v4-199",
+      "field": "caption",
+      "text": "Flat shoes helped me navigate all those graduation steps."
+    },
+    {
+      "id": "en-holdout-v4-200",
+      "field": "caption",
+      "text": "A folded spare bag rescued an unexpectedly large grocery shop."
+    },
+    {
+      "id": "en-holdout-v4-201",
+      "field": "caption",
+      "text": "The triangular shawl sits neatly without needing another pin."
+    },
+    {
+      "id": "en-holdout-v4-202",
+      "field": "caption",
+      "text": "Graphite on my cuff is a small souvenir of today's drawing."
+    },
+    {
+      "id": "en-holdout-v4-203",
+      "field": "caption",
+      "text": "Took my everyday shoes along so the tailor could judge the hem."
+    },
+    {
+      "id": "en-holdout-v4-204",
+      "field": "caption",
+      "text": "A flash of bright sock appears whenever I sit down."
+    },
+    {
+      "id": "en-holdout-v4-205",
+      "field": "caption",
+      "text": "Quiet fabric matters when you turn pages beside an orchestra."
+    },
+    {
+      "id": "en-holdout-v4-206",
+      "field": "caption",
+      "text": "The maker showed me how the clasp works before I bought it."
+    },
+    {
+      "id": "en-holdout-v4-207",
+      "field": "caption",
+      "text": "Brushed dried mud off the cuffs after our woodland walk."
+    },
+    {
+      "id": "en-holdout-v4-208",
+      "field": "caption",
+      "text": "My roomy jacket has become the unofficial train picnic storage."
+    },
+    {
+      "id": "en-holdout-v4-209",
+      "field": "caption",
+      "text": "The buttons catch light differently each time I move."
+    },
+    {
+      "id": "en-holdout-v4-210",
+      "field": "caption",
+      "text": "Added a sturdy hanging loop so this coat rests securely."
+    },
+    {
+      "id": "en-holdout-v4-211",
+      "field": "caption",
+      "text": "Different charcoal shades give this simple combination a gentle depth."
+    },
+    {
+      "id": "en-holdout-v4-212",
+      "field": "caption",
+      "text": "The flower stall's bright buckets made my neutral clothes stand out."
+    },
+    {
+      "id": "en-holdout-v4-213",
+      "field": "caption",
+      "text": "Removing one link helped the necklace sit above my collar."
+    },
+    {
+      "id": "en-holdout-v4-214",
+      "field": "caption",
+      "text": "Letting the scarf carry all the gradual colour changes today."
+    },
+    {
+      "id": "en-holdout-v4-215",
+      "field": "caption",
+      "text": "Wore old stripes to watch the little boats come in."
+    },
+    {
+      "id": "en-holdout-v4-216",
+      "field": "caption",
+      "text": "A stitched leaf now covers the tiny moth hole."
+    },
+    {
+      "id": "en-holdout-v4-217",
+      "field": "caption",
+      "text": "Quick-drying pieces made washing in a small guesthouse sink practical."
+    },
+    {
+      "id": "en-holdout-v4-218",
+      "field": "caption",
+      "text": "Taking a quiet courtyard break between the museum's crowded rooms."
+    },
+    {
+      "id": "en-holdout-v4-219",
+      "field": "caption",
+      "text": "A cloth handkerchief fits the little pocket I usually overlook."
+    },
+    {
+      "id": "en-holdout-v4-220",
+      "field": "caption",
+      "text": "Fresh soles have given my walking shoes another useful chapter."
+    },
+    {
+      "id": "en-holdout-v4-221",
+      "field": "caption",
+      "text": "Repeating yesterday's combination because it worked beautifully all day."
+    },
+    {
+      "id": "en-holdout-v4-222",
+      "field": "caption",
+      "text": "Brought a familiar jacket to compare against the fabric stalls."
+    },
+    {
+      "id": "en-holdout-v4-223",
+      "field": "caption",
+      "text": "The coat falls differently when I leave the belt untied."
+    },
+    {
+      "id": "en-holdout-v4-224",
+      "field": "caption",
+      "text": "Stitched a tiny outline of home inside the bag lining."
+    },
+    {
+      "id": "en-holdout-v4-225",
+      "field": "caption",
+      "text": "A soft glasses pouch now lives in this waistcoat pocket."
+    },
+    {
+      "id": "en-holdout-v4-226",
+      "field": "caption",
+      "text": "Side zips let these rain trousers go on above my boots."
+    },
+    {
+      "id": "en-holdout-v4-227",
+      "field": "caption",
+      "text": "Leaving space in my tote for whatever the book fair brings."
+    },
+    {
+      "id": "en-holdout-v4-228",
+      "field": "caption",
+      "text": "Mum showed me the careful repairs in her old shawl."
+    },
+    {
+      "id": "en-holdout-v4-229",
+      "field": "caption",
+      "text": "A braided belt lets me adjust the fit between meals."
+    },
+    {
+      "id": "en-holdout-v4-230",
+      "field": "caption",
+      "text": "Unbuttoned layers helped with the carriage's enthusiastic heating today."
+    },
+    {
+      "id": "en-holdout-v4-231",
+      "field": "caption",
+      "text": "Rounded pocket corners echo the curves along this jacket's hem."
+    },
+    {
+      "id": "en-holdout-v4-232",
+      "field": "caption",
+      "text": "A quiet museum morning called for soft shoes and familiar layers."
+    },
+    {
+      "id": "en-holdout-v4-233",
+      "field": "caption",
+      "text": "Came home from the costume archive full of sleeve ideas."
+    },
+    {
+      "id": "en-holdout-v4-234",
+      "field": "caption",
+      "text": "Tried a colour pairing from a magazine my neighbour saved."
+    },
+    {
+      "id": "en-holdout-v4-235",
+      "field": "caption",
+      "text": "A neat knot shortened the strap to a comfortable length."
+    },
+    {
+      "id": "en-holdout-v4-236",
+      "field": "caption",
+      "text": "We spent the afternoon comparing three generations of handmade clothes."
+    },
+    {
+      "id": "en-holdout-v4-237",
+      "field": "caption",
+      "text": "Replacing the buckle brought an old belt back into daily use."
+    },
+    {
+      "id": "en-holdout-v4-238",
+      "field": "caption",
+      "text": "A broad brim kept the afternoon sun off my face."
+    },
+    {
+      "id": "en-holdout-v4-239",
+      "field": "caption",
+      "text": "Deep pockets kept my keys secure while sorting food donations."
+    },
+    {
+      "id": "en-holdout-v4-240",
+      "field": "caption",
+      "text": "The sea vanished into fog halfway through our promenade stroll."
+    },
+    {
+      "id": "en-holdout-v4-241",
+      "field": "caption",
+      "text": "A fold at each shoulder gives this blouse its lovely structure."
+    },
+    {
+      "id": "en-holdout-v4-242",
+      "field": "caption",
+      "text": "Finally wearing the little flowers that spent months in my hoop."
+    },
+    {
+      "id": "en-holdout-v4-243",
+      "field": "caption",
+      "text": "Dressed for a long lunch around our building's shared table."
+    },
+    {
+      "id": "en-holdout-v4-244",
+      "field": "caption",
+      "text": "A homemade divider stops my sketching pencils escaping inside the bag."
+    },
+    {
+      "id": "en-holdout-v4-245",
+      "field": "caption",
+      "text": "A little steam loosened the packing folds before the presentation."
+    },
+    {
+      "id": "en-holdout-v4-246",
+      "field": "caption",
+      "text": "Moved the pocket opening where I can reach it comfortably."
+    },
+    {
+      "id": "en-holdout-v4-247",
+      "field": "caption",
+      "text": "Taking my unfinished cardigan to the weekly knitting circle."
+    },
+    {
+      "id": "en-holdout-v4-248",
+      "field": "caption",
+      "text": "Dawn on the passenger ferry deserved an especially warm hood."
+    },
+    {
+      "id": "en-holdout-v4-249",
+      "field": "caption",
+      "text": "The print on my shirt started a lovely conversation at the opening."
+    },
+    {
+      "id": "en-holdout-v4-250",
+      "field": "caption",
+      "text": "The faded knees show exactly how often these trousers get worn."
+    },
+    {
+      "id": "en-holdout-v4-251",
+      "field": "caption",
+      "text": "A swatch in my wallet helped me choose coordinating thread."
+    },
+    {
+      "id": "en-holdout-v4-252",
+      "field": "caption",
+      "text": "Tied my hair with a ribbon saved from childhood."
+    },
+    {
+      "id": "en-holdout-v4-253",
+      "field": "caption",
+      "text": "Covered shoes made working in the shared herb garden comfortable."
+    },
+    {
+      "id": "en-holdout-v4-254",
+      "field": "caption",
+      "text": "The aligned checks at the seam still make me smile."
+    },
+    {
+      "id": "en-holdout-v4-255",
+      "field": "caption",
+      "text": "Opened the locket and found its original tiny paper insert."
+    },
+    {
+      "id": "en-holdout-v4-256",
+      "field": "caption",
+      "text": "The reflective panel lights up when the evening bus approaches."
+    },
+    {
+      "id": "en-holdout-v4-257",
+      "field": "caption",
+      "text": "Sand-resistant sandals and a loose shirt for the beach cafe."
+    },
+    {
+      "id": "en-holdout-v4-258",
+      "field": "caption",
+      "text": "A safety pin got my coat button home safely."
+    },
+    {
+      "id": "en-holdout-v4-259",
+      "field": "caption",
+      "text": "This shorter jacket leaves the long shirt hem visible beneath it."
+    },
+    {
+      "id": "en-holdout-v4-260",
+      "field": "caption",
+      "text": "A longer zipper loop is easier for me to grasp."
+    },
+    {
+      "id": "en-holdout-v4-261",
+      "field": "caption",
+      "text": "The apron caught a colourful splash during our paper-marbling workshop."
+    },
+    {
+      "id": "en-holdout-v4-262",
+      "field": "caption",
+      "text": "Turned up the collar when the temperature dropped near the river."
+    },
+    {
+      "id": "en-holdout-v4-263",
+      "field": "caption",
+      "text": "Soft shoes made learning the community dance steps feel possible."
+    },
+    {
+      "id": "en-holdout-v4-264",
+      "field": "caption",
+      "text": "Clearing the pockets before washing turned up an entire week's receipts."
+    },
+    {
+      "id": "en-holdout-v4-265",
+      "field": "caption",
+      "text": "Left the jingling bracelet off for a quiet recording session."
+    },
+    {
+      "id": "en-holdout-v4-266",
+      "field": "caption",
+      "text": "Wore close-fitting sleeves while learning to weave a willow basket."
+    },
+    {
+      "id": "en-holdout-v4-267",
+      "field": "caption",
+      "text": "The sleeve unzips completely to make a sleeveless vest."
+    },
+    {
+      "id": "en-holdout-v4-268",
+      "field": "caption",
+      "text": "This little pouch keeps glass bottles separate from my bag's contents."
+    },
+    {
+      "id": "en-holdout-v4-269",
+      "field": "caption",
+      "text": "Unrolled my brown-paper pattern and finally started that summer top."
+    },
+    {
+      "id": "en-holdout-v4-270",
+      "field": "caption",
+      "text": "Waterproof shoes made the puddled school pickup route less complicated."
+    },
+    {
+      "id": "en-holdout-v4-271",
+      "field": "caption",
+      "text": "Tried the scarf as a headband after wearing it loose yesterday."
+    },
+    {
+      "id": "en-holdout-v4-272",
+      "field": "caption",
+      "text": "The soft ruffle adds movement without needing any extra accessories."
+    },
+    {
+      "id": "en-holdout-v4-273",
+      "field": "caption",
+      "text": "A washable shirt was sensible for helping serve the community meal."
+    },
+    {
+      "id": "en-holdout-v4-274",
+      "field": "caption",
+      "text": "Framed a fragile lace fragment inside a protective pendant."
+    },
+    {
+      "id": "en-holdout-v4-275",
+      "field": "caption",
+      "text": "The roomy back pleat lets me reach the top shelf freely."
+    },
+    {
+      "id": "en-holdout-v4-276",
+      "field": "caption",
+      "text": "Packed an extra jumper for the observatory's late opening."
+    },
+    {
+      "id": "en-holdout-v4-277",
+      "field": "caption",
+      "text": "A firm insert helps this soft bag stand upright beside my desk."
+    },
+    {
+      "id": "en-holdout-v4-278",
+      "field": "caption",
+      "text": "Hung the dress in the bathroom while I unpacked everything else."
+    },
+    {
+      "id": "en-holdout-v4-279",
+      "field": "caption",
+      "text": "My little shoe horn has a permanent place by the door."
+    },
+    {
+      "id": "en-holdout-v4-280",
+      "field": "caption",
+      "text": "Looser tension stopped the seam puckering on this lightweight fabric."
+    },
+    {
+      "id": "en-holdout-v4-281",
+      "field": "caption",
+      "text": "Flat shoes were welcome on the historic house's uneven floors."
+    },
+    {
+      "id": "en-holdout-v4-282",
+      "field": "caption",
+      "text": "Learned which jacket rustles too loudly for a chamber concert."
+    },
+    {
+      "id": "en-holdout-v4-283",
+      "field": "caption",
+      "text": "An unhurried breakfast gave me time to try an unfamiliar combination."
+    },
+    {
+      "id": "en-holdout-v4-284",
+      "field": "caption",
+      "text": "A washable pouch keeps the dog treats away from my gloves."
+    },
+    {
+      "id": "en-holdout-v4-285",
+      "field": "caption",
+      "text": "The maker stitched a tiny signature into the inside seam."
+    },
+    {
+      "id": "en-holdout-v4-286",
+      "field": "caption",
+      "text": "These generous trouser pleats leave room for a full day's movement."
+    },
+    {
+      "id": "en-holdout-v4-287",
+      "field": "caption",
+      "text": "Fabric shoe bags keep the soles away from clean clothes when travelling."
+    },
+    {
+      "id": "en-holdout-v4-288",
+      "field": "caption",
+      "text": "Waited beneath the cafe canopy while rain dotted my sleeves."
+    },
+    {
+      "id": "en-holdout-v4-289",
+      "field": "caption",
+      "text": "Packed a tiny sewing kit and used it on the first evening."
+    },
+    {
+      "id": "en-holdout-v4-290",
+      "field": "caption",
+      "text": "Wearing the long shirt open gives the whole outfit a relaxed shape."
+    },
+    {
+      "id": "en-holdout-v4-291",
+      "field": "caption",
+      "text": "A small brooch brings back a very big childhood memory."
+    },
+    {
+      "id": "en-holdout-v4-292",
+      "field": "caption",
+      "text": "My folded rain cape rides in the bicycle basket all summer."
+    },
+    {
+      "id": "en-holdout-v4-293",
+      "field": "caption",
+      "text": "The different panels become clearer when the skirt swings outward."
+    },
+    {
+      "id": "en-holdout-v4-294",
+      "field": "caption",
+      "text": "A soft collar stays comfortable underneath the radio club's headphones."
+    },
+    {
+      "id": "en-holdout-v4-295",
+      "field": "caption",
+      "text": "An old shirt found a new job covering my sewing machine."
+    },
+    {
+      "id": "en-holdout-v4-296",
+      "field": "caption",
+      "text": "One fine metallic thread catches the evening light across the knit."
+    },
+    {
+      "id": "en-holdout-v4-297",
+      "field": "caption",
+      "text": "Low broad heels coped well with the garden party lawn."
+    },
+    {
+      "id": "en-holdout-v4-298",
+      "field": "caption",
+      "text": "Wearing uneven first attempts reminds me how much I've learned."
+    },
+    {
+      "id": "en-holdout-v4-299",
+      "field": "caption",
+      "text": "Stuffed the crown with soft paper before putting the hat away."
+    },
+    {
+      "id": "en-holdout-v4-300",
+      "field": "caption",
+      "text": "Chose a comfortable neckline for sitting through a portrait class."
+    },
+    {
+      "id": "en-holdout-v4-301",
+      "field": "caption",
+      "text": "My newly repaired umbrella is finally back beside the rain boots."
+    },
+    {
+      "id": "en-holdout-v4-302",
+      "field": "caption",
+      "text": "A neighbour's spare fabric became this easy summer shirt."
+    },
+    {
+      "id": "en-holdout-v4-303",
+      "field": "caption",
+      "text": "Different chain lengths let each little pendant find its own space."
+    },
+    {
+      "id": "en-holdout-v4-304",
+      "field": "caption",
+      "text": "Walked every aisle before deciding these handmade shoes fitted best."
+    },
+    {
+      "id": "en-holdout-v4-305",
+      "field": "caption",
+      "text": "A spare cuff button gives me room to adjust the sleeve."
+    },
+    {
+      "id": "en-holdout-v4-306",
+      "field": "caption",
+      "text": "Picked up the evening paper with my coat still half buttoned."
+    },
+    {
+      "id": "en-holdout-v4-307",
+      "field": "caption",
+      "text": "Crossed the bag strap differently and relieved the pressure on my shoulder."
+    },
+    {
+      "id": "en-holdout-v4-308",
+      "field": "caption",
+      "text": "A favourite brooch came with me to the town hall celebration."
+    },
+    {
+      "id": "en-holdout-v4-309",
+      "field": "caption",
+      "text": "A blanket-stitched edge gives this plain wrap a handmade finish."
+    },
+    {
+      "id": "en-holdout-v4-310",
+      "field": "caption",
+      "text": "The flat seams let this reversible cap fold without bulk."
+    },
+    {
+      "id": "en-holdout-v4-311",
+      "field": "caption",
+      "text": "The apron gained another ink mark at printmaking class today."
+    },
+    {
+      "id": "en-holdout-v4-312",
+      "field": "caption",
+      "text": "The removable peplum changes this dress below the waist."
+    },
+    {
+      "id": "en-holdout-v4-313",
+      "field": "caption",
+      "text": "This jumper survived years of storage and still feels like a hug."
+    },
+    {
+      "id": "en-holdout-v4-314",
+      "field": "caption",
+      "text": "The museum map tucked neatly beneath the bag's outside flap."
+    },
+    {
+      "id": "en-holdout-v4-315",
+      "field": "caption",
+      "text": "A slightly lower heel made the long event easier to enjoy."
+    },
+    {
+      "id": "en-holdout-v4-316",
+      "field": "caption",
+      "text": "Rolled the unstructured jacket gently for the crowded weekend bag."
+    },
+    {
+      "id": "en-holdout-v4-317",
+      "field": "caption",
+      "text": "Conditioning the handle made the dry leather supple again."
+    },
+    {
+      "id": "en-holdout-v4-318",
+      "field": "caption",
+      "text": "My neighbour lent the belt that pulled this outfit together."
+    },
+    {
+      "id": "en-holdout-v4-319",
+      "field": "caption",
+      "text": "Short boot chains clip off before I clean the leather."
+    },
+    {
+      "id": "en-holdout-v4-320",
+      "field": "caption",
+      "text": "A wrist pincushion helped while I adjusted this uneven hem."
+    },
+    {
+      "id": "en-holdout-v4-321",
+      "field": "caption",
+      "text": "A window full of glazed bowls inspired this unexpected palette."
+    },
+    {
+      "id": "en-holdout-v4-322",
+      "field": "caption",
+      "text": "Light passing through the loose weave makes its structure visible."
+    },
+    {
+      "id": "en-holdout-v4-323",
+      "field": "caption",
+      "text": "Wearing something familiar gave me one less decision before the presentation."
+    },
+    {
+      "id": "en-holdout-v4-324",
+      "field": "caption",
+      "text": "The shoulder ties let me alter the fit without sewing."
+    },
+    {
+      "id": "en-holdout-v4-325",
+      "field": "caption",
+      "text": "My aunt spotted her old earrings during our video call."
+    },
+    {
+      "id": "en-holdout-v4-326",
+      "field": "caption",
+      "text": "A soft bag fits beneath the little table on this train."
+    },
+    {
+      "id": "en-holdout-v4-327",
+      "field": "caption",
+      "text": "A removable sweatband makes this hat easier to freshen."
+    },
+    {
+      "id": "en-holdout-v4-328",
+      "field": "caption",
+      "text": "The wide ridges change shade when I brush them with my hand."
+    },
+    {
+      "id": "en-holdout-v4-329",
+      "field": "caption",
+      "text": "Our daily neighbourhood walk has become a test of comfortable footwear."
+    },
+    {
+      "id": "en-holdout-v4-330",
+      "field": "caption",
+      "text": "A stitched constellation covers the worn patch near my knee."
+    },
+    {
+      "id": "en-holdout-v4-331",
+      "field": "caption",
+      "text": "The cobbler found laces that fit these unusually small eyelets."
+    },
+    {
+      "id": "en-holdout-v4-332",
+      "field": "caption",
+      "text": "A discreet adjustment inside the waistband made these trousers wearable again."
+    },
+    {
+      "id": "en-holdout-v4-333",
+      "field": "caption",
+      "text": "Noted the measurements so I can recognise a good secondhand fit."
+    },
+    {
+      "id": "en-holdout-v4-334",
+      "field": "caption",
+      "text": "I turned a damaged scarf into fabric-covered beads."
+    },
+    {
+      "id": "en-holdout-v4-335",
+      "field": "caption",
+      "text": "The loose cape shape fits comfortably across my backpack straps."
+    },
+    {
+      "id": "en-holdout-v4-336",
+      "field": "caption",
+      "text": "Restitched the glasses case with a bit of sturdy leftover thread."
+    },
+    {
+      "id": "en-holdout-v4-337",
+      "field": "caption",
+      "text": "A damaged tablecloth became this top after some careful cutting."
+    },
+    {
+      "id": "en-holdout-v4-338",
+      "field": "caption",
+      "text": "A fringed shawl joined me for an evening of folk music."
+    },
+    {
+      "id": "en-holdout-v4-339",
+      "field": "caption",
+      "text": "Removing tired padding gave the old jacket a softer outline."
+    },
+    {
+      "id": "en-holdout-v4-340",
+      "field": "caption",
+      "text": "The bookshop cat approved of my lap and my wool skirt."
+    },
+    {
+      "id": "en-holdout-v4-341",
+      "field": "caption",
+      "text": "The covered market offered shelter while I folded my dripping coat."
+    },
+    {
+      "id": "en-holdout-v4-342",
+      "field": "caption",
+      "text": "Kept the raw edge where its little fringe adds character."
+    },
+    {
+      "id": "en-holdout-v4-343",
+      "field": "caption",
+      "text": "A shell found years ago finally became a simple pendant."
+    },
+    {
+      "id": "en-holdout-v4-344",
+      "field": "caption",
+      "text": "Counting what I already own brought forgotten favourites back into view."
+    },
+    {
+      "id": "en-holdout-v4-345",
+      "field": "caption",
+      "text": "This folding rain bonnet occupies almost no space in my bag."
+    },
+    {
+      "id": "en-holdout-v4-346",
+      "field": "caption",
+      "text": "Deep secure pockets helped while moving things around the theatre."
+    },
+    {
+      "id": "en-holdout-v4-347",
+      "field": "caption",
+      "text": "The buckle's carved surface gives a plain outfit a focal point."
+    },
+    {
+      "id": "en-holdout-v4-348",
+      "field": "caption",
+      "text": "Narrow piping outlines the unusual curves along the jacket front."
+    },
+    {
+      "id": "en-holdout-v4-349",
+      "field": "caption",
+      "text": "Daylight by the window helped me see every tiny stitch."
+    },
+    {
+      "id": "en-holdout-v4-350",
+      "field": "caption",
+      "text": "Wearing a handmade gift while visiting the person who made it."
+    },
+    {
+      "id": "en-holdout-v4-351",
+      "field": "caption",
+      "text": "A pocketed vest kept my travel documents close throughout the journey."
+    },
+    {
+      "id": "en-holdout-v4-352",
+      "field": "caption",
+      "text": "The airy fabric felt welcome after walking up the hill."
+    },
+    {
+      "id": "en-holdout-v4-353",
+      "field": "caption",
+      "text": "Washable layers made sense for the harbour's busy fish market."
+    },
+    {
+      "id": "en-holdout-v4-354",
+      "field": "caption",
+      "text": "An old trouser leg became a tidy roll for sewing tools."
+    },
+    {
+      "id": "en-holdout-v4-355",
+      "field": "caption",
+      "text": "A single shoulder cord adjusts the height of this neckline."
+    },
+    {
+      "id": "en-holdout-v4-356",
+      "field": "caption",
+      "text": "Getting the print to meet across the opening took patient pinning."
+    },
+    {
+      "id": "en-holdout-v4-357",
+      "field": "caption",
+      "text": "Kept a warm pair of socks handy for the long bus ride."
+    },
+    {
+      "id": "en-holdout-v4-358",
+      "field": "caption",
+      "text": "Covered plain buttons in scraps from the sleeve alterations."
+    },
+    {
+      "id": "en-holdout-v4-359",
+      "field": "caption",
+      "text": "The retired postal bag still carries my everyday shopping beautifully."
+    },
+    {
+      "id": "en-holdout-v4-360",
+      "field": "caption",
+      "text": "A decorative band now covers the stubborn mark on my cuff."
+    },
+    {
+      "id": "en-holdout-v4-361",
+      "field": "caption",
+      "text": "The fabric wristband has stayed beside my watch all week."
+    },
+    {
+      "id": "en-holdout-v4-362",
+      "field": "caption",
+      "text": "Knitted wristlets bridge the gap between my gloves and sleeves."
+    },
+    {
+      "id": "en-holdout-v4-363",
+      "field": "caption",
+      "text": "A stranger recognised the regional weave in my scarf today."
+    },
+    {
+      "id": "en-holdout-v4-364",
+      "field": "caption",
+      "text": "The hood folds into a little compartment behind the collar."
+    },
+    {
+      "id": "en-holdout-v4-365",
+      "field": "caption",
+      "text": "The colour came from onion skins saved during a month of cooking."
+    },
+    {
+      "id": "en-holdout-v4-366",
+      "field": "caption",
+      "text": "My most supportive shoes came to the standing-room concert."
+    },
+    {
+      "id": "en-holdout-v4-367",
+      "field": "caption",
+      "text": "We still call this the station coat after that memorable trip."
+    },
+    {
+      "id": "en-holdout-v4-368",
+      "field": "caption",
+      "text": "A flexible brim survived being squeezed into my crowded tote."
+    },
+    {
+      "id": "en-holdout-v4-369",
+      "field": "caption",
+      "text": "Hand sewing let me attach the pocket without opening the lining."
+    },
+    {
+      "id": "en-holdout-v4-370",
+      "field": "caption",
+      "text": "We watched the parade from beneath a very practical rain cape."
+    },
+    {
+      "id": "en-holdout-v4-371",
+      "field": "caption",
+      "text": "Straight trousers leave the rounded jacket shape easy to see."
+    },
+    {
+      "id": "en-holdout-v4-372",
+      "field": "caption",
+      "text": "The elastic stirrup keeps my trouser leg tucked neatly inside the boot."
+    },
+    {
+      "id": "en-holdout-v4-373",
+      "field": "caption",
+      "text": "Keeping the handwritten maker's tag tucked inside my jewellery box."
+    },
+    {
+      "id": "en-holdout-v4-374",
+      "field": "caption",
+      "text": "Years of washing have made this sturdy denim feel wonderfully soft."
+    },
+    {
+      "id": "en-holdout-v4-375",
+      "field": "caption",
+      "text": "Found an old ticket while turning out the coat pockets."
+    },
+    {
+      "id": "en-holdout-v4-376",
+      "field": "caption",
+      "text": "The sharp back pleat reminds me of a folded paper model."
+    },
+    {
+      "id": "en-holdout-v4-377",
+      "field": "caption",
+      "text": "Bringing the lighter layers forward as the afternoons grow warmer."
+    },
+    {
+      "id": "en-holdout-v4-378",
+      "field": "caption",
+      "text": "Bought a small woven bookmark that now ties around my bag."
+    },
+    {
+      "id": "en-holdout-v4-379",
+      "field": "caption",
+      "text": "A fine sleeve beneath the cardigan kept the wool comfortable."
+    },
+    {
+      "id": "en-holdout-v4-380",
+      "field": "caption",
+      "text": "Trimmed the loose threads before taking this thrifted piece outside."
+    },
+    {
+      "id": "en-holdout-v4-381",
+      "field": "caption",
+      "text": "Gaiters protected the trouser cuffs on a very wet path."
+    },
+    {
+      "id": "en-holdout-v4-382",
+      "field": "caption",
+      "text": "Little metal feet keep the base clear of the cafe floor."
+    },
+    {
+      "id": "en-holdout-v4-383",
+      "field": "caption",
+      "text": "Cool water and gentle handling helped this old knit hold its shape."
+    },
+    {
+      "id": "en-holdout-v4-384",
+      "field": "caption",
+      "text": "The bridge was windy enough to put every fastening to work."
+    },
+    {
+      "id": "en-holdout-v4-385",
+      "field": "caption",
+      "text": "Looped fastenings add such lovely detail to this short jacket."
+    },
+    {
+      "id": "en-holdout-v4-386",
+      "field": "caption",
+      "text": "A soft waistband helped me settle in for a generous shared dinner."
+    },
+    {
+      "id": "en-holdout-v4-387",
+      "field": "caption",
+      "text": "Packed unfinished projects and comfortable clothes for a weekend of sewing."
+    },
+    {
+      "id": "en-holdout-v4-388",
+      "field": "caption",
+      "text": "Two saved sleeves became the sides of a patchwork tote."
+    },
+    {
+      "id": "en-holdout-v4-389",
+      "field": "caption",
+      "text": "A light sunhat came along for the garden's first spring opening."
+    },
+    {
+      "id": "en-holdout-v4-390",
+      "field": "caption",
+      "text": "A little elastic keeper stops the belt end flapping."
+    },
+    {
+      "id": "en-holdout-v4-391",
+      "field": "caption",
+      "text": "Standing in the early queue made me grateful for thick soles."
+    },
+    {
+      "id": "en-holdout-v4-392",
+      "field": "caption",
+      "text": "The glaze on a favourite mug suggested today's muted tones."
+    },
+    {
+      "id": "en-holdout-v4-393",
+      "field": "caption",
+      "text": "Sewed a small date inside to remember when I finished it."
+    },
+    {
+      "id": "en-holdout-v4-394",
+      "field": "caption",
+      "text": "Draped the coat across my chair while the afternoon warmed up."
+    },
+    {
+      "id": "en-holdout-v4-395",
+      "field": "caption",
+      "text": "A broad-strapped backpack made the walk from the grocery shop easier."
+    },
+    {
+      "id": "en-holdout-v4-396",
+      "field": "caption",
+      "text": "Collected the suit in its cloth cover before the ceremony."
+    },
+    {
+      "id": "en-holdout-v4-397",
+      "field": "caption",
+      "text": "New fabric inside the collar stopped its worn edge feeling rough."
+    },
+    {
+      "id": "en-holdout-v4-398",
+      "field": "caption",
+      "text": "A shorter skirt was practical around the archive's narrow ladder."
+    },
+    {
+      "id": "en-holdout-v4-399",
+      "field": "caption",
+      "text": "Bound the leftover strip into a bookmark after finishing the trousers."
+    },
+    {
+      "id": "en-holdout-v4-400",
+      "field": "caption",
+      "text": "A little felt bird makes my everyday bag easy to recognise."
+    },
+    {
+      "id": "en-holdout-v4-401",
+      "field": "caption",
+      "text": "Came away from the textile exhibition wanting to examine every seam."
+    },
+    {
+      "id": "en-holdout-v4-402",
+      "field": "caption",
+      "text": "Press studs make this coat simple to close when my hands ache."
+    },
+    {
+      "id": "en-holdout-v4-403",
+      "field": "caption",
+      "text": "Folded cuffs put the sleeve length exactly where I wanted it."
+    },
+    {
+      "id": "en-holdout-v4-404",
+      "field": "caption",
+      "text": "Wore my oldest clothes to help paint the neighbourhood mural."
+    },
+    {
+      "id": "en-holdout-v4-405",
+      "field": "caption",
+      "text": "The neckline carries enough tiny beads to stand on its own."
+    },
+    {
+      "id": "en-holdout-v4-406",
+      "field": "caption",
+      "text": "My neighbour drew the folding steps before I tried the pleat."
+    },
+    {
+      "id": "en-holdout-v4-407",
+      "field": "caption",
+      "text": "A canvas jacket kept the shed's rough edges off my sleeves."
+    },
+    {
+      "id": "en-holdout-v4-408",
+      "field": "caption",
+      "text": "A compact bag made squeezing past the interval queue much easier."
+    },
+    {
+      "id": "en-holdout-v4-409",
+      "field": "caption",
+      "text": "A comfortable thimble finally made hand hemming feel natural."
+    },
+    {
+      "id": "en-holdout-v4-410",
+      "field": "caption",
+      "text": "I recognised the loom marks after watching the weaver work."
+    },
+    {
+      "id": "en-holdout-v4-411",
+      "field": "caption",
+      "text": "Made this shirt at a community printing day last spring."
+    },
+    {
+      "id": "en-holdout-v4-412",
+      "field": "caption",
+      "text": "A small gusset gives the sleeve extra reach when I stretch."
+    },
+    {
+      "id": "en-holdout-v4-413",
+      "field": "caption",
+      "text": "Boarded the riverboat with my hat tucked safely into the tote."
+    },
+    {
+      "id": "en-holdout-v4-414",
+      "field": "caption",
+      "text": "A worn linen sheet has become the softest summer trousers."
+    },
+    {
+      "id": "en-holdout-v4-415",
+      "field": "caption",
+      "text": "The rain cape folds small enough to carry around the festival."
+    },
+    {
+      "id": "en-holdout-v4-416",
+      "field": "caption",
+      "text": "Moved heavier things to the middle so the bag hangs evenly."
+    },
+    {
+      "id": "en-holdout-v4-417",
+      "field": "caption",
+      "text": "The fabric guard stops the zip resting against my neck."
+    },
+    {
+      "id": "en-holdout-v4-418",
+      "field": "caption",
+      "text": "The shoe repairer gently widened the tight spot near my toes."
+    },
+    {
+      "id": "en-holdout-v4-419",
+      "field": "caption",
+      "text": "Sent a postcard in the same scarf I wore on arrival."
+    },
+    {
+      "id": "en-holdout-v4-420",
+      "field": "caption",
+      "text": "A solid underlayer lets the sheer pattern show clearly."
+    },
+    {
+      "id": "en-holdout-v4-421",
+      "field": "caption",
+      "text": "Paint marks have slowly become part of this studio jacket's pattern."
+    },
+    {
+      "id": "en-holdout-v4-422",
+      "field": "caption",
+      "text": "These sandals stayed comfortable through the long climb from the harbour."
+    },
+    {
+      "id": "en-holdout-v4-423",
+      "field": "caption",
+      "text": "A little embroidered beetle sits exactly where the tear used to be."
+    },
+    {
+      "id": "en-holdout-v4-424",
+      "field": "caption",
+      "text": "My aunt remembers carrying this bag on her first workday."
+    },
+    {
+      "id": "en-holdout-v4-425",
+      "field": "caption",
+      "text": "Pulled the hood up for a short nap between stations."
+    },
+    {
+      "id": "en-holdout-v4-426",
+      "field": "caption",
+      "text": "Found the removable stays while getting this shirt ready for washing."
+    },
+    {
+      "id": "en-holdout-v4-427",
+      "field": "caption",
+      "text": "The reverse side of this cloth has become the visible front."
+    },
+    {
+      "id": "en-holdout-v4-428",
+      "field": "caption",
+      "text": "The shopkeeper showed me a gentler way to fasten the bracelet."
+    },
+    {
+      "id": "en-holdout-v4-429",
+      "field": "caption",
+      "text": "Familiar boots and a soft shirt for my first open-mic reading."
+    },
+    {
+      "id": "en-holdout-v4-430",
+      "field": "caption",
+      "text": "Added a short key lanyard inside so I can stop searching."
+    },
+    {
+      "id": "en-holdout-v4-431",
+      "field": "caption",
+      "text": "Wrapped the fraying handle with a strip of sturdy cloth."
+    },
+    {
+      "id": "en-holdout-v4-432",
+      "field": "caption",
+      "text": "A new lining made the inside as pleasant as the outside."
+    },
+    {
+      "id": "en-holdout-v4-433",
+      "field": "caption",
+      "text": "The breeze rearranged the skirt faster than we could take pictures."
+    },
+    {
+      "id": "en-holdout-v4-434",
+      "field": "caption",
+      "text": "A useful pocket held my tokens at the community fair."
+    },
+    {
+      "id": "en-holdout-v4-435",
+      "field": "caption",
+      "text": "Leaving extra length at the hem gives me room for future changes."
+    },
+    {
+      "id": "en-holdout-v4-436",
+      "field": "caption",
+      "text": "Hand washing the silk scarf felt worth a little extra care."
+    },
+    {
+      "id": "en-holdout-v4-437",
+      "field": "caption",
+      "text": "Adjusted the drawcord until the hood stayed clear of my eyes."
+    },
+    {
+      "id": "en-holdout-v4-438",
+      "field": "caption",
+      "text": "Sat on a folding museum stool to study the little stitched details."
+    },
+    {
+      "id": "en-holdout-v4-439",
+      "field": "caption",
+      "text": "The small leather offcut became a sturdy tab on my zipper."
+    },
+    {
+      "id": "en-holdout-v4-440",
+      "field": "caption",
+      "text": "A pin from each journey now sits along this bag strap."
+    },
+    {
+      "id": "en-holdout-v4-441",
+      "field": "caption",
+      "text": "Raglan seams leave my shoulders room when I layer up."
+    },
+    {
+      "id": "en-holdout-v4-442",
+      "field": "caption",
+      "text": "The rusted railings made a beautiful backdrop for these clean lines."
+    },
+    {
+      "id": "en-holdout-v4-443",
+      "field": "caption",
+      "text": "Closer button spacing helped the shirt sit smoothly when I moved."
+    },
+    {
+      "id": "en-holdout-v4-444",
+      "field": "caption",
+      "text": "Noting comfort alongside outfit photos is proving useful this month."
+    },
+    {
+      "id": "en-holdout-v4-445",
+      "field": "caption",
+      "text": "A folding hook keeps my bag beside me at small cafe tables."
+    },
+    {
+      "id": "en-holdout-v4-446",
+      "field": "caption",
+      "text": "Set aside the morning for little repairs before another busy week."
+    },
+    {
+      "id": "en-holdout-v4-447",
+      "field": "caption",
+      "text": "Rolling these scarves loosely keeps their edges from becoming sharply creased."
+    },
+    {
+      "id": "en-holdout-v4-448",
+      "field": "caption",
+      "text": "The evening sky found a quieter version of the colours I'm wearing."
+    },
+    {
+      "id": "en-holdout-v4-449",
+      "field": "caption",
+      "text": "The naturally dyed shirt has softened in colour with every wash."
+    },
+    {
+      "id": "en-holdout-v4-450",
+      "field": "caption",
+      "text": "Insulating insoles made standing at the winter market much more comfortable."
+    },
+    {
+      "id": "en-holdout-v4-451",
+      "field": "caption",
+      "text": "Enjoying how a seamless knit moves without any bulky shoulder joins."
+    },
+    {
+      "id": "en-holdout-v4-452",
+      "field": "caption",
+      "text": "A tiny zipped pouch keeps locker coins together on museum days."
+    },
+    {
+      "id": "en-holdout-v4-453",
+      "field": "caption",
+      "text": "Mended a small snag while waiting for the next workshop to begin."
+    },
+    {
+      "id": "en-holdout-v4-454",
+      "field": "caption",
+      "text": "The curved hem gives the shirt a different outline from each side."
+    },
+    {
+      "id": "en-holdout-v4-455",
+      "field": "caption",
+      "text": "A fabric necklace adds colour without making sound during rehearsals."
+    },
+    {
+      "id": "en-holdout-v4-456",
+      "field": "caption",
+      "text": "The outside sleeve holds a wet umbrella clear of everything else."
+    },
+    {
+      "id": "en-holdout-v4-457",
+      "field": "caption",
+      "text": "These split-toe socks leave room for my sandal straps."
+    },
+    {
+      "id": "en-holdout-v4-458",
+      "field": "caption",
+      "text": "Dew on the grass persuaded me to choose taller boots."
+    },
+    {
+      "id": "en-holdout-v4-459",
+      "field": "caption",
+      "text": "An open weave made the crowded afternoon tram feel less warm."
+    },
+    {
+      "id": "en-holdout-v4-460",
+      "field": "caption",
+      "text": "Traded a button repair for my neighbour's help with a knitted cuff."
+    },
+    {
+      "id": "en-holdout-v4-461",
+      "field": "caption",
+      "text": "Tried my friend's hat and finally understood its unusual brim."
+    },
+    {
+      "id": "en-holdout-v4-462",
+      "field": "caption",
+      "text": "An extra fold hides the buttons along this shirt's front."
+    },
+    {
+      "id": "en-holdout-v4-463",
+      "field": "caption",
+      "text": "Changing the armhole slightly stopped the whole jacket lifting with my arm."
+    },
+    {
+      "id": "en-holdout-v4-464",
+      "field": "caption",
+      "text": "A folded scarf became a surprisingly good pillow on the return journey."
+    },
+    {
+      "id": "en-holdout-v4-465",
+      "field": "caption",
+      "text": "My pencil pouch clips inside the bag for windy sketching afternoons."
+    },
+    {
+      "id": "en-holdout-v4-466",
+      "field": "caption",
+      "text": "The little ceramic brooch carries a thumbprint left by its maker."
+    },
+    {
+      "id": "en-holdout-v4-467",
+      "field": "caption",
+      "text": "This easy dress reduced the number of pieces in my weekend bag."
+    },
+    {
+      "id": "en-holdout-v4-468",
+      "field": "caption",
+      "text": "An overlooked tissue taught me to check the hidden pocket twice."
+    },
+    {
+      "id": "en-holdout-v4-469",
+      "field": "caption",
+      "text": "A crochet hook helped pull the loose loop back into place."
+    },
+    {
+      "id": "en-holdout-v4-470",
+      "field": "caption",
+      "text": "The wider neckline leaves plenty of room for my scarf knot."
+    },
+    {
+      "id": "en-holdout-v4-471",
+      "field": "caption",
+      "text": "Opening the side vents helped on a warm rainy walk."
+    },
+    {
+      "id": "en-holdout-v4-472",
+      "field": "caption",
+      "text": "A small woven sash is the useful souvenir from that journey."
+    },
+    {
+      "id": "en-holdout-v4-473",
+      "field": "caption",
+      "text": "A pressing cloth protected the surface while I flattened the seam."
+    },
+    {
+      "id": "en-holdout-v4-474",
+      "field": "caption",
+      "text": "Moved my wallet to the zipped inside pocket before the busy fair."
+    },
+    {
+      "id": "en-holdout-v4-475",
+      "field": "caption",
+      "text": "Finished the slippers just in time for a quiet weekend indoors."
+    },
+    {
+      "id": "en-holdout-v4-476",
+      "field": "caption",
+      "text": "A clothes brush lifted the lint after my visit to the dog shelter."
+    },
+    {
+      "id": "en-holdout-v4-477",
+      "field": "caption",
+      "text": "The lightweight windbreaker earned its place in my beach bag."
+    },
+    {
+      "id": "en-holdout-v4-478",
+      "field": "caption",
+      "text": "We wore the bracelets we made together at last summer's workshop."
+    },
+    {
+      "id": "en-holdout-v4-479",
+      "field": "caption",
+      "text": "A sparkling clip made my dependable shoes ready for the celebration."
+    },
+    {
+      "id": "en-holdout-v4-480",
+      "field": "caption",
+      "text": "Basted the new length and walked around before making it permanent."
+    },
+    {
+      "id": "en-holdout-v4-481",
+      "field": "caption",
+      "text": "Kept one folded tote inside another for the extra books I found."
+    },
+    {
+      "id": "en-holdout-v4-482",
+      "field": "caption",
+      "text": "The uneven fringe shows where the weaver finished each little bundle."
+    },
+    {
+      "id": "en-holdout-v4-483",
+      "field": "caption",
+      "text": "A little extra room lets this coat sit comfortably above thick knitwear."
+    },
+    {
+      "id": "en-holdout-v4-484",
+      "field": "caption",
+      "text": "Accordion folds let this small bag open surprisingly wide."
+    },
+    {
+      "id": "en-holdout-v4-485",
+      "field": "caption",
+      "text": "A bound buttonhole gives the coat front a neat little frame."
+    },
+    {
+      "id": "en-holdout-v4-486",
+      "field": "caption",
+      "text": "A lighter brooch stopped the soft collar pulling out of shape."
+    },
+    {
+      "id": "en-holdout-v4-487",
+      "field": "caption",
+      "text": "Keeping my packing list inside the case lid saved another search."
+    },
+    {
+      "id": "en-holdout-v4-488",
+      "field": "caption",
+      "text": "Rotating the clothes on display helped avoid a faded shoulder."
+    },
+    {
+      "id": "en-holdout-v4-489",
+      "field": "caption",
+      "text": "Enclosing the seams makes the shirt just as pleasant inside."
+    },
+    {
+      "id": "en-holdout-v4-490",
+      "field": "caption",
+      "text": "A few careful stitches closed the small split beside my thumb."
+    },
+    {
+      "id": "en-holdout-v4-491",
+      "field": "caption",
+      "text": "My aunt showed me how to secure the hat with a pin."
+    },
+    {
+      "id": "en-holdout-v4-492",
+      "field": "caption",
+      "text": "Turning the bag through its opening reveals a completely different lining."
+    },
+    {
+      "id": "en-holdout-v4-493",
+      "field": "caption",
+      "text": "Better light inside the wardrobe brought several overlooked colours into view."
+    },
+    {
+      "id": "en-holdout-v4-494",
+      "field": "caption",
+      "text": "Wrapped a scarf around the worn handle for a comfortable grip."
+    },
+    {
+      "id": "en-holdout-v4-495",
+      "field": "caption",
+      "text": "A padded sleeve on the strap helps with a heavier load."
+    },
+    {
+      "id": "en-holdout-v4-496",
+      "field": "caption",
+      "text": "Wooden shoe trees keep the creases gentle between outings."
+    },
+    {
+      "id": "en-holdout-v4-497",
+      "field": "caption",
+      "text": "The cloth-covered clasp blends quietly into the front of the wrap."
+    },
+    {
+      "id": "en-holdout-v4-498",
+      "field": "caption",
+      "text": "Photographed the damaged area before working out how to mend it."
+    },
+    {
+      "id": "en-holdout-v4-499",
+      "field": "caption",
+      "text": "A side tie lets these wrap trousers adjust throughout the day."
+    },
+    {
+      "id": "en-holdout-v4-500",
+      "field": "caption",
+      "text": "A hook outside the wardrobe holds tomorrow's combination ready."
+    },
+    {
+      "id": "en-holdout-v4-501",
+      "field": "altText",
+      "text": "Fine folds cast narrow shadows across a hanging skirt."
+    },
+    {
+      "id": "en-holdout-v4-502",
+      "field": "altText",
+      "text": "A window reflects in one polished coat button."
+    },
+    {
+      "id": "en-holdout-v4-503",
+      "field": "altText",
+      "text": "The bag strap runs diagonally across an open vest."
+    },
+    {
+      "id": "en-holdout-v4-504",
+      "field": "altText",
+      "text": "Two small lace bows rest above rounded shoe toes."
+    },
+    {
+      "id": "en-holdout-v4-505",
+      "field": "altText",
+      "text": "A flat metal spring holds the coin purse shut."
+    },
+    {
+      "id": "en-holdout-v4-506",
+      "field": "altText",
+      "text": "An irregular cloth patch covers the jacket's left elbow."
+    },
+    {
+      "id": "en-holdout-v4-507",
+      "field": "altText",
+      "text": "Long ribbon ends fall from the back of a hat."
+    },
+    {
+      "id": "en-holdout-v4-508",
+      "field": "altText",
+      "text": "Leather gloves lie together beside a folded newspaper."
+    },
+    {
+      "id": "en-holdout-v4-509",
+      "field": "altText",
+      "text": "Three curved seams meet below the shoulder blade."
+    },
+    {
+      "id": "en-holdout-v4-510",
+      "field": "altText",
+      "text": "An open tote reveals a notebook and rolled jumper."
+    },
+    {
+      "id": "en-holdout-v4-511",
+      "field": "altText",
+      "text": "Thick braided handles rise above the basket's narrow opening."
+    },
+    {
+      "id": "en-holdout-v4-512",
+      "field": "altText",
+      "text": "The coat widens gently from shoulders to hem."
+    },
+    {
+      "id": "en-holdout-v4-513",
+      "field": "altText",
+      "text": "Two circular cutouts sit beside the blouse's shoulder seam."
+    },
+    {
+      "id": "en-holdout-v4-514",
+      "field": "altText",
+      "text": "A loose scarf end lifts away from the shoulder."
+    },
+    {
+      "id": "en-holdout-v4-515",
+      "field": "altText",
+      "text": "A round watch face peeks below the shirt cuff."
+    },
+    {
+      "id": "en-holdout-v4-516",
+      "field": "altText",
+      "text": "A small stitched bird sits above the breast pocket."
+    },
+    {
+      "id": "en-holdout-v4-517",
+      "field": "altText",
+      "text": "The belt passes through two closely spaced side loops."
+    },
+    {
+      "id": "en-holdout-v4-518",
+      "field": "altText",
+      "text": "Raised ribs continue from the jumper body into its cuffs."
+    },
+    {
+      "id": "en-holdout-v4-519",
+      "field": "altText",
+      "text": "Damp grass reaches the edges of two sturdy shoes."
+    },
+    {
+      "id": "en-holdout-v4-520",
+      "field": "altText",
+      "text": "A broad fabric loop hangs from the zipper pull."
+    },
+    {
+      "id": "en-holdout-v4-521",
+      "field": "altText",
+      "text": "The bag's triangular side panel opens outward near its base."
+    },
+    {
+      "id": "en-holdout-v4-522",
+      "field": "altText",
+      "text": "Short fringe follows the pointed edge of the shawl."
+    },
+    {
+      "id": "en-holdout-v4-523",
+      "field": "altText",
+      "text": "Trouser hems form a slight fold above polished loafers."
+    },
+    {
+      "id": "en-holdout-v4-524",
+      "field": "altText",
+      "text": "A cord necklace closes with a knot behind the neck."
+    },
+    {
+      "id": "en-holdout-v4-525",
+      "field": "altText",
+      "text": "One large clasp joins the cape below the throat."
+    },
+    {
+      "id": "en-holdout-v4-526",
+      "field": "altText",
+      "text": "The shirt has a longer rounded hem at the back."
+    },
+    {
+      "id": "en-holdout-v4-527",
+      "field": "altText",
+      "text": "Small metal eyelets line both sides of the boot opening."
+    },
+    {
+      "id": "en-holdout-v4-528",
+      "field": "altText",
+      "text": "Round beads cast separate dots of shadow on the blouse."
+    },
+    {
+      "id": "en-holdout-v4-529",
+      "field": "altText",
+      "text": "One pocket flap curls upward at its outer corner."
+    },
+    {
+      "id": "en-holdout-v4-530",
+      "field": "altText",
+      "text": "The cardigan's top button is fastened above an open front."
+    },
+    {
+      "id": "en-holdout-v4-531",
+      "field": "altText",
+      "text": "The wide brim shades the upper half of the face."
+    },
+    {
+      "id": "en-holdout-v4-532",
+      "field": "altText",
+      "text": "A canvas backpack hangs from a wooden chair back."
+    },
+    {
+      "id": "en-holdout-v4-533",
+      "field": "altText",
+      "text": "The skirt forms broad folds across the seated knees."
+    },
+    {
+      "id": "en-holdout-v4-534",
+      "field": "altText",
+      "text": "Two fabric panels cross above the waist tie."
+    },
+    {
+      "id": "en-holdout-v4-535",
+      "field": "altText",
+      "text": "A fine chain links the glasses arms behind the neck."
+    },
+    {
+      "id": "en-holdout-v4-536",
+      "field": "altText",
+      "text": "One upturned shoe shows a worn patterned sole."
+    },
+    {
+      "id": "en-holdout-v4-537",
+      "field": "altText",
+      "text": "Small scallops trace the neckline of a plain blouse."
+    },
+    {
+      "id": "en-holdout-v4-538",
+      "field": "altText",
+      "text": "A watch, belt and key pouch lie in a row."
+    },
+    {
+      "id": "en-holdout-v4-539",
+      "field": "altText",
+      "text": "An open collar exposes a small woven label inside."
+    },
+    {
+      "id": "en-holdout-v4-540",
+      "field": "altText",
+      "text": "Pale threads hang below the shortened denim hem."
+    },
+    {
+      "id": "en-holdout-v4-541",
+      "field": "altText",
+      "text": "A square metal clasp sits centrally on the bag flap."
+    },
+    {
+      "id": "en-holdout-v4-542",
+      "field": "altText",
+      "text": "Soft diagonal creases cross the linen sleeve near the elbow."
+    },
+    {
+      "id": "en-holdout-v4-543",
+      "field": "altText",
+      "text": "A narrow pin passes through overlapping layers of a shawl."
+    },
+    {
+      "id": "en-holdout-v4-544",
+      "field": "altText",
+      "text": "A short chain joins the shirt's folded cuffs."
+    },
+    {
+      "id": "en-holdout-v4-545",
+      "field": "altText",
+      "text": "A curved yoke spans the upper back of the jacket."
+    },
+    {
+      "id": "en-holdout-v4-546",
+      "field": "altText",
+      "text": "The folded umbrella is secured beneath the bag's side strap."
+    },
+    {
+      "id": "en-holdout-v4-547",
+      "field": "altText",
+      "text": "Dark elastic panels border the ankle on both boots."
+    },
+    {
+      "id": "en-holdout-v4-548",
+      "field": "altText",
+      "text": "A sharpened pencil stands in the apron's narrow chest pocket."
+    },
+    {
+      "id": "en-holdout-v4-549",
+      "field": "altText",
+      "text": "A scarf lies loosely across the arm of an empty chair."
+    },
+    {
+      "id": "en-holdout-v4-550",
+      "field": "altText",
+      "text": "A long hem follows the edge of a stone step."
+    },
+    {
+      "id": "en-holdout-v4-551",
+      "field": "altText",
+      "text": "Diamond stitching divides the padded vest into even sections."
+    },
+    {
+      "id": "en-holdout-v4-552",
+      "field": "altText",
+      "text": "A broad ring rests beside a smaller band on one hand."
+    },
+    {
+      "id": "en-holdout-v4-553",
+      "field": "altText",
+      "text": "One collar point sits above the jacket lapel."
+    },
+    {
+      "id": "en-holdout-v4-554",
+      "field": "altText",
+      "text": "A wooden clothes brush lies against a folded wool coat."
+    },
+    {
+      "id": "en-holdout-v4-555",
+      "field": "altText",
+      "text": "A narrow strap gathers the back of the waistcoat."
+    },
+    {
+      "id": "en-holdout-v4-556",
+      "field": "altText",
+      "text": "Two pairs of shoes stand below a row of coat hooks."
+    },
+    {
+      "id": "en-holdout-v4-557",
+      "field": "altText",
+      "text": "A thick braided headband crosses the crown above loose hair."
+    },
+    {
+      "id": "en-holdout-v4-558",
+      "field": "altText",
+      "text": "Two parallel stitch lines outline the patch pocket."
+    },
+    {
+      "id": "en-holdout-v4-559",
+      "field": "altText",
+      "text": "A mesh panel appears beneath the lifted back flap."
+    },
+    {
+      "id": "en-holdout-v4-560",
+      "field": "altText",
+      "text": "Small rounded beads cover the handbag's short curved handle."
+    },
+    {
+      "id": "en-holdout-v4-561",
+      "field": "altText",
+      "text": "The loose shirt billows slightly between the belt and ribs."
+    },
+    {
+      "id": "en-holdout-v4-562",
+      "field": "altText",
+      "text": "A small bow closes each sleeve at the wrist."
+    },
+    {
+      "id": "en-holdout-v4-563",
+      "field": "altText",
+      "text": "A long woven wrap hangs over the balcony railing."
+    },
+    {
+      "id": "en-holdout-v4-564",
+      "field": "altText",
+      "text": "The upright bag casts a narrow shadow toward the doorway."
+    },
+    {
+      "id": "en-holdout-v4-565",
+      "field": "altText",
+      "text": "A fabric shield covers the top of the closed zip."
+    },
+    {
+      "id": "en-holdout-v4-566",
+      "field": "altText",
+      "text": "A shirt collar rises above the rounded jacket neckline."
+    },
+    {
+      "id": "en-holdout-v4-567",
+      "field": "altText",
+      "text": "The hat crown has four shallow dents around its centre."
+    },
+    {
+      "id": "en-holdout-v4-568",
+      "field": "altText",
+      "text": "Short darts shape the trousers below the waistband."
+    },
+    {
+      "id": "en-holdout-v4-569",
+      "field": "altText",
+      "text": "A leaf-shaped brooch sits near the edge of the lapel."
+    },
+    {
+      "id": "en-holdout-v4-570",
+      "field": "altText",
+      "text": "Tall boots stand together beneath a slatted garden bench."
+    },
+    {
+      "id": "en-holdout-v4-571",
+      "field": "altText",
+      "text": "Small textured pads cover the fingertips of both gloves."
+    },
+    {
+      "id": "en-holdout-v4-572",
+      "field": "altText",
+      "text": "Uneven woven strands form tiny squares across the scarf."
+    },
+    {
+      "id": "en-holdout-v4-573",
+      "field": "altText",
+      "text": "An interior pocket holds two pens beside the open tote rim."
+    },
+    {
+      "id": "en-holdout-v4-574",
+      "field": "altText",
+      "text": "The skirt's back slit opens slightly during a step."
+    },
+    {
+      "id": "en-holdout-v4-575",
+      "field": "altText",
+      "text": "Three small hooks join the jacket edges at the chest."
+    },
+    {
+      "id": "en-holdout-v4-576",
+      "field": "altText",
+      "text": "The turned pendant shows a scratched plain reverse side."
+    },
+    {
+      "id": "en-holdout-v4-577",
+      "field": "altText",
+      "text": "Narrow tape covers the seams inside the open rain jacket."
+    },
+    {
+      "id": "en-holdout-v4-578",
+      "field": "altText",
+      "text": "A triangular bandana point rests between the shoulder blades."
+    },
+    {
+      "id": "en-holdout-v4-579",
+      "field": "altText",
+      "text": "Decorative perforations trace the curved caps of the shoes."
+    },
+    {
+      "id": "en-holdout-v4-580",
+      "field": "altText",
+      "text": "A metal slider sits halfway along the adjustable shoulder strap."
+    },
+    {
+      "id": "en-holdout-v4-581",
+      "field": "altText",
+      "text": "Three folded knits form a short stack on a stool."
+    },
+    {
+      "id": "en-holdout-v4-582",
+      "field": "altText",
+      "text": "The cape's open side reveals a sleeve underneath."
+    },
+    {
+      "id": "en-holdout-v4-583",
+      "field": "altText",
+      "text": "A small hanging loop sits below the shirt's rear collar."
+    },
+    {
+      "id": "en-holdout-v4-584",
+      "field": "altText",
+      "text": "The watch pin rests in the strap's third visible hole."
+    },
+    {
+      "id": "en-holdout-v4-585",
+      "field": "altText",
+      "text": "Large printed leaves curve around the extended sleeve."
+    },
+    {
+      "id": "en-holdout-v4-586",
+      "field": "altText",
+      "text": "A deep boot tread leaves a clear impression in wet sand."
+    },
+    {
+      "id": "en-holdout-v4-587",
+      "field": "altText",
+      "text": "A broad wooden hanger supports the jacket's rounded shoulders."
+    },
+    {
+      "id": "en-holdout-v4-588",
+      "field": "altText",
+      "text": "A narrow scarf threads through the trousers' belt loops."
+    },
+    {
+      "id": "en-holdout-v4-589",
+      "field": "altText",
+      "text": "Dense stitches surround the long opening of a buttonhole."
+    },
+    {
+      "id": "en-holdout-v4-590",
+      "field": "altText",
+      "text": "The open case shows a soft lining around folded glasses."
+    },
+    {
+      "id": "en-holdout-v4-591",
+      "field": "altText",
+      "text": "Small water droplets bead on the bag's curved outer flap."
+    },
+    {
+      "id": "en-holdout-v4-592",
+      "field": "altText",
+      "text": "Two pointed panels extend below the waistcoat buttons."
+    },
+    {
+      "id": "en-holdout-v4-593",
+      "field": "altText",
+      "text": "Two leather straps cross above the instep."
+    },
+    {
+      "id": "en-holdout-v4-594",
+      "field": "altText",
+      "text": "The sleeve curves outward before narrowing at the cuff."
+    },
+    {
+      "id": "en-holdout-v4-595",
+      "field": "altText",
+      "text": "Open crochet circles join across the front of the vest."
+    },
+    {
+      "id": "en-holdout-v4-596",
+      "field": "altText",
+      "text": "A deep back vent divides the lower coat into two panels."
+    },
+    {
+      "id": "en-holdout-v4-597",
+      "field": "altText",
+      "text": "Two apron ties form a loose bow at the back."
+    },
+    {
+      "id": "en-holdout-v4-598",
+      "field": "altText",
+      "text": "Three narrow bangles sit together above a bare wrist."
+    },
+    {
+      "id": "en-holdout-v4-599",
+      "field": "altText",
+      "text": "The raised collar exposes a contrasting strip underneath."
+    },
+    {
+      "id": "en-holdout-v4-600",
+      "field": "altText",
+      "text": "A soft hat hangs by its inner loop from a peg."
+    },
+    {
+      "id": "en-holdout-v4-601",
+      "field": "altText",
+      "text": "Sunlight passes through one lightweight panel of the skirt."
+    },
+    {
+      "id": "en-holdout-v4-602",
+      "field": "altText",
+      "text": "A single stitched initial appears on the bag's inner pocket."
+    },
+    {
+      "id": "en-holdout-v4-603",
+      "field": "altText",
+      "text": "The folded trouser cuff stops just above the boot opening."
+    },
+    {
+      "id": "en-holdout-v4-604",
+      "field": "altText",
+      "text": "A fine chain disappears beneath both sides of the collar."
+    },
+    {
+      "id": "en-holdout-v4-605",
+      "field": "altText",
+      "text": "The shoes rest on newspaper with their insoles lifted out."
+    },
+    {
+      "id": "en-holdout-v4-606",
+      "field": "altText",
+      "text": "Folding lines divide the spread scarf into broad rectangles."
+    },
+    {
+      "id": "en-holdout-v4-607",
+      "field": "altText",
+      "text": "A buttoned tab holds the rolled sleeve above the elbow."
+    },
+    {
+      "id": "en-holdout-v4-608",
+      "field": "altText",
+      "text": "A narrow welt pocket sits horizontally below the lapel."
+    },
+    {
+      "id": "en-holdout-v4-609",
+      "field": "altText",
+      "text": "A smooth wooden handle joins the soft fabric bag body."
+    },
+    {
+      "id": "en-holdout-v4-610",
+      "field": "altText",
+      "text": "A strip of open mesh circles the base of the hat crown."
+    },
+    {
+      "id": "en-holdout-v4-611",
+      "field": "altText",
+      "text": "A cord joins the mittens across the coat lining."
+    },
+    {
+      "id": "en-holdout-v4-612",
+      "field": "altText",
+      "text": "Small gathers radiate downward from the blouse neckline."
+    },
+    {
+      "id": "en-holdout-v4-613",
+      "field": "altText",
+      "text": "Pale cross-shaped stitches hold each dark button in place."
+    },
+    {
+      "id": "en-holdout-v4-614",
+      "field": "altText",
+      "text": "A small buckle fastens the shoe strap near the ankle."
+    },
+    {
+      "id": "en-holdout-v4-615",
+      "field": "altText",
+      "text": "The shirt hem curves upward toward a short side split."
+    },
+    {
+      "id": "en-holdout-v4-616",
+      "field": "altText",
+      "text": "A padded divider separates a camera from a folded cardigan."
+    },
+    {
+      "id": "en-holdout-v4-617",
+      "field": "altText",
+      "text": "The shawl doubles back across one shoulder in a broad fold."
+    },
+    {
+      "id": "en-holdout-v4-618",
+      "field": "altText",
+      "text": "A short side tab adjusts the width of the waistband."
+    },
+    {
+      "id": "en-holdout-v4-619",
+      "field": "altText",
+      "text": "One jacket panel overlaps the other beneath a single button."
+    },
+    {
+      "id": "en-holdout-v4-620",
+      "field": "altText",
+      "text": "A few darker stitches repair the edge of the straw brim."
+    },
+    {
+      "id": "en-holdout-v4-621",
+      "field": "altText",
+      "text": "Printed lining peeks from the inside of an open coat."
+    },
+    {
+      "id": "en-holdout-v4-622",
+      "field": "altText",
+      "text": "Fabric pull tabs rise above the backs of both boots."
+    },
+    {
+      "id": "en-holdout-v4-623",
+      "field": "altText",
+      "text": "A horizontal seam joins the skirt's lower gathered section."
+    },
+    {
+      "id": "en-holdout-v4-624",
+      "field": "altText",
+      "text": "A rounded stone sits within the brooch's fine metal rim."
+    },
+    {
+      "id": "en-holdout-v4-625",
+      "field": "altText",
+      "text": "A soft tassel hangs beside the handbag clasp."
+    },
+    {
+      "id": "en-holdout-v4-626",
+      "field": "altText",
+      "text": "A patterned scarf is knotted beneath a low bun."
+    },
+    {
+      "id": "en-holdout-v4-627",
+      "field": "altText",
+      "text": "Two rows of buttons run down the coat front."
+    },
+    {
+      "id": "en-holdout-v4-628",
+      "field": "altText",
+      "text": "The socks have deep ribbing above smooth shoe openings."
+    },
+    {
+      "id": "en-holdout-v4-629",
+      "field": "altText",
+      "text": "Metal clips secure the apron straps to its square bib."
+    },
+    {
+      "id": "en-holdout-v4-630",
+      "field": "altText",
+      "text": "A fresh heel layer contrasts with the worn leather above it."
+    },
+    {
+      "id": "en-holdout-v4-631",
+      "field": "altText",
+      "text": "Two cords gather the bag opening into soft folds."
+    },
+    {
+      "id": "en-holdout-v4-632",
+      "field": "altText",
+      "text": "A short pleat begins just below each shoulder seam."
+    },
+    {
+      "id": "en-holdout-v4-633",
+      "field": "altText",
+      "text": "The bracelet's clasp sits on the outside of the wrist."
+    },
+    {
+      "id": "en-holdout-v4-634",
+      "field": "altText",
+      "text": "The raised hood frames the face above a fastened collar."
+    },
+    {
+      "id": "en-holdout-v4-635",
+      "field": "altText",
+      "text": "A pressed crease runs from each knee toward the shoe toe."
+    },
+    {
+      "id": "en-holdout-v4-636",
+      "field": "altText",
+      "text": "The fringe makes a broken shadow across the pale sleeve."
+    },
+    {
+      "id": "en-holdout-v4-637",
+      "field": "altText",
+      "text": "A metal bottle sits in the bag's stretched side pocket."
+    },
+    {
+      "id": "en-holdout-v4-638",
+      "field": "altText",
+      "text": "Oval patches cover both elbows of the ribbed jumper."
+    },
+    {
+      "id": "en-holdout-v4-639",
+      "field": "altText",
+      "text": "The soft felt brim folds upward along one side."
+    },
+    {
+      "id": "en-holdout-v4-640",
+      "field": "altText",
+      "text": "Two narrow fabric ties hang from the open neckline."
+    },
+    {
+      "id": "en-holdout-v4-641",
+      "field": "altText",
+      "text": "A folded cuff frames the watch without covering its face."
+    },
+    {
+      "id": "en-holdout-v4-642",
+      "field": "altText",
+      "text": "One shoe rests a step above the other on the staircase."
+    },
+    {
+      "id": "en-holdout-v4-643",
+      "field": "altText",
+      "text": "A box pleat opens at the centre of the skirt front."
+    },
+    {
+      "id": "en-holdout-v4-644",
+      "field": "altText",
+      "text": "Two chains form separate curves above the blouse opening."
+    },
+    {
+      "id": "en-holdout-v4-645",
+      "field": "altText",
+      "text": "Buttoned shoulder tabs lie flat along the jacket seams."
+    },
+    {
+      "id": "en-holdout-v4-646",
+      "field": "altText",
+      "text": "A square patch reinforces the tote's lower outer corner."
+    },
+    {
+      "id": "en-holdout-v4-647",
+      "field": "altText",
+      "text": "A striped scarf end hangs beside a plain trouser leg."
+    },
+    {
+      "id": "en-holdout-v4-648",
+      "field": "altText",
+      "text": "Rounded scallops repeat along the cape's lower edge."
+    },
+    {
+      "id": "en-holdout-v4-649",
+      "field": "altText",
+      "text": "The laces cross diagonally between tall rows of eyelets."
+    },
+    {
+      "id": "en-holdout-v4-650",
+      "field": "altText",
+      "text": "Fine uneven ridges encircle the wide metal ring."
+    },
+    {
+      "id": "en-holdout-v4-651",
+      "field": "altText",
+      "text": "Gentle gathers begin below the shirt's straight back yoke."
+    },
+    {
+      "id": "en-holdout-v4-652",
+      "field": "altText",
+      "text": "A short chain curves between two small waistcoat pockets."
+    },
+    {
+      "id": "en-holdout-v4-653",
+      "field": "altText",
+      "text": "The lifted flap exposes two magnetic fastening discs."
+    },
+    {
+      "id": "en-holdout-v4-654",
+      "field": "altText",
+      "text": "The sleeve seam falls well below the natural shoulder."
+    },
+    {
+      "id": "en-holdout-v4-655",
+      "field": "altText",
+      "text": "A small ribbon bow sits above the left brim."
+    },
+    {
+      "id": "en-holdout-v4-656",
+      "field": "altText",
+      "text": "A hand rests inside the coat's slanted side pocket."
+    },
+    {
+      "id": "en-holdout-v4-657",
+      "field": "altText",
+      "text": "Woven leather strips create small openings across each shoe."
+    },
+    {
+      "id": "en-holdout-v4-658",
+      "field": "altText",
+      "text": "The blouse has a rounded collar with narrow stitched edging."
+    },
+    {
+      "id": "en-holdout-v4-659",
+      "field": "altText",
+      "text": "A faded rectangular patch interrupts the skirt's darker denim."
+    },
+    {
+      "id": "en-holdout-v4-660",
+      "field": "altText",
+      "text": "A thick brass ring connects the handle to the bag."
+    },
+    {
+      "id": "en-holdout-v4-661",
+      "field": "altText",
+      "text": "A finely rolled edge frames the scarf's irregular printed border."
+    },
+    {
+      "id": "en-holdout-v4-662",
+      "field": "altText",
+      "text": "A folded strip conceals the buttons down the shirt front."
+    },
+    {
+      "id": "en-holdout-v4-663",
+      "field": "altText",
+      "text": "Raised seams follow the fingers along the back of each glove."
+    },
+    {
+      "id": "en-holdout-v4-664",
+      "field": "altText",
+      "text": "Alternating light and dark threads form the shawl fringe."
+    },
+    {
+      "id": "en-holdout-v4-665",
+      "field": "altText",
+      "text": "Dried mud marks the boots below the ankle seams."
+    },
+    {
+      "id": "en-holdout-v4-666",
+      "field": "altText",
+      "text": "Six fabric panels meet at the top of the cap."
+    },
+    {
+      "id": "en-holdout-v4-667",
+      "field": "altText",
+      "text": "The coat belt is tied loosely behind the waist."
+    },
+    {
+      "id": "en-holdout-v4-668",
+      "field": "altText",
+      "text": "Folded side panels expand beside the bag's flat front."
+    },
+    {
+      "id": "en-holdout-v4-669",
+      "field": "altText",
+      "text": "The turned brooch shows an open pin across its back."
+    },
+    {
+      "id": "en-holdout-v4-670",
+      "field": "altText",
+      "text": "A thin drawcord emerges from two holes in the waistband."
+    },
+    {
+      "id": "en-holdout-v4-671",
+      "field": "altText",
+      "text": "A wooden pencil protrudes from the shirt's chest pocket."
+    },
+    {
+      "id": "en-holdout-v4-672",
+      "field": "altText",
+      "text": "Several woven cords join beneath a small round pendant."
+    },
+    {
+      "id": "en-holdout-v4-673",
+      "field": "altText",
+      "text": "A pale stitch line follows the edge above the sole."
+    },
+    {
+      "id": "en-holdout-v4-674",
+      "field": "altText",
+      "text": "Diagonal seams run from the neckline toward each underarm."
+    },
+    {
+      "id": "en-holdout-v4-675",
+      "field": "altText",
+      "text": "Four small metal feet lift the bag base off the table."
+    },
+    {
+      "id": "en-holdout-v4-676",
+      "field": "altText",
+      "text": "Long twisted tassels hang from both ends of the scarf."
+    },
+    {
+      "id": "en-holdout-v4-677",
+      "field": "altText",
+      "text": "Two fabric bows join the vest at its open sides."
+    },
+    {
+      "id": "en-holdout-v4-678",
+      "field": "altText",
+      "text": "A narrow buckle closes the band around the hat crown."
+    },
+    {
+      "id": "en-holdout-v4-679",
+      "field": "altText",
+      "text": "A small triangular insert joins the shirt's curved side hems."
+    },
+    {
+      "id": "en-holdout-v4-680",
+      "field": "altText",
+      "text": "A knitted band extends above each leather boot shaft."
+    },
+    {
+      "id": "en-holdout-v4-681",
+      "field": "altText",
+      "text": "A hand emerges through a narrow opening in the cape."
+    },
+    {
+      "id": "en-holdout-v4-682",
+      "field": "altText",
+      "text": "The bag flap folds into a pointed envelope shape."
+    },
+    {
+      "id": "en-holdout-v4-683",
+      "field": "altText",
+      "text": "Uneven glaze forms small glossy pools across the ceramic ring."
+    },
+    {
+      "id": "en-holdout-v4-684",
+      "field": "altText",
+      "text": "A second skirt layer extends slightly below the upper hem."
+    },
+    {
+      "id": "en-holdout-v4-685",
+      "field": "altText",
+      "text": "Tiny embroidered dots follow the collar's outer curve."
+    },
+    {
+      "id": "en-holdout-v4-686",
+      "field": "altText",
+      "text": "A narrow strap circles the heel behind an open shoe."
+    },
+    {
+      "id": "en-holdout-v4-687",
+      "field": "altText",
+      "text": "Knotted fringe forms a diamond pattern beneath the woven section."
+    },
+    {
+      "id": "en-holdout-v4-688",
+      "field": "altText",
+      "text": "A curved zip follows the handbag's rounded upper edge."
+    },
+    {
+      "id": "en-holdout-v4-689",
+      "field": "altText",
+      "text": "A single broad cable runs down the jumper's centre."
+    },
+    {
+      "id": "en-holdout-v4-690",
+      "field": "altText",
+      "text": "Sunlight dots the shoulder through the hat's open weave."
+    },
+    {
+      "id": "en-holdout-v4-691",
+      "field": "altText",
+      "text": "An inner pocket is visible beside the coat's open facing."
+    },
+    {
+      "id": "en-holdout-v4-692",
+      "field": "altText",
+      "text": "A shaped reinforcement panel covers the front of each knee."
+    },
+    {
+      "id": "en-holdout-v4-693",
+      "field": "altText",
+      "text": "A cloth bracelet closes with two short trailing ties."
+    },
+    {
+      "id": "en-holdout-v4-694",
+      "field": "altText",
+      "text": "The sleeve cuff opens at a short slit near the wrist."
+    },
+    {
+      "id": "en-holdout-v4-695",
+      "field": "altText",
+      "text": "The bag's upper edge folds outward into a broad rim."
+    },
+    {
+      "id": "en-holdout-v4-696",
+      "field": "altText",
+      "text": "A low curved heel supports the shoe's smooth back."
+    },
+    {
+      "id": "en-holdout-v4-697",
+      "field": "altText",
+      "text": "A brooch secures three gathered scarf folds below the shoulder."
+    },
+    {
+      "id": "en-holdout-v4-698",
+      "field": "altText",
+      "text": "A small knot marks where the yarn changes colour."
+    },
+    {
+      "id": "en-holdout-v4-699",
+      "field": "altText",
+      "text": "A sturdy hanging loop spans the inside neckline of the coat."
+    },
+    {
+      "id": "en-holdout-v4-700",
+      "field": "altText",
+      "text": "A short adjustable strap sits above the back opening."
+    },
+    {
+      "id": "en-holdout-v4-701",
+      "field": "altText",
+      "text": "A broad tie holds the overlapping skirt panels at one hip."
+    },
+    {
+      "id": "en-holdout-v4-702",
+      "field": "altText",
+      "text": "Tiny beads form an irregular band around the neckline."
+    },
+    {
+      "id": "en-holdout-v4-703",
+      "field": "altText",
+      "text": "Two vertical straps fasten the satchel's broad front flap."
+    },
+    {
+      "id": "en-holdout-v4-704",
+      "field": "altText",
+      "text": "A newer metal eyelet stands beside the older darkened ones."
+    },
+    {
+      "id": "en-holdout-v4-705",
+      "field": "altText",
+      "text": "The sleeve ends in a deep cuff with three small buttons."
+    },
+    {
+      "id": "en-holdout-v4-706",
+      "field": "altText",
+      "text": "A narrow running stitch follows the shawl's broad border."
+    },
+    {
+      "id": "en-holdout-v4-707",
+      "field": "altText",
+      "text": "A long zip runs down the inner side of the boot."
+    },
+    {
+      "id": "en-holdout-v4-708",
+      "field": "altText",
+      "text": "The cape falls in a broad semicircle across the back."
+    },
+    {
+      "id": "en-holdout-v4-709",
+      "field": "altText",
+      "text": "Shallow dents cover the ring's uneven metal surface."
+    },
+    {
+      "id": "en-holdout-v4-710",
+      "field": "altText",
+      "text": "The open bag reveals a finely checked fabric lining."
+    },
+    {
+      "id": "en-holdout-v4-711",
+      "field": "altText",
+      "text": "The sleeve extends over the hand through a knitted thumb opening."
+    },
+    {
+      "id": "en-holdout-v4-712",
+      "field": "altText",
+      "text": "The cap band doubles upward above the forehead."
+    },
+    {
+      "id": "en-holdout-v4-713",
+      "field": "altText",
+      "text": "The shirt front has a smooth unbroken panel below the neckline."
+    },
+    {
+      "id": "en-holdout-v4-714",
+      "field": "altText",
+      "text": "A triangular insert widens the skirt near the bottom."
+    },
+    {
+      "id": "en-holdout-v4-715",
+      "field": "altText",
+      "text": "Curved stitching crosses the upper shoe above the toes."
+    },
+    {
+      "id": "en-holdout-v4-716",
+      "field": "altText",
+      "text": "A small sliding knot rests at the back of the neck."
+    },
+    {
+      "id": "en-holdout-v4-717",
+      "field": "altText",
+      "text": "The bag opening rolls downward beneath two fastening straps."
+    },
+    {
+      "id": "en-holdout-v4-718",
+      "field": "altText",
+      "text": "A single button secures the flap across one shoulder."
+    },
+    {
+      "id": "en-holdout-v4-719",
+      "field": "altText",
+      "text": "A thin plain border surrounds the scarf's busy centre pattern."
+    },
+    {
+      "id": "en-holdout-v4-720",
+      "field": "altText",
+      "text": "The wide sleeve gathers closely into its narrow wristband."
+    },
+    {
+      "id": "en-holdout-v4-721",
+      "field": "altText",
+      "text": "Large oval links lie loosely around the wrist."
+    },
+    {
+      "id": "en-holdout-v4-722",
+      "field": "altText",
+      "text": "A textured panel runs from the boot heel toward its opening."
+    },
+    {
+      "id": "en-holdout-v4-723",
+      "field": "altText",
+      "text": "Concentric stitch lines circle the soft brim."
+    },
+    {
+      "id": "en-holdout-v4-724",
+      "field": "altText",
+      "text": "A diagonal panel crosses the front between waist and hem."
+    },
+    {
+      "id": "en-holdout-v4-725",
+      "field": "altText",
+      "text": "A small latch joins the two halves of the rigid handle."
+    },
+    {
+      "id": "en-holdout-v4-726",
+      "field": "altText",
+      "text": "The shawl hangs lower on one shoulder than the other."
+    },
+    {
+      "id": "en-holdout-v4-727",
+      "field": "altText",
+      "text": "The jacket fronts curve away below the single fastening."
+    },
+    {
+      "id": "en-holdout-v4-728",
+      "field": "altText",
+      "text": "A removable bow clips onto the centre of each shoe."
+    },
+    {
+      "id": "en-holdout-v4-729",
+      "field": "altText",
+      "text": "The shirt fastens along its side with a narrow concealed zip."
+    },
+    {
+      "id": "en-holdout-v4-730",
+      "field": "altText",
+      "text": "A translucent glass pendant holds a small trapped air bubble."
+    },
+    {
+      "id": "en-holdout-v4-731",
+      "field": "altText",
+      "text": "Metal guards cover the two lower corners of the bag."
+    },
+    {
+      "id": "en-holdout-v4-732",
+      "field": "altText",
+      "text": "Contrasting stitches form a small rectangle on the knitted sleeve."
+    },
+    {
+      "id": "en-holdout-v4-733",
+      "field": "altText",
+      "text": "The soft crown collapses gently above its firm brim."
+    },
+    {
+      "id": "en-holdout-v4-734",
+      "field": "altText",
+      "text": "Short ties gather the trouser hems around the ankles."
+    },
+    {
+      "id": "en-holdout-v4-735",
+      "field": "altText",
+      "text": "A partly mended jacket rests beneath a lamp beside thread spools."
+    },
+    {
+      "id": "en-holdout-v4-736",
+      "field": "altText",
+      "text": "Coat tails lift behind someone approaching the station platform."
+    },
+    {
+      "id": "en-holdout-v4-737",
+      "field": "altText",
+      "text": "Pale clay marks cover the lower half of a tied apron."
+    },
+    {
+      "id": "en-holdout-v4-738",
+      "field": "altText",
+      "text": "Two cufflinks sit in a lined box beside an unfolded shirt."
+    },
+    {
+      "id": "en-holdout-v4-739",
+      "field": "altText",
+      "text": "A rolled trouser leg clears the bicycle chain above the pedal."
+    },
+    {
+      "id": "en-holdout-v4-740",
+      "field": "altText",
+      "text": "Short sleeves leave both forearms clear above the bookbinding table."
+    },
+    {
+      "id": "en-holdout-v4-741",
+      "field": "altText",
+      "text": "A dripping raincoat hangs above a shallow tray near the doorway."
+    },
+    {
+      "id": "en-holdout-v4-742",
+      "field": "altText",
+      "text": "A damp cardigan lies flat with its edges pinned into shape."
+    },
+    {
+      "id": "en-holdout-v4-743",
+      "field": "altText",
+      "text": "Gloved hands rest beside an open folder and rolled sleeves."
+    },
+    {
+      "id": "en-holdout-v4-744",
+      "field": "altText",
+      "text": "A pencil drawing of a jacket lies beside the finished garment."
+    },
+    {
+      "id": "en-holdout-v4-745",
+      "field": "altText",
+      "text": "Leafy vegetables protrude from the basket carried beside a loose coat."
+    },
+    {
+      "id": "en-holdout-v4-746",
+      "field": "altText",
+      "text": "A bright new button interrupts a row of older wooden ones."
+    },
+    {
+      "id": "en-holdout-v4-747",
+      "field": "altText",
+      "text": "Narrow reflective strips shine along a jacket in the dark street."
+    },
+    {
+      "id": "en-holdout-v4-748",
+      "field": "altText",
+      "text": "Soft-soled shoes are tucked beneath the reading room's long table."
+    },
+    {
+      "id": "en-holdout-v4-749",
+      "field": "altText",
+      "text": "A programme rests on the lap above a finely pleated skirt."
+    },
+    {
+      "id": "en-holdout-v4-750",
+      "field": "altText",
+      "text": "A creased linen jacket lies across the back of a woven chair."
+    },
+    {
+      "id": "en-holdout-v4-751",
+      "field": "altText",
+      "text": "Reinforced trouser knees press into a small pad beside the seedlings."
+    },
+    {
+      "id": "en-holdout-v4-752",
+      "field": "altText",
+      "text": "Folded layers surround a jacket laid flat inside the open case."
+    },
+    {
+      "id": "en-holdout-v4-753",
+      "field": "altText",
+      "text": "Rust-coloured clothing echoes the tiled wall behind the seated person."
+    },
+    {
+      "id": "en-holdout-v4-754",
+      "field": "altText",
+      "text": "Raised seams run visibly along the outside of the shirt sleeves."
+    },
+    {
+      "id": "en-holdout-v4-755",
+      "field": "altText",
+      "text": "A small shoulder bag hangs beside a row of museum lockers."
+    },
+    {
+      "id": "en-holdout-v4-756",
+      "field": "altText",
+      "text": "An oval brooch gathers the scarf securely against the coat front."
+    },
+    {
+      "id": "en-holdout-v4-757",
+      "field": "altText",
+      "text": "A newly soled boot sits beside its worn original sole."
+    },
+    {
+      "id": "en-holdout-v4-758",
+      "field": "altText",
+      "text": "Handwritten clothing-swap tags hang from a rack of mixed garments."
+    },
+    {
+      "id": "en-holdout-v4-759",
+      "field": "altText",
+      "text": "The flexible waistband lies flat while the person sits cross-legged."
+    },
+    {
+      "id": "en-holdout-v4-760",
+      "field": "altText",
+      "text": "A small earplug pouch clips to the inside of the jacket pocket."
+    },
+    {
+      "id": "en-holdout-v4-761",
+      "field": "altText",
+      "text": "A stitched initial is visible beneath the lifted collar."
+    },
+    {
+      "id": "en-holdout-v4-762",
+      "field": "altText",
+      "text": "A knit layer shows beneath an open shell in the morning mist."
+    },
+    {
+      "id": "en-holdout-v4-763",
+      "field": "altText",
+      "text": "Two people hold the same jacket between their different outfits."
+    },
+    {
+      "id": "en-holdout-v4-764",
+      "field": "altText",
+      "text": "Slip-on shoes wait beside a small case at an airport seat."
+    },
+    {
+      "id": "en-holdout-v4-765",
+      "field": "altText",
+      "text": "Trouser legs stretch beside a picnic basket on the rough grass."
+    },
+    {
+      "id": "en-holdout-v4-766",
+      "field": "altText",
+      "text": "A loose buckle lies beside the bag on a repair table."
+    },
+    {
+      "id": "en-holdout-v4-767",
+      "field": "altText",
+      "text": "Smooth, ribbed and brushed layers share the same muted shade."
+    },
+    {
+      "id": "en-holdout-v4-768",
+      "field": "altText",
+      "text": "A large rounded collar frames the neck above a simple knit."
+    },
+    {
+      "id": "en-holdout-v4-769",
+      "field": "altText",
+      "text": "Cardigans hang across the backs of chairs behind open music folders."
+    },
+    {
+      "id": "en-holdout-v4-770",
+      "field": "altText",
+      "text": "The open dark bag reveals a vividly coloured lining and keys."
+    },
+    {
+      "id": "en-holdout-v4-771",
+      "field": "altText",
+      "text": "Pins hold a small adjustment along the blazer's shoulder seam."
+    },
+    {
+      "id": "en-holdout-v4-772",
+      "field": "altText",
+      "text": "Thick mittens frame a cup above a frost-covered bench."
+    },
+    {
+      "id": "en-holdout-v4-773",
+      "field": "altText",
+      "text": "A care label extends from the turned inside seam of the shirt."
+    },
+    {
+      "id": "en-holdout-v4-774",
+      "field": "altText",
+      "text": "Rolled sleeves and an apron leave the hands clear above the counter."
+    },
+    {
+      "id": "en-holdout-v4-775",
+      "field": "altText",
+      "text": "Tiny checks sit beside much larger flowers across two clothing layers."
+    },
+    {
+      "id": "en-holdout-v4-776",
+      "field": "altText",
+      "text": "Two halves of the necklace clasp meet between thumb and finger."
+    },
+    {
+      "id": "en-holdout-v4-777",
+      "field": "altText",
+      "text": "A short chain joins the two decorative collar points."
+    },
+    {
+      "id": "en-holdout-v4-778",
+      "field": "altText",
+      "text": "A scarf supports the sleeping passenger's head beside the train window."
+    },
+    {
+      "id": "en-holdout-v4-779",
+      "field": "altText",
+      "text": "A woven strap holds an old round watch against the wrist."
+    },
+    {
+      "id": "en-holdout-v4-780",
+      "field": "altText",
+      "text": "A trouser hem ends just above shoes on wide stone steps."
+    },
+    {
+      "id": "en-holdout-v4-781",
+      "field": "altText",
+      "text": "A length of finished cloth hangs beside the loom that produced it."
+    },
+    {
+      "id": "en-holdout-v4-782",
+      "field": "altText",
+      "text": "Warm socks lie on a towel beside a pair of wet sandals."
+    },
+    {
+      "id": "en-holdout-v4-783",
+      "field": "altText",
+      "text": "Dust coats the shoes resting beside the folded festival programme."
+    },
+    {
+      "id": "en-holdout-v4-784",
+      "field": "altText",
+      "text": "The jacket hangs half turned to show both wearable surfaces."
+    },
+    {
+      "id": "en-holdout-v4-785",
+      "field": "altText",
+      "text": "White chalk marks trace a shorter sleeve above the existing cuff."
+    },
+    {
+      "id": "en-holdout-v4-786",
+      "field": "altText",
+      "text": "A short earring leaves a visible gap beside the hearing device."
+    },
+    {
+      "id": "en-holdout-v4-787",
+      "field": "altText",
+      "text": "The open vest moves away from the torso beside a canal railing."
+    },
+    {
+      "id": "en-holdout-v4-788",
+      "field": "altText",
+      "text": "Buttoned cuffs sit clear of the tools laid across the workbench."
+    },
+    {
+      "id": "en-holdout-v4-789",
+      "field": "altText",
+      "text": "Different fabric patches form irregular blocks across the jacket back."
+    },
+    {
+      "id": "en-holdout-v4-790",
+      "field": "altText",
+      "text": "A cloth presses against a small damp mark on the shirt cuff."
+    },
+    {
+      "id": "en-holdout-v4-791",
+      "field": "altText",
+      "text": "A brush rests across the coat sleeve beside scattered sand grains."
+    },
+    {
+      "id": "en-holdout-v4-792",
+      "field": "altText",
+      "text": "A folded map protrudes from the jacket's inner pocket."
+    },
+    {
+      "id": "en-holdout-v4-793",
+      "field": "altText",
+      "text": "An airy shirt hangs loosely above trousers beside an office desk."
+    },
+    {
+      "id": "en-holdout-v4-794",
+      "field": "altText",
+      "text": "A familiar suit hangs beside a fresh flower pinned to its lapel."
+    },
+    {
+      "id": "en-holdout-v4-795",
+      "field": "altText",
+      "text": "A hand places a pin into the turned hem above a stool."
+    },
+    {
+      "id": "en-holdout-v4-796",
+      "field": "altText",
+      "text": "Round droplets gather along the sleeve of the waterproof coat."
+    },
+    {
+      "id": "en-holdout-v4-797",
+      "field": "altText",
+      "text": "Small crocheted loops border the edge of a plain top."
+    },
+    {
+      "id": "en-holdout-v4-798",
+      "field": "altText",
+      "text": "An almost empty shoulder bag contains only keys and a small notebook."
+    },
+    {
+      "id": "en-holdout-v4-799",
+      "field": "altText",
+      "text": "An iron rests beside straight pleats spread across the board."
+    },
+    {
+      "id": "en-holdout-v4-800",
+      "field": "altText",
+      "text": "The beret has a small loop at its centre."
+    },
+    {
+      "id": "en-holdout-v4-801",
+      "field": "altText",
+      "text": "A diagonal bag strap leaves one hand free to hold the cane."
+    },
+    {
+      "id": "en-holdout-v4-802",
+      "field": "altText",
+      "text": "An open neckline shows above a jacket against a plain portrait backdrop."
+    },
+    {
+      "id": "en-holdout-v4-803",
+      "field": "altText",
+      "text": "Colourful woven belts hang in loops above a small craft stall."
+    },
+    {
+      "id": "en-holdout-v4-804",
+      "field": "altText",
+      "text": "A long coat hangs inside an open breathable cloth cover."
+    },
+    {
+      "id": "en-holdout-v4-805",
+      "field": "altText",
+      "text": "A lidded cup sits beside a jacket with broad inside pockets."
+    },
+    {
+      "id": "en-holdout-v4-806",
+      "field": "altText",
+      "text": "The loafers show gentle folds where the leather bends above the toes."
+    },
+    {
+      "id": "en-holdout-v4-807",
+      "field": "altText",
+      "text": "A shirt outline appears on paper beneath a spread original shirt."
+    },
+    {
+      "id": "en-holdout-v4-808",
+      "field": "altText",
+      "text": "A badge clips to a fabric tab above the soft knit."
+    },
+    {
+      "id": "en-holdout-v4-809",
+      "field": "altText",
+      "text": "Sturdy boots stand on uneven ground beneath low fruit branches."
+    },
+    {
+      "id": "en-holdout-v4-810",
+      "field": "altText",
+      "text": "A folded sleeve projects outward from the bent elbow."
+    },
+    {
+      "id": "en-holdout-v4-811",
+      "field": "altText",
+      "text": "Two people in matching prints face each other beside a doorway."
+    },
+    {
+      "id": "en-holdout-v4-812",
+      "field": "altText",
+      "text": "A small raised tag is sewn inside one of two similar scarves."
+    },
+    {
+      "id": "en-holdout-v4-813",
+      "field": "altText",
+      "text": "Reflected fountain light glints across the metallic shoe tips."
+    },
+    {
+      "id": "en-holdout-v4-814",
+      "field": "altText",
+      "text": "An open tin of old buttons sits beside a partly fastened cardigan."
+    },
+    {
+      "id": "en-holdout-v4-815",
+      "field": "altText",
+      "text": "A tied cord holds the hat beneath the chin on the open deck."
+    },
+    {
+      "id": "en-holdout-v4-816",
+      "field": "altText",
+      "text": "A small lit lamp clips to the backpack's outer loop."
+    },
+    {
+      "id": "en-holdout-v4-817",
+      "field": "altText",
+      "text": "A square scarf folds into a narrow band across the table."
+    },
+    {
+      "id": "en-holdout-v4-818",
+      "field": "altText",
+      "text": "A removed cardigan hangs across a chair in the meeting room."
+    },
+    {
+      "id": "en-holdout-v4-819",
+      "field": "altText",
+      "text": "The opened coat exposes a patterned lining and an older woven label."
+    },
+    {
+      "id": "en-holdout-v4-820",
+      "field": "altText",
+      "text": "Full sleeves gather into close cuffs above the wrists."
+    },
+    {
+      "id": "en-holdout-v4-821",
+      "field": "altText",
+      "text": "A brush sweeps pale chalk dust from a dark coat shoulder."
+    },
+    {
+      "id": "en-holdout-v4-822",
+      "field": "altText",
+      "text": "A person holds a page on stage in a softly draped shirt."
+    },
+    {
+      "id": "en-holdout-v4-823",
+      "field": "altText",
+      "text": "A cloth and open tin of wax lie beside freshly treated boots."
+    },
+    {
+      "id": "en-holdout-v4-824",
+      "field": "altText",
+      "text": "The detached shoulder strap lies beside a bag held by short handles."
+    },
+    {
+      "id": "en-holdout-v4-825",
+      "field": "altText",
+      "text": "A folded seed packet emerges from the gardening jacket's chest pocket."
+    },
+    {
+      "id": "en-holdout-v4-826",
+      "field": "altText",
+      "text": "A denim shirt soaks alone in a wide wash basin."
+    },
+    {
+      "id": "en-holdout-v4-827",
+      "field": "altText",
+      "text": "The skirt fans outward as the person turns on the dance floor."
+    },
+    {
+      "id": "en-holdout-v4-828",
+      "field": "altText",
+      "text": "Soft fibres catch the light along the overshirt's raised collar."
+    },
+    {
+      "id": "en-holdout-v4-829",
+      "field": "altText",
+      "text": "A faded postcard lies beside clothing in similar muted tones."
+    },
+    {
+      "id": "en-holdout-v4-830",
+      "field": "altText",
+      "text": "A glove protrudes from the inside of a hanging coat sleeve."
+    },
+    {
+      "id": "en-holdout-v4-831",
+      "field": "altText",
+      "text": "Cushioned shoes rest below the long coat at a gallery opening."
+    },
+    {
+      "id": "en-holdout-v4-832",
+      "field": "altText",
+      "text": "Small outfit photographs are arranged across an open notebook page."
+    },
+    {
+      "id": "en-holdout-v4-833",
+      "field": "altText",
+      "text": "A hand holds chestnuts above the coat's bulging side pocket."
+    },
+    {
+      "id": "en-holdout-v4-834",
+      "field": "altText",
+      "text": "A soft collar rests below the curved headrest in the parked car."
+    },
+    {
+      "id": "en-holdout-v4-835",
+      "field": "altText",
+      "text": "Faded printing and stitched lettering share the old coat label."
+    },
+    {
+      "id": "en-holdout-v4-836",
+      "field": "altText",
+      "text": "Short trouser hems leave the shoes clear on steep station stairs."
+    },
+    {
+      "id": "en-holdout-v4-837",
+      "field": "altText",
+      "text": "Floral lace lies above a plain underlayer through the torso."
+    },
+    {
+      "id": "en-holdout-v4-838",
+      "field": "altText",
+      "text": "Small painted marks gather along the overshirt's rolled cuffs."
+    },
+    {
+      "id": "en-holdout-v4-839",
+      "field": "altText",
+      "text": "One hand holds the tie while another adjusts its knot."
+    },
+    {
+      "id": "en-holdout-v4-840",
+      "field": "altText",
+      "text": "Freshly aired garments hang separately beside the open window."
+    },
+    {
+      "id": "en-holdout-v4-841",
+      "field": "altText",
+      "text": "The edge of a library card shows through a narrow sewn pocket."
+    },
+    {
+      "id": "en-holdout-v4-842",
+      "field": "altText",
+      "text": "A misshapen hat rests beside a steaming kettle and folded towel."
+    },
+    {
+      "id": "en-holdout-v4-843",
+      "field": "altText",
+      "text": "A close-fitting top sits above broad trousers with soft front folds."
+    },
+    {
+      "id": "en-holdout-v4-844",
+      "field": "altText",
+      "text": "A familiar jacket hangs behind a speaker's notes on the chair."
+    },
+    {
+      "id": "en-holdout-v4-845",
+      "field": "altText",
+      "text": "A woven selvedge forms the wrap's straight outer edge."
+    },
+    {
+      "id": "en-holdout-v4-846",
+      "field": "altText",
+      "text": "Tomorrow's clothes are arranged across the foot of the bed."
+    },
+    {
+      "id": "en-holdout-v4-847",
+      "field": "altText",
+      "text": "Small padded squares cover the handbag beneath its short handles."
+    },
+    {
+      "id": "en-holdout-v4-848",
+      "field": "altText",
+      "text": "Long hair falls across the smooth back of a rounded collar."
+    },
+    {
+      "id": "en-holdout-v4-849",
+      "field": "altText",
+      "text": "Mud stains the lower trousers beside gloves and a litter grabber."
+    },
+    {
+      "id": "en-holdout-v4-850",
+      "field": "altText",
+      "text": "A gathered fabric hair tie lies beside a matching sewing offcut."
+    },
+    {
+      "id": "en-holdout-v4-851",
+      "field": "altText",
+      "text": "A tiny enamel building decorates the jacket's upper lapel."
+    },
+    {
+      "id": "en-holdout-v4-852",
+      "field": "altText",
+      "text": "Checked trouser legs cross a hallway of larger square tiles."
+    },
+    {
+      "id": "en-holdout-v4-853",
+      "field": "altText",
+      "text": "The freshly polished toes reflect the nearby window."
+    },
+    {
+      "id": "en-holdout-v4-854",
+      "field": "altText",
+      "text": "A soft cardigan hangs above a small bag on the visitor's chair."
+    },
+    {
+      "id": "en-holdout-v4-855",
+      "field": "altText",
+      "text": "A needle threader lies beside a loose cuff button."
+    },
+    {
+      "id": "en-holdout-v4-856",
+      "field": "altText",
+      "text": "A damp beret stretches around a round plate on the towel."
+    },
+    {
+      "id": "en-holdout-v4-857",
+      "field": "altText",
+      "text": "Small press studs run beneath the sleeve's overlapping wrist panel."
+    },
+    {
+      "id": "en-holdout-v4-858",
+      "field": "altText",
+      "text": "Both hands rest inside deep pockets at the skirt's side seams."
+    },
+    {
+      "id": "en-holdout-v4-859",
+      "field": "altText",
+      "text": "One foot moves forward while the loose trouser fabric swings behind it."
+    },
+    {
+      "id": "en-holdout-v4-860",
+      "field": "altText",
+      "text": "A sliding metal tab sits along the waistband's inner edge."
+    },
+    {
+      "id": "en-holdout-v4-861",
+      "field": "altText",
+      "text": "A glazed ring sits beside a tiny unglazed patch on its underside."
+    },
+    {
+      "id": "en-holdout-v4-862",
+      "field": "altText",
+      "text": "A side-on mirror view shows pins along the jacket waist."
+    },
+    {
+      "id": "en-holdout-v4-863",
+      "field": "altText",
+      "text": "Smooth pebbles spill from the pocket of a laid-out jacket."
+    },
+    {
+      "id": "en-holdout-v4-864",
+      "field": "altText",
+      "text": "Close-fitting gloves rest on the bicycle handlebars near the brake levers."
+    },
+    {
+      "id": "en-holdout-v4-865",
+      "field": "altText",
+      "text": "Several practice buttonholes run down a small fabric sample."
+    },
+    {
+      "id": "en-holdout-v4-866",
+      "field": "altText",
+      "text": "Plain trouser legs and shoes cross a brightly painted street marking."
+    },
+    {
+      "id": "en-holdout-v4-867",
+      "field": "altText",
+      "text": "A finished skirt hangs beside paper pattern pieces and sewing scissors."
+    },
+    {
+      "id": "en-holdout-v4-868",
+      "field": "altText",
+      "text": "A short pencil rests behind the ear above an open collar."
+    },
+    {
+      "id": "en-holdout-v4-869",
+      "field": "altText",
+      "text": "A separate collar lies beside the plain neckline it attaches to."
+    },
+    {
+      "id": "en-holdout-v4-870",
+      "field": "altText",
+      "text": "Gathered hair leaves the high shirt collar fully visible."
+    },
+    {
+      "id": "en-holdout-v4-871",
+      "field": "altText",
+      "text": "Three simple garments hang together beside a pair of practical shoes."
+    },
+    {
+      "id": "en-holdout-v4-872",
+      "field": "altText",
+      "text": "A folded coat sits on the spare chair overlooking moored boats."
+    },
+    {
+      "id": "en-holdout-v4-873",
+      "field": "altText",
+      "text": "The bag retains the shirt's original button placket down its front."
+    },
+    {
+      "id": "en-holdout-v4-874",
+      "field": "altText",
+      "text": "Loose beads and a partly strung necklace cover a small tray."
+    },
+    {
+      "id": "en-holdout-v4-875",
+      "field": "altText",
+      "text": "A large sketchbook rises above the tote's open upper edge."
+    },
+    {
+      "id": "en-holdout-v4-876",
+      "field": "altText",
+      "text": "The line's shadow stripes the freshly dried shirt across its sleeves."
+    },
+    {
+      "id": "en-holdout-v4-877",
+      "field": "altText",
+      "text": "Deep-tread shoes stand on shiny cobblestones dotted with rainwater."
+    },
+    {
+      "id": "en-holdout-v4-878",
+      "field": "altText",
+      "text": "A roll-neck knit rises cleanly through the jacket's collarless opening."
+    },
+    {
+      "id": "en-holdout-v4-879",
+      "field": "altText",
+      "text": "Trainers and a long skirt appear below a row of fairground lights."
+    },
+    {
+      "id": "en-holdout-v4-880",
+      "field": "altText",
+      "text": "Tool marks remain visible inside the smooth wooden bangle."
+    },
+    {
+      "id": "en-holdout-v4-881",
+      "field": "altText",
+      "text": "Pins secure a leaf-shaped patch on the jacket shoulder."
+    },
+    {
+      "id": "en-holdout-v4-882",
+      "field": "altText",
+      "text": "The adjusted backpack straps sit outside the folded scarf ends."
+    },
+    {
+      "id": "en-holdout-v4-883",
+      "field": "altText",
+      "text": "A thin bright line follows the jacket edge beneath street lights."
+    },
+    {
+      "id": "en-holdout-v4-884",
+      "field": "altText",
+      "text": "The two trouser legs have hems at different heights."
+    },
+    {
+      "id": "en-holdout-v4-885",
+      "field": "altText",
+      "text": "An old jacket lies beside a group photograph on the table."
+    },
+    {
+      "id": "en-holdout-v4-886",
+      "field": "altText",
+      "text": "The sleeve fabric gathers into a full shape above each fastened cuff."
+    },
+    {
+      "id": "en-holdout-v4-887",
+      "field": "altText",
+      "text": "Woven shoe straps rest near the leg of the gallery bench."
+    },
+    {
+      "id": "en-holdout-v4-888",
+      "field": "altText",
+      "text": "Thick and thin yarn sections create an uneven surface on the hat."
+    },
+    {
+      "id": "en-holdout-v4-889",
+      "field": "altText",
+      "text": "A padded coat is worn above light clothes beside a small carry-on."
+    },
+    {
+      "id": "en-holdout-v4-890",
+      "field": "altText",
+      "text": "The turned shirt reveals broad flat seams along its inside edges."
+    },
+    {
+      "id": "en-holdout-v4-891",
+      "field": "altText",
+      "text": "Warm socks appear above boots tucked beneath a theatre seat."
+    },
+    {
+      "id": "en-holdout-v4-892",
+      "field": "altText",
+      "text": "Small tomatoes fill the two broad pockets of the gardening apron."
+    },
+    {
+      "id": "en-holdout-v4-893",
+      "field": "altText",
+      "text": "Rows of pale running stitches reinforce a faded denim patch."
+    },
+    {
+      "id": "en-holdout-v4-894",
+      "field": "altText",
+      "text": "The shop window reflects a full coat, bag and pair of boots."
+    },
+    {
+      "id": "en-holdout-v4-895",
+      "field": "altText",
+      "text": "A brushed section of velvet catches light beside a darker unbrushed area."
+    },
+    {
+      "id": "en-holdout-v4-896",
+      "field": "altText",
+      "text": "The tiny purse retains the pointed end of a patterned necktie."
+    },
+    {
+      "id": "en-holdout-v4-897",
+      "field": "altText",
+      "text": "A softly folded skirt falls toward the floor beside an organ bench."
+    },
+    {
+      "id": "en-holdout-v4-898",
+      "field": "altText",
+      "text": "Fresh stitching secures the handle where it joins the bag body."
+    },
+    {
+      "id": "en-holdout-v4-899",
+      "field": "altText",
+      "text": "Paint-stained dungarees hang beside brushes and a bucket in the studio."
+    },
+    {
+      "id": "en-holdout-v4-900",
+      "field": "altText",
+      "text": "Two thread colours lie against the fabric beside the bright window."
+    },
+    {
+      "id": "en-holdout-v4-901",
+      "field": "altText",
+      "text": "A narrow transparent pocket holds a small paper badge."
+    },
+    {
+      "id": "en-holdout-v4-902",
+      "field": "altText",
+      "text": "A knitted scarf dries flat within a rectangle of evenly spaced pins."
+    },
+    {
+      "id": "en-holdout-v4-903",
+      "field": "altText",
+      "text": "The low camera angle shows the trousers widening toward their hems."
+    },
+    {
+      "id": "en-holdout-v4-904",
+      "field": "altText",
+      "text": "One oversized shirt hangs between two differently sized coats."
+    },
+    {
+      "id": "en-holdout-v4-905",
+      "field": "altText",
+      "text": "A long coat folds across the chair beside an outdoor chessboard."
+    },
+    {
+      "id": "en-holdout-v4-906",
+      "field": "altText",
+      "text": "Darkened areas surround the handle and corners of the old leather bag."
+    },
+    {
+      "id": "en-holdout-v4-907",
+      "field": "altText",
+      "text": "A neat woven repair covers the underside of one turned sock."
+    },
+    {
+      "id": "en-holdout-v4-908",
+      "field": "altText",
+      "text": "A visitor's canvas jacket hangs near restored railway tools."
+    },
+    {
+      "id": "en-holdout-v4-909",
+      "field": "altText",
+      "text": "Only the front of the shirt is tucked behind the visible belt."
+    },
+    {
+      "id": "en-holdout-v4-910",
+      "field": "altText",
+      "text": "A compact paint box fits beside a rolled layer inside the bag."
+    },
+    {
+      "id": "en-holdout-v4-911",
+      "field": "altText",
+      "text": "A hat cord lies taut beneath the chin on the exposed hillside."
+    },
+    {
+      "id": "en-holdout-v4-912",
+      "field": "altText",
+      "text": "A large zip runs down the middle of the otherwise plain jacket."
+    },
+    {
+      "id": "en-holdout-v4-913",
+      "field": "altText",
+      "text": "A worn travel tag remains tied inside the coat's hanging loop."
+    },
+    {
+      "id": "en-holdout-v4-914",
+      "field": "altText",
+      "text": "A small metal weight sits inside an opened section of the hem."
+    },
+    {
+      "id": "en-holdout-v4-915",
+      "field": "altText",
+      "text": "Smooth boots rest beside a gate marked with dried mud."
+    },
+    {
+      "id": "en-holdout-v4-916",
+      "field": "altText",
+      "text": "The pouch lining includes a small section of striped uniform fabric."
+    },
+    {
+      "id": "en-holdout-v4-917",
+      "field": "altText",
+      "text": "Polished shoes reflect light beneath matte wool trousers."
+    },
+    {
+      "id": "en-holdout-v4-918",
+      "field": "altText",
+      "text": "A new zipper sits between the coat's visibly older front panels."
+    },
+    {
+      "id": "en-holdout-v4-919",
+      "field": "altText",
+      "text": "Fingerless gloves hold an open book above a bench-side bag."
+    },
+    {
+      "id": "en-holdout-v4-920",
+      "field": "altText",
+      "text": "A paper pocket shape lies beside the matching sewn shirt pocket."
+    },
+    {
+      "id": "en-holdout-v4-921",
+      "field": "altText",
+      "text": "Pinned sleeves remain above the wrists while hands stir a bowl."
+    },
+    {
+      "id": "en-holdout-v4-922",
+      "field": "altText",
+      "text": "Tiny joining stitches cross a tear within the lace's flower pattern."
+    },
+    {
+      "id": "en-holdout-v4-923",
+      "field": "altText",
+      "text": "Several relaxed outfits form a row against the portrait studio wall."
+    },
+    {
+      "id": "en-holdout-v4-924",
+      "field": "altText",
+      "text": "A new ribbon circles the straw hat above its curved brim."
+    },
+    {
+      "id": "en-holdout-v4-925",
+      "field": "altText",
+      "text": "The trouser waistband gathers across the back between smooth side panels."
+    },
+    {
+      "id": "en-holdout-v4-926",
+      "field": "altText",
+      "text": "Small lace loops stop above the sides of the shoes."
+    },
+    {
+      "id": "en-holdout-v4-927",
+      "field": "altText",
+      "text": "A folded scarf lies on top of papers inside an old moving box."
+    },
+    {
+      "id": "en-holdout-v4-928",
+      "field": "altText",
+      "text": "Dark sleeves and practical shoes appear beside stacked theatre scenery."
+    },
+    {
+      "id": "en-holdout-v4-929",
+      "field": "altText",
+      "text": "Horizontal stripes cross the pocket above the shirt's vertical lines."
+    },
+    {
+      "id": "en-holdout-v4-930",
+      "field": "altText",
+      "text": "A wool jacket hangs freely beside the open balcony door."
+    },
+    {
+      "id": "en-holdout-v4-931",
+      "field": "altText",
+      "text": "Flat shoes emerge beneath a gown on broad ceremony steps."
+    },
+    {
+      "id": "en-holdout-v4-932",
+      "field": "altText",
+      "text": "A second tote unfolds beside an already full shopping bag."
+    },
+    {
+      "id": "en-holdout-v4-933",
+      "field": "altText",
+      "text": "The shawl narrows into a long point down the back."
+    },
+    {
+      "id": "en-holdout-v4-934",
+      "field": "altText",
+      "text": "Grey smudges mark the cuff beside a pencil drawing."
+    },
+    {
+      "id": "en-holdout-v4-935",
+      "field": "altText",
+      "text": "A tailor measures the hem above the wearer's everyday shoes."
+    },
+    {
+      "id": "en-holdout-v4-936",
+      "field": "altText",
+      "text": "A bright band of sock appears between trousers and loafers."
+    },
+    {
+      "id": "en-holdout-v4-937",
+      "field": "altText",
+      "text": "A soft sleeve rests beside the orchestra's open music score."
+    },
+    {
+      "id": "en-holdout-v4-938",
+      "field": "altText",
+      "text": "Two hands hold the clasp apart above the jeweller's small counter."
+    },
+    {
+      "id": "en-holdout-v4-939",
+      "field": "altText",
+      "text": "Dried mud follows the turned cuffs below a walking jacket."
+    },
+    {
+      "id": "en-holdout-v4-940",
+      "field": "altText",
+      "text": "A folded napkin and small fruit protrude from broad jacket pockets."
+    },
+    {
+      "id": "en-holdout-v4-941",
+      "field": "altText",
+      "text": "The shirt buttons show a shifting pearly sheen in side light."
+    },
+    {
+      "id": "en-holdout-v4-942",
+      "field": "altText",
+      "text": "New stitching anchors a broad loop inside the coat collar."
+    },
+    {
+      "id": "en-holdout-v4-943",
+      "field": "altText",
+      "text": "Several charcoal shades overlap between scarf, jacket and trousers."
+    },
+    {
+      "id": "en-holdout-v4-944",
+      "field": "altText",
+      "text": "A plain coat stands out against buckets of bright market flowers."
+    },
+    {
+      "id": "en-holdout-v4-945",
+      "field": "altText",
+      "text": "A small removed link lies beside the shortened necklace."
+    },
+    {
+      "id": "en-holdout-v4-946",
+      "field": "altText",
+      "text": "The scarf changes gradually from a dark centre to pale ends."
+    },
+    {
+      "id": "en-holdout-v4-947",
+      "field": "altText",
+      "text": "A striped shirt frames a view of small boats along the harbour."
+    },
+    {
+      "id": "en-holdout-v4-948",
+      "field": "altText",
+      "text": "An embroidered leaf covers a tiny opening in the knitted fabric."
+    },
+    {
+      "id": "en-holdout-v4-949",
+      "field": "altText",
+      "text": "Light travel clothes hang above a small guesthouse wash basin."
+    },
+    {
+      "id": "en-holdout-v4-950",
+      "field": "altText",
+      "text": "A visitor sits with a folded coat beside a quiet museum fountain."
+    },
+    {
+      "id": "en-holdout-v4-951",
+      "field": "altText",
+      "text": "The folded corner of a cloth handkerchief shows above a narrow pocket."
+    },
+    {
+      "id": "en-holdout-v4-952",
+      "field": "altText",
+      "text": "A pale new sole runs below the worn upper of a walking shoe."
+    },
+    {
+      "id": "en-holdout-v4-953",
+      "field": "altText",
+      "text": "A familiar outfit hangs beside two dated photographs of it being worn."
+    },
+    {
+      "id": "en-holdout-v4-954",
+      "field": "altText",
+      "text": "A jacket sleeve rests against several fabric rolls on the stall."
+    },
+    {
+      "id": "en-holdout-v4-955",
+      "field": "altText",
+      "text": "The coat belt hangs loose while the front panels fall straight."
+    },
+    {
+      "id": "en-holdout-v4-956",
+      "field": "altText",
+      "text": "A fine stitched outline appears inside the bag's opened lining."
+    },
+    {
+      "id": "en-holdout-v4-957",
+      "field": "altText",
+      "text": "A soft glasses pouch rises above a small waistcoat pocket."
+    },
+    {
+      "id": "en-holdout-v4-958",
+      "field": "altText",
+      "text": "An open ankle zip reveals the boot inside the rain trousers."
+    },
+    {
+      "id": "en-holdout-v4-959",
+      "field": "altText",
+      "text": "Two books lean against the side of an otherwise empty tote."
+    },
+    {
+      "id": "en-holdout-v4-960",
+      "field": "altText",
+      "text": "Several careful repairs interrupt the shawl's worn woven border."
+    },
+    {
+      "id": "en-holdout-v4-961",
+      "field": "altText",
+      "text": "The buckle pin passes between strands of the braided belt."
+    },
+    {
+      "id": "en-holdout-v4-962",
+      "field": "altText",
+      "text": "An unbuttoned cardigan reveals a light shirt inside the train carriage."
+    },
+    {
+      "id": "en-holdout-v4-963",
+      "field": "altText",
+      "text": "Curved pocket corners follow the jacket's softly rounded lower edge."
+    },
+    {
+      "id": "en-holdout-v4-964",
+      "field": "altText",
+      "text": "Sleeve sketches sit beside an open folder of historical clothing photographs."
+    },
+    {
+      "id": "en-holdout-v4-965",
+      "field": "altText",
+      "text": "A saved magazine page lies near clothing in matching colours."
+    },
+    {
+      "id": "en-holdout-v4-966",
+      "field": "altText",
+      "text": "A neat knot shortens the bag strap near its upper attachment."
+    },
+    {
+      "id": "en-holdout-v4-967",
+      "field": "altText",
+      "text": "Three handmade garments of different sizes hang together on the rail."
+    },
+    {
+      "id": "en-holdout-v4-968",
+      "field": "altText",
+      "text": "A new buckle shines against the worn end of an old belt."
+    },
+    {
+      "id": "en-holdout-v4-969",
+      "field": "altText",
+      "text": "The broad brim casts shade across the nose and collar."
+    },
+    {
+      "id": "en-holdout-v4-970",
+      "field": "altText",
+      "text": "Deep trouser pockets sit beside stacked crates of donated food."
+    },
+    {
+      "id": "en-holdout-v4-971",
+      "field": "altText",
+      "text": "The small bag opens into several accordion-like sections."
+    },
+    {
+      "id": "en-holdout-v4-972",
+      "field": "altText",
+      "text": "A narrow fabric frame surrounds each coat buttonhole."
+    },
+    {
+      "id": "en-holdout-v4-973",
+      "field": "altText",
+      "text": "A small light brooch rests flat against the soft collar."
+    },
+    {
+      "id": "en-holdout-v4-974",
+      "field": "altText",
+      "text": "A written packing list is tucked into the open suitcase lid."
+    },
+    {
+      "id": "en-holdout-v4-975",
+      "field": "altText",
+      "text": "One shoulder of the displayed jacket is paler than the covered back."
+    },
+    {
+      "id": "en-holdout-v4-976",
+      "field": "altText",
+      "text": "The shirt's turned interior shows fully enclosed side seams."
+    },
+    {
+      "id": "en-holdout-v4-977",
+      "field": "altText",
+      "text": "Fine repair stitches close a split beside the glove thumb."
+    },
+    {
+      "id": "en-holdout-v4-978",
+      "field": "altText",
+      "text": "A long decorative pin passes through the hat above its brim."
+    },
+    {
+      "id": "en-holdout-v4-979",
+      "field": "altText",
+      "text": "The tote is partly turned outward to show its second fabric surface."
+    },
+    {
+      "id": "en-holdout-v4-980",
+      "field": "altText",
+      "text": "A small light illuminates folded clothes along the wardrobe shelves."
+    },
+    {
+      "id": "en-holdout-v4-981",
+      "field": "altText",
+      "text": "A narrow scarf wraps closely around the handbag's worn handle."
+    },
+    {
+      "id": "en-holdout-v4-982",
+      "field": "altText",
+      "text": "A padded sleeve covers the broad section of the shoulder strap."
+    },
+    {
+      "id": "en-holdout-v4-983",
+      "field": "altText",
+      "text": "Wooden forms fill the shoes beneath a low storage shelf."
+    },
+    {
+      "id": "en-holdout-v4-984",
+      "field": "altText",
+      "text": "Matching cloth covers the clasp at the wrap's front opening."
+    },
+    {
+      "id": "en-holdout-v4-985",
+      "field": "altText",
+      "text": "A camera screen shows the small damaged area beside the actual garment."
+    },
+    {
+      "id": "en-holdout-v4-986",
+      "field": "altText",
+      "text": "A broad side tie secures two overlapping trouser panels."
+    },
+    {
+      "id": "en-holdout-v4-987",
+      "field": "altText",
+      "text": "A complete outfit hangs from a hook outside the wardrobe door."
+    },
+    {
+      "id": "en-holdout-v4-988",
+      "field": "altText",
+      "text": "Folded socks reveal a small knitted motif along each heel."
+    },
+    {
+      "id": "en-holdout-v4-989",
+      "field": "altText",
+      "text": "A translucent cover hangs open around a long ceremonial garment."
+    },
+    {
+      "id": "en-holdout-v4-990",
+      "field": "altText",
+      "text": "An unfinished shoe rests beside the wooden last shaping its toe."
+    },
+    {
+      "id": "en-holdout-v4-991",
+      "field": "altText",
+      "text": "Thick felt edges join in a raised seam down the bag's side."
+    },
+    {
+      "id": "en-holdout-v4-992",
+      "field": "altText",
+      "text": "Two narrow collar stays lie on the shirt beside its pointed tips."
+    },
+    {
+      "id": "en-holdout-v4-993",
+      "field": "altText",
+      "text": "The hood rolls into a broad collar behind the jacket neckline."
+    },
+    {
+      "id": "en-holdout-v4-994",
+      "field": "altText",
+      "text": "A fabric loop hangs below the trousers' right side pocket."
+    },
+    {
+      "id": "en-holdout-v4-995",
+      "field": "altText",
+      "text": "Stitched mountain outlines cross the broad panel between the shoulder seams."
+    },
+    {
+      "id": "en-holdout-v4-996",
+      "field": "altText",
+      "text": "A small clamp holds the separated sole against the shoe upper."
+    },
+    {
+      "id": "en-holdout-v4-997",
+      "field": "altText",
+      "text": "A beaded slide secures a folded section of hair above the ear."
+    },
+    {
+      "id": "en-holdout-v4-998",
+      "field": "altText",
+      "text": "Small ventilation holes circle the sides of the hat crown."
+    },
+    {
+      "id": "en-holdout-v4-999",
+      "field": "altText",
+      "text": "A short strap narrows the coat sleeve above the wrist."
+    },
+    {
+      "id": "en-holdout-v4-1000",
+      "field": "altText",
+      "text": "A tiny printed signature sits inside the scarf's lower border."
+    }
+  ]
+}

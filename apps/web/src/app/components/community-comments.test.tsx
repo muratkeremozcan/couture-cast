@@ -36,6 +36,11 @@ const reply = createCommunityComment({
 })
 // Contextual action names are "<Action>: <author>. <body>" (community-comments.tsx L67-72).
 const rootContext = `${root.author}. ${root.body}`
+/** The visible body of a published fixture comment; a tombstone has none. */
+function bodyText(comment: { body: string | null }): string {
+  if (comment.body === null) throw new Error('fixture comment has no body')
+  return comment.body
+}
 const page = (items = [root]) => ({
   data: { items, snapshot: 2, nextCursor: null, hasNewer: false },
 })
@@ -292,6 +297,140 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     expect(await screen.findByText('Next private page')).toBeVisible()
   })
 
+  it('keeps the replies a member expands while a refresh is still reading the roots', async () => {
+    let rootReads = 0
+    let releaseRefresh: () => void = () => undefined
+    const refreshRead = new Promise<void>((resolve) => {
+      releaseRefresh = resolve
+    })
+    useMswHandlers(
+      http.get(`${base}/comments`, async () => {
+        if (++rootReads > 1) await refreshRead
+        return HttpResponse.json(page())
+      }),
+      http.get(`${base}/comments/root/replies`, () => HttpResponse.json(page([reply])))
+    )
+    const state = makeState()
+    const user = userEvent.setup()
+    render(<CommunityComments postId="community-post-1" state={state} />)
+    const expand = await screen.findByRole('button', {
+      name: `Replies (1): ${rootContext}`,
+    })
+    let refreshing: Promise<void> = Promise.resolve()
+    await act(async () => {
+      refreshing = state.refresh('community-post-1')
+      await waitFor(() => expect(rootReads).toBe(2))
+    })
+    await user.click(expand)
+    expect(await screen.findByText(bodyText(reply))).toBeVisible()
+    await act(async () => {
+      releaseRefresh()
+      await refreshing
+    })
+    expect(
+      screen.getByRole('button', { name: `Replies (1): ${rootContext}` })
+    ).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText(bodyText(reply))).toBeVisible()
+  })
+
+  it('keeps the next replies a member loads while a refresh is still reading the roots', async () => {
+    const nextReply = createCommunityComment({
+      id: 'reply-next',
+      parentId: root.id,
+      publicationSequence: 3,
+      body: 'Next reply body.',
+    })
+    let rootReads = 0
+    let releaseRefresh: () => void = () => undefined
+    const refreshRead = new Promise<void>((resolve) => {
+      releaseRefresh = resolve
+    })
+    const replyPage = (request: Request) => {
+      const next = new URL(request.url).searchParams.has('cursor')
+      return HttpResponse.json({
+        data: {
+          items: [next ? nextReply : reply],
+          nextCursor: next ? null : 'replies-next',
+          snapshot: 2,
+          hasNewer: false,
+        },
+      })
+    }
+    useMswHandlers(
+      http.get(`${base}/comments`, async () => {
+        if (++rootReads > 1) await refreshRead
+        return HttpResponse.json(page())
+      }),
+      http.get(`${base}/comments/root/replies`, ({ request }) => replyPage(request))
+    )
+    const state = makeState()
+    const user = userEvent.setup()
+    render(<CommunityComments postId="community-post-1" state={state} />)
+    await user.click(
+      await screen.findByRole('button', { name: `Replies (1): ${rootContext}` })
+    )
+    expect(await screen.findByText(bodyText(reply))).toBeVisible()
+    let refreshing: Promise<void> = Promise.resolve()
+    await act(async () => {
+      refreshing = state.refresh('community-post-1')
+      await waitFor(() => expect(rootReads).toBe(2))
+    })
+    await user.click(screen.getByRole('button', { name: 'More replies' }))
+    expect(await screen.findByText(bodyText(nextReply))).toBeVisible()
+    await act(async () => {
+      releaseRefresh()
+      await refreshing
+    })
+    expect(screen.getByText(bodyText(reply))).toBeVisible()
+    expect(screen.getByText(bodyText(nextReply))).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'More replies' })).toBeNull()
+  })
+
+  it('keeps the next comments a member loads while a refresh is still reading the roots', async () => {
+    const nextRoot = createCommunityComment({
+      id: 'root-next',
+      body: 'Next root body.',
+      publicationSequence: 3,
+    })
+    let firstPageReads = 0
+    let releaseRefresh: () => void = () => undefined
+    const refreshRead = new Promise<void>((resolve) => {
+      releaseRefresh = resolve
+    })
+    useMswHandlers(
+      http.get(`${base}/comments`, async ({ request }) => {
+        const next = new URL(request.url).searchParams.has('cursor')
+        if (!next && ++firstPageReads > 1) await refreshRead
+        return HttpResponse.json({
+          data: {
+            items: [next ? nextRoot : root],
+            nextCursor: next ? null : 'roots-next',
+            snapshot: 2,
+            hasNewer: false,
+          },
+        })
+      })
+    )
+    const state = makeState()
+    const user = userEvent.setup()
+    render(<CommunityComments postId="community-post-1" state={state} />)
+    expect(await screen.findByText(bodyText(root))).toBeVisible()
+    let refreshing: Promise<void> = Promise.resolve()
+    await act(async () => {
+      refreshing = state.refresh('community-post-1')
+      await waitFor(() => expect(firstPageReads).toBe(2))
+    })
+    await user.click(screen.getByRole('button', { name: 'More comments' }))
+    expect(await screen.findByText(bodyText(nextRoot))).toBeVisible()
+    await act(async () => {
+      releaseRefresh()
+      await refreshing
+    })
+    expect(screen.getByText(bodyText(root))).toBeVisible()
+    expect(screen.getByText(bodyText(nextRoot))).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'More comments' })).toBeNull()
+  })
+
   it('cancels a reply draft and drops its reply target', async () => {
     useMswHandlers(http.get(`${base}/comments`, () => HttpResponse.json(page())))
     const user = userEvent.setup()
@@ -433,10 +572,14 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     )
     const state = makeState()
     render(<Journey state={state} />)
-    expect(await screen.findByText(root.body!)).toBeVisible()
+    // The private published row prints the same body until the public root lands and
+    // deduplicates it, so wait for the public entry itself.
+    expect(
+      within(await screen.findByTestId('comment-root')).getByText(root.body!)
+    ).toBeVisible()
     suspended = true
     await act(async () => state.statuses('community-post-1'))
-    expect(screen.queryByText(root.body!)).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText(root.body!)).not.toBeInTheDocument())
     expect(screen.getByText('Unavailable.')).toBeVisible()
   })
 
@@ -477,6 +620,39 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     expect(close).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps the public thread when a suspension lands while the first read is in flight', async () => {
+    let releaseFirstRead: () => void = () => undefined
+    const firstRead = new Promise<void>((resolve) => {
+      releaseFirstRead = resolve
+    })
+    let reads = 0
+    useMswHandlers(
+      http.get(`${base}/comments`, async () => {
+        if (++reads === 1) await firstRead
+        return HttpResponse.json(
+          page([{ ...root, isOwn: true, unavailable: true, body: null, author: null }])
+        )
+      }),
+      http.get(`${base}/comment-submissions`, () =>
+        HttpResponse.json(
+          submissionsPage([
+            createCommunityCommentSubmission({
+              id: root.id,
+              status: 'consent_suspended',
+              body: null,
+            }),
+          ])
+        )
+      )
+    )
+    render(<Journey state={makeState()} />)
+    await screen.findByTestId('comment-submission-root')
+    releaseFirstRead()
+    expect(
+      await screen.findByRole('button', { name: 'Delete: Unavailable.' })
+    ).toBeVisible()
+  })
+
   it('keeps author deletion available on an own unavailable public placeholder', async () => {
     useMswHandlers(
       http.get(`${base}/comments`, () =>
@@ -507,9 +683,9 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     )
     const user = userEvent.setup()
     render(<Journey state={makeState()} />)
-    await screen.findByText('Unavailable.')
-    // An unavailable own entry has no author or body, so only the placeholder names it.
-    await user.click(screen.getByRole('button', { name: 'Delete: Unavailable.' }))
+    // An unavailable own entry has no author or body, so only the placeholder names it. The
+    // private row shows the same text before the public read lands, so wait for the control.
+    await user.click(await screen.findByRole('button', { name: 'Delete: Unavailable.' }))
     expect(await screen.findByText('Comment deleted.')).toBeVisible()
   })
 
@@ -675,7 +851,10 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     render(<Journey state={makeState()} />)
     await user.click(await screen.findByRole('button', { name: 'More submissions' }))
     expect(await screen.findByText('Second private page')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+    // Refresh is disabled while the public read is in flight, and a click then does nothing.
+    const refresh = screen.getByRole('button', { name: 'Refresh' })
+    await waitFor(() => expect(refresh).toBeEnabled())
+    await user.click(refresh)
     await waitFor(() => expect(refreshStarted).toBe(true))
     expect(screen.getByText('Second private page')).toBeVisible()
     await act(async () => {

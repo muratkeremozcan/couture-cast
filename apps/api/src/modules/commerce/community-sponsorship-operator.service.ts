@@ -13,6 +13,7 @@ import {
   type CommunitySponsorshipEndReason,
   type CommunitySponsorshipLinkReason,
 } from './community-sponsorship.constants.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 export type CommunitySponsorshipRefusalCode =
   | 'reason_invalid'
@@ -257,7 +258,7 @@ export class CommunitySponsorshipOperatorService {
   ): Promise<T> {
     let planned: T | undefined
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      return await interactiveTransaction(this.prisma, async (tx) => {
         const result = await work(tx)
         if (!dryRun) return result
         planned = result

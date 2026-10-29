@@ -1,0 +1,5013 @@
+{
+  "language": "tr",
+  "corpusVersion": "holdout-v4",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "e87f504e9adeea7bbbcb9ce87516d937a636d579612c2448fe7853d282ef3547",
+    "languageAllowListSha256": "865b5547537e7a204ceb38cdc34be81ef68a11d6c99f694e0d2e8ad49bc2338e"
+  },
+  "entries": [
+    {
+      "id": "tr-holdout-v4-001",
+      "field": "caption",
+      "text": "Balık biçimli tokamı bugün ensede kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-002",
+      "field": "caption",
+      "text": "Küçük metal toka sade gömleğimi güzel tamamladı."
+    },
+    {
+      "id": "tr-holdout-v4-003",
+      "field": "caption",
+      "text": "Saçımı toplarken bu eski tokayı yeniden buldum."
+    },
+    {
+      "id": "tr-holdout-v4-004",
+      "field": "altText",
+      "text": "Balık biçimli metal toka toplu saçın üzerinde duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-005",
+      "field": "altText",
+      "text": "Uzun kuyruğu olan küçük toka enseyi açık bırakıyor."
+    },
+    {
+      "id": "tr-holdout-v4-006",
+      "field": "caption",
+      "text": "Kadife cepkenimi bugün pamuklu gömlekle giydim."
+    },
+    {
+      "id": "tr-holdout-v4-007",
+      "field": "caption",
+      "text": "Kısa cepkenin işlemeleri başka takı istemiyor."
+    },
+    {
+      "id": "tr-holdout-v4-008",
+      "field": "caption",
+      "text": "Sandıktaki parçayı günlük kıyafetlerime katmak hoşuma gitti."
+    },
+    {
+      "id": "tr-holdout-v4-009",
+      "field": "altText",
+      "text": "İşlemeli kısa cepken bol bir gömleğin üzerine giyilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-010",
+      "field": "altText",
+      "text": "Cepkenin ön kenarlarında kıvrımlı kordon işlemeler görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-011",
+      "field": "caption",
+      "text": "İki yaka ucunu ince bir zincirle birleştirdim."
+    },
+    {
+      "id": "tr-holdout-v4-012",
+      "field": "caption",
+      "text": "Bugün gömlek yakamın arasında küçük bir köprü var."
+    },
+    {
+      "id": "tr-holdout-v4-013",
+      "field": "caption",
+      "text": "Yakayı tutan zinciri yıllardır ilk kez taktım."
+    },
+    {
+      "id": "tr-holdout-v4-014",
+      "field": "altText",
+      "text": "Kısa zincir gömleğin iki yaka ucunu birbirine bağlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-015",
+      "field": "altText",
+      "text": "Zincirin uçlarındaki küçük klipsler sivri yakalara tutturulmuş."
+    },
+    {
+      "id": "tr-holdout-v4-016",
+      "field": "caption",
+      "text": "Eteğimdeki yuvarlak cepler ellerime rahat bir yer açıyor."
+    },
+    {
+      "id": "tr-holdout-v4-017",
+      "field": "caption",
+      "text": "Bugün kabarık cepleri görünür bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-018",
+      "field": "caption",
+      "text": "Yeni diktiğim cepler eteğin bütün havasını değiştirdi."
+    },
+    {
+      "id": "tr-holdout-v4-019",
+      "field": "altText",
+      "text": "Eteğin yanlarında yuvarlak ve hacimli cepler bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-020",
+      "field": "altText",
+      "text": "İki büyük cep düz kumaş üzerinde hafifçe kabarıyor."
+    },
+    {
+      "id": "tr-holdout-v4-021",
+      "field": "caption",
+      "text": "Topuğun arkasındaki renkli dikişi özellikle seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-022",
+      "field": "caption",
+      "text": "Bugün ayakkabılarımdaki küçük dikiş çizgisi görünür kalıyor."
+    },
+    {
+      "id": "tr-holdout-v4-023",
+      "field": "caption",
+      "text": "Sade çiftimin arka yüzünde güzel bir ayrıntı var."
+    },
+    {
+      "id": "tr-holdout-v4-024",
+      "field": "altText",
+      "text": "Ayakkabı topuğunun arkasında dikey bir süs dikişi görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-025",
+      "field": "altText",
+      "text": "Kontrast iplik topuğun ortasındaki birleşme yerini izliyor."
+    },
+    {
+      "id": "tr-holdout-v4-026",
+      "field": "caption",
+      "text": "Şalımın ucundaki fermuarlı cep anahtarımı taşıyor."
+    },
+    {
+      "id": "tr-holdout-v4-027",
+      "field": "caption",
+      "text": "Bugün küçük çanta almadan cepli şalımla çıktım."
+    },
+    {
+      "id": "tr-holdout-v4-028",
+      "field": "caption",
+      "text": "Bu gizli cebi dikmek düşündüğümden kolay oldu."
+    },
+    {
+      "id": "tr-holdout-v4-029",
+      "field": "altText",
+      "text": "Uzun şalın ucunda küçük fermuarlı bir bölüm bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-030",
+      "field": "altText",
+      "text": "Kumaşa gizlenen fermuar şalın kısa kenarı boyunca uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-031",
+      "field": "caption",
+      "text": "Düğmeler gömleğimin önünde hafif bir yay çiziyor."
+    },
+    {
+      "id": "tr-holdout-v4-032",
+      "field": "caption",
+      "text": "Bugün kıvrımlı kapanan gömleğimi düz pantolonla tamamladım."
+    },
+    {
+      "id": "tr-holdout-v4-033",
+      "field": "caption",
+      "text": "Ortadan saparak ilerleyen düğme sırası hoşuma gidiyor."
+    },
+    {
+      "id": "tr-holdout-v4-034",
+      "field": "altText",
+      "text": "Düğmeler yaka altından başlayıp kıvrılarak bele iniyor."
+    },
+    {
+      "id": "tr-holdout-v4-035",
+      "field": "altText",
+      "text": "Gömleğin ön kapanışı düz yerine kavisli ilerliyor."
+    },
+    {
+      "id": "tr-holdout-v4-036",
+      "field": "caption",
+      "text": "İpli kemerimi büyük halkadan geçirip düğümledim."
+    },
+    {
+      "id": "tr-holdout-v4-037",
+      "field": "caption",
+      "text": "Bugün metal toka yerine yuvarlak halka kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-038",
+      "field": "caption",
+      "text": "Kemerin uzun uçlarını yanda serbest bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-039",
+      "field": "altText",
+      "text": "Kalın kordon yuvarlak bir halkadan geçirilerek bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-040",
+      "field": "altText",
+      "text": "Halkanın altında iki uzun kemer ucu sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-041",
+      "field": "caption",
+      "text": "Kazağımın dirseklerini örgüyle yeniden güçlendirdim."
+    },
+    {
+      "id": "tr-holdout-v4-042",
+      "field": "caption",
+      "text": "Bugün tamir ettiğim örgü parça ilk gezisine çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-043",
+      "field": "caption",
+      "text": "Yıpranan yere ördüğüm küçük yama elde çok yumuşak."
+    },
+    {
+      "id": "tr-holdout-v4-044",
+      "field": "altText",
+      "text": "Kazağın dirseğinde daha sık örülmüş oval bir yama görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-045",
+      "field": "altText",
+      "text": "Yeni ilmekler eski örgünün yıpranmış bölümünü kapatıyor."
+    },
+    {
+      "id": "tr-holdout-v4-046",
+      "field": "caption",
+      "text": "Çantamın küçük penceresinden iç kesenin deseni görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-047",
+      "field": "caption",
+      "text": "Bugün pencereli çantama farklı bir astar yerleştirdim."
+    },
+    {
+      "id": "tr-holdout-v4-048",
+      "field": "caption",
+      "text": "İçteki kumaşı değiştirmek çantaya başka bir görünüm verdi."
+    },
+    {
+      "id": "tr-holdout-v4-049",
+      "field": "altText",
+      "text": "Çantanın önünde şeffaf dikdörtgen bir pencere bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-050",
+      "field": "altText",
+      "text": "Şeffaf bölümün arkasında desenli kumaş kese görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-051",
+      "field": "caption",
+      "text": "Elbisemin ön kenarı çapraz katlanarak kapanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-052",
+      "field": "caption",
+      "text": "Bugün geniş ön katı açıkça göstermek istedim."
+    },
+    {
+      "id": "tr-holdout-v4-053",
+      "field": "caption",
+      "text": "Katlanan kumaş tek başına güzel bir çizgi oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-054",
+      "field": "altText",
+      "text": "Elbisenin ön parçası geniş bir çapraz katla birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-055",
+      "field": "altText",
+      "text": "Düz kumaşın üzerinde eğik bir katlama çizgisi beliriyor."
+    },
+    {
+      "id": "tr-holdout-v4-056",
+      "field": "caption",
+      "text": "Terliklerimin üstündeki büyük düğümleri kendim bağladım."
+    },
+    {
+      "id": "tr-holdout-v4-057",
+      "field": "caption",
+      "text": "Bugün düğümlü kumaş terliklerim hafif eteğime eşlik ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-058",
+      "field": "caption",
+      "text": "Yumuşak bantların hacmi ayağın üstünde güzel duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-059",
+      "field": "altText",
+      "text": "Kumaş bantlar terliğin üzerinde iri bir düğüm oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-060",
+      "field": "altText",
+      "text": "İki yumuşak parça ayak üstünde birbirine dolanmış."
+    },
+    {
+      "id": "tr-holdout-v4-061",
+      "field": "caption",
+      "text": "Küçük dokuma parçalarını küpeye dönüştürdüm."
+    },
+    {
+      "id": "tr-holdout-v4-062",
+      "field": "caption",
+      "text": "Bugün kendi ördüğüm minik kumaş küpeleri takıyorum."
+    },
+    {
+      "id": "tr-holdout-v4-063",
+      "field": "caption",
+      "text": "Küpelerin saçaklı uçları yakamın hemen üstünde bitiyor."
+    },
+    {
+      "id": "tr-holdout-v4-064",
+      "field": "altText",
+      "text": "Küçük dokuma dikdörtgenler küpe kancalarından sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-065",
+      "field": "altText",
+      "text": "Dokuma parçaların alt kenarında kısa iplik saçakları var."
+    },
+    {
+      "id": "tr-holdout-v4-066",
+      "field": "caption",
+      "text": "Yağmurluğumun cep kapakları suyu dışarı yönlendiriyor."
+    },
+    {
+      "id": "tr-holdout-v4-067",
+      "field": "caption",
+      "text": "Bugün geniş kapakları kapalı tutup yola çıktım."
+    },
+    {
+      "id": "tr-holdout-v4-068",
+      "field": "caption",
+      "text": "Islak havada bu katlı cep ayrıntısı işime yarıyor."
+    },
+    {
+      "id": "tr-holdout-v4-069",
+      "field": "altText",
+      "text": "Yağmurluğun ceplerini aşağı eğimli geniş kapaklar örtüyor."
+    },
+    {
+      "id": "tr-holdout-v4-070",
+      "field": "altText",
+      "text": "Cep açıklıkları iki kat su geçirmez kumaşın altında kalıyor."
+    },
+    {
+      "id": "tr-holdout-v4-071",
+      "field": "caption",
+      "text": "Yün eteğimin kuşağını bugün arkada bağladım."
+    },
+    {
+      "id": "tr-holdout-v4-072",
+      "field": "caption",
+      "text": "Ön yüzü düz bırakmak bu eteğe iyi geldi."
+    },
+    {
+      "id": "tr-holdout-v4-073",
+      "field": "caption",
+      "text": "Geniş bağlama parçası belde fazla sıkmıyor."
+    },
+    {
+      "id": "tr-holdout-v4-074",
+      "field": "altText",
+      "text": "Yün eteğin geniş kuşağı sırt tarafında düğümlenmiş."
+    },
+    {
+      "id": "tr-holdout-v4-075",
+      "field": "altText",
+      "text": "İki uzun kuşak ucu eteğin arkasına düşüyor."
+    },
+    {
+      "id": "tr-holdout-v4-076",
+      "field": "caption",
+      "text": "İlik kenarlarını farklı renk iplikle diktim."
+    },
+    {
+      "id": "tr-holdout-v4-077",
+      "field": "caption",
+      "text": "Bugün gömleğimin küçük renkli çizgileri yakından belli oluyor."
+    },
+    {
+      "id": "tr-holdout-v4-078",
+      "field": "caption",
+      "text": "Düğme aralarındaki minicik ayrıntı bütün gömleği canlandırdı."
+    },
+    {
+      "id": "tr-holdout-v4-079",
+      "field": "altText",
+      "text": "Her iliğin çevresinde belirgin renkli iplik dikişleri var."
+    },
+    {
+      "id": "tr-holdout-v4-080",
+      "field": "altText",
+      "text": "Gömleğin açık kenarında kısa kontrast çizgiler sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-081",
+      "field": "caption",
+      "text": "Belin arkasındaki küçük oyuk otururken rahatlık sağlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-082",
+      "field": "caption",
+      "text": "Bugün pantolonumun yüksek belini içerideki gömlekle gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-083",
+      "field": "caption",
+      "text": "Arka beldeki V ayrıntısını dikerken özellikle uğraştım."
+    },
+    {
+      "id": "tr-holdout-v4-084",
+      "field": "altText",
+      "text": "Pantolon belinin arkasında küçük V biçimli açıklık bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-085",
+      "field": "altText",
+      "text": "Arka kemer bandı ortada kısa bir oyukla kesiliyor."
+    },
+    {
+      "id": "tr-holdout-v4-086",
+      "field": "caption",
+      "text": "Fularımı ortasından küçük bir tokayla topladım."
+    },
+    {
+      "id": "tr-holdout-v4-087",
+      "field": "caption",
+      "text": "Bugün kumaşın iki ucu tokadan aşağı eşit düşüyor."
+    },
+    {
+      "id": "tr-holdout-v4-088",
+      "field": "caption",
+      "text": "Bu yöntem boynumda büyük düğüm bırakmıyor."
+    },
+    {
+      "id": "tr-holdout-v4-089",
+      "field": "altText",
+      "text": "Dikdörtgen toka fuların iki ucunu göğüste topluyor."
+    },
+    {
+      "id": "tr-holdout-v4-090",
+      "field": "altText",
+      "text": "Kumaş uçları metal parçanın altından paralel sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-091",
+      "field": "caption",
+      "text": "Ceketimin kenarına ilmekli bir süs geçtim."
+    },
+    {
+      "id": "tr-holdout-v4-092",
+      "field": "caption",
+      "text": "Bugün açık renk ilmekler koyu kumaşta iyice görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-093",
+      "field": "caption",
+      "text": "Elde yaptığım kenar işi biraz sabır istedi."
+    },
+    {
+      "id": "tr-holdout-v4-094",
+      "field": "altText",
+      "text": "Ceketin ön kenarını iri el ilmekleri çevreliyor."
+    },
+    {
+      "id": "tr-holdout-v4-095",
+      "field": "altText",
+      "text": "Kenar boyunca düzenli aralıklarla kontrast iplik halkaları görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-096",
+      "field": "caption",
+      "text": "Çantamın kapağı küçük bir mıknatısla sessizce kapanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-097",
+      "field": "caption",
+      "text": "Bugün tokasız düz çantamı elbiseyle kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-098",
+      "field": "caption",
+      "text": "Gizli kapanış ön yüzü oldukça sade bırakıyor."
+    },
+    {
+      "id": "tr-holdout-v4-099",
+      "field": "altText",
+      "text": "Açık kapağın içinde yuvarlak bir manyetik çıtçıt görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-100",
+      "field": "altText",
+      "text": "Çantanın dış yüzünde herhangi bir toka bulunmuyor."
+    },
+    {
+      "id": "tr-holdout-v4-101",
+      "field": "caption",
+      "text": "Beremin tepesindeki düğümü örerken biraz büyük tuttum."
+    },
+    {
+      "id": "tr-holdout-v4-102",
+      "field": "caption",
+      "text": "Bugün tepe kısmı düğümlü örgü beremi taktım."
+    },
+    {
+      "id": "tr-holdout-v4-103",
+      "field": "caption",
+      "text": "Küçük çıkıntı bu sade bereyi bana özel kılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-104",
+      "field": "altText",
+      "text": "Örgü berenin tepesinde kısa düğümlü bir çıkıntı var."
+    },
+    {
+      "id": "tr-holdout-v4-105",
+      "field": "altText",
+      "text": "İlmekler yukarıda toplanıp küçük bir düğümle bitiyor."
+    },
+    {
+      "id": "tr-holdout-v4-106",
+      "field": "caption",
+      "text": "Bluzumun kolu iki ince kumaş katından oluşuyor."
+    },
+    {
+      "id": "tr-holdout-v4-107",
+      "field": "caption",
+      "text": "Bugün alttaki kat yürürken biraz daha fazla görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-108",
+      "field": "caption",
+      "text": "Katların farklı uzunluğu kollara hafiflik kattı."
+    },
+    {
+      "id": "tr-holdout-v4-109",
+      "field": "altText",
+      "text": "Kısa dış kolun altından daha uzun ince kat çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-110",
+      "field": "altText",
+      "text": "İki hafif kumaş tabakası kol çevresinde üst üste duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-111",
+      "field": "caption",
+      "text": "Ayakkabılarımdaki küçük delikler çiçek gibi sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-112",
+      "field": "caption",
+      "text": "Bugün delikli deri çiftimi düz çoraplarla tamamladım."
+    },
+    {
+      "id": "tr-holdout-v4-113",
+      "field": "caption",
+      "text": "Burun kısmındaki işçiliği her giyişimde yeniden inceliyorum."
+    },
+    {
+      "id": "tr-holdout-v4-114",
+      "field": "altText",
+      "text": "Deri ayakkabının ucunda deliklerle oluşturulmuş bir motif bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-115",
+      "field": "altText",
+      "text": "Küçük yuvarlak delikler ayakkabının kıvrımlı dikişlerini izliyor."
+    },
+    {
+      "id": "tr-holdout-v4-116",
+      "field": "caption",
+      "text": "Elbisemin sırtındaki tek volan yürürken hafifçe havalanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-117",
+      "field": "caption",
+      "text": "Bugün önünü sade tutup arka ayrıntıyı gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-118",
+      "field": "caption",
+      "text": "Sırt hattındaki dalgalı kat diktiğime değdi."
+    },
+    {
+      "id": "tr-holdout-v4-119",
+      "field": "altText",
+      "text": "Elbisenin arkasında bel hizasını geçen tek geniş volan var."
+    },
+    {
+      "id": "tr-holdout-v4-120",
+      "field": "altText",
+      "text": "Dalgalı kumaş parçası sırtın ortasında serbest duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-121",
+      "field": "caption",
+      "text": "Gözlüğümün ipini küçük renkli düğümlerle süsledim."
+    },
+    {
+      "id": "tr-holdout-v4-122",
+      "field": "caption",
+      "text": "Bugün gözlük kordonum yakamın iki yanına düşüyor."
+    },
+    {
+      "id": "tr-holdout-v4-123",
+      "field": "caption",
+      "text": "İnce ip hem kullanışlı hem de hafif bir aksesuar."
+    },
+    {
+      "id": "tr-holdout-v4-124",
+      "field": "altText",
+      "text": "İnce düğümlü kordon gözlüğün saplarına bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-125",
+      "field": "altText",
+      "text": "Küçük renkli düğümler gömlek yakasının yanında sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-126",
+      "field": "caption",
+      "text": "Paçanın yan fermuarını biraz açınca ayakkabım rahat görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-127",
+      "field": "caption",
+      "text": "Bugün pantolonun uçlarını daha geniş kullanıyorum."
+    },
+    {
+      "id": "tr-holdout-v4-128",
+      "field": "caption",
+      "text": "Küçük yan açıklık düz paçaya hareket katıyor."
+    },
+    {
+      "id": "tr-holdout-v4-129",
+      "field": "altText",
+      "text": "Pantolon paçasının yanında kısa bir fermuar açık duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-130",
+      "field": "altText",
+      "text": "Açılan kenar ayakkabının üstünde küçük bir üçgen oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-131",
+      "field": "caption",
+      "text": "Üç farklı düğmeyi ceketimde küçük bir grup yaptım."
+    },
+    {
+      "id": "tr-holdout-v4-132",
+      "field": "caption",
+      "text": "Bugün uyumsuz düğmelerin birlikte duruşunu seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-133",
+      "field": "caption",
+      "text": "Düğme kutumdan çıkan parçalar bu cekete yerleşti."
+    },
+    {
+      "id": "tr-holdout-v4-134",
+      "field": "altText",
+      "text": "Farklı biçimli üç düğme ceketin üst bölümünde kümeleniyor."
+    },
+    {
+      "id": "tr-holdout-v4-135",
+      "field": "altText",
+      "text": "Yuvarlak ve köşeli düğmeler aynı kumaş üzerinde yan yana."
+    },
+    {
+      "id": "tr-holdout-v4-136",
+      "field": "caption",
+      "text": "Eteğin kavisli cebini elimle çizip biçtim."
+    },
+    {
+      "id": "tr-holdout-v4-137",
+      "field": "caption",
+      "text": "Bugün cep girişlerinin genişliğinden çok memnunum."
+    },
+    {
+      "id": "tr-holdout-v4-138",
+      "field": "caption",
+      "text": "Yuvarlak cep çizgileri düz eteği biraz yumuşatıyor."
+    },
+    {
+      "id": "tr-holdout-v4-139",
+      "field": "altText",
+      "text": "Eteğin önünde geniş kavisli iki cep açıklığı görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-140",
+      "field": "altText",
+      "text": "Cep kenarları yarım daire biçiminde aşağı kıvrılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-141",
+      "field": "caption",
+      "text": "Atkımın ortasını daha sık örerek boyunda durmasını sağladım."
+    },
+    {
+      "id": "tr-holdout-v4-142",
+      "field": "caption",
+      "text": "Bugün uçları hafif, orta kısmı tok atkımı doladım."
+    },
+    {
+      "id": "tr-holdout-v4-143",
+      "field": "caption",
+      "text": "Aynı iplikle iki farklı doku denemek hoşuma gitti."
+    },
+    {
+      "id": "tr-holdout-v4-144",
+      "field": "altText",
+      "text": "Atkının orta bölümünde uçlardan daha sık ilmekler bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-145",
+      "field": "altText",
+      "text": "İnce uçlar geniş ve yoğun örülmüş orta parçaya bağlanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-146",
+      "field": "caption",
+      "text": "Çantamın esnek yanları içine eşya koyunca genişliyor."
+    },
+    {
+      "id": "tr-holdout-v4-147",
+      "field": "caption",
+      "text": "Bugün küçük görünen çantama rahatça her şeyi yerleştirdim."
+    },
+    {
+      "id": "tr-holdout-v4-148",
+      "field": "caption",
+      "text": "Yanlarda kullandığım lastikli kumaş oldukça işe yaradı."
+    },
+    {
+      "id": "tr-holdout-v4-149",
+      "field": "altText",
+      "text": "Çantanın yan panelleri ince lastik sıralarıyla büzülmüş."
+    },
+    {
+      "id": "tr-holdout-v4-150",
+      "field": "altText",
+      "text": "Düz ön yüzün yanında esnek kumaş körükler görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-151",
+      "field": "caption",
+      "text": "Yakanın yalnızca üst kenarına küçük dantel ekledim."
+    },
+    {
+      "id": "tr-holdout-v4-152",
+      "field": "caption",
+      "text": "Bugün dantel çizgisi gömleğin düz formunu takip ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-153",
+      "field": "caption",
+      "text": "Bu ince süs için eski bir parça kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-154",
+      "field": "altText",
+      "text": "Gömlek yakasının üst sınırında dar bir dantel şerit var."
+    },
+    {
+      "id": "tr-holdout-v4-155",
+      "field": "altText",
+      "text": "Küçük dantel çıkıntıları dik yakanın üzerinde sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-156",
+      "field": "caption",
+      "text": "Kemerimin iki ucunu geniş bir yay gibi bağladım."
+    },
+    {
+      "id": "tr-holdout-v4-157",
+      "field": "caption",
+      "text": "Bugün fiyonk düz elbisemin tam ortasında duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-158",
+      "field": "caption",
+      "text": "Yumuşak kuşağın şeklini sıkmadan koruyabildim."
+    },
+    {
+      "id": "tr-holdout-v4-159",
+      "field": "altText",
+      "text": "Geniş kumaş kuşak belde yassı bir fiyonk oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-160",
+      "field": "altText",
+      "text": "Fiyongun iki halkası elbisenin önünde simetrik duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-161",
+      "field": "caption",
+      "text": "Cam boncukların arasına küçük şeffaf parçalar ekledim."
+    },
+    {
+      "id": "tr-holdout-v4-162",
+      "field": "caption",
+      "text": "Bugün ışık kolyemin içinden geçerek güzel parlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-163",
+      "field": "caption",
+      "text": "El yapımı camların her biri farklı görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-164",
+      "field": "altText",
+      "text": "Düzensiz cam boncuklar ince bir ipe sıralanmış."
+    },
+    {
+      "id": "tr-holdout-v4-165",
+      "field": "altText",
+      "text": "Şeffaf kolye parçaları açık renk bluz üzerinde parlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-166",
+      "field": "caption",
+      "text": "Düz ve ters ilmeklerle büyük bloklar ördüm."
+    },
+    {
+      "id": "tr-holdout-v4-167",
+      "field": "caption",
+      "text": "Bugün deseni yalnızca dokusuyla belli olan kazağımı giydim."
+    },
+    {
+      "id": "tr-holdout-v4-168",
+      "field": "caption",
+      "text": "Aynı rengin iki örgü yüzü güzelce ayrılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-169",
+      "field": "altText",
+      "text": "Kazağın önünde düz ve ters örgü blokları dönüşümlü sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-170",
+      "field": "altText",
+      "text": "Büyük kareler renk farkı olmadan dokuyla belirginleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-171",
+      "field": "caption",
+      "text": "Törende giydiğim elbisenin cepleri bugün de çok kullanışlı."
+    },
+    {
+      "id": "tr-holdout-v4-172",
+      "field": "caption",
+      "text": "Şık elbiseyi düz sandaletle gündelik hayata taşıdım."
+    },
+    {
+      "id": "tr-holdout-v4-173",
+      "field": "caption",
+      "text": "Cepli uzun elbisemi dolapta bekletmek istemedim."
+    },
+    {
+      "id": "tr-holdout-v4-174",
+      "field": "altText",
+      "text": "Uzun sade elbisenin yan ceplerine eller yerleştirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-175",
+      "field": "altText",
+      "text": "Dökümlü elbise alçak sandaletlerle günlük biçimde tamamlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-176",
+      "field": "caption",
+      "text": "Ayakkabımın püskülü bu kez arka tarafta duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-177",
+      "field": "caption",
+      "text": "Bugün topuk üstündeki küçük hareketli parçayı fark ettim."
+    },
+    {
+      "id": "tr-holdout-v4-178",
+      "field": "caption",
+      "text": "Arka halkaya taktığım püskülü gerektiğinde çıkarabiliyorum."
+    },
+    {
+      "id": "tr-holdout-v4-179",
+      "field": "altText",
+      "text": "Ayakkabının topuk arkasındaki halkadan kısa deri püskül sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-180",
+      "field": "altText",
+      "text": "Küçük saçaklı süs ayakkabının arka dikişine bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-181",
+      "field": "caption",
+      "text": "Ceketimin yakasından ince kapüşonu çıkardım."
+    },
+    {
+      "id": "tr-holdout-v4-182",
+      "field": "caption",
+      "text": "Bugün gizli kapüşon beklenmedik rüzgârda işime yaradı."
+    },
+    {
+      "id": "tr-holdout-v4-183",
+      "field": "caption",
+      "text": "Katlayınca yakanın iç cebine bütünüyle sığıyor."
+    },
+    {
+      "id": "tr-holdout-v4-184",
+      "field": "altText",
+      "text": "Fermuarlı yaka bölümünden ince bir kapüşon açılmış."
+    },
+    {
+      "id": "tr-holdout-v4-185",
+      "field": "altText",
+      "text": "Kapüşon kumaşı yakanın arkasındaki küçük bölmeye katlanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-186",
+      "field": "caption",
+      "text": "Dokumadaki ince parlak çizgi yürüdükçe ortaya çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-187",
+      "field": "caption",
+      "text": "Bugün eteğimin ışığa göre değişen dokusunu seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-188",
+      "field": "caption",
+      "text": "Uzaktan düz görünen kumaş yakından çok katmanlı."
+    },
+    {
+      "id": "tr-holdout-v4-189",
+      "field": "altText",
+      "text": "Mat etek dokusunda aralıklı parlak iplikler görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-190",
+      "field": "altText",
+      "text": "İnce ışık çizgileri kumaşın enine dokusunu takip ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-191",
+      "field": "caption",
+      "text": "İki katlı yakanın alt parçasını dışarıda bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-192",
+      "field": "caption",
+      "text": "Bugün gömleğimde üst üste iki farklı yaka görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-193",
+      "field": "caption",
+      "text": "Küçük üst yaka alttakine güzel bir çerçeve yapıyor."
+    },
+    {
+      "id": "tr-holdout-v4-194",
+      "field": "altText",
+      "text": "Büyük alt yakanın üzerinde daha kısa ikinci yaka bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-195",
+      "field": "altText",
+      "text": "İki ayrı kumaş katı boyun çevresinde üst üste duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-196",
+      "field": "caption",
+      "text": "Üçgen deri parçalarını bileklik yapmak için birleştirdim."
+    },
+    {
+      "id": "tr-holdout-v4-197",
+      "field": "caption",
+      "text": "Bugün geometrik bilekliğimi geniş kolun dışında taktım."
+    },
+    {
+      "id": "tr-holdout-v4-198",
+      "field": "caption",
+      "text": "Yumuşak deri eklemler bileğe rahatça uyuyor."
+    },
+    {
+      "id": "tr-holdout-v4-199",
+      "field": "altText",
+      "text": "Üçgen deri parçaları ince halkalarla birbirine bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-200",
+      "field": "altText",
+      "text": "Bilekliğin köşeli parçaları kol üzerinde zikzak çiziyor."
+    },
+    {
+      "id": "tr-holdout-v4-201",
+      "field": "caption",
+      "text": "Paçanın çapraz bağları bilekte küçük bir desen yapıyor."
+    },
+    {
+      "id": "tr-holdout-v4-202",
+      "field": "caption",
+      "text": "Bugün geniş pantolonumu bağlarla biraz topladım."
+    },
+    {
+      "id": "tr-holdout-v4-203",
+      "field": "caption",
+      "text": "İnce şeritlerin uçlarını yanlarda düğümledim."
+    },
+    {
+      "id": "tr-holdout-v4-204",
+      "field": "altText",
+      "text": "Pantolon paçalarının etrafında çapraz kumaş bağlar bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-205",
+      "field": "altText",
+      "text": "Dar şeritler bilek çevresinde birbiri üzerinden geçiyor."
+    },
+    {
+      "id": "tr-holdout-v4-206",
+      "field": "caption",
+      "text": "Şapkamı küçük keçe karelerle kendim süsledim."
+    },
+    {
+      "id": "tr-holdout-v4-207",
+      "field": "caption",
+      "text": "Bugün yumuşak parçalar düz şapka bandına renk kattı."
+    },
+    {
+      "id": "tr-holdout-v4-208",
+      "field": "caption",
+      "text": "Artan keçeleri değerlendirmek için güzel bir yol buldum."
+    },
+    {
+      "id": "tr-holdout-v4-209",
+      "field": "altText",
+      "text": "Şapkanın bandında farklı büyüklükte keçe kareler sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-210",
+      "field": "altText",
+      "text": "Küçük tekstil parçaları şapka çevresinde serbest kenarlar oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-211",
+      "field": "caption",
+      "text": "Geniş iç pervaz bluzumun kenarını düzgün tutuyor."
+    },
+    {
+      "id": "tr-holdout-v4-212",
+      "field": "caption",
+      "text": "Bugün bitirdiğim bluzun iç temizliğini de gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-213",
+      "field": "caption",
+      "text": "Yaka çevresindeki sağlam bitişe uğraşmaya değdi."
+    },
+    {
+      "id": "tr-holdout-v4-214",
+      "field": "altText",
+      "text": "Bluzun iç yakasında geniş bir kumaş pervaz görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-215",
+      "field": "altText",
+      "text": "İçe çevrilen düzgün parça boyun açıklığını tamamen çevreliyor."
+    },
+    {
+      "id": "tr-holdout-v4-216",
+      "field": "caption",
+      "text": "Kutuyu andıran çantam aslında oldukça yumuşak."
+    },
+    {
+      "id": "tr-holdout-v4-217",
+      "field": "caption",
+      "text": "Bugün köşeli şekli bol elbisemle eşleştirdim."
+    },
+    {
+      "id": "tr-holdout-v4-218",
+      "field": "caption",
+      "text": "Dört yan panel bu küçük çantaya hacim kazandırdı."
+    },
+    {
+      "id": "tr-holdout-v4-219",
+      "field": "altText",
+      "text": "Yumuşak kumaş çanta küpü andıran geniş bir hacme sahip."
+    },
+    {
+      "id": "tr-holdout-v4-220",
+      "field": "altText",
+      "text": "Dört köşe dikimi çantanın kutu biçimini belirginleştiriyor."
+    },
+    {
+      "id": "tr-holdout-v4-221",
+      "field": "caption",
+      "text": "Yuvarlak roba kumaşı omuzlardan rahatça aşağı bırakıyor."
+    },
+    {
+      "id": "tr-holdout-v4-222",
+      "field": "caption",
+      "text": "Bugün elbisemin üst parçasındaki küçük pileleri açık tuttum."
+    },
+    {
+      "id": "tr-holdout-v4-223",
+      "field": "caption",
+      "text": "Bu kesimin bol duruşu sıcak havaya çok uygun."
+    },
+    {
+      "id": "tr-holdout-v4-224",
+      "field": "altText",
+      "text": "Yuvarlak robadan aşağı ince kumaş pileleri yayılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-225",
+      "field": "altText",
+      "text": "Elbisenin üst kısmı yarım daire biçimli parçayla çevrelenmiş."
+    },
+    {
+      "id": "tr-holdout-v4-226",
+      "field": "caption",
+      "text": "Kazağımın yüzeyine küçük yün toplar diktim."
+    },
+    {
+      "id": "tr-holdout-v4-227",
+      "field": "caption",
+      "text": "Bugün aynı renk ponponlar dokuyla fark yaratıyor."
+    },
+    {
+      "id": "tr-holdout-v4-228",
+      "field": "caption",
+      "text": "Minik kabarıklıklar sade örgüyü biraz eğlenceli yaptı."
+    },
+    {
+      "id": "tr-holdout-v4-229",
+      "field": "altText",
+      "text": "Kazağın ön yüzünde küçük yuvarlak yün toplar bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-230",
+      "field": "altText",
+      "text": "Aynı renk kabarık noktalar düz örgü üzerinde dağılmış."
+    },
+    {
+      "id": "tr-holdout-v4-231",
+      "field": "caption",
+      "text": "Cebin ortasındaki pili gerektiğinde güzelce açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-232",
+      "field": "caption",
+      "text": "Bugün küçük defterimi ceketimin genişleyen cebine koydum."
+    },
+    {
+      "id": "tr-holdout-v4-233",
+      "field": "caption",
+      "text": "Dikdörtgen ceplerdeki tek pili çok işlevli buluyorum."
+    },
+    {
+      "id": "tr-holdout-v4-234",
+      "field": "altText",
+      "text": "Ceketin büyük cebinin ortasında derin bir pili var."
+    },
+    {
+      "id": "tr-holdout-v4-235",
+      "field": "altText",
+      "text": "Cep üzerindeki dikey kat iç hacmi genişletiyor."
+    },
+    {
+      "id": "tr-holdout-v4-236",
+      "field": "caption",
+      "text": "Şalın bir ucu hafif, diğer ucu daha tok dokundu."
+    },
+    {
+      "id": "tr-holdout-v4-237",
+      "field": "caption",
+      "text": "Bugün iki farklı ağırlığın omuzda duruşunu denedim."
+    },
+    {
+      "id": "tr-holdout-v4-238",
+      "field": "caption",
+      "text": "Dokuma geçişi yumuşak bir çizgiyle belli oluyor."
+    },
+    {
+      "id": "tr-holdout-v4-239",
+      "field": "altText",
+      "text": "Şalın iki ucunda farklı yoğunlukta dokuma bölümleri var."
+    },
+    {
+      "id": "tr-holdout-v4-240",
+      "field": "altText",
+      "text": "Seyrek örgü sık dokunmuş geniş bir bölüme dönüşüyor."
+    },
+    {
+      "id": "tr-holdout-v4-241",
+      "field": "caption",
+      "text": "Kare burunlu ayakkabılarımı bugün yuvarlak çantayla kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-242",
+      "field": "caption",
+      "text": "Bu düz ön çizgi geniş paçaların altında güzel görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-243",
+      "field": "caption",
+      "text": "Eski çiftimin köşeli biçimini yeniden sevmeye başladım."
+    },
+    {
+      "id": "tr-holdout-v4-244",
+      "field": "altText",
+      "text": "Ayakkabıların ön uçları geniş ve düz bir çizgiyle bitiyor."
+    },
+    {
+      "id": "tr-holdout-v4-245",
+      "field": "altText",
+      "text": "Köşeli burunlar uzun pantolonun altından dışarı çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-246",
+      "field": "caption",
+      "text": "İpek şeride birkaç gevşek düğüm atıp kolye yaptım."
+    },
+    {
+      "id": "tr-holdout-v4-247",
+      "field": "caption",
+      "text": "Bugün boynumdaki kumaş parçası gömleğimin tonunu tamamlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-248",
+      "field": "caption",
+      "text": "Yumuşak düğümler metal takıdan daha hafif geliyor."
+    },
+    {
+      "id": "tr-holdout-v4-249",
+      "field": "altText",
+      "text": "İpek şerit üzerindeki düğümler boyun çevresinde sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-250",
+      "field": "altText",
+      "text": "Kumaş kolyenin uçları ensede küçük bir bağla birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-251",
+      "field": "caption",
+      "text": "İğne oyasını bluzumun yakasına tek tek ekledim."
+    },
+    {
+      "id": "tr-holdout-v4-252",
+      "field": "caption",
+      "text": "Bugün minik oya çiçekleri boyun çevresinde duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-253",
+      "field": "caption",
+      "text": "İnce el işi sade bluzuma güzel uydu."
+    },
+    {
+      "id": "tr-holdout-v4-254",
+      "field": "altText",
+      "text": "Bluzun yaka kenarında küçük iğne oyaları bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-255",
+      "field": "altText",
+      "text": "Minik iplik çiçekleri yuvarlak boyun açıklığını çevreliyor."
+    },
+    {
+      "id": "tr-holdout-v4-256",
+      "field": "caption",
+      "text": "Kolumdaki tokayı gevşetince ceket daha rahat oldu."
+    },
+    {
+      "id": "tr-holdout-v4-257",
+      "field": "caption",
+      "text": "Bugün bilek çevresini küçük halkadan geçirerek ayarladım."
+    },
+    {
+      "id": "tr-holdout-v4-258",
+      "field": "caption",
+      "text": "Kol ağzındaki bant rüzgârı içeri almıyor."
+    },
+    {
+      "id": "tr-holdout-v4-259",
+      "field": "altText",
+      "text": "Ceket kolundaki kısa bant dikdörtgen halkadan geçirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-260",
+      "field": "altText",
+      "text": "Bilek çevresinde ayarlanabilir düz bir kumaş şerit var."
+    },
+    {
+      "id": "tr-holdout-v4-261",
+      "field": "caption",
+      "text": "Omuz bağlarını bugün iki küçük düğümle tutturdum."
+    },
+    {
+      "id": "tr-holdout-v4-262",
+      "field": "caption",
+      "text": "Elbisenin askı boyunu bağlayarak değiştirebiliyorum."
+    },
+    {
+      "id": "tr-holdout-v4-263",
+      "field": "caption",
+      "text": "Omuz üstündeki fiyonklar yazlık elbiseye çok yakıştı."
+    },
+    {
+      "id": "tr-holdout-v4-264",
+      "field": "altText",
+      "text": "Elbisenin geniş askıları omuz üzerinde düğümlenmiş."
+    },
+    {
+      "id": "tr-holdout-v4-265",
+      "field": "altText",
+      "text": "İki kısa bağ omuzların üstünde küçük fiyonklar oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-266",
+      "field": "caption",
+      "text": "Büyük çantamın içine ayrı bir düzenleyici diktim."
+    },
+    {
+      "id": "tr-holdout-v4-267",
+      "field": "caption",
+      "text": "Bugün aradığım her şey kendi küçük cebinde duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-268",
+      "field": "caption",
+      "text": "Çantayı değiştirirken iç parçayı bütünüyle çıkarıyorum."
+    },
+    {
+      "id": "tr-holdout-v4-269",
+      "field": "altText",
+      "text": "Açık çantanın içinde çok cepli çıkarılabilir bir kese var."
+    },
+    {
+      "id": "tr-holdout-v4-270",
+      "field": "altText",
+      "text": "Düzenleyicinin kısa tutacakları çantanın içinden dışarı uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-271",
+      "field": "caption",
+      "text": "Sırttaki eğik dikiş gömleğe farklı bir düşüş veriyor."
+    },
+    {
+      "id": "tr-holdout-v4-272",
+      "field": "caption",
+      "text": "Bugün sırt parçasını verev kestiğim gömleği denedim."
+    },
+    {
+      "id": "tr-holdout-v4-273",
+      "field": "caption",
+      "text": "Arka çizgi düz pantolonla güzel bir denge kurdu."
+    },
+    {
+      "id": "tr-holdout-v4-274",
+      "field": "altText",
+      "text": "Gömleğin arkasını çapraz bir birleşme dikişi bölüyor."
+    },
+    {
+      "id": "tr-holdout-v4-275",
+      "field": "altText",
+      "text": "İki sırt parçası eğimli bir çizgi boyunca birleşmiş."
+    },
+    {
+      "id": "tr-holdout-v4-276",
+      "field": "caption",
+      "text": "Geniş lastikli bel bütün gün rahatça yerinde duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-277",
+      "field": "caption",
+      "text": "Bugün kemer gerektirmeyen eteğimi bol üstle tamamladım."
+    },
+    {
+      "id": "tr-holdout-v4-278",
+      "field": "caption",
+      "text": "Bel bandını kumaşla kaplayınca daha yumuşak oldu."
+    },
+    {
+      "id": "tr-holdout-v4-279",
+      "field": "altText",
+      "text": "Eteğin üstünde geniş ve düz bir lastik bant bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-280",
+      "field": "altText",
+      "text": "Kumaşla kaplı esnek bel eteğin geniş kısmını topluyor."
+    },
+    {
+      "id": "tr-holdout-v4-281",
+      "field": "caption",
+      "text": "Babetimin çapraz bandı küçük bir düğmeyle kapanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-282",
+      "field": "caption",
+      "text": "Bugün yuvarlak düğmeli ayakkabılarımı kısa paçayla giydim."
+    },
+    {
+      "id": "tr-holdout-v4-283",
+      "field": "caption",
+      "text": "İnce bant ayağın üzerinde sağlam duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-284",
+      "field": "altText",
+      "text": "Babetin üstündeki dar bant yandaki düğmeye bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-285",
+      "field": "altText",
+      "text": "Yuvarlak küçük düğme ayakkabının dış yanında görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-286",
+      "field": "caption",
+      "text": "Şalımın rengi bir uçtan diğerine yavaşça değişiyor."
+    },
+    {
+      "id": "tr-holdout-v4-287",
+      "field": "caption",
+      "text": "Bugün açık ucunu öne bırakarak sardım."
+    },
+    {
+      "id": "tr-holdout-v4-288",
+      "field": "caption",
+      "text": "Uzun renk geçişi düz kabanımla güzel göründü."
+    },
+    {
+      "id": "tr-holdout-v4-289",
+      "field": "altText",
+      "text": "Şalın rengi uçlar arasında kademeli olarak koyulaşıyor."
+    },
+    {
+      "id": "tr-holdout-v4-290",
+      "field": "altText",
+      "text": "Yumuşak renk geçişi geniş kumaş boyunca kesintisiz ilerliyor."
+    },
+    {
+      "id": "tr-holdout-v4-291",
+      "field": "caption",
+      "text": "Ceketi boyunda tek bir kopçayla kapattım."
+    },
+    {
+      "id": "tr-holdout-v4-292",
+      "field": "caption",
+      "text": "Bugün ön kısmı açık bırakıp üst bağlantıyı kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-293",
+      "field": "caption",
+      "text": "Küçük kanca kumaş kenarlarını nazikçe bir araya getiriyor."
+    },
+    {
+      "id": "tr-holdout-v4-294",
+      "field": "altText",
+      "text": "Ceketin yaka altında küçük bir metal kopça bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-295",
+      "field": "altText",
+      "text": "İki ön kenar tek bir üst bağlantıyla birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-296",
+      "field": "caption",
+      "text": "Küpelerimi ince telden dalga biçiminde büktüm."
+    },
+    {
+      "id": "tr-holdout-v4-297",
+      "field": "caption",
+      "text": "Bugün tek çizgiden oluşan hafif küpeler takıyorum."
+    },
+    {
+      "id": "tr-holdout-v4-298",
+      "field": "caption",
+      "text": "Kıvrımların birebir aynı olmaması hoşuma gidiyor."
+    },
+    {
+      "id": "tr-holdout-v4-299",
+      "field": "altText",
+      "text": "İnce metal teller dalgalı küpe biçiminde kıvrılmış."
+    },
+    {
+      "id": "tr-holdout-v4-300",
+      "field": "altText",
+      "text": "Birbirinden hafifçe farklı iki tel çizgisi kulaktan sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-301",
+      "field": "caption",
+      "text": "Arka beldeki pileler pantolona fazladan hareket sağlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-302",
+      "field": "caption",
+      "text": "Bugün arkası genişleyen kesimi kısa kazakla giydim."
+    },
+    {
+      "id": "tr-holdout-v4-303",
+      "field": "caption",
+      "text": "Pileleri ütülemeden biraz yumuşak bırakmayı seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-304",
+      "field": "altText",
+      "text": "Pantolonun arka belinden iki derin pili aşağı açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-305",
+      "field": "altText",
+      "text": "Kumaş kıvrımları arka kalça bölümüne genişlik kazandırıyor."
+    },
+    {
+      "id": "tr-holdout-v4-306",
+      "field": "caption",
+      "text": "Çiçek biçimli düğmeleri elbiseme kendim yaptım."
+    },
+    {
+      "id": "tr-holdout-v4-307",
+      "field": "caption",
+      "text": "Bugün düz kumaşta küçük seramik çiçekler görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-308",
+      "field": "caption",
+      "text": "Her düğmenin yaprağını biraz farklı şekillendirdim."
+    },
+    {
+      "id": "tr-holdout-v4-309",
+      "field": "altText",
+      "text": "Elbisenin kapanışında küçük çiçek biçimli düğmeler sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-310",
+      "field": "altText",
+      "text": "Seramik düğmelerin yuvarlak yaprakları kumaş üzerinde kabarıyor."
+    },
+    {
+      "id": "tr-holdout-v4-311",
+      "field": "caption",
+      "text": "Çantam iki yandan toplanınca hamak gibi duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-312",
+      "field": "caption",
+      "text": "Bugün geniş alt kısmına hafif hırkamı yerleştirdim."
+    },
+    {
+      "id": "tr-holdout-v4-313",
+      "field": "caption",
+      "text": "Yumuşak kavisli biçimini düz çizgili kıyafetlerle seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-314",
+      "field": "altText",
+      "text": "Çanta iki üst köşeden asılarak kavisli bir hacim oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-315",
+      "field": "altText",
+      "text": "Alt bölüm ortada aşağı doğru genişçe sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-316",
+      "field": "caption",
+      "text": "Yarasa kolları kaldırınca kazağım kocaman bir üçgen oluyor."
+    },
+    {
+      "id": "tr-holdout-v4-317",
+      "field": "caption",
+      "text": "Bugün geniş kol altı kesimini dar etekle dengeledim."
+    },
+    {
+      "id": "tr-holdout-v4-318",
+      "field": "caption",
+      "text": "Bu rahat örgünün içine ince bir kat sığıyor."
+    },
+    {
+      "id": "tr-holdout-v4-319",
+      "field": "altText",
+      "text": "Kazağın kol altları bel hizasına kadar uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-320",
+      "field": "altText",
+      "text": "Geniş üst parça bileklere doğru giderek daralıyor."
+    },
+    {
+      "id": "tr-holdout-v4-321",
+      "field": "caption",
+      "text": "Gömleğimin sırtındaki küçük halka askıda çok işe yarıyor."
+    },
+    {
+      "id": "tr-holdout-v4-322",
+      "field": "caption",
+      "text": "Bugün arka roba üstündeki kumaş ilmeği gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-323",
+      "field": "caption",
+      "text": "İnce askı parçasını kendi artan kumaşımdan diktim."
+    },
+    {
+      "id": "tr-holdout-v4-324",
+      "field": "altText",
+      "text": "Gömleğin arka roba ortasında kısa kumaş halka bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-325",
+      "field": "altText",
+      "text": "İki ucu sağlam dikişle tutturulmuş küçük askı dışarı çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-326",
+      "field": "caption",
+      "text": "Kumaş kemeri iki halkadan geçirerek sıkılığını ayarladım."
+    },
+    {
+      "id": "tr-holdout-v4-327",
+      "field": "caption",
+      "text": "Bugün tokasız kemerim uzun gömleği toparlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-328",
+      "field": "caption",
+      "text": "Bu çift halka sistemi farklı bel ölçülerine uyuyor."
+    },
+    {
+      "id": "tr-holdout-v4-329",
+      "field": "altText",
+      "text": "Geniş kemer iki paralel metal halkadan geçirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-330",
+      "field": "altText",
+      "text": "Kumaş uç halkaların arasından geri dönerek sabitleniyor."
+    },
+    {
+      "id": "tr-holdout-v4-331",
+      "field": "caption",
+      "text": "Bluzum bugün yandaki küçük düğmelerle kapanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-332",
+      "field": "caption",
+      "text": "Önü bütünüyle düz kalan bu kesimi seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-333",
+      "field": "caption",
+      "text": "Yan düğme sırası kol altında saklanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-334",
+      "field": "altText",
+      "text": "Bluzun sol yanında dikey küçük düğmeler bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-335",
+      "field": "altText",
+      "text": "Ön yüz kesintisiz kalırken kapanış yan dikişe taşınmış."
+    },
+    {
+      "id": "tr-holdout-v4-336",
+      "field": "caption",
+      "text": "Şapka kenarına ince bir oya şeridi diktim."
+    },
+    {
+      "id": "tr-holdout-v4-337",
+      "field": "caption",
+      "text": "Bugün güneşlik kısmındaki küçük ilmekler hafif gölge yapıyor."
+    },
+    {
+      "id": "tr-holdout-v4-338",
+      "field": "caption",
+      "text": "Eski dantelimi böylece yeniden kullanmaya başladım."
+    },
+    {
+      "id": "tr-holdout-v4-339",
+      "field": "altText",
+      "text": "Şapkanın geniş kenarını dar bir oya şeridi çevreliyor."
+    },
+    {
+      "id": "tr-holdout-v4-340",
+      "field": "altText",
+      "text": "İnce ilmekli süs güneşliğin dış çizgisini takip ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-341",
+      "field": "caption",
+      "text": "Kalın tabandaki katmanları bugün daha çok fark ettim."
+    },
+    {
+      "id": "tr-holdout-v4-342",
+      "field": "caption",
+      "text": "Düz üstlü ayakkabılarım basamaklı tabanla biraz farklı görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-343",
+      "field": "caption",
+      "text": "Kat kat kenarı bol paçanın altında da seçiliyor."
+    },
+    {
+      "id": "tr-holdout-v4-344",
+      "field": "altText",
+      "text": "Ayakkabı tabanında üst üste üç belirgin katman bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-345",
+      "field": "altText",
+      "text": "Tabanın dış kenarı küçük basamaklar halinde genişliyor."
+    },
+    {
+      "id": "tr-holdout-v4-346",
+      "field": "caption",
+      "text": "Belin iki yanındaki düğmeler eteğin genişliğini ayarlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-347",
+      "field": "caption",
+      "text": "Bugün eteğimi bir düğme daha gevşek kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-348",
+      "field": "caption",
+      "text": "Ayarlanabilir bel fikri dikiş projemi çok kullanışlı yaptı."
+    },
+    {
+      "id": "tr-holdout-v4-349",
+      "field": "altText",
+      "text": "Eteğin yan belinde kısa bir düğme sırası var."
+    },
+    {
+      "id": "tr-holdout-v4-350",
+      "field": "altText",
+      "text": "Küçük bel kulakları farklı düğmelere geçirilerek sıkılabiliyor."
+    },
+    {
+      "id": "tr-holdout-v4-351",
+      "field": "caption",
+      "text": "Kolyemdeki ince çizgiler sırın doğal çatlakları."
+    },
+    {
+      "id": "tr-holdout-v4-352",
+      "field": "caption",
+      "text": "Bugün küçük porselen parçayı düz bir kordonla taktım."
+    },
+    {
+      "id": "tr-holdout-v4-353",
+      "field": "caption",
+      "text": "Pürüzsüz yüzeyin altındaki ağ gibi deseni seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-354",
+      "field": "altText",
+      "text": "Porselen kolye ucunun sırında ince çatlak çizgileri bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-355",
+      "field": "altText",
+      "text": "Küçük yuvarlak parça sade ipten göğse doğru sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-356",
+      "field": "caption",
+      "text": "Ceketimin alt fermuarını otururken biraz açtım."
+    },
+    {
+      "id": "tr-holdout-v4-357",
+      "field": "caption",
+      "text": "Bugün iki yönlü kapanışın rahatlığını yeniden anladım."
+    },
+    {
+      "id": "tr-holdout-v4-358",
+      "field": "caption",
+      "text": "Üstü kapalı tutup altta hareket alanı bırakıyorum."
+    },
+    {
+      "id": "tr-holdout-v4-359",
+      "field": "altText",
+      "text": "Ceketin ön fermuarında iki ayrı sürgü görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-360",
+      "field": "altText",
+      "text": "Alt uç açıkken üst bölüm fermuarla kapalı duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-361",
+      "field": "caption",
+      "text": "Kalıp çizgisini andıran ince dikişleri dışarıda bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-362",
+      "field": "caption",
+      "text": "Bugün kendi diktiğim elbisenin yapısını gösteriyorum."
+    },
+    {
+      "id": "tr-holdout-v4-363",
+      "field": "caption",
+      "text": "Bel ve yan çizgileri belirgin iplikle takip ettim."
+    },
+    {
+      "id": "tr-holdout-v4-364",
+      "field": "altText",
+      "text": "Elbise üzerindeki belirgin dikişler parçaların sınırlarını çiziyor."
+    },
+    {
+      "id": "tr-holdout-v4-365",
+      "field": "altText",
+      "text": "Kontrast iplik omuzdan bele kadar uzun çizgiler oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-366",
+      "field": "caption",
+      "text": "Çantanın sapı kendi çevresinde rahatça dönebiliyor."
+    },
+    {
+      "id": "tr-holdout-v4-367",
+      "field": "caption",
+      "text": "Bugün çantamı kısa sapla yanımda taşıdım."
+    },
+    {
+      "id": "tr-holdout-v4-368",
+      "field": "caption",
+      "text": "Döner bağlantılar kayışın burulmasını önlüyor."
+    },
+    {
+      "id": "tr-holdout-v4-369",
+      "field": "altText",
+      "text": "Çanta sapı dönebilen küçük metal halkalara bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-370",
+      "field": "altText",
+      "text": "Sap ucundaki eklem iki yönde serbest hareket ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-371",
+      "field": "caption",
+      "text": "Omuzdaki küçük pileleri bugün ütüsüz bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-372",
+      "field": "caption",
+      "text": "Gömleğim yukarıdan başlayan kıvrımlarla daha rahat düşüyor."
+    },
+    {
+      "id": "tr-holdout-v4-373",
+      "field": "caption",
+      "text": "Tek noktadan açılan kumaş boyunda toplanmıyor."
+    },
+    {
+      "id": "tr-holdout-v4-374",
+      "field": "altText",
+      "text": "Omuz dikişinden üç kısa kumaş pili aşağı açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-375",
+      "field": "altText",
+      "text": "Dar kıvrımlar gömleğin üst bölümüne ek genişlik veriyor."
+    },
+    {
+      "id": "tr-holdout-v4-376",
+      "field": "caption",
+      "text": "Balıksırtı örgüyü bu küçük süveterde denedim."
+    },
+    {
+      "id": "tr-holdout-v4-377",
+      "field": "caption",
+      "text": "Bugün çapraz ilmeklerin sık dokusunu seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-378",
+      "field": "caption",
+      "text": "Bu örgü tek renkte bile belirgin duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-379",
+      "field": "altText",
+      "text": "Süveterin yüzeyinde sık çapraz ilmekler balıksırtı oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-380",
+      "field": "altText",
+      "text": "Yön değiştiren kısa örgü çizgileri düzenli sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-381",
+      "field": "caption",
+      "text": "Çorabın ajurlu bileği ayakkabının üstünden hafifçe görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-382",
+      "field": "caption",
+      "text": "Bugün ince örgü boşluklarını kısa paçayla gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-383",
+      "field": "caption",
+      "text": "Bilek kısmını ayrı örmek güzel bir deneme oldu."
+    },
+    {
+      "id": "tr-holdout-v4-384",
+      "field": "altText",
+      "text": "Çorabın bileğinde küçük açık örgü delikleri bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-385",
+      "field": "altText",
+      "text": "Ajurlu bölüm kapalı örgü ayağın üzerinde dar bir bant oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-386",
+      "field": "caption",
+      "text": "Etek cebime küçük bir kuş işledim."
+    },
+    {
+      "id": "tr-holdout-v4-387",
+      "field": "caption",
+      "text": "Bugün çizdiğim kuşu renkli iplikle tamamladım."
+    },
+    {
+      "id": "tr-holdout-v4-388",
+      "field": "caption",
+      "text": "Sade eteğimin cebinde artık minik bir resim var."
+    },
+    {
+      "id": "tr-holdout-v4-389",
+      "field": "altText",
+      "text": "Eteğin dış cebinde küçük kuş nakışı görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-390",
+      "field": "altText",
+      "text": "Kanat biçimli iplik çizgileri cep köşesine yerleştirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-391",
+      "field": "caption",
+      "text": "Yakamdan aşağı ince bir bağ serbestçe sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-392",
+      "field": "caption",
+      "text": "Bugün gömlek bağını düğümlemeden açık bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-393",
+      "field": "caption",
+      "text": "İki uzun uç ceketimin içinde dikey çizgiler yapıyor."
+    },
+    {
+      "id": "tr-holdout-v4-394",
+      "field": "altText",
+      "text": "Gömlek yakasından çıkan iki dar bağ göğse düşüyor."
+    },
+    {
+      "id": "tr-holdout-v4-395",
+      "field": "altText",
+      "text": "Kumaş şeritler herhangi bir düğüm olmadan aşağı uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-396",
+      "field": "caption",
+      "text": "Şapkanın altı parçası tepede küçük bir noktada buluşuyor."
+    },
+    {
+      "id": "tr-holdout-v4-397",
+      "field": "caption",
+      "text": "Bugün parça dikişleri belirgin şapkamı taktım."
+    },
+    {
+      "id": "tr-holdout-v4-398",
+      "field": "caption",
+      "text": "Kavisli paneller başa güzelce oturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-399",
+      "field": "altText",
+      "text": "Şapka tepesinde altı dar panel birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-400",
+      "field": "altText",
+      "text": "Kavisli dikişler çevreden üstteki küçük düğmeye ilerliyor."
+    },
+    {
+      "id": "tr-holdout-v4-401",
+      "field": "caption",
+      "text": "Diz üstündeki kat çizgisi pantolona yeni bir şekil verdi."
+    },
+    {
+      "id": "tr-holdout-v4-402",
+      "field": "caption",
+      "text": "Bugün iki parçalı paçanın birleşimini açıkça gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-403",
+      "field": "caption",
+      "text": "Alt bölüm biraz daha geniş açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-404",
+      "field": "altText",
+      "text": "Pantolonun diz üstünde yatay birleşme dikişi bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-405",
+      "field": "altText",
+      "text": "Alt bacak parçası üst bölümden daha geniş kesilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-406",
+      "field": "caption",
+      "text": "Bluzumun arka uçlarını belde küçükçe bağladım."
+    },
+    {
+      "id": "tr-holdout-v4-407",
+      "field": "caption",
+      "text": "Bugün sırtı açık bağlamalı bluzumu denedim."
+    },
+    {
+      "id": "tr-holdout-v4-408",
+      "field": "caption",
+      "text": "İki uzun parça gevşek düğümle bir arada kalıyor."
+    },
+    {
+      "id": "tr-holdout-v4-409",
+      "field": "altText",
+      "text": "Bluzun iki arka parçası belde düğümlenmiş."
+    },
+    {
+      "id": "tr-holdout-v4-410",
+      "field": "altText",
+      "text": "Bağın üstünde geniş üçgen bir sırt açıklığı oluşuyor."
+    },
+    {
+      "id": "tr-holdout-v4-411",
+      "field": "caption",
+      "text": "Ceketimin arkasına kendi bastığım büyük bir kumaş parçası diktim."
+    },
+    {
+      "id": "tr-holdout-v4-412",
+      "field": "caption",
+      "text": "Bugün sırtımdaki soyut baskıyı sade parçalarla kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-413",
+      "field": "caption",
+      "text": "Yeni arka panel eski ceketi bambaşka yaptı."
+    },
+    {
+      "id": "tr-holdout-v4-414",
+      "field": "altText",
+      "text": "Ceketin arkasına soyut desenli büyük dikdörtgen kumaş dikilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-415",
+      "field": "altText",
+      "text": "Baskılı panel sırtın ortasında görünür dikişlerle çevrelenmiş."
+    },
+    {
+      "id": "tr-holdout-v4-416",
+      "field": "caption",
+      "text": "Süet ayakkabılarımı fırçaladıktan sonra dokusu yeniden ortaya çıktı."
+    },
+    {
+      "id": "tr-holdout-v4-417",
+      "field": "caption",
+      "text": "Bugün bakımdan çıkan eski çiftimi tekrar giydim."
+    },
+    {
+      "id": "tr-holdout-v4-418",
+      "field": "caption",
+      "text": "Küçük fırça derinin yönünü düzgünce toparladı."
+    },
+    {
+      "id": "tr-holdout-v4-419",
+      "field": "altText",
+      "text": "Süet ayakkabının yüzeyinde düzenli fırça izleri görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-420",
+      "field": "altText",
+      "text": "Küçük bakım fırçası temizlenmiş ayakkabının yanında duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-421",
+      "field": "caption",
+      "text": "Alışveriş çantam kendi ön cebinin içine katlanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-422",
+      "field": "caption",
+      "text": "Bugün büyük keseyi küçücük bir pakete çevirdim."
+    },
+    {
+      "id": "tr-holdout-v4-423",
+      "field": "caption",
+      "text": "Kendi cebinde taşınması günlük çantamda yer açıyor."
+    },
+    {
+      "id": "tr-holdout-v4-424",
+      "field": "altText",
+      "text": "Büyük kumaş çanta küçük ön cebine katlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-425",
+      "field": "altText",
+      "text": "Cebin dışındaki kısa halka paketlenmiş çantayı taşımayı sağlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-426",
+      "field": "caption",
+      "text": "Yaka kısmını makrome düğümleriyle tamamladım."
+    },
+    {
+      "id": "tr-holdout-v4-427",
+      "field": "caption",
+      "text": "Bugün elbisemin boynunda örgülü küçük boşluklar var."
+    },
+    {
+      "id": "tr-holdout-v4-428",
+      "field": "caption",
+      "text": "Düğümlü bant kumaştan bağımsız güzel bir doku kattı."
+    },
+    {
+      "id": "tr-holdout-v4-429",
+      "field": "altText",
+      "text": "Elbisenin yakasında makrome düğümlerinden oluşan dar bir bant var."
+    },
+    {
+      "id": "tr-holdout-v4-430",
+      "field": "altText",
+      "text": "Küçük iplik düğümleri boyun açıklığında üçgen boşluklar oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-431",
+      "field": "caption",
+      "text": "İnce dal biçimli kolyemi bugün sade gömlekle taktım."
+    },
+    {
+      "id": "tr-holdout-v4-432",
+      "field": "caption",
+      "text": "Metal dalın küçük çıkıntıları ışıkta belirginleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-433",
+      "field": "caption",
+      "text": "Tek bir dallanma çizgisi bana yeterli geldi."
+    },
+    {
+      "id": "tr-holdout-v4-434",
+      "field": "altText",
+      "text": "İnce metal kolye ucu küçük dallara ayrılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-435",
+      "field": "altText",
+      "text": "Dal biçimli parça düz gömleğin üzerinde yatay duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-436",
+      "field": "caption",
+      "text": "Kazağın yuvarlak robasını kesintisiz örmek keyifliydi."
+    },
+    {
+      "id": "tr-holdout-v4-437",
+      "field": "caption",
+      "text": "Bugün yaka çevresindeki halkalı deseni göstermeyi seçtim."
+    },
+    {
+      "id": "tr-holdout-v4-438",
+      "field": "caption",
+      "text": "Omuzlarda dikiş olmaması giyerken rahat hissettiriyor."
+    },
+    {
+      "id": "tr-holdout-v4-439",
+      "field": "altText",
+      "text": "Kazak yakasının etrafında dairesel örgü sıraları bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-440",
+      "field": "altText",
+      "text": "Omuz bölümündeki desen halkalar halinde dışarı genişliyor."
+    },
+    {
+      "id": "tr-holdout-v4-441",
+      "field": "caption",
+      "text": "Yan fermuarı dikiş çizgisine saklamayı başardım."
+    },
+    {
+      "id": "tr-holdout-v4-442",
+      "field": "caption",
+      "text": "Bugün eteğimin belinde yalnızca küçük sürgü görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-443",
+      "field": "caption",
+      "text": "Önü kesintisiz kalan bu eteği seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-444",
+      "field": "altText",
+      "text": "Eteğin yan dikişinde küçük fermuar sürgüsü görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-445",
+      "field": "altText",
+      "text": "Fermuar dişleri iki kumaş kenarı arasında saklanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-446",
+      "field": "caption",
+      "text": "Yakanın altındaki küçük şerit rüzgârda kapanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-447",
+      "field": "caption",
+      "text": "Bugün paltonun boyun bağını ilk kez kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-448",
+      "field": "caption",
+      "text": "Dik yakayı kısa bir bantla yerinde tutuyorum."
+    },
+    {
+      "id": "tr-holdout-v4-449",
+      "field": "altText",
+      "text": "Paltonun yakası kısa kumaş bantla ön tarafta birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-450",
+      "field": "altText",
+      "text": "Yandaki düğme boyun çevresindeki şeridi sabitliyor."
+    },
+    {
+      "id": "tr-holdout-v4-451",
+      "field": "caption",
+      "text": "Çorap kenarını bugün tek bir ince kıvrımla bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-452",
+      "field": "caption",
+      "text": "Yuvarlanan bitiş bilekte yumuşak duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-453",
+      "field": "caption",
+      "text": "Lastiksiz çoraplarım sade ayakkabılardan azıcık görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-454",
+      "field": "altText",
+      "text": "Çorabın üst kenarı ince bir rulo halinde kıvrılmış."
+    },
+    {
+      "id": "tr-holdout-v4-455",
+      "field": "altText",
+      "text": "Yumuşak bitiş bileği sıkmadan ayakkabının üstünde duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-456",
+      "field": "caption",
+      "text": "Gömleğin önündeki tek derin pili bugün açık bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-457",
+      "field": "caption",
+      "text": "Düğmesiz ön yüz kumaş katıyla hareketleniyor."
+    },
+    {
+      "id": "tr-holdout-v4-458",
+      "field": "caption",
+      "text": "Ortadaki geniş kıvrımı ütülemek görünümü epey değiştirdi."
+    },
+    {
+      "id": "tr-holdout-v4-459",
+      "field": "altText",
+      "text": "Gömleğin ön ortasında tek geniş pili bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-460",
+      "field": "altText",
+      "text": "Düz kumaşın ortasındaki kat boyundan aşağı uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-461",
+      "field": "caption",
+      "text": "Ceketimin kumaş ilmeklerini deri şeritlerle güçlendirdim."
+    },
+    {
+      "id": "tr-holdout-v4-462",
+      "field": "caption",
+      "text": "Bugün küçük bağlantıların iki farklı dokusunu seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-463",
+      "field": "caption",
+      "text": "Deri parçalar kapanışın üstünde güzelce duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-464",
+      "field": "altText",
+      "text": "Ceket kapanışında kumaş halkalara bağlı kısa deri şeritler var."
+    },
+    {
+      "id": "tr-holdout-v4-465",
+      "field": "altText",
+      "text": "İki malzeme ön kenarlar arasında küçük köprüler oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-466",
+      "field": "caption",
+      "text": "Şapkamın siperi ortadan katlanıp çantaya sığıyor."
+    },
+    {
+      "id": "tr-holdout-v4-467",
+      "field": "caption",
+      "text": "Bugün kırılmadan toplanan güneşliğimi yanıma aldım."
+    },
+    {
+      "id": "tr-holdout-v4-468",
+      "field": "caption",
+      "text": "Ortadaki ince kat çizgisi kullanımda pek belli olmuyor."
+    },
+    {
+      "id": "tr-holdout-v4-469",
+      "field": "altText",
+      "text": "Şapkanın siperi orta çizgiden ikiye katlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-470",
+      "field": "altText",
+      "text": "Esnek güneşlik küçük bir kumaş torbanın yanında duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-471",
+      "field": "caption",
+      "text": "Elbisemin alt bölümünü içe çevirerek daha kısa kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-472",
+      "field": "caption",
+      "text": "Bugün iç düğmeler eteğin uzunluğunu değiştirmemi sağladı."
+    },
+    {
+      "id": "tr-holdout-v4-473",
+      "field": "caption",
+      "text": "Aynı elbisenin iki boyunu da seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-474",
+      "field": "altText",
+      "text": "Elbisenin alt ucu içteki düğmelere tutturulmuş."
+    },
+    {
+      "id": "tr-holdout-v4-475",
+      "field": "altText",
+      "text": "İçeri toplanan bölüm dışarıda hafif kabarık bir kenar oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-476",
+      "field": "caption",
+      "text": "Kemerime küçük bir fermuarlı kese ekledim."
+    },
+    {
+      "id": "tr-holdout-v4-477",
+      "field": "caption",
+      "text": "Bugün minicik eşyalarım beldeki bölmede duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-478",
+      "field": "caption",
+      "text": "Çıkarılabilir keseyi başka kemere de takabiliyorum."
+    },
+    {
+      "id": "tr-holdout-v4-479",
+      "field": "altText",
+      "text": "Kemerin yanında küçük dikdörtgen bir kese asılı duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-480",
+      "field": "altText",
+      "text": "Kesenin arkasındaki iki halka kemer bandına geçirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-481",
+      "field": "caption",
+      "text": "Kazağın önündeki başak desenini birkaç akşamda ördüm."
+    },
+    {
+      "id": "tr-holdout-v4-482",
+      "field": "caption",
+      "text": "Bugün kabarık ilmekler ışıkta daha iyi görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-483",
+      "field": "caption",
+      "text": "Tek sıra başak bütün örgüye yetti."
+    },
+    {
+      "id": "tr-holdout-v4-484",
+      "field": "altText",
+      "text": "Örgü ön yüzünde dikey bir başak motifi bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-485",
+      "field": "altText",
+      "text": "Kabarık ilmekler merkezde iki yana eğilen küçük yapraklar oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-486",
+      "field": "caption",
+      "text": "Pantolon askılarım arkada tek noktada birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-487",
+      "field": "caption",
+      "text": "Bugün askıları ince gömleğin üzerine taktım."
+    },
+    {
+      "id": "tr-holdout-v4-488",
+      "field": "caption",
+      "text": "Y biçimli arka bağlantı sırtı rahat bırakıyor."
+    },
+    {
+      "id": "tr-holdout-v4-489",
+      "field": "altText",
+      "text": "Pantolon askıları sırtta Y biçiminde birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-490",
+      "field": "altText",
+      "text": "İki ön bant arkada tek bir kayışa dönüşüyor."
+    },
+    {
+      "id": "tr-holdout-v4-491",
+      "field": "caption",
+      "text": "Şalımın iki ucunu düğmeyle birbirine tutturdum."
+    },
+    {
+      "id": "tr-holdout-v4-492",
+      "field": "caption",
+      "text": "Bugün şal kaymadan omuzumda duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-493",
+      "field": "caption",
+      "text": "Küçük ilik sayesinde bağlamadan kullanabiliyorum."
+    },
+    {
+      "id": "tr-holdout-v4-494",
+      "field": "altText",
+      "text": "Şalın iki kenarı tek bir büyük düğmeyle birleşmiş."
+    },
+    {
+      "id": "tr-holdout-v4-495",
+      "field": "altText",
+      "text": "Yuvarlak düğme omuz üstündeki kumaş katlarını tutuyor."
+    },
+    {
+      "id": "tr-holdout-v4-496",
+      "field": "caption",
+      "text": "Çantanın alt köşelerine küçük püsküller ekledim."
+    },
+    {
+      "id": "tr-holdout-v4-497",
+      "field": "caption",
+      "text": "Bugün dört köşedeki ipler yürürken sallanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-498",
+      "field": "caption",
+      "text": "Artan iplikleri çantamda değerlendirmiş oldum."
+    },
+    {
+      "id": "tr-holdout-v4-499",
+      "field": "altText",
+      "text": "Kumaş çantanın alt köşelerinden kısa iplik püskülleri sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-500",
+      "field": "altText",
+      "text": "Her köşede küçük düğümlü bir iplik demeti görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-501",
+      "field": "caption",
+      "text": "Eteğin kalıcı buruşuk dokusunu ütülemeden seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-502",
+      "field": "caption",
+      "text": "Bugün doğal kıvrımlar sade üstüme hareket kattı."
+    },
+    {
+      "id": "tr-holdout-v4-503",
+      "field": "altText",
+      "text": "Etek kumaşında düzensiz kalıcı kırışıklıklar bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-504",
+      "field": "altText",
+      "text": "Küçük buruşuk yüzeyler ışıkta farklı gölgeler oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-505",
+      "field": "altText",
+      "text": "Yumuşak kıvrımlar eteğin bütün yüzeyine yayılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-506",
+      "field": "caption",
+      "text": "Ceket kenarına minik ponponlu bir şerit ekledim."
+    },
+    {
+      "id": "tr-holdout-v4-507",
+      "field": "caption",
+      "text": "Bugün küçük toplar ön açıklığı güzelce çerçeveliyor."
+    },
+    {
+      "id": "tr-holdout-v4-508",
+      "field": "altText",
+      "text": "Ceketin ön kenarında küçük ponponlar sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-509",
+      "field": "altText",
+      "text": "İnce süs şeridi etek ucuna kadar devam ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-510",
+      "field": "altText",
+      "text": "Yuvarlak iplik topları koyu kumaşın sınırında duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-511",
+      "field": "caption",
+      "text": "Bluzdaki ince açıklıklar yatay çizgiler oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-512",
+      "field": "caption",
+      "text": "Bugün alt katın rengini küçük aralıklardan gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-513",
+      "field": "altText",
+      "text": "Bluzun önünde dar yatay kumaş aralıkları bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-514",
+      "field": "altText",
+      "text": "Açıklıkların arkasında tek renk ince bir iç kat görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-515",
+      "field": "altText",
+      "text": "Birbirine paralel şeritler üst parçayı birkaç bölüme ayırıyor."
+    },
+    {
+      "id": "tr-holdout-v4-516",
+      "field": "caption",
+      "text": "Tişörtümün yan bağını çekince bir tarafı biraz kısalıyor."
+    },
+    {
+      "id": "tr-holdout-v4-517",
+      "field": "caption",
+      "text": "Bugün yandaki büzgüyü gevşek bırakarak giydim."
+    },
+    {
+      "id": "tr-holdout-v4-518",
+      "field": "altText",
+      "text": "Tişörtün sol yanında ayarlanabilir bir büzgü bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-519",
+      "field": "altText",
+      "text": "İnce bağın çevresinde çapraz kumaş kıvrımları toplanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-520",
+      "field": "altText",
+      "text": "Bir yandaki etek ucu diğerinden daha yukarıda duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-521",
+      "field": "caption",
+      "text": "Sandalların geniş bandı küçük deri şeritlerden örülmüş."
+    },
+    {
+      "id": "tr-holdout-v4-522",
+      "field": "caption",
+      "text": "Bugün örgülü bantların dokusunu düz elbiseyle kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-523",
+      "field": "altText",
+      "text": "Sandaletin üstünü sık örülmüş bir deri bant kaplıyor."
+    },
+    {
+      "id": "tr-holdout-v4-524",
+      "field": "altText",
+      "text": "İnce şeritler ayak üzerinde sepet örgüsü oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-525",
+      "field": "altText",
+      "text": "Örgülü parçanın kenarları düzgün deri şeritle tamamlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-526",
+      "field": "caption",
+      "text": "Çantamın yanları açıldıkça daha fazla yer ortaya çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-527",
+      "field": "caption",
+      "text": "Bugün akordeon körükleri kapalı tutup küçük kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-528",
+      "field": "altText",
+      "text": "Çantanın yanlarında üst üste katlanmış körükler var."
+    },
+    {
+      "id": "tr-holdout-v4-529",
+      "field": "altText",
+      "text": "Açık çanta yan tarafta akordeon biçimi oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-530",
+      "field": "altText",
+      "text": "Üç dar kumaş katı çantaya ek hacim sağlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-531",
+      "field": "caption",
+      "text": "Eski bir süs anahtarını kolye ucuna dönüştürdüm."
+    },
+    {
+      "id": "tr-holdout-v4-532",
+      "field": "caption",
+      "text": "Bugün küçük metal anahtar düz kazağımda duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-533",
+      "field": "altText",
+      "text": "Süs amaçlı küçük anahtar ince zincirden sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-534",
+      "field": "altText",
+      "text": "Anahtarın yuvarlak üst bölümü boyun zincirine geçirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-535",
+      "field": "altText",
+      "text": "Düz metal kolye ucu göğsün ortasına kadar uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-536",
+      "field": "caption",
+      "text": "Çoraplarımın küçük fiyonkları arkada kalıyor."
+    },
+    {
+      "id": "tr-holdout-v4-537",
+      "field": "caption",
+      "text": "Bugün ayakkabı üstünde görünen bağları özellikle sevdim."
+    },
+    {
+      "id": "tr-holdout-v4-538",
+      "field": "altText",
+      "text": "Çorabın arka bileğinde küçük bir kumaş fiyonk var."
+    },
+    {
+      "id": "tr-holdout-v4-539",
+      "field": "altText",
+      "text": "İki kısa kurdele ucu topuğun üzerinde duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-540",
+      "field": "altText",
+      "text": "Örgü çorabın arkasını ince bir saten bağ süslüyor."
+    },
+    {
+      "id": "tr-holdout-v4-541",
+      "field": "caption",
+      "text": "Yeleğin yanlarını iki küçük düğmeyle kapattım."
+    },
+    {
+      "id": "tr-holdout-v4-542",
+      "field": "caption",
+      "text": "Bugün kol altındaki açıklık geniş gömleğime yer bırakıyor."
+    },
+    {
+      "id": "tr-holdout-v4-543",
+      "field": "altText",
+      "text": "Yeleğin iki yanında kısa düğmeli bağlantılar bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-544",
+      "field": "altText",
+      "text": "Ön ve arka parçalar yandaki küçük bantla birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-545",
+      "field": "altText",
+      "text": "Geniş yan açıklıktan alttaki gömlek görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-546",
+      "field": "caption",
+      "text": "Hırkamın kol ucunu tığ işiyle yeniledim."
+    },
+    {
+      "id": "tr-holdout-v4-547",
+      "field": "caption",
+      "text": "Bugün küçük kafesler örgüye farklı bir bitiş veriyor."
+    },
+    {
+      "id": "tr-holdout-v4-548",
+      "field": "altText",
+      "text": "Hırkanın kolu tığla örülmüş ince bir bantla bitiyor."
+    },
+    {
+      "id": "tr-holdout-v4-549",
+      "field": "altText",
+      "text": "Açık tığ ilmekleri bilek çevresinde küçük kafesler oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-550",
+      "field": "altText",
+      "text": "Düz örgü kolun ucunda farklı teknikle yapılmış bölüm görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-551",
+      "field": "caption",
+      "text": "Başımdaki kumaşı iki geniş katla topladım."
+    },
+    {
+      "id": "tr-holdout-v4-552",
+      "field": "caption",
+      "text": "Bugün öndeki katlama çizgisini düzgünce sabitledim."
+    },
+    {
+      "id": "tr-holdout-v4-553",
+      "field": "altText",
+      "text": "Baş çevresindeki kumaş iki geniş kat halinde sarılmış."
+    },
+    {
+      "id": "tr-holdout-v4-554",
+      "field": "altText",
+      "text": "Ön bölümdeki düzgün kıvrımlar şakaklara doğru devam ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-555",
+      "field": "altText",
+      "text": "Yumuşak kumaş katları ense tarafında küçükçe birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-556",
+      "field": "caption",
+      "text": "Gömleğimin arkası önünden belirgin biçimde daha uzun."
+    },
+    {
+      "id": "tr-holdout-v4-557",
+      "field": "caption",
+      "text": "Bugün uzun arka parçayı pantolon dışında bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-558",
+      "field": "altText",
+      "text": "Gömleğin arka etek ucu ön bölümden aşağıda bitiyor."
+    },
+    {
+      "id": "tr-holdout-v4-559",
+      "field": "altText",
+      "text": "Yan çizgide iki farklı kumaş uzunluğu görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-560",
+      "field": "altText",
+      "text": "Kısa ön parça uzun ve yuvarlak sırta bağlanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-561",
+      "field": "caption",
+      "text": "Pantolonun üst bandı yanda çapraz kapanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-562",
+      "field": "caption",
+      "text": "Bugün eğik bel çizgisini kısa üstle gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-563",
+      "field": "altText",
+      "text": "Pantolonun bel bandı ön tarafta çapraz üst üste geliyor."
+    },
+    {
+      "id": "tr-holdout-v4-564",
+      "field": "altText",
+      "text": "Düğme tam ortada değil, yan tarafa yerleştirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-565",
+      "field": "altText",
+      "text": "Bandın serbest ucu küçük üçgen bir çıkıntı oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-566",
+      "field": "caption",
+      "text": "Elbisemin omzundaki düğmeleri açınca rahatça giyebiliyorum."
+    },
+    {
+      "id": "tr-holdout-v4-567",
+      "field": "caption",
+      "text": "Bugün omuz boyunca sıralanan küçük kapanışları gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-568",
+      "field": "altText",
+      "text": "Elbisenin tek omzunda üç düz düğme bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-569",
+      "field": "altText",
+      "text": "Kısa kapanış yaka kenarından kol başlangıcına uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-570",
+      "field": "altText",
+      "text": "İlikli üst parça omuz üzerinde alttaki kumaşı örtüyor."
+    },
+    {
+      "id": "tr-holdout-v4-571",
+      "field": "caption",
+      "text": "Sepet örgüsünü kalın iplikle örünce daha belirgin oldu."
+    },
+    {
+      "id": "tr-holdout-v4-572",
+      "field": "caption",
+      "text": "Bugün kazağımda büyük dokuma blokları gibi ilmekler var."
+    },
+    {
+      "id": "tr-holdout-v4-573",
+      "field": "altText",
+      "text": "Kazak yüzeyi birbirine geçen örgü bloklarından oluşuyor."
+    },
+    {
+      "id": "tr-holdout-v4-574",
+      "field": "altText",
+      "text": "Yatay ve dikey ilmek grupları sepet görünümü veriyor."
+    },
+    {
+      "id": "tr-holdout-v4-575",
+      "field": "altText",
+      "text": "Kabarık kareler geniş bir dama düzeninde sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-576",
+      "field": "caption",
+      "text": "Kot pantolonun yanına dar bir kumaş şerit ekledim."
+    },
+    {
+      "id": "tr-holdout-v4-577",
+      "field": "caption",
+      "text": "Bugün yeni parçayla biraz genişleyen pantolonumu denedim."
+    },
+    {
+      "id": "tr-holdout-v4-578",
+      "field": "altText",
+      "text": "Kotun dış yanına eklenmiş uzun kumaş parçası görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-579",
+      "field": "altText",
+      "text": "İki dikiş çizgisi sonradan eklenen yan şeridi çerçeveliyor."
+    },
+    {
+      "id": "tr-holdout-v4-580",
+      "field": "altText",
+      "text": "Farklı kumaş parçası belden paçaya kadar devam ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-581",
+      "field": "caption",
+      "text": "Yuvarlak şal yakası ceketimin önünde yumuşakça kıvrılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-582",
+      "field": "caption",
+      "text": "Bugün sivri uçları olmayan bu ceketi seçtim."
+    },
+    {
+      "id": "tr-holdout-v4-583",
+      "field": "altText",
+      "text": "Ceketin yakası boyundan aşağı kesintisiz kavisle iniyor."
+    },
+    {
+      "id": "tr-holdout-v4-584",
+      "field": "altText",
+      "text": "Geniş şal yaka ön açıklığı yuvarlak biçimde çevreliyor."
+    },
+    {
+      "id": "tr-holdout-v4-585",
+      "field": "altText",
+      "text": "Yaka üzerinde köşeli kesik veya sivri uç bulunmuyor."
+    },
+    {
+      "id": "tr-holdout-v4-586",
+      "field": "caption",
+      "text": "Bez ayakkabılarımın bilek bağlarını bugün biraz uzun bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-587",
+      "field": "caption",
+      "text": "Hafif keten üstler hasır tabanla güzel birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-588",
+      "field": "altText",
+      "text": "Keten ayakkabının tabanı örgülü doğal lifle kaplanmış."
+    },
+    {
+      "id": "tr-holdout-v4-589",
+      "field": "altText",
+      "text": "İnce kumaş bağlar ayak bileğini iki kez dolanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-590",
+      "field": "altText",
+      "text": "Bez üst parça düşük hasır tabanın üzerinde duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-591",
+      "field": "caption",
+      "text": "Babetlerimin açıklığı küçük dalgalarla çevreleniyor."
+    },
+    {
+      "id": "tr-holdout-v4-592",
+      "field": "caption",
+      "text": "Bugün yuvarlak kesimleri düz çorapla belirginleştirdim."
+    },
+    {
+      "id": "tr-holdout-v4-593",
+      "field": "altText",
+      "text": "Ayakkabı açıklığının kenarında küçük yarım daireler bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-594",
+      "field": "altText",
+      "text": "Deri üst kenar düzenli dalgalı çizgiyle kesilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-595",
+      "field": "altText",
+      "text": "Kavisli açıklık ayağın üstünü ince bir çerçeveyle sarıyor."
+    },
+    {
+      "id": "tr-holdout-v4-596",
+      "field": "caption",
+      "text": "Dergi kâğıtlarını sararak küçük boncuklar yaptım."
+    },
+    {
+      "id": "tr-holdout-v4-597",
+      "field": "caption",
+      "text": "Bugün hafif kâğıt kolyem sade elbisemi tamamlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-598",
+      "field": "altText",
+      "text": "Sarılmış kâğıt boncuklar ince bir ipe geçirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-599",
+      "field": "altText",
+      "text": "Boncukların yüzeyinde eğik kâğıt katları seçiliyor."
+    },
+    {
+      "id": "tr-holdout-v4-600",
+      "field": "altText",
+      "text": "Küçük konik parçalar boyun çevresinde renkli sıra oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-601",
+      "field": "caption",
+      "text": "Artan iplikleri yuvarlak bir güneş broşuna çevirdim."
+    },
+    {
+      "id": "tr-holdout-v4-602",
+      "field": "caption",
+      "text": "Bugün yaka üstünde ince ışınlar gibi ipler var."
+    },
+    {
+      "id": "tr-holdout-v4-603",
+      "field": "altText",
+      "text": "Yuvarlak iplik broşunun çevresinde kısa saçaklar bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-604",
+      "field": "altText",
+      "text": "Merkezden dışa uzanan ipler güneş ışınlarını andırıyor."
+    },
+    {
+      "id": "tr-holdout-v4-605",
+      "field": "altText",
+      "text": "Tekstil broş ceketin üst kenarına küçük iğneyle tutturulmuş."
+    },
+    {
+      "id": "tr-holdout-v4-606",
+      "field": "caption",
+      "text": "Çantamın alt fermuarını açınca hacmi biraz büyüyor."
+    },
+    {
+      "id": "tr-holdout-v4-607",
+      "field": "caption",
+      "text": "Bugün ek bölümü kapalı tutarak daha ince taşıyorum."
+    },
+    {
+      "id": "tr-holdout-v4-608",
+      "field": "altText",
+      "text": "Çantanın alt çevresinde genişletici bir fermuar bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-609",
+      "field": "altText",
+      "text": "Açılan fermuarın arasından ek kumaş şeridi çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-610",
+      "field": "altText",
+      "text": "Tabanın üstündeki gizli kat çantaya yükseklik kazandırıyor."
+    },
+    {
+      "id": "tr-holdout-v4-611",
+      "field": "caption",
+      "text": "Eteğimin yüksek belini bir kat aşağı çevirdim."
+    },
+    {
+      "id": "tr-holdout-v4-612",
+      "field": "caption",
+      "text": "Bugün esnek üst bandı daha dar kullanıyorum."
+    },
+    {
+      "id": "tr-holdout-v4-613",
+      "field": "altText",
+      "text": "Eteğin geniş üst bandı dışarı doğru katlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-614",
+      "field": "altText",
+      "text": "İki kat kumaş bel çevresinde düz bir şerit oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-615",
+      "field": "altText",
+      "text": "Yüksek esnek parça katlanarak yarı boyuna indirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-616",
+      "field": "caption",
+      "text": "Bluzumun omuzlarına birkaç küçük boncuk diktim."
+    },
+    {
+      "id": "tr-holdout-v4-617",
+      "field": "caption",
+      "text": "Bugün ışık omuz çizgilerindeki minik tanelere vuruyor."
+    },
+    {
+      "id": "tr-holdout-v4-618",
+      "field": "altText",
+      "text": "Bluzun omuz dikişi boyunca küçük boncuklar sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-619",
+      "field": "altText",
+      "text": "Yuvarlak taneler sade kumaşın üstünde hafif kabarıyor."
+    },
+    {
+      "id": "tr-holdout-v4-620",
+      "field": "altText",
+      "text": "Boncuk sırası boyun kenarından kol başına uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-621",
+      "field": "caption",
+      "text": "Yün başlığın iki ucunu çene altında bağladım."
+    },
+    {
+      "id": "tr-holdout-v4-622",
+      "field": "caption",
+      "text": "Bugün kulakları örten yumuşak başlığımı taktım."
+    },
+    {
+      "id": "tr-holdout-v4-623",
+      "field": "altText",
+      "text": "Örgü başlığın uçları çene altında gevşekçe birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-624",
+      "field": "altText",
+      "text": "Uzun yan parçalar kulakların üzerinden aşağı iniyor."
+    },
+    {
+      "id": "tr-holdout-v4-625",
+      "field": "altText",
+      "text": "İnce bağlar başlığın alt bölümünü yerinde tutuyor."
+    },
+    {
+      "id": "tr-holdout-v4-626",
+      "field": "caption",
+      "text": "Paçayı katlayınca içteki yansıtıcı şerit ortaya çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-627",
+      "field": "caption",
+      "text": "Bugün bisiklet yolunda pantolonun küçük ayrıntısını kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-628",
+      "field": "altText",
+      "text": "Katlanan paçanın iç yüzünde yansıtıcı bir bant bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-629",
+      "field": "altText",
+      "text": "İnce parlak şerit bilek çevresinde dışarı dönmüş."
+    },
+    {
+      "id": "tr-holdout-v4-630",
+      "field": "altText",
+      "text": "Pantolonun normalde saklı kalan iç dikişi ışığı yansıtıyor."
+    },
+    {
+      "id": "tr-holdout-v4-631",
+      "field": "caption",
+      "text": "Gömleğimin yanını küçük bir kumaş ilmekle topladım."
+    },
+    {
+      "id": "tr-holdout-v4-632",
+      "field": "caption",
+      "text": "Bugün düğüm yapmadan ön boyu kısaltmayı denedim."
+    },
+    {
+      "id": "tr-holdout-v4-633",
+      "field": "altText",
+      "text": "Küçük kumaş halka gömleğin yan ucunu tutuyor."
+    },
+    {
+      "id": "tr-holdout-v4-634",
+      "field": "altText",
+      "text": "Ön parça ilmekten geçirilerek belde hafif toplanmış."
+    },
+    {
+      "id": "tr-holdout-v4-635",
+      "field": "altText",
+      "text": "Yanda biriken kıvrımlar gömleğin önünü yukarı çekiyor."
+    },
+    {
+      "id": "tr-holdout-v4-636",
+      "field": "caption",
+      "text": "Kazağımın sırtındaki küçük açıklıktan iç kat görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-637",
+      "field": "caption",
+      "text": "Bugün açık sırt parçasını ince üstle tamamladım."
+    },
+    {
+      "id": "tr-holdout-v4-638",
+      "field": "altText",
+      "text": "Kazağın arkasında dikdörtgen küçük bir açıklık bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-639",
+      "field": "altText",
+      "text": "Örgü pencerenin içinden düz bir kumaş katı görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-640",
+      "field": "altText",
+      "text": "Sırtın ortasındaki boşluk kalın örgü kenarla çevrili."
+    },
+    {
+      "id": "tr-holdout-v4-641",
+      "field": "caption",
+      "text": "Elbisemin kuşağını bugün kravat gibi önde bağladım."
+    },
+    {
+      "id": "tr-holdout-v4-642",
+      "field": "caption",
+      "text": "Uzun dar bağ normal fiyonktan farklı durdu."
+    },
+    {
+      "id": "tr-holdout-v4-643",
+      "field": "altText",
+      "text": "Kumaş kuşak belin önünde kravat düğümüyle bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-644",
+      "field": "altText",
+      "text": "Bir kuşak ucu diğerinin üzerinden düz biçimde iniyor."
+    },
+    {
+      "id": "tr-holdout-v4-645",
+      "field": "altText",
+      "text": "Düğümün altında uzun tek şerit belirginleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-646",
+      "field": "caption",
+      "text": "Ceketimin kapitone deseni küçük dairelerden oluşuyor."
+    },
+    {
+      "id": "tr-holdout-v4-647",
+      "field": "caption",
+      "text": "Bugün yuvarlak dikişleri düz pantolonla birlikte kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-648",
+      "field": "altText",
+      "text": "Dairesel dikişler ceketin dolgulu yüzeyini bölüyor."
+    },
+    {
+      "id": "tr-holdout-v4-649",
+      "field": "altText",
+      "text": "Yuvarlak kapitone alanları birbirine düzenli aralıklarla temas ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-650",
+      "field": "altText",
+      "text": "İç içe küçük halkalar ince dolgu üstünde kabarıyor."
+    },
+    {
+      "id": "tr-holdout-v4-651",
+      "field": "caption",
+      "text": "Çanta kayışı tabanın altından geçerek ağırlığı taşıyor."
+    },
+    {
+      "id": "tr-holdout-v4-652",
+      "field": "caption",
+      "text": "Bugün geniş askılı kesemi rahatça omzuma aldım."
+    },
+    {
+      "id": "tr-holdout-v4-653",
+      "field": "altText",
+      "text": "Uzun askılar çantanın iki yüzünden tabana uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-654",
+      "field": "altText",
+      "text": "Geniş kumaş bantlar alt bölümde kesintisiz devam ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-655",
+      "field": "altText",
+      "text": "Çanta gövdesi iki dış taşıyıcı şeridin arasında duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-656",
+      "field": "caption",
+      "text": "Eteğime eklediğim üçgenler yürürken genişçe açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-657",
+      "field": "caption",
+      "text": "Bugün alt bölümdeki kumaş dilimlerinin hareketini sevdim."
+    },
+    {
+      "id": "tr-holdout-v4-658",
+      "field": "altText",
+      "text": "Eteğin alt kısmına dar üçgen kumaşlar eklenmiş."
+    },
+    {
+      "id": "tr-holdout-v4-659",
+      "field": "altText",
+      "text": "Üstte birleşen parçalar aşağı doğru genişliyor."
+    },
+    {
+      "id": "tr-holdout-v4-660",
+      "field": "altText",
+      "text": "Üçgen dilimler dar eteğe belirgin hareket alanı veriyor."
+    },
+    {
+      "id": "tr-holdout-v4-661",
+      "field": "caption",
+      "text": "Şapka kenarını tek tarafta yukarı tutturdum."
+    },
+    {
+      "id": "tr-holdout-v4-662",
+      "field": "caption",
+      "text": "Bugün küçük çıtçıt güneşliği farklı bir biçime soktu."
+    },
+    {
+      "id": "tr-holdout-v4-663",
+      "field": "altText",
+      "text": "Şapkanın bir yanı yukarı kıvrılıp çıtçıtla sabitlenmiş."
+    },
+    {
+      "id": "tr-holdout-v4-664",
+      "field": "altText",
+      "text": "Diğer tarafı düz kalan kenar asimetrik bir görünüm oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-665",
+      "field": "altText",
+      "text": "Kıvrık şapka kenarının iç kısmı dışarıdan görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-666",
+      "field": "caption",
+      "text": "Kalın örgü ipini denizci düğümüyle kolyeye dönüştürdüm."
+    },
+    {
+      "id": "tr-holdout-v4-667",
+      "field": "caption",
+      "text": "Bugün büyük düğüm göğsümde yumuşak bir odak oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-668",
+      "field": "altText",
+      "text": "Kalın kordonlar merkezde geniş bir denizci düğümü oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-669",
+      "field": "altText",
+      "text": "Birbirinden geçen ipler yassı ve simetrik bir şekil yapıyor."
+    },
+    {
+      "id": "tr-holdout-v4-670",
+      "field": "altText",
+      "text": "Kumaş kolyenin iki ucu ensede birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-671",
+      "field": "caption",
+      "text": "Bluzumun uzun pileleri bilekte küçük bir düğmeyle kapanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-672",
+      "field": "caption",
+      "text": "Bugün ince kol kıvrımlarını yakından paylaşmak istedim."
+    },
+    {
+      "id": "tr-holdout-v4-673",
+      "field": "altText",
+      "text": "Bileğe kadar uzanan dar pileler bluz kolunu kaplıyor."
+    },
+    {
+      "id": "tr-holdout-v4-674",
+      "field": "altText",
+      "text": "Küçük düğmeli manşet ince kumaş kıvrımlarını topluyor."
+    },
+    {
+      "id": "tr-holdout-v4-675",
+      "field": "altText",
+      "text": "Kol yüzeyindeki uzun katlar ele doğru açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-676",
+      "field": "caption",
+      "text": "Pantolon ceplerimin girişleri çapraz çizgiyle açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-677",
+      "field": "caption",
+      "text": "Bugün yan cep çizgisini içeri soktuğum üstle gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-678",
+      "field": "altText",
+      "text": "Pantolonun ön cepleri belden yana eğimli açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-679",
+      "field": "altText",
+      "text": "İki çapraz giriş üst bacakta simetrik duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-680",
+      "field": "altText",
+      "text": "Düz dikiş çizgileri kalça yanındaki cep açıklıklarını izliyor."
+    },
+    {
+      "id": "tr-holdout-v4-681",
+      "field": "caption",
+      "text": "Bağcıklarımı bugün küçük bir stoperle sabitledim."
+    },
+    {
+      "id": "tr-holdout-v4-682",
+      "field": "caption",
+      "text": "Düğüm atmadan sıkılan bu ayakkabı rahatça giyiliyor."
+    },
+    {
+      "id": "tr-holdout-v4-683",
+      "field": "altText",
+      "text": "İki bağcık ucu küçük plastik kilitten geçirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-684",
+      "field": "altText",
+      "text": "Ayakkabının üzerinde yaylı bir kordon stoperi bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-685",
+      "field": "altText",
+      "text": "Kilit altında kalan kısa uçlar yan yana uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-686",
+      "field": "caption",
+      "text": "Elbisemin önüne sonradan eklediğim panel bugün çok güzel durdu."
+    },
+    {
+      "id": "tr-holdout-v4-687",
+      "field": "caption",
+      "text": "Kısa üst kat alt kumaştan bağımsız hareket ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-688",
+      "field": "altText",
+      "text": "Elbisenin önünde serbest duran ikinci kumaş paneli bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-689",
+      "field": "altText",
+      "text": "Üst kat bel hizasının hemen altında bitiyor."
+    },
+    {
+      "id": "tr-holdout-v4-690",
+      "field": "altText",
+      "text": "Düz alt bölüm kısa ön parçanın aşağısında devam ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-691",
+      "field": "caption",
+      "text": "Çantanın üç yuvarlak bölümü yonca gibi görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-692",
+      "field": "caption",
+      "text": "Bugün bu eğlenceli biçimi sade kıyafetlerle taşıyorum."
+    },
+    {
+      "id": "tr-holdout-v4-693",
+      "field": "altText",
+      "text": "Çantanın dış çizgisi üç yuvarlak çıkıntıdan oluşuyor."
+    },
+    {
+      "id": "tr-holdout-v4-694",
+      "field": "altText",
+      "text": "Yonca biçimli küçük çanta ince bir sapla tutuluyor."
+    },
+    {
+      "id": "tr-holdout-v4-695",
+      "field": "altText",
+      "text": "Üç kavisli bölüm merkezde birleşerek dolgun bir şekil yapıyor."
+    },
+    {
+      "id": "tr-holdout-v4-696",
+      "field": "caption",
+      "text": "Ceketin birleşme paylarını bugün dışarıda bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-697",
+      "field": "caption",
+      "text": "Görünür kenarlar diktiğim parçanın yapısını anlatıyor."
+    },
+    {
+      "id": "tr-holdout-v4-698",
+      "field": "altText",
+      "text": "Ceketin yan dikiş payları dış yüzeyde görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-699",
+      "field": "altText",
+      "text": "Kumaş kenarları omuz üzerinde ince çıkıntılar oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-700",
+      "field": "altText",
+      "text": "Açık birleşme çizgileri ceketin bütün parçalarını belirginleştiriyor."
+    },
+    {
+      "id": "tr-holdout-v4-701",
+      "field": "caption",
+      "text": "Gömleğimin cebi dikişin içinde neredeyse kayboluyor."
+    },
+    {
+      "id": "tr-holdout-v4-702",
+      "field": "caption",
+      "text": "Bugün cep ağzını yakından göstermeyi seçtim."
+    },
+    {
+      "id": "tr-holdout-v4-703",
+      "field": "altText",
+      "text": "Gömleğin birleşme çizgisinde küçük yatay cep açıklığı var."
+    },
+    {
+      "id": "tr-holdout-v4-704",
+      "field": "altText",
+      "text": "Cep torbası kumaşın iç tarafında tamamen saklı duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-705",
+      "field": "altText",
+      "text": "Dar giriş ön yüzde yalnızca kısa bir çizgi oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-706",
+      "field": "caption",
+      "text": "Beremin ponponunu bugün çıkararak daha sade kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-707",
+      "field": "caption",
+      "text": "Küçük çıtçıt sayesinde tepedeki parçayı değiştirebiliyorum."
+    },
+    {
+      "id": "tr-holdout-v4-708",
+      "field": "altText",
+      "text": "Çıkarılmış ponpon örgü berenin yanında duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-709",
+      "field": "altText",
+      "text": "Bere tepesinde küçük bir bağlantı çıtçıtı görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-710",
+      "field": "altText",
+      "text": "Yuvarlak ponponun altında takılıp çıkarılan bir klips var."
+    },
+    {
+      "id": "tr-holdout-v4-711",
+      "field": "caption",
+      "text": "Eteğin iç bitişini ince bir kurdeleyle temizledim."
+    },
+    {
+      "id": "tr-holdout-v4-712",
+      "field": "caption",
+      "text": "Bugün kumaşı çevirip özenli iç kenarı da gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-713",
+      "field": "altText",
+      "text": "Eteğin iç alt kenarı ince kurdeleyle kaplanmış."
+    },
+    {
+      "id": "tr-holdout-v4-714",
+      "field": "altText",
+      "text": "Kurdele dikiş payının açık ucunu düzgünce örtüyor."
+    },
+    {
+      "id": "tr-holdout-v4-715",
+      "field": "altText",
+      "text": "İç yüz boyunca dar ve düz bir bitiş şeridi uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-716",
+      "field": "caption",
+      "text": "Ayrı yakalığı küçük düğmelerle gömleğime tutturuyorum."
+    },
+    {
+      "id": "tr-holdout-v4-717",
+      "field": "caption",
+      "text": "Bugün yakalığı çıkarınca aynı üst başka göründü."
+    },
+    {
+      "id": "tr-holdout-v4-718",
+      "field": "altText",
+      "text": "Bağımsız yaka parçası küçük iç düğmelere bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-719",
+      "field": "altText",
+      "text": "Yakalığın kenarında dar ilmekli bağlantılar görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-720",
+      "field": "altText",
+      "text": "Çıkarılmış yaka gömleğin boyun açıklığı yanında duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-721",
+      "field": "caption",
+      "text": "Küpelerimin delikli yüzeyi ışığı küçük noktalara bölüyor."
+    },
+    {
+      "id": "tr-holdout-v4-722",
+      "field": "caption",
+      "text": "Bugün hafif metal levhaları saçımı toplayarak gösterdim."
+    },
+    {
+      "id": "tr-holdout-v4-723",
+      "field": "altText",
+      "text": "İnce metal küpe parçalarında çok sayıda küçük delik var."
+    },
+    {
+      "id": "tr-holdout-v4-724",
+      "field": "altText",
+      "text": "Yuvarlak boşluklar oval levhanın üzerinde düzenli sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-725",
+      "field": "altText",
+      "text": "Işık delikli küpenin arkasından geçerek gölgeler oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-726",
+      "field": "caption",
+      "text": "Şalın dört kenarını farklı bir örgüyle çerçeveledim."
+    },
+    {
+      "id": "tr-holdout-v4-727",
+      "field": "caption",
+      "text": "Bugün ortadaki düz dokuyla kenar desenini birlikte seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-728",
+      "field": "altText",
+      "text": "Düz şalın çevresinde geniş desenli örgü bant bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-729",
+      "field": "altText",
+      "text": "Kenarın kabarık ilmekleri orta bölümden belirgin biçimde ayrılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-730",
+      "field": "altText",
+      "text": "Dört kenardaki aynı desen köşelerde birbirine bağlanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-731",
+      "field": "caption",
+      "text": "Paltonun arka kemeri bol kumaşı biraz topluyor."
+    },
+    {
+      "id": "tr-holdout-v4-732",
+      "field": "caption",
+      "text": "Bugün arkadaki düğmeleri bir kademe daha dar kapattım."
+    },
+    {
+      "id": "tr-holdout-v4-733",
+      "field": "altText",
+      "text": "Paltonun arkasında iki düğmeli kısa kemer bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-734",
+      "field": "altText",
+      "text": "Yatay bant arka belde kumaşı hafifçe topluyor."
+    },
+    {
+      "id": "tr-holdout-v4-735",
+      "field": "altText",
+      "text": "Kısa kemerin altından uzun arka pile açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-736",
+      "field": "caption",
+      "text": "Metal halkayı ince iplikle sarıp kolyeye ekledim."
+    },
+    {
+      "id": "tr-holdout-v4-737",
+      "field": "caption",
+      "text": "Bugün yumuşak kaplı halka gömlek üstünde duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-738",
+      "field": "altText",
+      "text": "Yuvarlak kolye halkasının tamamı ince iplikle sarılmış."
+    },
+    {
+      "id": "tr-holdout-v4-739",
+      "field": "altText",
+      "text": "Sık iplik turları metal yüzeyi tamamen örtüyor."
+    },
+    {
+      "id": "tr-holdout-v4-740",
+      "field": "altText",
+      "text": "Kaplı halka iki ince kordonla boyna bağlanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-741",
+      "field": "caption",
+      "text": "Cebin kapağını ters çevirince içteki desen ortaya çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-742",
+      "field": "caption",
+      "text": "Bugün küçük cep kanadını açık bırakmayı sevdim."
+    },
+    {
+      "id": "tr-holdout-v4-743",
+      "field": "altText",
+      "text": "Ceket cebinin kapağı yukarı doğru çevrilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-744",
+      "field": "altText",
+      "text": "Kapak içindeki desenli kumaş dışarıdan görünür durumda."
+    },
+    {
+      "id": "tr-holdout-v4-745",
+      "field": "altText",
+      "text": "Düz cep yüzünün üzerinde desenli kısa parça duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-746",
+      "field": "caption",
+      "text": "Üç uyumlu parçayla birkaç günlük kıyafet hazırladım."
+    },
+    {
+      "id": "tr-holdout-v4-747",
+      "field": "caption",
+      "text": "Bugün aynı ceketi farklı altlarla kullanmayı deniyorum."
+    },
+    {
+      "id": "tr-holdout-v4-748",
+      "field": "altText",
+      "text": "Bir ceket iki farklı alt parçayla yan yana serilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-749",
+      "field": "altText",
+      "text": "Üç giysi birbirine uyan sade bir küçük grup oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-750",
+      "field": "altText",
+      "text": "Aynı üst parçanın yanında etek ve pantolon seçenekleri var."
+    },
+    {
+      "id": "tr-holdout-v4-751",
+      "field": "caption",
+      "text": "Çizgili gömlekle çiçekli eteği bugün birlikte giydim."
+    },
+    {
+      "id": "tr-holdout-v4-752",
+      "field": "caption",
+      "text": "İki desenin ortak rengini bulunca kombin kolaylaştı."
+    },
+    {
+      "id": "tr-holdout-v4-753",
+      "field": "altText",
+      "text": "İnce çizgili gömlek iri çiçekli etekle eşleştirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-754",
+      "field": "altText",
+      "text": "İki ayrı desen aynı renk vurgusuyla birbirine bağlanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-755",
+      "field": "altText",
+      "text": "Dikey çizgiler belde yoğun çiçek desenine dönüşüyor."
+    },
+    {
+      "id": "tr-holdout-v4-756",
+      "field": "caption",
+      "text": "Bugün aynı rengin birkaç tonunu bir araya getirdim."
+    },
+    {
+      "id": "tr-holdout-v4-757",
+      "field": "caption",
+      "text": "Açık üst ve koyu alt birlikte sakin göründü."
+    },
+    {
+      "id": "tr-holdout-v4-758",
+      "field": "altText",
+      "text": "Kıyafette aynı rengin açık ve koyu tonları kullanılmış."
+    },
+    {
+      "id": "tr-holdout-v4-759",
+      "field": "altText",
+      "text": "Kaban, üst ve pantolon benzer tonlarda farklılaşan yüzeylere sahip."
+    },
+    {
+      "id": "tr-holdout-v4-760",
+      "field": "altText",
+      "text": "Yumuşak renk geçişleri üç ayrı giysi boyunca devam ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-761",
+      "field": "caption",
+      "text": "Bütün kıyafetim sakin, küçük çantam oldukça canlı bugün."
+    },
+    {
+      "id": "tr-holdout-v4-762",
+      "field": "caption",
+      "text": "Tek renk vurgusunu çantada bırakmayı sevdim."
+    },
+    {
+      "id": "tr-holdout-v4-763",
+      "field": "altText",
+      "text": "Canlı renkli küçük çanta nötr giysilerin yanında duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-764",
+      "field": "altText",
+      "text": "Kaban ve pantolon sade tonlarda, çanta belirgin parlaklıkta."
+    },
+    {
+      "id": "tr-holdout-v4-765",
+      "field": "altText",
+      "text": "Kıyafetin tek yoğun renkli parçası elde taşınan çanta."
+    },
+    {
+      "id": "tr-holdout-v4-766",
+      "field": "caption",
+      "text": "Şık elbisemi bugün günlük spor ayakkabıyla giydim."
+    },
+    {
+      "id": "tr-holdout-v4-767",
+      "field": "caption",
+      "text": "Uzun eteğin altında rahat tabanları görmek hoşuma gidiyor."
+    },
+    {
+      "id": "tr-holdout-v4-768",
+      "field": "altText",
+      "text": "Dökümlü uzun elbise sade spor ayakkabılarla tamamlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-769",
+      "field": "altText",
+      "text": "Ayakkabının kalın yumuşak tabanı elbisenin altından görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-770",
+      "field": "altText",
+      "text": "İnce kumaşlı elbisenin altında bağcıklı günlük ayakkabılar bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-771",
+      "field": "caption",
+      "text": "Eteğim uzun çizmelerin üstünü hafifçe örtüyor."
+    },
+    {
+      "id": "tr-holdout-v4-772",
+      "field": "caption",
+      "text": "Bugün kesintisiz görünen bu etek ve çizme eşleşmesini seçtim."
+    },
+    {
+      "id": "tr-holdout-v4-773",
+      "field": "altText",
+      "text": "Orta boy eteğin altından yüksek çizmeler çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-774",
+      "field": "altText",
+      "text": "Etek kenarı çizme şaftının üstüne birkaç santim biniyor."
+    },
+    {
+      "id": "tr-holdout-v4-775",
+      "field": "altText",
+      "text": "Uzun etek ile çizme arasında açık bölüm kalmıyor."
+    },
+    {
+      "id": "tr-holdout-v4-776",
+      "field": "caption",
+      "text": "Ceketimin dışından taktığım kemer beli biraz topladı."
+    },
+    {
+      "id": "tr-holdout-v4-777",
+      "field": "caption",
+      "text": "Bugün geniş ceketi dar bir kemerle kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-778",
+      "field": "altText",
+      "text": "İnce kemer kapalı ceketin dışından bele dolanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-779",
+      "field": "altText",
+      "text": "Ceketin ön parçaları kemerin altında hafifçe üst üste geliyor."
+    },
+    {
+      "id": "tr-holdout-v4-780",
+      "field": "altText",
+      "text": "Geniş omuzlu ceket belde bir kemerle daraltılmış."
+    },
+    {
+      "id": "tr-holdout-v4-781",
+      "field": "caption",
+      "text": "Gömleğin yalnızca bir ucunu eteğin içine yerleştirdim."
+    },
+    {
+      "id": "tr-holdout-v4-782",
+      "field": "caption",
+      "text": "Bugün asimetrik duran ön kısmı özellikle böyle bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-783",
+      "field": "altText",
+      "text": "Gömleğin ön tarafındaki tek uç belin içine sokulmuş."
+    },
+    {
+      "id": "tr-holdout-v4-784",
+      "field": "altText",
+      "text": "Diğer gömlek ucu eteğin üzerinde serbestçe duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-785",
+      "field": "altText",
+      "text": "Bel çevresinde bir taraf kısa, karşı taraf uzun görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-786",
+      "field": "caption",
+      "text": "İnce yeleği bugün ceketimin üstünden giydim."
+    },
+    {
+      "id": "tr-holdout-v4-787",
+      "field": "caption",
+      "text": "Katların sırasını değiştirmek alıştığım ceketi yeniledi."
+    },
+    {
+      "id": "tr-holdout-v4-788",
+      "field": "altText",
+      "text": "Kısa yelek uzun kollu ceketin dışına giyilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-789",
+      "field": "altText",
+      "text": "Ceket yakaları yeleğin açık önünden dışarı çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-790",
+      "field": "altText",
+      "text": "İki üst katın farklı boyları bel çevresinde belirginleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-791",
+      "field": "caption",
+      "text": "İnce kazağımı omuzlarıma alıp kollarını önde bağladım."
+    },
+    {
+      "id": "tr-holdout-v4-792",
+      "field": "caption",
+      "text": "Bugün kazağı giymeden hafif bir omuz katı yaptım."
+    },
+    {
+      "id": "tr-holdout-v4-793",
+      "field": "altText",
+      "text": "Kazak omuzların üzerine serilmiş ve kolları önde bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-794",
+      "field": "altText",
+      "text": "Kazağın gövdesi sırta düşerken iki kol göğüste birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-795",
+      "field": "altText",
+      "text": "İnce örgü parça gömlek üstünde gevşekçe duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-796",
+      "field": "caption",
+      "text": "Gömleğimi belime bağlayıp ellerimi serbest bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-797",
+      "field": "caption",
+      "text": "Bugün yedek katı çanta yerine belimde taşıyorum."
+    },
+    {
+      "id": "tr-holdout-v4-798",
+      "field": "altText",
+      "text": "Uzun kollu gömlek bel çevresine sarılarak bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-799",
+      "field": "altText",
+      "text": "Düğümlü kolların altından gömleğin arka parçası sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-800",
+      "field": "altText",
+      "text": "Ekose gömlek düz pantolonun üzerine gevşek biçimde dolanmış."
+    },
+    {
+      "id": "tr-holdout-v4-801",
+      "field": "caption",
+      "text": "İnce çorabın üstüne kısa örgü çorap ekledim."
+    },
+    {
+      "id": "tr-holdout-v4-802",
+      "field": "caption",
+      "text": "Bugün iki farklı çorap kenarı birlikte görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-803",
+      "field": "altText",
+      "text": "Uzun ince çorabın üzerinde kısa kalın çorap bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-804",
+      "field": "altText",
+      "text": "İki ayrı bitiş çizgisi ayakkabının üstünde sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-805",
+      "field": "altText",
+      "text": "Örgü kat ince iç çorabı bilek çevresinde örtüyor."
+    },
+    {
+      "id": "tr-holdout-v4-806",
+      "field": "caption",
+      "text": "Bugün sandaletlerimi yumuşak çoraplarla birlikte kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-807",
+      "field": "caption",
+      "text": "Açık bantların altında örgü dokusunu görmek hoşuma gitti."
+    },
+    {
+      "id": "tr-holdout-v4-808",
+      "field": "altText",
+      "text": "Açık sandaletlerin içine örgü çorap giyilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-809",
+      "field": "altText",
+      "text": "Sandalet bantları kalın çorabın üstünden ayağı sarıyor."
+    },
+    {
+      "id": "tr-holdout-v4-810",
+      "field": "altText",
+      "text": "Çorabın dikişli burnu açık ayakkabıdan görünür durumda."
+    },
+    {
+      "id": "tr-holdout-v4-811",
+      "field": "caption",
+      "text": "Kapüşonlu üstümü bugün bol ceketle tamamladım."
+    },
+    {
+      "id": "tr-holdout-v4-812",
+      "field": "caption",
+      "text": "Yumuşak kapüşonu ceket yakasının dışına yerleştirdim."
+    },
+    {
+      "id": "tr-holdout-v4-813",
+      "field": "altText",
+      "text": "Kapüşon ceket yakasının üzerinden sırta doğru düşüyor."
+    },
+    {
+      "id": "tr-holdout-v4-814",
+      "field": "altText",
+      "text": "Ceketin açık önünde kapüşonlu üstün bağları görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-815",
+      "field": "altText",
+      "text": "Yumuşak iç kat sert ceket yakasını çevreliyor."
+    },
+    {
+      "id": "tr-holdout-v4-816",
+      "field": "caption",
+      "text": "Şortumu bugün kalın çorapla serin havaya uyarladım."
+    },
+    {
+      "id": "tr-holdout-v4-817",
+      "field": "caption",
+      "text": "Geniş paçalı şort uzun çorapla daha farklı görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-818",
+      "field": "altText",
+      "text": "Kısa şortun altında opak kalın çorap bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-819",
+      "field": "altText",
+      "text": "Geniş şort kenarı düz renkli iç katın üzerinde bitiyor."
+    },
+    {
+      "id": "tr-holdout-v4-820",
+      "field": "altText",
+      "text": "Çorap katı kısa alt parçadan ayakkabıya kadar devam ediyor."
+    },
+    {
+      "id": "tr-holdout-v4-821",
+      "field": "caption",
+      "text": "Kısa elbisemi bugün geniş pantolonun üstüne giydim."
+    },
+    {
+      "id": "tr-holdout-v4-822",
+      "field": "caption",
+      "text": "Aynı elbiseyi ikinci bir alt katla yeniden deniyorum."
+    },
+    {
+      "id": "tr-holdout-v4-823",
+      "field": "altText",
+      "text": "Diz hizasındaki elbise geniş paçalı pantolonun üzerine giyilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-824",
+      "field": "altText",
+      "text": "Pantolonun uzun bacakları elbise kenarının altından çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-825",
+      "field": "altText",
+      "text": "İki dökümlü kumaş katı diz çevresinde üst üste duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-826",
+      "field": "caption",
+      "text": "Bugün tek paçayı kıvırıp iki tarafı farklı bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-827",
+      "field": "caption",
+      "text": "Asimetrik paça ayakkabılardan birini biraz daha gösteriyor."
+    },
+    {
+      "id": "tr-holdout-v4-828",
+      "field": "altText",
+      "text": "Pantolonun yalnızca bir paçası yukarı doğru katlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-829",
+      "field": "altText",
+      "text": "Diğer bacak düz kalırken tek bilek daha açık görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-830",
+      "field": "altText",
+      "text": "Bir ayakkabının üzerinde geniş kumaş kıvrımı bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-831",
+      "field": "caption",
+      "text": "Bugün bir uzun küpe ve küçük bir halka taktım."
+    },
+    {
+      "id": "tr-holdout-v4-832",
+      "field": "caption",
+      "text": "Küpe çiftini farklı uzunluklarla bir araya getirdim."
+    },
+    {
+      "id": "tr-holdout-v4-833",
+      "field": "altText",
+      "text": "Bir kulakta uzun küpe, diğerinde küçük halka bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-834",
+      "field": "altText",
+      "text": "İki farklı boydaki takı yüzün iki yanında duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-835",
+      "field": "altText",
+      "text": "Uzun metal parça küçük yuvarlak eşiyle eşleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-836",
+      "field": "caption",
+      "text": "Saatimin kayışını bugün iki tur dolayarak taktım."
+    },
+    {
+      "id": "tr-holdout-v4-837",
+      "field": "caption",
+      "text": "Uzun ince bant bilekte başka takı istemiyor."
+    },
+    {
+      "id": "tr-holdout-v4-838",
+      "field": "altText",
+      "text": "Saatin deri kayışı bileği iki kez sarıyor."
+    },
+    {
+      "id": "tr-holdout-v4-839",
+      "field": "altText",
+      "text": "İki paralel bant küçük saat kadranının altından geçiyor."
+    },
+    {
+      "id": "tr-holdout-v4-840",
+      "field": "altText",
+      "text": "Uzun kayışın ucu ikinci turdan sonra tokaya bağlanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-841",
+      "field": "caption",
+      "text": "Çantanın uzun askısını çıkarıp kısa sapını kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-842",
+      "field": "caption",
+      "text": "Bugün aynı çantayı elde taşımak daha iyi geldi."
+    },
+    {
+      "id": "tr-holdout-v4-843",
+      "field": "altText",
+      "text": "Çantada kısa tutma sapı ve çıkarılmış omuz kayışı bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-844",
+      "field": "altText",
+      "text": "Uzun askının klipsi çantanın yanına bırakılmış."
+    },
+    {
+      "id": "tr-holdout-v4-845",
+      "field": "altText",
+      "text": "Kısa sap katlanarak üstteki iki halkayı birleştiriyor."
+    },
+    {
+      "id": "tr-holdout-v4-846",
+      "field": "caption",
+      "text": "Dirseğe kadar uzanan eldivenleri kısa kollu elbiseyle denedim."
+    },
+    {
+      "id": "tr-holdout-v4-847",
+      "field": "caption",
+      "text": "Bugün uzun kumaş eldivenler kol çizgisini tamamlıyor."
+    },
+    {
+      "id": "tr-holdout-v4-848",
+      "field": "altText",
+      "text": "İnce eldivenler ellerden dirsek üstüne kadar uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-849",
+      "field": "altText",
+      "text": "Kısa elbise kolunun altında uzun eldivenler görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-850",
+      "field": "altText",
+      "text": "Yumuşak eldiven kumaşı bilekte hafif kıvrımlar oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-851",
+      "field": "caption",
+      "text": "Seramik yüzüğün hafif pürüzlü yüzeyini seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-852",
+      "field": "caption",
+      "text": "Bugün elde şekillendirdiğim halkayı ilk kez taktım."
+    },
+    {
+      "id": "tr-holdout-v4-853",
+      "field": "altText",
+      "text": "Geniş seramik yüzüğün kenarları hafif düzensiz görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-854",
+      "field": "altText",
+      "text": "Parmak üzerindeki mat halka küçük sır benekleri taşıyor."
+    },
+    {
+      "id": "tr-holdout-v4-855",
+      "field": "altText",
+      "text": "El yapımı yüzüğün üst yüzeyi ince çatlaklarla kaplı."
+    },
+    {
+      "id": "tr-holdout-v4-856",
+      "field": "caption",
+      "text": "Küçük kâğıt turnayı koruyucu kaplamayla kolyeye çevirdim."
+    },
+    {
+      "id": "tr-holdout-v4-857",
+      "field": "caption",
+      "text": "Bugün boynumda katlanmış minicik bir kuş taşıyorum."
+    },
+    {
+      "id": "tr-holdout-v4-858",
+      "field": "altText",
+      "text": "Kâğıttan katlanmış küçük turna ince zincire bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-859",
+      "field": "altText",
+      "text": "Kuş biçimli kolye ucunda keskin kat çizgileri görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-860",
+      "field": "altText",
+      "text": "Üçgen kanatlar gömleğin düz yüzeyinin üzerinde açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-861",
+      "field": "caption",
+      "text": "Geniş şalımı başımın üzerinden geçirip omuzda topladım."
+    },
+    {
+      "id": "tr-holdout-v4-862",
+      "field": "caption",
+      "text": "Bugün tek parça kumaş hem başlık hem boyun katı oldu."
+    },
+    {
+      "id": "tr-holdout-v4-863",
+      "field": "altText",
+      "text": "Geniş şal başın üzerinden omuzlara doğru iniyor."
+    },
+    {
+      "id": "tr-holdout-v4-864",
+      "field": "altText",
+      "text": "Kumaşın iki uzun ucu boynun yanında serbest duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-865",
+      "field": "altText",
+      "text": "Tek şal baş çevresinde yumuşak bir çerçeve oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-866",
+      "field": "caption",
+      "text": "Küçük kulağa geçmeli halkayı bugün tek başına kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-867",
+      "field": "caption",
+      "text": "Yeni delik gerektirmeyen bu küçük takıyı seviyorum."
+    },
+    {
+      "id": "tr-holdout-v4-868",
+      "field": "altText",
+      "text": "İnce açık halka kulağın üst kenarına geçirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-869",
+      "field": "altText",
+      "text": "Küçük metal parça kulak çevresini kısmen sarıyor."
+    },
+    {
+      "id": "tr-holdout-v4-870",
+      "field": "altText",
+      "text": "Halkanın iki ucu arasında dar bir boşluk bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-871",
+      "field": "caption",
+      "text": "Küçük çantamı bugün kemere geçirerek taşıdım."
+    },
+    {
+      "id": "tr-holdout-v4-872",
+      "field": "caption",
+      "text": "Askıyı çıkarınca çanta belimde düzgün duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-873",
+      "field": "altText",
+      "text": "Küçük çantanın arka halkaları kemer bandına geçirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-874",
+      "field": "altText",
+      "text": "Çanta kalça yanında bel kemerinden asılı duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-875",
+      "field": "altText",
+      "text": "Uzun omuz askısı çıkarılmış, kısa bağlantılar kullanılmış."
+    },
+    {
+      "id": "tr-holdout-v4-876",
+      "field": "caption",
+      "text": "Açık tepeli güneşliğimi bugün saçımı toplamadan taktım."
+    },
+    {
+      "id": "tr-holdout-v4-877",
+      "field": "caption",
+      "text": "Geniş siper yüzü gölgelerken üst taraf açık kalıyor."
+    },
+    {
+      "id": "tr-holdout-v4-878",
+      "field": "altText",
+      "text": "Başın üstünü kapatmayan geniş bir güneşlik bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-879",
+      "field": "altText",
+      "text": "Ön siper esnek bantla baş çevresinde tutuluyor."
+    },
+    {
+      "id": "tr-holdout-v4-880",
+      "field": "altText",
+      "text": "Saç güneşliğin açık üst bölümünden dışarı çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-881",
+      "field": "caption",
+      "text": "Küçük kuş iğnesini gömleğimin yaka ucuna taktım."
+    },
+    {
+      "id": "tr-holdout-v4-882",
+      "field": "caption",
+      "text": "Bugün metal kuş sade yakada küçük bir ayrıntı oldu."
+    },
+    {
+      "id": "tr-holdout-v4-883",
+      "field": "altText",
+      "text": "Kuş biçimli küçük iğne gömlek yakasına tutturulmuş."
+    },
+    {
+      "id": "tr-holdout-v4-884",
+      "field": "altText",
+      "text": "Metal kanat yaka ucunun bir bölümünü kaplıyor."
+    },
+    {
+      "id": "tr-holdout-v4-885",
+      "field": "altText",
+      "text": "İğnenin kısa gövdesi sivri yakanın üzerinde yatay duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-886",
+      "field": "caption",
+      "text": "Kuşağın sivri ucunu küçük kumaş halkanın içinden geçirdim."
+    },
+    {
+      "id": "tr-holdout-v4-887",
+      "field": "caption",
+      "text": "Bugün bel bağının düz ucunu görünür bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-888",
+      "field": "altText",
+      "text": "Kuşağın ucu uzun sivri bir üçgen biçiminde bitiyor."
+    },
+    {
+      "id": "tr-holdout-v4-889",
+      "field": "altText",
+      "text": "Küçük kumaş halka bel bağının serbest ucunu tutuyor."
+    },
+    {
+      "id": "tr-holdout-v4-890",
+      "field": "altText",
+      "text": "Düz kuşak bandının sonunda düzgünce dikilmiş üçgen uç bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-891",
+      "field": "caption",
+      "text": "Keçe kedimi ceket yakasında taşımaya karar verdim."
+    },
+    {
+      "id": "tr-holdout-v4-892",
+      "field": "caption",
+      "text": "Bugün minicik patileri olan el yapımı broşu taktım."
+    },
+    {
+      "id": "tr-holdout-v4-893",
+      "field": "altText",
+      "text": "Kedi biçimli küçük keçe broş cekete tutturulmuş."
+    },
+    {
+      "id": "tr-holdout-v4-894",
+      "field": "altText",
+      "text": "İki sivri kulak ve ince kuyruk keçe parçadan kesilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-895",
+      "field": "altText",
+      "text": "Dikişlerle belirtilmiş küçük patiler broşun alt bölümünde görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-896",
+      "field": "caption",
+      "text": "Balıkçı yakanın yüksek kısmını iki kez dışarı çevirdim."
+    },
+    {
+      "id": "tr-holdout-v4-897",
+      "field": "caption",
+      "text": "Bugün boyun katını daha kısa kullanmak rahat geldi."
+    },
+    {
+      "id": "tr-holdout-v4-898",
+      "field": "altText",
+      "text": "Yüksek örgü yaka iki kez katlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-899",
+      "field": "altText",
+      "text": "Boyun çevresinde kalın ve yuvarlak bir örgü bant oluşuyor."
+    },
+    {
+      "id": "tr-holdout-v4-900",
+      "field": "altText",
+      "text": "Yakanın iç yüzü dışa dönük kıvrımda görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-901",
+      "field": "caption",
+      "text": "Bluzun arkasındaki alt volan önden görünmüyor."
+    },
+    {
+      "id": "tr-holdout-v4-902",
+      "field": "caption",
+      "text": "Bugün düz ön yüzün arkasında küçük bir sürpriz var."
+    },
+    {
+      "id": "tr-holdout-v4-903",
+      "field": "altText",
+      "text": "Bluzun yalnızca arka alt kenarında geniş volan bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-904",
+      "field": "altText",
+      "text": "Arka etek ucunda dalgalı ikinci kumaş katı görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-905",
+      "field": "altText",
+      "text": "Düz yan dikiş arkaya doğru fırfırlı bitişe bağlanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-906",
+      "field": "caption",
+      "text": "Elbisemin sırtı boyunca küçük düğmeler uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-907",
+      "field": "caption",
+      "text": "Bugün arka kapanışın ince çizgisini paylaşmak istedim."
+    },
+    {
+      "id": "tr-holdout-v4-908",
+      "field": "altText",
+      "text": "Elbisenin sırt ortasında küçük düğmeler sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-909",
+      "field": "altText",
+      "text": "Düğmeli arka açıklık enseden bel hizasına kadar iniyor."
+    },
+    {
+      "id": "tr-holdout-v4-910",
+      "field": "altText",
+      "text": "İki dar kumaş şeridi sırtın ortasında üst üste geliyor."
+    },
+    {
+      "id": "tr-holdout-v4-911",
+      "field": "caption",
+      "text": "Şapkanın geniş kenarı yumuşak bir volan gibi duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-912",
+      "field": "caption",
+      "text": "Bugün hafif kumaş kenarı güneşte güzelce dalgalandı."
+    },
+    {
+      "id": "tr-holdout-v4-913",
+      "field": "altText",
+      "text": "Şapkanın çevresinde bol ve dalgalı kumaş kenar bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-914",
+      "field": "altText",
+      "text": "Büzgülü dış parça şapka gövdesinden aşağı doğru açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-915",
+      "field": "altText",
+      "text": "Geniş yumuşak kenar omuz üstünde gölge oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-916",
+      "field": "caption",
+      "text": "Örgü papyonumu bugün gömleğimin üst düğmesine taktım."
+    },
+    {
+      "id": "tr-holdout-v4-917",
+      "field": "caption",
+      "text": "Bu küçük aksesuarı artan yünle örmüştüm."
+    },
+    {
+      "id": "tr-holdout-v4-918",
+      "field": "altText",
+      "text": "Küçük örgü papyon gömlek yakasının ortasında duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-919",
+      "field": "altText",
+      "text": "Papyonun iki kanadında belirgin yatay ilmekler bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-920",
+      "field": "altText",
+      "text": "Dar orta bant örgü fiyongun merkezini topluyor."
+    },
+    {
+      "id": "tr-holdout-v4-921",
+      "field": "caption",
+      "text": "Eski kravatı bugün belimde kuşak gibi kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-922",
+      "field": "caption",
+      "text": "Desenli bağ düz elbiseme farklı bir çizgi ekledi."
+    },
+    {
+      "id": "tr-holdout-v4-923",
+      "field": "altText",
+      "text": "Bir kravat elbisenin beline dolanarak bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-924",
+      "field": "altText",
+      "text": "Kravatın sivri ucu kalçanın yanında aşağı sarkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-925",
+      "field": "altText",
+      "text": "Desenli dar kumaş parçası bel çevresinde kemer görevi görüyor."
+    },
+    {
+      "id": "tr-holdout-v4-926",
+      "field": "caption",
+      "text": "Ceket yakasının altına küçük deri parçalar ekledim."
+    },
+    {
+      "id": "tr-holdout-v4-927",
+      "field": "caption",
+      "text": "Bugün iki dokunun yaka kenarında buluşmasını sevdim."
+    },
+    {
+      "id": "tr-holdout-v4-928",
+      "field": "altText",
+      "text": "Ceketin yaka uçlarında küçük deri ekler bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-929",
+      "field": "altText",
+      "text": "Deri parçaların kenarında ince sabitleme dikişleri görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-930",
+      "field": "altText",
+      "text": "Mat kumaş yaka pürüzsüz küçük eklerle tamamlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-931",
+      "field": "caption",
+      "text": "Pantolonun yan çizgisini kumaş boyasıyla kendim çektim."
+    },
+    {
+      "id": "tr-holdout-v4-932",
+      "field": "caption",
+      "text": "Bugün el çizgimin hafif dalgalanması hoşuma gidiyor."
+    },
+    {
+      "id": "tr-holdout-v4-933",
+      "field": "altText",
+      "text": "Pantolonun dış yanında elle boyanmış uzun çizgi var."
+    },
+    {
+      "id": "tr-holdout-v4-934",
+      "field": "altText",
+      "text": "Boya izi yan dikişe paralel fakat hafif düzensiz ilerliyor."
+    },
+    {
+      "id": "tr-holdout-v4-935",
+      "field": "altText",
+      "text": "İnce fırça çizgisi belden paça ucuna kadar uzanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-936",
+      "field": "caption",
+      "text": "Ayakkabının ucundaki koruyucu parça başka dokuda duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-937",
+      "field": "caption",
+      "text": "Bugün belirgin burun kapakları sade çifti hareketlendirdi."
+    },
+    {
+      "id": "tr-holdout-v4-938",
+      "field": "altText",
+      "text": "Ayakkabının ön ucu farklı dokulu bir parçayla kaplanmış."
+    },
+    {
+      "id": "tr-holdout-v4-939",
+      "field": "altText",
+      "text": "Burun kapağı ayakkabının kalanından keskin çizgiyle ayrılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-940",
+      "field": "altText",
+      "text": "İki küçük parlak kapak mat deri üstünde öne çıkıyor."
+    },
+    {
+      "id": "tr-holdout-v4-941",
+      "field": "caption",
+      "text": "Pantolon paçamı bisiklet klipsiyle topladım."
+    },
+    {
+      "id": "tr-holdout-v4-942",
+      "field": "caption",
+      "text": "Bugün metal halka geniş kumaşı zincirden uzak tuttu."
+    },
+    {
+      "id": "tr-holdout-v4-943",
+      "field": "altText",
+      "text": "Pantolonun sağ paçasında ince metal bir klips bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-944",
+      "field": "altText",
+      "text": "Yay biçimli halka kumaşı bileğe yakın topluyor."
+    },
+    {
+      "id": "tr-holdout-v4-945",
+      "field": "altText",
+      "text": "Geniş paça küçük bir bağlantıyla daraltılmış."
+    },
+    {
+      "id": "tr-holdout-v4-946",
+      "field": "caption",
+      "text": "Kazağımın arkasını örgü kordonlarla gevşekçe bağladım."
+    },
+    {
+      "id": "tr-holdout-v4-947",
+      "field": "caption",
+      "text": "Bugün sırt açıklığının bağları iki yana düşüyor."
+    },
+    {
+      "id": "tr-holdout-v4-948",
+      "field": "altText",
+      "text": "Kazağın arka kenarlarını kalın örgü bağlar birleştiriyor."
+    },
+    {
+      "id": "tr-holdout-v4-949",
+      "field": "altText",
+      "text": "İki kordon sırtın ortasında büyük bir düğüm oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-950",
+      "field": "altText",
+      "text": "Açık arka parçanın altında düz bir iç kat görünüyor."
+    },
+    {
+      "id": "tr-holdout-v4-951",
+      "field": "caption",
+      "text": "Şalımı omuzda eski broşumla sabitledim."
+    },
+    {
+      "id": "tr-holdout-v4-952",
+      "field": "caption",
+      "text": "Bugün bağlamadan duran yumuşak kumaş daha rahat geldi."
+    },
+    {
+      "id": "tr-holdout-v4-953",
+      "field": "altText",
+      "text": "Geniş şal omuz üstünde tek broşla tutturulmuş."
+    },
+    {
+      "id": "tr-holdout-v4-954",
+      "field": "altText",
+      "text": "Metal iğne iki kumaş katını yan tarafta birleştiriyor."
+    },
+    {
+      "id": "tr-holdout-v4-955",
+      "field": "altText",
+      "text": "Şalın serbest uçları göğsün iki yanında aşağı düşüyor."
+    },
+    {
+      "id": "tr-holdout-v4-956",
+      "field": "caption",
+      "text": "Tığla ördüğüm çanta deniz kabuğu biçiminde açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-957",
+      "field": "caption",
+      "text": "Bugün yelpazeli örgüyü sade üstle tamamladım."
+    },
+    {
+      "id": "tr-holdout-v4-958",
+      "field": "altText",
+      "text": "Tığ işi çanta genişleyen dilimlerle deniz kabuğu oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-959",
+      "field": "altText",
+      "text": "Yarım daire çantanın üst kenarı dalgalı biçimde bitiyor."
+    },
+    {
+      "id": "tr-holdout-v4-960",
+      "field": "altText",
+      "text": "Örgü çizgileri alt merkezden dışa doğru yayılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-961",
+      "field": "caption",
+      "text": "Eteğimin arkasında aşağıya kadar küçük düğmeler var."
+    },
+    {
+      "id": "tr-holdout-v4-962",
+      "field": "caption",
+      "text": "Bugün arka düğme sırasını görünür bıraktım."
+    },
+    {
+      "id": "tr-holdout-v4-963",
+      "field": "altText",
+      "text": "Eteğin arkasında belden aşağı dikey düğmeler sıralanıyor."
+    },
+    {
+      "id": "tr-holdout-v4-964",
+      "field": "altText",
+      "text": "Arka açıklık en alttaki iki düğmenin altında açılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-965",
+      "field": "altText",
+      "text": "Küçük düğmeler düz etek arkasında tek çizgi oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-966",
+      "field": "caption",
+      "text": "Eldivenin ince ağı ellerimde çapraz çizgiler yapıyor."
+    },
+    {
+      "id": "tr-holdout-v4-967",
+      "field": "caption",
+      "text": "Bugün hafif file eldivenleri sade elbiseyle denedim."
+    },
+    {
+      "id": "tr-holdout-v4-968",
+      "field": "altText",
+      "text": "İnce ağ eldivenlerin yüzeyinde küçük eşkenar boşluklar bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-969",
+      "field": "altText",
+      "text": "Çapraz iplikler parmakları ve elin arkasını örtüyor."
+    },
+    {
+      "id": "tr-holdout-v4-970",
+      "field": "altText",
+      "text": "Eldivenin açık örgüsü alttaki yüzeyi görünür bırakıyor."
+    },
+    {
+      "id": "tr-holdout-v4-971",
+      "field": "caption",
+      "text": "İnce zinciri bugün kemer halkalarından geçirerek taktım."
+    },
+    {
+      "id": "tr-holdout-v4-972",
+      "field": "caption",
+      "text": "Pantolonun yanında sarkan metal çizgi hoşuma gitti."
+    },
+    {
+      "id": "tr-holdout-v4-973",
+      "field": "altText",
+      "text": "İnce zincir pantolonun iki kemer halkasına bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-974",
+      "field": "altText",
+      "text": "Metal bağlantı kalçanın yanında yumuşak bir yay çiziyor."
+    },
+    {
+      "id": "tr-holdout-v4-975",
+      "field": "altText",
+      "text": "Küçük kancalar zincirin uçlarını bel hizasında tutuyor."
+    },
+    {
+      "id": "tr-holdout-v4-976",
+      "field": "caption",
+      "text": "Çantamın iki sapı ortadaki küçük kilitle birleşiyor."
+    },
+    {
+      "id": "tr-holdout-v4-977",
+      "field": "caption",
+      "text": "Bugün kilidi açınca çantanın ağzı bütünüyle genişledi."
+    },
+    {
+      "id": "tr-holdout-v4-978",
+      "field": "altText",
+      "text": "İki kısa sap ortada küçük metal kilitle bağlanmış."
+    },
+    {
+      "id": "tr-holdout-v4-979",
+      "field": "altText",
+      "text": "Açılmış bağlantı çantanın üst bölümünde iki parçaya ayrılıyor."
+    },
+    {
+      "id": "tr-holdout-v4-980",
+      "field": "altText",
+      "text": "Küçük mandal sapları yan yana sabit tutuyor."
+    },
+    {
+      "id": "tr-holdout-v4-981",
+      "field": "caption",
+      "text": "İnce hırkamın ön uçlarını eteğin içinde sakladım."
+    },
+    {
+      "id": "tr-holdout-v4-982",
+      "field": "caption",
+      "text": "Bugün düğmeli hırkayı üst parça gibi kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-983",
+      "field": "altText",
+      "text": "Kapalı ince hırkanın alt kenarı eteğin içine yerleştirilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-984",
+      "field": "altText",
+      "text": "Küçük hırka düğmeleri belin üstünde düz bir sıra oluşturuyor."
+    },
+    {
+      "id": "tr-holdout-v4-985",
+      "field": "altText",
+      "text": "Bel bandı örgü hırkanın bütün alt kısmını örtüyor."
+    },
+    {
+      "id": "tr-holdout-v4-986",
+      "field": "caption",
+      "text": "Ceketin içindeki askı bandını bugün yeniledim."
+    },
+    {
+      "id": "tr-holdout-v4-987",
+      "field": "caption",
+      "text": "Yeni kumaş ilmek ceketin ağırlığını rahatça taşıyor."
+    },
+    {
+      "id": "tr-holdout-v4-988",
+      "field": "altText",
+      "text": "Ceketin iç ense bölümüne geniş bir askı bandı dikilmiş."
+    },
+    {
+      "id": "tr-holdout-v4-989",
+      "field": "altText",
+      "text": "Kısa kumaş ilmeğin iki ucunda sağlam çapraz dikişler var."
+    },
+    {
+      "id": "tr-holdout-v4-990",
+      "field": "altText",
+      "text": "Açık yakada astarın üstüne eklenmiş taşıma halkası görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-991",
+      "field": "caption",
+      "text": "Çift yüzlü eteğimin bugün düz tarafını kullandım."
+    },
+    {
+      "id": "tr-holdout-v4-992",
+      "field": "caption",
+      "text": "Aynı eteği ters çevirince desen bütünüyle kayboluyor."
+    },
+    {
+      "id": "tr-holdout-v4-993",
+      "field": "altText",
+      "text": "Eteğin çevrilmiş kenarında iki farklı kullanılabilir yüz görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-994",
+      "field": "altText",
+      "text": "Bir tarafı desenli kumaşın diğer yüzü tamamen düz."
+    },
+    {
+      "id": "tr-holdout-v4-995",
+      "field": "altText",
+      "text": "Bel kısmında içe ya da dışa giyilebilen temiz dikişler bulunuyor."
+    },
+    {
+      "id": "tr-holdout-v4-996",
+      "field": "caption",
+      "text": "Düğmenin altına küçük iplik ayağı yapınca daha rahat kapandı."
+    },
+    {
+      "id": "tr-holdout-v4-997",
+      "field": "caption",
+      "text": "Bugün kalın kabanın düğmelerini yeniden sağlamlaştırdım."
+    },
+    {
+      "id": "tr-holdout-v4-998",
+      "field": "altText",
+      "text": "Düğmenin altında sıkıca sarılmış kısa iplik ayağı görülüyor."
+    },
+    {
+      "id": "tr-holdout-v4-999",
+      "field": "altText",
+      "text": "Kaban düğmesi kumaştan küçük bir aralıkla yukarıda duruyor."
+    },
+    {
+      "id": "tr-holdout-v4-1000",
+      "field": "altText",
+      "text": "İplik sargısı kalın kumaşla düğme arasında sağlam bağlantı oluşturuyor."
+    }
+  ]
+}

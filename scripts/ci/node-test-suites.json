@@ -1,0 +1,39 @@
+{
+  "discoverRoot": "scripts",
+  "discoverPattern": "\\.(test|spec)\\.mjs$",
+  "workflow": ".github/workflows/pr-share-card-native.yml",
+  "vitest": ["scripts/lib/story68-api-entry.test.mjs"],
+  "suites": {
+    "startup-deadline": ["scripts/ci/supabase-start-deadline.test.mjs"],
+    "browser-deps": ["scripts/ci/share-card-browser-deps.test.mjs"],
+    "worklets-staging": ["scripts/lib/story68-worklets-staging.test.mjs"],
+    "share-card-plugins": [
+      "apps/mobile/plugins/with-share-card-permissions.test.js",
+      "apps/mobile/plugins/with-story68-release-network.test.js"
+    ],
+    "native-harness": "discover"
+  },
+  "conditionNeeds": {
+    "startup-deadline": ["install"],
+    "browser-deps": [],
+    "share-card-plugins": ["install"],
+    "native-harness": ["install"],
+    "worklets-staging": ["prebuild"],
+    "vitest": ["runtime"]
+  },
+  "rowRestrictions": {
+    "browser-deps": { "platform": ["android"] },
+    "worklets-staging": { "platform": ["android"] }
+  },
+  "runElsewhere": {
+    "apps/mobile/plugins/with-watchos.test.js": "apps/mobile npm test (test:watchos-prebuild) and watchos-native.yml",
+    "apps/mobile/plugins/with-widgets.test.js": "apps/mobile npm test (test:widget-prebuild)"
+  },
+  "pinnedReasons": {
+    "startup-deadline": "Must pass before the job starts local Supabase.",
+    "browser-deps": "Must pass before the Android lane provisions pinned browsers.",
+    "worklets-staging": "Needs the generated Android project, so it runs after prebuild.",
+    "share-card-plugins": "apps/mobile/plugins also holds the watchOS and widget prebuild suites that other workflows own, so these two are listed instead of discovered.",
+    "vitest": "Imports vitest, so node --test cannot run it; the vitest step gates it from its JSON report."
+  }
+}

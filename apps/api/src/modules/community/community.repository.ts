@@ -51,6 +51,7 @@ import {
   COMMUNITY_REACTION_CONFLICT_MESSAGE,
   COMMUNITY_POST_NOT_FOUND_MESSAGE,
 } from '@couture/api-client/contracts/http'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 export interface FindFeedPostsParams {
   filterBand?: ClimateBand
@@ -249,7 +250,7 @@ export class CommunityRepository {
     ) => Promise<void>
   }): Promise<{ summary: CommunityReactionSummary } | { retryAfterSeconds: number }> {
     const { userId, postId, input, platform } = params
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       await assertCommunitySubjectAvailable(tx, userId)
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
@@ -491,7 +492,7 @@ export class CommunityRepository {
   async createPostDraft(
     data: Prisma.LookbookPostUncheckedCreateInput
   ): Promise<LookbookPost> {
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${data.user_id}))`
       await assertCommunityDatabaseAccess(tx, data.user_id)
       const subject = await tx.communitySubject.findUnique({
@@ -594,7 +595,7 @@ export class CommunityRepository {
   }): Promise<PublishWithinQuotaResult> {
     const { userId, postId, cap, data } = params
 
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       // FIRST statement, always. Counting before locking is exactly the
       // check-then-act race the cap is supposed to close: two parallel requests
       // both read nine and both accept. The lock is per user and released at
@@ -718,7 +719,7 @@ export class CommunityRepository {
       params
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      return await interactiveTransaction(this.prisma, async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_report:' || ${reporterId}))`
 
         const locked = await tx.$queryRaw<
@@ -997,7 +998,7 @@ export class CommunityRepository {
     data: Prisma.CommunityChallengeUncheckedCreateInput & CommunityChallengeWriteData
   ): Promise<{ kind: 'created'; challenge: ChallengeRowWithZone } | { kind: 'overlap' }> {
     return mapChallengeConstraintErrors(() =>
-      this.prisma.$transaction(async (tx) => {
+      interactiveTransaction(this.prisma, async (tx) => {
         const overlap = await this.findOverlappingChallenge(
           climateBand,
           startsAt,
@@ -1026,7 +1027,7 @@ export class CommunityRepository {
     data: Prisma.CommunityChallengeUncheckedUpdateInput & CommunityChallengeWriteData
   ): Promise<{ kind: 'updated'; challenge: ChallengeRowWithZone } | { kind: 'overlap' }> {
     return mapChallengeConstraintErrors(() =>
-      this.prisma.$transaction(async (tx) => {
+      interactiveTransaction(this.prisma, async (tx) => {
         const overlap = await this.findOverlappingChallenge(
           climateBand,
           startsAt,

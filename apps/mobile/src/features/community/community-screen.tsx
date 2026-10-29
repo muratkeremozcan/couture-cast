@@ -1,11 +1,11 @@
-import { onLocationsChanged } from '@/src/lib/locations'
-import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
+import { useAndroidSpotlightDetailPresentation } from '@/components/android-spotlight-detail-presentation'
 import {
-  resolveMobileAccessToken,
-  mobileApplicationUserId,
-  subscribeMobileApplicationUser,
-} from '@/src/lib/mobile-auth'
+  ScreenShareCardComposer,
+  useShareCardPresentationOpener,
+} from '@/components/android-share-card-presentation'
+import { focusShareCardElement, shareCardHeadingNode } from '@/src/lib/share-card-focus'
 import {
+  type ShareCardSource,
   abortError,
   ResponseError,
   withRequestDeadline,
@@ -15,6 +15,13 @@ import {
   CommunityRequestSuperseded,
   CommunityVerification,
 } from '@couture/api-client'
+import { onLocationsChanged } from '@/src/lib/locations'
+import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
+import {
+  resolveMobileAccessToken,
+  mobileApplicationUserId,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
 import { CommunityCommentsSheet } from '@/components/community/community-comments-sheet'
 import { useCommunityScrollRestore } from './use-community-scroll-restore'
 import { CommunityCommentDrafts } from './community-comment-drafts'
@@ -187,6 +194,14 @@ function sheetPostId(
   focused: boolean
 ): string | null {
   return available && focused ? postId : null
+}
+
+function spotlightDetailForVisit(
+  item: CommunityReactionSpotlightItem | null,
+  available: boolean,
+  currentVisit: boolean
+) {
+  return available && currentVisit ? item : null
 }
 
 export function CommunityScreen() {
@@ -366,6 +381,27 @@ export function CommunityScreen() {
    * focus arrives after an intent the router delivered first; the ref guards
    * their timers and frames.
    */
+  const openAndroidShareCard = useShareCardPresentationOpener()
+  const shareCardInvoker = useRef<{
+    node: (() => number | null) | null
+    member: string | null
+  }>({
+    node: null,
+    member: null,
+  })
+  const [shareCardSource, setShareCardSource] = useState<ShareCardSource | null>(null)
+  const [shareCardOpen, setShareCardOpen] = useState(false)
+  useEffect(() => {
+    setShareCardSource(null)
+    setShareCardOpen(false)
+  }, [sessionScope])
+  const openShareCard = (postId: string, opener: () => number | null) => {
+    if (openAndroidShareCard({ kind: 'community_post', postId }, 'community', opener))
+      return
+    shareCardInvoker.current = { node: opener, member: mobileApplicationUserId() }
+    setShareCardSource({ kind: 'community_post', postId })
+    setShareCardOpen(true)
+  }
   const screenFocusedRef = useRef(false)
   const [screenFocused, setScreenFocused] = useState(false)
   useFocusEffect(
@@ -373,6 +409,8 @@ export function CommunityScreen() {
       screenFocusedRef.current = true
       setScreenFocused(true)
       return () => {
+        setShareCardSource(null)
+        setShareCardOpen(false)
         screenFocusedRef.current = false
         setScreenFocused(false)
         setSpotlightIntent(null)
@@ -383,6 +421,7 @@ export function CommunityScreen() {
     }, [])
   )
   const canMoveSpotlightFocus = useCallback(() => screenFocusedRef.current, [])
+  const retainedSpotlight = useAndroidSpotlightDetailPresentation()
   const [spotlightDetail, setSpotlightDetail] =
     useState<CommunityReactionSpotlightItem | null>(null)
   const spotlightRankRefs = useRef(new Map<string, View | null>())
@@ -1178,6 +1217,7 @@ export function CommunityScreen() {
           setFeedError(null)
         }
         if (state === 'denied') {
+          setIsPostSheetVisible(false)
           actionControllerRef.current?.abort()
           setIsSubmittingReport(false)
           actionGenerationRef.current++
@@ -1292,15 +1332,38 @@ export function CommunityScreen() {
           post.rank,
           spotlightLevel
         ).catch(() => undefined)
+      retainedSpotlight.setPostId(post.id)
       setSpotlightDetail(post)
     },
-    [spotlightLevel]
+    [spotlightLevel, retainedSpotlight.setPostId]
   )
 
   // A look that left the spotlight (hidden, erased, withdrawn or the member
   // changed) cannot stay open in its detail. While it stays, the detail shows the
   // live copy, so a refreshed image or realtime update reaches it too.
   const spotlightItems = spotlight.items
+  useEffect(() => {
+    if (!retainedSpotlight.managed) return
+    if (!retainedSpotlight.active || !retainedSpotlight.postId) {
+      setSpotlightDetail(null)
+      return
+    }
+    if (spotlight.status === 'ready') {
+      const fresh = spotlightItems.find((post) => post.id === retainedSpotlight.postId)
+      setSpotlightDetail(fresh ?? null)
+      if (!fresh) retainedSpotlight.setPostId(null)
+    } else if (spotlight.status === 'disabled') {
+      retainedSpotlight.setPostId(null)
+      setSpotlightDetail(null)
+    }
+  }, [
+    retainedSpotlight.managed,
+    retainedSpotlight.active,
+    retainedSpotlight.postId,
+    retainedSpotlight.setPostId,
+    spotlight.status,
+    spotlightItems,
+  ])
   const spotlightDetailItem = spotlightDetail
     ? (spotlightItems.find((post) => post.id === spotlightDetail.id) ?? null)
     : null
@@ -1322,6 +1385,7 @@ export function CommunityScreen() {
   const closeSpotlightDetail = useCallback(
     (action?: () => void) => {
       const closing = spotlightDetail
+      retainedSpotlight.setPostId(null)
       setSpotlightDetail(null)
       if (action) {
         pendingSpotlightActionRef.current = action
@@ -1332,7 +1396,7 @@ export function CommunityScreen() {
       }
       if (closing) focusNode(spotlightRankRefs.current.get(closing.id) ?? null)
     },
-    [focusNode, runPendingSpotlightAction, spotlightDetail]
+    [focusNode, runPendingSpotlightAction, spotlightDetail, retainedSpotlight.setPostId]
   )
 
   const markReported = useCallback((postId: string) => {
@@ -1732,6 +1796,7 @@ export function CommunityScreen() {
       inDetail ? closeSpotlightDetail(action) : action()
     return (
       <CommunityCard
+        onExport={(postId, opener) => viaDetail(() => openShareCard(postId, opener))}
         onComments={(target) =>
           viaDetail(() => {
             notificationIntentRef.current++
@@ -1833,6 +1898,7 @@ export function CommunityScreen() {
           style={styles.highlightSection}
         >
           <CommunityCard
+            onExport={openShareCard}
             onComments={(post) => {
               notificationIntentRef.current++
               commentsInvokerRef.current = highlightedCommentsButtonRef.current
@@ -1918,7 +1984,6 @@ export function CommunityScreen() {
         style={[styles.container, { backgroundColor: palette.background }]}
         testID="community-screen"
       >
-        {/* The tab header already names the screen, as on every other tab. */}
         <View style={styles.header}>
           <TouchableOpacity
             ref={newPostButtonRef}
@@ -1965,6 +2030,7 @@ export function CommunityScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <CommunityCard
+              onExport={openShareCard}
               onComments={(post) => {
                 notificationIntentRef.current++
                 commentsInvokerRef.current =
@@ -2050,10 +2116,31 @@ export function CommunityScreen() {
           }}
         />
         <CommunitySpotlightDetail
-          item={communityAvailable ? spotlightDetailItem : null}
+          item={spotlightDetailForVisit(
+            spotlightDetailItem,
+            communityAvailable,
+            retainedSpotlight.active
+          )}
           onClose={() => closeSpotlightDetail()}
           onDismissed={runPendingSpotlightAction}
           renderCard={(post) => renderSpotlightCard(post, true)}
+        />
+        <ScreenShareCardComposer
+          source={shareCardSource}
+          open={
+            shareCardOpen && shareCardInvoker.current.member === mobileApplicationUserId()
+          }
+          onClose={() => setShareCardOpen(false)}
+          onRestoreFocus={() => {
+            if (
+              !screenFocusedRef.current ||
+              shareCardInvoker.current.member !== mobileApplicationUserId()
+            )
+              return
+            const node =
+              shareCardInvoker.current.node?.() ?? shareCardHeadingNode('community')
+            focusShareCardElement(node)
+          }}
         />
         <CommunityPostSheet
           key={sessionScope ?? 'anonymous'}

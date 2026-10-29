@@ -13,6 +13,7 @@
 // CLI: PROBE_API_BASE_URL=... [PROBE_WEB_ORIGIN=...] [VERCEL_AUTOMATION_BYPASS_SECRET=...]
 //      [PROBE_READER_USER_ID=... PROBE_WRITER_USER_ID=...] [PROBE_ALLOW_LOCAL_TARGET=1 loopback only] [PROBE_HOLD_MS=320000] [PROBE_SOCKETS=6] [PROBE_SAMPLES=5] [PROBE_OUT=evidence.json]
 //      node scripts/probe-community-preview.mjs
+import fs from 'node:fs'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
@@ -776,7 +777,10 @@ export async function runPreviewProbe(options) {
   return evidence
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (
+  import.meta.url ===
+  pathToFileURL(process.argv[1] ? fs.realpathSync(process.argv[1]) : '').href
+) {
   const apiBaseUrl = process.env.PROBE_API_BASE_URL
   if (!apiBaseUrl) {
     console.error('PROBE_API_BASE_URL is required.')

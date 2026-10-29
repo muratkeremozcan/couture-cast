@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { assertTestDiskSpace } from './lib/test-disk-space.mjs'
 // Step 12 step 4 owner: searchable owner anchor
 
 /**
@@ -27,6 +28,15 @@ import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
+import {
+  assertGenericMaestroFlows,
+  discoverRunnableMaestroFlows,
+} from './lib/native-maestro-flows.mjs'
+import {
+  iosDriverPidfile,
+  reclaimIosDriverPort,
+  trackOwnedIosDrivers,
+} from './lib/maestro-ios-driver-ownership.mjs'
 import {
   COMMUNITY_COMMENTS_FLOW,
   COMMUNITY_COMMENTS_LONG_ROOT,
@@ -132,16 +142,10 @@ for (let index = 0; index < cliArgs.length; index += 1) {
  * that bites) is responsible for restoring it before it ends; nothing here may
  * depend on running before or after a particular sibling.
  */
-const discoverFlows = () => {
-  const flowDir = path.join(projectRoot, 'maestro')
-  return fs
-    .readdirSync(flowDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
-    .map((entry) => `maestro/${entry.name}`)
-    .sort()
-}
+const discoverFlows = () => discoverRunnableMaestroFlows(projectRoot)
 
 const flowsToRun = FLOW_PATHS.length > 0 ? FLOW_PATHS : discoverFlows()
+assertGenericMaestroFlows(flowsToRun)
 const WRITE_ARTIFACTS =
   process.argv.includes('--ci') ||
   process.argv.includes('--artifacts') ||
@@ -1914,6 +1918,7 @@ const prepareAndroidFlows = async (appId, devices) => {
   }
   const sourceDir = path.resolve(projectRoot, 'maestro')
   const targetDir = path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR, 'android-flows')
+  assertTestDiskSpace(projectRoot)
   const { files, rewritten } = prepareAndroidFlowTree({
     sourceDir,
     targetDir,
@@ -2238,6 +2243,8 @@ const waitForCondition = async (condition, timeoutMs = 60000, intervalMs = 2000)
  * @property {{ intervalMs: number, check: () => Promise<string | undefined> }} [stallCheck]
  *   polled while the child runs; a message stops the child and fails it with
  *   that message, which the flow does not retry (Story 6.7b R18)
+ * @property {(child: import('node:child_process').ChildProcess) => (() => void) | undefined} [onSpawn]
+ *   called once the child has a PID; the function it returns runs when the child exits
  */
 
 /**
@@ -2253,7 +2260,7 @@ const waitForCondition = async (condition, timeoutMs = 60000, intervalMs = 2000)
  */
 const spawnProcess = (command, args, options = {}) =>
   new Promise((resolve, reject) => {
-    const { timeoutMs, signal, logFile, stallCheck, ...spawnOptions } = options
+    const { timeoutMs, signal, logFile, stallCheck, onSpawn, ...spawnOptions } = options
     let logStream
     if (logFile) {
       fs.mkdirSync(path.dirname(logFile), { recursive: true })
@@ -2264,6 +2271,7 @@ const spawnProcess = (command, args, options = {}) =>
       stdio: logFile ? ['inherit', 'pipe', 'pipe'] : 'inherit',
       ...spawnOptions,
     })
+    const afterExit = child.pid ? onSpawn?.(child) : undefined
     let timedOut = false
     const timeout =
       typeof timeoutMs === 'number'
@@ -2317,6 +2325,7 @@ const spawnProcess = (command, args, options = {}) =>
     child.on('exit', (code) => {
       if (timeout) clearTimeout(timeout)
       if (stallTimer) clearInterval(stallTimer)
+      afterExit?.()
       if (stalled) {
         finish(() => reject(launchStallError(stalled)))
         return
@@ -3089,28 +3098,6 @@ const resolveReportPath = (requestedPath) => {
 }
 
 /**
- * Kill iOS driver processes left behind by an earlier run.
- *
- * Maestro's iOS driver listens on a fixed host port. A driver that outlived its
- * run keeps that port, and the next run's first flow dies with
- * `Failed to connect to /127.0.0.1:7001` -- a failure that looks exactly like a
- * flaky device and was recorded as one twice before it was traced here.
- *
- * @returns {Promise<void>}
- */
-const killStaleIosDrivers = async () => {
-  if (!isMac) return
-  for (const pattern of [
-    'maestro-driver-iosUITests-Runner',
-    'maestro-driver-ios-config.xctestrun',
-  ]) {
-    await spawnProcess('pkill', ['-f', pattern], { timeoutMs: 5_000 }).catch(() => {
-      // `pkill` exits non-zero when nothing matched, which is the normal case.
-    })
-  }
-}
-
-/**
  * Build the JavaScript bundle before the first flow runs.
  *
  * Metro answers its health check as soon as it is listening, long before it can
@@ -3175,7 +3162,19 @@ const warmMetroBundle = async (healthUrl, platform) => {
  * @param {SpawnProcessOptions} [options]
  * @returns {Promise<void>}
  */
-const runMaestroCommand = async (args, options = {}) => {
+const runMaestroCommand = async (args, baseOptions = {}) => {
+  // Record the iOS drivers this Maestro child starts so the next run can stop
+  // exactly those; see scripts/lib/maestro-ios-driver-ownership.mjs.
+  const options = isMac
+    ? {
+        ...baseOptions,
+        onSpawn: (child) =>
+          trackOwnedIosDrivers({
+            pidfile: iosDriverPidfile(projectRoot),
+            rootPid: child.pid,
+          }),
+      }
+    : baseOptions
   try {
     await spawnProcess('maestro', args, options)
     return
@@ -4544,6 +4543,17 @@ const cleanupMobileRun = async (apiSetupBaseUrl, mobileIdentities, children) => 
 }
 
 /**
+ * Stop the iOS drivers an earlier run of this checkout left behind and refuse to
+ * start while another process holds the driver port.
+ *
+ * @returns {Promise<void>}
+ */
+const reclaimOwnedIosDriverPort = async () => {
+  if (!isMac) return
+  await reclaimIosDriverPort({ pidfile: iosDriverPidfile(projectRoot) })
+}
+
+/**
  * End-to-end runner for the mobile smoke flow.
  *
  * High-level order:
@@ -4558,7 +4568,8 @@ const cleanupMobileRun = async (apiSetupBaseUrl, mobileIdentities, children) => 
  * @returns {Promise<void>}
  */
 const run = async () => {
-  await killStaleIosDrivers()
+  await reclaimOwnedIosDriverPort()
+  assertTestDiskSpace(projectRoot)
   const metroPort = await chooseMetroPort()
   process.env.MOBILE_E2E_METRO_PORT = String(metroPort)
   const target = await ensureMaestroTarget()

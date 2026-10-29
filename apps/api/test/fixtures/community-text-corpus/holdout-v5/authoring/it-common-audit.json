@@ -1,0 +1,930 @@
+{
+  "language": "it",
+  "sourceSha256": "c24f7ea97c32a18e8c8a36cd56665f6e40ae4c375f6115e4a2b825570ea6ee33",
+  "total": 1000,
+  "fields": {
+    "caption": 500,
+    "altText": 500
+  },
+  "fiveWordOverlap": {
+    "affectedCount": 0,
+    "affectedShare": 0.0,
+    "affectedItems": [],
+    "repeatedSequences": []
+  },
+  "concepts": {
+    "distinct": 215,
+    "maximumCount": 8,
+    "maximumShare": 0.008,
+    "groups": [
+      {
+        "concept": "Adjustment cord concealed within a garment compartment",
+        "items": [725, 726, 727, 728, 925, 926, 927, 928]
+      },
+      {
+        "concept": "Backing patch protects cloth behind metal hardware",
+        "items": [177, 178, 179, 180, 373, 374, 375, 376]
+      },
+      {
+        "concept": "Bag strap doubled through fittings to shorten carrying length",
+        "items": [773, 774, 775, 776, 881, 882, 883, 884]
+      },
+      {
+        "concept": "Button attachment supported from the reverse",
+        "items": [425, 426, 427, 428, 905, 906, 907, 908]
+      },
+      {
+        "concept": "Closure or knot moved clear of hand contact",
+        "items": [297, 298, 299, 300, 941, 942, 943, 944]
+      },
+      {
+        "concept": "Earring parts held on a textile storage support",
+        "items": [385, 386, 387, 388, 949, 950, 951, 952]
+      },
+      {
+        "concept": "Fabric folded into a flower ornament",
+        "items": [525, 526, 527, 528, 797, 798, 799, 800]
+      },
+      {
+        "concept": "Factory basting removed before wearing",
+        "items": [1, 2, 3, 4, 5, 6, 7, 8]
+      },
+      {
+        "concept": "Fixed pleats released to allow lower garment movement",
+        "items": [73, 74, 75, 76, 541, 542, 543, 544]
+      },
+      {
+        "concept": "Folded upper edge forms a pocket or bag flap",
+        "items": [213, 214, 215, 216, 585, 586, 587, 588]
+      },
+      {
+        "concept": "Garment fit checked while seated",
+        "items": [857, 858, 859, 860, 965, 966, 967, 968]
+      },
+      {
+        "concept": "Garment rolled compactly for storage or travel",
+        "items": [369, 370, 371, 372, 885, 886, 887, 888]
+      },
+      {
+        "concept": "Garment shoulders supported during storage",
+        "items": [201, 202, 203, 204, 377, 378, 379, 380]
+      },
+      {
+        "concept": "Hat tilted to change brim position and facial shade",
+        "items": [53, 54, 55, 56, 577, 578, 579, 580]
+      },
+      {
+        "concept": "Interior turned outward for viewing",
+        "items": [733, 734, 735, 736, 833, 834, 835, 836]
+      },
+      {
+        "concept": "Internal facing secured with small stitches",
+        "items": [677, 678, 679, 680, 929, 930, 931, 932]
+      },
+      {
+        "concept": "Internal raw seams enclosed by ribbon binding",
+        "items": [149, 150, 151, 152, 733, 734, 735, 736]
+      },
+      {
+        "concept": "Lace layered above plain garment fabric",
+        "items": [77, 78, 79, 80, 433, 434, 435, 436]
+      },
+      {
+        "concept": "Leaf embroidery decorates a shirt collar",
+        "items": [729, 730, 731, 732, 889, 890, 891, 892]
+      },
+      {
+        "concept": "Lining tethered with a loose thread chain",
+        "items": [37, 38, 39, 40, 969, 970, 971, 972]
+      },
+      {
+        "concept": "Long pendant layered over a short neck scarf",
+        "items": [137, 138, 139, 140, 985, 986, 987, 988]
+      },
+      {
+        "concept": "Lower garment opening expands during a stride",
+        "items": [209, 210, 211, 212, 673, 674, 675, 676]
+      },
+      {
+        "concept": "Metal accessory wrapped in a textile strip",
+        "items": [497, 498, 499, 500, 609, 610, 611, 612]
+      },
+      {
+        "concept": "Necklace centred within an open shirt collar",
+        "items": [353, 354, 355, 356, 837, 838, 839, 840]
+      },
+      {
+        "concept": "Outerwear fit checked with arms reaching",
+        "items": [21, 22, 23, 24, 477, 478, 479, 480]
+      },
+      {
+        "concept": "Paper protects garment folds in storage or packing",
+        "items": [193, 194, 195, 196, 565, 566, 567, 568]
+      },
+      {
+        "concept": "Pin secures draped garment at a chosen position",
+        "items": [197, 198, 199, 200, 561, 562, 563, 564]
+      },
+      {
+        "concept": "Scarf anchored to an outer garment",
+        "items": [217, 218, 219, 220, 861, 862, 863, 864]
+      },
+      {
+        "concept": "Scarf integrated into tied or braided hair",
+        "items": [189, 190, 191, 192, 417, 418, 419, 420]
+      },
+      {
+        "concept": "Seam direction checked along a wearable item",
+        "items": [529, 530, 531, 532, 757, 758, 759, 760]
+      },
+      {
+        "concept": "Soft divider separates contents inside a carrying bag",
+        "items": [169, 170, 171, 172, 593, 594, 595, 596]
+      },
+      {
+        "concept": "Soft textile spacer separates jewellery elements",
+        "items": [581, 582, 583, 584, 605, 606, 607, 608]
+      },
+      {
+        "concept": "Stitched interior symbol identifies a wearable item",
+        "items": [513, 514, 515, 516, 865, 866, 867, 868]
+      },
+      {
+        "concept": "Stored buckle protected with a textile guard",
+        "items": [93, 94, 95, 96, 873, 874, 875, 876]
+      },
+      {
+        "concept": "Textile attachment enlarges a small closure grip",
+        "items": [205, 206, 207, 208, 465, 466, 467, 468]
+      },
+      {
+        "concept": "Upper shirt fabric gathered for shoulder and arm room",
+        "items": [777, 778, 779, 780, 869, 870, 871, 872]
+      },
+      {
+        "concept": "Waist tie stabilised through a double pass",
+        "items": [261, 262, 263, 264, 573, 574, 575, 576]
+      },
+      {
+        "concept": "Wearable circumference extended by an added connector",
+        "items": [257, 258, 259, 260, 501, 502, 503, 504]
+      },
+      {
+        "concept": "Bag base lifted by small metal feet",
+        "items": [909, 910, 911, 912]
+      },
+      {
+        "concept": "Bag base shaped with four corner folds",
+        "items": [737, 738, 739, 740]
+      },
+      {
+        "concept": "Bag bottom supported by woven mat",
+        "items": [553, 554, 555, 556]
+      },
+      {
+        "concept": "Bag carried in elbow crook beside bouquet",
+        "items": [233, 234, 235, 236]
+      },
+      {
+        "concept": "Bag carrying small umbrella in sleeve",
+        "items": [489, 490, 491, 492]
+      },
+      {
+        "concept": "Bag clipped to bicycle rear rack",
+        "items": [249, 250, 251, 252]
+      },
+      {
+        "concept": "Bag drawstring ends gathered by bead",
+        "items": [349, 350, 351, 352]
+      },
+      {
+        "concept": "Bag flap shaped into round arch",
+        "items": [701, 702, 703, 704]
+      },
+      {
+        "concept": "Bag handle attached with wooden rings",
+        "items": [421, 422, 423, 424]
+      },
+      {
+        "concept": "Bag handle made from wide braid",
+        "items": [853, 854, 855, 856]
+      },
+      {
+        "concept": "Bag handles cut directly into body panels",
+        "items": [105, 106, 107, 108]
+      },
+      {
+        "concept": "Bag weight checked on both shoulders",
+        "items": [41, 42, 43, 44]
+      },
+      {
+        "concept": "Bag zipper ends tucked under tabs",
+        "items": [285, 286, 287, 288]
+      },
+      {
+        "concept": "Bangle stacked beneath rolled sleeve",
+        "items": [333, 334, 335, 336]
+      },
+      {
+        "concept": "Beanie crown shaped with decreases",
+        "items": [453, 454, 455, 456]
+      },
+      {
+        "concept": "Beanie decorated with one oversized knitted cable",
+        "items": [977, 978, 979, 980]
+      },
+      {
+        "concept": "Belt buckle rotated to side seam",
+        "items": [281, 282, 283, 284]
+      },
+      {
+        "concept": "Belt colour echoed in hair clip",
+        "items": [61, 62, 63, 64]
+      },
+      {
+        "concept": "Belt end rolled inside keeper",
+        "items": [457, 458, 459, 460]
+      },
+      {
+        "concept": "Belt threaded around cardigan buttons",
+        "items": [125, 126, 127, 128]
+      },
+      {
+        "concept": "Boot buckles aligned at different heights",
+        "items": [681, 682, 683, 684]
+      },
+      {
+        "concept": "Boot pull loop reinforced with lining",
+        "items": [569, 570, 571, 572]
+      },
+      {
+        "concept": "Boot shaft loosened behind knee",
+        "items": [245, 246, 247, 248]
+      },
+      {
+        "concept": "Boot zip covered by narrow flap",
+        "items": [361, 362, 363, 364]
+      },
+      {
+        "concept": "Bracelet closure facing easy hand",
+        "items": [13, 14, 15, 16]
+      },
+      {
+        "concept": "Canvas apron neck loop adjusted with knot",
+        "items": [697, 698, 699, 700]
+      },
+      {
+        "concept": "Cardigan buttons alternated by size",
+        "items": [65, 66, 67, 68]
+      },
+      {
+        "concept": "Cardigan decorated with crocheted cherries",
+        "items": [589, 590, 591, 592]
+      },
+      {
+        "concept": "Cardigan hem left open around hips",
+        "items": [793, 794, 795, 796]
+      },
+      {
+        "concept": "Cardigan waist shaped by back ribbon",
+        "items": [253, 254, 255, 256]
+      },
+      {
+        "concept": "Circle skirt photographed mid turn",
+        "items": [669, 670, 671, 672]
+      },
+      {
+        "concept": "Coat collar brushed upward for nap",
+        "items": [533, 534, 535, 536]
+      },
+      {
+        "concept": "Coat hanging loop covered by collar",
+        "items": [345, 346, 347, 348]
+      },
+      {
+        "concept": "Coat hem weighted at side seams",
+        "items": [945, 946, 947, 948]
+      },
+      {
+        "concept": "Coat lining pinned away from zipper",
+        "items": [133, 134, 135, 136]
+      },
+      {
+        "concept": "Coat pockets opening beneath front yoke",
+        "items": [761, 762, 763, 764]
+      },
+      {
+        "concept": "Contrasting inside surface exposed",
+        "items": [733, 734, 735, 736]
+      },
+      {
+        "concept": "Cropped sleeve compared with long glove",
+        "items": [173, 174, 175, 176]
+      },
+      {
+        "concept": "Decorative necklace clasp worn at front",
+        "items": [45, 46, 47, 48]
+      },
+      {
+        "concept": "Dolman sleeve continuous with body",
+        "items": [661, 662, 663, 664]
+      },
+      {
+        "concept": "Double breasted buttons in staggered rows",
+        "items": [617, 618, 619, 620]
+      },
+      {
+        "concept": "Dress back tie made shorter",
+        "items": [161, 162, 163, 164]
+      },
+      {
+        "concept": "Dress bodice pressed on folded towel",
+        "items": [325, 326, 327, 328]
+      },
+      {
+        "concept": "Dress covered with raised fabric bobbles",
+        "items": [809, 810, 811, 812]
+      },
+      {
+        "concept": "Dress hem kept clear of boot buckle",
+        "items": [781, 782, 783, 784]
+      },
+      {
+        "concept": "Dress sleeve opened into short cape",
+        "items": [393, 394, 395, 396]
+      },
+      {
+        "concept": "Dress straps crossed with small ring",
+        "items": [953, 954, 955, 956]
+      },
+      {
+        "concept": "Dress waistline lowered with folded band",
+        "items": [893, 894, 895, 896]
+      },
+      {
+        "concept": "Earring hooks changed to clips",
+        "items": [113, 114, 115, 116]
+      },
+      {
+        "concept": "Earring shape traced on paper first",
+        "items": [765, 766, 767, 768]
+      },
+      {
+        "concept": "Earrings resembling tiny buttons",
+        "items": [29, 30, 31, 32]
+      },
+      {
+        "concept": "Earrings shortened by removing lower piece",
+        "items": [537, 538, 539, 540]
+      },
+      {
+        "concept": "Elastic smocking across dress back",
+        "items": [645, 646, 647, 648]
+      },
+      {
+        "concept": "Felt hat seams shown on outside",
+        "items": [633, 634, 635, 636]
+      },
+      {
+        "concept": "Flat knit drying without hanger",
+        "items": [9, 10, 11, 12]
+      },
+      {
+        "concept": "Flat shoe toe reinforced with stitching",
+        "items": [709, 710, 711, 712]
+      },
+      {
+        "concept": "Four gore skirt seams highlighted",
+        "items": [665, 666, 667, 668]
+      },
+      {
+        "concept": "Glove fingertip stitched with conductive thread",
+        "items": [745, 746, 747, 748]
+      },
+      {
+        "concept": "Glove wrist elastic replaced carefully",
+        "items": [933, 934, 935, 936]
+      },
+      {
+        "concept": "Hat brim folded away from glasses",
+        "items": [229, 230, 231, 232]
+      },
+      {
+        "concept": "Hat care label tucked beneath sweatband",
+        "items": [145, 146, 147, 148]
+      },
+      {
+        "concept": "Hat crown ventilated by open mesh panel",
+        "items": [789, 790, 791, 792]
+      },
+      {
+        "concept": "Hat held by comb inside crown",
+        "items": [505, 506, 507, 508]
+      },
+      {
+        "concept": "Hat held flat in travel sleeve",
+        "items": [993, 994, 995, 996]
+      },
+      {
+        "concept": "Hat inner band loosened at back",
+        "items": [845, 846, 847, 848]
+      },
+      {
+        "concept": "Hat ribbon bow fixed with hand stitches",
+        "items": [397, 398, 399, 400]
+      },
+      {
+        "concept": "Hat ribbon loop carrying sunglasses",
+        "items": [313, 314, 315, 316]
+      },
+      {
+        "concept": "Jacket buttons painted in thin layers",
+        "items": [973, 974, 975, 976]
+      },
+      {
+        "concept": "Jacket collar back shortened for comfort",
+        "items": [717, 718, 719, 720]
+      },
+      {
+        "concept": "Jacket colour blocks meeting at waist",
+        "items": [401, 402, 403, 404]
+      },
+      {
+        "concept": "Jacket cuff widened with gusset",
+        "items": [317, 318, 319, 320]
+      },
+      {
+        "concept": "Jacket cuffs secured with cufflinks",
+        "items": [269, 270, 271, 272]
+      },
+      {
+        "concept": "Jacket lapels aligned with trouser crease",
+        "items": [185, 186, 187, 188]
+      },
+      {
+        "concept": "Jacket lining attached above hem fold",
+        "items": [445, 446, 447, 448]
+      },
+      {
+        "concept": "Jacket middle button shaping front",
+        "items": [613, 614, 615, 616]
+      },
+      {
+        "concept": "Jacket shoulder line compared in mirror",
+        "items": [109, 110, 111, 112]
+      },
+      {
+        "concept": "Jacket sleeve lining eased at elbow",
+        "items": [877, 878, 879, 880]
+      },
+      {
+        "concept": "Jeans brushed at frayed seam",
+        "items": [49, 50, 51, 52]
+      },
+      {
+        "concept": "Knit neck edge repaired with crochet",
+        "items": [741, 742, 743, 744]
+      },
+      {
+        "concept": "Knitted cuff replaced with woven strip",
+        "items": [329, 330, 331, 332]
+      },
+      {
+        "concept": "Lace insert between shirt button rows",
+        "items": [621, 622, 623, 624]
+      },
+      {
+        "concept": "Loafer tassels moving above shoe vamp",
+        "items": [705, 706, 707, 708]
+      },
+      {
+        "concept": "Long coat carried by inside sling",
+        "items": [57, 58, 59, 60]
+      },
+      {
+        "concept": "Long shirt worn as open light jacket",
+        "items": [469, 470, 471, 472]
+      },
+      {
+        "concept": "Matte jacket beside glossy trousers",
+        "items": [597, 598, 599, 600]
+      },
+      {
+        "concept": "Metal necklace laid over felt collar",
+        "items": [221, 222, 223, 224]
+      },
+      {
+        "concept": "Mittens joined with removable snaps",
+        "items": [81, 82, 83, 84]
+      },
+      {
+        "concept": "Muffler rolled into short neck tube",
+        "items": [241, 242, 243, 244]
+      },
+      {
+        "concept": "Neck bow tied lower than collar",
+        "items": [277, 278, 279, 280]
+      },
+      {
+        "concept": "Neck scarf folded with one broad end",
+        "items": [89, 90, 91, 92]
+      },
+      {
+        "concept": "Neck scarf layered inside coat hood",
+        "items": [365, 366, 367, 368]
+      },
+      {
+        "concept": "Necklace chain doubled through pendant",
+        "items": [165, 166, 167, 168]
+      },
+      {
+        "concept": "Necklace cord replaced after fraying",
+        "items": [785, 786, 787, 788]
+      },
+      {
+        "concept": "Necklace pearls graded toward centre",
+        "items": [693, 694, 695, 696]
+      },
+      {
+        "concept": "Old button retained inside new jacket",
+        "items": [829, 830, 831, 832]
+      },
+      {
+        "concept": "One shoulder neckline with soft fold",
+        "items": [653, 654, 655, 656]
+      },
+      {
+        "concept": "Outfit photo taken at matching distance",
+        "items": [801, 802, 803, 804]
+      },
+      {
+        "concept": "Packing cube containing complete outfit",
+        "items": [625, 626, 627, 628]
+      },
+      {
+        "concept": "Pendant reflected in polished brooch",
+        "items": [301, 302, 303, 304]
+      },
+      {
+        "concept": "Pendant rests inside open metal frame",
+        "items": [921, 922, 923, 924]
+      },
+      {
+        "concept": "Pendant suspended from two side chains",
+        "items": [441, 442, 443, 444]
+      },
+      {
+        "concept": "Pin placed clear of embroidery",
+        "items": [889, 890, 891, 892]
+      },
+      {
+        "concept": "Pleated trousers hung from padded clips",
+        "items": [485, 486, 487, 488]
+      },
+      {
+        "concept": "Purse closed by sliding wooden bead",
+        "items": [685, 686, 687, 688]
+      },
+      {
+        "concept": "Purse gusset opening like small book",
+        "items": [517, 518, 519, 520]
+      },
+      {
+        "concept": "Purse held upright by rigid divider",
+        "items": [69, 70, 71, 72]
+      },
+      {
+        "concept": "Quilted vest with circular stitching",
+        "items": [825, 826, 827, 828]
+      },
+      {
+        "concept": "Raglan seam emphasised by narrow braid",
+        "items": [657, 658, 659, 660]
+      },
+      {
+        "concept": "Rain jacket hem fixed to belt loop",
+        "items": [389, 390, 391, 392]
+      },
+      {
+        "concept": "Reflective cord outlining bag at dusk",
+        "items": [481, 482, 483, 484]
+      },
+      {
+        "concept": "Ring surface patterned by knitted texture",
+        "items": [721, 722, 723, 724]
+      },
+      {
+        "concept": "Sash finished with small coin charms",
+        "items": [821, 822, 823, 824]
+      },
+      {
+        "concept": "Scarf adjusted to leave hearing space",
+        "items": [473, 474, 475, 476]
+      },
+      {
+        "concept": "Scarf border embroidered with running stitches",
+        "items": [961, 962, 963, 964]
+      },
+      {
+        "concept": "Scarf checked through coat movement",
+        "items": [901, 902, 903, 904]
+      },
+      {
+        "concept": "Scarf corners linked in pairs",
+        "items": [17, 18, 19, 20]
+      },
+      {
+        "concept": "Scarf fringe trimmed in shallow arc",
+        "items": [637, 638, 639, 640]
+      },
+      {
+        "concept": "Scarf printed border framing plain jacket",
+        "items": [749, 750, 751, 752]
+      },
+      {
+        "concept": "Shawl fringe tied into a diamond lattice",
+        "items": [713, 714, 715, 716]
+      },
+      {
+        "concept": "Shawl fringe tucked into bag pocket",
+        "items": [321, 322, 323, 324]
+      },
+      {
+        "concept": "Shawl threaded through bag top handle",
+        "items": [181, 182, 183, 184]
+      },
+      {
+        "concept": "Shirt bloused above skirt waistband",
+        "items": [601, 602, 603, 604]
+      },
+      {
+        "concept": "Shirt collar tips supported by removable stays",
+        "items": [493, 494, 495, 496]
+      },
+      {
+        "concept": "Shirt cuff extended by a thumb loop",
+        "items": [689, 690, 691, 692]
+      },
+      {
+        "concept": "Shirt darts softened before sewing",
+        "items": [237, 238, 239, 240]
+      },
+      {
+        "concept": "Shirt fabric tested against light",
+        "items": [289, 290, 291, 292]
+      },
+      {
+        "concept": "Shirt fabric washed before pattern cutting",
+        "items": [461, 462, 463, 464]
+      },
+      {
+        "concept": "Shirt hem tied at back",
+        "items": [549, 550, 551, 552]
+      },
+      {
+        "concept": "Shirt measured flat from shoulder to hem",
+        "items": [813, 814, 815, 816]
+      },
+      {
+        "concept": "Shirt neckline tied with narrow cord",
+        "items": [913, 914, 915, 916]
+      },
+      {
+        "concept": "Shirt placket folded beneath lapel",
+        "items": [117, 118, 119, 120]
+      },
+      {
+        "concept": "Shirt pocket enlarged through hidden pleat",
+        "items": [157, 158, 159, 160]
+      },
+      {
+        "concept": "Shirt shoulder seam moved forward",
+        "items": [413, 414, 415, 416]
+      },
+      {
+        "concept": "Shirt side seam lengthened with insert",
+        "items": [337, 338, 339, 340]
+      },
+      {
+        "concept": "Shirt sleeve cuff closed with fabric toggle",
+        "items": [981, 982, 983, 984]
+      },
+      {
+        "concept": "Shoe heel taps heard on wooden floor",
+        "items": [937, 938, 939, 940]
+      },
+      {
+        "concept": "Shoe laces crossed through central ring",
+        "items": [341, 342, 343, 344]
+      },
+      {
+        "concept": "Shoe laces stored around tongue tab",
+        "items": [545, 546, 547, 548]
+      },
+      {
+        "concept": "Shoe ribbons threaded through ankle loops",
+        "items": [509, 510, 511, 512]
+      },
+      {
+        "concept": "Shoe strap holes reinforced by eyelets",
+        "items": [897, 898, 899, 900]
+      },
+      {
+        "concept": "Shoe tongue padded with wool insert",
+        "items": [129, 130, 131, 132]
+      },
+      {
+        "concept": "Shoelaces switched for elastic cords",
+        "items": [25, 26, 27, 28]
+      },
+      {
+        "concept": "Shoes aired with tongue pulled forward",
+        "items": [265, 266, 267, 268]
+      },
+      {
+        "concept": "Shoes paired by removable cloth clip",
+        "items": [817, 818, 819, 820]
+      },
+      {
+        "concept": "Shoes separated from clothes by washable cover",
+        "items": [957, 958, 959, 960]
+      },
+      {
+        "concept": "Shoes softened with short indoor walks",
+        "items": [437, 438, 439, 440]
+      },
+      {
+        "concept": "Silk top worn under rough cardigan",
+        "items": [273, 274, 275, 276]
+      },
+      {
+        "concept": "Skirt fullness gathered at one hip",
+        "items": [101, 102, 103, 104]
+      },
+      {
+        "concept": "Skirt pleat centre marked with chalk",
+        "items": [449, 450, 451, 452]
+      },
+      {
+        "concept": "Skirt side seam smoothed by pressing cloth",
+        "items": [849, 850, 851, 852]
+      },
+      {
+        "concept": "Skirt supported by separate petticoat",
+        "items": [989, 990, 991, 992]
+      },
+      {
+        "concept": "Skirt tied to inner waist button",
+        "items": [357, 358, 359, 360]
+      },
+      {
+        "concept": "Skirt waistband covered with soft jersey",
+        "items": [293, 294, 295, 296]
+      },
+      {
+        "concept": "Sleeve edge folded into a cuff",
+        "items": [841, 842, 843, 844]
+      },
+      {
+        "concept": "Sleeve print placed across elbow",
+        "items": [85, 86, 87, 88]
+      },
+      {
+        "concept": "Sleeve volume gathered mid forearm",
+        "items": [629, 630, 631, 632]
+      },
+      {
+        "concept": "Sleeveless dress worn over wide shirt",
+        "items": [121, 122, 123, 124]
+      },
+      {
+        "concept": "Sock heel knitted in contrast yarn",
+        "items": [405, 406, 407, 408]
+      },
+      {
+        "concept": "Socks reversed to keep toe seam outside",
+        "items": [153, 154, 155, 156]
+      },
+      {
+        "concept": "Soft coat collar opened with brooch",
+        "items": [305, 306, 307, 308]
+      },
+      {
+        "concept": "Striped pocket set diagonally across horizontal shirt lines",
+        "items": [97, 98, 99, 100]
+      },
+      {
+        "concept": "Three shades arranged from light to dark",
+        "items": [805, 806, 807, 808]
+      },
+      {
+        "concept": "Top back neckline anchored to strap",
+        "items": [521, 522, 523, 524]
+      },
+      {
+        "concept": "Trouser ankle straps left loose",
+        "items": [409, 410, 411, 412]
+      },
+      {
+        "concept": "Trouser back pockets temporarily stitched shut",
+        "items": [309, 310, 311, 312]
+      },
+      {
+        "concept": "Trouser knee patch sewn with wide border",
+        "items": [769, 770, 771, 772]
+      },
+      {
+        "concept": "Trouser side seam with removable stripe",
+        "items": [917, 918, 919, 920]
+      },
+      {
+        "concept": "Trouser stirrups passing under shoe arches",
+        "items": [225, 226, 227, 228]
+      },
+      {
+        "concept": "Trousers supported by button-on braces",
+        "items": [141, 142, 143, 144]
+      },
+      {
+        "concept": "Twin needle stitching on shirt hem",
+        "items": [641, 642, 643, 644]
+      },
+      {
+        "concept": "Unequal dress straps in matching fabric",
+        "items": [649, 650, 651, 652]
+      },
+      {
+        "concept": "Vest shoulders sitting beyond shirt seam",
+        "items": [33, 34, 35, 36]
+      },
+      {
+        "concept": "Waistcoat fronts connected by horizontal ladder lacing",
+        "items": [429, 430, 431, 432]
+      },
+      {
+        "concept": "Waistcoat pockets matched by straight edge",
+        "items": [753, 754, 755, 756]
+      },
+      {
+        "concept": "Wide belt fitted around gathered tunic",
+        "items": [381, 382, 383, 384]
+      },
+      {
+        "concept": "Woven belt end sealed with hand stitches",
+        "items": [997, 998, 999, 1000]
+      },
+      {
+        "concept": "Wristwatch band covering shirt button",
+        "items": [557, 558, 559, 560]
+      }
+    ]
+  },
+  "wholeTextDuplicates": [],
+  "historicalCollisions": [],
+  "historicalPaths": [
+    "apps/api/test/fixtures/community-text-corpus/de.json",
+    "apps/api/test/fixtures/community-text-corpus/en.json",
+    "apps/api/test/fixtures/community-text-corpus/es.json",
+    "apps/api/test/fixtures/community-text-corpus/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/it.json",
+    "apps/api/test/fixtures/community-text-corpus/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/tr.json"
+  ],
+  "overLengthItems": [],
+  "wordCounts": {
+    "minimum": 9,
+    "median": 13.0,
+    "maximum": 18,
+    "fewerThanFiveWords": 0
+  },
+  "maximumCaptionLength": 106,
+  "maximumAltTextLength": 96
+}

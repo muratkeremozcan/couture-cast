@@ -9,6 +9,7 @@ import {
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { RevenueCatClient } from './revenuecat-client.js'
 import { StripeBillingClient } from './stripe-client.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 /**
  * Story 5.2: the single owner of PremiumEntitlement reads and writes.
@@ -283,7 +284,7 @@ export class PremiumEntitlementService {
     const occurredAt = new Date()
     const eventId = `pull:${pullId}`
 
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       const existing = await tx.premiumEntitlement.findUnique({
         where: { user_id: userId },
       })

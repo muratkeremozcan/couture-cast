@@ -1,0 +1,100 @@
+{
+  "author": "cc68-tea (/root)",
+  "locale": "pt",
+  "sourceRows": [1, 1000],
+  "captionSourceRows": "odd rows1..999",
+  "altTextSourceRows": "even rows2..1000",
+  "v4Author": "/root/general_review",
+  "authorRotationSatisfied": true,
+  "assignmentRecordedBeforeFirstPortugueseItem": true,
+  "method": "All1000 complete Portuguese sentences individually composed and persisted literally in literal batches. No shared banks, templates, combinatorial assembly, prior-wording translation or text-generating program. Helpers only measure and serialize complete items unchanged.",
+  "sourceSha256": "a6517ae82b1507dcb6aae85282167fb620e7359536e528b6b3fd8b1f62a25d25",
+  "counts": {
+    "caption": 500,
+    "altText": 500
+  },
+  "total": 1000,
+  "fiveWordAffected": 2,
+  "distinctConcepts": 479,
+  "maximumConceptCount": 10,
+  "wordCounts": {
+    "minimum": 8,
+    "median": 12.0,
+    "maximum": 16,
+    "fewerThanFiveWords": 0
+  },
+  "maximumCaptionLength": 82,
+  "maximumAltTextLength": 85,
+  "wholeTextDuplicates": 0,
+  "historicalCollisions": 0,
+  "lengthViolations": 0,
+  "presealWholeSentenceCopyedits": [
+    640, 680, 686, 688, 732, 812, 914, 954, 970, 971, 986
+  ],
+  "presealNewScenarioRows": [547, 548],
+  "presealRevisionReason": "Remove incidental repeated five-word sequences and reduce a conservative12-item personal-memory embroidery concept before any screening.",
+  "allTiedMaximumConcepts": [
+    {
+      "concept": "texto-decorativo-tecido",
+      "englishGloss": "Readable personal marks or letters reproduced as textile decoration, consolidated across stitching and printing.",
+      "count": 10,
+      "rows": [553, 554, 583, 584, 757, 758, 759, 760, 955, 956],
+      "membership": [
+        {
+          "row": 553,
+          "field": "caption"
+        },
+        {
+          "row": 554,
+          "field": "altText"
+        },
+        {
+          "row": 583,
+          "field": "caption"
+        },
+        {
+          "row": 584,
+          "field": "altText"
+        },
+        {
+          "row": 757,
+          "field": "caption"
+        },
+        {
+          "row": 758,
+          "field": "altText"
+        },
+        {
+          "row": 759,
+          "field": "caption"
+        },
+        {
+          "row": 760,
+          "field": "altText"
+        },
+        {
+          "row": 955,
+          "field": "caption"
+        },
+        {
+          "row": 956,
+          "field": "altText"
+        }
+      ]
+    }
+  ],
+  "screeningRun": false,
+  "round3Or4RepairInspection": false,
+  "knownContext": "Root retains prior released repairs and v4 results/cases after retirement. Only the coordinator's abstract notice about future round4 and disguised bypass repairs is known; no repair source, manifest, supplement or new bypass cases read.",
+  "peerReviewPending": false,
+  "presealGrammarCopyeditRows": [282, 895, 993],
+  "peerReauthoredRows": [
+    41, 42, 103, 104, 117, 118, 129, 130, 613, 614, 615, 616, 647, 648, 687, 688, 741,
+    742, 761, 762, 835, 836, 843, 844, 871, 872, 895, 896, 899, 900, 917, 918, 953, 954,
+    975, 976, 981, 982, 995, 996
+  ],
+  "peerResolution": "pt-peer-resolution.json",
+  "previousAuthorAttestationStatus": "Superseded by conservative peer-boundary consolidation and36 individually reauthored complete items before seal.",
+  "peerReview": "pt-peer-review-edge_paths.json: READY at the final source SHA",
+  "status": "FINAL. No further source edits after handoff unless another explicit pre-seal issue is found."
+}

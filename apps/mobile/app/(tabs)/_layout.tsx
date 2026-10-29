@@ -1,4 +1,6 @@
 import React from 'react'
+import { useAndroidNavigationIntent } from '@/components/android-share-card-presentation'
+import { ShareCardTabHeading } from '@/components/share-card-tab-heading'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { Link, Tabs } from 'expo-router'
 import { Pressable, StyleSheet, useColorScheme, View } from 'react-native'
@@ -32,6 +34,7 @@ function TabBarIcon(props: {
 }
 
 export default function TabLayout() {
+  const navigationIntent = useAndroidNavigationIntent()
   const colorScheme = useColorScheme()
   const palette = colorScheme === 'dark' ? Colors.dark : Colors.light
   const insets = useSafeAreaInsets()
@@ -46,6 +49,7 @@ export default function TabLayout() {
   }
 
   const trackTabPress = (tabId: string, label: string, targetPath: string) => {
+    navigationIntent(targetPath)
     try {
       analytics.capture('bottom_nav_clicked', {
         tabId,
@@ -77,6 +81,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: tabLabels.home,
+          headerTitle: (props) => <ShareCardTabHeading {...props} scope="outfit" />,
           tabBarButtonTestID: 'tab-home',
           tabBarAccessibilityLabel: tabLabels.home,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
@@ -129,6 +134,7 @@ export default function TabLayout() {
         name="community"
         options={{
           title: tabLabels.community,
+          headerTitle: (props) => <ShareCardTabHeading {...props} scope="community" />,
           tabBarButtonTestID: 'tab-community',
           tabBarAccessibilityLabel: tabLabels.community,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (

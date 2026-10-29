@@ -1,0 +1,10 @@
+appId: ${MAESTRO_APP_ID}
+---
+- extendedWaitUntil:
+    visible: ${MAESTRO_PENDING}
+    timeout: 20000
+- assertNotVisible: ${MAESTRO_SAVING}
+- assertNotVisible: ${MAESTRO_SAVED}
+- assertVisible:
+    id: share-card-save
+    enabled: false

@@ -1,0 +1,20 @@
+appId: ${MAESTRO_APP_ID}
+---
+- extendedWaitUntil:
+    notVisible: ${MAESTRO_PENDING}
+    timeout: 20000
+- assertNotVisible: ${MAESTRO_SAVING}
+- assertNotVisible: ${MAESTRO_SAVED}
+- scrollUntilVisible:
+    element:
+      id: share-card-watermark
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    id: share-card-watermark
+    enabled: true
+- runFlow: watermark.yaml
+- assertVisible:
+    id: share-card-save
+    enabled: true
