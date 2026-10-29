@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
-import { failedAuditIssues, failedAuditTestDigest } from './share-card-audit-report.mjs'
+import {
+  failedAuditIssues,
+  failedAuditTestDigest,
+  xcodebuildFailureReport,
+} from './share-card-audit-report.mjs'
 
 const log = [
   "Test Case '-[ShareCardAccessibilityUITests.ShareCardAccessibilityUITests testAllLocales]' started.",
@@ -89,11 +93,42 @@ describe('failed audit test digest', () => {
     assert.equal(audits.length, handled.length)
     assert.match(
       swift,
-      /performAccessibilityAudit\(for: \.all\) \{ issue in\n\s+print\(self\.auditIssueLine\("home", issue\)\)\n\s+return false\n/
+      /performAccessibilityAudit\(for: \.all\) \{ issue in\n\s+print\(shareCardAuditIssueLine\("home", issue\)\)\n\s+return false\n/
     )
     assert.match(
       swift,
-      /if !allowed \{ print\(self\.auditIssueLine\(state, issue\)\) \}\n\s+return allowed/
+      /if !allowed \{ print\(shareCardAuditIssueLine\(state, issue\)\) \}\n\s+return allowed/
     )
+  })
+
+  test('the failure report falls back to the log tail when no test case failed', () => {
+    const report = xcodebuildFailureReport(
+      Array.from(
+        { length: 30 },
+        (_, i) => `line ${i} /Users/runner/x/A.swift:3: boom`
+      ).join('\n')
+    )
+    assert.deepEqual(report.tests, [])
+    assert.equal(report.tail.length, 12)
+    assert.ok(report.tail.every((line) => !line.includes('/Users/')))
+    assert.equal(xcodebuildFailureReport(log).tail.length, 0)
+    assert.equal(xcodebuildFailureReport(log).tests[0].test, 'testOpenSave')
+  })
+
+  test('the fallback XCUITest names every refused issue through the shared helper', () => {
+    const swift = fs.readFileSync(
+      'apps/mobile/native-tests/ShareCardFallbackUITests.swift',
+      'utf8'
+    )
+    assert.match(
+      swift,
+      /performAccessibilityAudit\(for: \.all\) \{ issue in\n\s+print\(shareCardAuditIssueLine\("fallback", issue\)\)\n\s+return false\n/
+    )
+    assert.equal([...swift.matchAll(/performAccessibilityAudit/g)].length, 1)
+    const query = fs.readFileSync(
+      'apps/mobile/native-tests/ShareCardHeaderQuery.swift',
+      'utf8'
+    )
+    assert.match(query, /func shareCardAuditIssueLine\(/)
   })
 })

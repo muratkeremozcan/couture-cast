@@ -1,5 +1,15 @@
 import XCTest
 
+// The job log is the only place a failed audit is readable, so name each failing issue.
+@MainActor
+func shareCardAuditIssueLine(_ scope: String, _ issue: XCUIAccessibilityAuditIssue) -> String {
+  func compact(_ text: String) -> String {
+    String(text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "|", with: "/").prefix(120))
+  }
+  let element = issue.element
+  return "CC68_AUDIT_ISSUE \(scope)|\(issue.auditType.rawValue)|\(compact(element?.identifier ?? "none"))|\(compact(element?.label ?? "none"))|\(compact(issue.compactDescription))"
+}
+
 @MainActor
 func existingShareCardHeader(in app: XCUIApplication, expected: String) throws -> XCUIElement {
   let predicate = NSPredicate(format: "label == %@", expected)

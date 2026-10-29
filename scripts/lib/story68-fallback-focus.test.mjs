@@ -322,3 +322,32 @@ describe('fallback-focus fail-closed guards', () => {
       assert.equal(await runIos(t, input), code)
     })
 })
+
+test('a failed native test prints what names the failed step before it rejects', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-fallback-failure-'))
+  const printed = []
+  const log = console.log
+  console.log = (line) => printed.push(line)
+  try {
+    await assert.rejects(
+      recordedIosTest({ directory }, [], 'child.log', (_binary, _args, options) =>
+        spawn(
+          process.execPath,
+          [
+            '-e',
+            "console.log(\"Test Case '-[A.B testX]' started.\");console.log('CC68_AUDIT_ISSUE fallback|3|none|none|Contrast failed');console.log('/r/w/B.swift:9: error: boom');console.log(\"Test Case '-[A.B testX]' failed (1.0 seconds).\");process.exit(65)",
+          ],
+          options
+        )
+      ),
+      /fallback_native_assertion_failed/
+    )
+  } finally {
+    console.log = log
+    fs.rmSync(directory, { recursive: true })
+  }
+  const [{ iosFallbackFailure }] = printed.map((line) => JSON.parse(line))
+  assert.deepEqual(iosFallbackFailure.issues, ['fallback|3|none|none|Contrast failed'])
+  assert.equal(iosFallbackFailure.tests[0].test, 'testX')
+  assert.ok(iosFallbackFailure.tests[0].lines.includes('B.swift:9: error: boom'))
+})

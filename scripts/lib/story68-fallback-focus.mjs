@@ -6,6 +6,7 @@ import { createServer } from 'node:http'
 import { story68FocusObservationHandler } from './story68-ios-focus-observation.mjs'
 import { assertRapidWatermarkRuntime } from './story68-rapid-watermark.mjs'
 import { withUnavailableOwnedFallbackPost } from './story68-fallback-post.mjs'
+import { xcodebuildFailureReport } from './share-card-audit-report.mjs'
 
 function recorded(ctx, binary, args, name, env = {}) {
   const file = path.join(ctx.directory, name)
@@ -54,7 +55,15 @@ export async function recordedIosTest(ctx, args, name, spawnChild = spawn) {
       child.once('close', (code) => {
         clearTimeout(timer)
         if (code === 0) resolve()
-        else reject(new Error('fallback_native_assertion_failed'))
+        else {
+          // The xcodebuild log is private; the job log gets what names the failed step.
+          console.log(
+            JSON.stringify({
+              iosFallbackFailure: xcodebuildFailureReport(fs.readFileSync(file, 'utf8')),
+            })
+          )
+          reject(new Error('fallback_native_assertion_failed'))
+        }
       })
     })
     return fs.readFileSync(file, 'utf8')

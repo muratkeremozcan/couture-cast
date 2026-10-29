@@ -121,6 +121,29 @@ export function failedAuditIssues(log) {
     .map((match) => match[1].replace(/\S*\/(?=[^/\s]+\.swift)/g, '').slice(0, 400))
     .slice(0, failedIssueLimit)
 }
+const failureTailLines = 12
+// What a job log needs from a failed private xcodebuild log: the refused audit issues, the
+// steps around each failed test's first assertion, and, when no test case failed (a build
+// or launch failure), the last lines.
+export function xcodebuildFailureReport(log) {
+  const tests = failedAuditTestDigest(log)
+  return {
+    issues: failedAuditIssues(log),
+    tests,
+    tail: tests.length
+      ? []
+      : log
+          .split(/\r?\n/)
+          .filter((line) => line.trim())
+          .slice(-failureTailLines)
+          .map((line) =>
+            line
+              .replace(/\S*\/(?=[^/\s]+\.swift)/g, '')
+              .trim()
+              .slice(0, failureLineChars)
+          ),
+  }
+}
 export function closedShareCardAuditReport(summary, tree, log) {
   const tests = []
   const walk = (node) => {

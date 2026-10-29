@@ -33,7 +33,10 @@ final class ShareCardFallbackUITests: XCTestCase {
     XCTAssertTrue(header.isHittable)
     XCTAssertEqual(header.label, fixture["community"]!)
     XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label == %@", fixture["removedHeading"]!)).firstMatch.exists)
-    try app.performAccessibilityAudit(for: .all)
+    try app.performAccessibilityAudit(for: .all) { issue in
+      print(shareCardAuditIssueLine("fallback", issue))
+      return false
+    }
     print("CC68_FALLBACK_PASS ios existing-header-target-and-all-audit")
   }
 }
