@@ -1,7 +1,9 @@
 appId: ${MAESTRO_APP_ID}
 ---
-- tapOn:
-    id: share-card-save
+- runFlow:
+    file: tap-save.yaml
+    env:
+      MAESTRO_SAVE_EFFECT: "Don.t allow|Don’t Allow|Don't Allow"
 - tapOn: "Don.t allow|Don’t Allow|Don't Allow"
 - extendedWaitUntil:
     visible: ${MAESTRO_DENIED}

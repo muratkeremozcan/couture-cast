@@ -1,7 +1,9 @@
 appId: ${MAESTRO_APP_ID}
 ---
-- tapOn:
-    id: share-card-save
+- runFlow:
+    file: tap-save.yaml
+    env:
+      MAESTRO_SAVE_EFFECT: 'Allow|Allow Adding Photos|Allow Access to All Photos|Add Photos Only|${MAESTRO_SAVING}|${MAESTRO_SAVED}'
 - runFlow:
     when:
       visible: 'Allow|Allow Adding Photos|Allow Access to All Photos|Add Photos Only'

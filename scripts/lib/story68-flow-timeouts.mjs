@@ -45,6 +45,27 @@ export const RELEASE_WATERMARK_OFF_WORST_CASE_MS =
   FLOW_STARTUP_MS + WATERMARK_TAP_ATTEMPTS * WATERMARK_ATTEMPT_MS + 20_000
 
 /**
+ * tap-save.yaml, which the Save flows run for their first Save tap: a retry of maxRetries 3 (4
+ * attempts). An attempt is the guard (its two condition checks), the 8 s wait for what a received
+ * press shows and that wait's poll. The calling flow's own steps keep the default budget; a test
+ * reads the subflow and keeps these numbers equal to what it declares.
+ */
+export const SAVE_TAP_ATTEMPTS = 4
+export const SAVE_TAP_ATTEMPT_MS = 2 * CONDITION_CHECK_MS + 8_000 + CONDITION_CHECK_MS
+export const SAVE_TAP_WORST_CASE_MS = SAVE_TAP_ATTEMPTS * SAVE_TAP_ATTEMPT_MS
+export const SAVE_TAP_FLOWS = [
+  'maestro/story68/permanent.yaml',
+  'maestro/story68/save.yaml',
+  'maestro/story68/denied.yaml',
+  'maestro/story68/failure.yaml',
+  'maestro/story68/precommit-cancel.yaml',
+  'maestro/story68/pending.yaml',
+]
+const saveTapTimeoutMs = Math.ceil(
+  (DEFAULT_FLOW_TIMEOUT_MS + SAVE_TAP_WORST_CASE_MS) * FLOW_TIMEOUT_MARGIN
+)
+
+/**
  * wait-notification-settings.yaml waits for the member's notification controls or fails when the
  * Try again button shows. Its repeat count only bounds a stuck screen and must equal `times` in
  * that flow (a test reads it). Each turn is a 1 s wait plus two condition checks (the Try again
@@ -64,6 +85,7 @@ const waitSettingsTimeoutMs = Math.ceil(
 )
 
 const flowTimeouts = {
+  ...Object.fromEntries(SAVE_TAP_FLOWS.map((flow) => [flow, saveTapTimeoutMs])),
   ...Object.fromEntries(WAIT_SETTINGS_FLOWS.map((flow) => [flow, waitSettingsTimeoutMs])),
   'maestro/story65/open-app.yaml': Math.ceil(
     OPEN_APP_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
