@@ -76,7 +76,7 @@ const mountSurface = () => {
 }
 
 describe('AccessibleModal stack', () => {
-  it('keeps the share dialog interactive after a detail and share suspend and resume together', () => {
+  it('releases the page while a detail and share suspend, then leaves the share dialog uncovered and the detail covered when they resume together', () => {
     const { controls } = mountSurface()
     act(() => controls.current!.set({ detailSuspended: true, share: false }))
     expect(dialog('Detail')).toHaveAttribute('aria-hidden', 'true')
