@@ -498,9 +498,11 @@ describe('SubscriptionSection', () => {
 
     renderSection()
 
-    // The poll opens with one refresh (beats webhook latency).
+    // The poll opens with one refresh (beats webhook latency). Each wait below is on the
+    // request itself: in a real browser the mock worker answers over a message channel that
+    // fake timers do not drive, so advancing the clock alone does not run the poll's chain.
     await act(() => vi.advanceTimersByTimeAsync(0))
-    expect(refreshCalls).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(refreshCalls).toHaveBeenCalledTimes(1))
 
     // Mid-poll `none` is "activating", never a failure or a subscribe prompt.
     const statusRegion = screen.getByTestId('premium-status-region')
@@ -514,16 +516,18 @@ describe('SubscriptionSection', () => {
 
     // Tick 2 at +5s still returns `none`; the poll keeps going.
     await act(() => vi.advanceTimersByTimeAsync(5_000))
-    expect(statusCalls).toBe(1)
+    await vi.waitFor(() => expect(statusCalls).toBe(1))
     expect(statusRegion).toHaveTextContent('Activating')
 
     // Tick 3 at +10s lands the entitlement: the poll stops and status renders.
     await act(() => vi.advanceTimersByTimeAsync(5_000))
-    expect(statusCalls).toBe(2)
-    expect(statusRegion).toHaveTextContent('')
-    expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
-      'Premium is active: Premium Monthly.'
+    await vi.waitFor(() => expect(statusCalls).toBe(2))
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+        'Premium is active: Premium Monthly.'
+      )
     )
+    expect(statusRegion).toHaveTextContent('')
     expect(screen.getByTestId('premium-manage-button')).toBeInTheDocument()
 
     // The poll is over: more time must not produce more requests.
@@ -551,10 +555,13 @@ describe('SubscriptionSection', () => {
 
     renderSection()
     await act(() => vi.advanceTimersByTimeAsync(0))
+    await vi.waitFor(() => expect(requests).toBe(1))
 
-    // 23 scheduled ticks after the opening refresh = 24 attempts, inside 2:00.
+    // 23 scheduled ticks after the opening refresh = 24 attempts, inside 2:00. A tick is
+    // scheduled once the previous request has been answered, so each one is awaited.
     for (let tick = 0; tick < 23; tick += 1) {
       await act(() => vi.advanceTimersByTimeAsync(5_000))
+      await vi.waitFor(() => expect(requests).toBe(tick + 2))
     }
 
     expect(requests).toBe(24)
