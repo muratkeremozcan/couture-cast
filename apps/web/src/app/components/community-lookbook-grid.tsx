@@ -2302,7 +2302,7 @@ export function CommunityLookbookGrid({
   const detailGenerationRef = useRef(0)
   const notificationIntentRef = useRef(0)
   const realtimeSyncRef = useRef<CommunitySyncState | null>(null)
-  const hasLoadedFeedRef = useRef(false)
+  const feedReadsStartedRef = useRef(0)
 
   useEffect(() => {
     modeRef.current = currentMode
@@ -2401,6 +2401,9 @@ export function CommunityLookbookGrid({
       feedControllerRef.current = controller
       const generation = feedGenerationRef.current + 1
       feedGenerationRef.current = generation
+      // The deep-link effect resolves the highlighted target for the first feed read. A read
+      // started after it supersedes that one, finished or not, so it revalidates the target.
+      const isFirstRead = feedReadsStartedRef.current++ === 0
 
       if (append) {
         setIsLoadingMore(true)
@@ -2469,14 +2472,13 @@ export function CommunityLookbookGrid({
           detailRevalidationTargets(
             highlightedIdRef.current,
             openedItemRef.current,
-            hasLoadedFeedRef.current
+            !isFirstRead
           ),
           readTicket,
           controller.signal,
           generation,
           loadedIds
         )
-        hasLoadedFeedRef.current = true
       } catch (error: unknown) {
         if (controller.signal.aborted || generation !== feedGenerationRef.current) {
           return
