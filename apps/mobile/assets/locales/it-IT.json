@@ -847,6 +847,8 @@
       "save": "Salva impostazioni",
       "saved": "Impostazioni salvate.",
       "failed": "Impossibile salvare le impostazioni. Riprova.",
+      "loadFailed": "Impossibile caricare le impostazioni. Riprova.",
+      "retry": "Riprova",
       "conflict": "Le impostazioni sono state modificate altrove. Controlla i valori attuali e riprova.",
       "permission": "Consenti le notifiche nelle impostazioni del dispositivo, poi riprova.",
       "signin": "Accedi",

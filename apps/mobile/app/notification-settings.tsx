@@ -15,9 +15,12 @@ import {
   ScrollView,
   StyleSheet,
   Linking,
+  AccessibilityInfo,
+  Platform,
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
+import { LOAD_RETRY_DELAYS_MS } from '@/src/lib/notification-load-retry'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import type { CommunityNotificationSettings } from '@couture/api-client/contracts/http'
 import { communitySyncFromMobile } from '@/src/lib/community'
@@ -30,29 +33,44 @@ import {
   subscribeNativeSession,
   signOutNativeSession,
 } from '@/src/lib/native-session'
+const LOAD_FAILED = 'community.notifications.loadFailed'
 export default function NotificationSettingsScreen() {
   const { t } = useTranslation()
   const [settings, setSettings] = useState<CommunityNotificationSettings | null>(null)
   const [draft, setDraft] = useState<CommunityNotificationSettings | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // True once the bounded automatic retries have stopped without settings.
+  const [loadStalled, setLoadStalled] = useState(false)
+  const reload = useRef<(() => void) | null>(null)
   const suggestedTimezone = useRef<string | undefined>(undefined)
   const generation = useRef(0)
   const clientRef = useRef<ReturnType<typeof communitySyncFromMobile> | null>(null)
   useEffect(() => {
     let active = true
     let owner: string | null | undefined
-    const update = () => {
-      const next = nativeSessionIdentity()
-      if (next === owner) return
-      owner = next
+    let attempts = 0
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    // A load that ends without settings is never silent: the failure message shows and a bounded
+    // retry follows, so a token that settles after sign-in still produces the controls.
+    const failed = (request: number, next: string) => {
+      if (!active || request !== generation.current || nativeSessionIdentity() !== next)
+        return
+      setMessage(LOAD_FAILED)
+      const delay = LOAD_RETRY_DELAYS_MS[attempts++]
+      if (delay === undefined) {
+        setLoadStalled(true)
+        return
+      }
+      traceShareCardOpener('prefs-retry')
+      retryTimer = setTimeout(() => {
+        if (active && request === generation.current && nativeSessionIdentity() === next)
+          load(next)
+      }, delay)
+    }
+    const load = (next: string) => {
       const request = ++generation.current
       clientRef.current = null
-      setSettings(null)
-      setDraft(null)
-      setMessage(null)
-      setBusy(false)
-      if (!next) return
       void (async () => {
         const token = await resolveMobileAccessToken()
         if (
@@ -62,6 +80,7 @@ export default function NotificationSettingsScreen() {
           !token
         ) {
           traceShareCardOpener(token ? 'prefs-stale' : 'prefs-token-null')
+          if (!token) failed(request, next)
           return
         }
         const client = communitySyncFromMobile(async () => {
@@ -81,6 +100,9 @@ export default function NotificationSettingsScreen() {
           return
         }
         traceShareCardOpener('prefs-loaded')
+        attempts = 0
+        setLoadStalled(false)
+        setMessage(null)
         setSettings(value)
         const draft = communityDeviceTimezoneDraft(
           value,
@@ -90,9 +112,31 @@ export default function NotificationSettingsScreen() {
         setDraft(draft)
       })().catch(() => {
         traceShareCardOpener('prefs-failed')
-        if (active && request === generation.current)
-          setMessage('community.notifications.failed')
+        failed(request, next)
       })
+    }
+    const update = () => {
+      const next = nativeSessionIdentity()
+      if (next === owner) return
+      owner = next
+      attempts = 0
+      clearTimeout(retryTimer)
+      generation.current++
+      clientRef.current = null
+      setLoadStalled(false)
+      setSettings(null)
+      setDraft(null)
+      setMessage(null)
+      setBusy(false)
+      if (next) load(next)
+    }
+    reload.current = () => {
+      if (!owner) return
+      attempts = 0
+      clearTimeout(retryTimer)
+      setLoadStalled(false)
+      setMessage(null)
+      load(owner)
     }
     update()
     const unsubscribe = subscribeNativeSession(update)
@@ -102,6 +146,8 @@ export default function NotificationSettingsScreen() {
     }
     return () => {
       active = false
+      reload.current = null
+      clearTimeout(retryTimer)
       retire()
       unsubscribe()
     }
@@ -171,6 +217,11 @@ export default function NotificationSettingsScreen() {
       if (current()) setBusy(false)
     }
   }
+  // accessibilityLiveRegion is honoured on Android only; iOS needs an explicit announcement.
+  useEffect(() => {
+    if (message === LOAD_FAILED && Platform.OS === 'ios')
+      AccessibilityInfo.announceForAccessibility(t(LOAD_FAILED))
+  }, [message, t])
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {draft && (
@@ -233,6 +284,16 @@ export default function NotificationSettingsScreen() {
         </>
       )}
       <Text accessibilityLiveRegion="polite">{message ? t(message) : ''}</Text>
+      {loadStalled && !draft && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('community.notifications.retry')}
+          onPress={() => reload.current?.()}
+          style={styles.button}
+        >
+          <Text>{t('community.notifications.retry')}</Text>
+        </Pressable>
+      )}
       {message === 'community.notifications.permission' && (
         <Pressable
           accessibilityRole="button"

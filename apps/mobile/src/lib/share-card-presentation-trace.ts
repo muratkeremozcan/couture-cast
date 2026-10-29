@@ -46,6 +46,7 @@ export type ShareCardOpenerEvent =
   | 'prefs-failed'
   | 'prefs-token-null'
   | 'prefs-stale'
+  | 'prefs-retry'
 type OpenerSink = (event: ShareCardOpenerEvent, length?: number) => void
 let openerSink: OpenerSink | null = null
 export function traceShareCardOpener(event: ShareCardOpenerEvent, length?: number) {

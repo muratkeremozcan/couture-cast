@@ -847,6 +847,8 @@
       "save": "Ayarları kaydet",
       "saved": "Ayarlar kaydedildi.",
       "failed": "Ayarlar kaydedilemedi. Yeniden deneyin.",
+      "loadFailed": "Ayarlar yüklenemedi. Yeniden deneyin.",
+      "retry": "Yeniden dene",
       "conflict": "Ayarlar başka bir yerde değiştirildi. Güncel değerleri kontrol edip yeniden deneyin.",
       "permission": "Cihaz ayarlarından bildirimlere izin verip yeniden deneyin.",
       "signin": "Oturum aç",

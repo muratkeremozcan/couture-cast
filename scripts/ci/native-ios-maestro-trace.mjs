@@ -380,6 +380,7 @@ const OPENER_EVENTS = new Set([
   'prefs-failed',
   'prefs-token-null',
   'prefs-stale',
+  'prefs-retry',
   'press',
   'state-open',
   'composer-idle',

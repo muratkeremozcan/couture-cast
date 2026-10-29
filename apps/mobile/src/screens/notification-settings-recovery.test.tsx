@@ -304,7 +304,7 @@ describe('notification settings failure, retry and cleanup journeys', () => {
       )
     )
     await render(<NotificationSettingsScreen />)
-    await screen.findByText(label('failed'))
+    await screen.findByText(label('loadFailed'))
     await interact(() => {
       fireEvent.click(screen.getByRole('link', { name: label('signin') }))
     })
