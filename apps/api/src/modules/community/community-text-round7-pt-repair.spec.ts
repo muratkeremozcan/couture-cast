@@ -2112,3 +2112,93 @@ describe('round 7t rapped, bolera and gok', () => {
     expect(screen('niger', 'en-US').disposition).toBe('pass')
   })
 })
+
+/**
+ * Round 7u. A sexual-violence form of exactly five letters (raped, rapes and the other
+ * violence-category five-letter spellings) is below the six-letter edit-distance-one floor,
+ * so one appended or prepended letter is withheld on its own; the ordinary words that these
+ * affixes make (draped, drapes, grapes, draper) are cleared by allow entries. Spanish bolleros
+ * goes back to review with bollero.
+ */
+describe('round 7u five-letter sexual-violence forms with one letter appended or prepended', () => {
+  it.each([
+    'rapedx',
+    'xraped',
+    'rapesx',
+    'xrapes',
+    'rapedd',
+    'zrapes',
+    'raperq',
+    'qrapey',
+  ])('withholds %s', (text) => {
+    expect(screen(text, 'en-US').disposition, text).not.toBe('pass')
+    expect(screen(text, null).disposition, text).not.toBe('pass')
+  })
+
+  it.each([
+    'draped',
+    'drapes',
+    'grapes',
+    'draper',
+    'draped silk',
+    'The drapes are cream.',
+  ])('keeps the ordinary word %s clean', (text) => {
+    expect(screen(text, 'en-US').disposition, text).toBe('pass')
+  })
+
+  it('leaves substitutions and inserts of a five-letter form to the exact match', () => {
+    // Only append and prepend are checked at five letters: a substitution or an insert
+    // would meet far too many ordinary words (rated, taped, rapid).
+    for (const text of ['rated', 'taped', 'rapid', 'raged', 'raves'])
+      expect(screen(text, 'en-US').disposition, text).toBe('pass')
+  })
+
+  it('sends bolleros back to review with bollero', () => {
+    expect(screen('bolleros', 'es-ES').disposition).not.toBe('pass')
+  })
+})
+
+/**
+ * Round 7u, passive frames and cost. A person subject with was, were, is, are, been, being,
+ * got, gets or get before rapped is the victim of the verb, so the knock sense is written in
+ * the active voice only. The grammar is gated on its target word: every reviewed phrase holds
+ * its target, so a text without it is never scanned.
+ */
+describe('round 7u passive rapped and the construction gate', () => {
+  it.each([
+    'She was rapped on the door.',
+    'The customer was rapped against the glass.',
+    'They were rapped on the window.',
+    'He got rapped on the table.',
+    'She gets rapped on the door.',
+    'It is rapped on the glass.',
+    'Being rapped on the door',
+    'He has been rapped on the door.',
+  ])('withholds the passive %s', (text) => {
+    expect(screen(text, 'en-US').disposition, text).not.toBe('pass')
+  })
+
+  it.each([
+    'She rapped on the door.',
+    'He rapped softly at the glass and waited.',
+    'She was rapping bars on stage.',
+    'He is rapping about fashion',
+  ])('keeps the active %s clean', (text) => {
+    expect(screen(text, 'en-US').disposition, text).toBe('pass')
+  })
+
+  it('has a target word in every reviewed phrase', () => {
+    const construction = JSON.parse(
+      fs.readFileSync(
+        path.resolve(
+          __dirname,
+          '../../../policies/community-screening/reviewed-occurrence-constructions-v1.json'
+        ),
+        'utf8'
+      )
+    ) as { constructions: { target: string; phrases: string[] }[] }
+    for (const { target, phrases } of construction.constructions)
+      for (const phrase of phrases)
+        expect(phrase.toLowerCase().includes(target), `${target}: ${phrase}`).toBe(true)
+  })
+})

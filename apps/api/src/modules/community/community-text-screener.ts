@@ -1003,6 +1003,20 @@ function occurrenceLookbehind(
   return alternatives.length ? `(?:${alternatives.join('|')})` : ''
 }
 
+/** Whether a construction's declared-language requirement, if any, is met. */
+function declaresRequiredLanguage(
+  required: readonly ScreeningLanguage[] | undefined,
+  language: ScreeningLanguage | null
+): boolean {
+  return !required || (language !== null && required.includes(language))
+}
+
+/** A thunk that computes its value on the first call and returns it ever after. */
+function memoized<T>(compute: () => T): () => T {
+  let value: T | undefined
+  return () => (value ??= compute())
+}
+
 /**
  * One alternation per target and scope instead of one pattern per phrase: a bank with
  * a thousand phrases would otherwise run a thousand scans on every screened text.
@@ -1011,7 +1025,8 @@ function compileOccurrenceConstructions(
   phrases: ReturnType<typeof reviewedOccurrencePhrases>
 ): {
   target: string
-  pattern: RegExp
+  /** Compiled on first use: most texts never reach a construction's target word. */
+  pattern: () => RegExp
   requiredDeclaredLanguages?: readonly ScreeningLanguage[]
   rejectedPrefixFrames: readonly string[]
   textForbidden: readonly string[]
@@ -1069,14 +1084,17 @@ function compileOccurrenceConstructions(
     textForbidden: (group.textForbidden ?? []).map((word) =>
       collapseRepeats(toLeetClassForm(toFoldedForm(toLiteralForm(word))))
     ),
-    pattern: new RegExp(
-      `${occurrenceLookbehind(group.precedingWords, group.sentenceInitial)}(?<![\\p{L}\\p{N}])(?:${[
-        ...group.phrases,
-      ]
-        .sort((left, right) => right.length - left.length)
-        .map((phrase) => phrase.replaceAll(' ', ' +'))
-        .join('|')})(?![\\p{L}\\p{N}])${occurrenceLookahead(group.closedTails)}`,
-      'gu'
+    pattern: memoized(
+      () =>
+        new RegExp(
+          `${occurrenceLookbehind(group.precedingWords, group.sentenceInitial)}(?<![\\p{L}\\p{N}])(?:${[
+            ...group.phrases,
+          ]
+            .sort((left, right) => right.length - left.length)
+            .map((phrase) => phrase.replaceAll(' ', ' +'))
+            .join('|')})(?![\\p{L}\\p{N}])${occurrenceLookahead(group.closedTails)}`,
+          'gu'
+        )
     ),
   }))
 }
@@ -1564,6 +1582,36 @@ function buildEditOneIndex(
   return keys
 }
 
+/**
+ * The five-letter sexual-violence forms (raped, rapes, raper and the listed misspellings),
+ * which sit under the six-letter edit-distance-one floor. They are looked up with one letter
+ * appended or prepended only: a substitution or an insert of a five-letter word meets far too
+ * many ordinary words (rated, taped, rapid). The violence category is how the lists mark
+ * rape and tecavüz terms, and the sexual-violence family is English.
+ */
+function buildAffixTerms(
+  indexes: readonly LanguageIndex[],
+  family: ReadonlySet<string>
+): ReadonlyMap<string, TermMeta> {
+  const terms = new Map<string, TermMeta>()
+  for (const index of indexes)
+    for (const form of new Set([...index.listedTerms, ...index.generatedForms])) {
+      const meta = index.single.get(form)
+      if (
+        !meta ||
+        form.length !== EDIT_ONE_MIN_TERM_LENGTH - 1 ||
+        !/^\p{L}+$/u.test(form)
+      )
+        continue
+      if (
+        (meta.severity === 'high' && meta.category === 'violence') ||
+        family.has(collapseRepeats(form))
+      )
+        terms.set(form, meta)
+    }
+  return terms
+}
+
 /** Suffixes of INFLECTION_SUFFIXES.tr that agree with the last vowel of a stem. */
 const TURKISH_HARMONIC_SUFFIXES: Readonly<Record<string, ReadonlySet<string>>> = (() => {
   const back = ['lar', 'a', 'da', 'dan', 'ları']
@@ -1896,6 +1944,11 @@ export class CommunityTextScreener {
     )
   }
 
+  /** The five-letter forms looked up with one letter appended or prepended. */
+  affixIndexedForms(): string[] {
+    return [...this.affixTerms.keys()].toSorted()
+  }
+
   /** The scoped phrases of the language the current screen() call declared. */
   private activeScopedPhrases: readonly ScopedPhrase[] = []
   private readonly splitFrames: ReadonlyMap<string, readonly SplitFrame[]>
@@ -1910,6 +1963,7 @@ export class CommunityTextScreener {
   /** One inner deletion or adjacent transposition of every long high-severity spelling. */
   private typoKeys: ReadonlyMap<string, TermMeta> = new Map()
   private editOneKeys: ReadonlyMap<string, readonly EditOneTerm[]> = new Map()
+  private affixTerms: ReadonlyMap<string, TermMeta> = new Map()
   /** The words of high-severity phrases, keyed by their censored and leet spellings. */
   private phraseWordCensorKeys: ReadonlyMap<string, readonly string[]> = new Map()
   private phraseWordLeetKeys: ReadonlyMap<string, readonly string[]> = new Map()
@@ -1921,7 +1975,7 @@ export class CommunityTextScreener {
   })[]
   private readonly occurrenceConstructions: readonly {
     target: string
-    pattern: RegExp
+    pattern: () => RegExp
     requiredDeclaredLanguages?: readonly ScreeningLanguage[]
     rejectedPrefixFrames: readonly string[]
     textForbidden: readonly string[]
@@ -2070,6 +2124,7 @@ export class CommunityTextScreener {
     this.censorKeys = buildCensorKeys(this.indexes, this.cutFamilyTerms)
     this.typoKeys = buildTypoKeys(this.indexes)
     this.editOneKeys = buildEditOneIndex(this.indexes, this.cutFamilyTerms)
+    this.affixTerms = buildAffixTerms(this.indexes, this.cutFamilyTerms)
     const phraseWords = buildPhraseWordKeys(this.indexes)
     this.phraseWordCensorKeys = phraseWords.censored
     this.phraseWordLeetKeys = phraseWords.leet
@@ -2415,12 +2470,11 @@ export class CommunityTextScreener {
     const exact = raw.toLowerCase()
     const language = this.resolveLanguage(declaredLocale)
     for (const construction of this.occurrenceConstructions) {
-      if (
-        construction.requiredDeclaredLanguages &&
-        (!language || !construction.requiredDeclaredLanguages.includes(language))
-      )
+      // Every phrase holds the target word, so a text without it cannot match: skip the scan.
+      if (!exact.includes(construction.target)) continue
+      if (!declaresRequiredLanguage(construction.requiredDeclaredLanguages, language))
         continue
-      for (const match of exact.matchAll(construction.pattern)) {
+      for (const match of exact.matchAll(construction.pattern())) {
         const prefix = exact.slice(0, match.index)
         // Screening folds may only remove an exception here. The construction
         // itself still requires exact raw spelling and ordinary spaces.
@@ -2707,6 +2761,11 @@ export class CommunityTextScreener {
       return null
     // A listed spelling is matched as itself, whatever other term sits one edit from it.
     if (this.indexes.some((index) => index.single.has(token))) return null
+    if (token.length === EDIT_ONE_MIN_TERM_LENGTH) {
+      const affixed =
+        this.affixTerms.get(token.slice(0, -1)) ?? this.affixTerms.get(token.slice(1))
+      if (affixed) return { meta: { ...affixed, severity: 'medium' }, obfuscated: true }
+    }
     for (const key of [token, ...singleDeletes(token)])
       for (const { term, meta } of this.editOneKeys.get(key) ?? [])
         if (isEditDistanceOne(token, term))

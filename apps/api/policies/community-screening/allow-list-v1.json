@@ -1901,11 +1901,6 @@
       "reason": "Ordinary Spanish word, one letter from the listed or generated spelling bolleras, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
     },
     {
-      "entry": "bolleros",
-      "language": "es",
-      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling bolleras, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
-    },
-    {
       "entry": "metates",
       "language": "es",
       "reason": "Ordinary Spanish word, one letter from the listed or generated spelling matates, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
@@ -2294,6 +2289,66 @@
       "entry": "tentes",
       "language": "fr",
       "reason": "Ordinary French word, one letter from the generated spelling tuntes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "draped",
+      "language": "en",
+      "reason": "Ordinary English word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "drapes",
+      "language": "en",
+      "reason": "Ordinary English word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "draper",
+      "language": "en",
+      "reason": "Ordinary English word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "grapes",
+      "language": "en",
+      "reason": "Ordinary English word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "crapes",
+      "language": "en",
+      "reason": "Ordinary English word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "trapes",
+      "language": "en",
+      "reason": "Ordinary English word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "drapey",
+      "language": "en",
+      "reason": "Ordinary English word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "drapés",
+      "language": "fr",
+      "reason": "Ordinary French word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "rapera",
+      "language": "es",
+      "reason": "Ordinary Spanish word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "rapero",
+      "language": "es",
+      "reason": "Ordinary Spanish word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "rapina",
+      "language": "it",
+      "reason": "Ordinary Italian word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "rapino",
+      "language": "it",
+      "reason": "Ordinary Italian word, the five-letter sexual-violence form raped, rapes or raper with one letter added, so the append and prepend check of five-letter forms meets it. It clears only the exact lowercase token; the form it neighbours and every other spelling one letter from it keep screening, and as a single-word allowance it never clears a listed phrase."
     },
     {
       "entry": "tentés",

@@ -47,6 +47,8 @@ import {
  * - edit1: one letter added (appended, prepended, inserted), dropped, changed or two
  *   neighbours swapped, for single words of six letters or more, letters seeded per word.
  *   A variant that is an ordinary word the lists clear is listed in EDIT1_REAL_WORDS.
+ * - edit1-affix: every letter a-z appended and prepended to each five-letter sexual-violence
+ *   form (EDIT1_REAL_WORDS applies here too).
  * - edit1-inflection: the same edits over every generated inflection of six letters or more
  *   that the edit-distance-one index reads (EDIT1_REAL_WORDS applies here too).
  * - inflection-typo: the same two typos over every generated plural and inflected spelling of
@@ -200,10 +202,16 @@ const EDIT1_REAL_WORDS: ReadonlySet<string> = new Set([
   'borre',
   'chines',
   'chins',
+  'crapes',
   'drapeable',
+  'draped',
+  'draper',
+  'drapes',
+  'drapey',
   'engere',
   'engeren',
   'estupor',
+  'grapes',
   'lutes',
   'marca',
   'marcas',
@@ -232,7 +240,12 @@ const EDIT1_REAL_WORDS: ReadonlySet<string> = new Set([
   'racing',
   'raines',
   'rains',
+  'rapera',
+  'rapero',
+  'rapina',
   'rapine',
+  'rapini',
+  'rapino',
   'rayed',
   'rayes',
   'reaping',
@@ -252,6 +265,7 @@ const EDIT1_REAL_WORDS: ReadonlySet<string> = new Set([
   'stupor',
   'terron',
   'terrosi',
+  'trapes',
   'tunen',
   'tunes',
   'tuten',
@@ -484,6 +498,20 @@ function typos(word: string, emit: Emit): void {
  * severity, and not a Turkish inflection whose suffix breaks vowel harmony (its one-letter-less
  * spelling is an ordinary word, see the screener; their number is pinned).
  */
+/**
+ * Every letter a-z appended and prepended to each five-letter sexual-violence form (raped,
+ * rapes, raper ...): below the six-letter edit-distance-one floor only these two edits are
+ * checked, so only these are crossed.
+ */
+function affixFive(): void {
+  for (const form of screener.affixIndexedForms())
+    for (let code = 97; code <= 122; code += 1) {
+      const letter = String.fromCharCode(code)
+      check('edit1-affix', form, form + letter)
+      check('edit1-affix', form, letter + form)
+    }
+}
+
 /** edit1 over every generated inflection the edit-distance-one index reads. */
 function inflectionEdit1(): void {
   const seen = new Set<string>()
@@ -512,6 +540,7 @@ function runMatrix(): void {
   }
   inflectionTypos()
   inflectionEdit1()
+  affixFive()
   const seen = new Set<string>()
   for (const { term } of terms) {
     if (seen.has(term)) continue
@@ -668,6 +697,7 @@ const PINNED_COUNTS: Record<string, number> = {
   stretch: 2025,
   'inflection-typo': 8074,
   edit1: 4718,
+  'edit1-affix': 468,
   'edit1-inflection': 9473,
   'typo-delete': 677,
   'typo-transpose': 577,

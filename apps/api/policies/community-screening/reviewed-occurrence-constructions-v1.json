@@ -7825,15 +7825,26 @@
         "rapped the intro",
         "rapped the bridge"
       ],
-      "reason": "Round7 coordinator ruling: rapped is the knock or the music verb only. It clears inside enumerated knock frames (on, at or against the door, table, window or knuckles) and music frames (along, over, to, about, bars, lyrics, verses, freestyle, the verse), with a closed opener list before it, a closed tail list after it and no assault, victim or sex word anywhere in the text. Declared English is required. A person object or pronoun (rapped her, rapping women), euphemism and typo spellings of rape, bare forms and every disguised spelling stay blocked.",
+      "reason": "Round7 coordinator ruling: rapped is the knock or the music verb only. It clears inside enumerated knock frames (on, at or against the door, table, window or knuckles) and music frames (along, over, to, about, bars, lyrics, verses, freestyle, the verse), with a closed opener list before it, a closed tail list after it and no assault, victim or sex word anywhere in the text. Declared English is required. A person object or pronoun (rapped her, rapping women), euphemism and typo spellings of rape, bare forms and every disguised spelling stay blocked. Passive frames (was, were, is, are, been, being, got, gets or get directly before rapped) are rejected: a person subject there is the victim of the verb, so the knock sense is written in the active voice only.",
       "nativeLanguages": ["en"],
       "requiredDeclaredLanguages": ["en"],
-      "rejectedPrefixFrames": ["you are", "such a", "what a", "stupid", "you absolute"],
-      "openers": [
-        "is",
-        "are",
+      "rejectedPrefixFrames": [
+        "you are",
+        "such a",
+        "what a",
+        "stupid",
+        "you absolute",
         "was",
         "were",
+        "is",
+        "are",
+        "been",
+        "being",
+        "got",
+        "gets",
+        "get"
+      ],
+      "openers": [
         "he",
         "she",
         "they",
