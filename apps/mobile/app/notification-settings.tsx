@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import { Text, useThemeColor } from '@/components/themed'
 import { LOAD_RETRY_DELAYS_MS } from '@/src/lib/notification-load-retry'
+import { shareCardFixtureMode } from '@/src/lib/share-card-native-fixture'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import type { CommunityNotificationSettings } from '@couture/api-client/contracts/http'
 import { communitySyncFromMobile } from '@/src/lib/community'
@@ -88,6 +89,9 @@ export default function NotificationSettingsScreen() {
           if (!token) failed(request, next)
           return
         }
+        // Only the isolated native test build can select this mode; elsewhere it is always 'real'.
+        if (shareCardFixtureMode() === 'prefs_unavailable')
+          throw new Error('Fixture: notification settings unavailable.')
         const client = communitySyncFromMobile(async () => {
           const fresh = await resolveMobileAccessToken()
           if (!fresh || nativeSessionIdentity() !== next)

@@ -14,6 +14,7 @@ const session = vi.hoisted(() => ({
   listeners: new Set<() => void>(),
 }))
 const enable = vi.hoisted(() => vi.fn())
+const fixture = vi.hoisted(() => ({ mode: 'real' }))
 vi.mock('../lib/native-session', () => ({
   nativeSessionIdentity: () => session.owner,
   subscribeNativeSession: (fn: () => void) => {
@@ -27,6 +28,9 @@ vi.mock('../lib/mobile-auth', () => ({
     Promise.resolve(
       session.owner && session.ready ? `verified-${session.owner}` : undefined
     ),
+}))
+vi.mock('../lib/share-card-native-fixture', () => ({
+  shareCardFixtureMode: () => fixture.mode,
 }))
 vi.mock('../lib/native-notifications', () => ({
   enableNativeCommunityNotifications: enable,
@@ -86,6 +90,7 @@ beforeAll(async () => {
 beforeEach(() => {
   session.owner = null
   session.ready = true
+  fixture.mode = 'real'
   session.listeners.clear()
   process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
 })
@@ -227,6 +232,50 @@ describe('R11 native settings journeys', () => {
       Platform.OS = original
       announce.mockRestore()
     }
+  })
+
+  it('the native fixture mode forces the stalled failed state even with a working bearer and server', async () => {
+    server.use(
+      http.get('*/api/v1/community/notification-preferences', () =>
+        HttpResponse.json({ data: { ...settings(), timezoneConfigured: true } })
+      )
+    )
+    fixture.mode = 'prefs_unavailable'
+    await render(<NotificationSettingsScreen />)
+    identify('member-a')
+    await screen.findByRole('button', { name: label('retry') })
+    expect(screen.getByText(label('loadFailed'))).toBeTruthy()
+    expect(screen.queryByLabelText(label('timezone'))).toBeNull()
+    fixture.mode = 'real'
+    fireEvent.click(screen.getByRole('button', { name: label('retry') }))
+    await screen.findByDisplayValue('UTC', undefined, { timeout: 2000 })
+  })
+
+  it('offers Try again only after the last automatic retry fails', async () => {
+    // Each request is held until released, so every state between two failures is observable.
+    const gates: (() => void)[] = []
+    server.use(
+      http.get('*/api/v1/community/notification-preferences', async () => {
+        await new Promise<void>((resolve) => gates.push(resolve))
+        return HttpResponse.json({ error: 'unavailable' }, { status: 503 })
+      })
+    )
+    const retry = () => screen.queryByRole('button', { name: label('retry') })
+    await render(<NotificationSettingsScreen />)
+    identify('member-a')
+    // Four requests: the first load and one per scheduled retry. While request k is pending,
+    // the k - 1 failures before it have happened and none of them may offer the button.
+    for (const k of [1, 2, 3, 4]) {
+      await waitFor(() => expect(gates).toHaveLength(k), { timeout: 2000 })
+      expect(retry(), `no button while request ${k} is pending`).toBeNull()
+      expect(screen.queryByText(label('loadFailed'))).toBeNull()
+      if (k > 1) expect(screen.getByText(label('loadRetrying'))).toBeTruthy()
+      gates[k - 1]!()
+    }
+    await screen.findByRole('button', { name: label('retry') })
+    expect(gates).toHaveLength(4)
+    expect(screen.getByText(label('loadFailed'))).toBeTruthy()
+    expect(screen.queryByText(label('loadRetrying'))).toBeNull()
   })
 
   it('has a load message and a Try again label in every supported locale', () => {

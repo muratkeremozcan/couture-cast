@@ -247,6 +247,8 @@ function localeEnv() {
     MAESTRO_EMAIL_LABEL: n.email,
     MAESTRO_CODE_LABEL: n.code,
     MAESTRO_ENABLED: n.enabled,
+    MAESTRO_PREFS_RETRY: n.retry,
+    MAESTRO_LOAD_FAILED: n.loadFailed,
     MAESTRO_SIGNOUT: n.signout,
     MAESTRO_BACK: json.common.back,
     MAESTRO_SAVED: json.shareCard.saved,
@@ -1526,6 +1528,33 @@ if (command === 'prebuild') {
     mark(`M-SINGLE-WRITE M-IDENTITY:${lifecycle}`)
     fixture('real')
     if (lifecycle === 'signout') await signin()
+  }
+  // Native pixel evidence of the stalled notification-settings state in both color schemes.
+  const setAppearance = async (scheme) => {
+    if (platform === 'ios') run('xcrun', ['simctl', 'ui', device, 'appearance', scheme])
+    else
+      run(adb, [
+        '-s',
+        device,
+        'shell',
+        'cmd',
+        'uimode',
+        'night',
+        scheme === 'dark' ? 'yes' : 'no',
+      ])
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+  }
+  fixture('prefs_unavailable')
+  try {
+    maestro('maestro/story68/prefs-failed.yaml')
+    for (const scheme of ['light', 'dark']) {
+      await setAppearance(scheme)
+      screenshot(`prefs-failed-${scheme}`)
+    }
+    mark('M-UI:prefs-failed-state-light-dark')
+  } finally {
+    await setAppearance('light')
+    fixture('real')
   }
   report.completed = true
   privateJson(`native-matrix-${platform}.json`, report)

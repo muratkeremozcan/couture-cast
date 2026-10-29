@@ -102,6 +102,12 @@ describe('isolated native fixtures and browser boundaries', () => {
       true
     )
   })
+  it('selects the notification-settings failure mode only inside the fixture build flag', () => {
+    mode('prefs_unavailable')
+    expect(nativeFixture.shareCardFixtureMode()).toBe('prefs_unavailable')
+    environment.enabled = false
+    expect(nativeFixture.shareCardFixtureMode()).toBe('real')
+  })
   it('fixture URL boundary rejects other hosts/routes/schemes and unknown modes', () => {
     for (const url of [
       'bad url',

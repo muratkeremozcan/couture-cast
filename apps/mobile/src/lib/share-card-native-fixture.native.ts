@@ -33,6 +33,8 @@ const modes = [
   'offline',
   'unavailable',
   'deferred',
+  // Notification settings fail to load, so the native journey can capture the stalled state.
+  'prefs_unavailable',
 ] as const
 type Mode = (typeof modes)[number]
 let mode: Mode = 'real'
