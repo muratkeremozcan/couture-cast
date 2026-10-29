@@ -178,6 +178,80 @@ describe('screen-owned comments state', () => {
         ?.items.map((reply) => reply.id)
     ).toEqual(['reply'])
   })
+  it('drops a reply page expanded during a refresh when its parent is gone from the new roots', async () => {
+    const { state, transport } = setup(),
+      roots = deferred<CommunityCommentsPage>()
+    transport.roots.mockReturnValueOnce(roots.promise)
+    const refreshing = state.refresh('post')
+    transport.replies.mockResolvedValueOnce(page([item('reply', 2)]))
+    await state.load('post', 'root')
+    roots.resolve(page([item('other', 3)]))
+    await refreshing
+    expect(state.current('post').replies.has('root')).toBe(false)
+  })
+  it('keeps a page loaded onto an expanded parent while a refresh re-reads that parent', async () => {
+    const { state, transport } = setup(),
+      roots = deferred<CommunityCommentsPage>()
+    transport.replies.mockResolvedValueOnce(page([item('first', 2)], 'next'))
+    await state.load('post', 'root')
+    transport.roots.mockReturnValueOnce(roots.promise)
+    const refreshing = state.refresh('post')
+    transport.replies
+      .mockResolvedValueOnce(page([item('second', 3)]))
+      .mockResolvedValueOnce(page([item('first', 2)], 'next'))
+    await state.load('post', 'root', true)
+    roots.resolve(page([{ ...item('root'), replyCount: 2 }]))
+    await refreshing
+    const replies = state.current('post').replies.get('root')
+    expect(replies?.items.map((reply) => reply.id)).toEqual(['first', 'second'])
+    expect(replies?.nextCursor).toBeNull()
+  })
+  it('does not announce a reply page a member expanded while a refresh was reading', async () => {
+    const { state, transport } = setup(),
+      roots = deferred<CommunityCommentsPage>()
+    await state.load('post')
+    transport.roots.mockReturnValueOnce(roots.promise)
+    const refreshing = state.refresh('post')
+    transport.replies.mockResolvedValueOnce(page([item('reply', 2)]))
+    await state.load('post', 'root')
+    roots.resolve(page([{ ...item('root'), replyCount: 1 }]))
+    await refreshing
+    expect(state.current('post').replies.get('root')?.items).toHaveLength(1)
+    expect(state.current('post').announcement).toBeNull()
+  })
+  it('does not announce replies a member loaded onto a page while a refresh re-read it', async () => {
+    const { state, transport } = setup(),
+      roots = deferred<CommunityCommentsPage>()
+    await state.load('post')
+    transport.replies.mockResolvedValueOnce(page([item('first', 2)], 'next'))
+    await state.load('post', 'root')
+    transport.roots.mockReturnValueOnce(roots.promise)
+    const refreshing = state.refresh('post')
+    transport.replies
+      .mockResolvedValueOnce(page([item('second', 3)]))
+      .mockResolvedValueOnce(page([item('first', 2)], 'next'))
+    await state.load('post', 'root', true)
+    roots.resolve(page([{ ...item('root'), replyCount: 2 }]))
+    await refreshing
+    expect(state.current('post').replies.get('root')?.items).toHaveLength(2)
+    expect(state.current('post').announcement).toBeNull()
+  })
+  it('still announces a reply that arrived while a refresh kept a member-loaded page', async () => {
+    const { state, transport } = setup(),
+      roots = deferred<CommunityCommentsPage>()
+    await state.load('post')
+    transport.replies.mockResolvedValueOnce(page([item('first', 2)], 'next'))
+    await state.load('post', 'root')
+    transport.roots.mockReturnValueOnce(roots.promise)
+    const refreshing = state.refresh('post')
+    transport.replies
+      .mockResolvedValueOnce(page([item('second', 3)]))
+      .mockResolvedValueOnce(page([item('first', 2), item('arrived', 4)], 'next'))
+    await state.load('post', 'root', true)
+    roots.resolve(page([{ ...item('root'), replyCount: 3 }]))
+    await refreshing
+    expect(state.current('post').announcement?.key).toBe('community.realtime.newComments')
+  })
   it('lets a refresh replace the reply pages it re-read', async () => {
     const { state, transport } = setup(),
       roots = deferred<CommunityCommentsPage>()

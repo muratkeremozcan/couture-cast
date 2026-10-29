@@ -328,6 +328,59 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     expect(screen.getByText(reply.body)).toBeVisible()
   })
 
+  it('keeps the next replies a member loads while a refresh is still reading the roots', async () => {
+    const nextReply = createCommunityComment({
+      id: 'reply-next',
+      parentId: root.id,
+      publicationSequence: 3,
+      body: 'Next reply body.',
+    })
+    let rootReads = 0
+    let releaseRefresh: () => void = () => undefined
+    const refreshRead = new Promise<void>((resolve) => {
+      releaseRefresh = resolve
+    })
+    const replyPage = (request: Request) => {
+      const next = new URL(request.url).searchParams.has('cursor')
+      return HttpResponse.json({
+        data: {
+          items: [next ? nextReply : reply],
+          nextCursor: next ? null : 'replies-next',
+          snapshot: 2,
+          hasNewer: false,
+        },
+      })
+    }
+    useMswHandlers(
+      http.get(`${base}/comments`, async () => {
+        if (++rootReads > 1) await refreshRead
+        return HttpResponse.json(page())
+      }),
+      http.get(`${base}/comments/root/replies`, ({ request }) => replyPage(request))
+    )
+    const state = makeState()
+    const user = userEvent.setup()
+    render(<CommunityComments postId="community-post-1" state={state} />)
+    await user.click(
+      await screen.findByRole('button', { name: `Replies (1): ${rootContext}` })
+    )
+    expect(await screen.findByText(reply.body)).toBeVisible()
+    let refreshing: Promise<void> = Promise.resolve()
+    await act(async () => {
+      refreshing = state.refresh('community-post-1')
+      await waitFor(() => expect(rootReads).toBe(2))
+    })
+    await user.click(screen.getByRole('button', { name: 'More replies' }))
+    expect(await screen.findByText(nextReply.body)).toBeVisible()
+    await act(async () => {
+      releaseRefresh()
+      await refreshing
+    })
+    expect(screen.getByText(reply.body)).toBeVisible()
+    expect(screen.getByText(nextReply.body)).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'More replies' })).toBeNull()
+  })
+
   it('cancels a reply draft and drops its reply target', async () => {
     useMswHandlers(http.get(`${base}/comments`, () => HttpResponse.json(page())))
     const user = userEvent.setup()

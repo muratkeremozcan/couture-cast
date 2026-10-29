@@ -90,6 +90,39 @@ function mergePage(
   }
 }
 
+/**
+ * A refresh re-reads a fixed number of pages. When a member loaded more of the same
+ * snapshot while it was reading, those later replies and the cursor that follows them
+ * are appended to the re-read page. A page the refresh read from another snapshot, or
+ * one reloaded from its start, has no cursor that continues the later replies, so the
+ * re-read page stands alone.
+ */
+function withLaterPages(
+  captured: CommunityCommentsPage | undefined,
+  current: CommunityCommentsPage | undefined,
+  refreshed: CommunityCommentsPage
+): CommunityCommentsPage {
+  if (
+    !captured ||
+    !current ||
+    current === captured ||
+    current.snapshot !== captured.snapshot ||
+    current.snapshot !== refreshed.snapshot ||
+    !captured.items.every((item) => current.items.some(({ id }) => id === item.id))
+  )
+    return refreshed
+  const known = new Set([...captured.items, ...refreshed.items].map(({ id }) => id))
+  const later = current.items.filter(({ id }) => !known.has(id))
+  if (later.length === 0) return refreshed
+  return {
+    ...refreshed,
+    items: [...refreshed.items, ...later].sort(
+      (a, b) => a.publicationSequence - b.publicationSequence
+    ),
+    nextCursor: current.nextCursor,
+  }
+}
+
 export class CommunityCommentsState {
   private realtimeHealthy = false
 
@@ -446,6 +479,7 @@ export class CommunityCommentsState {
     const rootsBound =
       this.publicPages.get(`${postId}/`) ??
       Math.max(1, Math.ceil((state.roots?.items.length ?? 0) / 20))
+    const captured = new Map(state.replies)
     const replyBounds = new Map(
       [...state.replies].map(
         ([parent, page]) =>
@@ -472,11 +506,24 @@ export class CommunityCommentsState {
       if (!owns()) throw new CommunityRequestSuperseded()
       state.roots = roots
       // A reply page expanded while this refresh was reading is newer than anything the
-      // refresh could have captured, so it stays; every page the refresh re-read replaces
-      // its predecessor.
+      // refresh could have captured, so it stays unless its parent left the thread. Pages
+      // the refresh re-read replace their predecessors, keeping any later page a member
+      // loaded onto them meanwhile.
+      // Replies the member loaded meanwhile are not news to them, so they count as seen.
+      for (const page of state.replies.values())
+        for (const { id } of page.items) previousIds.add(id)
+      const parents = new Set(roots.items.map((item) => item.id))
       state.replies = new Map([
-        ...[...state.replies].filter(([parent]) => !replyBounds.has(parent)),
-        ...replies,
+        ...[...state.replies].filter(
+          ([parent]) => !replyBounds.has(parent) && parents.has(parent)
+        ),
+        ...replies.map(
+          ([parent, page]) =>
+            [
+              parent,
+              withLaterPages(captured.get(parent), state.replies.get(parent), page),
+            ] as const
+        ),
       ])
       state.error = null
       if ([...this.publicIds(state)].some((id) => !previousIds.has(id)))
