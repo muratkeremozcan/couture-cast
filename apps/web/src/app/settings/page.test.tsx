@@ -419,12 +419,14 @@ describe('Web settings page', () => {
     signIn()
     const gate = deferred<void>()
     const aborted = deferred<void>()
+    const started = deferred<void>()
     useMswHandlers(
       subscriptionHandler(),
       themeHandler(),
       locationsHandler(),
       http.get(PREFERENCES_PATH, async ({ request }) => {
         request.signal.addEventListener('abort', () => aborted.resolve())
+        started.resolve()
         await gate.promise
         return HttpResponse.json({ data: { affiliateCtasEnabled: true } })
       })
@@ -432,6 +434,8 @@ describe('Web settings page', () => {
 
     const view = render(<SettingsPage />)
     await waitFor(() => expect(toggle()).toBeDisabled())
+    // Unmounting before the request reaches the handler would abort it unseen.
+    await started.promise
 
     view.unmount()
     await aborted.promise

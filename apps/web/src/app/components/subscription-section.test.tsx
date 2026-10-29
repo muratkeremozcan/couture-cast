@@ -123,13 +123,15 @@ describe('SubscriptionSection', () => {
 
     renderSection()
 
+    // The status line shows the same "no subscription" copy while the read is in flight, so
+    // it proves nothing. The subscribe controls render only once the response has landed.
     await waitFor(() =>
-      expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
-        /You don.t have a Premium subscription yet\./
-      )
+      expect(screen.getByTestId('premium-subscribe-monthly')).toBeEnabled()
+    )
+    expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+      /You don.t have a Premium subscription yet\./
     )
     expect(authorization).toHaveBeenCalledWith('Bearer test-access-token')
-    expect(screen.getByTestId('premium-subscribe-monthly')).toBeEnabled()
     expect(screen.getByTestId('premium-subscribe-annual')).toBeEnabled()
     expect(screen.queryByTestId('premium-signed-out-hint')).not.toBeInTheDocument()
   })
@@ -165,8 +167,13 @@ describe('SubscriptionSection', () => {
 
     renderSection()
 
-    const statusLine = await screen.findByTestId('premium-status-line')
-    expect(statusLine).toHaveTextContent('Premium is active: Premium Monthly.')
+    // The status line mounts under the "no subscription" copy while the read is in flight, so
+    // wait for the entitled copy itself.
+    await waitFor(() =>
+      expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+        'Premium is active: Premium Monthly.'
+      )
+    )
     expect(screen.queryByTestId('premium-subscribe-monthly')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('premium-manage-button'))
@@ -572,7 +579,8 @@ describe('SubscriptionSection', () => {
 
     const hint = await screen.findByTestId('premium-portal-lag-hint')
     expect(hint).toHaveTextContent('can take a couple of hours')
-    await screen.findByTestId('premium-status-line')
+    // The manage entry renders only once the refresh response has landed.
+    await screen.findByTestId('premium-manage-button')
     expect(refreshCalls).toHaveBeenCalledTimes(1)
   })
 

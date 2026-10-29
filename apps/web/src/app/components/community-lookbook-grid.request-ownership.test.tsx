@@ -300,6 +300,8 @@ describe('Story 6.3 screen request ownership', () => {
           return Promise.resolve()
         })
         await screen.findByTestId('lookbook-card-post-1')
+        // The deep-link target can render before the feed page that holds the other card.
+        await screen.findByTestId('lookbook-card-post-2')
         await waitFor(() => expect(targetCalls).toBe(1))
         if (opened === 'post-1' || opened === 'post-2') {
           await act(() => {
@@ -957,7 +959,8 @@ describe('Story 6.3 screen request ownership', () => {
     await act(async () => {
       await journey.sync().catchUp()
     })
-    expect(screen.queryByText('Visible before resync.')).toBeNull()
+    // The thread reread follows the resync, so the removal lands after catchUp resolves.
+    await waitFor(() => expect(screen.queryByText('Visible before resync.')).toBeNull())
     expect(screen.getByLabelText('Add a comment')).toHaveValue('Keep this draft')
     expect(screen.getByLabelText('Add a comment')).toHaveFocus()
     journey.state.failed = true
@@ -965,12 +968,16 @@ describe('Story 6.3 screen request ownership', () => {
       journey.sync().foreground()
       await journey.sync().catchUp()
     })
-    expect(screen.queryByRole('textbox', { name: 'Add a comment' })).toBeNull()
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Add a comment' })).toBeNull()
+    )
     journey.state.failed = false
     await act(async () => {
       await journey.sync().catchUp()
     })
-    expect(screen.getByLabelText('Add a comment')).toHaveValue('Keep this draft')
+    await waitFor(() =>
+      expect(screen.getByLabelText('Add a comment')).toHaveValue('Keep this draft')
+    )
     expect(screen.getByLabelText('Add a comment')).toHaveFocus()
   })
 

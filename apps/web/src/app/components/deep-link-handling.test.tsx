@@ -190,7 +190,10 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
     const highlightedCard = await screen.findByTestId(
       `lookbook-card-${mockCommunityFeedItem.id}`
     )
-    expect(highlightedCard).toHaveAttribute('data-highlighted', 'true')
+    // The feed can show the card before the probe marks it as the deep link target.
+    await waitFor(() =>
+      expect(highlightedCard).toHaveAttribute('data-highlighted', 'true')
+    )
     expect(screen.queryByTestId('deep-link-info-banner')).not.toBeInTheDocument()
     await waitFor(() => expect(highlightedCard).toHaveFocus())
     expect(captureMock).toHaveBeenCalledWith('deep_link_handled', {
