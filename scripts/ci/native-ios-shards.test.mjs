@@ -32,14 +32,15 @@ test('every matrix section, locale and command belongs to exactly one shard', ()
       1,
       locale
     )
-  for (const command of ['proof', ...AFTER_MATRIX])
+  for (const command of ['proof', 'permission-baseline', ...AFTER_MATRIX])
     assert.equal(shards.filter((s) => runsCommand(s, command)).length, 1, command)
 })
 
 test('the plan names only sections and commands the runner knows', () => {
   for (const { sections, commands } of Object.values(SHARD_PLAN)) {
     for (const s of sections) assert.ok(MATRIX_SECTIONS[s], s)
-    for (const c of commands) assert.ok(['proof', ...AFTER_MATRIX].includes(c), c)
+    for (const c of commands)
+      assert.ok(['proof', 'permission-baseline', ...AFTER_MATRIX].includes(c), c)
   }
 })
 
@@ -95,10 +96,11 @@ test('a missing, incomplete, failed or foreign shard report fails the merge', ()
   assert.throws(() => assertShardEvidence(undefined), /ios_shard_missing:1,2/)
 })
 
-test('each shard signs in, and only shard 1 proves the original', () => {
+test('each shard signs in, only shard 1 proves the original and shard 2 sets the same permissions', () => {
   assert.deepEqual(commandsForShard(1), ['signin', 'proof', 'matrix'])
   assert.deepEqual(commandsForShard(2), [
     'signin',
+    'permission-baseline',
     'matrix',
     'rapid-watermark',
     'a11y',
@@ -119,4 +121,43 @@ test('every case a shard must report is accepted by the closed published matrix 
       cases: [{ id: 'M-UNKNOWN', passed: true }],
     })
   )
+})
+
+// Run 40867653316: shard 2 died in precommit-cancel.yaml with the Photos add-only alert up. The
+// only `simctl privacy grant photos-add` is in `proof`, which the plan gives to shard 1, so the
+// shard that never runs `proof` must establish the same permission state itself, before the matrix.
+test('the shard that does not run proof establishes the post-proof Photos permission before the matrix', () => {
+  for (const shard of Object.keys(SHARD_PLAN).map(Number)) {
+    const commands = commandsForShard(shard)
+    const matrix = commands.indexOf('matrix')
+    const grant = ['proof', 'permission-baseline'].filter((c) => commands.includes(c))
+    assert.equal(grant.length, 1, `shard ${shard} grants exactly once`)
+    assert.ok(
+      commands.indexOf(grant[0]) < matrix,
+      `shard ${shard} grants before the matrix`
+    )
+  }
+  assert.deepEqual(commandsForShard(2).slice(0, 3), [
+    'signin',
+    'permission-baseline',
+    'matrix',
+  ])
+})
+
+test('permission-baseline revokes read, grants add-only and asserts both, on iOS only', async () => {
+  const { readFileSync } = await import('node:fs')
+  const source = readFileSync(
+    new URL('../run-story68-native.mjs', import.meta.url),
+    'utf8'
+  )
+  const start = source.indexOf("} else if (command === 'permission-baseline') {")
+  assert.ok(start >= 0)
+  const branch = source.slice(
+    start,
+    source.indexOf("} else if (command === 'fixture')", start)
+  )
+  assert.match(branch, /platform === 'ios'/)
+  assert.match(branch, /'revoke', 'photos', appId/)
+  assert.match(branch, /'grant', 'photos-add', appId/)
+  assert.match(branch, /assertIosReadDenied\(iosPhotoPermissions\(\), true\)/)
 })

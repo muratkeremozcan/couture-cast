@@ -79,7 +79,9 @@ export const SHARD_PLAN = Object.freeze({
   2: {
     sections: ['large-text', 'precommit-lifecycle', 'save-lifecycle'],
     locales: LOCALES.slice(5),
-    commands: [...AFTER_MATRIX],
+    // `proof` denies and then grants Photos add-only through the real UI and simctl, and runs in
+    // shard 1 only. Shard 2 reaches the same permission state directly.
+    commands: ['permission-baseline', ...AFTER_MATRIX],
   },
 })
 
@@ -120,6 +122,7 @@ export function expectedMatrixCases(shard) {
 export const commandsForShard = (shard) => [
   'signin',
   ...(runsCommand(shard, 'proof') ? ['proof'] : []),
+  ...(runsCommand(shard, 'permission-baseline') ? ['permission-baseline'] : []),
   'matrix',
   ...AFTER_MATRIX.filter((command) => runsCommand(shard, command)),
 ]

@@ -1695,6 +1695,15 @@ if (command === 'prebuild') {
   report.completed = true
   privateJson(`native-matrix-${platform}.json`, report)
   console.log(`Native ${platform} matrix passed ${report.cases.length} cases.`)
+} else if (command === 'permission-baseline') {
+  // The Photos state `proof` leaves behind (read denied, add-only granted), for the iOS shard that
+  // does not run `proof`. Without it the first Save shows the add-only prompt instead of Saving.
+  requireDevice()
+  if (platform === 'ios') {
+    run('xcrun', ['simctl', 'privacy', device, 'revoke', 'photos', appId])
+    run('xcrun', ['simctl', 'privacy', device, 'grant', 'photos-add', appId])
+    assertIosReadDenied(iosPhotoPermissions(), true)
+  }
 } else if (command === 'fixture') {
   const mode = option('mode')
   if (
