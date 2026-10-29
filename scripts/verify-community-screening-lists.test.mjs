@@ -12,6 +12,7 @@ const reviewedBank = JSON.parse(
 ).constructions
 import {
   literalContextProblems,
+  scopedPhraseProblems,
   globallyAllowsOccurrenceTarget,
   occurrenceConstructionProblems,
 } from './verify-community-screening-lists.mjs'
@@ -87,6 +88,32 @@ describe('literal assembly contexts', () => {
       )
   })
 
+  test('veto lists and radius are bounded literal tokens', () => {
+    const vetoContext = {
+      ...context,
+      objects: [],
+      evidence: ['de'],
+      evidenceRadius: 1,
+      vetoes: ['seu'],
+      vetoRadius: 3,
+      textVetoes: ['nazista'],
+    }
+    assert.deepEqual(literalContextProblems([vetoContext]), [])
+    for (const mutation of [
+      { vetoes: ['s3u'] },
+      { vetoes: ['seu', 'seu'] },
+      { vetoes: 'seu' },
+      { textVetoes: ['dois termos'] },
+      { vetoRadius: 0 },
+      { vetoRadius: 7 },
+      { vetoRadius: 2.5 },
+    ])
+      assert.ok(
+        literalContextProblems([{ ...vetoContext, ...mutation }]).length,
+        JSON.stringify(mutation)
+      )
+  })
+
   test('literal context generation rejects every deliberate review term', () => {
     for (const term of ['lolita', 'baiser']) {
       assert.deepEqual(
@@ -110,6 +137,29 @@ describe('literal assembly contexts', () => {
       assert.ok(
         literalContextProblems([{ ...context, terms: [term] }], [], ['nigga']).length
       )
+  })
+})
+
+describe('scoped phrase evidence lists', () => {
+  const scoped = {
+    entry: 'pé de',
+    language: 'pt',
+    complements: ['elefante'],
+    before: ['ao', 'um'],
+    refusedAfter: ['bobo'],
+    reason: 'Portuguese foot-of noun phrase with bounded grammar evidence.',
+  }
+  test('accepts bounded literal before and refusedAfter lists', () => {
+    assert.deepEqual(scopedPhraseProblems([scoped]), [])
+  })
+  test('rejects malformed before and refusedAfter lists', () => {
+    for (const mutation of [
+      { before: ['a0'] },
+      { before: ['ao', 'ao'] },
+      { refusedAfter: 'bobo' },
+      { refusedAfter: ['dois termos'] },
+    ])
+      assert.ok(scopedPhraseProblems([{ ...scoped, ...mutation }]).length)
   })
 })
 

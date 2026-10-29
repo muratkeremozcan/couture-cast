@@ -239,6 +239,21 @@ function validLiteralTokens(values, required) {
   )
 }
 
+function contextVetoProblems(context) {
+  const problems = []
+  for (const key of ['vetoes', 'textVetoes'])
+    if (key in context && !validLiteralTokens(context[key], false))
+      problems.push(`a literal context has invalid ${key}`)
+  if (
+    'vetoRadius' in context &&
+    (!Number.isInteger(context.vetoRadius) ||
+      context.vetoRadius < 1 ||
+      context.vetoRadius > 6)
+  )
+    problems.push('a literal context must bound vetoRadius to 1..6 tokens')
+  return problems
+}
+
 function contextTokenProblems(context) {
   const problems = []
   const hasEvidence = Array.isArray(context.evidence) && context.evidence.length > 0
@@ -255,6 +270,7 @@ function contextTokenProblems(context) {
       context.evidenceRadius > 4)
   )
     problems.push('a literal context has invalid evidence or evidenceRadius')
+  problems.push(...contextVetoProblems(context))
   return problems
 }
 
@@ -391,7 +407,7 @@ function cutFamilyProblems(families) {
   })
 }
 
-function scopedPhraseProblems(scopedPhrases) {
+export function scopedPhraseProblems(scopedPhrases) {
   const problems = []
   for (const scoped of scopedPhrases) {
     const literal = toLiteral(scoped.entry ?? '')
@@ -406,6 +422,9 @@ function scopedPhraseProblems(scopedPhrases) {
       problems.push(
         `scoped allow phrase "${scoped.entry}" needs a language, two words, complements and a reason`
       )
+    for (const key of ['before', 'refusedAfter'])
+      if (key in scoped && !validLiteralTokens(scoped[key], false))
+        problems.push(`scoped allow phrase "${scoped.entry}" has invalid ${key}`)
     if (globallyAllowsOccurrenceTarget(literal))
       problems.push('reviewed occurrence target cannot be globally allow-listed')
   }
@@ -632,16 +651,33 @@ function buildAllowFile(language, allowState, hashes) {
         phrase: toLiteral(entry.entry),
         complements: entry.complements.map(toLiteral),
         ...(entry.before?.length ? { before: entry.before.map(toLiteral) } : {}),
+        ...(entry.refusedAfter?.length
+          ? { refusedAfter: entry.refusedAfter.map(toLiteral) }
+          : {}),
       })),
     literalContexts: (allowState.allow.literalContexts ?? [])
       .filter((context) => context.language === language)
-      .map(({ terms, objects, connectors, maxDistance, evidence, evidenceRadius }) => ({
-        terms,
-        objects,
-        connectors,
-        maxDistance,
-        ...(evidence?.length ? { evidence, evidenceRadius } : {}),
-      })),
+      .map(
+        ({
+          terms,
+          objects,
+          connectors,
+          maxDistance,
+          evidence,
+          evidenceRadius,
+          vetoes,
+          vetoRadius,
+          textVetoes,
+        }) => ({
+          terms,
+          objects,
+          connectors,
+          maxDistance,
+          ...(evidence?.length ? { evidence, evidenceRadius } : {}),
+          ...(vetoes?.length ? { vetoes, vetoRadius } : {}),
+          ...(textVetoes?.length ? { textVetoes } : {}),
+        })
+      ),
     occurrenceConstructions: REVIEWED_OCCURRENCE_CONSTRUCTIONS.filter(
       (rule) => rule.language === language
     ).map(({ target, phrases, contextPhrases }) => ({

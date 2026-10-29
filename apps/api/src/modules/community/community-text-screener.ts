@@ -280,6 +280,11 @@ const literalContextSchema = z
     // forms needs no enumerated object nouns.
     evidence: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
     evidenceRadius: z.number().int().min(1).max(4).default(1),
+    // Frames that veto the clearance: a word within vetoRadius tokens on either side
+    // (punctuation does not stop it), or anywhere in the text for textVetoes.
+    vetoes: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    vetoRadius: z.number().int().min(1).max(6).default(3),
+    textVetoes: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
   })
   .refine((context) => context.objects.length > 0 || context.evidence.length > 0)
 
@@ -479,6 +484,9 @@ const allowFileSchema = z.object({
         complements: z.array(z.string().regex(/^\p{L}+$/u)).min(1),
         // Words that clear the phrase when they stand directly before it ("ao pé de").
         before: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+        // Words that refuse the left-evidence clearance when they follow the phrase (insult
+        // targets and person nouns).
+        refusedAfter: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
       })
     )
     .default([]),
@@ -928,6 +936,55 @@ function connectedLiteralTokens(
   return joiner === 'space-or-hyphen' && gap === '-'
 }
 
+/** Whether a veto word stands near the term or anywhere in the text. */
+function isVetoed(
+  tokens: readonly string[],
+  position: number,
+  context: {
+    vetoes: readonly string[]
+    vetoRadius: number
+    textVetoes: readonly string[]
+  }
+): boolean {
+  if (context.textVetoes.length > 0 && tokens.some((t) => context.textVetoes.includes(t)))
+    return true
+  if (context.vetoes.length === 0) return false
+  const from = Math.max(0, position - context.vetoRadius)
+  return tokens
+    .slice(from, position + context.vetoRadius + 1)
+    .some((token, index) => from + index !== position && context.vetoes.includes(token))
+}
+
+/** Whether an object noun stands within the context's distance, joined through its connectors. */
+function hasObjectContext(
+  literal: string,
+  spans: readonly RegExpMatchArray[],
+  tokens: readonly string[],
+  position: number,
+  context: {
+    objects: readonly string[]
+    connectors: readonly string[]
+    maxDistance: number
+  }
+): boolean {
+  for (const direction of [-1, 1]) {
+    for (let distance = 1; distance <= context.maxDistance; distance++) {
+      const at = position + direction * distance
+      const token = tokens[at]
+      if (token === undefined) break
+      if (!connectedLiteralTokens(literal, spans, at, at - direction)) break
+      if (context.objects.includes(token)) {
+        // A preceding object needs an assembly connector ("fibbia da montare"); a bare verb
+        // after a noun is not that construction.
+        if (direction === 1 || distance > 1) return true
+        break
+      }
+      if (!context.connectors.includes(token)) break
+    }
+  }
+  return false
+}
+
 /** Whether a context's grammar evidence word stands within its radius, joined by plain spaces. */
 function hasEvidenceNear(
   literal: string,
@@ -945,6 +1002,20 @@ function hasEvidenceNear(
       if (!connectedLiteralTokens(literal, spans, at, at - direction)) break
       if (context.evidence.includes(token)) return true
     }
+  }
+  return false
+}
+
+/** Whether any frame ending at the last of these words is a rejected prefix frame. */
+function rejectsPrefixFrame(
+  rejected: readonly string[],
+  words: readonly string[]
+): boolean {
+  let frame = ''
+  for (const word of words.slice(-32).toReversed()) {
+    frame = collapseRepeats(word + frame)
+    if (rejected.includes(frame)) return true
+    if (frame.length > 32) break
   }
   return false
 }
@@ -972,12 +1043,18 @@ function scopedPhraseHasEvidence(
     )
   ).every(Boolean)
   if (!inner) return false
+  // A function word before the phrase clears it only when the next word follows on a plain
+  // space (no sentence break, symbol or line) and is not an insult target or a person.
+  const next = tokens[start + size]
   const left =
     start > 0 &&
+    next !== undefined &&
     scoped.before.has(tokens[start - 1] as string) &&
-    connectedLiteralTokens(literal, spans, start - 1, start)
+    connectedLiteralTokens(literal, spans, start - 1, start) &&
+    connectedLiteralTokens(literal, spans, start + size - 1, start + size) &&
+    !scoped.refusedAfter.has(next)
   const right =
-    scoped.complements.has(tokens[start + size] as string) &&
+    scoped.complements.has(next as string) &&
     connectedLiteralTokens(
       literal,
       spans,
@@ -991,7 +1068,12 @@ function scopedPhraseHasEvidence(
 function indexScopedPhrases(
   lists: readonly {
     language: ScreeningLanguage
-    scopedPhrases?: { phrase: string; complements: string[]; before?: string[] }[]
+    scopedPhrases?: {
+      phrase: string
+      complements: string[]
+      before?: string[]
+      refusedAfter?: string[]
+    }[]
   }[]
 ): ReadonlyMap<ScreeningLanguage, readonly ScopedPhrase[]> {
   const scoped = new Map<ScreeningLanguage, ScopedPhrase[]>()
@@ -1008,6 +1090,7 @@ function indexScopedPhrases(
           tokens,
           complements: new Set(entry.complements.map(toLiteralForm)),
           before: new Set((entry.before ?? []).map(toLiteralForm)),
+          refusedAfter: new Set((entry.refusedAfter ?? []).map(toLiteralForm)),
         },
       ])
     }
@@ -1318,6 +1401,7 @@ interface ScopedPhrase {
   readonly tokens: readonly string[]
   readonly complements: ReadonlySet<string>
   readonly before: ReadonlySet<string>
+  readonly refusedAfter: ReadonlySet<string>
 }
 
 interface PhraseEntry {
@@ -2214,6 +2298,9 @@ export class CommunityTextScreener {
         objects: context.objects ?? [],
         evidence: context.evidence ?? [],
         evidenceRadius: context.evidenceRadius ?? 1,
+        vetoes: context.vetoes ?? [],
+        vetoRadius: context.vetoRadius ?? 3,
+        textVetoes: context.textVetoes ?? [],
         language: list.language,
       }))
     )
@@ -2560,25 +2647,12 @@ export class CommunityTextScreener {
       for (const context of this.literalContexts) {
         if (context.language !== language) continue
         if (!context.terms.includes(tokens[position] as string)) continue
-        if (hasEvidenceNear(literal, spans, tokens, position, context)) {
+        if (isVetoed(tokens, position, context)) continue
+        if (
+          hasEvidenceNear(literal, spans, tokens, position, context) ||
+          hasObjectContext(literal, spans, tokens, position, context)
+        )
           allowed[position] = true
-          continue
-        }
-        for (const direction of [-1, 1]) {
-          for (let distance = 1; distance <= context.maxDistance; distance++) {
-            const at = position + direction * distance
-            const token = tokens[at]
-            if (token === undefined) break
-            if (!connectedLiteralTokens(literal, spans, at, at - direction)) break
-            if (context.objects.includes(token)) {
-              // A preceding object needs an assembly connector ("fibbia da
-              // montare"); a bare verb after a noun is not that construction.
-              if (direction === 1 || distance > 1) allowed[position] = true
-              break
-            }
-            if (!context.connectors.includes(token)) break
-          }
-        }
       }
     }
   }
@@ -2614,17 +2688,26 @@ export class CommunityTextScreener {
         // Screening folds may only remove an exception here. The construction
         // itself still requires exact raw spelling and ordinary spaces.
         const prefixWords = tokenize(toLeetRunForm(toFoldedForm(toLiteralForm(prefix))))
-        let frame = ''
-        let rejected = false
-        for (const word of prefixWords.slice(-32).toReversed()) {
-          frame = collapseRepeats(word + frame)
-          if (construction.rejectedPrefixFrames.includes(frame)) {
-            rejected = true
-            break
-          }
-          if (frame.length > 32) break
-        }
-        if (rejected) continue
+        // A frame may also run across the start of the matched phrase: the words before the
+        // target belong to it, so "espece" + "de tapete" is the rejected frame "espece de".
+        const phraseWords = match[0].split(/ +/)
+        const leadWords = tokenize(
+          toLeetRunForm(
+            toFoldedForm(
+              toLiteralForm(
+                phraseWords.slice(0, phraseWords.indexOf(construction.target)).join(' ')
+              )
+            )
+          )
+        )
+        if (
+          rejectsPrefixFrame(construction.rejectedPrefixFrames, prefixWords) ||
+          rejectsPrefixFrame(construction.rejectedPrefixFrames, [
+            ...prefixWords,
+            ...leadWords,
+          ])
+        )
+          continue
         if (
           construction.openers.length > 0 &&
           !tiledByPhrases(
@@ -2638,7 +2721,7 @@ export class CommunityTextScreener {
           this.textHoldsForbidden(exact, construction.textForbidden)
         )
           continue
-        const words = match[0].split(/ +/)
+        const words = phraseWords
         const at = tokenize(toLiteralForm(prefix)).length
         if (!words.every((word, index) => tokens[at + index] === word)) continue
         if (tokens.length < construction.minWords) continue
@@ -3241,28 +3324,12 @@ export class CommunityTextScreener {
       contiguous('space')
     )
       return true
-    return this.activeScopedPhrases.some((scoped) => {
-      if (
-        scoped.tokens.length !== size ||
-        !scoped.tokens.every((word, offset) => tokens[start + offset] === word) ||
-        tokens[start + size] === undefined ||
-        !contiguous('space-or-hyphen')
-      )
-        return false
-      return (
-        (scoped.complements.has(tokens[start + size] as string) &&
-          connectedLiteralTokens(
-            literal,
-            spans,
-            start + size - 1,
-            start + size,
-            'space-or-hyphen'
-          )) ||
-        (start > 0 &&
-          scoped.before.has(tokens[start - 1] as string) &&
-          connectedLiteralTokens(literal, spans, start - 1, start))
-      )
-    })
+    return this.activeScopedPhrases.some(
+      (scoped) =>
+        scoped.tokens.length === size &&
+        scoped.tokens.every((word, offset) => tokens[start + offset] === word) &&
+        scopedPhraseHasEvidence(scoped, literal, spans, tokens, start)
+    )
   }
 
   private matchCandidate(

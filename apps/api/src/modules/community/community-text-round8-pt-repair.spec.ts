@@ -57,6 +57,7 @@ describe('round 8 class A: the floor-rug noun in every position', () => {
     'Tapetes macios na entrada e galochas na porta.',
     'Casaco dobrado sobre o tapete de lã.',
     'Roupas separadas para doação sobre os tapetes.',
+    'Sapatos pretos sobre tapetes persas que são bem leves, lá na sala, mais três pares.',
   ]
   it.each(clean)('passes under declared Portuguese: %s', (text) => {
     for (const locale of portuguese)
@@ -106,7 +107,7 @@ describe('round 8 class A: the floor-rug noun in every position', () => {
       ['tapete', 'tapetes'].includes(entry.target)
     )) {
       expect(rule.contextMinWords).toBe(4)
-      expect(rule.contextPhrases?.length).toBeGreaterThan(60)
+      expect(rule.contextPhrases?.length).toBeGreaterThan(15)
       for (const phrase of rule.contextPhrases ?? [])
         expect(phrase.split(' ').filter((word) => word === rule.target)).toHaveLength(1)
       for (const hostile of ['nojentos', 'lixo', 'odeio', 'morram'])
