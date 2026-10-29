@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "eligible": {},
   "retired": {
     "holdout-v1": "Superseded historical cohort; retained as history and ineligible for release evidence.",
@@ -7,6 +7,9 @@
     "holdout-v3": "Coordinator B9: non-independent fragment-bank corpus; historical evidence only.",
     "holdout-v4": "Coordinator retirement after failed evaluation: released development data, disclosed to the builder.",
     "holdout-v5": "Coordinator retirement after round-4 evaluation failed Italian at4/1000: development data; full false-positive handoff authorized only after this retirement is committed.",
-    "holdout-v7": "Coordinator retirement after failed PT-only evaluation (14 of 2000, Wilson upper 1.1716 percent): development data; PT row-level handoff authorized only after this retirement is committed."
+    "holdout-v7": {
+      "locales": ["pt"],
+      "reason": "Coordinator retirement after failed PT-only evaluation (14 of 2000, Wilson upper 1.1716 percent): development data; PT row-level handoff authorized only after this retirement is committed."
+    }
   }
 }

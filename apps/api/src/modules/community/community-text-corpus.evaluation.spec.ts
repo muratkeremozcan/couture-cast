@@ -26,10 +26,12 @@ import {
   passesCleanHoldoutGate,
   wilsonInterval,
 } from './community-text-corpus-gate.js'
+import { assertLocaleFileSealed } from './community-text-holdout-eligibility.js'
 import {
-  assertActiveHoldoutEligible,
-  requireEligibleHoldout,
-} from './community-text-holdout-eligibility.js'
+  assertVersionDirectorySealed,
+  describeCleanGates,
+  loadActiveHoldouts,
+} from './community-text-holdout-selection.mjs'
 import { loadCommunityScreeningPolicy } from './community-screening-policy.js'
 import {
   CommunityTextScreener,
@@ -47,26 +49,12 @@ async function currentInputSetHash(): Promise<string> {
 }
 
 const corpusDir = path.resolve(__dirname, '../../../test/fixtures/community-text-corpus')
-const activeHoldout = JSON.parse(
-  fs.readFileSync(path.join(corpusDir, 'active-holdout.json'), 'utf8')
-) as { corpusVersion: string }
-const holdoutVersion = activeHoldout.corpusVersion
-if (!/^holdout-v[1-9]\d*$/.test(holdoutVersion)) {
-  throw new Error('active text holdout version is invalid')
-}
-const retirementLedger: unknown = JSON.parse(
-  fs.readFileSync(path.join(corpusDir, 'holdout-retirements.json'), 'utf8')
-)
-requireEligibleHoldout(holdoutVersion, retirementLedger)
-const freezeManifest = JSON.parse(
-  fs.readFileSync(path.join(corpusDir, holdoutVersion, 'freeze-manifest.json'), 'utf8')
-) as {
-  corpusVersion: string
-  sealedAt: string
-  corpusSha256: string
-  files: { language: string; path: string; sha256: string }[]
-}
-assertActiveHoldoutEligible(holdoutVersion, freezeManifest, retirementLedger)
+// Each locale names its own active holdout version; every one must be eligible for that
+// locale with a registered seal before any corpus file is read.
+const { holdouts, manifests } = loadActiveHoldouts(corpusDir)
+const holdoutVersion = (language: string): string => holdouts[language]?.version ?? ''
+const holdoutPath = (language: string): string =>
+  path.join(corpusDir, holdoutVersion(language), `${language}.json`)
 
 const LANGUAGE_LOCALE: Record<string, string> = {
   de: 'de-DE',
@@ -130,9 +118,7 @@ function readCorpus(language: string): Corpus {
 }
 
 function readHoldout(language: string): Holdout {
-  return JSON.parse(
-    fs.readFileSync(path.join(corpusDir, holdoutVersion, `${language}.json`), 'utf8')
-  ) as Holdout
+  return JSON.parse(fs.readFileSync(holdoutPath(language), 'utf8')) as Holdout
 }
 
 interface CleanResult {
@@ -273,7 +259,7 @@ describe.each(languages)('text corpus: %s', (language) => {
 
   it('holds a frozen holdout disjoint from the clean half it was not tuned on', () => {
     expect(holdout.language).toBe(language)
-    expect(holdout.corpusVersion).toBe(holdoutVersion)
+    expect(holdout.corpusVersion).toBe(holdoutVersion(language))
     expect(holdout.entries.length).toBeGreaterThanOrEqual(MINIMUM_CLEAN)
     const ids = holdout.entries.map((entry) => entry.id)
     expect(new Set(ids).size).toBe(ids.length)
@@ -282,16 +268,20 @@ describe.each(languages)('text corpus: %s', (language) => {
   })
 
   it('matches the independent corpus seal recorded before repair inspection', () => {
-    expect(freezeManifest.corpusVersion).toBe(holdoutVersion)
-    const sealed = freezeManifest.files.filter((file) => file.language === language)
-    expect(sealed).toHaveLength(1)
-    expect(sealed[0]?.path).toBe(
-      `apps/api/test/fixtures/community-text-corpus/${holdoutVersion}/${language}.json`
+    const version = holdoutVersion(language)
+    const manifest = manifests.get(version)
+    assertLocaleFileSealed({
+      version,
+      locale: language,
+      file: holdout,
+      fileSha256: createHash('sha256')
+        .update(fs.readFileSync(holdoutPath(language)))
+        .digest('hex'),
+      manifest,
+    })
+    expect(manifest?.files.find((file) => file.language === language)?.path).toBe(
+      `apps/api/test/fixtures/community-text-corpus/${version}/${language}.json`
     )
-    const digest = createHash('sha256')
-      .update(fs.readFileSync(path.join(corpusDir, holdoutVersion, `${language}.json`)))
-      .digest('hex')
-    expect(digest).toBe(sealed[0]?.sha256)
   })
 
   // The holdout is the release gate, so it is asserted by the release command
@@ -336,17 +326,17 @@ describe.each(languages)('text corpus: %s', (language) => {
 })
 
 describe('text corpus run product', () => {
-  it('matches the complete seven-language corpus seal', () => {
-    expect(freezeManifest.files.map((file) => file.language).toSorted()).toEqual(
-      languages.toSorted()
-    )
-    const material = freezeManifest.files
-      .toSorted((a, b) => a.path.localeCompare(b.path, 'en'))
-      .map((file) => `${file.path}\0${file.sha256}\n`)
-      .join('')
-    expect(createHash('sha256').update(material).digest('hex')).toBe(
-      freezeManifest.corpusSha256
-    )
+  it('seals every version directory by exactly the locale files it holds', () => {
+    for (const [version, manifest] of manifests) {
+      assertVersionDirectorySealed(corpusDir, version, manifest)
+      const named = Object.entries(holdouts)
+        .filter(([, holdout]) => holdout.version === version)
+        .map(([language]) => language)
+      expect(manifest.files.map((file) => file.language)).toEqual(
+        expect.arrayContaining(named)
+      )
+    }
+    expect(Object.keys(holdouts).toSorted()).toEqual(languages.toSorted())
   })
 
   it('writes the measurement the readiness evidence consumes, when asked to', async () => {
@@ -365,8 +355,7 @@ describe('text corpus run product', () => {
             (entry) => ({ reason: entry.reason })
           ),
           gates: {
-            cleanGatedOn: holdoutVersion,
-            corpusSha256: freezeManifest.corpusSha256,
+            ...describeCleanGates(holdouts),
             cleanWilson95UpperBoundMaximum: CLEAN_UPPER_BOUND_GATE,
             disallowedBypassesMaximum: 0,
             minimumClean: MINIMUM_CLEAN,

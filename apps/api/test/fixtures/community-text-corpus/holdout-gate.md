@@ -275,3 +275,20 @@ refusal occurs before screening activity. No repair inspection or holdout evalua
 The shared runtime validator lives under `apps/api/src/modules/community`, an existing screening
 input-set directory. Its bytes therefore participate in readiness provenance without changing the
 frozen input-set helper.
+
+## Per-locale active holdout
+
+`active-holdout.json` (schema 2) maps each of the seven locales to the holdout version it is
+gated on, so a version directory holds only the locales authored for it and a locale whose
+holdout fails is re-authored alone. A legacy `{ "corpusVersion": ... }` file still reads as
+every locale on that version. `holdout-retirements.json` (schema 3) scopes both sides to
+locales: an eligible seal lists its `locales`, and a retirement is either a string (every
+locale) or `{ "locales": [...], "reason": ... }`. A locale that is eligible and retired for
+one version makes the ledger invalid. A schema 2 ledger still reads as all seven locales.
+
+Each locale answers for its own version: eligibility, retirement, the registered seal, the
+locale file's `corpusVersion` and its digest in that version's freeze manifest. A manifest
+lists exactly the locale files in its directory and its `corpusSha256` aggregates those
+files only. The run product records `gates.cleanGatedOn` and `gates.cleanSeals` as maps from
+locale to version and to seal. Import a holdout for chosen locales with
+`--import-holdout <dir> --holdout-version holdout-vN --locales pt[,xx]`.

@@ -165,7 +165,15 @@ describe('community text holdout eligibility', () => {
         /retired/
       )
     }
-    assert.equal(current.schemaVersion, 2)
+    assert.equal(current.schemaVersion, 3)
+    assert.throws(
+      () => requireEligibleHoldout('holdout-v7', current, 'pt'),
+      /retired for pt/
+    )
+    assert.throws(
+      () => requireEligibleHoldout('holdout-v7', current, 'de'),
+      /not eligible for de/
+    )
     assert.throws(
       () => requireEligibleHoldout('holdout-v100', current, 'de'),
       /not eligible/

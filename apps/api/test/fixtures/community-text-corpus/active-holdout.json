@@ -1,3 +1,12 @@
 {
-  "corpusVersion": "holdout-v5"
+  "schemaVersion": 2,
+  "locales": {
+    "de": "holdout-v5",
+    "en": "holdout-v5",
+    "es": "holdout-v5",
+    "fr": "holdout-v5",
+    "it": "holdout-v5",
+    "pt": "holdout-v5",
+    "tr": "holdout-v5"
+  }
 }
