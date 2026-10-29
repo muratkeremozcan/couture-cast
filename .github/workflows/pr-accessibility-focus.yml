@@ -6,6 +6,10 @@
 # OS focus report. The full Home teaser flow under TalkBack is local evidence
 # (scripts/run-story67-talkback.mjs). PR Gate makes every job that runs here
 # required.
+#
+# The release iOS app build takes about 21 minutes alone, over the 20 minute PR
+# job limit, so it runs on pushes to main, nightly and on demand. PRs keep the
+# XCTest module tests, the Android module tests and build, and the TalkBack run.
 name: Accessibility focus module
 
 on:
@@ -42,6 +46,8 @@ on:
       - 'scripts/ci/check-accessibility-focus-builds.sh'
       - 'scripts/run-story67-talkback.mjs'
       - '.github/workflows/pr-accessibility-focus.yml'
+  schedule:
+    - cron: '17 4 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -117,12 +123,11 @@ jobs:
           bash scripts/ci/check-accessibility-focus-builds.sh android-test apps/mobile/modules/accessibility-focus/android/build/outputs/apk/androidTest/debug/accessibility-focus-debug-androidTest.apk
 
   ios:
-    name: iOS module tests and app build
+    name: iOS module tests
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        id: checkout
 
       - name: XCTest for the focus target decisions
         working-directory: apps/mobile/modules/accessibility-focus/ios
@@ -130,6 +135,16 @@ jobs:
           device=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [0-9]+[^(]*' | sed 's/ *$//')
           echo "Simulator: $device"
           xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device"
+
+  # Not on pull requests: the release build alone takes about 21 minutes.
+  ios-app-build:
+    name: iOS app build
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        id: checkout
 
       - name: Setup Node
         id: node
@@ -144,7 +159,7 @@ jobs:
         if: ${{ !cancelled() && steps.node.outcome == 'success' }}
         run: npm ci
 
-      # The SwiftPM target above leaves out AccessibilityFocusModule.swift, which
+      # The XCTest target in the ios job leaves out AccessibilityFocusModule.swift, which
       # needs ExpoModulesCore; the app build compiles it with its Expo dependency.
       - name: Generate the iOS project
         id: ios_project
