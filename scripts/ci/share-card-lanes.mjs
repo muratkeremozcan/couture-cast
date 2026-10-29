@@ -184,6 +184,21 @@ function iosAppProblems(build, check) {
       ),
     'ios-build: the app scan must run with the harness directory set'
   )
+  // The artifact is exactly the packaged app the scan read: the scan, the tar and the upload
+  // name the same files, so nothing else can ride along in a public artifact.
+  const products = '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator'
+  check(
+    build?.steps?.[appUpload]?.with?.path === '/tmp/cc68-ios-app.tar' &&
+      (build?.steps ?? []).some(
+        (step) =>
+          step.run?.trim() ===
+          `tar -C ${products} -cf /tmp/cc68-ios-app.tar CoutureCastStory68.app`
+      ) &&
+      build?.steps?.[scan]?.run?.startsWith(
+        `node scripts/ci/native-ios-app-secret-scan.mjs ${products}/CoutureCastStory68.app `
+      ),
+    'ios-build: the app artifact must be the scanned app, packaged to its one pinned path'
+  )
   check(
     build?.steps?.[appUpload]?.with?.['retention-days'] === 1,
     'ios-build: the app artifact keeps one day'

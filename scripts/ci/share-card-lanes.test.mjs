@@ -563,6 +563,34 @@ describe('share-card parallel lane validator', () => {
         row.run = row.run.replace('"$CC68_HARNESS_DIR"', '""')
       }
     )
+    for (const [title, change] of [
+      [
+        'uploading a broader path than the packaged app',
+        (jobs) => {
+          step(jobs['ios-build'], (row) => row.with?.name === 'cc68-ios-app').with.path =
+            '/tmp/'
+        },
+      ],
+      [
+        'packaging something besides the app',
+        (jobs) => {
+          const row = step(jobs['ios-build'], (item) =>
+            item.run?.includes('-cf /tmp/cc68-ios-app.tar')
+          )
+          row.run = row.run.replace('CoutureCastStory68.app', '.')
+        },
+      ],
+      [
+        'scanning a different directory than the one packaged',
+        (jobs) => {
+          const row = step(jobs['ios-build'], (item) =>
+            item.run?.includes('native-ios-app-secret-scan')
+          )
+          row.run = row.run.replace('/CoutureCastStory68.app', '')
+        },
+      ],
+    ])
+      rejected(title, /must be the scanned app, packaged to its one pinned path/, change)
     rejected(
       'keeping the app artifact for longer',
       /app artifact keeps one day/,
