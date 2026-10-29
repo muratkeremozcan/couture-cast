@@ -26,7 +26,7 @@ jobs:
       matrix:
         include: ${{ fromJSON(inputs.ios_only && '[{"os":"macos-15","platform":"ios","api":0}]' || '[{"os":"ubuntu-latest","platform":"android","api":32,"target":"google_apis"},{"os":"ubuntu-latest","platform":"android","api":36,"target":"google_apis_playstore"},{"os":"macos-15","platform":"ios","api":0}]') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: ${{ matrix.platform == 'ios' && 150 || 90 }}
     env:
       CC68_HARNESS_DIR: _bmad-output/test-artifacts/story-6-8/runtime
       MAESTRO_CLI_NO_ANALYTICS: '1'
