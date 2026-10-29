@@ -206,9 +206,21 @@ function nativeOriginalPaths() {
       : []
   return visit(path.join(selected.dataPath, 'Media/DCIM'))
 }
+// Reads through the one XCUITest runner of the run (its pinned port, no reinstall) as the flows do.
+// A bare `maestro hierarchy` cold starts a second runner beside it, and on run 40938852299 shard 2
+// that runner did not answer inside Maestro's 120 s startup wait.
+function hierarchyOutput() {
+  return run(maestroBinary, [
+    '--device',
+    device,
+    ...iosDriverGlobalArgs(platform),
+    'hierarchy',
+    ...iosDriverTestArgs({ platform, directory, device }),
+  ])
+}
 function captureApproved() {
   requireDevice()
-  const hierarchy = run(maestroBinary, ['--device', device, 'hierarchy'])
+  const hierarchy = hierarchyOutput()
   fs.writeFileSync(path.join(directory, `hierarchy-${platform}.txt`), hierarchy, {
     mode: 0o600,
   })
@@ -223,9 +235,7 @@ function captureApproved() {
 }
 function previewDigest() {
   requireDevice()
-  const digest = run(maestroBinary, ['--device', device, 'hierarchy']).match(
-    /share-card-preview-loaded-([a-f0-9]{64})/
-  )?.[1]
+  const digest = hierarchyOutput().match(/share-card-preview-loaded-([a-f0-9]{64})/)?.[1]
   if (!digest) throw new Error('loaded_approved_preview_required')
   return digest
 }
@@ -1530,7 +1540,7 @@ if (command === 'prebuild') {
       'CoutureCast',
     ].join('. ')
     const matchesLabel = (expected) => {
-      const hierarchy = JSON.parse(run(maestroBinary, ['--device', device, 'hierarchy']))
+      const hierarchy = JSON.parse(hierarchyOutput())
       const findPreview = (node) =>
         node.attributes?.['resource-id']?.includes('share-card-preview-loaded-')
           ? node.attributes
