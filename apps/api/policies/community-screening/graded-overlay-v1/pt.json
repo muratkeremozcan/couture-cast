@@ -520,6 +520,71 @@
       "term": "estupros",
       "category": "violence",
       "severity": "high"
+    },
+    {
+      "term": "estuprastes",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprasteis",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupráveis",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupravais",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupráramos",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprarais",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprarei",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupraríeis",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprássemos",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprásseis",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprai",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprante",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprantes",
+      "category": "violence",
+      "severity": "high"
     }
   ]
 }

@@ -638,6 +638,38 @@ function multiCensor(word: string, emit: Emit): void {
     }
 }
 
+/**
+ * A censored word inside a wrapper (hash, bold, italics, underscores) or followed by sentence
+ * punctuation: the one-symbol censor and the all-inner-vowels multi-letter censor of every
+ * word of four letters or more, wrapped and punctuated every way the screener peels.
+ */
+const WRAPS: readonly (readonly [string, string])[] = [
+  ['#', ''],
+  ['**', '**'],
+  ['_', '_'],
+  ['__', '__'],
+  ['*', '*'],
+  ['', '!'],
+  ['', '?'],
+  ['', '!!'],
+  ['', '?!'],
+  ['', '.'],
+  ['#', '!'],
+  ['**', '**!'],
+]
+
+function wrappedCensor(word: string, emit: Emit): void {
+  const n = word.length
+  const vowels = [...word]
+    .map((letter, at) => (at > 0 && 'aeiou'.includes(letter) ? '*' : letter))
+    .join('')
+  const hidden = vowels.split('*').length - 1
+  const shapes = [`${word[0]}*${word.slice(2)}`]
+  if (hidden >= 2 && n - hidden >= Math.max(2, Math.ceil(n * 0.4))) shapes.push(vowels)
+  for (const shape of shapes)
+    for (const [open, close] of WRAPS) emit('censor-wrapped', `${open}${shape}${close}`)
+}
+
 function wordClasses(word: string, phrase: boolean, emitWord: Emit): void {
   const short = !phrase && word.length < 4
   const dropShort: Emit = (cls, variant) => {
@@ -647,6 +679,7 @@ function wordClasses(word: string, phrase: boolean, emitWord: Emit): void {
   }
   perLetter(word, dropShort)
   if (!short) multiCensor(word, emitWord)
+  if (!short) wrappedCensor(word, emitWord)
   if (!short && (!phrase || word.length >= 6)) splits(word, dropShort, !phrase, !phrase)
   if (phrase || short) return
   chains(word, dropShort)
@@ -706,47 +739,48 @@ const PINNED_FLAG_AMBIGUOUS: string[] = [
   'sieg heil',
   'töte dich selbst',
 ]
-const PINNED_TERMS = 298
+const PINNED_TERMS = 311
 const PINNED_DISHARMONIC = 350
 
 const PINNED_COUNTS: Record<string, number> = {
-  censor: 11262,
-  'confusable-single': 8493,
-  'enclosed-circled-all': 298,
-  'enclosed-circled-single': 2553,
-  'enclosed-negative-circled-all': 298,
-  'enclosed-negative-circled-single': 2553,
-  'enclosed-negative-squared-all': 298,
-  'enclosed-negative-squared-single': 2553,
-  'enclosed-parenthesized-all': 298,
-  'enclosed-parenthesized-single': 2553,
-  'enclosed-regional-all': 275,
-  'enclosed-regional-single': 2553,
-  'enclosed-squared-all': 298,
-  'enclosed-squared-single': 2553,
-  'enclosed-tag-all': 298,
-  'enclosed-tag-single': 2553,
-  'fullwidth-all': 298,
-  inflection: 1065,
-  'flag-splice': 4731,
-  'latin-extended-all': 298,
-  'latin-extended-single': 28437,
-  'leet-all': 298,
-  'leet-all-sym': 298,
-  'leet-single': 2626,
-  'math-bold-all': 298,
-  'smallcaps-all': 298,
-  split2: 24923,
-  split3: 5150,
-  split4: 12481,
-  split5: 20235,
-  chain: 1344,
-  stretch: 2553,
-  'inflection-typo': 9438,
-  edit1: 6583,
+  censor: 11930,
+  'confusable-single': 8987,
+  'enclosed-circled-all': 311,
+  'enclosed-circled-single': 2697,
+  'enclosed-negative-circled-all': 311,
+  'enclosed-negative-circled-single': 2697,
+  'enclosed-negative-squared-all': 311,
+  'enclosed-negative-squared-single': 2697,
+  'enclosed-parenthesized-all': 311,
+  'enclosed-parenthesized-single': 2697,
+  'enclosed-regional-all': 288,
+  'enclosed-regional-single': 2697,
+  'enclosed-squared-all': 311,
+  'enclosed-squared-single': 2697,
+  'enclosed-tag-all': 311,
+  'enclosed-tag-single': 2697,
+  'fullwidth-all': 311,
+  inflection: 1090,
+  'flag-splice': 5121,
+  'latin-extended-all': 311,
+  'latin-extended-single': 30021,
+  'leet-all': 311,
+  'leet-all-sym': 311,
+  'leet-single': 2801,
+  'math-bold-all': 311,
+  'smallcaps-all': 311,
+  split2: 26705,
+  split3: 5709,
+  split4: 14164,
+  split5: 23387,
+  chain: 1422,
+  stretch: 2697,
+  'inflection-typo': 9875,
+  edit1: 7157,
   'edit1-affix': 468,
-  'edit1-inflection': 12923,
-  'typo-delete': 1040,
-  'typo-transpose': 892,
-  'multi-censor': 18643,
+  'edit1-inflection': 14001,
+  'typo-delete': 1158,
+  'typo-transpose': 995,
+  'multi-censor': 20329,
+  'censor-wrapped': 8556,
 }

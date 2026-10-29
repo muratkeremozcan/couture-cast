@@ -124,7 +124,7 @@
         "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/pt.json; allow list allow-list-v1.json",
         "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
         "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
-        "termsSha256": "38251e8a0ce323500bfcd9de35de694ce1d695ba896099ceb4b4d79e3de5792d",
+        "termsSha256": "7c1223a6062f06ae8909dcb035180ca6fc06cc46e7e756b84ca43ccffc46ba6f",
         "allowListSha256": "dc1f0f47e6dd474b6c0fca35991589a1e1e5e46ccd13b982d19aba23b08aebf1"
       },
       {

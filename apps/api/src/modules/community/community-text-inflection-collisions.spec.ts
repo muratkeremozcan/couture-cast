@@ -24,9 +24,9 @@ import { CommunityTextScreener } from './community-text-screener'
  */
 const screener = new CommunityTextScreener()
 
-const GENERATED_FORM_COUNT = 1065
+const GENERATED_FORM_COUNT = 1090
 const GENERATED_FORMS_SHA256 =
-  '2f33a2b9842619526449056f7d465d16615aea7cf26d20bf426476b611b1f806'
+  '272709db24e0323eb9c5ada9ef6efa8fb34f3c2a1ef23b8bf0ae4a2a95f5c929'
 
 // [form, languages whose sweep found it, expected disposition for the bare form, no locale]
 // pass: ruled an ordinary word. withheld: a hate or violence plural, a generated spelling

@@ -604,3 +604,93 @@ describe('round 8f: censored phrases and mixed dot or hyphen symbols', () => {
         expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
   })
 })
+
+describe('round 8g: wrapped and punctuated censored terms, remaining estupr forms', () => {
+  const everywhere = (text: string) => {
+    for (const locale of [...portuguese, ...elsewhere])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  }
+  it.each([
+    '#n**ger',
+    '**n**ger**',
+    '_n**ger_',
+    '__n**ger__',
+    '#n*gger',
+    '**n*gger**',
+    '_n*gger_',
+    '*n*gger*',
+    '#v**d*',
+    '#h*r*ns*hn',
+    '**r*p*st**',
+    'Veja #n**ger agora',
+    'Veja **n**ger** agora',
+    'kill y**rself!',
+    'kill y*urself!',
+    'kill y**rself!!',
+    'kill y**rself?!',
+    '#k*ll y**rself',
+    '**kill y**rself**',
+    '_kill y**rself_',
+    'te voy a v*ol*r!',
+    '¡te voy a v*ol*r!',
+    'te voy a v*ol*r!!!',
+    'n*gg*r?',
+    'n*gg*r!',
+  ])('withholds wrapped and punctuated censoring in every locale: %s', everywhere)
+
+  it('keeps real markdown, hashtags and clean emphasis clear', () => {
+    for (const text of [
+      '#tag_longa e #hashtag e #moda',
+      '**Atenção**: leia o aviso e _veja_ o código.',
+      '*itálico* e **negrito** e ***ambos***.',
+      '# Título\n\n## Subtítulo com **ênfase**',
+      'Use __init__ e **kwargs no código!',
+      'Grande liquidação!!! Compre já?!',
+    ])
+      for (const locale of [...portuguese, ...elsewhere])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+
+  it.each([
+    'estuprarei',
+    'estuprasteis',
+    'estuprassemos',
+    'estuprasseis',
+    'estupravais',
+    'estupraríeis',
+    'estuprante',
+    'estuprantes',
+    'estuprárias',
+  ])('holds the remaining estupr inflection as high in every locale: %s', (text) => {
+    for (const locale of [...portuguese, ...elsewhere])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('block')
+  })
+})
+
+describe('round 8g: technical tokens stay clear, milder readings win', () => {
+  it('keeps digits, regex fragments and glob fragments with masks clear', () => {
+    for (const text of [
+      '18**',
+      'CI.**',
+      'Go.*',
+      'hand.**',
+      'Use 18** e CI.** e Go.* e hand.** aqui.',
+      'Padrão foo.*, bar.** e baz-** no glob.',
+      'Versão 2.0** e 1-9** no changelog.',
+    ])
+      for (const locale of [...portuguese, ...elsewhere])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+
+  it('reads an ambiguous mask as the milder word and keeps unambiguous masks high', () => {
+    for (const locale of [...portuguese, ...elsewhere]) {
+      const mild = screen('s**t happens', locale)
+      expect(mild.disposition, `${locale} s**t`).toBe('review')
+      expect(mild.severity, `${locale} s**t`).toBe('medium')
+      for (const text of ['n*gg*r', 'n**ger', '#n**ger', '**n**ger**', 'h*r*ns*hn'])
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+      expect(screen('n*gg*r', locale).severity, `${locale} n*gg*r`).toBe('high')
+      expect(screen('v**d*', locale).disposition, `${locale} v**d*`).not.toBe('pass')
+    }
+  })
+})

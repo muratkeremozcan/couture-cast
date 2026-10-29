@@ -1774,6 +1774,36 @@ function buildMultiCensorIndex(
   return buckets
 }
 
+/** Every listed word of any severity and every allow-listed ordinary word, bucketed like the terms. */
+function buildMultiCensorMilderIndex(
+  indexes: readonly LanguageIndex[],
+  allowSingles: ReadonlySet<string>,
+  terms: MultiCensorBuckets
+): MultiCensorBuckets {
+  // A word that is itself an eligible term in some list is never the milder reading, even
+  // where another language grades it lower ("nigger" is medium in a list that carries it).
+  const eligible = new Set(
+    [...terms.values()].flatMap((entries) => entries.map((e) => e.word))
+  )
+  const buckets = new Map<string, MultiCensorEntry[]>()
+  const seen = new Set<string>()
+  const add = (word: string, meta?: TermMeta): void => {
+    if (word.length < MIN_SINGLE_TERM_LENGTH || !/^\p{L}+$/u.test(word)) return
+    if (eligible.has(word)) return
+    const key = `${word}|${meta?.severity ?? ''}`
+    if (seen.has(key)) return
+    seen.add(key)
+    addMultiCensorEntry(buckets, {
+      classed: toLeetRunForm(toFoldedForm(word)),
+      word,
+      meta,
+    })
+  }
+  for (const index of indexes) for (const [term, meta] of index.single) add(term, meta)
+  for (const word of allowSingles) add(word)
+  return buckets
+}
+
 /** The words of every high-severity phrase, bucketed like the terms. */
 function buildMultiCensorPhraseIndex(
   indexes: readonly LanguageIndex[]
@@ -1803,8 +1833,70 @@ function isMultiCensorRun(core: string): boolean {
     /^[\p{L}\p{N}*_#.-]+$/u.test(core) &&
     // A dot or hyphen beside a digit is a version, date, range or price, never a hidden letter.
     !/\d[.-]|[.-]\d/u.test(core) &&
+    // A dot or hyphen followed only by masks to the end, or preceded only by masks from the
+    // start, is a separator before a regex or glob fragment ("Go.*", "hand.**", "CI.**").
+    !/[.-][*_#]*$|^[*_#]*[.-]/u.test(core) &&
     MULTI_CENSOR_MASKS.test(core) &&
     (core.match(MULTI_CENSOR_SYMBOLS)?.length ?? 0) >= 2
+  )
+}
+
+/** The most symbols of a wrapper that are peeled from either end of a run. */
+const MAX_WRAPPER_RUN = 4
+
+/**
+ * The readings of a censored run once a wrapper is peeled: markdown bold, italics, a hash or
+ * underscores around the word ("#n**ger", "**n**ger**", "_n*gger_"). The run as written stays a
+ * reading, because an edge symbol may be a hidden letter ("v**d*", "__f*tz*__"); a reading that
+ * starts with a symbol is dropped by the first-letter rule.
+ */
+function censorReadings(core: string, trailingWrapper = false): string[] {
+  if (!MULTI_CENSOR_MASKS.test(core)) return [core]
+  const opening = (/^[*_#]+/u.exec(core)?.[0] ?? '').slice(0, MAX_WRAPPER_RUN)
+  const closing = (/[*_#]+$/u.exec(core)?.[0] ?? '').slice(-MAX_WRAPPER_RUN)
+  const readings = new Set<string>([core])
+  const peel = (lead: number, trail: number): void => {
+    const reading = core.slice(lead, core.length - trail)
+    if (/[\p{L}\p{N}]/u.test(reading)) readings.add(reading)
+  }
+  if (opening && closing.endsWith(opening)) {
+    // The same marks on both ends are one wrapper ("_n*gger_", "**n**ger**", "__f*tz*__").
+    for (let k = 1; k <= opening.length; k += 1) peel(k, k)
+    return [...readings]
+  }
+  // An opening mark alone ("#n**ger", "#v**d*") is a wrapper; a closing run alone is read as
+  // hidden letters ("rapine**" is never "rapine" in bold), except for a word inside a phrase,
+  // where the opening mark stands on an earlier word.
+  for (let k = 1; k <= opening.length; k += 1) peel(k, 0)
+  if (trailingWrapper) for (let k = 1; k <= closing.length; k += 1) peel(0, k)
+  return [...readings]
+}
+
+/**
+ * The leet-class shape of a censored run when it clears the visibility floor, or undefined.
+ * The first letter shows, at least two real letters show (a digit is not a letter, so "18**"
+ * is never a term), and at least the ratio of all characters shows.
+ */
+function multiCensorShape(core: string): string | undefined {
+  if (core.length < MIN_SINGLE_TERM_LENGTH || !isMultiCensorRun(core)) return undefined
+  const folded = toFoldedForm(core.replaceAll(MULTI_CENSOR_SYMBOLS, '?'))
+  if (folded.length !== core.length || folded[0] === '?') return undefined
+  const letters = [...folded].filter((character) => /\p{L}/u.test(character)).length
+  const visible = folded.length - (folded.match(/\?/gu)?.length ?? 0)
+  if (
+    letters < MULTI_CENSOR_MIN_VISIBLE ||
+    visible < Math.ceil(folded.length * MULTI_CENSOR_MIN_VISIBLE_RATIO)
+  )
+    return undefined
+  return toLeetRunForm(folded)
+}
+
+function fillMultiCensor(
+  buckets: MultiCensorBuckets,
+  classed: string
+): readonly MultiCensorEntry[] {
+  return (buckets.get(`${classed.length}:${classed[0]}`) ?? []).filter((entry) =>
+    [...classed].every((letter, at) => letter === '?' || letter === entry.classed[at])
   )
 }
 
@@ -1813,32 +1905,39 @@ function multiCensorMatches(
   buckets: MultiCensorBuckets,
   core: string
 ): readonly MultiCensorEntry[] {
-  if (core.length < MIN_SINGLE_TERM_LENGTH || !isMultiCensorRun(core)) return []
-  const folded = toFoldedForm(core.replaceAll(MULTI_CENSOR_SYMBOLS, '?'))
-  if (folded.length !== core.length || folded[0] === '?') return []
-  const classed = toLeetRunForm(folded)
-  const visible = classed.length - (classed.match(/\?/gu)?.length ?? 0)
-  if (
-    visible < MULTI_CENSOR_MIN_VISIBLE ||
-    visible < Math.ceil(classed.length * MULTI_CENSOR_MIN_VISIBLE_RATIO)
-  )
-    return []
-  return (buckets.get(`${classed.length}:${classed[0]}`) ?? []).filter((entry) =>
-    [...classed].every((letter, at) => letter === '?' || letter === entry.classed[at])
-  )
+  const classed = multiCensorShape(core)
+  return classed === undefined ? [] : fillMultiCensor(buckets, classed)
 }
 
-/** The worst term a run with two or more censor symbols can spell, or undefined. */
+/**
+ * The worst term a run with two or more censor symbols can spell, or undefined. A mask that
+ * a milder listed word or an allow-listed ordinary word also fills ("s**t" is shit as well as
+ * slut) follows the milder reading; a mask no such word fills ("n*gg*r") keeps the term.
+ */
 function matchMultiCensored(
   buckets: MultiCensorBuckets,
+  milder: MultiCensorBuckets,
   core: string
 ): TermMeta | undefined {
+  const classed = multiCensorShape(core)
+  if (classed === undefined) return undefined
   let worst: TermMeta | undefined
-  for (const { meta } of multiCensorMatches(buckets, core)) {
+  for (const { meta } of fillMultiCensor(buckets, classed)) {
     if (meta && (!worst || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[worst.severity]))
       worst = meta
   }
-  return worst
+  if (!worst) return undefined
+  const top = SEVERITY_RANK[worst.severity]
+  const lower = fillMultiCensor(milder, classed).filter(
+    (entry) => !entry.meta || SEVERITY_RANK[entry.meta.severity] < top
+  )
+  if (lower.length === 0) return worst
+  let mild: TermMeta | undefined
+  for (const { meta } of lower)
+    if (meta && (!mild || SEVERITY_RANK[meta.severity] > SEVERITY_RANK[mild.severity]))
+      mild = meta
+  // Only an allow-listed ordinary word fills it: the lowest grade that still withholds.
+  return mild ?? { category: worst.category, severity: 'low' }
 }
 
 /**
@@ -2393,6 +2492,7 @@ export class CommunityTextScreener {
   private censorKeys: ReadonlyMap<string, TermMeta> = new Map()
   private multiCensorTerms: MultiCensorBuckets = new Map()
   private multiCensorPhraseWords: MultiCensorBuckets = new Map()
+  private multiCensorMilder: MultiCensorBuckets = new Map()
   /** One inner deletion or adjacent transposition of every long high-severity spelling. */
   private typoKeys: ReadonlyMap<string, TermMeta> = new Map()
   private editOneKeys: ReadonlyMap<string, readonly EditOneTerm[]> = new Map()
@@ -2570,6 +2670,11 @@ export class CommunityTextScreener {
     this.censorKeys = buildCensorKeys(this.indexes, this.cutFamilyTerms)
     this.multiCensorTerms = buildMultiCensorIndex(this.indexes, this.cutFamilyTerms)
     this.multiCensorPhraseWords = buildMultiCensorPhraseIndex(this.indexes)
+    this.multiCensorMilder = buildMultiCensorMilderIndex(
+      this.indexes,
+      this.allowSingles,
+      this.multiCensorTerms
+    )
     this.typoKeys = buildTypoKeys(this.indexes)
     this.editOneKeys = buildEditOneIndex(this.indexes, this.cutFamilyTerms)
     this.affixTerms = buildAffixTerms(this.indexes, this.cutFamilyTerms)
@@ -3278,6 +3383,45 @@ export class CommunityTextScreener {
   }
 
   /**
+   * The phrase words a censored or symbol-leet run can restore to, with the part of the run
+   * that was read. A wrapper (#, **, _) and sentence punctuation (!) around the word are
+   * peeled before the censor read.
+   */
+  private restorableWords(
+    core: string
+  ): { reading: string; words: readonly string[] } | undefined {
+    if (core.length < 3) return undefined
+    const edgeFree = core.replace(/^[^\p{L}\p{N}*_#]+|[^\p{L}\p{N}*_#]+$/gu, '')
+    // Every reading can name a different word ("b*ing" is bring, "b*ing*" is bringe), so the
+    // candidates of all readings are offered, capped.
+    const candidates = new Set<string>()
+    for (const reading of new Set([
+      ...censorReadings(core, true),
+      ...censorReadings(edgeFree, true),
+    ])) {
+      if (/^[\p{L}\p{N}]*[*_#.-][\p{L}\p{N}]*$/u.test(reading)) {
+        const at = reading.search(/[*_#.-]/u)
+        const words = this.phraseWordCensorKeys.get(
+          toLeetRunForm(toFoldedForm(`${reading.slice(0, at)}?${reading.slice(at + 1)}`))
+        )
+        for (const word of words ?? []) candidates.add(word)
+      } else if (isMultiCensorRun(reading)) {
+        for (const entry of multiCensorMatches(
+          this.multiCensorPhraseWords,
+          reading
+        ).slice(0, 4))
+          candidates.add(entry.word)
+      }
+    }
+    if (candidates.size > 0) return { reading: core, words: [...candidates].slice(0, 6) }
+    if (/[@$!|+]/.test(core) && /^[\p{L}\p{N}@$!|+]+$/u.test(core)) {
+      const words = this.phraseWordLeetKeys.get(toLeetRunForm(toFoldedForm(core)))
+      if (words) return { reading: core, words }
+    }
+    return undefined
+  }
+
+  /**
    * One word of a high-severity phrase written censored ("v*olar") or with a leet symbol
    * ("viol@r") is put back, so the phrase windows can see "te voy a violar". Returns the
    * rewritten text, or null when no word was restored.
@@ -3292,24 +3436,11 @@ export class CommunityTextScreener {
     for (const chunk of literal.matchAll(/\S+/gu)) {
       const raw = chunk[0]
       const core = raw.replace(/^[^\p{L}\p{N}*_#@$!|+]+|[^\p{L}\p{N}*_#@$!|+]+$/gu, '')
-      let words: readonly string[] | undefined
-      if (core.length >= 3) {
-        if (/^[\p{L}\p{N}]*[*_#.-][\p{L}\p{N}]*$/u.test(core)) {
-          const at = core.search(/[*_#.-]/u)
-          words = this.phraseWordCensorKeys.get(
-            toLeetRunForm(toFoldedForm(`${core.slice(0, at)}?${core.slice(at + 1)}`))
-          )
-        } else if (isMultiCensorRun(core)) {
-          const matched = multiCensorMatches(this.multiCensorPhraseWords, core)
-          if (matched.length > 0) words = matched.map((entry) => entry.word).slice(0, 4)
-        } else if (/[@$!|+]/.test(core) && /^[\p{L}\p{N}@$!|+]+$/u.test(core)) {
-          words = this.phraseWordLeetKeys.get(toLeetRunForm(toFoldedForm(core)))
-        }
-      }
+      const found = this.restorableWords(core)
       const gap = literal.slice(cursor, chunk.index)
       cursor = chunk.index + raw.length
-      const options = words ? words.map((word) => raw.replace(core, word)) : [raw]
-      if (words) changed = true
+      const options = found ? found.words.map((word) => raw.replace(core, word)) : [raw]
+      if (found) changed = true
       texts = texts
         .flatMap((text) => options.map((option) => text + gap + option))
         .slice(0, 16)
@@ -3333,18 +3464,24 @@ export class CommunityTextScreener {
       // The run between whitespace, without surrounding punctuation. An asterisk, hash or
       // underscore at an edge may be a censored letter; a dot or hyphen there is punctuation.
       const core = chunk[0].replace(/^[^\p{L}\p{N}*_#]+|[^\p{L}\p{N}*_#]+$/gu, '')
-      if (isMultiCensorRun(core)) {
-        if (!budget.spend(core)) return outcomes
-        const multi = matchMultiCensored(this.multiCensorTerms, core)
-        if (multi) outcomes.push({ meta: multi, obfuscated: true })
+      for (const reading of censorReadings(core)) {
+        if (isMultiCensorRun(reading)) {
+          if (!budget.spend(reading)) return outcomes
+          const multi = matchMultiCensored(
+            this.multiCensorTerms,
+            this.multiCensorMilder,
+            reading
+          )
+          if (multi) outcomes.push({ meta: multi, obfuscated: true })
+        }
+        if (!/^[\p{L}\p{N}]*[*_#.-][\p{L}\p{N}]*$/u.test(reading)) continue
+        if (reading.length < MIN_SINGLE_TERM_LENGTH) continue
+        if (!budget.spend(reading)) return outcomes
+        const at = reading.search(/[*_#.-]/u)
+        const folded = toFoldedForm(`${reading.slice(0, at)}?${reading.slice(at + 1)}`)
+        const meta = this.censorKeys.get(toLeetRunForm(folded))
+        if (meta) outcomes.push({ meta, obfuscated: true })
       }
-      if (!/^[\p{L}\p{N}]*[*_#.-][\p{L}\p{N}]*$/u.test(core)) continue
-      if (core.length < MIN_SINGLE_TERM_LENGTH) continue
-      if (!budget.spend(core)) return outcomes
-      const at = core.search(/[*_#.-]/u)
-      const folded = toFoldedForm(`${core.slice(0, at)}?${core.slice(at + 1)}`)
-      const meta = this.censorKeys.get(toLeetRunForm(folded))
-      if (meta) outcomes.push({ meta, obfuscated: true })
     }
     return outcomes
   }
