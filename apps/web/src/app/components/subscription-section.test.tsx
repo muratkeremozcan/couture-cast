@@ -147,9 +147,16 @@ describe('SubscriptionSection', () => {
 
     renderSection()
 
+    // The status line mounts under the "no subscription" copy while the read is in flight,
+    // and no subscribe control exists yet either, so only the section's busy state says the
+    // response has landed.
     await waitFor(() =>
-      expect(screen.getByTestId('premium-status-line')).toBeInTheDocument()
+      expect(screen.getByTestId('premium-subscription-section')).toHaveAttribute(
+        'aria-busy',
+        'false'
+      )
     )
+    expect(screen.getByTestId('premium-status-line')).toBeInTheDocument()
     expect(screen.queryByTestId('premium-subscribe-monthly')).not.toBeInTheDocument()
     expect(screen.queryByTestId('premium-subscribe-annual')).not.toBeInTheDocument()
   })
