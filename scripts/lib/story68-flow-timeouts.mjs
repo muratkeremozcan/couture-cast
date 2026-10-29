@@ -26,6 +26,24 @@ export const OPEN_APP_WORST_CASE_MS =
 export const OPEN_POST_WORST_CASE_MS = FLOW_STARTUP_MS + 50_000 + 14 * CONDITION_CHECK_MS
 
 /**
+ * The guarded watermark taps (watermark.yaml, release-watermark-off.yaml). Each tap sits in a
+ * retry of maxRetries 3 (4 attempts); an attempt is the guard's condition check, the 8 s wait for
+ * the switch to flip and that wait's poll. A test reads both flows and keeps these numbers equal to
+ * what they declare.
+ */
+export const WATERMARK_TAP_ATTEMPTS = 4
+export const WATERMARK_ATTEMPT_MS = 8_000 + 2 * CONDITION_CHECK_MS
+// watermark.yaml: two guarded taps, three 20 s preview waits and four asserts.
+export const WATERMARK_WORST_CASE_MS =
+  FLOW_STARTUP_MS +
+  2 * WATERMARK_TAP_ATTEMPTS * WATERMARK_ATTEMPT_MS +
+  3 * 20_000 +
+  4 * CONDITION_CHECK_MS
+// release-watermark-off.yaml: one guarded tap and one 20 s render wait.
+export const RELEASE_WATERMARK_OFF_WORST_CASE_MS =
+  FLOW_STARTUP_MS + WATERMARK_TAP_ATTEMPTS * WATERMARK_ATTEMPT_MS + 20_000
+
+/**
  * wait-notification-settings.yaml waits for the member's notification controls or fails when the
  * Try again button shows. Its repeat count only bounds a stuck screen and must equal `times` in
  * that flow (a test reads it). Each turn is a 1 s wait plus two condition checks (the Try again
@@ -51,6 +69,12 @@ const flowTimeouts = {
   ),
   'maestro/story68/open-post.yaml': Math.ceil(
     OPEN_POST_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
+  ),
+  'maestro/story68/watermark.yaml': Math.ceil(
+    WATERMARK_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
+  ),
+  'maestro/story68/release-watermark-off.yaml': Math.ceil(
+    RELEASE_WATERMARK_OFF_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
   ),
 }
 
