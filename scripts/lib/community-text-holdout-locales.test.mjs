@@ -183,6 +183,32 @@ describe('active holdout selector', () => {
     )
   })
 
+  test('refuses unknown keys beside either selector form', () => {
+    assert.throws(
+      () =>
+        parseActiveHoldout({
+          corpusVersion: 'holdout-v7',
+          locales: { de: 'holdout-v9' },
+        }),
+      /selector is invalid: unknown key locales/
+    )
+    assert.throws(
+      () => parseActiveHoldout({ corpusVersion: 'holdout-v7', note: 'x' }),
+      /unknown key note/
+    )
+    assert.throws(
+      () =>
+        parseActiveHoldout({
+          schemaVersion: 2,
+          corpusVersion: 'holdout-v7',
+          locales: Object.fromEntries(
+            TEXT_LOCALES.map((locale) => [locale, 'holdout-v50'])
+          ),
+        }),
+      /unknown key corpusVersion/
+    )
+  })
+
   test('refuses a missing locale, an extra locale key and a bad version', () => {
     const missing = Object.fromEntries(
       Object.entries(map()).filter(([locale]) => locale !== 'pt')

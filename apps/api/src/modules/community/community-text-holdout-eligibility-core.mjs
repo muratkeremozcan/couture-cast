@@ -95,10 +95,18 @@ function parseLedger(ledger) {
   return { eligible, retired: parseRetired(ledger, scoped, eligible) }
 }
 
+function refuseUnknownKeys(value, allowed) {
+  const unknown = Object.keys(value).find((key) => !allowed.includes(key))
+  if (unknown !== undefined) {
+    throw new Error(`active text holdout selector is invalid: unknown key ${unknown}`)
+  }
+}
+
 /** Reads the selector: a schema 2 locale map, or a legacy single version for every locale. */
 export function parseActiveHoldout(value) {
   if (!record(value)) throw new Error('active text holdout selector is invalid')
   if (value.schemaVersion === 2 && record(value.locales)) {
+    refuseUnknownKeys(value, ['schemaVersion', 'locales'])
     for (const locale of Object.keys(value.locales)) {
       if (!TEXT_LOCALES.includes(locale)) {
         throw new Error(`active text holdout names unknown locale ${locale}`)
@@ -118,6 +126,7 @@ export function parseActiveHoldout(value) {
     )
   }
   if (value.schemaVersion === undefined && Object.hasOwn(value, 'corpusVersion')) {
+    refuseUnknownKeys(value, ['corpusVersion'])
     if (typeof value.corpusVersion !== 'string' || !VERSION.test(value.corpusVersion)) {
       throw new Error('active text holdout version is invalid')
     }
