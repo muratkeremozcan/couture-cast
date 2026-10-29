@@ -21,6 +21,7 @@ import {
   liveRegionText,
   pageOneReads,
   ranked,
+  feedSettled,
   recordAnnouncements,
   spotlightBody,
 } from '../../test-utils/community-spotlight'
@@ -52,6 +53,7 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-2')
+    await feedSettled()
     const announcements = recordAnnouncements()
     await user.click(screen.getByTestId('community-spotlight-view-more'))
 
@@ -109,6 +111,7 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-1')
+    await feedSettled()
     await user.click(screen.getByTestId('community-spotlight-view-more'))
 
     const fresh = await screen.findByTestId('spotlight-lookbook-card-fresh-1')
@@ -152,6 +155,7 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-1')
+    await feedSettled()
     const announcements = recordAnnouncements()
     await user.click(screen.getByTestId('community-spotlight-view-more'))
 
@@ -196,6 +200,7 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-2')
+    await feedSettled()
     const announcements = recordAnnouncements()
     const viewMore = screen.getByTestId('community-spotlight-view-more')
     await user.click(viewMore)
@@ -236,6 +241,7 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-2')
+    await feedSettled()
     const announcements = recordAnnouncements()
     await user.click(screen.getByTestId('community-spotlight-view-more'))
 
@@ -275,6 +281,7 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-old-1')
+    await feedSettled()
     const announcements = recordAnnouncements()
     await user.click(screen.getByTestId('community-spotlight-view-more'))
 
