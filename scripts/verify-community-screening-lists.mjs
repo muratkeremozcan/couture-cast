@@ -61,7 +61,10 @@ function sameBankScope(rule, reviewed) {
     same('sentenceInitial', false) &&
     same('closedTails', []) &&
     same('textForbidden', []) &&
-    same('openers', [])
+    same('openers', []) &&
+    same('contextPhrases', []) &&
+    same('contextRequiredDeclaredLanguages', []) &&
+    same('contextMinWords', 0)
   )
 }
 
@@ -236,6 +239,25 @@ function validLiteralTokens(values, required) {
   )
 }
 
+function contextTokenProblems(context) {
+  const problems = []
+  const hasEvidence = Array.isArray(context.evidence) && context.evidence.length > 0
+  for (const key of ['terms', 'objects', 'connectors']) {
+    const required = key === 'terms' || (key === 'objects' && !hasEvidence)
+    if (!validLiteralTokens(context[key], required))
+      problems.push(`a literal context has invalid ${key}`)
+  }
+  if (
+    'evidence' in context &&
+    (!validLiteralTokens(context.evidence, true) ||
+      !Number.isInteger(context.evidenceRadius) ||
+      context.evidenceRadius < 1 ||
+      context.evidenceRadius > 4)
+  )
+    problems.push('a literal context has invalid evidence or evidenceRadius')
+  return problems
+}
+
 export function literalContextProblems(contexts, deliberateTerms = [], highTerms = []) {
   const problems = []
   const highKeys = new Set(
@@ -253,11 +275,7 @@ export function literalContextProblems(contexts, deliberateTerms = [], highTerms
       context.reason.trim().length < 20
     )
       problems.push('a literal context has no valid language or reason')
-    for (const key of ['terms', 'objects', 'connectors']) {
-      const values = context[key]
-      if (!validLiteralTokens(values, key !== 'connectors'))
-        problems.push(`a literal context has invalid ${key}`)
-    }
+    problems.push(...contextTokenProblems(context))
     problems.push(...contextTargetProblems(context.terms, deliberateTerms, highKeys))
     if (
       !Number.isInteger(context.maxDistance) ||
@@ -613,18 +631,24 @@ function buildAllowFile(language, allowState, hashes) {
       .map((entry) => ({
         phrase: toLiteral(entry.entry),
         complements: entry.complements.map(toLiteral),
+        ...(entry.before?.length ? { before: entry.before.map(toLiteral) } : {}),
       })),
     literalContexts: (allowState.allow.literalContexts ?? [])
       .filter((context) => context.language === language)
-      .map(({ terms, objects, connectors, maxDistance }) => ({
+      .map(({ terms, objects, connectors, maxDistance, evidence, evidenceRadius }) => ({
         terms,
         objects,
         connectors,
         maxDistance,
+        ...(evidence?.length ? { evidence, evidenceRadius } : {}),
       })),
     occurrenceConstructions: REVIEWED_OCCURRENCE_CONSTRUCTIONS.filter(
       (rule) => rule.language === language
-    ).map(({ target, phrases }) => ({ target, phrases })),
+    ).map(({ target, phrases, contextPhrases }) => ({
+      target,
+      phrases,
+      ...(contextPhrases?.length ? { contextPhrases } : {}),
+    })),
   }
 }
 

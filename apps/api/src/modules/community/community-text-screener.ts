@@ -269,12 +269,19 @@ const termsFileSchema = z.object({
   entries: z.array(termEntrySchema).min(1),
 })
 
-const literalContextSchema = z.object({
-  terms: z.array(z.string().regex(/^\p{Script=Latin}+$/u)).min(1),
-  objects: z.array(z.string().regex(/^\p{L}+$/u)).min(1),
-  connectors: z.array(z.string().regex(/^\p{L}+$/u)),
-  maxDistance: z.number().int().min(1).max(6),
-})
+const literalContextSchema = z
+  .object({
+    terms: z.array(z.string().regex(/^\p{Script=Latin}+$/u)).min(1),
+    objects: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    connectors: z.array(z.string().regex(/^\p{L}+$/u)),
+    maxDistance: z.number().int().min(1).max(6),
+    // Grammar evidence: the term also clears when one of these function words stands within
+    // evidenceRadius plain-space-joined tokens on either side, so a family of ordinary
+    // forms needs no enumerated object nouns.
+    evidence: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    evidenceRadius: z.number().int().min(1).max(4).default(1),
+  })
+  .refine((context) => context.objects.length > 0 || context.evidence.length > 0)
 
 // Coordinator-reviewed native-sense constructions. Each marks only its exact
 // target occurrence in raw contiguous words. High-term rules also require the
@@ -337,6 +344,24 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
             phraseRequiredDeclaredLanguages: z
               .record(z.string(), z.array(z.enum(SCREENING_LANGUAGES)).min(1))
               .optional(),
+            // Grammar-evidence phrases (a determiner or preposition beside the noun). They
+            // clear under their own declared languages and only inside a text of at least
+            // contextMinWords words, so a bare two or three word frame stays withheld.
+            contextPhrases: z
+              .array(
+                z
+                  .string()
+                  .regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u)
+                  .max(120)
+              )
+              .min(1)
+              .max(4096)
+              .optional(),
+            contextRequiredDeclaredLanguages: z
+              .array(z.enum(SCREENING_LANGUAGES))
+              .min(1)
+              .optional(),
+            contextMinWords: z.number().int().min(2).max(8).optional(),
             rejectedPrefixFrames: z
               .array(z.string().regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u))
               .min(1)
@@ -371,7 +396,18 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
               rule.phrases.every(
                 (phrase) =>
                   phrase.split(/ +/).filter((word) => word === rule.target).length === 1
-              ),
+              ) &&
+              (rule.contextPhrases === undefined ||
+                (rule.contextRequiredDeclaredLanguages !== undefined &&
+                  rule.contextMinWords !== undefined &&
+                  rule.contextRequiredDeclaredLanguages.every((language) =>
+                    rule.nativeLanguages.includes(language)
+                  ) &&
+                  rule.contextPhrases.every(
+                    (phrase) =>
+                      phrase.split(/ +/).filter((word) => word === rule.target).length ===
+                      1
+                  ))),
             'reviewed occurrence must bind exactly one literal target in its native grammar'
           )
       )
@@ -384,6 +420,7 @@ const occurrenceConstructionSchema = z
   .object({
     target: z.string().regex(/^\p{Script=Latin}+$/u),
     phrases: z.array(z.string()),
+    contextPhrases: z.array(z.string()).optional(),
   })
   .strict()
 
@@ -440,6 +477,8 @@ const allowFileSchema = z.object({
       z.object({
         phrase: z.string().trim().min(1),
         complements: z.array(z.string().regex(/^\p{L}+$/u)).min(1),
+        // Words that clear the phrase when they stand directly before it ("ao pé de").
+        before: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
       })
     )
     .default([]),
@@ -889,10 +928,70 @@ function connectedLiteralTokens(
   return joiner === 'space-or-hyphen' && gap === '-'
 }
 
+/** Whether a context's grammar evidence word stands within its radius, joined by plain spaces. */
+function hasEvidenceNear(
+  literal: string,
+  spans: readonly RegExpMatchArray[],
+  tokens: readonly string[],
+  position: number,
+  context: { evidence: readonly string[]; evidenceRadius: number }
+): boolean {
+  if (context.evidence.length === 0) return false
+  for (const direction of [-1, 1]) {
+    for (let distance = 1; distance <= context.evidenceRadius; distance++) {
+      const at = position + direction * distance
+      const token = tokens[at]
+      if (token === undefined) break
+      if (!connectedLiteralTokens(literal, spans, at, at - direction)) break
+      if (context.evidence.includes(token)) return true
+    }
+  }
+  return false
+}
+
+/**
+ * Whether Portuguese grammar stands beside a scoped phrase at `start`: a listed function word
+ * directly before it, or a listed complement directly after it, each joined by plain spaces
+ * (the phrase's own words may also join by one hyphen).
+ */
+function scopedPhraseHasEvidence(
+  scoped: ScopedPhrase,
+  literal: string,
+  spans: readonly RegExpMatchArray[],
+  tokens: readonly string[],
+  start: number
+): boolean {
+  const size = scoped.tokens.length
+  const inner = Array.from({ length: size - 1 }, (_, offset) =>
+    connectedLiteralTokens(
+      literal,
+      spans,
+      start + offset,
+      start + offset + 1,
+      'space-or-hyphen'
+    )
+  ).every(Boolean)
+  if (!inner) return false
+  const left =
+    start > 0 &&
+    scoped.before.has(tokens[start - 1] as string) &&
+    connectedLiteralTokens(literal, spans, start - 1, start)
+  const right =
+    scoped.complements.has(tokens[start + size] as string) &&
+    connectedLiteralTokens(
+      literal,
+      spans,
+      start + size - 1,
+      start + size,
+      'space-or-hyphen'
+    )
+  return left || right
+}
+
 function indexScopedPhrases(
   lists: readonly {
     language: ScreeningLanguage
-    scopedPhrases?: { phrase: string; complements: string[] }[]
+    scopedPhrases?: { phrase: string; complements: string[]; before?: string[] }[]
   }[]
 ): ReadonlyMap<ScreeningLanguage, readonly ScopedPhrase[]> {
   const scoped = new Map<ScreeningLanguage, ScopedPhrase[]>()
@@ -905,7 +1004,11 @@ function indexScopedPhrases(
         )
       scoped.set(list.language, [
         ...(scoped.get(list.language) ?? []),
-        { tokens, complements: new Set(entry.complements.map(toLiteralForm)) },
+        {
+          tokens,
+          complements: new Set(entry.complements.map(toLiteralForm)),
+          before: new Set((entry.before ?? []).map(toLiteralForm)),
+        },
       ])
     }
   }
@@ -1031,6 +1134,7 @@ function compileOccurrenceConstructions(
   rejectedPrefixFrames: readonly string[]
   textForbidden: readonly string[]
   openers: readonly (readonly string[])[]
+  minWords: number
 }[] {
   const groups = new Map<
     string,
@@ -1043,6 +1147,7 @@ function compileOccurrenceConstructions(
       closedTails?: readonly string[]
       textForbidden?: readonly string[]
       openers?: readonly string[]
+      minWords: number
       phrases: string[]
     }
   >()
@@ -1059,6 +1164,7 @@ function compileOccurrenceConstructions(
       entry.closedTails ?? null,
       entry.textForbidden ?? null,
       entry.openers ?? null,
+      entry.minWords ?? 0,
     ])
     const group = groups.get(key) ?? {
       target: entry.target,
@@ -1069,6 +1175,7 @@ function compileOccurrenceConstructions(
       closedTails: entry.closedTails,
       textForbidden: entry.textForbidden,
       openers: entry.openers,
+      minWords: entry.minWords ?? 0,
       phrases: [],
     }
     group.phrases.push(entry.phrase)
@@ -1076,6 +1183,7 @@ function compileOccurrenceConstructions(
   }
   return [...groups.values()].map((group) => ({
     target: group.target,
+    minWords: group.minWords,
     requiredDeclaredLanguages: group.requiredDeclaredLanguages,
     rejectedPrefixFrames: group.rejectedPrefixFrames,
     openers: (group.openers ?? []).map((phrase) =>
@@ -1114,6 +1222,7 @@ function reviewedOccurrencePhrases(
   closedTails?: readonly string[]
   textForbidden?: readonly string[]
   openers?: readonly string[]
+  minWords?: number
 }[] {
   const phrases: {
     target: string
@@ -1125,6 +1234,7 @@ function reviewedOccurrencePhrases(
     closedTails?: readonly string[]
     textForbidden?: readonly string[]
     openers?: readonly string[]
+    minWords?: number
   }[] = []
   const targets = new Set<string>()
   for (const list of lists) {
@@ -1135,7 +1245,11 @@ function reviewedOccurrencePhrases(
       if (
         !reviewed ||
         rule.phrases.length !== reviewed.phrases.length ||
-        !reviewed.phrases.every((phrase) => rule.phrases.includes(phrase))
+        !reviewed.phrases.every((phrase) => rule.phrases.includes(phrase)) ||
+        (rule.contextPhrases ?? []).length !== (reviewed.contextPhrases ?? []).length ||
+        !(reviewed.contextPhrases ?? []).every((phrase) =>
+          (rule.contextPhrases ?? []).includes(phrase)
+        )
       )
         throw new CommunityTextScreenerConfigError('unreviewed occurrence construction')
       if (targets.has(rule.target))
@@ -1154,6 +1268,18 @@ function reviewedOccurrencePhrases(
           closedTails: reviewed.closedTails,
           textForbidden: reviewed.textForbidden,
           openers: reviewed.openers,
+        })),
+        ...(reviewed.contextPhrases ?? []).map((phrase) => ({
+          target: rule.target,
+          phrase,
+          requiredDeclaredLanguages: reviewed.contextRequiredDeclaredLanguages,
+          rejectedPrefixFrames: reviewed.rejectedPrefixFrames,
+          precedingWords: reviewed.precedingWords,
+          sentenceInitial: reviewed.sentenceInitial,
+          closedTails: reviewed.closedTails,
+          textForbidden: reviewed.textForbidden,
+          openers: reviewed.openers,
+          minWords: reviewed.contextMinWords,
         }))
       )
     }
@@ -1191,6 +1317,7 @@ function matchRun(index: RunIndex, candidate: string): TermMeta | undefined {
 interface ScopedPhrase {
   readonly tokens: readonly string[]
   readonly complements: ReadonlySet<string>
+  readonly before: ReadonlySet<string>
 }
 
 interface PhraseEntry {
@@ -1975,6 +2102,7 @@ export class CommunityTextScreener {
   })[]
   private readonly occurrenceConstructions: readonly {
     target: string
+    minWords: number
     pattern: () => RegExp
     requiredDeclaredLanguages?: readonly ScreeningLanguage[]
     rejectedPrefixFrames: readonly string[]
@@ -2083,6 +2211,9 @@ export class CommunityTextScreener {
     this.literalContexts = allowLists.flatMap((list) =>
       (list.literalContexts ?? []).map((context) => ({
         ...context,
+        objects: context.objects ?? [],
+        evidence: context.evidence ?? [],
+        evidenceRadius: context.evidenceRadius ?? 1,
         language: list.language,
       }))
     )
@@ -2390,12 +2521,12 @@ export class CommunityTextScreener {
         connectedLiteralTokens(literal, spans, start + offset, start + offset + 1, joiner)
       ).every(Boolean)
     for (const scoped of this.activeScopedPhrases) {
-      const { tokens: head, complements } = scoped
+      const { tokens: head } = scoped
       for (let start = 0; start + head.length < literalTokens.length; start += 1) {
         if (!head.every((token, offset) => literalTokens[start + offset] === token))
           continue
-        if (!complements.has(literalTokens[start + head.length] as string)) continue
-        if (!contiguous(start, head.length + 1, 'space-or-hyphen')) continue
+        if (!scopedPhraseHasEvidence(scoped, literal, spans, literalTokens, start))
+          continue
         for (let offset = 0; offset < head.length; offset += 1)
           allowed[start + offset] = true
       }
@@ -2429,6 +2560,10 @@ export class CommunityTextScreener {
       for (const context of this.literalContexts) {
         if (context.language !== language) continue
         if (!context.terms.includes(tokens[position] as string)) continue
+        if (hasEvidenceNear(literal, spans, tokens, position, context)) {
+          allowed[position] = true
+          continue
+        }
         for (const direction of [-1, 1]) {
           for (let distance = 1; distance <= context.maxDistance; distance++) {
             const at = position + direction * distance
@@ -2506,6 +2641,7 @@ export class CommunityTextScreener {
         const words = match[0].split(/ +/)
         const at = tokenize(toLiteralForm(prefix)).length
         if (!words.every((word, index) => tokens[at + index] === word)) continue
+        if (tokens.length < construction.minWords) continue
         allowed[at + words.indexOf(construction.target)] = true
       }
     }
@@ -3105,20 +3241,28 @@ export class CommunityTextScreener {
       contiguous('space')
     )
       return true
-    return this.activeScopedPhrases.some(
-      (scoped) =>
-        scoped.tokens.length === size &&
-        scoped.tokens.every((word, offset) => tokens[start + offset] === word) &&
-        scoped.complements.has(tokens[start + size] as string) &&
-        connectedLiteralTokens(
-          literal,
-          spans,
-          start + size - 1,
-          start + size,
-          'space-or-hyphen'
-        ) &&
-        contiguous('space-or-hyphen')
-    )
+    return this.activeScopedPhrases.some((scoped) => {
+      if (
+        scoped.tokens.length !== size ||
+        !scoped.tokens.every((word, offset) => tokens[start + offset] === word) ||
+        tokens[start + size] === undefined ||
+        !contiguous('space-or-hyphen')
+      )
+        return false
+      return (
+        (scoped.complements.has(tokens[start + size] as string) &&
+          connectedLiteralTokens(
+            literal,
+            spans,
+            start + size - 1,
+            start + size,
+            'space-or-hyphen'
+          )) ||
+        (start > 0 &&
+          scoped.before.has(tokens[start - 1] as string) &&
+          connectedLiteralTokens(literal, spans, start - 1, start))
+      )
+    })
   }
 
   private matchCandidate(

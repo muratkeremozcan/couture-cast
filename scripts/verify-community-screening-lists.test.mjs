@@ -60,6 +60,33 @@ describe('literal assembly contexts', () => {
     assert.ok(literalContextProblems([null]).length)
   })
 
+  test('grammar-evidence contexts accept a bounded evidence list and no object nouns', () => {
+    const evidenceContext = {
+      ...context,
+      terms: ['brinca'],
+      objects: [],
+      connectors: [],
+      maxDistance: 1,
+      evidence: ['com', 'o'],
+      evidenceRadius: 2,
+    }
+    assert.deepEqual(literalContextProblems([evidenceContext]), [])
+    for (const mutation of [
+      { evidence: [] },
+      { evidence: ['com', 'com'] },
+      { evidence: ['c0m'] },
+      { evidence: ['com tudo'] },
+      { evidenceRadius: 0 },
+      { evidenceRadius: 5 },
+      { evidenceRadius: 1.5 },
+      { objects: [], evidence: undefined },
+    ])
+      assert.ok(
+        literalContextProblems([{ ...evidenceContext, ...mutation }]).length,
+        JSON.stringify(mutation)
+      )
+  })
+
   test('literal context generation rejects every deliberate review term', () => {
     for (const term of ['lolita', 'baiser']) {
       assert.deepEqual(
