@@ -14,10 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { story68FocusObservationHandler } from './lib/story68-ios-focus-observation.mjs'
-import {
-  nativeJourneyTemperature,
-  startWeatherProviderDouble,
-} from './weather-provider-double.mjs'
+import { startWeatherProviderDouble } from './weather-provider-double.mjs'
 import { closedShareCardAuditReport } from './lib/share-card-audit-report.mjs'
 import { summarizeNativeFlowFailure } from './lib/share-card-native-failure.mjs'
 import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics.mjs'
@@ -983,8 +980,6 @@ if (command === 'prebuild') {
   env.E2E_CALLER_OWNED_ENV_KEYS = Object.keys(env).join(',')
   const weather = await startWeatherProviderDouble({
     port: Number(env.E2E_WEATHER_DOUBLE_PORT ?? env.WEATHER_PROVIDER_TEST_DOUBLE_PORT),
-    // The matrix expects top, bottom and shoes; see NATIVE_JOURNEY_TEMPERATURE_C.
-    temperatureAt: nativeJourneyTemperature,
   })
   const api = child(
     process.execPath,

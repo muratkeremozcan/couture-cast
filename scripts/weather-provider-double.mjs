@@ -61,7 +61,6 @@ function placeAt(lat, lon) {
   )
 }
 
-/** Hours after the request hour to degrees Celsius. The default curve swings 12 to 24 degrees. */
 function hourlyTemperature(index) {
   return Math.round((18 + 6 * Math.sin(index / 4)) * 10) / 10
 }
@@ -70,7 +69,7 @@ function utcDate(epochSeconds) {
   return new Date(epochSeconds * 1000).toISOString().slice(0, 10)
 }
 
-function openWeatherForecast(lat, lon, timezone, nowSeconds, temperatureAt) {
+function openWeatherForecast(lat, lon, timezone, nowSeconds) {
   const hourStart = Math.floor(nowSeconds / 3600) * 3600
   const condition = {
     id: SENTINEL_OPENWEATHER_CONDITION_ID,
@@ -92,8 +91,8 @@ function openWeatherForecast(lat, lon, timezone, nowSeconds, temperatureAt) {
     },
     hourly: Array.from({ length: 48 }, (_, index) => ({
       dt: hourStart + index * 3600,
-      temp: temperatureAt(index),
-      feels_like: temperatureAt(index) - 1,
+      temp: hourlyTemperature(index),
+      feels_like: hourlyTemperature(index) - 1,
       pop: 0.2,
       wind_speed: 3,
       wind_gust: 5,
@@ -110,7 +109,7 @@ function openWeatherForecast(lat, lon, timezone, nowSeconds, temperatureAt) {
   }
 }
 
-function weatherApiForecast(lat, lon, timezone, nowSeconds, temperatureAt) {
+function weatherApiForecast(lat, lon, timezone, nowSeconds) {
   const hourStart = Math.floor(nowSeconds / 3600) * 3600
   const condition = { text: 'Light drizzle', code: SENTINEL_WEATHERAPI_CONDITION_CODE }
   const days = Array.from({ length: 3 }, (_, dayIndex) => {
@@ -130,8 +129,8 @@ function weatherApiForecast(lat, lon, timezone, nowSeconds, temperatureAt) {
         const index = dayIndex * 24 + hourIndex
         return {
           time_epoch: hourStart + index * 3600,
-          temp_c: temperatureAt(index),
-          feelslike_c: temperatureAt(index) - 1,
+          temp_c: hourlyTemperature(index),
+          feelslike_c: hourlyTemperature(index) - 1,
           chance_of_rain: 20,
           chance_of_snow: 0,
           precip_mm: 0.1,
@@ -245,7 +244,7 @@ function forecastTimezone(place) {
   return place?.timezone ?? 'America/Denver'
 }
 
-async function handleForecast(url, response, nowSeconds, failedOnce, temperatureAt) {
+async function handleForecast(url, response, nowSeconds, failedOnce) {
   const [lat, lon] = forecastCoordinates(url)
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
     return send(response, 400, { message: 'bad coordinates' })
@@ -264,8 +263,8 @@ async function handleForecast(url, response, nowSeconds, failedOnce, temperature
     response,
     200,
     url.pathname === '/data/3.0/onecall'
-      ? openWeatherForecast(lat, lon, timezone, nowSeconds, temperatureAt)
-      : weatherApiForecast(lat, lon, timezone, nowSeconds, temperatureAt)
+      ? openWeatherForecast(lat, lon, timezone, nowSeconds)
+      : weatherApiForecast(lat, lon, timezone, nowSeconds)
   )
 }
 
@@ -282,11 +281,7 @@ function handleControl(url, response, { stats, requests, failedOnce }) {
   return send(response, 200, stats)
 }
 
-async function handle(
-  request,
-  response,
-  { stats, requests, now, failedOnce, temperatureAt }
-) {
+async function handle(request, response, { stats, requests, now, failedOnce }) {
   const url = new URL(request.url ?? '/', 'http://127.0.0.1')
   if (url.pathname.startsWith('/__double/')) {
     return handleControl(url, response, { stats, requests, failedOnce })
@@ -312,13 +307,7 @@ async function handle(
   stats.forecast += 1
   const [latitude, longitude] = forecastCoordinates(url)
   logRequest(requests.forecast, { seq: stats.forecast, provider, latitude, longitude })
-  return handleForecast(
-    url,
-    response,
-    Math.floor(now() / 1000),
-    failedOnce,
-    temperatureAt
-  )
+  return handleForecast(url, response, Math.floor(now() / 1000), failedOnce)
 }
 
 /**
@@ -329,7 +318,6 @@ async function handle(
 export async function startWeatherProviderDouble({
   port = 0,
   now = () => Date.now(),
-  temperatureAt = hourlyTemperature,
 } = {}) {
   const stats = { geocoding: 0, forecast: 0 }
   const requests = { geocoding: [], forecast: [] }
@@ -338,11 +326,9 @@ export async function startWeatherProviderDouble({
   const sockets = new Set()
 
   const server = createServer((request, response) => {
-    handle(request, response, { stats, requests, now, failedOnce, temperatureAt }).catch(
-      (error) => {
-        send(response, 500, { message: error instanceof Error ? error.message : 'error' })
-      }
-    )
+    handle(request, response, { stats, requests, now, failedOnce }).catch((error) => {
+      send(response, 500, { message: error instanceof Error ? error.message : 'error' })
+    })
   })
   server.on('connection', (socket) => {
     sockets.add(socket)

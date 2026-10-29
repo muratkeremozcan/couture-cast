@@ -1,11 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
 import {
+  NATIVE_JOURNEY_FEELS_LIKE_C,
+  NATIVE_JOURNEY_LOCATION_KEY,
   NATIVE_JOURNEY_TEMPERATURE_C,
-  nativeJourneyTemperature,
-  startWeatherProviderDouble,
-  type WeatherProviderDouble,
-} from '../../../../../scripts/weather-provider-double.mjs'
-import { mapOpenWeatherCondition } from '../weather/providers/weather-condition.mapper'
+} from '../../../../../scripts/lib/native-journey-weather.mjs'
+import { createWeatherSnapshot } from '../../../../../packages/testing/src/factories/weather.factory'
 import {
   generateRitualScenarios,
   hourlySegmentToScenarioInput,
@@ -14,54 +15,74 @@ import {
 } from './ritual-generation.engine'
 
 /**
- * The native journeys (Android and iOS) hard-code the Home morning outfit as top, bottom and
- * shoes. The ritual adds outerwear when the morning segment feels below 15 degrees, and the
- * weather double's default curve swings 12 to 24 degrees indexed from the request hour, so
- * which outfit a run gets used to depend on when it started (run 40878814608 saw four
- * categories on every lane that started after the morning cutoff). These tests replay the
- * ritual over a pinned clock, every half hour for two days and in every zone the harness can
- * resolve, using the forecast the double really serves.
+ * The native journeys hard-code the Home morning outfit as top, bottom and shoes. The ritual adds
+ * outerwear when the morning segment feels below 15 degrees. The journey database is seeded with
+ * packages/db/prisma/seeds/weather.ts, which ramps the harness location's feels-like from 14
+ * degrees by half a degree per hour from the next full hour, so the outfit depended on when the
+ * run seeded (run 40878814608: every lane that seeded between 13:00 and 14:59 UTC got outerwear).
+ * These tests replay the seed and the ritual's anchor, matcher and engine over a pinned clock.
  */
+// The seed module imports its factory with a .ts extension, which this project cannot import
+// as a module, so the seed is read as text: the location's entry and the ramp formula the
+// replay below copies. A change to either breaks this spec on purpose.
+const SEED_SOURCE = readFileSync(
+  resolve(__dirname, '../../../../../packages/db/prisma/seeds/weather.ts'),
+  'utf8'
+)
+const seedEntry = new RegExp(
+  `id: '(wx-\\d+)',\\s+location: '([^']+)',\\s+locationKey: '${NATIVE_JOURNEY_LOCATION_KEY}',\\s+latitude: ([-\\d.]+),\\s+longitude: ([-\\d.]+),\\s+timezone: '([^']+)',\\s+baseTempCelsius: (\\d+),\\s+condition: '([^']+)'`
+).exec(SEED_SOURCE)
+if (!seedEntry) throw new Error('seed entry for the journey location not found')
+const SEED = {
+  id: seedEntry[1]!,
+  location: seedEntry[2]!,
+  locationKey: NATIVE_JOURNEY_LOCATION_KEY,
+  latitude: Number(seedEntry[3]),
+  longitude: Number(seedEntry[4]),
+  timezone: seedEntry[5]!,
+  baseTempCelsius: Number(seedEntry[6]),
+  condition: seedEntry[7] as 'clear' | 'cloudy' | 'rain' | 'snow',
+}
 const BASE = Date.UTC(2026, 9, 29, 0, 0, 0)
-const ZONES = [
-  'America/Denver', // the double's zone for any place it does not know, such as San Francisco
-  'America/Chicago',
-  'America/New_York',
-  'America/Los_Angeles',
-  'UTC',
-]
-let double: WeatherProviderDouble | undefined
-afterEach(async () => {
-  await double?.close()
-  double = undefined
-})
+const HALF_HOUR = 30 * 60_000
 
-type OpenWeatherHour = {
-  dt: number
-  feels_like: number
-  wind_speed: number
-  pop: number
-  weather: { id: number }[]
+/** The segments seedWeather writes for the location, as of `seededAt`, optionally pinned. */
+function seededSegments(seededAt: Date, pinned: boolean) {
+  const fixture = createWeatherSnapshot({
+    id: SEED.id,
+    location: SEED.location,
+    locationKey: SEED.locationKey,
+    latitude: SEED.latitude,
+    longitude: SEED.longitude,
+    timezone: SEED.timezone,
+    provider: 'openweather',
+    providerUpdatedAt: new Date(seededAt.getTime() - 30 * 60_000),
+    timestamp: seededAt,
+    temperature: SEED.baseTempCelsius,
+    feelsLike: SEED.baseTempCelsius,
+    conditions: SEED.condition,
+  })
+  return fixture.segments.map((segment, offset) => ({
+    id: `${SEED.id}-seg-${offset}`,
+    forecast_at: segment.forecastAt,
+    // seedWeather: feels_like = base + offset * 0.5
+    feels_like: pinned ? NATIVE_JOURNEY_FEELS_LIKE_C : fixture.feelsLike + offset * 0.5,
+    wind_speed: fixture.windSpeed,
+    precipitation_probability: segment.precipitationProbability,
+    precipitation_amount: segment.precipitationAmount,
+    condition: segment.conditions,
+  }))
 }
 
-async function morningCategories(zone: string, clock: { now: number }) {
-  const url = `${double!.origin}/data/3.0/onecall?lat=37.7749&lon=-122.4194&appid=k`
-  const body = (await (await fetch(url)).json()) as { hourly: OpenWeatherHour[] }
-  const segments = body.hourly.map((hour) => ({
-    id: `seg-${hour.dt}`,
-    forecast_at: new Date(hour.dt * 1000),
-    feels_like: hour.feels_like,
-    wind_speed: hour.wind_speed,
-    precipitation_probability: hour.pop,
-    precipitation_amount: 0,
-    condition: mapOpenWeatherCondition(hour.weather[0]!.id),
-  }))
-  const target = resolveRitualAnchorDate(new Date(clock.now), zone)
-  const matched = matchHourlyScenarioSegments(segments, zone, target)
-  expect(matched, `${zone} at ${new Date(clock.now).toISOString()}`).not.toBeNull()
+/** Outfits the ritual generates when it runs at `at` against a snapshot seeded at `seededAt`. */
+function outfits(seededAt: Date, at: Date, pinned: boolean) {
+  const segments = seededSegments(seededAt, pinned)
+  const target = resolveRitualAnchorDate(at, SEED.timezone)
+  const matched = matchHourlyScenarioSegments(segments, SEED.timezone, target)
+  if (!matched) return null
   const result = generateRitualScenarios({
     userId: 'u',
-    targetLocalDate: matched!.resolvedLocalDate,
+    targetLocalDate: matched.resolvedLocalDate,
     locale: 'en-US',
     comfortPreferences: {
       runsColdWarm: 'neutral',
@@ -73,9 +94,9 @@ async function morningCategories(zone: string, clock: { now: number }) {
     weather: {
       status: 'available',
       scenarios: [
-        hourlySegmentToScenarioInput('morning', matched!.morning),
-        hourlySegmentToScenarioInput('midday', matched!.midday),
-        hourlySegmentToScenarioInput('evening', matched!.evening),
+        hourlySegmentToScenarioInput('morning', matched.morning),
+        hourlySegmentToScenarioInput('midday', matched.midday),
+        hourlySegmentToScenarioInput('evening', matched.evening),
       ],
     },
   })
@@ -84,39 +105,47 @@ async function morningCategories(zone: string, clock: { now: number }) {
   )
 }
 
-async function sweep(options: Parameters<typeof startWeatherProviderDouble>[0]) {
-  const clock = { now: BASE }
-  double = await startWeatherProviderDouble({ ...options, now: () => clock.now })
-  const seen = new Map<string, string[]>()
-  for (const zone of ZONES)
-    for (let minutes = 0; minutes < 48 * 60; minutes += 30) {
-      clock.now = BASE + minutes * 60_000
-      const outfits = await morningCategories(zone, clock)
-      seen.set(`${zone} ${new Date(clock.now).toISOString()}`, outfits)
+/** Every half-hour seed time of two days; the ritual runs at the seed and up to 90 minutes later. */
+function sweep(pinned: boolean) {
+  const seen = new Map<string, string[] | null>()
+  for (let step = 0; step < 96; step++) {
+    const seededAt = new Date(BASE + step * HALF_HOUR)
+    for (const later of [0, 15, 30, 45, 60, 75, 90]) {
+      const at = new Date(seededAt.getTime() + later * 60_000)
+      seen.set(`${seededAt.toISOString()} +${later}m`, outfits(seededAt, at, pinned))
     }
+  }
   return seen
 }
 
 describe('the outfit the native journeys expect does not depend on the clock', () => {
-  it('serves top, bottom and shoes for every scenario at every half hour in every zone', async () => {
-    const seen = await sweep({ temperatureAt: nativeJourneyTemperature })
-    expect(seen.size).toBe(ZONES.length * 96)
-    for (const [when, outfits] of seen)
-      expect(outfits, when).toEqual(Array(3).fill('top+bottom+shoes'))
-  }, 120_000)
-
-  it('keeps the pinned series warm enough that no layer is ever added', () => {
-    // The ritual adds outerwear below 15 degrees feels-like; the pin is a degree under its
-    // own temperature.
-    expect(NATIVE_JOURNEY_TEMPERATURE_C - 1).toBeGreaterThanOrEqual(15)
+  it('replays the seed as it is written: a ramp of half a degree per hour from the base', () => {
+    expect(SEED_SOURCE).toContain('feels_like: fixture.feelsLike + offset * 0.5')
+    expect(SEED_SOURCE).toContain('feelsLike: seed.baseTempCelsius')
+    expect(SEED.baseTempCelsius).toBe(14)
   })
 
-  it('reproduces the failure: the default curve adds outerwear for some start times and not for others', async () => {
-    const seen = await sweep({})
-    const withOuterwear = [...seen.values()].filter((outfits) =>
-      outfits[0]!.includes('outerwear')
-    )
-    expect(withOuterwear.length).toBeGreaterThan(0)
-    expect(withOuterwear.length).toBeLessThan(seen.size)
-  }, 120_000)
+  it('gives top, bottom and shoes for every scenario at every seed time with the pin', () => {
+    const seen = sweep(true)
+    expect(seen.size).toBe(96 * 7)
+    for (const [when, result] of seen)
+      expect(result, when).toEqual(Array(3).fill('top+bottom+shoes'))
+  })
+
+  it('reproduces the failure without the pin: outerwear exactly when the seed lands 13:00 to 14:59 UTC', () => {
+    const cold = new Set<number>()
+    for (let step = 0; step < 96; step++) {
+      const seededAt = new Date(BASE + step * HALF_HOUR)
+      const morning = outfits(seededAt, seededAt, false)?.[0] ?? ''
+      if (morning.includes('outerwear'))
+        cold.add(seededAt.getUTCHours() + (seededAt.getUTCDate() - 29) * 24)
+    }
+    // The ramp starts at 14 degrees: segment 0 and 1 (14.0 and 14.5) are below the 15 line.
+    expect([...cold].sort((a, b) => a - b)).toEqual([13, 14, 37, 38])
+  })
+
+  it('keeps the pinned value above the ritual line with room to spare', () => {
+    expect(NATIVE_JOURNEY_FEELS_LIKE_C).toBe(NATIVE_JOURNEY_TEMPERATURE_C - 1)
+    expect(NATIVE_JOURNEY_FEELS_LIKE_C).toBeGreaterThanOrEqual(15)
+  })
 })

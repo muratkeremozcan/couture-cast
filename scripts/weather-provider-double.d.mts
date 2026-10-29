@@ -29,6 +29,4 @@ export interface WeatherProviderDouble {
 export declare function startWeatherProviderDouble(options?: {
   port?: number
   now?: () => number
-  /** Hours after the request hour to degrees Celsius; the default curve drifts with the clock. */
-  temperatureAt?: (hourIndex: number) => number
 }): Promise<WeatherProviderDouble>

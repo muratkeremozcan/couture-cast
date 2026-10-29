@@ -9,6 +9,7 @@ import { PrismaClient } from '@prisma/client'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
 import { planRedis, resolveSupabase } from './runtime-sources.mjs'
+import { pinNativeJourneyWeather } from '../lib/native-journey-weather.mjs'
 
 const root = process.cwd()
 const directory = path.resolve(
@@ -166,6 +167,8 @@ run('seed', path.join(root, 'node_modules/.bin/tsx'), [
   'packages/db/prisma/seeds/index.ts',
 ])
 const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl.toString() } } })
+// The seeded forecast ramps with the start time and decides the Home outfit; see the module.
+await pinNativeJourneyWeather(prisma)
 const authAdmin = createClient(supabaseUrl, supabase.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
