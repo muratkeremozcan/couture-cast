@@ -10,9 +10,24 @@ appId: ${MAESTRO_APP_ID}
     direction: DOWN
     timeout: 30000
     centerElement: true
-- tapOn:
-    id: outfit-share-card-open
-    index: 0
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - waitForAnimationToEnd
+      - runFlow: position-outfit-open.yaml
+      - tapOn:
+          id: outfit-share-card-open
+          below:
+            id: header-info-modal
+          index: 0
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: outfit-share-card-open
+          index: 0
 - extendedWaitUntil:
     visible: ${MAESTRO_PREPARING}
     timeout: 10000

@@ -13,9 +13,19 @@ appId: ${MAESTRO_APP_ID}
       platform: iOS
     commands:
       - waitForAnimationToEnd
-- tapOn:
-    id: outfit-share-card-open
-    index: 0
+      - runFlow: position-outfit-open.yaml
+      - tapOn:
+          id: outfit-share-card-open
+          below:
+            id: header-info-modal
+          index: 0
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: outfit-share-card-open
+          index: 0
 - extendedWaitUntil:
     visible:
       id: share-card-preview-loaded-.*

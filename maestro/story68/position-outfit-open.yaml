@@ -1,0 +1,24 @@
+appId: ${MAESTRO_APP_ID}
+---
+# The scroll can stop with the outfit opener under the Home header, where a tap lands on the
+# status bar and opens nothing (run 26, it-IT). Maestro's `below` compares the top edge, so the
+# opener counts once its top is under the header's info button. Swipe the content down until it
+# does, at most 3 times; the tap that follows uses the same selector.
+- repeat:
+    while:
+      notVisible:
+        id: outfit-share-card-open
+        below:
+          id: header-info-modal
+    times: 3
+    commands:
+      - swipe:
+          start: 50%, 30%
+          end: 50%, 55%
+          duration: 500
+      - waitForAnimationToEnd
+- assertVisible:
+    id: outfit-share-card-open
+    below:
+      id: header-info-modal
+    label: outfit_opener_under_header
