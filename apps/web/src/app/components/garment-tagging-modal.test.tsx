@@ -66,12 +66,17 @@ describe('GarmentTaggingModal Component', () => {
       />
     )
 
-    await waitFor(() => {
-      expect(screen.getByRole('radio', { name: /Top/ })).toBeDefined()
-    })
-
+    // The options render before the suggestions arrive, so their presence proves
+    // nothing. The confident suggestions are applied once the category is checked
+    // and the form can be confirmed.
     const confirmBtn = screen.getByRole('button', { name: 'Confirm & Save Tags' })
-    expect(confirmBtn).not.toHaveProperty('disabled', true)
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: /Top/ })).toHaveAttribute(
+        'aria-checked',
+        'true'
+      )
+      expect(confirmBtn).toBeEnabled()
+    })
 
     await user.click(confirmBtn)
 
