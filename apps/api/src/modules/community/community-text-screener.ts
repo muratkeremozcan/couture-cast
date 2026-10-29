@@ -287,8 +287,24 @@ const literalContextSchema = z
     textVetoes: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
     // Word-for-word frames that hold the term and veto the clearance ("burro do chefe").
     vetoFrames: z.array(z.string().regex(/^\p{L}+(?: \p{L}+){1,4}$/u)).default([]),
+    // Positive grammar: the term also clears directly after one of these noun heads, inside
+    // one of these word-for-word frames, or anywhere in a text that holds one of these cues.
+    adjacentBefore: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    clearFrames: z.array(z.string().regex(/^\p{L}+(?: \p{L}+){1,4}$/u)).default([]),
+    textEvidence: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
+    // An age mention (a number or numeral word before ano, anos or aninhos) within this many
+    // tokens of the term vetoes the clearance.
+    ageRadius: z.number().int().min(1).max(8).optional(),
+    ageNumerals: z.array(z.string().regex(/^\p{L}+$/u)).default([]),
   })
-  .refine((context) => context.objects.length > 0 || context.evidence.length > 0)
+  .refine(
+    (context) =>
+      context.objects.length > 0 ||
+      context.evidence.length > 0 ||
+      context.adjacentBefore.length > 0 ||
+      context.clearFrames.length > 0 ||
+      context.textEvidence.length > 0
+  )
 
 // Coordinator-reviewed native-sense constructions. Each marks only its exact
 // target occurrence in raw contiguous words. High-term rules also require the
@@ -954,12 +970,62 @@ function isVetoed(
     vetoRadius: number
     textVetoes: readonly string[]
     vetoFrames: readonly string[]
+    ageRadius?: number
+    ageNumerals: readonly string[]
   }
 ): boolean {
   if (context.textVetoes.length > 0 && tokens.some((t) => context.textVetoes.includes(t)))
     return true
   return (
-    hasVetoNear(tokens, position, context) || holdsVetoFrame(tokens, position, context)
+    hasVetoNear(tokens, position, context) ||
+    holdsFrame(tokens, position, context.vetoFrames) ||
+    mentionsAgeNear(tokens, position, context)
+  )
+}
+
+/** Whether "12 anos", "doze anos" or "aninhos" with a number stands near the term. */
+function mentionsAgeNear(
+  tokens: readonly string[],
+  position: number,
+  context: { ageRadius?: number; ageNumerals: readonly string[] }
+): boolean {
+  if (context.ageRadius === undefined) return false
+  const from = Math.max(0, position - context.ageRadius)
+  for (let at = from; at <= position + context.ageRadius; at += 1) {
+    if (!['ano', 'anos', 'aninho', 'aninhos'].includes(tokens[at] as string)) continue
+    const number = tokens[at - 1] ?? ''
+    if (/^\d+$/u.test(number) || context.ageNumerals.includes(number)) return true
+  }
+  return false
+}
+
+/** Whether any clearing rule of the context holds at the term's position. */
+function contextClears(
+  literal: string,
+  spans: readonly RegExpMatchArray[],
+  tokens: readonly string[],
+  position: number,
+  context: {
+    objects: readonly string[]
+    connectors: readonly string[]
+    maxDistance: number
+    evidence: readonly string[]
+    evidenceRadius: number
+    adjacentBefore: readonly string[]
+    clearFrames: readonly string[]
+    textEvidence: readonly string[]
+  }
+): boolean {
+  const before = tokens[position - 1]
+  return (
+    hasEvidenceNear(literal, spans, tokens, position, context) ||
+    hasObjectContext(literal, spans, tokens, position, context) ||
+    (before !== undefined &&
+      context.adjacentBefore.includes(before) &&
+      connectedLiteralTokens(literal, spans, position - 1, position)) ||
+    holdsFrame(tokens, position, context.clearFrames) ||
+    (context.textEvidence.length > 0 &&
+      tokens.some((token) => context.textEvidence.includes(token)))
   )
 }
 
@@ -975,13 +1041,13 @@ function hasVetoNear(
     .some((token, index) => from + index !== position && context.vetoes.includes(token))
 }
 
-/** Whether the words around the term spell one of the veto frames exactly. */
-function holdsVetoFrame(
+/** Whether the words around the term spell one of the frames exactly. */
+function holdsFrame(
   tokens: readonly string[],
   position: number,
-  context: { vetoFrames: readonly string[] }
+  frames: readonly string[]
 ): boolean {
-  return context.vetoFrames.some((frame) => {
+  return frames.some((frame) => {
     const words = frame.split(' ')
     const at = words.indexOf(tokens[position] as string)
     return at >= 0 && words.every((word, index) => tokens[position - at + index] === word)
@@ -1664,6 +1730,69 @@ function buildCensorKeys(
 }
 
 /**
+ * Multi-letter censoring ("n*gg*r", "v**d*", "r*p*st", "h*r*ns*hn"): the symbols * _ #
+ * each stand for one letter. The first letter must stay visible, at least
+ * MULTI_CENSOR_MIN_VISIBLE letters and MULTI_CENSOR_MIN_VISIBLE_RATIO of the word must
+ * show, so a short run of symbols between a few letters cannot become a term by accident.
+ * Chosen by the collision sweep in the round 8e report: at 0.4 every shape in the frozen
+ * clean corpora and code snippets stays clear, and a ratio of 0.5 would miss v**d*.
+ */
+const MULTI_CENSOR_SYMBOLS = /[*_#]/gu
+const MULTI_CENSOR_MIN_VISIBLE = 2
+const MULTI_CENSOR_MIN_VISIBLE_RATIO = 0.4
+
+interface MultiCensorTerm {
+  readonly classed: string
+  readonly meta: TermMeta
+}
+
+/** Every eligible term in leet-run form, bucketed by length and first letter. */
+function buildMultiCensorIndex(
+  indexes: readonly LanguageIndex[],
+  family: ReadonlySet<string>
+): ReadonlyMap<string, readonly MultiCensorTerm[]> {
+  const buckets = new Map<string, MultiCensorTerm[]>()
+  for (const index of indexes) {
+    for (const [term, meta] of index.single) {
+      if (meta.severity !== 'high' && !family.has(collapseRepeats(term))) continue
+      if (term.length < MIN_SINGLE_TERM_LENGTH || !/^\p{L}+$/u.test(term)) continue
+      const classed = toLeetRunForm(term)
+      const key = `${classed.length}:${classed[0]}`
+      buckets.set(key, [...(buckets.get(key) ?? []), { classed, meta }])
+    }
+  }
+  return buckets
+}
+
+/** The worst term a run with two or more censor symbols can spell, or undefined. */
+function matchMultiCensored(
+  buckets: ReadonlyMap<string, readonly MultiCensorTerm[]>,
+  core: string
+): TermMeta | undefined {
+  const symbols = core.match(MULTI_CENSOR_SYMBOLS)?.length ?? 0
+  if (symbols < 2 || core.length < MIN_SINGLE_TERM_LENGTH) return undefined
+  const folded = toFoldedForm(core.replaceAll(MULTI_CENSOR_SYMBOLS, '?'))
+  if (folded.length !== core.length || folded[0] === '?') return undefined
+  const classed = toLeetRunForm(folded)
+  const visible = classed.length - (classed.match(/\?/gu)?.length ?? 0)
+  if (
+    visible < MULTI_CENSOR_MIN_VISIBLE ||
+    visible < Math.ceil(classed.length * MULTI_CENSOR_MIN_VISIBLE_RATIO)
+  )
+    return undefined
+  let worst: TermMeta | undefined
+  for (const term of buckets.get(`${classed.length}:${classed[0]}`) ?? []) {
+    if (
+      ![...classed].every((letter, at) => letter === '?' || letter === term.classed[at])
+    )
+      continue
+    if (!worst || SEVERITY_RANK[term.meta.severity] > SEVERITY_RANK[worst.severity])
+      worst = term.meta
+  }
+  return worst
+}
+
+/**
  * Across plain whitespace a one- or two-letter word is a function word in most of the
  * seven languages ("put a", "via do"), so only whole words of three letters or more
  * rejoin there. Across a symbol every length rejoins, at review when a part is that short.
@@ -2213,6 +2342,7 @@ export class CommunityTextScreener {
   private readonly cutFamilyNameFollowers: ReadonlySet<string>
   /** Each indexed high-severity or family form with one letter replaced by "?", in leet-class form. */
   private censorKeys: ReadonlyMap<string, TermMeta> = new Map()
+  private multiCensorTerms: ReadonlyMap<string, readonly MultiCensorTerm[]> = new Map()
   /** One inner deletion or adjacent transposition of every long high-severity spelling. */
   private typoKeys: ReadonlyMap<string, TermMeta> = new Map()
   private editOneKeys: ReadonlyMap<string, readonly EditOneTerm[]> = new Map()
@@ -2345,6 +2475,10 @@ export class CommunityTextScreener {
         vetoRadius: context.vetoRadius ?? 3,
         textVetoes: context.textVetoes ?? [],
         vetoFrames: context.vetoFrames ?? [],
+        adjacentBefore: context.adjacentBefore ?? [],
+        clearFrames: context.clearFrames ?? [],
+        textEvidence: context.textEvidence ?? [],
+        ageNumerals: context.ageNumerals ?? [],
         language: list.language,
       }))
     )
@@ -2384,6 +2518,7 @@ export class CommunityTextScreener {
       buildLanguageIndex(list, this.policy, indexable, new Set(familyForms))
     )
     this.censorKeys = buildCensorKeys(this.indexes, this.cutFamilyTerms)
+    this.multiCensorTerms = buildMultiCensorIndex(this.indexes, this.cutFamilyTerms)
     this.typoKeys = buildTypoKeys(this.indexes)
     this.editOneKeys = buildEditOneIndex(this.indexes, this.cutFamilyTerms)
     this.affixTerms = buildAffixTerms(this.indexes, this.cutFamilyTerms)
@@ -2692,10 +2827,7 @@ export class CommunityTextScreener {
         if (context.language !== language) continue
         if (!context.terms.includes(tokens[position] as string)) continue
         if (isVetoed(tokens, position, context)) continue
-        if (
-          hasEvidenceNear(literal, spans, tokens, position, context) ||
-          hasObjectContext(literal, spans, tokens, position, context)
-        )
+        if (contextClears(literal, spans, tokens, position, context))
           allowed[position] = true
       }
     }
@@ -3147,6 +3279,11 @@ export class CommunityTextScreener {
       // The run between whitespace, without surrounding punctuation. An asterisk, hash or
       // underscore at an edge may be a censored letter; a dot or hyphen there is punctuation.
       const core = chunk[0].replace(/^[^\p{L}\p{N}*_#]+|[^\p{L}\p{N}*_#]+$/gu, '')
+      if (/[*_#].*[*_#]/u.test(core) && /^[\p{L}\p{N}*_#]+$/u.test(core)) {
+        if (!budget.spend(core)) return outcomes
+        const multi = matchMultiCensored(this.multiCensorTerms, core)
+        if (multi) outcomes.push({ meta: multi, obfuscated: true })
+      }
       if (!/^[\p{L}\p{N}]*[*_#.-][\p{L}\p{N}]*$/u.test(core)) continue
       if (core.length < MIN_SINGLE_TERM_LENGTH) continue
       if (!budget.spend(core)) return outcomes

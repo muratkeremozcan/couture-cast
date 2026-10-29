@@ -592,6 +592,34 @@ function edit1(word: string, emit: Emit): void {
   }
 }
 
+/**
+ * Several letters censored at once with * _ # (n*gg*r, v**d*, r*p*st): every inner vowel,
+ * every other inner letter, and every pair of inner letters, for single words of four letters
+ * or more. The first letter always shows, and at least two letters and 40 percent of the
+ * word show, which is the floor the screener applies.
+ */
+function multiCensor(word: string, emit: Emit): void {
+  const n = word.length
+  const feasible = (hidden: ReadonlySet<number>): boolean =>
+    hidden.size >= 2 && n - hidden.size >= Math.max(2, Math.ceil(n * 0.4))
+  const render = (hidden: ReadonlySet<number>, symbol: string): string =>
+    [...word].map((letter, at) => (hidden.has(at) ? symbol : letter)).join('')
+  const masks: Set<number>[] = [
+    new Set(
+      [...word].flatMap((letter, at) => (at > 0 && 'aeiou'.includes(letter) ? [at] : []))
+    ),
+    new Set([...word].flatMap((_, at) => (at > 0 && at % 2 === 1 ? [at] : []))),
+  ]
+  for (const mask of masks)
+    if (feasible(mask))
+      for (const symbol of ['*', '_', '#']) emit('multi-censor', render(mask, symbol))
+  for (let first = 1; first < n; first += 1)
+    for (let second = first + 1; second < n; second += 1) {
+      const pair = new Set([first, second])
+      if (feasible(pair)) emit('multi-censor', render(pair, '*'))
+    }
+}
+
 function wordClasses(word: string, phrase: boolean, emitWord: Emit): void {
   const short = !phrase && word.length < 4
   const dropShort: Emit = (cls, variant) => {
@@ -600,6 +628,7 @@ function wordClasses(word: string, phrase: boolean, emitWord: Emit): void {
     emitWord(cls, variant)
   }
   perLetter(word, dropShort)
+  if (!phrase && !short) multiCensor(word, emitWord)
   if (!short && (!phrase || word.length >= 6)) splits(word, dropShort, !phrase, !phrase)
   if (phrase || short) return
   chains(word, dropShort)
@@ -659,46 +688,47 @@ const PINNED_FLAG_AMBIGUOUS: string[] = [
   'sieg heil',
   'töte dich selbst',
 ]
-const PINNED_TERMS = 251
+const PINNED_TERMS = 298
 const PINNED_DISHARMONIC = 350
 
 const PINNED_COUNTS: Record<string, number> = {
-  censor: 9115,
-  'confusable-single': 6908,
-  'enclosed-circled-all': 251,
-  'enclosed-circled-single': 2086,
-  'enclosed-negative-circled-all': 251,
-  'enclosed-negative-circled-single': 2086,
-  'enclosed-negative-squared-all': 251,
-  'enclosed-negative-squared-single': 2086,
-  'enclosed-parenthesized-all': 251,
-  'enclosed-parenthesized-single': 2086,
-  'enclosed-regional-all': 228,
-  'enclosed-regional-single': 2086,
-  'enclosed-squared-all': 251,
-  'enclosed-squared-single': 2086,
-  'enclosed-tag-all': 251,
-  'enclosed-tag-single': 2086,
-  'fullwidth-all': 251,
-  inflection: 978,
-  'flag-splice': 3481,
-  'latin-extended-all': 251,
-  'latin-extended-single': 23163,
-  'leet-all': 251,
-  'leet-all-sym': 251,
-  'leet-single': 2153,
-  'math-bold-all': 251,
-  'smallcaps-all': 251,
-  split2: 19231,
-  split3: 3577,
-  split4: 8172,
-  split5: 12832,
-  chain: 1062,
-  stretch: 2086,
-  'inflection-typo': 8074,
-  edit1: 4718,
+  censor: 11262,
+  'confusable-single': 8493,
+  'enclosed-circled-all': 298,
+  'enclosed-circled-single': 2553,
+  'enclosed-negative-circled-all': 298,
+  'enclosed-negative-circled-single': 2553,
+  'enclosed-negative-squared-all': 298,
+  'enclosed-negative-squared-single': 2553,
+  'enclosed-parenthesized-all': 298,
+  'enclosed-parenthesized-single': 2553,
+  'enclosed-regional-all': 275,
+  'enclosed-regional-single': 2553,
+  'enclosed-squared-all': 298,
+  'enclosed-squared-single': 2553,
+  'enclosed-tag-all': 298,
+  'enclosed-tag-single': 2553,
+  'fullwidth-all': 298,
+  inflection: 1065,
+  'flag-splice': 4731,
+  'latin-extended-all': 298,
+  'latin-extended-single': 28437,
+  'leet-all': 298,
+  'leet-all-sym': 298,
+  'leet-single': 2626,
+  'math-bold-all': 298,
+  'smallcaps-all': 298,
+  split2: 24923,
+  split3: 5150,
+  split4: 12481,
+  split5: 20235,
+  chain: 1344,
+  stretch: 2553,
+  'inflection-typo': 9438,
+  edit1: 6583,
   'edit1-affix': 468,
-  'edit1-inflection': 9473,
-  'typo-delete': 677,
-  'typo-transpose': 577,
+  'edit1-inflection': 12923,
+  'typo-delete': 1040,
+  'typo-transpose': 892,
+  'multi-censor': 6868,
 }

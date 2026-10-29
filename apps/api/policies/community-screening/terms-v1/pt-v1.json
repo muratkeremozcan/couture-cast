@@ -14,13 +14,13 @@
     "generator": "scripts/verify-community-screening-lists.mjs",
     "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
     "upstreamFileSha256": "05ef524b0bb7f83f87257f6ec4dabf70e16b8bb6930f769fb93deaf608ff196d",
-    "overlaySha256": "3030757a84bff2a387ed7e90f9aaad7ae9280fac7c5aec4e39e0e332c9d43df6",
-    "allowListSha256": "ae85a7e3a05a27d0b7e4c7396295d14653603d1eb3661b2c5c71109757bccf1d",
-    "reviewedOccurrenceSha256": "9867076e9ca5cb69a0ae9e6102d7b8700fcabffbd800b82376d59f95f0116d0e",
+    "overlaySha256": "5972d7b0850c9c28f6773f87102afbadd98c10f44cb4e08227d0537912342524",
+    "allowListSha256": "b25c9043213ba09b2ca3f415ae05f79cd9222910c715eeda2100d748d5444613",
+    "reviewedOccurrenceSha256": "e5c93949c90d428f783d1e273c1abf0f97004dbde479663590011f4d2e5c23bf",
     "counts": {
       "upstreamLines": 76,
-      "overlayEntries": 55,
-      "entries": 103,
+      "overlayEntries": 102,
+      "entries": 150,
       "excludedUpstreamTerms": 16
     }
   },
@@ -273,13 +273,295 @@
       "source": "ldnoobw"
     },
     {
+      "term": "estupra",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprada",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupradas",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprado",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprador",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupradora",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupradoras",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupradores",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupradorzinho",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprados",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprais",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupram",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupramos",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprando",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
       "term": "estuprar",
       "category": "violence",
       "severity": "high",
       "source": "overlay"
     },
     {
+      "term": "estuprara",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupraram",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupraras",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprardes",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprareis",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprarem",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupraremos",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprares",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupraria",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprariam",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprarias",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprarmos",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprará",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprarás",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprarão",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupraríamos",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupras",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprasse",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprassem",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprasses",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupraste",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprava",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupravam",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupravas",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupre",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprei",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupreis",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprem",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupremos",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupres",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
       "term": "estupro",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estupros",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprou",
+      "category": "violence",
+      "severity": "high",
+      "source": "overlay"
+    },
+    {
+      "term": "estuprávamos",
       "category": "violence",
       "severity": "high",
       "source": "overlay"

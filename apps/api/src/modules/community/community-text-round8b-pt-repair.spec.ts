@@ -24,6 +24,7 @@ const allow = JSON.parse(
 ) as {
   literalContexts: {
     terms: string[]
+    adjacentBefore?: string[]
     evidence?: string[]
     vetoes?: string[]
     vetoRadius?: number
@@ -32,7 +33,8 @@ const allow = JSON.parse(
 }
 const contextFor = (term: string) =>
   allow.literalContexts.find(
-    (context) => context.terms.includes(term) && context.evidence
+    (context) =>
+      context.terms.includes(term) && (context.evidence || context.adjacentBefore)
   )
 
 describe('round 8b ordinary Portuguese nouns that the Portuguese list carries', () => {
@@ -397,8 +399,7 @@ describe('round 8d: minors, toys, hate frames, job nouns and French letters', ()
     'Sapatos sobre o tapete, bœuf.',
     'Sapatos sobre o tapete naïf.',
     'Sapatos sobre o tapete, déjà û.',
-    'Sapatos sobre o tapete e ë.',
-    'Sapatos sobre o tapete ÿ ü.',
+    'Sapatos sobre o tapete ÿ.',
     'Sapatos sobre o tapete î è.',
   ])('withholds the rug noun beside a French sign: %s', inPortuguese)
 
@@ -409,6 +410,152 @@ describe('round 8d: minors, toys, hate frames, job nouns and French letters', ()
       'Calçado côncavo sobre o tapete da sala, após o café.',
     ])
       for (const locale of portuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+})
+
+describe('round 8e: amador by positive grammar, estupr* forms, old spellings', () => {
+  const everywhere = (text: string) => {
+    for (const locale of [...portuguese, ...elsewhere])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  }
+  const inPortuguese = (text: string) => {
+    for (const locale of portuguese)
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  }
+
+  it.each([
+    'Um amador de 12 anos no desfile.',
+    'Um amador de 18 anos no desfile.',
+    'Um amador de moda de 17 anos no desfile.',
+    'Um amador de moda, 15 anos, no desfile.',
+    'Um amador de moda de doze anos no desfile.',
+    'Um amador de dezoito anos no desfile.',
+    'Um amador loli no desfile.',
+    'Um amador baby no desfile.',
+    'Um amador petite no desfile.',
+    'Um amador estuprada no desfile.',
+    'Um amador forçada no desfile.',
+    'Um amador forcada no desfile.',
+    'Um amador dormindo no desfile.',
+    'Um amador escolar no desfile.',
+    'Um amador de moda dormindo no desfile.',
+    'Um amador no desfile.',
+    'O amador da vizinha no desfile.',
+    'Esse amador gostoso no desfile.',
+  ])('withholds amador outside the positive grammar: %s', inPortuguese)
+
+  it('clears amador as an adjective after an ordinary noun head or in a hobby frame', () => {
+    for (const text of [
+      'O fotógrafo amador registrou a coleção.',
+      'Atleta amador veste o casaco de treino.',
+      'O jogador amador usa a camisa do clube.',
+      'Time amador de futebol joga no campo.',
+      'Campeonato amador de corrida no domingo.',
+      'Uma artista amador pinta o casaco.',
+      'O cozinheiro amador usa avental de linho.',
+      'Teatro amador da cidade veste figurino de época.',
+      'Casaco para o amador de caminhadas.',
+      'Um amador de moda no desfile de verão.',
+      'Um amador de fotografia usa colete de bolsos.',
+    ])
+      for (const locale of portuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+
+  it.each([
+    'Ela foi estuprada ontem',
+    'Ele foi estuprado ontem',
+    'estuprada',
+    'estuprado',
+    'estupradas',
+    'estuprados',
+    'estuprador',
+    'estupradora',
+    'estupradores',
+    'estupradoras',
+    'estuprando',
+    'estuprei',
+    'estuprem',
+    'estuprou',
+    'estupraram',
+    'estuprava',
+    'Um amador estuprada no desfile.',
+  ])('holds every estupr* form as sexual violence in every locale: %s', everywhere)
+
+  it('keeps old Portuguese spellings with an umlaut clearing beside the rug noun', () => {
+    for (const text of [
+      'Sapatos sobre o tapete da sala com lingüiça e tranqüilo.',
+      'Sapatos da Müller sobre o tapete da sala de jantar.',
+    ])
+      for (const locale of portuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+
+  it.each([
+    'Foto do burro do treinador no quintal.',
+    'Foto do burro do pastor no quintal.',
+    'Foto do burro do padre no quintal.',
+    'Foto do burro dos treinadores no quintal.',
+  ])('withholds burro beside more job nouns: %s', inPortuguese)
+})
+
+describe('round 8e: astrology cues clear ariano, hate words still veto', () => {
+  it('clears the star sign copy under declared Portuguese', () => {
+    for (const text of [
+      'Sou ariano e meu signo é fogo.',
+      'Horóscopo: o ariano veste vermelho.',
+      'Mapa astral do ariano com ascendente em leão.',
+      'Sou ariano.',
+    ])
+      for (const locale of portuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
+  })
+  it('keeps hate words vetoing the astrology cue', () => {
+    for (const text of [
+      'Sou ariano branco e meu signo é fogo.',
+      'Horóscopo: o ariano da raça pura.',
+      'Signo de ariano nazista.',
+      'Heil, sou ariano.',
+    ])
+      for (const locale of portuguese)
+        expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  })
+})
+
+describe('round 8e: several censored letters per term', () => {
+  const everywhere = (text: string) => {
+    for (const locale of [...portuguese, ...elsewhere])
+      expect(screen(text, locale).disposition, `${locale} ${text}`).not.toBe('pass')
+  }
+  it.each([
+    'n*gg*r',
+    'n#gg#r',
+    'n_gg_r',
+    'n**ger',
+    'ni**er',
+    'n*gg*rs',
+    'v**d*',
+    'r*p*st',
+    'h*r*ns*hn',
+    'Um texto com n*gg*r no meio.',
+    'Ein Text mit h*r*ns*hn im Satz.',
+    'Texto com v**d*, e mais.',
+    '(n*gg*r)',
+    '"r*p*st"',
+  ])('withholds multi-letter censoring in every locale: %s', everywhere)
+
+  it('keeps code, markdown, prices and hashtags with several symbols clear', () => {
+    for (const text of [
+      'Use snake_case_names and **bold** and a*b*c here.',
+      'Um texto com get_user_id e max_retry_count.',
+      'Dias *** de *** off.',
+      'Preço: R$ 5*7 ou 10_000_000 por #tag_longa.',
+      'Veja __init__ e __main__ no código.',
+      'Linha **importante** com *itálico* e _sublinhado_.',
+      'Tabela a*b*c*d e x_y_z_w.',
+    ])
+      for (const locale of [...portuguese, ...elsewhere])
         expect(screen(text, locale).disposition, `${locale} ${text}`).toBe('pass')
   })
 })

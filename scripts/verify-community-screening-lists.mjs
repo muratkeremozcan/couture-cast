@@ -240,37 +240,54 @@ function validLiteralTokens(values, required) {
   )
 }
 
+function invalidFrames(context, key) {
+  if (!(key in context)) return false
+  const frames = context[key]
+  return (
+    !Array.isArray(frames) ||
+    frames.some(
+      (frame) =>
+        typeof frame !== 'string' ||
+        !/^\p{L}+(?: \p{L}+){1,4}$/u.test(frame) ||
+        frame !== toLiteral(frame) ||
+        frame.split(' ').filter((word) => (context.terms ?? []).includes(word)).length !==
+          1
+    )
+  )
+}
+
+function boundedInteger(context, key, min, max) {
+  return (
+    !(key in context) ||
+    (Number.isInteger(context[key]) && context[key] >= min && context[key] <= max)
+  )
+}
+
 function contextVetoProblems(context) {
   const problems = []
-  for (const key of ['vetoes', 'textVetoes'])
+  for (const key of [
+    'vetoes',
+    'textVetoes',
+    'adjacentBefore',
+    'textEvidence',
+    'ageNumerals',
+  ])
     if (key in context && !validLiteralTokens(context[key], false))
       problems.push(`a literal context has invalid ${key}`)
-  if (
-    'vetoFrames' in context &&
-    (!Array.isArray(context.vetoFrames) ||
-      context.vetoFrames.some(
-        (frame) =>
-          typeof frame !== 'string' ||
-          !/^\p{L}+(?: \p{L}+){1,4}$/u.test(frame) ||
-          frame !== toLiteral(frame) ||
-          frame.split(' ').filter((word) => (context.terms ?? []).includes(word))
-            .length !== 1
-      ))
-  )
-    problems.push('a literal context has invalid vetoFrames')
-  if (
-    'vetoRadius' in context &&
-    (!Number.isInteger(context.vetoRadius) ||
-      context.vetoRadius < 1 ||
-      context.vetoRadius > 6)
-  )
+  for (const key of ['vetoFrames', 'clearFrames'])
+    if (invalidFrames(context, key)) problems.push(`a literal context has invalid ${key}`)
+  if (!boundedInteger(context, 'ageRadius', 1, 8))
+    problems.push('a literal context must bound ageRadius to 1..8 tokens')
+  if (!boundedInteger(context, 'vetoRadius', 1, 6))
     problems.push('a literal context must bound vetoRadius to 1..6 tokens')
   return problems
 }
 
 function contextTokenProblems(context) {
   const problems = []
-  const hasEvidence = Array.isArray(context.evidence) && context.evidence.length > 0
+  const hasEvidence = ['evidence', 'adjacentBefore', 'clearFrames', 'textEvidence'].some(
+    (key) => Array.isArray(context[key]) && context[key].length > 0
+  )
   for (const key of ['terms', 'objects', 'connectors']) {
     const required = key === 'terms' || (key === 'objects' && !hasEvidence)
     if (!validLiteralTokens(context[key], required))
@@ -683,6 +700,11 @@ function buildAllowFile(language, allowState, hashes) {
           vetoRadius,
           textVetoes,
           vetoFrames,
+          adjacentBefore,
+          clearFrames,
+          textEvidence,
+          ageRadius,
+          ageNumerals,
         }) => ({
           terms,
           objects,
@@ -692,6 +714,10 @@ function buildAllowFile(language, allowState, hashes) {
           ...(vetoes?.length ? { vetoes, vetoRadius } : {}),
           ...(textVetoes?.length ? { textVetoes } : {}),
           ...(vetoFrames?.length ? { vetoFrames } : {}),
+          ...(adjacentBefore?.length ? { adjacentBefore } : {}),
+          ...(clearFrames?.length ? { clearFrames } : {}),
+          ...(textEvidence?.length ? { textEvidence } : {}),
+          ...(ageRadius ? { ageRadius, ageNumerals: ageNumerals ?? [] } : {}),
         })
       ),
     occurrenceConstructions: REVIEWED_OCCURRENCE_CONSTRUCTIONS.filter(

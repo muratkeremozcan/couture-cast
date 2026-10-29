@@ -285,6 +285,241 @@
       "term": "nação ariana",
       "category": "hate",
       "severity": "high"
+    },
+    {
+      "term": "estupras",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupra",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupramos",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprais",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupram",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprava",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupravas",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupravam",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprávamos",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprei",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupraste",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprou",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupraram",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprara",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupraras",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupre",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupres",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupremos",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupreis",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprem",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprasse",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprasses",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprassem",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprares",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprarmos",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprardes",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprarem",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprando",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprado",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprada",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprados",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupradas",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprará",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprarás",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupraremos",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprareis",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprarão",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupraria",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprarias",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupraríamos",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprariam",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprador",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupradora",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupradores",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupradoras",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupradorzinho",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estupros",
+      "category": "violence",
+      "severity": "high"
     }
   ]
 }

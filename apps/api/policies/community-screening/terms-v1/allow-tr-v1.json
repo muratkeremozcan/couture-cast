@@ -12,8 +12,8 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "ae85a7e3a05a27d0b7e4c7396295d14653603d1eb3661b2c5c71109757bccf1d",
-    "reviewedOccurrenceSha256": "9867076e9ca5cb69a0ae9e6102d7b8700fcabffbd800b82376d59f95f0116d0e"
+    "allowListSha256": "b25c9043213ba09b2ca3f415ae05f79cd9222910c715eeda2100d748d5444613",
+    "reviewedOccurrenceSha256": "e5c93949c90d428f783d1e273c1abf0f97004dbde479663590011f4d2e5c23bf"
   },
   "entries": [
     "açıklar",
