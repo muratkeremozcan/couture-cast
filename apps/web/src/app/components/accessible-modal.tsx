@@ -15,7 +15,8 @@ export interface AccessibleModalProps {
   description?: string
   invokingElementRef?: React.RefObject<HTMLElement | null>
   initialFocusRef?: React.RefObject<HTMLElement | null>
-  fallbackFocusSelector?: string
+  /** Where focus goes when the invoker is gone: the first selector that still matches. */
+  fallbackFocusSelector?: string | readonly string[]
   closeLabel?: string
   children: React.ReactNode
   ariaLiveMessage?: string | null
@@ -44,6 +45,12 @@ export function AccessibleModal({
   const resumeFocusRef = useRef<HTMLElement | null>(null)
   const previousActiveElementRef = useRef<HTMLElement | null>(null)
   const focusGenerationRef = useRef({ value: 0 })
+  // One string, so a caller passing a fresh array each render does not restart the effect.
+  const fallbackSelectors = JSON.stringify(
+    fallbackFocusSelector === undefined
+      ? []
+      : [fallbackFocusSelector].flat().filter(Boolean)
+  )
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
@@ -96,9 +103,10 @@ export function AccessibleModal({
       // Resolve the target after that commit, including its final inert ancestry.
       queueMicrotask(() => {
         if (focusGeneration.value !== restoreGeneration) return
-        const fallback = fallbackFocusSelector
-          ? document.querySelector<HTMLElement>(fallbackFocusSelector)
-          : null
+        const fallback =
+          (JSON.parse(fallbackSelectors) as string[])
+            .map((selector) => document.querySelector<HTMLElement>(selector))
+            .find((element) => element !== null) ?? null
         const targetToFocus = [
           currentInvoker,
           fallback,
@@ -121,7 +129,7 @@ export function AccessibleModal({
         targetToFocus?.focus()
       })
     }
-  }, [initialFocusRef, isOpen, suspended, invokingElementRef, fallbackFocusSelector])
+  }, [initialFocusRef, isOpen, suspended, invokingElementRef, fallbackSelectors])
 
   if (!isOpen || typeof document === 'undefined') {
     return null

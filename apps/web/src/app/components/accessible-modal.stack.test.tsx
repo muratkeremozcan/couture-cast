@@ -289,4 +289,39 @@ describe('AccessibleModal stack', () => {
     expect(dialog('Detail')).toBeNull()
     expect(screen.getByRole('button', { name: 'Open detail' })).toHaveFocus()
   })
+
+  it('focuses the first fallback selector that still matches once the invoker is gone', async () => {
+    function Fallbacks({ open, withFirst }: { open: boolean; withFirst: boolean }) {
+      return (
+        <>
+          {withFirst && <button data-testid="first-target">First</button>}
+          <button data-testid="second-target">Second</button>
+          <AccessibleModal
+            isOpen={open}
+            onClose={vi.fn()}
+            titleId="solo-title"
+            title="Solo"
+            fallbackFocusSelector={[
+              '[data-testid="first-target"]',
+              '[data-testid="second-target"]',
+            ]}
+          >
+            <button type="button">Solo action</button>
+          </AccessibleModal>
+        </>
+      )
+    }
+    const view = render(<Fallbacks open withFirst />)
+    view.rerender(<Fallbacks open={false} withFirst />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.getByTestId('first-target')).toHaveFocus()
+    view.rerender(<Fallbacks open withFirst={false} />)
+    view.rerender(<Fallbacks open={false} withFirst={false} />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.getByTestId('second-target')).toHaveFocus()
+  })
 })

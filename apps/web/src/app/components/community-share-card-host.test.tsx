@@ -42,10 +42,11 @@ const own = () => ({
   }),
   reactions: ZERO,
 })
-const opener = (surface: 'feed' | 'spotlight' | 'detail') =>
+type Surface = 'feed' | 'spotlight' | 'detail' | 'spotlight-detail'
+const opener = (surface: Surface) =>
   within(
     screen.getByTestId(
-      surface === 'detail'
+      surface.endsWith('detail')
         ? 'community-detail'
         : `${surface === 'spotlight' ? 'spotlight-' : ''}lookbook-card-spot-self`
     )
@@ -122,12 +123,16 @@ function useTransport(duplicate = false) {
   }
 }
 
-async function open(surface: 'feed' | 'spotlight' | 'detail' = 'spotlight') {
+async function open(surface: Surface = 'spotlight') {
   await screen.findByTestId(
-    `${surface === 'spotlight' ? 'spotlight-' : ''}lookbook-card-spot-self`
+    `${surface.startsWith('spotlight') ? 'spotlight-' : ''}lookbook-card-spot-self`
   )
-  if (surface === 'detail') {
-    await userEvent.click(screen.getByTestId('lookbook-open-spot-self'))
+  if (surface.endsWith('detail')) {
+    await userEvent.click(
+      screen.getByTestId(
+        `${surface === 'spotlight-detail' ? 'spotlight-' : ''}lookbook-open-spot-self`
+      )
+    )
     await screen.findByTestId('community-detail')
   }
   const button = opener(surface)
@@ -253,6 +258,16 @@ describe('community share host across card surfaces', () => {
   )
 })
 
+async function closeDetail() {
+  await userEvent.click(
+    within(
+      document.querySelector<HTMLElement>('[aria-labelledby="community-detail-title"]')!
+    ).getAllByRole('button', { name: 'Close this look' })[0]!
+  )
+  await act(async () => {
+    await Promise.resolve()
+  })
+}
 const detailDialog = () =>
   document.querySelector('[aria-labelledby="community-detail-title"]')!
 const shareDialog = () => document.querySelector('[aria-labelledby="share-card-title"]')!
@@ -334,17 +349,43 @@ describe('community share host above an open detail dialog', () => {
     expect(
       within(detailDialog() as HTMLElement).getByTestId('share-card-open')
     ).toHaveFocus()
-    await userEvent.click(
-      within(detailDialog() as HTMLElement).getAllByRole('button', {
-        name: 'Close this look',
-      })[0]!
-    )
+    await closeDetail()
     expect(detailDialog()).toBeNull()
     expect(pageIsInteractive()).toBe(true)
-    // ... and after the detail closes, to the card control that opened the detail.
+  })
+
+  // Re-verification remounts every card, so the control that opened the detail is a
+  // new element; focus returns to its replacement on the surface the detail came from.
+  it.each([
+    ['feed', 'detail', 'lookbook-open-spot-self'],
+    ['spotlight', 'spotlight-detail', 'spotlight-lookbook-open-spot-self'],
+  ] as const)(
+    'restores focus to the remounted %s card control after the detail closes',
+    async (_origin, surface, testId) => {
+      const view = useTransport(true)
+      renderGrid()
+      await open(surface)
+      const before = screen.getByTestId(testId)
+      await reverify(view)
+      await screen.findByRole('dialog', { name: 'Your share card' })
+      await cancel()
+      await closeDetail()
+      const after = screen.getByTestId(testId)
+      expect(after).not.toBe(before)
+      expect(after).toHaveFocus()
+    }
+  )
+
+  it('falls back to the community section only when the card is gone', async () => {
+    const view = useTransport(true)
+    renderGrid()
+    await open('detail')
+    await reverify(view, view.removePost)
+    await waitFor(() => expect(detailDialog()).toBeNull())
     await act(async () => {
       await Promise.resolve()
     })
+    expect(screen.queryByTestId('lookbook-open-spot-self')).toBeNull()
     expect(
       document.querySelector('[data-share-card-focus-fallback="community"]')
     ).toHaveFocus()
