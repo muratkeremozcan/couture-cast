@@ -240,6 +240,35 @@ export function systemSurfaceSummary(hierarchy) {
   }
 }
 
+const CODE_INPUT_ID = 'signin-code-input'
+
+/**
+ * What the sign-in code field looked like when a step failed, without its content: whether it is
+ * on screen, enabled and focused, and how many characters it held. The step carries the owner's
+ * email and one-time code, so only a length and flags leave, never a character.
+ */
+export function inputSurface(hierarchy) {
+  if (!hierarchy || typeof hierarchy !== 'object') return null
+  let codeInput = null
+  let focusedNodeCount = 0
+  const isTrue = (node, key) => node?.[key] === true || node?.attributes?.[key] === 'true'
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return
+    if (isTrue(node, 'focused')) focusedNodeCount++
+    if (node.attributes?.['resource-id'] === CODE_INPUT_ID && !codeInput) {
+      const text = node.attributes?.text
+      codeInput = {
+        focused: isTrue(node, 'focused'),
+        enabled: isTrue(node, 'enabled'),
+        textLength: typeof text === 'string' ? Math.min(text.length, 99) : 0,
+      }
+    }
+    for (const child of Array.isArray(node.children) ? node.children : []) visit(child)
+  }
+  visit(hierarchy)
+  return { codeInput, focusedNodeCount }
+}
+
 const GEOMETRY_IDS = {
   chips: 'mobile-chip-navigation',
   opener: 'outfit-share-card-open',
@@ -316,6 +345,13 @@ export function scrollPath(output, maestroLog = '') {
 }
 
 const OPENER_EVENTS = new Set([
+  'signin-code-focus',
+  'signin-code-change',
+  'signin-verify-press',
+  'signin-verify-ok',
+  'signin-verify-denied',
+  'signin-verify-code_invalid',
+  'signin-verify-unavailable',
   'press',
   'state-open',
   'composer-idle',
@@ -345,7 +381,14 @@ export function readIosOpenerTrace({ device, appId, spawn = spawnSync }) {
           row.t >= 0 &&
           row.t < 1e10
       )
-      .map((row) => ({ event: row.e, ms: Math.round(row.t) }))
+      .map((row) => ({
+        event: row.e,
+        ms: Math.round(row.t),
+        // Only a small count (an input length) may ride along; nothing else is read.
+        ...(Number.isSafeInteger(row.n) && row.n >= 0 && row.n <= 99
+          ? { length: row.n }
+          : {}),
+      }))
       .slice(-40)
   } catch {
     return null
@@ -512,6 +555,7 @@ export function recordIosFlowProgress({
       flow,
       hostSampled,
       systemSurface: systemSurfaceSummary(hierarchy),
+      inputSurface: inputSurface(hierarchy),
       openerGeometry: geometry,
       scrollPath: output ? scrollPath(output, maestroLog) : null,
       openerTrace: device && appId ? readIosOpenerTrace({ device, appId, spawn }) : null,

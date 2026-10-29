@@ -57,13 +57,22 @@ export function openerTraceRecorder(
   write: (uri: string, contents: string) => Promise<void>,
   now: () => number = Date.now
 ) {
-  const events: { e: ShareCardOpenerEvent; t: number }[] = []
+  const events: { e: ShareCardOpenerEvent; t: number; n?: number }[] = []
   let started: number | null = null
   let pending: Promise<void> = Promise.resolve()
-  return (event: ShareCardOpenerEvent) => {
+  return (event: ShareCardOpenerEvent, length?: number) => {
     if (!directory) return
     started ??= now()
-    events.push({ e: event, t: now() - started })
+    // A length is a small count; anything else is dropped so no input text can ride along.
+    const n =
+      typeof length === 'number' && Number.isSafeInteger(length) && length >= 0
+        ? Math.min(length, 99)
+        : undefined
+    events.push(
+      n === undefined
+        ? { e: event, t: now() - started }
+        : { e: event, t: now() - started, n }
+    )
     if (events.length > OPENER_TRACE_LIMIT) events.shift()
     const contents = JSON.stringify({ version: 1, events })
     pending = pending

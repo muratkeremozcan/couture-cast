@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import { requestNativeOtp, verifyNativeOtp } from '@/src/lib/native-session'
+import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import {
   NativeSignInError,
   type NativeSignInFailure,
@@ -23,7 +24,9 @@ export default function SignInScreen() {
     setBusy(true)
     try {
       if (sent) {
+        traceShareCardOpener('signin-verify-press', code.length)
         await verifyNativeOtp(email, code)
+        traceShareCardOpener('signin-verify-ok')
         router.back()
       } else {
         await requestNativeOtp(email)
@@ -32,9 +35,9 @@ export default function SignInScreen() {
       }
     } catch (error) {
       // Anything unclassified is treated as temporary, so the person retries.
-      setMessage(
-        FAILURE_KEYS[error instanceof NativeSignInError ? error.reason : 'unavailable']
-      )
+      const reason = error instanceof NativeSignInError ? error.reason : 'unavailable'
+      if (sent) traceShareCardOpener(`signin-verify-${reason}`)
+      setMessage(FAILURE_KEYS[reason])
     } finally {
       setBusy(false)
     }
@@ -59,8 +62,13 @@ export default function SignInScreen() {
             accessibilityLabel={t('community.notifications.code')}
             autoComplete="one-time-code"
             keyboardType="number-pad"
+            testID="signin-code-input"
             value={code}
-            onChangeText={setCode}
+            onFocus={() => traceShareCardOpener('signin-code-focus')}
+            onChangeText={(next) => {
+              traceShareCardOpener('signin-code-change', next.length)
+              setCode(next)
+            }}
             style={styles.input}
           />
         </>

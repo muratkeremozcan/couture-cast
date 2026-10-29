@@ -11,6 +11,7 @@ import {
   openerGeometry,
   readIosAppLogSummary,
   readIosOpenerTrace,
+  inputSurface,
   recordIosHostSample,
   scheduleIosInFlowSample,
   scrollPath,
@@ -594,6 +595,10 @@ test('the opener trace is read from the app container and reduced to closed name
         { e: 'secret-token', t: 15 },
         { e: 'composer-prepare', t: -1 },
         { e: 'composer-cached', t: 20 },
+        { e: 'signin-code-change', t: 30, n: 6 },
+        { e: 'signin-code-change', t: 31, n: '123456' },
+        { e: 'signin-verify-press', t: 32, n: 250 },
+        { e: 'signin-verify-unavailable', t: 33 },
       ],
     })
   )
@@ -606,6 +611,10 @@ test('the opener trace is read from the app container and reduced to closed name
     { event: 'press', ms: 10 },
     { event: 'state-open', ms: 14 },
     { event: 'composer-cached', ms: 20 },
+    { event: 'signin-code-change', ms: 30, length: 6 },
+    { event: 'signin-code-change', ms: 31 },
+    { event: 'signin-verify-press', ms: 32 },
+    { event: 'signin-verify-unavailable', ms: 33 },
   ])
   assert.deepEqual(calls[0], [
     'xcrun',
@@ -685,4 +694,44 @@ test('the app log query is bounded to the app process and the last minute', () =
     readIosAppLogSummary({ device: 'DEV', spawn: () => ({ status: 1, stdout: '' }) }),
     null
   )
+})
+
+const field = (attributes, extra = {}) => ({ attributes, children: [], ...extra })
+
+test('the input surface reports the code field flags and length, never a character', () => {
+  const hierarchy = {
+    attributes: {},
+    children: [
+      field({ 'resource-id': 'other', text: 'Private Person person@private.invalid' }),
+      field(
+        { 'resource-id': 'signin-code-input', text: '493817', enabled: 'true' },
+        { focused: true }
+      ),
+    ],
+  }
+  const surface = inputSurface(hierarchy)
+  assert.deepEqual(surface, {
+    codeInput: { focused: true, enabled: true, textLength: 6 },
+    focusedNodeCount: 1,
+  })
+  const text = JSON.stringify(surface)
+  assert.ok(!/493817|Private|person@/.test(text))
+})
+
+test('the input surface tells an unfocused empty field from an absent one', () => {
+  assert.deepEqual(
+    inputSurface({
+      attributes: {},
+      children: [field({ 'resource-id': 'signin-code-input', enabled: 'true' })],
+    }),
+    {
+      codeInput: { focused: false, enabled: true, textLength: 0 },
+      focusedNodeCount: 0,
+    }
+  )
+  assert.deepEqual(inputSurface({ attributes: {}, children: [] }), {
+    codeInput: null,
+    focusedNodeCount: 0,
+  })
+  assert.equal(inputSurface(null), null)
 })

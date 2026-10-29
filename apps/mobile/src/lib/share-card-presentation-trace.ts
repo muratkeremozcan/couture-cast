@@ -32,12 +32,20 @@ export type ShareCardOpenerEvent =
   | 'composer-prepare'
   | 'reset-identity'
   | 'reset-blur'
-let openerSink: ((event: ShareCardOpenerEvent) => void) | null = null
-export function traceShareCardOpener(event: ShareCardOpenerEvent) {
-  openerSink?.(event)
+  // Sign-in input path of the same build: whether the code field took focus, how many characters
+  // its state held after each change (a length, never a character), and how verify ended.
+  | 'signin-code-focus'
+  | 'signin-code-change'
+  | 'signin-verify-press'
+  | 'signin-verify-ok'
+  | 'signin-verify-denied'
+  | 'signin-verify-code_invalid'
+  | 'signin-verify-unavailable'
+type OpenerSink = (event: ShareCardOpenerEvent, length?: number) => void
+let openerSink: OpenerSink | null = null
+export function traceShareCardOpener(event: ShareCardOpenerEvent, length?: number) {
+  openerSink?.(event, length)
 }
-export function installShareCardOpenerTrace(
-  next: ((event: ShareCardOpenerEvent) => void) | null
-) {
+export function installShareCardOpenerTrace(next: OpenerSink | null) {
   openerSink = next
 }

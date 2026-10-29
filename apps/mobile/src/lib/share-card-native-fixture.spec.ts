@@ -258,6 +258,32 @@ describe('opener trace recorder', () => {
     expect(first.events).toEqual([{ e: 'press', t: 7 }])
   })
 
+  it('records a sign-in input length as a bounded count and drops anything else', async () => {
+    const writes: string[] = []
+    const record = nativeFixture.openerTraceRecorder(
+      'file:///docs/',
+      (_uri, contents) => {
+        writes.push(contents)
+        return Promise.resolve()
+      },
+      () => 1
+    )
+    record('signin-code-change', 6)
+    record('signin-code-change', 4000)
+    record('signin-code-change', -1)
+    record('signin-code-change', 1.5)
+    record('signin-code-focus')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const events = JSON.parse(writes.at(-1) ?? '{}').events
+    expect(events.map((event: { n?: number }) => event.n)).toEqual([
+      6,
+      99,
+      undefined,
+      undefined,
+      undefined,
+    ])
+  })
+
   it('stays silent without a documents directory and survives a failed write', async () => {
     const quiet = nativeFixture.openerTraceRecorder(null, () =>
       Promise.reject(new Error('x'))

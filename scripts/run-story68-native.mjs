@@ -25,6 +25,11 @@ import {
 } from './ci/native-ios-maestro-trace.mjs'
 import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
 import {
+  iosDriverGlobalArgs,
+  iosDriverTestArgs,
+  recordIosDriverFlow,
+} from './ci/native-ios-maestro-driver.mjs'
+import {
   assertIosReadDenied,
   shouldRetryIosSnapshot,
   assertOwnedStory68AppReset,
@@ -276,7 +281,9 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
       [
         '--device',
         device,
+        ...iosDriverGlobalArgs(platform),
         'test',
+        ...iosDriverTestArgs({ platform, directory, device }),
         ...(platform === 'android'
           ? [DRIVER_HOST_PORT_ARG, String(MAESTRO_ANDROID_DRIVER_PORT)]
           : []),
@@ -369,6 +376,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
       // Diagnostics must preserve the original Maestro failure.
     }
   }
+  recordIosDriverFlow({ platform, directory, device, ok: result.status === 0 })
   const log = `${result.stdout}\n${result.stderr}`
     .split(secret || '\0')
     .join('[REDACTED]')
