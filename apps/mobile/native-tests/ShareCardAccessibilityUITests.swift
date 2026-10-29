@@ -57,6 +57,15 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     if waitForPreview { XCTAssertTrue(loaded().waitForExistence(timeout: 20)) }
   }
 
+  // The job log is the only place a failed audit is readable, so name each failing issue.
+  func auditIssueLine(_ scope: String, _ issue: XCUIAccessibilityAuditIssue) -> String {
+    func compact(_ text: String) -> String {
+      String(text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "|", with: "/").prefix(120))
+    }
+    let element = issue.element
+    return "CC68_AUDIT_ISSUE \(scope)|\(issue.auditType.rawValue)|\(compact(element?.identifier ?? "none"))|\(compact(element?.label ?? "none"))|\(compact(issue.compactDescription))"
+  }
+
   static func allowsRasterOCRIssue(type: XCUIAccessibilityAuditType, description: String, detail: String, state: String, hasElement: Bool, previewVerified: Bool) -> Bool {
     let signatures = [
       "Potentially inaccessible element": "This element contains content that could potentially form one or more separate accessibility elements.",
@@ -155,7 +164,9 @@ final class ShareCardAccessibilityUITests: XCTestCase {
       print("CC68_AUDIT \(state): \(description)")
       // Apple's raster OCR heuristic has no AX element for this fixed artwork.
       // Coordinator-approved exception requires its exact issue signature/state.
-      return Self.allowsRasterOCRIssue(type: issue.auditType, description: issue.compactDescription, detail: issue.detailedDescription, state: state, hasElement: issue.element != nil, previewVerified: previewVerified)
+      let allowed = Self.allowsRasterOCRIssue(type: issue.auditType, description: issue.compactDescription, detail: issue.detailedDescription, state: state, hasElement: issue.element != nil, previewVerified: previewVerified)
+      if !allowed { print(self.auditIssueLine(state, issue)) }
+      return allowed
     }
     let title = element("share-card-title")
     let watermark = element("share-card-watermark")
@@ -279,7 +290,10 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     try assertExistingHeader(tabs["community"]!, removedContentHeading: communityLabels["heading"] as! String)
     print("CC68_NATIVE_BEHAVIOR_PASS existing-header-labels")
     element("tab-home").tap()
-    try app.performAccessibilityAudit(for: .all)
+    try app.performAccessibilityAudit(for: .all) { issue in
+      print(self.auditIssueLine("home", issue))
+      return false
+    }
     try openCard()
     fixture("storage")
     focusSequence = try readShareCardFocusObservation(self).sequence

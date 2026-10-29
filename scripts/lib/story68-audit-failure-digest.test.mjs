@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
-import { failedAuditTestDigest } from './share-card-audit-report.mjs'
+import { failedAuditIssues, failedAuditTestDigest } from './share-card-audit-report.mjs'
 
 const log = [
   "Test Case '-[ShareCardAccessibilityUITests.ShareCardAccessibilityUITests testAllLocales]' started.",
@@ -48,8 +48,52 @@ describe('failed audit test digest', () => {
 
   test('the runner prints the digest before it throws', () => {
     const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
-    const print = source.indexOf('iosAuditFailure: failedAuditTestDigest(auditText)')
+    const print = source.indexOf('tests: failedAuditTestDigest(auditText)')
     const thrown = source.indexOf("throw new Error('ios_accessibility_audit_failed')")
     assert.ok(print > 0 && print < thrown)
+  })
+
+  test('lists the audit issues the Swift handler refused, in order', () => {
+    const issues = failedAuditIssues(
+      [
+        'CC68_STATE_PASS en-US open on',
+        'CC68_AUDIT_ISSUE home|3|outfit-card|Today|Contrast failed',
+        '    t = 1s Tear Down',
+        'CC68_AUDIT_ISSUE open|2|none|none|Potentially inaccessible text',
+        'x'.repeat(10) + ' CC68_AUDIT_ISSUE not-at-line-start|1|a|b|c',
+      ].join('\n')
+    )
+    assert.deepEqual(issues, [
+      'home|3|outfit-card|Today|Contrast failed',
+      'open|2|none|none|Potentially inaccessible text',
+    ])
+  })
+
+  test('caps the issue list and each issue line', () => {
+    const issues = failedAuditIssues(
+      Array.from({ length: 100 }, () => `CC68_AUDIT_ISSUE ${'z'.repeat(900)}`).join('\n')
+    )
+    assert.equal(issues.length, 40)
+    assert.ok(issues.every((line) => line.length <= 400))
+  })
+
+  test('the Swift audits name every refused issue and still fail on it', () => {
+    const swift = fs.readFileSync(
+      'apps/mobile/native-tests/ShareCardAccessibilityUITests.swift',
+      'utf8'
+    )
+    const audits = [...swift.matchAll(/performAccessibilityAudit\(for: \.all\)/g)]
+    const handled = [
+      ...swift.matchAll(/performAccessibilityAudit\(for: \.all\) \{ issue in/g),
+    ]
+    assert.equal(audits.length, handled.length)
+    assert.match(
+      swift,
+      /performAccessibilityAudit\(for: \.all\) \{ issue in\n\s+print\(self\.auditIssueLine\("home", issue\)\)\n\s+return false\n/
+    )
+    assert.match(
+      swift,
+      /if !allowed \{ print\(self\.auditIssueLine\(state, issue\)\) \}\n\s+return allowed/
+    )
   })
 })

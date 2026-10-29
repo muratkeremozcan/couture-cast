@@ -3,6 +3,7 @@ export const shareCardAuditStates: string[]
 export const shareCardAuditTestIDs: string[]
 export const shareCardNativeBehaviors: string[]
 export function failedAuditTestDigest(log: string): { test: string; lines: string[] }[]
+export function failedAuditIssues(log: string): string[]
 export function closedShareCardAuditReport(
   summary: {
     result?: string

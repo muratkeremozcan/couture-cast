@@ -80,6 +80,7 @@ function observedAuditIssues(log) {
 const failureContextLines = 8
 const failureLineChars = 300
 const failureDigestLimit = 24
+const failedIssueLimit = 40
 // The xcodebuild log is private. A failed XCUITest is only explained by the steps
 // right before its first assertion, so the job log carries that window.
 export function failedAuditTestDigest(log) {
@@ -113,6 +114,12 @@ export function failedAuditTestDigest(log) {
     })
   }
   return digests
+}
+// Each issue the Swift audit handler refused, in log order.
+export function failedAuditIssues(log) {
+  return [...log.matchAll(/^CC68_AUDIT_ISSUE ([^\r\n]+)/gm)]
+    .map((match) => match[1].replace(/\S*\/(?=[^/\s]+\.swift)/g, '').slice(0, 400))
+    .slice(0, failedIssueLimit)
 }
 export function closedShareCardAuditReport(summary, tree, log) {
   const tests = []

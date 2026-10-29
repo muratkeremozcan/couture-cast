@@ -17,6 +17,7 @@ import { story68FocusObservationHandler } from './lib/story68-ios-focus-observat
 import { startWeatherProviderDouble } from './weather-provider-double.mjs'
 import {
   closedShareCardAuditReport,
+  failedAuditIssues,
   failedAuditTestDigest,
 } from './lib/share-card-audit-report.mjs'
 import { summarizeNativeFlowFailure } from './lib/share-card-native-failure.mjs'
@@ -970,7 +971,14 @@ if (command === 'prebuild') {
     const closed = closedShareCardAuditReport(summary, tree, auditText)
     privateJson('accessibility-ios.json', closed)
     if (code !== 0 || !closed.passed) {
-      console.log(JSON.stringify({ iosAuditFailure: failedAuditTestDigest(auditText) }))
+      console.log(
+        JSON.stringify({
+          iosAuditFailure: {
+            issues: failedAuditIssues(auditText),
+            tests: failedAuditTestDigest(auditText),
+          },
+        })
+      )
       const hierarchy = run(maestroBinary, ['--device', device, 'hierarchy'])
       if (hierarchy.includes('share-card-title'))
         run('xcrun', [
