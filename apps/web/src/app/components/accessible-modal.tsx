@@ -25,6 +25,22 @@ export interface AccessibleModalProps {
   errorMessage?: string | null
 }
 
+/** Whether the element or an ancestor is inert or hidden from assistive technology. */
+function isHiddenFromFocus(target: HTMLElement): boolean {
+  for (
+    let ancestor: HTMLElement | null = target;
+    ancestor;
+    ancestor = ancestor.parentElement
+  )
+    if (
+      ancestor.inert ||
+      ancestor.hasAttribute('inert') ||
+      ancestor.getAttribute('aria-hidden') === 'true'
+    )
+      return true
+  return false
+}
+
 export function AccessibleModal({
   isOpen,
   suspended = false,
@@ -106,34 +122,25 @@ export function AccessibleModal({
       // Resolve the target after that commit, including its final inert ancestry.
       queueMicrotask(() => {
         if (focusGeneration.value !== restoreGeneration) return
-        const fallback =
-          (JSON.parse(fallbackSelectors) as string[])
-            .map((selector) => document.querySelector<HTMLElement>(selector))
-            .find((element) => element !== null) ?? null
+        const fallbacks = (JSON.parse(fallbackSelectors) as string[]).map((selector) =>
+          document.querySelector<HTMLElement>(selector)
+        )
         const final = finalFocusSelector
           ? document.querySelector<HTMLElement>(finalFocusSelector)
           : null
-        const targetToFocus = [
+        // A candidate can be connected and visible yet unable to take focus, such as a
+        // control disabled while the dialog was open. Each attempt is checked, and the
+        // next candidate is tried when focus did not move to it.
+        for (const target of [
           currentInvoker,
-          fallback,
+          ...fallbacks,
           previousActiveElementRef.current,
           final,
-        ].find((target) => {
-          if (!target?.isConnected) return false
-          for (
-            let ancestor: HTMLElement | null = target;
-            ancestor;
-            ancestor = ancestor.parentElement
-          )
-            if (
-              ancestor.inert ||
-              ancestor.hasAttribute('inert') ||
-              ancestor.getAttribute('aria-hidden') === 'true'
-            )
-              return false
-          return true
-        })
-        targetToFocus?.focus()
+        ]) {
+          if (!target?.isConnected || isHiddenFromFocus(target)) continue
+          target.focus()
+          if (document.activeElement === target) return
+        }
       })
     }
   }, [

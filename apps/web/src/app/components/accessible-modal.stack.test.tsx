@@ -404,6 +404,37 @@ describe('AccessibleModal stack', () => {
       expect(screen.getByTestId('earlier-focus')).toHaveFocus()
     })
 
+    it('falls through a candidate that cannot take focus, such as a button disabled while the dialog was open', async () => {
+      function Disabling({ open, disabled }: { open: boolean; disabled: boolean }) {
+        return (
+          <>
+            <button data-testid="earlier-focus" disabled={disabled}>
+              Earlier
+            </button>
+            <button data-testid="section-target">Section</button>
+            <AccessibleModal
+              isOpen={open}
+              onClose={vi.fn()}
+              titleId="solo-title"
+              title="Solo"
+              finalFocusSelector={section}
+            >
+              <button type="button">Solo action</button>
+            </AccessibleModal>
+          </>
+        )
+      }
+      const view = render(<Disabling open={false} disabled={false} />)
+      screen.getByTestId('earlier-focus').focus()
+      view.rerender(<Disabling open disabled={false} />)
+      view.rerender(<Disabling open disabled />)
+      view.rerender(<Disabling open={false} disabled />)
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(screen.getByTestId('section-target')).toHaveFocus()
+    })
+
     it('falls to the final target when neither the recorded control nor the earlier element remains', async () => {
       const view = render(<Ordered open={false} withRecorded={false} />)
       const earlier = screen.getByTestId('earlier-focus')
