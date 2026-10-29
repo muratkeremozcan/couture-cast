@@ -1881,14 +1881,137 @@ describe('round 7r edit distance one from a long term', () => {
     expect(screen('marcá la cintura', 'es-ES').disposition).toBe('pass')
   })
 
-  it('leaves terms under six letters exact', () => {
-    for (const text of ['hurex', 'fotzex'])
-      expect(screen(text, 'de-DE').disposition, text).toBe('pass')
+  it('leaves terms under six letters exact unless a generated inflection is six or more', () => {
+    // hure has no six-letter generated form one edit from hurex; fotze does (fotzen).
+    expect(screen('hurex', 'de-DE').disposition).toBe('pass')
+    expect(screen('fotzex', 'de-DE').disposition).not.toBe('pass')
   })
 
   it('does not release a violence term by the Turkish harmony exclusion', () => {
     // tecavzlar is tecavuzlar less one letter; lar breaks harmony with the front-vowel stem tecavüz.
     expect(screen('tecavzlar', 'tr-TR').disposition).not.toBe('pass')
     expect(screen('ciftler', 'tr-TR').disposition).toBe('pass')
+  })
+})
+
+/**
+ * Round 7s. Ordinary words that sit one edit from a long term are cleared by allow entries
+ * that cannot clear a listed term inside a phrase; two cross-language allow entries from 6.2
+ * (Turkish fagot, Italian mongolico) clear only under their own declared language.
+ */
+describe('round 7s allow entries and language scope', () => {
+  const policyDir = path.resolve(__dirname, '../../../policies/community-screening')
+  const LOCALE_OF: Record<string, string> = {
+    de: 'de-DE',
+    en: 'en-US',
+    es: 'es-ES',
+    fr: 'fr-FR',
+    it: 'it-IT',
+    pt: 'pt-BR',
+    tr: 'tr-TR',
+  }
+  const CLEARED: Record<string, string[]> = {
+    en: ['vaping', 'tigger', 'gapers'],
+    it: ['terrore', 'torrone', 'sbarra', 'boccola', 'coccola'],
+    es: ['negrita', 'mollera', 'collera', 'atate'],
+    fr: ['youpi', 'fouine'],
+    pt: ['mariscas'],
+    de: ['verdecke', 'verrenke'],
+  }
+
+  it('keeps the cleared ordinary words clean under their own language', () => {
+    for (const [language, words] of Object.entries(CLEARED))
+      for (const word of words)
+        expect(screen(word, LOCALE_OF[language]).disposition, `${language} ${word}`).toBe(
+          'pass'
+        )
+  })
+
+  it('never lets a cleared word clear a listed phrase it stands beside', () => {
+    const cleared = Object.entries(CLEARED).flatMap(([language, words]) =>
+      words.map((word) => [word, language] as const)
+    )
+    let probed = 0
+    for (const language of Object.keys(LOCALE_OF)) {
+      const list = JSON.parse(
+        fs.readFileSync(path.join(policyDir, 'terms-v1', `${language}-v1.json`), 'utf8')
+      ) as { entries: { term: string; severity: string }[] }
+      for (const { term, severity } of list.entries) {
+        if (!term.includes(' ') || severity !== 'high') continue
+        for (const [word, wordLanguage] of cleared) {
+          probed += 2
+          for (const text of [`${word} ${term}`, `${term} ${word}`])
+            expect(
+              screen(text, LOCALE_OF[wordLanguage]).disposition,
+              `${text} (${language})`
+            ).not.toBe('pass')
+        }
+      }
+    }
+    expect(probed).toBeGreaterThan(1000)
+  })
+
+  it('keeps the Brazilian slang word and the derogatory neighbours in review', () => {
+    for (const text of ['boceta', 'ligger', 'nagger', 'wigger', 'sigger', 'niggery'])
+      expect(
+        screen(text, text === 'boceta' ? 'pt-BR' : 'en-US').disposition,
+        text
+      ).not.toBe('pass')
+  })
+
+  it('withholds a letter added or changed on a generated plural or inflection', () => {
+    for (const [text, locale] of [
+      ['niggars', 'en-US'],
+      ['faggets', 'en-US'],
+      ['puttanex', 'it-IT'],
+      ['hurensohnex', 'de-DE'],
+      ['vergewaltigenx', 'de-DE'],
+    ] as const)
+      expect(screen(text, locale).disposition, text).not.toBe('pass')
+  })
+
+  it('clears the further ordinary words and keeps the pejorative ones in review', () => {
+    for (const [text, locale] of [
+      ['vapers', 'en-US'],
+      ['drapeable', 'en-US'],
+      ['ropeable', 'en-US'],
+      ['chores', 'en-US'],
+      ['suedes', 'en-US'],
+      ['chinos', 'en-US'],
+      ['polleras', 'es-ES'],
+      ['negritas', 'es-ES'],
+      ['picots', 'fr-FR'],
+      ['coccole', 'it-IT'],
+      ['soquetes', 'pt-BR'],
+      ['nutzen', 'de-DE'],
+      ['sürtüp', 'tr-TR'],
+    ] as const)
+      expect(screen(text, locale).disposition, text).toBe('pass')
+    // Inflections of listed violent verbs, and words that are mostly used as insults, stay in
+    // review: no fashion copy needs them.
+    for (const [text, locale] of [
+      ['ammazzato', 'it-IT'],
+      ['impiccato', 'it-IT'],
+      ['vagabundo', 'pt-BR'],
+      ['retardada', 'pt-BR'],
+      ['nutter', 'en-US'],
+    ] as const)
+      expect(screen(text, locale).disposition, text).not.toBe('pass')
+  })
+
+  it('clears Turkish fagot only under a declared Turkish locale', () => {
+    expect(screen('fagot dikişi', 'tr-TR').disposition).toBe('pass')
+    for (const locale of ['en-US', 'fr-FR', 'it-IT', 'es-ES', 'de-DE', 'pt-BR', null])
+      expect(screen('look at this fagot', locale).disposition, String(locale)).not.toBe(
+        'pass'
+      )
+  })
+
+  it('clears Italian mongolico only under a declared Italian locale', () => {
+    expect(screen('il popolo mongolico', 'it-IT').disposition).toBe('pass')
+    for (const locale of ['es-ES', 'pt-BR', 'en-US', 'fr-FR', 'de-DE', null])
+      expect(screen('eres un mongolico', locale).disposition, String(locale)).not.toBe(
+        'pass'
+      )
   })
 })

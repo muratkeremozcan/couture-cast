@@ -47,6 +47,8 @@ import {
  * - edit1: one letter added (appended, prepended, inserted), dropped, changed or two
  *   neighbours swapped, for single words of six letters or more, letters seeded per word.
  *   A variant that is an ordinary word the lists clear is listed in EDIT1_REAL_WORDS.
+ * - edit1-inflection: the same edits over every generated inflection of six letters or more
+ *   that the edit-distance-one index reads (EDIT1_REAL_WORDS applies here too).
  * - inflection-typo: the same two typos over every generated plural and inflected spelling of
  *   eight letters or more, except the Turkish inflections whose suffix breaks vowel harmony
  *   (PINNED_DISHARMONIC).
@@ -187,32 +189,77 @@ const failures: Record<string, string[]> = {}
 const counts: Record<string, number> = {}
 /**
  * Ordinary words that sit one edit from a listed term and that the allow list clears, each
- * with its reason in allow-list-v1.json (or an earlier allow entry: fagot, niger). The edit1
+ * with its reason in allow-list-v1.json (or an earlier allow entry: niger). The edit1
  * class cannot withhold them; every other edit of every eligible term is withheld.
  */
 const EDIT1_REAL_WORDS: ReadonlySet<string> = new Set([
   'aping',
+  'atate',
+  'bicos',
   'borra',
-  'fagot',
+  'borre',
+  'chines',
+  'chins',
+  'drapeable',
+  'engere',
+  'engeren',
+  'estupor',
+  'lutes',
   'marca',
   'marcas',
   'marcia',
   'maria',
+  'marias',
   'marion',
   'matite',
   'matte',
+  'mattes',
   'mongolic',
   'narica',
+  'negras',
+  'negro',
+  'negros',
   'niger',
+  'ollera',
+  'olleras',
+  'paste',
   'pasti',
+  'pastie',
+  'pastis',
+  'pasts',
+  'picots',
   'pompion',
   'racing',
+  'raines',
+  'rains',
+  'rapine',
   'rayed',
+  'rayes',
   'reaping',
+  'retardador',
+  'retarde',
+  'ropings',
+  'salpes',
+  'sbarre',
   'slope',
+  'slopes',
+  'slues',
+  'spass',
+  'spate',
+  'spats',
+  'spice',
+  'spies',
   'stupor',
   'terron',
+  'terrosi',
+  'tunen',
+  'tunes',
+  'tuten',
   'tyranny',
+  'unten',
+  'vaias',
+  'virados',
+  'youpi',
 ])
 
 function check(cls: string, term: string, text: string): void {
@@ -221,7 +268,7 @@ function check(cls: string, term: string, text: string): void {
   if (
     disposition === 'pass' &&
     !EXCEPTIONS.has(`${cls}|${term}`) &&
-    !(cls === 'edit1' && EDIT1_REAL_WORDS.has(text))
+    !(cls.startsWith('edit1') && EDIT1_REAL_WORDS.has(text))
   )
     (failures[cls] ??= []).push(`${term} => ${text}`)
 }
@@ -437,6 +484,17 @@ function typos(word: string, emit: Emit): void {
  * severity, and not a Turkish inflection whose suffix breaks vowel harmony (its one-letter-less
  * spelling is an ordinary word, see the screener; their number is pinned).
  */
+/** edit1 over every generated inflection the edit-distance-one index reads. */
+function inflectionEdit1(): void {
+  const seen = new Set<string>()
+  for (const entry of screener.editOneIndexedInflectionForms()) {
+    const form = entry.split(':').slice(1).join(':')
+    if (seen.has(form) || !/^[a-z]+$/.test(form)) continue
+    seen.add(form)
+    edit1(form, (_cls, variant) => check('edit1-inflection', form, variant))
+  }
+}
+
 function inflectionTypos(): void {
   const seen = new Set<string>()
   for (const entry of screener.typoIndexedInflectionForms()) {
@@ -453,6 +511,7 @@ function runMatrix(): void {
     check('inflection', rest.join(':'), rest.join(':'))
   }
   inflectionTypos()
+  inflectionEdit1()
   const seen = new Set<string>()
   for (const { term } of terms) {
     if (seen.has(term)) continue
@@ -609,6 +668,7 @@ const PINNED_COUNTS: Record<string, number> = {
   stretch: 2016,
   'inflection-typo': 7829,
   edit1: 4682,
+  'edit1-inflection': 7635,
   'typo-delete': 670,
   'typo-transpose': 571,
 }

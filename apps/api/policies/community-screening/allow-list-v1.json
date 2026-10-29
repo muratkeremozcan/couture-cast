@@ -116,11 +116,6 @@
       "reason": "The colour black in Spanish, Portuguese and Italian, the most common colour word in their fashion copy. LDNOOBW lists it in English and French; the French négro and the English slur still screen through the graded overlay."
     },
     {
-      "entry": "mongolico",
-      "language": "it",
-      "reason": "The Italian adjective for Mongolian. The accented Spanish mongólico still screens because allow-list lookup runs on the literal spelling."
-    },
-    {
       "entry": "putto",
       "language": "it",
       "reason": "The Renaissance cherub motif printed on silks and embroidered on jackets. Collapses onto the Spanish term puto."
@@ -174,11 +169,6 @@
       "entry": "níger",
       "language": "pt",
       "reason": "The country name with its Portuguese accent; held out for the same reason as niger."
-    },
-    {
-      "entry": "fagot",
-      "language": "tr",
-      "reason": "Turkish for the bassoon and for the openwork stitch that joins two fabric edges, fagot dikişi. The English slur collapses onto it; the slur itself still screens."
     },
     {
       "entry": "gok",
@@ -701,11 +691,6 @@
       "reason": "Ordinary English word, one letter from the listed term nigger, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
     },
     {
-      "entry": "ligger",
-      "language": "en",
-      "reason": "Ordinary English word, one letter from the listed term nigger, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
-    },
-    {
       "entry": "rigger",
       "language": "en",
       "reason": "Ordinary English word, one letter from the listed term nigger, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
@@ -884,11 +869,6 @@
       "entry": "narica",
       "language": "en",
       "reason": "Ordinary English word, one letter from the listed term marica, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
-    },
-    {
-      "entry": "nagger",
-      "language": "en",
-      "reason": "Ordinary English word, one letter from the listed term nigger, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
     },
     {
       "entry": "salopet",
@@ -1089,6 +1069,1251 @@
       "entry": "terrones",
       "language": "es",
       "reason": "Ordinary Spanish word (plural of terr\u00f3n, clod or lump), one letter from the listed term terrone, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening."
+    },
+    {
+      "entry": "vaping",
+      "language": "en",
+      "reason": "Ordinary English word (the act of using a vape), one letter from the listed term raping, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "tigger",
+      "language": "en",
+      "reason": "Ordinary English word (the character's name (Winnie-the-Pooh)), one letter from the listed term nigger, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "gapers",
+      "language": "en",
+      "reason": "Ordinary English word (people who gape or stare), one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "terrore",
+      "language": "it",
+      "reason": "Ordinary Italian word (terror), one letter from the listed term terrone, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "torrone",
+      "language": "it",
+      "reason": "Ordinary Italian word (nougat), one letter from the listed term terrone, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sbarra",
+      "language": "it",
+      "reason": "Ordinary Italian word (bar or barrier), one letter from the listed term sborra, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "boccola",
+      "language": "it",
+      "reason": "Ordinary Italian word (curl or ringlet), one letter from the listed term zoccola, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "coccola",
+      "language": "it",
+      "reason": "Ordinary Italian word (third person of coccolare, cuddles), one letter from the listed term zoccola, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "negrita",
+      "language": "es",
+      "reason": "Ordinary Spanish word (bold type (letra negrita)), one letter from the listed term negrata, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "mollera",
+      "language": "es",
+      "reason": "Ordinary Spanish word (the crown of the head, also wit), one letter from the listed term bollera, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "collera",
+      "language": "es",
+      "reason": "Ordinary Spanish word (anger), one letter from the listed term bollera, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "atate",
+      "language": "es",
+      "reason": "Ordinary Spanish word (imperative of atar, tie), one letter from the listed term matate, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "youpi",
+      "language": "fr",
+      "reason": "Ordinary French word (an exclamation of joy (yippee)), one letter from the listed term youpin, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "fouine",
+      "language": "fr",
+      "reason": "Ordinary French word (the stone marten, and fur), one letter from the listed term gouine, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "mariscas",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (forms of mariscar, to gather shellfish), one letter from the listed term maricas, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "verdecke",
+      "language": "de",
+      "reason": "Ordinary German word (plural of Verdeck, convertible top), one letter from the listed term verrecke, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "verrenke",
+      "language": "de",
+      "reason": "Ordinary German word (to contort, from verrenken), one letter from the listed term verrecke, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "schlappe",
+      "language": "de",
+      "reason": "Ordinary German word (a setback or a slipper), one letter from the listed term schlampe, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "verdrecke",
+      "language": "de",
+      "reason": "Ordinary German word (first person of verdrecken, to make dirty), one letter from the listed term verrecke, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "raspers",
+      "language": "en",
+      "reason": "Ordinary English word (plural of rasper, a rasping tool), one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "japers",
+      "language": "en",
+      "reason": "Ordinary English word (plural of japer, a joker), one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "ragers",
+      "language": "en",
+      "reason": "Ordinary English word (plural of rager, as in party ragers), one letter from the listed term rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "japing",
+      "language": "en",
+      "reason": "Ordinary English word (joking, from jape), one letter from the listed term raping, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "gapings",
+      "language": "en",
+      "reason": "Ordinary English word (plural of gaping), one letter from the listed term rapings, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "tapings",
+      "language": "en",
+      "reason": "Ordinary English word (plural of taping), one letter from the listed term rapings, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "ropings",
+      "language": "en",
+      "reason": "Ordinary English word (plural of roping), one letter from the listed term rapings, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "racings",
+      "language": "en",
+      "reason": "Ordinary English word (plural of racing), one letter from the listed term rapings, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "rapini",
+      "language": "en",
+      "reason": "Ordinary English word (the vegetable), one letter from the listed term raping, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "tapeable",
+      "language": "en",
+      "reason": "Ordinary English word (able to be taped), one letter from the listed term rapeable, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "ollera",
+      "language": "es",
+      "reason": "Ordinary Spanish word (a woman potter), one letter from the listed term bollera, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "bolsera",
+      "language": "es",
+      "reason": "Ordinary Spanish word (a bag maker), one letter from the listed term bollera, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "bollero",
+      "language": "es",
+      "reason": "Ordinary Spanish word (a seller of bollos, buns), one letter from the listed term bollera, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "marisca",
+      "language": "es",
+      "reason": "Ordinary Spanish word (third person of mariscar, to gather shellfish), one letter from the listed term marica, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "marida",
+      "language": "es",
+      "reason": "Ordinary Spanish word (third person of maridar, to match or marry), one letter from the listed term marica, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "matute",
+      "language": "es",
+      "reason": "Ordinary Spanish word (smuggling), one letter from the listed term matate, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sudaba",
+      "language": "es",
+      "reason": "Ordinary Spanish word (imperfect of sudar, to sweat), one letter from the listed term sudaca, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sudada",
+      "language": "es",
+      "reason": "Ordinary Spanish word (a sweat, a drenching), one letter from the listed term sudaca, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sudara",
+      "language": "es",
+      "reason": "Ordinary Spanish word (subjunctive of sudar, to sweat), one letter from the listed term sudaca, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "couine",
+      "language": "fr",
+      "reason": "Ordinary French word (third person of couiner, to squeak), one letter from the listed term gouine, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "galope",
+      "language": "fr",
+      "reason": "Ordinary French word (third person of galoper, to gallop), one letter from the listed term salope, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "impicciati",
+      "language": "it",
+      "reason": "Ordinary Italian word (imperative of impicciarsi, get involved), one letter from the listed term impiccati, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "impaccati",
+      "language": "it",
+      "reason": "Ordinary Italian word (packed or wrapped, from impaccare), one letter from the listed term impiccati, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "mignatta",
+      "language": "it",
+      "reason": "Ordinary Italian word (a leech), one letter from the listed term mignotta, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "pampino",
+      "language": "it",
+      "reason": "Ordinary Italian word (a vine leaf), one letter from the listed term pompino, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "scorra",
+      "language": "it",
+      "reason": "Ordinary Italian word (subjunctive of scorrere, to flow), one letter from the listed term sborra, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sborsa",
+      "language": "it",
+      "reason": "Ordinary Italian word (third person of sborsare, to pay out), one letter from the listed term sborra, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sbarrata",
+      "language": "it",
+      "reason": "Ordinary Italian word (barred, blocked), one letter from the listed term sborrata, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sborsata",
+      "language": "it",
+      "reason": "Ordinary Italian word (a payout), one letter from the listed term sborrata, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "terrose",
+      "language": "it",
+      "reason": "Ordinary Italian word (feminine plural of terroso, earthy), one letter from the listed term terrone, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "zoccolai",
+      "language": "it",
+      "reason": "Ordinary Italian word (plural of zoccolaio, a clog maker), one letter from the listed term zoccola, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "bosquete",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (a small grove), one letter from the listed term boquete, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "roquete",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (a rochet, a vestment), one letter from the listed term boquete, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "bureta",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (a laboratory burette), one letter from the listed term buceta, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "estupor",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (stupor), one letter from the listed term estupro, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "estuporar",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (to stupefy), one letter from the listed term estuprar, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "estuporo",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (first person of estuporar), one letter from the listed term estupro, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "esturro",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (the smell of burnt food), one letter from the listed term estupro, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "esturrar",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (to burn food), one letter from the listed term estuprar, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "magicas",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (magic, feminine plural written without the accent), one letter from the listed term maricas, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "marias",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (plural of the name Maria), one letter from the listed term maricas, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "bloquete",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (a paving block or bank slip), one letter from the listed term boquete, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "retardando",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (gerund of retardar, to delay), one letter from the listed term retardado, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "retardador",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word (a retarding agent), one letter from the listed term retardado, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the term itself and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "motzen",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling fotzen, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "fetzen",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling fotzen, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "negiere",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling negere, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "negieren",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling negeren, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "legere",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling negere, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "legeren",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling negeren, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "engere",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling negere, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "engeren",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling negeren, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "neuere",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling negere, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "neueren",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling negeren, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "nutzten",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling nutten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "nutzen",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling nutten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "netten",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling nutten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "nettes",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling nuttes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "putten",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling nutten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "cutten",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling nutten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spalte",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling spaste, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spalten",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling spasten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sparte",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling spaste, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sparten",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling spasten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spass",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling spasts, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "turnten",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling tunten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "bunten",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling tunten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "buntes",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling tuntes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "tuten",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling tunten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "tunen",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling tunten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "tunken",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling tunten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "verdrecken",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling verrecken, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "verdecken",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling verrecken, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "verrenken",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling verrecken, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "schlappen",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling schlampen, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "schlappes",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling schlampes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "vapers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling rapers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "drapeable",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling rapeable, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "ropeable",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling rapeable, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "chines",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling chinkes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "thinks",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling chinks, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "clinks",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling chinks, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "chunks",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling chinks, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "chicks",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling chinks, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "chins",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling chinks, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "chinos",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling chinks, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "maggots",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling faggots, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "navies",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling nazies, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "niggles",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling niggaes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sniggers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling niggeres, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "diggers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling niggers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "jiggers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling niggers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "riggers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling niggers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "ravines",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling rapines, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "rains",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling rapins, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "rapids",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling raepds, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "papists",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling rapists, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "racists",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling rapists, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "retarder",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling retardes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "petards",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling retards, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "regards",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling retards, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "rewards",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling retards, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "suedes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling saedes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "swedes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling saedes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "salutes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling slutes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "solutes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling slutes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "lutes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling slutes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "elutes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling slutes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "flutes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling slutes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "glutes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling slutes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "scutes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling cuntes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "slates",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling slutes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "splices",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "apices",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "slices",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spaces",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spies",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spikes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spines",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spires",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spites",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spice",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spiced",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spicer",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "tyrannies",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling trannies, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "crannies",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling trannies, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "grannies",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling trannies, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "setbacks",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling wetbacks, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "chores",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling whores, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "shores",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling whores, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "wholes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling whores, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "whorls",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling whores, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spasms",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spasts, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spats",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spasts, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "pastis",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spastis, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "pastie",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spastie, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spate",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spaste, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "tunes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling tuntes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "buttes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling nuttes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "mutates",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling matates, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "mattes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling matates, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "slopes",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling salopes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "picots",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling bicots, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "bigots",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling bicots, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "olleras",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling bolleras, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "colleras",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling bolleras, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "molleras",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling bolleras, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "polleras",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling bolleras, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "bolseras",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling bolleras, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "bolleros",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling bolleras, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "metates",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling matates, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "matutes",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling matates, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "negritas",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling negratas, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sudabas",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling sudacas, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sudadas",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling sudacas, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sudaras",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling sudacas, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "picote",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling bicote, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "couines",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling gouines, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "fouines",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling gouines, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "galopes",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling salopes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "salpes",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling salopes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "mignatte",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling mignotte, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "pampini",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling pompini, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sbarrate",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling sborrate, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sborsate",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling sborrate, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "borre",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling sborre, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "scorre",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling sborre, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sbarre",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling sborre, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "stupori",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling stupri, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "torroni",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling terroni, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "terreni",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling terroni, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "terrori",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling terroni, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "terrosi",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling terroni, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "boccole",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling zoccole, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "coccole",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the listed or generated spelling zoccole, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "bloquetes",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling boquetes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "soquetes",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling boquetes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "buretas",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling bucetas, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "esturros",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling estupros, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "retardadores",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling retardadoes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "retardamos",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling retardados, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "radias",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling vadias, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sadias",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling vadias, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "vaias",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling vadias, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "valias",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling vadias, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "varias",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling vadias, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "vazias",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling vadias, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "aviados",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling viadoes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "vaiados",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling viadoes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "virados",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling viadoes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "visados",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling viadoes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "fiados",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling viados, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "liados",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling viados, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "miados",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling viados, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "piados",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling viados, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "voados",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling viados, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "vindos",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling viados, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sürtüp",
+      "language": "tr",
+      "reason": "Ordinary Turkish word (converb of sürtmek, to rub), one letter from the listed or generated spelling surtuk, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "negras",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling negers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "vacías",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling vadias, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "vacias",
+      "language": "es",
+      "reason": "Ordinary Spanish word, one letter from the listed or generated spelling vadias, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "degrés",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling negres, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "degres",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling negres, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "légère",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling negere, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "légers",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling negers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "legers",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling negers, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "repères",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling raperes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "reperes",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling raperes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "rayés",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling raypes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "rayes",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the listed or generated spelling raypes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "unten",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the listed or generated spelling tunten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "nelere",
+      "language": "tr",
+      "reason": "Ordinary Turkish word, one letter from the listed or generated spelling negere, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "várias",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling vadias, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "bicos",
+      "language": "pt",
+      "reason": "Ordinary Portuguese word, one letter from the listed or generated spelling bicots, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "paste",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the listed or generated spelling spaste, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "späte",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the generated spelling spaste, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "späten",
+      "language": "de",
+      "reason": "Ordinary German word, one letter from the generated spelling spasten, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "pasts",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the generated spelling spasts, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "dicots",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the generated spelling bicots, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "slues",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the generated spelling slutes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "spicers",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the generated spelling spices, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "wheres",
+      "language": "en",
+      "reason": "Ordinary English word, one letter from the generated spelling whores, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "contes",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the generated spelling cuntes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "racines",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the generated spelling rapines, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "raines",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the generated spelling rapines, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "rapides",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the generated spelling raepdes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "tantes",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the generated spelling tuntes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "tentes",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the generated spelling tuntes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "tentés",
+      "language": "fr",
+      "reason": "Ordinary French word, one letter from the generated spelling tuntes, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
+    },
+    {
+      "entry": "sposte",
+      "language": "it",
+      "reason": "Ordinary Italian word, one letter from the generated spelling spaste, so the edit-distance-one index of long high-severity terms meets it. It clears only the exact lowercase token; the spelling it neighbours and every other spelling one edit from it keep screening, and as a single-word allowance it never clears a listed phrase."
     }
   ],
   "literalContexts": [
@@ -1753,6 +2978,16 @@
     }
   ],
   "scopedWords": [
+    {
+      "entry": "fagot",
+      "language": "tr",
+      "reason": "Turkish for the bassoon and for the openwork stitch that joins two fabric edges, fagot dikişi. The English slur collapses onto it; the slur itself still screens. It clears only when the declared locale is Turkish; in every other locale, and with no declared locale, fagot keeps screening."
+    },
+    {
+      "entry": "mongolico",
+      "language": "it",
+      "reason": "The Italian adjective for Mongolian. The accented Spanish mongólico still screens because allow-list lookup runs on the literal spelling. It clears only when the declared locale is Italian; the accent-stripped Spanish term mongolico keeps screening in every other locale, and with no declared locale."
+    },
     {
       "entry": "pede",
       "language": "pt",

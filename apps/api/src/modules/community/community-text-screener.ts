@@ -1532,12 +1532,28 @@ function buildEditOneIndex(
     if (!bucket) keys.set(key, [entry])
     else if (!bucket.some((other) => other.term === entry.term)) bucket.push(entry)
   }
+  // The spellings a list names and the plural and inflected spellings generated from its
+  // high-severity terms ("niggars" is one edit from the generated "niggers"). A generated
+  // Turkish inflection that breaks vowel harmony is left out, as in the typo index, except
+  // for violence terms.
+  // Turkish is left to the listed spellings: its suffix chains put ordinary words one edit
+  // from many generated forms (dikişi, one letter from the generated sikişi), and no spell
+  // checker is available to sweep them. Its inflected typos stay in the typo index.
   for (const index of indexes)
-    for (const term of index.listedTerms) {
+    for (const term of [
+      ...index.listedTerms,
+      ...(index.language === 'tr' ? [] : index.generatedForms),
+    ]) {
       const meta = index.single.get(term)
       if (!meta || term.length < EDIT_ONE_MIN_TERM_LENGTH || !/^\p{L}+$/u.test(term))
         continue
       if (meta.severity !== 'high' && !family.has(collapseRepeats(term))) continue
+      if (
+        index.disharmonicForms.has(term) &&
+        !index.listedTerms.has(term) &&
+        meta.category !== 'violence'
+      )
+        continue
       const entry = { term, meta }
       add(term, entry)
       for (const deleted of singleDeletes(term)) add(deleted, entry)
@@ -1865,6 +1881,18 @@ export class CommunityTextScreener {
     )
   }
 
+  /** The generated inflections the edit-distance-one index reads, as language:form. */
+  editOneIndexedInflectionForms(): string[] {
+    const indexed = new Set<string>()
+    for (const bucket of this.editOneKeys.values())
+      for (const { term } of bucket) indexed.add(term)
+    return this.indexes.flatMap((index) =>
+      index.generatedForms
+        .filter((form) => indexed.has(form) && !index.listedTerms.has(form))
+        .map((form) => `${index.language}:${form}`)
+    )
+  }
+
   /** The scoped phrases of the language the current screen() call declared. */
   private activeScopedPhrases: readonly ScopedPhrase[] = []
   private readonly splitFrames: ReadonlyMap<string, readonly SplitFrame[]>
@@ -1899,6 +1927,7 @@ export class CommunityTextScreener {
   private readonly listVersions: Readonly<Record<string, string>>
   private readonly loadedLanguages: readonly ScreeningLanguage[]
   private readonly englishFilter: Filter
+  private readonly englishProfane: ReadonlySet<string>
   private readonly fieldLimits: Readonly<Record<TextScreeningField, number>>
   private readonly longestTerm: number
 
@@ -2061,6 +2090,22 @@ export class CommunityTextScreener {
     if (allowed.length > 0) {
       this.englishFilter.removeWords(...allowed)
     }
+    // The filter builds one regular expression per list word on every call and tests each
+    // word against the whole allow list first, so its cost grows with both lists. For a token
+    // of plain word characters the two reduce to set membership, which is what this holds.
+    const excluded = new Set(this.englishFilter.exclude)
+    this.englishProfane = new Set(
+      this.englishFilter.list
+        .map((word) => word.toLowerCase())
+        .filter((word) => /^\w+$/.test(word) && !excluded.has(word))
+    )
+  }
+
+  /** Whether the English backstop list holds the token, as `bad-words` would answer. */
+  private isEnglishProfane(token: string): boolean {
+    return /^\w+$/.test(token)
+      ? this.englishProfane.has(token)
+      : this.englishFilter.isProfane(token)
   }
 
   private assertDeliberateReviewTerms(): void {
@@ -2425,10 +2470,7 @@ export class CommunityTextScreener {
         outcomes.push(outcome)
         continue
       }
-      if (
-        folded.length >= MIN_SINGLE_TERM_LENGTH &&
-        this.englishFilter.isProfane(folded)
-      ) {
+      if (folded.length >= MIN_SINGLE_TERM_LENGTH && this.isEnglishProfane(folded)) {
         outcomes.push({
           meta: { category: 'profanity', severity: 'low' },
           obfuscated: false,
