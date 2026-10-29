@@ -277,10 +277,10 @@ describe('deployment workflows', () => {
         expect(reserve, `${file} ${job}`).toBeLessThan(start)
       }
     }
-    // pr-share-card-native.yml starts it in six jobs: the image prewarm job, the API32 and
-    // iOS original-resource job, the browser lane and the three Android 36 partitions (two
-    // of them reuse the first one's anchored steps).
-    expect(startingJobs).toBe(12)
+    // pr-share-card-native.yml starts it in five jobs: the API32 original-resource job, the
+    // browser lane and the three Android 36 partitions (two of them reuse the first one's
+    // anchored steps). The iOS shards start Supabase from scripts/ci/native-supabase.mjs.
+    expect(startingJobs).toBe(11)
   })
 
   it('local Supabase starts from the image cache with its host ports guarded', () => {
