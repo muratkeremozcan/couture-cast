@@ -123,6 +123,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
+import { useDetailOpener } from './detail-opener'
 import { CHIP_NAVIGATION_HEIGHT_PX, type ChipCategory } from './chip-navigation'
 
 /**
@@ -999,24 +1000,6 @@ interface LookbookDetailDialogProps {
   /** Where focus goes after close when the control that opened the detail is gone. */
   restoreFocus?: readonly string[]
   onClose: () => void
-}
-
-/** The card control, on the surface it came from, that opened a post's detail. */
-function detailOpenerSelector(
-  surface: AffiliateCommunitySurface,
-  commentsFocus: boolean,
-  postId: string
-): string {
-  const scope = surface === 'community_spotlight' ? SPOTLIGHT_CARD_SCOPE : ''
-  const control = commentsFocus ? 'comments-button' : 'lookbook-open'
-  return `[data-testid="${scope}${control}-${postId}"]`
-}
-
-/** That control first; the community section only when its card is gone. */
-function detailRestoreFocus(opener: string | null): readonly string[] | undefined {
-  return opener === null
-    ? undefined
-    : [opener, '[data-share-card-focus-fallback="community"]']
 }
 
 /**
@@ -2098,6 +2081,8 @@ export function CommunityLookbookGrid({
   >()
   const [focusComments, setFocusComments] = useState(false)
   const [openedItem, setOpenedItem] = useState<CommunityFeedItem | null>(null)
+  const detailOpener = useDetailOpener(openedItem)
+  const clearDetailOpener = detailOpener.clear
   const openedItemRef = useRef(openedItem)
   openedItemRef.current = openedItem
   /**
@@ -2107,9 +2092,6 @@ export function CommunityLookbookGrid({
    */
   const [detailSurface, setDetailSurface] =
     useState<AffiliateCommunitySurface>('community_feed')
-  // The card control that opened the detail, by surface and post. Re-verification
-  // remounts every card, so closing the detail looks that control up again by id.
-  const [detailOpener, setDetailOpener] = useState<string | null>(null)
   const sponsoredShown = useSponsoredShownRegistry()
   const reactionAnnouncementId = useRef(0)
   // Set once the spotlight hook exists below; reaction updates reach its copies too.
@@ -3014,6 +2996,7 @@ export function CommunityLookbookGrid({
         const post = reactionState.read(target.post, readTicket)
         if (!post) return
         setDetailSurface('community_feed')
+        clearDetailOpener()
         // A resolve copy: it takes the latest live answer for its post.
         setOpenedItem(() => withLiveSponsorship(post, liveSponsorships))
         if (focus)
@@ -3049,7 +3032,14 @@ export function CommunityLookbookGrid({
       active = false
       controller.abort()
     }
-  }, [sessionScope, highlightedCardId, reactionState, comments, liveSponsorships])
+  }, [
+    sessionScope,
+    highlightedCardId,
+    reactionState,
+    comments,
+    liveSponsorships,
+    clearDetailOpener,
+  ])
 
   /**
    * The rows on screen: the loaded pages, with a deep-link target that is not
@@ -3118,7 +3108,7 @@ export function CommunityLookbookGrid({
   ) => {
     notificationIntentRef.current++
     setDetailSurface(surface)
-    setDetailOpener(detailOpenerSelector(surface, commentsFocus, item.id))
+    detailOpener.record(surface, commentsFocus, item.id)
     setFocusComments(commentsFocus)
     setAnnouncement(null)
     setReactionFeedback(null)
@@ -3637,10 +3627,9 @@ export function CommunityLookbookGrid({
             canAct={presentation.canAct}
             sponsored={sponsoredHost(detailSurface)}
             t={t}
-            restoreFocus={detailRestoreFocus(detailOpener)}
+            restoreFocus={detailOpener.restoreFocus}
             onClose={() => {
               notificationIntentRef.current++
-              setDetailOpener(null)
               comments.retireFocus(presentation.detail!.id)
               setCommentTarget(undefined)
               setOpenedItem(null)
