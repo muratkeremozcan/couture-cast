@@ -11,6 +11,9 @@ const session = vi.hoisted(() => ({
   owner: null as string | null,
   // False while the verified bearer has not settled after sign-in.
   ready: true,
+  // While true, token reads stay pending until a test settles them.
+  hold: false,
+  pending: [] as ((token: string | undefined) => void)[],
   listeners: new Set<() => void>(),
 }))
 const enable = vi.hoisted(() => vi.fn())
@@ -25,9 +28,13 @@ vi.mock('../lib/native-session', () => ({
 }))
 vi.mock('../lib/mobile-auth', () => ({
   resolveMobileAccessToken: () =>
-    Promise.resolve(
-      session.owner && session.ready ? `verified-${session.owner}` : undefined
-    ),
+    session.hold
+      ? new Promise<string | undefined>((resolve) => {
+          session.pending.push(resolve)
+        })
+      : Promise.resolve(
+          session.owner && session.ready ? `verified-${session.owner}` : undefined
+        ),
 }))
 vi.mock('../lib/share-card-native-fixture', () => ({
   shareCardFixtureMode: () => fixture.mode,
@@ -89,6 +96,8 @@ beforeAll(async () => {
 })
 beforeEach(() => {
   session.owner = null
+  session.hold = false
+  session.pending = []
   session.ready = true
   fixture.mode = 'real'
   session.listeners.clear()
@@ -276,6 +285,17 @@ describe('R11 native settings journeys', () => {
     expect(gates).toHaveLength(4)
     expect(screen.getByText(label('loadFailed'))).toBeTruthy()
     expect(screen.queryByText(label('loadRetrying'))).toBeNull()
+  })
+
+  it('shows no message when a token read that was in flight at sign-out settles empty', async () => {
+    session.hold = true
+    await render(<NotificationSettingsScreen />)
+    identify('member-a')
+    identify(null)
+    for (const settle of session.pending) settle(undefined)
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(screen.queryByText(label('loadRetrying'))).toBeNull()
+    expect(screen.queryByText(label('loadFailed'))).toBeNull()
   })
 
   it('has a load message and a Try again label in every supported locale', () => {
