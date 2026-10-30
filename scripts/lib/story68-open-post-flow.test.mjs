@@ -62,8 +62,16 @@ test('the opener tap is guarded: lift, tap and wait for the composer title, retr
     )
   assert.ok(guard, 'retry sits right before the preview wait')
   const body = guard[1]
+  // A press that lands late has opened the composer: neither the lift nor the tap may run then.
+  const guarded =
+    /- runFlow:\n\s+when:\n\s+notVisible:\n\s+id: share-card-title\n\s+commands:\n([\s\S]*)\n\s+- extendedWaitUntil:/.exec(
+      body
+    )
+  assert.ok(guarded, 'lift and tap sit inside the composer-title-absent guard')
+  assert.match(guarded[1], /- swipe:/)
+  assert.match(guarded[1], /- tapOn:/)
   assert.ok(body.indexOf('- swipe:') < body.indexOf('- tapOn:'))
-  assert.ok(body.indexOf('- tapOn:') < body.indexOf('id: share-card-title'))
+  assert.ok(body.indexOf('- tapOn:') < body.lastIndexOf('id: share-card-title'))
   assert.match(body, /platform: iOS/)
   assert.match(body, /label: 'share_card_press_not_received'/)
   // The only tapOn of the opener sits inside the retry.

@@ -19,7 +19,7 @@ test('other platforms and flows use their derived budget', () => {
   )
   assert.ok(flowTimeoutMs(OPEN_APP_FLOW) > 120_000)
   assert.equal(nativeFlowTimeoutMs(OPEN_POST, 'ios'), flowTimeoutMs(OPEN_POST))
-  assert.equal(nativeFlowTimeoutMs(OPEN_POST, 'ios'), 238_750)
+  assert.equal(nativeFlowTimeoutMs(OPEN_POST, 'ios'), 261_250)
   assert.equal(nativeFlowTimeoutMs('maestro/story68/cancel.yaml', 'ios'), 120_000)
 })
 

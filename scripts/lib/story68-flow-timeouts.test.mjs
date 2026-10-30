@@ -60,8 +60,10 @@ function declaredOpenPostWorstCase() {
     const repeats = (block.match(/^\s*times:/gm) ?? []).length
     const swipes = (block.match(/^\s*- swipe:/gm) ?? []).length
     const asserts = (block.match(/^\s*-? ?assert(?:Not)?Visible:/gm) ?? []).length
+    // The guarded opener attempt checks the composer title before it lifts and taps.
+    const guards = (block.match(/^\s*when:\n\s*notVisible:/gm) ?? []).length
     // Each repeat iteration holds its own swipe; the remaining swipes are single steps.
-    return { waits, steps: iterations + (swipes - repeats) + asserts }
+    return { waits, steps: iterations + (swipes - repeats) + asserts + guards }
   }
   const sum = (parts) =>
     parts.reduce(
@@ -104,7 +106,7 @@ describe('Maestro flow timeouts', () => {
     assert.equal(OPEN_POST_WORST_CASE_MS, Math.max(ios, android))
     assert.ok(flowTimeoutMs(openPost) >= Math.max(ios, android) * FLOW_TIMEOUT_MARGIN)
     // The old 38-iteration walk could not be covered by any sane budget.
-    assert.ok(flowTimeoutMs(openPost) <= 240_000)
+    assert.ok(flowTimeoutMs(openPost) <= 270_000)
   })
 
   test('open-app covers its declared worst case with the stated margin', () => {
