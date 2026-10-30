@@ -19,6 +19,25 @@ export const OPEN_APP_WORST_CASE_MS =
   FLOW_STARTUP_MS + 4 * (100_000 + 17 * CONDITION_CHECK_MS)
 
 /**
+ * expo-go-open.yaml, the iOS Expo Go proof opener. A pass of its loop checks the tab bar, then the
+ * open prompt, the developer-menu onboarding and the connected menu; each absent check costs up to
+ * 7.4 s on the iOS host (run 40992501585, a skipped `when` check of open-app.yaml), budgeted at 8 s,
+ * plus 4 s for the taps. The loop runs at most 10 passes and ends on the named 30 s tab-bar wait,
+ * so a project that never loads fails inside this budget with the failed-step hierarchy captured.
+ * open-app.yaml, which this replaces for Expo Go, declares 100 s of waits per attempt and was pinned
+ * to 120 s on iOS: the Maestro process was killed before it could name a failure.
+ */
+export const EXPO_GO_OPEN_FLOW = 'maestro/story68/expo-go-open.yaml'
+export const EXPO_GO_OPEN_PASSES = 10
+export const EXPO_GO_CONDITION_CHECK_MS = 8_000
+export const EXPO_GO_OPEN_PASS_MS = 4 * EXPO_GO_CONDITION_CHECK_MS + 4_000
+export const EXPO_GO_OPEN_FINAL_WAIT_MS = 30_000
+export const EXPO_GO_OPEN_WORST_CASE_MS =
+  FLOW_STARTUP_MS +
+  EXPO_GO_OPEN_PASSES * EXPO_GO_OPEN_PASS_MS +
+  EXPO_GO_OPEN_FINAL_WAIT_MS
+
+/**
  * open-post.yaml on iOS (its slower platform): 10 s + 20 s + 20 s of declared waits, and 13
  * budgeted steps outside the guarded opener tap: 2 feed-state checks, 3 up and 5 down walk
  * iterations, 2 opener iterations and the post assertion. The opener tap is a retry of
@@ -138,6 +157,7 @@ const flowTimeouts = {
   'maestro/story65/open-app.yaml': Math.ceil(
     OPEN_APP_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
   ),
+  [EXPO_GO_OPEN_FLOW]: Math.ceil(EXPO_GO_OPEN_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN),
   'maestro/story68/open-post.yaml': Math.ceil(
     OPEN_POST_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
   ),

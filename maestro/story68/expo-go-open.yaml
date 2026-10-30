@@ -1,0 +1,35 @@
+# Story 6.8 iOS Expo Go proof: the runner has sent exp:// to the simulator. Expo Go is a fresh
+# install, so its first load shows the iOS open prompt and then the developer-menu onboarding over
+# the app, in a timing the host sets. Each pass answers whichever of the three is on screen and the
+# loop ends as soon as the tab bar is visible, so the screens cannot be missed by one fixed
+# sequence of waits. A project that never loads fails on the named assertion below, inside the
+# process budget, so the failed-step hierarchy is captured. Only ids and Expo Go text are matched.
+appId: ${MAESTRO_APP_ID}
+---
+- repeat:
+    while:
+      notVisible:
+        id: 'tab-home'
+    times: 10
+    commands:
+      - runFlow:
+          when:
+            visible: 'Open in .*'
+          commands:
+            - tapOn: 'Open'
+      - runFlow:
+          when:
+            visible: 'This is the developer menu.*'
+          commands:
+            - tapOn: 'Continue'
+      # Continue leaves the full dev menu open over the app; close it.
+      - runFlow:
+          when:
+            visible: 'Connected to:'
+          commands:
+            - tapOn: 'Close'
+- extendedWaitUntil:
+    visible:
+      id: 'tab-home'
+    timeout: 30000
+    label: 'expo_go_project_not_loaded'

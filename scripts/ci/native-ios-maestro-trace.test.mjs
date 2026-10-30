@@ -704,6 +704,32 @@ test('the app log query is bounded to the app process and the last minute', () =
   )
 })
 
+test('an Expo Go flow reads the Expo Go process log and every other flow the dev client log', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-progress-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const predicates = []
+  const spawn = (binary, args) => {
+    const at = args.indexOf('--predicate')
+    if (at !== -1) predicates.push(args[at + 1])
+    return { status: 1, stdout: '' }
+  }
+  for (const appId of ['host.exp.Exponent', 'com.couturecast.story68'])
+    recordIosFlowProgress({
+      platform: 'ios',
+      flow: 'maestro/story68/expo-go-open.yaml',
+      maestroLog: killedLog,
+      directory,
+      device: 'DEV',
+      appId,
+      spawn,
+      report: () => undefined,
+    })
+  assert.deepEqual(predicates, [
+    'process == "Expo Go"',
+    'process == "CoutureCastStory68"',
+  ])
+})
+
 const field = (attributes, extra = {}) => ({ attributes, children: [], ...extra })
 
 test('the input surface reports the code field flags and length, never a character', () => {

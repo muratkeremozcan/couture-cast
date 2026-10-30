@@ -19,6 +19,7 @@ export const CHECKED_FLOWS = Object.freeze([
   'maestro/story68/open-outfit.yaml',
   'maestro/story68/open-post.yaml',
   'maestro/story68/preparing-cancel.yaml',
+  'maestro/story68/expo-go-open.yaml',
   'maestro/story68/expo-go-unavailable.yaml',
   'maestro/story68/rapid-ready-outfit.yaml',
   'maestro/story68/rapid-watermark-held.yaml',

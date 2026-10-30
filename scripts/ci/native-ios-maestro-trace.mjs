@@ -476,6 +476,15 @@ export function summarizeAppLog(ndjson) {
   return summary
 }
 
+// Expo Go's bundle id and the process name its log lines carry: the app log of an Expo Go flow
+// is this process, not the dev client's, or a flow that ran for minutes reports zero lines.
+export const EXPO_GO_APP_ID = 'host.exp.Exponent'
+export const EXPO_GO_PROCESS = 'Expo Go'
+
+/** The `processName` option of readIosAppLogSummary for the app a flow ran in. */
+const appLogProcess = (appId) =>
+  appId === EXPO_GO_APP_ID ? { processName: EXPO_GO_PROCESS } : {}
+
 /** The app process's log of the last minute, as counts only; null when the query fails. */
 export function readIosAppLogSummary({
   device,
@@ -616,7 +625,9 @@ export function recordIosFlowProgress({
       openerGeometry: geometry,
       scrollPath: output ? scrollPath(output, maestroLog) : null,
       openerTrace: device && appId ? readIosOpenerTrace({ device, appId, spawn }) : null,
-      appLog: device ? readIosAppLogSummary({ device, spawn }) : null,
+      appLog: device
+        ? readIosAppLogSummary({ device, spawn, ...appLogProcess(appId) })
+        : null,
       ...maestroFlowProgress(maestroLog),
       communityApi: apiLogFile
         ? communityPreferenceApiRows(logTail(apiLogFile, apiLogFromByte))

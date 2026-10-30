@@ -5,6 +5,12 @@ import { fileURLToPath } from 'node:url'
 import {
   CONDITION_CHECK_MS,
   DEFAULT_FLOW_TIMEOUT_MS,
+  EXPO_GO_CONDITION_CHECK_MS,
+  EXPO_GO_OPEN_FINAL_WAIT_MS,
+  EXPO_GO_OPEN_FLOW,
+  EXPO_GO_OPEN_PASSES,
+  EXPO_GO_OPEN_PASS_MS,
+  EXPO_GO_OPEN_WORST_CASE_MS,
   FLOW_STARTUP_MS,
   FLOW_TIMEOUT_MARGIN,
   OPEN_APP_WORST_CASE_MS,
@@ -120,6 +126,29 @@ describe('Maestro flow timeouts', () => {
     assert.ok(flowTimeoutMs(openApp) >= worst * FLOW_TIMEOUT_MARGIN)
     // The killed CI run: one attempt and a half fit in the old fixed budget.
     assert.ok(flowTimeoutMs(openApp) > 4 * DEFAULT_FLOW_TIMEOUT_MS)
+  })
+
+  test('expo-go-open covers its declared passes and final wait with the margin', () => {
+    const text = fs.readFileSync(
+      new URL(`../../${EXPO_GO_OPEN_FLOW}`, import.meta.url),
+      'utf8'
+    )
+    const passes = Number(/^\s*times:\s*(\d+)\s*$/m.exec(text)[1])
+    // The loop condition and the three `when` checks are the budgeted checks of one pass.
+    const checks = (text.match(/^\s*when:\s*$/gm) ?? []).length + 1
+    const waits = [...text.matchAll(/^\s*timeout:\s*(\d+)\s*$/gm)].map((m) =>
+      Number(m[1])
+    )
+    assert.equal(EXPO_GO_OPEN_PASSES, passes)
+    assert.equal(EXPO_GO_OPEN_PASS_MS, checks * EXPO_GO_CONDITION_CHECK_MS + 4_000)
+    assert.deepEqual(waits, [EXPO_GO_OPEN_FINAL_WAIT_MS])
+    const worst = FLOW_STARTUP_MS + passes * EXPO_GO_OPEN_PASS_MS + waits[0]
+    assert.equal(EXPO_GO_OPEN_WORST_CASE_MS, worst)
+    assert.ok(flowTimeoutMs(EXPO_GO_OPEN_FLOW) >= worst * FLOW_TIMEOUT_MARGIN)
+    // The killed CI run: open-app.yaml hit the fixed 120 s with the project still loading.
+    assert.ok(flowTimeoutMs(EXPO_GO_OPEN_FLOW) > 4 * DEFAULT_FLOW_TIMEOUT_MS)
+    // A project that never loads names its failure on the final wait, not on the kill.
+    assert.match(text, /label: 'expo_go_project_not_loaded'/)
   })
 
   test('the harness passes each flow its own budget to the Maestro process', () => {

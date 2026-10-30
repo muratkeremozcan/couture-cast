@@ -1160,7 +1160,7 @@ if (command === 'prebuild') {
       downloaded,
     })
     openUrl('exp://127.0.0.1:8089')
-    maestro('maestro/story65/open-app.yaml')
+    maestro('maestro/story68/expo-go-open.yaml')
     await signin()
     const before = JSON.stringify(nativeOriginalPaths())
     maestro('maestro/story68/expo-go-unavailable.yaml')
