@@ -9,6 +9,7 @@ import {
   recordIosCommandTimings,
   recordIosFlowProgress,
   openerGeometry,
+  expoGoScreenSummary,
   readIosAppLogSummary,
   readIosOpenerTrace,
   inputSurface,
@@ -728,6 +729,58 @@ test('an Expo Go flow reads the Expo Go process log and every other flow the dev
     'process == "Expo Go"',
     'process == "CoutureCastStory68"',
   ])
+})
+
+test('an Expo Go screen is named by flags and counts, never by its text', () => {
+  const screen = (...texts) => ({
+    attributes: {},
+    children: texts.map((text) => ({ attributes: { text }, children: [] })),
+  })
+  const flags = (hierarchy) => {
+    const { nodeCount, textNodes, ...seen } = expoGoScreenSummary(hierarchy)
+    return { nodeCount, textNodes, on: Object.keys(seen).filter((key) => seen[key]) }
+  }
+  assert.deepEqual(
+    flags(screen('Something went wrong', 'Reload', 'private stack frame')),
+    {
+      nodeCount: 4,
+      textNodes: 3,
+      on: ['error', 'retry'],
+    }
+  )
+  assert.deepEqual(flags(screen('Opening exp://127.0.0.1:8089', 'Downloading 45%')).on, [
+    'loading',
+  ])
+  assert.deepEqual(flags(screen('Development servers', 'Expo Go')).on, ['projectList'])
+  assert.deepEqual(flags(screen('This is the developer menu.')).on, ['developerMenu'])
+  assert.deepEqual(flags(screen('Project is incompatible with this version')).on, [
+    'incompatible',
+  ])
+  assert.equal(expoGoScreenSummary(null), null)
+  assert.doesNotMatch(
+    JSON.stringify(expoGoScreenSummary(screen('private stack frame', 'exp://127.0.0.1'))),
+    /private|exp:/
+  )
+})
+
+test('only an Expo Go flow carries the Expo Go screen record', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-progress-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  for (const appId of ['host.exp.Exponent', 'com.couturecast.story68'])
+    recordIosFlowProgress({
+      platform: 'ios',
+      flow: 'maestro/story68/expo-go-open.yaml',
+      maestroLog: killedLog,
+      directory,
+      appId,
+      report: () => undefined,
+    })
+  const [expoGo, devClient] = JSON.parse(
+    fs.readFileSync(path.join(directory, 'native-ios-flow-progress.json'))
+  ).failedFlows
+  assert.ok('expoGoScreen' in expoGo)
+  assert.equal(expoGo.expoGoScreen, null)
+  assert.ok(!('expoGoScreen' in devClient))
 })
 
 const field = (attributes, extra = {}) => ({ attributes, children: [], ...extra })

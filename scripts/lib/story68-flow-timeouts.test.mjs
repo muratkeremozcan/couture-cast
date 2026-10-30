@@ -9,6 +9,7 @@ import {
   EXPO_GO_OPEN_FINAL_WAIT_MS,
   EXPO_GO_OPEN_FLOW,
   EXPO_GO_OPEN_PASSES,
+  EXPO_GO_PASS_WAIT_MS,
   EXPO_GO_OPEN_PASS_MS,
   EXPO_GO_OPEN_WORST_CASE_MS,
   FLOW_STARTUP_MS,
@@ -140,9 +141,15 @@ describe('Maestro flow timeouts', () => {
       Number(m[1])
     )
     assert.equal(EXPO_GO_OPEN_PASSES, passes)
-    assert.equal(EXPO_GO_OPEN_PASS_MS, checks * EXPO_GO_CONDITION_CHECK_MS + 4_000)
-    assert.deepEqual(waits, [EXPO_GO_OPEN_FINAL_WAIT_MS])
-    const worst = FLOW_STARTUP_MS + passes * EXPO_GO_OPEN_PASS_MS + waits[0]
+    assert.equal(
+      EXPO_GO_OPEN_PASS_MS,
+      EXPO_GO_PASS_WAIT_MS + checks * EXPO_GO_CONDITION_CHECK_MS + 4_000
+    )
+    // The pass wait comes first and the named tab-bar wait last; no other wait exists.
+    assert.deepEqual(waits, [EXPO_GO_PASS_WAIT_MS, EXPO_GO_OPEN_FINAL_WAIT_MS])
+    // The project has this long, in waits alone, to show the open prompt, the menu or the tab bar.
+    assert.ok(passes * waits[0] + waits[1] >= 190_000)
+    const worst = FLOW_STARTUP_MS + passes * EXPO_GO_OPEN_PASS_MS + waits[1]
     assert.equal(EXPO_GO_OPEN_WORST_CASE_MS, worst)
     assert.ok(flowTimeoutMs(EXPO_GO_OPEN_FLOW) >= worst * FLOW_TIMEOUT_MARGIN)
     // The killed CI run: open-app.yaml hit the fixed 120 s with the project still loading.

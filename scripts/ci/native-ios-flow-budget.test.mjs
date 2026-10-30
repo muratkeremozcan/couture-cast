@@ -26,7 +26,7 @@ test('other platforms and flows use their derived budget', () => {
 test('the Expo Go proof opener takes its derived budget on iOS, not the first-flow 120000 ms', () => {
   const expoGoOpen = 'maestro/story68/expo-go-open.yaml'
   assert.equal(nativeFlowTimeoutMs(expoGoOpen, 'ios'), flowTimeoutMs(expoGoOpen))
-  assert.equal(nativeFlowTimeoutMs(expoGoOpen, 'ios'), 525_000)
+  assert.equal(nativeFlowTimeoutMs(expoGoOpen, 'ios'), 635_000)
   const harness = fs.readFileSync(
     fileURLToPath(new URL('../run-story68-native.mjs', import.meta.url)),
     'utf8'
