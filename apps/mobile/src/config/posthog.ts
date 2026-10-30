@@ -1,5 +1,9 @@
 import Constants from 'expo-constants'
-import PostHog from 'posthog-react-native'
+import PostHog, { type PostHogOptions } from 'posthog-react-native'
+import {
+  SHARE_CARD_SHARED_EVENT,
+  sanitizeShareCardSharedProperties,
+} from '@couture/api-client'
 
 type ExpoExtra = {
   posthogApiKey?: string
@@ -25,6 +29,45 @@ if (!isPostHogConfigured) {
     'PostHog API key not configured. Analytics will be disabled. ' +
       'Set POSTHOG_API_KEY in root env files to enable analytics.'
   )
+}
+
+type BeforeSend = Extract<
+  NonNullable<PostHogOptions['before_send']>,
+  (event: never) => unknown
+>
+type PostHogCaptureEvent = NonNullable<Parameters<BeforeSend>[0]>
+type PostHogEventProperties = NonNullable<PostHogCaptureEvent['properties']>
+
+/**
+ * Story 6.9 D5: the final allowlist at the SDK boundary, run by the SDK after it has
+ * merged super properties and device enrichment. For `share_card_shared` only, the
+ * envelope stays intact (event, uuid, timestamp; the SDK keeps distinct_id, type, library
+ * and library_version outside this hook), `properties` become the sanitized allowlist with
+ * `$geoip_disable: true`, and top-level and nested `$set`/`$set_once` are removed. A
+ * sanitizer refusal or any error drops the event and logs a closed code; the SDK would
+ * otherwise send the unsanitized event after a throwing hook, so this never throws.
+ * Every other event passes through unchanged.
+ */
+export function mobilePostHogBeforeSend(
+  event: PostHogCaptureEvent | null
+): PostHogCaptureEvent | null {
+  try {
+    if (!event || event.event !== SHARE_CARD_SHARED_EVENT) return event
+    const properties = sanitizeShareCardSharedProperties(event.properties)
+    if (!properties) {
+      console.warn('[cc69-analytics] share_event_dropped')
+      return null
+    }
+    return {
+      uuid: event.uuid,
+      event: event.event,
+      timestamp: event.timestamp,
+      properties: properties as PostHogEventProperties,
+    }
+  } catch {
+    console.warn('[cc69-analytics] before_send_failed')
+    return null
+  }
 }
 
 /**
@@ -73,6 +116,9 @@ export const posthogProviderClient = new PostHog(
     requestTimeout: 10000, // General request timeout in ms
     fetchRetryCount: 3, // Number of retry attempts for failed requests
     fetchRetryDelay: 3000, // Delay between retries in ms
+
+    // Story 6.9 D5: the event-specific final allowlist for share_card_shared.
+    before_send: mobilePostHogBeforeSend,
   }
 )
 

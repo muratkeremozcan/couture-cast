@@ -18,6 +18,9 @@ type MobileAnalyticsValue =
 
 type MobileAnalyticsProperties = Record<string, MobileAnalyticsValue>
 
+const isThenable = (value: unknown): value is PromiseLike<unknown> =>
+  typeof (value as { then?: unknown } | null)?.then === 'function'
+
 function withLocaleContext(properties?: MobileAnalyticsProperties) {
   const locale =
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
@@ -59,9 +62,17 @@ export function createMobileAnalyticsClient(
 ): MobileAnalyticsClient {
   return {
     capture(event, properties) {
-      const contextualProperties = withLocaleContext(properties)
-      recordMobileAnalyticsEvent(event, contextualProperties)
-      client.capture(event, contextualProperties)
+      // Analytics never changes app behavior: a provider throw or rejection stops here.
+      try {
+        const contextualProperties = withLocaleContext(properties)
+        recordMobileAnalyticsEvent(event, contextualProperties)
+        const result: unknown = (
+          client as { capture: (name: string, props: object) => unknown }
+        ).capture(event, contextualProperties)
+        if (isThenable(result)) Promise.resolve(result).catch(() => undefined)
+      } catch {
+        // Swallowed on purpose; see above.
+      }
     },
     screen(screenName, properties) {
       return client.screen(screenName, withLocaleContext(properties))

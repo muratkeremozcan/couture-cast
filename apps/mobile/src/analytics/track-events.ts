@@ -5,9 +5,12 @@ import {
   trackLocaleSwitched,
   trackPremiumSubscribeTapped,
   trackRitualCreated,
+  trackShareCardShared,
   trackWardrobeUploadStarted,
+  SHARE_CARD_SHARED_EVENT,
   type AffiliateCtaShownEvent,
   type PremiumSubscribeTappedEvent,
+  type ShareCardSharedEvent,
 } from '@couture/api-client'
 import type { MobileAnalyticsClient } from './mobile-analytics'
 
@@ -141,4 +144,35 @@ export function trackMobileLocaleSwitched(
   })
 
   client.capture(payload.event, payload.properties)
+}
+
+const MAX_SHARE_DURATION_MS = 86_400_000
+const isThenable = (value: unknown): value is PromiseLike<unknown> =>
+  typeof (value as { then?: unknown } | null)?.then === 'function'
+/**
+ * Story 6.9 D5: one `share_card_shared` capture per settled share attempt, on the
+ * analytics client's own distinctId like {@link trackMobileAffiliateCtaShown}. Analytics
+ * can never change a share outcome: an invalid pair, a synchronous throw and an
+ * asynchronous rejection are all swallowed here.
+ */
+export function trackMobileShareCardShared(
+  client: MobileAnalyticsCaptureClient,
+  input: ShareCardSharedEvent
+) {
+  try {
+    const properties = trackShareCardShared({
+      ...input,
+      duration_ms: Math.min(
+        MAX_SHARE_DURATION_MS,
+        Math.max(0, Math.round(input.duration_ms))
+      ),
+    })
+    // Typed as void, but a provider may still return a promise that later rejects.
+    const result: unknown = (
+      client as { capture: (event: string, properties: object) => unknown }
+    ).capture(SHARE_CARD_SHARED_EVENT, properties)
+    if (isThenable(result)) Promise.resolve(result).catch(() => undefined)
+  } catch {
+    // The share already settled; its copy, focus and lock never depend on analytics.
+  }
 }

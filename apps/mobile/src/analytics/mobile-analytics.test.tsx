@@ -135,4 +135,34 @@ describe('mobile analytics facade', () => {
     })
     expect(result.current.getDistinctId()).toBe('hook-user')
   })
+
+  it('C-COMP-SHARE-ANALYTICS-DOWN: a provider throw or rejection never reaches the caller', async () => {
+    const rejected = vi.fn(() => Promise.reject(new Error('network down')))
+    const throwing = createMobileAnalyticsClient({
+      capture: () => {
+        throw new Error('sdk exploded')
+      },
+      screen: vi.fn(),
+      getDistinctId: () => 'runtime-user',
+    })
+    const rejecting = createMobileAnalyticsClient({
+      // Typed as void, but a provider may still hand back a rejecting promise.
+      capture: rejected as () => void,
+      screen: vi.fn(),
+      getDistinctId: () => 'runtime-user',
+    })
+    const unhandled = vi.fn()
+    window.addEventListener('unhandledrejection', unhandled)
+    try {
+      expect(() => throwing.capture('share_card_shared', { client: 'ios' })).not.toThrow()
+      expect(() =>
+        rejecting.capture('share_card_shared', { client: 'ios' })
+      ).not.toThrow()
+      expect(rejected).toHaveBeenCalledOnce()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(unhandled).not.toHaveBeenCalled()
+    } finally {
+      window.removeEventListener('unhandledrejection', unhandled)
+    }
+  })
 })
