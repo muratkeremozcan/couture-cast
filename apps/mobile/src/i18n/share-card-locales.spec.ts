@@ -101,6 +101,22 @@ const catalogs = [
     other: other9.shareCard,
   },
 ]
+/** Story 6.9: the share copy keys, in every catalog on both clients. */
+const shareKeys = [
+  'share',
+  'sharing',
+  'shared',
+  'sentToApp',
+  'shareClosed',
+  'shareFailed',
+  'shareUnavailable',
+  'shareTapAgain',
+] as const
+/**
+ * Keys whose wording may differ by surface. The share failure and unavailable copy points
+ * to Save on mobile and to Download on web; web never renders the native finishing copy.
+ */
+const surfaceSpecific = new Set(['finishingSave', 'shareFailed', 'shareUnavailable'])
 function flatten(value: unknown, prefix = ''): Record<string, string> {
   if (typeof value === 'string') return { [prefix]: value }
   if (!value || typeof value !== 'object') return {}
@@ -117,7 +133,10 @@ describe('share-card catalog parity', () => {
       const values = flatten(client)
       const baseline = flatten(catalogs.find((item) => item.locale === 'en-US')!.client)
       expect(Object.keys(values).sort()).toEqual(Object.keys(baseline).sort())
-      expect(client).toEqual(other)
+      const otherValues = flatten(other)
+      expect(Object.keys(otherValues).sort()).toEqual(Object.keys(values).sort())
+      for (const [key, text] of Object.entries(values))
+        if (!surfaceSpecific.has(key)) expect(otherValues[key], key).toBe(text)
       expect(render.outfit).toBe(client.sourceOutfit)
       expect(render.community).toBe(client.sourceCommunity)
       expect(render.scenarios).toEqual(client.scenarios)
@@ -132,6 +151,29 @@ describe('share-card catalog parity', () => {
       expect(
         client.title === catalogs.find((item) => item.locale === 'en-US')!.client.title
       ).toBe(sharesEnUsTitle)
+    }
+  )
+  it.each(catalogs)(
+    'U-SHARE-LOCALES: $locale has every share key, and Android copy never claims a post',
+    ({ locale, client }) => {
+      const english = catalogs.find((item) => item.locale === 'en-US')!.client
+      for (const key of shareKeys) {
+        expect(client[key], `${locale} ${key}`).toEqual(expect.any(String))
+        expect(client[key].trim().length).toBeGreaterThan(0)
+        expect(client[key].match(/{{[^}]+}}/g) ?? []).toEqual(
+          english[key].match(/{{[^}]+}}/g) ?? []
+        )
+      }
+      // `shared` is iOS completed only. Chosen and closed must never read as posted.
+      expect(client.sentToApp).not.toBe(client.shared)
+      expect(client.shareClosed).not.toBe(client.shared)
+      expect(client.sentToApp).not.toContain(client.shared)
+      expect(client.shareClosed).not.toContain(client.shared)
+      if (locale !== 'en-US' && locale !== 'en-CA')
+        for (const key of shareKeys) expect(client[key]).not.toBe(english[key])
+      // The pending-operation copy is shared by Save and Share, so it names neither.
+      expect(client.finishingSave).not.toBe(client.saving)
+      expect(client.finishingSave.toLowerCase()).not.toContain(client.share.toLowerCase())
     }
   )
 })

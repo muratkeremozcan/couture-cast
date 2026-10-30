@@ -359,4 +359,36 @@ describe('native immutable file and permission adapter', () => {
     expect(mocks.files.size).toBe(0)
     expect(nativeShareCardSavePending()).toBe(false)
   })
+  it('U-SHARE-LEASE: the cc68 orphan sweep and Save settlement never touch cc69-share files', async () => {
+    const leased =
+      'file:///cache/share-cards/cc69-share-00000000-0000-4000-8000-00000000000a.png'
+    const orphan =
+      'file:///cache/share-cards/cc68-00000000-0000-4000-8000-00000000000b.png'
+    mocks.files.set(leased, 'leased-bytes')
+    mocks.files.set(orphan, 'orphan-bytes')
+    await cleanOrphanShareCards()
+    expect(mocks.files.has(leased)).toBe(true)
+    expect(mocks.files.has(orphan)).toBe(false)
+    await saveShareCard(card, new AbortController().signal, () => true)
+    expect(mocks.remove).toHaveBeenCalledTimes(2)
+    expect((mocks.remove.mock.calls as [string][]).map(([uri]) => uri)).not.toContain(
+      leased
+    )
+    expect([...mocks.files.keys()]).toEqual([leased])
+  })
+  it('U-SHARE-LIB-BYTES: Save writes through the shared prepare-file helper with its cc68 prefix', async () => {
+    mocks.nativeSave.mockImplementation((uri: string) => {
+      expect(uri).toMatch(/^file:\/\/\/cache\/share-cards\/cc68-[a-f0-9-]+\.png$/)
+      return Promise.resolve()
+    })
+    await saveShareCard(card, new AbortController().signal, () => true)
+    await expect(
+      saveShareCard(
+        { ...card, sha256: 'f'.repeat(64) },
+        new AbortController().signal,
+        () => true
+      )
+    ).rejects.toThrow('render')
+    expect(mocks.write).toHaveBeenCalledOnce()
+  })
 })

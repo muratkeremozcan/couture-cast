@@ -33,7 +33,10 @@ import {
   mobileApplicationUserId,
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
-import { prepareShareCardFromMobile } from '@/src/lib/share-cards'
+import {
+  prepareShareCardFromMobile,
+  shareCardCapabilitiesFromMobile,
+} from '@/src/lib/share-cards'
 import {
   nativeShareCardSaveAvailable,
   saveShareCard,
@@ -44,6 +47,13 @@ import {
   ownsPendingShareCardSave,
   subscribeShareCardSave,
 } from '@/src/lib/share-card-save-operations'
+import {
+  nativeShareCardShareAvailable,
+  shareShareCard,
+  type ShareCardShareSettlement,
+} from '@/src/lib/share-card-share'
+import type { ShareCardShareAnchor } from '../modules/share-card-native-share/types'
+import { trackMobileShareCardShared } from '@/src/analytics/track-events'
 
 type PreparedPreview = {
   card: PreparedShareCard
@@ -74,6 +84,75 @@ function saveFailure(error: unknown) {
     if (error.response.status === 503) return 'render'
   }
   return 'storage'
+}
+
+/** Story 6.9: each settled outcome's copy, and whether it is a merlot error. */
+const shareFeedback: Record<
+  ShareCardShareSettlement['outcome'],
+  { key: string; error: boolean }
+> = {
+  completed: { key: 'shared', error: false },
+  target_chosen: { key: 'sentToApp', error: false },
+  handed_off: { key: 'sentToApp', error: false },
+  cancelled: { key: 'shareClosed', error: false },
+  dismissed: { key: 'shareClosed', error: false },
+  not_confirmed: { key: 'shareClosed', error: false },
+  failed: { key: 'shareFailed', error: true },
+  unavailable: { key: 'shareUnavailable', error: true },
+}
+/** Every share outcome except failed and unavailable returns focus to Share. */
+const focusShareAfter = new Set(['shared', 'sentToApp', 'shareClosed'])
+const focusSaveAfter = new Set(['saved', 'shareFailed', 'shareUnavailable'])
+/** Share failures recover through Save or Share, so no Retry action replaces the preview. */
+const shareErrors = new Set(['shareFailed', 'shareUnavailable'])
+const sharePreviewChanged = (failure: unknown) =>
+  (failure instanceof ResponseError && failure.response.status === 409) ||
+  (failure instanceof Error && failure.message === 'previewChanged')
+const errorNamed = (failure: unknown, name: string) =>
+  failure instanceof Error && (failure.name === name || failure.message === name)
+const ANCHOR_TIMEOUT_MS = 1000
+/** The Share button frame in window coordinates, the iPad popover anchor. */
+function measureWindowFrame(node: View | null) {
+  return new Promise<ShareCardShareAnchor | null>((resolve) => {
+    if (!node) return resolve(null)
+    const timer = setTimeout(() => resolve(null), ANCHOR_TIMEOUT_MS)
+    node.measureInWindow((x, y, width, height) => {
+      clearTimeout(timer)
+      resolve(
+        [x, y, width, height].every(Number.isFinite) && width > 0 && height > 0
+          ? { x, y, width, height }
+          : null
+      )
+    })
+  })
+}
+
+/**
+ * Story 6.9 D4: capability state belongs to one member. A late answer for anyone else is
+ * dropped, and the composer clears it on every identity change, sign-out included.
+ */
+function useShareCardCapability(open: boolean, member: string | null) {
+  const [capability, setCapability] = useState<{
+    member: string
+    nativeShare: boolean
+  } | null>(null)
+  const currentMember = useRef(member)
+  currentMember.current = member
+  useEffect(() => {
+    setCapability(null)
+  }, [member])
+  useEffect(() => {
+    if (!open || member === null) return
+    const abort = new AbortController()
+    void shareCardCapabilitiesFromMobile(abort.signal)
+      .then((result) => {
+        if (!abort.signal.aborted && currentMember.current === member)
+          setCapability({ member, nativeShare: result.nativeShare === true })
+      })
+      .catch(() => undefined)
+    return () => abort.abort()
+  }, [open, member])
+  return capability !== null && capability.member === member && capability.nativeShare
 }
 
 type SaveOwner = { owner: object; generation: number }
@@ -147,6 +226,8 @@ export function ShareCardComposer({
   const restorePending = useRef(false)
   const title = useRef<Text>(null)
   const saveTarget = useRef<View>(null)
+  const shareTarget = useRef<View>(null)
+  const memberEpoch = useRef(0)
   const recoveryTarget = useRef<View>(null)
   const cancelTarget = useRef<View>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -160,6 +241,8 @@ export function ShareCardComposer({
     modalSystemBarsAvailable()
   )
   const available = nativeShareCardSaveAvailable()
+  const shareCapable = useShareCardCapability(open, member)
+  const shareModule = nativeShareCardShareAvailable()
   const sourceIdentity = JSON.stringify(source)
   const key = JSON.stringify({ source, locale, watermark })
   const [feedbackOwner, setFeedbackOwner] = useState({ member, key })
@@ -184,9 +267,17 @@ export function ShareCardComposer({
     pendingNative,
     available
   )
+  const shareDisabled = saveDisabled(
+    valid,
+    loaded === presentation,
+    busy,
+    pendingNative,
+    true
+  )
   useEffect(() => {
     abortRef.current?.abort()
     generation.current++
+    memberEpoch.current++
     setPreview(null)
     setLoaded(null)
     setBusy(false)
@@ -379,6 +470,93 @@ export function ShareCardComposer({
       if (stillCurrent()) setBusy(false)
     }
   }
+  const reportShareSettlement = (
+    settlement: ShareCardShareSettlement,
+    failure: unknown
+  ) => {
+    if (failure !== null) {
+      if (errorNamed(failure, 'AbortError')) return
+      if (errorNamed(failure, 'finishingSave')) {
+        setError(null)
+        setMessage('finishingSave')
+        return
+      }
+      if (sharePreviewChanged(failure)) {
+        // The 6.8 stale path: keep the old composition, focus Refresh, block Save and Share.
+        setChanged(true)
+        setError('previewChanged')
+        setMessage(null)
+        return
+      }
+    }
+    const feedback = shareFeedback[settlement.outcome]
+    setError(feedback.error ? feedback.key : null)
+    setMessage(feedback.error ? null : feedback.key)
+  }
+  const share = async () => {
+    if (!source || !current || !shareCapable || !shareModule) return
+    if (shareDisabled || saveGuard.current) return
+    saveGuard.current = true
+    const started = Date.now()
+    setSaving(true)
+    setBusy(true)
+    setError(null)
+    setMessage('sharing')
+    setPermission(null)
+    const abort = new AbortController()
+    abortRef.current = abort
+    const captured = {
+      member,
+      key,
+      generation: generation.current,
+      memberEpoch: memberEpoch.current,
+    }
+    const owner = {}
+    activeSave.current = { owner, generation: captured.generation }
+    const stillCurrent = () =>
+      !abort.signal.aborted &&
+      latest.current.open &&
+      latest.current.member === captured.member &&
+      latest.current.key === captured.key &&
+      generation.current === captured.generation
+    let settlement: ShareCardShareSettlement = { target: 'none', outcome: 'failed' }
+    let failure: unknown = null
+    try {
+      settlement = await shareShareCard(
+        { source, locale, watermark, expectedSha256: current.card.sha256 },
+        {
+          signal: abort.signal,
+          isCurrent: stillCurrent,
+          owner,
+          anchor: () => measureWindowFrame(shareTarget.current),
+        }
+      )
+    } catch (error) {
+      failure = error
+    } finally {
+      saveGuard.current = false
+      setSaving(false)
+      if (stillCurrent()) setBusy(false)
+    }
+    // Settled and the global lock already released. A sign-out or identity change
+    // supersedes the attempt: no feedback and no event.
+    if (stillCurrent()) reportShareSettlement(settlement, failure)
+    if (memberEpoch.current !== captured.memberEpoch) return
+    if (errorNamed(failure, 'finishingSave')) return
+    const event = {
+      client: Platform.OS === 'android' ? ('android' as const) : ('ios' as const),
+      target: settlement.target,
+      outcome: settlement.outcome,
+      duration_ms: Date.now() - started,
+    }
+    // Loaded on first use, so the SDK never joins the composer's startup path. A failed
+    // load, a throw or a rejection is swallowed: analytics never changes the outcome.
+    void import('../src/analytics/mobile-analytics.js')
+      .then(({ mobileAnalyticsClient }) =>
+        trackMobileShareCardShared(mobileAnalyticsClient, event)
+      )
+      .catch(() => undefined)
+  }
   return (
     <EdgeToEdgeModal
       visible={open && source !== null && systemBarsReady}
@@ -452,9 +630,10 @@ export function ShareCardComposer({
           />
           <ComposerFeedback
             onFocusResult={(status) => {
-              const target =
-                status === 'saved'
-                  ? saveTarget.current
+              const target = focusSaveAfter.has(status)
+                ? saveTarget.current
+                : focusShareAfter.has(status)
+                  ? shareTarget.current
                   : status === 'finishingSave'
                     ? cancelTarget.current
                     : recoveryTarget.current
@@ -489,6 +668,14 @@ export function ShareCardComposer({
           >
             <Text style={styles.buttonText}>{t('shareCard.save')}</Text>
           </Pressable>
+          <ShareAction
+            target={shareTarget}
+            capable={shareCapable}
+            present={shareModule}
+            disabled={shareDisabled}
+            onPress={() => void share()}
+            t={t}
+          />
           <RecoveryActions
             target={recoveryTarget}
             permission={permission}
@@ -589,7 +776,7 @@ function ComposerFeedback({
     const announcement = t(`shareCard.${key}`)
     if (announced.current === announcement) return
     announced.current = announcement
-    if (!['preparing', 'saving', 'nativeSaveUnavailable'].includes(key))
+    if (!['preparing', 'saving', 'sharing', 'nativeSaveUnavailable'].includes(key))
       onFocusResult(key)
     if (Platform.OS !== 'ios') return
     AccessibilityInfo.announceForAccessibilityWithOptions(announcement, {
@@ -615,6 +802,48 @@ function ComposerFeedback({
           style={styles.error}
         >
           {t(`shareCard.${available ? error : 'nativeSaveUnavailable'}`)}
+        </Text>
+      )}
+    </>
+  )
+}
+/**
+ * Story 6.9: Share sits after Save with its own ref. Without the native module it stays
+ * visible but statically disabled with a localized reason, and pressing it does nothing.
+ */
+function ShareAction({
+  target,
+  capable,
+  present,
+  disabled,
+  onPress,
+  t,
+}: {
+  target: React.Ref<View>
+  capable: boolean
+  present: boolean
+  disabled: boolean
+  onPress: () => void
+  t: Translation
+}) {
+  if (!capable) return null
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: disabled || !present }}
+        accessibilityHint={present ? undefined : t('shareCard.shareUnavailable')}
+        disabled={disabled || !present}
+        onPress={present ? onPress : undefined}
+        style={styles.button}
+        ref={target}
+        testID="share-card-share"
+      >
+        <Text style={styles.buttonText}>{t('shareCard.share')}</Text>
+      </Pressable>
+      {!present && (
+        <Text testID="share-card-share-unavailable" style={styles.text}>
+          {t('shareCard.shareUnavailable')}
         </Text>
       )}
     </>
@@ -651,7 +880,7 @@ function RecoveryActions({
         <Text style={styles.buttonText}>{t('shareCard.openSettings')}</Text>
       </Pressable>
     )
-  if (!error && !changed) return null
+  if ((!error || shareErrors.has(error)) && !changed) return null
   return (
     <Pressable
       ref={target}

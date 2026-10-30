@@ -8,6 +8,7 @@ import {
   decodeShareCardBase64,
   shareCardsClient,
   type PrepareShareCardInput,
+  type ShareCardCapabilities,
 } from '@couture/api-client'
 import { createMobileApiClient } from './api-client'
 import { resolveMobileAccessToken } from './mobile-auth'
@@ -37,4 +38,21 @@ export async function prepareShareCardFromMobile(
   if ((await sha256Hex(bytes)) !== card.sha256) throw new Error('render')
   if (signal.aborted) throw abortError('Preparation cancelled')
   return card
+}
+/**
+ * Story 6.9 D4: whether this member may use native share. Never rejects; any problem
+ * reads as off. The caller binds the answer to the member it asked for.
+ */
+export async function shareCardCapabilitiesFromMobile(
+  signal: AbortSignal
+): Promise<ShareCardCapabilities> {
+  try {
+    const api = createMobileApiClient({
+      accessToken: async () => (await resolveMobileAccessToken()) ?? '',
+    })
+    return await shareCardsClient(api).capabilities(signal)
+  } catch {
+    // A missing API base URL is a configuration problem, and it reads as off too.
+    return { nativeShare: false }
+  }
 }

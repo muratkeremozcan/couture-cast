@@ -1,6 +1,7 @@
 import { startShareCardNativeFixture } from '@/src/lib/share-card-native-fixture'
 import { AndroidShareCardPresentation } from '@/components/android-share-card-presentation'
 import { cleanOrphanShareCards } from '@/src/lib/share-card-save'
+import { sweepExpiredShareCardFiles } from '@/src/lib/share-card-share'
 // Step 2 step 3 owner: searchable owner anchor
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
@@ -52,6 +53,8 @@ export default function RootLayout() {
   useEffect(() => startShareCardNativeFixture(), [])
   useEffect(() => {
     void cleanOrphanShareCards().catch(() => undefined)
+    // Story 6.9: share handoff files outlive the app process for a 30-minute lease.
+    void sweepExpiredShareCardFiles().catch(() => undefined)
   }, [])
   type FontLoadTuple = readonly [boolean, Error | null]
   /* eslint-disable @typescript-eslint/no-unsafe-assignment */

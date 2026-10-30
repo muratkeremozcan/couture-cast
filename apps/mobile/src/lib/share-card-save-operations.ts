@@ -5,7 +5,16 @@ type Operation = {
   save: () => Promise<void>
   cleanup: () => Promise<void>
 }
-let pending: Promise<void> | null = null
+/**
+ * Story 6.9: a share holds the same global operation as a save, so share blocks save and
+ * save blocks share. Its file is leased for 30 minutes, so settlement never deletes it.
+ */
+type ShareOperation<T> = {
+  owner?: object
+  fileUri: string
+  share: () => Promise<T>
+}
+let pending: Promise<unknown> | null = null
 let pendingOwner: object | undefined
 const precommitFiles = new Set<string>()
 export function reserveShareCardFile(uri: string) {
@@ -98,17 +107,38 @@ async function runCleanup(automatic: boolean): Promise<void> {
 }
 /** Atomic commit is synchronous. The returned native promise alone owns settlement. */
 export function commitShareCardSave(operation: Operation): Promise<void> {
-  if (pending || cleaningFiles.has(operation.fileUri))
-    return Promise.reject(new Error('finishingSave'))
-  activeFile = operation.fileUri
-  pendingOwner = operation.owner
-  // Defer invocation until ownership and the duplicate guard are both installed.
-  const native = Promise.resolve().then(operation.save)
-  const owned = native.finally(async () => {
+  return commitOperation(operation.fileUri, operation.owner, operation.save, async () => {
     try {
       await operation.cleanup()
     } catch {
       cleanupRetries.set(operation.fileUri, { cleanup: operation.cleanup, attempts: 0 })
+    }
+  })
+}
+/**
+ * Story 6.9: the same atomic commit for a share handoff. The lock releases exactly once,
+ * when the native promise settles, and the leased file stays on disk for its age sweep.
+ */
+export function commitShareCardShare<T>(operation: ShareOperation<T>): Promise<T> {
+  return commitOperation(operation.fileUri, operation.owner, operation.share, () =>
+    Promise.resolve()
+  )
+}
+function commitOperation<T>(
+  fileUri: string,
+  owner: object | undefined,
+  run: () => Promise<T>,
+  settle: () => Promise<void>
+): Promise<T> {
+  if (pending || cleaningFiles.has(fileUri))
+    return Promise.reject(new Error('finishingSave'))
+  activeFile = fileUri
+  pendingOwner = owner
+  // Defer invocation until ownership and the duplicate guard are both installed.
+  const native = Promise.resolve().then(run)
+  const owned = native.finally(async () => {
+    try {
+      await settle()
     } finally {
       activeFile = null
       pending = null

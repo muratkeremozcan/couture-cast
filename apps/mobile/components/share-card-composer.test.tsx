@@ -8,6 +8,10 @@ import { supportedLocales } from '@couture/api-client/contracts/http'
 import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
 import i18n, { initI18n } from '@/src/lib/i18n'
 vi.mock('expo-status-bar', () => ({ StatusBar: () => null }))
+// The Android status-bar stack is a native window concern; Story 6.9 cases simulate Android.
+vi.mock('@/src/lib/use-share-card-status-bar', () => ({
+  useShareCardStatusBar: (open: boolean) => open,
+}))
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
@@ -25,6 +29,12 @@ const boundary = vi.hoisted(() => {
     announce: vi.fn(),
     settings: vi.fn(),
     imageLoads: [] as (() => void)[],
+    capabilities: vi.fn(),
+    shareModule: true,
+    shareFile: vi.fn(),
+    capture: vi.fn(),
+    files: new Map<string, string>(),
+    write: vi.fn(),
   }
 })
 vi.mock('@/src/lib/mobile-auth', () => ({
@@ -34,7 +44,47 @@ vi.mock('@/src/lib/mobile-auth', () => ({
     return () => boundary.subscribers.delete(listener)
   },
 }))
-vi.mock('@/src/lib/share-cards', () => ({ prepareShareCardFromMobile: boundary.prepare }))
+vi.mock('@/src/lib/share-cards', () => ({
+  prepareShareCardFromMobile: boundary.prepare,
+  shareCardCapabilitiesFromMobile: boundary.capabilities,
+}))
+// Story 6.9: the real share flow runs against a mocked file system, digest and module.
+vi.mock('@/src/lib/share-card-share', () =>
+  vi.importActual('../src/lib/share-card-share.native')
+)
+vi.mock('../modules/share-card-native-share', () => ({
+  shareCardNativeShareModule: () =>
+    boundary.shareModule ? { shareFile: boundary.shareFile } : null,
+}))
+vi.mock('@/src/analytics/mobile-analytics', () => ({
+  mobileAnalyticsClient: { capture: boundary.capture },
+}))
+vi.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  EncodingType: { Base64: 'base64' },
+  makeDirectoryAsync: () => Promise.resolve(),
+  writeAsStringAsync: boundary.write,
+  deleteAsync: (uri: string) => {
+    boundary.files.delete(uri)
+    return Promise.resolve()
+  },
+  getInfoAsync: (uri: string) =>
+    Promise.resolve(
+      uri.endsWith('/')
+        ? { exists: true, isDirectory: true }
+        : boundary.files.has(uri)
+          ? { exists: true, isDirectory: false, modificationTime: Date.now() / 1000 }
+          : { exists: false }
+    ),
+  readDirectoryAsync: () =>
+    Promise.resolve([...boundary.files.keys()].map((uri) => uri.split('/').at(-1))),
+}))
+vi.mock('expo-crypto', () => ({
+  CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
+  digest: (_algorithm: string, bytes: Uint8Array<ArrayBuffer>) =>
+    crypto.subtle.digest('SHA-256', bytes),
+  randomUUID: () => crypto.randomUUID(),
+}))
 vi.mock('@/src/lib/share-card-save', () => ({
   nativeShareCardSaveAvailable: () => boundary.available,
   shareCardSavePermission: boundary.permission,
@@ -49,6 +99,7 @@ vi.mock('@/src/lib/accessibility-focus', () => ({
       'share-card-refresh': 43,
       'share-card-settings': 43,
       'share-card-cancel': 44,
+      'share-card-share': 45,
     })[node?.getAttribute('data-testid') ?? ''] ?? 41,
 }))
 vi.mock('../modules/accessibility-focus', () => ({
@@ -120,6 +171,9 @@ vi.mock('react-native', async (original) => {
 })
 import { Platform } from 'react-native'
 import { ShareCardComposer } from './share-card-composer'
+function setOS(os: string) {
+  Object.defineProperty(Platform, 'OS', { configurable: true, value: os })
+}
 import {
   commitShareCardSave,
   nativeShareCardSavePending,
@@ -180,6 +234,18 @@ beforeEach(async () => {
   boundary.announce.mockClear()
   boundary.settings.mockClear()
   boundary.imageLoads.length = 0
+  boundary.capabilities.mockReset().mockResolvedValue({ nativeShare: false })
+  boundary.shareModule = true
+  boundary.shareFile
+    .mockReset()
+    .mockResolvedValue({ target: 'instagram', outcome: 'completed' })
+  boundary.capture.mockReset()
+  boundary.files.clear()
+  boundary.write.mockReset().mockImplementation((uri: string, bytes: string) => {
+    boundary.files.set(uri, bytes)
+    return Promise.resolve()
+  })
+  setOS('ios')
 })
 afterEach(async () => {
   cleanup()
@@ -870,5 +936,449 @@ describe('share-card composer lifecycle', () => {
     expect(boundary.permission).toHaveBeenCalledOnce()
     expect(boundary.prepare).toHaveBeenCalledTimes(2)
     expect(boundary.save).toHaveBeenCalledOnce()
+  })
+})
+
+const purposes = () =>
+  (boundary.prepare.mock.calls as [PrepareShareCardInput][]).map(
+    ([input]) => input.purpose
+  )
+const shareFiles = () =>
+  [...boundary.files.keys()].filter((uri) =>
+    /^file:\/\/\/cache\/share-cards\/cc69-share-[a-f0-9-]+\.png$/.test(uri)
+  )
+const shareCaptures = () =>
+  boundary.capture.mock.calls.filter(([event]) => event === 'share_card_shared')
+const announced = (key: string) =>
+  boundary.announce.mock.calls.filter(([text]) => text === i18n.t(`shareCard.${key}`))
+async function readyShare() {
+  boundary.capabilities.mockResolvedValue({ nativeShare: true })
+  render(<Harness />)
+  await ready()
+  await waitFor(() =>
+    expect(screen.getByTestId('share-card-share')).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+  )
+}
+async function tapShare() {
+  await userEvent.click(screen.getByTestId('share-card-share'))
+}
+async function settledEvent(event: Record<string, unknown>) {
+  await waitFor(() => expect(shareCaptures()).toHaveLength(1))
+  expect(shareCaptures()[0]).toEqual([
+    'share_card_shared',
+    { ...event, duration_ms: expect.any(Number) },
+  ])
+}
+function expectSaveUsable() {
+  expect(screen.getByTestId('share-card-save')).not.toHaveAttribute(
+    'aria-disabled',
+    'true'
+  )
+  expect(nativeShareCardSavePending()).toBe(false)
+}
+
+describe('Story 6.9 composer Share', () => {
+  it('C-COMP-SHARE-GATE: Share renders only for the current member with capability on and the module present', async () => {
+    render(<Harness />)
+    await ready()
+    expect(boundary.capabilities).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(screen.queryByTestId('share-card-share')).not.toBeInTheDocument()
+    cleanup()
+    boundary.prepare.mockClear()
+    boundary.capabilities.mockResolvedValue({ nativeShare: true })
+    render(<Harness />)
+    expect(await screen.findByTestId('share-card-share')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    // Disabled until the preview validates; a press emits nothing and sends no prepare.
+    await userEvent.click(screen.getByTestId('share-card-share'), { force: true })
+    expect(purposes()).toEqual(['preview'])
+    await ready()
+    await waitFor(() =>
+      expect(screen.getByTestId('share-card-share')).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    )
+    expect(screen.getByTestId('share-card-share')).toHaveTextContent(
+      i18n.t('shareCard.share')
+    )
+    expect(boundary.capture).not.toHaveBeenCalled()
+  })
+  it.each([
+    ['a rejected read', () => Promise.reject(new Error('timeout'))],
+    ['an off answer', () => Promise.resolve({ nativeShare: false })],
+    ['a malformed answer', () => Promise.resolve({ nativeShare: 'yes' })],
+  ])('C-COMP-SHARE-GATE: %s hides Share', async (_name, answer) => {
+    boundary.capabilities.mockImplementation(answer)
+    render(<Harness />)
+    await ready()
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.queryByTestId('share-card-share')).not.toBeInTheDocument()
+  })
+  it('C-COMP-SHARE-GATE: identity change clears capability and a late answer for the previous member is ignored', async () => {
+    const first = deferred<{ nativeShare: boolean }>()
+    const second = deferred<{ nativeShare: boolean }>()
+    boundary.capabilities
+      .mockResolvedValueOnce({ nativeShare: true })
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+    render(<Harness />)
+    expect(await screen.findByTestId('share-card-share')).toBeInTheDocument()
+    changeIdentity('member-b')
+    expect(screen.queryByTestId('share-card-share')).not.toBeInTheDocument()
+    changeIdentity('member-c')
+    await act(async () => {
+      first.resolve({ nativeShare: true })
+      await first.promise
+    })
+    // member-b's answer arrived while member-c is signed in.
+    expect(screen.queryByTestId('share-card-share')).not.toBeInTheDocument()
+    changeIdentity(null)
+    await act(async () => {
+      second.resolve({ nativeShare: true })
+      await second.promise
+    })
+    expect(screen.queryByTestId('share-card-share')).not.toBeInTheDocument()
+    expect(boundary.capabilities).toHaveBeenCalledTimes(3)
+  })
+  it('C-COMP-SHARE-GATE: an absent module shows a statically disabled Share with its reason, and presses do nothing', async () => {
+    boundary.shareModule = false
+    boundary.capabilities.mockResolvedValue({ nativeShare: true })
+    render(<Harness />)
+    await ready()
+    const share = await screen.findByTestId('share-card-share')
+    expect(share).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByTestId('share-card-share-unavailable')).toHaveTextContent(
+      i18n.t('shareCard.shareUnavailable')
+    )
+    await userEvent.click(share, { force: true })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(boundary.prepare).toHaveBeenCalledOnce()
+    expect(boundary.shareFile).not.toHaveBeenCalled()
+    expect(boundary.capture).not.toHaveBeenCalled()
+    expect(shareFiles()).toEqual([])
+  })
+  it('C-COMP-SHARE-COMPLETED: iOS completed announces Shared once, focuses Share and records instagram/completed', async () => {
+    await readyShare()
+    await tapShare()
+    expect(await screen.findByText(i18n.t('shareCard.shared'))).toBeInTheDocument()
+    expect(boundary.prepare.mock.calls[1]?.[0]).toMatchObject({
+      purpose: 'share',
+      expectedSha256: card.sha256,
+    })
+    const [uri, digest] = boundary.shareFile.mock.calls[0] as [string, string]
+    expect(uri).toMatch(/cc69-share-/)
+    expect(digest).toBe(card.sha256)
+    await waitFor(() =>
+      expect(announced('shared')).toEqual([[i18n.t('shareCard.shared'), { queue: true }]])
+    )
+    await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(45))
+    await settledEvent({ client: 'ios', target: 'instagram', outcome: 'completed' })
+    expectSaveUsable()
+  })
+  it('C-COMP-SHARE-CHOSEN: Android target chosen says Sent to the app, never Shared, and records pinterest/target_chosen', async () => {
+    setOS('android')
+    boundary.shareFile.mockResolvedValue({
+      target: 'pinterest',
+      outcome: 'target_chosen',
+    })
+    await readyShare()
+    await tapShare()
+    expect(await screen.findByText(i18n.t('shareCard.sentToApp'))).toBeInTheDocument()
+    expect(screen.queryByText(i18n.t('shareCard.shared'))).not.toBeInTheDocument()
+    await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(45))
+    await settledEvent({
+      client: 'android',
+      target: 'pinterest',
+      outcome: 'target_chosen',
+    })
+    // The handoff file stays leased after settlement while the lock is already released.
+    expect(shareFiles()).toHaveLength(1)
+    expectSaveUsable()
+  })
+  it.each([
+    ['ios', { target: 'pinterest', outcome: 'cancelled' }],
+    ['ios', { target: 'none', outcome: 'cancelled' }],
+    ['android', { target: 'none', outcome: 'not_confirmed' }],
+  ])(
+    'C-COMP-SHARE-CLOSED: %s %j keeps the composition and returns focus to Share',
+    async (os, result) => {
+      setOS(os)
+      boundary.shareFile.mockResolvedValue(result)
+      await readyShare()
+      await userEvent.click(screen.getByTestId('share-card-watermark'))
+      await ready()
+      await waitFor(() =>
+        expect(screen.getByTestId('share-card-share')).not.toHaveAttribute(
+          'aria-disabled',
+          'true'
+        )
+      )
+      await tapShare()
+      expect(await screen.findByText(i18n.t('shareCard.shareClosed'))).toBeInTheDocument()
+      expect(screen.getByTestId('share-card-preview-loaded')).toBeInTheDocument()
+      expect(screen.getByTestId('share-card-watermark')).toHaveAttribute(
+        'aria-checked',
+        'false'
+      )
+      expect(boundary.prepare.mock.calls.at(-1)?.[0]).toMatchObject({
+        purpose: 'share',
+        watermark: false,
+        source,
+      })
+      await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(45))
+      await settledEvent({ client: os, ...result })
+      expectSaveUsable()
+    }
+  )
+  it.each([
+    ['native error', () => boundary.shareFile.mockRejectedValue(new Error('bridge'))],
+    ['write error', () => boundary.write.mockRejectedValue(new Error('disk_full'))],
+    [
+      '403',
+      () =>
+        boundary.prepare
+          .mockResolvedValueOnce(card)
+          .mockRejectedValueOnce(new ResponseError(new Response('{}', { status: 403 }))),
+    ],
+    [
+      'offline',
+      () =>
+        boundary.prepare
+          .mockResolvedValueOnce(card)
+          .mockRejectedValueOnce(new Error('offline')),
+    ],
+  ])(
+    'C-COMP-SHARE-FAIL: %s shows merlot shareFailed, focuses Save and keeps the preview',
+    async (_name, arrange) => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      arrange()
+      await readyShare()
+      await tapShare()
+      const error = await screen.findByTestId('share-card-error')
+      expect(error).toHaveTextContent(i18n.t('shareCard.shareFailed'))
+      expect(screen.queryByTestId('share-card-retry')).not.toBeInTheDocument()
+      expect(screen.getByTestId('share-card-preview-loaded')).toBeInTheDocument()
+      await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(42))
+      await settledEvent({ client: 'ios', target: 'none', outcome: 'failed' })
+      expectSaveUsable()
+    }
+  )
+  it('C-COMP-SHARE-UNAVAILABLE: a runtime unavailable result says so, focuses Save and records one event', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    setOS('android')
+    boundary.shareFile.mockResolvedValue({
+      target: 'none',
+      outcome: 'unavailable',
+      code: 'chooser_unavailable',
+    })
+    await readyShare()
+    await tapShare()
+    expect(await screen.findByTestId('share-card-error')).toHaveTextContent(
+      i18n.t('shareCard.shareUnavailable')
+    )
+    await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(42))
+    await settledEvent({ client: 'android', target: 'none', outcome: 'unavailable' })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(shareCaptures()).toHaveLength(1)
+  })
+  it('C-COMP-SHARE-STALE: 409 keeps the 6.8 stale path, disables Save and Share until a fresh preview, and records failed', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    await readyShare()
+    boundary.prepare.mockRejectedValueOnce(
+      new ResponseError(new Response('{}', { status: 409 }))
+    )
+    await tapShare()
+    expect(
+      await screen.findByText(i18n.t('shareCard.previewChanged'))
+    ).toBeInTheDocument()
+    await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(43))
+    expect(screen.getByAltText(card.accessibilityLabel)).toBeInTheDocument()
+    expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByTestId('share-card-share')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    expect(boundary.shareFile).not.toHaveBeenCalled()
+    await settledEvent({ client: 'ios', target: 'none', outcome: 'failed' })
+    await userEvent.click(screen.getByTestId('share-card-refresh'))
+    await ready()
+    await waitFor(() =>
+      expect(screen.getByTestId('share-card-share')).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    )
+  })
+  it('C-COMP-SHARE-IDENTITY: sign-out while the sheet is open clears the preview and drops the late result', async () => {
+    const native = deferred<unknown>()
+    boundary.shareFile.mockReturnValue(native.promise)
+    await readyShare()
+    await tapShare()
+    await waitFor(() => expect(boundary.shareFile).toHaveBeenCalledOnce())
+    changeIdentity(null)
+    expect(screen.queryByTestId('share-card-preview-loaded')).not.toBeInTheDocument()
+    boundary.announce.mockClear()
+    await act(async () => {
+      native.resolve({ target: 'instagram', outcome: 'completed' })
+      await native.promise
+    })
+    await waitFor(() => expect(nativeShareCardSavePending()).toBe(false))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(screen.queryByText(i18n.t('shareCard.shared'))).not.toBeInTheDocument()
+    expect(screen.queryByTestId('share-card-feedback')).not.toBeInTheDocument()
+    expect(boundary.announce).not.toHaveBeenCalled()
+    expect(boundary.capture).not.toHaveBeenCalled()
+    expect(shareFiles()).toHaveLength(1)
+  })
+  it.each(['throws', 'rejects'])(
+    'C-COMP-SHARE-ANALYTICS-DOWN: a capture that %s leaves copy, focus and the lock unchanged',
+    async (mode) => {
+      const unhandled = vi.fn()
+      window.addEventListener('unhandledrejection', unhandled)
+      boundary.capture.mockImplementation(() => {
+        if (mode === 'throws') throw new Error('analytics down')
+        return Promise.reject(new Error('analytics down'))
+      })
+      try {
+        await readyShare()
+        await tapShare()
+        expect(await screen.findByText(i18n.t('shareCard.shared'))).toBeInTheDocument()
+        await waitFor(() => expect(boundary.capture).toHaveBeenCalledOnce())
+        await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(45))
+        expectSaveUsable()
+        await userEvent.click(screen.getByTestId('share-card-save'))
+        expect(await screen.findByText(i18n.t('shareCard.saved'))).toBeInTheDocument()
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        expect(unhandled).not.toHaveBeenCalled()
+      } finally {
+        window.removeEventListener('unhandledrejection', unhandled)
+      }
+    }
+  )
+  it('C-COMP-SHARE-ONE-EVENT: duplicate taps are ignored, nothing is recorded before settlement, and Share blocks Save', async () => {
+    const native = deferred<unknown>()
+    boundary.shareFile.mockReturnValue(native.promise)
+    await readyShare()
+    const share = screen.getByTestId('share-card-share')
+    act(() => {
+      share.click()
+      share.click()
+    })
+    await waitFor(() => expect(boundary.shareFile).toHaveBeenCalledOnce())
+    expect(screen.getByText(i18n.t('shareCard.sharing'))).toBeInTheDocument()
+    await userEvent.click(share, { force: true })
+    await userEvent.click(screen.getByTestId('share-card-save'), { force: true })
+    expect(boundary.permission).not.toHaveBeenCalled()
+    expect(boundary.save).not.toHaveBeenCalled()
+    expect(boundary.capture).not.toHaveBeenCalled()
+    expect(nativeShareCardSavePending()).toBe(true)
+    await act(async () => {
+      native.resolve({ target: 'none', outcome: 'cancelled' })
+      await native.promise
+    })
+    await settledEvent({ client: 'ios', target: 'none', outcome: 'cancelled' })
+    expect(purposes()).toEqual(['preview', 'share'])
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(shareCaptures()).toHaveLength(1)
+  })
+  it('C-COMP-SHARE-ANCHOR: every attempt passes the Share frame measured at handoff', async () => {
+    await readyShare()
+    const button: HTMLElement & {
+      measureInWindow?: (callback: (...frame: number[]) => void) => void
+    } = screen.getByTestId('share-card-share')
+    const frames = [
+      [16, 600, 343, 48],
+      [16, 664, 343, 48],
+    ]
+    let attempt = 0
+    button.measureInWindow = (callback) => callback(...frames[attempt]!)
+    await tapShare()
+    expect(await screen.findByText(i18n.t('shareCard.shared'))).toBeInTheDocument()
+    expect(boundary.shareFile.mock.calls[0]?.[2]).toEqual({
+      x: 16,
+      y: 600,
+      width: 343,
+      height: 48,
+    })
+    // The feedback line moved the button: the next attempt measures again.
+    attempt = 1
+    await waitFor(() => expect(shareCaptures()).toHaveLength(1))
+    await tapShare()
+    await waitFor(() => expect(boundary.shareFile).toHaveBeenCalledTimes(2))
+    expect(boundary.shareFile.mock.calls[1]?.[2]).toEqual({
+      x: 16,
+      y: 664,
+      width: 343,
+      height: 48,
+    })
+  })
+  it('C-COMP-SHARE-ANCHOR: the anchor is the real window frame after the pending copy renders', async () => {
+    const frames: DOMRect[] = []
+    boundary.shareFile.mockImplementation(() => {
+      frames.push(screen.getByTestId('share-card-share').getBoundingClientRect())
+      return Promise.resolve({ target: 'none', outcome: 'cancelled' })
+    })
+    await readyShare()
+    await tapShare()
+    await waitFor(() => expect(boundary.shareFile).toHaveBeenCalledOnce())
+    const anchor = boundary.shareFile.mock.calls[0]?.[2] as Record<string, number>
+    expect(anchor.x).toBeCloseTo(frames[0]!.left, 0)
+    expect(anchor.y).toBeCloseTo(frames[0]!.top, 0)
+    expect(anchor.width).toBeCloseTo(frames[0]!.width, 0)
+    expect(anchor.height).toBeCloseTo(frames[0]!.height, 0)
+  })
+  it('C-COMP-SHARE-A11Y: 44-point target, one announcement, Back keeps the operation, neutral finishing copy', async () => {
+    const native = deferred<unknown>()
+    boundary.shareFile.mockReturnValue(native.promise)
+    await readyShare()
+    expect(
+      screen.getByTestId('share-card-share').getBoundingClientRect().height
+    ).toBeGreaterThanOrEqual(44)
+    await tapShare()
+    await waitFor(() => expect(boundary.shareFile).toHaveBeenCalledOnce())
+    // Android Back and Cancel share the modal's close handler.
+    await userEvent.click(screen.getByTestId('share-card-cancel'))
+    expect(nativeShareCardSavePending()).toBe(true)
+    await userEvent.click(screen.getByText('Reopen'))
+    expect(await screen.findByText(i18n.t('shareCard.finishingSave'))).toBeInTheDocument()
+    expect(i18n.t('shareCard.finishingSave')).not.toMatch(/save|share/i)
+    await act(async () => {
+      native.resolve({ target: 'instagram', outcome: 'completed' })
+      await native.promise
+    })
+    await waitFor(() => expect(nativeShareCardSavePending()).toBe(false))
+    // The member is unchanged, so the closed composer's attempt still records once.
+    await settledEvent({ client: 'ios', target: 'instagram', outcome: 'completed' })
+    expect(announced('shared')).toEqual([])
+    await ready()
+    await waitFor(() =>
+      expect(screen.getByTestId('share-card-share')).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    )
+    boundary.shareFile.mockResolvedValue({ target: 'other', outcome: 'completed' })
+    await tapShare()
+    expect(await screen.findByText(i18n.t('shareCard.shared'))).toBeInTheDocument()
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(announced('shared')).toHaveLength(1)
   })
 })

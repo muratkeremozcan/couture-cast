@@ -9,6 +9,7 @@ import * as Application from 'expo-application'
 import Constants from 'expo-constants'
 import * as Linking from 'expo-linking'
 import * as FileSystem from 'expo-file-system/legacy'
+import { Platform } from 'react-native'
 import {
   installShareCardOpenerTrace,
   installShareCardPresentationTrace,
@@ -35,9 +36,49 @@ const modes = [
   'deferred',
   // Notification settings fail to load, so the native journey can capture the stalled state.
   'prefs_unavailable',
+  // Story 6.9: real authorization and the real file write, then a substituted native result.
+  'share_completed_instagram',
+  'share_chosen_pinterest',
+  'share_target_other',
+  'share_closed',
+  'share_not_confirmed',
+  'share_failed',
+  'share_unavailable',
 ] as const
 type Mode = (typeof modes)[number]
 let mode: Mode = 'real'
+/** Platform-only share modes. On the other platform the mode switch is ignored. */
+const platformOnlyModes: Partial<Record<Mode, 'ios' | 'android'>> = {
+  share_completed_instagram: 'ios',
+  share_chosen_pinterest: 'android',
+  share_not_confirmed: 'android',
+}
+const acceptsMode = (candidate: Mode) => {
+  const only = platformOnlyModes[candidate]
+  return only === undefined || only === Platform.OS
+}
+/** The native result each share mode substitutes, per platform. */
+function shareFixtureResult(current: string, os: string): unknown {
+  const ios = os === 'ios'
+  switch (current) {
+    case 'share_completed_instagram':
+      return ios ? { target: 'instagram', outcome: 'completed' } : undefined
+    case 'share_chosen_pinterest':
+      return ios ? undefined : { target: 'pinterest', outcome: 'target_chosen' }
+    case 'share_target_other':
+      return { target: 'other', outcome: ios ? 'completed' : 'target_chosen' }
+    case 'share_closed':
+      return { target: 'none', outcome: ios ? 'cancelled' : 'not_confirmed' }
+    case 'share_not_confirmed':
+      return ios ? undefined : { target: 'none', outcome: 'not_confirmed' }
+    case 'share_failed':
+      return { target: 'none', outcome: 'failed', code: 'native_error' }
+    case 'share_unavailable':
+      return { target: 'none', outcome: 'unavailable', code: 'chooser_unavailable' }
+    default:
+      return undefined
+  }
+}
 const preparationWaiters = new Set<() => void>()
 let releasePending: (() => void) | null = null
 export function shareCardFixtureMode(): string {
@@ -105,7 +146,8 @@ export function startShareCardNativeFixture(): () => void {
       releasePending = null
       return
     }
-    if (modes.some((candidate) => candidate === next)) mode = next as Mode
+    const candidate = modes.find((known) => known === next)
+    if (candidate && acceptsMode(candidate)) mode = candidate
   })
   return () => {
     subscription.remove()
@@ -131,14 +173,23 @@ export async function runShareCardNativeAdapter(
   await save()
 }
 
+/**
+ * Story 6.9: the share handoff boundary. Authorization and the file write already ran for
+ * real; a share mode replaces only the native result, and `real` calls the module.
+ */
+export function runShareCardNativeShare(share: () => Promise<unknown>): Promise<unknown> {
+  const substituted = shareFixtureResult(shareCardFixtureMode(), Platform.OS)
+  return substituted === undefined ? share() : Promise.resolve(substituted)
+}
+
 export async function waitShareCardNativePreparation(
   signal: AbortSignal,
-  purpose?: 'preview' | 'save'
+  purpose?: 'preview' | 'save' | 'share'
 ): Promise<void> {
   const current = shareCardFixtureMode()
   if (
     current !== 'prepare_deferred' &&
-    !(current === 'authorization_deferred' && purpose === 'save')
+    !(current === 'authorization_deferred' && (purpose === 'save' || purpose === 'share'))
   )
     return
   await new Promise<void>((resolve, reject) => {

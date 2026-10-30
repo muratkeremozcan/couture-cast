@@ -1,8 +1,10 @@
+import { Platform } from 'react-native'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
 import { decodeShareCardBase64 } from '@couture/api-client'
 import { sha256Hex } from './share-card-digest'
 import * as fallback from './share-card-save'
+import * as shareFallback from './share-card-share'
 import * as browserFixture from './share-card-native-fixture'
 const observe = vi.hoisted(() => vi.fn(() => Promise.resolve(true)))
 vi.mock('../../modules/accessibility-focus', () => ({
@@ -221,6 +223,25 @@ describe('isolated native fixtures and browser boundaries', () => {
       fallback.saveShareCard(card, new AbortController().signal, () => true)
     ).rejects.toThrow('nativeSaveUnavailable')
   })
+  it('U-SHARE-LIB-UNAVAILABLE: browser share fallback never activates native sharing', async () => {
+    expect(shareFallback.nativeShareCardShareAvailable()).toBe(false)
+    await expect(shareFallback.sweepExpiredShareCardFiles()).resolves.toBeUndefined()
+    await expect(
+      shareFallback.shareShareCard(
+        {
+          source: { kind: 'outfit', recommendationId: 'owned' },
+          locale: 'en-US',
+          watermark: true,
+          expectedSha256: card.sha256,
+        },
+        {
+          signal: new AbortController().signal,
+          isCurrent: () => true,
+          anchor: () => Promise.resolve(null),
+        }
+      )
+    ).rejects.toThrow('nativeShareUnavailable')
+  })
   it('browser fixture module stays in real mode and passes the adapter through', async () => {
     expect(browserFixture.shareCardFixtureMode()).toBe('real')
     browserFixture.startShareCardNativeFixture()()
@@ -234,6 +255,104 @@ describe('isolated native fixtures and browser boundaries', () => {
   })
   it('portable digest matches the fixture sha256 for the exact decoded bytes', async () => {
     expect(await sha256Hex(decodeShareCardBase64(card.pngBase64))).toBe(card.sha256)
+  })
+})
+
+const originalOS = Platform.OS
+const setOS = (os: string) =>
+  Object.defineProperty(Platform, 'OS', { configurable: true, value: os })
+describe('Story 6.9 share fixture modes', () => {
+  afterEach(() => setOS(originalOS))
+  const real = { target: 'real-module', outcome: 'real-module' }
+  const shareWith = async (value: string) => {
+    mode(value)
+    const share = vi.fn(() => Promise.resolve(real))
+    return { result: await nativeFixture.runShareCardNativeShare(share), share }
+  }
+  it.each([
+    ['ios', 'share_completed_instagram', { target: 'instagram', outcome: 'completed' }],
+    [
+      'android',
+      'share_chosen_pinterest',
+      { target: 'pinterest', outcome: 'target_chosen' },
+    ],
+    ['ios', 'share_target_other', { target: 'other', outcome: 'completed' }],
+    ['android', 'share_target_other', { target: 'other', outcome: 'target_chosen' }],
+    ['ios', 'share_closed', { target: 'none', outcome: 'cancelled' }],
+    ['android', 'share_closed', { target: 'none', outcome: 'not_confirmed' }],
+    ['android', 'share_not_confirmed', { target: 'none', outcome: 'not_confirmed' }],
+    ['ios', 'share_failed', { target: 'none', outcome: 'failed', code: 'native_error' }],
+    [
+      'android',
+      'share_failed',
+      { target: 'none', outcome: 'failed', code: 'native_error' },
+    ],
+    [
+      'ios',
+      'share_unavailable',
+      { target: 'none', outcome: 'unavailable', code: 'chooser_unavailable' },
+    ],
+    [
+      'android',
+      'share_unavailable',
+      { target: 'none', outcome: 'unavailable', code: 'chooser_unavailable' },
+    ],
+  ])(
+    'U-SHARE-FIXTURE: %s %s substitutes only the native result',
+    async (os, value, expected) => {
+      setOS(os)
+      const { result, share } = await shareWith(value)
+      expect(nativeFixture.shareCardFixtureMode()).toBe(value)
+      expect(result).toEqual(expected)
+      expect(share).not.toHaveBeenCalled()
+    }
+  )
+  it.each([
+    ['android', 'share_completed_instagram'],
+    ['ios', 'share_chosen_pinterest'],
+    ['ios', 'share_not_confirmed'],
+  ])('U-SHARE-FIXTURE: %s rejects the other platform mode %s', async (os, value) => {
+    setOS(os)
+    const { result, share } = await shareWith(value)
+    expect(nativeFixture.shareCardFixtureMode()).toBe('real')
+    expect(result).toBe(real)
+    expect(share).toHaveBeenCalledOnce()
+  })
+  it.each(['flag', 'release'])(
+    'U-SHARE-FIXTURE: share modes need the fixture build; a %s build calls the real module',
+    async (gate) => {
+      setOS('ios')
+      if (gate === 'flag') environment.enabled = false
+      else vi.stubGlobal('__DEV__', false)
+      const { result, share } = await shareWith('share_completed_instagram')
+      expect(nativeFixture.shareCardFixtureMode()).toBe('real')
+      expect(result).toBe(real)
+      expect(share).toHaveBeenCalledOnce()
+    }
+  )
+  it('U-SHARE-FIXTURE: real mode and the browser fixture call the module', async () => {
+    setOS('android')
+    const { result, share } = await shareWith('real')
+    expect(result).toBe(real)
+    expect(share).toHaveBeenCalledOnce()
+    const browser = vi.fn(() => Promise.resolve(real))
+    expect(await browserFixture.runShareCardNativeShare(browser)).toBe(real)
+    expect(browser).toHaveBeenCalledOnce()
+  })
+  it('authorization_deferred also holds a share authorization until release', async () => {
+    mode('authorization_deferred')
+    const held = nativeFixture.waitShareCardNativePreparation(
+      new AbortController().signal,
+      'share'
+    )
+    let settled = false
+    void held.then(() => {
+      settled = true
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    mode('release')
+    await expect(held).resolves.toBeUndefined()
   })
 })
 
