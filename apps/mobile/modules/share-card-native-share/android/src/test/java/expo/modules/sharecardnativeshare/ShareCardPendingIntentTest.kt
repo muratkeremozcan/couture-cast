@@ -20,16 +20,16 @@ import org.robolectric.annotation.Config
 
 /**
  * N-AND-PENDINGINTENT: the chooser callback is mutable, package-bound and attempt-scoped, its
- * receiver is not exported, and a system fill-in with the chosen component reaches it.
+ * receiver is not exported, and a system fill-in reaches it as the selection it observed.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34, 36])
 class ShareCardPendingIntentTest {
   private val application: Application = ApplicationProvider.getApplicationContext()
-  private val chosen = mutableListOf<Pair<String, String?>>()
+  private val chosen = mutableListOf<Pair<String, ShareCardChooserSelection>>()
 
   private fun register(attemptId: String) =
-    ShareCardChooserCallback.register(application, attemptId) { id, packageName -> chosen += id to packageName }
+    ShareCardChooserCallback.register(application, attemptId) { id, selection -> chosen += id to selection }
 
   private fun receivers(action: String) =
     shadowOf(application).registeredReceivers.filter { it.intentFilter.hasAction(action) }
@@ -68,7 +68,7 @@ class ShareCardPendingIntentTest {
       Intent().putExtra(Intent.EXTRA_CHOSEN_COMPONENT, ComponentName("com.pinterest", "com.pinterest.Share")),
     )
     shadowOf(Looper.getMainLooper()).idle()
-    assertEquals(listOf("attempt-1" to "com.pinterest"), chosen)
+    assertEquals(listOf("attempt-1" to ShareCardChooserSelection.App("com.pinterest")), chosen)
   }
 
   /** The platform builds ChooserResult; its constructor is hidden from the SDK stubs. */
@@ -77,27 +77,45 @@ class ShareCardPendingIntentTest {
       .getConstructor(Int::class.javaPrimitiveType, ComponentName::class.java, Boolean::class.javaPrimitiveType)
       .newInstance(type, component, false)
 
+  private fun sendChooserResult(callback: ShareCardChooserCallback, type: Int, component: ComponentName?) =
+    callback.pendingIntent.send(
+      application,
+      0,
+      Intent().putExtra(Intent.EXTRA_CHOOSER_RESULT, chooserResult(type, component)),
+    )
+
   @Test
   @Config(sdk = [36])
   fun anAndroid15ChooserResultFillInReachesTheReceiver() {
     val callback = register("attempt-1")
+    sendChooserResult(
+      callback,
+      ChooserResult.CHOOSER_RESULT_SELECTED_COMPONENT,
+      ComponentName("com.instagram.android", "Share"),
+    )
+    shadowOf(Looper.getMainLooper()).idle()
+    assertEquals(listOf("attempt-1" to ShareCardChooserSelection.App("com.instagram.android")), chosen)
+  }
+
+  @Test
+  @Config(sdk = [36])
+  fun anAndroid15ChooserResultThatSelectsNoAppIsNoTarget() {
+    val callback = register("attempt-1")
+    // Copy and Edit name no app; a component selection without a component confirms none either,
+    // even when a chosen-component extra rides along.
+    sendChooserResult(callback, ChooserResult.CHOOSER_RESULT_COPY, null)
+    sendChooserResult(callback, ChooserResult.CHOOSER_RESULT_EDIT, null)
+    sendChooserResult(callback, ChooserResult.CHOOSER_RESULT_UNKNOWN, null)
+    sendChooserResult(callback, ChooserResult.CHOOSER_RESULT_COPY, ComponentName("com.pinterest", "Share"))
     callback.pendingIntent.send(
       application,
       0,
       Intent()
-        .putExtra(
-          Intent.EXTRA_CHOOSER_RESULT,
-          chooserResult(ChooserResult.CHOOSER_RESULT_SELECTED_COMPONENT, ComponentName("com.instagram.android", "Share")),
-        ),
-    )
-    callback.pendingIntent.send(
-      application,
-      0,
-      Intent().putExtra(Intent.EXTRA_CHOOSER_RESULT, chooserResult(ChooserResult.CHOOSER_RESULT_COPY, null)),
+        .putExtra(Intent.EXTRA_CHOOSER_RESULT, chooserResult(ChooserResult.CHOOSER_RESULT_SELECTED_COMPONENT, null))
+        .putExtra(Intent.EXTRA_CHOSEN_COMPONENT, ComponentName("com.pinterest", "Share")),
     )
     shadowOf(Looper.getMainLooper()).idle()
-    // Copy names no app; the session maps a chosen-without-package callback to `other`.
-    assertEquals(listOf("attempt-1" to "com.instagram.android", "attempt-1" to null), chosen)
+    assertEquals(List(5) { "attempt-1" to ShareCardChooserSelection.NoTarget }, chosen)
   }
 
   @Test

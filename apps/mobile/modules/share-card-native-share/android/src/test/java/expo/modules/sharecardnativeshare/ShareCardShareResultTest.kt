@@ -58,15 +58,36 @@ class ShareCardShareResultTest {
   private fun begin(id: String = "a1") =
     session.begin(id, teardown = { teardowns++ }, settle = { settled += it })
 
+  private fun app(packageName: String?) = ShareCardChooserSelection.App(packageName)
+
   @Test
   fun callbackSettlesTargetChosenWithTheMappedAppOrOther() {
     assertTrue(begin())
-    session.chooserCallback("a1", "com.instagram.android")
+    session.chooserCallback("a1", app("com.instagram.android"))
     assertEquals(listOf(ShareCardShareResult.chosen(ShareCardShareTarget.INSTAGRAM)), settled)
     assertTrue(begin("a2"))
-    session.chooserCallback("a2", "com.google.android.apps.messaging")
+    session.chooserCallback("a2", app("com.google.android.apps.messaging"))
     assertEquals(ShareCardShareResult.chosen(ShareCardShareTarget.OTHER), settled.last())
     assertEquals(mapOf("target" to "other", "outcome" to "target_chosen"), settled.last().toBridge())
+    assertEquals(2, teardowns)
+  }
+
+  @Test
+  fun aCallbackWithoutAPackageIsOtherAndOneThatSelectsNoAppIsNotConfirmed() {
+    begin()
+    session.chooserCallback("a1", app(null))
+    assertEquals(listOf(ShareCardShareResult.chosen(ShareCardShareTarget.OTHER)), settled)
+    begin("a2")
+    session.hostPaused()
+    session.hostResumed()
+    session.chooserCallback("a2", ShareCardChooserSelection.NoTarget)
+    assertEquals(ShareCardShareResult.notConfirmed, settled.last())
+    assertEquals(mapOf("target" to "none", "outcome" to "not_confirmed"), settled.last().toBridge())
+    // It wins like any callback: the grace is cancelled and a late callback is ignored.
+    assertEquals(1, clock.cancelled)
+    session.chooserCallback("a2", app("com.pinterest"))
+    clock.fire()
+    assertEquals(2, settled.size)
     assertEquals(2, teardowns)
   }
 
@@ -99,7 +120,7 @@ class ShareCardShareResultTest {
     begin()
     session.hostPaused()
     session.hostResumed()
-    session.chooserCallback("a1", "com.pinterest")
+    session.chooserCallback("a1", app("com.pinterest"))
     assertEquals(listOf(ShareCardShareResult.chosen(ShareCardShareTarget.PINTEREST)), settled)
     assertEquals(1, clock.cancelled)
     clock.fire()
@@ -112,13 +133,13 @@ class ShareCardShareResultTest {
     session.hostPaused()
     session.hostResumed()
     clock.fire()
-    session.chooserCallback("a1", "com.pinterest")
+    session.chooserCallback("a1", app("com.pinterest"))
     assertEquals(listOf(ShareCardShareResult.notConfirmed), settled)
     begin("a2")
-    session.chooserCallback("a1", "com.pinterest")
+    session.chooserCallback("a1", app("com.pinterest"))
     assertTrue("old attempt id ignored", session.isActive)
-    session.chooserCallback("a2", "com.facebook.katana")
-    session.chooserCallback("a2", "com.instagram.android")
+    session.chooserCallback("a2", app("com.facebook.katana"))
+    session.chooserCallback("a2", app("com.instagram.android"))
     assertEquals(ShareCardShareResult.chosen(ShareCardShareTarget.FACEBOOK), settled.last())
     assertEquals(2, settled.size)
     assertEquals(2, teardowns)

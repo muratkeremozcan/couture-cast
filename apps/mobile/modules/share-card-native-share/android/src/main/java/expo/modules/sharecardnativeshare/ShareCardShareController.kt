@@ -56,8 +56,8 @@ class ShareCardShareController(
     session.begin(attemptId, teardown = { callback?.teardown() }, settle = { resolve(it.toBridge()) })
     try {
       callback =
-        ShareCardChooserCallback.register(context, attemptId) { id, packageName ->
-          session.chooserCallback(id, packageName)
+        ShareCardChooserCallback.register(context, attemptId) { id, selection ->
+          session.chooserCallback(id, selection)
         }
       activity.startActivity(ShareCardChooserIntent.build(uri, callback.pendingIntent.intentSender))
     } catch (error: ActivityNotFoundException) {

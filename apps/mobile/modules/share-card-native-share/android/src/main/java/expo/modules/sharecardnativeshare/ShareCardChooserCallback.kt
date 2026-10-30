@@ -11,6 +11,21 @@ import android.service.chooser.ChooserResult
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 
+/** What one chooser callback observed. Package names stop at the target mapper. */
+sealed interface ShareCardChooserSelection {
+  /**
+   * An app was selected. A pre-Android 15 callback without a component still means chosen, so a
+   * missing package maps to `other`.
+   */
+  data class App(val packageName: String?) : ShareCardChooserSelection
+
+  /**
+   * An Android 15+ result that selects no app: Copy, Edit, an unknown type or no component. It
+   * settles as `not_confirmed`, because no selected target is confirmed.
+   */
+  data object NoTarget : ShareCardChooserSelection
+}
+
 /**
  * The chooser's per-attempt callback. The PendingIntent is mutable so the system can fill in
  * `EXTRA_CHOSEN_COMPONENT`, and its Intent is bound to this package with the attempt id in the
@@ -46,30 +61,39 @@ private constructor(
     const val receiverFlags = ContextCompat.RECEIVER_NOT_EXPORTED
 
     /**
-     * Android 15+ fills in `EXTRA_CHOOSER_RESULT`, which may name no component (Copy, Edit);
-     * earlier releases fill in `EXTRA_CHOSEN_COMPONENT`. Either way a callback means chosen.
+     * Android 15+ fills in `EXTRA_CHOOSER_RESULT`. Only a component selection that names a
+     * component is an app; Copy, Edit, an unknown type or a missing component is
+     * [ShareCardChooserSelection.NoTarget]. Without a chooser result, the earlier
+     * `EXTRA_CHOSEN_COMPONENT` callback means an app was chosen.
      */
-    fun chosenPackage(intent: Intent): String? {
+    fun selection(intent: Intent): ShareCardChooserSelection {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-        IntentCompat.getParcelableExtra(intent, Intent.EXTRA_CHOOSER_RESULT, ChooserResult::class.java)
-          ?.selectedComponent
-          ?.let { return it.packageName }
+        val result =
+          IntentCompat.getParcelableExtra(intent, Intent.EXTRA_CHOOSER_RESULT, ChooserResult::class.java)
+        if (result != null) {
+          val component = result.selectedComponent
+          return if (result.type == ChooserResult.CHOOSER_RESULT_SELECTED_COMPONENT && component != null)
+            ShareCardChooserSelection.App(component.packageName)
+          else ShareCardChooserSelection.NoTarget
+        }
       }
-      return IntentCompat.getParcelableExtra(intent, Intent.EXTRA_CHOSEN_COMPONENT, ComponentName::class.java)
-        ?.packageName
+      return ShareCardChooserSelection.App(
+        IntentCompat.getParcelableExtra(intent, Intent.EXTRA_CHOSEN_COMPONENT, ComponentName::class.java)
+          ?.packageName
+      )
     }
 
     fun register(
       context: Context,
       attemptId: String,
-      onChosen: (attemptId: String, packageName: String?) -> Unit,
+      onChosen: (attemptId: String, selection: ShareCardChooserSelection) -> Unit,
     ): ShareCardChooserCallback {
       val action = action(context, attemptId)
       val receiver =
         object : BroadcastReceiver() {
           override fun onReceive(context: Context, intent: Intent) {
             if (intent.action != action) return
-            onChosen(attemptId, chosenPackage(intent))
+            onChosen(attemptId, selection(intent))
           }
         }
       ContextCompat.registerReceiver(context, receiver, IntentFilter(action), receiverFlags)

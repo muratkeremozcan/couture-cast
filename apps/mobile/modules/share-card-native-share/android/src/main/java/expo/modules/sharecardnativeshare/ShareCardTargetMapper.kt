@@ -15,7 +15,7 @@ object ShareCardTargetMapper {
       "com.ss.android.ugc.trill" to ShareCardShareTarget.TIKTOK,
     )
 
-  /** A chooser callback always means a target was chosen, so a missing package is `other`. */
+  /** Maps a chooser callback that selected an app, so a missing package is `other`. */
   fun target(packageName: String?): ShareCardShareTarget =
     packageName?.let { allowlist[it] } ?: ShareCardShareTarget.OTHER
 }

@@ -2,7 +2,8 @@ package expo.modules.sharecardnativeshare
 
 /**
  * One share attempt at a time, settled by the first of these events:
- * - the chooser callback, as `target_chosen` with the mapped app;
+ * - the chooser callback, as `target_chosen` with the mapped app, or as `not_confirmed` when an
+ *   Android 15+ result selects no app;
  * - the host resuming after the chooser plus [graceMs] with no callback, as `not_confirmed`;
  * - host recreation or destruction mid-attempt, as `not_confirmed`;
  * - a start error, as `failed` or `unavailable`.
@@ -42,9 +43,15 @@ class ShareCardShareSession(
     return true
   }
 
-  fun chooserCallback(attemptId: String, packageName: String?) {
+  fun chooserCallback(attemptId: String, selection: ShareCardChooserSelection) {
     if (active?.id != attemptId) return
-    settle(ShareCardShareResult.chosen(ShareCardTargetMapper.target(packageName)))
+    settle(
+      when (selection) {
+        is ShareCardChooserSelection.App ->
+          ShareCardShareResult.chosen(ShareCardTargetMapper.target(selection.packageName))
+        ShareCardChooserSelection.NoTarget -> ShareCardShareResult.notConfirmed
+      }
+    )
   }
 
   /** The chooser covering the host pauses it; only a resume after that can close the attempt. */
