@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import {
@@ -849,5 +852,125 @@ describe('share-card parallel lane validator', () => {
       (jobs) => (jobs['android36-original'].steps[0].id = 'changed')
     )
     assert.deepEqual(problems, [])
+  })
+})
+
+// U-HARNESS-PR-WORKFLOW: the share native unit lane runs on every PR that touches either native
+// share-card module, each test step fails on zero tests, and no job outlives the PR budget.
+describe('share native unit workflow', () => {
+  const unit = parse(
+    fs.readFileSync('.github/workflows/pr-share-native-unit.yml', 'utf8')
+  )
+  const paths = [
+    'apps/mobile/modules/share-card-native-share/**',
+    'apps/mobile/modules/share-card-photo-save/**',
+    '.github/workflows/pr-share-native-unit.yml',
+  ]
+  const testSteps = Object.values(unit.jobs).flatMap((job) =>
+    job.steps.filter((row) => /swift test|testDebugUnitTest/.test(row.run ?? ''))
+  )
+
+  /** Runs one step's script with stub tools on PATH; returns the exit status. */
+  const runWithStubs = (row, stubs) => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'share-native-unit-'))
+    try {
+      const bin = path.join(scratch, 'bin')
+      fs.mkdirSync(bin)
+      for (const [name, body] of Object.entries(stubs)) {
+        fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, {
+          mode: 0o755,
+        })
+      }
+      const cwd = path.join(scratch, row['working-directory'] ?? '.')
+      fs.mkdirSync(cwd, { recursive: true })
+      return spawnSync('bash', ['-c', row.run], {
+        cwd,
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: scratch },
+      }).status
+    } finally {
+      fs.rmSync(scratch, { recursive: true, force: true })
+    }
+  }
+
+  const swiftSummary = (count, failures = 0) =>
+    `echo "Test Suite 'All tests' passed."; echo "\t Executed ${count} test${count === 1 ? '' : 's'}, with ${failures} failures (0 unexpected) in 0.1 (0.1) seconds"; exit ${failures ? 1 : 0}`
+  const gradleReports = (counts, status = 0) =>
+    [
+      'dir=apps/mobile/modules/share-card-native-share/android/unit-tests/build/test-results/testDebugUnitTest',
+      'mkdir -p "$dir"',
+      ...counts.map(
+        (count, index) =>
+          `echo '<?xml version="1.0"?><testsuite name="S${index}" tests="${count}" skipped="0" failures="0" errors="0"></testsuite>' > "$dir/TEST-S${index}.xml"`
+      ),
+      `exit ${status}`,
+    ].join('\n')
+
+  test('runs on pull requests, main, nightly and on demand for both modules', () => {
+    // The YAML `on` key parses as the string "on".
+    const on = unit.on
+    assert.deepEqual(on.pull_request.paths, paths)
+    assert.deepEqual(on.push.paths, paths)
+    assert.deepEqual(on.push.branches, ['main'])
+    assert.equal(on.schedule.length, 1)
+    assert.ok('workflow_dispatch' in on)
+  })
+
+  test('every job is unconditional, visible on failure and within 20 minutes', () => {
+    const jobs = Object.entries(unit.jobs)
+    assert.deepEqual(jobs.map(([name]) => name).sort(), ['robolectric', 'swift'])
+    for (const [name, job] of jobs) {
+      assert.ok(job['timeout-minutes'] > 0 && job['timeout-minutes'] <= 20, name)
+      assert.equal(job.if, undefined, `${name} runs on pull requests`)
+      assert.notEqual(job['continue-on-error'], true, name)
+      assert.ok(
+        job.steps.every((row) => row['continue-on-error'] !== true),
+        name
+      )
+    }
+  })
+
+  test('tests both Swift packages and the standalone Robolectric project', () => {
+    const swift = unit.jobs.swift.steps.filter((row) => /swift test/.test(row.run ?? ''))
+    assert.deepEqual(
+      swift.map((row) => row['working-directory']),
+      [
+        'apps/mobile/modules/share-card-native-share/ios',
+        'apps/mobile/modules/share-card-photo-save/ios',
+      ]
+    )
+    const gradle = unit.jobs.robolectric.steps.filter((row) =>
+      /testDebugUnitTest/.test(row.run ?? '')
+    )
+    assert.equal(gradle.length, 1)
+    assert.match(
+      gradle[0].run,
+      /apps\/mobile\/modules\/share-card-native-share\/android\/unit-tests/
+    )
+    assert.equal(
+      unit.jobs.robolectric.steps.find((row) =>
+        row.uses?.startsWith('actions/setup-java')
+      ).with['java-version'],
+      '21'
+    )
+    assert.equal(testSteps.length, 3)
+  })
+
+  test('each test step passes with tests and fails on zero tests or a test failure', () => {
+    for (const row of testSteps) {
+      const swift = /swift test/.test(row.run)
+      const tool = swift ? 'swift' : 'gradle'
+      const pass = swift ? swiftSummary(21) : gradleReports([4, 11])
+      assert.equal(runWithStubs(row, { [tool]: pass }), 0, `${row.name} passes`)
+      if (swift) assert.equal(runWithStubs(row, { swift: swiftSummary(1) }), 0, row.name)
+      const zero = swift
+        ? [swiftSummary(0), 'echo "no summary"', 'exit 0']
+        : [gradleReports([]), gradleReports([0, 0]), 'exit 0']
+      for (const body of zero) {
+        assert.notEqual(runWithStubs(row, { [tool]: body }), 0, `${row.name}: zero tests`)
+      }
+      const failing = swift ? swiftSummary(21, 1) : gradleReports([4], 1)
+      assert.notEqual(runWithStubs(row, { [tool]: failing }), 0, `${row.name}: failure`)
+    }
   })
 })
