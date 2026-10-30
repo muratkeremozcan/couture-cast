@@ -376,3 +376,40 @@ test('the observation server names the container once and answers while the look
   )
   assert.equal(lookups, 1)
 })
+
+test('concurrent first requests share one container lookup and a failed lookup is asked again', async () => {
+  const device = 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE'
+  const container = `/Users/test/Library/Developer/CoreSimulator/Devices/${device}/data/Containers/Data/Application/owned`
+  let lookups = 0
+  let release
+  const gate = new Promise((resolve) => (release = resolve))
+  await withIosFocusObservation(
+    {
+      device,
+      appId: 'com.couturecast.story68',
+      dataContainer: async () => {
+        lookups++
+        // The prefetch before the journey fails; every later call waits for the gate.
+        if (lookups === 1) throw new Error('simctl_not_ready')
+        await gate
+        return container
+      },
+    },
+    async (port) => {
+      assert.equal(lookups, 1)
+      const url = `http://127.0.0.1:${port}/focus-observation`
+      const requests = Promise.all([fetch(url), fetch(url), fetch(url)])
+      try {
+        // Let all three requests reach the handler while the second lookup is pending.
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        assert.equal(lookups, 2)
+      } finally {
+        release()
+      }
+      for (const response of await requests) assert.equal(response.status, 503)
+      await fetch(url)
+      assert.equal(lookups, 2)
+    },
+    0
+  )
+})

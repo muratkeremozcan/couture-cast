@@ -76,8 +76,8 @@ const execFileText = promisify(execFile)
 /**
  * The data container of the installed app. The lookup is asynchronous so a starved host never
  * blocks the event loop that answers the XCUITest (run 40984431884: -1001 after the 2 s client
- * timeout while a synchronous simctl call held the loop), and it is read once: the container
- * path stays the same until the app is reinstalled.
+ * timeout while a synchronous simctl call held the loop), and it is read once at a time and kept: the
+ * container path stays the same until the app is reinstalled.
  */
 export async function withIosFocusObservation(ctx, work, port = 63068) {
   const lookup =
@@ -90,8 +90,18 @@ export async function withIosFocusObservation(ctx, work, port = 63068) {
           { timeout: 60_000 }
         )
       ).stdout)
-  let container
-  const readContainer = async () => (container ??= await lookup())
+  // One simctl call serves every request that arrives before it answers; a failed call is
+  // forgotten so the next request asks again.
+  let pending
+  const readContainer = () => {
+    const attempt = (pending ??= Promise.resolve()
+      .then(lookup)
+      .catch((error) => {
+        if (pending === attempt) pending = undefined
+        throw error
+      }))
+    return attempt
+  }
   const observe = story68FocusObservationHandler({
     device: ctx.device,
     appId: ctx.appId,
