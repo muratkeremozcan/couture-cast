@@ -33,6 +33,25 @@ const catalogs = SUPPORTED_LOCALES.map((locale) => ({
   other: json(`../../../mobile/assets/locales/${locale}.json`).shareCard as Catalog,
 }))
 const baseline = catalogs.find((item) => item.locale === DEFAULT_LOCALE)!
+// Story 6.9 share keys. Web copy offers Download where the mobile copy offers Save, so
+// these two keys are the only ones whose wording differs between the clients.
+const SHARE_KEYS = [
+  'share',
+  'sharing',
+  'shared',
+  'sentToApp',
+  'shareClosed',
+  'shareFailed',
+  'shareUnavailable',
+  'shareTapAgain',
+] as const
+const SURFACE_KEYS = ['shareFailed', 'shareUnavailable'] as const
+const withoutSurfaceKeys = (catalog: Catalog) =>
+  Object.fromEntries(
+    Object.entries(catalog).filter(
+      ([key]) => !(SURFACE_KEYS as readonly string[]).includes(key)
+    )
+  )
 function flatten(value: unknown, prefix = ''): Record<string, string> {
   if (typeof value === 'string') return { [prefix]: value }
   if (!value || typeof value !== 'object') return {}
@@ -53,7 +72,7 @@ describe('share-card catalog parity', () => {
   it.each(catalogs)(
     'U-LOCALES: $locale has render words, surface wording and no unresolved keys',
     ({ client, render, other }) => {
-      expect(client).toEqual(other)
+      expect(withoutSurfaceKeys(client)).toEqual(withoutSurfaceKeys(other))
       expect(render.outfit).toBe(client.sourceOutfit)
       expect(render.community).toBe(client.sourceCommunity)
       expect(render.scenarios).toEqual(client.scenarios)
@@ -75,6 +94,30 @@ describe('share-card catalog parity', () => {
           reference[key]!.match(/{{[^}]+}}/g) ?? []
         )
       if (!locale.startsWith('en')) expect(client.title).not.toBe(baseline.client.title)
+    }
+  )
+  it.each(catalogs)(
+    'U-SHARE-LOCALES: $locale has every share key, truthful outcome copy and Download wording',
+    ({ client, other }) => {
+      const values = flatten(client)
+      for (const key of SHARE_KEYS) {
+        expect(typeof values[key]).toBe('string')
+        expect(values[key]!.trim().length).toBeGreaterThan(0)
+        expect(values[key]!.match(/{{[^}]+}}/g) ?? []).toEqual(
+          flatten(baseline.client)[key]!.match(/{{[^}]+}}/g) ?? []
+        )
+      }
+      // A handoff or a closed sheet never reads as a finished post.
+      expect(values.sentToApp).not.toBe(values.shared)
+      expect(values.shareClosed).not.toBe(values.shared)
+      expect(values.sentToApp).not.toBe(values.shareClosed)
+      // The tap-again prompt names the visible Share button.
+      expect(values.shareTapAgain).toContain(values.share!)
+      // Web offers Download where mobile offers Save.
+      for (const key of SURFACE_KEYS) {
+        expect(typeof flatten(other)[key]).toBe('string')
+        expect(values[key]).not.toBe(flatten(other)[key])
+      }
     }
   )
 })

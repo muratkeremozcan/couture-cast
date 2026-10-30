@@ -1,13 +1,22 @@
-import { webcrypto } from 'node:crypto'
-import { fireEvent, render, screen, waitFor, act } from '@testing-library/react'
+import { createHash, webcrypto } from 'node:crypto'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { preparedShareCardFixture } from '@couture/api-client/testing/share-card-fixture'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { currentI18n } from '../../i18n'
 import enUS from '../../i18n/locales/en-US.json'
-import { ShareCardControl } from './share-card-dialog'
+import { browserAnalytics } from '../../analytics/browser-analytics'
+import { SHARE_AUTHORIZATION_TTL_MS, ShareCardControl } from './share-card-dialog'
 const identity = vi.hoisted(() => ({ member: 'member-one' as string | null }))
 vi.mock('../../lib/web-session', () => ({ webSessionIdentity: () => identity.member }))
 const source = { kind: 'outfit', recommendationId: 'owned-recommendation' } as const
@@ -517,4 +526,460 @@ describe('exact-byte share-card dialog', () => {
         expect(screen.getByTestId('share-card-save')).not.toHaveFocus()
     }
   )
+})
+
+const capabilitiesEndpoint = 'http://localhost:3001/api/v1/share-cards/capabilities'
+type ShareResponder = (body: { purpose: string }) => Response | Promise<Response>
+const approved = () => HttpResponse.json({ data: preparedShareCardFixture })
+function useShareHandlers(
+  respond: ShareResponder = approved,
+  capability: () => Response | Promise<Response> = () =>
+    HttpResponse.json({ data: { nativeShare: true } })
+) {
+  const capabilityRequests: (string | null)[] = []
+  useMswHandlers(
+    http.get(capabilitiesEndpoint, async () => {
+      capabilityRequests.push(identity.member)
+      return capability()
+    }),
+    http.post(endpoint, async ({ request }) => {
+      const body = (await request.json()) as { purpose: string }
+      requests.push(body)
+      return body.purpose === 'preview' ? approved() : respond(body)
+    })
+  )
+  return capabilityRequests
+}
+const webShare = vi.fn<(data: { files: File[] }) => Promise<void>>()
+const canShare = vi.fn<(data: { files: File[] }) => boolean>()
+const shareError = (name: string) => Promise.reject(new DOMException(name, name))
+const fileDigest = (file: File) =>
+  new Promise<string>((resolve) => {
+    const reader = new FileReader()
+    reader.onload = () =>
+      resolve(
+        createHash('sha256')
+          .update(new Uint8Array(reader.result as ArrayBuffer))
+          .digest('hex')
+      )
+    reader.readAsArrayBuffer(file)
+  })
+// Ready means neither disabled nor busy: Share is aria-disabled while anything runs.
+async function openWithShare() {
+  const image = await open()
+  fireEvent.load(image)
+  const button = await screen.findByTestId('share-card-share')
+  await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled'))
+  return { image, button }
+}
+const shareEvents = (capture: { mock: { calls: unknown[][] } }) =>
+  capture.mock.calls.filter(([event]) => event === 'share_card_shared').map(([, p]) => p)
+describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
+  let capture: MockInstance<typeof browserAnalytics.capture>
+  beforeEach(() => {
+    canShare.mockReset().mockReturnValue(true)
+    webShare.mockReset().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: canShare })
+    Object.defineProperty(navigator, 'share', { configurable: true, value: webShare })
+    capture = vi.spyOn(browserAnalytics, 'capture').mockImplementation(() => undefined)
+    useShareHandlers()
+  })
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'canShare')
+    Reflect.deleteProperty(navigator, 'share')
+    vi.useRealTimers()
+  })
+  it('C-WEB-SHARE-DIALOG IO8: Share needs the member capability and canShare; unsupported never asks', async () => {
+    const asked = useShareHandlers()
+    const image = await open()
+    const button = await screen.findByTestId('share-card-share')
+    expect(button).toBeDisabled()
+    fireEvent.load(image)
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled'))
+    expect(button).toHaveAccessibleName(enUS.shareCard.share)
+    expect(asked).toEqual(['member-one'])
+    expect(canShare.mock.calls[0]![0].files[0]).toMatchObject({
+      name: 'couturecast-card.png',
+      type: 'image/png',
+    })
+    cleanup()
+    canShare.mockReturnValue(false)
+    const unsupported = useShareHandlers()
+    render(<ShareCardControl source={source} />)
+    await userEvent.click(screen.getByTestId('share-card-open'))
+    fireEvent.load(await screen.findByTestId('share-card-preview'))
+    expect(screen.queryByTestId('share-card-share')).not.toBeInTheDocument()
+    expect(unsupported).toEqual([])
+    expect(webShare).not.toHaveBeenCalled()
+    expect(shareEvents(capture)).toEqual([])
+  })
+  it.each([
+    ['off', () => HttpResponse.json({ data: { nativeShare: false } })],
+    ['404', () => HttpResponse.json({ code: 'not_found' }, { status: 404 })],
+    ['malformed', () => HttpResponse.json({ data: { nativeShare: 'yes' } })],
+    ['missing', () => HttpResponse.json({ nativeShare: true })],
+    ['pending', () => new Promise<Response>(() => undefined)],
+  ] as const)(
+    'C-WEB-SHARE-DIALOG IO8: a capability that is %s leaves Download alone',
+    async (_, capability) => {
+      const requested = useShareHandlers(approved, capability)
+      const image = await open()
+      fireEvent.load(image)
+      await waitFor(() => expect(requested).toHaveLength(1))
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      })
+      expect(screen.queryByTestId('share-card-share')).not.toBeInTheDocument()
+      expect(screen.getByTestId('share-card-save')).toBeEnabled()
+      expect(shareEvents(capture)).toEqual([])
+    }
+  )
+  it('C-WEB-SHARE-DIALOG IO10: identity change clears capability and authorization and drops a late former-member capability answer', async () => {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const asked = useShareHandlers(approved, async () => {
+      if (identity.member === 'member-two') {
+        await held
+        return HttpResponse.json({ data: { nativeShare: true } })
+      }
+      return HttpResponse.json({ data: { nativeShare: true } })
+    })
+    const { button } = await openWithShare()
+    webShare.mockImplementationOnce(() => shareError('NotAllowedError'))
+    fireEvent.click(button)
+    await screen.findByText(enUS.shareCard.shareTapAgain, { selector: '[role="status"]' })
+    act(() => {
+      identity.member = 'member-two'
+      window.dispatchEvent(new Event('couture:session'))
+    })
+    expect(screen.queryByTestId('share-card-share')).not.toBeInTheDocument()
+    await waitFor(() => expect(asked).toEqual(['member-one', 'member-two']))
+    act(() => {
+      identity.member = 'member-three'
+      window.dispatchEvent(new Event('couture:session'))
+    })
+    await act(async () => {
+      release()
+      await held
+    })
+    // member-two's late answer never shows Share to member-three.
+    await waitFor(() =>
+      expect(asked).toEqual(['member-one', 'member-two', 'member-three'])
+    )
+    const fresh = await screen.findByTestId('share-card-preview')
+    fireEvent.load(fresh)
+    const again = await screen.findByTestId('share-card-share')
+    await waitFor(() => expect(again).not.toHaveAttribute('aria-disabled'))
+    fireEvent.click(again)
+    // The former member's authorization is gone: a new share prepare runs first.
+    await waitFor(() => expect(webShare).toHaveBeenCalledTimes(2))
+    expect(
+      requests.filter((body) => (body as { purpose: string }).purpose === 'share')
+    ).toHaveLength(2)
+  })
+  it('C-WEB-SHARE-DIALOG IO3 AC1: resolve hands off the reauthorized previewed bytes, says sentToApp once, focuses Share and captures one event', async () => {
+    const { image, button } = await openWithShare()
+    await userEvent.click(button)
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(enUS.shareCard.sentToApp)
+    )
+    expect(requests).toEqual([
+      expect.objectContaining({ purpose: 'preview' }),
+      {
+        source,
+        locale: 'en-US',
+        watermark: true,
+        purpose: 'share',
+        expectedSha256: preparedShareCardFixture.sha256,
+      },
+    ])
+    const { files } = webShare.mock.calls[0]![0]
+    expect(files).toHaveLength(1)
+    expect(files[0]!.name).toBe('couturecast-card.png')
+    expect(files[0]!.type).toBe('image/png')
+    expect(await fileDigest(files[0]!)).toBe(preparedShareCardFixture.sha256)
+    expect(button).toHaveFocus()
+    expect(screen.getByTestId('share-card-preview')).toBe(image)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText(enUS.shareCard.shared)).not.toBeInTheDocument()
+    expect(shareEvents(capture)).toEqual([
+      {
+        client: 'web',
+        target: 'unknown',
+        outcome: 'handed_off',
+        duration_ms: expect.any(Number) as number,
+      },
+    ])
+    expect(handoff).not.toHaveBeenCalled()
+  })
+  it('C-WEB-SHARE-DIALOG IO7 R-007: NotAllowedError keeps the authorization; the next tap calls share synchronously with no new prepare', async () => {
+    const { button } = await openWithShare()
+    webShare.mockImplementationOnce(() => shareError('NotAllowedError'))
+    await userEvent.click(button)
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(enUS.shareCard.shareTapAgain)
+    )
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(button).toHaveFocus()
+    expect(shareEvents(capture)).toEqual([
+      {
+        client: 'web',
+        target: 'none',
+        outcome: 'failed',
+        duration_ms: expect.any(Number) as number,
+      },
+    ])
+    const first = webShare.mock.calls[0]![0].files[0]
+    fireEvent.click(button)
+    // No await between the tap and share(): the call has already happened.
+    expect(webShare).toHaveBeenCalledTimes(2)
+    expect(webShare.mock.calls[1]![0].files[0]).toBe(first)
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(enUS.shareCard.sentToApp)
+    )
+    expect(requests.map((body) => (body as { purpose: string }).purpose)).toEqual([
+      'preview',
+      'share',
+    ])
+    expect(shareEvents(capture)).toHaveLength(2)
+    expect(shareEvents(capture)[1]).toMatchObject({ outcome: 'handed_off' })
+  })
+  it('C-WEB-SHARE-DIALOG R-007: the authorization expires at 60 s, then a tap reauthorizes', async () => {
+    vi.useFakeTimers({
+      shouldAdvanceTime: true,
+      toFake: ['setTimeout', 'clearTimeout', 'Date'],
+    })
+    const { button } = await openWithShare()
+    webShare.mockImplementation(() => shareError('NotAllowedError'))
+    fireEvent.click(button)
+    await waitFor(() => expect(webShare).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'))
+    act(() => {
+      vi.advanceTimersByTime(SHARE_AUTHORIZATION_TTL_MS - 1000)
+    })
+    fireEvent.click(button)
+    expect(webShare).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'))
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+    fireEvent.click(button)
+    expect(webShare).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(webShare).toHaveBeenCalledTimes(3))
+    expect(
+      requests.filter((body) => (body as { purpose: string }).purpose === 'share')
+    ).toHaveLength(2)
+  })
+  it.each(['close', 'composition'] as const)(
+    'C-WEB-SHARE-DIALOG R-007: %s clears the authorization',
+    async (change) => {
+      const { button } = await openWithShare()
+      webShare.mockImplementationOnce(() => shareError('NotAllowedError'))
+      fireEvent.click(button)
+      await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'))
+      if (change === 'close') {
+        await userEvent.keyboard('{Escape}')
+        await userEvent.click(screen.getByTestId('share-card-open'))
+        fireEvent.load(await screen.findByTestId('share-card-preview'))
+      } else {
+        useMswHandlers(
+          http.post(endpoint, async ({ request }) => {
+            const body = (await request.json()) as { purpose: string; watermark: boolean }
+            requests.push(body)
+            if (body.purpose !== 'preview') return approved()
+            const accessibilityLabel = body.watermark ? 'ON card' : 'OFF card'
+            return HttpResponse.json({
+              data: { ...preparedShareCardFixture, accessibilityLabel },
+            })
+          })
+        )
+        const toggle = screen.getByRole('checkbox', { name: enUS.shareCard.watermark })
+        for (const name of ['OFF card', 'ON card']) {
+          await userEvent.click(toggle)
+          fireEvent.load(await screen.findByRole('img', { name }))
+        }
+      }
+      const again = screen.getByTestId('share-card-share')
+      await waitFor(() => expect(again).not.toHaveAttribute('aria-disabled'))
+      fireEvent.click(again)
+      expect(webShare).toHaveBeenCalledTimes(1)
+      await waitFor(() => expect(webShare).toHaveBeenCalledTimes(2))
+      expect(
+        requests.filter((body) => (body as { purpose: string }).purpose === 'share')
+      ).toHaveLength(2)
+    }
+  )
+  it('C-WEB-SHARE-DIALOG IO4 AC2: AbortError says shareClosed, keeps the preview and focuses Share', async () => {
+    const { image, button } = await openWithShare()
+    webShare.mockImplementationOnce(() => shareError('AbortError'))
+    await userEvent.click(button)
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(enUS.shareCard.shareClosed)
+    )
+    expect(button).toHaveFocus()
+    expect(screen.getByTestId('share-card-preview')).toBe(image)
+    expect(screen.getByRole('checkbox', { name: enUS.shareCard.watermark })).toBeChecked()
+    expect(screen.getByTestId('share-card-save')).toBeEnabled()
+    expect(shareEvents(capture)).toEqual([
+      {
+        client: 'web',
+        target: 'none',
+        outcome: 'dismissed',
+        duration_ms: expect.any(Number) as number,
+      },
+    ])
+  })
+  it.each([
+    ['a share() failure', approved, () => shareError('DataError'), 1],
+    [
+      'a 403',
+      () => HttpResponse.json({ code: 'share_disabled' }, { status: 403 }),
+      undefined,
+      0,
+    ],
+    ['offline', approved, undefined, 0],
+  ] as const)(
+    'C-WEB-SHARE-DIALOG IO5: %s shows merlot shareFailed, focuses Download and keeps the preview',
+    async (name, respond, rejection, handoffs) => {
+      useShareHandlers(respond)
+      const { image, button } = await openWithShare()
+      if (rejection) webShare.mockImplementationOnce(rejection)
+      if (name === 'offline')
+        Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+      await userEvent.click(button)
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        enUS.shareCard.shareFailed
+      )
+      expect(screen.getByTestId('share-card-save')).toHaveFocus()
+      expect(screen.getByTestId('share-card-save')).toBeEnabled()
+      expect(screen.getByTestId('share-card-preview')).toBe(image)
+      expect(webShare).toHaveBeenCalledTimes(handoffs)
+      expect(shareEvents(capture)).toEqual([
+        {
+          client: 'web',
+          target: 'none',
+          outcome: 'failed',
+          duration_ms: expect.any(Number) as number,
+        },
+      ])
+    }
+  )
+  it('C-WEB-SHARE-DIALOG IO6: a 409 takes the 6.8 stale path with focus on Refresh and both actions held', async () => {
+    useShareHandlers(() =>
+      HttpResponse.json({ code: 'preview_changed' }, { status: 409 })
+    )
+    const { image, button } = await openWithShare()
+    await userEvent.click(button)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      enUS.shareCard.previewChanged
+    )
+    const refresh = screen.getByRole('button', { name: enUS.shareCard.refresh })
+    await waitFor(() => expect(refresh).toHaveFocus())
+    expect(screen.getByTestId('share-card-preview')).toBe(image)
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(button)
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    expect(webShare).not.toHaveBeenCalled()
+    expect(shareEvents(capture)).toEqual([
+      {
+        client: 'web',
+        target: 'none',
+        outcome: 'failed',
+        duration_ms: expect.any(Number) as number,
+      },
+    ])
+    await userEvent.click(refresh)
+    await waitFor(() => expect(screen.getByTestId('share-card-preview')).not.toBe(image))
+    fireEvent.load(screen.getByTestId('share-card-preview'))
+    await waitFor(() =>
+      expect(screen.getByTestId('share-card-share')).not.toHaveAttribute('aria-disabled')
+    )
+  })
+  it('C-WEB-SHARE-DIALOG AC3: duplicate taps during a pending attempt make one attempt and one event', async () => {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    useShareHandlers(async () => {
+      await held
+      return approved()
+    })
+    const { button } = await openWithShare()
+    fireEvent.click(button)
+    fireEvent.click(button)
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent(enUS.shareCard.sharing)
+    expect(shareEvents(capture)).toEqual([])
+    await act(async () => {
+      release()
+      await held
+    })
+    await waitFor(() => expect(webShare).toHaveBeenCalledOnce())
+    await waitFor(() => expect(shareEvents(capture)).toHaveLength(1))
+    expect(requests).toHaveLength(2)
+    expect(handoff).not.toHaveBeenCalled()
+  })
+  it.each(['identity', 'close'] as const)(
+    'C-WEB-SHARE-DIALOG IO10: an attempt superseded by %s emits no event and no feedback',
+    async (change) => {
+      let release!: () => void
+      const held = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      const { button } = await openWithShare()
+      if (change === 'identity') {
+        // The sheet is still open when the member signs out.
+        webShare.mockImplementationOnce(() => held)
+        fireEvent.click(button)
+        await waitFor(() => expect(webShare).toHaveBeenCalledOnce())
+        act(() => {
+          identity.member = null
+          window.dispatchEvent(new Event('couture:session'))
+        })
+        expect(screen.queryByTestId('share-card-preview')).not.toBeInTheDocument()
+      } else {
+        useShareHandlers(async () => {
+          await held
+          return approved()
+        })
+        fireEvent.click(button)
+        await waitFor(() => expect(requests).toHaveLength(2))
+        await userEvent.keyboard('{Escape}')
+      }
+      await act(async () => {
+        release()
+        await held
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      })
+      expect(shareEvents(capture)).toEqual([])
+      expect(screen.queryByText(enUS.shareCard.sentToApp)).not.toBeInTheDocument()
+      if (change === 'close') expect(webShare).not.toHaveBeenCalled()
+    }
+  )
+  it('C-WEB-SHARE-DIALOG IO11: a capture that throws or rejects never changes the outcome', async () => {
+    const { button } = await openWithShare()
+    capture.mockImplementationOnce(() => {
+      throw new Error('analytics_down')
+    })
+    await userEvent.click(button)
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(enUS.shareCard.sentToApp)
+    )
+    expect(button).toHaveFocus()
+    capture.mockImplementationOnce(
+      () => Promise.reject(new Error('analytics_rejected')) as unknown as void
+    )
+    webShare.mockImplementationOnce(() => shareError('AbortError'))
+    await userEvent.click(button)
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(enUS.shareCard.shareClosed)
+    )
+    expect(button).toHaveFocus()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(shareEvents(capture)).toHaveLength(2)
+  })
 })

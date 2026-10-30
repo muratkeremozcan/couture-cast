@@ -83,7 +83,7 @@ describe('browser matrix evidence from producer to upload directory', () => {
         locales: expected.locales,
       })),
     })
-    assert.equal(summary.cases, 150)
+    assert.equal(summary.cases, 165)
     // Unapproved data excluded: the raw report, runtime files, logs and the private file.
     for (const name of listing(upload))
       assert.ok(!fs.readFileSync(path.join(upload, name), 'utf8').includes(SECRET), name)

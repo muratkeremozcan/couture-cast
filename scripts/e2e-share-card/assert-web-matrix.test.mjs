@@ -7,6 +7,8 @@ import {
   BROWSERS,
   LOCALE_BEHAVIORS,
   SHARED_BEHAVIORS,
+  SHARE_BEHAVIORS,
+  SHARE_TITLE_BUDGET,
   SPEC_FILE,
   assertWebMatrix,
   expectedWebMatrix,
@@ -42,11 +44,50 @@ describe('expected web matrix from the spec', () => {
       ),
       [1, 1, 1, 1, 2, 1, 1, 2]
     )
-    assert.equal(expected.shared.length, 10)
-    // The 2026-10 split: 4 cases in each of 10 locales plus 10 shared, per browser.
+    assert.deepEqual(
+      SHARE_BEHAVIORS.map(
+        (p) => expected.shared.filter((title) => title.startsWith(p)).length
+      ),
+      [1, 1, 1, 1, 1]
+    )
+    assert.equal(expected.shared.length, 15)
+    // The 2026-10 split: 4 cases in each of 10 locales plus 15 shared, per browser.
     const perBrowser =
       expected.perLocale.length * expected.locales.length + expected.shared.length
-    assert.deepEqual([expected.locales.length, perBrowser, perBrowser * 3], [10, 50, 150])
+    assert.deepEqual([expected.locales.length, perBrowser, perBrowser * 3], [10, 55, 165])
+  })
+
+  test('U-HARNESS-WEB-MATRIX: Web Share stays at five shared titles and never runs per locale', () => {
+    const shareTitles = expected.shared.filter((title) => title.startsWith('P-SHARE-'))
+    assert.equal(shareTitles.length, SHARE_TITLE_BUDGET)
+    assert.equal(SHARE_TITLE_BUDGET, 5)
+    assert.equal(
+      expected.perLocale.filter((title) => title.startsWith('P-SHARE-')).length,
+      0
+    )
+    assert.throws(
+      () =>
+        specCases(`${spec}\ntest('P-SHARE-EXTRA: a sixth share case', async () => {})\n`),
+      /web_matrix_spec_share_budget/
+    )
+    assert.throws(
+      () =>
+        specCases(
+          spec.replace(
+            "    test('P-A11Y:",
+            "    test('P-SHARE-LOCALE: per locale', async () => {})\n    test('P-A11Y:"
+          )
+        ),
+      /web_matrix_spec_share_per_locale/
+    )
+    const withoutDismiss = spec
+      .split('\n')
+      .filter((line) => !line.startsWith("test('P-SHARE-DISMISS:"))
+      .join('\n')
+    assert.throws(
+      () => specCases(withoutDismiss),
+      /web_matrix_spec_behavior_missing: P-SHARE-DISMISS:/
+    )
   })
 
   test('the expectation follows the spec, so a split body adds a required case', () => {
@@ -97,10 +138,10 @@ describe('assertWebMatrix', () => {
   test('accepts the full passed matrix and emits only the closed summary', () => {
     assert.deepEqual(assertWebMatrix(report(), expected), {
       passed: true,
-      cases: 150,
+      cases: 165,
       projects: BROWSERS.map((browser) => ({
         browser,
-        passed: 50,
+        passed: 55,
         locales: expected.locales,
       })),
     })

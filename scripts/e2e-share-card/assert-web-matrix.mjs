@@ -30,6 +30,20 @@ export const SHARED_BEHAVIORS = [
   'P-CANCEL-SAVE:',
   'P-MODAL-STACK:',
 ]
+/**
+ * Story 6.9 Web Share behaviors. Each runs once per browser as a shared case, never per
+ * locale, and the lane carries at most SHARE_TITLE_BUDGET share titles so the
+ * browser-acceptance job stays inside its time budget.
+ */
+export const SHARE_BEHAVIORS = [
+  'P-SHARE-BYTES:',
+  'P-SHARE-DISMISS:',
+  'P-SHARE-TAP-AGAIN:',
+  'P-SHARE-CAPABILITY-OFF:',
+  'P-SHARE-REVALIDATE:',
+]
+export const SHARE_TITLE_BUDGET = 5
+const SHARE_TITLE = 'P-SHARE-'
 
 function assertSpecBehaviors(perLocale, shared) {
   const proofs = (titles, behavior) =>
@@ -37,9 +51,13 @@ function assertSpecBehaviors(perLocale, shared) {
   for (const behavior of LOCALE_BEHAVIORS)
     if (proofs(perLocale, behavior) !== 1)
       throw new Error(`web_matrix_spec_behavior_missing: ${behavior}`)
-  for (const behavior of SHARED_BEHAVIORS)
+  for (const behavior of [...SHARED_BEHAVIORS, ...SHARE_BEHAVIORS])
     if (proofs(shared, behavior) < 1)
       throw new Error(`web_matrix_spec_behavior_missing: ${behavior}`)
+  if (proofs(perLocale, SHARE_TITLE) !== 0)
+    throw new Error('web_matrix_spec_share_per_locale')
+  if (proofs(shared, SHARE_TITLE) > SHARE_TITLE_BUDGET)
+    throw new Error('web_matrix_spec_share_budget')
   for (const titles of [perLocale, shared])
     if (new Set(titles).size !== titles.length)
       throw new Error('web_matrix_spec_duplicate_title')
