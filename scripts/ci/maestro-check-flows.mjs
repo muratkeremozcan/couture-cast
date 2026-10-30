@@ -35,6 +35,15 @@ export const CHECKED_FLOWS = Object.freeze([
   'maestro/story68/release-watermark-off.yaml',
   'maestro/story68/prefs-failed.yaml',
   'maestro/story68/community-draft-background-ios.yaml',
+  'maestro/story68/tap-share.yaml',
+  'maestro/story68/share-completed.yaml',
+  'maestro/story68/share-chosen.yaml',
+  'maestro/story68/share-closed.yaml',
+  'maestro/story68/share-not-confirmed.yaml',
+  'maestro/story68/share-failed.yaml',
+  'maestro/story68/share-unavailable.yaml',
+  'maestro/story68/share-other.yaml',
+  'maestro/story68/share-sheet.yaml',
 ])
 
 // The pinned install on CI, the PATH binary on a developer machine.

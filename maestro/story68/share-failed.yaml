@@ -1,0 +1,19 @@
+appId: ${MAESTRO_APP_ID}
+---
+# M-SHARE-FAILED: fixture share_failed reports {none, failed, native_error} on both platforms. The
+# merlot error shows `shareFailed`; the preview stays and Save stays enabled. The runner then
+# saves and proves the original, so the global lock was released at settlement.
+- runFlow:
+    file: tap-share.yaml
+    env:
+      MAESTRO_SHARE_OUTCOME: ${MAESTRO_SHARE_FAILED}
+- extendedWaitUntil:
+    visible: ${MAESTRO_SHARE_FAILED}
+    timeout: 20000
+- assertVisible:
+    id: share-card-error
+- assertVisible:
+    id: share-card-preview-loaded-.*
+- assertVisible:
+    id: share-card-save
+    enabled: true

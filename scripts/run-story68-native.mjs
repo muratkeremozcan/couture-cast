@@ -77,6 +77,7 @@ import {
   redactRapidWatermarkControl,
   closedRapidWatermarkFailure,
 } from './lib/story68-rapid-watermark-control.mjs'
+import { SHARE_FIXTURE_MODES, runStory69ShareSheet } from './lib/story69-share-sheet.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -92,6 +93,7 @@ if (
     'rapid-watermark',
     'fallback-focus',
     'release-live-font',
+    'share-sheet',
   ].includes(command)
 )
   assertStory68DiskSpace(root)
@@ -1276,6 +1278,36 @@ if (command === 'prebuild') {
     privateJson,
     openUrl,
   })
+} else if (command === 'share-sheet') {
+  requireDevice()
+  activeLocale = 'en-US'
+  await runStory69ShareSheet({
+    root,
+    directory,
+    device,
+    platform,
+    appId,
+    adb,
+    maestro,
+    run,
+    read,
+    privateJson,
+    openUrl,
+    previewDigest,
+    captureApproved,
+    catalog: readLocale(),
+    extract: () =>
+      run(process.execPath, [
+        fileURLToPath(import.meta.url),
+        'extract',
+        '--harness',
+        directory,
+        '--platform',
+        platform,
+        '--device',
+        device,
+      ]),
+  })
 } else if (command === 'rapid-watermark') {
   requireDevice()
   const report = { platform, passed: false, stage: 'validating_runtime' }
@@ -1788,6 +1820,7 @@ if (command === 'prebuild') {
       'unavailable',
       'deferred',
       'release',
+      ...SHARE_FIXTURE_MODES,
     ].includes(mode)
   )
     throw new Error('fixture_mode_required')

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { parse } from 'yaml'
+import { shareSheetFlowRuns, shareSheetSaveProofs } from './story69-share-sheet.mjs'
 import {
   CONDITION_CHECK_MS,
   DEFAULT_FLOW_TIMEOUT_MS,
@@ -16,6 +18,18 @@ import {
   FLOW_TIMEOUT_MARGIN,
   OPEN_APP_WORST_CASE_MS,
   OPEN_POST_WORST_CASE_MS,
+  SHARE_SHEET_DISMISS_MS,
+  SHARE_SHEET_DISMISS_WAIT_MS,
+  SHARE_SHEET_EXTRACT_ESTIMATE_MS,
+  SHARE_SHEET_FLOW,
+  SHARE_SHEET_FLOW_ESTIMATE_MS,
+  SHARE_SHEET_LANE_HEADROOM_MS,
+  SHARE_SHEET_NATIVE_TEST_ESTIMATE_MS,
+  SHARE_TAP_ATTEMPTS,
+  SHARE_TAP_ATTEMPT_MS,
+  SHARE_TAP_FLOWS,
+  SHARE_TAP_SCROLL_MS,
+  SHARE_TAP_WORST_CASE_MS,
   WAIT_SETTINGS_FLOWS,
   WAIT_SETTINGS_TURNS,
   WAIT_SETTINGS_WORST_CASE_MS,
@@ -205,5 +219,135 @@ describe('Maestro flow timeouts', () => {
       )
       assert.ok(flowTimeoutMs(flow) > DEFAULT_FLOW_TIMEOUT_MS, flow)
     }
+  })
+})
+
+// U-HARNESS-TIMEOUTS (Story 6.9): every share flow has its own derived budget, the budgets match
+// what the flows declare, and the share-sheet command fits the headroom of each lane that runs it.
+describe('Story 6.9 share flow timeouts', () => {
+  const dir = new URL('../../maestro/story68/', import.meta.url)
+  const commands = (name) =>
+    parse(fs.readFileSync(new URL(name, dir), 'utf8').split(/^---$/m)[1])
+  const shareFlows = fs
+    .readdirSync(dir)
+    .filter((name) => /^share-.*\.yaml$/.test(name))
+    .map((name) => `maestro/story68/${name}`)
+    .sort()
+
+  test('every share-*.yaml flow has a budget above the default that covers its Share tap', () => {
+    assert.deepEqual(shareFlows, [...SHARE_TAP_FLOWS, SHARE_SHEET_FLOW].sort())
+    for (const flow of SHARE_TAP_FLOWS) {
+      assert.equal(
+        flowTimeoutMs(flow),
+        Math.ceil(
+          (DEFAULT_FLOW_TIMEOUT_MS + SHARE_TAP_WORST_CASE_MS) * FLOW_TIMEOUT_MARGIN
+        ),
+        flow
+      )
+      const text = fs.readFileSync(`${root}${flow}`, 'utf8')
+      assert.match(text, /file: tap-share\.yaml/, `${flow} taps through tap-share`)
+      assert.equal(
+        (text.match(/file: tap-share\.yaml/g) ?? []).length,
+        flow.endsWith('share-other.yaml') ? 2 : 1,
+        `${flow}: one tap per platform branch`
+      )
+    }
+    assert.equal(
+      flowTimeoutMs(SHARE_SHEET_FLOW),
+      Math.ceil(
+        (DEFAULT_FLOW_TIMEOUT_MS + SHARE_TAP_WORST_CASE_MS + SHARE_SHEET_DISMISS_MS) *
+          FLOW_TIMEOUT_MARGIN
+      )
+    )
+    for (const flow of shareFlows)
+      assert.ok(flowTimeoutMs(flow) > DEFAULT_FLOW_TIMEOUT_MS, flow)
+  })
+
+  test('tap-share declares exactly the scroll, settle and retry the budget counts', () => {
+    const [precondition, scroll, settle, retry, ...rest] = commands('tap-share.yaml')
+    assert.deepEqual(rest, [])
+    assert.equal(precondition.assertNotVisible, '${MAESTRO_SHARE_OUTCOME}')
+    assert.equal(scroll.scrollUntilVisible.element.id, 'share-card-share')
+    assert.equal(
+      SHARE_TAP_SCROLL_MS,
+      scroll.scrollUntilVisible.timeout + 3 * CONDITION_CHECK_MS
+    )
+    assert.equal(settle, 'waitForAnimationToEnd')
+    assert.equal(retry.retry.maxRetries + 1, SHARE_TAP_ATTEMPTS)
+    const [guard, wait] = retry.retry.commands
+    assert.deepEqual(guard.runFlow.when, {
+      visible: { id: 'share-card-share', enabled: true },
+      notVisible: '${MAESTRO_SHARING}|${MAESTRO_SHARE_OUTCOME}',
+    })
+    assert.deepEqual(guard.runFlow.commands, [{ tapOn: { id: 'share-card-share' } }])
+    assert.equal(
+      wait.extendedWaitUntil.visible,
+      '${MAESTRO_SHARING}|${MAESTRO_SHARE_OUTCOME}'
+    )
+    assert.equal(
+      SHARE_TAP_ATTEMPT_MS,
+      2 * CONDITION_CHECK_MS + wait.extendedWaitUntil.timeout + CONDITION_CHECK_MS
+    )
+  })
+
+  test('share-sheet declares the same scroll and retry per platform and the counted dismissal', () => {
+    const steps = commands('share-sheet.yaml')
+    const scroll = steps.find((step) => step.scrollUntilVisible)
+    assert.equal(
+      SHARE_TAP_SCROLL_MS,
+      scroll.scrollUntilVisible.timeout + 3 * CONDITION_CHECK_MS
+    )
+    for (const platform of ['iOS', 'Android']) {
+      const branch = steps.find((step) => step.runFlow?.when?.platform === platform)
+        .runFlow.commands
+      const retry = branch.find((step) => step.retry).retry
+      assert.equal(retry.maxRetries + 1, SHARE_TAP_ATTEMPTS, platform)
+      const wait = retry.commands.find((step) => step.extendedWaitUntil).extendedWaitUntil
+      assert.equal(
+        SHARE_TAP_ATTEMPT_MS,
+        2 * CONDITION_CHECK_MS + wait.timeout + CONDITION_CHECK_MS,
+        platform
+      )
+      // Dismissal: the steps after the retry, each one condition check, plus the declared wait.
+      const dismissal = branch.slice(branch.findIndex((step) => step.retry) + 1)
+      const waits = dismissal
+        .map((step) => step.extendedWaitUntil?.timeout ?? 0)
+        .reduce((total, value) => total + value, 0)
+      const checks = dismissal.reduce((total, step) => total + (step.runFlow ? 2 : 1), 0)
+      assert.equal(waits, SHARE_SHEET_DISMISS_WAIT_MS, platform)
+      assert.ok(
+        waits + checks * CONDITION_CHECK_MS <= SHARE_SHEET_DISMISS_MS,
+        `${platform}: ${checks} checks`
+      )
+    }
+  })
+
+  test('the share-sheet command fits the measured headroom of android36-interaction and iOS shard 1', () => {
+    for (const platform of ['android', 'ios']) {
+      const flows = shareSheetFlowRuns(platform)
+      for (const flow of flows) assert.ok(fs.existsSync(`${root}${flow}`), flow)
+      const estimate =
+        flows.length * SHARE_SHEET_FLOW_ESTIMATE_MS +
+        shareSheetSaveProofs(platform) * SHARE_SHEET_EXTRACT_ESTIMATE_MS +
+        SHARE_SHEET_NATIVE_TEST_ESTIMATE_MS[platform]
+      assert.ok(
+        estimate <= SHARE_SHEET_LANE_HEADROOM_MS[platform],
+        `${platform}: ${estimate} ms of ${SHARE_SHEET_LANE_HEADROOM_MS[platform]} ms`
+      )
+    }
+    // The headroom is what the lane's own limit leaves after its measured run.
+    const workflow = parse(
+      fs.readFileSync(`${root}.github/workflows/pr-share-card-native.yml`, 'utf8')
+    )
+    const interaction = workflow.jobs['android36-interaction'].strategy.matrix.include[0]
+    assert.equal(interaction.suite, 'interaction')
+    assert.equal(
+      SHARE_SHEET_LANE_HEADROOM_MS.android,
+      interaction.journey_timeout * 60_000 - (27 * 60_000 + 38_000)
+    )
+    assert.equal(
+      SHARE_SHEET_LANE_HEADROOM_MS.ios,
+      workflow.jobs['ios-shard']['timeout-minutes'] * 60_000 - 49 * 60_000
+    )
   })
 })

@@ -33,6 +33,8 @@ if [[ "$suite" == all || "$suite" == interaction ]]; then
     node scripts/run-story68-native.mjs fallback-focus --platform android --device "$ANDROID_SERIAL"
   fi
   if [ "$sdk" -eq 36 ]; then
+    # Story 6.9 native share: fixture outcomes, the real chooser smoke and the receiving androidTest.
+    node scripts/run-story68-native.mjs share-sheet --platform android --device "$ANDROID_SERIAL"
     bash scripts/ci/share-card-android-release-font.sh
   fi
 fi

@@ -1,0 +1,26 @@
+appId: ${MAESTRO_APP_ID}
+---
+# M-SHARE-NOT-CONFIRMED (Android): fixture share_not_confirmed reports {none, not_confirmed}, the
+# chooser closing with no callback. The member sees `shareClosed`, never `shared` or `sentToApp`;
+# the preview, Share and Save stay.
+- runFlow:
+    file: tap-share.yaml
+    env:
+      MAESTRO_SHARE_OUTCOME: ${MAESTRO_SHARE_CLOSED}
+- extendedWaitUntil:
+    visible: ${MAESTRO_SHARE_CLOSED}
+    timeout: 20000
+- assertNotVisible: ${MAESTRO_SHARED}
+- assertNotVisible: ${MAESTRO_SENT_TO_APP}
+- assertVisible:
+    id: share-card-feedback
+- assertNotVisible:
+    id: share-card-error
+- assertVisible:
+    id: share-card-preview-loaded-.*
+- assertVisible:
+    id: share-card-share
+    enabled: true
+- assertVisible:
+    id: share-card-save
+    enabled: true

@@ -1,0 +1,24 @@
+appId: ${MAESTRO_APP_ID}
+---
+# M-SHARE-CLOSED: fixture share_closed reports {none, cancelled} on iOS and {none, not_confirmed}
+# on Android. The member sees `shareClosed`; the preview, Share and Save stay.
+- runFlow:
+    file: tap-share.yaml
+    env:
+      MAESTRO_SHARE_OUTCOME: ${MAESTRO_SHARE_CLOSED}
+- extendedWaitUntil:
+    visible: ${MAESTRO_SHARE_CLOSED}
+    timeout: 20000
+- assertNotVisible: ${MAESTRO_SHARED}
+- assertVisible:
+    id: share-card-feedback
+- assertNotVisible:
+    id: share-card-error
+- assertVisible:
+    id: share-card-preview-loaded-.*
+- assertVisible:
+    id: share-card-share
+    enabled: true
+- assertVisible:
+    id: share-card-save
+    enabled: true

@@ -1,4 +1,5 @@
 import test from 'node:test'
+import fs from 'node:fs'
 import { assertNativeEvidence } from '../lib/story68-native-evidence-schema.mjs'
 import assert from 'node:assert/strict'
 import {
@@ -106,7 +107,7 @@ test('a missing, incomplete, failed or foreign shard report fails the merge', ()
 })
 
 test('each shard signs in, only shard 1 proves the original and shard 2 sets the same permissions', () => {
-  assert.deepEqual(commandsForShard(1), ['signin', 'proof', 'matrix'])
+  assert.deepEqual(commandsForShard(1), ['signin', 'proof', 'matrix', 'share-sheet'])
   assert.deepEqual(commandsForShard(2), [
     'signin',
     'permission-baseline',
@@ -174,4 +175,51 @@ test('permission-baseline revokes read, grants add-only and asserts both, on iOS
   const relaunch = branch.indexOf('couturecast-story68://expo-development-client/')
   const tabs = branch.indexOf("maestro('maestro/story65/open-app.yaml')")
   assert.ok(grant >= 0 && relaunch > grant && tabs > relaunch)
+})
+
+// U-HARNESS-IOS-SHARDS (Story 6.9): share-sheet is dispatchable after the matrix, runs once and in
+// shard 1 only, and shard 2 keeps exactly the commands its AFTER_MATRIX spread gave it before.
+test('share-sheet is a dispatchable post-matrix command that runs exactly once, in shard 1', () => {
+  assert.ok(AFTER_MATRIX.includes('share-sheet'))
+  assert.equal(commandsForShard(1).filter((c) => c === 'share-sheet').length, 1)
+  assert.equal(commandsForShard(2).includes('share-sheet'), false)
+  assert.ok(SHARD_PLAN[1].commands.includes('share-sheet'), 'named explicitly in shard 1')
+  assert.ok(
+    commandsForShard(1).indexOf('share-sheet') > commandsForShard(1).indexOf('matrix'),
+    'after the matrix'
+  )
+  assert.equal(
+    runsCommand(undefined, 'share-sheet'),
+    true,
+    'an unsharded run includes it'
+  )
+})
+
+test('shard 2 lists its commands explicitly and they equal its previous AFTER_MATRIX spread', () => {
+  // Before Story 6.9 shard 2 was ['permission-baseline', ...AFTER_MATRIX] with AFTER_MATRIX
+  // ['rapid-watermark', 'a11y', 'fallback-focus'].
+  assert.deepEqual(SHARD_PLAN[2].commands, [
+    'permission-baseline',
+    'rapid-watermark',
+    'a11y',
+    'fallback-focus',
+  ])
+  assert.deepEqual(AFTER_MATRIX.slice(0, 3), [
+    'rapid-watermark',
+    'a11y',
+    'fallback-focus',
+  ])
+  const source = fs.readFileSync(
+    new URL('./native-ios-shards.mjs', import.meta.url),
+    'utf8'
+  )
+  const plan = source.slice(
+    source.indexOf('export const SHARD_PLAN'),
+    source.indexOf('const shards = ')
+  )
+  assert.ok(
+    plan.includes("commands: ['permission-baseline',"),
+    'the plan block was found'
+  )
+  assert.doesNotMatch(plan, /\.\.\.AFTER_MATRIX/, 'no shard spreads AFTER_MATRIX')
 })

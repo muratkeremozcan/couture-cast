@@ -71,11 +71,18 @@ describe('Android SDK guard', () => {
     [
       '36',
       'interaction',
-      ['rapid-watermark', 'a11y', 'fallback-focus'],
+      ['rapid-watermark', 'a11y', 'fallback-focus', 'share-sheet'],
       ['bash scripts/ci/share-card-android-release-font.sh'],
     ],
   ]
-  const owned = ['proof', 'matrix', 'rapid-watermark', 'a11y', 'fallback-focus']
+  const owned = [
+    'proof',
+    'matrix',
+    'rapid-watermark',
+    'a11y',
+    'fallback-focus',
+    'share-sheet',
+  ]
   const font = 'bash scripts/ci/share-card-android-release-font.sh'
 
   for (const [sdk, suite, expected, extra] of suites) {
@@ -114,7 +121,8 @@ describe('Android SDK guard', () => {
         )
       )
     }
-    // The pre-split API36 journey: proof, matrix, rapid, a11y, fallback and Release font.
+    // The pre-split API36 journey (proof, matrix, rapid, a11y, fallback and Release font) and
+    // the Story 6.9 share-sheet command.
     assert.deepEqual([...ran].sort(), [
       'a11y',
       'fallback-focus',
@@ -122,7 +130,53 @@ describe('Android SDK guard', () => {
       'matrix',
       'proof',
       'rapid-watermark',
+      'share-sheet',
     ])
+  })
+
+  // U-HARNESS-ANDROID-LANES (Story 6.9): share-sheet runs once, on API36 interaction only.
+  test('share-sheet runs exactly once on API36 interaction, after sign-in and before the Release font proof', async (t) => {
+    const { result, commands } = await journey(t, '36', '36', 0, undefined, {
+      suite: 'interaction',
+    })
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(commands.match(/mjs share-sheet /g)?.length, 1)
+    assert.match(commands, /mjs share-sheet --platform android --device \S+\n/)
+    const at = (needle) => commands.indexOf(needle)
+    // The Release font proof replaces the debug dev client that share-sheet drives.
+    assert.ok(at('mjs share-sheet ') > at('mjs fallback-focus '))
+    assert.ok(at('mjs share-sheet ') < at(font))
+    for (const [sdk, suite] of [
+      ['32', 'all'],
+      ['36', 'matrix'],
+      ['36', 'original'],
+    ]) {
+      const other = await journey(t, sdk, sdk, 0, undefined, { suite })
+      assert.equal(other.result.status, 0, other.result.stderr)
+      assert.equal(other.commands.includes('share-sheet'), false, `${sdk} ${suite}`)
+    }
+  })
+
+  // Spec Never: the android36-native-matrix workload does not change. This is its exact command
+  // list before Story 6.9, byte for byte.
+  test('the API36 matrix suite runs exactly its pre-Story-6.9 command list', async (t) => {
+    const { result, commands } = await journey(t, '36', '36', 0, undefined, {
+      suite: 'matrix',
+    })
+    assert.equal(result.status, 0, result.stderr)
+    const serial = process.env.ANDROID_SERIAL ?? 'emulator-5554'
+    assert.equal(
+      commands,
+      [
+        `adb -s ${serial} shell getprop ro.build.version.sdk`,
+        'emulator -accel-check',
+        `adb -s ${serial} install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`,
+        `node scripts/run-story68-native.mjs open --platform android --device ${serial}`,
+        `node scripts/run-story68-native.mjs signin --platform android --device ${serial}`,
+        `node scripts/run-story68-native.mjs matrix --platform android --device ${serial}`,
+        '',
+      ].join('\n')
+    )
   })
 
   for (const [name, sdk, suite] of [

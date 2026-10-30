@@ -1,0 +1,24 @@
+appId: ${MAESTRO_APP_ID}
+---
+# M-SHARE-COMPLETED (iOS): fixture share_completed_instagram. Real authorization and the real
+# file write run, then the fixture reports {instagram, completed}. The member sees `shared`; the
+# preview, Share and Save stay. The runner checks the preview digest is unchanged.
+- runFlow:
+    file: tap-share.yaml
+    env:
+      MAESTRO_SHARE_OUTCOME: ${MAESTRO_SHARED}
+- extendedWaitUntil:
+    visible: ${MAESTRO_SHARED}
+    timeout: 20000
+- assertVisible:
+    id: share-card-feedback
+- assertNotVisible:
+    id: share-card-error
+- assertVisible:
+    id: share-card-preview-loaded-.*
+- assertVisible:
+    id: share-card-share
+    enabled: true
+- assertVisible:
+    id: share-card-save
+    enabled: true

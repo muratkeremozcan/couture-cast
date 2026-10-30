@@ -62,25 +62,34 @@ export const MATRIX_SECTIONS = Object.freeze({
 })
 
 /**
- * Harness commands that follow the matrix, in runner order. `expo-go-proof` is no shard's: it has
- * never passed on a shard (runs 40992501585 to 41019906459, last in shard 2 on a host with 74 MB
- * free), so the `ios-expo-go` job runs it alone on a fresh simulator and the shards end here.
+ * Harness commands that follow the matrix, in runner order; any of them can be dispatched. Each
+ * shard names its own in SHARD_PLAN. `expo-go-proof` is no shard's: it has never passed on a shard
+ * (runs 40992501585 to 41019906459, last in shard 2 on a host with 74 MB free), so the
+ * `ios-expo-go` job runs it alone on a fresh simulator and the shards end here. `share-sheet`
+ * (Story 6.9) runs the share fixture flows, the real-sheet smoke and ShareCardShareSheetUITests.
  */
-export const AFTER_MATRIX = Object.freeze(['rapid-watermark', 'a11y', 'fallback-focus'])
+export const AFTER_MATRIX = Object.freeze([
+  'rapid-watermark',
+  'a11y',
+  'fallback-focus',
+  'share-sheet',
+])
 
 /** The placement. Edit this table, never the runner, to rebalance the shards. */
 export const SHARD_PLAN = Object.freeze({
   1: {
     sections: ['pre-locale', 'prefs-failed'],
     locales: LOCALES.slice(0, 5),
-    commands: ['proof'],
+    // Shard 1 finished in 49 of its 100 minutes on main run 41104845732; shard 2 is the longer.
+    commands: ['proof', 'share-sheet'],
   },
   2: {
     sections: ['large-text', 'precommit-lifecycle', 'save-lifecycle'],
     locales: LOCALES.slice(5),
     // `proof` denies and then grants Photos add-only through the real UI and simctl, and runs in
-    // shard 1 only. Shard 2 reaches the same permission state directly.
-    commands: ['permission-baseline', ...AFTER_MATRIX],
+    // shard 1 only. Shard 2 reaches the same permission state directly. Its commands are listed,
+    // never spread from AFTER_MATRIX, so a new post-matrix command lands in one shard by choice.
+    commands: ['permission-baseline', 'rapid-watermark', 'a11y', 'fallback-focus'],
   },
 })
 

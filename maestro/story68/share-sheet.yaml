@@ -1,0 +1,101 @@
+appId: ${MAESTRO_APP_ID}
+---
+# M-SHARE-SHEET-IOS and M-SHARE-SHEET-ANDROID, fixture mode real: Share opens the real OS sheet
+# for the previewed card and the member leaves it without choosing an app. iOS dismisses the
+# UIActivityViewController (cancelled); Android presses Back on the chooser (no callback, so
+# not_confirmed). Both settle on `shareClosed` with the preview, Share and Save intact. The runner
+# hashes the handed-off cc69-share file against the preview digest after this flow.
+- assertNotVisible: ${MAESTRO_SHARE_CLOSED}
+- scrollUntilVisible:
+    element:
+      id: share-card-share
+    direction: DOWN
+    centerElement: false
+    visibilityPercentage: 95
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      # The tap repeats only while no sheet is up, as in tap-share.yaml.
+      - retry:
+          maxRetries: 3
+          commands:
+            - runFlow:
+                when:
+                  visible:
+                    id: share-card-share
+                    enabled: true
+                  notVisible:
+                    id: ActivityListView
+                commands:
+                  - tapOn:
+                      id: share-card-share
+            - extendedWaitUntil:
+                visible:
+                  id: ActivityListView
+                timeout: 8000
+      # The sheet's Close button (id header.closeButton), then a drag on the sheet header if the
+      # sheet is still up. Both dismiss without a target (Photos probe, iOS 26.1 simulator).
+      - runFlow:
+          when:
+            visible:
+              id: header.closeButton
+          commands:
+            - tapOn:
+                id: header.closeButton
+      - runFlow:
+          when:
+            visible:
+              id: ActivityListView
+          commands:
+            - swipe:
+                start: 50%, 13%
+                end: 50%, 95%
+                duration: 400
+      - extendedWaitUntil:
+          notVisible:
+            id: ActivityListView
+          timeout: 10000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - retry:
+          maxRetries: 3
+          commands:
+            - runFlow:
+                when:
+                  visible:
+                    id: share-card-share
+                    enabled: true
+                  notVisible:
+                    id: '.*(chooser|resolver).*'
+                commands:
+                  - tapOn:
+                      id: share-card-share
+            - extendedWaitUntil:
+                visible:
+                  id: '.*(chooser|resolver).*'
+                timeout: 8000
+      # Back closes the chooser only: the retry above proved it is the top window.
+      - back
+      - extendedWaitUntil:
+          notVisible:
+            id: '.*(chooser|resolver).*'
+          timeout: 10000
+- extendedWaitUntil:
+    visible: ${MAESTRO_SHARE_CLOSED}
+    timeout: 20000
+- assertNotVisible: ${MAESTRO_SHARED}
+- assertNotVisible:
+    id: share-card-error
+- assertVisible:
+    id: share-card-preview-loaded-.*
+- assertVisible:
+    id: share-card-share
+    enabled: true
+- assertVisible:
+    id: share-card-save
+    enabled: true

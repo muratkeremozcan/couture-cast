@@ -1,0 +1,26 @@
+appId: ${MAESTRO_APP_ID}
+---
+# M-SHARE-CHOSEN (Android): fixture share_chosen_pinterest reports {pinterest, target_chosen}.
+# The member sees `sentToApp`, never `shared`: Android only knows an app was chosen, not that a
+# post was published. The runner then saves (the lock was released), closes the composer,
+# relaunches the app and reads the leased cc69-share file through run-as.
+- runFlow:
+    file: tap-share.yaml
+    env:
+      MAESTRO_SHARE_OUTCOME: ${MAESTRO_SENT_TO_APP}
+- extendedWaitUntil:
+    visible: ${MAESTRO_SENT_TO_APP}
+    timeout: 20000
+- assertNotVisible: ${MAESTRO_SHARED}
+- assertVisible:
+    id: share-card-feedback
+- assertNotVisible:
+    id: share-card-error
+- assertVisible:
+    id: share-card-preview-loaded-.*
+- assertVisible:
+    id: share-card-share
+    enabled: true
+- assertVisible:
+    id: share-card-save
+    enabled: true
