@@ -609,7 +609,17 @@ function rapidWatermarkFlow(signal, control) {
       )
       throw error
     })
-    .finally(() => redactRapidWatermarkControl(output, control.url))
+    .finally(() => {
+      // The 12 s hold leaves little slack, so keep every command's cost, pass or fail.
+      recordIosCommandTimings({
+        platform,
+        flow: 'maestro/story68/rapid-watermark-held.yaml',
+        output,
+        directory,
+        minMs: 0,
+      })
+      redactRapidWatermarkControl(output, control.url)
+    })
 }
 if (command === 'prebuild') {
   ownedEnv()

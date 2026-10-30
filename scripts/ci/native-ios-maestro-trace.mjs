@@ -58,10 +58,11 @@ export function recordIosCommandTimings({
   flow,
   output,
   directory,
+  minMs = 1000,
   log = console.log,
 }) {
   if (platform !== 'ios') return null
-  const entry = { flow, commands: slowMaestroCommands(output) }
+  const entry = { flow, commands: slowMaestroCommands(output, minMs) }
   const file = path.join(directory, 'native-ios-flow-command-timings.json')
   try {
     const record = fs.existsSync(file)

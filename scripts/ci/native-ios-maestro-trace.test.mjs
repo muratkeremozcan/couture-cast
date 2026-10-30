@@ -816,3 +816,22 @@ test('the system surface records Apple resource ids, the breadcrumb and a return
   assert.equal(none.breadcrumbSeen, false)
   assert.equal(none.returnLinkSeen, false)
 })
+
+test('a zero threshold keeps every command of the flow', (t) => {
+  const output = outputWith(t, [row('tapOnElement', 40), row('assertConditionCommand', 700)])
+  const directory = outputWith(t, [])
+  const entry = recordIosCommandTimings({
+    platform: 'ios',
+    flow: 'held.yaml',
+    output,
+    directory,
+    minMs: 0,
+  })
+  assert.deepEqual(
+    entry.commands.map((c) => [c.name, c.durationMs]),
+    [
+      ['tapOnElement', 40],
+      ['assertConditionCommand', 700],
+    ]
+  )
+})
