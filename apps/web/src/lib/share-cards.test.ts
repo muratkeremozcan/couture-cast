@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { ResponseError, shareCardSharedEventSchema } from '@couture/api-client'
 import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
 import { useMswHandlers } from '../test-utils/msw/runtime'
+import { currentI18n } from '../i18n'
 import { browserAnalytics } from '../analytics/browser-analytics'
 import {
   SHARE_CARD_FILE_NAME,
@@ -365,30 +366,37 @@ describe('web share-card Web Share boundary', () => {
       nativeShare: false,
     })
   })
-  it('U-WEB-SHARE-LIB: one capture holds only the four business keys and analytics failures are swallowed', () => {
+  it('U-WEB-SHARE-LIB: one capture holds only the four business keys and the locale, and analytics failures are swallowed', async () => {
     vi.spyOn(performance, 'now').mockReturnValue(1500.4)
     const capture = vi
       .spyOn(browserAnalytics, 'capture')
       .mockImplementation(() => undefined)
+    await currentI18n().changeLanguage('pt-BR')
     captureShareCardShared({ outcome: 'handed_off', target: 'unknown' }, 250)
     expect(capture).toHaveBeenCalledExactlyOnceWith('share_card_shared', {
       client: 'web',
       target: 'unknown',
       outcome: 'handed_off',
       duration_ms: 1250,
+      locale: 'pt-BR',
     })
-    expect(shareCardSharedEventSchema.safeParse(capture.mock.calls[0]![1]).success).toBe(
-      true
-    )
+    // The business keys alone still pass the strict four-key schema.
+    const { locale, ...business } = capture.mock.calls[0]![1] as Record<string, unknown>
+    expect(locale).toBe('pt-BR')
+    expect(shareCardSharedEventSchema.safeParse(business).success).toBe(true)
+    // A language outside the catalog falls back to the default supported locale.
+    await currentI18n().changeLanguage('xx')
     captureShareCardShared(
       { outcome: 'failed', target: 'none', code: 'activation_expired' },
       -86_400_000
     )
+    await currentI18n().changeLanguage('en-US')
     expect(capture.mock.calls[1]![1]).toEqual({
       client: 'web',
       target: 'none',
       outcome: 'failed',
       duration_ms: 86_400_000,
+      locale: 'en-US',
     })
     captureShareCardShared({ outcome: 'dismissed', target: 'none' }, 9_999)
     expect(capture.mock.calls[2]![1]).toMatchObject({ duration_ms: 0 })

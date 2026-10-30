@@ -11,6 +11,11 @@ import {
   type ShareCardShareOutcome,
   type ShareCardShareTarget,
 } from '@couture/api-client'
+import {
+  defaultSupportedLocale,
+  resolveSupportedLocale,
+} from '@couture/api-client/contracts/http'
+import { currentI18n } from '../i18n'
 import { browserAnalytics } from '../analytics/browser-analytics'
 import { createWebApiClient } from './api-client'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
@@ -138,21 +143,26 @@ const MAX_SHARE_DURATION_MS = 86_400_000
 /**
  * One share_card_shared capture for a settled attempt, timed from the tap. Called after
  * the outcome is shown; a synchronous throw or an async rejection is swallowed because
- * analytics never changes a share outcome.
+ * analytics never changes a share outcome. The four business keys are validated against
+ * the result model first; the resolved supported locale is added after, as on mobile,
+ * and the SDK boundary allowlist keeps it.
  */
 export function captureShareCardShared(result: WebShareResult, activatedAt: number) {
   try {
     const elapsed = Math.round(performance.now() - activatedAt)
-    const properties = trackShareCardShared({
+    const business = trackShareCardShared({
       client: 'web',
       target: result.target,
       outcome: result.outcome,
       duration_ms: Math.min(MAX_SHARE_DURATION_MS, Math.max(0, elapsed)),
     })
-    const returned: unknown = browserAnalytics.capture(
-      SHARE_CARD_SHARED_EVENT,
-      properties
-    )
+    // The same resolution the dialog uses for the card's own locale.
+    const locale =
+      resolveSupportedLocale(currentI18n().language) ?? defaultSupportedLocale
+    const returned: unknown = browserAnalytics.capture(SHARE_CARD_SHARED_EVENT, {
+      ...business,
+      locale,
+    })
     if (returned instanceof Promise) returned.catch(() => undefined)
   } catch {
     // Swallowed: the member already has the outcome.

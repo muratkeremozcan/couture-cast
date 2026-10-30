@@ -710,6 +710,7 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
         target: 'unknown',
         outcome: 'handed_off',
         duration_ms: expect.any(Number) as number,
+        locale: 'en-US',
       },
     ])
     expect(handoff).not.toHaveBeenCalled()
@@ -729,6 +730,7 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
         target: 'none',
         outcome: 'failed',
         duration_ms: expect.any(Number) as number,
+        locale: 'en-US',
       },
     ])
     const first = webShare.mock.calls[0]![0].files[0]
@@ -828,6 +830,7 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
         target: 'none',
         outcome: 'dismissed',
         duration_ms: expect.any(Number) as number,
+        locale: 'en-US',
       },
     ])
   })
@@ -862,6 +865,7 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
           target: 'none',
           outcome: 'failed',
           duration_ms: expect.any(Number) as number,
+          locale: 'en-US',
         },
       ])
     }
@@ -889,6 +893,7 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
         target: 'none',
         outcome: 'failed',
         duration_ms: expect.any(Number) as number,
+        locale: 'en-US',
       },
     ])
     await userEvent.click(refresh)
@@ -923,43 +928,99 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
     expect(requests).toHaveLength(2)
     expect(handoff).not.toHaveBeenCalled()
   })
-  it.each(['identity', 'close'] as const)(
-    'C-WEB-SHARE-DIALOG IO10: an attempt superseded by %s emits no event and no feedback',
+  it('C-WEB-SHARE-DIALOG IO10: an attempt superseded by an identity change emits no event and no feedback', async () => {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const { button } = await openWithShare()
+    // The sheet is still open when the member signs out.
+    webShare.mockImplementationOnce(() => held)
+    fireEvent.click(button)
+    await waitFor(() => expect(webShare).toHaveBeenCalledOnce())
+    act(() => {
+      identity.member = null
+      window.dispatchEvent(new Event('couture:session'))
+    })
+    expect(screen.queryByTestId('share-card-preview')).not.toBeInTheDocument()
+    await act(async () => {
+      release()
+      await held
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(shareEvents(capture)).toEqual([])
+    expect(screen.queryByText(enUS.shareCard.sentToApp)).not.toBeInTheDocument()
+  })
+  it.each(['close', 'composition'] as const)(
+    'C-WEB-SHARE-DIALOG IO10: a %s during the share prepare settles one failed event with no feedback and no handoff',
     async (change) => {
       let release!: () => void
       const held = new Promise<void>((resolve) => {
         release = resolve
       })
-      const { button } = await openWithShare()
-      if (change === 'identity') {
-        // The sheet is still open when the member signs out.
-        webShare.mockImplementationOnce(() => held)
-        fireEvent.click(button)
-        await waitFor(() => expect(webShare).toHaveBeenCalledOnce())
-        act(() => {
-          identity.member = null
-          window.dispatchEvent(new Event('couture:session'))
+      useShareHandlers(async () => {
+        await held
+        return approved()
+      })
+      const { image, button } = await openWithShare()
+      fireEvent.click(button)
+      await waitFor(() => expect(requests).toHaveLength(2))
+      if (change === 'close') await userEvent.keyboard('{Escape}')
+      else
+        await act(async () => {
+          await currentI18n().changeLanguage('fr-FR')
         })
-        expect(screen.queryByTestId('share-card-preview')).not.toBeInTheDocument()
-      } else {
-        useShareHandlers(async () => {
-          await held
-          return approved()
-        })
-        fireEvent.click(button)
-        await waitFor(() => expect(requests).toHaveLength(2))
-        await userEvent.keyboard('{Escape}')
-      }
       await act(async () => {
         release()
         await held
         await new Promise((resolve) => setTimeout(resolve, 20))
       })
-      expect(shareEvents(capture)).toEqual([])
+      expect(webShare).not.toHaveBeenCalled()
+      expect(shareEvents(capture)).toEqual([
+        {
+          client: 'web',
+          target: 'none',
+          outcome: 'failed',
+          duration_ms: expect.any(Number) as number,
+          locale: change === 'close' ? 'en-US' : 'fr-FR',
+        },
+      ])
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
       expect(screen.queryByText(enUS.shareCard.sentToApp)).not.toBeInTheDocument()
-      if (change === 'close') expect(webShare).not.toHaveBeenCalled()
+      if (change === 'composition') {
+        // The replacement preview loads and Share is ready again for a new attempt.
+        await waitFor(() =>
+          expect(screen.getByTestId('share-card-preview')).not.toBe(image)
+        )
+        fireEvent.load(screen.getByTestId('share-card-preview'))
+        await waitFor(() =>
+          expect(screen.getByTestId('share-card-share')).not.toHaveAttribute(
+            'aria-disabled'
+          )
+        )
+      }
     }
   )
+  it('C-WEB-SHARE-DIALOG R-007: a new presentation of the same composition ends the authorization', async () => {
+    const { image, button } = await openWithShare()
+    webShare.mockImplementationOnce(() => shareError('NotAllowedError'))
+    fireEvent.click(button)
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'))
+    // A render failure and Retry load the same composition as a new presentation.
+    fireEvent.error(image)
+    await userEvent.click(await screen.findByTestId('share-card-recovery'))
+    await waitFor(() => expect(screen.getByTestId('share-card-preview')).not.toBe(image))
+    fireEvent.load(screen.getByTestId('share-card-preview'))
+    const again = screen.getByTestId('share-card-share')
+    await waitFor(() => expect(again).not.toHaveAttribute('aria-disabled'))
+    fireEvent.click(again)
+    // No synchronous handoff with the former presentation's File: it reauthorizes first.
+    expect(webShare).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(webShare).toHaveBeenCalledTimes(2))
+    expect(
+      requests.filter((body) => (body as { purpose: string }).purpose === 'share')
+    ).toHaveLength(2)
+  })
   it('C-WEB-SHARE-DIALOG IO11: a capture that throws or rejects never changes the outcome', async () => {
     const { button } = await openWithShare()
     capture.mockImplementationOnce(() => {

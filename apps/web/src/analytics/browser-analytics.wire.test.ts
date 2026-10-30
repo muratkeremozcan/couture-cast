@@ -58,6 +58,7 @@ import { useMswHandlers } from '../test-utils/msw/runtime'
 import { currentI18n } from '../i18n'
 import enUS from '../i18n/locales/en-US.json'
 import { ShareCardControl } from '../app/components/share-card-dialog'
+import { captureShareCardShared } from '../lib/share-cards'
 import {
   SHARE_CARD_ANALYTICS_DROPPED,
   browserAnalytics,
@@ -98,16 +99,18 @@ async function flushBatches() {
       batches.push(await decode(request.body))
   return batches
 }
-// The web client never adds locale, so its allowlist is the shared one without it.
-const WEB_ALLOWLIST = SHARE_CARD_SHARED_ALLOWED_PROPERTIES.filter(
-  (key) => key !== 'locale'
-).sort()
-const shareProperties = trackShareCardShared({
-  client: 'web',
-  target: 'unknown',
-  outcome: 'handed_off',
-  duration_ms: 1250,
-})
+// The web client sends every allowlisted key: the business keys, its locale, the GeoIP
+// switch and the SDK identity and transport keys.
+const WEB_ALLOWLIST = [...SHARE_CARD_SHARED_ALLOWED_PROPERTIES].sort()
+const shareProperties = {
+  ...trackShareCardShared({
+    client: 'web',
+    target: 'unknown',
+    outcome: 'handed_off',
+    duration_ms: 1250,
+  }),
+  locale: 'en-US',
+}
 
 beforeAll(async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] })
@@ -126,7 +129,16 @@ afterAll(() => {
 
 describe('I-SHARE-WIRE-WEB: the serialized posthog-js batch', () => {
   it('holds one share event with only the web allowlist and its envelope intact', async () => {
-    browserAnalytics.capture('share_card_shared', shareProperties)
+    // The dialog's own capture path, in a non-default locale.
+    await currentI18n().changeLanguage('de-DE')
+    try {
+      captureShareCardShared(
+        { outcome: 'handed_off', target: 'unknown' },
+        performance.now() - 1250
+      )
+    } finally {
+      await currentI18n().changeLanguage('en-US')
+    }
     browserAnalytics.capture('ritual_created', { ritual_type: 'daily_outfit' })
     const events = (await flushBatches()).flat()
     const shares = events.filter(({ event }) => event === 'share_card_shared')
@@ -134,7 +146,11 @@ describe('I-SHARE-WIRE-WEB: the serialized posthog-js batch', () => {
     const [share] = shares
     expect(Object.keys(share!.properties).sort()).toEqual(WEB_ALLOWLIST)
     expect(share!.properties).toMatchObject({
-      ...shareProperties,
+      client: 'web',
+      target: 'unknown',
+      outcome: 'handed_off',
+      duration_ms: expect.any(Number) as number,
+      locale: 'de-DE',
       $geoip_disable: true,
       token: 'phc_wire_test',
       distinct_id: 'member-123',

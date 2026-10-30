@@ -1567,6 +1567,7 @@ test('P-SHARE-BYTES: the shared File is the previewed PNG and one handed_off eve
       target: 'unknown',
       outcome: 'handed_off',
       duration_ms: expect.any(Number),
+      locale: 'en-US',
     },
   ])
   await expect(dialog.getByText(shareCopy().shared, { exact: true })).toHaveCount(0)
@@ -1598,6 +1599,7 @@ test('P-SHARE-DISMISS: a closed share sheet keeps the preview, watermark and Dow
       target: 'none',
       outcome: 'dismissed',
       duration_ms: expect.any(Number),
+      locale: 'en-US',
     },
   ])
 })

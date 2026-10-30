@@ -50,7 +50,7 @@ const buttonLabel = (busy: boolean) => (busy ? 'saving' : 'download')
 export const SHARE_AUTHORIZATION_TTL_MS = 60_000
 type ShareAuthorization = {
   member: string | null
-  key: string
+  presentation: string
   digest: string
   file: File
   expiresAt: number
@@ -221,6 +221,9 @@ export function ShareCardDialog({
   const controller = useRef<AbortController | null>(null)
   const sequence = useRef(0)
   const saving = useRef(false)
+  // Bumped on every identity change, so a share attempt can tell a sign-out or member
+  // switch (which suppresses its event) from a close or composition change.
+  const identityEpoch = useRef(0)
   const titleRef = useRef<HTMLHeadingElement>(null)
   const saveRef = useRef<HTMLButtonElement>(null)
   const sourceIdentity = JSON.stringify(source)
@@ -273,6 +276,7 @@ export function ShareCardDialog({
     setCapability(null)
     setShareNote(null)
     revokeAuthorization(authorization)
+    identityEpoch.current++
     controller.current?.abort()
     sequence.current++
   }, [member])
@@ -406,9 +410,10 @@ export function ShareCardDialog({
   }
   /**
    * One Share activation that passes the duplicate guard is one attempt, and every
-   * settled attempt captures exactly one share_card_shared. An attempt superseded
-   * before its handoff (close, composition or identity change) settles nothing; after
-   * the handoff only an identity change suppresses its event.
+   * attempt captures exactly one share_card_shared. Only an identity change or sign-out
+   * suppresses it. A close or composition change before the handoff settles the
+   * attempt as failed/none without feedback; after the handoff the attempt keeps the
+   * outcome the browser reports, again without feedback.
    */
   const share = () => {
     if (!current || !valid || loaded !== presentation || saving.current || busy) return
@@ -420,7 +425,7 @@ export function ShareCardDialog({
     if (
       held &&
       (held.member !== member ||
-        held.key !== key ||
+        held.presentation !== presentation ||
         held.digest !== digest ||
         Date.now() >= held.expiresAt)
     )
@@ -438,21 +443,36 @@ export function ShareCardDialog({
     setMessage('sharing')
     const abort = new AbortController()
     controller.current = abort
-    const original = { member, key, generation: sequence.current }
+    const original = {
+      member,
+      key,
+      presentation,
+      generation: sequence.current,
+      identity: identityEpoch.current,
+    }
     const stillCurrent = () =>
       !abort.signal.aborted &&
       latest.current.open &&
       latest.current.key === original.key &&
       latest.current.member === original.member &&
       sequence.current === original.generation
+    // The live session read also covers a sign-out that unmounts the dialog before it
+    // re-renders with the new identity.
+    const identityChanged = () =>
+      webSessionIdentity() !== original.member ||
+      identityEpoch.current !== original.identity
     const release = () => {
       saving.current = false
       setSharing(false)
     }
-    const settle = (result: WebShareResult, handedOff: boolean) => {
+    const shareFailure: WebShareResult = {
+      outcome: 'failed',
+      target: 'none',
+      code: 'share_error',
+    }
+    const settle = (result: WebShareResult) => {
       release()
-      if (latest.current.member !== original.member) return
-      if (!handedOff && !stillCurrent()) return
+      if (identityChanged()) return
       if (stillCurrent()) {
         setBusy(false)
         const note = shareFeedback(result)
@@ -470,7 +490,7 @@ export function ShareCardDialog({
       captureShareCardShared(result, activatedAt)
     }
     if (handoff) {
-      void handoff.then((result) => settle(result, true))
+      void handoff.then(settle)
       return
     }
     void (async () => {
@@ -494,17 +514,17 @@ export function ShareCardDialog({
           captureShareCardShared({ outcome: 'failed', target: 'none' }, activatedAt)
           return
         }
-        settle({ outcome: 'failed', target: 'none', code: 'share_error' }, false)
+        settle(shareFailure)
         return
       }
       if (!stillCurrent()) {
-        release()
+        settle(shareFailure)
         return
       }
       clearAuthorization()
       authorization.current = {
         member,
-        key,
+        presentation: original.presentation,
         digest,
         file,
         expiresAt: Date.now() + SHARE_AUTHORIZATION_TTL_MS,
@@ -512,7 +532,7 @@ export function ShareCardDialog({
       }
       // The activation may have expired during the reauthorization; NotAllowedError
       // then keeps this authorization and asks for one more tap.
-      settle(await handOffShareCardFile(file), true)
+      settle(await handOffShareCardFile(file))
     })()
   }
   return (
