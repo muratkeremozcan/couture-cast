@@ -1,13 +1,25 @@
 import XCTest
 
 // The job log is the only place a failed audit is readable, so name each failing issue.
+func compactAuditText(_ text: String) -> String {
+  String(text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "|", with: "/").prefix(120))
+}
+
 @MainActor
 func shareCardAuditIssueLine(_ scope: String, _ issue: XCUIAccessibilityAuditIssue) -> String {
-  func compact(_ text: String) -> String {
-    String(text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "|", with: "/").prefix(120))
-  }
   let element = issue.element
-  return "CC68_AUDIT_ISSUE \(scope)|\(issue.auditType.rawValue)|\(compact(element?.identifier ?? "none"))|\(compact(element?.label ?? "none"))|\(compact(issue.compactDescription))"
+  return "CC68_AUDIT_ISSUE \(scope)|\(issue.auditType.rawValue)|\(compactAuditText(element?.identifier ?? "none"))|\(compactAuditText(element?.label ?? "none"))|\(compactAuditText(issue.compactDescription))"
+}
+
+/// An element-less issue names no text, so list what the screen exposes: the text it flags is not among these.
+@MainActor
+func shareCardAuditContextLines(_ scope: String, _ app: XCUIApplication) -> [String] {
+  func line(_ kind: String, _ element: XCUIElement) -> String {
+    let frame = element.frame
+    return "CC68_AUDIT_ISSUE \(scope)-context|\(kind)|\(compactAuditText(element.identifier))|\(compactAuditText(element.label))|\(Int(frame.minX)),\(Int(frame.minY)),\(Int(frame.width)),\(Int(frame.height))"
+  }
+  return app.staticTexts.allElementsBoundByIndex.prefix(24).map { line("staticText", $0) }
+    + app.images.allElementsBoundByIndex.prefix(8).map { line("image", $0) }
 }
 
 @MainActor

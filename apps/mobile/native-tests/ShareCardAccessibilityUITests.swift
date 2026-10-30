@@ -46,6 +46,24 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     throw last
   }
 
+  /// Home mounts and lays out again after a tab switch, and the audit reads pixels as well as the tree.
+  /// Audit only after the outfit opener exists and the visible text has stopped changing.
+  func settleHome() throws {
+    XCTAssertTrue(app.buttons.matching(identifier: "outfit-share-card-open").firstMatch.waitForExistence(timeout: 20))
+    func texts() -> [String] {
+      app.staticTexts.allElementsBoundByIndex.map { "\($0.label)@\(Int($0.frame.minY))" }
+    }
+    var previous = texts()
+    var stable = 0
+    let deadline = Date().addingTimeInterval(10)
+    while stable < 3 && Date() < deadline {
+      RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+      let current = texts()
+      stable = current == previous ? stable + 1 : 0
+      previous = current
+    }
+  }
+
   func openCard(waitForPreview: Bool = true) throws {
     if element("share-card-cancel").exists { element("share-card-cancel").tap() }
     element("tab-home").tap()
@@ -281,8 +299,10 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     try assertExistingHeader(tabs["community"]!, removedContentHeading: communityLabels["heading"] as! String)
     print("CC68_NATIVE_BEHAVIOR_PASS existing-header-labels")
     element("tab-home").tap()
+    try settleHome()
     try app.performAccessibilityAudit(for: .all) { issue in
       print(shareCardAuditIssueLine("home", issue))
+      shareCardAuditContextLines("home", self.app).forEach { print($0) }
       return false
     }
     try openCard()
