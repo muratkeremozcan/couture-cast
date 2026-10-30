@@ -74,7 +74,9 @@ function declaredOpenPostWorstCase() {
   // The guarded opener tap is a retry; every attempt repeats its waits and steps.
   const guarded = (b) => b.startsWith('- retry:')
   const attempts = (b) => Number(/maxRetries:\s*(\d+)/.exec(b)[1]) + 1
-  const sharedBlocks = blocks.filter((b) => guarded(b) || !/platform: (iOS|Android)/.test(b))
+  const sharedBlocks = blocks.filter(
+    (b) => guarded(b) || !/platform: (iOS|Android)/.test(b)
+  )
   const shared = sum(
     sharedBlocks.map((b) => {
       const part = cost(b)

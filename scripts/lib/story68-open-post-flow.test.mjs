@@ -56,9 +56,10 @@ test('the card is found on the feed surface, not through the highlighted deep-li
 })
 
 test('the opener tap is guarded: lift, tap and wait for the composer title, retried on a lost press', () => {
-  const guard = /- retry:\n\s+maxRetries: 2\n\s+commands:\n([\s\S]*?)\n- extendedWaitUntil:\n\s+visible:\n\s+id: share-card-preview-loaded/.exec(
-    flow
-  )
+  const guard =
+    /- retry:\n\s+maxRetries: 2\n\s+commands:\n([\s\S]*?)\n- extendedWaitUntil:\n\s+visible:\n\s+id: share-card-preview-loaded/.exec(
+      flow
+    )
   assert.ok(guard, 'retry sits right before the preview wait')
   const body = guard[1]
   assert.ok(body.indexOf('- swipe:') < body.indexOf('- tapOn:'))

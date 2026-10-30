@@ -95,7 +95,10 @@ describe('failed audit test digest', () => {
       swift,
       /performAccessibilityAudit\(for: \.all\) \{ issue in\n\s+print\(shareCardAuditIssueLine\("home", issue\)\)\n\s+shareCardAuditContextLines\("home", self\.app\)\.forEach \{ print\(\$0\) \}\n\s+return false\n/
     )
-    assert.match(swift, /element\("tab-home"\)\.tap\(\)\n\s+try settleHome\(\)\n\s+try app\.performAccessibilityAudit/)
+    assert.match(
+      swift,
+      /element\("tab-home"\)\.tap\(\)\n\s+try settleHome\(\)\n\s+try app\.performAccessibilityAudit/
+    )
     assert.match(
       swift,
       /if !allowed \{ print\(shareCardAuditIssueLine\(state, issue\)\) \}\n\s+return allowed/

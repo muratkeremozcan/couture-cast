@@ -40,8 +40,16 @@ export function story68FocusObservationHandler({
           !record.headings.every((label) => typeof label === 'string')
         )
           throw new Error('invalid_record')
-        const { session, sequence, identifier, label, posted, attached, header, headings } =
-          record
+        const {
+          session,
+          sequence,
+          identifier,
+          label,
+          posted,
+          attached,
+          header,
+          headings,
+        } = record
         response
           .writeHead(200, {
             'Content-Type': 'application/json',

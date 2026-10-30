@@ -818,7 +818,10 @@ test('the system surface records Apple resource ids, the breadcrumb and a return
 })
 
 test('a zero threshold keeps every command of the flow', (t) => {
-  const output = outputWith(t, [row('tapOnElement', 40), row('assertConditionCommand', 700)])
+  const output = outputWith(t, [
+    row('tapOnElement', 40),
+    row('assertConditionCommand', 700),
+  ])
   const directory = outputWith(t, [])
   const entry = recordIosCommandTimings({
     platform: 'ios',
