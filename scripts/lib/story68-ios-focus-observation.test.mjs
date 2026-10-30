@@ -79,3 +79,21 @@ describe('story68FocusObservationHandler', () => {
       assert.equal(request(options).response.status, 503)
   })
 })
+
+describe('story68FocusObservationHandler async container lookup', () => {
+  test('answers once an asynchronous container lookup resolves, and 503 when it rejects', async () => {
+    const answer = async (readContainer) => {
+      const result = request({ readContainer })
+      assert.equal(result.handled, true)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      return result.response
+    }
+    const ok = await answer(async () => container)
+    assert.equal(ok.status, 200)
+    assert.deepEqual(JSON.parse(ok.body), record)
+    const refused = await answer(async () => {
+      throw new Error('simctl_failed')
+    })
+    assert.equal(refused.status, 503)
+  })
+})

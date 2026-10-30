@@ -21,7 +21,7 @@ final class ShareCardFallbackUITests: XCTestCase {
     XCTAssertEqual(cancel.label, fixture["cancel"]!)
     for _ in 0..<8 where !cancel.isHittable { app.swipeUp() }
     XCTAssertTrue(cancel.isHittable)
-    let focusSequence = try readShareCardFocusObservation(self).sequence
+    let focusSequence = try awaitShareCardFocusObservation(self).sequence
     cancel.tap()
     let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element("share-card-title"))
     XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 20), .completed)

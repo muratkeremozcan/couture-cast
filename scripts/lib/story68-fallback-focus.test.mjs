@@ -63,7 +63,7 @@ test('actual asynchronous fallback runner serves UIKit observations while its na
   )
   try {
     await withIosFocusObservation(
-      { device, appId: 'com.couturecast.story68', run: () => container },
+      { device, appId: 'com.couturecast.story68', dataContainer: async () => container },
       async (port) => {
         const log = await recordedIosTest(
           { directory },
@@ -350,4 +350,29 @@ test('a failed native test prints what names the failed step before it rejects',
   assert.deepEqual(iosFallbackFailure.issues, ['fallback|3|none|none|Contrast failed'])
   assert.equal(iosFallbackFailure.tests[0].test, 'testX')
   assert.ok(iosFallbackFailure.tests[0].lines.includes('B.swift:9: error: boom'))
+})
+
+test('the observation server names the container once and answers while the lookup is pending', async () => {
+  const device = 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE'
+  const container = `/Users/test/Library/Developer/CoreSimulator/Devices/${device}/data/Containers/Data/Application/owned`
+  let lookups = 0
+  await withIosFocusObservation(
+    {
+      device,
+      appId: 'com.couturecast.story68',
+      dataContainer: async () => {
+        lookups++
+        return container
+      },
+    },
+    async (port) => {
+      for (let i = 0; i < 3; i++) {
+        const response = await fetch(`http://127.0.0.1:${port}/focus-observation`)
+        // The record file is absent here: the route answers 503, never a hang.
+        assert.equal(response.status, 503)
+      }
+    },
+    0
+  )
+  assert.equal(lookups, 1)
 })

@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { spawn, spawnSync } from 'node:child_process'
+import { execFile, spawn, spawnSync } from 'node:child_process'
+import { promisify } from 'node:util'
 import pg from 'pg'
 import { createServer } from 'node:http'
 import { story68FocusObservationHandler } from './story68-ios-focus-observation.mjs'
@@ -71,12 +72,30 @@ export async function recordedIosTest(ctx, args, name, spawnChild = spawn) {
     fs.closeSync(fd)
   }
 }
+const execFileText = promisify(execFile)
+/**
+ * The data container of the installed app. The lookup is asynchronous so a starved host never
+ * blocks the event loop that answers the XCUITest (run 40984431884: -1001 after the 2 s client
+ * timeout while a synchronous simctl call held the loop), and it is read once: the container
+ * path stays the same until the app is reinstalled.
+ */
 export async function withIosFocusObservation(ctx, work, port = 63068) {
+  const lookup =
+    ctx.dataContainer ??
+    (async () =>
+      (
+        await execFileText(
+          'xcrun',
+          ['simctl', 'get_app_container', ctx.device, ctx.appId, 'data'],
+          { timeout: 60_000 }
+        )
+      ).stdout)
+  let container
+  const readContainer = async () => (container ??= await lookup())
   const observe = story68FocusObservationHandler({
     device: ctx.device,
     appId: ctx.appId,
-    readContainer: () =>
-      ctx.run('xcrun', ['simctl', 'get_app_container', ctx.device, ctx.appId, 'data']),
+    readContainer,
   })
   const server = createServer((request, response) => {
     if (!observe(request, response)) response.writeHead(404).end()
@@ -86,6 +105,8 @@ export async function withIosFocusObservation(ctx, work, port = 63068) {
     server.listen(port, '127.0.0.1', resolve)
   })
   try {
+    // Resolve the container before the first request; a failure is retried by the next request.
+    await readContainer().catch(() => undefined)
     return await work(server.address().port)
   } finally {
     await new Promise((resolve) => server.close(resolve))

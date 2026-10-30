@@ -44,7 +44,7 @@ func readShareCardFocusObservation(_ test: XCTestCase) throws -> ShareCardFocusO
   let done = test.expectation(description: "Read actual attached UIKit focus-request target")
   var result: Result<ShareCardFocusObservation, Error>?
   var request = URLRequest(url: URL(string: "http://127.0.0.1:63068/focus-observation")!)
-  request.timeoutInterval = 2
+  request.timeoutInterval = 6
   URLSession.shared.dataTask(with: request) { data, response, error in
     result = Result {
       if let error { throw error }
@@ -55,8 +55,20 @@ func readShareCardFocusObservation(_ test: XCTestCase) throws -> ShareCardFocusO
     }
     done.fulfill()
   }.resume()
-  test.wait(for: [done], timeout: 3)
+  test.wait(for: [done], timeout: 8)
   return try XCTUnwrap(result).get()
+}
+
+/// The harness answers from a busy host; a transport failure is read again until the deadline.
+@MainActor
+func awaitShareCardFocusObservation(_ test: XCTestCase, within seconds: TimeInterval = 20) throws -> ShareCardFocusObservation {
+  let deadline = Date().addingTimeInterval(seconds)
+  var last: Error = ShareCardFocusObservationError.missingPostedTargetOrHeaderTrait
+  repeat {
+    do { return try readShareCardFocusObservation(test) } catch { last = error }
+    RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+  } while Date() < deadline
+  throw last
 }
 
 @MainActor
