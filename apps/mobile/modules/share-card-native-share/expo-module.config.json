@@ -1,0 +1,7 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["ShareCardNativeShareModule"] },
+  "android": {
+    "modules": ["expo.modules.sharecardnativeshare.ShareCardNativeShareModule"]
+  }
+}

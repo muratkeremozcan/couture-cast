@@ -1,0 +1,51 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.couturecast'
+version = '1.0.0'
+
+// The pure sources and their Robolectric tests also build alone in unit-tests/, without Expo:
+//   gradle -p unit-tests testDebugUnitTest
+android {
+  namespace 'expo.modules.sharecardnativeshare'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+    testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+  }
+  sourceSets {
+    main.java.srcDirs += 'src/expo/java'
+  }
+  // The receive test drives only framework activities, while the test APK would bundle React
+  // Native and Expo native libraries for every ABI. This library ships no native code, so these
+  // excludes only reach its own androidTest APK.
+  packaging {
+    jniLibs {
+      excludes += ['**/*.so']
+    }
+  }
+  testOptions {
+    unitTests {
+      includeAndroidResources = true
+    }
+  }
+}
+
+// Robolectric runs the SDK 36 runtime only on Java 21, while React Native pins the app's
+// compile toolchain to 17. The tests run on 21 whatever JDK compiled them.
+tasks.withType(Test).configureEach {
+  javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+dependencies {
+  implementation 'androidx.core:core:1.13.1'
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.robolectric:robolectric:4.16.1'
+  testImplementation 'androidx.test:core:1.6.1'
+  androidTestImplementation 'junit:junit:4.13.2'
+  androidTestImplementation 'androidx.test:core:1.6.1'
+  androidTestImplementation 'androidx.test:runner:1.6.2'
+  androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}

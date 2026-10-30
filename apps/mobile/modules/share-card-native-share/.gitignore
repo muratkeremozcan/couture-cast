@@ -1,0 +1,7 @@
+# Swift Package Manager and Gradle own these generated test/build artifacts.
+ios/.build/
+ios/.swiftpm/
+android/build/
+android/unit-tests/build/
+android/unit-tests/.gradle/
+android/unit-tests/local.properties

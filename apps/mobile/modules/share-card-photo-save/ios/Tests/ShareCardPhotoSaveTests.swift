@@ -92,4 +92,18 @@ final class ShareCardPhotoSaveTests: XCTestCase {
     try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
     XCTAssertThrowsError(try ShareCardPngFile.validateFile(link.absoluteString, digest, root))
   }
+
+  /// N-IOS-PNGFILE-PREFIX: Save stays `cc68-`-only; the share module's `cc69-share-*` handoff
+  /// files are refused here even when bytes, digest and folder are all valid.
+  func testCacheFileAcceptsPhotoSavePrefixAndRejectsShareHandoffFiles() throws {
+    let data = try approved()
+    let (file, root, digest) = try cacheFile(data)
+    XCTAssertEqual(try ShareCardPngFile.validateFile(file.absoluteString, digest, root), file)
+    let directory = file.deletingLastPathComponent()
+    for name in ["cc69-share-\(UUID().uuidString.lowercased()).png", "cc69-share-\(UUID().uuidString).png"] {
+      let share = directory.appendingPathComponent(name)
+      try data.write(to: share)
+      XCTAssertThrowsError(try ShareCardPngFile.validateFile(share.absoluteString, digest, root), name)
+    }
+  }
 }

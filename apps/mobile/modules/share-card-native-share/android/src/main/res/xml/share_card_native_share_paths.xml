@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the share-card handoff folder inside the app cache; nothing else is grantable. -->
+<paths>
+  <cache-path name="share_cards" path="share-cards/" />
+</paths>

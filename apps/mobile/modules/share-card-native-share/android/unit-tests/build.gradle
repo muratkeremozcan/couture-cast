@@ -1,0 +1,67 @@
+// Versions follow the app's React Native 0.81 toolchain (AGP 8.11, Kotlin 2.1.20, SDK 36).
+//   gradle testDebugUnitTest          Robolectric tests (pr-share-native-unit)
+//   gradle assembleDebugAndroidTest   the N-AND-RECEIVE instrumentation APK
+plugins {
+  id 'com.android.library' version '8.11.0'
+  id 'org.jetbrains.kotlin.android' version '2.1.20'
+}
+
+android {
+  namespace 'expo.modules.sharecardnativeshare'
+  compileSdk 36
+  defaultConfig {
+    minSdk 24
+    testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+  }
+  sourceSets {
+    // src/expo/java (the Expo bridge) is deliberately absent.
+    main {
+      manifest.srcFile '../src/main/AndroidManifest.xml'
+      java.srcDirs = ['../src/main/java']
+      res.srcDirs = ['../src/main/res']
+    }
+    test.java.srcDirs = ['../src/test/java']
+    // The same receive test the app build packages; this APK carries no React Native libraries.
+    androidTest {
+      manifest.srcFile '../src/androidTest/AndroidManifest.xml'
+      java.srcDirs = ['../src/androidTest/java']
+    }
+  }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+  kotlinOptions {
+    jvmTarget = '17'
+  }
+  testOptions {
+    unitTests {
+      includeAndroidResources = true
+      all {
+        // The provider policy test parses the module's own manifest and paths XML.
+        systemProperty 'shareCardModuleDir', file('..').absolutePath
+        testLogging {
+          events 'passed', 'skipped', 'failed'
+          exceptionFormat 'full'
+        }
+      }
+    }
+  }
+}
+
+// Robolectric runs the SDK 36 runtime only on Java 21, while React Native pins the app's
+// compile toolchain to 17. The tests run on 21 whatever JDK compiled them.
+tasks.withType(Test).configureEach {
+  javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+dependencies {
+  implementation 'androidx.core:core:1.13.1'
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.robolectric:robolectric:4.16.1'
+  testImplementation 'androidx.test:core:1.6.1'
+  androidTestImplementation 'junit:junit:4.13.2'
+  androidTestImplementation 'androidx.test:core:1.6.1'
+  androidTestImplementation 'androidx.test:runner:1.6.2'
+  androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}
