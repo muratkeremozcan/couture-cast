@@ -1,23 +1,17 @@
-# Story 6.8 iOS Expo Go proof: the runner has sent exp:// to the simulator. Expo Go is a fresh
-# install, so its first load shows the iOS open prompt and then the developer-menu onboarding over
-# the app, in a timing the host sets. Each pass waits up to 20 s for one of the three screens,
-# answers whichever is on screen and the loop ends as soon as the tab bar is visible. The window is
-# set by these waits: a check of an absent screen answers in about 0.5 s, so a count of checks alone
-# gave a window of 25 s (run 41002591476). A project that never loads fails on the named assertion
-# below, inside the process budget, so the failed-step hierarchy is captured. Only ids and Expo Go
-# text are matched.
+# Story 6.8 iOS Expo Go proof: the runner has built the launch bundle and sent exp:// to the
+# simulator. Expo Go is a fresh install, so its first load shows the iOS open prompt and then the
+# developer-menu onboarding over the app, in a timing the host sets. Each attempt answers whichever
+# of those screens is up, then waits for the tab bar; an overlay that covers the tab bar fails that
+# wait and the next attempt answers it. The window is these waits and nothing else: an optional
+# `extendedWaitUntil` returned in 0.8 s when nothing matched (run 41010366797), so the earlier loop
+# held 54 s instead of its declared 160 s. A project that never loads fails on the named wait,
+# inside the process budget, so the failed-step hierarchy is captured. Only ids and Expo Go text
+# are matched.
 appId: ${MAESTRO_APP_ID}
 ---
-- repeat:
-    while:
-      notVisible:
-        id: 'tab-home'
-    times: 8
+- retry:
+    maxRetries: 3
     commands:
-      - extendedWaitUntil:
-          visible: 'Open in .*|This is the developer menu.*|Connected to:'
-          timeout: 20000
-          optional: true
       - runFlow:
           when:
             visible: 'Open in .*'
@@ -34,8 +28,8 @@ appId: ${MAESTRO_APP_ID}
             visible: 'Connected to:'
           commands:
             - tapOn: 'Close'
-- extendedWaitUntil:
-    visible:
-      id: 'tab-home'
-    timeout: 30000
-    label: 'expo_go_project_not_loaded'
+      - extendedWaitUntil:
+          visible:
+            id: 'tab-home'
+          timeout: 45000
+          label: 'expo_go_project_not_loaded'

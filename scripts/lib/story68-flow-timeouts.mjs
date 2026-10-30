@@ -19,26 +19,25 @@ export const OPEN_APP_WORST_CASE_MS =
   FLOW_STARTUP_MS + 4 * (100_000 + 17 * CONDITION_CHECK_MS)
 
 /**
- * expo-go-open.yaml, the iOS Expo Go proof opener. A pass of its loop waits up to 20 s for the open
- * prompt or the developer menu, then runs the loop check and three `when` checks. An absent check
- * answered in about 0.5 s in run 41002591476 and a skipped one took up to 7.4 s in run 40992501585,
- * budgeted at 8 s, plus 4 s for the taps. The loop runs at most 8 passes, so the project has at
- * least 160 s of waits plus the named 30 s tab-bar wait, and a project that never loads fails
- * inside this budget with the failed-step hierarchy captured.
+ * expo-go-open.yaml, the iOS Expo Go proof opener. It runs one `retry` of 4 attempts. An attempt
+ * answers the open prompt and the developer-menu onboarding with three `when` checks, then waits
+ * 45 s for the tab bar. An absent check answered in about 0.5 s in run 41010366797 and a skipped
+ * one took up to 7.4 s in run 40992501585, budgeted at 8 s, plus 4 s for the taps. The project has
+ * at least 180 s of waits, and one that never loads fails on the named wait inside this budget
+ * with the failed-step hierarchy captured. An optional `extendedWaitUntil` is not used as a
+ * window: it returned in 0.8 s when nothing matched, so the loop of run 41010366797 held 54 s
+ * instead of the declared 160 s.
  * open-app.yaml, which this replaces for Expo Go, declares 100 s of waits per attempt and was pinned
  * to 120 s on iOS: the Maestro process was killed before it could name a failure.
  */
 export const EXPO_GO_OPEN_FLOW = 'maestro/story68/expo-go-open.yaml'
-export const EXPO_GO_OPEN_PASSES = 8
-export const EXPO_GO_PASS_WAIT_MS = 20_000
+export const EXPO_GO_OPEN_ATTEMPTS = 4
+export const EXPO_GO_ATTEMPT_WAIT_MS = 45_000
 export const EXPO_GO_CONDITION_CHECK_MS = 8_000
-export const EXPO_GO_OPEN_PASS_MS =
-  EXPO_GO_PASS_WAIT_MS + 4 * EXPO_GO_CONDITION_CHECK_MS + 4_000
-export const EXPO_GO_OPEN_FINAL_WAIT_MS = 30_000
+export const EXPO_GO_OPEN_ATTEMPT_MS =
+  EXPO_GO_ATTEMPT_WAIT_MS + 3 * EXPO_GO_CONDITION_CHECK_MS + 4_000
 export const EXPO_GO_OPEN_WORST_CASE_MS =
-  FLOW_STARTUP_MS +
-  EXPO_GO_OPEN_PASSES * EXPO_GO_OPEN_PASS_MS +
-  EXPO_GO_OPEN_FINAL_WAIT_MS
+  FLOW_STARTUP_MS + EXPO_GO_OPEN_ATTEMPTS * EXPO_GO_OPEN_ATTEMPT_MS
 
 /**
  * open-post.yaml on iOS (its slower platform): 10 s + 20 s + 20 s of declared waits, and 13

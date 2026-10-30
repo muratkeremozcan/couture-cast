@@ -263,8 +263,12 @@ function openOsSettings() {
   return { foregroundMarkers: IOS_SETTINGS_MARKERS }
 }
 // A cold Metro needs longer to build the launch bundle than open-app.yaml waits for the
-// tab bar, so the dev client is only pointed at Metro once that exact bundle is built.
+// tab bar, so the dev client is only pointed at Metro once that exact bundle is built. Expo Go
+// asks the same manifest for the same bundle, and the Expo Go proof runs in its own process after
+// the shard's other flows: run 41010366797 sent it to Metro unwarmed and it stayed on its
+// loading screen for the whole window.
 const DEV_CLIENT_URL = 'couturecast-story68://expo-development-client/'
+const EXPO_GO_URL = 'exp://127.0.0.1:8089'
 const LAUNCH_BUNDLE_DEADLINE_SECONDS = 600
 let launchBundleWarm = false
 function warmLaunchBundle() {
@@ -284,6 +288,7 @@ function warmLaunchBundle() {
   const bundle = new URL(manifest.launchAsset?.url ?? '')
   if (bundle.origin !== 'http://127.0.0.1:8089' || !bundle.pathname.endsWith('.bundle'))
     throw new Error('owned_metro_launch_bundle_required')
+  const started = Date.now()
   run('curl', [
     '-sf',
     '--max-time',
@@ -293,11 +298,16 @@ function warmLaunchBundle() {
     bundle.href,
   ])
   launchBundleWarm = true
+  console.log(
+    JSON.stringify({
+      launchBundleWarm: { seconds: Math.round((Date.now() - started) / 100) / 10 },
+    })
+  )
 }
 function openUrl(url) {
   requireDevice()
   reverse()
-  if (url.startsWith(DEV_CLIENT_URL)) warmLaunchBundle()
+  if (url.startsWith(DEV_CLIENT_URL) || url.startsWith(EXPO_GO_URL)) warmLaunchBundle()
   if (platform === 'ios') run('xcrun', ['simctl', 'openurl', device, url])
   else
     run(adb, [
@@ -1159,7 +1169,7 @@ if (command === 'prebuild') {
       appId,
       downloaded,
     })
-    openUrl('exp://127.0.0.1:8089')
+    openUrl(EXPO_GO_URL)
     maestro('maestro/story68/expo-go-open.yaml')
     await signin()
     const before = JSON.stringify(nativeOriginalPaths())
