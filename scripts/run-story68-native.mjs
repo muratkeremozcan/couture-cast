@@ -17,6 +17,7 @@ import { story68FocusObservationHandler } from './lib/story68-ios-focus-observat
 import { startWeatherProviderDouble } from './weather-provider-double.mjs'
 import {
   closedShareCardAuditReport,
+  failedAuditContext,
   failedAuditIssues,
   failedAuditTestDigest,
 } from './lib/share-card-audit-report.mjs'
@@ -985,6 +986,7 @@ if (command === 'prebuild') {
         JSON.stringify({
           iosAuditFailure: {
             issues: failedAuditIssues(auditText),
+            context: failedAuditContext(auditText),
             tests: failedAuditTestDigest(auditText),
           },
         })

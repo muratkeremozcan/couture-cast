@@ -2,7 +2,7 @@ import XCTest
 
 // The job log is the only place a failed audit is readable, so name each failing issue.
 func compactAuditText(_ text: String) -> String {
-  String(text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "|", with: "/").prefix(120))
+  String(text.components(separatedBy: .newlines).joined(separator: " ").replacingOccurrences(of: "|", with: "/").prefix(120))
 }
 
 @MainActor
