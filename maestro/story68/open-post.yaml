@@ -80,6 +80,8 @@ appId: ${MAESTRO_APP_ID}
 # distance on iOS, taps, and waits for the composer title, so a lost press is taken again.
 # The lift and the tap run only while the composer title is absent: a press that lands after
 # the wait gave up has opened the composer, and a swipe or tap there would hit its controls.
+# The title is checked again after the lift, because the composer can open during the swipe
+# and its animation wait, and a tap by id under the open modal cannot resolve.
 - retry:
     maxRetries: 2
     commands:
@@ -97,8 +99,13 @@ appId: ${MAESTRO_APP_ID}
                       end: 50%, 55%
                       duration: 1000
                   - waitForAnimationToEnd
-            - tapOn:
-                id: community-share-card-open-${MAESTRO_POST_ID}
+            - runFlow:
+                when:
+                  notVisible:
+                    id: share-card-title
+                commands:
+                  - tapOn:
+                      id: community-share-card-open-${MAESTRO_POST_ID}
       - extendedWaitUntil:
           visible:
             id: share-card-title

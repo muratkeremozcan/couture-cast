@@ -55,27 +55,78 @@ test('the card is found on the feed surface, not through the highlighted deep-li
   assert.match(flow, /community-card-author-\$\{MAESTRO_POST_ID\}/)
 })
 
-test('the opener tap is guarded: lift, tap and wait for the composer title, retried on a lost press', () => {
-  const guard =
+const OPENER = 'community-share-card-open-${MAESTRO_POST_ID}'
+const guardHead =
+  /^\s+- runFlow:\n\s+when:\n\s+notVisible:\n\s+id: share-card-title\n\s+commands:\n/
+
+/** The retry body of the opener attempt: its top-level commands, in order. */
+function attemptCommands(text) {
+  const retry =
     /- retry:\n\s+maxRetries: 2\n\s+commands:\n([\s\S]*?)\n- extendedWaitUntil:\n\s+visible:\n\s+id: share-card-preview-loaded/.exec(
-      flow
+      text
     )
-  assert.ok(guard, 'retry sits right before the preview wait')
-  const body = guard[1]
-  // A press that lands late has opened the composer: neither the lift nor the tap may run then.
-  const guarded =
-    /- runFlow:\n\s+when:\n\s+notVisible:\n\s+id: share-card-title\n\s+commands:\n([\s\S]*)\n\s+- extendedWaitUntil:/.exec(
-      body
+  return retry ? retry[1].split(/\n(?= {6}- )/) : null
+}
+
+/** Everything wrong with the attempt: the lift and the tap are only reachable while the title is absent. */
+function openerAttemptProblems(text) {
+  const items = attemptCommands(text)
+  if (!items || items.length !== 2) return ['retry holds a guard and the strict wait']
+  const [guard, wait] = items
+  const problems = []
+  if (!guardHead.test(guard)) problems.push('attempt not guarded on the title')
+  const inner = guard.replace(guardHead, '').split(/\n(?= {12}- )/)
+  if (inner.length !== 2) problems.push('guard holds the lift and the guarded tap')
+  const [lift = '', tap = ''] = inner
+  if (!/platform: iOS/.test(lift) || !/- swipe:/.test(lift) || /- tapOn:/.test(lift))
+    problems.push('the lift is an iOS-only swipe without a tap')
+  if (
+    !guardHead.test(tap) ||
+    tap.replace(guardHead, '').trim() !== `- tapOn:\n                      id: ${OPENER}`
+  )
+    problems.push('the opener tap is alone inside its own title guard')
+  if (/- swipe:|- tapOn:/.test(wait)) problems.push('nothing acts after the guard')
+  if (
+    !/^\s+- extendedWaitUntil:\n\s+visible:\n\s+id: share-card-title\n\s+timeout: 5000\n\s+label: 'share_card_press_not_received'$/.test(
+      wait
     )
-  assert.ok(guarded, 'lift and tap sit inside the composer-title-absent guard')
-  assert.match(guarded[1], /- swipe:/)
-  assert.match(guarded[1], /- tapOn:/)
-  assert.ok(body.indexOf('- swipe:') < body.indexOf('- tapOn:'))
-  assert.ok(body.indexOf('- tapOn:') < body.lastIndexOf('id: share-card-title'))
-  assert.match(body, /platform: iOS/)
-  assert.match(body, /label: 'share_card_press_not_received'/)
+  )
+    problems.push('the strict wait names share_card_press_not_received')
+  return problems
+}
+
+test('the opener tap is guarded twice: attempt and tap, then a strict wait for the composer title', () => {
+  assert.deepEqual(openerAttemptProblems(flow), [])
   // The only tapOn of the opener sits inside the retry.
   const taps = [...flow.matchAll(/- tapOn:\n\s+id: community-share-card-open/g)]
   assert.equal(taps.length, 1)
   assert.ok(flow.indexOf('- retry:') < taps[0].index)
+})
+
+test('the opener attempt check rejects a swipe or tap that sits outside its guards', () => {
+  const guarded = attemptCommands(flow)[0]
+  const tapBlock = guarded.slice(guarded.lastIndexOf('            - runFlow:'))
+  const mutations = {
+    'a tap after the outer guard': flow.replace(
+      '      - extendedWaitUntil:\n          visible:\n            id: share-card-title',
+      `      - tapOn:\n          id: ${OPENER}\n      - extendedWaitUntil:\n          visible:\n            id: share-card-title`
+    ),
+    'a swipe after the outer guard': flow.replace(
+      '      - extendedWaitUntil:\n          visible:\n            id: share-card-title',
+      '      - swipe:\n          start: 50%, 70%\n          end: 50%, 55%\n      - extendedWaitUntil:\n          visible:\n            id: share-card-title'
+    ),
+    'a tap outside the inner guard': flow.replace(
+      tapBlock,
+      `            - tapOn:\n                id: ${OPENER}\n`
+    ),
+    'no outer guard': flow.replace(
+      / {6}- runFlow:\n\s+when:\n\s+notVisible:\n\s+id: share-card-title\n\s+commands:\n/,
+      '      - runFlow:\n          when:\n            platform: iOS\n          commands:\n'
+    ),
+    'a weaker wait': flow.replace("label: 'share_card_press_not_received'", ''),
+  }
+  for (const [name, mutated] of Object.entries(mutations)) {
+    assert.notEqual(mutated, flow, `${name} must change the flow`)
+    assert.notDeepEqual(openerAttemptProblems(mutated), [], name)
+  }
 })

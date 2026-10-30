@@ -41,14 +41,14 @@ export const EXPO_GO_OPEN_WORST_CASE_MS =
  * open-post.yaml on iOS (its slower platform): 10 s + 20 s + 20 s of declared waits, and 13
  * budgeted steps outside the guarded opener tap: 2 feed-state checks, 3 up and 5 down walk
  * iterations, 2 opener iterations and the post assertion. The opener tap is a retry of
- * maxRetries 2 (3 attempts); an attempt is the composer-title guard check, the lift swipe and
- * the 5 s wait for the composer title. Every named failure fires inside this budget, so a
+ * maxRetries 2 (3 attempts); an attempt is the composer-title guard check, the lift swipe, the
+ * guard check before the tap and the 5 s wait for the composer title. Every named failure fires inside this budget, so a
  * missing post is reported, not killed.
  */
 export const OPEN_POST_TAP_ATTEMPTS = 3
 export const OPEN_POST_PRESS_WAIT_MS = 5_000
-// The guard check and the lift swipe each cost one budgeted step per attempt.
-export const OPEN_POST_ATTEMPT_STEPS = 2
+// The attempt guard, the lift swipe and the guard before the tap each cost one budgeted step.
+export const OPEN_POST_ATTEMPT_STEPS = 3
 export const OPEN_POST_WORST_CASE_MS =
   FLOW_STARTUP_MS +
   50_000 +

@@ -112,7 +112,7 @@ describe('Maestro flow timeouts', () => {
     assert.equal(OPEN_POST_WORST_CASE_MS, Math.max(ios, android))
     assert.ok(flowTimeoutMs(openPost) >= Math.max(ios, android) * FLOW_TIMEOUT_MARGIN)
     // The old 38-iteration walk could not be covered by any sane budget.
-    assert.ok(flowTimeoutMs(openPost) <= 270_000)
+    assert.ok(flowTimeoutMs(openPost) <= 300_000)
   })
 
   test('open-app covers its declared worst case with the stated margin', () => {
