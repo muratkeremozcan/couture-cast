@@ -12,8 +12,8 @@ export const requiredShareCardJobs = Object.freeze([
   'ios-build',
   'ios-shard',
   'ios-evidence',
-  // `ios-expo-go` (the Expo Go proof) is not here: it has never passed in CI, so it runs nightly
-  // and on dispatch outside this gate. Follow-up: require it once it has passed.
+  // The Expo Go proof on its own fresh simulator.
+  'ios-expo-go',
 ])
 
 // The lanes that run on a pull request. Every other required job drives a device or an emulator

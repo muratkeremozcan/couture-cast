@@ -10,6 +10,7 @@ import {
   EXPO_GO_OPEN_FLOW,
   EXPO_GO_OPEN_WAITS_MS,
   EXPO_GO_TAP_MS,
+  EXPO_GO_TAPS,
   EXPO_GO_OPEN_WORST_CASE_MS,
   FLOW_STARTUP_MS,
   FLOW_TIMEOUT_MARGIN,
@@ -137,21 +138,25 @@ describe('Maestro flow timeouts', () => {
     const waits = [...commands.matchAll(/^\s*timeout:\s*(\d+)\s*$/gm)].map((m) =>
       Number(m[1])
     )
-    // The checks are the three `when` conditions, one per taps block.
+    // One `when` check guards the open-prompt tap; the second tap is the sheet backdrop.
     const checks = (commands.match(/^\s*when:\s*$/gm) ?? []).length
     const taps = (commands.match(/^\s*- tapOn:/gm) ?? []).length
     assert.deepEqual(waits, [...EXPO_GO_OPEN_WAITS_MS])
     assert.equal(checks, EXPO_GO_CONDITION_CHECKS)
-    assert.equal(taps, EXPO_GO_CONDITION_CHECKS)
+    assert.equal(taps, EXPO_GO_TAPS)
     // A wait Maestro runs again returns at once (run 41019906459), so none may be in a loop.
     assert.doesNotMatch(commands, /^\s*-?\s*(?:retry|repeat):/m)
-    // Only the two screens that may be absent are optional; the last wait names the failure.
-    assert.equal((commands.match(/optional: true/g) ?? []).length, 2)
-    assert.match(commands, /label: 'expo_go_project_not_loaded'\s*$/)
+    // Only the open prompt may be absent; the project load and the dismissed sheet are named.
+    assert.equal((commands.match(/optional: true/g) ?? []).length, 1)
+    assert.match(commands, /label: 'expo_go_project_not_loaded'/)
+    assert.match(commands, /label: 'expo_go_developer_menu_left_open'\s*$/)
+    // The developer-menu sheet is not in the hierarchy, so nothing may wait on its text.
+    assert.doesNotMatch(commands, /developer menu|Continue|Connected to/)
     const worst =
       FLOW_STARTUP_MS +
       waits.reduce((total, wait) => total + wait, 0) +
-      checks * (EXPO_GO_CONDITION_CHECK_MS + EXPO_GO_TAP_MS)
+      checks * EXPO_GO_CONDITION_CHECK_MS +
+      taps * EXPO_GO_TAP_MS
     assert.equal(EXPO_GO_OPEN_WORST_CASE_MS, worst)
     assert.ok(flowTimeoutMs(EXPO_GO_OPEN_FLOW) >= worst * FLOW_TIMEOUT_MARGIN)
     // The killed CI run: open-app.yaml hit the fixed 120 s with the project still loading.

@@ -23,11 +23,10 @@ const reservedContext = 'gate'
 // skipped on pull_request and successful on main, the nightly schedule and dispatch.
 export const deviceLaneCondition = `github.event_name != '${pullRequestEvent}'`
 export const evidenceCondition = `always() && ${deviceLaneCondition}`
-// The Expo Go proof job runs on the nightly schedule and on dispatch only: it has never passed in
-// CI, so it is outside share-card-lanes-gate until it has.
+// The Expo Go proof runs alone on a fresh simulator, like every other device lane: skipped on a
+// pull request, required by share-card-lanes-gate on main, nightly and dispatch runs.
 export const expoGoJobName = 'ios-expo-go'
-export const expoGoLaneCondition =
-  "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+export const expoGoLaneCondition = deviceLaneCondition
 const deviceLaneIf = (name) =>
   pullRequestShareCardJobs.includes(name) ? undefined : deviceLaneCondition
 const emulatorAction = 'reactivecircus/android-emulator-runner@v2'
@@ -69,10 +68,6 @@ function gateProblems(jobs, check) {
     JSON.stringify([...(gate.needs ?? [])].sort()) ===
       JSON.stringify([...requiredShareCardJobs].sort()),
     'gate must require every browser and native partition'
-  )
-  check(
-    !(gate.needs ?? []).includes(expoGoJobName),
-    `${expoGoJobName} stays out of the gate until the Expo Go proof has passed in CI`
   )
   check(gate['continue-on-error'] === undefined, 'gate cannot hide failure')
   check(
@@ -193,7 +188,7 @@ function expoGoProblems({ shard, expoGo }, check) {
   const name = expoGoJobName
   check(
     expoGo?.if === expoGoLaneCondition,
-    `${name} must run on the nightly schedule and on dispatch only`
+    `${name} must skip pull requests like the other device lanes`
   )
   check(
     JSON.stringify(needsList(expoGo)) === JSON.stringify(['ios-build']),
