@@ -13,7 +13,14 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     continueAfterFailure = false
     app.activate()
     if element("share-card-cancel").exists { element("share-card-cancel").tap() }
-    element("tab-settings").tap()
+    // The first test starts on the app runtime the rapid-watermark flow just relaunched. In run
+    // 41076993191 its Settings tap left Settings closed, so no locale button existed after eight
+    // swipes, while the eight later tests opened Settings from the same code.
+    let settingsTab = element("tab-settings")
+    XCTAssertTrue(settingsTab.waitForExistence(timeout: 15))
+    settingsTab.tap()
+    if !element("settings-screen").waitForExistence(timeout: 10) { settingsTab.tap() }
+    XCTAssertTrue(element("settings-screen").waitForExistence(timeout: 10))
     let english = element("locale-btn-en-US")
     for _ in 0..<8 where !english.isHittable { app.swipeDown() }
     XCTAssertTrue(english.exists)
