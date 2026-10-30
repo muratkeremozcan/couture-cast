@@ -20,9 +20,39 @@ test('Android and unspecified platforms leave Expo lazy bundling untouched', () 
   for (const platform of ['android', undefined, 'web']) {
     const env = metroServerEnv(build, platform)
     assert.equal('EXPO_NO_METRO_LAZY' in env, false, String(platform))
-    assert.deepEqual(env, build)
+    assert.deepEqual(env, { ...build, EXPO_OFFLINE: '1' })
   }
   assert.notEqual(metroServerEnv(build, 'android'), build)
+})
+
+test('every owned Metro runs offline, even over a build environment that says otherwise', () => {
+  for (const platform of ['ios', 'android', undefined])
+    assert.equal(
+      metroServerEnv({ EXPO_OFFLINE: '0' }, platform).EXPO_OFFLINE,
+      '1',
+      String(platform)
+    )
+})
+
+test('the installed Expo CLI skips the Expo account lookup for the Expo Go manifest offline', () => {
+  const signing = fs.readFileSync(
+    `${root}node_modules/@expo/cli/build/src/utils/codesigning.js`,
+    'utf8'
+  )
+  // The online branch fetches a development certificate, which needs a logged-in actor.
+  assert.match(
+    signing,
+    /if \(!_env\d*\.env\.EXPO_OFFLINE\) \{\s*try \{\s*const newCodeSigningInfo = await fetchAndCacheNewDevelopmentCodeSigningInfoAsync/
+  )
+  assert.match(signing, /Offline and no cached development certificate found/)
+  const user = fs.readFileSync(
+    `${root}node_modules/@expo/cli/build/src/api/user/user.js`,
+    'utf8'
+  )
+  assert.match(
+    user,
+    /if \(!_env\d*\.env\.EXPO_OFFLINE && !currentUser && hasCredentials\)/
+  )
 })
 
 test('the installed Expo CLI still reads that variable to decide lazy bundling', () => {
