@@ -1,5 +1,7 @@
 import {
+  shareCardCapabilityInteractions,
   shareCardInteractions,
+  verifyShareCardCapabilityInteraction,
   verifyShareCardInteraction,
 } from './interactions/share-cards'
 import {
@@ -951,4 +953,14 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
   it.each(shareCardInteractions)('prepares $kind $purpose for $id', async (scenario) => {
     await verifyShareCardInteraction(pact, createMobileClientForMockServer, scenario)
   })
+  it.each(shareCardCapabilityInteractions)(
+    'reads share-card capabilities with native share $name',
+    async (scenario) => {
+      await verifyShareCardCapabilityInteraction(
+        pact,
+        createMobileClientForMockServer,
+        scenario
+      )
+    }
+  )
 })

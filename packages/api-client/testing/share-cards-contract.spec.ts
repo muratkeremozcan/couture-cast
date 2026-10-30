@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   SHARE_CARD_MAX_BYTES,
   prepareShareCardInputSchema,
+  prepareShareCardResponseSchema,
   preparedShareCardSchema,
+  shareCardCapabilitiesResponseSchema,
+  shareCardCapabilitiesSchema,
 } from '../src/contracts/http/share-cards'
+import * as root from '../src'
 import { generateHttpOpenApiDocument } from '../src/contracts/http/openapi'
 import { preparedShareCardFixture } from '../src/testing/share-card-fixture'
 const preview = {
@@ -84,5 +88,83 @@ describe('share-card contract', () => {
         accessibilityLabel: 'Tenue. Matin. CoutureCast. Filigrane: CoutureCast',
       }).success
     ).toBe(true)
+  })
+  it('U-SHARE-CONTRACT: share requires a lowercase 64-hex digest and nothing else', () => {
+    const share = {
+      ...preview,
+      source: { kind: 'community_post', postId: 'own-post' },
+      purpose: 'share',
+      expectedSha256: 'b'.repeat(64),
+    }
+    expect(prepareShareCardInputSchema.parse(share)).toEqual(share)
+    for (const candidate of [
+      { ...share, expectedSha256: undefined },
+      { ...share, expectedSha256: 'B'.repeat(64) },
+      { ...share, expectedSha256: 'b'.repeat(63) },
+      { ...share, expectedSha256: 'b'.repeat(65) },
+      { ...share, url: 'https://private.invalid' },
+      { ...share, fileUri: 'file:///private/cc69-share-1.png' },
+      { ...share, filename: 'couturecast-card.png' },
+      { ...share, source: { kind: 'community_post', postId: '../private' } },
+      { ...share, source: { kind: 'outfit', recommendationId: 'https://x' } },
+      { ...share, purpose: 'post' },
+    ])
+      expect(prepareShareCardInputSchema.safeParse(candidate).success).toBe(false)
+  })
+  it('U-SHARE-CONTRACT: capabilities is the strict envelope with one boolean', () => {
+    expect(
+      shareCardCapabilitiesResponseSchema.parse({ data: { nativeShare: true } })
+    ).toEqual({ data: { nativeShare: true } })
+    expect(shareCardCapabilitiesSchema.parse({ nativeShare: false })).toEqual({
+      nativeShare: false,
+    })
+    for (const candidate of [
+      {},
+      { nativeShare: true },
+      { data: {} },
+      { data: { nativeShare: 'true' } },
+      { data: { nativeShare: true, tier: 'beta' } },
+      { data: { nativeShare: true }, meta: {} },
+    ])
+      expect(shareCardCapabilitiesResponseSchema.safeParse(candidate).success).toBe(false)
+    expect(root.shareCardCapabilitiesResponseSchema).toBe(
+      shareCardCapabilitiesResponseSchema
+    )
+  })
+  it('U-SHARE-CONTRACT: preview and save responses keep the exact 6.8 shape', () => {
+    // Deployed 6.8 clients parse these strictly; one extra field breaks them.
+    expect(Object.keys(preparedShareCardSchema.shape).sort()).toEqual([
+      'accessibilityLabel',
+      'filename',
+      'height',
+      'mimeType',
+      'pngBase64',
+      'sha256',
+      'templateVersion',
+      'width',
+    ])
+    expect(Object.keys(prepareShareCardResponseSchema.shape)).toEqual(['data'])
+    expect(
+      prepareShareCardResponseSchema.safeParse({
+        data: { ...preparedShareCardFixture, nativeShare: true },
+      }).success
+    ).toBe(false)
+    expect(
+      prepareShareCardResponseSchema.safeParse({
+        data: preparedShareCardFixture,
+        capabilities: { nativeShare: true },
+      }).success
+    ).toBe(false)
+  })
+  it('U-SHARE-CONTRACT: publishes the capabilities operation', () => {
+    const doc = generateHttpOpenApiDocument()
+    const operation = doc.paths?.['/api/v1/share-cards/capabilities']?.get
+    expect(operation?.operationId).toBe('getShareCardCapabilities')
+    expect(operation?.security).toEqual([{ bearerAuth: [] }])
+    expect(Object.keys(operation?.responses ?? {}).sort()).toEqual(['200', '401'])
+    const purposes = JSON.stringify(
+      doc.paths?.['/api/v1/share-cards/prepare']?.post?.requestBody
+    )
+    expect(purposes).toContain('"share"')
   })
 })

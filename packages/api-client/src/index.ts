@@ -62,8 +62,14 @@ export {
   prepareShareCardInputSchema,
   preparedShareCardSchema,
   prepareShareCardResponseSchema,
+  shareCardCapabilitiesSchema,
+  shareCardCapabilitiesResponseSchema,
   registerShareCardsContracts,
 } from './contracts/http/share-cards'
-export type { ShareCardSource, PreparedShareCard } from './contracts/http/share-cards'
+export type {
+  ShareCardSource,
+  PreparedShareCard,
+  ShareCardCapabilities,
+} from './contracts/http/share-cards'
 export * from './share-cards-client'
 export * from './share-card-png'

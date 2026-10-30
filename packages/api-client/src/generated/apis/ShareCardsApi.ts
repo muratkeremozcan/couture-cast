@@ -13,6 +13,7 @@
 
 import * as runtime from '../runtime'
 import type {
+  GetShareCardCapabilities200Response,
   PrepareShareCard200Response,
   PrepareShareCardRequest,
 } from '../models/index'
@@ -25,6 +26,55 @@ export interface PrepareShareCardOperationRequest {
  *
  */
 export class ShareCardsApi extends runtime.BaseAPI {
+  /**
+   * Creates request options for getShareCardCapabilities without sending the request
+   */
+  async getShareCardCapabilitiesRequestOpts(): Promise<runtime.RequestOpts> {
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/share-cards/capabilities`
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * The caller\'s share-card capabilities (private, no-store)
+   */
+  async getShareCardCapabilitiesRaw(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<GetShareCardCapabilities200Response>> {
+    const requestOptions = await this.getShareCardCapabilitiesRequestOpts()
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * The caller\'s share-card capabilities (private, no-store)
+   */
+  async getShareCardCapabilities(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<GetShareCardCapabilities200Response> {
+    const response = await this.getShareCardCapabilitiesRaw(initOverrides)
+    return await response.value()
+  }
+
   /**
    * Creates request options for prepareShareCard without sending the request
    */

@@ -5,7 +5,12 @@ import {
   type ProviderLocationScenario,
 } from './state'
 import type { VerifierOptions } from '@pact-foundation/pact'
-import { configureShareCardOutcome, type ShareCardOutcome } from './doubles/share-cards'
+import {
+  configureShareCardNativeShare,
+  configureShareCardOutcome,
+  type ShareCardNativeShare,
+  type ShareCardOutcome,
+} from './doubles/share-cards'
 import type {
   EntitlementStore,
   PremiumThemeKey,
@@ -109,6 +114,12 @@ const shareCardState = (outcome: ShareCardOutcome, description: string) => () =>
   return Promise.resolve({ description })
 }
 
+/** Story 6.9: the member's native-share flag answer, or a server with no route. */
+const nativeShareState = (value: ShareCardNativeShare, description: string) => () => {
+  configureShareCardNativeShare(value)
+  return Promise.resolve({ description })
+}
+
 export const stateHandlers: StateHandlers = {
   'An eligible member prepares a share card': shareCardState(
     'prepared',
@@ -125,6 +136,18 @@ export const stateHandlers: StateHandlers = {
   'The share-card preview changed': shareCardState(
     'preview_changed',
     'Configured a composition that changed after its preview'
+  ),
+  'Native share is on for the share-card member': nativeShareState(
+    true,
+    'Configured share_card_native_share_enabled on for the member'
+  ),
+  'Native share is off for the share-card member': nativeShareState(
+    false,
+    'Configured share_card_native_share_enabled off for the member'
+  ),
+  'The share-card capabilities route is absent': nativeShareState(
+    'absent',
+    'Configured a pre-6.9 server with no capabilities route'
   ),
 
   /* ----------------------------------------------------------------------- *

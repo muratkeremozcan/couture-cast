@@ -17947,6 +17947,95 @@
               "expectedSha256"
             ],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "outfit"
+                        ]
+                      },
+                      "recommendationId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "recommendationId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "community_post"
+                        ]
+                      },
+                      "postId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "postId"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en-US",
+                  "en-CA",
+                  "es-419",
+                  "fr-CA",
+                  "fr-FR",
+                  "tr-TR",
+                  "de-DE",
+                  "it-IT",
+                  "pt-BR",
+                  "pt-PT"
+                ]
+              },
+              "watermark": {
+                "type": "boolean"
+              },
+              "purpose": {
+                "type": "string",
+                "enum": [
+                  "share"
+                ]
+              },
+              "expectedSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "source",
+              "locale",
+              "watermark",
+              "purpose",
+              "expectedSha256"
+            ],
+            "additionalProperties": false
           }
         ]
       },
@@ -18012,6 +18101,27 @@
               "mimeType",
               "filename",
               "templateVersion"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ShareCardCapabilitiesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "nativeShare": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "nativeShare"
             ],
             "additionalProperties": false
           }
@@ -28012,6 +28122,95 @@
                       "expectedSha256"
                     ],
                     "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "source": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "outfit"
+                                ]
+                              },
+                              "recommendationId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9_-]+$"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "recommendationId"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "community_post"
+                                ]
+                              },
+                              "postId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9_-]+$"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "postId"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "locale": {
+                        "type": "string",
+                        "enum": [
+                          "en-US",
+                          "en-CA",
+                          "es-419",
+                          "fr-CA",
+                          "fr-FR",
+                          "tr-TR",
+                          "de-DE",
+                          "it-IT",
+                          "pt-BR",
+                          "pt-PT"
+                        ]
+                      },
+                      "watermark": {
+                        "type": "boolean"
+                      },
+                      "purpose": {
+                        "type": "string",
+                        "enum": [
+                          "share"
+                        ]
+                      },
+                      "expectedSha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "locale",
+                      "watermark",
+                      "purpose",
+                      "expectedSha256"
+                    ],
+                    "additionalProperties": false
                   }
                 ]
               }
@@ -28020,7 +28219,7 @@
         },
         "responses": {
           "200": {
-            "description": "Exact preview bytes or fresh save authorization",
+            "description": "Exact preview bytes or fresh save or share authorization",
             "content": {
               "application/json": {
                 "schema": {
@@ -28114,6 +28313,53 @@
           },
           "503": {
             "description": "Preparation unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/share-cards/capabilities": {
+      "get": {
+        "operationId": "getShareCardCapabilities",
+        "tags": [
+          "share-cards"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The caller's share-card capabilities (private, no-store)",
+        "responses": {
+          "200": {
+            "description": "Whether native share is enabled for this member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "nativeShare": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "nativeShare"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
           }
         }
       }

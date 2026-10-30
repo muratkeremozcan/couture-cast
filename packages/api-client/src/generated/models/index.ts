@@ -7219,6 +7219,32 @@ export interface GetPushRegistrationsResponseData {
 /**
  *
  * @export
+ * @interface GetShareCardCapabilities200Response
+ */
+export interface GetShareCardCapabilities200Response {
+  /**
+   *
+   * @type {GetShareCardCapabilities200ResponseData}
+   * @memberof GetShareCardCapabilities200Response
+   */
+  data: GetShareCardCapabilities200ResponseData
+}
+/**
+ *
+ * @export
+ * @interface GetShareCardCapabilities200ResponseData
+ */
+export interface GetShareCardCapabilities200ResponseData {
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetShareCardCapabilities200ResponseData
+   */
+  nativeShare: boolean
+}
+/**
+ *
+ * @export
  * @interface GuardianConsentInput
  */
 export interface GuardianConsentInput {
@@ -10391,6 +10417,7 @@ export type PrepareShareCard200ResponseDataTemplateVersionEnum =
 export type PrepareShareCardInput =
   | PrepareShareCardInputOneOf
   | PrepareShareCardRequestOneOf1
+  | PrepareShareCardRequestOneOf2
 /**
  *
  * @export
@@ -10458,6 +10485,7 @@ export type PrepareShareCardInputOneOfPurposeEnum =
 export type PrepareShareCardRequest =
   | PrepareShareCardRequestOneOf
   | PrepareShareCardRequestOneOf1
+  | PrepareShareCardRequestOneOf2
 /**
  *
  * @export
@@ -10647,6 +10675,71 @@ export const PrepareShareCardRequestOneOf1SourceOneOf1KindEnum = {
 } as const
 export type PrepareShareCardRequestOneOf1SourceOneOf1KindEnum =
   (typeof PrepareShareCardRequestOneOf1SourceOneOf1KindEnum)[keyof typeof PrepareShareCardRequestOneOf1SourceOneOf1KindEnum]
+
+/**
+ *
+ * @export
+ * @interface PrepareShareCardRequestOneOf2
+ */
+export interface PrepareShareCardRequestOneOf2 {
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOf1Source}
+   * @memberof PrepareShareCardRequestOneOf2
+   */
+  source: PrepareShareCardRequestOneOf1Source
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOf2LocaleEnum}
+   * @memberof PrepareShareCardRequestOneOf2
+   */
+  locale: PrepareShareCardRequestOneOf2LocaleEnum
+  /**
+   *
+   * @type {boolean}
+   * @memberof PrepareShareCardRequestOneOf2
+   */
+  watermark: boolean
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOf2PurposeEnum}
+   * @memberof PrepareShareCardRequestOneOf2
+   */
+  purpose: PrepareShareCardRequestOneOf2PurposeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCardRequestOneOf2
+   */
+  expectedSha256: string
+}
+
+/**
+ * @export
+ */
+export const PrepareShareCardRequestOneOf2LocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type PrepareShareCardRequestOneOf2LocaleEnum =
+  (typeof PrepareShareCardRequestOneOf2LocaleEnum)[keyof typeof PrepareShareCardRequestOneOf2LocaleEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCardRequestOneOf2PurposeEnum = {
+  share: 'share',
+} as const
+export type PrepareShareCardRequestOneOf2PurposeEnum =
+  (typeof PrepareShareCardRequestOneOf2PurposeEnum)[keyof typeof PrepareShareCardRequestOneOf2PurposeEnum]
 
 /**
  * @type PrepareShareCardRequestOneOfSource
@@ -12163,6 +12256,32 @@ export interface SetPrimarySavedLocationResponse {
    * @memberof SetPrimarySavedLocationResponse
    */
   data: ListSavedLocationsResponseDataInner
+}
+/**
+ *
+ * @export
+ * @interface ShareCardCapabilitiesResponse
+ */
+export interface ShareCardCapabilitiesResponse {
+  /**
+   *
+   * @type {ShareCardCapabilitiesResponseData}
+   * @memberof ShareCardCapabilitiesResponse
+   */
+  data: ShareCardCapabilitiesResponseData
+}
+/**
+ *
+ * @export
+ * @interface ShareCardCapabilitiesResponseData
+ */
+export interface ShareCardCapabilitiesResponseData {
+  /**
+   *
+   * @type {boolean}
+   * @memberof ShareCardCapabilitiesResponseData
+   */
+  nativeShare: boolean
 }
 /**
  *
