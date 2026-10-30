@@ -22,6 +22,7 @@ describe('feature flag registry', () => {
       'commerce_affiliate_enabled',
       'commerce_subscription_enabled',
       'premium_planner_enabled',
+      'share_card_native_share_enabled',
     ])
   })
 
@@ -37,6 +38,13 @@ describe('feature flag registry', () => {
 
   it('defaults the premium planner kill switch to off', () => {
     expect(getDefaultFeatureFlagValue('premium_planner_enabled')).toBe(false)
+  })
+
+  it('6.9-CFG-001: defaults the native share-card share kill switch to off', () => {
+    // Story 6.9 D4: production stays off until the flag is flipped deliberately.
+    // Only the dev seed turns it on, so a degraded PostHog with no cache row can
+    // never expose the OS share sheet.
+    expect(getDefaultFeatureFlagValue('share_card_native_share_enabled')).toBe(false)
   })
 
   it('defaults the commerce kill switch to off', () => {
