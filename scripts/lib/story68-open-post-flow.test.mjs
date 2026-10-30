@@ -54,3 +54,19 @@ test('the card is found on the feed surface, not through the highlighted deep-li
   assert.doesNotMatch(flow, /highlighted-community-card|openLink|source=notification/)
   assert.match(flow, /community-card-author-\$\{MAESTRO_POST_ID\}/)
 })
+
+test('the opener tap is guarded: lift, tap and wait for the composer title, retried on a lost press', () => {
+  const guard = /- retry:\n\s+maxRetries: 2\n\s+commands:\n([\s\S]*?)\n- extendedWaitUntil:\n\s+visible:\n\s+id: share-card-preview-loaded/.exec(
+    flow
+  )
+  assert.ok(guard, 'retry sits right before the preview wait')
+  const body = guard[1]
+  assert.ok(body.indexOf('- swipe:') < body.indexOf('- tapOn:'))
+  assert.ok(body.indexOf('- tapOn:') < body.indexOf('id: share-card-title'))
+  assert.match(body, /platform: iOS/)
+  assert.match(body, /label: 'share_card_press_not_received'/)
+  // The only tapOn of the opener sits inside the retry.
+  const taps = [...flow.matchAll(/- tapOn:\n\s+id: community-share-card-open/g)]
+  assert.equal(taps.length, 1)
+  assert.ok(flow.indexOf('- retry:') < taps[0].index)
+})

@@ -71,9 +71,21 @@ function declaredOpenPostWorstCase() {
       }),
       { waits: 0, steps: 0 }
     )
-  const shared = sum(blocks.filter((b) => !/platform: (iOS|Android)/.test(b)).map(cost))
+  // The guarded opener tap is a retry; every attempt repeats its waits and steps.
+  const guarded = (b) => b.startsWith('- retry:')
+  const attempts = (b) => Number(/maxRetries:\s*(\d+)/.exec(b)[1]) + 1
+  const sharedBlocks = blocks.filter((b) => guarded(b) || !/platform: (iOS|Android)/.test(b))
+  const shared = sum(
+    sharedBlocks.map((b) => {
+      const part = cost(b)
+      const n = guarded(b) ? attempts(b) : 1
+      return { waits: part.waits * n, steps: part.steps * n }
+    })
+  )
   const worst = (platform) => {
-    const own = sum(blocks.filter((b) => b.includes(`platform: ${platform}`)).map(cost))
+    const own = sum(
+      blocks.filter((b) => !guarded(b) && b.includes(`platform: ${platform}`)).map(cost)
+    )
     return (
       FLOW_STARTUP_MS +
       shared.waits +

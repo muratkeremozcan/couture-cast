@@ -19,12 +19,19 @@ export const OPEN_APP_WORST_CASE_MS =
   FLOW_STARTUP_MS + 4 * (100_000 + 17 * CONDITION_CHECK_MS)
 
 /**
- * open-post.yaml on iOS (its slower platform), one attempt: 10 s + 20 s + 20 s of declared
- * waits, and 14 budgeted steps: 2 feed-state checks, 3 up and 5 down walk iterations, 2
- * opener iterations, the post assertion and the final lift swipe. Every named failure fires
- * inside this budget, so a missing post is reported, not killed.
+ * open-post.yaml on iOS (its slower platform): 10 s + 20 s + 20 s of declared waits, and 13
+ * budgeted steps outside the guarded opener tap: 2 feed-state checks, 3 up and 5 down walk
+ * iterations, 2 opener iterations and the post assertion. The opener tap is a retry of
+ * maxRetries 2 (3 attempts); an attempt is the lift swipe and the 5 s wait for the composer
+ * title. Every named failure fires inside this budget, so a missing post is reported, not killed.
  */
-export const OPEN_POST_WORST_CASE_MS = FLOW_STARTUP_MS + 50_000 + 14 * CONDITION_CHECK_MS
+export const OPEN_POST_TAP_ATTEMPTS = 3
+export const OPEN_POST_PRESS_WAIT_MS = 5_000
+export const OPEN_POST_WORST_CASE_MS =
+  FLOW_STARTUP_MS +
+  50_000 +
+  13 * CONDITION_CHECK_MS +
+  OPEN_POST_TAP_ATTEMPTS * (OPEN_POST_PRESS_WAIT_MS + CONDITION_CHECK_MS)
 
 /**
  * The guarded watermark taps (watermark.yaml, release-watermark-off.yaml). Each tap sits in a
