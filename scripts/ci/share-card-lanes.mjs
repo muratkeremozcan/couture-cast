@@ -23,6 +23,11 @@ const reservedContext = 'gate'
 // skipped on pull_request and successful on main, the nightly schedule and dispatch.
 export const deviceLaneCondition = `github.event_name != '${pullRequestEvent}'`
 export const evidenceCondition = `always() && ${deviceLaneCondition}`
+// The Expo Go proof job runs on the nightly schedule and on dispatch only: it has never passed in
+// CI, so it is outside share-card-lanes-gate until it has.
+export const expoGoJobName = 'ios-expo-go'
+export const expoGoLaneCondition =
+  "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
 const deviceLaneIf = (name) =>
   pullRequestShareCardJobs.includes(name) ? undefined : deviceLaneCondition
 const emulatorAction = 'reactivecircus/android-emulator-runner@v2'
@@ -64,6 +69,10 @@ function gateProblems(jobs, check) {
     JSON.stringify([...(gate.needs ?? [])].sort()) ===
       JSON.stringify([...requiredShareCardJobs].sort()),
     'gate must require every browser and native partition'
+  )
+  check(
+    !(gate.needs ?? []).includes(expoGoJobName),
+    `${expoGoJobName} stays out of the gate until the Expo Go proof has passed in CI`
   )
   check(gate['continue-on-error'] === undefined, 'gate cannot hide failure')
   check(
@@ -122,6 +131,7 @@ function iosJobProblems(jobs, check) {
   for (const [name, runner] of [
     ['ios-build', 'macos-15'],
     ['ios-shard', 'macos-15'],
+    [expoGoJobName, 'macos-15'],
     ['ios-evidence', 'ubuntu-latest'],
   ]) {
     const job = jobs[name]
@@ -143,7 +153,7 @@ function iosJobProblems(jobs, check) {
   }
 }
 
-function iosShapeProblems({ build, shard, evidence }, check) {
+function iosShapeProblems({ build, shard, evidence, expoGo }, check) {
   check(build?.needs === undefined, 'ios-build must start independently')
   check(build?.if === deviceLaneCondition, 'ios-build must be skipped on pull_request')
   check(shard?.if === deviceLaneCondition, 'ios-shard must be skipped on pull_request')
@@ -171,10 +181,53 @@ function iosShapeProblems({ build, shard, evidence }, check) {
       includesRun(evidence?.steps ?? [], 'test "$CC68_SHARD_RESULT" = success'),
     'ios-evidence: both shards must report their exact cases'
   )
+  expoGoProblems({ shard, expoGo }, check)
+}
+
+/**
+ * The Expo Go proof: its own job on a fresh simulator, off every pull request and out of the
+ * gate. The shard steps it shares run the same setup text as the shards, so a change to one
+ * cannot leave the other behind.
+ */
+function expoGoProblems({ shard, expoGo }, check) {
+  const name = expoGoJobName
+  check(
+    expoGo?.if === expoGoLaneCondition,
+    `${name} must run on the nightly schedule and on dispatch only`
+  )
+  check(
+    JSON.stringify(needsList(expoGo)) === JSON.stringify(['ios-build']),
+    `${name} must need exactly ios-build`
+  )
+  check(
+    expoGo?.strategy === undefined,
+    `${name} runs once on its own simulator, not in a matrix`
+  )
+  const proof = (expoGo?.steps ?? []).filter((step) =>
+    step.run?.includes('run-story68-native.mjs expo-go-proof')
+  )
+  check(
+    proof.length === 1 &&
+      proof[0].run.includes('--platform ios --device "$device"') &&
+      !proof[0].run.includes('--shard') &&
+      includesRun(expoGo?.steps ?? [], 'native-ios-startup-probe.mjs --for-native-flow'),
+    `${name}: the proof must run once, on the probe's simulator, without a shard`
+  )
+  check(
+    !includesRun(shard?.steps ?? [], 'expo-go-proof'),
+    'ios-shard must not run the Expo Go proof'
+  )
+  const shared = (shard?.steps ?? []).findIndex((step) => step.name === 'iOS shard flows')
+  check(
+    shared > 0 &&
+      JSON.stringify((expoGo?.steps ?? []).slice(0, shared)) ===
+        JSON.stringify((shard?.steps ?? []).slice(0, shared)),
+    `${name}: the runtime setup must be the ios-shard setup, step for step`
+  )
 }
 
 function iosEvidenceProblems(jobs, check) {
-  for (const name of ['ios-build', 'ios-shard']) {
+  for (const name of ['ios-build', 'ios-shard', expoGoJobName]) {
     const job = jobs[name]
     check(
       job?.env?.CC68_HARNESS_DIR === iosHarnessDirectory,
@@ -251,12 +304,14 @@ function iosAppProblems(build, check) {
 
 /**
  * The iOS journey: one build job, a two-way shard matrix and a job that proves both shards
- * reported their exact cases. All three run on the free macos-15 runner (evidence on Ubuntu).
+ * reported their exact cases, plus the Expo Go proof job outside the gate. All run on the free
+ * macos-15 runner (evidence on Ubuntu).
  */
 function iosProblems(jobs, check) {
   const parts = {
     build: jobs['ios-build'],
     shard: jobs['ios-shard'],
+    expoGo: jobs[expoGoJobName],
     evidence: jobs['ios-evidence'],
   }
   iosJobProblems(jobs, check)

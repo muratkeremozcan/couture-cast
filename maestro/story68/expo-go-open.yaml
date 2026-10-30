@@ -1,0 +1,39 @@
+# Story 6.8 iOS Expo Go proof: the runner has built the launch bundle and sent exp:// to a fresh
+# simulator. Expo Go is a fresh install, so its first load shows the iOS open prompt and then the
+# developer-menu onboarding over the app, in a timing the host sets. Each wait below runs once, in
+# order, and none sits in a `retry` or `repeat`: a wait that Maestro runs a second time returned
+# in 0.4 s in run 41019906459 (attempts 2 to 4 of a 45 s wait), so the earlier loops held 54 s
+# instead of the 160 s and 180 s they declared. The first run of a wait holds its timeout. A
+# project that never loads fails on the named last wait, inside the process budget, so the
+# failed-step hierarchy is captured. Only ids and Expo Go text are matched.
+appId: ${MAESTRO_APP_ID}
+---
+- extendedWaitUntil:
+    visible: 'Open in .*'
+    timeout: 30000
+    optional: true
+- runFlow:
+    when:
+      visible: 'Open in .*'
+    commands:
+      - tapOn: 'Open'
+- extendedWaitUntil:
+    visible: 'This is the developer menu.*'
+    timeout: 150000
+    optional: true
+- runFlow:
+    when:
+      visible: 'This is the developer menu.*'
+    commands:
+      - tapOn: 'Continue'
+# Continue leaves the full dev menu open over the app; close it.
+- runFlow:
+    when:
+      visible: 'Connected to:'
+    commands:
+      - tapOn: 'Close'
+- extendedWaitUntil:
+    visible:
+      id: 'tab-home'
+    timeout: 60000
+    label: 'expo_go_project_not_loaded'

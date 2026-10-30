@@ -63,7 +63,7 @@ test('actual asynchronous fallback runner serves UIKit observations while its na
   )
   try {
     await withIosFocusObservation(
-      { device, appId: 'com.couturecast.story68', run: () => container },
+      { device, appId: 'com.couturecast.story68', dataContainer: async () => container },
       async (port) => {
         const log = await recordedIosTest(
           { directory },
@@ -321,4 +321,95 @@ describe('fallback-focus fail-closed guards', () => {
     test(`iOS fallback fails closed on ${name}`, async (t) => {
       assert.equal(await runIos(t, input), code)
     })
+})
+
+test('a failed native test prints what names the failed step before it rejects', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-fallback-failure-'))
+  const printed = []
+  const log = console.log
+  console.log = (line) => printed.push(line)
+  try {
+    await assert.rejects(
+      recordedIosTest({ directory }, [], 'child.log', (_binary, _args, options) =>
+        spawn(
+          process.execPath,
+          [
+            '-e',
+            "console.log(\"Test Case '-[A.B testX]' started.\");console.log('CC68_AUDIT_ISSUE fallback|3|none|none|Contrast failed');console.log('/r/w/B.swift:9: error: boom');console.log(\"Test Case '-[A.B testX]' failed (1.0 seconds).\");process.exit(65)",
+          ],
+          options
+        )
+      ),
+      /fallback_native_assertion_failed/
+    )
+  } finally {
+    console.log = log
+    fs.rmSync(directory, { recursive: true })
+  }
+  const [{ iosFallbackFailure }] = printed.map((line) => JSON.parse(line))
+  assert.deepEqual(iosFallbackFailure.issues, ['fallback|3|none|none|Contrast failed'])
+  assert.equal(iosFallbackFailure.tests[0].test, 'testX')
+  assert.ok(iosFallbackFailure.tests[0].lines.includes('B.swift:9: error: boom'))
+})
+
+test('the observation server names the container once and answers while the lookup is pending', async () => {
+  const device = 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE'
+  const container = `/Users/test/Library/Developer/CoreSimulator/Devices/${device}/data/Containers/Data/Application/owned`
+  let lookups = 0
+  await withIosFocusObservation(
+    {
+      device,
+      appId: 'com.couturecast.story68',
+      dataContainer: async () => {
+        lookups++
+        return container
+      },
+    },
+    async (port) => {
+      for (let i = 0; i < 3; i++) {
+        const response = await fetch(`http://127.0.0.1:${port}/focus-observation`)
+        // The record file is absent here: the route answers 503, never a hang.
+        assert.equal(response.status, 503)
+      }
+    },
+    0
+  )
+  assert.equal(lookups, 1)
+})
+
+test('concurrent first requests share one container lookup and a failed lookup is asked again', async () => {
+  const device = 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE'
+  const container = `/Users/test/Library/Developer/CoreSimulator/Devices/${device}/data/Containers/Data/Application/owned`
+  let lookups = 0
+  let release
+  const gate = new Promise((resolve) => (release = resolve))
+  await withIosFocusObservation(
+    {
+      device,
+      appId: 'com.couturecast.story68',
+      dataContainer: async () => {
+        lookups++
+        // The prefetch before the journey fails; every later call waits for the gate.
+        if (lookups === 1) throw new Error('simctl_not_ready')
+        await gate
+        return container
+      },
+    },
+    async (port) => {
+      assert.equal(lookups, 1)
+      const url = `http://127.0.0.1:${port}/focus-observation`
+      const requests = Promise.all([fetch(url), fetch(url), fetch(url)])
+      try {
+        // Let all three requests reach the handler while the second lookup is pending.
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        assert.equal(lookups, 2)
+      } finally {
+        release()
+      }
+      for (const response of await requests) assert.equal(response.status, 503)
+      await fetch(url)
+      assert.equal(lookups, 2)
+    },
+    0
+  )
 })

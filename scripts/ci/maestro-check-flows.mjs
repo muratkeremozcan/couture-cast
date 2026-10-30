@@ -10,13 +10,16 @@ import { MAESTRO_BIN } from '../maestro-version.mjs'
 
 export const CHECKED_FLOWS = Object.freeze([
   'maestro/story65/open-app.yaml',
+  'maestro/story65/set-locale.yaml',
   'maestro/story65/signin-verify.yaml',
   'maestro/story65/wait-notification-settings.yaml',
   'maestro/story68/position-outfit-open.yaml',
   'maestro/story68/settings.yaml',
   'maestro/story68/wait-os-settings-ios.yaml',
   'maestro/story68/open-outfit.yaml',
+  'maestro/story68/open-post.yaml',
   'maestro/story68/preparing-cancel.yaml',
+  'maestro/story68/expo-go-open.yaml',
   'maestro/story68/expo-go-unavailable.yaml',
   'maestro/story68/rapid-ready-outfit.yaml',
   'maestro/story68/rapid-watermark-held.yaml',

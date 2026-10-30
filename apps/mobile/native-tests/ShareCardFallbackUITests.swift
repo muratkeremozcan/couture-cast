@@ -21,7 +21,7 @@ final class ShareCardFallbackUITests: XCTestCase {
     XCTAssertEqual(cancel.label, fixture["cancel"]!)
     for _ in 0..<8 where !cancel.isHittable { app.swipeUp() }
     XCTAssertTrue(cancel.isHittable)
-    let focusSequence = try readShareCardFocusObservation(self).sequence
+    let focusSequence = try awaitShareCardFocusObservation(self).sequence
     cancel.tap()
     let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element("share-card-title"))
     XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 20), .completed)
@@ -33,7 +33,10 @@ final class ShareCardFallbackUITests: XCTestCase {
     XCTAssertTrue(header.isHittable)
     XCTAssertEqual(header.label, fixture["community"]!)
     XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label == %@", fixture["removedHeading"]!)).firstMatch.exists)
-    try app.performAccessibilityAudit(for: .all)
+    try app.performAccessibilityAudit(for: .all) { issue in
+      print(shareCardAuditIssueLine("fallback", issue))
+      return false
+    }
     print("CC68_FALLBACK_PASS ios existing-header-target-and-all-audit")
   }
 }

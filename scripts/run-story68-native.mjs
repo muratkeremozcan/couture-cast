@@ -17,6 +17,7 @@ import { story68FocusObservationHandler } from './lib/story68-ios-focus-observat
 import { startWeatherProviderDouble } from './weather-provider-double.mjs'
 import {
   closedShareCardAuditReport,
+  failedAuditContext,
   failedAuditIssues,
   failedAuditTestDigest,
 } from './lib/share-card-audit-report.mjs'
@@ -35,6 +36,7 @@ import {
   logSize,
 } from './ci/native-ios-maestro-trace.mjs'
 import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
+import { beginExpoGoProbe, readExpoGoVersion } from './ci/native-ios-expo-go-probe.mjs'
 import { inMatrixSection, localesForShard, parseShard } from './ci/native-ios-shards.mjs'
 import {
   iosDriverGlobalArgs,
@@ -142,8 +144,8 @@ function child(binary, args, env, log, cwd = root) {
   fs.closeSync(fd)
   return process
 }
-const appId =
-  command === 'expo-go-proof' ? 'host.exp.Exponent' : 'com.couturecast.story68'
+const DEV_CLIENT_APP_ID = 'com.couturecast.story68'
+const appId = command === 'expo-go-proof' ? 'host.exp.Exponent' : DEV_CLIENT_APP_ID
 const device = option('device')
 const platform = option('platform')
 let activeLocale = option('locale') ?? 'en-US'
@@ -262,8 +264,12 @@ function openOsSettings() {
   return { foregroundMarkers: IOS_SETTINGS_MARKERS }
 }
 // A cold Metro needs longer to build the launch bundle than open-app.yaml waits for the
-// tab bar, so the dev client is only pointed at Metro once that exact bundle is built.
+// tab bar, so the dev client is only pointed at Metro once that exact bundle is built. Expo Go
+// asks the same manifest for the same bundle, and the Expo Go proof runs in its own process after
+// the shard's other flows: run 41010366797 sent it to Metro unwarmed and it stayed on its
+// loading screen for the whole window.
 const DEV_CLIENT_URL = 'couturecast-story68://expo-development-client/'
+const EXPO_GO_URL = 'exp://127.0.0.1:8089'
 const LAUNCH_BUNDLE_DEADLINE_SECONDS = 600
 let launchBundleWarm = false
 function warmLaunchBundle() {
@@ -283,6 +289,7 @@ function warmLaunchBundle() {
   const bundle = new URL(manifest.launchAsset?.url ?? '')
   if (bundle.origin !== 'http://127.0.0.1:8089' || !bundle.pathname.endsWith('.bundle'))
     throw new Error('owned_metro_launch_bundle_required')
+  const started = Date.now()
   run('curl', [
     '-sf',
     '--max-time',
@@ -292,11 +299,24 @@ function warmLaunchBundle() {
     bundle.href,
   ])
   launchBundleWarm = true
+  console.log(
+    JSON.stringify({
+      launchBundleWarm: { seconds: Math.round((Date.now() - started) / 100) / 10 },
+    })
+  )
+}
+// Run 41019906459 sampled 74 MB free with the dev client still resident next to Expo Go. A
+// client that is not running is not an error.
+function terminateDevClient() {
+  requireDevice()
+  spawnSync('xcrun', ['simctl', 'terminate', device, DEV_CLIENT_APP_ID], {
+    encoding: 'utf8',
+  })
 }
 function openUrl(url) {
   requireDevice()
   reverse()
-  if (url.startsWith(DEV_CLIENT_URL)) warmLaunchBundle()
+  if (url.startsWith(DEV_CLIENT_URL) || url.startsWith(EXPO_GO_URL)) warmLaunchBundle()
   if (platform === 'ios') run('xcrun', ['simctl', 'openurl', device, url])
   else
     run(adb, [
@@ -609,7 +629,17 @@ function rapidWatermarkFlow(signal, control) {
       )
       throw error
     })
-    .finally(() => redactRapidWatermarkControl(output, control.url))
+    .finally(() => {
+      // The 12 s hold leaves little slack, so keep every command's cost, pass or fail.
+      recordIosCommandTimings({
+        platform,
+        flow: 'maestro/story68/rapid-watermark-held.yaml',
+        output,
+        directory,
+        minMs: 0,
+      })
+      redactRapidWatermarkControl(output, control.url)
+    })
 }
 if (command === 'prebuild') {
   ownedEnv()
@@ -975,6 +1005,7 @@ if (command === 'prebuild') {
         JSON.stringify({
           iosAuditFailure: {
             issues: failedAuditIssues(auditText),
+            context: failedAuditContext(auditText),
             tests: failedAuditTestDigest(auditText),
           },
         })
@@ -1147,8 +1178,20 @@ if (command === 'prebuild') {
       appId,
       downloaded,
     })
-    openUrl('exp://127.0.0.1:8089')
-    maestro('maestro/story65/open-app.yaml')
+    terminateDevClient()
+    // Built before the probe takes its Metro baseline, so the counts are Expo Go's own.
+    warmLaunchBundle()
+    const probe = beginExpoGoProbe({
+      directory,
+      device,
+      version: readExpoGoVersion(downloaded),
+    })
+    openUrl(EXPO_GO_URL)
+    try {
+      maestro('maestro/story68/expo-go-open.yaml')
+    } finally {
+      probe.finish()
+    }
     await signin()
     const before = JSON.stringify(nativeOriginalPaths())
     maestro('maestro/story68/expo-go-unavailable.yaml')

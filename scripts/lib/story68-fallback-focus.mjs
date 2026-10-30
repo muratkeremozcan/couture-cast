@@ -1,11 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { spawn, spawnSync } from 'node:child_process'
+import { execFile, spawn, spawnSync } from 'node:child_process'
+import { promisify } from 'node:util'
 import pg from 'pg'
 import { createServer } from 'node:http'
 import { story68FocusObservationHandler } from './story68-ios-focus-observation.mjs'
 import { assertRapidWatermarkRuntime } from './story68-rapid-watermark.mjs'
 import { withUnavailableOwnedFallbackPost } from './story68-fallback-post.mjs'
+import { xcodebuildFailureReport } from './share-card-audit-report.mjs'
 
 function recorded(ctx, binary, args, name, env = {}) {
   const file = path.join(ctx.directory, name)
@@ -54,7 +56,15 @@ export async function recordedIosTest(ctx, args, name, spawnChild = spawn) {
       child.once('close', (code) => {
         clearTimeout(timer)
         if (code === 0) resolve()
-        else reject(new Error('fallback_native_assertion_failed'))
+        else {
+          // The xcodebuild log is private; the job log gets what names the failed step.
+          console.log(
+            JSON.stringify({
+              iosFallbackFailure: xcodebuildFailureReport(fs.readFileSync(file, 'utf8')),
+            })
+          )
+          reject(new Error('fallback_native_assertion_failed'))
+        }
       })
     })
     return fs.readFileSync(file, 'utf8')
@@ -62,12 +72,40 @@ export async function recordedIosTest(ctx, args, name, spawnChild = spawn) {
     fs.closeSync(fd)
   }
 }
+const execFileText = promisify(execFile)
+/**
+ * The data container of the installed app. The lookup is asynchronous so a starved host never
+ * blocks the event loop that answers the XCUITest (run 40984431884: -1001 after the 2 s client
+ * timeout while a synchronous simctl call held the loop), and it is read once at a time and kept: the
+ * container path stays the same until the app is reinstalled.
+ */
 export async function withIosFocusObservation(ctx, work, port = 63068) {
+  const lookup =
+    ctx.dataContainer ??
+    (async () =>
+      (
+        await execFileText(
+          'xcrun',
+          ['simctl', 'get_app_container', ctx.device, ctx.appId, 'data'],
+          { timeout: 60_000 }
+        )
+      ).stdout)
+  // One simctl call serves every request that arrives before it answers; a failed call is
+  // forgotten so the next request asks again.
+  let pending
+  const readContainer = () => {
+    const attempt = (pending ??= Promise.resolve()
+      .then(lookup)
+      .catch((error) => {
+        if (pending === attempt) pending = undefined
+        throw error
+      }))
+    return attempt
+  }
   const observe = story68FocusObservationHandler({
     device: ctx.device,
     appId: ctx.appId,
-    readContainer: () =>
-      ctx.run('xcrun', ['simctl', 'get_app_container', ctx.device, ctx.appId, 'data']),
+    readContainer,
   })
   const server = createServer((request, response) => {
     if (!observe(request, response)) response.writeHead(404).end()
@@ -77,6 +115,8 @@ export async function withIosFocusObservation(ctx, work, port = 63068) {
     server.listen(port, '127.0.0.1', resolve)
   })
   try {
+    // Resolve the container before the first request; a failure is retried by the next request.
+    await readContainer().catch(() => undefined)
     return await work(server.address().port)
   } finally {
     await new Promise((resolve) => server.close(resolve))

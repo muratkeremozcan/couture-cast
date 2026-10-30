@@ -58,10 +58,11 @@ export function recordIosCommandTimings({
   flow,
   output,
   directory,
+  minMs = 1000,
   log = console.log,
 }) {
   if (platform !== 'ios') return null
-  const entry = { flow, commands: slowMaestroCommands(output) }
+  const entry = { flow, commands: slowMaestroCommands(output, minMs) }
   const file = path.join(directory, 'native-ios-flow-command-timings.json')
   try {
     const record = fs.existsSync(file)
@@ -320,6 +321,45 @@ export function inputSurface(hierarchy) {
   return { codeInput, focusedNodeCount }
 }
 
+// Screen kinds Expo Go can show once the open prompt is answered, as flags only: no text of the
+// screen is kept. Run 41002591476 stopped on a hierarchy of 46 nodes whose only bundled label was
+// "Expo Go", which names neither a loading screen, an error screen nor the project list.
+const EXPO_GO_SCREENS = {
+  loading: /opening|downloading|loading|bundl/i,
+  error:
+    /something went wrong|uncaught|unhandled|exception|invariant violation|could not be loaded|failed to/i,
+  incompatible: /incompatible|sdk version|newer version|older version/i,
+  connection:
+    /could not connect|unable to connect|network request failed|timed out|offline/i,
+  retry: /^(reload|try again|go back|go to home)$/i,
+  projectList: /development servers|enter url manually|recently opened/i,
+  developerMenu: /developer menu|connected to/i,
+}
+
+/** What an Expo Go failed-step hierarchy shows: node and text counts plus screen-kind flags. */
+export function expoGoScreenSummary(hierarchy) {
+  if (!hierarchy || typeof hierarchy !== 'object') return null
+  let nodeCount = 0
+  let textNodes = 0
+  const seen = Object.fromEntries(Object.keys(EXPO_GO_SCREENS).map((key) => [key, false]))
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return
+    nodeCount++
+    let labelled = false
+    for (const key of ['text', 'accessibilityText', 'title']) {
+      const value = node.attributes?.[key]
+      if (typeof value !== 'string' || value.trim() === '') continue
+      labelled = true
+      for (const [kind, pattern] of Object.entries(EXPO_GO_SCREENS))
+        if (pattern.test(value.trim())) seen[kind] = true
+    }
+    if (labelled) textNodes++
+    for (const child of Array.isArray(node.children) ? node.children : []) visit(child)
+  }
+  visit(hierarchy)
+  return { nodeCount, textNodes, ...seen }
+}
+
 const GEOMETRY_IDS = {
   chips: 'mobile-chip-navigation',
   opener: 'outfit-share-card-open',
@@ -475,6 +515,19 @@ export function summarizeAppLog(ndjson) {
   return summary
 }
 
+// Expo Go's bundle id and the process name its log lines carry: the app log of an Expo Go flow
+// is this process, not the dev client's, or a flow that ran for minutes reports zero lines.
+export const EXPO_GO_APP_ID = 'host.exp.Exponent'
+export const EXPO_GO_PROCESS = 'Expo Go'
+
+/** The `expoGoScreen` entry of a failed Expo Go flow; nothing for any other app. */
+const expoGoScreen = (appId, hierarchy) =>
+  appId === EXPO_GO_APP_ID ? { expoGoScreen: expoGoScreenSummary(hierarchy) } : {}
+
+/** The `processName` option of readIosAppLogSummary for the app a flow ran in. */
+const appLogProcess = (appId) =>
+  appId === EXPO_GO_APP_ID ? { processName: EXPO_GO_PROCESS } : {}
+
 /** The app process's log of the last minute, as counts only; null when the query fails. */
 export function readIosAppLogSummary({
   device,
@@ -612,10 +665,13 @@ export function recordIosFlowProgress({
       hostSampled,
       systemSurface: systemSurfaceSummary(hierarchy),
       inputSurface: inputSurface(hierarchy),
+      ...expoGoScreen(appId, hierarchy),
       openerGeometry: geometry,
       scrollPath: output ? scrollPath(output, maestroLog) : null,
       openerTrace: device && appId ? readIosOpenerTrace({ device, appId, spawn }) : null,
-      appLog: device ? readIosAppLogSummary({ device, spawn }) : null,
+      appLog: device
+        ? readIosAppLogSummary({ device, spawn, ...appLogProcess(appId) })
+        : null,
       ...maestroFlowProgress(maestroLog),
       communityApi: apiLogFile
         ? communityPreferenceApiRows(logTail(apiLogFile, apiLogFromByte))

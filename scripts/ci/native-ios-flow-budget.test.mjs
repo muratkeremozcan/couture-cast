@@ -19,8 +19,43 @@ test('other platforms and flows use their derived budget', () => {
   )
   assert.ok(flowTimeoutMs(OPEN_APP_FLOW) > 120_000)
   assert.equal(nativeFlowTimeoutMs(OPEN_POST, 'ios'), flowTimeoutMs(OPEN_POST))
-  assert.equal(nativeFlowTimeoutMs(OPEN_POST, 'ios'), 205_000)
+  assert.equal(nativeFlowTimeoutMs(OPEN_POST, 'ios'), 283_750)
   assert.equal(nativeFlowTimeoutMs('maestro/story68/cancel.yaml', 'ios'), 120_000)
+})
+
+test('the Expo Go proof opener takes its derived budget on iOS, not the first-flow 120000 ms', () => {
+  const expoGoOpen = 'maestro/story68/expo-go-open.yaml'
+  assert.equal(nativeFlowTimeoutMs(expoGoOpen, 'ios'), flowTimeoutMs(expoGoOpen))
+  assert.equal(nativeFlowTimeoutMs(expoGoOpen, 'ios'), 382_500)
+  const harness = fs.readFileSync(
+    fileURLToPath(new URL('../run-story68-native.mjs', import.meta.url)),
+    'utf8'
+  )
+  const proof = harness.slice(harness.indexOf("} else if (command === 'expo-go-proof')"))
+  assert.ok(proof.indexOf(`maestro('${expoGoOpen}')`) > -1)
+  assert.ok(
+    proof.indexOf(`maestro('${expoGoOpen}')`) <
+      proof.indexOf("maestro('maestro/story68/expo-go-unavailable.yaml')")
+  )
+  assert.doesNotMatch(
+    proof.slice(0, proof.indexOf("maestro('maestro/story68/expo-go-unavailable.yaml')")),
+    /story65\/open-app\.yaml/
+  )
+})
+
+test('the Expo Go proof builds the launch bundle before it opens the exp:// link', () => {
+  const harness = fs.readFileSync(
+    fileURLToPath(new URL('../run-story68-native.mjs', import.meta.url)),
+    'utf8'
+  )
+  const open = harness.slice(harness.indexOf('function openUrl(url)'))
+  assert.match(
+    open.slice(0, open.indexOf("if (platform === 'ios')")),
+    /url\.startsWith\(EXPO_GO_URL\)\) warmLaunchBundle\(\)/
+  )
+  const proof = harness.slice(harness.indexOf("} else if (command === 'expo-go-proof')"))
+  assert.ok(proof.indexOf('openUrl(EXPO_GO_URL)') > -1)
+  assert.match(harness, /const EXPO_GO_URL = 'exp:\/\/127\.0\.0\.1:8089'/)
 })
 
 test('a missing or unknown platform throws instead of reaching the derived open-app budget', () => {

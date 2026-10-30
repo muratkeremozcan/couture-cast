@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
-import { failedAuditIssues, failedAuditTestDigest } from './share-card-audit-report.mjs'
+import {
+  failedAuditContext,
+  failedAuditIssues,
+  failedAuditTestDigest,
+  xcodebuildFailureReport,
+} from './share-card-audit-report.mjs'
 
 const log = [
   "Test Case '-[ShareCardAccessibilityUITests.ShareCardAccessibilityUITests testAllLocales]' started.",
@@ -69,12 +74,53 @@ describe('failed audit test digest', () => {
     ])
   })
 
+  test('screen context lines stay out of the issue list and have their own cap', () => {
+    const text = [
+      'CC68_AUDIT_ISSUE home|2|none|none|Potentially inaccessible text',
+      ...Array.from(
+        { length: 50 },
+        (_, i) => `CC68_AUDIT_ISSUE home-context|staticText|id${i}|Label ${i}|1,2,3,4`
+      ),
+      'CC68_AUDIT_ISSUE open|3|card|Today|Contrast failed',
+    ].join('\n')
+    assert.deepEqual(failedAuditIssues(text), [
+      'home|2|none|none|Potentially inaccessible text',
+      'open|3|card|Today|Contrast failed',
+    ])
+    const context = failedAuditContext(text)
+    assert.equal(context.length, 40)
+    assert.equal(context[0], 'home-context|staticText|id0|Label 0|1,2,3,4')
+    assert.deepEqual(xcodebuildFailureReport(text).context, context)
+  })
+
   test('caps the issue list and each issue line', () => {
     const issues = failedAuditIssues(
       Array.from({ length: 100 }, () => `CC68_AUDIT_ISSUE ${'z'.repeat(900)}`).join('\n')
     )
     assert.equal(issues.length, 40)
     assert.ok(issues.every((line) => line.length <= 400))
+  })
+
+  test('the Swift issue line keeps the CC68_AUDIT_ISSUE prefix and five pipe separated fields', () => {
+    const swift = fs.readFileSync(
+      'apps/mobile/native-tests/ShareCardHeaderQuery.swift',
+      'utf8'
+    )
+    // Interpolations carry their own quotes, so take the whole return line.
+    const returned = (from) =>
+      /return "(CC68_AUDIT_ISSUE .*)"$/m.exec(swift.slice(swift.indexOf(from)))[1]
+    const line = returned('func shareCardAuditIssueLine')
+    assert.match(line, /^CC68_AUDIT_ISSUE \\\(scope\)\|/)
+    // scope, audit type, identifier, label and description: four separators.
+    assert.equal(line.replace(/\\\([^)]*\)\)?/g, 'x').split('|').length, 5)
+    // Field text may not smuggle a separator or a line break into the record.
+    const compact = /func compactAuditText[\s\S]*?\n}/.exec(swift)[0]
+    assert.match(compact, /\.newlines/)
+    assert.match(compact, /replacingOccurrences\(of: "\|", with: "\/"\)/)
+    assert.match(compact, /prefix\(120\)/)
+    const context = returned('func shareCardAuditContextLines')
+    assert.match(context, /^CC68_AUDIT_ISSUE \\\(scope\)-context\|/)
+    assert.equal(context.replace(/\\\([^)]*\)\)?/g, 'x').split('|').length, 5)
   })
 
   test('the Swift audits name every refused issue and still fail on it', () => {
@@ -89,11 +135,46 @@ describe('failed audit test digest', () => {
     assert.equal(audits.length, handled.length)
     assert.match(
       swift,
-      /performAccessibilityAudit\(for: \.all\) \{ issue in\n\s+print\(self\.auditIssueLine\("home", issue\)\)\n\s+return false\n/
+      /performAccessibilityAudit\(for: \.all\) \{ issue in\n\s+print\(shareCardAuditIssueLine\("home", issue\)\)\n\s+shareCardAuditContextLines\("home", self\.app\)\.forEach \{ print\(\$0\) \}\n\s+return false\n/
     )
     assert.match(
       swift,
-      /if !allowed \{ print\(self\.auditIssueLine\(state, issue\)\) \}\n\s+return allowed/
+      /element\("tab-home"\)\.tap\(\)\n\s+try settleHome\(\)\n\s+try app\.performAccessibilityAudit/
     )
+    assert.match(
+      swift,
+      /if !allowed \{ print\(shareCardAuditIssueLine\(state, issue\)\) \}\n\s+return allowed/
+    )
+  })
+
+  test('the failure report falls back to the log tail when no test case failed', () => {
+    const report = xcodebuildFailureReport(
+      Array.from(
+        { length: 30 },
+        (_, i) => `line ${i} /Users/runner/x/A.swift:3: boom`
+      ).join('\n')
+    )
+    assert.deepEqual(report.tests, [])
+    assert.equal(report.tail.length, 12)
+    assert.ok(report.tail.every((line) => !line.includes('/Users/')))
+    assert.equal(xcodebuildFailureReport(log).tail.length, 0)
+    assert.equal(xcodebuildFailureReport(log).tests[0].test, 'testOpenSave')
+  })
+
+  test('the fallback XCUITest names every refused issue through the shared helper', () => {
+    const swift = fs.readFileSync(
+      'apps/mobile/native-tests/ShareCardFallbackUITests.swift',
+      'utf8'
+    )
+    assert.match(
+      swift,
+      /performAccessibilityAudit\(for: \.all\) \{ issue in\n\s+print\(shareCardAuditIssueLine\("fallback", issue\)\)\n\s+return false\n/
+    )
+    assert.equal([...swift.matchAll(/performAccessibilityAudit/g)].length, 1)
+    const query = fs.readFileSync(
+      'apps/mobile/native-tests/ShareCardHeaderQuery.swift',
+      'utf8'
+    )
+    assert.match(query, /func shareCardAuditIssueLine\(/)
   })
 })

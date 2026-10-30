@@ -374,6 +374,7 @@ describe('Maestro driver port', () => {
           privateJson: () => undefined,
           summarizeNativeFlowFailure: () => ({}),
           redactRapidWatermarkControl: () => undefined,
+          recordIosCommandTimings: () => undefined,
           spawnSync: capture,
           spawn: capture,
           flowTimeoutMs: () => 120_000,

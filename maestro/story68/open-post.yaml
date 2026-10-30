@@ -64,12 +64,6 @@ appId: ${MAESTRO_APP_ID}
                 end: 50%, 55%
                 duration: 800
             - waitForAnimationToEnd
-      # AX can count the footer under the tab bar. Lift it a short distance.
-      - swipe:
-          start: 50%, 70%
-          end: 50%, 55%
-          duration: 1000
-      - waitForAnimationToEnd
 - runFlow:
     when:
       platform: Android
@@ -80,8 +74,43 @@ appId: ${MAESTRO_APP_ID}
           direction: DOWN
           timeout: 30000
           centerElement: false
-- tapOn:
-    id: community-share-card-open-${MAESTRO_POST_ID}
+# AX can count the opener under the tab bar, and Maestro reports a tap on that edge as
+# completed although the app never received the press (run 40984431884: the opener spanned
+# the tab bar edge and no press reached the app). Each attempt lifts the list a short
+# distance on iOS, taps, and waits for the composer title, so a lost press is taken again.
+# The lift and the tap run only while the composer title is absent: a press that lands after
+# the wait gave up has opened the composer, and a swipe or tap there would hit its controls.
+# The title is checked again after the lift, because the composer can open during the swipe
+# and its animation wait, and a tap by id under the open modal cannot resolve.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: share-card-title
+          commands:
+            - runFlow:
+                when:
+                  platform: iOS
+                commands:
+                  - swipe:
+                      start: 50%, 70%
+                      end: 50%, 55%
+                      duration: 1000
+                  - waitForAnimationToEnd
+            - runFlow:
+                when:
+                  notVisible:
+                    id: share-card-title
+                commands:
+                  - tapOn:
+                      id: community-share-card-open-${MAESTRO_POST_ID}
+      - extendedWaitUntil:
+          visible:
+            id: share-card-title
+          timeout: 5000
+          label: 'share_card_press_not_received'
 - extendedWaitUntil:
     visible:
       id: share-card-preview-loaded-.*

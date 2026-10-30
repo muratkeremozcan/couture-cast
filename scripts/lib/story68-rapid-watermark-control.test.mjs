@@ -198,6 +198,7 @@ describe('withRapidWatermarkControl', () => {
     const start = source.indexOf('function rapidWatermarkFlow(')
     const end = source.indexOf("\nif (command === 'prebuild')", start)
     const records = []
+    const timings = []
     const child = new EventEmitter()
     const context = {
       signal: new AbortController().signal,
@@ -228,6 +229,7 @@ describe('withRapidWatermarkControl', () => {
       privateJson: (file, record) => records.push({ file, record }),
       summarizeNativeFlowFailure,
       redactRapidWatermarkControl: () => undefined,
+      recordIosCommandTimings: (options) => timings.push(options),
     }
     const result = vm.runInNewContext(
       `(${source.slice(start, end)})(signal, control)`,
@@ -244,6 +246,9 @@ describe('withRapidWatermarkControl', () => {
     ])
     assert.equal(records[0].record.flow, 'rapid-watermark-held.yaml')
     assert.equal(records[0].record.classification, 'assertion')
+    assert.equal(timings.length, 1)
+    assert.equal(timings[0].flow, 'maestro/story68/rapid-watermark-held.yaml')
+    assert.equal(timings[0].minMs, 0)
     assert.equal(JSON.stringify(records).includes('PRIVATE_USER'), false)
     assert.equal(JSON.stringify(records).includes('private-capability'), false)
   })

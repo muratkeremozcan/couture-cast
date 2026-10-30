@@ -4,6 +4,13 @@ export const shareCardAuditTestIDs: string[]
 export const shareCardNativeBehaviors: string[]
 export function failedAuditTestDigest(log: string): { test: string; lines: string[] }[]
 export function failedAuditIssues(log: string): string[]
+export function failedAuditContext(log: string): string[]
+export function xcodebuildFailureReport(log: string): {
+  issues: string[]
+  context: string[]
+  tests: { test: string; lines: string[] }[]
+  tail: string[]
+}
 export function closedShareCardAuditReport(
   summary: {
     result?: string

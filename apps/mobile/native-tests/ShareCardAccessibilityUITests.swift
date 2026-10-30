@@ -46,6 +46,24 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     throw last
   }
 
+  /// Home mounts and lays out again after a tab switch, and the audit reads pixels as well as the tree.
+  /// Audit only after the outfit opener exists and the visible text has stopped changing.
+  func settleHome() throws {
+    XCTAssertTrue(app.buttons.matching(identifier: "outfit-share-card-open").firstMatch.waitForExistence(timeout: 20))
+    func texts() -> [String] {
+      app.staticTexts.allElementsBoundByIndex.map { "\($0.label)@\(Int($0.frame.minY))" }
+    }
+    var previous = texts()
+    var stable = 0
+    let deadline = Date().addingTimeInterval(10)
+    while stable < 3 && Date() < deadline {
+      RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+      let current = texts()
+      stable = current == previous ? stable + 1 : 0
+      previous = current
+    }
+  }
+
   func openCard(waitForPreview: Bool = true) throws {
     if element("share-card-cancel").exists { element("share-card-cancel").tap() }
     element("tab-home").tap()
@@ -55,15 +73,6 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     focusSequence = try baselineFocusSequence()
     opener.tap()
     if waitForPreview { XCTAssertTrue(loaded().waitForExistence(timeout: 20)) }
-  }
-
-  // The job log is the only place a failed audit is readable, so name each failing issue.
-  func auditIssueLine(_ scope: String, _ issue: XCUIAccessibilityAuditIssue) -> String {
-    func compact(_ text: String) -> String {
-      String(text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "|", with: "/").prefix(120))
-    }
-    let element = issue.element
-    return "CC68_AUDIT_ISSUE \(scope)|\(issue.auditType.rawValue)|\(compact(element?.identifier ?? "none"))|\(compact(element?.label ?? "none"))|\(compact(issue.compactDescription))"
   }
 
   static func allowsRasterOCRIssue(type: XCUIAccessibilityAuditType, description: String, detail: String, state: String, hasElement: Bool, previewVerified: Bool) -> Bool {
@@ -165,7 +174,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
       // Apple's raster OCR heuristic has no AX element for this fixed artwork.
       // Coordinator-approved exception requires its exact issue signature/state.
       let allowed = Self.allowsRasterOCRIssue(type: issue.auditType, description: issue.compactDescription, detail: issue.detailedDescription, state: state, hasElement: issue.element != nil, previewVerified: previewVerified)
-      if !allowed { print(self.auditIssueLine(state, issue)) }
+      if !allowed { print(shareCardAuditIssueLine(state, issue)) }
       return allowed
     }
     let title = element("share-card-title")
@@ -290,8 +299,10 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     try assertExistingHeader(tabs["community"]!, removedContentHeading: communityLabels["heading"] as! String)
     print("CC68_NATIVE_BEHAVIOR_PASS existing-header-labels")
     element("tab-home").tap()
+    try settleHome()
     try app.performAccessibilityAudit(for: .all) { issue in
-      print(self.auditIssueLine("home", issue))
+      print(shareCardAuditIssueLine("home", issue))
+      shareCardAuditContextLines("home", self.app).forEach { print($0) }
       return false
     }
     try openCard()

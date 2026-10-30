@@ -19,12 +19,45 @@ export const OPEN_APP_WORST_CASE_MS =
   FLOW_STARTUP_MS + 4 * (100_000 + 17 * CONDITION_CHECK_MS)
 
 /**
- * open-post.yaml on iOS (its slower platform), one attempt: 10 s + 20 s + 20 s of declared
- * waits, and 14 budgeted steps: 2 feed-state checks, 3 up and 5 down walk iterations, 2
- * opener iterations, the post assertion and the final lift swipe. Every named failure fires
- * inside this budget, so a missing post is reported, not killed.
+ * expo-go-open.yaml, the iOS Expo Go proof opener, on a fresh simulator and a fresh Expo Go. Three
+ * waits run once each, in order: the open prompt (30 s, optional), the developer-menu onboarding
+ * that follows the project load (150 s, optional) and the named tab-bar wait (60 s). A wait that
+ * Maestro ran a second time returned in 0.4 s in run 41019906459, so no wait sits in a `retry` or
+ * `repeat`. Three `when` checks cost 0.3 to 0.6 s when absent (run 41019906459) and up to 7.4 s in
+ * run 40992501585, budgeted at 8 s, plus 4 s for each of the three taps. The project has 240 s of
+ * waits, and one that never loads fails on the named wait inside this budget with the failed-step
+ * hierarchy captured.
+ * open-app.yaml, which this replaces for Expo Go, declares 100 s of waits per attempt and was pinned
+ * to 120 s on iOS: the Maestro process was killed before it could name a failure.
  */
-export const OPEN_POST_WORST_CASE_MS = FLOW_STARTUP_MS + 50_000 + 14 * CONDITION_CHECK_MS
+export const EXPO_GO_OPEN_FLOW = 'maestro/story68/expo-go-open.yaml'
+export const EXPO_GO_OPEN_WAITS_MS = Object.freeze([30_000, 150_000, 60_000])
+export const EXPO_GO_CONDITION_CHECK_MS = 8_000
+export const EXPO_GO_CONDITION_CHECKS = 3
+export const EXPO_GO_TAP_MS = 4_000
+export const EXPO_GO_OPEN_WORST_CASE_MS =
+  FLOW_STARTUP_MS +
+  EXPO_GO_OPEN_WAITS_MS.reduce((total, wait) => total + wait, 0) +
+  EXPO_GO_CONDITION_CHECKS * (EXPO_GO_CONDITION_CHECK_MS + EXPO_GO_TAP_MS)
+
+/**
+ * open-post.yaml on iOS (its slower platform): 10 s + 20 s + 20 s of declared waits, and 13
+ * budgeted steps outside the guarded opener tap: 2 feed-state checks, 3 up and 5 down walk
+ * iterations, 2 opener iterations and the post assertion. The opener tap is a retry of
+ * maxRetries 2 (3 attempts); an attempt is the composer-title guard check, the lift swipe, the
+ * guard check before the tap and the 5 s wait for the composer title. Every named failure fires inside this budget, so a
+ * missing post is reported, not killed.
+ */
+export const OPEN_POST_TAP_ATTEMPTS = 3
+export const OPEN_POST_PRESS_WAIT_MS = 5_000
+// The attempt guard, the lift swipe and the guard before the tap each cost one budgeted step.
+export const OPEN_POST_ATTEMPT_STEPS = 3
+export const OPEN_POST_WORST_CASE_MS =
+  FLOW_STARTUP_MS +
+  50_000 +
+  13 * CONDITION_CHECK_MS +
+  OPEN_POST_TAP_ATTEMPTS *
+    (OPEN_POST_PRESS_WAIT_MS + OPEN_POST_ATTEMPT_STEPS * CONDITION_CHECK_MS)
 
 /**
  * The guarded watermark taps (watermark.yaml, release-watermark-off.yaml). Each tap sits in a
@@ -100,9 +133,31 @@ const waitSettingsTimeoutMs = Math.ceil(
   (DEFAULT_FLOW_TIMEOUT_MS + WAIT_SETTINGS_WORST_CASE_MS) * FLOW_TIMEOUT_MARGIN
 )
 
+/**
+ * set-locale.yaml: the Settings tab opener (up to 4 attempts of a tap and a 15 s wait), the
+ * 15 s scroll to the language button and the closing settle wait, then the guarded language
+ * tap. Each tap attempt is the guard check, the tap, a 6 s wait for the target to read disabled
+ * (the press landed or the change started), a 15 s wait for a different language button to read
+ * enabled (the change finished: every button is disabled while it runs) and a 6 s wait for the
+ * target to read disabled again (it stayed selected; a rollback enables it); maxRetries 3
+ * allows 4 attempts.
+ */
+export const SET_LOCALE_FLOW = 'maestro/story65/set-locale.yaml'
+export const SET_LOCALE_TAP_ATTEMPTS = 4
+export const SET_LOCALE_SETTLE_WAIT_MS = 15_000
+export const SET_LOCALE_TAP_ATTEMPT_MS =
+  3 * CONDITION_CHECK_MS + SET_LOCALE_SETTLE_WAIT_MS + 2_000
+export const SET_LOCALE_TAP_WORST_CASE_MS =
+  SET_LOCALE_TAP_ATTEMPTS * SET_LOCALE_TAP_ATTEMPT_MS
+export const SET_LOCALE_OTHER_STEPS_MS = 4 * 17_000 + 15_000 + 2_000
+
 const flowTimeouts = {
   ...Object.fromEntries(SAVE_TAP_FLOWS.map((flow) => [flow, saveTapTimeoutMs])),
   ...Object.fromEntries(WAIT_SETTINGS_FLOWS.map((flow) => [flow, waitSettingsTimeoutMs])),
+  [SET_LOCALE_FLOW]: Math.ceil(
+    (FLOW_STARTUP_MS + SET_LOCALE_OTHER_STEPS_MS + SET_LOCALE_TAP_WORST_CASE_MS) *
+      FLOW_TIMEOUT_MARGIN
+  ),
   [PICK_IMAGE_FLOW]: Math.ceil(
     (FLOW_STARTUP_MS + PICK_IMAGE_OTHER_STEPS_MS + PICK_IMAGE_TAP_WORST_CASE_MS) *
       FLOW_TIMEOUT_MARGIN
@@ -110,6 +165,7 @@ const flowTimeouts = {
   'maestro/story65/open-app.yaml': Math.ceil(
     OPEN_APP_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
   ),
+  [EXPO_GO_OPEN_FLOW]: Math.ceil(EXPO_GO_OPEN_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN),
   'maestro/story68/open-post.yaml': Math.ceil(
     OPEN_POST_WORST_CASE_MS * FLOW_TIMEOUT_MARGIN
   ),

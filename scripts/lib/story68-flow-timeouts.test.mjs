@@ -5,6 +5,12 @@ import { fileURLToPath } from 'node:url'
 import {
   CONDITION_CHECK_MS,
   DEFAULT_FLOW_TIMEOUT_MS,
+  EXPO_GO_CONDITION_CHECK_MS,
+  EXPO_GO_CONDITION_CHECKS,
+  EXPO_GO_OPEN_FLOW,
+  EXPO_GO_OPEN_WAITS_MS,
+  EXPO_GO_TAP_MS,
+  EXPO_GO_OPEN_WORST_CASE_MS,
   FLOW_STARTUP_MS,
   FLOW_TIMEOUT_MARGIN,
   OPEN_APP_WORST_CASE_MS,
@@ -60,8 +66,10 @@ function declaredOpenPostWorstCase() {
     const repeats = (block.match(/^\s*times:/gm) ?? []).length
     const swipes = (block.match(/^\s*- swipe:/gm) ?? []).length
     const asserts = (block.match(/^\s*-? ?assert(?:Not)?Visible:/gm) ?? []).length
+    // The guarded opener attempt checks the composer title before it lifts and taps.
+    const guards = (block.match(/^\s*when:\n\s*notVisible:/gm) ?? []).length
     // Each repeat iteration holds its own swipe; the remaining swipes are single steps.
-    return { waits, steps: iterations + (swipes - repeats) + asserts }
+    return { waits, steps: iterations + (swipes - repeats) + asserts + guards }
   }
   const sum = (parts) =>
     parts.reduce(
@@ -71,9 +79,23 @@ function declaredOpenPostWorstCase() {
       }),
       { waits: 0, steps: 0 }
     )
-  const shared = sum(blocks.filter((b) => !/platform: (iOS|Android)/.test(b)).map(cost))
+  // The guarded opener tap is a retry; every attempt repeats its waits and steps.
+  const guarded = (b) => b.startsWith('- retry:')
+  const attempts = (b) => Number(/maxRetries:\s*(\d+)/.exec(b)[1]) + 1
+  const sharedBlocks = blocks.filter(
+    (b) => guarded(b) || !/platform: (iOS|Android)/.test(b)
+  )
+  const shared = sum(
+    sharedBlocks.map((b) => {
+      const part = cost(b)
+      const n = guarded(b) ? attempts(b) : 1
+      return { waits: part.waits * n, steps: part.steps * n }
+    })
+  )
   const worst = (platform) => {
-    const own = sum(blocks.filter((b) => b.includes(`platform: ${platform}`)).map(cost))
+    const own = sum(
+      blocks.filter((b) => !guarded(b) && b.includes(`platform: ${platform}`)).map(cost)
+    )
     return (
       FLOW_STARTUP_MS +
       shared.waits +
@@ -90,7 +112,7 @@ describe('Maestro flow timeouts', () => {
     assert.equal(OPEN_POST_WORST_CASE_MS, Math.max(ios, android))
     assert.ok(flowTimeoutMs(openPost) >= Math.max(ios, android) * FLOW_TIMEOUT_MARGIN)
     // The old 38-iteration walk could not be covered by any sane budget.
-    assert.ok(flowTimeoutMs(openPost) <= 240_000)
+    assert.ok(flowTimeoutMs(openPost) <= 300_000)
   })
 
   test('open-app covers its declared worst case with the stated margin', () => {
@@ -104,6 +126,36 @@ describe('Maestro flow timeouts', () => {
     assert.ok(flowTimeoutMs(openApp) >= worst * FLOW_TIMEOUT_MARGIN)
     // The killed CI run: one attempt and a half fit in the old fixed budget.
     assert.ok(flowTimeoutMs(openApp) > 4 * DEFAULT_FLOW_TIMEOUT_MS)
+  })
+
+  test('expo-go-open runs each declared wait once and covers them with the margin', () => {
+    const text = fs.readFileSync(
+      new URL(`../../${EXPO_GO_OPEN_FLOW}`, import.meta.url),
+      'utf8'
+    )
+    const commands = text.replace(/^\s*#.*$/gm, '')
+    const waits = [...commands.matchAll(/^\s*timeout:\s*(\d+)\s*$/gm)].map((m) =>
+      Number(m[1])
+    )
+    // The checks are the three `when` conditions, one per taps block.
+    const checks = (commands.match(/^\s*when:\s*$/gm) ?? []).length
+    const taps = (commands.match(/^\s*- tapOn:/gm) ?? []).length
+    assert.deepEqual(waits, [...EXPO_GO_OPEN_WAITS_MS])
+    assert.equal(checks, EXPO_GO_CONDITION_CHECKS)
+    assert.equal(taps, EXPO_GO_CONDITION_CHECKS)
+    // A wait Maestro runs again returns at once (run 41019906459), so none may be in a loop.
+    assert.doesNotMatch(commands, /^\s*-?\s*(?:retry|repeat):/m)
+    // Only the two screens that may be absent are optional; the last wait names the failure.
+    assert.equal((commands.match(/optional: true/g) ?? []).length, 2)
+    assert.match(commands, /label: 'expo_go_project_not_loaded'\s*$/)
+    const worst =
+      FLOW_STARTUP_MS +
+      waits.reduce((total, wait) => total + wait, 0) +
+      checks * (EXPO_GO_CONDITION_CHECK_MS + EXPO_GO_TAP_MS)
+    assert.equal(EXPO_GO_OPEN_WORST_CASE_MS, worst)
+    assert.ok(flowTimeoutMs(EXPO_GO_OPEN_FLOW) >= worst * FLOW_TIMEOUT_MARGIN)
+    // The killed CI run: open-app.yaml hit the fixed 120 s with the project still loading.
+    assert.ok(flowTimeoutMs(EXPO_GO_OPEN_FLOW) > 2 * DEFAULT_FLOW_TIMEOUT_MS)
   })
 
   test('the harness passes each flow its own budget to the Maestro process', () => {
