@@ -2,6 +2,7 @@ import {
   alertReceivedPropertiesSchema,
   communityReactionSinkPropertiesSchema,
   analyticsEventNameSchema,
+  shareCardSharedPropertiesSchema,
   guardianConsentGrantedPropertiesSchema,
   moderationActionPropertiesSchema,
   ritualCreatedPropertiesSchema,
@@ -118,6 +119,7 @@ export const analyticsPropertySchemas = {
   community_spotlight_opened: communitySpotlightOpenedPropertiesSchema,
   location_saved: locationSavedPropertiesSchema,
   location_search_failed: locationSearchFailedPropertiesSchema,
+  share_card_shared: shareCardSharedPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

@@ -131,6 +131,10 @@ export const analyticsEventNameSchema = z.enum([
   // location keys or raw identifiers.
   'location_saved',
   'location_search_failed',
+  // Story 6.9. Client-side only: mobile and web send it directly to PostHog with
+  // their own distinctId and never through TelemetryService. Closed enums and a
+  // duration only; each SDK's before_send keeps just the allowlisted keys.
+  'share_card_shared',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -1018,6 +1022,100 @@ export const communityReactionEventSchema = communityReactionEventPropertiesSche
   .extend({ analyticsSubjectId: z.string().min(1) })
   .strict()
 
+// Story 6.9 D5: share_card_shared, one event per settled share attempt. Client-side
+// only: mobile and web send it straight to PostHog with their own distinctId, exactly
+// like affiliate_cta_shown, and it never reaches TelemetryService. The result model
+// in the 6.9 spec is the single policy: each outcome has a closed set of valid
+// targets and a client that can observe it. The schema refuses every other pair, so
+// Android can never report `completed` and a raw activity id or package name can
+// never pass as a target. No bytes, digests, captions, ids, URLs or filenames exist
+// in the shape, and `.strict()` refuses any extra key.
+export const SHARE_CARD_SHARED_EVENT = 'share_card_shared'
+export const shareCardShareClientSchema = z.enum(['ios', 'android', 'web'])
+export const shareCardShareTargetSchema = z.enum([
+  'pinterest',
+  'instagram',
+  'facebook',
+  'tiktok',
+  'other',
+  'none',
+  'unknown',
+])
+export const shareCardShareOutcomeSchema = z.enum([
+  'completed',
+  'target_chosen',
+  'handed_off',
+  'cancelled',
+  'dismissed',
+  'not_confirmed',
+  'failed',
+  'unavailable',
+])
+export type ShareCardShareClient = z.infer<typeof shareCardShareClientSchema>
+export type ShareCardShareTarget = z.infer<typeof shareCardShareTargetSchema>
+export type ShareCardShareOutcome = z.infer<typeof shareCardShareOutcomeSchema>
+
+const shareCardNamedTargets: readonly ShareCardShareTarget[] = [
+  'pinterest',
+  'instagram',
+  'facebook',
+  'tiktok',
+  'other',
+]
+/** The spec's outcome table: the only targets each outcome may carry. */
+export const SHARE_CARD_SHARE_VALID_TARGETS: Readonly<
+  Record<ShareCardShareOutcome, readonly ShareCardShareTarget[]>
+> = Object.freeze({
+  completed: [...shareCardNamedTargets, 'unknown'],
+  target_chosen: shareCardNamedTargets,
+  handed_off: ['unknown'],
+  cancelled: [...shareCardNamedTargets, 'none'],
+  dismissed: ['none'],
+  not_confirmed: ['none'],
+  failed: ['none'],
+  unavailable: ['none'],
+})
+/** The "When" column: the only clients that can observe each outcome. */
+export const SHARE_CARD_SHARE_OUTCOME_CLIENTS: Readonly<
+  Record<ShareCardShareOutcome, readonly ShareCardShareClient[]>
+> = Object.freeze({
+  completed: ['ios'],
+  target_chosen: ['android'],
+  handed_off: ['web'],
+  cancelled: ['ios'],
+  dismissed: ['web'],
+  not_confirmed: ['android'],
+  failed: ['ios', 'android', 'web'],
+  unavailable: ['ios', 'android', 'web'],
+})
+
+export const shareCardSharedEventSchema = z
+  .object({
+    client: shareCardShareClientSchema,
+    target: shareCardShareTargetSchema,
+    outcome: shareCardShareOutcomeSchema,
+    duration_ms: z.number().int().min(0).max(86_400_000),
+  })
+  .strict()
+  .superRefine((event, context) => {
+    if (!SHARE_CARD_SHARE_VALID_TARGETS[event.outcome].includes(event.target))
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['target'],
+        message: `target ${event.target} is not valid for outcome ${event.outcome}`,
+      })
+    if (!SHARE_CARD_SHARE_OUTCOME_CLIENTS[event.outcome].includes(event.client))
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['client'],
+        message: `client ${event.client} cannot observe outcome ${event.outcome}`,
+      })
+  })
+/** The event input is already the provider shape: snake_case, four keys. */
+export const shareCardSharedPropertiesSchema = shareCardSharedEventSchema
+export type ShareCardSharedEvent = z.infer<typeof shareCardSharedEventSchema>
+export type ShareCardSharedProperties = z.infer<typeof shareCardSharedPropertiesSchema>
+
 export const analyticsEventSchemas = {
   community_reaction_added: communityReactionEventSchema,
   community_reaction_replaced: communityReactionEventSchema,
@@ -1071,6 +1169,7 @@ export const analyticsEventSchemas = {
   community_spotlight_opened: communitySpotlightOpenedEventSchema,
   location_saved: locationSavedEventSchema,
   location_search_failed: locationSearchFailedEventSchema,
+  share_card_shared: shareCardSharedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -2290,6 +2389,90 @@ export const communityChallengeParticipatedPropertiesSchema = z
 export type CommunityChallengeParticipatedProperties = z.infer<
   typeof communityChallengeParticipatedPropertiesSchema
 >
+
+/**
+ * Story 6.9: the four business keys of one settled share attempt, parsed against the
+ * result model. Throws on an invalid pair or an extra key; callers catch so analytics
+ * can never change a share outcome. The SDK adds identity and transport keys later.
+ */
+export function trackShareCardShared(
+  event: ShareCardSharedEvent
+): ShareCardSharedProperties {
+  const parsed = shareCardSharedEventSchema.parse(event)
+  return {
+    client: parsed.client,
+    target: parsed.target,
+    outcome: parsed.outcome,
+    duration_ms: parsed.duration_ms,
+  }
+}
+
+/**
+ * Story 6.9 D5: the only `properties` keys a share_card_shared request may carry once
+ * an SDK's before_send hook has run: the four business keys, `locale`, the GeoIP
+ * switch, and the SDK identity and transport keys. URL, path, host, referrer, screen,
+ * super properties and `$set`/`$set_once` are all outside it.
+ */
+export const SHARE_CARD_SHARED_ALLOWED_PROPERTIES = Object.freeze([
+  'client',
+  'target',
+  'outcome',
+  'duration_ms',
+  'locale',
+  '$geoip_disable',
+  'token',
+  'distinct_id',
+  '$lib',
+  '$lib_version',
+  '$os',
+  '$device_type',
+] as const)
+
+const shareCardSharedAllowedProperties: ReadonlySet<string> = new Set(
+  SHARE_CARD_SHARED_ALLOWED_PROPERTIES
+)
+
+/**
+ * Story 6.9 D5: the final allowlist for a share_card_shared `properties` object, for
+ * both SDKs' before_send hooks. Returns a new object with only allowlisted keys whose
+ * values are primitives (string, finite number or boolean), `$geoip_disable: true`,
+ * and the four business keys re-validated against the result model. Returns null on
+ * any problem, which drops the event: a missing or invalid business key, a value that
+ * is not an object, or any internal error. Never throws.
+ */
+export function sanitizeShareCardSharedProperties(
+  properties: unknown
+): Record<string, unknown> | null {
+  try {
+    if (
+      typeof properties !== 'object' ||
+      properties === null ||
+      Array.isArray(properties)
+    )
+      return null
+    const sanitized: Record<string, unknown> = {}
+    for (const key of Object.keys(properties)) {
+      if (!shareCardSharedAllowedProperties.has(key)) continue
+      const value: unknown = (properties as Record<string, unknown>)[key]
+      if (
+        typeof value === 'string' ||
+        typeof value === 'boolean' ||
+        (typeof value === 'number' && Number.isFinite(value))
+      )
+        sanitized[key] = value
+    }
+    sanitized.$geoip_disable = true
+    const business = shareCardSharedEventSchema.safeParse({
+      client: sanitized.client,
+      target: sanitized.target,
+      outcome: sanitized.outcome,
+      duration_ms: sanitized.duration_ms,
+    })
+    return business.success ? sanitized : null
+  } catch {
+    return null
+  }
+}
 
 export function trackPremiumSubscribeTapped(
   event: PremiumSubscribeTappedEvent,
