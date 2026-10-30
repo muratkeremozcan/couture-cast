@@ -36,6 +36,15 @@ test('every matrix section, locale and command belongs to exactly one shard', ()
     assert.equal(shards.filter((s) => runsCommand(s, command)).length, 1, command)
 })
 
+test('no shard runs the Expo Go proof: the ios-expo-go job runs it alone', () => {
+  for (const shard of Object.keys(SHARD_PLAN).map(Number)) {
+    assert.ok(!SHARD_PLAN[shard].commands.includes('expo-go-proof'), `shard ${shard}`)
+    assert.ok(!commandsForShard(shard).includes('expo-go-proof'), `shard ${shard}`)
+  }
+  assert.deepEqual(commandsForShard(2).at(-1), 'fallback-focus')
+  assert.ok(!AFTER_MATRIX.includes('expo-go-proof'))
+})
+
 test('the plan names only sections and commands the runner knows', () => {
   for (const { sections, commands } of Object.values(SHARD_PLAN)) {
     for (const s of sections) assert.ok(MATRIX_SECTIONS[s], s)
@@ -105,7 +114,6 @@ test('each shard signs in, only shard 1 proves the original and shard 2 sets the
     'rapid-watermark',
     'a11y',
     'fallback-focus',
-    'expo-go-proof',
   ])
 })
 

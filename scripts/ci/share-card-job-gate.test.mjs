@@ -46,6 +46,18 @@ describe('share-card aggregate job gate', () => {
     ])
   })
 
+  test('does not require the Expo Go proof job, which has never passed in CI', () => {
+    assert.ok(!requiredShareCardJobs.includes('ios-expo-go'))
+    assert.throws(
+      () =>
+        assertShareCardJobs(
+          { ...results(), 'ios-expo-go': { result: 'success' } },
+          'push'
+        ),
+      /share_card_job_results_invalid/
+    )
+  })
+
   test('passes only when every required job succeeded', () => {
     assert.deepEqual(assertShareCardJobs(results(), 'push'), requiredShareCardJobs)
     const ok = cli(JSON.stringify(results()), 'push')

@@ -36,6 +36,7 @@ import {
   logSize,
 } from './ci/native-ios-maestro-trace.mjs'
 import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
+import { beginExpoGoProbe, readExpoGoVersion } from './ci/native-ios-expo-go-probe.mjs'
 import { inMatrixSection, localesForShard, parseShard } from './ci/native-ios-shards.mjs'
 import {
   iosDriverGlobalArgs,
@@ -143,8 +144,8 @@ function child(binary, args, env, log, cwd = root) {
   fs.closeSync(fd)
   return process
 }
-const appId =
-  command === 'expo-go-proof' ? 'host.exp.Exponent' : 'com.couturecast.story68'
+const DEV_CLIENT_APP_ID = 'com.couturecast.story68'
+const appId = command === 'expo-go-proof' ? 'host.exp.Exponent' : DEV_CLIENT_APP_ID
 const device = option('device')
 const platform = option('platform')
 let activeLocale = option('locale') ?? 'en-US'
@@ -303,6 +304,14 @@ function warmLaunchBundle() {
       launchBundleWarm: { seconds: Math.round((Date.now() - started) / 100) / 10 },
     })
   )
+}
+// Run 41019906459 sampled 74 MB free with the dev client still resident next to Expo Go. A
+// client that is not running is not an error.
+function terminateDevClient() {
+  requireDevice()
+  spawnSync('xcrun', ['simctl', 'terminate', device, DEV_CLIENT_APP_ID], {
+    encoding: 'utf8',
+  })
 }
 function openUrl(url) {
   requireDevice()
@@ -1169,8 +1178,20 @@ if (command === 'prebuild') {
       appId,
       downloaded,
     })
+    terminateDevClient()
+    // Built before the probe takes its Metro baseline, so the counts are Expo Go's own.
+    warmLaunchBundle()
+    const probe = beginExpoGoProbe({
+      directory,
+      device,
+      version: readExpoGoVersion(downloaded),
+    })
     openUrl(EXPO_GO_URL)
-    maestro('maestro/story68/expo-go-open.yaml')
+    try {
+      maestro('maestro/story68/expo-go-open.yaml')
+    } finally {
+      probe.finish()
+    }
     await signin()
     const before = JSON.stringify(nativeOriginalPaths())
     maestro('maestro/story68/expo-go-unavailable.yaml')

@@ -27,6 +27,7 @@ export const PUBLIC_DIAGNOSTIC_FILES = Object.freeze([
   'native-ios-metro-bundles.json',
   'native-ios-flow-command-timings.json',
   'native-ios-flow-progress.json',
+  'native-ios-expo-go-probe.json',
 ])
 
 /** Never opened by the selector. The first three can carry paths, keys and tokens. */

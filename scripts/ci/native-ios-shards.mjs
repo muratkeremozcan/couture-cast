@@ -61,13 +61,12 @@ export const MATRIX_SECTIONS = Object.freeze({
   'prefs-failed': ['M-UI:prefs-failed-state-light-dark'],
 })
 
-/** Harness commands that follow the matrix, in runner order. */
-export const AFTER_MATRIX = Object.freeze([
-  'rapid-watermark',
-  'a11y',
-  'fallback-focus',
-  'expo-go-proof',
-])
+/**
+ * Harness commands that follow the matrix, in runner order. `expo-go-proof` is no shard's: it has
+ * never passed on a shard (runs 40992501585 to 41019906459, last in shard 2 on a host with 74 MB
+ * free), so the `ios-expo-go` job runs it alone on a fresh simulator and the shards end here.
+ */
+export const AFTER_MATRIX = Object.freeze(['rapid-watermark', 'a11y', 'fallback-focus'])
 
 /** The placement. Edit this table, never the runner, to rebalance the shards. */
 export const SHARD_PLAN = Object.freeze({

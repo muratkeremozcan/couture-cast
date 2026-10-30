@@ -298,6 +298,11 @@ describe('deployment workflows', () => {
       const name = block.slice(2, block.indexOf(':'))
       const condition = ifOf(block)
       if (condition?.includes("github.event_name != 'pull_request'")) skipped.add(name)
+      else if (name === 'ios-expo-go')
+        // Never passed in CI, so it runs nightly and on dispatch only and is not in the gate.
+        expect(condition).toBe(
+          "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+        )
       else expect(['browser-acceptance', 'share-card-lanes-gate'], name).toContain(name)
     }
     // Seven device lanes take over an hour each; a pull request would wait on all of them.

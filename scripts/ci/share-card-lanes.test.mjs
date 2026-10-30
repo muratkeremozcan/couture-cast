@@ -528,7 +528,7 @@ describe('share-card parallel lane validator', () => {
   })
 
   describe('iOS journey', () => {
-    const iosJobs = ['ios-build', 'ios-shard', 'ios-evidence']
+    const iosJobs = ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-evidence']
     const rejected = (title, expected, change) =>
       test(`${title} is rejected`, () => {
         const problems = mutate(change)
@@ -620,7 +620,7 @@ describe('share-card parallel lane validator', () => {
         delete jobs['ios-shard'].env
       }
     )
-    for (const name of ['ios-build', 'ios-shard'])
+    for (const name of ['ios-build', 'ios-shard', 'ios-expo-go'])
       rejected(
         `an evidence upload of a broader path in ${name}`,
         /evidence upload must fail closed/,
@@ -633,6 +633,79 @@ describe('share-card parallel lane validator', () => {
           row.with.path = '_bmad-output/test-artifacts/story-6-8/runtime/'
         }
       )
+    rejected(
+      'an ios-expo-go without the harness directory env',
+      /ios-expo-go: the harness directory env is required/,
+      (jobs) => {
+        delete jobs['ios-expo-go'].env
+      }
+    )
+    rejected(
+      'an ios-expo-go limit over the iOS bound',
+      /ios-expo-go: independent limit/,
+      (jobs) => {
+        jobs['ios-expo-go']['timeout-minutes'] = 151
+      }
+    )
+    rejected(
+      'an ios-expo-go on pull_request',
+      /ios-expo-go must run on the nightly schedule and on dispatch only/,
+      (jobs) => {
+        jobs['ios-expo-go'].if = "github.event_name != 'pull_request'"
+      }
+    )
+    rejected(
+      'an ios-expo-go on every push',
+      /ios-expo-go must run on the nightly schedule and on dispatch only/,
+      (jobs) => {
+        delete jobs['ios-expo-go'].if
+      }
+    )
+    rejected(
+      'an ios-expo-go without the build',
+      /ios-expo-go must need exactly ios-build/,
+      (jobs) => {
+        jobs['ios-expo-go'].needs = ['ios-build', 'ios-shard']
+      }
+    )
+    rejected('an ios-expo-go matrix', /not in a matrix/, (jobs) => {
+      jobs['ios-expo-go'].strategy = { matrix: { shard: [1, 2] } }
+    })
+    rejected(
+      'an ios-expo-go that never runs the proof',
+      /the proof must run once/,
+      (jobs) => {
+        jobs['ios-expo-go'].steps = jobs['ios-expo-go'].steps.filter(
+          (row) => !row.run?.includes('expo-go-proof')
+        )
+      }
+    )
+    rejected('an ios-expo-go proof with a shard', /without a shard/, (jobs) => {
+      const row = step(jobs['ios-expo-go'], (item) => item.run?.includes('expo-go-proof'))
+      row.run = row.run.replace('--device "$device"', '--device "$device" --shard 2/2')
+    })
+    rejected(
+      'an ios-shard that runs the Expo Go proof',
+      /ios-shard must not run the Expo Go proof/,
+      (jobs) => {
+        const row = step(jobs['ios-shard'], (item) => item.name === 'iOS shard flows')
+        row.run += '\nnode scripts/run-story68-native.mjs expo-go-proof --platform ios\n'
+      }
+    )
+    rejected(
+      'an ios-expo-go setup that drifted from the shard',
+      /step for step/,
+      (jobs) => {
+        const row = step(
+          jobs['ios-expo-go'],
+          (item) => item.name === 'Install the iOS project generator'
+        )
+        row.run = 'brew install xcodegen --head'
+      }
+    )
+    rejected('the Expo Go job in the lanes gate', /stays out of the gate/, (jobs) => {
+      jobs[gateJobName].needs.push('ios-expo-go')
+    })
     rejected(
       'an app scan without the harness directory env',
       /scan must run with the harness directory/,
@@ -711,6 +784,7 @@ describe('share-card parallel lane validator', () => {
       'android36-native-matrix',
       'ios-build',
       'ios-shard',
+      'ios-expo-go',
     ])
       rejected(
         `a Metro start without --platform in ${name}`,

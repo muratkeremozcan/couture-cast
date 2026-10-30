@@ -926,6 +926,198 @@ jobs:
         if: always()
         run: node scripts/ci/native-ios-device-cleanup.mjs
 
+  # The Expo Go proof has never passed in CI (runs 40992501585 to 41019906459, last step of shard
+  # 2). It runs alone on a fresh simulator, on the nightly schedule and on demand, and is not in
+  # share-card-lanes-gate needs. Follow-up: require it there once it has passed.
+  ios-expo-go:
+    needs: ios-build
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 60
+    env: *runtime_env
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disable Spotlight indexing on the disposable iOS runner
+        run: |
+          test "$GITHUB_ACTIONS" = 'true'
+          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
+          test "$RUNNER_OS" = 'macOS'
+          node scripts/ci/native-host-evidence.mjs sample before-indexing-disable --platform ios
+          sudo mdutil -a -s
+          sudo mdutil -a -i off
+          sudo mdutil -s /System/Volumes/Data
+          node scripts/ci/native-host-evidence.mjs sample after-indexing-disable --platform ios
+      # storage-api runs on the Node major its Dockerfile pins; the repo's own Node
+      # comes from the install step after this one and stays first on PATH.
+      - name: Provision Node 22 for the native storage-api
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Record the Node 22 binary for the native storage-api
+        run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/install
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install the iOS project generator
+        run: brew install xcodegen
+      # The macOS lane runs Supabase as native processes built from pinned,
+      # checksum-verified sources (scripts/ci/native-supabase.mjs). Each build is
+      # saved to the cache as soon as it exists, so a failed job still keeps it.
+      - name: Pin the native Supabase build inputs
+        id: native
+        run: node scripts/ci/native-supabase.mjs cache-keys >> "$GITHUB_OUTPUT"
+      - name: Restore PostgreSQL
+        id: postgres-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.postgres-path }}
+          key: ${{ steps.native.outputs.postgres-key }}
+      - name: Build PostgreSQL from its verified source
+        if: steps.postgres-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build postgres
+      - name: Save PostgreSQL
+        if: steps.postgres-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.postgres-path }}
+          key: ${{ steps.native.outputs.postgres-key }}
+      - name: Restore Redis
+        id: redis-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.redis-path }}
+          key: ${{ steps.native.outputs.redis-key }}
+      - name: Build Redis from its verified source
+        if: steps.redis-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build redis
+      - name: Save Redis
+        if: steps.redis-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.redis-path }}
+          key: ${{ steps.native.outputs.redis-key }}
+      - name: Restore GoTrue
+        id: gotrue-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.gotrue-path }}
+          key: ${{ steps.native.outputs.gotrue-key }}
+      - name: Fetch the pinned GoTrue source
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs fetch gotrue
+      - name: Provision Go for GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ runner.temp }}/native-supabase/sources/auth/go.mod
+          cache-dependency-path: ${{ runner.temp }}/native-supabase/sources/auth/go.sum
+      - name: Build GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build gotrue
+      - name: Save GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.gotrue-path }}
+          key: ${{ steps.native.outputs.gotrue-key }}
+      - name: Restore storage-api
+        id: storage-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.storage-path }}
+          key: ${{ steps.native.outputs.storage-key }}
+      - name: Build storage-api
+        if: steps.storage-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build storage
+      - name: Save storage-api
+        if: steps.storage-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.storage-path }}
+          key: ${{ steps.native.outputs.storage-key }}
+      - name: Start the native Supabase stack
+        timeout-minutes: 8
+        run: node scripts/ci/native-supabase.mjs start
+      - name: Provision the local Storage buckets
+        run: node scripts/local-storage-buckets.mjs provision
+      - name: Prepare isolated UUID runtime and built renderer
+        run: |
+          npm run db:generate
+          npm run build:packages
+          npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
+          node scripts/lib/story68-built-render.mjs
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          node scripts/maestro-install.mjs
+      - name: Download the built development client
+        uses: actions/download-artifact@v4
+        with:
+          name: cc68-ios-app
+          path: /tmp/cc68-ios-app
+      - name: Place the built development client
+        run: |
+          mkdir -p /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator
+          tar -C /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator -xf /tmp/cc68-ios-app/cc68-ios-app.tar
+          test -d /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app
+      - name: Expo Go proof on a fresh simulator
+        run: |
+          node scripts/e2e-share-card/warm-metro.mjs --platform ios
+          node scripts/ci/native-ios-startup-probe.mjs --for-native-flow
+          device=$(cat /tmp/cc68-simulator)
+          node scripts/ci/native-host-evidence.mjs sample before-first-flow --platform ios
+          node scripts/run-story68-native.mjs expo-go-proof --platform ios --device "$device"
+      - name: Record closed iOS host and Metro diagnostics
+        if: ${{ !cancelled() }}
+        run: |
+          if [ "${{ job.status }}" = failure ]; then
+            node scripts/ci/native-host-evidence.mjs sample failure --platform ios
+          fi
+          node scripts/ci/native-host-evidence.mjs metro --platform ios
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api metro; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Select and scan closed evidence
+        if: always()
+        env:
+          CC68_CI_PLATFORM: ios
+          CC68_CI_API: 0
+          CC68_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/e2e-share-card/public-evidence.mjs
+      - name: Collect Expo Go evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-card-ios-expo-go
+          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
+          if-no-files-found: error
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
+      - name: Show the native Supabase service logs
+        if: ${{ !cancelled() && failure() }}
+        run: node scripts/ci/native-supabase.mjs logs
+      - name: Stop the owned native Supabase stack
+        if: always()
+        run: node scripts/ci/native-supabase.mjs stop
+      - name: Delete owned CI simulator
+        if: always()
+        run: node scripts/ci/native-ios-device-cleanup.mjs
+
   # A skipped shard has no report, so this job fails; the lanes gate also requires its result.
   ios-evidence:
     if: always() && github.event_name != 'pull_request'

@@ -5,11 +5,11 @@ import { fileURLToPath } from 'node:url'
 import {
   CONDITION_CHECK_MS,
   DEFAULT_FLOW_TIMEOUT_MS,
-  EXPO_GO_ATTEMPT_WAIT_MS,
   EXPO_GO_CONDITION_CHECK_MS,
-  EXPO_GO_OPEN_ATTEMPTS,
-  EXPO_GO_OPEN_ATTEMPT_MS,
+  EXPO_GO_CONDITION_CHECKS,
   EXPO_GO_OPEN_FLOW,
+  EXPO_GO_OPEN_WAITS_MS,
+  EXPO_GO_TAP_MS,
   EXPO_GO_OPEN_WORST_CASE_MS,
   FLOW_STARTUP_MS,
   FLOW_TIMEOUT_MARGIN,
@@ -128,34 +128,34 @@ describe('Maestro flow timeouts', () => {
     assert.ok(flowTimeoutMs(openApp) > 4 * DEFAULT_FLOW_TIMEOUT_MS)
   })
 
-  test('expo-go-open covers its declared attempts with the margin and uses no optional wait', () => {
+  test('expo-go-open runs each declared wait once and covers them with the margin', () => {
     const text = fs.readFileSync(
       new URL(`../../${EXPO_GO_OPEN_FLOW}`, import.meta.url),
       'utf8'
     )
-    const attempts = Number(/^\s*maxRetries:\s*(\d+)\s*$/m.exec(text)[1]) + 1
-    // The three `when` checks are the budgeted checks of one attempt.
-    const checks = (text.match(/^\s*when:\s*$/gm) ?? []).length
-    const waits = [...text.matchAll(/^\s*timeout:\s*(\d+)\s*$/gm)].map((m) =>
+    const commands = text.replace(/^\s*#.*$/gm, '')
+    const waits = [...commands.matchAll(/^\s*timeout:\s*(\d+)\s*$/gm)].map((m) =>
       Number(m[1])
     )
-    assert.equal(EXPO_GO_OPEN_ATTEMPTS, attempts)
-    assert.equal(
-      EXPO_GO_OPEN_ATTEMPT_MS,
-      EXPO_GO_ATTEMPT_WAIT_MS + checks * EXPO_GO_CONDITION_CHECK_MS + 4_000
-    )
-    // One wait, the named tab-bar wait, and no optional wait that could return early.
-    assert.deepEqual(waits, [EXPO_GO_ATTEMPT_WAIT_MS])
-    assert.doesNotMatch(text, /optional:/)
-    // The project has this long, in waits alone, to show the tab bar.
-    assert.ok(attempts * waits[0] >= 180_000)
-    const worst = FLOW_STARTUP_MS + attempts * EXPO_GO_OPEN_ATTEMPT_MS
+    // The checks are the three `when` conditions, one per taps block.
+    const checks = (commands.match(/^\s*when:\s*$/gm) ?? []).length
+    const taps = (commands.match(/^\s*- tapOn:/gm) ?? []).length
+    assert.deepEqual(waits, [...EXPO_GO_OPEN_WAITS_MS])
+    assert.equal(checks, EXPO_GO_CONDITION_CHECKS)
+    assert.equal(taps, EXPO_GO_CONDITION_CHECKS)
+    // A wait Maestro runs again returns at once (run 41019906459), so none may be in a loop.
+    assert.doesNotMatch(commands, /^\s*-?\s*(?:retry|repeat):/m)
+    // Only the two screens that may be absent are optional; the last wait names the failure.
+    assert.equal((commands.match(/optional: true/g) ?? []).length, 2)
+    assert.match(commands, /label: 'expo_go_project_not_loaded'\s*$/)
+    const worst =
+      FLOW_STARTUP_MS +
+      waits.reduce((total, wait) => total + wait, 0) +
+      checks * (EXPO_GO_CONDITION_CHECK_MS + EXPO_GO_TAP_MS)
     assert.equal(EXPO_GO_OPEN_WORST_CASE_MS, worst)
     assert.ok(flowTimeoutMs(EXPO_GO_OPEN_FLOW) >= worst * FLOW_TIMEOUT_MARGIN)
     // The killed CI run: open-app.yaml hit the fixed 120 s with the project still loading.
     assert.ok(flowTimeoutMs(EXPO_GO_OPEN_FLOW) > 2 * DEFAULT_FLOW_TIMEOUT_MS)
-    // A project that never loads names its failure on the wait, not on the kill.
-    assert.match(text, /label: 'expo_go_project_not_loaded'/)
   })
 
   test('the harness passes each flow its own budget to the Maestro process', () => {
