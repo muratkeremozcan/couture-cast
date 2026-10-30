@@ -3,7 +3,11 @@ import React, { createElement, useEffect, useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
-import { ResponseError, type PrepareShareCardInput } from '@couture/api-client'
+import {
+  abortError,
+  ResponseError,
+  type PrepareShareCardInput,
+} from '@couture/api-client'
 import { supportedLocales } from '@couture/api-client/contracts/http'
 import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
 import i18n, { initI18n } from '@/src/lib/i18n'
@@ -1157,6 +1161,14 @@ describe('Story 6.9 composer Share', () => {
           .mockResolvedValueOnce(card)
           .mockRejectedValueOnce(new Error('offline')),
     ],
+    [
+      // The client's own deadline aborts the request while the composer stays current.
+      'request deadline',
+      () =>
+        boundary.prepare
+          .mockResolvedValueOnce(card)
+          .mockRejectedValueOnce(abortError('Request deadline')),
+    ],
   ])(
     'C-COMP-SHARE-FAIL: %s shows merlot shareFailed, focuses Save and keeps the preview',
     async (_name, arrange) => {
@@ -1220,6 +1232,24 @@ describe('Story 6.9 composer Share', () => {
         'true'
       )
     )
+  })
+  it('C-COMP-SHARE-ONE-EVENT: closing during the share prepare still records one failed event', async () => {
+    await readyShare()
+    boundary.prepare.mockImplementationOnce(
+      (_input: PrepareShareCardInput, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(abortError('cancelled')), {
+            once: true,
+          })
+        })
+    )
+    await tapShare()
+    await waitFor(() => expect(purposes()).toEqual(['preview', 'share']))
+    await userEvent.click(screen.getByTestId('share-card-cancel'))
+    // Only an identity change suppresses the event; a closed composer is not one.
+    await settledEvent({ client: 'ios', target: 'none', outcome: 'failed' })
+    expect(boundary.shareFile).not.toHaveBeenCalled()
+    expect(nativeShareCardSavePending()).toBe(false)
   })
   it('C-COMP-SHARE-IDENTITY: sign-out while the sheet is open clears the preview and drops the late result', async () => {
     const native = deferred<unknown>()

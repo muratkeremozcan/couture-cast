@@ -474,8 +474,9 @@ export function ShareCardComposer({
     settlement: ShareCardShareSettlement,
     failure: unknown
   ) => {
+    // A request-deadline AbortError arrives while the attempt is still current, so it
+    // settles as a failure like any other. Real supersession never reaches this function.
     if (failure !== null) {
-      if (errorNamed(failure, 'AbortError')) return
       if (errorNamed(failure, 'finishingSave')) {
         setError(null)
         setMessage('finishingSave')
