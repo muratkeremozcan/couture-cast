@@ -649,16 +649,17 @@ describe('share-card parallel lane validator', () => {
     )
     rejected(
       'an ios-expo-go on pull_request',
-      /ios-expo-go must run on the nightly schedule and on dispatch only/,
+      /ios-expo-go must skip pull requests like the other device lanes/,
       (jobs) => {
-        jobs['ios-expo-go'].if = "github.event_name != 'pull_request'"
+        delete jobs['ios-expo-go'].if
       }
     )
     rejected(
-      'an ios-expo-go on every push',
-      /ios-expo-go must run on the nightly schedule and on dispatch only/,
+      'an ios-expo-go that skips main pushes',
+      /ios-expo-go must skip pull requests like the other device lanes/,
       (jobs) => {
-        delete jobs['ios-expo-go'].if
+        jobs['ios-expo-go'].if =
+          "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
       }
     )
     rejected(
@@ -703,9 +704,15 @@ describe('share-card parallel lane validator', () => {
         row.run = 'brew install xcodegen --head'
       }
     )
-    rejected('the Expo Go job in the lanes gate', /stays out of the gate/, (jobs) => {
-      jobs[gateJobName].needs.push('ios-expo-go')
-    })
+    rejected(
+      'a lanes gate without the Expo Go job',
+      /gate must require every/,
+      (jobs) => {
+        jobs[gateJobName].needs = jobs[gateJobName].needs.filter(
+          (name) => name !== 'ios-expo-go'
+        )
+      }
+    )
     rejected(
       'an app scan without the harness directory env',
       /scan must run with the harness directory/,

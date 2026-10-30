@@ -33,7 +33,7 @@ const cli = (value, event) =>
   })
 
 describe('share-card aggregate job gate', () => {
-  test('requires the Android lane, the browser lane, all three Android36 partitions and the three iOS shard jobs', () => {
+  test('requires the Android lane, the browser lane, all three Android36 partitions, the three iOS shard jobs and the Expo Go proof', () => {
     assert.deepEqual([...requiredShareCardJobs].sort(), [
       'android36-interaction',
       'android36-native-matrix',
@@ -41,21 +41,10 @@ describe('share-card aggregate job gate', () => {
       'browser-acceptance',
       'ios-build',
       'ios-evidence',
+      'ios-expo-go',
       'ios-shard',
       'original-resource',
     ])
-  })
-
-  test('does not require the Expo Go proof job, which has never passed in CI', () => {
-    assert.ok(!requiredShareCardJobs.includes('ios-expo-go'))
-    assert.throws(
-      () =>
-        assertShareCardJobs(
-          { ...results(), 'ios-expo-go': { result: 'success' } },
-          'push'
-        ),
-      /share_card_job_results_invalid/
-    )
   })
 
   test('passes only when every required job succeeded', () => {
@@ -134,6 +123,7 @@ describe('share-card aggregate job gate', () => {
         'android36-original',
         'ios-build',
         'ios-evidence',
+        'ios-expo-go',
         'ios-shard',
         'original-resource',
       ])

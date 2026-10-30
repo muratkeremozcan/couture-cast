@@ -926,12 +926,11 @@ jobs:
         if: always()
         run: node scripts/ci/native-ios-device-cleanup.mjs
 
-  # The Expo Go proof has never passed in CI (runs 40992501585 to 41019906459, last step of shard
-  # 2). It runs alone on a fresh simulator, on the nightly schedule and on demand, and is not in
-  # share-card-lanes-gate needs. Follow-up: require it there once it has passed.
+  # The Expo Go proof runs alone on a fresh simulator, skipped on pull requests like every other
+  # device lane and required by share-card-lanes-gate.
   ios-expo-go:
     needs: ios-build
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     runs-on: macos-15
     timeout-minutes: 60
     env: *runtime_env
@@ -1147,6 +1146,7 @@ jobs:
       - ios-build
       - ios-shard
       - ios-evidence
+      - ios-expo-go
       - browser-acceptance
       - android36-native-matrix
       - android36-original
