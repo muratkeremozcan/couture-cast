@@ -136,16 +136,17 @@ const waitSettingsTimeoutMs = Math.ceil(
 /**
  * set-locale.yaml: the Settings tab opener (up to 4 attempts of a tap and a 15 s wait), the
  * 15 s scroll to the language button and the closing settle wait, then the guarded language
- * tap. Each tap attempt is the guard check, the tap, a 15 s wait for a different language button
- * to read enabled (the change finished: every button is disabled while it runs) and a 6 s wait
- * for the target to read disabled (it stayed selected; a rollback enables it); maxRetries 3
+ * tap. Each tap attempt is the guard check, the tap, a 6 s wait for the target to read disabled
+ * (the press landed or the change started), a 15 s wait for a different language button to read
+ * enabled (the change finished: every button is disabled while it runs) and a 6 s wait for the
+ * target to read disabled again (it stayed selected; a rollback enables it); maxRetries 3
  * allows 4 attempts.
  */
 export const SET_LOCALE_FLOW = 'maestro/story65/set-locale.yaml'
 export const SET_LOCALE_TAP_ATTEMPTS = 4
 export const SET_LOCALE_SETTLE_WAIT_MS = 15_000
 export const SET_LOCALE_TAP_ATTEMPT_MS =
-  CONDITION_CHECK_MS + SET_LOCALE_SETTLE_WAIT_MS + CONDITION_CHECK_MS + 2_000
+  3 * CONDITION_CHECK_MS + SET_LOCALE_SETTLE_WAIT_MS + 2_000
 export const SET_LOCALE_TAP_WORST_CASE_MS =
   SET_LOCALE_TAP_ATTEMPTS * SET_LOCALE_TAP_ATTEMPT_MS
 export const SET_LOCALE_OTHER_STEPS_MS = 4 * 17_000 + 15_000 + 2_000

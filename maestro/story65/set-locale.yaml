@@ -15,10 +15,12 @@ appId: ${MAESTRO_APP_ID}
 # the fr-FR tap completed, the next screen was still English). The product disables a
 # language button while it is the current locale and while a change is in flight (every
 # button), and a failed change rolls back and enables the target again. So a tap is judged by
-# the enabled attribute alone, which is device proven on iOS: tap only while the target reads
-# enabled, wait until a different language button reads enabled (the change finished), then
-# require the target to read disabled (it stayed selected). A lost press or a rollback leaves
-# the target enabled, fails the second wait and takes the next attempt.
+# the enabled attribute alone, which is device proven on iOS, in this order: tap only while
+# the target reads enabled; (1) wait for the target to read disabled, so the press landed or
+# the change started (another button reads enabled before a late press lands, so it cannot
+# come first); (2) wait for a different language button to read enabled, so the change
+# finished; (3) require the target to read disabled again, so it stayed selected. A lost press
+# fails (1); a rollback enables the target and fails (3); either takes the next attempt.
 - retry:
     maxRetries: 3
     commands:
@@ -30,6 +32,11 @@ appId: ${MAESTRO_APP_ID}
           commands:
             - tapOn:
                 id: 'locale-btn-${MAESTRO_LOCALE}'
+      - extendedWaitUntil:
+          visible:
+            id: 'locale-btn-${MAESTRO_LOCALE}'
+            enabled: false
+          timeout: 6000
       # The id is a full-match regex that excludes the target; no locale id prefixes another.
       - extendedWaitUntil:
           visible:

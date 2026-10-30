@@ -24,7 +24,7 @@ const commands = parse(
 )
 const button = { id: 'locale-btn-${MAESTRO_LOCALE}' }
 const retryStep = commands.find((step) => step.retry)
-const [guard, settled, selected] = retryStep.retry.commands
+const [guard, pressed, settled, selected] = retryStep.retry.commands
 // Any language button but the target: the id is a full-match regex, and no locale id is a prefix
 // of another.
 const otherButtons = { id: 'locale-btn-(?!${MAESTRO_LOCALE}).+' }
@@ -39,22 +39,24 @@ function buttonTaps(node) {
   return []
 }
 
-test('the language button is tapped only while it reads enabled, then the change must finish and the target stay selected', () => {
+test('the language button is tapped only while it reads enabled, then judged in order: press landed, change finished, target still selected', () => {
   assert.equal(commands.filter((step) => step.retry).length, 1)
   assert.equal(retryStep.retry.maxRetries, SET_LOCALE_TAP_ATTEMPTS - 1)
-  assert.equal(retryStep.retry.commands.length, 3)
+  assert.equal(retryStep.retry.commands.length, 4)
   assert.deepEqual(guard.runFlow.when, { visible: { ...button, enabled: true } })
   assert.equal(buttonTaps(guard.runFlow.commands).length, 1)
   assert.equal(buttonTaps(commands).length, 1, 'the only tap is the guarded one')
-  // Disabled also holds while a change is in flight, and a failed change rolls back. A different
-  // button reading enabled again proves the change finished (every button is disabled while it
-  // runs); the target still reading disabled then proves it stayed selected, because a rollback
-  // enables it again. Only the enabled attribute is read: it is device proven on iOS.
+  // Disabled also holds while a change is in flight, and a failed change rolls back. Only the
+  // enabled attribute is read: it is device proven on iOS. The order matters: another button
+  // reads enabled before a late press lands, so (1) the target reading disabled proves the press
+  // landed or the change started, (2) another button reading enabled proves the change finished
+  // (every button is disabled while it runs) and (3) the target still reading disabled proves it
+  // stayed selected, because a rollback enables it again.
+  assert.deepEqual(pressed.extendedWaitUntil.visible, { ...button, enabled: false })
+  assert.equal(pressed.extendedWaitUntil.timeout, CONDITION_CHECK_MS)
   assert.deepEqual(settled.extendedWaitUntil.visible, { ...otherButtons, enabled: true })
   assert.equal(settled.extendedWaitUntil.timeout, SET_LOCALE_SETTLE_WAIT_MS)
   assert.deepEqual(selected.extendedWaitUntil.visible, { ...button, enabled: false })
-  const seconds = selected.extendedWaitUntil.timeout / 1000
-  assert.ok(seconds >= 5 && seconds <= 10)
   assert.equal(selected.extendedWaitUntil.timeout, CONDITION_CHECK_MS)
   assert.equal(commands.at(-1), 'waitForAnimationToEnd')
 })
@@ -87,8 +89,8 @@ test('the process budget covers the settings opener, the scroll and every tap at
   )
   assert.equal(
     SET_LOCALE_TAP_ATTEMPT_MS,
-    CONDITION_CHECK_MS + SET_LOCALE_SETTLE_WAIT_MS + CONDITION_CHECK_MS + 2_000,
-    'a guard check, the tap, the settle wait and the selected wait'
+    3 * CONDITION_CHECK_MS + SET_LOCALE_SETTLE_WAIT_MS + 2_000,
+    'a guard check, the tap, the pressed wait, the settle wait and the selected wait'
   )
   assert.equal(
     SET_LOCALE_TAP_WORST_CASE_MS,
