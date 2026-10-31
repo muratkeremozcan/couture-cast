@@ -82,3 +82,33 @@ final class ShareCardShareGate {
     return result
   }
 }
+
+/// The requested sheet's state when the presentation deadline passes.
+enum ShareCardSheetState {
+  /// UIKit refused the presentation and released the controller.
+  case released
+  /// The controller exists but is neither presented nor being presented.
+  case offScreen
+  case onScreen
+}
+
+/// Decides one presentation. UIKit refuses a presentation with only a console warning, and then no
+/// completion ever arrives, so a sheet that has not appeared by the deadline settles the attempt as
+/// refused, and a sheet that appears after that is taken down. Main thread only.
+final class ShareCardPresentationWatch {
+  private var presented = false
+  private var refused = false
+
+  /// The sheet appeared. True when the attempt already settled as refused and the sheet must go.
+  func sheetAppeared() -> Bool {
+    presented = true
+    return refused
+  }
+
+  /// The deadline passed. True once, when the attempt must settle failed/presenter_unavailable.
+  func deadlinePassed(_ sheet: ShareCardSheetState) -> Bool {
+    guard sheet != .onScreen, !presented, !refused else { return false }
+    refused = true
+    return true
+  }
+}

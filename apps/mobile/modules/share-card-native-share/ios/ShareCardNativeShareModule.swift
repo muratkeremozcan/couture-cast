@@ -64,30 +64,27 @@ public final class ShareCardNativeShareModule: Module {
         activityType: activityType?.rawValue, completed: completed, error: error)
       DispatchQueue.main.async { self?.settle(attempt, result) }
     }
-    var presented = false
-    var refused = false
+    let watch = ShareCardPresentationWatch()
     presenter.present(controller, animated: true) { [weak self, weak controller, weak presenter] in
-      guard let controller, let presenter else { return }
-      presented = true
       // The attempt already settled as refused; a sheet that appears after that is taken down.
-      if refused {
-        controller.dismiss(animated: false)
+      if watch.sheetAppeared() {
+        controller?.dismiss(animated: false)
         return
       }
+      guard let controller, let presenter else { return }
       self?.writeStory68AnchorReport(
         controller, presenter: presenter, sourceView: configuredSource, sourceRect: configuredRect)
     }
-    // UIKit refuses a presentation with only a console warning, and then no completion would
-    // ever arrive. Presentation can start late: iOS 26 presents UIActivityViewController only
-    // after loading its activities (iOS 26.1 simulator: still no presenter one main-queue turn
-    // after present(), presented 650 ms later), so only a sheet that has not appeared by the
-    // deadline is refused.
+    // Presentation can start late: iOS 26 presents UIActivityViewController only after loading
+    // its activities (iOS 26.1 simulator: still no presenter one main-queue turn after present(),
+    // presented 650 ms later), so only a sheet that has not appeared by the deadline is refused.
+    // A refused present() releases the weakly held controller, which also counts as refused.
     DispatchQueue.main.asyncAfter(deadline: .now() + Self.presentationDeadline) {
       [weak self, weak controller] in
-      guard let controller, !presented, controller.presentingViewController == nil,
-        !controller.isBeingPresented
-      else { return }
-      refused = true
+      let sheet: ShareCardSheetState = controller.map {
+        $0.presentingViewController != nil || $0.isBeingPresented ? .onScreen : .offScreen
+      } ?? .released
+      guard watch.deadlinePassed(sheet) else { return }
       self?.settle(attempt, .failed(.presenterUnavailable))
     }
   }
