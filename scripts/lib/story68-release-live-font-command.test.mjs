@@ -221,6 +221,30 @@ describe('Release live-font command adapter', () => {
   })
 })
 
+describe('Release live-font failure code in the job log', () => {
+  // The sandbox's closed set is the adapter fixture's: the native command code only.
+  for (const [name, message, code] of [
+    [
+      'a closed failure',
+      'release_font_native_command_failed',
+      'release_font_native_command_failed',
+    ],
+    ['an unexpected error', '/owned/private/path', 'release_live_font_failed'],
+  ])
+    test(`${name} logs only its closed code`, async () => {
+      const error = new Error(message)
+      const f = adapterFixture(async () => {
+        throw error
+      })
+      await assert.rejects(f.invoke(), (thrown) => thrown === error)
+      assert.equal(f.records.at(-1).record.code, code)
+      assert.deepEqual(f.logs, [
+        JSON.stringify({ releaseLiveFont: { passed: false, code } }),
+      ])
+      assert.doesNotMatch(f.logs.join('\n'), /owned|private/)
+    })
+})
+
 describe('Release live-font native runner commands', () => {
   test('actual prebuild passes clean only when requested and preserves externally scoped proof input', () => {
     const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')

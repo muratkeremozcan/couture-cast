@@ -385,6 +385,59 @@ describe('Release live-font restoration deadline', () => {
     assert.equal(f.events.at(-1), 'settings put system font_scale 1.2')
   })
 
+  test('a snapshot cut off by the deadline reports the state that never settled', async () => {
+    // CI run 41179795488: the after state kept failing, and the last snapshot, bounded by the
+    // remaining deadline, was killed. The proof must name the state, never the killed command.
+    const f = fixture()
+    let reads = 0
+    const cutOff = new Error('release_font_native_command_failed')
+    f.io.hierarchy = async (timeout) => {
+      if (reads++ === 0) return tree()
+      if (f.now() + 3000 >= RESTORE_DEADLINE_MS) {
+        await f.io.pause(timeout)
+        throw cutOff
+      }
+      return tree({ height: 138, title: 'Another title' })
+    }
+    await assert.rejects(proveReleaseLiveFont(configuration(), f.io), (error) => {
+      assert.equal(error.message, 'release_localized_title_required')
+      assert.equal(error.cause, cutOff)
+      return true
+    })
+    assert.equal(f.now(), RESTORE_DEADLINE_MS)
+    assert.equal(f.events.at(-1), 'settings put system font_scale 1.2')
+  })
+
+  test('an after snapshot that fails before any state was read stays a command failure', async () => {
+    const f = fixture()
+    let reads = 0
+    f.io.hierarchy = async () => {
+      if (reads++ === 0) return tree()
+      throw new Error('release_font_native_command_failed')
+    }
+    await assert.rejects(
+      proveReleaseLiveFont(configuration(), f.io),
+      /release_font_native_command_failed/
+    )
+    assert.equal(f.events.at(-1), 'settings put system font_scale 1.2')
+  })
+
+  test('a read that fails inside the deadline after a failed state stays a command failure', async () => {
+    const f = fixture()
+    let reads = 0
+    f.io.hierarchy = async () => {
+      reads++
+      if (reads === 1) return tree()
+      if (reads === 2) return tree({ height: 138, title: 'Another title' })
+      throw new Error('release_font_native_command_failed')
+    }
+    await assert.rejects(
+      proveReleaseLiveFont(configuration(), f.io),
+      /release_font_native_command_failed/
+    )
+    assert.ok(f.now() < RESTORE_DEADLINE_MS)
+  })
+
   test('after snapshot skips driver reinstall only after the verified production baseline', async () => {
     const f = fixture()
     const stages = []

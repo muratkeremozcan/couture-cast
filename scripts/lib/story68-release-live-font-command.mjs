@@ -169,12 +169,15 @@ export async function runReleaseLiveFontCommand(ctx) {
     )
     return result
   } catch (error) {
+    const code = failures.has(error?.message) ? error.message : 'release_live_font_failed'
     ctx.privateJson(file, {
       platform: 'android',
       configuration: 'Release',
       passed: false,
-      code: failures.has(error?.message) ? error.message : 'release_live_font_failed',
+      code,
     })
+    // The closed code reaches the job log; the trees, logs and command output stay private.
+    console.log(JSON.stringify({ releaseLiveFont: { passed: false, code } }))
     throw error
   }
 }
