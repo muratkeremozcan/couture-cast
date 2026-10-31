@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 /**
  * Story 1.2b R24: the runner endpoint Android flows open Expo Go deep links
  * through, so every launch carries the extra that turns Expo Go's developer-menu

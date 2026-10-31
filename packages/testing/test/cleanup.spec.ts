@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-34-premium-subscription-lifecycle
 // Learning path Step 35: Premium theme switcher.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {

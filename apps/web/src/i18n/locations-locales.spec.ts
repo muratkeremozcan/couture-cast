@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Story 1.2b: every locations key ships in all ten web locales.
 import { describe, expect, it } from 'vitest'
 import type { LocationFailureReason } from '../lib/locations'

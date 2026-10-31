@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b HTTP boundary: the real CommunityController with a real
 // CommunitySponsorshipService over an owned database, so the opt-in header, the
 // strict response variants, Vary and the fail-closed projection are proven on

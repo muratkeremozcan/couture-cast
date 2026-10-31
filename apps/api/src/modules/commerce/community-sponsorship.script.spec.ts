@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the `tsx` entry, scripts/community-sponsorship.ts, run as the owner
 // runs it. A remote target with no --confirm-target is refused before any
 // connection, so this needs no database, and the refusal must reach the shell as

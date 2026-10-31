@@ -6,6 +6,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 import { describe, expect, it } from 'vitest'
 import {
   analyticsEventNameSchema,

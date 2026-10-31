@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the operator command's targeting and argument rules. Link and
 // end against PostgreSQL run in integration/community-sponsorship-operator.integration.spec.ts.
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'

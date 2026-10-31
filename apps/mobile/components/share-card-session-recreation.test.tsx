@@ -1,3 +1,5 @@
+// Learning path Step 48: Safe branded share-card export.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import type * as ReactNativeModule from 'react-native'
 import React, { createElement, useEffect } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'

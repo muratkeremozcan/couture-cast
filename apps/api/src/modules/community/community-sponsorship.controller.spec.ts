@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the opted-in sponsorship projection on the feed, post and
 // spotlight routes, and the Vary contract that keeps caches honest about it.
 import { describe, expect, it, vi } from 'vitest'

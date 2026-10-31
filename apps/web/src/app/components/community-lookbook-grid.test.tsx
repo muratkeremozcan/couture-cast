@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Community grid journeys through the real web transport and MSW.
 import { delay, http, HttpResponse } from 'msw'
 import { act, screen, waitFor, within } from '@testing-library/react'

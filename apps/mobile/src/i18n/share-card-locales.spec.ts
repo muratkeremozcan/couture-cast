@@ -1,3 +1,5 @@
+// Learning path Step 48: Safe branded share-card export.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import { describe, expect, it } from 'vitest'
 import client0 from '../../assets/locales/de-DE.json'
 import render0 from '../../../api/src/modules/share-cards/assets/de-DE.json'

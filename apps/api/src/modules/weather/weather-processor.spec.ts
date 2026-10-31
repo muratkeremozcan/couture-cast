@@ -1,5 +1,7 @@
 // Learning path Step 16: Weather API ingestion service and durable worker ingestion.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-16-weather-api-ingestion-service-and-durable-worker-ingestion
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 import { describe, expect, it, vi } from 'vitest'
 
 import {

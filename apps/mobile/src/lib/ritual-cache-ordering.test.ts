@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Story 1.2b review round 2: native cache writes are asynchronous, so the
 // latest-location pointer of a save that started before an invalidation must
 // never land after it, and an older save must never overwrite a newer primary.

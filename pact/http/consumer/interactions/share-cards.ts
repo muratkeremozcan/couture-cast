@@ -1,3 +1,5 @@
+// Learning path Step 48: Safe branded share-card export.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import type { PactV4, V3MockServer } from '@pact-foundation/pact'
 import { createProviderState, setJsonContent } from '@seontechnologies/pactjs-utils'
 import { expect } from 'vitest'

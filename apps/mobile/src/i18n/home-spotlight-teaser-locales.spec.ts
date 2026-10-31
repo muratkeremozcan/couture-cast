@@ -1,3 +1,5 @@
+// Learning path Step 46: Home spotlight teaser.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
 // Story 6.7: the Home teaser and its Community notices ship in all ten mobile
 // locales, with the same keys, placeholders and plural forms as web.
 import { describe, expect, it } from 'vitest'

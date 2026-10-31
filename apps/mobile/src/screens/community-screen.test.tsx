@@ -8,6 +8,12 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Learning path Step 44: Community city spotlight.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
+// Learning path Step 46: Home spotlight teaser.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 /* eslint-disable @typescript-eslint/await-thenable */
 import { CommunitySyncState } from '@couture/api-client'
 import type * as ReactNativeModule from 'react-native'

@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the sponsored CTA on the web Home spotlight teaser, inside the real
 // Lookbook Prism layout and through the real web transport and MSW.
 import { act, render, screen, waitFor, within } from '@testing-library/react'

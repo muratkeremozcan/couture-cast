@@ -1,3 +1,5 @@
+// Learning path Step 46: Home spotlight teaser.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
 // Story 6.7: the web Home spotlight teaser's re-read, expiry and deadline under a
 // fake clock. Reads are deferred through MSW so each test decides when one settles.
 import { act, render, screen } from '@testing-library/react'

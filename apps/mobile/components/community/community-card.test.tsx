@@ -1,4 +1,6 @@
 // Learning path Step 38: Community feed by climate band.
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.1 Task 8 owner: the community lookbook card.
 //
 // The card is 480 lines that were previously exercised only through the screen

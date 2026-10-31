@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Story 1.2b: the web location transport. Every failure reaches the UI as one
 // `LocationFailureReason`, so this pins the mapping from each HTTP answer.
 import { http, HttpResponse } from 'msw'

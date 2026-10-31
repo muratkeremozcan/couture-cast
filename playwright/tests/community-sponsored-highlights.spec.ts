@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: sponsored community highlights on web. The seeded sponsorship links
 // the top seeded spotlight post to the sample partner's top offer, so every
 // surface that renders that post opted in shows "Partnered" and a separate

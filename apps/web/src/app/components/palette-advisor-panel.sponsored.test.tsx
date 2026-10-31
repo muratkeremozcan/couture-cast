@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 5.4 Task 7 owner: the `/palette` panel's sponsored-CTA handoff, through
 // MSW and the partner tab stand-in. Split from palette-advisor-panel.test.tsx.
 import { http, HttpResponse } from 'msw'

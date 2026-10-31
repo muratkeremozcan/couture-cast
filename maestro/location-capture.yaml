@@ -1,3 +1,5 @@
+# Learning path Step 45: Client location capture.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 # Story 1.2b: client location capture through the guided entry.
 #
 # The runner removes this member's saved locations before the flow and restores

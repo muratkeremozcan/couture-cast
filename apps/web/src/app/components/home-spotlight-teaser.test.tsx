@@ -1,3 +1,5 @@
+// Learning path Step 46: Home spotlight teaser.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
 // Story 6.7: the web Home spotlight teaser in the Lookbook Prism layout. Reads
 // are deferred through MSW so each test decides when one settles. The fake-clock
 // re-read, expiry and deadline cases live in home-spotlight-teaser.timers.test.tsx.

@@ -1,3 +1,7 @@
+// Learning path Step 46: Home spotlight teaser.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 /* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.7: the Home spotlight teaser on mobile. Reads are deferred through MSW
 // so each test decides when a read settles; absence is asserted only after the

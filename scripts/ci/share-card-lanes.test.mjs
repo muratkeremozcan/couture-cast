@@ -1,3 +1,5 @@
+// Learning path Step 48: Safe branded share-card export.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
