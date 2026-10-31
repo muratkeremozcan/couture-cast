@@ -275,6 +275,18 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     expect(screen.getAllByTestId('hourly-item').length).toBe(8)
   })
 
+  it('centers the hourly ribbon toggle label inside its 44-point target', async () => {
+    await render(<TabOneScreen />)
+    const toggle = await screen.findByTestId('ribbon-expand-toggle')
+    expect(toggle).toHaveAttribute('role', 'button')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    const box = toggle.getBoundingClientRect()
+    const label = screen.getByText('Expand (48h)').getBoundingClientRect()
+    expect(box.height).toBeGreaterThanOrEqual(44)
+    expect(label.top - box.top).toBeCloseTo(box.bottom - label.bottom, 0)
+    expect(label.left - box.left).toBeCloseTo(box.right - label.right, 0)
+  })
+
   it('verifies garment swap modal flows and updates garment state with telemetry', async () => {
     await render(<TabOneScreen />)
 
