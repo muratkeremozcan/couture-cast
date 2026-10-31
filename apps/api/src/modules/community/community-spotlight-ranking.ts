@@ -1,4 +1,5 @@
 // Story 6.6 owner: the deterministic City Spotlight score and its pinned constants.
+// Story 6.6 ranking owner: score, window and constants in `apps/api/src/modules/community/community-spotlight-ranking.ts`
 import { createHash } from 'node:crypto'
 import type { CommunitySpotlightLevel } from '@couture/api-client/contracts/http'
 

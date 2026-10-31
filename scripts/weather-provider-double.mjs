@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Story 1.2b harness owner: the deterministic geocoding and forecast double in `scripts/weather-provider-double.mjs`
 // Story 1.2b: a local deterministic double for both weather providers'
 // geocoding and forecast endpoints. Acceptance lanes point the API at it with
 // OPENWEATHER_API_ORIGIN and WEATHERAPI_API_ORIGIN, so no test ever reaches a

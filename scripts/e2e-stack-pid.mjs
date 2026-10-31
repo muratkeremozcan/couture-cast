@@ -1,3 +1,4 @@
+// Story 6.2b E2E stack owner: record and check stack ownership in `scripts/e2e-stack-pid.mjs`, used by `scripts/start-api-e2e-with-workers.mjs` and `playwright/global-teardown.ts`
 import crypto from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'

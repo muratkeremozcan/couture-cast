@@ -1,3 +1,4 @@
+// Story 6.8 Task 12 step 1 owner: enforce lane triggers and the gate in `scripts/ci/share-card-lanes.mjs`
 import fs from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'

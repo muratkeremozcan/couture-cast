@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Story 6.8 Task 11 step 1 owner: run the native proof in `scripts/run-story68-native.mjs`
 // Story 6.8 native harness. Every mutation is scoped to the explicitly owned runtime/device.
 import { talkbackFailureSummary } from './lib/story68-talkback-failure.mjs'
 import {

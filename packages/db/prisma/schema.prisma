@@ -9,6 +9,9 @@
 // Story 5.4 Task 1 step 1 owner: define the seven enums, `PaletteProfile`, `AdvisorRecommendationState`, the `AffiliateOffer` columns and the `User` back-relations in `packages/db/prisma/schema.prisma`
 // Story 5.5 Task 3 step 1 owner: own `PlannerOutfitSource`, `PlannerDayPlan`, the `SavedLocation` composite unique key and the back-relations in `packages/db/prisma/schema.prisma`
 // Story 6.1 schema owner: own the community models, the two CHECK constraints, the exclusion constraint, the cascade posture and the RLS block in `packages/db/prisma/schema.prisma` and `packages/db/prisma/migrations/20260905120000_add_community_feed_and_challenges/migration.sql`
+// Story 6.3 schema owner: own reaction state, receipts, outbox, RLS, generation and erasure triggers in `packages/db/prisma/migrations/20261018090000_add_community_reactions/migration.sql`, mirrored in `packages/db/prisma/schema.prisma`
+// Story 6.6 schema owner: area columns, CHECKs, cursor and read-window tables in `packages/db/prisma/schema.prisma` and `packages/db/prisma/migrations/20261022120000_community_city_spotlight/migration.sql`
+// Story 6.7b schema owner: the sponsorship table, constraints, indexes and RLS in `packages/db/prisma/schema.prisma` and `packages/db/prisma/migrations/20261024120000_community_post_sponsorship/migration.sql`
 // Prisma schema for CoutureCast
 // Follows architecture Data Architecture and RLS requirements
 

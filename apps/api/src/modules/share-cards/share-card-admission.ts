@@ -1,3 +1,4 @@
+// Story 6.8 Task 2 step 5 owner: bound concurrent renders in `apps/api/src/modules/share-cards/share-card-admission.ts`
 type Waiting = { grant: () => void; refuse: () => void }
 type Slot = { signal: AbortSignal; waiting?: Waiting }
 

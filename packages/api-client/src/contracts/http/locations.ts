@@ -1,3 +1,4 @@
+// Story 1.2b contract owner: search, from-search and typed location error schemas in `packages/api-client/src/contracts/http/locations.ts`
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import {

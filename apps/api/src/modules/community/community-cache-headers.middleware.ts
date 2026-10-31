@@ -1,3 +1,4 @@
+// Story 6.3 cache-header owner: mark every community response private and vary it in `apps/api/src/modules/community/community-cache-headers.middleware.ts`
 import type { NestMiddleware } from '@nestjs/common'
 import type { NextFunction, Request, Response } from 'express'
 

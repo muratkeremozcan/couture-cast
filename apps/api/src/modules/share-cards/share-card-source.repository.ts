@@ -1,3 +1,4 @@
+// Story 6.8 Task 2 step 2 owner: resolve sources into closed projections in `apps/api/src/modules/share-cards/share-card-source.repository.ts`
 import { createHash } from 'node:crypto'
 import { Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { z } from 'zod'

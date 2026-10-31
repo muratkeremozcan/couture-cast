@@ -1,3 +1,4 @@
+// Story 6.7b mobile CTA owner: the Shop control in `apps/mobile/components/community/community-sponsored-shop.tsx`, the visit rule in `apps/mobile/src/features/community/sponsored-cta-impressions.tsx`
 // Story 6.7b owner: the "Shop this look" control on a sponsored community card
 // and on the Home teaser.
 //

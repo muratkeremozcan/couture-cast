@@ -1,3 +1,4 @@
+// Story 6.2b heartbeat owner: write, refresh and remove the presence key in `apps/api/src/modules/community/community-worker-heartbeat.ts`, read by `scripts/lib/community-worker-heartbeat.mjs`
 // Story 6.2b review (RF15): the community worker's presence, as every Redis node
 // sees it.
 import { randomUUID } from 'node:crypto'

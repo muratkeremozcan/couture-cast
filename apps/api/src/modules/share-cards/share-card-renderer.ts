@@ -1,3 +1,4 @@
+// Story 6.8 Task 2 step 3 owner: render the deterministic card in `apps/api/src/modules/share-cards/share-card-renderer.ts`
 import { checkImageSignal, runAbortableSharp } from '../../common/abortable-sharp.js'
 import { Injectable } from '@nestjs/common'
 import { readFile } from 'node:fs/promises'

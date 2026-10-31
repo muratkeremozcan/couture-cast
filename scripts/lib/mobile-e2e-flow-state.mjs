@@ -1,3 +1,4 @@
+// Story 6.3 device-reset owner: reset a member's reaction state between flow attempts in `scripts/lib/mobile-e2e-flow-state.mjs` and `scripts/lib/mobile-e2e-flow-retry.mjs`
 import { fold } from './weather-provider-double-data.mjs'
 
 // The native harness owns an isolated UUID database, genuine identities and source fixtures.

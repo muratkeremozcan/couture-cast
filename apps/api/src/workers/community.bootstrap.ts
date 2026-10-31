@@ -1,3 +1,4 @@
+// Story 6.2b shutdown owner: drain the consumer before closing the screener under one 20-second deadline in `apps/api/src/workers/community.bootstrap.ts`
 import { startCommunityEngagementRuntime } from '../modules/community/community-engagement.runtime.js'
 import { CommunityFlagEvaluationService } from '../modules/feature-flags/community-flag-evaluation.service.js'
 import '../load-env'

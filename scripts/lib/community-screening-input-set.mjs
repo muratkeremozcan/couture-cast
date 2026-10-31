@@ -1,3 +1,4 @@
+// Story 6.2b input-set owner: hash every input a run product depends on in `scripts/lib/community-screening-input-set.mjs`
 /*
  * The input set every community screening run product is measured against.
  *

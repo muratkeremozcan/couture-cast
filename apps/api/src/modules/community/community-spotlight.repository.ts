@@ -1,4 +1,5 @@
 // Story 6.6 owner: City Spotlight eligibility, cohort and ranking reads.
+// Story 6.6 repository owner: eligibility, cohort, ranking and the locked read limit in `apps/api/src/modules/community/community-spotlight.repository.ts`
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient, type LookbookPost } from '@prisma/client'
 import {

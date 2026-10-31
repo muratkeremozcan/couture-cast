@@ -1,3 +1,4 @@
+// Story 6.6 web owner: the module, View more, focus and announcements in `apps/web/src/app/components/community-spotlight.tsx`
 // Story 6.6 owner: the web City Spotlight module that heads the community
 // section on `/`.
 //

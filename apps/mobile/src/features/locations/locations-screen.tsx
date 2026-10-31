@@ -1,3 +1,4 @@
+// Story 1.2b mobile owner: the Locations screen in `apps/mobile/src/features/locations/locations-screen.tsx` and `onLocationsChanged` in `apps/mobile/src/lib/locations.ts`
 // Story 1.2b owner: the mobile Locations screen, pushed from Settings and from
 // the hero and Community no-location states.
 //

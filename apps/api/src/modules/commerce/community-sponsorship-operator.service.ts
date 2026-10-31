@@ -1,3 +1,4 @@
+// Story 6.7b operator transaction owner: link, end, dry run and audit rows in `apps/api/src/modules/commerce/community-sponsorship-operator.service.ts`, entered through `scripts/community-sponsorship.ts`
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { z } from 'zod'

@@ -1,4 +1,5 @@
 // Story 6.6 owner: the mobile City Spotlight's paging and reaction state.
+// Story 6.6 mobile state owner: paging, identity changes and eviction in `apps/mobile/src/features/community/use-community-spotlight.ts`
 import type { CommunityReactionState } from '@couture/api-client'
 import type {
   CommunityReactionFeedItem,

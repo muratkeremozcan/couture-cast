@@ -1,3 +1,4 @@
+// Story 6.6 fixture owner: the shared seeded cohort in `packages/db/prisma/seeds/community-spotlight.ts` and per-test cohorts in `packages/testing/src/factories/community-spotlight.factory.ts`
 import type { PrismaClient } from '@prisma/client'
 import * as spotlightFactories from '../../../testing/src/factories/community-spotlight.factory.ts'
 

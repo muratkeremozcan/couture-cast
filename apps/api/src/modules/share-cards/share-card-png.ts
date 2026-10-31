@@ -1,3 +1,4 @@
+// Story 6.8 Task 2 step 4 owner: rebuild the PNG from allowed chunks in `apps/api/src/modules/share-cards/share-card-png.ts`
 import { validateShareCardPng } from '@couture/api-client'
 /** Rebuild the encoder output using only the three permitted critical chunks. */
 export function stripShareCardMetadata(encoded: Buffer): Buffer {

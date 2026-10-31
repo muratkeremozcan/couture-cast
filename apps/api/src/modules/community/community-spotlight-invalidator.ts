@@ -1,4 +1,5 @@
 // Story 6.6 owner: at-least-once spotlight invalidation from the public stream.
+// Story 6.6 invalidator owner: durable cursor, version and epoch bumps in `apps/api/src/modules/community/community-spotlight-invalidator.ts`
 import type { PrismaClient } from '@prisma/client'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { areaHashesOf, storedAreaComponents } from './community-spotlight-area.js'

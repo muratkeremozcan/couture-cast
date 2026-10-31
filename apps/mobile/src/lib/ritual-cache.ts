@@ -1,3 +1,4 @@
+// Story 1.2b mobile cache owner: ordered, generation-aware ritual cache writes in `apps/mobile/src/lib/ritual-cache.ts`
 import { Platform } from 'react-native'
 import {
   alertPreferencesSchema,

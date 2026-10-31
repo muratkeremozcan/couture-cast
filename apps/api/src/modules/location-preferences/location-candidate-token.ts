@@ -1,3 +1,4 @@
+// Story 1.2b candidate token owner: HMAC signing, 15-minute expiry and fail-closed secret resolution in `apps/api/src/modules/location-preferences/location-candidate-token.ts`
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'

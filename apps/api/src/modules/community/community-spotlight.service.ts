@@ -1,4 +1,6 @@
 // Story 6.6 owner: City Spotlight reads, snapshots and analytics.
+// Story 6.6 service owner: reads, snapshots, fallback and analytics in `apps/api/src/modules/community/community-spotlight.service.ts`
+// Story 6.7 API owner: default `surface` to `community` and key both dedupes by surface in `apps/api/src/modules/community/community-spotlight.service.ts` and `apps/api/src/modules/community/community-analytics.ts`
 import { HttpException, Inject, Injectable, Logger } from '@nestjs/common'
 import type { LookbookPost } from '@prisma/client'
 import {

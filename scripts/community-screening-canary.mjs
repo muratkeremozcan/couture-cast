@@ -1,3 +1,4 @@
+// Story 6.2b canary owner: enqueue a safe fixture, prove the sole consumer, run the restart drill and resolve unknown outcomes in `scripts/community-screening-canary.mjs`
 /*
  * End-to-end canary for the deployed community moderation worker.
  *

@@ -1,3 +1,4 @@
+// Story 6.7b web CTA owner: disclosure, handoff and shown events in `apps/web/src/app/components/community-sponsored-cta.tsx`, the tab handoff in `apps/web/src/lib/commerce.ts`
 // Story 6.7b owner: the "Shop this look" CTA a sponsored community post renders
 // on a feed card, a spotlight card, the detail dialog and the Home teaser.
 //

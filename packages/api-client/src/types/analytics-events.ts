@@ -4,6 +4,9 @@
 // Story 5.3 Task 3 step 2 owner: register `premium_theme_selected` and its `{ theme }` property allowlist in `packages/api-client/src/types/analytics-events.ts` and `packages/api-client/src/testing/analytics-event-assertions.ts`
 // Story 5.4 Task 3 step 2 owner: register the three new events and their `.strict()` property allowlists in `packages/api-client/src/types/analytics-events.ts` and `packages/api-client/src/testing/analytics-event-assertions.ts`
 // Story 5.5 Task 5 step 2 owner: own both planner events in `packages/api-client/src/types/analytics-events.ts` and `packages/api-client/src/testing/analytics-event-assertions.ts`, and their pseudonymous server-side emission in `apps/api/src/modules/telemetry/telemetry.service.ts`
+// Story 6.6 analytics owner: the two strict spotlight events in `packages/api-client/src/types/analytics-events.ts`
+// Story 1.2b analytics owner: `location_saved`, `location_search_failed` and the pseudonymous `location_switched` in `packages/api-client/src/types/analytics-events.ts`
+// Story 6.7b analytics owner: the surface-keyed unions in `packages/api-client/src/types/analytics-events.ts`
 import { z } from 'zod'
 import {
   affiliateCommunitySurfaceSchema,

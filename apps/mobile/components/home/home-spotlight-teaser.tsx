@@ -1,4 +1,5 @@
 // Story 6.7 owner: the compact Home teaser for the viewer's top City Spotlight entry.
+// Story 6.7 mobile teaser owner: the card, the memoized slot and the absolutely positioned focus markers in `apps/mobile/components/home/home-spotlight-teaser.tsx`
 import React, {
   type RefObject,
   forwardRef,

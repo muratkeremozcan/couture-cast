@@ -1,4 +1,5 @@
 // Story 3.7 Task 1 step 1 owner: implement shared Zod deep-link parser, slot mapping, and expiry validation
+// Story 6.7 deep-link owner: the `app` source with `focus` and `focusToken` in `packages/utils/src/deep-link.ts` and `apps/mobile/src/lib/mobile-deep-link-handler.ts`
 import { z } from 'zod'
 
 export const deepLinkSourceSchema = z.enum(['widget', 'notification', 'watch', 'app'])

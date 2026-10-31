@@ -1,3 +1,4 @@
+// Story 6.3 client-state owner: own confirmed snapshots, intents and read fences per post in `packages/api-client/src/community-reaction-state.ts`
 import type {
   CommunityReactionFeedItem,
   CommunityReactionSelection,

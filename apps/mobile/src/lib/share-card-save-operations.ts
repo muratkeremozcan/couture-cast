@@ -1,3 +1,4 @@
+// Story 6.8 Task 5 step 2 owner: own committed native saves in `apps/mobile/src/lib/share-card-save-operations.ts`
 /** A process-lifetime owner. Navigation and identity changes cannot release a committed file. */
 type Operation = {
   owner?: object

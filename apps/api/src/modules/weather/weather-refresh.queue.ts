@@ -1,3 +1,4 @@
+// Story 1.2b refresh queue owner: the bounded, bucketed enqueue in `apps/api/src/modules/weather/weather-refresh.queue.ts`
 import { Inject, Injectable, OnModuleDestroy, Optional } from '@nestjs/common'
 import { Queue, type QueueOptions } from 'bullmq'
 

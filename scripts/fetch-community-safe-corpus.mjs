@@ -1,3 +1,4 @@
+// Story 6.2b corpus owner: fetch, split by creator and verify the safe photographs in `scripts/fetch-community-safe-corpus.mjs`, with calibration in `scripts/calibrate-community-screening-models.mjs`
 /*
  * Assembles the safe-content corpus: real, openly licensed fashion photographs.
  *

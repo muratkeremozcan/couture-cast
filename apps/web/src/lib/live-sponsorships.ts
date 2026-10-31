@@ -1,3 +1,4 @@
+// Story 6.7b web ledger owner: read-start ordering in `apps/web/src/lib/live-sponsorships.ts`, applied in `apps/web/src/app/components/community-lookbook-grid.tsx`
 // Story 6.7b owner: what the latest live, opted-in read said about each post's
 // sponsorship block, for one community surface and one viewer. The web twin of
 // `apps/mobile/src/features/community/live-sponsorships.ts`.

@@ -1,4 +1,5 @@
 // Story 6.5 owner: privacy locks precede every existing engagement lock.
+// Story 6.6 erasure owner: delete the read window with the community subject in `apps/api/src/modules/community/community-privacy.ts`
 import { Prisma, type PrismaClient } from '@prisma/client'
 import { ForbiddenException } from '@nestjs/common'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'

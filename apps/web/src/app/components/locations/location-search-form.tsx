@@ -1,4 +1,5 @@
 // Story 1.2b owner: the add-location combobox on Web settings.
+// Story 1.2b web owner: the combobox search in `apps/web/src/app/components/locations/location-search-form.tsx` and the section in `apps/web/src/app/components/locations/locations-section.tsx`
 //
 // ARIA 1.2 combobox: the input owns a listbox of candidates, arrow keys move the
 // active option, Enter picks it and Escape closes the list. The result count and

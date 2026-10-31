@@ -1,3 +1,4 @@
+// Story 6.8 Task 5 step 1 owner: compose, preview and save on mobile in `apps/mobile/components/share-card-composer.tsx`
 import { shareCardPreviewTestId } from '@/src/lib/share-card-native-fixture'
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {

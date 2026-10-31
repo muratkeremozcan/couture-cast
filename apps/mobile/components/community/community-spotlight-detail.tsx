@@ -1,4 +1,5 @@
 // Story 6.6 owner: the detail a spotlight card opens into.
+// Story 6.6 mobile detail owner: the detail a spotlight card opens in `apps/mobile/components/community/community-spotlight-detail.tsx`
 import React, { useRef } from 'react'
 import {
   AccessibilityInfo,

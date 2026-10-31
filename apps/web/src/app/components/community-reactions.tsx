@@ -1,3 +1,4 @@
+// Story 6.3 web owner: render the controls in `apps/web/src/app/components/community-reactions.tsx` and coordinate them in `apps/web/src/app/components/community-lookbook-grid.tsx`
 'use client'
 
 import { useTranslation } from 'react-i18next'

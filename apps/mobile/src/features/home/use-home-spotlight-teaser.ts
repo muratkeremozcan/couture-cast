@@ -1,3 +1,4 @@
+// Story 6.7 mobile binding owner: identity, focus, foreground, the one-attempt read and return focus in `apps/mobile/src/features/home/use-home-spotlight-teaser.ts`
 // Story 6.7 owner: binds the shared teaser lifecycle to mobile Home, with the
 // activation, the return focus and the focus hand-off when the teaser leaves.
 import {

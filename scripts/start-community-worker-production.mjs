@@ -1,3 +1,4 @@
+// Story 6.2b launcher owner: verify model artifacts, refuse an unset or fixture selector and an unverified production database URL, and forward `SIGTERM` in `scripts/start-community-worker-production.mjs`
 /*
  * Production entrypoint for the hosted community worker container.
  *

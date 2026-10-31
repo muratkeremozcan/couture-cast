@@ -1,3 +1,4 @@
+// Story 1.2b primary refresh owner: stale-snapshot refresh on switch and delete promotion in `apps/api/src/modules/location-preferences/location-preferences.service.ts`
 import {
   BadRequestException,
   Inject,

@@ -1,4 +1,5 @@
 // Story 6.6 owner: the City Spotlight Redis read model.
+// Story 6.6 cache owner: the Redis read model and compare-and-set in `apps/api/src/modules/community/community-spotlight-cache.ts`
 import { randomBytes } from 'node:crypto'
 import Redis from 'ioredis'
 import { z } from 'zod'

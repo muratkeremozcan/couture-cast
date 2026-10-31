@@ -3,6 +3,7 @@
 // Story 2.1 Task 4 step 1 owner: add Redis cache check and write with 15-minute TTL to RitualService in `apps/api/src/modules/personalization/ritual.service.ts`
 // Story 2.3 Task 2 step 1 owner: refactor dynamic badge generation and interpolation in `apps/api/src/modules/personalization/ritual.service.ts`
 // Story 5.5 Task 2 step 2 owner: own the delegation from `apps/api/src/modules/personalization/ritual.service.ts` to the engine, preserving its Redis keys, persistence and analytics behaviour
+// Story 1.2b ritual owner: skipping test weather for search-saved keys in `apps/api/src/modules/personalization/ritual.service.ts`
 import {
   Inject,
   Injectable,

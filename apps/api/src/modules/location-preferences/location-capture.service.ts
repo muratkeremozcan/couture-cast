@@ -1,3 +1,4 @@
+// Story 1.2b capture owner: search, rate limit, save-time forecast and transactional snapshot in `apps/api/src/modules/location-preferences/location-capture.service.ts`
 import { Inject, Injectable } from '@nestjs/common'
 import { classifyClimateBand } from '@couture/utils'
 import type { Prisma } from '@prisma/client'
