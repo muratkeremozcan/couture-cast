@@ -8,6 +8,7 @@ import {
   PATH_METADATA,
 } from '@nestjs/common/constants'
 import { describe, expect, it, vi } from 'vitest'
+import { ZodError } from 'zod'
 import { preparedShareCardFixture } from '@couture/api-client/testing/share-card-fixture'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module.js'
@@ -220,10 +221,17 @@ describe('U-SHARE-CAP-API: capabilities route', () => {
   )
   it('never forwards anything beyond the boolean', async () => {
     const capabilities = () => Promise.resolve({ nativeShare: true, cohort: 'beta' })
-    await expect(
-      new ShareCardsController({ capabilities } as never).capabilities({
-        userId: 'cap-member',
-      } as never)
-    ).rejects.toThrow()
+    const failure: unknown = await new ShareCardsController({ capabilities } as never)
+      .capabilities({ userId: 'cap-member' } as never)
+      .catch((error: unknown) => error)
+    // The strict envelope refuses the extra key itself; an unrelated throw would not match.
+    expect(failure).toBeInstanceOf(ZodError)
+    expect((failure as ZodError).issues).toEqual([
+      expect.objectContaining({
+        code: 'unrecognized_keys',
+        keys: ['cohort'],
+        path: ['data'],
+      }),
+    ])
   })
 })

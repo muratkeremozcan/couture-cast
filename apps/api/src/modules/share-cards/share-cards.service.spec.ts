@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { ConflictException, ForbiddenException } from '@nestjs/common'
+import { ConflictException, ForbiddenException, type HttpException } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { preparedShareCardFixture } from '@couture/api-client/testing/share-card-fixture'
 import { SHARE_CARD_GLOBAL_LIMIT, ShareCardsService } from './share-cards.service.js'
@@ -439,9 +439,18 @@ describe('Story 6.9 share purpose', () => {
       response: { code: 'preview_changed' },
     })
   })
-  it('U-SHARE-SVC-STALE: an audit outage blocks the share', async () => {
+  it('I-SHARE-AUDIT: an audit outage blocks the share with a closed 503 and no internal text', async () => {
     prisma.auditLog.create.mockRejectedValueOnce(new Error('private audit payload'))
-    await expect(service.prepare('member', share)).rejects.toMatchObject({ status: 503 })
+    const failure = (await service
+      .prepare('member', share)
+      .catch((error: unknown) => error)) as HttpException
+    expect(prisma.auditLog.create).toHaveBeenCalledOnce()
+    expect(failure).toMatchObject({
+      status: 503,
+      response: { code: 'render_unavailable' },
+    })
+    expect(JSON.stringify(failure.getResponse())).not.toContain('private audit payload')
+    expect(failure.message).not.toContain('private audit payload')
   })
   it.each([true, false])(
     'U-SHARE-SVC-SAVE-REGRESSION: preview and save are unchanged with the flag %s',
