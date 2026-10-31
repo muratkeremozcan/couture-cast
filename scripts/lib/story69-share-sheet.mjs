@@ -65,12 +65,6 @@ export const SHARE_SHEET_STEPS = Object.freeze({
   ios: Object.freeze([
     { id: 'M-SHARE-FAILED', mode: 'share_failed', flow: 'share-failed.yaml', save: true },
     {
-      id: 'M-SHARE-UNAVAILABLE',
-      mode: 'share_unavailable',
-      flow: 'share-unavailable.yaml',
-      save: true,
-    },
-    {
       id: 'M-SHARE-COMPLETED',
       mode: 'share_completed_instagram',
       flow: 'share-completed.yaml',

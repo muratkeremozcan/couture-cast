@@ -97,7 +97,6 @@ describe('share-sheet plan', () => {
   const settles = {
     ios: {
       'share-failed.yaml': 'shareFailed',
-      'share-unavailable.yaml': 'shareUnavailable',
       'share-completed.yaml': 'shared',
       'share-closed.yaml': 'shareClosed',
       'share-other.yaml': 'shared',
@@ -121,7 +120,6 @@ describe('share-sheet plan', () => {
       'M-SHARE-FAILED',
       'M-SHARE-OTHER',
       'M-SHARE-SHEET-IOS',
-      'M-SHARE-UNAVAILABLE',
     ])
     assert.deepEqual(SHARE_SHEET_STEPS.android.map((step) => step.id).sort(), [
       'M-SHARE-CHOSEN',
@@ -133,7 +131,11 @@ describe('share-sheet plan', () => {
       'M-SHARE-UNAVAILABLE',
     ])
     const iosOnly = ['share_completed_instagram']
-    const androidOnly = ['share_chosen_pinterest', 'share_not_confirmed']
+    const androidOnly = [
+      'share_chosen_pinterest',
+      'share_not_confirmed',
+      'share_unavailable',
+    ]
     for (const [platform, steps] of Object.entries(SHARE_SHEET_STEPS)) {
       for (const step of steps) {
         assert.ok(SHARE_FIXTURE_MODES.includes(step.mode), step.mode)

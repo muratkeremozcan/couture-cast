@@ -52,6 +52,7 @@ const platformOnlyModes: Partial<Record<Mode, 'ios' | 'android'>> = {
   share_completed_instagram: 'ios',
   share_chosen_pinterest: 'android',
   share_not_confirmed: 'android',
+  share_unavailable: 'android',
 }
 const acceptsMode = (candidate: Mode) => {
   const only = platformOnlyModes[candidate]
@@ -74,7 +75,9 @@ function shareFixtureResult(current: string, os: string): unknown {
     case 'share_failed':
       return { target: 'none', outcome: 'failed', code: 'native_error' }
     case 'share_unavailable':
-      return { target: 'none', outcome: 'unavailable', code: 'chooser_unavailable' }
+      return ios
+        ? undefined
+        : { target: 'none', outcome: 'unavailable', code: 'chooser_unavailable' }
     default:
       return undefined
   }

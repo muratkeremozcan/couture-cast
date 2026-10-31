@@ -56,7 +56,7 @@ const nativeCodes: readonly ShareCardNativeShareCode[] = [
 ]
 /** The outcomes each platform's module can observe. */
 const platformOutcomes: Readonly<Record<string, readonly ShareCardShareOutcome[]>> = {
-  ios: ['completed', 'cancelled', 'failed', 'unavailable'],
+  ios: ['completed', 'cancelled', 'failed'],
   android: ['target_chosen', 'not_confirmed', 'failed', 'unavailable'],
 }
 const resultKeys = new Set(['target', 'outcome', 'code'])
@@ -73,8 +73,9 @@ export const nativeShareCardShareAvailable = () =>
 
 /**
  * The strict bridge validator. Keys stay within `{target, outcome, code}`, `code` comes
- * from the closed set, and only the platform's valid outcome-to-target pairs pass. Any
- * other shape, including a raw activity id, package or URI, settles as failed/none.
+ * from the closed set and rides only on failed or unavailable, and only the platform's valid
+ * outcome-to-target pairs pass. Any other shape, including a raw activity id, package or URI,
+ * settles as failed/none.
  */
 export function validateShareCardShareResult(
   raw: unknown,
@@ -92,6 +93,7 @@ export function validateShareCardShareResult(
   )
   if (!validTarget) return invalidResult
   if (code === undefined) return { target: validTarget, outcome: known }
+  if (known !== 'failed' && known !== 'unavailable') return invalidResult
   const validCode = nativeCodes.find((candidate) => candidate === code)
   return validCode
     ? { target: validTarget, outcome: known, code: validCode }

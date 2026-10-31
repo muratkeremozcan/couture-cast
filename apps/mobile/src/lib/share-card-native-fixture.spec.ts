@@ -288,11 +288,6 @@ describe('Story 6.9 share fixture modes', () => {
       { target: 'none', outcome: 'failed', code: 'native_error' },
     ],
     [
-      'ios',
-      'share_unavailable',
-      { target: 'none', outcome: 'unavailable', code: 'chooser_unavailable' },
-    ],
-    [
       'android',
       'share_unavailable',
       { target: 'none', outcome: 'unavailable', code: 'chooser_unavailable' },
@@ -311,6 +306,7 @@ describe('Story 6.9 share fixture modes', () => {
     ['android', 'share_completed_instagram'],
     ['ios', 'share_chosen_pinterest'],
     ['ios', 'share_not_confirmed'],
+    ['ios', 'share_unavailable'],
   ])('U-SHARE-FIXTURE: %s rejects the other platform mode %s', async (os, value) => {
     setOS(os)
     const { result, share } = await shareWith(value)

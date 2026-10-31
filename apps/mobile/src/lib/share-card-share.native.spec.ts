@@ -251,6 +251,32 @@ describe('U-SHARE-LIB-RESULT: the strict bridge validator', () => {
       { target: 'com.pinterest', outcome: 'target_chosen' },
     ],
     ['open code', 'ios', { target: 'none', outcome: 'failed', code: 'NSError 42' }],
+    [
+      'iOS unavailable',
+      'ios',
+      { target: 'none', outcome: 'unavailable', code: 'chooser_unavailable' },
+    ],
+    ['iOS unavailable without a code', 'ios', { target: 'none', outcome: 'unavailable' }],
+    [
+      'code on completed',
+      'ios',
+      { target: 'instagram', outcome: 'completed', code: 'busy' },
+    ],
+    [
+      'code on cancelled',
+      'ios',
+      { target: 'none', outcome: 'cancelled', code: 'native_error' },
+    ],
+    [
+      'code on target_chosen',
+      'android',
+      { target: 'other', outcome: 'target_chosen', code: 'start_failed' },
+    ],
+    [
+      'code on not_confirmed',
+      'android',
+      { target: 'none', outcome: 'not_confirmed', code: 'busy' },
+    ],
     ['handed_off', 'ios', { target: 'unknown', outcome: 'handed_off' }],
     ['web client', 'web', { target: 'unknown', outcome: 'handed_off' }],
     ['null', 'ios', null],
