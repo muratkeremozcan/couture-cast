@@ -5,8 +5,9 @@ import XCTest
 /// ignores the popover anchor, so the module's test-build anchor report
 /// (`Documents/cc69-share-anchor.json`, served by the harness at `/share-anchor`) proves the
 /// presenter wiring: presented on the main thread from the top-most controller, sourceView set to
-/// that controller's view, sourceRect equal to the Share button frame. Closing the sheet must
-/// settle `shareClosed` and return focus to Share. The local iPad proof covers the real popover.
+/// that controller's view, sourceRect equal to the Share button frame at handoff. Closing the
+/// sheet must settle `shareClosed` and return focus to Share. The local iPad proof covers the real
+/// popover.
 @MainActor
 final class ShareCardShareSheetUITests: XCTestCase {
   let app = XCUIApplication(bundleIdentifier: "com.couturecast.story68")
@@ -161,7 +162,6 @@ final class ShareCardShareSheetUITests: XCTestCase {
     let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND hittable == true"), object: share)
     XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 20), .completed)
     XCTAssertEqual(share.label, labels.share)
-    let frame = share.frame
     let previousAnchor = try read("/share-anchor", as: AnchorReport.self)
     let previousFocus = try poll("/focus-observation", as: FocusObservation.self, within: 5) { _ in true }
 
@@ -174,17 +174,21 @@ final class ShareCardShareSheetUITests: XCTestCase {
     XCTAssertTrue(anchor.mainThread, "presented on the main thread")
     XCTAssertTrue(anchor.sourceViewSet, "popover sourceView set")
     XCTAssertTrue(anchor.sourceViewIsPresenterView, "sourceView is the presenter's view")
-    XCTAssertEqual(anchor.sourceRect.x, Double(frame.minX), accuracy: 1, "sourceRect x")
-    XCTAssertEqual(anchor.sourceRect.y, Double(frame.minY), accuracy: 1, "sourceRect y")
-    XCTAssertEqual(anchor.sourceRect.width, Double(frame.width), accuracy: 1, "sourceRect width")
-    XCTAssertEqual(anchor.sourceRect.height, Double(frame.height), accuracy: 1, "sourceRect height")
-    print("CC69_PRESENTER_ANCHOR_PASS")
 
     dismissShareSheetIfPresent()
     let feedback = element("share-card-feedback")
     XCTAssertTrue(feedback.waitForExistence(timeout: 20))
     let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", labels.shareClosed), object: feedback)
     XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 20), .completed, "shareClosed settles")
+    // JS measures Share at handoff, after the one-line `sharing` copy above it pushed it down, and
+    // the open sheet hides Share from the accessibility tree. `shareClosed` takes the same single
+    // line in en-US, so Share now sits where it was at handoff.
+    let frame = share.frame
+    XCTAssertEqual(anchor.sourceRect.x, Double(frame.minX), accuracy: 1, "sourceRect x")
+    XCTAssertEqual(anchor.sourceRect.y, Double(frame.minY), accuracy: 1, "sourceRect y")
+    XCTAssertEqual(anchor.sourceRect.width, Double(frame.width), accuracy: 1, "sourceRect width")
+    XCTAssertEqual(anchor.sourceRect.height, Double(frame.height), accuracy: 1, "sourceRect height")
+    print("CC69_PRESENTER_ANCHOR_PASS")
     let focus = try poll("/focus-observation", as: FocusObservation.self) {
       $0.session == previousFocus.session && $0.sequence > previousFocus.sequence
         && $0.posted && $0.attached && $0.identifier == "share-card-share"

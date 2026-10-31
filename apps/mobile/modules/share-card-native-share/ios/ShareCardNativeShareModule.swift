@@ -50,24 +50,49 @@ public final class ShareCardNativeShareModule: Module {
       return
     }
     let controller = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-    controller.popoverPresentationController?.sourceView = popover.sourceView
-    controller.popoverPresentationController?.sourceRect = popover.sourceRect
+    let popoverController = controller.popoverPresentationController
+    popoverController?.sourceView = popover.sourceView
+    popoverController?.sourceRect = popover.sourceRect
+    // What the test-build report records. UIKit does not report the anchor back on a compact
+    // iPhone (iOS 26.1 simulator: sourceView read nil right after it was set, and after
+    // presentation it was a UITransitionView with sourceRect its bottom 10 points).
+    let configuredSource = popoverController == nil ? nil : popover.sourceView
+    let configuredRect = configuredSource?.convert(popover.sourceRect, to: nil) ?? .zero
     controller.completionWithItemsHandler = { [weak self] activityType, completed, _, error in
       let result = ShareCardShareOutcomeReducer.result(
         activityType: activityType?.rawValue, completed: completed, error: error)
       DispatchQueue.main.async { self?.settle(attempt, result) }
     }
+    var presented = false
+    var refused = false
     presenter.present(controller, animated: true) { [weak self, weak controller, weak presenter] in
       guard let controller, let presenter else { return }
-      self?.writeStory68AnchorReport(controller, presenter: presenter)
+      presented = true
+      // The attempt already settled as refused; a sheet that appears after that is taken down.
+      if refused {
+        controller.dismiss(animated: false)
+        return
+      }
+      self?.writeStory68AnchorReport(
+        controller, presenter: presenter, sourceView: configuredSource, sourceRect: configuredRect)
     }
     // UIKit refuses a presentation with only a console warning, and then no completion would
-    // ever arrive. A refused sheet still has no presenter one main-queue turn later.
-    DispatchQueue.main.async { [weak self, weak controller] in
-      guard let controller, controller.presentingViewController == nil else { return }
+    // ever arrive. Presentation can start late: iOS 26 presents UIActivityViewController only
+    // after loading its activities (iOS 26.1 simulator: still no presenter one main-queue turn
+    // after present(), presented 650 ms later), so only a sheet that has not appeared by the
+    // deadline is refused.
+    DispatchQueue.main.asyncAfter(deadline: .now() + Self.presentationDeadline) {
+      [weak self, weak controller] in
+      guard let controller, !presented, controller.presentingViewController == nil,
+        !controller.isBeingPresented
+      else { return }
+      refused = true
       self?.settle(attempt, .failed(.presenterUnavailable))
     }
   }
+
+  /// How long a requested sheet may take to appear before the attempt settles as refused.
+  private static let presentationDeadline: TimeInterval = 10
 
   private func settle(_ attempt: UUID, _ result: ShareCardShareResult) {
     guard let settled = gate.settle(attempt, result), let pending, pending.attempt == attempt else { return }
@@ -88,17 +113,18 @@ public final class ShareCardNativeShareModule: Module {
   }
 
   /// Test-build-only proof for the iPhone XCUITest, where a compact sheet ignores the popover
-  /// anchor. Compiled out of Release and written only by the isolated story68 app, it records the
-  /// popover's actual sourceView and sourceRect, in window points, after presentation.
-  private func writeStory68AnchorReport(_ controller: UIActivityViewController, presenter: UIViewController) {
+  /// anchor. Compiled out of Release and written only by the isolated story68 app, it records,
+  /// after presentation, the sourceView and sourceRect (window points) assigned to the popover
+  /// controller; `sourceView` is nil when the controller had none to assign to.
+  private func writeStory68AnchorReport(
+    _ controller: UIActivityViewController, presenter: UIViewController, sourceView: UIView?,
+    sourceRect rect: CGRect
+  ) {
     #if DEBUG
     guard Bundle.main.bundleIdentifier == "com.couturecast.story68",
       let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
     else { return }
     story68Sequence += 1
-    let popover = controller.popoverPresentationController
-    let sourceView = popover?.sourceView
-    let rect = sourceView.map { view in view.convert(popover?.sourceRect ?? .zero, to: nil) } ?? .zero
     let record: [String: Any] = [
       "session": story68Session,
       "sequence": story68Sequence,
