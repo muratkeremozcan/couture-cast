@@ -1,3 +1,5 @@
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 /**
  * Story 6.9 Web Share over the owned UUID runtime: P-SHARE-BYTES, P-SHARE-DISMISS,
  * P-SHARE-TAP-AGAIN, P-SHARE-CAPABILITY-OFF and P-SHARE-REVALIDATE. The Story 6.8 export

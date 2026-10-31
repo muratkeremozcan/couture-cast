@@ -1,3 +1,5 @@
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'

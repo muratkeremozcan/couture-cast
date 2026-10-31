@@ -1,3 +1,5 @@
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import type * as ReactNativeModule from 'react-native'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'

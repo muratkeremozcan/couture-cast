@@ -1,5 +1,7 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 /// <reference types="vite/client" />
 import { Platform } from 'react-native'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

@@ -1,3 +1,5 @@
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import test from 'node:test'
 import fs from 'node:fs'
 import { assertNativeEvidence } from '../lib/story68-native-evidence-schema.mjs'

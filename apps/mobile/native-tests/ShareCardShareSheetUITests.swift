@@ -1,3 +1,5 @@
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import XCTest
 
 /// N-IOS-PRESENTER-UI and M-SHARE-SHEET-IOS against the installed story68 dev client, fixture mode

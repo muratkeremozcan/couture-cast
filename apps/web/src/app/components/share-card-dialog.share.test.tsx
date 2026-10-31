@@ -1,3 +1,5 @@
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 /**
  * Story 6.9 C-WEB-SHARE-DIALOG: Web Share beside Download. The Story 6.8 save tests live in
  * share-card-dialog.test.tsx; both files share src/test-utils/share-card-dialog.tsx.

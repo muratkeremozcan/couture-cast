@@ -1,3 +1,5 @@
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PostHog } from 'posthog-react-native'
 import type * as PostHogModule from 'posthog-react-native'

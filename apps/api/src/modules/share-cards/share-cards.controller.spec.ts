@@ -1,3 +1,7 @@
+// Learning path Step 48: Safe branded share-card export.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import 'reflect-metadata'
 import { EventEmitter } from 'node:events'
 import { BadRequestException, ForbiddenException } from '@nestjs/common'

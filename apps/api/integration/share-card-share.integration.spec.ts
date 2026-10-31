@@ -1,3 +1,5 @@
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 /**
  * Story 6.9: the share purpose and the share capability over the actual API and an
  * isolated database. I-SHARE-AUDIT and I-SHARE-FLAG; the Story 6.8 preview and save

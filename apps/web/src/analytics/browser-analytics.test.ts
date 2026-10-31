@@ -1,3 +1,5 @@
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CaptureResult } from 'posthog-js'
 import { SHARE_CARD_SHARED_ALLOWED_PROPERTIES } from '@couture/api-client'

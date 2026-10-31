@@ -1,3 +1,5 @@
+# Learning path Step 49: Native platform sharing.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 appId: ${MAESTRO_APP_ID}
 ---
 # M-SHARE-CHOSEN (Android): fixture share_chosen_pinterest reports {pinterest, target_chosen}.

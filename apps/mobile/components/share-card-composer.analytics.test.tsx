@@ -1,3 +1,5 @@
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 /**
  * Story 6.9 V4: the composer loads analytics with a dynamic import after a share settles and
  * checks the identity again once it resolves. The gated mock factory runs once per file, on

@@ -1,3 +1,5 @@
+// Learning path Step 49: Native platform sharing.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 // Story 6.9 G19, U-SHARE-CTRL: `FeatureFlagsModule` resolves in `ShareCardsModule`.
 //
 // The controller and service specs construct their classes by hand, so nothing in
