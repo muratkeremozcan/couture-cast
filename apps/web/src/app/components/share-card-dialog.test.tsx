@@ -756,6 +756,28 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
     expect(shareEvents(capture)).toHaveLength(2)
     expect(shareEvents(capture)[1]).toMatchObject({ outcome: 'handed_off' })
   })
+  it.each([
+    ['handed_off', () => Promise.resolve(), enUS.shareCard.sentToApp],
+    ['dismissed', () => shareError('AbortError'), enUS.shareCard.shareClosed],
+  ] as const)(
+    'C-WEB-SHARE-DIALOG R-007: a %s result ends the authorization, so the next tap prepares again',
+    async (_, result, note) => {
+      const { button } = await openWithShare()
+      webShare.mockImplementationOnce(result)
+      await userEvent.click(button)
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(note))
+      await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'))
+      fireEvent.click(button)
+      // No held File: the tap waits on a fresh share prepare before share().
+      expect(webShare).toHaveBeenCalledTimes(1)
+      await waitFor(() => expect(webShare).toHaveBeenCalledTimes(2))
+      expect(requests.map((body) => (body as { purpose: string }).purpose)).toEqual([
+        'preview',
+        'share',
+        'share',
+      ])
+    }
+  )
   it('C-WEB-SHARE-DIALOG R-007: the authorization expires at 60 s, then a tap reauthorizes', async () => {
     vi.useFakeTimers({
       shouldAdvanceTime: true,
@@ -886,6 +908,34 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
       ])
     }
   )
+  it('C-WEB-SHARE-DIALOG V13: a share_disabled 403 hides Share for the member and the next open reads the capability again', async () => {
+    const asked = useShareHandlers(() =>
+      HttpResponse.json({ code: 'share_disabled' }, { status: 403 })
+    )
+    const { button } = await openWithShare()
+    await userEvent.click(button)
+    expect(await screen.findByRole('alert')).toHaveTextContent(enUS.shareCard.shareFailed)
+    await waitFor(() =>
+      expect(screen.queryByTestId('share-card-share')).not.toBeInTheDocument()
+    )
+    expect(screen.getByTestId('share-card-save')).toBeEnabled()
+    expect(asked).toEqual(['member-one'])
+    await userEvent.keyboard('{Escape}')
+    await userEvent.click(screen.getByTestId('share-card-open'))
+    fireEvent.load(await screen.findByTestId('share-card-preview'))
+    await waitFor(() => expect(asked).toEqual(['member-one', 'member-one']))
+    expect(await screen.findByTestId('share-card-share')).toBeInTheDocument()
+  })
+  it('C-WEB-SHARE-DIALOG V13: a 403 that does not name share_disabled keeps Share', async () => {
+    useShareHandlers(() => HttpResponse.json({ code: 'forbidden' }, { status: 403 }))
+    const { button } = await openWithShare()
+    await userEvent.click(button)
+    expect(await screen.findByRole('alert')).toHaveTextContent(enUS.shareCard.shareFailed)
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(screen.getByTestId('share-card-share')).toBeInTheDocument()
+  })
   it('C-WEB-SHARE-DIALOG IO6: a 409 takes the 6.8 stale path with focus on Refresh and both actions held', async () => {
     useShareHandlers(() =>
       HttpResponse.json({ code: 'preview_changed' }, { status: 409 })
@@ -922,6 +972,28 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
     await waitFor(() =>
       expect(screen.getByTestId('share-card-share')).not.toHaveAttribute('aria-disabled')
     )
+  })
+  it('C-WEB-SHARE-DIALOG V14: a 409 after a sign-out the dialog has not seen yet emits no event', async () => {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    useShareHandlers(async () => {
+      await held
+      return HttpResponse.json({ code: 'preview_changed' }, { status: 409 })
+    })
+    const { button } = await openWithShare()
+    fireEvent.click(button)
+    await waitFor(() => expect(requests).toHaveLength(2))
+    // The live session changes before any couture:session event re-renders the dialog.
+    identity.member = null
+    await act(async () => {
+      release()
+      await held
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(shareEvents(capture)).toEqual([])
+    expect(screen.queryByText(enUS.shareCard.previewChanged)).not.toBeInTheDocument()
   })
   it('C-WEB-SHARE-DIALOG AC3: duplicate taps during a pending attempt make one attempt and one event', async () => {
     let release!: () => void

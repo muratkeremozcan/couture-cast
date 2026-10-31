@@ -9,7 +9,11 @@ import {
   useSyncExternalStore,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { PreparedShareCard, ShareCardSource } from '@couture/api-client'
+import {
+  ResponseError,
+  type PreparedShareCard,
+  type ShareCardSource,
+} from '@couture/api-client'
 import { resolveSupportedLocale } from '@couture/api-client/contracts/http'
 import { currentI18n } from '../../i18n'
 import {
@@ -41,11 +45,12 @@ const recoveryIsVisible = (action: string | null, changed: boolean) =>
   action !== null || changed
 const buttonLabel = (busy: boolean) => (busy ? 'saving' : 'download')
 /**
- * Story 6.9: a share handoff authorization lasts at most 60 s. Within it a tap hands the
- * already reauthorized File to `navigator.share` with no await before it, so the tap's
- * transient activation survives. Accepted revocation window: a member whose share access
- * is revoked on the server can still hand off these same previewed bytes until the
- * authorization expires, at most 60 s after its reauthorization.
+ * Story 6.9: a share handoff authorization lasts at most 60 s, and only an expired
+ * activation keeps it past its attempt. Within it a tap hands the already reauthorized
+ * File to `navigator.share` with no await before it, so the tap's transient activation
+ * survives. Accepted revocation window: a member whose share access is revoked on the
+ * server can still hand off these same previewed bytes until the authorization
+ * expires, at most 60 s after its reauthorization.
  */
 export const SHARE_AUTHORIZATION_TTL_MS = 60_000
 type ShareAuthorization = {
@@ -71,6 +76,20 @@ const shareFeedback = (result: WebShareResult): ShareFeedback | null =>
         ? 'shareTapAgain'
         : null
 const busyAttribute = (busy: boolean) => busy || undefined
+/** The share prepare's flag-off refusal: a 403 whose body names `share_disabled`. */
+async function shareDisabledRefusal(failure: unknown) {
+  if (!(failure instanceof ResponseError) || failure.response.status !== 403) return false
+  const body: unknown = await failure.response
+    .clone()
+    .json()
+    .catch(() => null)
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    'code' in body &&
+    body.code === 'share_disabled'
+  )
+}
 const shareIsVisible = (
   capability: { member: string; on: boolean } | null,
   member: string | null
@@ -261,9 +280,10 @@ export function ShareCardDialog({
     setFocusTarget(null)
   }, [focusTarget])
   // Capability state belongs to the member it was asked for: an identity change
-  // clears it, and a late answer for a previous member is dropped.
+  // clears it, and a late answer for a previous member is dropped. Each open reads it
+  // again, and a share_disabled refusal turns it off until then.
   useEffect(() => {
-    if (!open || member === null || capability?.member === member) return
+    if (!open || member === null) return
     if (!canShareCardFiles()) return
     const abort = new AbortController()
     void shareCardCapabilitiesFromWeb(abort.signal).then(({ nativeShare }) => {
@@ -271,7 +291,11 @@ export function ShareCardDialog({
         setCapability({ member, on: nativeShare })
     })
     return () => abort.abort()
-  }, [open, member, capability])
+  }, [open, member])
+  const revokeCapability = (refused: string | null) =>
+    setCapability((value) =>
+      value?.member === refused ? { member: value.member, on: false } : value
+    )
   // A composition change ends the handoff authorization.
   useEffect(() => () => revokeAuthorization(authorization), [key])
   useLayoutEffect(() => {
@@ -485,6 +509,8 @@ export function ShareCardDialog({
     }
     const settle = (result: WebShareResult) => {
       release()
+      // Only an expired activation keeps the authorization, for one more tap.
+      if (result.code !== 'activation_expired') clearAuthorization()
       if (identityChanged()) return
       if (stillCurrent()) {
         setBusy(false)
@@ -494,7 +520,6 @@ export function ShareCardDialog({
           setShareNote(note)
           setFocusTarget('share')
         } else {
-          clearAuthorization()
           setMessage(null)
           setError('shareFailed')
           setFocusTarget('download')
@@ -514,7 +539,14 @@ export function ShareCardDialog({
           abort.signal
         )
       } catch (failure) {
-        if (stillCurrent() && shareCardErrorKey(failure) === 'previewChanged') {
+        void shareDisabledRefusal(failure).then((refused) => {
+          if (refused) revokeCapability(original.member)
+        })
+        if (
+          stillCurrent() &&
+          !identityChanged() &&
+          shareCardErrorKey(failure) === 'previewChanged'
+        ) {
           // The 6.8 stale path: keep the old composition, disable Download and Share
           // until a fresh preview loads, and move focus to Refresh.
           release()
