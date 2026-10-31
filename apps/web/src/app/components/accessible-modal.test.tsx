@@ -1,3 +1,5 @@
+// Learning path Step 42: Screened threaded comments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 import React from 'react'
 import { renderToString } from 'react-dom/server'
 import { act, fireEvent, render, screen } from '@testing-library/react'

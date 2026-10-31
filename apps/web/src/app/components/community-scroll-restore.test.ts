@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.5 R43: the scroll restore hook on its own, against a stubbed layout. jsdom has
 // no layout, so every rect, scroll height and scroll position below is set by the test.
 import { renderHook } from '@testing-library/react'

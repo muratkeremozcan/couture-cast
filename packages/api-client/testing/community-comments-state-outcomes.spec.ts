@@ -1,3 +1,5 @@
+// Learning path Step 42: Screened threaded comments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 // Story 6.4 owner: create outcome classification, read failure keys, stale-response fences,
 // private suppression and snapshot pagination for the screen-owned comments state.
 import { describe, expect, it, vi } from 'vitest'

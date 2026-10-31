@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6 I/O matrix: pinned snapshots, signed cursors and live rechecks across
 // pages, against a real PG17 database and an owned Redis key space.
 import { describe, expect, it } from 'vitest'

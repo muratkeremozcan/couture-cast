@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 const os = vi.hoisted(() => ({
   applicationId: 'com.couturecast.story65',

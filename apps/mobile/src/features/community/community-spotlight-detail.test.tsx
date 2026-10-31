@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 /* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.6 R20: the spotlight detail moves screen-reader focus to its title and
 // announces the change once per open. The behavior lives in the Modal's

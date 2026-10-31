@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 acceptance lane C (D10/PERF-002): quiet-hour herd release and outages.
 //
 // N = max(500, H). H is an open input until a production cohort count exists, so N = 500.

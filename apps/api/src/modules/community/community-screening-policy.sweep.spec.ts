@@ -1,3 +1,5 @@
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Story 6.2b, AC 3: the exhaustive policy-surface evaluation.
 //
 // Recall against real unsafe imagery is the upstream model's property and is not

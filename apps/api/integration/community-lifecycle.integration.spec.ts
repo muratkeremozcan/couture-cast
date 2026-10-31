@@ -1,4 +1,6 @@
 // Learning path Step 38: Community feed by climate band.
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 //
 // Story 6.1: the state transitions that happen to a post WITHOUT anyone asking
 // for them -- consent lapsing, erasure completing, an upload being abandoned,

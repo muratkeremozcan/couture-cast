@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 /* eslint-disable @typescript-eslint/await-thenable */
 // T07 controls external SDK/storage/native/HTTP boundaries. Production session,
 // canonical profile client, initial screen effects and community wrappers execute.

@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.5 R43: the scroll restore after a required D3 hide gives the member back their
 // offset only for the same scope and the same rows. These cases pin the branches the
 // screen suite cannot reach, because the screen returns its own held rows unchanged.

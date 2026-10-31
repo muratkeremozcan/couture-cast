@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: area components reach a post only at submission, hold only a
 // hierarchical prefix, and leave the post exactly when its location key does.
 import { randomUUID } from 'node:crypto'

@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6 I/O matrix: level selection, eligibility and deterministic ranking
 // against a real PG17 database and an owned Redis key space.
 import { describe, expect, it } from 'vitest'

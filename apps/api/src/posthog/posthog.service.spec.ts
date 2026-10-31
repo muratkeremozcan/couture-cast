@@ -1,5 +1,7 @@
 // Learning path Step 8: Shared analytics contracts and event tracking.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-8-shared-analytics-contracts-and-event-tracking
+// Learning path Step 41: Curated reactions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getFeatureFlag = vi.fn()

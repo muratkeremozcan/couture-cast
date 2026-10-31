@@ -1,4 +1,6 @@
 // Learning path Step 38: Community feed by climate band.
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Story 6.1 owner: ten-locale parity for the `community.*` tree on Web.
 //
 // Nothing audits a new key tree by default in this repo: every parity spec is

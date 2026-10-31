@@ -1,3 +1,5 @@
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Story 6.2b peer review (CX8): the local E2E teardown stops the stack it
 // started, and only that one. A single shared pid file let one checkout's or one
 // port's run signal another's stack, and a stale record could signal whatever

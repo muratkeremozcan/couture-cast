@@ -1,3 +1,7 @@
+// Learning path Step 41: Curated reactions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.1 matrix row "Analytics": closed-enum, exactly-once events that record
 // no sensitive payload.
 import { describe, expect, it } from 'vitest'

@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6 HTTP boundary: the actual controller route, its headers, the opened
 // endpoint's two branches, the shared read gate and privacy-safe analytics.
 import 'reflect-metadata'

@@ -1,3 +1,5 @@
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Story 6.2b review (RF15): the worker's presence heartbeat against real Redis.
 //
 // Upstash answers CLIENT LIST from one node, so the canary and the measurements

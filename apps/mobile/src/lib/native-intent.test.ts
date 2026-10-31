@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5: the debug notification fixture URL never reaches a screen.
 import { describe, expect, it } from 'vitest'
 import { redirectSystemPath } from '@/app/+native-intent'

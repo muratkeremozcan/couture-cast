@@ -1,3 +1,5 @@
+// Learning path Step 41: Curated reactions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import { runMobileE2EFlow } from '../../../scripts/lib/mobile-e2e-flow-retry.mjs'

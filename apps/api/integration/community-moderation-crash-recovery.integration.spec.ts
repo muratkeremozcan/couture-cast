@@ -1,3 +1,5 @@
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Story 6.2b review (RF13): a worker that dies while a job is screening.
 //
 // The restart drill proves a job queued while no worker ran completes once one

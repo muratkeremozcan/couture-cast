@@ -1,3 +1,5 @@
+# Learning path Step 43: Realtime engagement and push notifications.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 # Story 6.5 owner: turn engagement notifications on through the product settings screen and
 # answer the real OS permission dialog with ${MAESTRO_DIALOG_CHOICE}. The runner resets the
 # OS permission to "ask" beforehand, so the dialog is required: a run where the OS does not

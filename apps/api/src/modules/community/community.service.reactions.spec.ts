@@ -1,4 +1,6 @@
 // Learning path Step 38: Community feed by climate band.
+// Learning path Step 41: Curated reactions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
 /* eslint-disable @typescript-eslint/no-unsafe-assignment -- assertions nest expect.objectContaining() and vi.fn() members, which is the established pattern for these suites. */
 import { ForbiddenException } from '@nestjs/common'
 import { describe, expect, it } from 'vitest'

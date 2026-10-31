@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 (D3/D9): a reconnect keeps a feed whose access was verified within the 8 s
 // bound, hides it once that lapses or on a foreground restore, and announces an outage
 // until verified content is visible again.

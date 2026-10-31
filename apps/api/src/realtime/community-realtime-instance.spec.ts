@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 (D10/O1): each realtime process carries one opaque random instance value.
 import { execFile } from 'node:child_process'
 import { resolve } from 'node:path'

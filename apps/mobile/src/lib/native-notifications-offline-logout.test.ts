@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 (D5 privacy): a logout that cannot reach the API keeps only the opaque pending
 // registration. No credential outlives the logout, and network restoration alone never
 // authenticates a deletion; cleanup waits for the owner to sign in again, an explicit

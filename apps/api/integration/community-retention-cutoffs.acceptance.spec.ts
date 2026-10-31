@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 acceptance lane B (D8): retention cutoffs and independent loop progress.
 //
 // The compiled runtime runs its own loops in an owned child. Each cutoff is seeded one minute

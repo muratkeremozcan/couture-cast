@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: the spotlight hook's own request bookkeeping. Responses for
 // abandoned requests never paint over newer state, and a single-post refresh
 // updates or evicts only its own copy.

@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: a Redis that accepted the connection and stopped answering. A
 // pausable TCP proxy sits in front of the owned Redis, so the spotlight client
 // connects and turns ready for real, then every later command meets silence.

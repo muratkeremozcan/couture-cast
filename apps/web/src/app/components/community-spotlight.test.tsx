@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: the City Spotlight module through the real web transport and MSW.
 // Paging lives in community-spotlight.paging.test.tsx and realtime in
 // community-spotlight.realtime.test.tsx.

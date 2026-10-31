@@ -1,4 +1,6 @@
 // Learning path Step 39: Production content-screening readiness.
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Story 6.2 Task 3: reusable multilingual community text screening (ADR-013).
 import fs from 'node:fs'
 import os from 'node:os'

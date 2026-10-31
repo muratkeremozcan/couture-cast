@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 (PR #157 review P2): new looks buffered under one feed filter never land in
 // another. A filter change drops the buffer and retires an insertion already under way;
 // target resolution itself stays filter-agnostic.

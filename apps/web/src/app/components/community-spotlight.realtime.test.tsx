@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: the City Spotlight under realtime removals and the D3 hide, through
 // the real web transport and MSW.
 import { http, HttpResponse } from 'msw'

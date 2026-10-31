@@ -1,3 +1,5 @@
+// Learning path Step 42: Screened threaded comments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 import { useState } from 'react'
 import {
   COMMUNITY_AGE_GATE_DENIED_MESSAGE,

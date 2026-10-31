@@ -1,5 +1,7 @@
 // Learning path Step 25: Lookbook Prism responsive layout and community grid.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-25-lookbook-prism-responsive-layout-and-community-grid
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 import { log } from '@seontechnologies/playwright-utils/log'
 import { communityTest, expect } from '../support/helpers/community-session'
 

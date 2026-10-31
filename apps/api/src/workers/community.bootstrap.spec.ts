@@ -1,4 +1,6 @@
 // Learning path Step 39: Production content-screening readiness.
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Story 6.2 Task 5: the dedicated community process starts ready and closes clean.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as ShutdownResourcesModule from './shutdown-resources'

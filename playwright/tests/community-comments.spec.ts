@@ -1,3 +1,5 @@
+// Learning path Step 42: Screened threaded comments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 import { randomInt, randomUUID } from 'node:crypto'
 import { mergeTests, type Locator, type Page, type Request } from '@playwright/test'
 import type {

@@ -1,3 +1,7 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.5 PR #157 web review F2: an erased community subject is a terminal, typed denial on
 // every shared authorization path, not a retryable outage. Real PG17 UUID database, actual
 // controllers, services, flag evaluation and the production realtime server factory.
