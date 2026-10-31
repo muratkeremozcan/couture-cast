@@ -253,7 +253,11 @@ export function ShareCardDialog({
     const target = { share: shareRef, download: saveRef, recovery: recoveryRef }[
       focusTarget
     ]
-    target.current?.focus({ preventScroll: true })
+    // Share keeps its place: its note fills the reserved line, so nothing moves. Refresh
+    // and Download take focus as an error alert grows the dialog, which at short
+    // viewports pushes the action rows below the panel's visible area; letting the
+    // focus scroll brings the focused control into view (WCAG 2.4.11).
+    target.current?.focus({ preventScroll: focusTarget === 'share' })
     setFocusTarget(null)
   }, [focusTarget])
   // Capability state belongs to the member it was asked for: an identity change

@@ -572,6 +572,14 @@ async function openWithShare() {
   await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled'))
   return { image, button }
 }
+// The options each focus() call on one element received, in call order.
+const focusOptions = (
+  focus: MockInstance<(options?: FocusOptions) => void>,
+  element: Element
+) =>
+  focus.mock.contexts.flatMap((context, index) =>
+    context === element ? [focus.mock.calls[index]?.[0]] : []
+  )
 const shareEvents = (capture: { mock: { calls: unknown[][] } }) =>
   capture.mock.calls.filter(([event]) => event === 'share_card_shared').map(([, p]) => p)
 describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
@@ -816,11 +824,14 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
   it('C-WEB-SHARE-DIALOG IO4 AC2: AbortError says shareClosed, keeps the preview and focuses Share', async () => {
     const { image, button } = await openWithShare()
     webShare.mockImplementationOnce(() => shareError('AbortError'))
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus')
     await userEvent.click(button)
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent(enUS.shareCard.shareClosed)
     )
     expect(button).toHaveFocus()
+    // Nothing moves on this path, so the focus return never scrolls the dialog.
+    expect(focusOptions(focus, button).at(-1)).toEqual({ preventScroll: true })
     expect(screen.getByTestId('share-card-preview')).toBe(image)
     expect(screen.getByRole('checkbox', { name: enUS.shareCard.watermark })).toBeChecked()
     expect(screen.getByTestId('share-card-save')).toBeEnabled()
@@ -851,11 +862,16 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
       if (rejection) webShare.mockImplementationOnce(rejection)
       if (name === 'offline')
         Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+      const focus = vi.spyOn(HTMLElement.prototype, 'focus')
       await userEvent.click(button)
       expect(await screen.findByRole('alert')).toHaveTextContent(
         enUS.shareCard.shareFailed
       )
       expect(screen.getByTestId('share-card-save')).toHaveFocus()
+      // The alert grows the dialog, so the focus move may scroll Download into view.
+      expect(focusOptions(focus, screen.getByTestId('share-card-save'))).toEqual([
+        { preventScroll: false },
+      ])
       expect(screen.getByTestId('share-card-save')).toBeEnabled()
       expect(screen.getByTestId('share-card-preview')).toBe(image)
       expect(webShare).toHaveBeenCalledTimes(handoffs)
@@ -875,12 +891,16 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
       HttpResponse.json({ code: 'preview_changed' }, { status: 409 })
     )
     const { image, button } = await openWithShare()
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus')
     await userEvent.click(button)
     expect(await screen.findByRole('alert')).toHaveTextContent(
       enUS.shareCard.previewChanged
     )
     const refresh = screen.getByRole('button', { name: enUS.shareCard.refresh })
     await waitFor(() => expect(refresh).toHaveFocus())
+    // WCAG 2.4.11: the alert and the new Refresh line grow the dialog, so the focus
+    // move may scroll Refresh into the panel's visible area.
+    expect(focusOptions(focus, refresh)).toEqual([{ preventScroll: false }])
     expect(screen.getByTestId('share-card-preview')).toBe(image)
     expect(button).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')

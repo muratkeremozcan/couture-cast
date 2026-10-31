@@ -1744,7 +1744,7 @@ test('P-SHARE-REVALIDATE: a share preparation conflict takes the stale path and 
   context,
   page,
   interceptNetworkCall,
-}) => {
+}, info) => {
   let conflict = true
   const { dialog, preview, share, purposes } = await openForShare(
     context,
@@ -1761,11 +1761,29 @@ test('P-SHARE-REVALIDATE: a share preparation conflict takes the stale path and 
     }
   )
   const digest = await preview.getAttribute('data-sha256')
+  // The shortest desktop size: the stale alert and Refresh line overflow the dialog.
+  await page.setViewportSize({ width: 1280, height: 720 })
   await activateFocused(share)
   await expect(dialog.getByRole('alert')).toHaveText(shareCopy().previewChanged)
   const recovery = dialog.getByTestId('share-card-recovery')
   await expect(recovery).toHaveText(shareCopy().refresh)
   await expect(recovery).toBeFocused()
+  // WCAG 2.4.11: the newly focused Refresh is scrolled fully into the viewport and into
+  // the dialog's visible scroll area.
+  await expect(recovery).toBeInViewport({ ratio: 1 })
+  const surface = dialog.locator(':scope > div')
+  await expect
+    .poll(async () => {
+      const visible = await surface.evaluate((element) => {
+        const rect = element.getBoundingClientRect()
+        const top = rect.top + element.clientTop
+        return { top, bottom: top + element.clientHeight }
+      })
+      const box = await recovery.boundingBox()
+      return box !== null && box.y >= visible.top && box.y + box.height <= visible.bottom
+    }, 'Refresh inside the dialog scroll area')
+    .toBe(true)
+  await page.screenshot({ path: info.outputPath('stale-1280x720.png') })
   await expect(preview).toHaveAttribute('data-sha256', digest!)
   await expect(share).toHaveAttribute('aria-disabled', 'true')
   await expect(dialog.getByTestId('share-card-save')).toHaveAttribute(
