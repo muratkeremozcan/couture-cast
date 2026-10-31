@@ -27,6 +27,7 @@ import {
 } from '@couture/api-client'
 import { resolveSupportedLocale } from '@couture/api-client/contracts/http'
 import { EdgeToEdgeModal, useModalInsets } from './edge-to-edge-modal'
+import { revealOffset } from './community/compose-field-reveal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { focusShareCardElement } from '@/src/lib/share-card-focus'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
@@ -150,6 +151,28 @@ function measureWindowFrame(node: View | null) {
 }
 
 /**
+ * The scroll offset that shows all of a focus target, or null when it is in view already. A result
+ * can move focus to an action under the fold (Retry after a storage failure sits below Save and
+ * Share on a phone), and a sighted member must see the control that has focus.
+ */
+async function revealInScroll(
+  scroll: ScrollView | null,
+  offset: number,
+  target: View | null
+): Promise<number | null> {
+  const [viewport, frame] = await Promise.all([
+    measureWindowFrame(scroll as unknown as View | null),
+    measureWindowFrame(target),
+  ])
+  if (!viewport || !frame) return null
+  const top = frame.y - viewport.y + offset
+  return revealOffset(
+    { top, bottom: top + frame.height },
+    { offset, height: viewport.height }
+  )
+}
+
+/**
  * Story 6.9 D4: capability state belongs to one member. A late answer for anyone else is
  * dropped, and the composer clears it on every identity change, sign-out included.
  */
@@ -252,6 +275,8 @@ export function ShareCardComposer({
   const memberEpoch = useRef(0)
   const recoveryTarget = useRef<View>(null)
   const cancelTarget = useRef<View>(null)
+  const scroll = useRef<ScrollView>(null)
+  const scrollOffset = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
   const generation = useRef(0)
   const saveGuard = useRef(false)
@@ -605,7 +630,14 @@ export function ShareCardComposer({
           { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 },
         ]}
       >
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          ref={scroll}
+          scrollEventThrottle={16}
+          onScroll={(event) => {
+            scrollOffset.current = event.nativeEvent.contentOffset.y
+          }}
+          contentContainerStyle={styles.content}
+        >
           <Text
             ref={title}
             accessibilityRole="header"
@@ -663,13 +695,17 @@ export function ShareCardComposer({
                     ? cancelTarget.current
                     : recoveryTarget.current
               const captured = generation.current
-              focusShareCardElement(
-                safeFindNodeHandle(target),
-                () =>
-                  latest.current.open &&
-                  latest.current.member === member &&
-                  latest.current.key === key &&
-                  generation.current === captured
+              const isCurrent = () =>
+                latest.current.open &&
+                latest.current.member === member &&
+                latest.current.key === key &&
+                generation.current === captured
+              focusShareCardElement(safeFindNodeHandle(target), isCurrent)
+              void revealInScroll(scroll.current, scrollOffset.current, target).then(
+                (offset) => {
+                  if (offset !== null && isCurrent())
+                    scroll.current?.scrollTo({ y: offset, animated: false })
+                }
               )
             }}
             visible={open}

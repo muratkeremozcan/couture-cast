@@ -1473,6 +1473,34 @@ describe('Story 6.9 composer layout', () => {
     expect(screen.getByTestId('share-card-retry')).toBeInTheDocument()
     expect(tops()).toEqual(resting)
   })
+  it('C-COMP-LAYOUT-REVEAL: a failure that focuses Retry below the fold scrolls Retry into view', async () => {
+    // A short phone window: Share, added after Save, leaves Retry under the fold. Focus moves to
+    // Retry, so a sighted member must see it too (iOS 26.1, ShareCardAccessibilityUITests
+    // storage-failure: Retry existed but was not hittable). The mocked modal is a plain div, so
+    // this test bounds it to the window like the native modal, making the ScrollView scroll.
+    const bounded = document.createElement('style')
+    bounded.textContent =
+      '[role="dialog"] { height: 100vh; display: flex; flex-direction: column; }'
+    document.head.append(bounded)
+    try {
+      await browserPage.viewport(390, 700)
+      boundary.save.mockRejectedValue(new Error('storage'))
+      await readyShare()
+      expect(frame('share-card-share').bottom).toBeGreaterThan(window.innerHeight)
+      await userEvent.click(screen.getByTestId('share-card-save'))
+      expect(await screen.findByTestId('share-card-error')).toHaveTextContent(
+        i18n.t('shareCard.storage')
+      )
+      await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(43))
+      await waitFor(() => {
+        const retry = frame('share-card-retry')
+        expect(retry.top).toBeGreaterThanOrEqual(0)
+        expect(retry.bottom).toBeLessThanOrEqual(window.innerHeight)
+      })
+    } finally {
+      bounded.remove()
+    }
+  })
   it.each([
     ['a phone', 414, 896],
     ['the largest phone', 440, 956],
