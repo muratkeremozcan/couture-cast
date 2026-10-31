@@ -50,9 +50,9 @@ vi.mock('react-native', async (original) =>
   (await loadMocks()).reactNative(await original<typeof ReactNativeModule>())
 )
 import {
+  actionRowTier,
   feedbackSlotHeight,
   fittedPreviewWidth,
-  labelFitsHalf,
   revealScrollOffset,
 } from './share-card-composer'
 import { nativeShareCardSavePending } from '@/src/lib/share-card-save-operations'
@@ -686,6 +686,18 @@ describe('Story 6.9 composer layout', () => {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         )
     )
+  /** Settles once the actions and the preview hold the same frames for three frames in a row. */
+  const layoutStable = async () => {
+    const snapshot = () =>
+      JSON.stringify([tops(), frame('share-card-preview-loaded').width])
+    let previous = snapshot()
+    for (let stable = 0, frames = 0; stable < 3 && frames < 30; frames++) {
+      await settleLayout()
+      const current = snapshot()
+      stable = current === previous ? stable + 1 : 0
+      previous = current
+    }
+  }
   /** Settles once the measured fit has given the preview its width. */
   const previewWidthSettles = (width: number) =>
     waitFor(() => expect(frame('share-card-preview-loaded').width).toBeCloseTo(width, 0))
@@ -1012,23 +1024,48 @@ describe('Story 6.9 composer layout', () => {
       }
     }
   )
-  it('U-COMP-LABEL-FIT: a label pairs only when it fits its half of the column on one line', () => {
-    // An iPhone SE column: each half is 157.5 pt, 127.5 pt of it inside padding and border.
-    expect(labelFitsHalf({ width: 125.5, height: 19 }, 327, 1)).toBe(true)
-    expect(labelFitsHalf({ width: 126, height: 19 }, 327, 1)).toBe(false)
-    // A label that already wrapped in its half, reported at its longest line.
-    expect(labelFitsHalf({ width: 110, height: 38 }, 327, 1)).toBe(false)
-    // Larger text: one line is taller, and the measured width grows with it.
-    expect(labelFitsHalf({ width: 120, height: 29 }, 327, 1.5)).toBe(true)
-    // The iPad's 420-pt column leaves 174 pt per label.
-    expect(labelFitsHalf({ width: 172, height: 19 }, 420, 1)).toBe(true)
+  it('U-COMP-ROW-TIER: a row takes equal halves, then content widths, then stacks', () => {
+    const line = (width: number) => ({ width, height: 19 })
+    // An iPhone SE column: each half leaves a label 127.5 pt inside padding and border.
+    expect(actionRowTier([line(108), line(42)], 327, 1)).toBe('halves')
+    expect(actionRowTier([line(125.5), line(50)], 327, 1)).toBe('halves')
+    // fr Enregistrer dans Photos and Partager: too wide for a half, 308 of 327 pt side by side.
+    expect(actionRowTier([line(174), line(62)], 327, 1)).toBe('content')
+    // pt-PT Atualizar pré-visualização and Cancelar leave 3 pt; four more points do not.
+    expect(actionRowTier([line(186), line(64)], 327, 1)).toBe('content')
+    expect(actionRowTier([line(190), line(64)], 327, 1)).toBe('stacked')
+    // A label that wrapped in its half has no one-line width yet: measure it at content width.
+    expect(actionRowTier([{ width: 110, height: 38 }, line(50)], 327, 1)).toBe('content')
+    // Larger text: one line is taller.
+    expect(actionRowTier([{ width: 120, height: 29 }, line(60)], 327, 1.5)).toBe('halves')
+    // A lone button fills its row; a row waiting on a label keeps its tier.
+    expect(actionRowTier([line(300)], 327, 1)).toBe('halves')
+    expect(actionRowTier([line(100), undefined], 327, 1)).toBeNull()
   })
-  it.each(supportedLocales)(
-    'C-COMP-LAYOUT-PAIRS: %s pairs equal halves on one split, or stacks a row whose label does not fit',
-    async (locale) => {
+  // Tiers of the Save and Share row, then the Refresh and Cancel row, measured with the browser's
+  // SF Pro: an iPhone SE column (375-pt window) and an iPhone 17 Pro column (402-pt window).
+  const tiers: Record<string, Record<number, [string, string]>> = {
+    'en-US': { 375: ['halves', 'halves'], 402: ['halves', 'halves'] },
+    'en-CA': { 375: ['halves', 'halves'], 402: ['halves', 'halves'] },
+    'es-419': { 375: ['halves', 'content'], 402: ['halves', 'content'] },
+    'fr-CA': { 375: ['content', 'content'], 402: ['content', 'halves'] },
+    'fr-FR': { 375: ['content', 'content'], 402: ['content', 'halves'] },
+    'tr-TR': { 375: ['content', 'content'], 402: ['content', 'halves'] },
+    'de-DE': { 375: ['halves', 'content'], 402: ['halves', 'content'] },
+    'it-IT': { 375: ['halves', 'content'], 402: ['halves', 'content'] },
+    'pt-BR': { 375: ['halves', 'halves'], 402: ['halves', 'halves'] },
+    'pt-PT': { 375: ['content', 'content'], 402: ['content', 'content'] },
+  }
+  it.each(
+    supportedLocales.flatMap((locale) =>
+      [375, 402].map((width) => [locale, width] as const)
+    )
+  )(
+    'C-COMP-LAYOUT-PAIRS: %s at a %i-pt window takes each row tier and never stacks',
+    async (locale, width) => {
       vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-      // An iPhone SE column, in the stale state that fills both rows.
-      await browserPage.viewport(375, 667)
+      // The stale state fills both rows.
+      await browserPage.viewport(width, 667)
       await i18n.changeLanguage(locale)
       await readyShare()
       boundary.prepare.mockRejectedValueOnce(
@@ -1037,65 +1074,53 @@ describe('Story 6.9 composer layout', () => {
       await tapShare()
       expect(await screen.findByTestId('share-card-refresh')).toBeInTheDocument()
       await settleShareAttempt()
-      const half = (327 - 12) / 2
-      const label = (name: string) =>
-        screen
-          .getByTestId(`share-card-${name}`)
-          .firstElementChild!.getBoundingClientRect()
-      const rows = [
-        ['save', 'share'],
-        ['refresh', 'cancel'],
-      ] as const
-      const paired = rows.map(([first, second]) => {
+      await settleLayout()
+      const column = width - 48
+      const half = (column - 12) / 2
+      const tierOf = ([first, second]: readonly [string, string]) => {
         const [a, b] = [frame(`share-card-${first}`), frame(`share-card-${second}`)]
-        const wide = [first, second].some((name) => label(name).width > half - 30 - 2)
-        if (a.top === b.top) {
-          // Equal halves: no label needs more than its half.
-          expect(a.width, `${first} ${second}`).toBeCloseTo(half, 0)
-          expect(b.width, `${first} ${second}`).toBeCloseTo(half, 0)
-          expect(wide, `${first} ${second}`).toBe(false)
-          return true
+        if (a.top !== b.top) {
+          expect(a.width, first).toBeCloseTo(column, 0)
+          expect(b.width, second).toBeCloseTo(column, 0)
+          return 'stacked'
         }
-        // Stacked full width, because a label would not fit its half.
-        expect(a.width, first).toBeCloseTo(327, 0)
-        expect(b.width, second).toBeCloseTo(327, 0)
-        expect(b.top - a.bottom, `${first} ${second}`).toBe(16)
-        expect(wide, `${first} ${second}`).toBe(true)
-        return false
-      })
-      // Two paired rows share one vertical split.
-      if (paired.every(Boolean)) {
+        // Side by side across the whole column, 12 pt apart.
+        expect(a.left + a.width + 12, `${first} ${second}`).toBeCloseTo(b.left, 0)
+        expect(a.width + b.width + 12, `${first} ${second}`).toBeCloseTo(column, 0)
+        return Math.abs(a.width - half) < 0.5 && Math.abs(b.width - half) < 0.5
+          ? 'halves'
+          : 'content'
+      }
+      const actual = [tierOf(['save', 'share']), tierOf(['refresh', 'cancel'])]
+      expect(actual).toEqual(tiers[locale]?.[width])
+      // Two halves rows share one vertical split.
+      if (actual.every((tier) => tier === 'halves'))
         expect(frame('share-card-save').right).toBeCloseTo(
           frame('share-card-refresh').right,
           0
         )
-        expect(frame('share-card-share').left).toBeCloseTo(
-          frame('share-card-cancel').left,
-          0
-        )
-      }
       // One line each: a wrapped label would make its button taller than Cancel.
       for (const name of ['save', 'share', 'refresh'])
         expect(frame(`share-card-${name}`).height, name).toBe(
           frame('share-card-cancel').height
         )
       expect(frame('share-card-cancel').height).toBeLessThan(52)
-      // en-US pairs both rows; pt-PT Guardar nas Fotografias and Atualizar pré-visualização
-      // need 174 and 186 pt of a 127.5-pt half, so both its rows stack.
-      if (locale === 'en-US') expect(paired).toEqual([true, true])
-      if (locale === 'pt-PT') expect(paired).toEqual([false, false])
     }
   )
-  it('C-COMP-LAYOUT-PAIRS: a stacked Save and Share row stays still through status and error copy', async () => {
-    // fr-FR Enregistrer dans Photos needs 174 pt of a 127.5-pt half, so Save and Share stack.
+  it('C-COMP-LAYOUT-PAIRS: a content-width Save and Share row stays still through status and error copy', async () => {
+    // fr-FR Enregistrer dans Photos needs 174 pt of a 127.5-pt half, so the row pairs at content
+    // widths instead.
     const unbound = boundToWindow()
     try {
       await browserPage.viewport(375, 667)
       await i18n.changeLanguage('fr-FR')
       await readyShare()
-      await settleLayout()
-      expect(frame('share-card-share').top).toBeGreaterThan(
-        frame('share-card-save').bottom
+      // Save wraps in its half first; the row then settles at content widths and the preview at
+      // its fitted size.
+      await layoutStable()
+      expect(frame('share-card-share').top).toBe(frame('share-card-save').top)
+      expect(frame('share-card-save').width).toBeGreaterThan(
+        frame('share-card-share').width + 40
       )
       const resting = tops()
       boundary.shareFile.mockResolvedValueOnce({ target: 'none', outcome: 'cancelled' })
@@ -1113,6 +1138,11 @@ describe('Story 6.9 composer layout', () => {
       )
       await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(42))
       expect(tops()).toEqual(resting)
+      // Every action still ends inside the viewport without scrolling.
+      const fold = scrollerOf(
+        screen.getByTestId('share-card-cancel')
+      ).getBoundingClientRect()
+      expect(frame('share-card-cancel').bottom).toBeLessThanOrEqual(fold.bottom)
     } finally {
       unbound()
     }
@@ -1138,5 +1168,15 @@ describe('Story 6.9 composer layout', () => {
     expect(screen.getByTestId('share-card-refresh')).toHaveTextContent(
       'Vorschau aktualisieren'
     )
+  })
+  it('C-COMP-LAYOUT-PAIRS: a lone Save or Cancel fills its row', async () => {
+    // Without share capability Save has no partner, and Cancel has none before an error.
+    await browserPage.viewport(375, 667)
+    render(<Harness />)
+    await ready()
+    await settleLayout()
+    expect(screen.queryByTestId('share-card-share')).not.toBeInTheDocument()
+    await waitFor(() => expect(frame('share-card-save').width).toBeCloseTo(327, 0))
+    expect(frame('share-card-cancel').width).toBeCloseTo(327, 0)
   })
 })

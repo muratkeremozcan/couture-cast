@@ -244,47 +244,107 @@ const BUTTON_PADDING = 14
 const BUTTON_BORDER = 1
 const LABEL_FONT_SIZE = 16
 type LabelFrame = { width: number; height: number }
+type ActionTier = 'halves' | 'content' | 'stacked'
 /**
- * Whether an action label, measured shrink-wrapped to its own width, fits on one line in half of
- * this column. Paired buttons are equal halves; a label wider than its half would wrap, so its row
- * stacks instead. The 2-pt margin keeps a label right at the edge from flipping between the two
- * layouts, and the height check catches a label that already wrapped in its half, which iOS
- * reports at its longest line's width.
+ * How one action row lays out, from its labels measured shrink-wrapped (null while one is not
+ * measured yet). Equal halves when every label fits its half on one line, so the rows share one
+ * vertical split; otherwise both buttons at their content widths when they still fit side by side;
+ * otherwise stacked full width. A label that wrapped (iOS reports it at its longest line) has no
+ * one-line width yet, so the row lays out at content width, where it gets one. The 2-pt margins
+ * keep a label right at an edge from flipping between tiers.
  */
-export function labelFitsHalf(label: LabelFrame, column: number, fontScale: number) {
-  const half = (column - ACTION_GAP) / 2 - 2 * (BUTTON_PADDING + BUTTON_BORDER)
-  return label.width <= half - 2 && label.height < LABEL_FONT_SIZE * 1.6 * fontScale
+export function actionRowTier(
+  labels: (LabelFrame | undefined)[],
+  column: number,
+  fontScale: number
+): ActionTier | null {
+  if (labels.some((label) => label === undefined)) return null
+  const measured = labels as LabelFrame[]
+  if (measured.length < 2) return 'halves'
+  const chrome = 2 * (BUTTON_PADDING + BUTTON_BORDER)
+  const half = (column - ACTION_GAP) / 2 - chrome
+  const oneLine = (label: LabelFrame) => label.height < LABEL_FONT_SIZE * 1.6 * fontScale
+  if (measured.every((label) => oneLine(label) && label.width <= half - 2))
+    return 'halves'
+  if (!measured.every(oneLine)) return 'content'
+  const side = measured.reduce((sum, label) => sum + label.width + chrome, ACTION_GAP)
+  return side <= column - 2 ? 'content' : 'stacked'
 }
 type ActionKind = 'save' | 'share' | 'refresh' | 'retry' | 'settings' | 'cancel'
+type ActionRow = (ActionKind | null)[]
 /**
- * Equal-width action columns. Each row (Save and Share, then a recovery action and Cancel) pairs
- * its buttons as two halves sharing one vertical split, and stacks them full width when either
- * label does not fit its half on one line. The decision reads only the labels in that row, so
- * status and error copy never move Save and Share. A label not measured yet counts as fitting.
- * Only a changed decision sets state: even an unchanged functional update renders the composer
- * again, and a render right after Retry or Open settings mounts made the iOS focus request for
- * that button find it detached (it fell back without posting layoutChanged).
+ * Action columns. Each row (Save and Share, then a recovery action and Cancel) takes the tier its
+ * own labels allow, so status and error copy never move Save and Share; a row not measured yet
+ * uses halves. Label frames live in a ref and only a changed tier sets state: even an unchanged
+ * update renders the composer again, and a render right after Retry or Open settings mounts made
+ * the iOS focus request for that button find it detached (it fell back without posting
+ * layoutChanged).
  */
-function useActionColumns() {
+function useActionColumns(rows: [ActionRow, ActionRow]) {
   const { width, fontScale } = useWindowDimensions()
   const column = Math.min(width - 2 * CONTENT_INSET, CONTENT_MAX_WIDTH)
-  const [wide, setWide] = useState<Partial<Record<ActionKind, boolean>>>({})
-  const known = useRef(wide)
+  const scale = `${column}:${fontScale}`
+  const frames = useRef({ scale, labels: {} as Partial<Record<ActionKind, LabelFrame>> })
+  if (frames.current.scale !== scale) frames.current = { scale, labels: {} }
+  const [tiers, setTiers] = useState<Record<string, ActionTier>>({})
+  const known = useRef(tiers)
+  const current = useRef(rows)
+  current.current = rows
+  const rowId = (kinds: ActionRow) => kinds.filter(Boolean).join('|')
   const measure =
     (kind: ActionKind) =>
     ({ nativeEvent }: LayoutChangeEvent) => {
-      const tooWide = !labelFitsHalf(nativeEvent.layout, column, fontScale)
-      if ((known.current[kind] ?? false) === tooWide) return
-      known.current = { ...known.current, [kind]: tooWide }
-      setWide(known.current)
+      const { labels } = frames.current
+      labels[kind] = {
+        width: nativeEvent.layout.width,
+        height: nativeEvent.layout.height,
+      }
+      let next = known.current
+      for (const kinds of current.current) {
+        if (!kinds.includes(kind)) continue
+        const present = kinds.filter((name): name is ActionKind => name !== null)
+        const tier = actionRowTier(
+          present.map((name) => labels[name]),
+          column,
+          fontScale
+        )
+        const id = rowId(kinds)
+        if (tier !== null && (next[id] ?? 'halves') !== tier)
+          next = { ...next, [id]: tier }
+      }
+      if (next === known.current) return
+      known.current = next
+      setTiers(next)
     }
-  const row = (kinds: (ActionKind | null)[]) =>
-    kinds.some((kind) => kind !== null && wide[kind] === true)
-      ? styles.stacked
-      : styles.paired
-  return { measure, row }
+  const half = (column - ACTION_GAP) / 2
+  // Halves take an explicit width: after a content-width row, Fabric laid two flexBasis 0
+  // buttons out unequal (fr-FR Try again at 172 pt beside Cancel at 143 pt on an iPhone SE).
+  // A lone button fills its row.
+  const styleOf = (kinds: ActionRow): ViewStyle => {
+    const tier = tiers[rowId(kinds)] ?? 'halves'
+    if (tier !== 'halves') return tierStyle(tier)
+    return { ...styles.halves, width: kinds.includes(null) ? '100%' : half }
+  }
+  return { measure, rows: [styleOf(rows[0]), styleOf(rows[1])] as const }
 }
 type ActionColumns = ReturnType<typeof useActionColumns>
+/** Read at render, after the stylesheet below is created. */
+const tierStyle = (tier: ActionTier) =>
+  tier === 'halves'
+    ? styles.halves
+    : tier === 'content'
+      ? styles.contentWidth
+      : styles.stacked
+/** The two action rows: Save and Share (Share only with capability), then recovery and Cancel. */
+function actionRows(
+  shareCapable: boolean,
+  recovery: ActionKind | null
+): [ActionRow, ActionRow] {
+  return [
+    ['save', shareCapable ? 'share' : null],
+    [recovery, 'cancel'],
+  ]
+}
 /** The recovery action a state offers beside Cancel, or none. */
 function recoveryKind(
   permission: 'denied' | 'permanent' | null,
@@ -463,7 +523,6 @@ export function ShareCardComposer({
   const activeSave = useRef<SaveOwner | null>(null)
   const insets = useModalInsets()
   const previewFit = usePreviewFit()
-  const columns = useActionColumns()
   const recovery = recoveryKind(permission, error, changed)
   const systemBarsReady = useShareCardStatusBar(
     open && source !== null,
@@ -471,6 +530,7 @@ export function ShareCardComposer({
   )
   const available = nativeShareCardSaveAvailable()
   const { shareCapable, revokeShareCapability } = useShareCardCapability(open, member)
+  const columns = useActionColumns(actionRows(shareCapable, recovery))
   const shareModule = nativeShareCardShareAvailable()
   const sourceIdentity = JSON.stringify(source)
   const key = JSON.stringify({ source, locale, watermark })
@@ -918,7 +978,7 @@ export function ShareCardComposer({
                 }}
                 disabled={disabled}
                 onPress={() => void save()}
-                style={[styles.button, columns.row(['save', 'share'])]}
+                style={[styles.button, columns.rows[0]]}
                 ref={saveTarget}
                 testID="share-card-save"
               >
@@ -940,7 +1000,7 @@ export function ShareCardComposer({
                 target={recoveryTarget}
                 kind={recovery}
                 disabled={busy || pendingNative}
-                style={columns.row([recovery, 'cancel'])}
+                style={columns.rows[1]}
                 columns={columns}
                 t={t}
                 retry={() => {
@@ -955,7 +1015,7 @@ export function ShareCardComposer({
               />
               <Pressable
                 accessibilityRole="button"
-                style={[styles.button, columns.row([recovery, 'cancel'])]}
+                style={[styles.button, columns.rows[1]]}
                 onPress={close}
                 ref={cancelTarget}
                 testID="share-card-cancel"
@@ -1111,7 +1171,7 @@ function ShareAction({
       accessibilityHint={present ? undefined : t('shareCard.shareUnavailable')}
       disabled={disabled || !present}
       onPress={present ? onPress : undefined}
-      style={[styles.button, columns.row(['save', 'share'])]}
+      style={[styles.button, columns.rows[0]]}
       ref={target}
       testID="share-card-share"
     >
@@ -1208,7 +1268,7 @@ const styles = StyleSheet.create({
     gap: CONTENT_GAP,
   },
   block: { gap: CONTENT_GAP },
-  /** An action row: two equal halves (`paired`), or full-width buttons that wrap (`stacked`). */
+  /** An action row; its buttons take `halves`, `contentWidth` or `stacked` (actionRowTier). */
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1233,8 +1293,10 @@ const styles = StyleSheet.create({
   error: { color: '#7A1F2D', fontSize: 16 },
   feedbackSlot: { gap: 16 },
   feedbackLine: { lineHeight: FEEDBACK_LINE_HEIGHT },
-  paired: { flexBasis: 0, flexGrow: 1 },
-  stacked: { width: '100%' },
+  // Every tier sets the same flex props, so a tier change never leaves one behind.
+  halves: { flexBasis: 'auto', flexGrow: 0, flexShrink: 0 },
+  contentWidth: { flexBasis: 'auto', flexGrow: 1, flexShrink: 1, width: 'auto' },
+  stacked: { flexBasis: 'auto', flexGrow: 0, flexShrink: 1, width: '100%' },
   button: {
     minHeight: 48,
     padding: BUTTON_PADDING,
