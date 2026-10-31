@@ -1043,4 +1043,58 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(shareEvents(capture)).toHaveLength(2)
   })
+  it('C-WEB-SHARE-LAYOUT: one hidden feedback slot holds its place while outcome copy appears and clears', async () => {
+    // jsdom has no layout: the slot keeps one line (min-h-5 = text-sm's 20 px) and is the
+    // same element in every state, so single-line copy never resizes the dialog.
+    const { button } = await openWithShare()
+    const slot = screen.getByTestId('share-card-feedback')
+    expect(slot).toHaveAttribute('aria-hidden', 'true')
+    expect(slot).toHaveClass('min-h-5', 'text-sm')
+    expect(slot).toBeEmptyDOMElement()
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    await userEvent.click(button)
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(enUS.shareCard.sentToApp)
+    )
+    expect(screen.getByTestId('share-card-feedback')).toBe(slot)
+    expect(slot).toHaveTextContent(enUS.shareCard.sentToApp)
+    expect(slot).toHaveAttribute('aria-hidden', 'true')
+    // Assistive technology reaches the copy once: through the status region alone.
+    const exposed = screen
+      .getAllByText(enUS.shareCard.sentToApp)
+      .filter((element) => !element.closest('[aria-hidden="true"]'))
+    expect(exposed).toEqual([screen.getByRole('status')])
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: enUS.shareCard.watermark })
+    )
+    expect(screen.getByTestId('share-card-feedback')).toBe(slot)
+    expect(slot).toBeEmptyDOMElement()
+  })
+  it('C-WEB-SHARE-LAYOUT: the stale path keeps Download and Share on row one and Refresh then Cancel on a second row aligned to Download', async () => {
+    useShareHandlers(() =>
+      HttpResponse.json({ code: 'preview_changed' }, { status: 409 })
+    )
+    const { button } = await openWithShare()
+    const primary = screen.getByTestId('share-card-primary-actions')
+    const secondary = screen.getByTestId('share-card-secondary-actions')
+    const ids = (row: HTMLElement) =>
+      Array.from(row.children).map((child) => child.getAttribute('data-testid'))
+    expect(ids(primary)).toEqual(['share-card-save', 'share-card-share'])
+    expect(ids(secondary)).toEqual(['share-card-cancel'])
+    await userEvent.click(button)
+    await screen.findByRole('button', { name: enUS.shareCard.refresh })
+    expect(ids(primary)).toEqual(['share-card-save', 'share-card-share'])
+    expect(ids(secondary)).toEqual(['share-card-recovery', 'share-card-cancel'])
+    // The row's negative margin equals the text buttons' padding, so the first label
+    // starts on Download's left edge on every line of the row.
+    expect(secondary).toHaveClass('-ml-3', 'flex-wrap')
+    for (const action of Array.from(secondary.children))
+      expect(action).toHaveClass('px-3')
+    for (const action of [...primary.children, ...secondary.children])
+      expect(action).toHaveClass('min-h-[44px]')
+    expect(screen.getByTestId('share-card-cancel')).toHaveAccessibleName(
+      enUS.shareCard.cancel
+    )
+  })
 })

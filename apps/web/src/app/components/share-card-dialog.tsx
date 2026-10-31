@@ -104,13 +104,22 @@ function ShareCardShareButton({
     </button>
   )
 }
+/**
+ * The visible feedback slot always holds one line (text-sm: 20 px), so single-line copy
+ * appearing or clearing never changes the dialog's height. The centered dialog would
+ * otherwise move up by half the line and its spacing. Visible copy is for sighted
+ * members; the dialog's status region announces it once, so the slot stays hidden from
+ * assistive technology whether it is empty or filled.
+ */
 function ShareCardShareNote({ note }: { note: ShareFeedback | null }) {
   const { t } = useTranslation(undefined, { i18n: currentI18n() })
-  if (!note) return null
-  // Visible copy for sighted members; the dialog's status region announces it once.
   return (
-    <p className="mt-3 text-sm text-[#292724] dark:text-zinc-100" aria-hidden="true">
-      {t(`shareCard.${note}`)}
+    <p
+      className="mt-3 min-h-5 text-sm text-[#292724] dark:text-zinc-100"
+      data-testid="share-card-feedback"
+      aria-hidden="true"
+    >
+      {note ? t(`shareCard.${note}`) : null}
     </p>
   )
 }
@@ -592,49 +601,64 @@ export function ShareCardDialog({
         />
       )}
       <ShareCardShareNote note={shareNote} />
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          ref={saveRef}
-          type="button"
-          className="min-h-[44px] rounded bg-[#292724] px-5 text-white disabled:opacity-50 aria-disabled:opacity-50"
-          data-testid="share-card-save"
-          {...saveButtonState(changed, busy, saveUnavailable)}
-          aria-busy={busyAttribute(downloadBusy)}
-          onClick={() => void save()}
-        >
-          {t(`shareCard.${buttonLabel(downloadBusy)}`)}
-        </button>
-        <ShareCardShareButton
-          visible={shareIsVisible(capability, member)}
-          buttonRef={shareRef}
-          state={saveButtonState(changed, busy, saveUnavailable)}
-          sharing={sharing}
-          onShare={share}
-        />
-        {recoveryIsVisible(recoveryAction, changed) && (
+      {/*
+       * Two deliberate rows. The boxed primary actions fit one row in every locale at
+       * 390 px. Recovery and Cancel are padded text buttons on their own row; the row's
+       * -ml-3 cancels their px-3 so the first label's glyphs start on Download's left
+       * edge, and a row that still wraps keeps that edge.
+       */}
+      <div className="mt-3 flex flex-col gap-1">
+        <div className="flex flex-wrap gap-3" data-testid="share-card-primary-actions">
           <button
-            ref={recoveryRef}
-            data-testid="share-card-recovery"
-            className="min-h-[44px] px-3 aria-disabled:opacity-50"
+            ref={saveRef}
             type="button"
-            aria-disabled={busy || undefined}
-            aria-busy={busy || undefined}
-            onClick={() => {
-              if (busy) return
-              if (recoveryAction === 'save' && valid && loaded === presentation) {
-                void save()
-              } else {
-                setChanged(true)
-                setRefresh((n) => n + 1)
-              }
-            }}
+            className="min-h-[44px] rounded bg-[#292724] px-5 text-white disabled:opacity-50 aria-disabled:opacity-50"
+            data-testid="share-card-save"
+            {...saveButtonState(changed, busy, saveUnavailable)}
+            aria-busy={busyAttribute(downloadBusy)}
+            onClick={() => void save()}
           >
-            {t(`shareCard.${recoveryLabel(changed)}`)}
+            {t(`shareCard.${buttonLabel(downloadBusy)}`)}
           </button>
-        )}
-        <button type="button" className="min-h-[44px] px-3" onClick={close}>
-          {t('shareCard.cancel')}
-        </button>
+          <ShareCardShareButton
+            visible={shareIsVisible(capability, member)}
+            buttonRef={shareRef}
+            state={saveButtonState(changed, busy, saveUnavailable)}
+            sharing={sharing}
+            onShare={share}
+          />
+        </div>
+        <div className="-ml-3 flex flex-wrap" data-testid="share-card-secondary-actions">
+          {recoveryIsVisible(recoveryAction, changed) && (
+            <button
+              ref={recoveryRef}
+              data-testid="share-card-recovery"
+              className="min-h-[44px] px-3 aria-disabled:opacity-50"
+              type="button"
+              aria-disabled={busy || undefined}
+              aria-busy={busy || undefined}
+              onClick={() => {
+                if (busy) return
+                if (recoveryAction === 'save' && valid && loaded === presentation) {
+                  void save()
+                } else {
+                  setChanged(true)
+                  setRefresh((n) => n + 1)
+                }
+              }}
+            >
+              {t(`shareCard.${recoveryLabel(changed)}`)}
+            </button>
+          )}
+          <button
+            type="button"
+            className="min-h-[44px] px-3"
+            data-testid="share-card-cancel"
+            onClick={close}
+          >
+            {t('shareCard.cancel')}
+          </button>
+        </div>
       </div>
     </AccessibleModal>
   )
