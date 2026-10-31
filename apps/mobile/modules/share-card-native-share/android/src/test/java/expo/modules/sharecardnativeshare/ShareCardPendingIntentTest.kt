@@ -136,7 +136,7 @@ class ShareCardPendingIntentTest {
   @Config(sdk = [34])
   fun anAndroid14ChooserWrapsOnePngSendWithTheCallbackUnderThePreAndroid15Extra() {
     resetFileProviderRoots()
-    val file = File(application.cacheDir, "share-cards/cc69-share-${UUID.randomUUID()}.png")
+    val file = File(application.cacheDir, "share-cards/cc69-share-${UUID.randomUUID()}/couturecast-card.png")
     file.parentFile!!.mkdirs()
     file.writeBytes(byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3))
     val results = mutableListOf<Map<String, String>>()
@@ -156,7 +156,7 @@ class ShareCardPendingIntentTest {
     val stream = IntentCompat.getParcelableExtra(send, Intent.EXTRA_STREAM, Uri::class.java)!!
     assertEquals("content", stream.scheme)
     assertEquals(ShareCardShareFiles.authority(application), stream.authority)
-    assertEquals("/share_cards/${file.name}", stream.path)
+    assertEquals("/share_cards/${file.parentFile!!.name}/couturecast-card.png", stream.path)
     assertEquals(1, send.clipData!!.itemCount)
     assertEquals(stream, send.clipData!!.getItemAt(0).uri)
     assertTrue(send.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
