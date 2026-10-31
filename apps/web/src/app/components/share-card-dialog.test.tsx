@@ -1125,9 +1125,15 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
     expect(screen.getByTestId('share-card-cancel')).toHaveAccessibleName(
       enUS.shareCard.cancel
     )
-    // The preview's cap leaves the rest of the dialog its 22rem at short viewports.
-    expect(screen.getByTestId('share-card-preview')).toHaveClass(
-      'max-h-[min(55dvh,calc(100dvh-22rem))]'
+    // The preview's cap leaves the rest of the dialog its 22rem at short viewports. In
+    // the column surface the stale alert and a wrapped Refresh row take their height
+    // from the preview, which may shrink to 12rem.
+    const preview = screen.getByTestId('share-card-preview')
+    expect(preview).toHaveClass(
+      'max-h-[min(55dvh,calc(100dvh-22rem))]',
+      'min-h-[min(12rem,55dvh,calc(100dvh-22rem))]'
     )
+    expect(screen.getByRole('dialog').firstElementChild).toHaveClass('flex', 'flex-col')
+    expect(preview.parentElement).toBe(screen.getByRole('dialog').firstElementChild)
   })
 })

@@ -11,6 +11,12 @@ export interface AccessibleModalProps {
   titleId: string
   title: string
   surface?: 'default' | 'theme'
+  /**
+   * Lays the surface out as a flex column, so a child with a min-height below its own
+   * height (such as an image preview) gives up height before the surface scrolls.
+   * Flex items keep both of two adjacent vertical margins, which block layout collapses.
+   */
+  columnLayout?: boolean
   descriptionId?: string
   description?: string
   invokingElementRef?: React.RefObject<HTMLElement | null>
@@ -23,6 +29,15 @@ export interface AccessibleModalProps {
   children: React.ReactNode
   ariaLiveMessage?: string | null
   errorMessage?: string | null
+}
+
+function surfaceClassName(surface: 'default' | 'theme', columnLayout: boolean) {
+  const layout = columnLayout ? ' flex flex-col' : ''
+  const colors =
+    surface === 'theme'
+      ? 'bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)]'
+      : 'bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100'
+  return `max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl p-6 shadow-2xl${layout} ${colors}`
 }
 
 /** Whether the element or an ancestor is inert or hidden from assistive technology. */
@@ -48,6 +63,7 @@ export function AccessibleModal({
   titleId,
   title,
   surface = 'default',
+  columnLayout = false,
   descriptionId,
   description,
   invokingElementRef,
@@ -208,7 +224,7 @@ export function AccessibleModal({
         ref={dialogRef}
         data-focus-surface={surface === 'theme' ? 'light' : undefined}
         tabIndex={-1}
-        className={`max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl p-6 shadow-2xl ${surface === 'theme' ? 'bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)]' : 'bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100'}`}
+        className={surfaceClassName(surface, columnLayout)}
       >
         <div className="flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
           <div>

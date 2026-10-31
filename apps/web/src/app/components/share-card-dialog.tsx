@@ -554,6 +554,7 @@ export function ShareCardDialog({
       onClose={close}
       titleId="share-card-title"
       title={t('shareCard.title')}
+      columnLayout
       closeLabel={t('shareCard.close')}
       invokingElementRef={opener}
       initialFocusRef={titleRef}
@@ -565,7 +566,7 @@ export function ShareCardDialog({
         {t('shareCard.title')}
       </h3>
       {source.kind === 'community_post' && (
-        <p className="my-3 text-sm">{t('shareCard.photoPrivacyHelp')}</p>
+        <p className="mt-3 text-sm">{t('shareCard.photoPrivacyHelp')}</p>
       )}
       <label className="my-3 flex min-h-[44px] items-center gap-3">
         <input
@@ -587,7 +588,11 @@ export function ShareCardDialog({
         // The preview is the dialog's one flexible height. At rest everything else, with
         // the photo privacy help, totals 337 px (overlay inset, padding, header, help,
         // watermark, feedback line, one action row); the 22rem (352 px) cap keeps the
-        // dialog unscrolled at desktop sizes as short as 1280x720.
+        // dialog unscrolled at desktop sizes as short as 1280x720. The stale alert and a
+        // wrapped Refresh row add up to 113 px more in German. The surface is a flex
+        // column (its margins add up, so the help text has no bottom margin) and the
+        // preview its only item allowed below its own height: it shrinks, keeping its
+        // aspect ratio, until the dialog fits again or it reaches 12rem.
         // The approved data URI needs a new native load event for every presentation.
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -599,7 +604,7 @@ export function ShareCardDialog({
           data-testid="share-card-preview"
           data-loaded={saveUnavailable ? 'false' : 'true'}
           data-sha256={current.card.sha256}
-          className="mx-auto h-auto max-h-[min(55dvh,calc(100dvh-22rem))] w-auto max-w-full"
+          className="mx-auto h-auto max-h-[min(55dvh,calc(100dvh-22rem))] min-h-[min(12rem,55dvh,calc(100dvh-22rem))] w-auto max-w-full"
           onLoad={() => setLoaded(presentation)}
           onError={() => {
             setLoaded(null)
