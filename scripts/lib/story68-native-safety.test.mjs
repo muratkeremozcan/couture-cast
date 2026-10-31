@@ -150,11 +150,19 @@ describe('U-SHARE-LOG-PRIVACY native log scan', () => {
     ])
   })
 
-  // Passes with no native sources yet; it still fails if the module folder moves away.
   test('no shipped Swift or Kotlin log call in the share module formats sensitive values', () => {
     const root = path.resolve(import.meta.dirname, '../..')
     assert.ok(fs.existsSync(path.join(root, SHARE_MODULE)), SHARE_MODULE)
-    const found = shippedSources(root).flatMap((file) =>
+    const sources = shippedSources(root)
+    // An empty or moved walk would make the clean result below vacuous.
+    for (const file of [
+      `${SHARE_MODULE}/ios/ShareCardNativeShareModule.swift`,
+      `${SHARE_MODULE}/android/src/expo/java/expo/modules/sharecardnativeshare/ShareCardNativeShareModule.kt`,
+      `${SHARE_MODULE}/android/src/main/java/expo/modules/sharecardnativeshare/ShareCardShareController.kt`,
+    ])
+      assert.ok(sources.includes(file), file)
+    assert.ok(sources.length >= 14, `scanned ${sources.length} shipped sources`)
+    const found = sources.flatMap((file) =>
       sensitiveLogCalls(file, fs.readFileSync(path.join(root, file), 'utf8'))
     )
     assert.deepEqual(found, [])
