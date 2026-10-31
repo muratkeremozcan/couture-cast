@@ -16,7 +16,6 @@ Added Steps 40 to 49:
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 PR and CI status below describe the 2026-10-31 snapshot.
-The source-comment follow-ups named in the new steps require a separate repository change.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
@@ -2662,8 +2661,8 @@ Task owner map:
 - Story 2.3 Task 2 step 1 owner: refactor dynamic badge generation and interpolation in `apps/api/src/modules/personalization/ritual.service.ts`
 - Story 2.3 Task 2 step 2 owner: update reasoning badges test factory schema in `packages/testing/src/factories/ritual.factory.ts`
 - Story 2.3 Task 2 step 3 owner: update database seeding structures in `packages/db/prisma/seeds/rituals.ts`
-- Story 2.3 Task 3 step 1 owner: update consumer contract pact expectations in `pact/http/consumer/api-contract-interactions.ts`
-- Story 2.3 Task 3 step 2 owner: update provider mock responses in `pact/http/provider/provider-helper.ts`
+- Story 2.3 Task 3 step 1 owner: update consumer contract pact expectations in `pact/http/consumer/interactions/ritual-comfort.ts`
+- Story 2.3 Task 3 step 2 owner: update provider mock responses in `pact/http/provider/doubles/ritual.ts`
 - Story 2.3 Task 4 step 1 owner: test badge keys, labels, and bullet interpolation rules in `apps/api/src/modules/personalization/ritual.service.spec.ts`
 
 Tests that cover this step:
@@ -2830,7 +2829,7 @@ Sequence to follow:
 
 1. Inspect the serialization schema and time-of-day scenario mapping in `apps/mobile/src/lib/widget-share.ts`.
 2. Trace the widget-sharing hook inside `saveRitualCache` in `apps/mobile/src/lib/ritual-cache.ts`.
-3. Check the custom bridge package and widget providers under `apps/mobile/android/app/src/main/java/com/anonymous/mobile/`.
+3. Check the custom bridge package and widget providers under `apps/mobile/targets/widgets/android/java/`.
 4. Review the SwiftUI widget views and the iOS App Group entitlements config in `apps/mobile/targets/widgets/OutfitWidget.swift` and `apps/mobile/plugins/with-widgets.js`.
 5. Trace the background fetch registration on app start in `apps/mobile/app/_layout.tsx` and the task logic in `apps/mobile/src/lib/background-fetch.ts`.
 6. Inspect the parameter parsing and PostHog capture triggers in `apps/mobile/app/(tabs)/index.tsx`.
@@ -2840,7 +2839,7 @@ Task owner map:
 
 - Story 3.3 Task 1 step 1 owner: implement the shareWidgetData serialization utility in `apps/mobile/src/lib/widget-share.ts`
 - Story 3.3 Task 1 step 2 owner: call the widget share utility inside saveRitualCache in `apps/mobile/src/lib/ritual-cache.ts`
-- Story 3.3 Task 2 step 1 owner: implement base OutfitWidgetProvider update and deep-link launcher logic in `apps/mobile/android/app/src/main/java/com/anonymous/mobile/OutfitWidgetProvider.kt`
+- Story 3.3 Task 2 step 1 owner: implement base OutfitWidgetProvider update and deep-link launcher logic in `apps/mobile/targets/widgets/android/java/OutfitWidgetProvider.kt`
 - Story 3.3 Task 2 step 2 owner: configure iOS App Group entitlements and Swift bridge files copy during prebuilds in `apps/mobile/plugins/with-widgets.js`
 - Story 3.3 Task 2 step 3 owner: define SwiftUI small and medium layouts in `apps/mobile/targets/widgets/OutfitWidget.swift`
 - Story 3.3 Task 3 step 1 owner: define background fetch task using task manager in `apps/mobile/src/lib/background-fetch.ts`
@@ -6495,10 +6494,6 @@ End-to-end tests:
 
 Evidence boundaries:
 
-- **Source-comment follow-up.**
-  26 of the 26 linked source files in this test map lack a Step 40 cross-link comment in the reviewed Git snapshot.
-  This document-only review leaves those source comments for a repository change.
-
 - **The verdict is `fail`, and no signature exists.**
   The payload at `abfdf88a` fails `safe-corpus` and `text-clean-copy` and passes the other fourteen gates.
   The Community Beta model-readiness signature this story authorizes has not been recorded, and the payload's `communityBetaGate.remainOpen` lists seven more: moderation staffing, SLA alerts, privacy, deletion, localization, accessibility and rollback.
@@ -6774,10 +6769,6 @@ Mobile end-to-end test:
 - [`maestro/community-feed.yaml`](../../maestro/community-feed.yaml): add, replace, relaunch persistence and removal with exact singular and plural text and visible count deltas, on iOS.
 
 Evidence boundaries:
-
-- **Source-comment follow-up.**
-  29 of the 29 linked source files in this test map lack a Step 41 cross-link comment in the reviewed Git snapshot.
-  This document-only review leaves those source comments for a repository change.
 
 - **Every execution log lives in `/tmp` on the implementing machine.**
   The spec and test artifacts cite logs such as `/tmp/couture63-no-debt-validate.log`; none is in the repository, and none was read for this step.
@@ -7073,10 +7064,6 @@ Harness tests:
 - [`playwright/support/helpers/run-maestro-bootstrap.spec.ts`](../../playwright/support/helpers/run-maestro-bootstrap.spec.ts): proves the runner builds shared outputs before importing `@couture/testing` on a cold or stale tree (CR10).
 
 Evidence boundaries:
-
-- **Source-comment follow-up.**
-  32 of the 32 linked source files in this test map lack a Step 42 cross-link comment in the reviewed Git snapshot.
-  This document-only review leaves those source comments for a repository change.
 
 - **Measured for this step.**
   PR #154 merged as `aa8cd0e1` on 2026-10-19 with all 30 checks green on head `0a12b3a5`, read from GitHub.
@@ -7447,10 +7434,6 @@ Mobile end-to-end tests:
 
 Evidence boundaries:
 
-- **Source-comment follow-up.**
-  89 of the 89 linked source files in this test map lack a Step 43 cross-link comment in the reviewed Git snapshot.
-  This document-only review leaves those source comments for a repository change.
-
 - **Local review artifacts.**
   The cited `story-*` review records are retained locally under `_bmad-output/test-artifacts/` and ignored by Git.
   A fresh checkout can use the tracked story spec as the portable account of those findings.
@@ -7768,10 +7751,6 @@ Mobile end-to-end tests:
 
 Evidence boundaries:
 
-- **Source-comment follow-up.**
-  40 of the 40 linked source files in this test map lack a Step 44 cross-link comment in the reviewed Git snapshot.
-  This document-only review leaves those source comments for a repository change.
-
 - **Local review artifacts.**
   The cited `story-*` review records are retained locally under `_bmad-output/test-artifacts/` and ignored by Git.
   A fresh checkout can use the tracked story spec as the portable account of those findings.
@@ -8038,10 +8017,6 @@ Mobile end-to-end test:
 - [`maestro/location-capture.yaml`](../../maestro/location-capture.yaml): the guided entry from the hero on a member with zero locations, proving the hero shows the per-run sentinel temperature and the runner's request-log check proves the forecast was fetched at the saved coordinates.
 
 Evidence boundaries:
-
-- **Source-comment follow-up.**
-  36 of the 36 linked source files in this test map lack a Step 45 cross-link comment in the reviewed Git snapshot.
-  This document-only review leaves those source comments for a repository change.
 
 - **Local review artifacts.**
   The cited `story-*` review records are retained locally under `_bmad-output/test-artifacts/` and ignored by Git.
@@ -8312,10 +8287,6 @@ Harness guards added on the same PR:
 
 Evidence boundaries:
 
-- **Source-comment follow-up.**
-  29 of the 29 linked source files in this test map lack a Step 46 cross-link comment in the reviewed Git snapshot.
-  This document-only review leaves those source comments for a repository change.
-
 - **Local review artifacts.**
   The cited `story-*` review records are retained locally under `_bmad-output/test-artifacts/` and ignored by Git.
   A fresh checkout can use the tracked story spec as the portable account of those findings.
@@ -8564,10 +8535,6 @@ Mobile end-to-end test:
 
 Evidence boundaries:
 
-- **Source-comment follow-up.**
-  33 of the 33 linked source files in this test map lack a Step 47 cross-link comment in the reviewed Git snapshot.
-  This document-only review leaves those source comments for a repository change.
-
 - **Local review artifacts.**
   The cited `story-*` review records are retained locally under `_bmad-output/test-artifacts/` and ignored by Git.
   A fresh checkout can use the tracked story spec as the portable account of those findings.
@@ -8783,9 +8750,6 @@ Sequence to follow:
 
 Task owner map:
 
-The Story 6.8 owner labels below are document navigation labels.
-Source files still need the matching owner comments.
-
 - Story 6.8 Task 1 step 1 owner: define the prepare contract in `packages/api-client/src/contracts/http/share-cards.ts`.
 - Story 6.8 Task 2 step 1 owner: orchestrate deadline, admission, rechecks and audit in `apps/api/src/modules/share-cards/share-cards.service.ts`.
 - Story 6.8 Task 2 step 2 owner: resolve sources into closed projections in `apps/api/src/modules/share-cards/share-card-source.repository.ts`.
@@ -8912,10 +8876,6 @@ The follow-up PRs added locale-tap, post-opener, Metro-environment and Expo Go p
   They are named here by group.
 
 Evidence boundaries:
-
-- **Source-comment follow-up.**
-  81 of the 81 linked source files in this test map lack a Step 48 cross-link comment in the reviewed Git snapshot.
-  This document-only review leaves those source comments for a repository change.
 
 - **Local review artifacts.**
   The cited `story-*` review records are retained locally under `_bmad-output/test-artifacts/` and ignored by Git.
@@ -9123,8 +9083,8 @@ Sequence to follow:
 
 Task owner map:
 
-The Story 6.9 owner labels below are document navigation labels.
-Source files on the reviewed branch still need the matching owner comments.
+Task 7 step 1 and Task 9 step 1 name two of the three `IPAD_ANCHOR_SOURCES` in `scripts/lib/story69-ipad-evidence.mjs`.
+Any edit to those files retires the X-IPAD-ANCHOR proof, so `_bmad-output/project-knowledge/owner-anchor-exceptions.md` records both anchors.
 
 - Story 6.9 Task 2 step 1 owner: define the share purpose and capabilities contract in `packages/api-client/src/contracts/http/share-cards.ts`.
 - Story 6.9 Task 3 step 1 owner: read the flag and refuse a disabled share in `apps/api/src/modules/share-cards/share-cards.service.ts`.
@@ -9139,8 +9099,6 @@ Source files on the reviewed branch still need the matching owner comments.
 - Story 6.9 Task 14 step 1 owner: run the share-sheet proof in `scripts/lib/story69-share-sheet.mjs`.
 
 Tests that cover this step:
-
-These paths exist on `feat/cc69-native-platform-sharing` and reach `main` only when PR #167 merges.
 
 API unit and integration tests:
 
@@ -9199,10 +9157,6 @@ Harness tests:
 - [`scripts/lib/story69-share-sheet.test.mjs`](../../scripts/lib/story69-share-sheet.test.mjs), [`scripts/lib/story69-ipad-evidence.test.mjs`](../../scripts/lib/story69-ipad-evidence.test.mjs), [`scripts/lib/story68-native-safety.test.mjs`](../../scripts/lib/story68-native-safety.test.mjs), [`scripts/ci/native-ios-shards.test.mjs`](../../scripts/ci/native-ios-shards.test.mjs), [`scripts/ci/share-card-android.test.mjs`](../../scripts/ci/share-card-android.test.mjs) and [`scripts/ci/share-card-lanes.test.mjs`](../../scripts/ci/share-card-lanes.test.mjs): prove the share-sheet plan and markers, the below-fold check, iPad proof staleness, the log privacy scan over shipped sources, `share-sheet` exactly once in iOS shard 1, and the PR unit lane's zero-test guards.
 
 Evidence boundaries:
-
-- **Source-comment follow-up.**
-  56 of the 56 linked source files in this test map lack a Step 49 cross-link comment in the reviewed Git snapshot.
-  This document-only review leaves those source comments for a repository change.
 
 - **Unmerged and still in CI.**
   PR #167 is open with head `37a00d33` on `origin`.
