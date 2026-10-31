@@ -976,15 +976,19 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
         await new Promise((resolve) => setTimeout(resolve, 20))
       })
       expect(webShare).not.toHaveBeenCalled()
-      expect(shareEvents(capture)).toEqual([
-        {
-          client: 'web',
-          target: 'none',
-          outcome: 'failed',
-          duration_ms: expect.any(Number) as number,
-          locale: change === 'close' ? 'en-US' : 'fr-FR',
-        },
-      ])
+      // The aborted prepare settles on its own schedule, which a loaded run can push
+      // past the fixed wait above.
+      await waitFor(() =>
+        expect(shareEvents(capture)).toEqual([
+          {
+            client: 'web',
+            target: 'none',
+            outcome: 'failed',
+            duration_ms: expect.any(Number) as number,
+            locale: change === 'close' ? 'en-US' : 'fr-FR',
+          },
+        ])
+      )
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
       expect(screen.queryByText(enUS.shareCard.sentToApp)).not.toBeInTheDocument()
       if (change === 'composition') {
@@ -1071,7 +1075,7 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
     expect(screen.getByTestId('share-card-feedback')).toBe(slot)
     expect(slot).toBeEmptyDOMElement()
   })
-  it('C-WEB-SHARE-LAYOUT: the stale path keeps Download and Share on row one and Refresh then Cancel on a second row aligned to Download', async () => {
+  it('C-WEB-SHARE-LAYOUT: Download and Share lead, Refresh then Cancel follow aligned to Download, stacked below sm and on one wrapping row from sm', async () => {
     useShareHandlers(() =>
       HttpResponse.json({ code: 'preview_changed' }, { status: 409 })
     )
@@ -1086,8 +1090,13 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
     await screen.findByRole('button', { name: enUS.shareCard.refresh })
     expect(ids(primary)).toEqual(['share-card-save', 'share-card-share'])
     expect(ids(secondary)).toEqual(['share-card-recovery', 'share-card-cancel'])
-    // The row's negative margin equals the text buttons' padding, so the first label
-    // starts on Download's left edge on every line of the row.
+    // jsdom has no layout: the playwright lane measures the rows at desktop sizes. The
+    // groups stack below sm and share one wrapping row from sm, in DOM and tab order.
+    const actions = primary.parentElement!
+    expect(Array.from(actions.children)).toEqual([primary, secondary])
+    expect(actions).toHaveClass('flex-col', 'gap-x-6', 'sm:flex-row', 'sm:flex-wrap')
+    // The group's negative margin equals the text buttons' padding, so the first label
+    // starts on Download's left edge on every line the group starts.
     expect(secondary).toHaveClass('-ml-3', 'flex-wrap')
     for (const action of Array.from(secondary.children))
       expect(action).toHaveClass('px-3')
@@ -1095,6 +1104,10 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
       expect(action).toHaveClass('min-h-[44px]')
     expect(screen.getByTestId('share-card-cancel')).toHaveAccessibleName(
       enUS.shareCard.cancel
+    )
+    // The preview's cap leaves the rest of the dialog its 22rem at short viewports.
+    expect(screen.getByTestId('share-card-preview')).toHaveClass(
+      'max-h-[min(55dvh,calc(100dvh-22rem))]'
     )
   })
 })

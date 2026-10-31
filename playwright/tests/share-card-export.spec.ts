@@ -21,6 +21,7 @@ import type {
   Request,
   Response,
   Route,
+  TestInfo,
 } from '@playwright/test'
 import {
   interceptNetworkCall as interceptPageNetworkCall,
@@ -1539,17 +1540,73 @@ async function openForShare(
   await prepareRoute
   return { ...opened, purposes, share: opened.dialog.getByTestId('share-card-share') }
 }
+// At rest with a loaded preview, the photo dialog (its tallest at-rest content, with the
+// privacy help) fits short desktop viewports: its surface and the page never scroll,
+// Cancel stays inside the viewport, and Download, Share and Cancel share one row.
+async function expectRestingDialogFits(page: Page, dialog: Locator, info: TestInfo) {
+  const surface = dialog.locator(':scope > div')
+  const box = async (target: Locator) => {
+    const found = await target.boundingBox()
+    expect(found).not.toBeNull()
+    return found!
+  }
+  for (const [width, height] of [
+    [1366, 768],
+    [1280, 720],
+  ] as const) {
+    await page.setViewportSize({ width, height })
+    await expect(dialog.getByTestId('share-card-preview')).toHaveAttribute(
+      'data-loaded',
+      'true'
+    )
+    await expect(dialog.getByTestId('share-card-feedback')).toBeEmpty()
+    await expect(dialog.getByTestId('share-card-recovery')).toHaveCount(0)
+    const pageY = await page.evaluate(() => window.scrollY)
+    await surface.hover()
+    await page.mouse.wheel(0, 600)
+    const scroll = await surface.evaluate(
+      (element) =>
+        new Promise<{ overflow: number; top: number; pageY: number }>((resolve) =>
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() =>
+              resolve({
+                overflow: element.scrollHeight - element.clientHeight,
+                top: element.scrollTop,
+                pageY: window.scrollY,
+              })
+            )
+          )
+        )
+    )
+    expect(scroll.overflow, `${width}x${height} dialog overflow`).toBeLessThanOrEqual(0)
+    expect(scroll.top, `${width}x${height} dialog scrollTop after wheel`).toBe(0)
+    expect(scroll.pageY, `${width}x${height} page scrollY after wheel`).toBe(pageY)
+    const outline = await box(surface)
+    const save = await box(dialog.getByTestId('share-card-save'))
+    const share = await box(dialog.getByTestId('share-card-share'))
+    const cancel = await box(dialog.getByTestId('share-card-cancel'))
+    expect(outline.y).toBeGreaterThanOrEqual(0)
+    expect(outline.y + outline.height).toBeLessThanOrEqual(height)
+    expect(cancel.y + cancel.height).toBeLessThanOrEqual(height)
+    expect(share.y, `${width}x${height} Share on Download's row`).toBeCloseTo(save.y, 0)
+    expect(cancel.y, `${width}x${height} Cancel on Download's row`).toBeCloseTo(save.y, 0)
+    expect(save.x).toBeLessThan(share.x)
+    expect(share.x).toBeLessThan(cancel.x)
+    await page.screenshot({ path: info.outputPath(`at-rest-${width}x${height}.png`) })
+  }
+}
 test('P-SHARE-BYTES: the shared File is the previewed PNG and one handed_off event is captured', async ({
   context,
   page,
   interceptNetworkCall,
-}) => {
+}, info) => {
   const { dialog, preview, share, purposes } = await openForShare(
     context,
     page,
     interceptNetworkCall,
     { canShare: true, outcomes: ['resolve'] }
   )
+  await expectRestingDialogFits(page, dialog, info)
   const digest = await preview.getAttribute('data-sha256')
   expect(sha256(await previewBytes(preview))).toBe(digest)
   await expect(share).toBeEnabled()

@@ -115,7 +115,7 @@ function ShareCardShareNote({ note }: { note: ShareFeedback | null }) {
   const { t } = useTranslation(undefined, { i18n: currentI18n() })
   return (
     <p
-      className="mt-3 min-h-5 text-sm text-[#292724] dark:text-zinc-100"
+      className="mt-2 min-h-5 text-sm text-[#292724] dark:text-zinc-100"
       data-testid="share-card-feedback"
       aria-hidden="true"
     >
@@ -580,6 +580,10 @@ export function ShareCardDialog({
         {t('shareCard.watermark')}
       </label>
       {current && (
+        // The preview is the dialog's one flexible height. At rest everything else, with
+        // the photo privacy help, totals 337 px (overlay inset, padding, header, help,
+        // watermark, feedback line, one action row); the 22rem (352 px) cap keeps the
+        // dialog unscrolled at desktop sizes as short as 1280x720.
         // The approved data URI needs a new native load event for every presentation.
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -591,7 +595,7 @@ export function ShareCardDialog({
           data-testid="share-card-preview"
           data-loaded={saveUnavailable ? 'false' : 'true'}
           data-sha256={current.card.sha256}
-          className="mx-auto h-auto max-h-[55dvh] w-auto max-w-full"
+          className="mx-auto h-auto max-h-[min(55dvh,calc(100dvh-22rem))] w-auto max-w-full"
           onLoad={() => setLoaded(presentation)}
           onError={() => {
             setLoaded(null)
@@ -602,12 +606,17 @@ export function ShareCardDialog({
       )}
       <ShareCardShareNote note={shareNote} />
       {/*
-       * Two deliberate rows. The boxed primary actions fit one row in every locale at
-       * 390 px. Recovery and Cancel are padded text buttons on their own row; the row's
-       * -ml-3 cancels their px-3 so the first label's glyphs start on Download's left
-       * edge, and a row that still wraps keeps that edge.
+       * Two action groups. The boxed primary actions fit one row in every locale at
+       * 390 px. Recovery and Cancel are padded text buttons; the group's -ml-3 cancels
+       * their px-3 so, whenever the group starts a line, the first label's glyphs start
+       * on Download's left edge. Below sm the groups stack as two rows. From sm the
+       * dialog is 464 px wide and they share one row (Download, Share, Cancel fit in
+       * every locale), so the dialog stays one action row shorter. There gap-x-6 less
+       * that margin leaves 24 px between Share's box and the first label, as between two
+       * labels. A group that does not fit, such as one with a long Refresh label, wraps
+       * whole onto the next line.
        */}
-      <div className="mt-3 flex flex-col gap-1">
+      <div className="mt-2 flex flex-col gap-x-6 gap-y-1 sm:flex-row sm:flex-wrap">
         <div className="flex flex-wrap gap-3" data-testid="share-card-primary-actions">
           <button
             ref={saveRef}
