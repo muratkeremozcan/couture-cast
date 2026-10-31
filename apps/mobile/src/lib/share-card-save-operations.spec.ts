@@ -244,12 +244,64 @@ describe('Story 6.9 one global native operation', () => {
       await Promise.resolve()
       expect(share).toHaveBeenCalledOnce()
       native.resolve({ outcome: 'completed' })
-      // A late duplicate callback from the bridge cannot settle the operation twice.
-      native.resolve({ outcome: 'failed' })
       await expect(shared).resolves.toEqual({ outcome: 'completed' })
       expect(nativeShareCardSavePending()).toBe(false)
       // One notification at commit and exactly one at release.
       expect(notifications).toHaveBeenCalledTimes(2)
+    } finally {
+      unsubscribe()
+    }
+  })
+  it('U-SHARE-OPS: a bridge that fires its completion twice settles once and releases once', async () => {
+    // The double reports through a callback the way the native bridge does, and the
+    // second callback is a late duplicate with a different outcome.
+    let complete!: (value: { outcome: string }) => void
+    const bridge: PromiseLike<{ outcome: string }> = {
+      then(onFulfilled, onRejected) {
+        return new Promise<{ outcome: string }>((resolve) => {
+          complete = resolve
+        }).then((value) => {
+          onFulfilled?.(value)
+          // A misbehaving bridge delivers the callback again for the same attempt.
+          onFulfilled?.({ outcome: 'failed' })
+          return value
+        }, onRejected) as never
+      },
+    }
+    const share = vi.fn(() => bridge as Promise<{ outcome: string }>)
+    const notifications = vi.fn()
+    const settlements = vi.fn()
+    const unsubscribe = subscribeShareCardSave(notifications)
+    try {
+      const owner = {}
+      const shared = commitShareCardShare({
+        fileUri: 'cache/cc69-share-twice.png',
+        owner,
+        share,
+      }).then((value) => {
+        settlements(value)
+        return value
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(share).toHaveBeenCalledOnce()
+      expect(notifications).toHaveBeenCalledTimes(1)
+      complete({ outcome: 'completed' })
+      await expect(shared).resolves.toEqual({ outcome: 'completed' })
+      expect(settlements).toHaveBeenCalledOnce()
+      expect(settlements).toHaveBeenCalledWith({ outcome: 'completed' })
+      expect(nativeShareCardSavePending()).toBe(false)
+      expect(ownsPendingShareCardSave(owner)).toBe(false)
+      // Exactly two notifications: commit and release. A second release would notify again.
+      expect(notifications).toHaveBeenCalledTimes(2)
+      // The released lock stays released: the next operation commits normally.
+      const next = commitShareCardShare({
+        fileUri: 'cache/cc69-share-after.png',
+        share: () => Promise.resolve({ outcome: 'completed' }),
+      })
+      expect(nativeShareCardSavePending()).toBe(true)
+      await expect(next).resolves.toEqual({ outcome: 'completed' })
+      expect(notifications).toHaveBeenCalledTimes(4)
     } finally {
       unsubscribe()
     }
