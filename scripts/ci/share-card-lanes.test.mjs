@@ -855,6 +855,32 @@ describe('share-card parallel lane validator', () => {
   })
 })
 
+/** Runs one step's script with stub tools on PATH; returns the exit status. */
+const runWithStubs = (row, stubs) => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'share-native-unit-'))
+  try {
+    const bin = path.join(scratch, 'bin')
+    fs.mkdirSync(bin)
+    for (const [name, body] of Object.entries(stubs)) {
+      fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, {
+        mode: 0o755,
+      })
+    }
+    const cwd = path.join(scratch, row['working-directory'] ?? '.')
+    fs.mkdirSync(cwd, { recursive: true })
+    return spawnSync('bash', ['-c', row.run], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: scratch },
+    }).status
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true })
+  }
+}
+
+const swiftSummary = (count, failures = 0) =>
+  `echo "Test Suite 'All tests' passed."; echo "\t Executed ${count} test${count === 1 ? '' : 's'}, with ${failures} failures (0 unexpected) in 0.1 (0.1) seconds"; exit ${failures ? 1 : 0}`
+
 // U-HARNESS-PR-WORKFLOW: the share native unit lane runs on every PR that touches either native
 // share-card module, each test step fails on zero tests, and no job outlives the PR budget.
 describe('share native unit workflow', () => {
@@ -870,31 +896,6 @@ describe('share native unit workflow', () => {
     job.steps.filter((row) => /swift test|testDebugUnitTest/.test(row.run ?? ''))
   )
 
-  /** Runs one step's script with stub tools on PATH; returns the exit status. */
-  const runWithStubs = (row, stubs) => {
-    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'share-native-unit-'))
-    try {
-      const bin = path.join(scratch, 'bin')
-      fs.mkdirSync(bin)
-      for (const [name, body] of Object.entries(stubs)) {
-        fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, {
-          mode: 0o755,
-        })
-      }
-      const cwd = path.join(scratch, row['working-directory'] ?? '.')
-      fs.mkdirSync(cwd, { recursive: true })
-      return spawnSync('bash', ['-c', row.run], {
-        cwd,
-        encoding: 'utf8',
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: scratch },
-      }).status
-    } finally {
-      fs.rmSync(scratch, { recursive: true, force: true })
-    }
-  }
-
-  const swiftSummary = (count, failures = 0) =>
-    `echo "Test Suite 'All tests' passed."; echo "\t Executed ${count} test${count === 1 ? '' : 's'}, with ${failures} failures (0 unexpected) in 0.1 (0.1) seconds"; exit ${failures ? 1 : 0}`
   const gradleReports = (counts, status = 0) =>
     [
       'dir=apps/mobile/modules/share-card-native-share/android/unit-tests/build/test-results/testDebugUnitTest',
@@ -972,5 +973,33 @@ describe('share native unit workflow', () => {
       const failing = swift ? swiftSummary(21, 1) : gradleReports([4], 1)
       assert.notEqual(runWithStubs(row, { [tool]: failing }), 0, `${row.name}: failure`)
     }
+  })
+})
+
+describe('ios-build photo-save guard', () => {
+  const guard = step(source.jobs['ios-build'], (row) => row.id === 'png_file_guards')
+
+  test('passes on any nonzero count and fails on zero tests, a skip or a failure', () => {
+    // A literal count breaks the lane whenever the suite grows.
+    assert.doesNotMatch(guard.run, /Executed \d+ tests/)
+    for (const count of [1, 4, 5, 21])
+      assert.equal(
+        runWithStubs(guard, { swift: swiftSummary(count) }),
+        0,
+        `${count} tests`
+      )
+    const skipped =
+      'echo "\t Executed 5 tests, with 1 test skipped and 0 failures (0 unexpected) in 0.1 (0.1) seconds"'
+    for (const body of [swiftSummary(0), 'echo "no summary"', 'exit 0', skipped])
+      assert.notEqual(runWithStubs(guard, { swift: body }), 0, body)
+    assert.notEqual(runWithStubs(guard, { swift: swiftSummary(5, 1) }), 0, 'failure')
+    // A failure summary from a tool that still exits zero.
+    assert.notEqual(
+      runWithStubs(guard, {
+        swift: swiftSummary(5, 1).replace(/exit \d+$/, 'exit 0'),
+      }),
+      0,
+      'failure with exit 0'
+    )
   })
 })

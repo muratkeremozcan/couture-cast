@@ -654,9 +654,14 @@ jobs:
         id: png_file_guards
         # SwiftPM builds the validator from the checkout alone.
         run: |
-          swift test --package-path apps/mobile/modules/share-card-photo-save/ios 2>&1 | tee /tmp/cc68-png-file-tests.log
-          # Four tests ran and none failed or was skipped.
-          grep -q 'Executed 4 tests, with 0 failures' /tmp/cc68-png-file-tests.log
+          set -euo pipefail
+          swift test --package-path apps/mobile/modules/share-card-photo-save/ios 2>&1 | tee "$RUNNER_TEMP/cc68-png-file-tests.log"
+          # Some tests ran and none failed or was skipped: a skip changes the summary wording.
+          summary=$(grep -Eo 'Executed [0-9]+ tests?, with [0-9]+ failures?' "$RUNNER_TEMP/cc68-png-file-tests.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          failures=$(echo "$summary" | grep -Eo 'with [0-9]+' | grep -Eo '[0-9]+' || true)
+          if [ "${count:-0}" -eq 0 ] || [ "${failures:-1}" -ne 0 ]; then echo "::error::swift test ran zero tests or had failures"; exit 1; fi
+          echo "swift test ran $count tests"
       - name: Generate native development client
         id: prebuild
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.maestro_flows.outcome == 'success' }}
