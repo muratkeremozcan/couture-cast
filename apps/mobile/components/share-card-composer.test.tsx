@@ -958,7 +958,9 @@ const purposes = () =>
   )
 const shareFiles = () =>
   [...boundary.files.keys()].filter((uri) =>
-    /^file:\/\/\/cache\/share-cards\/cc69-share-[a-f0-9-]+\.png$/.test(uri)
+    /^file:\/\/\/cache\/share-cards\/cc69-share-[a-f0-9-]+\/couturecast-card\.png$/.test(
+      uri
+    )
   )
 const shareCaptures = () =>
   boundary.capture.mock.calls.filter(([event]) => event === 'share_card_shared')
