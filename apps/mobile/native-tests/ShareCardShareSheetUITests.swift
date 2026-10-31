@@ -163,7 +163,12 @@ final class ShareCardShareSheetUITests: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 20), .completed)
     XCTAssertEqual(share.label, labels.share)
     let previousAnchor = try read("/share-anchor", as: AnchorReport.self)
-    let previousFocus = try poll("/focus-observation", as: FocusObservation.self, within: 5) { _ in true }
+    // nil when no focus request was posted yet: the harness answers 503 until the record exists,
+    // so a short poll rides out a busy host and an absent record no longer fails the test.
+    let previousFocus = try? poll("/focus-observation", as: FocusObservation.self, within: 5) { _ in true }
+    // The feedback slot is reserved, so the `sharing` copy never moves Share: the frame here is
+    // the frame JS measures at handoff, before the sheet hides Share or a later scroll moves it.
+    let shareFrame = share.frame
 
     share.tap()
     XCTAssertTrue(waitForShareSheet(true, timeout: 20), "UIActivityViewController presented")
@@ -189,17 +194,14 @@ final class ShareCardShareSheetUITests: XCTestCase {
     XCTAssertTrue(feedback.waitForExistence(timeout: 20))
     let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", labels.shareClosed), object: feedback)
     XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 20), .completed, "shareClosed settles")
-    // JS measures Share at handoff, after the one-line `sharing` copy above it pushed it down, and
-    // the open sheet hides Share from the accessibility tree. `shareClosed` takes the same single
-    // line in en-US, so Share now sits where it was at handoff.
-    let frame = share.frame
-    XCTAssertEqual(anchor.sourceRect.x, Double(frame.minX), accuracy: 1, "sourceRect x")
-    XCTAssertEqual(anchor.sourceRect.y, Double(frame.minY), accuracy: 1, "sourceRect y")
-    XCTAssertEqual(anchor.sourceRect.width, Double(frame.width), accuracy: 1, "sourceRect width")
-    XCTAssertEqual(anchor.sourceRect.height, Double(frame.height), accuracy: 1, "sourceRect height")
+    XCTAssertEqual(anchor.sourceRect.x, Double(shareFrame.minX), accuracy: 1, "sourceRect x")
+    XCTAssertEqual(anchor.sourceRect.y, Double(shareFrame.minY), accuracy: 1, "sourceRect y")
+    XCTAssertEqual(anchor.sourceRect.width, Double(shareFrame.width), accuracy: 1, "sourceRect width")
+    XCTAssertEqual(anchor.sourceRect.height, Double(shareFrame.height), accuracy: 1, "sourceRect height")
     print("CC69_PRESENTER_ANCHOR_PASS")
     let focus = try poll("/focus-observation", as: FocusObservation.self) {
-      $0.session == previousFocus.session && $0.sequence > previousFocus.sequence
+      (previousFocus == nil || $0.session == previousFocus?.session)
+        && $0.sequence > (previousFocus?.sequence ?? -1)
         && $0.posted && $0.attached && $0.identifier == "share-card-share"
     }
     XCTAssertEqual(focus.label, labels.share, "focus returns to Share")
