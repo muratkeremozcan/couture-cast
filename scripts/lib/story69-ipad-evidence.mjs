@@ -2,7 +2,7 @@
 // share sheet presents as a popover anchored to the Share button; this module validates the
 // committed record and the screenshot it names. `record` writes a record from a real screenshot;
 // it never invents one.
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -12,6 +12,12 @@ export const IPAD_EVIDENCE_DIRECTORY = '_bmad-output/test-artifacts/story-6-9'
 export const IPAD_EVIDENCE_RECORD = 'ipad-anchor-proof.json'
 export const IPAD_EVIDENCE_TEST = 'X-IPAD-ANCHOR'
 export const IPAD_ANCHORED_RESULT = 'anchored_to_share'
+/** The sources that place the iPad popover; a change to any of them retires the proof. */
+export const IPAD_ANCHOR_SOURCES = [
+  'apps/mobile/modules/share-card-native-share/ios/ShareCardNativeShareModule.swift',
+  'apps/mobile/modules/share-card-native-share/ios/ShareCardAnchorConfiguration.swift',
+  'apps/mobile/components/share-card-composer.tsx',
+]
 const KEYS = [
   'commit',
   'deviceClass',
@@ -46,6 +52,47 @@ const FIELD_CODES = {
   recordedAt: 'ipad_evidence_recorded_at',
 }
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+// Git without the caller's GIT_* variables, so a hook's GIT_DIR cannot point it at
+// another repository than the one holding the evidence.
+const gitEnv = () =>
+  Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+  )
+const git = (cwd, args) =>
+  spawnSync('git', args, { cwd, encoding: 'utf8', env: gitEnv() })
+
+/**
+ * The proof covers HEAD only when HEAD descends from the recorded commit and no anchor
+ * source changed since. A shallow clone that lacks the recorded commit cannot show
+ * either, so it fails with its own code; one deep enough to hold it is checked as usual.
+ */
+function lineageProblems(directory, commit) {
+  const top = git(directory, ['rev-parse', '--show-toplevel'])
+  if (top.error || top.status !== 0) return ['ipad_evidence_git_unavailable']
+  const root = top.stdout.trim()
+  if (git(root, ['cat-file', '-e', `${commit}^{commit}`]).status !== 0) {
+    const shallow = git(root, ['rev-parse', '--is-shallow-repository'])
+    if (shallow.status !== 0) return ['ipad_evidence_git_unavailable']
+    return [
+      shallow.stdout.trim() === 'true'
+        ? 'ipad_evidence_shallow_clone'
+        : 'ipad_evidence_commit_unknown',
+    ]
+  }
+  const ancestor = git(root, ['merge-base', '--is-ancestor', commit, 'HEAD']).status
+  if (ancestor === 1) return ['ipad_evidence_commit_not_ancestor']
+  if (ancestor !== 0) return ['ipad_evidence_git_unavailable']
+  const changed = git(root, [
+    'diff',
+    '--quiet',
+    commit,
+    'HEAD',
+    '--',
+    ...IPAD_ANCHOR_SOURCES,
+  ]).status
+  if (changed === 1) return ['ipad_evidence_anchor_changed']
+  return changed === 0 ? [] : ['ipad_evidence_git_unavailable']
+}
 const exactKeys = (value, keys) =>
   value !== null &&
   typeof value === 'object' &&
@@ -54,8 +101,8 @@ const exactKeys = (value, keys) =>
 
 /**
  * Returns the problems with the record in `directory`, as closed codes; an empty list passes.
- * The record has exactly the keys below, and its screenshot is a PNG committed beside it whose
- * SHA256 matches.
+ * The record has exactly the keys below, its commit is an ancestor of HEAD with no anchor
+ * source changed since, and its screenshot is a PNG committed beside it whose SHA256 matches.
  */
 export function ipadEvidenceProblems(directory) {
   const file = path.join(directory, IPAD_EVIDENCE_RECORD)
@@ -70,6 +117,8 @@ export function ipadEvidenceProblems(directory) {
   const problems = Object.entries(FIELD_CHECKS)
     .filter(([key, valid]) => !valid(record[key]))
     .map(([key]) => FIELD_CODES[key])
+  if (FIELD_CHECKS.commit(record.commit))
+    problems.push(...lineageProblems(directory, record.commit))
   const shot = record.screenshot
   if (
     !exactKeys(shot, SCREENSHOT_KEYS) ||

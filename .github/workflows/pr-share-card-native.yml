@@ -33,8 +33,12 @@ jobs:
       CC68_HARNESS_DIR: _bmad-output/test-artifacts/story-6-8/runtime
       MAESTRO_CLI_NO_ANALYTICS: '1'
     steps:
+      # Full history: the native-harness gate checks that the iPad proof's commit is an
+      # ancestor of HEAD, which a depth-1 checkout cannot show.
       - uses: actions/checkout@v4
         id: checkout
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/reserve-supabase-ports
       - uses: ./.github/actions/install
         id: install
@@ -198,8 +202,11 @@ jobs:
             journey_timeout: 60
     env: *runtime_env
     steps: &android36_steps
+      # Full history for the native-harness iPad proof lineage check, as above.
       - uses: actions/checkout@v4
         id: checkout
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/reserve-supabase-ports
       - uses: ./.github/actions/install
         id: install
@@ -384,8 +391,11 @@ jobs:
             suite: browser
     env: *runtime_env
     steps:
+      # Full history for the native-harness iPad proof lineage check, as above.
       - uses: actions/checkout@v4
         id: checkout
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/reserve-supabase-ports
       - uses: ./.github/actions/install
         id: install
@@ -481,7 +491,10 @@ jobs:
     timeout-minutes: 60
     env: *runtime_env
     steps:
+      # Full history for the native-harness iPad proof lineage check, as above.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Disable Spotlight indexing on the disposable iOS runner
         run: |
           test "$GITHUB_ACTIONS" = 'true'

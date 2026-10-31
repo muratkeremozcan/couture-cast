@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
+import { parse } from 'yaml'
 import {
+  IPAD_ANCHOR_SOURCES,
   IPAD_EVIDENCE_DIRECTORY,
   IPAD_EVIDENCE_RECORD,
   assertIpadEvidence,
@@ -18,12 +20,14 @@ const screenshotBytes = Buffer.concat([
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
   Buffer.from('popover anchored to Share'),
 ])
+// Stands for the temp repository's HEAD; evidence() writes the real commit in its place.
+const RECORDED = 'recorded-head'
 const valid = () => ({
   test: 'X-IPAD-ANCHOR',
   deviceClass: 'iPad',
   environment: 'simulator',
   osVersion: '18.1',
-  commit: '185e827c949a5a038b18f6c1fd1feb22f3aad3e9',
+  commit: RECORDED,
   result: 'anchored_to_share',
   screenshot: {
     file: 'ipad-anchor-proof.png',
@@ -31,16 +35,52 @@ const valid = () => ({
   },
   recordedAt: '2026-10-30T21:00:00.000Z',
 })
-function evidence(t, record = valid(), { image = screenshotBytes } = {}) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc69-ipad-evidence-'))
-  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+// Git without the caller's GIT_* variables, so a hook's GIT_DIR cannot redirect it.
+const gitEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+)
+const git = (cwd, ...args) =>
+  execFileSync('git', args, { cwd, encoding: 'utf8', env: gitEnv }).trim()
+/** Commits `content` to each named path and returns the new commit. */
+function commitFiles(repo, files, message) {
+  for (const [file, content] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true })
+    fs.writeFileSync(path.join(repo, file), content)
+  }
+  git(repo, 'add', '--', ...Object.keys(files))
+  git(repo, 'commit', '-q', '--no-verify', '-m', message)
+  return git(repo, 'rev-parse', 'HEAD')
+}
+/** A temp repository holding the anchor sources, the commit a proof records. */
+function anchorRepo(t) {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'cc69-ipad-evidence-'))
+  t.after(() => fs.rmSync(repo, { recursive: true, force: true }))
+  git(repo, 'init', '-q', '-b', 'main')
+  git(repo, 'config', 'user.email', 'evidence@example.invalid')
+  git(repo, 'config', 'user.name', 'Evidence Test')
+  git(repo, 'config', 'commit.gpgsign', 'false')
+  const head = commitFiles(
+    repo,
+    Object.fromEntries(IPAD_ANCHOR_SOURCES.map((file) => [file, `${file} v1\n`])),
+    'anchor sources'
+  )
+  return { repo, head }
+}
+function writeEvidence(directory, head, record, image) {
+  fs.mkdirSync(directory, { recursive: true })
   if (image) fs.writeFileSync(path.join(directory, 'ipad-anchor-proof.png'), image)
-  if (record !== null)
-    fs.writeFileSync(
-      path.join(directory, IPAD_EVIDENCE_RECORD),
-      typeof record === 'string' ? record : JSON.stringify(record)
-    )
+  if (record === null) return directory
+  const recorded = record?.commit === RECORDED ? { ...record, commit: head } : record
+  fs.writeFileSync(
+    path.join(directory, IPAD_EVIDENCE_RECORD),
+    typeof recorded === 'string' ? recorded : JSON.stringify(recorded)
+  )
   return directory
+}
+/** Evidence in a temp repository whose HEAD is the recorded commit, unless overridden. */
+function evidence(t, record = valid(), { image = screenshotBytes } = {}) {
+  const { repo, head } = anchorRepo(t)
+  return writeEvidence(path.join(repo, IPAD_EVIDENCE_DIRECTORY), head, record, image)
 }
 
 describe('X-IPAD-ANCHOR evidence check', () => {
@@ -133,14 +173,15 @@ describe('X-IPAD-ANCHOR evidence check', () => {
 
   test('record writes a verified record for a real screenshot and refuses a missing one', (t) => {
     const directory = evidence(t, null)
+    const head = git(directory, 'rev-parse', 'HEAD')
     const record = writeIpadEvidence(directory, {
       screenshot: 'ipad-anchor-proof.png',
       osVersion: '18.1',
       environment: 'device',
-      commit: valid().commit,
+      commit: head,
       recordedAt: valid().recordedAt,
     })
-    assert.deepEqual(record, { ...valid(), environment: 'device' })
+    assert.deepEqual(record, { ...valid(), environment: 'device', commit: head })
     assert.deepEqual(ipadEvidenceProblems(directory), [])
     assert.throws(
       () =>
@@ -148,10 +189,93 @@ describe('X-IPAD-ANCHOR evidence check', () => {
           screenshot: 'ipad-anchor-proof.png',
           osVersion: '18.1',
           environment: 'device',
-          commit: valid().commit,
+          commit: 'a'.repeat(40),
         }),
       { code: 'ENOENT' }
     )
+  })
+
+  test('a recorded commit that HEAD descends from, with the anchor sources unchanged, passes', (t) => {
+    const { repo, head } = anchorRepo(t)
+    commitFiles(repo, { 'README.md': 'unrelated\n' }, 'later work elsewhere')
+    const directory = writeEvidence(
+      path.join(repo, IPAD_EVIDENCE_DIRECTORY),
+      head,
+      valid(),
+      screenshotBytes
+    )
+    assert.deepEqual(ipadEvidenceProblems(directory), [])
+  })
+
+  for (const source of IPAD_ANCHOR_SOURCES)
+    test(`a later change to ${path.basename(source)} makes the proof stale`, (t) => {
+      const { repo, head } = anchorRepo(t)
+      commitFiles(repo, { [source]: 'moved the anchor\n' }, 'anchor change')
+      const directory = writeEvidence(repo, head, valid(), screenshotBytes)
+      assert.deepEqual(ipadEvidenceProblems(directory), ['ipad_evidence_anchor_changed'])
+      assert.throws(() => assertIpadEvidence(directory), /anchor_changed/)
+    })
+
+  test('a recorded commit that HEAD does not descend from fails', (t) => {
+    const { repo, head } = anchorRepo(t)
+    const side = git(repo, 'commit-tree', `${head}^{tree}`, '-m', 'side proof')
+    const directory = writeEvidence(
+      repo,
+      head,
+      { ...valid(), commit: side },
+      screenshotBytes
+    )
+    assert.deepEqual(ipadEvidenceProblems(directory), [
+      'ipad_evidence_commit_not_ancestor',
+    ])
+  })
+
+  test('a recorded commit the repository does not hold fails', (t) => {
+    const { repo, head } = anchorRepo(t)
+    const directory = writeEvidence(
+      repo,
+      head,
+      { ...valid(), commit: 'f'.repeat(40) },
+      screenshotBytes
+    )
+    assert.deepEqual(ipadEvidenceProblems(directory), ['ipad_evidence_commit_unknown'])
+  })
+
+  test('a shallow clone cannot prove the lineage and fails with its own code', (t) => {
+    const { repo, head } = anchorRepo(t)
+    commitFiles(repo, { 'README.md': 'unrelated\n' }, 'later work elsewhere')
+    const clone = fs.mkdtempSync(path.join(os.tmpdir(), 'cc69-ipad-shallow-'))
+    t.after(() => fs.rmSync(clone, { recursive: true, force: true }))
+    git(clone, 'clone', '-q', '--depth', '1', `file://${repo}`, 'checkout')
+    const directory = writeEvidence(
+      path.join(clone, 'checkout'),
+      head,
+      valid(),
+      screenshotBytes
+    )
+    assert.deepEqual(ipadEvidenceProblems(directory), ['ipad_evidence_shallow_clone'])
+  })
+
+  test('a shallow clone deep enough to hold the recorded commit is checked as usual', (t) => {
+    const { repo, head } = anchorRepo(t)
+    commitFiles(repo, { 'README.md': 'unrelated\n' }, 'later work elsewhere')
+    const clone = fs.mkdtempSync(path.join(os.tmpdir(), 'cc69-ipad-shallow-'))
+    t.after(() => fs.rmSync(clone, { recursive: true, force: true }))
+    git(clone, 'clone', '-q', '--depth', '2', `file://${repo}`, 'checkout')
+    const directory = writeEvidence(
+      path.join(clone, 'checkout'),
+      head,
+      valid(),
+      screenshotBytes
+    )
+    assert.deepEqual(ipadEvidenceProblems(directory), [])
+  })
+
+  test('evidence outside a git checkout fails closed', (t) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc69-ipad-no-git-'))
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+    writeEvidence(directory, 'a'.repeat(40), valid(), screenshotBytes)
+    assert.deepEqual(ipadEvidenceProblems(directory), ['ipad_evidence_git_unavailable'])
   })
 
   test('the CLI names the closed problem and exits nonzero', () => {
@@ -163,6 +287,23 @@ describe('X-IPAD-ANCHOR evidence check', () => {
     assert.equal(result.status, 1)
     assert.equal(result.stderr.trim(), 'ipad_evidence_action_invalid')
   })
+})
+
+// The native-harness gate runs this file on CI. A depth-1 checkout lacks the recorded commit
+// and would fail as ipad_evidence_shallow_clone, so every job that runs the gate fetches
+// full history.
+test('every CI job that runs the native-harness gate checks out full history', () => {
+  const workflow = parse(
+    fs.readFileSync(path.join(repo, '.github/workflows/pr-share-card-native.yml'), 'utf8')
+  )
+  const gated = Object.entries(workflow.jobs).filter(([, job]) =>
+    job.steps.some((row) => /node-test-gate\.mjs native-harness/.test(row.run ?? ''))
+  )
+  assert.ok(gated.length > 0)
+  for (const [name, job] of gated) {
+    const checkout = job.steps.find((row) => row.uses?.startsWith('actions/checkout@'))
+    assert.equal(checkout?.with?.['fetch-depth'], 0, name)
+  }
 })
 
 // U-HARNESS-IPAD-EVIDENCE against the repository. This is the gate the spec asks for: it fails the
