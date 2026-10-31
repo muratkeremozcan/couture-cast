@@ -118,6 +118,8 @@ const CONTENT_INSET = 24
 const PREVIEW_ASPECT = 1080 / 1350
 /** Share of a wide window's height the preview may take, so every action stays on screen. */
 const WIDE_PREVIEW_HEIGHT_SHARE = 0.45
+/** One feedback line: the reserved slot and the status and error copy share it. */
+const FEEDBACK_LINE_HEIGHT = 22
 /**
  * A window wider than the capped content (a tablet) centers the column and caps the preview's
  * height. Phones are at most 440 pt wide, so their content never reaches the cap and keeps the
@@ -810,15 +812,18 @@ function ComposerFeedback({
   }, [visible, scope, available, error, pending, message, t, onFocusResult])
   const status = Boolean(pending || message)
   const failure = !available || Boolean(error)
-  // The slot always holds at least one line at the current font scale, so a status or error
-  // line replacing it never moves Save and Share (the iPad popover anchors on Share).
+  const { fontScale } = useWindowDimensions()
+  // The slot always holds one feedback line at the current font scale, so a one-line status or
+  // error replacing it never moves Save and Share (the iPad popover anchors on Share). The
+  // height is reserved without a placeholder node: a hidden placeholder Text made Android
+  // TalkBack leave the title for the next element when the composer opened.
   return (
-    <View style={styles.feedbackSlot}>
+    <View style={[styles.feedbackSlot, { minHeight: FEEDBACK_LINE_HEIGHT * fontScale }]}>
       {status && (
         <Text
           testID="share-card-feedback"
           accessibilityLiveRegion="polite"
-          style={styles.text}
+          style={[styles.text, styles.feedbackLine]}
         >
           {pending ? t('shareCard.finishingSave') : t(`shareCard.${message}`)}
         </Text>
@@ -828,20 +833,9 @@ function ComposerFeedback({
           testID="share-card-error"
           accessibilityRole="alert"
           accessibilityLiveRegion="assertive"
-          style={styles.error}
+          style={[styles.error, styles.feedbackLine]}
         >
           {t(`shareCard.${available ? error : 'nativeSaveUnavailable'}`)}
-        </Text>
-      )}
-      {!status && !failure && (
-        <Text
-          accessible={false}
-          aria-hidden
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={styles.text}
-        >
-          {'\u00A0'}
         </Text>
       )}
     </View>
@@ -963,6 +957,7 @@ const styles = StyleSheet.create({
   preview: { width: '100%', aspectRatio: PREVIEW_ASPECT },
   error: { color: '#7A1F2D', fontSize: 16 },
   feedbackSlot: { gap: 16 },
+  feedbackLine: { lineHeight: FEEDBACK_LINE_HEIGHT },
   button: {
     minHeight: 48,
     padding: 14,

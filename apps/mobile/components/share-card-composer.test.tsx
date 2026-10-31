@@ -1433,9 +1433,14 @@ describe('Story 6.9 composer layout', () => {
     const saved = deferred<void>()
     boundary.save.mockReturnValue(saved.promise)
     await readyShare()
-    // The resting slot is one hidden line: no feedback element, nothing announced.
+    // The resting slot reserves one line with no node in it: a hidden placeholder Text made
+    // Android TalkBack leave the title for the next element when the composer opened.
     expect(screen.queryByTestId('share-card-feedback')).not.toBeInTheDocument()
     expect(screen.queryByTestId('share-card-error')).not.toBeInTheDocument()
+    const slot = screen.getByTestId('share-card-save').previousElementSibling
+    expect(slot?.childElementCount).toBe(0)
+    expect(slot?.textContent).toBe('')
+    expect(slot?.getBoundingClientRect().height).toBeGreaterThan(0)
     const resting = tops()
     await tapShare()
     expect(await screen.findByText(i18n.t('shareCard.sharing'))).toBeInTheDocument()
