@@ -1,3 +1,4 @@
+// Story 6.9 Task 7 step 2 owner: settle Android attempts in `apps/mobile/modules/share-card-native-share/android/src/main/java/expo/modules/sharecardnativeshare/ShareCardShareSession.kt`
 package expo.modules.sharecardnativeshare
 
 /**

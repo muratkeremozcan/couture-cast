@@ -1,6 +1,6 @@
 # Owner Anchor Exceptions
 
-Updated: 2026-10-31 - register owner IDs whose targets are applied Prisma migrations, JSON files or directories
+Updated: 2026-10-31. Register the Story 1.1 Grafana dashboard and the two Story 6.9 files that the X-IPAD-ANCHOR proof watches.
 
 Use this file only when the primary target cannot safely carry a stable in-file owner comment.
 
@@ -11,6 +11,7 @@ Use this file only when the primary target cannot safely carry a stable in-file 
 - Story 0.9 Task 3 step 2 owner: source lives in `openapitools.json` (JSON config file; no stable in-file comment anchor).
 - Story 0.11 Task 4 owner: source lives in `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql` (applied Prisma migration; editing it changes its checksum).
 - Story 1.1 Task 2 step 2 owner: source lives in `packages/db/prisma/migrations/20260707104000_normalize_weather_persistence/migration.sql` (applied Prisma migration; editing it changes its checksum).
+- Story 1.1 Task 6 step 2 owner: source lives in `infra/grafana/dashboards/couturecast-weather-ingestion.json` (JSON dashboard file; no stable in-file comment anchor).
 - Story 1.3 Task 1 step 2 owner: source lives in `packages/db/prisma/migrations/20260713180000_cascade_delete_user_event_envelopes/migration.sql` (applied Prisma migration; editing it changes its checksum).
 - Story 1.4 Task 1 step 2 owner: source lives in `packages/db/prisma/migrations/20260714100000_add_telemetry_event/migration.sql` (applied Prisma migration; editing it changes its checksum).
 - Story 5.1 Task 8 step 1 owner: source lives in `pact/http/consumer/` and `pact/http/provider/` (directories; no single file carries the anchor).
@@ -25,3 +26,5 @@ Use this file only when the primary target cannot safely carry a stable in-file 
 - Story 6.6 index owner: source lives in `packages/db/prisma/migrations/20261022140000_community_spotlight_window_indexes/migration.sql` (applied Prisma migration; editing it changes its checksum).
 - Story 1.2b schema owner: source lives in `packages/db/prisma/migrations/20261023090000_location_search_window/migration.sql` (applied Prisma migration; editing it changes its checksum).
 - Story 6.8 Task 3 step 1 owner: source lives in `apps/api/src/modules/share-cards/assets/` and `apps/api/nest-cli.json` (an asset directory and a JSON config file; no stable in-file comment anchor).
+- Story 6.9 Task 7 step 1 owner: source lives in `apps/mobile/modules/share-card-native-share/ios/ShareCardNativeShareModule.swift` (listed in `IPAD_ANCHOR_SOURCES` in `scripts/lib/story69-ipad-evidence.mjs`; any edit retires the X-IPAD-ANCHOR proof).
+- Story 6.9 Task 9 step 1 owner: source lives in `apps/mobile/components/share-card-composer.tsx` (listed in `IPAD_ANCHOR_SOURCES` in `scripts/lib/story69-ipad-evidence.mjs`; any edit retires the X-IPAD-ANCHOR proof).

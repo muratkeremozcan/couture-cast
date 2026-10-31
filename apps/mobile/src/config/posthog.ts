@@ -1,3 +1,4 @@
+// Story 6.9 Task 6 step 1 owner: sanitize mobile share events in `apps/mobile/src/config/posthog.ts`
 import Constants from 'expo-constants'
 import PostHog, { type PostHogOptions } from 'posthog-react-native'
 import {

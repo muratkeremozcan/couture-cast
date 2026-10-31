@@ -7,6 +7,7 @@
 // Story 6.6 analytics owner: the two strict spotlight events in `packages/api-client/src/types/analytics-events.ts`
 // Story 1.2b analytics owner: `location_saved`, `location_search_failed` and the pseudonymous `location_switched` in `packages/api-client/src/types/analytics-events.ts`
 // Story 6.7b analytics owner: the surface-keyed unions in `packages/api-client/src/types/analytics-events.ts`
+// Story 6.9 Task 5 step 1 owner: define `share_card_shared` in `packages/api-client/src/types/analytics-events.ts`
 import { z } from 'zod'
 import {
   affiliateCommunitySurfaceSchema,

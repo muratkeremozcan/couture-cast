@@ -1,4 +1,5 @@
 // Story 6.8 Task 4 step 1 owner: preview and download on web in `apps/web/src/app/components/share-card-dialog.tsx`
+// Story 6.9 Task 10 step 1 owner: gate and hand off Web Share in `apps/web/src/app/components/share-card-dialog.tsx`
 'use client'
 import {
   createContext,

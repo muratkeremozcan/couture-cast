@@ -1,3 +1,4 @@
+// Story 6.9 Task 14 step 1 owner: run the share-sheet proof in `scripts/lib/story69-share-sheet.mjs`
 // Story 6.9 `share-sheet` native command: the fixture share outcomes, the real-sheet smoke and the
 // native presenter or receiver test, on the owned device the runner was given. Public output is
 // closed: case ids and failure codes, never digests, file names or paths.

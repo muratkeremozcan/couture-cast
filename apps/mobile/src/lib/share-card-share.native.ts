@@ -1,3 +1,4 @@
+// Story 6.9 Task 8 step 1 owner: validate results and sweep leases in `apps/mobile/src/lib/share-card-share.native.ts`
 import {
   runShareCardNativeShare,
   shareCardFixtureMode,

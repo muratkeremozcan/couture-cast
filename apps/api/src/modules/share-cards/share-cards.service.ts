@@ -1,4 +1,5 @@
 // Story 6.8 Task 2 step 1 owner: orchestrate deadline, admission, rechecks and audit in `apps/api/src/modules/share-cards/share-cards.service.ts`
+// Story 6.9 Task 3 step 1 owner: read the flag and refuse a disabled share in `apps/api/src/modules/share-cards/share-cards.service.ts`
 import {
   ConflictException,
   ForbiddenException,

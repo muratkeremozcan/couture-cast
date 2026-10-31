@@ -1,3 +1,4 @@
+// Story 6.9 Task 6 step 2 owner: sanitize web share events in `apps/web/src/analytics/browser-analytics.ts`
 import posthog, { type CaptureResult } from 'posthog-js'
 import {
   SHARE_CARD_SHARED_EVENT,
