@@ -3,11 +3,11 @@
   "deviceClass": "iPad",
   "environment": "simulator",
   "osVersion": "26.1",
-  "commit": "7043c033e4515c8fdd15462d50e3a1250b434cad",
+  "commit": "e2d9fa181362fcf709df849fb13c0af5639dd345",
   "result": "anchored_to_share",
   "screenshot": {
     "file": "ipad-anchor-proof.png",
-    "sha256": "8ad943ba88ff5e6b417e3e5db021cfe027c9987f4a81f30ddee5166c861a4d93"
+    "sha256": "78c7e3ea7e44138b9d3408d1d26fae4ec5b17740f01d1353c54f409f634cb29c"
   },
-  "recordedAt": "2026-10-31T08:44:25.315Z"
+  "recordedAt": "2026-10-31T11:05:55.166Z"
 }
