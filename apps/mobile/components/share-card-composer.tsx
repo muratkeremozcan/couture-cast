@@ -113,6 +113,20 @@ const sharePreviewChanged = (failure: unknown) =>
   (failure instanceof Error && failure.message === 'previewChanged')
 const errorNamed = (failure: unknown, name: string) =>
   failure instanceof Error && (failure.name === name || failure.message === name)
+/** The share prepare's flag-off refusal: a 403 whose body names `share_disabled`. */
+async function shareDisabledRefusal(failure: unknown) {
+  if (!(failure instanceof ResponseError) || failure.response.status !== 403) return false
+  const body: unknown = await failure.response
+    .clone()
+    .json()
+    .catch(() => null)
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    'code' in body &&
+    body.code === 'share_disabled'
+  )
+}
 const ANCHOR_TIMEOUT_MS = 1000
 /** The app's 420-pt tablet convention (modals, spotlight cards): content stays phone-sized. */
 const CONTENT_MAX_WIDTH = 420
@@ -209,7 +223,8 @@ async function revealInScroll(
 
 /**
  * Story 6.9 D4: capability state belongs to one member. A late answer for anyone else is
- * dropped, and the composer clears it on every identity change, sign-out included.
+ * dropped, and the composer clears it on every identity change, sign-out included. A
+ * `share_disabled` refusal revokes it for that member until the next open reads it again.
  */
 function useShareCardCapability(open: boolean, member: string | null) {
   const [capability, setCapability] = useState<{
@@ -232,7 +247,15 @@ function useShareCardCapability(open: boolean, member: string | null) {
       .catch(() => undefined)
     return () => abort.abort()
   }, [open, member])
-  return capability !== null && capability.member === member && capability.nativeShare
+  const revoke = (refused: string | null) =>
+    setCapability((value) =>
+      value?.member === refused ? { member: value.member, nativeShare: false } : value
+    )
+  return {
+    shareCapable:
+      capability !== null && capability.member === member && capability.nativeShare,
+    revokeShareCapability: revoke,
+  }
 }
 
 type SaveOwner = { owner: object; generation: number }
@@ -324,7 +347,7 @@ export function ShareCardComposer({
     modalSystemBarsAvailable()
   )
   const available = nativeShareCardSaveAvailable()
-  const shareCapable = useShareCardCapability(open, member)
+  const { shareCapable, revokeShareCapability } = useShareCardCapability(open, member)
   const shareModule = nativeShareCardShareAvailable()
   const sourceIdentity = JSON.stringify(source)
   const key = JSON.stringify({ source, locale, watermark })
@@ -629,6 +652,9 @@ export function ShareCardComposer({
       memberEpoch.current !== captured.memberEpoch ||
       mobileApplicationUserId() !== captured.member
     if (stillCurrent()) reportShareSettlement(settlement, failure)
+    void shareDisabledRefusal(failure).then((refused) => {
+      if (refused) revokeShareCapability(captured.member)
+    })
     if (superseded()) return
     if (errorNamed(failure, 'finishingSave')) return
     const event = {

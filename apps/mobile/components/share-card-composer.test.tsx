@@ -1194,6 +1194,39 @@ describe('Story 6.9 composer Share', () => {
       expectSaveUsable()
     }
   )
+  it('C-COMP-SHARE-GATE: a share_disabled 403 hides Share for this member and keeps Save', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    await readyShare()
+    boundary.prepare.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(JSON.stringify({ code: 'share_disabled' }), { status: 403 })
+      )
+    )
+    await tapShare()
+    expect(await screen.findByTestId('share-card-error')).toHaveTextContent(
+      i18n.t('shareCard.shareFailed')
+    )
+    await waitFor(() =>
+      expect(screen.queryByTestId('share-card-share')).not.toBeInTheDocument()
+    )
+    await settledEvent({ client: 'ios', target: 'none', outcome: 'failed' })
+    expectSaveUsable()
+    // A plain 403 keeps Share: only the flag refusal revokes the capability.
+    cleanup()
+    boundary.prepare.mockReset().mockResolvedValue(card)
+    await readyShare()
+    boundary.prepare.mockRejectedValueOnce(
+      new ResponseError(new Response('{}', { status: 403 }))
+    )
+    await tapShare()
+    expect(await screen.findByTestId('share-card-error')).toHaveTextContent(
+      i18n.t('shareCard.shareFailed')
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(screen.getByTestId('share-card-share')).toBeInTheDocument()
+  })
   it('C-COMP-SHARE-UNAVAILABLE: a runtime unavailable result says so, focuses Save and records one event', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     setOS('android')
