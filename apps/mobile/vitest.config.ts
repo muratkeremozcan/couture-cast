@@ -63,6 +63,15 @@ export default defineConfig({
       'react/jsx-dev-runtime',
       'vitest-browser-react',
     ],
+    // A run never trusts an earlier run's prebundle. Vite reuses a cached optimizer result whose
+    // lockfile and config hashes match without crawling the test files again, so when that cache
+    // lacks a dependency (a long-lived local cache, a run that crashed mid-optimize), the first
+    // test importing it (axe-core, expo-media-library, the expo fonts) re-optimizes mid-run and
+    // Vite reloads the browser: "Vite unexpectedly reloaded a test".
+    // Forcing the optimizer makes every run crawl its own entries first, as a cold CI checkout
+    // does; a full local run still takes 78 s with the rest of the cache warm. Watch mode keeps
+    // the prebundle, where a reload only reruns the affected files.
+    force: !isWatchMode,
     esbuildOptions: {
       loader: {
         '.js': 'jsx',
