@@ -1,5 +1,3 @@
-// Learning path Step 48: Safe branded share-card export.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import { describe, expect, it, vi } from 'vitest'
 import { shareCardsClient } from '../src/share-cards-client'
 import { preparedShareCardFixture as card } from '../src/testing/share-card-fixture'
