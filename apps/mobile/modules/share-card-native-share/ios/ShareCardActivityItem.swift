@@ -1,8 +1,8 @@
 import LinkPresentation
 import UIKit
 
-/// The validated file URL as the activity item, so every receiver still gets the PNG file, plus
-/// header metadata that names the card `couturecast-card.png` in place of its cache name.
+/// The validated file URL as the activity item, so every receiver gets the PNG file named
+/// `couturecast-card.png`, plus header metadata with that name and no file path.
 final class ShareCardActivityItem: NSObject, UIActivityItemSource {
   private let file: URL
   private let metadata: LPLinkMetadata

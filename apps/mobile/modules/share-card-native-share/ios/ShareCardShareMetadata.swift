@@ -1,9 +1,8 @@
 import Foundation
 import LinkPresentation
 
-/// What the share sheet header shows for the card. The file keeps its cache name
-/// (`cc69-share-<uuid>.png`); the header shows the public name Story 6.8's save and the web
-/// download use, with the card itself as the thumbnail.
+/// What the share sheet header shows for the card: the public name Story 6.8's save and the web
+/// download use, which is also the handoff file's own name, with the card itself as the thumbnail.
 enum ShareCardShareMetadata {
   static let publicName = "couturecast-card.png"
 

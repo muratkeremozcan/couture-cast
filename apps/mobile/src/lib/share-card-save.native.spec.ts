@@ -87,8 +87,12 @@ beforeEach(() => {
   mocks.files.clear()
   mocks.readDirectory
     .mockReset()
-    .mockImplementation(() =>
-      Promise.resolve([...mocks.files.keys()].map((uri) => uri.split('/').at(-1)))
+    .mockImplementation((directory: string) =>
+      Promise.resolve([
+        ...new Set(
+          [...mocks.files.keys()].map((uri) => uri.slice(directory.length).split('/')[0])
+        ),
+      ])
     )
   mocks.uuid = 0
   mocks.getPermission.mockReset().mockResolvedValue({ granted: true, canAskAgain: true })
@@ -361,7 +365,7 @@ describe('native immutable file and permission adapter', () => {
   })
   it('U-SHARE-LEASE: the cc68 orphan sweep and Save settlement never touch cc69-share files', async () => {
     const leased =
-      'file:///cache/share-cards/cc69-share-00000000-0000-4000-8000-00000000000a.png'
+      'file:///cache/share-cards/cc69-share-00000000-0000-4000-8000-00000000000a/couturecast-card.png'
     const orphan =
       'file:///cache/share-cards/cc68-00000000-0000-4000-8000-00000000000b.png'
     mocks.files.set(leased, 'leased-bytes')
@@ -371,9 +375,8 @@ describe('native immutable file and permission adapter', () => {
     expect(mocks.files.has(orphan)).toBe(false)
     await saveShareCard(card, new AbortController().signal, () => true)
     expect(mocks.remove).toHaveBeenCalledTimes(2)
-    expect((mocks.remove.mock.calls as [string][]).map(([uri]) => uri)).not.toContain(
-      leased
-    )
+    for (const [uri] of mocks.remove.mock.calls as [string][])
+      expect(leased.startsWith(uri)).toBe(false)
     expect([...mocks.files.keys()]).toEqual([leased])
   })
   it('U-SHARE-LIB-BYTES: Save writes through the shared prepare-file helper with its cc68 prefix', async () => {

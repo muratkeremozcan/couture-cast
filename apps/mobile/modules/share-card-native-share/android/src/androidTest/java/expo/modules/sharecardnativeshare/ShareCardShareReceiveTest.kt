@@ -26,8 +26,8 @@ import org.junit.runner.RunWith
  * N-AND-RECEIVE on a real device. The receiving Activity gets the exact `ACTION_SEND` the chooser
  * wraps and reads the PNG through the module's provider; its SHA256 equals the previewed digest.
  * The shell then stands in for another app's UID: the granted URI is readable, while a sibling
- * `cc69-share-*` file that was never granted and every out-of-scope URI are denied. Receivers see
- * the card as `couturecast-card.png` with its real size, never its cache name.
+ * share file that was never granted and every out-of-scope URI are denied. Receivers see the card
+ * as `couturecast-card.png` with its real size, never its per-share directory name.
  */
 @RunWith(AndroidJUnit4::class)
 class ShareCardShareReceiveTest {
@@ -66,8 +66,8 @@ class ShareCardShareReceiveTest {
   @Before
   fun writeFiles() {
     val directory = File(context.cacheDir, ShareCardShareFiles.DIRECTORY)
-    shared = write(File(directory, "cc69-share-${UUID.randomUUID()}.png"))
-    sibling = write(File(directory, "cc69-share-${UUID.randomUUID()}.png"))
+    shared = write(File(directory, "cc69-share-${UUID.randomUUID()}/${ShareCardShareFiles.PUBLIC_NAME}"))
+    sibling = write(File(directory, "cc69-share-${UUID.randomUUID()}/${ShareCardShareFiles.PUBLIC_NAME}"))
     outside = write(File(context.cacheDir, "cc69-share-${UUID.randomUUID()}.png"))
     expected = ShareCardShareFiles.sha256(shared)
     uri = FileProvider.getUriForFile(context, authority, ShareCardShareFiles.validate(context.cacheDir, shared.toURI().toString(), expected)!!)
@@ -77,7 +77,8 @@ class ShareCardShareReceiveTest {
   @After
   fun cleanUp() {
     context.revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    listOf(shared, sibling, outside).forEach { it.delete() }
+    listOf(shared, sibling).forEach { it.parentFile!!.deleteRecursively() }
+    outside.delete()
   }
 
   @Test
@@ -108,7 +109,7 @@ class ShareCardShareReceiveTest {
       assertEquals(expected, received.sha256)
       assertEquals("couturecast-card.png", received.displayName)
       assertEquals(shared.length(), received.size)
-      assertTrue(shared.name.startsWith("cc69-share-"))
+      assertEquals("couturecast-card.png", shared.name)
     } finally {
       callback.teardown()
     }

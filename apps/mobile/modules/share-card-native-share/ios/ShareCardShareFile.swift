@@ -1,9 +1,11 @@
 import CryptoKit
 import Foundation
 
-/// Native gate before any handoff. Accepts only `cache/share-cards/cc69-share-<uuid>.png` inside the
-/// app Caches directory, holding a critical-chunk-only 1080x1350 PNG whose SHA256 matches. Photo
-/// save keeps its own `cc68-`-only `ShareCardPngFile`; neither validator accepts the other's files.
+/// Native gate before any handoff. Accepts only
+/// `cache/share-cards/cc69-share-<uuid>/couturecast-card.png` inside the app Caches directory,
+/// holding a critical-chunk-only 1080x1350 PNG whose SHA256 matches. The per-share directory lets
+/// every receiver see the public name. Photo save keeps its own `cc68-`-only `ShareCardPngFile`;
+/// neither validator accepts the other's files.
 enum ShareCardShareFile {
   static let prefix = "cc69-share-"
   static let maximumBytes = 3 * 1024 * 1024
@@ -11,10 +13,11 @@ enum ShareCardShareFile {
   static func validateFile(_ uri: String, _ digest: String, _ cacheRoot: URL?) throws -> URL {
     guard let url = URL(string: uri), url.isFileURL, let cache = cacheRoot,
       !url.pathComponents.contains(".."),
-      url.standardizedFileURL.deletingLastPathComponent()
+      url.standardizedFileURL.deletingLastPathComponent().deletingLastPathComponent()
         == cache.appendingPathComponent("share-cards", isDirectory: true).standardizedFileURL,
       url.resolvingSymlinksInPath() == url.standardizedFileURL,
-      isShareFileName(url.lastPathComponent),
+      url.lastPathComponent == ShareCardShareMetadata.publicName,
+      isShareDirectoryName(url.deletingLastPathComponent().lastPathComponent),
       (try url.resourceValues(forKeys: [.isSymbolicLinkKey])).isSymbolicLink == false
     else { throw InvalidFile() }
     let data = try Data(contentsOf: url, options: .mappedIfSafe)
@@ -25,9 +28,9 @@ enum ShareCardShareFile {
     return url
   }
 
-  static func isShareFileName(_ name: String) -> Bool {
-    guard name.hasPrefix(prefix), name.hasSuffix(".png") else { return false }
-    let id = name.dropFirst(prefix.count).dropLast(".png".count)
+  static func isShareDirectoryName(_ name: String) -> Bool {
+    guard name.hasPrefix(prefix) else { return false }
+    let id = name.dropFirst(prefix.count)
     return id.count == 36 && UUID(uuidString: String(id)) != nil
   }
 

@@ -9,7 +9,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** File policy before any FileProvider grant: `cache/share-cards/cc69-share-<uuid>.png` only. */
+/**
+ * File policy before any FileProvider grant: `cache/share-cards/cc69-share-<uuid>/couturecast-card.png`
+ * only.
+ */
 class ShareCardShareFilesTest {
   @get:Rule val folder = TemporaryFolder()
 
@@ -21,7 +24,8 @@ class ShareCardShareFilesTest {
       writeBytes(bytes)
     }
 
-  private fun name() = "cc69-share-${UUID.randomUUID()}.png"
+  /** The share-cards-relative handoff path: a per-share directory holding the public name. */
+  private fun name() = "cc69-share-${UUID.randomUUID()}/couturecast-card.png"
 
   private fun digest(file: File) = ShareCardShareFiles.sha256(file)
 
@@ -31,7 +35,8 @@ class ShareCardShareFilesTest {
     val file = write(cache, "share-cards/${name()}")
     assertEquals(file.canonicalFile, ShareCardShareFiles.validate(cache, "file://${file.path}", digest(file)))
     assertEquals(file.canonicalFile, ShareCardShareFiles.validate(cache, file.toURI().toString(), digest(file)))
-    val upper = write(cache, "share-cards/cc69-share-${UUID.randomUUID().toString().uppercase()}.png")
+    assertEquals("couturecast-card.png", file.name)
+    val upper = write(cache, "share-cards/cc69-share-${UUID.randomUUID().toString().uppercase()}/couturecast-card.png")
     assertEquals(upper.canonicalFile, ShareCardShareFiles.validate(cache, upper.toURI().toString(), digest(upper)))
   }
 
@@ -39,17 +44,21 @@ class ShareCardShareFilesTest {
   fun rejectsPhotoSaveAndOtherNames() {
     val cache = cache()
     val id = UUID.randomUUID()
+    val card = "couturecast-card.png"
     for (name in
       listOf(
+        "cc69-share-$id.png",
         "cc68-$id.png",
-        "cc69-$id.png",
-        "cc69-share-.png",
-        "cc69-share-not-a-uuid.png",
-        "cc69-share-$id.PNG",
-        "cc69-share-$id.jpg",
-        "cc69-share-${id}x.png",
-        "xcc69-share-$id.png",
-        "cc69-share-$id.png.png",
+        "cc68-$id/$card",
+        "cc69-$id/$card",
+        "cc69-share-/$card",
+        "cc69-share-not-a-uuid/$card",
+        "cc69-share-${id}x/$card",
+        "xcc69-share-$id/$card",
+        "cc69-share-$id/couturecast-card.PNG",
+        "cc69-share-$id/couturecast-card.png.png",
+        "cc69-share-$id/cc69-share-$id.png",
+        card,
       )) {
       val file = write(cache, "share-cards/$name")
       assertNull(name, ShareCardShareFiles.validate(cache, file.toURI().toString(), digest(file)))
@@ -66,20 +75,30 @@ class ShareCardShareFilesTest {
     }
     val above = File(cache, name)
     assertNull(ShareCardShareFiles.validate(cache, "file://${cache.path}/share-cards/../$name", digest(above)))
-    val inside = write(cache, "share-cards/${name()}")
+    val insideName = name()
+    val inside = write(cache, "share-cards/$insideName")
     assertNull(
-      ShareCardShareFiles.validate(cache, "file://${cache.path}/share-cards/../share-cards/${inside.name}", digest(inside)),
+      ShareCardShareFiles.validate(cache, "file://${cache.path}/share-cards/../share-cards/$insideName", digest(inside)),
+    )
+    val directory = inside.parentFile!!.name
+    assertNull(
+      ShareCardShareFiles.validate(cache, "file://${cache.path}/share-cards/$directory/../$insideName", digest(inside)),
     )
     val outside = write(folder.newFolder(), "share-cards/${name()}")
-    val link = File(cache, "share-cards/${name()}")
+    val link = File(cache, "share-cards/${name()}").apply { parentFile!!.mkdirs() }
     Files.createSymbolicLink(link.toPath(), outside.toPath())
     assertNull(ShareCardShareFiles.validate(cache, link.toURI().toString(), digest(outside)))
-    val linkedCache = folder.newFolder()
-    Files.createSymbolicLink(File(linkedCache, "share-cards").toPath(), outside.parentFile!!.toPath())
+    // A per-share directory that is a link out of the cache.
+    val linkedDirectory = File(cache, "share-cards/cc69-share-${UUID.randomUUID()}")
+    Files.createSymbolicLink(linkedDirectory.toPath(), outside.parentFile!!.toPath())
     assertNull(
-      ShareCardShareFiles.validate(linkedCache, "file://${linkedCache.path}/share-cards/${outside.name}", digest(outside)),
+      ShareCardShareFiles.validate(cache, File(linkedDirectory, outside.name).toURI().toString(), digest(outside)),
     )
-    assertNull(ShareCardShareFiles.validate(cache, "content://x/share-cards/${inside.name}", digest(inside)))
+    val linkedCache = folder.newFolder()
+    Files.createSymbolicLink(File(linkedCache, "share-cards").toPath(), outside.parentFile!!.parentFile!!.toPath())
+    val escaped = "share-cards/${outside.parentFile!!.name}/${outside.name}"
+    assertNull(ShareCardShareFiles.validate(linkedCache, "file://${linkedCache.path}/$escaped", digest(outside)))
+    assertNull(ShareCardShareFiles.validate(cache, "content://x/share-cards/$insideName", digest(inside)))
     assertNull(ShareCardShareFiles.validate(cache, "${inside.toURI()}?x=1", digest(inside)))
     assertNull(ShareCardShareFiles.validate(cache, "not a uri", digest(inside)))
   }

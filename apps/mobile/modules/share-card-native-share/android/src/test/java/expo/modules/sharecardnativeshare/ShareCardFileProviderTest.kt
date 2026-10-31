@@ -96,7 +96,7 @@ class ShareCardFileProviderTest {
   fun getUriForFileGrantsShareCardsAndThrowsOutsideIt() {
     resetFileProviderRoots()
     val authority = ShareCardShareFiles.authority(application)
-    val name = "cc69-share-${UUID.randomUUID()}.png"
+    val name = "cc69-share-${UUID.randomUUID()}/couturecast-card.png"
     val inside = File(application.cacheDir, "share-cards/$name").apply { parentFile!!.mkdirs(); writeText("x") }
     val uri = FileProvider.getUriForFile(application, authority, inside)
     assertEquals("content", uri.scheme)
@@ -130,7 +130,7 @@ class ShareCardFileProviderTest {
       )
     Robolectric.buildContentProvider(ShareCardFileProvider::class.java).create(info)
     val file =
-      File(application.cacheDir, "share-cards/cc69-share-${UUID.randomUUID()}.png").apply {
+      File(application.cacheDir, "share-cards/cc69-share-${UUID.randomUUID()}/couturecast-card.png").apply {
         parentFile!!.mkdirs()
         writeBytes(bytes)
       }
@@ -155,9 +155,11 @@ class ShareCardFileProviderTest {
       row,
     )
     assertFalse(row.values.any { it.toString().contains("cc69-share") })
-    // The name is presented only: the file on disk and the bytes a receiver reads are unchanged.
-    assertTrue(file.name.startsWith("cc69-share-"))
-    assertEquals("/share_cards/${file.name}", uri.path)
+    // The file itself carries the public name inside its per-share directory; the bytes a receiver
+    // reads are unchanged.
+    assertEquals("couturecast-card.png", file.name)
+    assertTrue(file.parentFile!!.name.startsWith("cc69-share-"))
+    assertEquals("/share_cards/${file.parentFile!!.name}/couturecast-card.png", uri.path)
     assertTrue(bytes.contentEquals(application.contentResolver.openInputStream(uri)!!.use { it.readBytes() }))
   }
 

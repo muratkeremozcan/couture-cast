@@ -11,7 +11,9 @@ final class ShareCardShareMetadataTests: XCTestCase {
       .appendingPathComponent("share-cards")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     addTeardownBlock { try? FileManager.default.removeItem(at: directory.deletingLastPathComponent()) }
-    let file = directory.appendingPathComponent("cc69-share-\(UUID().uuidString.lowercased()).png")
+    let file = directory.appendingPathComponent("cc69-share-\(UUID().uuidString.lowercased())")
+      .appendingPathComponent("couturecast-card.png")
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
     try bytes.write(to: file)
     return file
   }

@@ -11,7 +11,7 @@ import androidx.core.content.FileProvider
  * FileProvider. `res/xml/share_card_native_share_paths.xml` exposes only `cache/share-cards/`.
  *
  * Receivers and the chooser preview read [OpenableColumns.DISPLAY_NAME] as the file's name; it is
- * the public `couturecast-card.png` while the file keeps its cache name. Every other column,
+ * always the public `couturecast-card.png`, the handoff file's own name. Every other column,
  * [OpenableColumns.SIZE] included, and every refusal stay FileProvider's.
  */
 class ShareCardFileProvider : FileProvider() {

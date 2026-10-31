@@ -37,8 +37,9 @@ const png = (seed) =>
     Buffer.from(seed),
   ])
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex')
-const NAME_A = 'cc69-share-0f0e0d0c-1111-4222-8333-944455556666.png'
-const NAME_B = 'cc69-share-aaaaaaaa-1111-4222-8333-944455556666.png'
+// A handoff is named by its per-share directory; the file inside is always couturecast-card.png.
+const NAME_A = 'cc69-share-0f0e0d0c-1111-4222-8333-944455556666'
+const NAME_B = 'cc69-share-aaaaaaaa-1111-4222-8333-944455556666'
 const catalog = {
   shareCard: {
     share: 'Share',
@@ -316,7 +317,7 @@ describe('handoff file proof', () => {
     )
   })
 
-  test('the Android store lists only cc69-share files through run-as and reads their bytes', () => {
+  test('the Android store lists only cc69-share handoffs through run-as and reads their bytes', () => {
     const calls = []
     const ctx = {
       adb: '/owned/adb',
@@ -326,10 +327,11 @@ describe('handoff file proof', () => {
         calls.push([binary, ...args].join(' '))
         if (args.includes('find'))
           return [
-            `cache/share-cards/${NAME_A}`,
-            'cache/share-cards/cc68-11111111-2222.png',
-            `cache/other/${NAME_B}`,
-            'cache/share-cards/cc69-share-$(reboot).png',
+            `cache/share-cards/${NAME_A}/couturecast-card.png`,
+            'cache/share-cards/cc68-11111111-2222/couturecast-card.png',
+            `cache/other/${NAME_B}/couturecast-card.png`,
+            `cache/share-cards/nested/${NAME_B}/couturecast-card.png`,
+            'cache/share-cards/cc69-share-$(reboot)/couturecast-card.png',
             '',
           ].join('\r\n')
         if (args.includes('stat')) return '1000\n'
@@ -345,7 +347,7 @@ describe('handoff file proof', () => {
     assert.deepEqual(store.list(), [NAME_A])
     assert.equal(
       calls[0],
-      "/owned/adb -s emulator-5584 shell run-as com.couturecast.story68 find cache -maxdepth 2 -name 'cc69-share-*.png'"
+      '/owned/adb -s emulator-5584 shell run-as com.couturecast.story68 find cache -maxdepth 3 -name couturecast-card.png'
     )
     assert.ok(store.read(NAME_A).equals(bytes))
     assert.deepEqual(reads[0], [
@@ -355,7 +357,7 @@ describe('handoff file proof', () => {
       'run-as',
       'com.couturecast.story68',
       'cat',
-      `cache/share-cards/${NAME_A}`,
+      `cache/share-cards/${NAME_A}/couturecast-card.png`,
     ])
     assert.equal(store.ageMs(NAME_A), 60_000)
     assert.throws(() => store.read('../databases/x.png'), /share_handoff_file_removed/)
@@ -389,9 +391,11 @@ describe('handoff file proof', () => {
     }
     const store = iosShareFileStore(ctx)
     assert.deepEqual(store.list(), [], 'no cache yet')
-    fs.mkdirSync(cache, { recursive: true })
-    fs.writeFileSync(path.join(cache, NAME_A), bytes)
+    fs.mkdirSync(path.join(cache, NAME_A), { recursive: true })
+    fs.writeFileSync(path.join(cache, NAME_A, 'couturecast-card.png'), bytes)
     fs.writeFileSync(path.join(cache, 'cc68-11111111.png'), bytes)
+    // A directory without its card is not a handoff.
+    fs.mkdirSync(path.join(cache, NAME_B))
     assert.deepEqual(store.list(), [NAME_A])
     assert.ok(store.read(NAME_A).equals(bytes))
     assert.ok(store.ageMs(NAME_A) >= -2_000 && store.ageMs(NAME_A) < 60_000)
@@ -650,7 +654,7 @@ describe('runStory69ShareSheet', () => {
             env.MAESTRO_SHARE_CLOSED,
             shareCopyEnv(catalog).MAESTRO_SHARE_CLOSED
           )
-          files[`cc69-share-${String(++counter).padStart(8, '0')}-aaaa.png`] = bytes
+          files[`cc69-share-${String(++counter).padStart(8, '0')}-aaaa`] = bytes
         }
       },
       run: (binary, args) => {

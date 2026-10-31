@@ -26,6 +26,7 @@ import {
 } from './share-card-save-operations'
 import {
   deleteShareCardFile,
+  SHARE_CARD_PUBLIC_NAME,
   shareCardCacheDirectory,
   writeVerifiedShareCardFile,
 } from './share-card-file'
@@ -45,7 +46,7 @@ export type ShareCardShareInput = Omit<
 
 /** Story 6.9: the handoff file lease, by file modification time. */
 export const SHARE_CARD_SHARE_LEASE_MS = 30 * 60 * 1000
-const SHARE_FILE = /^cc69-share-[a-f0-9-]+\.png$/
+const SHARE_ENTRY = /^cc69-share-[a-f0-9-]+$/
 const nativeCodes: readonly ShareCardNativeShareCode[] = [
   'presenter_unavailable',
   'file_invalid',
@@ -129,30 +130,33 @@ function logShareFailure(code: string) {
 }
 
 /**
- * The 30-minute lease. Deletes `cc69-share-*` files whose modification time is older than
- * the lease, or in the future, and never touches `cc68-*` save files or the live handoff.
+ * The 30-minute lease. Deletes each `cc69-share-<uuid>/` directory whose card's modification
+ * time is older than the lease, or in the future, or that has no card, and never touches
+ * `cc68-*` save files or the live handoff.
  */
 export async function sweepExpiredShareCardFiles(now: number = Date.now()) {
   const directory = shareCardCacheDirectory()
   if (!(await FileSystem.getInfoAsync(directory)).exists) return
   for (const name of await FileSystem.readDirectoryAsync(directory)) {
-    const uri = directory + name
-    if (!SHARE_FILE.test(name) || liveShareCardFiles().has(uri)) continue
+    const entry = directory + name
+    const uri = `${entry}/${SHARE_CARD_PUBLIC_NAME}`
+    if (!SHARE_ENTRY.test(name) || liveShareCardFiles().has(uri)) continue
     const info = await FileSystem.getInfoAsync(uri)
-    if (!info.exists) continue
-    const modified = info.modificationTime * 1000
+    // A directory without its card was left by an interrupted write.
+    const modified = info.exists ? info.modificationTime * 1000 : NaN
     const expired =
       !Number.isFinite(modified) ||
       modified > now ||
       now - modified >= SHARE_CARD_SHARE_LEASE_MS
-    if (expired) await FileSystem.deleteAsync(uri, { idempotent: true })
+    if (expired) await FileSystem.deleteAsync(entry, { idempotent: true })
   }
 }
 
 /**
  * Call only after an enabled Share activation. Reauthorizes the previewed bytes with
  * `purpose:'share'`, checks the response and decoded digests before any write, writes a
- * leased `cc69-share-*` file, then hands it to the OS sheet under the global operation.
+ * leased `cc69-share-<uuid>/couturecast-card.png`, then hands it to the OS sheet under the
+ * global operation.
  * Throws before handoff; resolves with one validated settlement after it.
  */
 export async function shareShareCard(

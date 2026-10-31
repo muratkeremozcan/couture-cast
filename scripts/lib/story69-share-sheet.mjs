@@ -10,7 +10,9 @@ import { promisify } from 'node:util'
 import { xcodebuildFailureReport } from './share-card-audit-report.mjs'
 import { story68FocusObservationHandler } from './story68-ios-focus-observation.mjs'
 
-export const SHARE_FILE_PATTERN = /^cc69-share-[a-f0-9-]+\.png$/i
+/** A handoff is named by its per-share directory, which holds one `couturecast-card.png`. */
+export const SHARE_FILE_PATTERN = /^cc69-share-[a-f0-9-]+$/i
+const SHARE_PUBLIC_NAME = 'couturecast-card.png'
 export const SHARE_LEASE_MS = 30 * 60_000
 // A file written in the same second as the device clock read can read up to a second ahead.
 const CLOCK_TOLERANCE_MS = 2_000
@@ -218,9 +220,9 @@ export function iosShareFileStore(ctx) {
         .trim(),
       'Library/Caches/share-cards'
     )
-  const file = (name) => {
+  const file = (name, dir = directory()) => {
     if (!SHARE_FILE_PATTERN.test(name)) throw new Error('share_handoff_file_removed')
-    return path.join(directory(), name)
+    return path.join(dir, name, SHARE_PUBLIC_NAME)
   }
   return {
     list: () => {
@@ -229,6 +231,7 @@ export function iosShareFileStore(ctx) {
         ? fs
             .readdirSync(dir)
             .filter((name) => SHARE_FILE_PATTERN.test(name))
+            .filter((name) => fs.existsSync(file(name, dir)))
             .sort()
         : []
     },
@@ -244,17 +247,18 @@ export function androidShareFileStore(ctx, execute = spawnSync) {
     ctx.run(ctx.adb, ['-s', ctx.device, 'shell', 'run-as', ctx.appId, ...args])
   const relative = (name) => {
     if (!SHARE_FILE_PATTERN.test(name)) throw new Error('share_handoff_file_removed')
-    return `cache/share-cards/${name}`
+    return `cache/share-cards/${name}/${SHARE_PUBLIC_NAME}`
   }
   return {
     // `cache` always exists; `cache/share-cards` only after the first share or save.
     list: () =>
-      shell(['find', 'cache', '-maxdepth', '2', '-name', "'cc69-share-*.png'"])
+      shell(['find', 'cache', '-maxdepth', '3', '-name', SHARE_PUBLIC_NAME])
         .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => /^cache\/share-cards\/[^/]+$/.test(line))
-        .map((line) => line.slice('cache/share-cards/'.length))
-        .filter((name) => SHARE_FILE_PATTERN.test(name))
+        .map((line) =>
+          /^cache\/share-cards\/([^/]+)\/couturecast-card\.png$/.exec(line.trim())
+        )
+        .map((match) => match?.[1])
+        .filter((name) => name !== undefined && SHARE_FILE_PATTERN.test(name))
         .sort(),
     read: (name) => {
       const result = execute(

@@ -22,17 +22,29 @@ vi.mock('expo-file-system/legacy', () => ({
   makeDirectoryAsync: () => Promise.resolve(),
   writeAsStringAsync: mocks.write,
   deleteAsync: mocks.remove,
+  // Files only; a directory exists while it holds one.
   getInfoAsync: (uri: string) => {
     if (uri.endsWith('/')) return Promise.resolve({ exists: true, isDirectory: true })
     const file = mocks.files.get(uri)
+    if (file)
+      return Promise.resolve({
+        exists: true,
+        isDirectory: false,
+        modificationTime: file.modified / 1000,
+      })
+    const directory = [...mocks.files.keys()].some((key) => key.startsWith(`${uri}/`))
     return Promise.resolve(
-      file
-        ? { exists: true, isDirectory: false, modificationTime: file.modified / 1000 }
-        : { exists: false }
+      directory ? { exists: true, isDirectory: true } : { exists: false }
     )
   },
-  readDirectoryAsync: () =>
-    Promise.resolve([...mocks.files.keys()].map((uri) => uri.split('/').at(-1))),
+  readDirectoryAsync: (directory: string) =>
+    Promise.resolve([
+      ...new Set(
+        [...mocks.files.keys()]
+          .filter((uri) => uri.startsWith(directory))
+          .map((uri) => uri.slice(directory.length).split('/')[0])
+      ),
+    ]),
 }))
 vi.mock('expo-crypto', () => ({
   CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
@@ -64,7 +76,10 @@ import {
 } from './share-card-save-operations'
 
 const directory = 'file:///cache/share-cards/'
-const shareFile = /^file:\/\/\/cache\/share-cards\/cc69-share-[a-f0-9-]+\.png$/
+const shareFile =
+  /^file:\/\/\/cache\/share-cards\/cc69-share-[a-f0-9-]+\/couturecast-card\.png$/
+/** The per-share directory that holds one handoff file. */
+const shareEntry = (uri: string) => uri.slice(0, -'/couturecast-card.png'.length)
 const input = {
   source: { kind: 'outfit', recommendationId: 'owned-outfit' },
   locale: 'en-US',
@@ -133,7 +148,8 @@ beforeEach(() => {
   })
   mocks.remove.mockReset().mockImplementation((uri: string) => {
     mocks.order.push(`remove:${uri.split('/').at(-1)}`)
-    mocks.files.delete(uri)
+    for (const key of [...mocks.files.keys()])
+      if (key === uri || key.startsWith(`${uri}/`)) mocks.files.delete(key)
     return Promise.resolve()
   })
   mocks.shareFile.mockReset().mockImplementation(() => {
@@ -320,6 +336,8 @@ describe('U-SHARE-LEASE: the 30-minute handoff lease', () => {
     mocks.files.set(directory + name, { bytes: 'x', modified: now - ageMs })
     return directory + name
   }
+  const handoff = (id: string) =>
+    `cc69-share-00000000-0000-4000-8000-${id}/couturecast-card.png`
   it('settlement releases the lock while the handed-off file stays on disk', async () => {
     const native = deferred<unknown>()
     mocks.shareFile.mockReturnValue(native.promise)
@@ -355,43 +373,55 @@ describe('U-SHARE-LEASE: the 30-minute handoff lease', () => {
     ).rejects.toMatchObject({ name: 'AbortError' })
     expect(mocks.shareFile).not.toHaveBeenCalled()
     expect(shareFiles()).toHaveLength(0)
+    const [written] = mocks.write.mock.calls[0] as [string]
+    expect(mocks.remove).toHaveBeenCalledExactlyOnceWith(shareEntry(written), {
+      idempotent: true,
+    })
   })
-  it('the age sweep deletes expired and future-dated share files only', async () => {
-    const young = plant('cc69-share-00000000-0000-4000-8000-000000000001.png', 5 * 60_000)
-    const edge = plant(
-      'cc69-share-00000000-0000-4000-8000-000000000002.png',
-      SHARE_CARD_SHARE_LEASE_MS
-    )
-    const old = plant('cc69-share-00000000-0000-4000-8000-000000000003.png', 31 * 60_000)
-    const future = plant('cc69-share-00000000-0000-4000-8000-000000000004.png', -60_000)
+  it('the age sweep deletes expired and future-dated share directories only', async () => {
+    const young = plant(handoff('000000000001'), 5 * 60_000)
+    const edge = plant(handoff('000000000002'), SHARE_CARD_SHARE_LEASE_MS)
+    const old = plant(handoff('000000000003'), 31 * 60_000)
+    const future = plant(handoff('000000000004'), -60_000)
     const save = plant('cc68-00000000-0000-4000-8000-000000000005.png', 24 * 3_600_000)
     const foreign = plant('cc69-share-notes.txt', 24 * 3_600_000)
+    const nested = plant(`cc69-share-notes/${handoff('000000000007')}`, 24 * 3_600_000)
+    // A directory left without its card by an interrupted write is abandoned.
+    const partial = plant(
+      'cc69-share-00000000-0000-4000-8000-000000000008/partial',
+      5 * 60_000
+    )
     await sweepExpiredShareCardFiles(now)
     expect(mocks.files.has(young)).toBe(true)
-    expect(mocks.files.has(edge)).toBe(false)
-    expect(mocks.files.has(old)).toBe(false)
-    expect(mocks.files.has(future)).toBe(false)
+    for (const expired of [edge, old, future, partial]) {
+      expect(mocks.files.has(expired)).toBe(false)
+      expect(mocks.remove).toHaveBeenCalledWith(
+        expired.slice(0, expired.lastIndexOf('/')),
+        {
+          idempotent: true,
+        }
+      )
+    }
     expect(mocks.files.has(save)).toBe(true)
     expect(mocks.files.has(foreign)).toBe(true)
+    expect(mocks.files.has(nested)).toBe(true)
+    expect(mocks.remove).toHaveBeenCalledTimes(4)
   })
   it('a restart keeps a file younger than the lease', async () => {
-    const leased = plant(
-      'cc69-share-00000000-0000-4000-8000-000000000006.png',
-      SHARE_CARD_SHARE_LEASE_MS - 1
-    )
+    const leased = plant(handoff('000000000006'), SHARE_CARD_SHARE_LEASE_MS - 1)
     await sweepExpiredShareCardFiles(now)
     expect(mocks.files.has(leased)).toBe(true)
     await sweepExpiredShareCardFiles(now + 1)
     expect(mocks.files.has(leased)).toBe(false)
   })
   it('the sweep runs before each share, ahead of authorization', async () => {
-    const expired = directory + 'cc69-share-00000000-0000-4000-8000-0000000000aa.png'
+    const expired = directory + handoff('0000000000aa')
     mocks.files.set(expired, { bytes: 'x', modified: Date.now() - 31 * 60_000 })
     await shareShareCard(input, options())
     expect(mocks.files.has(expired)).toBe(false)
-    expect(mocks.order.indexOf(`remove:${expired.split('/').at(-1)}`)).toBeLessThan(
-      mocks.order.indexOf('prepare')
-    )
+    expect(
+      mocks.order.indexOf(`remove:${shareEntry(expired).split('/').at(-1)}`)
+    ).toBeLessThan(mocks.order.indexOf('prepare'))
   })
   it('the sweep never deletes the live handoff file', async () => {
     const native = deferred<unknown>()

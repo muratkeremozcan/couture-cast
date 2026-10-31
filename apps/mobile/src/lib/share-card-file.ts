@@ -8,8 +8,13 @@ import {
   reserveShareCardFile,
 } from './share-card-save-operations'
 
-/** Save files are `cc68-*`; Story 6.9 share handoff files are `cc69-share-*`. */
+/**
+ * Save files are `cc68-<uuid>.png`. Story 6.9 share handoff files are
+ * `cc69-share-<uuid>/couturecast-card.png`, so every receiver sees the public name while the
+ * directory keeps the prefix that separates the two sweeps.
+ */
 export type ShareCardFilePrefix = 'cc68' | 'cc69-share'
+export const SHARE_CARD_PUBLIC_NAME = 'couturecast-card.png'
 
 export function shareCardCacheDirectory() {
   if (!FileSystem.cacheDirectory) throw new Error('storage')
@@ -21,13 +26,19 @@ async function digestHex(bytes: Uint8Array<ArrayBuffer>) {
     byte.toString(16).padStart(2, '0')
   ).join('')
 }
+/** The entry under `share-cards/` a file lives in: itself, or its share handoff directory. */
+function shareCardEntry(fileUri: string) {
+  const name = `/${SHARE_CARD_PUBLIC_NAME}`
+  return fileUri.endsWith(name) ? fileUri.slice(0, -name.length) : fileUri
+}
 /** Deletes now, or queues a bounded retry when the file system refuses. */
 export async function deleteShareCardFile(fileUri: string) {
+  const entry = shareCardEntry(fileUri)
   try {
-    await FileSystem.deleteAsync(fileUri, { idempotent: true })
+    await FileSystem.deleteAsync(entry, { idempotent: true })
   } catch {
     enqueueShareCardCleanup(fileUri, () =>
-      FileSystem.deleteAsync(fileUri, { idempotent: true })
+      FileSystem.deleteAsync(entry, { idempotent: true })
     )
   }
 }
@@ -45,12 +56,15 @@ export async function writeVerifiedShareCardFile(
   if (card.sha256 !== expectedSha256) throw new Error('render')
   if ((await digestHex(decodeShareCardBase64(card.pngBase64))) !== card.sha256)
     throw new Error('render')
-  const directory = shareCardCacheDirectory()
-  const fileUri = `${directory}${prefix}-${Crypto.randomUUID()}.png`
+  const entry = `${shareCardCacheDirectory()}${prefix}-${Crypto.randomUUID()}`
+  const fileUri =
+    prefix === 'cc68' ? `${entry}.png` : `${entry}/${SHARE_CARD_PUBLIC_NAME}`
   const releaseFile = reserveShareCardFile(fileUri)
   try {
     if (shareCardFixtureMode() === 'cache_failure') throw new Error('storage')
-    await FileSystem.makeDirectoryAsync(directory, { intermediates: true })
+    await FileSystem.makeDirectoryAsync(fileUri.slice(0, fileUri.lastIndexOf('/') + 1), {
+      intermediates: true,
+    })
     await FileSystem.writeAsStringAsync(fileUri, card.pngBase64, {
       encoding: FileSystem.EncodingType.Base64,
     })

@@ -2,8 +2,8 @@ import CryptoKit
 import XCTest
 @testable import ShareCardShareCore
 
-/// N-IOS-SHARE-FILE: only a digest-matching critical-chunk PNG named
-/// `cache/share-cards/cc69-share-<uuid>.png` passes.
+/// N-IOS-SHARE-FILE: only a digest-matching critical-chunk PNG at
+/// `cache/share-cards/cc69-share-<uuid>/couturecast-card.png` passes.
 final class ShareCardShareFileTests: XCTestCase {
   func crc(_ bytes: [UInt8]) -> UInt32 {
     var value: UInt32 = 0xffffffff
@@ -46,14 +46,16 @@ final class ShareCardShareFileTests: XCTestCase {
     return file
   }
 
-  func shareName() -> String { "cc69-share-\(UUID().uuidString.lowercased()).png" }
+  /// The share-cards-relative handoff path: a per-share directory holding the public name.
+  func shareName() -> String { "cc69-share-\(UUID().uuidString.lowercased())/couturecast-card.png" }
 
   func testAcceptsOnlyAShareFileInsideShareCards() throws {
     let root = try cacheRoot()
     let data = png()
     let file = try write(data, "share-cards/\(shareName())", in: root)
     XCTAssertEqual(try ShareCardShareFile.validateFile(file.absoluteString, digest(data), root), file)
-    let upper = try write(data, "share-cards/cc69-share-\(UUID().uuidString).png", in: root)
+    XCTAssertEqual(file.lastPathComponent, "couturecast-card.png")
+    let upper = try write(data, "share-cards/cc69-share-\(UUID().uuidString)/couturecast-card.png", in: root)
     XCTAssertEqual(try ShareCardShareFile.validateFile(upper.absoluteString, digest(data), root), upper)
   }
 
@@ -61,10 +63,12 @@ final class ShareCardShareFileTests: XCTestCase {
     let root = try cacheRoot()
     let data = png()
     let id = UUID().uuidString.lowercased()
+    let card = "couturecast-card.png"
     for name in [
-      "cc68-\(id).png", "cc69-\(id).png", "cc69-share-.png", "cc69-share-not-a-uuid.png",
-      "cc69-share-\(id).PNG", "cc69-share-\(id).jpg", "cc69-share-\(id)x.png", "xcc69-share-\(id).png",
-      "cc69-share-\(id).png.png", "share-\(id).png",
+      "cc69-share-\(id).png", "cc68-\(id).png", "cc68-\(id)/\(card)", "cc69-\(id)/\(card)",
+      "cc69-share-/\(card)", "cc69-share-not-a-uuid/\(card)", "cc69-share-\(id)x/\(card)",
+      "xcc69-share-\(id)/\(card)", "cc69-share-\(id)/couturecast-card.PNG",
+      "cc69-share-\(id)/couturecast-card.png.png", "cc69-share-\(id)/cc69-share-\(id).png", card,
     ] {
       let file = try write(data, "share-cards/\(name)", in: root)
       XCTAssertThrowsError(try ShareCardShareFile.validateFile(file.absoluteString, digest(data), root), name)
@@ -83,9 +87,13 @@ final class ShareCardShareFileTests: XCTestCase {
     let traversal = root.absoluteString + "share-cards/../" + name
     XCTAssertThrowsError(try ShareCardShareFile.validateFile(traversal, digest(data), root))
     // Even a `..` that lands back inside share-cards is refused.
-    let inside = try write(data, "share-cards/\(shareName())", in: root)
-    let roundTrip = root.absoluteString + "share-cards/../share-cards/" + inside.lastPathComponent
+    let insideName = shareName()
+    let inside = try write(data, "share-cards/\(insideName)", in: root)
+    let roundTrip = root.absoluteString + "share-cards/../share-cards/" + insideName
     XCTAssertThrowsError(try ShareCardShareFile.validateFile(roundTrip, digest(data), root))
+    let directory = inside.deletingLastPathComponent().lastPathComponent
+    let viaDirectory = root.absoluteString + "share-cards/\(directory)/../\(insideName)"
+    XCTAssertThrowsError(try ShareCardShareFile.validateFile(viaDirectory, digest(data), root))
     XCTAssertThrowsError(try ShareCardShareFile.validateFile("https://example.invalid/\(name)", digest(data), root))
     XCTAssertThrowsError(try ShareCardShareFile.validateFile(inside.absoluteString, digest(data), nil))
   }
@@ -96,15 +104,23 @@ final class ShareCardShareFileTests: XCTestCase {
     let data = png()
     let target = try write(data, "share-cards/\(shareName())", in: outside)
     let link = root.appendingPathComponent("share-cards/\(shareName())")
+    try FileManager.default.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
     try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
     XCTAssertThrowsError(try ShareCardShareFile.validateFile(link.absoluteString, digest(data), root))
+    // A per-share directory that is a link out of Caches.
+    let linkedDirectory = root.appendingPathComponent("share-cards/cc69-share-\(UUID().uuidString.lowercased())")
+    try FileManager.default.createSymbolicLink(at: linkedDirectory, withDestinationURL: target.deletingLastPathComponent())
+    let throughDirectory = linkedDirectory.appendingPathComponent("couturecast-card.png")
+    XCTAssertThrowsError(try ShareCardShareFile.validateFile(throughDirectory.absoluteString, digest(data), root))
     // A share-cards directory that is itself a link out of Caches.
     let linkedRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: linkedRoot, withIntermediateDirectories: true)
     addTeardownBlock { try? FileManager.default.removeItem(at: linkedRoot) }
     try FileManager.default.createSymbolicLink(
-      at: linkedRoot.appendingPathComponent("share-cards"), withDestinationURL: target.deletingLastPathComponent())
-    let escaped = linkedRoot.appendingPathComponent("share-cards/\(target.lastPathComponent)")
+      at: linkedRoot.appendingPathComponent("share-cards"),
+      withDestinationURL: target.deletingLastPathComponent().deletingLastPathComponent())
+    let escaped = linkedRoot.appendingPathComponent(
+      "share-cards/\(target.deletingLastPathComponent().lastPathComponent)/couturecast-card.png")
     XCTAssertThrowsError(try ShareCardShareFile.validateFile(escaped.absoluteString, digest(data), linkedRoot))
   }
 
