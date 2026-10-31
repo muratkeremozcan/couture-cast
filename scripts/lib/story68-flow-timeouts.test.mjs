@@ -23,6 +23,7 @@ import {
   SHARE_SHEET_EXTRACT_ESTIMATE_MS,
   SHARE_SHEET_FLOW,
   SHARE_SHEET_FLOW_ESTIMATE_MS,
+  ANDROID_SHARE_LANE_BASE_MS,
   SHARE_SHEET_LANE_HEADROOM_MS,
   SHARE_SHEET_NATIVE_TEST_ESTIMATE_MS,
   SHARE_TAP_ATTEMPTS,
@@ -348,7 +349,21 @@ describe('Story 6.9 share flow timeouts', () => {
     assert.equal(interaction.suite, 'interaction')
     assert.equal(
       SHARE_SHEET_LANE_HEADROOM_MS.android,
-      interaction.journey_timeout * 60_000 - (27 * 60_000 + 38_000)
+      interaction.journey_timeout * 60_000 - ANDROID_SHARE_LANE_BASE_MS
+    )
+    // The interaction lane runs share-sheet and the Release font proof and nothing else after
+    // sign-in; the rapid watermark, TalkBack and fallback focus proofs run in android36-controls.
+    const script = fs.readFileSync(`${root}scripts/ci/share-card-android.sh`, 'utf8')
+    const branch = script.slice(
+      script.indexOf('  interaction)'),
+      script.indexOf(';;', script.indexOf('  interaction)'))
+    )
+    assert.match(branch, /^ {4}native share-sheet$/m)
+    assert.match(branch, /share-card-android-release-font\.sh/)
+    assert.doesNotMatch(branch, /rapid-watermark|a11y|fallback-focus/)
+    assert.equal(
+      workflow.jobs['android36-controls'].strategy.matrix.include[0].suite,
+      'controls'
     )
     assert.equal(
       SHARE_SHEET_LANE_HEADROOM_MS.ios,

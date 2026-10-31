@@ -41,6 +41,7 @@ import {
   inMatrixSection,
   localesForShard,
   parseShard,
+  shardPlanFor,
 } from './ci/native-matrix-shards.mjs'
 import {
   iosDriverGlobalArgs,
@@ -327,6 +328,14 @@ function terminateDevClient() {
   spawnSync('xcrun', ['simctl', 'terminate', device, DEV_CLIENT_APP_ID], {
     encoding: 'utf8',
   })
+}
+/** The emulator's SDK level on Android; iOS has none. */
+function androidSdk() {
+  if (platform !== 'android') return undefined
+  requireDevice()
+  return Number(
+    run(adb, ['-s', device, 'shell', 'getprop', 'ro.build.version.sdk']).trim()
+  )
 }
 function openUrl(url) {
   requireDevice()
@@ -1530,8 +1539,10 @@ if (command === 'prebuild') {
 } else if (command === 'matrix') {
   requireDevice()
   const report = { platform, cases: [], completed: false }
-  const shard =
-    option('shard') === undefined ? undefined : parseShard(platform, option('shard'))
+  // Each sharded lane has its own plan: iOS, or the Android plan of the emulator's API.
+  const plan =
+    option('shard') === undefined ? undefined : shardPlanFor(platform, androidSdk())
+  const shard = plan === undefined ? undefined : parseShard(plan, option('shard'))
   let before
   const mark = (id) => {
     report.cases.push({ id, passed: true })
@@ -1577,7 +1588,7 @@ if (command === 'prebuild') {
   // Real Settings controls establish locale; no direct i18n test setter is used.
   activeLocale = 'en-US'
   maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
-  if (inMatrixSection(platform, shard, 'pre-locale')) {
+  if (inMatrixSection(plan, shard, 'pre-locale')) {
     const beforePreparation = originals()
     fixture('prepare_deferred')
     maestro('maestro/story68/preparing-cancel.yaml')
@@ -1644,7 +1655,7 @@ if (command === 'prebuild') {
     close()
   }
   fixture('real')
-  for (const locale of localesForShard(platform, shard)) {
+  for (const locale of localesForShard(plan, shard)) {
     activeLocale = locale
     if (platform === 'ios') recordIosHostSample('locale-loop', { root })
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: locale })
@@ -1697,7 +1708,7 @@ if (command === 'prebuild') {
     mark(`M-LOCALE:${locale}`)
     close()
   }
-  if (inMatrixSection(platform, shard, 'large-text')) {
+  if (inMatrixSection(plan, shard, 'large-text')) {
     activeLocale = 'pt-PT'
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
     const previousFont =
@@ -1726,13 +1737,13 @@ if (command === 'prebuild') {
     }
   }
   if (
-    inMatrixSection(platform, shard, 'precommit-lifecycle') ||
-    inMatrixSection(platform, shard, 'save-lifecycle')
+    inMatrixSection(plan, shard, 'precommit-lifecycle') ||
+    inMatrixSection(plan, shard, 'save-lifecycle')
   ) {
     activeLocale = 'en-US'
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
   }
-  if (inMatrixSection(platform, shard, 'precommit-lifecycle')) {
+  if (inMatrixSection(plan, shard, 'precommit-lifecycle')) {
     for (const lifecycle of ['close', 'navigation']) {
       fixture('real')
       open('outfit')
@@ -1761,7 +1772,7 @@ if (command === 'prebuild') {
       mark(`M-CANCEL M-SINGLE-WRITE:precommit-authorization-${lifecycle}`)
     }
   }
-  if (inMatrixSection(platform, shard, 'save-lifecycle')) {
+  if (inMatrixSection(plan, shard, 'save-lifecycle')) {
     for (const lifecycle of ['close', 'navigation', 'signout']) {
       fixture('deferred')
       open('outfit')
@@ -1810,7 +1821,7 @@ if (command === 'prebuild') {
       ])
     await new Promise((resolve) => setTimeout(resolve, 2000))
   }
-  if (inMatrixSection(platform, shard, 'prefs-failed')) {
+  if (inMatrixSection(plan, shard, 'prefs-failed')) {
     fixture('prefs_unavailable')
     try {
       maestro('maestro/story68/prefs-failed.yaml')
@@ -1828,8 +1839,9 @@ if (command === 'prebuild') {
   privateJson(`native-matrix-${platform}.json`, report)
   console.log(`Native ${platform} matrix passed ${report.cases.length} cases.`)
 } else if (command === 'permission-baseline') {
-  // The Photos state `proof` leaves behind (read denied, add-only granted), for the iOS shard that
-  // does not run `proof`. Without it the first Save shows the add-only prompt instead of Saving.
+  // The permission state `proof` leaves behind, for the shard that does not run `proof`. On iOS
+  // that is Photos read denied and add-only granted: without it the first Save shows the add-only
+  // prompt instead of Saving. On API32 it is WRITE_EXTERNAL_STORAGE, which Saves need there.
   requireDevice()
   if (platform === 'ios') {
     run('xcrun', ['simctl', 'privacy', device, 'revoke', 'photos', appId])
@@ -1837,6 +1849,26 @@ if (command === 'prebuild') {
     assertIosReadDenied(iosPhotoPermissions(), true)
     // proof relaunches the dev client after its grant; do the same so the app reads the
     // permission in a fresh JS runtime and the next flow starts on the tabs.
+    openUrl(
+      `couturecast-story68://expo-development-client/?url=${encodeURIComponent('http://127.0.0.1:8089')}`
+    )
+    maestro('maestro/story65/open-app.yaml')
+  } else if (androidSdk() < 33) {
+    run(adb, [
+      '-s',
+      device,
+      'shell',
+      'pm',
+      'grant',
+      appId,
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+    ])
+    const granted = run(adb, ['-s', device, 'shell', 'dumpsys', 'package', appId])
+    if (!granted.includes('android.permission.WRITE_EXTERNAL_STORAGE: granted=true'))
+      throw new Error('android_storage_permission_not_granted')
+    // Reopen the dev client cold, as the large-text section does, so the next flow starts on
+    // the tabs of a runtime that has the permission.
+    run(adb, ['-s', device, 'shell', 'am', 'force-stop', appId])
     openUrl(
       `couturecast-story68://expo-development-client/?url=${encodeURIComponent('http://127.0.0.1:8089')}`
     )

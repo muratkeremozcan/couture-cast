@@ -277,10 +277,10 @@ describe('deployment workflows', () => {
         expect(reserve, `${file} ${job}`).toBeLessThan(start)
       }
     }
-    // pr-share-card-native.yml starts it in five jobs: the API32 original-resource job, the
-    // browser lane and the three Android 36 partitions (two of them reuse the first one's
+    // pr-share-card-native.yml starts it in six jobs: the API32 original-resource job, the
+    // browser lane and the four Android 36 partitions (three of them reuse the first one's
     // anchored steps). The iOS shards start Supabase from scripts/ci/native-supabase.mjs.
-    expect(startingJobs).toBe(11)
+    expect(startingJobs).toBe(12)
   })
 
   it('the share-card native workflow runs only the browser lane on pull requests', () => {
@@ -303,6 +303,7 @@ describe('deployment workflows', () => {
     // The device lanes take over an hour each, and the evidence jobs only read their artifacts;
     // a pull request would wait on all of them.
     expect([...skipped].sort()).toEqual([
+      'android36-controls',
       'android36-interaction',
       'android36-matrix-evidence',
       'android36-native-matrix',
@@ -312,6 +313,7 @@ describe('deployment workflows', () => {
       'ios-expo-go',
       'ios-shard',
       'original-resource',
+      'original-resource-evidence',
     ])
   })
 

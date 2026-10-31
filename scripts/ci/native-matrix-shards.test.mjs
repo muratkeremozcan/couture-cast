@@ -7,66 +7,90 @@ import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import { assertNativeEvidence } from '../lib/story68-native-evidence-schema.mjs'
 import {
-  ANDROID_MEASURED_MINUTES,
   LOCALES,
   MATRIX_SECTIONS,
-  MATRIX_SHARD_PLAN,
-  androidNominalMinutes,
+  MATRIX_SHARD_PLANS,
   assertShardEvidence,
+  commandsForShard,
   expectedMatrixCases,
   inMatrixSection,
   localesForShard,
+  nominalMinutes,
   parseShard,
+  planPlatform,
+  shardPlanFor,
   shardsOf,
 } from './native-matrix-shards.mjs'
 
 const workflow = parse(
   fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
 )
-const report = (platform, shard, patch = {}) => ({
-  platform,
+const plans = Object.keys(MATRIX_SHARD_PLANS)
+const androidPlans = plans.filter((plan) => planPlatform(plan) === 'android')
+const report = (plan, shard, patch = {}) => ({
+  platform: planPlatform(plan),
   completed: true,
-  cases: expectedMatrixCases(platform, shard).map((id) => ({ id, passed: true })),
+  cases: expectedMatrixCases(plan, shard).map((id) => ({ id, passed: true })),
   ...patch,
 })
-const both = (platform) =>
-  Object.fromEntries(shardsOf(platform).map((shard) => [shard, report(platform, shard)]))
+const both = (plan) =>
+  Object.fromEntries(shardsOf(plan).map((shard) => [shard, report(plan, shard)]))
+// Each sharded Android lane: its job, the plan it runs and the suite prefix of its rows.
+const lanes = [
+  ['android36-native-matrix', 'android-36', 'matrix'],
+  ['original-resource', 'android-32', 'all'],
+]
 
 describe('native matrix shard partition', () => {
-  for (const platform of ['android', 'ios'])
-    test(`${platform}: every matrix section and locale belongs to exactly one shard`, () => {
-      const shards = shardsOf(platform)
+  test('the plans are iOS and the two Android emulator APIs', () => {
+    assert.deepEqual(plans.sort(), ['android-32', 'android-36', 'ios'])
+    assert.equal(shardPlanFor('ios'), 'ios')
+    assert.equal(shardPlanFor('android', '36'), 'android-36')
+    assert.equal(shardPlanFor('android', 32), 'android-32')
+    for (const [platform, sdk] of [
+      ['android', '34'],
+      ['android', ''],
+      ['android', undefined],
+      ['web', '36'],
+    ])
+      assert.throws(() => shardPlanFor(platform, sdk), /shard_plan_invalid/)
+  })
+
+  for (const plan of plans)
+    test(`${plan}: every matrix section and locale belongs to exactly one shard`, () => {
+      const shards = shardsOf(plan)
       assert.deepEqual(shards, [1, 2])
-      for (const section of Object.keys(MATRIX_SECTIONS[platform]))
+      for (const section of Object.keys(MATRIX_SECTIONS[planPlatform(plan)]))
         assert.equal(
-          shards.filter((s) => inMatrixSection(platform, s, section)).length,
+          shards.filter((s) => inMatrixSection(plan, s, section)).length,
           1,
           section
         )
       for (const locale of LOCALES)
         assert.equal(
-          shards.filter((s) => localesForShard(platform, s).includes(locale)).length,
+          shards.filter((s) => localesForShard(plan, s).includes(locale)).length,
           1,
           locale
         )
     })
 
-  test('the Android shards together report all 43 cases of the unsharded matrix, none twice', () => {
-    const whole = expectedMatrixCases('android', undefined)
-    // pre-locale 11, large-text 1, precommit 2, save 8, prefs-failed 1, and per locale the
-    // dark-dialog status icons and the locale itself.
-    assert.equal(whole.length, 11 + 1 + 2 + 8 + 1 + LOCALES.length * 2)
-    assert.equal(whole.length, 43)
-    const [one, two] = shardsOf('android').map((s) => expectedMatrixCases('android', s))
-    assert.deepEqual([...one, ...two].sort(), whole)
-    // save-lifecycle reports M-SAVE-OWNERSHIP:current-saving three times, all in one shard.
-    const unique = (ids) => new Set(ids)
-    assert.equal(
-      [...unique(one)].filter((id) => unique(two).has(id)).length,
-      0,
-      'no case id is reported by both shards'
-    )
-  })
+  for (const plan of androidPlans)
+    test(`${plan}: the shards together report all 43 cases of the unsharded matrix, none twice`, () => {
+      const whole = expectedMatrixCases(plan, undefined)
+      // pre-locale 11, large-text 1, precommit 2, save 8, prefs-failed 1, and per locale the
+      // dark-dialog status icons and the locale itself.
+      assert.equal(whole.length, 11 + 1 + 2 + 8 + 1 + LOCALES.length * 2)
+      assert.equal(whole.length, 43)
+      const [one, two] = shardsOf(plan).map((s) => expectedMatrixCases(plan, s))
+      assert.deepEqual([...one, ...two].sort(), whole)
+      // save-lifecycle reports M-SAVE-OWNERSHIP:current-saving three times, all in one shard.
+      const second = new Set(two)
+      assert.equal(
+        [...new Set(one)].filter((id) => second.has(id)).length,
+        0,
+        'no case id is reported by both shards'
+      )
+    })
 
   test('the iOS shards keep their 34 cases', () => {
     const whole = expectedMatrixCases('ios', undefined)
@@ -80,88 +104,129 @@ describe('native matrix shard partition', () => {
   })
 
   test('an unsharded run selects every section and locale', () => {
-    for (const platform of ['android', 'ios']) {
-      for (const section of Object.keys(MATRIX_SECTIONS[platform]))
-        assert.equal(inMatrixSection(platform, undefined, section), true)
-      assert.deepEqual(localesForShard(platform, undefined), [...LOCALES])
+    for (const plan of plans) {
+      for (const section of Object.keys(MATRIX_SECTIONS[planPlatform(plan)]))
+        assert.equal(inMatrixSection(plan, undefined, section), true)
+      assert.deepEqual(localesForShard(plan, undefined), [...LOCALES])
     }
   })
 
   test('the plans name only sections the runner knows', () => {
-    for (const platform of ['android', 'ios'])
-      for (const { sections } of Object.values(MATRIX_SHARD_PLAN[platform]))
+    for (const plan of plans)
+      for (const { sections } of Object.values(MATRIX_SHARD_PLANS[plan].shards))
         for (const section of sections)
-          assert.ok(MATRIX_SECTIONS[platform][section], `${platform} ${section}`)
+          assert.ok(MATRIX_SECTIONS[planPlatform(plan)][section], `${plan} ${section}`)
   })
 
-  test('parseShard accepts only a shard of the platform plan', () => {
-    assert.equal(parseShard('android', '1/2'), 1)
-    assert.equal(parseShard('android', '2/2'), 2)
-    for (const bad of ['3/2', '1/3', '0/2', '', undefined, '1', '1/2; rm'])
-      assert.throws(() => parseShard('android', bad), /android_shard_invalid/)
-    assert.throws(() => parseShard('web', '1/2'), /shard_platform_invalid/)
+  test('parseShard accepts only a shard of the plan', () => {
+    for (const plan of plans) {
+      assert.equal(parseShard(plan, '1/2'), 1)
+      assert.equal(parseShard(plan, '2/2'), 2)
+      for (const bad of ['3/2', '1/3', '0/2', '', undefined, '1', '1/2; rm'])
+        assert.throws(() => parseShard(plan, bad), new RegExp(`${plan}_shard_invalid`))
+    }
+    assert.throws(() => parseShard('android', '1/2'), /shard_plan_invalid/)
   })
 
   test('every case a shard must report is accepted by the closed published matrix schema', () => {
-    for (const platform of ['android', 'ios'])
-      for (const shard of shardsOf(platform))
+    for (const plan of plans)
+      for (const shard of shardsOf(plan))
         assert.doesNotThrow(() =>
-          assertNativeEvidence(`native-matrix-${platform}.json`, report(platform, shard))
+          assertNativeEvidence(
+            `native-matrix-${planPlatform(plan)}.json`,
+            report(plan, shard)
+          )
         )
   })
 })
 
+describe('Android shard commands', () => {
+  test('every Android shard runs the matrix once and every other command in one shard only', () => {
+    for (const plan of androidPlans) {
+      for (const shard of shardsOf(plan))
+        assert.equal(
+          commandsForShard(plan, shard).filter((c) => c === 'matrix').length,
+          1,
+          `${plan} shard ${shard}`
+        )
+      const others = shardsOf(plan).flatMap((s) =>
+        commandsForShard(plan, s).filter((c) => c !== 'matrix')
+      )
+      assert.equal(new Set(others).size, others.length, plan)
+    }
+    assert.deepEqual(commandsForShard('android-36', 1), ['matrix'])
+    assert.deepEqual(commandsForShard('android-36', 2), ['matrix'])
+  })
+
+  // The API32 journey was one 62.7 minute step on run 41202706840: proof, the matrix and
+  // rapid-watermark. proof grants WRITE_EXTERNAL_STORAGE through Settings, which API32 Saves need,
+  // so the shard without proof sets the same permission before its matrix.
+  test('API32 shard 1 proves the original and the rapid watermark; shard 2 grants storage first', () => {
+    assert.deepEqual(commandsForShard('android-32', 1), [
+      'proof',
+      'matrix',
+      'rapid-watermark',
+    ])
+    assert.deepEqual(commandsForShard('android-32', 2), ['permission-baseline', 'matrix'])
+    for (const shard of shardsOf('android-32')) {
+      const commands = commandsForShard('android-32', shard)
+      const grant = ['proof', 'permission-baseline'].filter((c) => commands.includes(c))
+      assert.equal(grant.length, 1, `shard ${shard} grants exactly once`)
+      assert.ok(commands.indexOf(grant[0]) < commands.indexOf('matrix'))
+    }
+  })
+})
+
 describe('native matrix shard merge', () => {
-  test('passes only when both Android shards completed their exact cases', () => {
-    assert.equal(assertShardEvidence('android', both('android')), 43)
+  test('passes only when both shards completed their exact cases', () => {
+    for (const plan of androidPlans)
+      assert.equal(assertShardEvidence(plan, both(plan)), 43)
     assert.equal(assertShardEvidence('ios', both('ios')), 34)
   })
 
-  test('a missing Android shard fails the merge', () => {
-    assert.throws(
-      () => assertShardEvidence('android', { 1: report('android', 1) }),
-      /android_shard_missing:2/
-    )
-    assert.throws(
-      () => assertShardEvidence('android', { 2: report('android', 2) }),
-      /android_shard_missing:1/
-    )
-    assert.throws(
-      () => assertShardEvidence('android', undefined),
-      /android_shard_missing:1,2/
-    )
-  })
+  for (const plan of androidPlans)
+    test(`a missing ${plan} shard fails the merge`, () => {
+      assert.throws(
+        () => assertShardEvidence(plan, { 1: report(plan, 1) }),
+        new RegExp(`${plan}_shard_missing:2`)
+      )
+      assert.throws(
+        () => assertShardEvidence(plan, { 2: report(plan, 2) }),
+        new RegExp(`${plan}_shard_missing:1`)
+      )
+      assert.throws(
+        () => assertShardEvidence(plan, undefined),
+        new RegExp(`${plan}_shard_missing:1,2`)
+      )
+    })
 
-  test('an incomplete, failed, truncated, swapped or foreign shard report fails the merge', () => {
-    const run = (patch) => () =>
-      assertShardEvidence('android', { ...both('android'), ...patch })
-    assert.throws(
-      run({ 1: report('android', 1, { completed: false }) }),
-      /android_shard_evidence_incomplete:1/
+  for (const plan of androidPlans)
+    test(`an incomplete, failed, truncated, swapped, foreign or unsharded ${plan} report fails the merge`, () => {
+      const incomplete = new RegExp(`${plan}_shard_evidence_incomplete:`)
+      const run = (patch) => () => assertShardEvidence(plan, { ...both(plan), ...patch })
+      assert.throws(run({ 1: report(plan, 1, { completed: false }) }), incomplete)
+      const failed = report(plan, 2)
+      failed.cases[0].passed = false
+      assert.throws(run({ 2: failed }), incomplete)
+      const truncated = report(plan, 2)
+      truncated.cases.pop()
+      assert.throws(run({ 2: truncated }), incomplete)
+      assert.throws(
+        run({ 1: report(plan, 2), 2: report(plan, 1) }),
+        new RegExp(`${plan}_shard_evidence_incomplete:1,2`)
+      )
+      assert.throws(run({ 1: report(plan, undefined) }), incomplete)
+      assert.throws(run({ 1: { ...report(plan, 1), platform: 'ios' } }), incomplete)
+    })
+
+  test('the two Android plans are different splits, so one shard report cannot pass for the other', () => {
+    assert.notDeepEqual(
+      expectedMatrixCases('android-32', 1),
+      expectedMatrixCases('android-36', 1)
     )
-    const failed = report('android', 2)
-    failed.cases[0].passed = false
-    assert.throws(run({ 2: failed }), /android_shard_evidence_incomplete:2/)
-    const truncated = report('android', 2)
-    truncated.cases.pop()
-    assert.throws(run({ 2: truncated }), /android_shard_evidence_incomplete:2/)
     assert.throws(
-      run({ 1: report('android', 2), 2: report('android', 1) }),
-      /android_shard_evidence_incomplete:1,2/
-    )
-    // An unsharded report carries every case, so it is wrong for either shard.
-    const whole = {
-      platform: 'android',
-      completed: true,
-      cases: expectedMatrixCases('android', undefined).map((id) => ({
-        id,
-        passed: true,
-      })),
-    }
-    assert.throws(run({ 1: whole }), /android_shard_evidence_incomplete:1/)
-    assert.throws(
-      run({ 1: { ...report('android', 1), platform: 'ios' } }),
-      /android_shard_evidence_incomplete:1/
+      () => assertShardEvidence('android-32', both('android-36')),
+      /android-32_shard_evidence_incomplete/
     )
   })
 
@@ -169,69 +234,131 @@ describe('native matrix shard merge', () => {
     spawnSync(process.execPath, ['scripts/ci/native-matrix-shards.mjs', ...args], {
       encoding: 'utf8',
     })
-  const writeShards = (platform, shards) => {
+  const writeShards = (plan, shards) => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-matrix-shards-'))
     for (const shard of shards) {
       fs.mkdirSync(path.join(directory, `shard-${shard}`))
       fs.writeFileSync(
-        path.join(directory, `shard-${shard}`, `native-matrix-${platform}.json`),
-        JSON.stringify(report(platform, shard))
+        path.join(
+          directory,
+          `shard-${shard}`,
+          `native-matrix-${planPlatform(plan)}.json`
+        ),
+        JSON.stringify(report(plan, shard))
       )
     }
     return directory
   }
 
-  test('the merge CLI passes both Android shard artifacts and names a missing one', (t) => {
-    const full = writeShards('android', [1, 2])
-    const partial = writeShards('android', [1])
-    t.after(() => {
-      for (const directory of [full, partial])
-        fs.rmSync(directory, { recursive: true, force: true })
+  for (const plan of androidPlans)
+    test(`the merge CLI passes both ${plan} shard artifacts and names a missing one`, (t) => {
+      const full = writeShards(plan, [1, 2])
+      const partial = writeShards(plan, [1])
+      t.after(() => {
+        for (const directory of [full, partial])
+          fs.rmSync(directory, { recursive: true, force: true })
+      })
+      const ok = cli(['merge', plan, full])
+      assert.equal(ok.status, 0, ok.stderr)
+      assert.match(
+        ok.stdout,
+        new RegExp(`Both ${plan} matrix shards reported 43 cases\\.`)
+      )
+      const missing = cli(['merge', plan, partial])
+      assert.equal(missing.status, 1)
+      assert.match(missing.stderr, new RegExp(`${plan}_shard_missing:2`))
+      assert.equal(cli(['merge', 'android', full]).status, 1)
     })
-    const ok = cli(['merge', 'android', full])
-    assert.equal(ok.status, 0, ok.stderr)
-    assert.match(ok.stdout, /Both android matrix shards reported 43 cases\./)
-    const missing = cli(['merge', 'android', partial])
-    assert.equal(missing.status, 1)
-    assert.match(missing.stderr, /android_shard_missing:2/)
-    assert.equal(cli(['merge', 'web', full]).status, 1)
+})
+
+describe('Android shard balance and journey budget', () => {
+  for (const [job, plan, prefix] of lanes) {
+    const rows = workflow.jobs[job].strategy.matrix.include
+
+    test(`${job} runs exactly one row per ${plan} shard`, () => {
+      assert.deepEqual(
+        rows.map((row) => row.suite),
+        shardsOf(plan).map((shard) => `${prefix}-${shard}`)
+      )
+      assert.ok(rows.every((row) => row.api === Number(plan.split('-')[1])))
+    })
+
+    test(`${plan}: the measured minutes cover every section and command the plan places`, () => {
+      const minutes = MATRIX_SHARD_PLANS[plan].minutes
+      for (const section of Object.keys(MATRIX_SECTIONS.android))
+        assert.ok(minutes[section] > 0, section)
+      for (const shard of shardsOf(plan))
+        for (const command of commandsForShard(plan, shard).filter((c) => c !== 'matrix'))
+          assert.ok(minutes[command] > 0, command)
+      assert.ok(minutes.locale > 0)
+      assert.ok(minutes.shardSetup > 0)
+    })
+
+    test(`${plan}: the shards are balanced by measured wall time`, () => {
+      const [one, two] = shardsOf(plan).map((shard) => nominalMinutes(plan, shard))
+      assert.ok(Math.abs(one - two) <= 3, `shard 1 ${one} min, shard 2 ${two} min`)
+    })
+
+    test(`${job}: a runner 1.5x slower than the measured run still finishes every shard in its journey timeout`, () => {
+      for (const [index, shard] of shardsOf(plan).entries()) {
+        const timeout = rows[index].journey_timeout
+        assert.ok(
+          nominalMinutes(plan, shard) * 1.5 < timeout,
+          `shard ${shard}: ${nominalMinutes(plan, shard)} min nominal, ${timeout} min timeout`
+        )
+      }
+    })
+  }
+
+  test('the unsharded journeys match their measured runs and could not fit a 1.5x runner', () => {
+    // Main run 41104845732: the API36 matrix in one 43.4 minute step with a 60 minute timeout.
+    assert.ok(Math.abs(nominalMinutes('android-36', undefined) - 43.4) < 0.5)
+    assert.ok(nominalMinutes('android-36', undefined) * 1.5 > 60)
+    // Run 41202706840: proof, matrix and rapid-watermark in one 62.7 minute API32 step, in a
+    // job with a 90 minute limit.
+    assert.ok(Math.abs(nominalMinutes('android-32', undefined) - 62.7) < 0.5)
+    assert.ok(nominalMinutes('android-32', undefined) * 1.5 > 90)
   })
 })
 
-describe('Android matrix shard balance and journey budget', () => {
-  const job = workflow.jobs['android36-native-matrix']
-  const rows = job.strategy.matrix.include
+describe('runner shard wiring', () => {
+  const source = fs.readFileSync(
+    new URL('../run-story68-native.mjs', import.meta.url),
+    'utf8'
+  )
+  const branch = (from, to) => {
+    const start = source.indexOf(from)
+    assert.ok(start >= 0, from)
+    return source.slice(start, source.indexOf(to, start))
+  }
 
-  test('the workflow runs exactly one row per Android plan shard', () => {
-    assert.deepEqual(
-      rows.map((row) => row.suite),
-      shardsOf('android').map((shard) => `matrix-${shard}`)
+  test('the matrix reads its plan from the platform and the emulator SDK it runs on', () => {
+    const matrix = branch("} else if (command === 'matrix') {", "activeLocale = 'en-US'")
+    assert.match(matrix, /shardPlanFor\(platform, androidSdk\(\)\)/)
+    assert.match(matrix, /parseShard\(plan, option\('shard'\)\)/)
+    assert.doesNotMatch(source, /inMatrixSection\(platform, /)
+  })
+
+  // Run 41202706840: API32 Saves need WRITE_EXTERNAL_STORAGE, which only `proof` grants.
+  test('permission-baseline grants API32 storage, proves the grant and reopens the app on the tabs', () => {
+    const baseline = branch(
+      "} else if (command === 'permission-baseline') {",
+      "} else if (command === 'fixture')"
     )
-  })
-
-  test('the measured minutes cover every section the plan places', () => {
-    for (const section of Object.keys(MATRIX_SECTIONS.android))
-      assert.ok(ANDROID_MEASURED_MINUTES[section] > 0, section)
-    assert.ok(ANDROID_MEASURED_MINUTES.locale > 0)
-    assert.ok(ANDROID_MEASURED_MINUTES.shardSetup > 0)
-    // Main run 41104845732 ran the whole matrix in one 43.4 minute journey step.
-    assert.ok(Math.abs(androidNominalMinutes(undefined) - 43.4) < 0.5)
-  })
-
-  test('the shards are balanced by measured wall time', () => {
-    const [one, two] = shardsOf('android').map(androidNominalMinutes)
-    assert.ok(Math.abs(one - two) <= 3, `shard 1 ${one} min, shard 2 ${two} min`)
-  })
-
-  test('a runner 1.5x slower than main still finishes every shard inside its journey timeout', () => {
-    for (const [index, shard] of shardsOf('android').entries()) {
-      const timeout = rows[index].journey_timeout
-      assert.ok(
-        androidNominalMinutes(shard) * 1.5 < timeout,
-        `shard ${shard}: ${androidNominalMinutes(shard)} min nominal, ${timeout} min timeout`
-      )
+    const android = baseline
+      .slice(baseline.indexOf('androidSdk() < 33'))
+      .replace(/\s+/g, ' ')
+    assert.ok(baseline.includes('androidSdk() < 33'))
+    const at = (needle) => {
+      const index = android.indexOf(needle)
+      assert.ok(index >= 0, needle)
+      return index
     }
-    // The single unsharded journey had a 60 minute timeout and needs 65 at 1.5x.
-    assert.ok(androidNominalMinutes(undefined) * 1.5 > 60)
+    const grant = at("'pm', 'grant', appId, 'android.permission.WRITE_EXTERNAL_STORAGE'")
+    const proved = at('WRITE_EXTERNAL_STORAGE: granted=true')
+    const stop = at("'am', 'force-stop', appId")
+    const reopen = at('couturecast-story68://expo-development-client/')
+    const tabs = at("maestro('maestro/story65/open-app.yaml')")
+    assert.ok(grant < proved && proved < stop && stop < reopen && reopen < tabs)
   })
 })

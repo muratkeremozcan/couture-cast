@@ -15,6 +15,12 @@ concurrency:
   group: share-card-native-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  # The API32 journey runs as two shards (scripts/ci/native-matrix-shards.mjs), each on its own
+  # emulator with its own services and sign-in. Run 41202706840 ran it as one 62.7 minute
+  # journey in an 83 minute job. Shard 1 runs proof, half the matrix and rapid-watermark (35.6
+  # minutes at that run's pace); shard 2 grants storage and runs the other half (34.4 minutes).
+  # The 55 minute budget still holds on a runner 1.5x slower. original-resource-evidence proves
+  # both shards reported their exact cases.
   original-resource:
     if: github.event_name != 'pull_request'
     strategy:
@@ -25,7 +31,14 @@ jobs:
             platform: android
             api: 32
             target: google_apis
-            suite: all
+            suite: all-1
+            journey_timeout: 55
+          - os: ubuntu-latest
+            platform: android
+            api: 32
+            target: google_apis
+            suite: all-2
+            journey_timeout: 55
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env: &runtime_env
@@ -138,6 +151,7 @@ jobs:
           ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
       - name: Android isolated native journey
+        timeout-minutes: ${{ matrix.journey_timeout }}
         if: ${{ !cancelled() && matrix.platform == 'android' && steps.native_build.outcome == 'success' && steps.kvm.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -182,7 +196,7 @@ jobs:
       - name: Clean exact owned runtime
         if: always()
         run: node scripts/e2e-share-card/cleanup.mjs
-  # The three API36 partitions run on separate free runners with no dependency on each
+  # The four API36 partitions run on separate free runners with no dependency on each
   # other. Each one prepares, signs in and cleans up its own UUID runtime, so they share
   # steps (the alias) but never state. API32 stays in original-resource above; this list
   # is its Android path.
@@ -373,6 +387,25 @@ jobs:
             journey_timeout: 25
     env: *runtime_env
     steps: *android36_steps
+  # The rapid watermark, TalkBack and fallback focus proofs. Run 41202706840 ran them in 6.5
+  # minutes after an emulator, install and sign-in setup of 5.5 (12.0 in all).
+  android36-controls:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+            api: 36
+            target: google_apis_playstore
+            suite: controls
+            journey_timeout: 25
+    env: *runtime_env
+    steps: *android36_steps
+  # Story 6.9 share-sheet and the Release font proof: 21.2 minutes on run 41202706840.
   android36-interaction:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -1145,8 +1178,26 @@ jobs:
         if: always()
         run: node scripts/ci/native-ios-device-cleanup.mjs
 
-  # A skipped or partial shard has no complete report, so this job fails; the lanes gate also
-  # requires its result.
+  # A skipped or partial shard has no complete report, so these jobs fail; the lanes gate also
+  # requires their results.
+  original-resource-evidence:
+    if: always() && github.event_name != 'pull_request'
+    needs: original-resource
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: share-card-android-32-all-*
+          path: /tmp/android32-shards
+      - name: Require both API32 shards to report their exact cases
+        env:
+          CC68_SHARD_RESULT: ${{ needs.original-resource.result }}
+        run: |
+          test "$CC68_SHARD_RESULT" = success
+          for shard in 1 2; do mv "/tmp/android32-shards/share-card-android-32-all-$shard" "/tmp/android32-shards/shard-$shard"; done
+          node scripts/ci/native-matrix-shards.mjs merge android-32 /tmp/android32-shards
   android36-matrix-evidence:
     if: always() && github.event_name != 'pull_request'
     needs: android36-native-matrix
@@ -1164,7 +1215,7 @@ jobs:
         run: |
           test "$CC68_SHARD_RESULT" = success
           for shard in 1 2; do mv "/tmp/android-matrix-shards/share-card-android-36-matrix-$shard" "/tmp/android-matrix-shards/shard-$shard"; done
-          node scripts/ci/native-matrix-shards.mjs merge android /tmp/android-matrix-shards
+          node scripts/ci/native-matrix-shards.mjs merge android-36 /tmp/android-matrix-shards
   # A skipped shard has no report, so this job fails; the lanes gate also requires its result.
   ios-evidence:
     if: always() && github.event_name != 'pull_request'
@@ -1191,6 +1242,7 @@ jobs:
     if: always()
     needs:
       - original-resource
+      - original-resource-evidence
       - ios-build
       - ios-shard
       - ios-evidence
@@ -1199,6 +1251,7 @@ jobs:
       - android36-native-matrix
       - android36-matrix-evidence
       - android36-original
+      - android36-controls
       - android36-interaction
     runs-on: ubuntu-latest
     timeout-minutes: 5

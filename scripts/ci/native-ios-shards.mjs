@@ -12,7 +12,7 @@ import fs from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import {
   MATRIX_SECTIONS as PLATFORM_MATRIX_SECTIONS,
-  MATRIX_SHARD_PLAN,
+  MATRIX_SHARD_PLANS,
   SHARD_COUNT,
   LOCALES,
   assertShardEvidence as assertPlatformShardEvidence,
@@ -45,12 +45,12 @@ export const AFTER_MATRIX = Object.freeze([
 /** The iOS harness commands of each shard, with its matrix sections and locales. */
 export const SHARD_PLAN = Object.freeze({
   1: {
-    ...MATRIX_SHARD_PLAN.ios[1],
+    ...MATRIX_SHARD_PLANS.ios.shards[1],
     // Shard 1 finished in 49 of its 100 minutes on main run 41104845732; shard 2 is the longer.
     commands: ['proof', 'share-sheet'],
   },
   2: {
-    ...MATRIX_SHARD_PLAN.ios[2],
+    ...MATRIX_SHARD_PLANS.ios.shards[2],
     // `proof` denies and then grants Photos add-only through the real UI and simctl, and runs in
     // shard 1 only. Shard 2 reaches the same permission state directly. Its commands are listed,
     // never spread from AFTER_MATRIX, so a new post-matrix command lands in one shard by choice.

@@ -8,11 +8,12 @@ if [[ ! "$sdk" =~ ^[1-9][0-9]*$ ]] || [[ ! "${CC68_ANDROID_API:-}" =~ ^[1-9][0-9
   echo 'Owned emulator SDK must equal the explicit native CI matrix API' >&2
   exit 2
 fi
-# API36 partitions require an explicit suite; each fresh runner authenticates itself. The API36
-# matrix runs as two shards, matrix-1 and matrix-2 (scripts/ci/native-matrix-shards.mjs).
+# Every lane names an explicit suite; each fresh runner authenticates itself. The API32 journey
+# and the API36 matrix run as two shards each (all-1 and all-2, matrix-1 and matrix-2), planned
+# in scripts/ci/native-matrix-shards.mjs.
 suite="${CC68_ANDROID_SUITE:-}"
 case "$sdk:$suite" in
-  32:all|36:matrix-1|36:matrix-2|36:original|36:interaction) ;;
+  32:all-1|32:all-2|36:matrix-1|36:matrix-2|36:original|36:controls|36:interaction) ;;
   *) echo 'Explicit native CI suite must match the verified Android API' >&2; exit 2 ;;
 esac
 # Device permissions alone do not prove the emulator can use KVM.
@@ -21,24 +22,35 @@ grep -q 'KVM .* is installed and usable' /tmp/cc68-accel-check.txt
 adb -s "$ANDROID_SERIAL" install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 node scripts/run-story68-native.mjs open --platform android --device "$ANDROID_SERIAL"
 node scripts/run-story68-native.mjs signin --platform android --device "$ANDROID_SERIAL"
-if [[ "$suite" == all || "$suite" == original ]]; then
-  node scripts/run-story68-native.mjs proof --platform android --device "$ANDROID_SERIAL" --reinitialize-owned-app yes
-fi
-if [[ "$suite" == all ]]; then
-  node scripts/run-story68-native.mjs matrix --platform android --device "$ANDROID_SERIAL"
-fi
-if [[ "$suite" == matrix-* ]]; then
-  node scripts/run-story68-native.mjs matrix --platform android --device "$ANDROID_SERIAL" --shard "${suite#matrix-}/2"
-fi
-if [[ "$suite" == all || "$suite" == interaction ]]; then
-  node scripts/run-story68-native.mjs rapid-watermark --platform android --device "$ANDROID_SERIAL"
-  if [ "$sdk" -ge 33 ]; then
-    node scripts/run-story68-native.mjs a11y --platform android --device "$ANDROID_SERIAL"
-    node scripts/run-story68-native.mjs fallback-focus --platform android --device "$ANDROID_SERIAL"
-  fi
-  if [ "$sdk" -eq 36 ]; then
-    # Story 6.9 native share: fixture outcomes, the real chooser smoke and the receiving androidTest.
-    node scripts/run-story68-native.mjs share-sheet --platform android --device "$ANDROID_SERIAL"
+native() {
+  node scripts/run-story68-native.mjs "$1" --platform android --device "$ANDROID_SERIAL" "${@:2}"
+}
+case "$suite" in
+  all-1)
+    native proof --reinitialize-owned-app yes
+    native matrix --shard 1/2
+    native rapid-watermark
+    ;;
+  all-2)
+    # proof grants the API32 storage permission in shard 1; this shard sets it directly.
+    native permission-baseline
+    native matrix --shard 2/2
+    ;;
+  matrix-*)
+    native matrix --shard "${suite#matrix-}/2"
+    ;;
+  original)
+    native proof --reinitialize-owned-app yes
+    ;;
+  controls)
+    native rapid-watermark
+    native a11y
+    native fallback-focus
+    ;;
+  interaction)
+    # Story 6.9 native share: fixture outcomes, the real chooser smoke and the receiving
+    # androidTest. The Release font proof then replaces the debug dev client share-sheet drives.
+    native share-sheet
     bash scripts/ci/share-card-android-release-font.sh
-  fi
-fi
+    ;;
+esac

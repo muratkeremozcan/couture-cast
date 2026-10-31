@@ -187,13 +187,17 @@ const shareSheetTimeoutMs = Math.ceil(
 )
 
 /**
- * What the Story 6.9 `share-sheet` command may add to the lane that runs it, from main run
- * 41104845732 (2026-10-30, all green). android36-interaction's journey step took 27 min 38 s of
- * its 45 min journey_timeout, leaving 17 min 22 s. iOS shard 1 finished in 49 min of its 100 min
- * job, leaving 51 min.
+ * What the Story 6.9 `share-sheet` command may add to the lane that runs it. On Android that lane
+ * is android36-interaction, which runs share-sheet and the Release font proof; the rapid
+ * watermark, TalkBack and fallback focus proofs moved to android36-controls. On run 41202706840
+ * the interaction journey step took 27 min 42 s, of which those three proofs took 6 min 30 s and
+ * share-sheet 7 min 53 s, so the lane without share-sheet is 13 min 19 s of its 45 min
+ * journey_timeout, leaving 31 min 41 s. iOS shard 1 finished in 49 min of its 100 min job on main
+ * run 41104845732, leaving 51 min.
  */
+export const ANDROID_SHARE_LANE_BASE_MS = 13 * 60_000 + 19_000
 export const SHARE_SHEET_LANE_HEADROOM_MS = Object.freeze({
-  android: 17 * 60_000 + 22_000,
+  android: 31 * 60_000 + 41_000,
   ios: 51 * 60_000,
 })
 /**

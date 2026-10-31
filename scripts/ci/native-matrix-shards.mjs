@@ -1,11 +1,12 @@
 /**
- * Two-way split of the native share-card matrix on iOS and Android. Each shard boots its own
- * simulator or emulator, Supabase, Metro and signed-in account and runs the sections and locales
- * its platform plan gives it. The runner reads this table through `--shard N/2`; an unsharded
- * run (API32, local runs) runs every section and locale.
+ * Two-way split of the native share-card matrix, one plan per lane that shards it: iOS, the
+ * Android API36 matrix and the Android API32 journey. Each shard boots its own simulator or
+ * emulator, Supabase, Metro and signed-in account and runs the sections and locales its plan
+ * gives it. The runner picks the plan from the platform and the emulator SDK and reads this table
+ * through `--shard N/2`; an unsharded run (local runs) runs every section and locale.
  *
  * The split is data, and the tests prove it is a partition: every section and locale belongs to
- * exactly one shard per platform, and the cases a shard must report come from the same table the
+ * exactly one shard per plan, and the cases a shard must report come from the same table the
  * runner reads. This module imports only Node built-ins, so the evidence jobs run it straight
  * from a checkout.
  */
@@ -14,7 +15,6 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const SHARD_COUNT = 2
-export const PLATFORMS = Object.freeze(['android', 'ios'])
 
 export const LOCALES = Object.freeze([
   'en-US',
@@ -75,95 +75,149 @@ export const localeCases = (platform, locale) =>
     ? [`M-A11Y:dark-dialog-status-icons:${locale}`, `M-LOCALE:${locale}`]
     : [`M-LOCALE:${locale}`]
 
+const shard = (sections, locales, commands = ['matrix']) =>
+  Object.freeze({
+    sections: Object.freeze(sections),
+    locales: Object.freeze(locales),
+    commands: Object.freeze(commands),
+  })
+const lifecycle = ['large-text', 'precommit-lifecycle', 'save-lifecycle']
+
 /**
- * Minutes each part of the Android API36 matrix journey took on main run 41104845732, whose one
- * journey step ran all 43 cases in 43.4 minutes. `shardSetup` is what every shard repeats:
- * emulator boot inside the step (1.5), install and open (0.7), sign-in (3.5) and the en-US
- * Settings locale the matrix starts from (0.5). `save-lifecycle` includes its sign-in after
- * sign-out. Run 41190704639 ran every one of these parts about 1.4x slower.
+ * The placement. Edit this table, never the runner, to rebalance a lane. `commands` is what the
+ * Android journey script runs after sign-in for each shard (share-card-android.test.mjs proves
+ * it); iOS names its commands in native-ios-shards.mjs. `minutes` is what each part took on the
+ * run named beside it: `shardSetup` is what every shard repeats (emulator boot inside the journey
+ * step, install and open, sign-in and the en-US Settings locale the matrix starts from), and
+ * `save-lifecycle` includes its sign-in after sign-out.
  */
-export const ANDROID_MEASURED_MINUTES = Object.freeze({
-  shardSetup: 6.2,
-  'pre-locale': 7.0,
-  locale: 1.68,
-  'large-text': 1.8,
-  'precommit-lifecycle': 4.7,
-  'save-lifecycle': 6.5,
-  'prefs-failed': 0.5,
-})
-
-/** The placement. Edit this table, never the runner, to rebalance a platform. */
-export const MATRIX_SHARD_PLAN = Object.freeze({
+export const MATRIX_SHARD_PLANS = Object.freeze({
   ios: Object.freeze({
-    1: Object.freeze({
-      sections: ['pre-locale', 'prefs-failed'],
-      locales: LOCALES.slice(0, 5),
-    }),
-    2: Object.freeze({
-      sections: ['large-text', 'precommit-lifecycle', 'save-lifecycle'],
-      locales: LOCALES.slice(5),
+    platform: 'ios',
+    shards: Object.freeze({
+      1: shard(['pre-locale', 'prefs-failed'], LOCALES.slice(0, 5)),
+      2: shard(lifecycle, LOCALES.slice(5)),
     }),
   }),
-  // The iOS sections with one more locale in shard 1, because the Android lifecycle sections
-  // weigh 13.0 minutes against 7.5 for pre-locale and prefs-failed. Nominal journey steps:
-  // shard 1 23.8 minutes, shard 2 25.9 (androidNominalMinutes).
-  android: Object.freeze({
-    1: Object.freeze({
-      sections: ['pre-locale', 'prefs-failed'],
-      locales: LOCALES.slice(0, 6),
+  // The iOS sections with one more locale in shard 1, because the lifecycle sections weigh 13.0
+  // minutes against 7.5 for pre-locale and prefs-failed. Nominal journey steps: shard 1 23.8
+  // minutes, shard 2 25.9. Run 41202706840 took 32.0 and 34.3.
+  'android-36': Object.freeze({
+    platform: 'android',
+    shards: Object.freeze({
+      1: shard(['pre-locale', 'prefs-failed'], LOCALES.slice(0, 6)),
+      2: shard(lifecycle, LOCALES.slice(6)),
     }),
-    2: Object.freeze({
-      sections: ['large-text', 'precommit-lifecycle', 'save-lifecycle'],
-      locales: LOCALES.slice(6),
+    unsharded: Object.freeze(['matrix']),
+    // Main run 41104845732: the whole matrix in one 43.4 minute journey step.
+    minutes: Object.freeze({
+      shardSetup: 6.2,
+      'pre-locale': 7.0,
+      locale: 1.68,
+      'large-text': 1.8,
+      'precommit-lifecycle': 4.7,
+      'save-lifecycle': 6.5,
+      'prefs-failed': 0.5,
+    }),
+  }),
+  // proof and rapid-watermark ride with pre-locale and prefs-failed, which balances at five
+  // locales each. proof grants WRITE_EXTERNAL_STORAGE through Settings, so shard 2 sets the same
+  // grant with permission-baseline before its Saves. Nominal journey steps: shard 1 35.6
+  // minutes, shard 2 34.4.
+  'android-32': Object.freeze({
+    platform: 'android',
+    shards: Object.freeze({
+      1: shard(['pre-locale', 'prefs-failed'], LOCALES.slice(0, 5), [
+        'proof',
+        'matrix',
+        'rapid-watermark',
+      ]),
+      2: shard(lifecycle, LOCALES.slice(5), ['permission-baseline', 'matrix']),
+    }),
+    unsharded: Object.freeze(['proof', 'matrix', 'rapid-watermark']),
+    // Run 41202706840: proof, the matrix and rapid-watermark in one 62.7 minute journey step.
+    // permission-baseline is one grant and an app reopen, budgeted like the large-text reopen.
+    minutes: Object.freeze({
+      shardSetup: 6.8,
+      proof: 6.1,
+      'rapid-watermark': 2.0,
+      'permission-baseline': 0.5,
+      'pre-locale': 9.0,
+      locale: 2.22,
+      'large-text': 2.2,
+      'precommit-lifecycle': 5.9,
+      'save-lifecycle': 7.9,
+      'prefs-failed': 0.6,
     }),
   }),
 })
 
-const planOf = (platform) => {
-  const plan = MATRIX_SHARD_PLAN[platform]
-  if (!plan) throw new Error(`shard_platform_invalid:${platform}`)
+const planOf = (plan) => {
+  const value = Object.hasOwn(MATRIX_SHARD_PLANS, String(plan))
+    ? MATRIX_SHARD_PLANS[plan]
+    : undefined
+  if (!value) throw new Error(`shard_plan_invalid:${plan}`)
+  return value
+}
+
+export const planPlatform = (plan) => planOf(plan).platform
+
+/** The plan a matrix run uses: iOS, or the Android plan of the emulator SDK it runs on. */
+export function shardPlanFor(platform, sdk) {
+  const plan = platform === 'ios' ? 'ios' : `${platform}-${sdk}`
+  if (!Object.hasOwn(MATRIX_SHARD_PLANS, plan) || planOf(plan).platform !== platform)
+    throw new Error(`shard_plan_invalid:${plan}`)
   return plan
 }
 
-export const shardsOf = (platform) => Object.keys(planOf(platform)).map(Number)
+export const shardsOf = (plan) => Object.keys(planOf(plan).shards).map(Number)
 
 /** `1/2` or `2/2` to the shard number; anything else throws. */
-export function parseShard(platform, value) {
-  const plan = planOf(platform)
+export function parseShard(plan, value) {
+  const { shards } = planOf(plan)
   const m = /^([1-9])\/([1-9])$/.exec(String(value ?? ''))
-  if (!m || Number(m[2]) !== SHARD_COUNT || !plan[Number(m[1])])
-    throw new Error(`${platform}_shard_invalid:${value}`)
+  if (!m || Number(m[2]) !== SHARD_COUNT || !shards[Number(m[1])])
+    throw new Error(`${plan}_shard_invalid:${value}`)
   return Number(m[1])
 }
 
 /** With no shard every section and locale runs. */
-export const inMatrixSection = (platform, shard, section) =>
-  shard === undefined || planOf(platform)[shard].sections.includes(section)
+export const inMatrixSection = (plan, shard, section) =>
+  shard === undefined || planOf(plan).shards[shard].sections.includes(section)
 
-export const localesForShard = (platform, shard) =>
-  shard === undefined ? [...LOCALES] : [...planOf(platform)[shard].locales]
+export const localesForShard = (plan, shard) =>
+  shard === undefined ? [...LOCALES] : [...planOf(plan).shards[shard].locales]
 
-/** Case ids a completed matrix of this platform and shard must report, in sorted order. */
-export function expectedMatrixCases(platform, shard) {
+/** The Android journey commands of a shard after sign-in, or of the unsharded lane with none. */
+export const commandsForShard = (plan, shard) =>
+  shard === undefined
+    ? [...(planOf(plan).unsharded ?? ['matrix'])]
+    : [...planOf(plan).shards[shard].commands]
+
+/** Case ids a completed matrix of this plan and shard must report, in sorted order. */
+export function expectedMatrixCases(plan, shard) {
+  const platform = planPlatform(plan)
   return [
     ...Object.entries(MATRIX_SECTIONS[platform])
-      .filter(([section]) => inMatrixSection(platform, shard, section))
+      .filter(([section]) => inMatrixSection(plan, shard, section))
       .flatMap(([, ids]) => ids),
-    ...localesForShard(platform, shard).flatMap((locale) =>
-      localeCases(platform, locale)
-    ),
+    ...localesForShard(plan, shard).flatMap((locale) => localeCases(platform, locale)),
   ].sort()
 }
 
-/** Expected Android journey-step minutes for a shard, or for the whole matrix with none. */
-export function androidNominalMinutes(shard) {
-  const m = ANDROID_MEASURED_MINUTES
-  const work = Object.keys(MATRIX_SECTIONS.android)
-    .filter((section) => inMatrixSection('android', shard, section))
-    .reduce((sum, section) => sum + m[section], 0)
-  const minutes =
-    m.shardSetup + work + localesForShard('android', shard).length * m.locale
-  return Math.round(minutes * 10) / 10
+/** Expected journey-step minutes of an Android shard, or of the unsharded lane with none. */
+export function nominalMinutes(plan, shard) {
+  const { minutes } = planOf(plan)
+  if (!minutes) throw new Error(`shard_plan_unmeasured:${plan}`)
+  const work = [
+    ...Object.keys(MATRIX_SECTIONS[planPlatform(plan)]).filter((section) =>
+      inMatrixSection(plan, shard, section)
+    ),
+    ...commandsForShard(plan, shard).filter((command) => command !== 'matrix'),
+  ].reduce((sum, part) => sum + minutes[part], 0)
+  const total =
+    minutes.shardSetup + work + localesForShard(plan, shard).length * minutes.locale
+  return Math.round(total * 10) / 10
 }
 
 /**
@@ -171,10 +225,11 @@ export function androidNominalMinutes(shard) {
  * missing shard, an incomplete report or a case set that differs from the plan is a failure, so
  * a skipped or truncated shard can never pass for the whole matrix.
  */
-export function assertShardEvidence(platform, byShard) {
-  const shards = shardsOf(platform)
+export function assertShardEvidence(plan, byShard) {
+  const platform = planPlatform(plan)
+  const shards = shardsOf(plan)
   const missing = shards.filter((shard) => !byShard?.[shard])
-  if (missing.length) throw new Error(`${platform}_shard_missing:${missing.join(',')}`)
+  if (missing.length) throw new Error(`${plan}_shard_missing:${missing.join(',')}`)
   const wrong = shards.filter((shard) => {
     const report = byShard[shard]
     const got = (report.cases ?? []).map((c) => c.id).sort()
@@ -182,18 +237,19 @@ export function assertShardEvidence(platform, byShard) {
       report.platform !== platform ||
       report.completed !== true ||
       (report.cases ?? []).some((c) => c.passed !== true) ||
-      JSON.stringify(got) !== JSON.stringify(expectedMatrixCases(platform, shard))
+      JSON.stringify(got) !== JSON.stringify(expectedMatrixCases(plan, shard))
     )
   })
   if (wrong.length)
-    throw new Error(`${platform}_shard_evidence_incomplete:${wrong.join(',')}`)
-  return shards.flatMap((shard) => expectedMatrixCases(platform, shard)).length
+    throw new Error(`${plan}_shard_evidence_incomplete:${wrong.join(',')}`)
+  return shards.flatMap((shard) => expectedMatrixCases(plan, shard)).length
 }
 
 /** Reads `<directory>/shard-N/native-matrix-<platform>.json`; an absent report stays absent. */
-export function readShardReports(platform, directory) {
+export function readShardReports(plan, directory) {
+  const platform = planPlatform(plan)
   return Object.fromEntries(
-    shardsOf(platform).flatMap((shard) => {
+    shardsOf(plan).flatMap((shard) => {
       const file = path.join(
         directory,
         `shard-${shard}`,
@@ -211,12 +267,12 @@ if (
   import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href
 ) {
   try {
-    const [action, platform, value] = process.argv.slice(2)
+    const [action, plan, value] = process.argv.slice(2)
     if (action === 'merge') {
-      const total = assertShardEvidence(platform, readShardReports(platform, value))
-      console.log(`Both ${platform} matrix shards reported ${total} cases.`)
+      const total = assertShardEvidence(plan, readShardReports(plan, value))
+      console.log(`Both ${plan} matrix shards reported ${total} cases.`)
     } else if (action === 'cases')
-      console.log(expectedMatrixCases(platform, parseShard(platform, value)).join('\n'))
+      console.log(expectedMatrixCases(plan, parseShard(plan, value)).join('\n'))
     else throw new Error('matrix_shard_action_invalid')
   } catch (error) {
     console.error(error.message)
