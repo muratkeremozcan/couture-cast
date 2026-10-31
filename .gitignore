@@ -93,3 +93,4 @@ _bmad-output/test-artifacts/story-*/**
 !_bmad-output/test-artifacts/story-6-9/README.md
 !_bmad-output/test-artifacts/story-6-9/ipad-anchor-proof.json
 !_bmad-output/test-artifacts/story-6-9/ipad-anchor-*.png
+!_bmad-output/test-artifacts/story-6-9/android-status-bar-*.png

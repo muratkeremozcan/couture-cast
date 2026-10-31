@@ -18,6 +18,7 @@ import { useFonts } from 'expo-font'
 import type { Notification } from 'expo-notifications'
 import { Stack, usePathname, useRouter, useRootNavigationState } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
+import { StatusBar } from 'expo-status-bar'
 import { useEffect, useRef, useState } from 'react'
 import 'react-native-reanimated'
 
@@ -242,7 +243,17 @@ function RootLayoutNav() {
                 }}
               >
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+                {/* The modal names itself in its own heading; an untitled header would
+                    show the raw route name "modal". Android keeps the bar for its back
+                    arrow; an iOS sheet dismisses by swipe or Cancel and needs no empty bar. */}
+                <Stack.Screen
+                  name="modal"
+                  options={{
+                    presentation: 'modal',
+                    title: '',
+                    headerShown: Platform.OS !== 'ios',
+                  }}
+                />
                 <Stack.Screen
                   name="wardrobe-capsules"
                   options={{ title: t('wardrobe.capsules.title') }}
@@ -262,6 +273,10 @@ function RootLayoutNav() {
                 />
               </Stack>
             </AndroidShareCardPresentation>
+            {/* Android edge-to-edge leaves the status bar icons light whatever the theme, so
+                they vanished on the light headers. `auto` follows the OS scheme the navigation
+                theme follows; screens that need another style push their own entry on top. */}
+            <StatusBar style="auto" />
             {/* UI automation marker: commits with the navigator, so it exists on
                 every route once the JS tree has mounted and never on the splash.
                 maestro/subflows/open-app.yaml waits for it before deciding
