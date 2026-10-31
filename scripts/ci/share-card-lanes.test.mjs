@@ -878,8 +878,10 @@ const runWithStubs = (row, stubs) => {
   }
 }
 
-const swiftSummary = (count, failures = 0) =>
-  `echo "Test Suite 'All tests' passed."; echo "\t Executed ${count} test${count === 1 ? '' : 's'}, with ${failures} failures (0 unexpected) in 0.1 (0.1) seconds"; exit ${failures ? 1 : 0}`
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`
+// XCTest's own summary; with skips it reads "with S tests skipped and F failures".
+const swiftSummary = (count, failures = 0, skipped = 0) =>
+  `echo "Test Suite 'All tests' passed."; echo "\t Executed ${plural(count, 'test')}, with ${skipped ? `${plural(skipped, 'test')} skipped and ` : ''}${plural(failures, 'failure')} (0 unexpected) in 0.1 (0.1) seconds"; exit ${failures ? 1 : 0}`
 
 // U-HARNESS-PR-WORKFLOW: the share native unit lane runs on every PR that touches either native
 // share-card module, each test step fails on zero tests, and no job outlives the PR budget.
@@ -896,14 +898,15 @@ describe('share native unit workflow', () => {
     job.steps.filter((row) => /swift test|testDebugUnitTest/.test(row.run ?? ''))
   )
 
+  /** One JUnit XML report per entry: a test count, or [tests, skipped]. */
   const gradleReports = (counts, status = 0) =>
     [
       'dir=apps/mobile/modules/share-card-native-share/android/unit-tests/build/test-results/testDebugUnitTest',
       'mkdir -p "$dir"',
-      ...counts.map(
-        (count, index) =>
-          `echo '<?xml version="1.0"?><testsuite name="S${index}" tests="${count}" skipped="0" failures="0" errors="0"></testsuite>' > "$dir/TEST-S${index}.xml"`
-      ),
+      ...counts.map((entry, index) => {
+        const [count, skipped] = Array.isArray(entry) ? entry : [entry, 0]
+        return `echo '<?xml version="1.0"?><testsuite name="S${index}" tests="${count}" skipped="${skipped}" failures="0" errors="0" timestamp="2026-10-30T12:00:00"></testsuite>' > "$dir/TEST-S${index}.xml"`
+      }),
       `exit ${status}`,
     ].join('\n')
 
@@ -957,7 +960,7 @@ describe('share native unit workflow', () => {
     assert.equal(testSteps.length, 3)
   })
 
-  test('each test step passes with tests and fails on zero tests or a test failure', () => {
+  test('each test step passes with tests and fails on zero tests, all skipped or a failure', () => {
     for (const row of testSteps) {
       const swift = /swift test/.test(row.run)
       const tool = swift ? 'swift' : 'gradle'
@@ -970,6 +973,34 @@ describe('share native unit workflow', () => {
       for (const body of zero) {
         assert.notEqual(runWithStubs(row, { [tool]: body }), 0, `${row.name}: zero tests`)
       }
+      // Skipped tests did not run: an all-skipped run is a zero-test run, a partial one passes.
+      const allSkipped = swift
+        ? [swiftSummary(21, 0, 21), swiftSummary(1, 0, 1)]
+        : [
+            gradleReports([
+              [4, 4],
+              [11, 11],
+            ]),
+            gradleReports([[1, 1]]),
+          ]
+      for (const body of allSkipped) {
+        assert.notEqual(
+          runWithStubs(row, { [tool]: body }),
+          0,
+          `${row.name}: all skipped`
+        )
+      }
+      const partlySkipped = swift
+        ? swiftSummary(21, 0, 20)
+        : gradleReports([
+            [4, 4],
+            [11, 10],
+          ])
+      assert.equal(
+        runWithStubs(row, { [tool]: partlySkipped }),
+        0,
+        `${row.name}: one test ran`
+      )
       const failing = swift ? swiftSummary(21, 1) : gradleReports([4], 1)
       assert.notEqual(runWithStubs(row, { [tool]: failing }), 0, `${row.name}: failure`)
     }

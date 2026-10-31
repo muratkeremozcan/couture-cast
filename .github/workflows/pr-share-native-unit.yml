@@ -4,7 +4,8 @@
 #   ShareCardShareFile) and the photo-save package with its cross-prefix test (TEA RG3);
 # - the share module's Robolectric tests, from its standalone Gradle project, which compiles the
 #   pure Android sources without Expo or the generated app.
-# Each test step fails when it ran zero tests. PR Gate makes every job that runs here required.
+# Each test step fails when it ran zero tests, skipped tests not counted. PR Gate makes every job
+# that runs here required.
 name: Share native unit tests
 
 on:
@@ -43,9 +44,13 @@ jobs:
         run: |
           set -euo pipefail
           swift test 2>&1 | tee "$RUNNER_TEMP/share-swift-test.log"
-          count=$(grep -Eo 'Executed [0-9]+ tests?' "$RUNNER_TEMP/share-swift-test.log" | tail -1 | grep -Eo '[0-9]+' || true)
-          if [ "${count:-0}" -eq 0 ]; then echo "::error::swift test ran zero tests"; exit 1; fi
-          echo "swift test ran $count tests"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/share-swift-test.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "swift test ran $ran tests (${skipped:-0} skipped)"
 
       - name: Photo-save Swift package, with the cross-prefix test
         if: ${{ !cancelled() }}
@@ -53,9 +58,13 @@ jobs:
         run: |
           set -euo pipefail
           swift test 2>&1 | tee "$RUNNER_TEMP/photo-save-swift-test.log"
-          count=$(grep -Eo 'Executed [0-9]+ tests?' "$RUNNER_TEMP/photo-save-swift-test.log" | tail -1 | grep -Eo '[0-9]+' || true)
-          if [ "${count:-0}" -eq 0 ]; then echo "::error::swift test ran zero tests"; exit 1; fi
-          echo "swift test ran $count tests"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/photo-save-swift-test.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "swift test ran $ran tests (${skipped:-0} skipped)"
 
   robolectric:
     name: Android Robolectric tests (SDK 34 and 36)
@@ -96,12 +105,17 @@ jobs:
           shopt -s nullglob
           reports=("$project"/build/test-results/testDebugUnitTest/TEST-*.xml)
           count=0
+          skipped=0
           for report in "${reports[@]}"; do
-            tests=$(grep -Eo '<testsuite [^>]*tests="[0-9]+"' "$report" | grep -Eo 'tests="[0-9]+"' | grep -Eo '[0-9]+' || true)
+            suite=$(grep -Eo '<testsuite [^>]*>' "$report" | head -1 || true)
+            tests=$(echo "$suite" | grep -Eo ' tests="[0-9]+"' | grep -Eo '[0-9]+' || true)
+            skips=$(echo "$suite" | grep -Eo ' skipped="[0-9]+"' | grep -Eo '[0-9]+' || true)
             count=$((count + ${tests:-0}))
+            skipped=$((skipped + ${skips:-0}))
           done
-          if [ "$count" -eq 0 ]; then echo "::error::testDebugUnitTest ran zero tests"; exit 1; fi
-          echo "testDebugUnitTest ran $count tests"
+          ran=$((count - skipped))
+          if [ "$ran" -le 0 ]; then echo "::error::testDebugUnitTest ran zero tests ($count reported, $skipped skipped)"; exit 1; fi
+          echo "testDebugUnitTest ran $ran tests ($skipped skipped)"
 
       - name: Upload Robolectric reports
         if: ${{ !cancelled() }}
