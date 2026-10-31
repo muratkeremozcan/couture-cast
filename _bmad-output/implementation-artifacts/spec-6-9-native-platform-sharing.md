@@ -2,7 +2,7 @@
 title: 'CC-6.9 Native platform sharing'
 type: 'feature'
 created: '2026-10-30'
-status: 'review'
+status: 'in-review'
 baseline_commit: '185e827c949a5a038b18f6c1fd1feb22f3aad3e9'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -281,6 +281,52 @@ Result model, the single policy for UI, analytics and tests:
   on white, because React Native's edge-to-edge setup never sets status bar icon contrast. The info
   modal header also showed the raw route name "modal". Before and after screenshots are under
   `_bmad-output/test-artifacts/story-6-9/android-status-bar-*.png`.
+
+- 2026-10-30, formal step-04 review of `185e827c..f7024d48` (Blind Hunter, Edge Case Hunter,
+  Verification Gap, Codex peer review, TEA test-review). Verdicts against HEAD:
+  - V1 high, patch: `pr-share-card-native.yml` greps the photo-save suite for "Executed 4 tests";
+    the cross-prefix test makes it 5, so `ios-build` and every dependent iOS lane fail on main.
+  - V2 medium, patch: a refused iOS presentation deallocates the weakly held activity controller
+    and the 10 s watchdog returns without settling, holding the global share/save lock.
+  - V3 medium, patch: an Android attempt whose host never pauses (backgrounded during prepare,
+    blocked background start) never settles and holds the global lock until process death.
+  - V4 low, patch: an Android composer unmounted by a member change keeps a stale epoch, so a late
+    settlement emits an event for a superseded attempt.
+  - V5 low, patch: the web handoff authorization survives `handed_off`/`dismissed`, so a second
+    share within 60 s skips the prepare, the flag check and the audit row.
+  - V6 low, patch: share events carry the request IP at ingestion; the sanitizer now sets `$ip`
+    to null as server telemetry does.
+  - V7 low, patch: the allowlist drops `$process_person_profile`, so each anonymous share processes
+    a person profile; the sanitizer now sets it false.
+  - V8 low, patch: the iPad evidence check accepts a proof whose commit is not an ancestor of HEAD
+    or whose anchor sources changed since.
+  - V9 low, patch: the iOS activity item hands URL-saving receivers the cache name
+    `cc69-share-<uuid>.png`.
+  - V10 low, patch: `sentToApp` says "Finish posting there" for Drive, Gmail and Files handoffs,
+    and iOS `completed/other` says "Shared" for Copy or Print.
+  - V11 low, patch: the iOS result validator accepts `unavailable` and codes on non-failed
+    outcomes, and the iOS `share_unavailable` fixture returns an Android-only code.
+  - V12 low, patch: the OpenAPI 403 does not name `share_disabled`.
+  - V13 low, patch: a 403 `share_disabled` leaves Share visible because the cached capability is
+    kept; web never re-reads it per open.
+  - V14 low, patch: the web 409 branch captures without the `identityChanged()` check.
+  - V15 low, test gap: the Android receive test reads in the provider UID, so chooser grant
+    propagation to another app is inferred, not observed.
+  - V16 low, test gap: nothing verifies the startup sweep or the root layout header and status bar
+    options (`app/_layout.tsx`).
+  - Rejected: native validator divergence (false: iOS maps the file with `.mappedIfSafe`, Android
+    validation is in policy); a save racing the share prepare (false: the composer save guard and
+    abort path settle `failed`); Save disabled after a 409 (false: spec boundary keeps Save and
+    Share disabled until a fresh preview); `navigator.share` never settling (maybe-false, needs a
+    browser bug); NotAllowedError on an authorized tap (maybe-false, the `canShare` gate excludes
+    the permissions-policy cause and Download stays enabled); missing PNGs in the review patch
+    (false: the patch excluded binaries, the PNGs are committed); front matter loop counter
+    (fix edits this spec).
+  - TEA test-review gaps G01-G38 go to the automate pass.
+- 2026-10-31, Codex round 2 on `f7024d48..456439d1`: V1, V2 resolved; no new regressions.
+  - V17 low, patch: a sign-out and return as the same member while an unmounted composer holds a
+    committed share still emits, because only the current id is compared; a process-level
+    identity epoch now supersedes the attempt.
 
 ## Design Notes
 
