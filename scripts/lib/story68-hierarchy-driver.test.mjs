@@ -24,6 +24,7 @@ test('hierarchy reads go through the pinned iOS driver the flows use', () => {
 test('the approved-preview reads share that reader', () => {
   assert.match(body('captureApproved'), /hierarchyOutput\(\)/)
   assert.match(body('previewDigest'), /hierarchyOutput\(\)/)
+  assert.match(body('composerLayout'), /readComposerLayout\(hierarchyOutput\(\)\)/)
   assert.match(source, /JSON\.parse\(hierarchyOutput\(\)\)/)
 })
 

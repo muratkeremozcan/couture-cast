@@ -10,6 +10,7 @@ import {
   AppState,
   Image,
   Linking,
+  PixelRatio,
   Pressable,
   Platform,
   ScrollView,
@@ -27,7 +28,7 @@ import {
 } from '@couture/api-client'
 import { resolveSupportedLocale } from '@couture/api-client/contracts/http'
 import { EdgeToEdgeModal, useModalInsets } from './edge-to-edge-modal'
-import { revealOffset } from './community/compose-field-reveal'
+import { isRectInViewport, revealOffset } from './community/compose-field-reveal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { focusShareCardElement } from '@/src/lib/share-card-focus'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
@@ -122,6 +123,30 @@ const WIDE_PREVIEW_HEIGHT_SHARE = 0.45
 /** One feedback line: the reserved slot and the status and error copy share it. */
 const FEEDBACK_LINE_HEIGHT = 22
 /**
+ * The narrowest text column, in points at font scale 1, that fits every status and error string
+ * of all ten mobile catalogs on two lines. Measured at 16 pt with SF Pro (iOS) and Roboto
+ * (Android 16): the widest need is 289 pt, for de-DE `storage`. Every phone from 360 pt up gets
+ * a column of 312 pt or more; only a 320-pt window (Display Zoom on a 375-pt iPhone, or Android at
+ * a large display size) falls below, where de-DE and pt `storage` copy takes three lines.
+ */
+const FEEDBACK_TWO_LINE_COLUMN = 292
+/**
+ * The height the feedback slot reserves: the most lines any status or error string takes in this
+ * window's column at the current font scale, so copy appearing or changing never moves Save and
+ * Share (the iPad popover anchors on Share). Larger text keeps the reservation scaled; copy that
+ * still needs more lines grows the slot and is never truncated. Each line is rounded up to whole
+ * pixels as Android lays out every text line, so a 22-pt line at 2.625x reserves 58 px, not 57.75.
+ */
+export function feedbackSlotHeight(
+  windowWidth: number,
+  fontScale: number,
+  pixelRatio: number
+) {
+  const column = Math.min(windowWidth - 2 * CONTENT_INSET, CONTENT_MAX_WIDTH)
+  const lines = column / fontScale >= FEEDBACK_TWO_LINE_COLUMN ? 2 : 3
+  return (lines * Math.ceil(FEEDBACK_LINE_HEIGHT * fontScale * pixelRatio)) / pixelRatio
+}
+/**
  * A window wider than the capped content (a tablet) centers the column and caps the preview's
  * height. Phones are at most 440 pt wide, so their content never reaches the cap and keeps the
  * full-width preview.
@@ -153,8 +178,23 @@ function measureWindowFrame(node: View | null) {
 /**
  * The scroll offset that shows all of a focus target, or null when it is in view already. A result
  * can move focus to an action under the fold (Retry after a storage failure sits below Save and
- * Share on a phone), and a sighted member must see the control that has focus.
+ * Share on a phone), and a sighted member must see the control that has focus. A target already
+ * fully in view never scrolls: Share can rest just above the fold (iPhone 17 Pro), and a result
+ * that returns focus to it must not move the actions. A rubber-band pull, the negative offset a
+ * swipe that dismisses the iOS share sheet can leave, springs back to 0, so visibility is judged
+ * where the content comes to rest.
  */
+type WindowSpan = { y: number; height: number }
+export function revealScrollOffset(
+  viewport: WindowSpan,
+  frame: WindowSpan,
+  offset: number
+): number | null {
+  const top = frame.y - viewport.y + offset
+  const rect = { top, bottom: top + frame.height }
+  const resting = { offset: Math.max(0, offset), height: viewport.height }
+  return isRectInViewport(rect, resting) ? null : revealOffset(rect, resting)
+}
 async function revealInScroll(
   scroll: ScrollView | null,
   offset: number,
@@ -164,12 +204,7 @@ async function revealInScroll(
     measureWindowFrame(scroll as unknown as View | null),
     measureWindowFrame(target),
   ])
-  if (!viewport || !frame) return null
-  const top = frame.y - viewport.y + offset
-  return revealOffset(
-    { top, bottom: top + frame.height },
-    { offset, height: viewport.height }
-  )
+  return viewport && frame ? revealScrollOffset(viewport, frame, offset) : null
 }
 
 /**
@@ -848,13 +883,16 @@ function ComposerFeedback({
   }, [visible, scope, available, error, pending, message, t, onFocusResult])
   const status = Boolean(pending || message)
   const failure = !available || Boolean(error)
-  const { fontScale } = useWindowDimensions()
-  // The slot always holds one feedback line at the current font scale, so a one-line status or
-  // error replacing it never moves Save and Share (the iPad popover anchors on Share). The
-  // height is reserved without a placeholder node: a hidden placeholder Text made Android
+  const { width, fontScale } = useWindowDimensions()
+  // The height is reserved without a placeholder node: a hidden placeholder Text made Android
   // TalkBack leave the title for the next element when the composer opened.
   return (
-    <View style={[styles.feedbackSlot, { minHeight: FEEDBACK_LINE_HEIGHT * fontScale }]}>
+    <View
+      style={[
+        styles.feedbackSlot,
+        { minHeight: feedbackSlotHeight(width, fontScale, PixelRatio.get()) },
+      ]}
+    >
       {status && (
         <Text
           testID="share-card-feedback"

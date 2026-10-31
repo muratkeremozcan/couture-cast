@@ -19,6 +19,7 @@ import {
   assertShareSheetUITestResult,
   closedShareSheetFailure,
   iosShareFileStore,
+  readComposerLayout,
   runStory69ShareSheet,
   shareCopyEnv,
   shareModuleNamespace,
@@ -197,6 +198,55 @@ describe('share-sheet plan', () => {
       assert.equal(flows.at(-1), 'maestro/story68/cancel.yaml')
     }
     assert.throws(() => shareSheetFlowRuns('web'), /share_sheet_platform_required/)
+  })
+})
+
+describe('composer layout', () => {
+  const digest = 'c'.repeat(64)
+  const node = (id, bounds, children = []) => ({
+    attributes: { 'resource-id': id, bounds },
+    children,
+  })
+  const hierarchy = (scroll) =>
+    JSON.stringify(
+      node('', '[0,0][402,874]', [
+        node('share-card-title', `[24,${78 - scroll}][378,${109 - scroll}]`),
+        node(
+          `share-card-preview-loaded-${digest}`,
+          `[24,${189 - scroll}][378,${632 - scroll}]`
+        ),
+        node('share-card-save', `[24,${708 - scroll}][378,${757 - scroll}]`),
+        node('share-card-share', `[24,${773 - scroll}][378,${822 - scroll}]`),
+      ])
+    )
+
+  test('one read gives the preview digest and Share offset below the preview', () => {
+    assert.deepEqual(readComposerLayout(hierarchy(0)), {
+      digest,
+      share: { offset: 141, height: 49 },
+    })
+  })
+
+  test('the offset holds while the composer scrolls', () => {
+    assert.deepEqual(readComposerLayout(hierarchy(60)), readComposerLayout(hierarchy(0)))
+  })
+
+  test('a missing loaded preview or Share fails closed', () => {
+    assert.throws(
+      () => readComposerLayout(JSON.stringify(node('share-card-share', '[0,1][2,3]'))),
+      /loaded_approved_preview_required/
+    )
+    assert.throws(
+      () =>
+        readComposerLayout(
+          JSON.stringify(node(`share-card-preview-loaded-${digest}`, '[0,1][2,3]'))
+        ),
+      /share_action_required/
+    )
+    assert.equal(
+      closedShareSheetFailure(new Error('share_action_moved')),
+      'share_action_moved'
+    )
   })
 })
 
@@ -590,7 +640,7 @@ describe('runStory69ShareSheet', () => {
       privateJson: (name, value) => reports.push([name, structuredClone(value)]),
       read: () => ({}),
       openUrl: (url) => events.push(`open ${url.split('mode=')[1] ?? 'dev-client'}`),
-      previewDigest: () => digest,
+      composerLayout: () => ({ digest, share: { offset: 108, height: 49 } }),
       captureApproved: () => events.push('capture'),
       extract: () => events.push('extract'),
       maestro: (flow, env) => {
@@ -722,8 +772,25 @@ describe('runStory69ShareSheet', () => {
     const { ctx } = fakeDevice(t, 'ios')
     t.mock.method(console, 'log', () => undefined)
     let reads = 0
-    ctx.previewDigest = () => (++reads === 2 ? 'b'.repeat(64) : 'a'.repeat(64))
+    ctx.composerLayout = () => ({
+      digest: ++reads === 2 ? 'b'.repeat(64) : 'a'.repeat(64),
+      share: { offset: 108, height: 49 },
+    })
     await assert.rejects(runStory69ShareSheet(ctx), /share_composition_changed/)
+  })
+
+  test('feedback copy that moves Share fails the step as a moved action', async (t) => {
+    const { ctx, reports, digest } = fakeDevice(t, 'android')
+    t.mock.method(console, 'log', () => undefined)
+    let reads = 0
+    // The resting slot held one line and the two-line failure copy pushed Share down a line.
+    ctx.composerLayout = () => ({
+      digest,
+      share: { offset: ++reads === 2 ? 166 : 108, height: 136 },
+    })
+    await assert.rejects(runStory69ShareSheet(ctx), /share_action_moved/)
+    assert.equal(reports.at(-1)[1].code, 'share_action_moved')
+    assert.deepEqual(reports.at(-1)[1].cases, [])
   })
 
   test('a failed flow publishes only a closed code and the passed cases, never paths or digests', async (t) => {
@@ -809,7 +876,7 @@ describe('runner wiring', () => {
       'read',
       'privateJson',
       'openUrl',
-      'previewDigest',
+      'composerLayout',
       'captureApproved',
     ])
       assert.match(branch, new RegExp(`\\n\\s+${key},\\n`), key)
@@ -824,6 +891,9 @@ describe('runner wiring', () => {
       source.indexOf('} else if (command ===', start + 1)
     )
     assert.match(branch, /\.\.\.SHARE_FIXTURE_MODES,/)
-    assert.match(source, /import \{ SHARE_FIXTURE_MODES, runStory69ShareSheet \} from/)
+    assert.match(
+      source,
+      /import \{\n\s+SHARE_FIXTURE_MODES,\n\s+readComposerLayout,\n\s+runStory69ShareSheet,\n\} from/
+    )
   })
 })

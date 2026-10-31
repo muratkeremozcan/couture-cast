@@ -179,7 +179,11 @@ vi.mock('react-native', async (original) => {
   }
 })
 import { Platform } from 'react-native'
-import { ShareCardComposer } from './share-card-composer'
+import {
+  ShareCardComposer,
+  feedbackSlotHeight,
+  revealScrollOffset,
+} from './share-card-composer'
 function setOS(os: string) {
   Object.defineProperty(Platform, 'OS', { configurable: true, value: os })
 }
@@ -1433,7 +1437,7 @@ describe('Story 6.9 composer layout', () => {
     const saved = deferred<void>()
     boundary.save.mockReturnValue(saved.promise)
     await readyShare()
-    // The resting slot reserves one line with no node in it: a hidden placeholder Text made
+    // The resting slot reserves its lines with no node in it: a hidden placeholder Text made
     // Android TalkBack leave the title for the next element when the composer opened.
     expect(screen.queryByTestId('share-card-feedback')).not.toBeInTheDocument()
     expect(screen.queryByTestId('share-card-error')).not.toBeInTheDocument()
@@ -1473,6 +1477,63 @@ describe('Story 6.9 composer layout', () => {
     expect(screen.getByTestId('share-card-retry')).toBeInTheDocument()
     expect(tops()).toEqual(resting)
   })
+  it('C-COMP-LAYOUT-STABLE: the slot reserves exactly two lines and two-line copy moves nothing', async () => {
+    await readyShare()
+    const slot = screen.getByTestId('share-card-save').previousElementSibling
+    expect(slot?.getBoundingClientRect().height).toBe(44)
+    const resting = tops()
+    boundary.shareFile.mockResolvedValue({ target: 'none', outcome: 'cancelled' })
+    await tapShare()
+    expect(await screen.findByTestId('share-card-feedback')).toHaveTextContent(
+      i18n.t('shareCard.shareClosed')
+    )
+    expect(frame('share-card-feedback').height).toBe(22)
+    expect(tops()).toEqual(resting)
+    await waitFor(() =>
+      expect(screen.getByTestId('share-card-share')).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    )
+    boundary.shareFile.mockResolvedValue({ target: 'none', outcome: 'failed' })
+    await tapShare()
+    expect(await screen.findByTestId('share-card-error')).toHaveTextContent(
+      i18n.t('shareCard.shareFailed')
+    )
+    // The failure copy really wraps, and the reservation already held its second line.
+    expect(frame('share-card-error').height).toBe(44)
+    expect(tops()).toEqual(resting)
+    expect(slot?.getBoundingClientRect().height).toBe(44)
+  })
+  it('C-COMP-LAYOUT-STABLE: a 320-pt window reserves three lines and keeps the actions still', async () => {
+    await browserPage.viewport(320, 700)
+    await i18n.changeLanguage('de-DE')
+    boundary.save.mockRejectedValue(new Error('storage'))
+    await readyShare()
+    const slot = screen.getByTestId('share-card-save').previousElementSibling
+    expect(slot?.getBoundingClientRect().height).toBe(66)
+    const resting = tops()
+    await userEvent.click(screen.getByTestId('share-card-save'))
+    expect(await screen.findByTestId('share-card-error')).toHaveTextContent(
+      i18n.t('shareCard.storage')
+    )
+    expect(frame('share-card-error').height).toBeGreaterThan(22)
+    expect(tops()).toEqual(resting)
+  })
+  it('U-COMP-FEEDBACK-SLOT: the reservation follows the column and scales with the font', () => {
+    // Every phone from 360 pt up, and the 420-pt capped column, fits all copy on two lines.
+    expect(feedbackSlotHeight(360, 1, 3)).toBe(44)
+    expect(feedbackSlotHeight(402, 1, 3)).toBe(44)
+    expect(feedbackSlotHeight(1180, 1, 2)).toBe(44)
+    // A 320-pt window's 272-pt column needs three lines for de-DE and pt `storage`.
+    expect(feedbackSlotHeight(320, 1, 2)).toBe(66)
+    // Android rounds each 57.75-px line up to 58 px at 2.625x, and so does the reservation.
+    expect(feedbackSlotHeight(411, 1, 2.625) * 2.625).toBeCloseTo(116)
+    // Larger text narrows the column in effect and scales each line.
+    expect(feedbackSlotHeight(402, 1.1, 3) * 3).toBeCloseTo(146)
+    expect(feedbackSlotHeight(402, 1.5, 3)).toBeCloseTo(99)
+    expect(feedbackSlotHeight(1180, 2, 2)).toBeCloseTo(132)
+  })
   it('C-COMP-LAYOUT-REVEAL: a failure that focuses Retry below the fold scrolls Retry into view', async () => {
     // A short phone window: Share, added after Save, leaves Retry under the fold. Focus moves to
     // Retry, so a sighted member must see it too (iOS 26.1, ShareCardAccessibilityUITests
@@ -1500,6 +1561,59 @@ describe('Story 6.9 composer layout', () => {
     } finally {
       bounded.remove()
     }
+  })
+  it('C-COMP-LAYOUT-REVEAL: a result that focuses Share resting just above the fold scrolls nothing', async () => {
+    // iPhone 17 Pro: Share rests 2 pt above the fold. Focus returns to it after shareClosed, and
+    // a reveal with its 8-pt margin scrolled the whole composer up 6 pt.
+    const bounded = document.createElement('style')
+    bounded.textContent =
+      '[role="dialog"] { height: 100vh; display: flex; flex-direction: column; }'
+    document.head.append(bounded)
+    try {
+      await browserPage.viewport(390, 1200)
+      boundary.shareFile.mockResolvedValue({ target: 'none', outcome: 'cancelled' })
+      await readyShare()
+      let scroller = screen.getByTestId('share-card-share').parentElement
+      while (
+        scroller &&
+        !['auto', 'scroll'].includes(getComputedStyle(scroller).overflowY)
+      )
+        scroller = scroller.parentElement
+      const padding = window.innerHeight - scroller!.getBoundingClientRect().bottom
+      await browserPage.viewport(
+        390,
+        Math.ceil(frame('share-card-share').bottom + 4 + padding)
+      )
+      const fold = scroller!.getBoundingClientRect().bottom
+      expect(frame('share-card-share').bottom).toBeLessThanOrEqual(fold)
+      expect(frame('share-card-share').bottom).toBeGreaterThan(fold - 8)
+      const resting = tops()
+      await tapShare()
+      expect(await screen.findByTestId('share-card-feedback')).toHaveTextContent(
+        i18n.t('shareCard.shareClosed')
+      )
+      await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(45))
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+      expect(scroller!.scrollTop).toBe(0)
+      expect(tops()).toEqual(resting)
+    } finally {
+      bounded.remove()
+    }
+  })
+  it('U-COMP-LAYOUT-REVEAL: visibility is judged where the content rests, never mid-bounce', () => {
+    // iPhone 17 Pro: the ScrollView spans y 78 to 824 and Share rests at 773 to 822.
+    const viewport = { x: 0, y: 78, width: 402, height: 746 }
+    const share = { x: 24, y: 773, width: 354, height: 49.33 }
+    expect(revealScrollOffset(viewport, share, 0)).toBeNull()
+    // The swipe that dismissed the iOS share sheet left a 147.67-pt rubber-band pull as the
+    // result arrived (iOS 26.1 measurement). The content springs back, so nothing scrolls.
+    expect(
+      revealScrollOffset(viewport, { ...share, y: 773 + 147.67 }, -147.67)
+    ).toBeNull()
+    // A target under the fold still scrolls fully into view with its 8-pt margin.
+    expect(revealScrollOffset(viewport, { ...share, y: 838 }, 0)).toBeCloseTo(71.33)
   })
   it.each([
     ['a phone', 414, 896],

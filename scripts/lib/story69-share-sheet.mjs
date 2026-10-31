@@ -141,6 +141,49 @@ export function shareSheetFlowRuns(platform) {
   ]
 }
 
+/**
+ * The composer's state from one hierarchy read: the loaded preview's digest and Share's offset
+ * below the preview's bottom edge, in the platform's hierarchy units. Only the feedback slot sits
+ * between the two, and the offset holds while the composer scrolls, so a changed offset means
+ * status or error copy moved Share, the iPad popover anchor.
+ */
+export function readComposerLayout(hierarchy) {
+  let preview
+  let share
+  const visit = (node) => {
+    const id = node?.attributes?.['resource-id'] ?? ''
+    const bounds = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(
+      node?.attributes?.bounds ?? ''
+    )
+    if (bounds) {
+      const [top, bottom] = [Number(bounds[2]), Number(bounds[4])]
+      const digest = /^share-card-preview-loaded-([a-f0-9]{64})$/.exec(id)?.[1]
+      if (digest) preview = { digest, bottom }
+      if (id === 'share-card-share') share = { top, height: bottom - top }
+    }
+    for (const child of node?.children ?? []) visit(child)
+  }
+  visit(JSON.parse(hierarchy))
+  if (!preview) throw new Error('loaded_approved_preview_required')
+  if (!share || !(share.height > 0)) throw new Error('share_action_required')
+  return {
+    digest: preview.digest,
+    share: { offset: share.top - preview.bottom, height: share.height },
+  }
+}
+
+/**
+ * A step's copy replaced the earlier state's (resting, one line or two) in the reserved feedback
+ * slot, so Share kept its frame.
+ */
+export function assertShareStill(previous, settled) {
+  if (
+    settled.share.offset !== previous.share.offset ||
+    settled.share.height !== previous.share.height
+  )
+    throw new Error('share_action_moved')
+}
+
 /** Save proofs the command runs on a platform; each costs one extract. */
 export const shareSheetSaveProofs = (platform) =>
   (SHARE_SHEET_STEPS[platform] ?? []).filter((step) => step.save).length
@@ -377,6 +420,8 @@ const CLOSED_CODES = Object.freeze([
   'share_receive_namespace_required',
   'share_sheet_platform_required',
   'loaded_approved_preview_required',
+  'share_action_required',
+  'share_action_moved',
   'share_save_proof_failed',
 ])
 
@@ -768,7 +813,7 @@ function freshRuntime(ctx) {
 
 /**
  * Runs the plan for the runner's platform. `ctx` carries the runner's owned-device helpers:
- * maestro, run, openUrl, read, privateJson, previewDigest, captureApproved, extract and the
+ * maestro, run, openUrl, read, privateJson, composerLayout, captureApproved, extract and the
  * en-US catalog. The runner signs in before this command; a fresh runtime starts it, so it does
  * not depend on what ran before it in the lane.
  */
@@ -793,11 +838,14 @@ export async function runStory69ShareSheet(ctx) {
     ctx.maestro(OPEN_FLOW)
     for (const step of steps) {
       fixture(step.mode)
-      const digest = ctx.previewDigest()
+      const previous = ctx.composerLayout()
+      const digest = previous.digest
       const before = step.handoff ? store.list() : []
       ctx.maestro(`maestro/story68/${step.flow}`, env)
+      const settled = ctx.composerLayout()
       // The digest covers the composition and the watermark choice.
-      if (ctx.previewDigest() !== digest) throw new Error('share_composition_changed')
+      if (settled.digest !== digest) throw new Error('share_composition_changed')
+      assertShareStill(previous, settled)
       const handoff = step.handoff
         ? assertFreshShareFile(store, before, digest)
         : undefined

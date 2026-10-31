@@ -77,7 +77,11 @@ import {
   redactRapidWatermarkControl,
   closedRapidWatermarkFailure,
 } from './lib/story68-rapid-watermark-control.mjs'
-import { SHARE_FIXTURE_MODES, runStory69ShareSheet } from './lib/story69-share-sheet.mjs'
+import {
+  SHARE_FIXTURE_MODES,
+  readComposerLayout,
+  runStory69ShareSheet,
+} from './lib/story69-share-sheet.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -246,6 +250,10 @@ function previewDigest() {
   const digest = hierarchyOutput().match(/share-card-preview-loaded-([a-f0-9]{64})/)?.[1]
   if (!digest) throw new Error('loaded_approved_preview_required')
   return digest
+}
+function composerLayout() {
+  requireDevice()
+  return readComposerLayout(hierarchyOutput())
 }
 // settings.yaml asserts the destination in Maestro; this reads it again from the OS.
 function openOsSettings() {
@@ -1293,7 +1301,7 @@ if (command === 'prebuild') {
     read,
     privateJson,
     openUrl,
-    previewDigest,
+    composerLayout,
     captureApproved,
     catalog: readLocale(),
     extract: () =>
