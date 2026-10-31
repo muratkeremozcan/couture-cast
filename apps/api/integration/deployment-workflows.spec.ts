@@ -205,6 +205,16 @@ describe('deployment workflows', () => {
     expect(content).not.toMatch(/_url: \S*events\/poll/)
   })
 
+  it('prod e2e lets the newer main push supersede a run still testing the older one', () => {
+    // A group keyed by run_id never matches another run, so two pushes minutes
+    // apart overlapped and the older run's web-health-sha read the newer SHA.
+    const content = fs.readFileSync(prodE2eWorkflow, 'utf8')
+    expect(content).toMatch(
+      /^concurrency:\n {2}group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}\n {2}cancel-in-progress: true$/m
+    )
+    expect(content).not.toMatch(/github\.run_id/)
+  })
+
   it('mobile workflow exists and deploys manually with Expo token (Android-only)', () => {
     expect(fs.existsSync(mobileWorkflow)).toBe(true)
     const content = fs.readFileSync(mobileWorkflow, 'utf8')

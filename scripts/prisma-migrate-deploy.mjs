@@ -10,6 +10,9 @@
  * - `prisma migrate deploy` needs DATABASE_URL and the repo-level schema path.
  * - Some callers start from the repo root, some from script paths, and some via
  *   npm workspace commands. This wrapper normalizes that setup first.
+ * - The Vercel API build runs it too, so it migrates through DIRECT_URL when
+ *   that reaches the same database and retries a pooler that is out of client
+ *   slots (`scripts/lib/prisma-migrate-connection.mjs` says why).
  */
 import { existsSync } from 'node:fs'
 import path from 'node:path'
@@ -17,6 +20,13 @@ import { spawn } from 'node:child_process'
 import { config as loadEnv } from 'dotenv'
 import { applyLocalE2eDatabaseUrl } from './local-e2e-database.mjs'
 import { loadEnvKeepingCallerOwned } from './lib/caller-owned-env.mjs'
+import {
+  OUTPUT_TAIL_LIMIT,
+  poolRetryBaseDelay,
+  poolRetryDelays,
+  resolveMigrationDatabaseUrl,
+  runWithPoolRetry,
+} from './lib/prisma-migrate-connection.mjs'
 
 /**
  * Find the repository root by walking upward until we see the env files that
@@ -90,26 +100,59 @@ if (applyLocalE2eDatabaseUrl(process.env)) {
   )
 }
 
-// Run the deploy-style migration command, which applies committed migrations
-// without creating new ones. That is the safe behavior we want in startup flows.
-const child = spawn(
-  'npx',
-  ['prisma', 'migrate', 'deploy', '--schema', 'packages/db/prisma/schema.prisma'],
-  {
-    cwd: repoRoot,
-    env: process.env,
-    stdio: 'inherit',
-    shell: true,
-  }
-)
+const log = (message) => console.log(`[prisma-migrate-deploy] ${message}`)
 
-child.on('exit', (code, signal) => {
+/**
+ * One `prisma migrate deploy` run. Output still streams to the caller; the
+ * tail is kept so a failure can be classified.
+ *
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {Promise<{ code: number | null, signal: NodeJS.Signals | null, output: string }>}
+ */
+function runMigrateDeploy(env) {
+  return new Promise((resolve, reject) => {
+    // Deploy-style migration applies committed migrations without creating new
+    // ones, which is the safe behavior startup and build flows want.
+    // One command string: Node deprecates (DEP0190) passing args with `shell`.
+    const child = spawn(
+      'npx prisma migrate deploy --schema packages/db/prisma/schema.prisma',
+      { cwd: repoRoot, env, stdio: ['inherit', 'pipe', 'pipe'], shell: true }
+    )
+    let output = ''
+    const keep = (chunk, stream) => {
+      stream.write(chunk)
+      output = (output + chunk.toString()).slice(-OUTPUT_TAIL_LIMIT)
+    }
+    child.stdout.on('data', (chunk) => keep(chunk, process.stdout))
+    child.stderr.on('data', (chunk) => keep(chunk, process.stderr))
+    child.on('error', reject)
+    child.on('close', (code, signal) => resolve({ code, signal, output }))
+  })
+}
+
+try {
+  const migration = resolveMigrationDatabaseUrl(process.env)
+  if (migration.ignoredDirectUrl)
+    log('Ignoring DIRECT_URL: it reaches a different database than DATABASE_URL')
+  if (migration.source === 'DIRECT_URL') log('Migrating through DIRECT_URL')
+  const env =
+    migration.url === undefined
+      ? process.env
+      : { ...process.env, DATABASE_URL: migration.url }
+
+  const result = await runWithPoolRetry({
+    runAttempt: () => runMigrateDeploy(env),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    log,
+    delaysMs: poolRetryDelays({ baseMs: poolRetryBaseDelay(process.env) }),
+  })
+
   // Mirror the child outcome so callers see the real migration status instead
   // of a wrapper-specific success code.
-  if (signal) {
-    process.kill(process.pid, signal)
-    return
-  }
-
-  process.exit(code ?? 1)
-})
+  if (result.signal) process.kill(process.pid, result.signal)
+  else process.exit(result.code ?? 1)
+} catch (error) {
+  const named = error instanceof Error ? error : new Error(String(error))
+  console.error(`[prisma-migrate-deploy] ${named.name}: ${named.message}`)
+  process.exit(1)
+}
