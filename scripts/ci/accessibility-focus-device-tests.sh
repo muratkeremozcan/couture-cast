@@ -71,7 +71,7 @@ rm -rf "${results:?}"
 # Build first, so TalkBack and the backdrop are set up right before the runs.
 gradle :accessibility-focus:assembleDebugAndroidTest || exit 1
 bash "$here/android-talkback.sh" enable || exit 1
-park_backdrop || exit 1
+park_backdrop || { bash "$here/android-talkback.sh" disable || true; exit 1; }
 
 echo "== Instrumentation tests with TalkBack"
 run positive -Pandroid.testInstrumentationRunnerArguments.class=expo.modules.accessibilityfocus.AccessibilityFocusTalkBackTest

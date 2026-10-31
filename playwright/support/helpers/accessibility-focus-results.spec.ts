@@ -219,6 +219,7 @@ exit 0
     )
     expect(lane.status).toBe(1)
     expect(calls().some((line) => line.includes('connectedDebugAndroidTest'))).toBe(false)
+    expect(lane.stdout).toContain('TalkBack off.')
   })
 
   it('fails a lane whose control never ran, even with an old control result on disk', () => {
