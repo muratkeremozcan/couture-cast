@@ -1,8 +1,9 @@
 appId: ${MAESTRO_APP_ID}
 ---
 # M-SHARE-UNAVAILABLE: fixture share_unavailable reports {none, unavailable, chooser_unavailable}
-# on Android only; iOS has no unavailable outcome. The merlot error shows `shareUnavailable`; the
-# preview stays and Save stays enabled. The runner then saves and proves the original.
+# on Android only; iOS has no unavailable outcome. The merlot error shows `shareUnavailable` with no
+# `shared` or `sentToApp` copy; the preview stays and Save stays enabled. The runner then saves and
+# proves the original.
 - runFlow:
     file: tap-share.yaml
     env:
@@ -10,6 +11,8 @@ appId: ${MAESTRO_APP_ID}
 - extendedWaitUntil:
     visible: ${MAESTRO_SHARE_UNAVAILABLE}
     timeout: 20000
+- assertNotVisible: ${MAESTRO_SHARED}
+- assertNotVisible: ${MAESTRO_SENT_TO_APP}
 - assertVisible:
     id: share-card-error
 - assertVisible:
