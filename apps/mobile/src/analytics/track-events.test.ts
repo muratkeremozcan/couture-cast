@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { trackMobileShareCardShared } from './track-events'
+import { unhandledRejectionsDuring } from '@/src/test-utils/unhandled-rejections'
 
 describe('trackMobileShareCardShared', () => {
   it('C-COMP-SHARE-ONE-EVENT: captures one share_card_shared event with the four business keys', () => {
@@ -61,17 +62,17 @@ describe('trackMobileShareCardShared', () => {
         valid
       )
     ).not.toThrow()
-    const unhandled = vi.fn()
-    window.addEventListener('unhandledrejection', unhandled)
-    try {
-      const rejecting = vi.fn(() => Promise.reject(new Error('down')))
+    // A plain function, never a vi.fn: see unhandledRejectionsDuring.
+    let calls = 0
+    const rejecting = () => {
+      calls += 1
+      return Promise.reject(new Error('down'))
+    }
+    const unhandled = await unhandledRejectionsDuring(() =>
       // Typed as void, but a provider may still hand back a rejecting promise.
       trackMobileShareCardShared({ capture: rejecting as () => void }, valid)
-      expect(rejecting).toHaveBeenCalledOnce()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-      expect(unhandled).not.toHaveBeenCalled()
-    } finally {
-      window.removeEventListener('unhandledrejection', unhandled)
-    }
+    )
+    expect(calls).toBe(1)
+    expect(unhandled).toEqual([])
   })
 })

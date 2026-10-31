@@ -4,6 +4,7 @@
 import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { unhandledRejectionsDuring } from '@/src/test-utils/unhandled-rejections'
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -137,7 +138,12 @@ describe('mobile analytics facade', () => {
   })
 
   it('C-COMP-SHARE-ANALYTICS-DOWN: a provider throw or rejection never reaches the caller', async () => {
-    const rejected = vi.fn(() => Promise.reject(new Error('network down')))
+    // A plain function, never a vi.fn: see unhandledRejectionsDuring.
+    let rejectedCalls = 0
+    const rejected = () => {
+      rejectedCalls += 1
+      return Promise.reject(new Error('network down'))
+    }
     const throwing = createMobileAnalyticsClient({
       capture: () => {
         throw new Error('sdk exploded')
@@ -151,18 +157,13 @@ describe('mobile analytics facade', () => {
       screen: vi.fn(),
       getDistinctId: () => 'runtime-user',
     })
-    const unhandled = vi.fn()
-    window.addEventListener('unhandledrejection', unhandled)
-    try {
-      expect(() => throwing.capture('share_card_shared', { client: 'ios' })).not.toThrow()
+    expect(() => throwing.capture('share_card_shared', { client: 'ios' })).not.toThrow()
+    const unhandled = await unhandledRejectionsDuring(() => {
       expect(() =>
         rejecting.capture('share_card_shared', { client: 'ios' })
       ).not.toThrow()
-      expect(rejected).toHaveBeenCalledOnce()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-      expect(unhandled).not.toHaveBeenCalled()
-    } finally {
-      window.removeEventListener('unhandledrejection', unhandled)
-    }
+    })
+    expect(rejectedCalls).toBe(1)
+    expect(unhandled).toEqual([])
   })
 })
