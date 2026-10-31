@@ -117,6 +117,21 @@ const shareKeys = [
  * to Save on mobile and to Download on web; web never renders the native finishing copy.
  */
 const surfaceSpecific = new Set(['finishingSave', 'shareFailed', 'shareUnavailable'])
+/**
+ * U-SHARE-LOCALES truthfulness: the copy shown when a share leaves for an app, or when the
+ * sheet closes, never claims a post was published. Keyed by language; every catalog's
+ * language must have an entry, so a new locale cannot skip the check.
+ */
+const publishedClaims: Record<string, RegExp> = {
+  en: /\b(posted|published)\b/i,
+  de: /veröffentlicht|gepostet/i,
+  fr: /publié/i,
+  es: /publicad/i,
+  pt: /publicad/i,
+  it: /pubblicat/i,
+  tr: /yayınlandı/i,
+}
+const handoffKeys = ['sentToApp', 'shareClosed', 'shareTapAgain'] as const
 function flatten(value: unknown, prefix = ''): Record<string, string> {
   if (typeof value === 'string') return { [prefix]: value }
   if (!value || typeof value !== 'object') return {}
@@ -172,6 +187,10 @@ describe('share-card catalog parity', () => {
       expect(client.shareClosed).not.toBe(client.shared)
       expect(client.sentToApp).not.toContain(client.shared)
       expect(client.shareClosed).not.toContain(client.shared)
+      const claim = publishedClaims[locale.split('-')[0]!]
+      expect(claim, `${locale} has a published-claim denylist`).toBeInstanceOf(RegExp)
+      for (const key of handoffKeys)
+        expect(client[key], `${locale} ${key}`).not.toMatch(claim!)
       if (locale !== 'en-US' && locale !== 'en-CA')
         for (const key of shareKeys) expect(client[key]).not.toBe(english[key])
       // The pending-operation copy is shared by Save and Share, so it names neither.
