@@ -99,8 +99,8 @@ async function flushBatches() {
       batches.push(await decode(request.body))
   return batches
 }
-// The web client sends every allowlisted key: the business keys, its locale, the GeoIP
-// switch and the SDK identity and transport keys.
+// The web client sends every allowlisted key: the business keys, its locale, the GeoIP,
+// IP and person profile switches and the SDK identity and transport keys.
 const WEB_ALLOWLIST = [...SHARE_CARD_SHARED_ALLOWED_PROPERTIES].sort()
 const shareProperties = {
   ...trackShareCardShared({
@@ -152,6 +152,8 @@ describe('I-SHARE-WIRE-WEB: the serialized posthog-js batch', () => {
       duration_ms: expect.any(Number) as number,
       locale: 'de-DE',
       $geoip_disable: true,
+      $ip: null,
+      $process_person_profile: false,
       token: 'phc_wire_test',
       distinct_id: 'member-123',
       $lib: 'web',

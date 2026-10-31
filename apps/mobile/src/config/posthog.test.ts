@@ -159,6 +159,8 @@ describe('U-SHARE-SANITIZER-MOBILE: before_send for share_card_shared', () => {
         $os: 'iOS',
         $device_type: 'Mobile',
         $geoip_disable: true,
+        $ip: null,
+        $process_person_profile: false,
       },
     })
     expect(result).not.toHaveProperty('$set')

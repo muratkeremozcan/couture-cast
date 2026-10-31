@@ -2409,8 +2409,8 @@ export function trackShareCardShared(
 
 /**
  * Story 6.9 D5: the only `properties` keys a share_card_shared request may carry once
- * an SDK's before_send hook has run: the four business keys, `locale`, the GeoIP
- * switch, and the SDK identity and transport keys. URL, path, host, referrer, screen,
+ * an SDK's before_send hook has run: the four business keys, `locale`, the GeoIP, IP
+ * and person profile switches, and the SDK identity and transport keys. URL, path, host, referrer, screen,
  * super properties and `$set`/`$set_once` are all outside it.
  */
 export const SHARE_CARD_SHARED_ALLOWED_PROPERTIES = Object.freeze([
@@ -2420,6 +2420,8 @@ export const SHARE_CARD_SHARED_ALLOWED_PROPERTIES = Object.freeze([
   'duration_ms',
   'locale',
   '$geoip_disable',
+  '$ip',
+  '$process_person_profile',
   'token',
   'distinct_id',
   '$lib',
@@ -2435,8 +2437,10 @@ const shareCardSharedAllowedProperties: ReadonlySet<string> = new Set(
 /**
  * Story 6.9 D5: the final allowlist for a share_card_shared `properties` object, for
  * both SDKs' before_send hooks. Returns a new object with only allowlisted keys whose
- * values are primitives (string, finite number or boolean), `$geoip_disable: true`,
- * and the four business keys re-validated against the result model. Returns null on
+ * values are primitives (string, finite number or boolean), the privacy switches
+ * `$geoip_disable: true`, `$ip: null` and `$process_person_profile: false` (set
+ * after the copy, so the null is deliberate), and the four business keys
+ * re-validated against the result model. Returns null on
  * any problem, which drops the event: a missing or invalid business key, a value that
  * is not an object, or any internal error. Never throws.
  */
@@ -2462,6 +2466,8 @@ export function sanitizeShareCardSharedProperties(
         sanitized[key] = value
     }
     sanitized.$geoip_disable = true
+    sanitized.$ip = null
+    sanitized.$process_person_profile = false
     const business = shareCardSharedEventSchema.safeParse({
       client: sanitized.client,
       target: sanitized.target,

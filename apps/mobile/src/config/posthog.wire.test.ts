@@ -169,6 +169,8 @@ describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => 
         )
       ).toEqual([])
       expect(properties.$geoip_disable).toBe(true)
+      expect(properties.$ip).toBeNull()
+      expect(properties.$process_person_profile).toBe(false)
       expect(JSON.stringify(item)).not.toContain('couturecast.app')
       expect(JSON.stringify(item)).not.toContain('member@example.com')
       expect(JSON.stringify(item)).not.toContain('plan-premium')
@@ -182,6 +184,8 @@ describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => 
         'duration_ms',
         'locale',
         '$geoip_disable',
+        '$ip',
+        '$process_person_profile',
         '$lib',
         '$lib_version',
         ...SDK_IDENTITY_KEYS,

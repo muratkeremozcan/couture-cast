@@ -23,6 +23,8 @@ const sdk = {
   $os: 'Mac OS X',
   $device_type: 'Desktop',
 }
+// What the sanitizer always sets: no GeoIP, no stored IP, no person profile.
+const privacy = { $geoip_disable: true, $ip: null, $process_person_profile: false }
 // What posthog-js adds to a capture before before_send runs: URL, path, host, referrer,
 // screen, session, a registered super property and person updates.
 const enriched = {
@@ -69,7 +71,7 @@ describe('U-SHARE-SANITIZER-WEB: share_card_shared before_send', () => {
       uuid: '0199-share',
       event: 'share_card_shared',
       timestamp,
-      properties: { ...business, ...sdk, $geoip_disable: true },
+      properties: { ...business, ...sdk, ...privacy },
     })
     expect(Object.keys(result!).sort()).toEqual(
       ['event', 'properties', 'timestamp', 'uuid'].sort()
@@ -84,7 +86,7 @@ describe('U-SHARE-SANITIZER-WEB: share_card_shared before_send', () => {
       shareCardSharedBeforeSend(
         shareEvent({ ...business, $geoip_disable: false, locale: 'de-DE' })
       )?.properties
-    ).toEqual({ ...business, locale: 'de-DE', $geoip_disable: true })
+    ).toEqual({ ...business, locale: 'de-DE', ...privacy })
     const untimed = shareEvent()
     delete untimed.timestamp
     expect(shareCardSharedBeforeSend(untimed)).not.toHaveProperty('timestamp')

@@ -234,6 +234,7 @@ describe('sanitizeShareCardSharedProperties: the SDK-boundary allowlist', () => 
     $device_type: 'Mobile',
     locale: 'fr-CA',
   }
+  const privacy = { $geoip_disable: true, $ip: null, $process_person_profile: false }
   it('lists exactly the allowed keys', () => {
     expect([...SHARE_CARD_SHARED_ALLOWED_PROPERTIES].sort()).toEqual(
       [
@@ -243,6 +244,8 @@ describe('sanitizeShareCardSharedProperties: the SDK-boundary allowlist', () => 
         'duration_ms',
         'locale',
         '$geoip_disable',
+        '$ip',
+        '$process_person_profile',
         'token',
         'distinct_id',
         '$lib',
@@ -253,11 +256,13 @@ describe('sanitizeShareCardSharedProperties: the SDK-boundary allowlist', () => 
     )
     expect(Object.isFrozen(SHARE_CARD_SHARED_ALLOWED_PROPERTIES)).toBe(true)
   })
-  it('keeps allowlisted primitives, drops everything else and disables GeoIP', () => {
+  it('keeps allowlisted primitives, drops everything else and disables GeoIP, IP and profiles', () => {
     const input = {
       ...valid,
       ...sdk,
       $geoip_disable: false,
+      $ip: '203.0.113.7',
+      $process_person_profile: true,
       $current_url: 'https://couturecast.app/share?postId=private',
       $pathname: '/community/private-post',
       $host: 'couturecast.app',
@@ -270,7 +275,7 @@ describe('sanitizeShareCardSharedProperties: the SDK-boundary allowlist', () => 
       nested: { $set: { email: 'private@example.invalid' } },
     }
     const sanitized = sanitizeShareCardSharedProperties(input)
-    expect(sanitized).toEqual({ ...valid, ...sdk, $geoip_disable: true })
+    expect(sanitized).toEqual({ ...valid, ...sdk, ...privacy })
     expect(sanitized).not.toBe(input)
     expect(input.$geoip_disable).toBe(false)
   })
@@ -283,7 +288,7 @@ describe('sanitizeShareCardSharedProperties: the SDK-boundary allowlist', () => 
         $lib_version: Number.NaN,
         token: ['phc'],
       })
-    ).toEqual({ ...valid, $geoip_disable: true })
+    ).toEqual({ ...valid, ...privacy })
   })
   it.each([
     ['null', null],
