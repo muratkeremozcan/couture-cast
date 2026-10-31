@@ -110,3 +110,30 @@ test('the JVM unit test proves the old snapshot fails and the waits pass on a la
   ])
     assert.match(unit, new RegExp(`fun ${name}\\(`), name)
 })
+
+test('every label the composer test compares against is en-US catalog copy', () => {
+  // The test runs in en-US and matches labels by literal text, so catalog copy that changes
+  // without it (finishingSave became operation-neutral in 6.9) fails only on a device.
+  const catalog = JSON.parse(
+    fs.readFileSync(
+      fileURLToPath(
+        new URL('../../apps/mobile/assets/locales/en-US.json', import.meta.url)
+      ),
+      'utf8'
+    )
+  )
+  const copy = new Set()
+  const collect = (value) => {
+    if (typeof value === 'string') copy.add(value)
+    else if (value && typeof value === 'object') Object.values(value).forEach(collect)
+  }
+  collect(catalog)
+  const labels = [...composer.matchAll(/label\(it\)\s*\}?\s*==\s*"([^"]+)"/g)].map(
+    (match) => match[1]
+  )
+  assert.ok(labels.includes('Finishing up') && labels.includes('Saved to photos'))
+  assert.deepEqual(
+    labels.filter((label) => !copy.has(label)),
+    []
+  )
+})

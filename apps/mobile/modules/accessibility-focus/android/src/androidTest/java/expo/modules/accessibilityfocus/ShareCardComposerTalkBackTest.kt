@@ -184,10 +184,10 @@ class ShareCardComposerTalkBackTest {
       waitForFocus("Owned Saving without a Cancel focus jump") {
         find("share-card-feedback")?.let { label(it) == "Saving" } == true && find("share-card-save")?.isAccessibilityFocused == true
       }
-      assertFalse("No Finishing save label while owned saving", all().any { label(it) == "Finishing save" })
+      assertFalse("No Finishing up label while owned saving", all().any { label(it) == "Finishing up" })
       click("share-card-cancel")
       click("outfit-share-card-open")
-      waitFor("Reopened Finishing save") { find("share-card-feedback")?.let { label(it) == "Finishing save" } == true }
+      waitFor("Reopened Finishing up") { find("share-card-feedback")?.let { label(it) == "Finishing up" } == true }
       waitForFocus("Old save focuses its Cancel recovery control") { find("share-card-cancel")?.isAccessibilityFocused == true }
       waitFor("Save is disabled while the old save finishes") { find("share-card-save")?.isEnabled == false }
       fixture("release")
