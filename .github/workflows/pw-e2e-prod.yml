@@ -12,9 +12,12 @@ on:
 permissions:
   contents: read
 
+# One run per ref. Web and API serve only the newest main commit, so a run left
+# going after the next push tests a deployment that moves under it (web-health-sha
+# then reads the newer SHA). The newer push supersedes the older run.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.run_id }}
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   wait-web:
