@@ -18,7 +18,7 @@ import {
   SHARE_RECEIVER_GRADLE_TASK,
   SHARE_RECEIVER_PACKAGE,
   SHARE_RECEIVER_PROJECT,
-  SHARE_SHEET_NATIVE_CASE,
+  SHARE_SHEET_NATIVE_CASES,
   SHARE_SHEET_STEPS,
   SHARE_SHEET_UITEST_MARKERS,
   androidShareFileStore,
@@ -39,6 +39,7 @@ import {
   shareReceiveTestSource,
   shareSheetFlowRuns,
   shareAnchorHandler,
+  shareHandoffHandler,
   shareItemHandler,
   shareSheetUITestProject,
   withShareFixtureIngress,
@@ -153,7 +154,6 @@ describe('share-sheet plan', () => {
       'share-completed.yaml': 'shared',
       'share-closed.yaml': 'shareClosed',
       'share-other.yaml': 'sentToApp',
-      'share-sheet.yaml': 'shareClosed',
     },
     android: {
       'share-failed.yaml': 'shareFailed',
@@ -172,7 +172,6 @@ describe('share-sheet plan', () => {
       'M-SHARE-COMPLETED',
       'M-SHARE-FAILED',
       'M-SHARE-OTHER',
-      'M-SHARE-SHEET-IOS',
     ])
     assert.deepEqual(SHARE_SHEET_STEPS.android.map((step) => step.id).sort(), [
       'M-SHARE-CHOSEN',
@@ -202,9 +201,10 @@ describe('share-sheet plan', () => {
         `${platform} never uses the other platform's modes`
       )
     }
-    assert.deepEqual(SHARE_SHEET_NATIVE_CASE, {
-      ios: 'N-IOS-PRESENTER-UI',
-      android: 'N-AND-RECEIVE',
+    // The XCUITest carries the iOS real sheet: Maestro cannot see it on the CI simulator.
+    assert.deepEqual(SHARE_SHEET_NATIVE_CASES, {
+      ios: ['M-SHARE-SHEET-IOS', 'N-IOS-PRESENTER-UI'],
+      android: ['N-AND-RECEIVE'],
     })
   })
 
@@ -253,9 +253,17 @@ describe('share-sheet plan', () => {
           step.id
         )
       }
-      assert.equal(steps.at(-1).flow, 'share-sheet.yaml')
-      assert.equal(steps.at(-1).mode, 'real')
     }
+    const real = SHARE_SHEET_STEPS.android.at(-1)
+    assert.equal(real.flow, 'share-sheet.yaml')
+    assert.equal(real.mode, 'real')
+    // iOS proves the real sheet and its handoff file in ShareCardShareSheetUITests.
+    assert.equal(
+      SHARE_SHEET_STEPS.ios.some(
+        (step) => step.mode === 'real' || step.flow === 'share-sheet.yaml'
+      ),
+      false
+    )
     const chosen = SHARE_SHEET_STEPS.android.find((step) => step.id === 'M-SHARE-CHOSEN')
     assert.equal(chosen.relaunch, true, 'the lease is proven after a restart')
     assert.equal(
@@ -526,6 +534,93 @@ describe('handoff file proof', () => {
     assert.ok(store.read(NAME_A).equals(bytes))
     assert.ok(store.ageMs(NAME_A) >= -2_000 && store.ageMs(NAME_A) < 60_000)
     assert.throws(() => store.read('cc68-11111111.png'), /share_handoff_file_removed/)
+  })
+
+  /** Serves the handoff route alone on a free port and returns a GET helper. */
+  async function handoffIngress(t, store) {
+    const { createServer } = await import('node:http')
+    const route = shareHandoffHandler({ store })
+    const server = createServer((request, response) => {
+      if (!route(request, response)) response.writeHead(400).end()
+    })
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+    t.after(() => new Promise((resolve) => server.close(resolve)))
+    return async (route) => {
+      const response = await fetch(`http://127.0.0.1:${server.address().port}${route}`)
+      const text = await response.text()
+      return { status: response.status, body: text ? JSON.parse(text) : null }
+    }
+  }
+
+  test('the XCUITest handoff route passes one fresh leased file of the preview bytes since its mark', async (t) => {
+    const files = { [NAME_A]: png('old') }
+    const get = await handoffIngress(t, () => memoryStore(files))
+    assert.deepEqual(await get('/share-handoff/mark'), {
+      status: 200,
+      body: { marked: true },
+    })
+    files[NAME_B] = bytes
+    const result = await get(`/share-handoff/check?digest=${digest}`)
+    assert.deepEqual(result, { status: 200, body: { fresh: 1, leased: true } })
+    // The answer names no file and no path.
+    assert.doesNotMatch(JSON.stringify(result), /cc69-share|\//)
+  })
+
+  test('the handoff route fails closed without a mark, on a bad digest, a count or a mismatch', async (t) => {
+    const files = {}
+    const get = await handoffIngress(t, () => memoryStore(files))
+    assert.deepEqual(await get(`/share-handoff/check?digest=${digest}`), {
+      status: 409,
+      body: { code: 'share_handoff_mark_required' },
+    })
+    await get('/share-handoff/mark')
+    assert.deepEqual(await get('/share-handoff/check?digest=../x'), {
+      status: 409,
+      body: { code: 'share_handoff_mark_required' },
+    })
+    assert.deepEqual(await get(`/share-handoff/check?digest=${digest}`), {
+      status: 409,
+      body: { code: 'share_handoff_file_count' },
+    })
+    files[NAME_A] = png('other')
+    assert.deepEqual(await get(`/share-handoff/check?digest=${digest}`), {
+      status: 409,
+      body: { code: 'share_handoff_digest_mismatch' },
+    })
+    files[NAME_B] = bytes
+    assert.deepEqual(await get(`/share-handoff/check?digest=${digest}`), {
+      status: 409,
+      body: { code: 'share_handoff_file_count' },
+    })
+  })
+
+  test('an unreadable or foreign container answers 503 and other routes pass through', async (t) => {
+    const get = await handoffIngress(t, () => {
+      throw new Error('owned_container_required')
+    })
+    assert.equal((await get('/share-handoff/mark')).status, 503)
+    assert.equal((await get('/share-item')).status, 400)
+  })
+
+  test('the ingress refuses a container outside the owned simulator for the handoff proof', async (t) => {
+    const foreign = path.join(
+      tempDir(t),
+      'Devices/OTHER/data/Containers/Data/Application/APP'
+    )
+    await withShareFixtureIngress(
+      {
+        device: '0F0E0D0C-1111-4222-8333-944455556666',
+        appId: 'com.couturecast.story68',
+        openUrl: () => undefined,
+        readContainer: () => foreign,
+        fixturePort: 0,
+      },
+      async (port) =>
+        assert.equal(
+          (await fetch(`http://127.0.0.1:${port}/share-handoff/mark`)).status,
+          503
+        )
+    )
   })
 })
 
@@ -1090,7 +1185,7 @@ describe('runStory69ShareSheet', () => {
         passed: true,
         cases: [
           ...SHARE_SHEET_STEPS[platform].map((step) => step.id),
-          SHARE_SHEET_NATIVE_CASE[platform],
+          ...SHARE_SHEET_NATIVE_CASES[platform],
         ],
       })
       assert.deepEqual(logs, [JSON.stringify({ shareSheet: report })])
@@ -1128,12 +1223,13 @@ describe('runStory69ShareSheet', () => {
     await assert.rejects(runStory69ShareSheet(ctx), /share_handoff_file_removed/)
   })
 
-  test('ios: the XCUITest must print the item, public name, anchor, closed and failed-focus markers', () => {
+  test('ios: the XCUITest must print the item, public name, anchor, closed, handoff and failed-focus markers', () => {
     assert.deepEqual(SHARE_SHEET_UITEST_MARKERS, [
       'CC69_PRESENTER_ITEM_PASS',
       'CC69_PRESENTER_PUBLIC_NAME_PASS',
       'CC69_PRESENTER_ANCHOR_PASS',
       'CC69_PRESENTER_CLOSED_PASS',
+      'CC69_PRESENTER_HANDOFF_PASS',
       'CC69_PRESENTER_FAILED_FOCUS_PASS',
     ])
     const source = fs.readFileSync(
@@ -1153,6 +1249,7 @@ describe('runStory69ShareSheet', () => {
       await assert.rejects(runStory69ShareSheet(ctx), /share_sheet_ios_uitest_failed/)
       assert.equal(reports.at(-1)[1].code, 'share_sheet_ios_uitest_failed')
       assert.equal(reports.at(-1)[1].cases.includes('N-IOS-PRESENTER-UI'), false)
+      assert.equal(reports.at(-1)[1].cases.includes('M-SHARE-SHEET-IOS'), false)
     })
 
   test('android: an instrumentation run that skipped a declared receive test fails', async (t) => {

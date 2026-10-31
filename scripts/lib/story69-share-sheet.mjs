@@ -73,7 +73,6 @@ export const SHARE_SHEET_STEPS = Object.freeze({
     },
     { id: 'M-SHARE-CLOSED', mode: 'share_closed', flow: 'share-closed.yaml' },
     { id: 'M-SHARE-OTHER', mode: 'share_target_other', flow: 'share-other.yaml' },
-    { id: 'M-SHARE-SHEET-IOS', mode: 'real', flow: 'share-sheet.yaml', handoff: true },
   ]),
   android: Object.freeze([
     { id: 'M-SHARE-FAILED', mode: 'share_failed', flow: 'share-failed.yaml', save: true },
@@ -107,10 +106,15 @@ export const SHARE_SHEET_STEPS = Object.freeze({
   ]),
 })
 
-/** The native test each platform runs after the flows, with the case id it reports. */
-export const SHARE_SHEET_NATIVE_CASE = Object.freeze({
-  ios: 'N-IOS-PRESENTER-UI',
-  android: 'N-AND-RECEIVE',
+/**
+ * The native test each platform runs after the flows, with the case ids it reports. On iOS the
+ * real sheet's open and dismiss (M-SHARE-SHEET-IOS) runs inside ShareCardShareSheetUITests: Maestro
+ * cannot see UIActivityViewController on the CI simulator (iOS 18.5, run 41179795488), and the
+ * XCUITest already presents the real sheet, so it closes it and proves the handoff file too.
+ */
+export const SHARE_SHEET_NATIVE_CASES = Object.freeze({
+  ios: Object.freeze(['M-SHARE-SHEET-IOS', 'N-IOS-PRESENTER-UI']),
+  android: Object.freeze(['N-AND-RECEIVE']),
 })
 
 const FRESH_RUNTIME_FLOWS = [
@@ -241,13 +245,16 @@ export function assertLeasedShareFile(store, name, digest) {
 
 /** The app's `cache/share-cards` handoff files on the owned simulator, read from its container. */
 export function iosShareFileStore(ctx) {
-  const directory = () =>
-    path.join(
-      ctx
-        .run('xcrun', ['simctl', 'get_app_container', ctx.device, ctx.appId, 'data'])
-        .trim(),
-      'Library/Caches/share-cards'
-    )
+  return containerShareFileStore(() =>
+    ctx
+      .run('xcrun', ['simctl', 'get_app_container', ctx.device, ctx.appId, 'data'])
+      .trim()
+  )
+}
+
+/** The same files under an app data container the caller has already looked up. */
+export function containerShareFileStore(container) {
+  const directory = () => path.join(container(), 'Library/Caches/share-cards')
   const file = (name, dir = directory()) => {
     if (!SHARE_FILE_PATTERN.test(name)) throw new Error('share_handoff_file_removed')
     return path.join(dir, name, SHARE_PUBLIC_NAME)
@@ -447,6 +454,7 @@ export const SHARE_SHEET_UITEST_MARKERS = Object.freeze([
   'CC69_PRESENTER_PUBLIC_NAME_PASS',
   'CC69_PRESENTER_ANCHOR_PASS',
   'CC69_PRESENTER_CLOSED_PASS',
+  'CC69_PRESENTER_HANDOFF_PASS',
   'CC69_PRESENTER_FAILED_FOCUS_PASS',
 ])
 
@@ -704,6 +712,63 @@ export function shareItemHandler({
   })
 }
 
+const HANDOFF_CODES = Object.freeze([
+  'share_handoff_mark_required',
+  'share_handoff_file_count',
+  'share_handoff_file_removed',
+  'share_handoff_digest_mismatch',
+  'share_handoff_lease_invalid',
+])
+
+/**
+ * The real-sheet handoff proof ShareCardShareSheetUITests asks for around its Share tap, the one
+ * M-SHARE-SHEET-IOS made after its Maestro flow. `/share-handoff/mark` records the cc69-share files
+ * before the tap; `/share-handoff/check?digest=` then requires exactly one fresh file since the
+ * mark, a PNG of the previewed bytes inside its lease (assertFreshShareFile). 200 on a pass, 409
+ * with the closed code on a failed proof, 503 when the files cannot be read. No name or path is
+ * ever served. `store` resolves to the owned app's file store.
+ */
+export function shareHandoffHandler({ store }) {
+  let before
+  return (request, response) => {
+    const url = new URL(request.url, 'http://127.0.0.1')
+    if (!['/share-handoff/mark', '/share-handoff/check'].includes(url.pathname))
+      return false
+    if (request.method !== 'GET') {
+      response.writeHead(405).end()
+      return true
+    }
+    const reply = (status, body) =>
+      response
+        .writeHead(status, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        })
+        .end(JSON.stringify(body))
+    Promise.resolve()
+      .then(store)
+      .then((files) => {
+        if (url.pathname === '/share-handoff/mark') {
+          before = files.list()
+          return { marked: true }
+        }
+        const digest = url.searchParams.get('digest') ?? ''
+        if (before === undefined || !/^[a-f0-9]{64}$/.test(digest))
+          throw new Error('share_handoff_mark_required')
+        assertFreshShareFile(files, before, digest)
+        return { fresh: 1, leased: true }
+      })
+      .then(
+        (body) => reply(200, body),
+        (error) =>
+          HANDOFF_CODES.includes(error?.message)
+            ? reply(409, { code: error.message })
+            : response.writeHead(503).end()
+      )
+    return true
+  }
+}
+
 const execFileText = promisify(execFile)
 /**
  * The owned app's data container, looked up asynchronously once and kept, so a starved host never
@@ -736,8 +801,8 @@ function cachedContainer(ctx) {
 /**
  * The loopback ingress ShareCardShareSheetUITests talks to while it runs: `/fixture?mode=` for the
  * share modes (as the a11y runner serves its own modes), `/focus-observation` for the posted
- * focus request, `/share-anchor` for the presenter's anchor report and `/share-item` for the
- * activity item's report.
+ * focus request, `/share-anchor` for the presenter's anchor report, `/share-item` for the
+ * activity item's report and `/share-handoff/*` for the handoff file proof.
  */
 export async function withShareFixtureIngress(
   ctx,
@@ -753,6 +818,23 @@ export async function withShareFixtureIngress(
     }),
     shareAnchorHandler({ device: ctx.device, appId: ctx.appId, readContainer }),
     shareItemHandler({ device: ctx.device, appId: ctx.appId, readContainer }),
+    shareHandoffHandler({
+      // The looked-up container, so a starved host never blocks the loop on simctl.
+      store:
+        ctx.store !== undefined
+          ? () => ctx.store
+          : async () => {
+              const directory = String(await readContainer()).trim()
+              if (
+                !path.isAbsolute(directory) ||
+                !directory.includes(
+                  `/Devices/${ctx.device}/data/Containers/Data/Application/`
+                )
+              )
+                throw new Error('owned_container_required')
+              return containerShareFileStore(() => directory)
+            },
+    }),
   ]
   const server = createServer((request, response) => {
     if (routes.some((route) => route(request, response))) return
@@ -1060,7 +1142,7 @@ export async function runStory69ShareSheet(ctx) {
     ctx.maestro(CLOSE_FLOW)
     if (ctx.platform === 'ios') await runShareSheetUITest(ctx)
     else runShareReceiveTest(ctx)
-    mark(SHARE_SHEET_NATIVE_CASE[ctx.platform])
+    for (const id of SHARE_SHEET_NATIVE_CASES[ctx.platform]) mark(id)
     report.passed = true
     ctx.privateJson(name, report)
     console.log(JSON.stringify({ shareSheet: report }))

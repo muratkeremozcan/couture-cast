@@ -157,10 +157,9 @@ export const SET_LOCALE_OTHER_STEPS_MS = 4 * 17_000 + 15_000 + 2_000
  * precondition that the outcome copy is not yet on screen, the scroll that brings Share into view
  * (10 s and its poll) and the settle wait, then a retry of maxRetries 3 (4 attempts) shaped like
  * tap-save.yaml: the guard (its two condition checks), the 8 s wait for what a received press shows
- * and that wait's poll. share-sheet.yaml runs the same scroll and retry against the OS sheet, then
- * dismisses it: two guarded dismissal steps (a check and a tap each) and the 10 s wait for the sheet
- * to leave plus its poll. A test reads both flows and keeps these numbers equal to what they
- * declare.
+ * and that wait's poll. share-sheet.yaml (Android only) runs the same scroll and retry against the
+ * chooser, then dismisses it: Back and the 10 s wait for the chooser to leave plus its poll. A test
+ * reads both flows and keeps these numbers equal to what they declare.
  */
 export const SHARE_TAP_SCROLL_MS = 10_000 + 3 * CONDITION_CHECK_MS
 export const SHARE_TAP_ATTEMPTS = 4

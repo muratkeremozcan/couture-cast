@@ -1,15 +1,19 @@
 import XCTest
 
-/// N-IOS-PRESENTER-UI against the installed story68 dev client, fixture mode `real`.
-/// Share presents the real UIActivityViewController. On an iPhone simulator the compact sheet
+/// N-IOS-PRESENTER-UI and M-SHARE-SHEET-IOS against the installed story68 dev client, fixture mode
+/// `real`. Share presents the real UIActivityViewController. On an iPhone simulator the compact sheet
 /// ignores the popover anchor, so the module's test-build anchor report
 /// (`Documents/cc69-share-anchor.json`, served by the harness at `/share-anchor`) proves the
 /// presenter wiring: presented on the main thread from the top-most controller, sourceView set to
 /// that controller's view, sourceRect equal to the Share button frame at handoff. Closing the
 /// sheet must settle `shareClosed` and return focus to Share. The activity item's test-build report
 /// (`Documents/cc69-share-item.json`, served at `/share-item`) proves the item a receiver gets is a
-/// file URL holding the previewed bytes. A failed share settles on the error and moves focus to
-/// Save. The local iPad proof covers the real popover.
+/// file URL holding the previewed bytes, and the harness proves the one fresh `cc69-share` file
+/// in the container holds them and stays leased after the close (`/share-handoff/*`). Closing
+/// counts only once the composer settles on `shareClosed`, so no sheet id is load-bearing: the
+/// sheet's own controls differ by iOS release and Maestro cannot see them on iOS 18.5. A failed
+/// share settles on the error and moves focus to Save. The local iPad proof covers the real
+/// popover.
 @MainActor
 final class ShareCardShareSheetUITests: XCTestCase {
   let app = XCUIApplication(bundleIdentifier: "com.couturecast.story68")
@@ -47,6 +51,9 @@ final class ShareCardShareSheetUITests: XCTestCase {
 
   struct Copy: Decodable { let share: String; let shareClosed: String; let save: String }
 
+  /// The harness's answer to a handoff check: 200 with the proof, 409 with a closed code.
+  struct HandoffReport: Decodable { let fresh: Int?; let leased: Bool?; let code: String? }
+
   enum ReadError: Error { case unavailable, timedOut }
 
   override func setUpWithError() throws {
@@ -79,7 +86,53 @@ final class ShareCardShareSheetUITests: XCTestCase {
   /// activity list as `ActivityListView`.
   func shareSheetClose() -> XCUIElement { app.buttons["header.closeButton"] }
 
+  /// The iOS 17 and 18 header's Close button, in the `UIActivityContentView` header.
+  func legacyShareSheetClose() -> XCUIElement {
+    app.descendants(matching: .any).matching(identifier: "UIActivityContentView")
+      .buttons.matching(identifier: "Close").firstMatch
+  }
+
   func shareSheetPresented() -> Bool { shareSheetClose().exists || element("ActivityListView").exists }
+
+  func waitUntil(_ timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if condition() { return true }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    } while Date() < deadline
+    return condition()
+  }
+
+  /// Leaves the real sheet without choosing a target. The attempts run in order until the composer
+  /// settles on `closedLabel`: the iOS 26 Close button, the iOS 17 and 18 header Close, a drag
+  /// down from mid screen (inside the compact sheet; dismissed it with both buttons skipped on the
+  /// iOS 26.1 simulator), a drag from the expanded sheet's header, then a tap on the dimmed screen
+  /// above the sheet. An attempt whose control is absent is skipped.
+  func closeShareSheet(settlingOn closedLabel: String) -> Bool {
+    let feedback = element("share-card-feedback")
+    let settled = { feedback.exists && feedback.label == closedLabel }
+    let drag = { (from: CGVector) in
+      self.app.coordinate(withNormalizedOffset: from)
+        .press(forDuration: 0.1, thenDragTo: self.app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
+    }
+    let tapIfPresent = { (control: XCUIElement) -> Bool in
+      guard control.exists else { return false }
+      control.tap()
+      return true
+    }
+    let attempts: [() -> Bool] = [
+      { tapIfPresent(self.shareSheetClose()) },
+      { tapIfPresent(self.legacyShareSheetClose()) },
+      { drag(CGVector(dx: 0.5, dy: 0.5)); return true },
+      { drag(CGVector(dx: 0.5, dy: 0.12)); return true },
+      { self.app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.06)).tap(); return true },
+    ]
+    for attempt in attempts {
+      if settled() { return true }
+      if attempt(), waitUntil(8, settled) { return true }
+    }
+    return settled()
+  }
 
   func waitForShareSheet(_ presented: Bool, timeout: TimeInterval) -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
@@ -105,23 +158,25 @@ final class ShareCardShareSheetUITests: XCTestCase {
     wait(for: [done], timeout: 10)
   }
 
-  /// One GET against the harness ingress; nil when the record does not exist yet.
-  func read<T: Decodable>(_ path: String, as type: T.Type) throws -> T? {
+  /// One GET against the harness ingress; nil when the record does not exist yet. `accepting`
+  /// lists the other statuses whose JSON body is an answer.
+  func read<T: Decodable>(_ path: String, as type: T.Type, accepting: Set<Int> = [],
+                          within seconds: TimeInterval = 6) throws -> T? {
     let done = expectation(description: "Read \(path)")
     var result: Result<T?, Error> = .failure(ReadError.unavailable)
     var request = URLRequest(url: URL(string: "\(ingress)\(path)")!)
-    request.timeoutInterval = 6
+    request.timeoutInterval = seconds
     URLSession.shared.dataTask(with: request) { data, response, error in
       result = Result {
         if let error { throw error }
-        let status = (response as? HTTPURLResponse)?.statusCode
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if status == 404 { return nil }
-        guard status == 200, let data else { throw ReadError.unavailable }
+        guard status == 200 || accepting.contains(status), let data else { throw ReadError.unavailable }
         return try JSONDecoder().decode(T.self, from: data)
       }
       done.fulfill()
     }.resume()
-    wait(for: [done], timeout: 8)
+    wait(for: [done], timeout: seconds + 2)
     return try result.get()
   }
 
@@ -166,7 +221,7 @@ final class ShareCardShareSheetUITests: XCTestCase {
   /// header Close, else a drag of the sheet header down.
   func dismissShareSheetIfPresent() {
     guard shareSheetPresented() else { return }
-    let legacyClose = app.otherElements["UIActivityContentView"].buttons["Close"]
+    let legacyClose = legacyShareSheetClose()
     if shareSheetClose().exists {
       shareSheetClose().tap()
     } else if legacyClose.exists {
@@ -192,9 +247,14 @@ final class ShareCardShareSheetUITests: XCTestCase {
     // The feedback slot is reserved, so the `sharing` copy never moves Share: the frame here is
     // the frame JS measures at handoff, before the sheet hides Share or a later scroll moves it.
     let shareFrame = share.frame
+    // The handoff files before this tap; the check after the close expects exactly one more.
+    let mark = try read("/share-handoff/mark", as: HandoffReport.self, within: 30)
+    XCTAssertNotNil(mark, "the harness marked the handoff files")
 
     share.tap()
-    XCTAssertTrue(waitForShareSheet(true, timeout: 20), "UIActivityViewController presented")
+    // UIKit asks for the activity item only once the sheet is loading its activities, and the
+    // anchor report is written after presentation completes. Neither depends on sheet ids, which
+    // differ by iOS release.
     // AC1 on iOS: what UIKit hands a receiver is the file holding the exact previewed bytes.
     let item = try poll("/share-item", as: ItemReport.self) { $0.id != previousItem?.id }
     XCTAssertTrue(item.itemIsFileURL, "the activity item is a file URL")
@@ -205,27 +265,36 @@ final class ShareCardShareSheetUITests: XCTestCase {
     }
     XCTAssertTrue(anchor.presented, "presented by the top-most controller")
     XCTAssertTrue(anchor.mainThread, "presented on the main thread")
-    XCTAssertTrue(anchor.sourceViewSet, "popover sourceView set")
-    XCTAssertTrue(anchor.sourceViewIsPresenterView, "sourceView is the presenter's view")
-    // The header names the card by its public name; the cache file name never shows.
+    // An app linked against the iOS 18 SDK (the CI build) gets no popover presentation controller
+    // for the compact iPhone sheet, so the module has nothing to anchor and records sourceView nil
+    // with a zero rect; the 26 SDK offers one and the anchor must be the Share frame. The iPad
+    // proof covers the real popover either way.
+    let popoverOffered = anchor.sourceViewSet
+    XCTAssertEqual(anchor.sourceViewIsPresenterView, popoverOffered, "sourceView is the presenter's view")
+    // The header names the card by its public name (with or without the extension, as the
+    // release shows it); the cache file name never shows.
     let labelled = { (format: String, value: String) in
       self.app.descendants(matching: .any).matching(NSPredicate(format: format, value)).firstMatch
     }
+    let publicName = NSPredicate(format: "label == %@ OR label == %@", "couturecast-card.png", "couturecast-card")
     XCTAssertTrue(
-      labelled("label == %@", "couturecast-card.png").waitForExistence(timeout: 10),
+      app.descendants(matching: .any).matching(publicName).firstMatch.waitForExistence(timeout: 10),
       "header shows couturecast-card.png")
     XCTAssertFalse(labelled("label CONTAINS %@", "cc69-share").exists, "header hides the cache file name")
     print("CC69_PRESENTER_PUBLIC_NAME_PASS")
 
-    dismissShareSheetIfPresent()
-    let feedback = element("share-card-feedback")
-    XCTAssertTrue(feedback.waitForExistence(timeout: 20))
-    let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", labels.shareClosed), object: feedback)
-    XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 20), .completed, "shareClosed settles")
-    XCTAssertEqual(anchor.sourceRect.x, Double(shareFrame.minX), accuracy: 1, "sourceRect x")
-    XCTAssertEqual(anchor.sourceRect.y, Double(shareFrame.minY), accuracy: 1, "sourceRect y")
-    XCTAssertEqual(anchor.sourceRect.width, Double(shareFrame.width), accuracy: 1, "sourceRect width")
-    XCTAssertEqual(anchor.sourceRect.height, Double(shareFrame.height), accuracy: 1, "sourceRect height")
+    // M-SHARE-SHEET-IOS: the member leaves the real sheet without a target.
+    XCTAssertTrue(element("share-card-feedback").waitForExistence(timeout: 20))
+    XCTAssertTrue(closeShareSheet(settlingOn: labels.shareClosed), "shareClosed settles")
+    XCTAssertTrue(waitForShareSheet(false, timeout: 10), "share sheet dismissed")
+    let expectedRect = popoverOffered
+      ? AnchorReport.Rect(x: Double(shareFrame.minX), y: Double(shareFrame.minY),
+                          width: Double(shareFrame.width), height: Double(shareFrame.height))
+      : AnchorReport.Rect(x: 0, y: 0, width: 0, height: 0)
+    XCTAssertEqual(anchor.sourceRect.x, expectedRect.x, accuracy: 1, "sourceRect x")
+    XCTAssertEqual(anchor.sourceRect.y, expectedRect.y, accuracy: 1, "sourceRect y")
+    XCTAssertEqual(anchor.sourceRect.width, expectedRect.width, accuracy: 1, "sourceRect width")
+    XCTAssertEqual(anchor.sourceRect.height, expectedRect.height, accuracy: 1, "sourceRect height")
     print("CC69_PRESENTER_ANCHOR_PASS")
     let focus = try poll("/focus-observation", as: FocusObservation.self) {
       (previousFocus == nil || $0.session == previousFocus?.session)
@@ -235,6 +304,19 @@ final class ShareCardShareSheetUITests: XCTestCase {
     XCTAssertEqual(focus.label, labels.share, "focus returns to Share")
     XCTAssertTrue(share.isHittable, "Share stays available")
     print("CC69_PRESENTER_CLOSED_PASS")
+
+    // The composer is intact after the close: the same preview, no error, Share and Save usable,
+    // and the one fresh handoff file holds the previewed bytes inside its lease.
+    XCTAssertTrue(element("share-card-preview-loaded-\(previewDigest)").exists, "the same preview stays")
+    XCTAssertFalse(element("share-card-error").exists, "no share error")
+    XCTAssertTrue(share.isEnabled, "Share stays enabled")
+    XCTAssertTrue(element("share-card-save").isEnabled, "Save stays enabled")
+    let handoff = try XCTUnwrap(
+      read("/share-handoff/check?digest=\(previewDigest)", as: HandoffReport.self, accepting: [409], within: 60))
+    XCTAssertNil(handoff.code, "handoff proof: \(handoff.code ?? "")")
+    XCTAssertEqual(handoff.fresh, 1, "exactly one fresh handoff file")
+    XCTAssertEqual(handoff.leased, true, "the handoff file holds the previewed bytes inside its lease")
+    print("CC69_PRESENTER_HANDOFF_PASS")
   }
 
   /// M-SHARE-FAILED's focus half, which Maestro cannot observe: a failed share shows the error and

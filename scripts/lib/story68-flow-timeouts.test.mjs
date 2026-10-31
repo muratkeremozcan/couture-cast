@@ -290,14 +290,19 @@ describe('Story 6.9 share flow timeouts', () => {
     )
   })
 
-  test('share-sheet declares the same scroll and retry per platform and the counted dismissal', () => {
+  test('share-sheet declares the same scroll and retry on Android and the counted dismissal', () => {
     const steps = commands('share-sheet.yaml')
     const scroll = steps.find((step) => step.scrollUntilVisible)
     assert.equal(
       SHARE_TAP_SCROLL_MS,
       scroll.scrollUntilVisible.timeout + 3 * CONDITION_CHECK_MS
     )
-    for (const platform of ['iOS', 'Android']) {
+    // The iOS real sheet runs in ShareCardShareSheetUITests; the flow has no iOS branch.
+    assert.equal(
+      steps.some((step) => step.runFlow?.when?.platform === 'iOS'),
+      false
+    )
+    for (const platform of ['Android']) {
       const branch = steps.find((step) => step.runFlow?.when?.platform === platform)
         .runFlow.commands
       const retry = branch.find((step) => step.retry).retry
