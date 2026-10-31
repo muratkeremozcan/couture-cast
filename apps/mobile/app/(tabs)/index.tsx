@@ -1,3 +1,5 @@
+// Story 3.3 Task 4 step 1 owner: read deep link query parameters to hydrate active scenario in `apps/mobile/app/(tabs)/index.tsx`
+// Story 5.1 Task 6 step 2 owner: strip commerce before device caching in `apps/mobile/app/(tabs)/index.tsx`
 import {
   ScreenShareCardComposer,
   useShareCardPresentationOpener,

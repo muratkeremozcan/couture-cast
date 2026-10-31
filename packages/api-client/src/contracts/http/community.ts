@@ -1,4 +1,5 @@
 // Story 6.1 Task 3 owner: community HTTP contracts and schemas.
+// Story 6.1 contract owner: define the community HTTP contracts, message constants, cursor codec, feed mode enum and challenge schemas in `packages/api-client/src/contracts/http/community.ts`, registered through `packages/api-client/src/contracts/http/openapi.ts`
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { CLIMATE_BANDS } from '@couture/utils'

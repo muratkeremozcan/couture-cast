@@ -1,3 +1,4 @@
+// Story 6.1 repository owner: own the advisory-locked quota transaction, the report transaction and SQLSTATE mapping in `apps/api/src/modules/community/community.repository.ts`
 import type { CommunityAuthorizationBudget } from './community-availability.js'
 import {
   assertCommunityDatabaseAccess,

@@ -1,4 +1,5 @@
 // Story 5.5 Task 7 owner: the web app's premium 7-day outfit planner client.
+// Story 5.5 Task 7 step 1 owner: own transport, failure classification and the temperature and date formatters in `apps/web/src/lib/planner.ts`
 //
 // Mirrors `palette-advisor.ts` deliberately: the same `sessionStorage` bearer
 // token, the same `.strict()`-envelope message reading, Zod-parsed responses

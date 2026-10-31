@@ -1,3 +1,4 @@
+// Story 5.5 Task 6 step 2 owner: own the routes, the guard stack, the platform header check and response parsing in `apps/api/src/modules/personalization/planner.controller.ts`, registered in `apps/api/src/modules/personalization/personalization.module.ts`
 // Story 5.5 Decision 6: `api/v1/commerce/premium/planner` deliberately lives
 // in PersonalizationModule, not CommerceModule -- the generation engine and
 // weather/comfort/wardrobe reads it needs already live here. The

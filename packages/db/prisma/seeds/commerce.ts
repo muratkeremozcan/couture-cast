@@ -1,3 +1,5 @@
+// Story 5.1 Task 1 step 2 owner: seed the partner, global offer, and feature flag in `packages/db/prisma/seeds/commerce.ts` and `feature-flags.ts`
+// Story 5.2 Task 1 step 2 owner: seed the three entitlement states and the purchasing flag in `packages/db/prisma/seeds/commerce.ts` and `feature-flags.ts`
 import type { PrismaClient } from '@prisma/client'
 // From `@couture/utils`, not from the factory package's source the way
 // `seeds/wardrobe.ts` reaches it. This module is imported by the Playwright

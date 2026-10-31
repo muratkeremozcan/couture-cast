@@ -1,3 +1,4 @@
+// Story 1.1 Task 5 step 3 owner: expose the authenticated weather read adapter in `apps/api/src/modules/weather/weather.controller.ts` and `weather.module.ts`
 import {
   BadRequestException,
   Controller,

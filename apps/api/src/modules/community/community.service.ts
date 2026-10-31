@@ -1,3 +1,4 @@
+// Story 6.1 service owner: own feed assembly, band resolution, aliasing, upload allocation and replay, publication, reporting, withdrawal and challenges in `apps/api/src/modules/community/community.service.ts`
 import {
   CommunityAuthorizationBudget,
   communityDependency,

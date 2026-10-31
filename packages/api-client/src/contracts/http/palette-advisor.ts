@@ -1,4 +1,5 @@
 // Story 5.4 Task 3 owner: color palette & beauty/accessory advisor HTTP contracts.
+// Story 5.4 Task 3 step 1 owner: define the palette advisor HTTP contracts, `ADVISOR_RULES`, `ADVISOR_RULES_VERSION` and the locale-key enumeration in `packages/api-client/src/contracts/http/palette-advisor.ts`, registered through `packages/api-client/src/contracts/http/openapi.ts`
 //
 // Design decisions that are load-bearing and easy to undo by accident:
 //

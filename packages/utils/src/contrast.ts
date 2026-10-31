@@ -1,3 +1,5 @@
+// Story 5.3 Task 2 step 1 owner: own the WCAG luminance maths and the two AA thresholds in `packages/utils/src/contrast.ts`
+// Story 5.4 Task 2 step 1 owner: own the reusable sRGB linearization in `packages/utils/src/contrast.ts`
 /**
  * Story 5.3 Decision 3 owner: canonical WCAG 2.2 AA contrast math over hex colors.
  *

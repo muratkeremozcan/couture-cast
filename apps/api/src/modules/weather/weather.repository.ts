@@ -1,3 +1,5 @@
+// Story 1.1 Task 2 step 4 owner: persist normalized snapshots and segments transactionally in `apps/api/src/modules/weather/weather.repository.ts`
+// Story 5.5 Task 1 step 3 owner: own `daily_summaries` serialization and the guarded `parseDailySummaries` reader in `apps/api/src/modules/weather/weather.repository.ts`, over the column added by the migration `packages/db/prisma/migrations/20260904090000_add_weather_daily_summaries/`
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 

@@ -1,3 +1,4 @@
+// Story 5.5 Task 6 step 1 owner: own location and locale resolution, fingerprinting, per-day resolution, pruning, enrichment and versioned reshuffle in `apps/api/src/modules/personalization/planner.service.ts`, over the stored-payload schema in `apps/api/src/modules/personalization/planner-payload.schema.ts`
 // Story 5.5: premium 7-day outfit planner. See Decisions 2, 3, 4, 6, 8, 9 in
 // _bmad-output/implementation-artifacts/5-5-premium-7-day-outfit-planner.md.
 import {

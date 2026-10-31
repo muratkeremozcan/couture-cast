@@ -1,3 +1,5 @@
+// Story 5.1 Task 3 step 1 owner: resolve eligible offers in `apps/api/src/modules/commerce/affiliate-offer.service.ts`
+// Story 5.4 Task 5 step 3 owner: own the advisor offer selection chain in `apps/api/src/modules/commerce/affiliate-offer.service.ts` and the advisor click branch in `apps/api/src/modules/commerce/affiliate-click.service.ts`, over the queries in `apps/api/src/modules/commerce/commerce.repository.ts`
 import { Inject, Injectable } from '@nestjs/common'
 import { garmentCategoryEnum } from '@couture/api-client'
 import {

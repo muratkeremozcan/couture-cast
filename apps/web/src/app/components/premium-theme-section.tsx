@@ -1,4 +1,5 @@
 // Story 5.3 Task 5 owner: the "Interface palettes" section of Web settings.
+// Story 5.3 Task 5 step 3 owner: own the gallery, locked, loading, unavailable, and error states in `apps/web/src/app/components/premium-theme-section.tsx`, mounted from `apps/web/src/app/settings/page.tsx`
 //
 // The third child section on `/settings`, after `SubscriptionSection`, following its
 // `SectionState`/`resolveSectionView` shape deliberately. Three things about this

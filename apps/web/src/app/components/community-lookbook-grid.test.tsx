@@ -1,5 +1,6 @@
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
+// Story 3.5 Task 6 step 2 owner: unit-test community lookbook filter chip interactions and ARIA status in `apps/web/src/app/components/community-lookbook-grid.test.tsx`
 // Community grid journeys through the real web transport and MSW.
 import { delay, http, HttpResponse } from 'msw'
 import { act, screen, waitFor, within } from '@testing-library/react'

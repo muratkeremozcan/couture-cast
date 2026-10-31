@@ -1,3 +1,4 @@
+// Story 6.1 maintenance owner: own the expiry and retention sweeps in `apps/api/src/modules/community/community-maintenance.service.ts` and their schedule in `community-maintenance.scheduler.ts`
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { communityPrivacyTransaction, guardCommunityPost } from './community-privacy.js'

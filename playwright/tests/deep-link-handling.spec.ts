@@ -1,5 +1,6 @@
 // Learning path Step 27: Widget and notification deep-link handling.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
+// Story 3.7 Task 6 step 1 owner: E2E Playwright test widget tap, severe weather alert focus, community lookbook highlight, and invalid deep link fallback in `playwright/tests/deep-link-handling.spec.ts`
 import { communityTest as test, expect } from '../support/helpers/community-session'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
 import type { Page } from '@playwright/test'

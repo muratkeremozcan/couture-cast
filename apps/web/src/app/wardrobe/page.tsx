@@ -1,4 +1,5 @@
 // Story 4.1 & 4.2 owner: implement web wardrobe hub page with capture and smart tagging
+// Story 4.1 Task 8 step 2 owner: implement web wardrobe hub page in `apps/web/src/app/wardrobe/page.tsx`
 // Story 4.4 Task 5 owner: "Set up your closet" onboarding entry card and the
 // silhouette settings surface reachable outside onboarding (decision 3).
 'use client'

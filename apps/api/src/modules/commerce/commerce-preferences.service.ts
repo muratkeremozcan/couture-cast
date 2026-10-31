@@ -1,3 +1,4 @@
+// Story 5.1 Task 3 step 2 owner: persist preference changes and audit rows in `apps/api/src/modules/commerce/commerce-preferences.service.ts`
 import { Inject, Injectable } from '@nestjs/common'
 import type { CommercePreference } from '../../contracts/http.js'
 import { CommerceRepository } from './commerce.repository.js'

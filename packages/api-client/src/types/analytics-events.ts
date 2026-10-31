@@ -1,3 +1,9 @@
+// Story 1.4 Task 2 step 1 owner: declare telemetry event schemas and trackers in `packages/api-client/src/types/analytics-events.ts`
+// Story 5.1 Task 2 step 2 owner: register privacy-safe commerce analytics in `packages/api-client/src/types/analytics-events.ts`
+// Story 5.2 Task 2 step 2 owner: register the premium analytics events and their property allowlists in `packages/api-client/src/types/analytics-events.ts`
+// Story 5.3 Task 3 step 2 owner: register `premium_theme_selected` and its `{ theme }` property allowlist in `packages/api-client/src/types/analytics-events.ts` and `packages/api-client/src/testing/analytics-event-assertions.ts`
+// Story 5.4 Task 3 step 2 owner: register the three new events and their `.strict()` property allowlists in `packages/api-client/src/types/analytics-events.ts` and `packages/api-client/src/testing/analytics-event-assertions.ts`
+// Story 5.5 Task 5 step 2 owner: own both planner events in `packages/api-client/src/types/analytics-events.ts` and `packages/api-client/src/testing/analytics-event-assertions.ts`, and their pseudonymous server-side emission in `apps/api/src/modules/telemetry/telemetry.service.ts`
 import { z } from 'zod'
 import {
   affiliateCommunitySurfaceSchema,

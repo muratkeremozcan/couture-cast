@@ -1,3 +1,4 @@
+// Story 1.1 Task 7 step 1 owner: weather API integration proof lives in `apps/api/integration/weather.integration.spec.ts`
 import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 // Learning path Step 16: Weather API ingestion service and durable worker ingestion.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-16-weather-api-ingestion-service-and-durable-worker-ingestion

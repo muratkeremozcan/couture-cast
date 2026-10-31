@@ -1,3 +1,5 @@
+// Story 5.4 Task 4 step 1 owner: own the `color_analysis_enabled` registry default in `packages/config/src/flags.ts` and its seeded `true` in `packages/db/prisma/seeds/feature-flags.ts`
+// Story 5.5 Task 5 step 1 owner: own the `premium_planner_enabled` registry entry in `packages/config/src/flags.ts` and its seeded `true` in `packages/db/prisma/seeds/feature-flags.ts`
 /** Story 0.7 Task 8 owner file: shared feature-flag contract and request-time evaluation.
  * Why this file exists:
  * - Every runtime needs the same legal flag names and the same default answers.

@@ -1,3 +1,4 @@
+// Story 5.4 Task 5 step 1 owner: own consent, wardrobe analysis, recommendation state, offer resolution and erasure in `apps/api/src/modules/commerce/palette-advisor.service.ts`
 // Story 5.4 Task 5/6: the palette advisor's single owner of PaletteProfile
 // and AdvisorRecommendationState reads and writes, mirroring
 // wardrobe-silhouette.service.ts's upload lifecycle shape and

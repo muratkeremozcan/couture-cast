@@ -1,4 +1,5 @@
 // Story 5.2 Task 6 owner: mobile premium subscription boundary.
+// Story 5.2 Task 6 step 1 owner: own the mobile purchase outcomes and poll in `apps/mobile/src/lib/premium.ts`
 //
 // Everything the settings Premium section needs from the network and from the
 // RevenueCat SDK lives here so the screen stays presentational. The

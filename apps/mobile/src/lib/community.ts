@@ -1,3 +1,4 @@
+// Story 6.1 mobile owner: own transport in `apps/mobile/src/lib/community.ts`, the screen in `apps/mobile/src/features/community/community-screen.tsx`, the route shim in `apps/mobile/app/(tabs)/community.tsx`, and the presentational components under `apps/mobile/components/community/`
 import { Platform } from 'react-native'
 import {
   communityCommentsClient,

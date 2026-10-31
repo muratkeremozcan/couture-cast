@@ -1,3 +1,4 @@
+// Story 5.2 Task 3 step 1 owner: own entitlement reads and writes, including the ordering guard, in `apps/api/src/modules/commerce/premium-entitlement.service.ts`
 import { Inject, Injectable } from '@nestjs/common'
 import {
   PrismaClient,

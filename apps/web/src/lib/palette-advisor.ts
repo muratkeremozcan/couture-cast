@@ -1,3 +1,4 @@
+// Story 5.4 Task 7 step 1 owner: own transport and failure classification in `apps/web/src/lib/palette-advisor.ts`, and the affiliate click mint in `apps/web/src/lib/commerce.ts`
 // Story 5.4 Task 7 owner: the web app's colour palette & beauty/accessory
 // advisor client.
 //

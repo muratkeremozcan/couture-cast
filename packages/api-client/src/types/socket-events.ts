@@ -1,3 +1,4 @@
+// Story 6.1 socket and analytics owner: own `CLIMATE_BANDS` tuple parity and the `.strict()` `lookbook:new` payload in `packages/api-client/src/types/socket-events.ts`, and the community events with their `dedupeKey` in `packages/api-client/src/types/analytics-events.ts`
 import { z } from 'zod'
 import { CLIMATE_BANDS } from '@couture/utils'
 

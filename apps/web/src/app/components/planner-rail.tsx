@@ -1,5 +1,6 @@
 // Story 3.5 Task 1 step 2 owner: implement ultrawide 7-day planning drawer in apps/web/src/app/components/planner-rail.tsx
 // Story 5.2 Task 7 owner: entitlement-aware locked state (Decision 2).
+// Story 5.5 Task 7 step 2 owner: own the entitlement state machine, the week render, per-date reshuffle state and both variants' focus behaviour in `apps/web/src/app/components/planner-rail.tsx`
 // Story 5.5 Task 7 owner: replace the static shell with the live seven-day
 // planner (Decision 7).
 //

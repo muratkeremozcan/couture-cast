@@ -1,3 +1,4 @@
+// Story 5.2 Task 4 step 1 owner: create Checkout and Portal sessions in `apps/api/src/modules/commerce/stripe-billing.service.ts`
 import {
   ConflictException,
   Inject,

@@ -1,3 +1,4 @@
+// Story 3.5 Task 2 step 1 owner: implement community lookbook filter chips, card grid, and ARIA live regions in `apps/web/src/app/components/community-lookbook-grid.tsx`
 // Story 6.1 owner: the web community surface -- climate-band filter chips, the
 // published card grid, the caller's own in-progress posts, reporting, and the
 // two-step compose flow.

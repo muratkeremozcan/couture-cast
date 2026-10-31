@@ -1,3 +1,5 @@
+// Story 0.5 Task 1 owner: expose the Socket.io gateway surface and attach the core auth + connection orchestration in `apps/api/src/modules/gateway/gateway.gateway.ts`
+// Story 1.3 Task 6 step 3 owner: broadcast realtime updates over `/alert:weather` in `apps/api/src/modules/gateway/gateway.gateway.ts`
 import { alertWeatherEventSchema, type AlertWeatherEvent } from '@couture/api-client'
 import { Inject } from '@nestjs/common'
 import {

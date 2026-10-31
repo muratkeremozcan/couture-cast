@@ -1,3 +1,5 @@
+// Story 5.3 Task 1 step 3 owner: build and persist theme fixtures in `packages/testing/src/factories/premium.factory.ts`, registered in `packages/testing/src/factories/registry.ts` and `packages/testing/src/cleanup.ts`
+// Story 5.4 Task 1 step 3 owner: build and persist palette fixtures in `packages/testing/src/factories/premium.factory.ts`, registered in `packages/testing/src/factories/registry.ts` and `packages/testing/src/cleanup.ts`
 import type {
   AdvisorAction,
   AdvisorRecommendationState,

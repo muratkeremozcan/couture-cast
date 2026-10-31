@@ -1,4 +1,5 @@
 // Story 5.5 Task 8 owner: the mobile 7-day outfit planner client.
+// Story 5.5 Task 8 step 1 owner: own transport and failure classification in `apps/mobile/src/lib/planner.ts`
 //
 // Follows `premium-theme.ts` and `palette-advisor.ts` exactly: the same
 // `readAccessToken` pre-check so a signed-out reader gets `signed_out` without a wasted

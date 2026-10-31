@@ -1,3 +1,4 @@
+// Story 1.3 Task 3 step 1 owner: implement user alerts controllers and RLS repository queries in `apps/api/src/modules/alerts/alerts.controller.ts` and `apps/api/src/modules/alerts/alerts.repository.ts`
 import {
   BadRequestException,
   Body,

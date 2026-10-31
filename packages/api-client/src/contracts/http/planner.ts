@@ -1,3 +1,4 @@
+// Story 5.5 Task 4 step 1 owner: define the planner HTTP contracts, the header schema, the collection invariants and the message constants in `packages/api-client/src/contracts/http/planner.ts`, registered through `packages/api-client/src/contracts/http/index.ts` and `packages/api-client/src/contracts/http/openapi.ts`, and bridged into the API through `apps/api/src/contracts/http.ts`
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { nonEmptyStringSchema, type RegisteredCommonHttpSchemas } from './common'

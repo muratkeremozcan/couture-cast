@@ -1,3 +1,4 @@
+// Story 2.1 Task 2 step 1 owner: scaffold the NestJS personalization module in `apps/api/src/modules/personalization/personalization.module.ts`
 import { Module } from '@nestjs/common'
 import { AnalyticsModule } from '../../analytics/analytics.module.js'
 import { PrismaModule } from '../../prisma/prisma.module.js'

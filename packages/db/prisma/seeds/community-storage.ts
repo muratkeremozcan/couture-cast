@@ -1,4 +1,5 @@
 // Learning path Step 38: Community feed by climate band.
+// Story 6.1 seed owner: own the community fixtures and the storage objects behind them in `packages/db/prisma/seeds/community-storage.ts`, with factories in `packages/testing/src/factories/community.factory.ts` and cleanup in `packages/testing/src/cleanup.ts`
 //
 // Uploads the placeholder image object that each seeded community post points
 // at.

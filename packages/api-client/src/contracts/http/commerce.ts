@@ -1,4 +1,5 @@
 // Story 5.1 Task 2 owner: affiliate commerce HTTP contracts.
+// Story 5.1 Task 2 step 1 owner: define commerce HTTP and Ritual response contracts in `packages/api-client/src/contracts/http/commerce.ts` and `ritual.ts`
 //
 // Two design decisions in this file are load-bearing and easy to undo by
 // accident, so they are stated here rather than only in the story.

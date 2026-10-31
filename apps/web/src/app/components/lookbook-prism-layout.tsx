@@ -1,4 +1,5 @@
 // Story 3.5 Task 1 step 1 owner: orchestrate responsive grid breakpoints and hero/community panels in apps/web/src/app/components/lookbook-prism-layout.tsx
+// Story 5.5 Task 7 step 3 owner: own the Plan week control, the closed default and the 1440px variant decision in `apps/web/src/app/components/lookbook-prism-layout.tsx`
 'use client'
 
 import { RitualShareCardLauncher } from './ritual-share-card-launcher'

@@ -1,4 +1,5 @@
 // Story 5.2 Task 7 owner: the "Premium" section of Web settings.
+// Story 5.2 Task 7 step 1 owner: own the web subscription surface in `apps/web/src/app/components/subscription-section.tsx`
 //
 // The second child section on `/settings`, after `CommercePreferencesSection`,
 // following its state shape deliberately. Purchasing and lifecycle UI are

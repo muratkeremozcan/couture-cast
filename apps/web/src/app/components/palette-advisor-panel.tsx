@@ -1,3 +1,4 @@
+// Story 5.4 Task 7 step 2 owner: own the consent, source, status, result and card states in `apps/web/src/app/components/palette-advisor-panel.tsx`, mounted from `apps/web/src/app/palette/page.tsx`
 // Story 5.4 Task 7 owner: the `/palette` route's body, the colour palette &
 // beauty/accessory advisor.
 //

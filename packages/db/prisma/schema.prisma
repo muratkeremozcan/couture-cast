@@ -1,5 +1,14 @@
 // Step 3 step 1 owner: searchable owner anchor
 // Step 4 step 1 owner: searchable owner anchor
+// Story 1.1 Task 2 step 1 owner: model normalized weather snapshots and forecast segments in `packages/db/prisma/schema.prisma`
+// Story 1.3 Task 1 step 1 owner: define Prisma models for alert rules and preferences in `packages/db/prisma/schema.prisma`
+// Story 1.4 Task 1 step 1 owner: define Prisma model for telemetry events in `packages/db/prisma/schema.prisma`
+// Story 5.1 Task 1 step 1 owner: define commerce models, constraints, indexes, and RLS policies in `packages/db/prisma/schema.prisma` and its migration
+// Story 5.2 Task 1 step 1 owner: define the billing models, append-only trigger, and worker-only row-level security in `packages/db/prisma/schema.prisma` and its migration
+// Story 5.3 Task 1 step 1 owner: define the `PremiumThemeKey` enum, the `PremiumThemePreference` model, and the `User` back-relation in `packages/db/prisma/schema.prisma`
+// Story 5.4 Task 1 step 1 owner: define the seven enums, `PaletteProfile`, `AdvisorRecommendationState`, the `AffiliateOffer` columns and the `User` back-relations in `packages/db/prisma/schema.prisma`
+// Story 5.5 Task 3 step 1 owner: own `PlannerOutfitSource`, `PlannerDayPlan`, the `SavedLocation` composite unique key and the back-relations in `packages/db/prisma/schema.prisma`
+// Story 6.1 schema owner: own the community models, the two CHECK constraints, the exclusion constraint, the cascade posture and the RLS block in `packages/db/prisma/schema.prisma` and `packages/db/prisma/migrations/20260905120000_add_community_feed_and_challenges/migration.sql`
 // Prisma schema for CoutureCast
 // Follows architecture Data Architecture and RLS requirements
 

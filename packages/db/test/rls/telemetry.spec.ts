@@ -1,5 +1,6 @@
 // Learning path Step 18: Telemetry and audit baseline.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-18-telemetry-and-audit-baseline
+// Story 1.4 Task 6 step 1 owner: verify telemetry RLS policies for authenticated users and the service role in `packages/db/test/rls/telemetry.spec.ts`
 import { randomUUID } from 'node:crypto'
 import { describe, expect } from 'vitest'
 import { buildClaims, scenarioTest, useRlsDatabase, withRole } from './harness.js'

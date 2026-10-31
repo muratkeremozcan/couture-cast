@@ -1,3 +1,6 @@
+// Story 1.4 Task 3 step 1 owner: implement telemetry service database and PostHog concurrent delivery in `apps/api/src/modules/telemetry/telemetry.service.ts`
+// Story 5.3 Task 3 step 3 owner: own the server-side pseudonymous emission for the new event in `apps/api/src/modules/telemetry/telemetry.service.ts`
+// Story 5.4 Task 3 step 3 owner: own the server-side pseudonymous emission for the three new events in `apps/api/src/modules/telemetry/telemetry.service.ts`
 import {
   communityCommentEventNameSchema,
   communityCommentEventPropertiesSchema,

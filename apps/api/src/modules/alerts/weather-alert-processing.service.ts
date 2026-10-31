@@ -1,3 +1,4 @@
+// Story 1.3 Task 5 step 2 owner: orchestrate weather alert processing and BullMQ dispatch in `apps/api/src/modules/alerts/weather-alert-processing.service.ts`
 import { alertWeatherEventSchema } from '@couture/api-client'
 import { Inject, Injectable, Optional } from '@nestjs/common'
 import { createHash } from 'node:crypto'

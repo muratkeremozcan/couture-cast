@@ -1,3 +1,4 @@
+// Story 2.1 Task 1 step 3 owner: re-export ritual contracts into the API workspace in `apps/api/src/contracts/http.ts`
 // Story 0.9 Task 2 step 7 owner:
 // consume the shared HTTP contracts from the API here, so Nest controllers stay thin adapters.
 //

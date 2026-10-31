@@ -1,3 +1,4 @@
+// Story 5.5 Task 2 step 1 owner: own the date helpers, the comfort thresholds, the badge and comfort-note localization tables, the exclusion behaviour and `generateRitualScenarios` in `apps/api/src/modules/personalization/ritual-generation.engine.ts`
 // Story 5.5 Decision 1: the pure generation core extracted from
 // `RitualService.getOrCreateRitual`. This module owns no I/O -- no Prisma,
 // no Redis, no HTTP -- so both `RitualService` (one ritual date, one

@@ -1,3 +1,4 @@
+// Story 5.2 Task 5 step 1 owner: apply provider events and drive the forward outbox in `apps/api/src/modules/commerce/billing-webhook.service.ts`
 import { timingSafeEqual } from 'node:crypto'
 import {
   BadRequestException,

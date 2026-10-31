@@ -1,3 +1,4 @@
+// Story 2.1 Task 1 step 1 owner: define Zod request/response schemas for the ritual endpoint in `packages/api-client/src/contracts/http/ritual.ts`
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { nonEmptyStringSchema, type RegisteredCommonHttpSchemas } from './common'

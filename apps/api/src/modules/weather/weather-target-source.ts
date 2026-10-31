@@ -1,3 +1,4 @@
+// Story 1.1 Task 4 step 1 owner: load configured bootstrap ingestion targets in `apps/api/src/modules/weather/weather-target-source.ts`
 import { createBaseLogger } from '../../logger/pino.config.js'
 import type { PrismaClient } from '@prisma/client'
 import type { WeatherIngestionTarget } from './providers/weather.types.js'

@@ -1,3 +1,4 @@
+# Step 7 step 8 owner: merge workspace summaries, upload coverage artifact, parse metrics, comment on PR, and update four gist-backed badges in `.github/actions/unit-test-coverage-comment/action.yml`
 name: Unit Test Coverage Report and PR Comment
 description: |
   Upload coverage reports, parse metrics from coverage-summary.json,

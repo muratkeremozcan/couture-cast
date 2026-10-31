@@ -1,3 +1,4 @@
+// Story 1.1 Task 4 step 3 owner: register the durable BullMQ weather sweep scheduler in `apps/api/src/modules/weather/weather-scheduler.ts`
 import type { Queue } from 'bullmq'
 
 export const WEATHER_SWEEP_JOB_NAME = 'weather-refresh-sweep'

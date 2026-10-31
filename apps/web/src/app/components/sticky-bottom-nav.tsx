@@ -1,4 +1,5 @@
 // Story 3.6 Task 2 step 1 owner: implement mobile sticky bottom navigation bar with gold active indicator and safe-area insets in apps/web/src/app/components/sticky-bottom-nav.tsx
+// Story 5.4 Task 7 step 3 owner: own the longest-prefix active-tab resolution in `apps/web/src/app/components/sticky-bottom-nav.tsx`
 'use client'
 
 import React, { useState } from 'react'

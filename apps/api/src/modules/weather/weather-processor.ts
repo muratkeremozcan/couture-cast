@@ -1,3 +1,4 @@
+// Story 1.1 Task 4 step 2 owner: coalesce targets and enqueue interval-bucketed location jobs in `apps/api/src/modules/weather/weather-processor.ts`
 import type { Job, JobsOptions, Queue } from 'bullmq'
 
 import type { WeatherIngestionTarget } from './providers/weather.types.js'

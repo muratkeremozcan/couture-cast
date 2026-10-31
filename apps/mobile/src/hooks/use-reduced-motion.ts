@@ -1,3 +1,4 @@
+// Story 3.8 Task 4 step 2 owner: implement native mobile reduced motion listener hook in `apps/mobile/src/hooks/use-reduced-motion.ts`
 import { useEffect, useState } from 'react'
 import { AccessibilityInfo } from 'react-native'
 

@@ -1,3 +1,4 @@
+// Story 1.1 Task 3 step 2 owner: classify latest-weather freshness and fallback responses in `apps/api/src/modules/weather/weather-query.service.ts`
 import { Injectable } from '@nestjs/common'
 
 import {

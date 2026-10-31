@@ -1,5 +1,6 @@
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
+// Story 3.8 Task 5 step 1 owner: unit-test the web skip-link contract in `apps/web/src/app/components/accessibility-hardening.test.tsx`
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { SkipToContent } from './skip-to-content'

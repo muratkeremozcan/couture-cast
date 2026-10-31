@@ -1,3 +1,4 @@
+// Story 5.3 Task 4 step 2 owner: own the route, the guard stack, and response parsing in `apps/api/src/modules/commerce/premium-theme.controller.ts`, registered in `apps/api/src/modules/commerce/commerce.module.ts`
 import { Body, Controller, Get, Inject, Put, UseGuards } from '@nestjs/common'
 import {
   premiumThemeResponseSchema,
