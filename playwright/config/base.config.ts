@@ -12,7 +12,7 @@ export const baseConfig: PlaywrightTestConfig = defineConfig({
   testDir: testsDir,
   // The genuine share-card lane owns a UUID runtime and disables private Auth captures.
   // Its dedicated config and pr-share-card-native workflow execute all acceptance cases.
-  testIgnore: ['**/share-card-export.spec.ts'],
+  testIgnore: ['**/share-card-export.spec.ts', '**/share-card-native-share.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

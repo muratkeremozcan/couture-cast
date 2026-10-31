@@ -4,25 +4,13 @@ import { createHash } from 'node:crypto'
 import pg from 'pg'
 import {
   withBrowserWatermarkLock,
-  afterInitialCommunityVerification,
   browserWatermarkChecks,
   assertBrowserWatermarkEvidence,
   closedBrowserWatermarkFailure,
 } from '../../scripts/lib/story68-browser-watermark.mjs'
 import { COMMUNITY_AUTHORIZATION_BUDGET_MS } from '../../apps/api/src/modules/community/community-authorization-budget'
-import { createClient, type Session } from '@supabase/supabase-js'
 import AxeBuilder from '@axe-core/playwright'
-import type {
-  APIResponse,
-  BrowserContext,
-  Download,
-  Page,
-  Locator,
-  Request,
-  Response,
-  Route,
-  TestInfo,
-} from '@playwright/test'
+import type { APIResponse, Page, Request, Response, Route } from '@playwright/test'
 import {
   interceptNetworkCall as interceptPageNetworkCall,
   type InterceptNetworkCallFn,
@@ -35,94 +23,24 @@ import {
   resolveCommunityTargetsResponseSchema,
   userProfileResponseSchema,
 } from '@couture/api-client/contracts/http'
-import { decodeShareCardBase64, validateShareCardPng } from '@couture/api-client'
 import { test, expect } from '../support/fixtures/share-card-fixtures'
-const directory = path.resolve(
-  process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
-)
-const read = (name: string): unknown =>
-  JSON.parse(fs.readFileSync(path.join(directory, name), 'utf8'))
-const env = read('owned-env.json') as {
-  DATABASE_URL: string
-  API_BASE_URL: string
-}
-if (!/^\/tea_community_[a-f0-9]{32}$/.test(new URL(env.DATABASE_URL).pathname))
-  throw new Error('owned_uuid_required')
-const fixture = read('fixtures.json') as {
-  postId: string
-  identities: { email: string; appUserId: string; authUserId: string; label: string }[]
-}
-const build = read('public-build-env.json') as {
-  EXPO_PUBLIC_SUPABASE_ANON_KEY: string
-  EXPO_PUBLIC_API_BASE_URL: string
-}
-const proxy = read('auth-harness.json') as { proxyUrl: string; otpDir: string }
-async function session(account: number): Promise<Session> {
-  const auth = createClient(proxy.proxyUrl, build.EXPO_PUBLIC_SUPABASE_ANON_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-  const filename = `session-${account === 0 ? 'primary' : 'secondary'}.json`
-  if (fs.existsSync(path.join(directory, filename))) {
-    const existing = read(filename) as Session
-    if ((existing.expires_at ?? 0) * 1000 > Date.now() + 60000) {
-      // An earlier genuine UI sign-out revokes this session before its JWT expires.
-      const current = await auth.auth.getUser(existing.access_token)
-      if (current.data.user) {
-        expect(current.data.user.id).toBe(existing.user.id)
-        return existing
-      }
-      if (
-        current.error?.code !== 'session_not_found' &&
-        !(
-          current.error?.name === 'AuthSessionMissingError' &&
-          current.error.status === 400
-        )
-      )
-        throw new Error('owned_cached_session_verification_failed')
-    }
-  }
-  const identity = fixture.identities[account]!
-  const since = Date.now()
-  const issued = await auth.auth.signInWithOtp({
-    email: identity.email,
-    options: { shouldCreateUser: false },
-  })
-  expect(issued.error).toBeNull()
-  const code = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        proxy.otpDir,
-        createHash('sha256').update(identity.email).digest('hex') + '.json'
-      ),
-      'utf8'
-    )
-  ) as { issuedAt: number; code: string }
-  expect(code.issuedAt).toBeGreaterThanOrEqual(since)
-  const verified = await auth.auth.verifyOtp({
-    email: identity.email,
-    token: code.code,
-    type: 'email',
-  })
-  expect(verified.error).toBeNull()
-  expect(verified.data.session).toBeTruthy()
-  fs.writeFileSync(
-    path.join(directory, filename),
-    JSON.stringify(verified.data.session),
-    { mode: 0o600 }
-  )
-  return verified.data.session!
-}
-async function identify(context: BrowserContext, account = 0) {
-  const member = await session(account)
-  await context.addInitScript((value) => {
-    if (!sessionStorage.getItem('cc68-session-initialized')) {
-      localStorage.setItem('couturecast.auth-session', JSON.stringify(value))
-      sessionStorage.setItem('cc68-session-initialized', 'true')
-    }
-  }, member)
-  return member
-}
-const modal = (page: Page) => page.locator('[aria-labelledby="share-card-title"]')
+import {
+  activateFocused,
+  build,
+  directory,
+  downloadedDigest,
+  env,
+  fixture,
+  identify,
+  loadOwnFeed,
+  modal,
+  nextDownload,
+  ownPhoto,
+  previewBytes,
+  proxy,
+  sha256,
+} from '../support/share-card-owned-runtime'
+import { expectDialogFits, openForShare } from '../support/share-card-web-share'
 const cancellationWitness = (page: Page, request: Request) =>
   page
     .waitForEvent('requestfailed', {
@@ -210,48 +128,6 @@ async function expectNoLateDownload(page: Page) {
   // The probe settles only after every continuation of the save path has run.
   expect(await page.evaluate(settleHandoffProbe), 'late download handoffs').toBe(0)
 }
-// Loads the home feed once the owned post is verified, and returns the API origin.
-async function loadOwnFeed(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
-  const profile = interceptNetworkCall({ method: 'GET', url: '**/api/v1/user/profile' })
-  // The feed settles only after the owned target resolves and the cursor replay lands,
-  // and the spotlight above it grows past its skeleton's height when its cards land.
-  // A click pressed before both can release over another element and never open.
-  await afterInitialCommunityVerification({
-    page,
-    postId: fixture.postId,
-    navigate: () => page.goto('/').then(() => undefined),
-  })
-  await expect(page.getByTestId('community-spotlight-loading')).toHaveCount(0)
-  const verified = await profile
-  expect(verified.status).toBe(200)
-  return new URL(verified.request!.url()).origin
-}
-async function ownPhoto(
-  page: Page,
-  interceptNetworkCall: InterceptNetworkCallFn | null,
-  preparationJourney?: (open: () => Promise<void>, apiOrigin: string) => Promise<void>
-) {
-  const apiOrigin = interceptNetworkCall
-    ? await loadOwnFeed(page, interceptNetworkCall)
-    : ''
-  const opener = page
-    .locator(`[data-testid$="lookbook-card-${fixture.postId}"]`)
-    .first()
-    .getByTestId('share-card-open')
-  await expect(opener).toBeVisible()
-  if (preparationJourney) await preparationJourney(() => opener.click(), apiOrigin)
-  else await opener.click()
-  const preview = modal(page).getByTestId('share-card-preview')
-  await expect(preview).toHaveAttribute('data-loaded', 'true')
-  return { opener, preview, dialog: modal(page) }
-}
-async function previewBytes(preview: Locator) {
-  const bytes = decodeShareCardBase64((await preview.getAttribute('src'))!.split(',')[1]!)
-  validateShareCardPng(bytes)
-  return bytes
-}
-const sha256 = (bytes: Uint8Array | Buffer) =>
-  createHash('sha256').update(bytes).digest('hex')
 function renderCatalog(locale: string) {
   const catalog = JSON.parse(
     fs.readFileSync(
@@ -465,11 +341,6 @@ async function markDocument(page: Page) {
   return () =>
     expect(page.locator('html')).toHaveAttribute('data-share-card-document', token)
 }
-async function activateFocused(control: Locator) {
-  await control.focus()
-  await expect(control).toBeFocused()
-  await control.press('Enter')
-}
 // One held route step: the handler records the request, signals entry and waits for
 // the test to release it.
 function routeGate() {
@@ -585,14 +456,6 @@ async function holdThenFulfill(
   } finally {
     gate.settle()
   }
-}
-// playwright-utils deviation: handleDownload saves the file but does not expose
-// Download.suggestedFilename, which these cases assert.
-const nextDownload = (page: Page) => page.waitForEvent('download')
-async function downloadedDigest(download: Download, file: string) {
-  // saveAs works for local and remote browsers; Download.path() only for local ones.
-  await download.saveAs(file)
-  return sha256(fs.readFileSync(file))
 }
 // The settings form loads above the page's links; click them only once it is in place.
 const settingsLoaded = (page: Page) =>
@@ -1462,397 +1325,4 @@ test('P-CANCEL-SAVE: closing during held save authorization prevents browser han
   await expectNoLateDownload(page)
   await sameDocument()
   expect(downloads).toEqual([])
-})
-
-// Story 6.9 Web Share. Headless engines expose no share sheet, so an init script stubs
-// navigator.canShare and navigator.share per engine and records each shared File. The
-// stub reads its configuration from localStorage so a later navigation can change it.
-type ShareStubConfig = {
-  canShare: boolean | 'missing'
-  outcomes: ('resolve' | 'AbortError' | 'NotAllowedError')[]
-}
-type ShareStubWindow = Window &
-  typeof globalThis & {
-    __shareCardShareFiles?: File[]
-    __enableAnalyticsTestHook?: boolean
-    __capturedAnalyticsEvents?: { event: string; properties: Record<string, unknown> }[]
-  }
-const SHARE_STUB_KEY = 'cc69-share-stub'
-function shareStub(fallback: ShareStubConfig) {
-  const target = window as ShareStubWindow
-  target.__enableAnalyticsTestHook = true
-  const stored = localStorage.getItem('cc69-share-stub')
-  const config = stored ? (JSON.parse(stored) as ShareStubConfig) : fallback
-  const files: File[] = []
-  target.__shareCardShareFiles = files
-  Object.defineProperty(navigator, 'canShare', {
-    configurable: true,
-    value: config.canShare === 'missing' ? undefined : () => config.canShare,
-  })
-  Object.defineProperty(navigator, 'share', {
-    configurable: true,
-    value: (data: { files?: File[] }) => {
-      files.push(...(data.files ?? []))
-      const outcome = config.outcomes.shift() ?? 'resolve'
-      return outcome === 'resolve'
-        ? Promise.resolve()
-        : Promise.reject(new DOMException(outcome, outcome))
-    },
-  })
-}
-// Runs in the page: each File the stub received, with its digest.
-function sharedFiles() {
-  const files = (window as ShareStubWindow).__shareCardShareFiles ?? []
-  return Promise.all(
-    files.map(async (file) => ({
-      name: file.name,
-      type: file.type,
-      sha256: Array.from(
-        new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())),
-        (byte) => byte.toString(16).padStart(2, '0')
-      ).join(''),
-    }))
-  )
-}
-const shareEvents = (page: Page) =>
-  page.evaluate(() =>
-    ((window as ShareStubWindow).__capturedAnalyticsEvents ?? [])
-      .filter(({ event }) => event === 'share_card_shared')
-      .map(({ properties }) => properties)
-  )
-const shareCopy = (locale = 'en-US') =>
-  (
-    JSON.parse(
-      fs.readFileSync(path.resolve(`apps/web/src/i18n/locales/${locale}.json`), 'utf8')
-    ) as {
-      shareCard: Record<
-        | 'shared'
-        | 'sentToApp'
-        | 'shareClosed'
-        | 'shareTapAgain'
-        | 'previewChanged'
-        | 'refresh',
-        string
-      >
-    }
-  ).shareCard
-// Opens the own photo's dialog with the share stub installed and records each share
-// preparation's purpose.
-async function openForShare(
-  context: BrowserContext,
-  page: Page,
-  interceptNetworkCall: InterceptNetworkCallFn,
-  config: ShareStubConfig,
-  answerShare?: (route: Route) => Promise<void>
-) {
-  await identify(context)
-  await context.addInitScript(shareStub, config)
-  const purposes: string[] = []
-  const prepareRoute = interceptNetworkCall({
-    url: '**/api/v1/share-cards/prepare',
-    handler: async (route, request) => {
-      const input = prepareShareCardInputSchema.parse(request.postDataJSON())
-      purposes.push(input.purpose)
-      if (input.purpose === 'share' && answerShare) await answerShare(route)
-      else await route.continue()
-    },
-  })
-  const opened = await ownPhoto(page, interceptNetworkCall)
-  await prepareRoute
-  return { ...opened, purposes, share: opened.dialog.getByTestId('share-card-share') }
-}
-// The photo dialog (its tallest content, with the privacy help) fits short desktop
-// viewports at rest with a loaded preview and in the stale state (the stale alert above
-// Refresh, Download and Share disabled): no scroll container in the dialog overflows or
-// scrolls on a wheel, the page never scrolls, and the surface, Cancel and Refresh stay
-// inside the viewport. At rest Download, Share and Cancel share one row.
-async function expectDialogFits(
-  page: Page,
-  dialog: Locator,
-  info: TestInfo,
-  state: 'at-rest' | 'stale'
-) {
-  const surface = dialog.locator(':scope > div')
-  const recovery = dialog.getByTestId('share-card-recovery')
-  const box = async (target: Locator) => {
-    const found = await target.boundingBox()
-    expect(found).not.toBeNull()
-    return found!
-  }
-  for (const [width, height] of [
-    [1366, 768],
-    [1280, 720],
-  ] as const) {
-    const size = `${state} ${width}x${height}`
-    await page.setViewportSize({ width, height })
-    if (state === 'at-rest') {
-      await expect(dialog.getByTestId('share-card-preview')).toHaveAttribute(
-        'data-loaded',
-        'true'
-      )
-      await expect(dialog.getByTestId('share-card-feedback')).toBeEmpty()
-      await expect(recovery).toHaveCount(0)
-    } else {
-      await expect(dialog.getByRole('alert')).toBeVisible()
-      await expect(recovery).toBeVisible()
-      await expect(dialog.getByTestId('share-card-save')).toHaveAttribute(
-        'aria-disabled',
-        'true'
-      )
-    }
-    const pageY = await page.evaluate(() => window.scrollY)
-    await surface.hover()
-    await page.mouse.wheel(0, 600)
-    const scroll = await dialog.evaluate(
-      (element) =>
-        new Promise<{ scrollers: number; overflow: number; top: number; pageY: number }>(
-          (resolve) =>
-            requestAnimationFrame(() =>
-              requestAnimationFrame(() => {
-                const scrollers = [
-                  element,
-                  ...Array.from(element.querySelectorAll('*')),
-                ].filter((node) => /auto|scroll/.test(getComputedStyle(node).overflowY))
-                resolve({
-                  scrollers: scrollers.length,
-                  overflow: Math.max(
-                    ...scrollers.map((node) => node.scrollHeight - node.clientHeight)
-                  ),
-                  top: Math.max(...scrollers.map((node) => node.scrollTop)),
-                  pageY: window.scrollY,
-                })
-              })
-            )
-        )
-    )
-    expect(scroll.scrollers, `${size} dialog scroll containers`).toBeGreaterThan(0)
-    expect(scroll.overflow, `${size} dialog overflow`).toBeLessThanOrEqual(0)
-    expect(scroll.top, `${size} dialog scrollTop after wheel`).toBe(0)
-    expect(scroll.pageY, `${size} page scrollY after wheel`).toBe(pageY)
-    const outline = await box(surface)
-    const save = await box(dialog.getByTestId('share-card-save'))
-    const share = await box(dialog.getByTestId('share-card-share'))
-    const cancel = await box(dialog.getByTestId('share-card-cancel'))
-    expect(outline.y).toBeGreaterThanOrEqual(0)
-    expect(outline.y + outline.height).toBeLessThanOrEqual(height)
-    expect(cancel.y + cancel.height).toBeLessThanOrEqual(height)
-    if (state === 'at-rest') {
-      expect(share.y, `${size} Share on Download's row`).toBeCloseTo(save.y, 0)
-      expect(cancel.y, `${size} Cancel on Download's row`).toBeCloseTo(save.y, 0)
-      expect(save.x).toBeLessThan(share.x)
-      expect(share.x).toBeLessThan(cancel.x)
-    } else {
-      const refresh = await box(recovery)
-      expect(refresh.y + refresh.height).toBeLessThanOrEqual(height)
-    }
-    await page.screenshot({ path: info.outputPath(`${state}-${width}x${height}.png`) })
-  }
-}
-test('P-SHARE-BYTES: the shared File is the previewed PNG and one handed_off event is captured', async ({
-  context,
-  page,
-  interceptNetworkCall,
-}, info) => {
-  const { dialog, preview, share, purposes } = await openForShare(
-    context,
-    page,
-    interceptNetworkCall,
-    { canShare: true, outcomes: ['resolve'] }
-  )
-  await expectDialogFits(page, dialog, info, 'at-rest')
-  const digest = await preview.getAttribute('data-sha256')
-  expect(sha256(await previewBytes(preview))).toBe(digest)
-  await expect(share).toBeEnabled()
-  await share.click()
-  await expect(dialog.getByRole('status')).toHaveText(shareCopy().sentToApp)
-  await expect(share).toBeFocused()
-  expect(await page.evaluate(sharedFiles)).toEqual([
-    { name: 'couturecast-card.png', type: 'image/png', sha256: digest },
-  ])
-  expect(purposes).toEqual(['preview', 'share'])
-  await expect.poll(() => shareEvents(page)).toHaveLength(1)
-  expect(await shareEvents(page)).toEqual([
-    {
-      client: 'web',
-      target: 'unknown',
-      outcome: 'handed_off',
-      duration_ms: expect.any(Number),
-      locale: 'en-US',
-    },
-  ])
-  await expect(dialog.getByText(shareCopy().shared, { exact: true })).toHaveCount(0)
-})
-test('P-SHARE-DISMISS: a closed share sheet keeps the preview, watermark and Download', async ({
-  context,
-  page,
-  interceptNetworkCall,
-}) => {
-  const { dialog, preview, share } = await openForShare(
-    context,
-    page,
-    interceptNetworkCall,
-    { canShare: true, outcomes: ['AbortError'] }
-  )
-  const digest = await preview.getAttribute('data-sha256')
-  await activateFocused(share)
-  await expect(dialog.getByRole('status')).toHaveText(shareCopy().shareClosed)
-  await expect(share).toBeFocused()
-  await expect(dialog.getByRole('alert')).toHaveCount(0)
-  await expect(preview).toHaveAttribute('data-sha256', digest!)
-  await expect(preview).toHaveAttribute('data-loaded', 'true')
-  await expect(dialog.getByRole('checkbox')).toBeChecked()
-  await expect(dialog.getByTestId('share-card-save')).toBeEnabled()
-  await expect.poll(() => shareEvents(page)).toHaveLength(1)
-  expect(await shareEvents(page)).toEqual([
-    {
-      client: 'web',
-      target: 'none',
-      outcome: 'dismissed',
-      duration_ms: expect.any(Number),
-      locale: 'en-US',
-    },
-  ])
-})
-test('P-SHARE-TAP-AGAIN: an expired activation asks for one more tap that shares the same bytes without a new preparation', async ({
-  context,
-  page,
-  interceptNetworkCall,
-}) => {
-  const { dialog, preview, share, purposes } = await openForShare(
-    context,
-    page,
-    interceptNetworkCall,
-    { canShare: true, outcomes: ['NotAllowedError', 'resolve'] }
-  )
-  const digest = await preview.getAttribute('data-sha256')
-  await share.click()
-  await expect(dialog.getByRole('status')).toHaveText(shareCopy().shareTapAgain)
-  // The polite prompt is visible too; the status region alone is screen-reader only.
-  await expect(
-    dialog.locator('p[aria-hidden="true"]', { hasText: shareCopy().shareTapAgain })
-  ).toBeVisible()
-  await expect(dialog.getByRole('alert')).toHaveCount(0)
-  await expect(share).toBeFocused()
-  expect(
-    (
-      await new AxeBuilder({ page })
-        .include('[aria-labelledby="share-card-title"]')
-        .analyze()
-    ).violations
-  ).toEqual([])
-  await share.click()
-  await expect(dialog.getByRole('status')).toHaveText(shareCopy().sentToApp)
-  const files = await page.evaluate(sharedFiles)
-  expect(files.map((file) => file.sha256)).toEqual([digest, digest])
-  expect(purposes).toEqual(['preview', 'share'])
-  await expect.poll(() => shareEvents(page)).toHaveLength(2)
-  expect((await shareEvents(page)).map(({ outcome }) => outcome)).toEqual([
-    'failed',
-    'handed_off',
-  ])
-})
-test('P-SHARE-CAPABILITY-OFF: no Share control when the capability is absent or canShare is missing, and Download still works', async ({
-  context,
-  page,
-  interceptNetworkCall,
-}, info) => {
-  // playwright-utils deviation: interceptNetworkCall resolves on the first match, and
-  // this route must answer every capability read for the first page.
-  let absent = true
-  let reads = 0
-  await page.route('**/api/v1/share-cards/capabilities', (route) => {
-    reads += 1
-    return absent
-      ? route.fulfill({ status: 404, json: { statusCode: 404, message: 'Not Found' } })
-      : route.continue()
-  })
-  const first = await openForShare(context, page, interceptNetworkCall, {
-    canShare: true,
-    outcomes: [],
-  })
-  await expect.poll(() => reads).toBe(1)
-  await expect(first.dialog.getByTestId('share-card-save')).toBeEnabled()
-  await expect(first.share).toHaveCount(0)
-  await page.keyboard.press('Escape')
-  absent = false
-  await page.evaluate(
-    ([key, config]) => localStorage.setItem(key, JSON.stringify(config)),
-    [SHARE_STUB_KEY, { canShare: 'missing', outcomes: [] }] as const
-  )
-  const { dialog, preview } = await ownPhoto(page, interceptNetworkCall)
-  await expect(dialog.getByTestId('share-card-save')).toBeEnabled()
-  await expect(dialog.getByTestId('share-card-share')).toHaveCount(0)
-  // Without canShare the dialog never asks for the capability.
-  expect(reads).toBe(1)
-  const downloaded = nextDownload(page)
-  await dialog.getByTestId('share-card-save').click()
-  const download = await downloaded
-  expect(await downloadedDigest(download, info.outputPath('capability-off.png'))).toBe(
-    await preview.getAttribute('data-sha256')
-  )
-  expect(await page.evaluate(sharedFiles)).toEqual([])
-  expect(await shareEvents(page)).toEqual([])
-})
-test('P-SHARE-REVALIDATE: a share preparation conflict takes the stale path and never hands off', async ({
-  context,
-  page,
-  interceptNetworkCall,
-}, info) => {
-  let conflict = true
-  const { dialog, preview, share, purposes } = await openForShare(
-    context,
-    page,
-    interceptNetworkCall,
-    { canShare: true, outcomes: ['resolve'] },
-    async (route) => {
-      if (!conflict) return route.continue()
-      conflict = false
-      await route.fulfill({
-        status: 409,
-        json: { code: 'preview_changed', statusCode: 409, message: 'preview_changed' },
-      })
-    }
-  )
-  const digest = await preview.getAttribute('data-sha256')
-  // The shortest desktop size: the stale alert and Refresh line overflow the dialog.
-  await page.setViewportSize({ width: 1280, height: 720 })
-  await activateFocused(share)
-  await expect(dialog.getByRole('alert')).toHaveText(shareCopy().previewChanged)
-  const recovery = dialog.getByTestId('share-card-recovery')
-  await expect(recovery).toHaveText(shareCopy().refresh)
-  await expect(recovery).toBeFocused()
-  // WCAG 2.4.11: the newly focused Refresh is scrolled fully into the viewport and into
-  // the dialog's visible scroll area.
-  await expect(recovery).toBeInViewport({ ratio: 1 })
-  const surface = dialog.locator(':scope > div')
-  await expect
-    .poll(async () => {
-      const visible = await surface.evaluate((element) => {
-        const rect = element.getBoundingClientRect()
-        const top = rect.top + element.clientTop
-        return { top, bottom: top + element.clientHeight }
-      })
-      const box = await recovery.boundingBox()
-      return box !== null && box.y >= visible.top && box.y + box.height <= visible.bottom
-    }, 'Refresh inside the dialog scroll area')
-    .toBe(true)
-  await page.screenshot({ path: info.outputPath('stale-1280x720.png') })
-  await expect(preview).toHaveAttribute('data-sha256', digest!)
-  await expect(share).toHaveAttribute('aria-disabled', 'true')
-  await expect(dialog.getByTestId('share-card-save')).toHaveAttribute(
-    'aria-disabled',
-    'true'
-  )
-  expect(await page.evaluate(sharedFiles)).toEqual([])
-  await expect.poll(() => shareEvents(page)).toHaveLength(1)
-  expect((await shareEvents(page))[0]).toMatchObject({
-    outcome: 'failed',
-    target: 'none',
-  })
-  await activateFocused(recovery)
-  await expect(preview).toHaveAttribute('data-loaded', 'true')
-  await expect(share).toBeEnabled()
-  await share.click()
-  await expect(dialog.getByRole('status')).toHaveText(shareCopy().sentToApp)
-  expect(purposes).toEqual(['preview', 'share', 'preview', 'share'])
 })

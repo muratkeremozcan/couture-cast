@@ -9,7 +9,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 // can finish before a later browser task, which these event controls reproduce.
 const source = fs.readFileSync('playwright/tests/share-card-export.spec.ts', 'utf8')
 const start = source.indexOf('const cancellationWitness =')
-const end = source.indexOf('\nasync function ownPhoto(', start)
+const end = source.indexOf('\nfunction renderCatalog(', start)
+if (start === -1 || end === -1) throw new Error('cancellation helpers moved')
 const javascript = transpileModule(source.slice(start, end), {
   compilerOptions: { target: ScriptTarget.ES2022 },
 }).outputText

@@ -8,6 +8,7 @@ import {
   LOCALE_BEHAVIORS,
   SHARED_BEHAVIORS,
   SHARE_BEHAVIORS,
+  SHARE_SPEC_FILE,
   SHARE_TITLE_BUDGET,
   SPEC_FILE,
   assertWebMatrix,
@@ -18,6 +19,7 @@ import { passingReport } from './web-matrix-fixture.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const spec = fs.readFileSync(path.join(root, SPEC_FILE), 'utf8')
+const shareSpec = fs.readFileSync(path.join(root, SHARE_SPEC_FILE), 'utf8')
 const expected = expectedWebMatrix()
 
 const report = () => passingReport(expected)
@@ -67,7 +69,10 @@ describe('expected web matrix from the spec', () => {
     )
     assert.throws(
       () =>
-        specCases(`${spec}\ntest('P-SHARE-EXTRA: a sixth share case', async () => {})\n`),
+        specCases(
+          spec,
+          `${shareSpec}\ntest('P-SHARE-EXTRA: a sixth share case', async () => {})\n`
+        ),
       /web_matrix_spec_share_budget/
     )
     assert.throws(
@@ -76,17 +81,58 @@ describe('expected web matrix from the spec', () => {
           spec.replace(
             "    test('P-A11Y:",
             "    test('P-SHARE-LOCALE: per locale', async () => {})\n    test('P-A11Y:"
-          )
+          ),
+          shareSpec
         ),
       /web_matrix_spec_share_per_locale/
     )
-    const withoutDismiss = spec
+    const withoutDismiss = shareSpec
       .split('\n')
       .filter((line) => !line.startsWith("test('P-SHARE-DISMISS:"))
       .join('\n')
     assert.throws(
-      () => specCases(withoutDismiss),
+      () => specCases(spec, withoutDismiss),
       /web_matrix_spec_behavior_missing: P-SHARE-DISMISS:/
+    )
+  })
+
+  test('U-HARNESS-WEB-MATRIX: Web Share cases live only in the share spec, at top level', () => {
+    assert.ok(
+      expected.shared.slice(-SHARE_TITLE_BUDGET).every((t) => t.startsWith('P-SHARE-'))
+    )
+    const dismiss = shareSpec
+      .split('\n')
+      .find((line) => line.startsWith("test('P-SHARE-DISMISS:"))
+    assert.ok(dismiss)
+    // Moved back into the export spec, a share case is refused there.
+    assert.throws(
+      () => specCases(`${spec}\n${dismiss} async () => {})\n`, shareSpec),
+      /web_matrix_spec_share_misplaced: P-SHARE-DISMISS:/
+    )
+    // A non-share case or a nested case in the share spec is refused.
+    assert.throws(
+      () =>
+        specCases(
+          spec,
+          `${shareSpec}\ntest('P-OFFLINE-COPY: drifted', async () => {})\n`
+        ),
+      /web_matrix_spec_share_misplaced: P-OFFLINE-COPY:/
+    )
+    assert.throws(
+      () =>
+        specCases(
+          spec,
+          shareSpec.replace("test('P-SHARE-DISMISS:", "  test('P-SHARE-DISMISS:")
+        ),
+      /web_matrix_spec_share_misplaced: P-SHARE-DISMISS:/
+    )
+    assert.throws(
+      () =>
+        specCases(
+          spec,
+          shareSpec.replace("test('P-SHARE-DISMISS:", "test.only('P-SHARE-DISMISS:")
+        ),
+      /web_matrix_spec_unsupported_declaration/
     )
   })
 
@@ -95,7 +141,10 @@ describe('expected web matrix from the spec', () => {
       "    test('P-A11Y:",
       "    test('P-A11Y-SPLIT: a separated half', async () => {})\n    test('P-A11Y:"
     )
-    assert.equal(specCases(split).perLocale.length, expected.perLocale.length + 1)
+    assert.equal(
+      specCases(split, shareSpec).perLocale.length,
+      expected.perLocale.length + 1
+    )
   })
 
   test('a spec without a required behavior, with a duplicate or a skipped case is refused', () => {
@@ -104,31 +153,35 @@ describe('expected web matrix from the spec', () => {
       .filter((line) => !line.startsWith("test('P-OFFLINE:"))
       .join('\n')
     assert.throws(
-      () => specCases(offline),
+      () => specCases(offline, shareSpec),
       /web_matrix_spec_behavior_missing: P-OFFLINE:/
     )
     assert.throws(
       () =>
         specCases(
-          spec.replace("    test('P-WATERMARK:", "    test('P-DOWNLOAD-BYTES: copy")
+          spec.replace("    test('P-WATERMARK:", "    test('P-DOWNLOAD-BYTES: copy"),
+          shareSpec
         ),
       /web_matrix_spec_behavior_missing: P-(WATERMARK|DOWNLOAD-BYTES):/
     )
     assert.throws(
-      () => specCases(`${spec}\ntest('${expected.shared[1]}', async () => {})\n`),
+      () =>
+        specCases(`${spec}\ntest('${expected.shared[1]}', async () => {})\n`, shareSpec),
       /web_matrix_spec_duplicate_title/
     )
     const [community] = expected.shared.filter((title) => title.startsWith('P-OFFLINE:'))
     assert.throws(
-      () => specCases(`${spec}\ntest('${community}', async () => {})\n`),
+      () => specCases(`${spec}\ntest('${community}', async () => {})\n`, shareSpec),
       /web_matrix_spec_duplicate_title/
     )
     assert.throws(
-      () => specCases(spec.replace("test('P-OFFLINE:", "test.skip('P-OFFLINE:")),
+      () =>
+        specCases(spec.replace("test('P-OFFLINE:", "test.skip('P-OFFLINE:"), shareSpec),
       /web_matrix_spec_unsupported_declaration/
     )
     assert.throws(
-      () => specCases(spec.replace('for (const locale of supportedLocales)', '')),
+      () =>
+        specCases(spec.replace('for (const locale of supportedLocales)', ''), shareSpec),
       /web_matrix_spec_locale_block_missing/
     )
   })
