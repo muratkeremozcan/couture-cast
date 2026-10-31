@@ -137,35 +137,63 @@ export function shareSheetFlowRuns(platform) {
   ]
 }
 
+const COMPOSER_ACTIONS = new Set(
+  ['save', 'share', 'retry', 'refresh', 'settings', 'cancel'].map(
+    (name) => `share-card-${name}`
+  )
+)
+
 /**
  * The composer's state from one hierarchy read: the loaded preview's digest and Share's offset
  * below the preview's bottom edge, in the platform's hierarchy units. Only the feedback slot sits
  * between the two, and the offset holds while the composer scrolls, so a changed offset means
- * status or error copy moved Share, the iPad popover anchor.
+ * status or error copy moved Share, the iPad popover anchor. `actionsInView` says Cancel and every
+ * other action shown end inside the composer's scroll view (Android) or the screen (iOS, whose
+ * hierarchy has no scroll view node), so none of them needs a scroll.
  */
 export function readComposerLayout(hierarchy) {
   let preview
   let share
+  let viewport
+  let screen = 0
+  const actions = new Map()
   const visit = (node) => {
     const id = node?.attributes?.['resource-id'] ?? ''
     const bounds = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(
       node?.attributes?.bounds ?? ''
     )
     if (bounds) {
-      const [top, bottom] = [Number(bounds[2]), Number(bounds[4])]
+      const [left, top, bottom] = [
+        Number(bounds[1]),
+        Number(bounds[2]),
+        Number(bounds[4]),
+      ]
       const digest = /^share-card-preview-loaded-([a-f0-9]{64})$/.exec(id)?.[1]
       if (digest) preview = { digest, bottom }
       if (id === 'share-card-share') share = { top, height: bottom - top }
+      if (COMPOSER_ACTIONS.has(id)) actions.set(id, bottom)
+      if (/ScrollView/.test(node.attributes.class ?? '') && viewport === undefined)
+        viewport = bottom
+      if (left === 0 && top === 0) screen = Math.max(screen, bottom)
     }
     for (const child of node?.children ?? []) visit(child)
   }
   visit(JSON.parse(hierarchy))
   if (!preview) throw new Error('loaded_approved_preview_required')
   if (!share || !(share.height > 0)) throw new Error('share_action_required')
+  const fold = viewport ?? screen
   return {
     digest: preview.digest,
     share: { offset: share.top - preview.bottom, height: share.height },
+    actionsInView:
+      actions.has('share-card-cancel') &&
+      [...actions.values()].every((bottom) => bottom <= fold),
   }
+}
+
+/** Every composer action, Cancel included, shows without scrolling (Story 6.9 composer fit). */
+export function assertActionsInView(layout) {
+  if (layout.actionsInView !== true) throw new Error('composer_action_below_fold')
 }
 
 /**
@@ -505,6 +533,7 @@ const CLOSED_CODES = Object.freeze([
   'loaded_approved_preview_required',
   'share_action_required',
   'share_action_moved',
+  'composer_action_below_fold',
   'share_save_proof_failed',
 ])
 
@@ -1002,6 +1031,8 @@ export async function runStory69ShareSheet(ctx) {
       // The digest covers the composition and the watermark choice.
       if (settled.digest !== digest) throw new Error('share_composition_changed')
       assertShareStill(previous, settled)
+      assertActionsInView(previous)
+      assertActionsInView(settled)
       const handoff = step.handoff
         ? assertFreshShareFile(store, before, digest)
         : undefined

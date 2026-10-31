@@ -22,6 +22,7 @@ import {
   SHARE_SHEET_STEPS,
   SHARE_SHEET_UITEST_MARKERS,
   androidShareFileStore,
+  assertActionsInView,
   assertFreshShareFile,
   assertLeasedShareFile,
   assertShareReceiveInstrumentation,
@@ -279,11 +280,12 @@ describe('share-sheet plan', () => {
 
 describe('composer layout', () => {
   const digest = 'c'.repeat(64)
-  const node = (id, bounds, children = []) => ({
-    attributes: { 'resource-id': id, bounds },
+  const node = (id, bounds, children = [], className) => ({
+    attributes: { 'resource-id': id, bounds, ...(className && { class: className }) },
     children,
   })
-  const hierarchy = (scroll) =>
+  // iPhone 17 Pro at rest: Save and Share share a row and Cancel ends at 822 of 874 pt.
+  const hierarchy = (scroll, cancelBottom = 822) =>
     JSON.stringify(
       node('', '[0,0][402,874]', [
         node('share-card-title', `[24,${78 - scroll}][378,${109 - scroll}]`),
@@ -291,16 +293,64 @@ describe('composer layout', () => {
           `share-card-preview-loaded-${digest}`,
           `[24,${189 - scroll}][378,${632 - scroll}]`
         ),
-        node('share-card-save', `[24,${708 - scroll}][378,${757 - scroll}]`),
-        node('share-card-share', `[24,${773 - scroll}][378,${822 - scroll}]`),
+        node('share-card-save', `[24,${708 - scroll}][228,${757 - scroll}]`),
+        node('share-card-share', `[240,${708 - scroll}][378,${757 - scroll}]`),
+        node(
+          'share-card-cancel',
+          `[24,${cancelBottom - 49 - scroll}][378,${cancelBottom - scroll}]`
+        ),
       ])
     )
 
   test('one read gives the preview digest and Share offset below the preview', () => {
     assert.deepEqual(readComposerLayout(hierarchy(0)), {
       digest,
-      share: { offset: 141, height: 49 },
+      share: { offset: 76, height: 49 },
+      actionsInView: true,
     })
+  })
+
+  test('an action past the fold, or no Cancel at all, fails the fit', () => {
+    // Before the fit, Cancel rested at 838 to 887 on the 874-pt iPhone 17 Pro screen.
+    assert.equal(readComposerLayout(hierarchy(0, 887)).actionsInView, false)
+    assert.throws(
+      () => assertActionsInView(readComposerLayout(hierarchy(0, 887))),
+      /composer_action_below_fold/
+    )
+    const noCancel = JSON.parse(hierarchy(0))
+    noCancel.children = noCancel.children.filter(
+      (child) => child.attributes['resource-id'] !== 'share-card-cancel'
+    )
+    assert.equal(readComposerLayout(JSON.stringify(noCancel)).actionsInView, false)
+    assert.equal(
+      closedShareSheetFailure(new Error('composer_action_below_fold')),
+      'composer_action_below_fold'
+    )
+  })
+
+  test('Android measures the fit against the scroll view, not the screen', () => {
+    // Android API 36 at 1080 by 2400 before the fit: the scroll view ends at 2295 px and Try
+    // again fills its last row, so Cancel (2333 to 2469) is off screen and absent.
+    const android = (cancel) =>
+      JSON.stringify(
+        node('', '[0,0][1080,2400]', [
+          node(
+            '',
+            '[0,105][1080,2295]',
+            [
+              node(`share-card-preview-loaded-${digest}`, '[63,407][1017,1600]'),
+              node('share-card-save', '[63,1800][610,1935]'),
+              node('share-card-share', '[641,1800][1017,1935]'),
+              node('share-card-retry', '[63,1978][546,2113]'),
+              ...(cancel ? [node('share-card-cancel', cancel)] : []),
+            ],
+            'android.widget.ScrollView'
+          ),
+        ])
+      )
+    assert.equal(readComposerLayout(android('[578,1978][1017,2113]')).actionsInView, true)
+    assert.equal(readComposerLayout(android('[63,2333][1017,2469]')).actionsInView, false)
+    assert.equal(readComposerLayout(android(null)).actionsInView, false)
   })
 
   test('the offset holds while the composer scrolls', () => {
@@ -956,7 +1006,11 @@ describe('runStory69ShareSheet', () => {
       privateJson: (name, value) => reports.push([name, structuredClone(value)]),
       read: () => ({}),
       openUrl: (url) => events.push(`open ${url.split('mode=')[1] ?? 'dev-client'}`),
-      composerLayout: () => ({ digest, share: { offset: 108, height: 49 } }),
+      composerLayout: () => ({
+        digest,
+        share: { offset: 108, height: 49 },
+        actionsInView: true,
+      }),
       captureApproved: () => events.push('capture'),
       extract: () => events.push('extract'),
       maestro: (flow, env) => {
@@ -1192,6 +1246,7 @@ describe('runStory69ShareSheet', () => {
     ctx.composerLayout = () => ({
       digest: ++reads === 2 ? 'b'.repeat(64) : 'a'.repeat(64),
       share: { offset: 108, height: 49 },
+      actionsInView: true,
     })
     await assert.rejects(runStory69ShareSheet(ctx), /share_composition_changed/)
   })
@@ -1204,10 +1259,25 @@ describe('runStory69ShareSheet', () => {
     ctx.composerLayout = () => ({
       digest,
       share: { offset: ++reads === 2 ? 166 : 108, height: 136 },
+      actionsInView: true,
     })
     await assert.rejects(runStory69ShareSheet(ctx), /share_action_moved/)
     assert.equal(reports.at(-1)[1].code, 'share_action_moved')
     assert.deepEqual(reports.at(-1)[1].cases, [])
+  })
+
+  test('a step that leaves an action below the fold fails the fit', async (t) => {
+    const { ctx, reports, digest } = fakeDevice(t, 'ios')
+    t.mock.method(console, 'log', () => undefined)
+    let reads = 0
+    // The two-line failure copy left Cancel under the fold after the step.
+    ctx.composerLayout = () => ({
+      digest,
+      share: { offset: 108, height: 49 },
+      actionsInView: ++reads !== 2,
+    })
+    await assert.rejects(runStory69ShareSheet(ctx), /composer_action_below_fold/)
+    assert.equal(reports.at(-1)[1].code, 'composer_action_below_fold')
   })
 
   test('a failed flow publishes only a closed code and the passed cases, never paths or digests', async (t) => {
