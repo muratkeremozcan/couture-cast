@@ -33,9 +33,10 @@ const cli = (value, event) =>
   })
 
 describe('share-card aggregate job gate', () => {
-  test('requires the Android lane, the browser lane, all three Android36 partitions, the three iOS shard jobs and the Expo Go proof', () => {
+  test('requires the Android lane, the browser lane, all three Android36 partitions, the Android matrix shard evidence, the three iOS shard jobs and the Expo Go proof', () => {
     assert.deepEqual([...requiredShareCardJobs].sort(), [
       'android36-interaction',
+      'android36-matrix-evidence',
       'android36-native-matrix',
       'android36-original',
       'browser-acceptance',
@@ -119,6 +120,7 @@ describe('share-card aggregate job gate', () => {
       assert.deepEqual([...pullRequestShareCardJobs], ['browser-acceptance'])
       assert.deepEqual(deviceLanes.sort(), [
         'android36-interaction',
+        'android36-matrix-evidence',
         'android36-native-matrix',
         'android36-original',
         'ios-build',

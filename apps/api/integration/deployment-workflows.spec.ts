@@ -300,9 +300,11 @@ describe('deployment workflows', () => {
       if (condition?.includes("github.event_name != 'pull_request'")) skipped.add(name)
       else expect(['browser-acceptance', 'share-card-lanes-gate'], name).toContain(name)
     }
-    // Eight device lanes take over an hour each; a pull request would wait on all of them.
+    // The device lanes take over an hour each, and the evidence jobs only read their artifacts;
+    // a pull request would wait on all of them.
     expect([...skipped].sort()).toEqual([
       'android36-interaction',
+      'android36-matrix-evidence',
       'android36-native-matrix',
       'android36-original',
       'ios-build',

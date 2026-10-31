@@ -37,7 +37,11 @@ import {
 } from './ci/native-ios-maestro-trace.mjs'
 import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
 import { beginExpoGoProbe, readExpoGoVersion } from './ci/native-ios-expo-go-probe.mjs'
-import { inMatrixSection, localesForShard, parseShard } from './ci/native-ios-shards.mjs'
+import {
+  inMatrixSection,
+  localesForShard,
+  parseShard,
+} from './ci/native-matrix-shards.mjs'
 import {
   iosDriverGlobalArgs,
   iosDriverTestArgs,
@@ -1501,7 +1505,8 @@ if (command === 'prebuild') {
 } else if (command === 'matrix') {
   requireDevice()
   const report = { platform, cases: [], completed: false }
-  const shard = option('shard') === undefined ? undefined : parseShard(option('shard'))
+  const shard =
+    option('shard') === undefined ? undefined : parseShard(platform, option('shard'))
   let before
   const mark = (id) => {
     report.cases.push({ id, passed: true })
@@ -1547,7 +1552,7 @@ if (command === 'prebuild') {
   // Real Settings controls establish locale; no direct i18n test setter is used.
   activeLocale = 'en-US'
   maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
-  if (inMatrixSection(shard, 'pre-locale')) {
+  if (inMatrixSection(platform, shard, 'pre-locale')) {
     const beforePreparation = originals()
     fixture('prepare_deferred')
     maestro('maestro/story68/preparing-cancel.yaml')
@@ -1614,7 +1619,7 @@ if (command === 'prebuild') {
     close()
   }
   fixture('real')
-  for (const locale of localesForShard(shard)) {
+  for (const locale of localesForShard(platform, shard)) {
     activeLocale = locale
     if (platform === 'ios') recordIosHostSample('locale-loop', { root })
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: locale })
@@ -1667,7 +1672,7 @@ if (command === 'prebuild') {
     mark(`M-LOCALE:${locale}`)
     close()
   }
-  if (inMatrixSection(shard, 'large-text')) {
+  if (inMatrixSection(platform, shard, 'large-text')) {
     activeLocale = 'pt-PT'
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
     const previousFont =
@@ -1696,13 +1701,13 @@ if (command === 'prebuild') {
     }
   }
   if (
-    inMatrixSection(shard, 'precommit-lifecycle') ||
-    inMatrixSection(shard, 'save-lifecycle')
+    inMatrixSection(platform, shard, 'precommit-lifecycle') ||
+    inMatrixSection(platform, shard, 'save-lifecycle')
   ) {
     activeLocale = 'en-US'
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
   }
-  if (inMatrixSection(shard, 'precommit-lifecycle')) {
+  if (inMatrixSection(platform, shard, 'precommit-lifecycle')) {
     for (const lifecycle of ['close', 'navigation']) {
       fixture('real')
       open('outfit')
@@ -1731,7 +1736,7 @@ if (command === 'prebuild') {
       mark(`M-CANCEL M-SINGLE-WRITE:precommit-authorization-${lifecycle}`)
     }
   }
-  if (inMatrixSection(shard, 'save-lifecycle')) {
+  if (inMatrixSection(platform, shard, 'save-lifecycle')) {
     for (const lifecycle of ['close', 'navigation', 'signout']) {
       fixture('deferred')
       open('outfit')
@@ -1780,7 +1785,7 @@ if (command === 'prebuild') {
       ])
     await new Promise((resolve) => setTimeout(resolve, 2000))
   }
-  if (inMatrixSection(shard, 'prefs-failed')) {
+  if (inMatrixSection(platform, shard, 'prefs-failed')) {
     fixture('prefs_unavailable')
     try {
       maestro('maestro/story68/prefs-failed.yaml')

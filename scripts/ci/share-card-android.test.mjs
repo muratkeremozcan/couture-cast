@@ -12,7 +12,7 @@ async function journey(
   expected = '36',
   status = 0,
   accel = 'KVM (version 12) is installed and usable.',
-  { suite = sdk.trim() === '32' ? 'all' : 'matrix', failOn = '' } = {}
+  { suite = sdk.trim() === '32' ? 'all' : 'matrix-1', failOn = '' } = {}
 ) {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'cc68-sdk-guard-'))
   t.after(() => rm(directory, { recursive: true, force: true }))
@@ -66,7 +66,8 @@ describe('Android SDK guard', () => {
   // Every selectable suite and the exact commands it owns after install, open and signin.
   const suites = [
     ['32', 'all', ['proof', 'matrix', 'rapid-watermark'], []],
-    ['36', 'matrix', ['matrix'], []],
+    ['36', 'matrix-1', ['matrix'], []],
+    ['36', 'matrix-2', ['matrix'], []],
     ['36', 'original', ['proof'], []],
     [
       '36',
@@ -110,9 +111,9 @@ describe('Android SDK guard', () => {
     })
   }
 
-  test('the Android36 partitions together cover every proof command exactly once', async (t) => {
+  test('the Android36 partitions together cover every proof command once and the matrix once per shard', async (t) => {
     const ran = []
-    for (const suite of ['matrix', 'original', 'interaction']) {
+    for (const suite of ['matrix-1', 'matrix-2', 'original', 'interaction']) {
       const { result, commands } = await journey(t, '36', '36', 0, undefined, { suite })
       assert.equal(result.status, 0, result.stderr)
       ran.push(
@@ -127,6 +128,7 @@ describe('Android SDK guard', () => {
       'a11y',
       'fallback-focus',
       'font',
+      'matrix',
       'matrix',
       'proof',
       'rapid-watermark',
@@ -148,7 +150,8 @@ describe('Android SDK guard', () => {
     assert.ok(at('mjs share-sheet ') < at(font))
     for (const [sdk, suite] of [
       ['32', 'all'],
-      ['36', 'matrix'],
+      ['36', 'matrix-1'],
+      ['36', 'matrix-2'],
       ['36', 'original'],
     ]) {
       const other = await journey(t, sdk, sdk, 0, undefined, { suite })
@@ -157,35 +160,47 @@ describe('Android SDK guard', () => {
     }
   })
 
-  // Spec Never: the android36-native-matrix workload does not change. This is its exact command
-  // list before Story 6.9, byte for byte.
-  test('the API36 matrix suite runs exactly its pre-Story-6.9 command list', async (t) => {
-    const { result, commands } = await journey(t, '36', '36', 0, undefined, {
-      suite: 'matrix',
+  // Spec Never: the android36-native-matrix workload does not change. Each shard runs the exact
+  // pre-Story-6.9 command list, byte for byte, with only its own shard added to the matrix command;
+  // native-matrix-shards.test.mjs proves the two shards report all 43 matrix cases.
+  for (const shard of [1, 2])
+    test(`API36 matrix shard ${shard} runs exactly the pre-Story-6.9 command list for its shard`, async (t) => {
+      const { result, commands } = await journey(t, '36', '36', 0, undefined, {
+        suite: `matrix-${shard}`,
+      })
+      assert.equal(result.status, 0, result.stderr)
+      const serial = process.env.ANDROID_SERIAL ?? 'emulator-5554'
+      assert.equal(
+        commands,
+        [
+          `adb -s ${serial} shell getprop ro.build.version.sdk`,
+          'emulator -accel-check',
+          `adb -s ${serial} install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`,
+          `node scripts/run-story68-native.mjs open --platform android --device ${serial}`,
+          `node scripts/run-story68-native.mjs signin --platform android --device ${serial}`,
+          `node scripts/run-story68-native.mjs matrix --platform android --device ${serial} --shard ${shard}/2`,
+          '',
+        ].join('\n')
+      )
     })
+
+  test('API32 runs the whole matrix unsharded', async (t) => {
+    const { result, commands } = await journey(t, '32', '32')
     assert.equal(result.status, 0, result.stderr)
-    const serial = process.env.ANDROID_SERIAL ?? 'emulator-5554'
-    assert.equal(
-      commands,
-      [
-        `adb -s ${serial} shell getprop ro.build.version.sdk`,
-        'emulator -accel-check',
-        `adb -s ${serial} install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`,
-        `node scripts/run-story68-native.mjs open --platform android --device ${serial}`,
-        `node scripts/run-story68-native.mjs signin --platform android --device ${serial}`,
-        `node scripts/run-story68-native.mjs matrix --platform android --device ${serial}`,
-        '',
-      ].join('\n')
-    )
+    assert.match(commands, /mjs matrix --platform android --device \S+\n/)
+    assert.doesNotMatch(commands, /--shard/)
   })
 
   for (const [name, sdk, suite] of [
     ['an unpartitioned API36 run', '36', 'all'],
     ['an empty API36 suite', '36', ''],
     ['an unknown API36 suite', '36', 'browser'],
-    ['an Android36 suite on API32', '32', 'matrix'],
+    ['an Android36 suite on API32', '32', 'matrix-1'],
+    ['an unsharded API36 matrix', '36', 'matrix'],
+    ['a third API36 matrix shard', '36', 'matrix-3'],
+    ['an API36 matrix shard zero', '36', 'matrix-0'],
     ['an empty API32 suite', '32', ''],
-    ['a mixed-case suite', '36', 'Matrix'],
+    ['a mixed-case suite', '36', 'Matrix-1'],
   ]) {
     test(`${name} stops before install`, async (t) => {
       const { result, commands } = await journey(t, sdk, sdk, 0, undefined, { suite })
@@ -196,7 +211,8 @@ describe('Android SDK guard', () => {
   }
 
   for (const [suite, failOn] of [
-    ['matrix', 'mjs matrix '],
+    ['matrix-1', 'mjs matrix '],
+    ['matrix-2', 'mjs matrix '],
     ['original', 'mjs proof '],
     ['interaction', 'mjs a11y '],
     ['interaction', 'android-release-font'],
@@ -213,7 +229,7 @@ describe('Android SDK guard', () => {
   }
 
   test('a failing sign-in stops every suite before its proofs', async (t) => {
-    for (const suite of ['matrix', 'original', 'interaction']) {
+    for (const suite of ['matrix-1', 'matrix-2', 'original', 'interaction']) {
       const { result, commands } = await journey(t, '36', '36', 0, undefined, {
         suite,
         failOn: 'mjs signin ',

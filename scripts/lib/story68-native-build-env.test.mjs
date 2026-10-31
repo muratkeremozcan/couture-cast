@@ -154,7 +154,7 @@ describe('original-resource proof', () => {
       assert.equal(dialogOpen, false, 'completed proof must leave tabs reachable')
       const matrixStart = end + "} else if (command === 'matrix') {".length
       const matrixSetupEnd = source.indexOf(
-        "  if (inMatrixSection(shard, 'pre-locale')) {",
+        "  if (inMatrixSection(platform, shard, 'pre-locale')) {",
         matrixStart
       )
       const setup = source

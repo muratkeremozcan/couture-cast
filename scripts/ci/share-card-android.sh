@@ -8,10 +8,11 @@ if [[ ! "$sdk" =~ ^[1-9][0-9]*$ ]] || [[ ! "${CC68_ANDROID_API:-}" =~ ^[1-9][0-9
   echo 'Owned emulator SDK must equal the explicit native CI matrix API' >&2
   exit 2
 fi
-# API36 partitions require an explicit suite; each fresh runner authenticates itself.
+# API36 partitions require an explicit suite; each fresh runner authenticates itself. The API36
+# matrix runs as two shards, matrix-1 and matrix-2 (scripts/ci/native-matrix-shards.mjs).
 suite="${CC68_ANDROID_SUITE:-}"
 case "$sdk:$suite" in
-  32:all|36:matrix|36:original|36:interaction) ;;
+  32:all|36:matrix-1|36:matrix-2|36:original|36:interaction) ;;
   *) echo 'Explicit native CI suite must match the verified Android API' >&2; exit 2 ;;
 esac
 # Device permissions alone do not prove the emulator can use KVM.
@@ -23,8 +24,11 @@ node scripts/run-story68-native.mjs signin --platform android --device "$ANDROID
 if [[ "$suite" == all || "$suite" == original ]]; then
   node scripts/run-story68-native.mjs proof --platform android --device "$ANDROID_SERIAL" --reinitialize-owned-app yes
 fi
-if [[ "$suite" == all || "$suite" == matrix ]]; then
+if [[ "$suite" == all ]]; then
   node scripts/run-story68-native.mjs matrix --platform android --device "$ANDROID_SERIAL"
+fi
+if [[ "$suite" == matrix-* ]]; then
+  node scripts/run-story68-native.mjs matrix --platform android --device "$ANDROID_SERIAL" --shard "${suite#matrix-}/2"
 fi
 if [[ "$suite" == all || "$suite" == interaction ]]; then
   node scripts/run-story68-native.mjs rapid-watermark --platform android --device "$ANDROID_SERIAL"

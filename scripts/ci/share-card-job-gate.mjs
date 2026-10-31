@@ -5,6 +5,9 @@ export const requiredShareCardJobs = Object.freeze([
   'original-resource',
   'browser-acceptance',
   'android36-native-matrix',
+  // Both API36 matrix shards reported exactly their cases (a matrix job succeeds only when both
+  // legs do, so this job also catches a leg that passed without its full report).
+  'android36-matrix-evidence',
   'android36-original',
   'android36-interaction',
   // The iOS journey: one build, two shards (a matrix job succeeds only when both legs do) and

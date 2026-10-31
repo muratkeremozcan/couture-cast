@@ -2,18 +2,25 @@ import fs from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
 import { matrixRows } from './workflow-step-shadowing.mjs'
+import { shardsOf } from './native-matrix-shards.mjs'
 import {
   pullRequestEvent,
   pullRequestShareCardJobs,
   requiredShareCardJobs,
 } from './share-card-job-gate.mjs'
 
+// The API36 matrix runs one row per shard of its plan; every other lane runs one row.
+export const androidMatrixSuites = Object.freeze(
+  shardsOf('android').map((shard) => `matrix-${shard}`)
+)
 export const android36Lanes = Object.freeze({
-  'browser-acceptance': 'browser',
-  'android36-native-matrix': 'matrix',
-  'android36-original': 'original',
-  'android36-interaction': 'interaction',
+  'browser-acceptance': ['browser'],
+  'android36-native-matrix': androidMatrixSuites,
+  'android36-original': ['original'],
+  'android36-interaction': ['interaction'],
 })
+const androidMatrixJob = 'android36-native-matrix'
+export const androidMatrixEvidenceJob = 'android36-matrix-evidence'
 // pr-gate.yml publishes the required ruleset context gate as a commit status; no job or
 // check run may take that name.
 export const gateJobName = 'share-card-lanes-gate'
@@ -315,6 +322,66 @@ function iosProblems(jobs, check) {
   iosAppProblems(parts.build, check)
 }
 
+/** A shell glob such as an artifact download pattern, as a whole-string regular expression. */
+const globPattern = (glob) =>
+  new RegExp(
+    `^${String(glob)
+      .split('*')
+      .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+      .join('.*')}$`
+  )
+
+/**
+ * The job that proves both API36 matrix shards reported exactly their cases: it runs after any
+ * shard result, downloads exactly the shard artifacts and fails unless the shard job succeeded
+ * and the merged reports equal the plan.
+ */
+function androidMatrixEvidenceProblems(jobs, artifactsByJob, check) {
+  const name = androidMatrixEvidenceJob
+  const job = jobs[name]
+  const steps = job?.steps ?? []
+  check(job !== undefined, `${name}: required job missing`)
+  check(
+    job?.['runs-on'] === 'ubuntu-latest',
+    `${name}: free ubuntu-latest runner required`
+  )
+  check(
+    job?.['continue-on-error'] === undefined &&
+      steps.every((step) => step['continue-on-error'] === undefined),
+    `${name}: failures must remain visible`
+  )
+  const limit = job?.['timeout-minutes']
+  check(
+    Number.isInteger(limit) && limit > 0 && limit <= maxMinutes,
+    `${name}: independent limit must stay within ${maxMinutes} minutes`
+  )
+  check(
+    JSON.stringify(needsList(job)) === JSON.stringify([androidMatrixJob]) &&
+      job?.if === evidenceCondition,
+    `${name} must run after any ${androidMatrixJob} result, except on pull_request`
+  )
+  const download = steps.find((step) => step.uses === 'actions/download-artifact@v4')
+  const pattern = globPattern(download?.with?.pattern)
+  const shardArtifacts = artifactsByJob[androidMatrixJob] ?? []
+  check(
+    shardArtifacts.length === androidMatrixSuites.length &&
+      shardArtifacts.every((artifact) => pattern.test(artifact)) &&
+      Object.entries(artifactsByJob).every(
+        ([lane, artifacts]) =>
+          lane === androidMatrixJob ||
+          !artifacts.some((artifact) => pattern.test(artifact))
+      ),
+    `${name}: download every shard artifact and nothing else`
+  )
+  const merge = steps.find((step) => step.run?.includes('native-matrix-shards.mjs merge'))
+  check(
+    merge?.env?.CC68_SHARD_RESULT === `\${{ needs.${androidMatrixJob}.result }}` &&
+      merge.run.includes('test "$CC68_SHARD_RESULT" = success') &&
+      merge.run.includes('node scripts/ci/native-matrix-shards.mjs merge android '),
+    `${name}: both shards must report their exact cases`
+  )
+}
+
 /** Rules for every job of the workflow, native and browser alike. */
 function workflowProblems(jobs, check) {
   for (const [name, job] of Object.entries(jobs)) {
@@ -344,7 +411,7 @@ function workflowProblems(jobs, check) {
 }
 
 /** Independence, limits, owned runtime and evidence every lane needs. */
-function commonProblems(name, job, suite, rows, check) {
+function commonProblems(name, job, suites, rows, check) {
   const steps = job.steps ?? []
   check(job['runs-on'] === 'ubuntu-latest', `${name}: free Ubuntu runner required`)
   check(job.needs === undefined, `${name}: partitions must start independently`)
@@ -360,11 +427,14 @@ function commonProblems(name, job, suite, rows, check) {
     `${name}: failures must preserve sibling evidence`
   )
   check(
-    rows.length === 1 &&
-      rows[0]?.platform === 'android' &&
-      rows[0]?.api === 36 &&
-      rows[0]?.suite === suite,
-    `${name}: exact API36 partition required`
+    rows.length === suites.length &&
+      rows.every(
+        (row, index) =>
+          row?.platform === 'android' && row?.api === 36 && row?.suite === suites[index]
+      ),
+    suites.length > 1
+      ? `${name}: exact API36 partition required, one row per shard`
+      : `${name}: exact API36 partition required`
   )
   const limit = job['timeout-minutes']
   check(
@@ -441,7 +511,6 @@ function nativeProblems(name, job, rows, check) {
   const prepare = steps.find((step) => step.id === 'runtime')
   const engines = steps.find((step) => step.id === 'browser_deps')?.run ?? ''
   const emulator = steps.find((step) => step.uses === emulatorAction)
-  const row = rows[0]
   check(
     engines.includes('share-card-browser-deps.mjs --chromium-only'),
     `${name}: Chromium bridge prerequisite required`
@@ -465,14 +534,17 @@ function nativeProblems(name, job, rows, check) {
     `${name}: exact API, suite and free-runner emulator required`
   )
   check(
-    row?.target === 'google_apis_playstore',
+    rows.every((row) => row?.target === 'google_apis_playstore'),
     `${name}: actual TalkBack system image required`
   )
   check(
     emulator?.['timeout-minutes'] === '${{ matrix.journey_timeout }}' &&
-      Number.isInteger(row?.journey_timeout) &&
-      row.journey_timeout > 0 &&
-      job['timeout-minutes'] - row.journey_timeout >= 25,
+      rows.every(
+        (row) =>
+          Number.isInteger(row?.journey_timeout) &&
+          row.journey_timeout > 0 &&
+          job['timeout-minutes'] - row.journey_timeout >= 25
+      ),
     `${name}: journey must leave preparation and cleanup budget`
   )
   check(
@@ -494,14 +566,16 @@ export function shareCardLaneProblems(workflow) {
   iosProblems(jobs, check)
   workflowProblems(jobs, check)
   const artifacts = new Set()
-  for (const [name, suite] of Object.entries(android36Lanes)) {
+  const artifactsByJob = {}
+  for (const [name, suites] of Object.entries(android36Lanes)) {
     const job = jobs[name]
     if (!job) {
       problems.push(`${name}: required parallel job missing`)
       continue
     }
     const rows = matrixRows(job.strategy?.matrix) ?? []
-    const upload = commonProblems(name, job, suite, rows, check)
+    const upload = commonProblems(name, job, suites, rows, check)
+    artifactsByJob[name] = []
     for (const row of rows) {
       const artifact = (upload?.with?.name ?? '').replace(
         /\$\{\{ matrix\.(\w+) \}\}/g,
@@ -512,10 +586,12 @@ export function shareCardLaneProblems(workflow) {
         `${name}: artifact name must be unique`
       )
       artifacts.add(artifact)
+      artifactsByJob[name].push(artifact)
     }
-    if (suite === 'browser') browserProblems(name, job.steps ?? [], check)
+    if (suites.includes('browser')) browserProblems(name, job.steps ?? [], check)
     else nativeProblems(name, job, rows, check)
   }
+  androidMatrixEvidenceProblems(jobs, artifactsByJob, check)
   return problems
 }
 

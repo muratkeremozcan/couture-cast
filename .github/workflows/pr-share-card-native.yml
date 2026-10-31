@@ -186,10 +186,14 @@ jobs:
   # other. Each one prepares, signs in and cleans up its own UUID runtime, so they share
   # steps (the alias) but never state. API32 stays in original-resource above; this list
   # is its Android path.
+  # The matrix runs as two shards (scripts/ci/native-matrix-shards.mjs), each on its own
+  # emulator with its own services and sign-in. Their journey steps take 23.8 and 25.9 minutes
+  # at main run 41104845732's pace; the 45 minute budget still holds on a runner 1.5x slower.
+  # android36-matrix-evidence proves both shards reported their exact cases.
   android36-native-matrix:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -198,8 +202,14 @@ jobs:
             platform: android
             api: 36
             target: google_apis_playstore
-            suite: matrix
-            journey_timeout: 60
+            suite: matrix-1
+            journey_timeout: 45
+          - os: ubuntu-latest
+            platform: android
+            api: 36
+            target: google_apis_playstore
+            suite: matrix-2
+            journey_timeout: 45
     env: *runtime_env
     steps: &android36_steps
       # Full history for the native-harness iPad proof lineage check, as above.
@@ -1135,6 +1145,26 @@ jobs:
         if: always()
         run: node scripts/ci/native-ios-device-cleanup.mjs
 
+  # A skipped or partial shard has no complete report, so this job fails; the lanes gate also
+  # requires its result.
+  android36-matrix-evidence:
+    if: always() && github.event_name != 'pull_request'
+    needs: android36-native-matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: share-card-android-36-matrix-*
+          path: /tmp/android-matrix-shards
+      - name: Require both Android matrix shards to report their exact cases
+        env:
+          CC68_SHARD_RESULT: ${{ needs.android36-native-matrix.result }}
+        run: |
+          test "$CC68_SHARD_RESULT" = success
+          for shard in 1 2; do mv "/tmp/android-matrix-shards/share-card-android-36-matrix-$shard" "/tmp/android-matrix-shards/shard-$shard"; done
+          node scripts/ci/native-matrix-shards.mjs merge android /tmp/android-matrix-shards
   # A skipped shard has no report, so this job fails; the lanes gate also requires its result.
   ios-evidence:
     if: always() && github.event_name != 'pull_request'
@@ -1167,6 +1197,7 @@ jobs:
       - ios-expo-go
       - browser-acceptance
       - android36-native-matrix
+      - android36-matrix-evidence
       - android36-original
       - android36-interaction
     runs-on: ubuntu-latest

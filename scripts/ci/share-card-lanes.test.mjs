@@ -807,6 +807,126 @@ describe('share-card parallel lane validator', () => {
       )
   })
 
+  describe('Android36 matrix shards', () => {
+    const matrixJob = 'android36-native-matrix'
+    const evidenceJob = 'android36-matrix-evidence'
+    const rejected = (title, expected, change) =>
+      test(`${title} is rejected`, () => {
+        const problems = mutate(change)
+        assert.ok(
+          problems.some((problem) => expected.test(problem)),
+          problems.join('\n') || 'no problem raised'
+        )
+      })
+    const rows = (jobs) => jobs[matrixJob].strategy.matrix.include
+    const mergeStep = (jobs) =>
+      step(jobs[evidenceJob], (row) => row.run?.includes('native-matrix-shards.mjs'))
+
+    test('the matrix runs one row per shard and the evidence job merges both', () => {
+      assert.deepEqual(
+        source.jobs[matrixJob].strategy.matrix.include.map((row) => row.suite),
+        ['matrix-1', 'matrix-2']
+      )
+      assert.deepEqual(source.jobs[evidenceJob].needs, matrixJob)
+      assert.ok(
+        source.jobs[gateJobName].needs.includes(evidenceJob),
+        'the lanes gate requires the evidence job'
+      )
+    })
+
+    rejected(
+      'removing the Android matrix evidence job',
+      /required job missing/,
+      (jobs) => {
+        delete jobs[evidenceJob]
+      }
+    )
+    rejected('a single matrix shard', /one row per shard/, (jobs) => {
+      rows(jobs).pop()
+    })
+    rejected('the unsharded matrix suite', /one row per shard/, (jobs) => {
+      rows(jobs).splice(0, 2, { ...rows(jobs)[0], suite: 'matrix' })
+    })
+    rejected(
+      'two rows for the same shard',
+      /one row per shard|artifact name must be unique/,
+      (jobs) => {
+        rows(jobs)[1].suite = 'matrix-1'
+      }
+    )
+    rejected('a third matrix shard', /one row per shard/, (jobs) => {
+      rows(jobs).push({ ...rows(jobs)[1], suite: 'matrix-3' })
+    })
+    rejected(
+      'a shard without a journey budget',
+      /preparation and cleanup budget/,
+      (jobs) => {
+        delete rows(jobs)[1].journey_timeout
+      }
+    )
+    rejected(
+      'an evidence job skipped after a failed shard',
+      /android36-matrix-evidence must run after/,
+      (jobs) => {
+        jobs[evidenceJob].if = "github.event_name != 'pull_request'"
+      }
+    )
+    rejected(
+      'an evidence job that also runs on pull_request',
+      /android36-matrix-evidence must run after/,
+      (jobs) => {
+        jobs[evidenceJob].if = 'always()'
+      }
+    )
+    rejected(
+      'an evidence job that waits on another job',
+      /android36-matrix-evidence must run after/,
+      (jobs) => {
+        jobs[evidenceJob].needs = ['android36-original']
+      }
+    )
+    rejected(
+      'an evidence job that does not check the shard result',
+      /android36-matrix-evidence: both shards must report their exact cases/,
+      (jobs) => {
+        const row = mergeStep(jobs)
+        row.run = row.run.replace('test "$CC68_SHARD_RESULT" = success', 'true')
+      }
+    )
+    rejected(
+      'an evidence job that merges the iOS reports',
+      /android36-matrix-evidence: both shards must report their exact cases/,
+      (jobs) => {
+        const row = mergeStep(jobs)
+        row.run = row.run.replace('merge android', 'merge ios')
+      }
+    )
+    rejected(
+      'an evidence job that downloads other artifacts',
+      /android36-matrix-evidence: download every shard artifact/,
+      (jobs) => {
+        step(
+          jobs[evidenceJob],
+          (row) => row.uses === 'actions/download-artifact@v4'
+        ).with.pattern = 'share-card-android-36-*'
+      }
+    )
+    rejected(
+      'an evidence job that hides a failure',
+      /android36-matrix-evidence: failures must remain visible/,
+      (jobs) => {
+        jobs[evidenceJob]['continue-on-error'] = true
+      }
+    )
+    rejected(
+      'an evidence job on another runner',
+      /android36-matrix-evidence: free ubuntu-latest runner required/,
+      (jobs) => {
+        jobs[evidenceJob]['runs-on'] = 'macos-15'
+      }
+    )
+  })
+
   test('giving the legacy API32 journey a new step timeout is rejected', () => {
     for (const change of [
       (jobs) =>

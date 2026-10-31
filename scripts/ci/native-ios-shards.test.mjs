@@ -215,7 +215,7 @@ test('shard 2 lists its commands explicitly and they equal its previous AFTER_MA
   )
   const plan = source.slice(
     source.indexOf('export const SHARD_PLAN'),
-    source.indexOf('const shards = ')
+    source.indexOf('export const parseShard')
   )
   assert.ok(
     plan.includes("commands: ['permission-baseline',"),
