@@ -94,7 +94,7 @@ function ShareCardShareButton({
     <button
       ref={buttonRef}
       type="button"
-      className="min-h-[44px] rounded border border-[#292724] px-5 text-[#292724] disabled:opacity-50 dark:border-zinc-100 dark:text-zinc-100"
+      className="min-h-[44px] rounded border border-[#292724] px-5 text-[#292724] disabled:opacity-50 aria-disabled:opacity-50 dark:border-zinc-100 dark:text-zinc-100"
       data-testid="share-card-share"
       {...state}
       aria-busy={busyAttribute(sharing)}
@@ -596,7 +596,7 @@ export function ShareCardDialog({
         <button
           ref={saveRef}
           type="button"
-          className="min-h-[44px] rounded bg-[#292724] px-5 text-white disabled:opacity-50"
+          className="min-h-[44px] rounded bg-[#292724] px-5 text-white disabled:opacity-50 aria-disabled:opacity-50"
           data-testid="share-card-save"
           {...saveButtonState(changed, busy, saveUnavailable)}
           aria-busy={busyAttribute(downloadBusy)}
@@ -615,7 +615,7 @@ export function ShareCardDialog({
           <button
             ref={recoveryRef}
             data-testid="share-card-recovery"
-            className="min-h-[44px] px-3"
+            className="min-h-[44px] px-3 aria-disabled:opacity-50"
             type="button"
             aria-disabled={busy || undefined}
             aria-busy={busy || undefined}
