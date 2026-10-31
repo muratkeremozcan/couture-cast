@@ -36,6 +36,7 @@ const boundary = vi.hoisted(() => {
 })
 vi.mock('@/src/lib/mobile-auth', () => ({
   mobileApplicationUserId: () => boundary.member,
+  mobileIdentityEpoch: () => 0,
   subscribeMobileApplicationUser: (listener: () => void) => {
     boundary.subscribers.add(listener)
     return () => boundary.subscribers.delete(listener)

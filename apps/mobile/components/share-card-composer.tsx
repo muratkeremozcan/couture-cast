@@ -34,6 +34,7 @@ import { focusShareCardElement } from '@/src/lib/share-card-focus'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import {
   mobileApplicationUserId,
+  mobileIdentityEpoch,
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
 import {
@@ -622,6 +623,7 @@ export function ShareCardComposer({
       key,
       generation: generation.current,
       memberEpoch: memberEpoch.current,
+      identityEpoch: mobileIdentityEpoch(),
     }
     const owner = {}
     activeSave.current = { owner, generation: captured.generation }
@@ -652,10 +654,11 @@ export function ShareCardComposer({
     }
     // Settled and the global lock already released. A sign-out or identity change
     // supersedes the attempt: no feedback and no event. An unmounted composer never advances
-    // its epoch, so the live identity is read as well.
+    // its epoch, so the process identity epoch is read as well; it also catches a sign-out and
+    // return as the same member.
     const superseded = () =>
       memberEpoch.current !== captured.memberEpoch ||
-      mobileApplicationUserId() !== captured.member
+      mobileIdentityEpoch() !== captured.identityEpoch
     if (stillCurrent()) reportShareSettlement(settlement, failure)
     void shareDisabledRefusal(failure).then((refused) => {
       if (refused) revokeShareCapability(captured.member)

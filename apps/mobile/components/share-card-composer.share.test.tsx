@@ -459,23 +459,29 @@ describe('Story 6.9 composer Share', () => {
     expect(boundary.capture).not.toHaveBeenCalled()
     expect(shareFiles()).toHaveLength(1)
   })
-  it('C-COMP-SHARE-IDENTITY: an unmounted composer drops a late result after a member change', async () => {
-    const native = deferred<unknown>()
-    boundary.shareFile.mockReturnValue(native.promise)
-    await readyShare()
-    await tapShare()
-    await waitFor(() => expect(boundary.shareFile).toHaveBeenCalledOnce())
-    // Unmounted first, so no member effect runs to advance the composer's epoch.
-    cleanup()
-    changeIdentity('member-b')
-    await act(async () => {
-      native.resolve({ target: 'instagram', outcome: 'completed' })
-      await native.promise
-    })
-    await waitFor(() => expect(nativeShareCardSavePending()).toBe(false))
-    await settleShareAttempt()
-    expect(boundary.capture).not.toHaveBeenCalled()
-  })
+  it.each([
+    ['a member change', ['member-b']],
+    ['a sign-out and return as the same member', [null, 'member-a']],
+  ])(
+    'C-COMP-SHARE-IDENTITY: an unmounted composer drops a late result after %s',
+    async (_, members) => {
+      const native = deferred<unknown>()
+      boundary.shareFile.mockReturnValue(native.promise)
+      await readyShare()
+      await tapShare()
+      await waitFor(() => expect(boundary.shareFile).toHaveBeenCalledOnce())
+      // Unmounted first, so no member effect runs to advance the composer's epoch.
+      cleanup()
+      for (const member of members) changeIdentity(member)
+      await act(async () => {
+        native.resolve({ target: 'instagram', outcome: 'completed' })
+        await native.promise
+      })
+      await waitFor(() => expect(nativeShareCardSavePending()).toBe(false))
+      await settleShareAttempt()
+      expect(boundary.capture).not.toHaveBeenCalled()
+    }
+  )
   it.each(['throws', 'rejects'])(
     'C-COMP-SHARE-ANALYTICS-DOWN: a capture that %s leaves copy, focus and the lock unchanged',
     async (mode) => {

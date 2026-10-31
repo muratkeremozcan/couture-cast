@@ -66,6 +66,7 @@ export async function ready() {
 
 export function changeIdentity(member: string | null) {
   act(() => {
+    if (boundary.member !== member) boundary.identityEpoch++
     boundary.member = member
     boundary.subscribers.forEach((listener) => listener())
   })

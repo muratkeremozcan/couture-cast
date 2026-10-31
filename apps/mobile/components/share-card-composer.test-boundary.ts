@@ -14,6 +14,7 @@ export const boundary = {
   save: vi.fn(),
   available: true,
   member: 'member-a' as string | null,
+  identityEpoch: 0,
   subscribers: new Set<() => void>(),
   appState: new Set<(state: string) => void>(),
   focus: vi.fn(),
@@ -51,6 +52,7 @@ const focusTags: Record<string, number> = {
 export const composerMocks = {
   mobileAuth: () => ({
     mobileApplicationUserId: () => boundary.member,
+    mobileIdentityEpoch: () => boundary.identityEpoch,
     subscribeMobileApplicationUser: (listener: () => void) => {
       boundary.subscribers.add(listener)
       return () => boundary.subscribers.delete(listener)
