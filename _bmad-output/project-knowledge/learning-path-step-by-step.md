@@ -12,14 +12,16 @@ Added Steps 40 to 49:
 - Step 46: Story 6.7, Home spotlight teaser, `f7045a7b` (PR #160).
 - Step 47: Story 6.7b, sponsored community highlights, `1d7b9848` (PR #161).
 - Step 48: Story 6.8, safe branded share-card export, `67806196` (PR #162), with native-lane fixes `3112efbd` (PR #165) and `185e827c` (PR #166).
-- Step 49: Story 6.9, native platform sharing, PR #167 at `37a00d33`, in review and unmerged.
+- Step 49: Story 6.9, native platform sharing, `6d92598f` (PR #167), merged on 2026-10-31.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
+Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
 PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
 Step 49 departs from instruction 2 the same way Steps 38 and 39 did, and its `Evidence boundaries` section says what passed, what timed out, and what only a physical device can prove.
+Moved Step 49 to completed after PR #167 merged as `6d92598f`.
 Moved Step 39 to completed, since PR #151 closed Story 6.2.
 Corrected `Current position`, which said six of the eight Community Beta signatures stay open; the Story 6.2b payload lists seven.
 Rewrote the whole document in plain voice, one sentence per line.
@@ -95,14 +97,13 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest completed step: Step 48, Story 6.8, Safe branded share-card export, status `done`, merged as `67806196` (PR #162) with native-lane fixes in `3112efbd` (PR #165) and `185e827c` (PR #166).
-  Its plan is `_bmad-output/implementation-artifacts/spec-6-8-safe-branded-share-card-export.md`.
-- In review: Step 49, Story 6.9, Native platform sharing, status `review` on its branch and `backlog` on `main`, PR #167 at `37a00d33`.
-  PR checks pass at the reviewed head.
-  [Dispatch run 41190704639](https://github.com/muratkeremozcan/couture-cast/actions/runs/41190704639) timed out in `android36-native-matrix` at its 60-minute step limit; the dependent `share-card-lanes-gate` also failed.
-  Its plan is `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md` on the branch.
-  Step 49 is written before merge, and its `Evidence boundaries` section says so.
+- Latest completed step: Step 49, Story 6.9, Native platform sharing, status `done`, merged as `6d92598f` (PR #167) on 2026-10-31.
+  Its plan is `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`.
+  Step 49 was written from the PR head `37a00d33` before merge, and its `Evidence boundaries` section says so.
+  Production stays dark because `share_card_native_share_enabled` defaults to false.
 - Next in `backlog` under epic 6, which is `in-progress`: Stories 6.10 to 6.13 (moderator queue, moderation decisions and sanctions, SLA monitoring, immutable moderation history), 6.14 (complimentary full access) and 6.15 (Expo SDK 58 live font-scale layout).
+- Step 48, Story 6.8, Safe branded share-card export, status `done`, merged as `67806196` (PR #162) with native-lane fixes in `3112efbd` (PR #165) and `185e827c` (PR #166).
+  Its plan is `_bmad-output/implementation-artifacts/spec-6-8-safe-branded-share-card-export.md`.
 - Step 47, Story 6.7b, Sponsored community highlights, status `done`, merged as `1d7b9848` (PR #161).
   Its plan is `_bmad-output/implementation-artifacts/spec-6-7b-sponsored-community-highlights.md`.
   Production stays dark because `commerce_affiliate_enabled` and both community flags default to false.
@@ -9028,8 +9029,10 @@ Hard-won lessons from the implementation and code review of this story:
     It also listed gaps G01 to G38, including missing lease checks and device lanes that had never run on the branch.
     The automate pass split the files (`00b5725d`, `51648590`, `80d2124a`, `c7cf95cf`), replaced the sleeps with real settle signals, and closed gaps in separate commits such as `dcc30caa` (a test receiver app with its own UID observes the chooser read grant) and `57d8dd3d` (the iOS share item holds the previewed bytes).
 15. **A stale device proof must fail.**
-    `b555f8ff` requires the iPad anchor record's commit to be an ancestor of `HEAD` with no change since to the three anchor sources, and every native-harness job now checks out full history.
-    The record was re-recorded at `7043c033` in `9570f663`.
+    `b555f8ff` required the iPad anchor record's commit to be an ancestor of `HEAD` with no change since to the three anchor sources, and every native-harness job checked out full history.
+    The branch recorded the proof once and re-recorded it seven times, the last at `eab74b0d` in `1783e312`.
+    The squash merge left `eab74b0d` outside `main`'s history, so U-HARNESS-IPAD-EVIDENCE failed on `main` with `ipad_evidence_commit_not_ancestor`.
+    The follow-up fix stores the git blob SHA of each anchor source in the record and compares those blobs with `HEAD`; the commit stays as provenance, and the native-harness jobs check out depth 1 again.
 16. **An owner request fixed an Android contrast bug outside the story.**
     The light-theme Android headers showed white status bar icons on white, because React Native's edge-to-edge setup never sets icon contrast, and the info modal header showed the raw route name "modal"; `a359d0d8` fixed both, with screenshots under `_bmad-output/test-artifacts/story-6-9/`.
 
@@ -9054,12 +9057,12 @@ Story/Task mapping:
 
 Story reference:
 
-- `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md` on `feat/cc69-native-platform-sharing`, with the result model, edge rulings RG1 to RG6 and the review triage log V1 to V17
+- `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`, with the result model, edge rulings RG1 to RG6 and the review triage log V1 to V17
 - `_bmad-output/implementation-artifacts/cc69-code-review-codex.md` (Codex rounds 1 and 2)
 - `_bmad-output/test-artifacts/test-reviews/cc69-native-platform-sharing-test-review.md` (TEA test review and gaps G01 to G38)
 - `_bmad-output/test-artifacts/test-design/cc69-native-platform-sharing-test-design.md`
 - `_bmad-output/test-artifacts/story-6-9/README.md` and `ipad-anchor-proof.json`
-- [PR #167](https://github.com/muratkeremozcan/couture-cast/pull/167), commits `185e827c..37a00d33`
+- [PR #167](https://github.com/muratkeremozcan/couture-cast/pull/167), commits `185e827c..1783e312`, squash-merged as `6d92598f`
 
 Cross-links:
 
@@ -9158,12 +9161,10 @@ Harness tests:
 
 Evidence boundaries:
 
-- **Unmerged and still in CI.**
-  PR #167 is open with head `37a00d33` on `origin`.
-  The branch's `sprint-status.yaml` reads `review`, and `main` still reads `backlog`.
-  This step describes `origin` at `37a00d33`.
-  The reviewed snapshot excludes later local commits, including `e2d9fa18` and `0b307a7e`, and uncommitted work.
-  The local checkout is active, so the number of unpushed commits can change during this review.
+- **Written before merge.**
+  PR #167 merged on 2026-10-31 as `6d92598f` from head `1783e312`, and `sprint-status.yaml` on `main` reads `done`.
+  This step describes `origin` at `37a00d33`; the merge-status lines were updated afterwards.
+  The reviewed snapshot excludes the later branch commits `37a00d33..1783e312`, which include the final iPad re-record at `eab74b0d`.
 - **The pull request checks pass, and the device lanes do not yet.**
   On `37a00d33` every PR job passed and the PR `gate` reported 49 watched jobs green; the slowest were burn-in at 18m5s and browser-acceptance at 15m35s, inside the 20-minute PR budget.
   The [dispatch run 41190704639](https://github.com/muratkeremozcan/couture-cast/actions/runs/41190704639) on the same commit passed both iOS shards, `ios-expo-go`, `android36-interaction`, `android36-original` and `original-resource`, but `android36-native-matrix` timed out at its 60-minute step limit, so `share-card-lanes-gate` failed at 06:30 CDT on 2026-10-31.
@@ -9173,7 +9174,7 @@ Evidence boundaries:
   The TEA review's 40/100 score is for `f7024d48`; no re-scored review is committed.
 - **Some things only a device can prove.**
   X-SHARE-DEVICE-PIN, -IG and -FB-TT need physical devices with Pinterest, Instagram, Facebook and TikTok installed, and the test design requires them before the flag is enabled beyond the dev seed; none is recorded.
-  The iPad anchor proof is an iPadOS 26.1 simulator at `7043c033`; a physical iPad popover is unproven.
+  The iPad anchor proof is an iPadOS 26.1 simulator at `eab74b0d`; a physical iPad popover is unproven.
   No lane reads the bytes a third-party iOS share extension receives, and the file name Files or AirDrop shows was not checked on a device.
 - **Counts here come from commit bodies and reviews.**
   The 1,205 tests the TEA review executed, the 141 files and 1,824 mobile tests in `c979eee5`, and the layout measurements in `46a5c762` are reported, and this step did not re-run them.

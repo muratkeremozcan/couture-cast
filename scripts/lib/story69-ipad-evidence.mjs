@@ -12,7 +12,10 @@ export const IPAD_EVIDENCE_DIRECTORY = '_bmad-output/test-artifacts/story-6-9'
 export const IPAD_EVIDENCE_RECORD = 'ipad-anchor-proof.json'
 export const IPAD_EVIDENCE_TEST = 'X-IPAD-ANCHOR'
 export const IPAD_ANCHORED_RESULT = 'anchored_to_share'
-/** The sources that place the iPad popover; a change to any of them retires the proof. */
+/**
+ * The sources that place the iPad popover. The record keeps each one's git blob SHA from the
+ * proven build, so a change to any of them retires the proof.
+ */
 export const IPAD_ANCHOR_SOURCES = [
   'apps/mobile/modules/share-card-native-share/ios/ShareCardNativeShareModule.swift',
   'apps/mobile/modules/share-card-native-share/ios/ShareCardAnchorConfiguration.swift',
@@ -26,9 +29,11 @@ const KEYS = [
   'recordedAt',
   'result',
   'screenshot',
+  'sources',
   'test',
 ]
 const SCREENSHOT_KEYS = ['file', 'sha256']
+const SOURCE_KEYS = [...IPAD_ANCHOR_SOURCES].sort()
 const text = (pattern) => (value) => typeof value === 'string' && pattern.test(value)
 /** Each scalar field, its rule and the closed code it fails with. */
 const FIELD_CHECKS = {
@@ -62,36 +67,41 @@ const git = (cwd, args) =>
   spawnSync('git', args, { cwd, encoding: 'utf8', env: gitEnv() })
 
 /**
- * The proof covers HEAD only when HEAD descends from the recorded commit and no anchor
- * source changed since. A shallow clone that lacks the recorded commit cannot show
- * either, so it fails with its own code; one deep enough to hold it is checked as usual.
+ * The blob SHA of each anchor source in `rev`, keyed by path, from the repository holding
+ * `directory`; a source missing from `rev` is left out. Null when git cannot answer. Reading
+ * one tree needs no history, so this works in a shallow clone and after a squash merge.
  */
-function lineageProblems(directory, commit) {
+function anchorBlobs(directory, rev) {
   const top = git(directory, ['rev-parse', '--show-toplevel'])
-  if (top.error || top.status !== 0) return ['ipad_evidence_git_unavailable']
-  const root = top.stdout.trim()
-  if (git(root, ['cat-file', '-e', `${commit}^{commit}`]).status !== 0) {
-    const shallow = git(root, ['rev-parse', '--is-shallow-repository'])
-    if (shallow.status !== 0) return ['ipad_evidence_git_unavailable']
-    return [
-      shallow.stdout.trim() === 'true'
-        ? 'ipad_evidence_shallow_clone'
-        : 'ipad_evidence_commit_unknown',
-    ]
-  }
-  const ancestor = git(root, ['merge-base', '--is-ancestor', commit, 'HEAD']).status
-  if (ancestor === 1) return ['ipad_evidence_commit_not_ancestor']
-  if (ancestor !== 0) return ['ipad_evidence_git_unavailable']
-  const changed = git(root, [
-    'diff',
-    '--quiet',
-    commit,
-    'HEAD',
+  if (top.error || top.status !== 0) return null
+  const listed = git(top.stdout.trim(), [
+    'ls-tree',
+    '-z',
+    rev,
     '--',
     ...IPAD_ANCHOR_SOURCES,
-  ]).status
-  if (changed === 1) return ['ipad_evidence_anchor_changed']
-  return changed === 0 ? [] : ['ipad_evidence_git_unavailable']
+  ])
+  if (listed.status !== 0) return null
+  const blobs = {}
+  for (const entry of listed.stdout.split('\0').filter(Boolean)) {
+    const [meta, file] = entry.split('\t')
+    const [, type, sha] = meta.split(' ')
+    if (type === 'blob') blobs[file] = sha
+  }
+  return blobs
+}
+
+/**
+ * The proof covers HEAD when every anchor source in HEAD has the blob the record names. The
+ * recorded commit is provenance only: a squash merge leaves it outside HEAD's history while
+ * the proven sources reach the default branch unchanged.
+ */
+function anchorProblems(directory, sources) {
+  const head = anchorBlobs(directory, 'HEAD')
+  if (head === null) return ['ipad_evidence_git_unavailable']
+  return IPAD_ANCHOR_SOURCES.every((file) => head[file] === sources[file])
+    ? []
+    : ['ipad_evidence_anchor_changed']
 }
 const exactKeys = (value, keys) =>
   value !== null &&
@@ -101,8 +111,8 @@ const exactKeys = (value, keys) =>
 
 /**
  * Returns the problems with the record in `directory`, as closed codes; an empty list passes.
- * The record has exactly the keys below, its commit is an ancestor of HEAD with no anchor
- * source changed since, and its screenshot is a PNG committed beside it whose SHA256 matches.
+ * The record has exactly the keys below, HEAD holds the anchor source blobs it names, and its
+ * screenshot is a PNG committed beside it whose SHA256 matches.
  */
 export function ipadEvidenceProblems(directory) {
   const file = path.join(directory, IPAD_EVIDENCE_RECORD)
@@ -117,8 +127,12 @@ export function ipadEvidenceProblems(directory) {
   const problems = Object.entries(FIELD_CHECKS)
     .filter(([key, valid]) => !valid(record[key]))
     .map(([key]) => FIELD_CODES[key])
-  if (FIELD_CHECKS.commit(record.commit))
-    problems.push(...lineageProblems(directory, record.commit))
+  if (
+    exactKeys(record.sources, SOURCE_KEYS) &&
+    Object.values(record.sources).every(text(/^[0-9a-f]{40}$/))
+  )
+    problems.push(...anchorProblems(directory, record.sources))
+  else problems.push('ipad_evidence_sources')
   const shot = record.screenshot
   if (
     !exactKeys(shot, SCREENSHOT_KEYS) ||
@@ -146,19 +160,25 @@ export function assertIpadEvidence(directory) {
 
 /**
  * Writes the record for a screenshot that already sits in `directory`. The owner passes what the
- * proof observed; the commit defaults to the checkout's HEAD and the digest is computed.
+ * proof observed and the commit of the proven build; the anchor source blobs are read from that
+ * commit and the screenshot digest is computed.
  */
 export function writeIpadEvidence(
   directory,
   { screenshot, osVersion, environment, commit, recordedAt = new Date().toISOString() }
 ) {
   const bytes = fs.readFileSync(path.join(directory, screenshot))
+  const blobs = anchorBlobs(directory, `${commit}^{commit}`)
+  if (blobs === null) throw new Error('ipad_evidence_commit_unknown')
+  if (IPAD_ANCHOR_SOURCES.some((file) => !(file in blobs)))
+    throw new Error('ipad_evidence_sources')
   const record = {
     test: IPAD_EVIDENCE_TEST,
     deviceClass: 'iPad',
     environment,
     osVersion,
     commit,
+    sources: Object.fromEntries(SOURCE_KEYS.map((file) => [file, blobs[file]])),
     result: IPAD_ANCHORED_RESULT,
     screenshot: {
       file: screenshot,
