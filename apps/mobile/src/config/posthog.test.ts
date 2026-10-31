@@ -195,6 +195,30 @@ describe('U-SHARE-SANITIZER-MOBILE: before_send for share_card_shared', () => {
     expect(warn.mock.calls.flat().join(' ')).not.toMatch(/file:|[a-f0-9]{64}/)
   })
 
+  it('drops an event whose required key holds a cyclic value, with one closed code', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const cyclic: Record<string, unknown> = { path: 'file:///cache/cc69-share-1.png' }
+    cyclic.self = cyclic
+    expect(
+      mobilePostHogBeforeSend(shareEvent({ ...enriched, outcome: cyclic }))
+    ).toBeNull()
+    expect(warn.mock.calls).toEqual([['[cc69-analytics] share_event_dropped']])
+  })
+
+  it('strips a cyclic value under a non-allowlisted key and keeps the event serializable', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const properties: Record<string, unknown> = { ...enriched }
+    properties.self = properties
+    const result = mobilePostHogBeforeSend(shareEvent(properties))
+    expect(result?.properties).not.toHaveProperty('self')
+    expect(result?.properties).toMatchObject({
+      outcome: 'completed',
+      $geoip_disable: true,
+    })
+    expect(() => JSON.stringify(result)).not.toThrow()
+    expect(warn).not.toHaveBeenCalled()
+  })
+
   it('passes every other event through unchanged, by reference', () => {
     const other: HookEvent = {
       event: 'ritual_created',
