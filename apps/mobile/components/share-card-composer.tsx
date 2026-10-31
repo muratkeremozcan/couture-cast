@@ -623,9 +623,13 @@ export function ShareCardComposer({
       if (stillCurrent()) setBusy(false)
     }
     // Settled and the global lock already released. A sign-out or identity change
-    // supersedes the attempt: no feedback and no event.
+    // supersedes the attempt: no feedback and no event. An unmounted composer never advances
+    // its epoch, so the live identity is read as well.
+    const superseded = () =>
+      memberEpoch.current !== captured.memberEpoch ||
+      mobileApplicationUserId() !== captured.member
     if (stillCurrent()) reportShareSettlement(settlement, failure)
-    if (memberEpoch.current !== captured.memberEpoch) return
+    if (superseded()) return
     if (errorNamed(failure, 'finishingSave')) return
     const event = {
       client: Platform.OS === 'android' ? ('android' as const) : ('ios' as const),
@@ -636,9 +640,9 @@ export function ShareCardComposer({
     // Loaded on first use, so the SDK never joins the composer's startup path. A failed
     // load, a throw or a rejection is swallowed: analytics never changes the outcome.
     void import('../src/analytics/mobile-analytics.js')
-      .then(({ mobileAnalyticsClient }) =>
-        trackMobileShareCardShared(mobileAnalyticsClient, event)
-      )
+      .then(({ mobileAnalyticsClient }) => {
+        if (!superseded()) trackMobileShareCardShared(mobileAnalyticsClient, event)
+      })
       .catch(() => undefined)
   }
   return (
