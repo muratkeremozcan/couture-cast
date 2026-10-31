@@ -7,12 +7,14 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
- * Expo bridge for [ShareCardShareController]. It lives outside `src/main/java` so the pure
- * sources build and run under Robolectric in `unit-tests/` without the Expo runtime.
+ * Expo bridge for [ShareCardShareController] and [ShareCardHostLifecycle]. It lives outside
+ * `src/main/java` so the pure sources build and run under Robolectric in `unit-tests/` without
+ * the Expo runtime.
  */
 class ShareCardNativeShareModule : Module() {
   private val mainHandler = Handler(Looper.getMainLooper())
   private val controller = ShareCardShareController(mainHandler)
+  private val lifecycle = ShareCardHostLifecycle(mainHandler, controller)
 
   override fun definition() = ModuleDefinition {
     Name("ShareCardNativeShare")
@@ -33,12 +35,12 @@ class ShareCardNativeShareModule : Module() {
       }
     }
 
-    OnActivityEntersBackground { mainHandler.post { controller.hostPaused() } }
+    OnActivityEntersBackground { lifecycle.on(ShareCardHostEvent.ACTIVITY_ENTERS_BACKGROUND) }
 
-    OnActivityEntersForeground { mainHandler.post { controller.hostResumed() } }
+    OnActivityEntersForeground { lifecycle.on(ShareCardHostEvent.ACTIVITY_ENTERS_FOREGROUND) }
 
-    OnActivityDestroys { mainHandler.post { controller.hostDestroyed() } }
+    OnActivityDestroys { lifecycle.on(ShareCardHostEvent.ACTIVITY_DESTROYS) }
 
-    OnDestroy { mainHandler.post { controller.hostDestroyed() } }
+    OnDestroy { lifecycle.on(ShareCardHostEvent.MODULE_DESTROYS) }
   }
 }

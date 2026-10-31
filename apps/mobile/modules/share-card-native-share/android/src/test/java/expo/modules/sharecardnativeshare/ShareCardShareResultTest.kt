@@ -92,7 +92,9 @@ class ShareCardShareResultTest {
     begin()
     session.hostPaused()
     session.hostResumed()
-    assertEquals(listOf(ShareCardShareSession.GRACE_MS), clock.pending.map { it.first })
+    // The spec's literal bound, so a changed constant cannot pass through a symbolic compare.
+    assertEquals(750L, ShareCardShareSession.GRACE_MS)
+    assertEquals(listOf(750L), clock.pending.map { it.first })
     assertTrue(settled.isEmpty())
     clock.fire()
     assertEquals(listOf(ShareCardShareResult.notConfirmed), settled)
@@ -300,9 +302,12 @@ class ShareCardShareResultTest {
     controller.share(application, activity, file.toURI().toString(), digest) { results += it }
     idle(ShareCardShareSession.START_MS - 1)
     assertTrue(results.isEmpty())
+    val action = ShareCardChooserCallback.action(application, "attempt-7")
+    assertNotNull(livePendingIntent(action, "attempt-7"))
     idle(1)
     assertEquals(listOf(mapOf("target" to "none", "outcome" to "not_confirmed")), results)
-    assertFalse(registered(ShareCardChooserCallback.action(application, "attempt-7")))
+    assertFalse(registered(action))
+    assertNull(livePendingIntent(action, "attempt-7"))
     assertFalse(controller.session.isActive)
   }
 
@@ -316,9 +321,12 @@ class ShareCardShareResultTest {
     controller.hostResumed()
     idle(ShareCardShareSession.GRACE_MS - 1)
     assertTrue(results.isEmpty())
+    val action = ShareCardChooserCallback.action(application, "attempt-2")
+    assertNotNull(livePendingIntent(action, "attempt-2"))
     idle(1)
     assertEquals(listOf(mapOf("target" to "none", "outcome" to "not_confirmed")), results)
-    assertFalse(registered(ShareCardChooserCallback.action(application, "attempt-2")))
+    assertFalse(registered(action))
+    assertNull(livePendingIntent(action, "attempt-2"))
   }
 
   @Test
@@ -339,8 +347,11 @@ class ShareCardShareResultTest {
       ),
       results,
     )
-    assertFalse(registered(ShareCardChooserCallback.action(application, "attempt-3")))
-    assertFalse(registered(ShareCardChooserCallback.action(application, "attempt-4")))
+    for (attemptId in listOf("attempt-3", "attempt-4")) {
+      val action = ShareCardChooserCallback.action(application, attemptId)
+      assertFalse(registered(action))
+      assertNull(livePendingIntent(action, attemptId))
+    }
   }
 
   @Test
@@ -368,9 +379,12 @@ class ShareCardShareResultTest {
     val controller = ShareCardShareController(Handler(Looper.getMainLooper())) { "attempt-5" }
     controller.share(application, activity, file.toURI().toString(), digest) { results += it }
     controller.hostPaused()
+    val action = ShareCardChooserCallback.action(application, "attempt-5")
+    assertNotNull(livePendingIntent(action, "attempt-5"))
     controller.hostDestroyed()
     assertEquals(listOf(mapOf("target" to "none", "outcome" to "not_confirmed")), results)
-    assertFalse(registered(ShareCardChooserCallback.action(application, "attempt-5")))
+    assertFalse(registered(action))
+    assertNull(livePendingIntent(action, "attempt-5"))
   }
 
   class ThrowingActivity : Activity() {
