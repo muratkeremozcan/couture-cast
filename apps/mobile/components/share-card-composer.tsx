@@ -20,6 +20,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type ViewStyle,
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
@@ -239,6 +240,61 @@ function usePreviewFit() {
     onBelow: measure('below'),
   }
 }
+const BUTTON_PADDING = 14
+const BUTTON_BORDER = 1
+const LABEL_FONT_SIZE = 16
+type LabelFrame = { width: number; height: number }
+/**
+ * Whether an action label, measured shrink-wrapped to its own width, fits on one line in half of
+ * this column. Paired buttons are equal halves; a label wider than its half would wrap, so its row
+ * stacks instead. The 2-pt margin keeps a label right at the edge from flipping between the two
+ * layouts, and the height check catches a label that already wrapped in its half, which iOS
+ * reports at its longest line's width.
+ */
+export function labelFitsHalf(label: LabelFrame, column: number, fontScale: number) {
+  const half = (column - ACTION_GAP) / 2 - 2 * (BUTTON_PADDING + BUTTON_BORDER)
+  return label.width <= half - 2 && label.height < LABEL_FONT_SIZE * 1.6 * fontScale
+}
+type ActionKind = 'save' | 'share' | 'refresh' | 'retry' | 'settings' | 'cancel'
+/**
+ * Equal-width action columns. Each row (Save and Share, then a recovery action and Cancel) pairs
+ * its buttons as two halves sharing one vertical split, and stacks them full width when either
+ * label does not fit its half on one line. The decision reads only the labels in that row, so
+ * status and error copy never move Save and Share. A label not measured yet counts as fitting.
+ * Only a changed decision sets state: even an unchanged functional update renders the composer
+ * again, and a render right after Retry or Open settings mounts made the iOS focus request for
+ * that button find it detached (it fell back without posting layoutChanged).
+ */
+function useActionColumns() {
+  const { width, fontScale } = useWindowDimensions()
+  const column = Math.min(width - 2 * CONTENT_INSET, CONTENT_MAX_WIDTH)
+  const [wide, setWide] = useState<Partial<Record<ActionKind, boolean>>>({})
+  const known = useRef(wide)
+  const measure =
+    (kind: ActionKind) =>
+    ({ nativeEvent }: LayoutChangeEvent) => {
+      const tooWide = !labelFitsHalf(nativeEvent.layout, column, fontScale)
+      if ((known.current[kind] ?? false) === tooWide) return
+      known.current = { ...known.current, [kind]: tooWide }
+      setWide(known.current)
+    }
+  const row = (kinds: (ActionKind | null)[]) =>
+    kinds.some((kind) => kind !== null && wide[kind] === true)
+      ? styles.stacked
+      : styles.paired
+  return { measure, row }
+}
+type ActionColumns = ReturnType<typeof useActionColumns>
+/** The recovery action a state offers beside Cancel, or none. */
+function recoveryKind(
+  permission: 'denied' | 'permanent' | null,
+  error: string | null,
+  changed: boolean
+): ActionKind | null {
+  if (permission === 'permanent') return 'settings'
+  if (changed) return 'refresh'
+  return error && !shareErrors.has(error) ? 'retry' : null
+}
 /** The Share button frame in window coordinates, the iPad popover anchor. */
 function measureWindowFrame(node: View | null) {
   return new Promise<ShareCardShareAnchor | null>((resolve) => {
@@ -407,6 +463,8 @@ export function ShareCardComposer({
   const activeSave = useRef<SaveOwner | null>(null)
   const insets = useModalInsets()
   const previewFit = usePreviewFit()
+  const columns = useActionColumns()
+  const recovery = recoveryKind(permission, error, changed)
   const systemBarsReady = useShareCardStatusBar(
     open && source !== null,
     modalSystemBarsAvailable()
@@ -860,11 +918,11 @@ export function ShareCardComposer({
                 }}
                 disabled={disabled}
                 onPress={() => void save()}
-                style={styles.button}
+                style={[styles.button, columns.row(['save', 'share'])]}
                 ref={saveTarget}
                 testID="share-card-save"
               >
-                <Text style={styles.buttonText}>{t('shareCard.save')}</Text>
+                <ActionLabel kind="save" columns={columns} t={t} />
               </Pressable>
               <ShareAction
                 target={shareTarget}
@@ -872,6 +930,7 @@ export function ShareCardComposer({
                 present={shareModule}
                 disabled={shareDisabled}
                 onPress={() => void share()}
+                columns={columns}
                 t={t}
               />
             </View>
@@ -879,10 +938,10 @@ export function ShareCardComposer({
             <View style={styles.actions}>
               <RecoveryActions
                 target={recoveryTarget}
-                permission={permission}
-                error={error}
-                changed={changed}
+                kind={recovery}
                 disabled={busy || pendingNative}
+                style={columns.row([recovery, 'cancel'])}
+                columns={columns}
                 t={t}
                 retry={() => {
                   if (permission === 'denied') {
@@ -896,12 +955,12 @@ export function ShareCardComposer({
               />
               <Pressable
                 accessibilityRole="button"
-                style={styles.button}
+                style={[styles.button, columns.row([recovery, 'cancel'])]}
                 onPress={close}
                 ref={cancelTarget}
                 testID="share-card-cancel"
               >
-                <Text style={styles.buttonText}>{t('shareCard.cancel')}</Text>
+                <ActionLabel kind="cancel" columns={columns} t={t} />
               </Pressable>
             </View>
           </View>
@@ -1033,6 +1092,7 @@ function ShareAction({
   present,
   disabled,
   onPress,
+  columns,
   t,
 }: {
   target: React.Ref<View>
@@ -1040,6 +1100,7 @@ function ShareAction({
   present: boolean
   disabled: boolean
   onPress: () => void
+  columns: ActionColumns
   t: Translation
 }) {
   if (!capable) return null
@@ -1050,11 +1111,11 @@ function ShareAction({
       accessibilityHint={present ? undefined : t('shareCard.shareUnavailable')}
       disabled={disabled || !present}
       onPress={present ? onPress : undefined}
-      style={styles.button}
+      style={[styles.button, columns.row(['save', 'share'])]}
       ref={target}
       testID="share-card-share"
     >
-      <Text style={styles.buttonText}>{t('shareCard.share')}</Text>
+      <ActionLabel kind="share" columns={columns} t={t} />
     </Pressable>
   )
 }
@@ -1075,50 +1136,64 @@ function ShareUnavailable({
     </Text>
   )
 }
+/** An action's label, shrink-wrapped so its measured width is the width it needs. */
+function ActionLabel({
+  kind,
+  columns,
+  t,
+}: {
+  kind: ActionKind
+  columns: ActionColumns
+  t: Translation
+}) {
+  return (
+    <Text style={styles.buttonText} onLayout={columns.measure(kind)}>
+      {t(`shareCard.${kind === 'settings' ? 'openSettings' : kind}`)}
+    </Text>
+  )
+}
 function RecoveryActions({
   target,
-  permission,
-  error,
-  changed,
+  kind,
   disabled,
+  style,
+  columns,
   t,
   retry,
 }: {
   target: React.Ref<View>
-  permission: 'denied' | 'permanent' | null
-  error: string | null
-  changed: boolean
+  kind: ActionKind | null
   disabled: boolean
+  style: ViewStyle
+  columns: ActionColumns
   t: Translation
   retry: () => void
 }) {
-  if (permission === 'permanent')
+  if (kind === 'settings')
     return (
       <Pressable
         ref={target}
         testID="share-card-settings"
         accessibilityRole="button"
-        style={styles.button}
+        style={[styles.button, style]}
         onPress={() => {
           void Linking.openSettings()
         }}
       >
-        <Text style={styles.buttonText}>{t('shareCard.openSettings')}</Text>
+        <ActionLabel kind="settings" columns={columns} t={t} />
       </Pressable>
     )
-  if ((!error || shareErrors.has(error)) && !changed) return null
+  if (kind === null) return null
   return (
     <Pressable
       ref={target}
-      testID={changed ? 'share-card-refresh' : 'share-card-retry'}
+      testID={`share-card-${kind}`}
       accessibilityRole="button"
-      style={styles.button}
+      style={[styles.button, style]}
       disabled={disabled}
       onPress={retry}
     >
-      <Text style={styles.buttonText}>
-        {t(`shareCard.${changed ? 'refresh' : 'retry'}`)}
-      </Text>
+      <ActionLabel kind={kind} columns={columns} t={t} />
     </Pressable>
   )
 }
@@ -1133,11 +1208,7 @@ const styles = StyleSheet.create({
     gap: CONTENT_GAP,
   },
   block: { gap: CONTENT_GAP },
-  /**
-   * Save and Share, then a recovery action and Cancel, share a row when both labels fit on one
-   * line each; otherwise the row wraps and stacks them as full-width buttons. On a 327-pt column
-   * the widest pairs (fr Save and Share, pt-PT Refresh and Cancel) leave 15 and 5 pt to spare.
-   */
+  /** An action row: two equal halves (`paired`), or full-width buttons that wrap (`stacked`). */
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1162,14 +1233,19 @@ const styles = StyleSheet.create({
   error: { color: '#7A1F2D', fontSize: 16 },
   feedbackSlot: { gap: 16 },
   feedbackLine: { lineHeight: FEEDBACK_LINE_HEIGHT },
+  paired: { flexBasis: 0, flexGrow: 1 },
+  stacked: { width: '100%' },
   button: {
-    flexGrow: 1,
-    flexShrink: 1,
     minHeight: 48,
-    padding: 14,
-    borderWidth: 1,
+    padding: BUTTON_PADDING,
+    borderWidth: BUTTON_BORDER,
     borderColor: '#B28D46',
     borderRadius: 8,
   },
-  buttonText: { color: '#292724', fontSize: 16, textAlign: 'center' },
+  buttonText: {
+    alignSelf: 'center',
+    color: '#292724',
+    fontSize: LABEL_FONT_SIZE,
+    textAlign: 'center',
+  },
 })
