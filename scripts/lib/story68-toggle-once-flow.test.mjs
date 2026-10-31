@@ -116,10 +116,11 @@ test('release-watermark-off.yaml turns the switch off through the same guarded r
   assert.equal(watermarkTaps(commands).length, 1)
 })
 
-test('no flow taps the watermark switch outside a guard, except the rapid flow that is timed to a 12 s hold', () => {
+test('no flow taps the watermark switch outside a guard, except the timed rapid flow', () => {
   // rapid-watermark-held.yaml presses the switch back to back while the preview is held in
-  // `preparing` and must finish inside the 12 s hold (9.4 s measured on Android), so a guard
-  // read per press would spend its budget; it asserts each press immediately instead.
+  // `preparing`. Each press supersedes a prepare request that must leave the held source
+  // within 12 s of arriving, so a guard read per press would spend that budget; it asserts
+  // each press immediately instead.
   const timedExceptions = new Set(['rapid-watermark-held.yaml'])
   const names = fs
     .readdirSync(flowsDir)

@@ -193,25 +193,64 @@ describe('withRapidWatermarkControl', () => {
     }
   })
 
-  test('the actual async child failure path publishes only the closed four-field native record', async () => {
+  test('PostgreSQL ending the held transaction itself maps to closed codes', () => {
+    const database = (message, code) => Object.assign(new Error(message), { code })
+    assert.equal(
+      closedRapidWatermarkFailure(
+        database('canceling statement due to lock timeout', '55P03')
+      ),
+      'rapid_watermark_lock_timeout'
+    )
+    assert.equal(
+      closedRapidWatermarkFailure(
+        database('terminating connection due to idle-in-transaction timeout', '25P03')
+      ),
+      'rapid_watermark_idle_session_timeout'
+    )
+    assert.equal(
+      closedRapidWatermarkFailure(new Error('Query read timeout')),
+      'rapid_watermark_query_timeout'
+    )
+    assert.equal(
+      closedRapidWatermarkFailure(database('private relation detail', 'XX000')),
+      'native_rapid_watermark_failed'
+    )
+    assert.equal(
+      closedRapidWatermarkFailure('rapid_watermark_hold_deadline'),
+      'native_rapid_watermark_failed'
+    )
+  })
+
+  /** Runs the runner's own rapidWatermarkFlow source against a fake Maestro child. */
+  function runHeldFlow({ signal, exitCode, maestroLog }) {
     const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
     const start = source.indexOf('function rapidWatermarkFlow(')
     const end = source.indexOf("\nif (command === 'prebuild')", start)
     const records = []
     const timings = []
+    const progress = []
+    const killed = []
     const child = new EventEmitter()
+    child.pid = 4242
     const context = {
-      signal: new AbortController().signal,
+      signal,
       control: { url: 'http://127.0.0.1:12345/private-capability' },
       reverse: () => undefined,
       path,
       directory: '/owned/runtime',
       platform: 'ios',
       device: 'owned',
+      appId: 'com.couturecast.story68',
       maestroBinary: 'fake-maestro',
       root: process.cwd(),
       localeEnv: () => ({}),
-      process: { env: {} },
+      process: {
+        env: {},
+        kill: (pid, name) => {
+          killed.push(name)
+          if (name === 'SIGTERM') queueMicrotask(() => child.emit('close', null))
+        },
+      },
       setTimeout,
       clearTimeout,
       fs: {
@@ -219,15 +258,17 @@ describe('withRapidWatermarkControl', () => {
         openSync: () => 1,
         closeSync: () => undefined,
         existsSync: () => true,
-        readFileSync: () =>
-          'AssertionFailure PRIVATE_USER@example.test private-capability',
+        statSync: () => ({ size: 77 }),
+        readFileSync: (file) => (file.endsWith('maestro.log') ? maestroLog : ''),
       },
       spawn: () => {
-        queueMicrotask(() => child.emit('close', 1))
+        if (exitCode !== undefined) queueMicrotask(() => child.emit('close', exitCode))
         return child
       },
       privateJson: (file, record) => records.push({ file, record }),
       summarizeNativeFlowFailure,
+      closedRapidWatermarkFailure,
+      recordIosFlowProgress: (options) => progress.push(options),
       redactRapidWatermarkControl: () => undefined,
       recordIosCommandTimings: (options) => timings.push(options),
     }
@@ -235,6 +276,15 @@ describe('withRapidWatermarkControl', () => {
       `(${source.slice(start, end)})(signal, control)`,
       context
     )
+    return { result, records, timings, progress, killed }
+  }
+
+  test('the actual async child failure path publishes only the closed four-field native record', async () => {
+    const { result, records, timings, progress } = runHeldFlow({
+      signal: new AbortController().signal,
+      exitCode: 1,
+      maestroLog: 'AssertionFailure PRIVATE_USER@example.test private-capability',
+    })
     await assert.rejects(result, /native_rapid_watermark_flow_failed/)
     assert.equal(records.length, 1)
     assert.equal(records[0].file, 'native-flow-failure-ios.json')
@@ -246,10 +296,41 @@ describe('withRapidWatermarkControl', () => {
     ])
     assert.equal(records[0].record.flow, 'rapid-watermark-held.yaml')
     assert.equal(records[0].record.classification, 'assertion')
+    assert.equal(progress.length, 1)
     assert.equal(timings.length, 1)
     assert.equal(timings[0].flow, 'maestro/story68/rapid-watermark-held.yaml')
     assert.equal(timings[0].minMs, 0)
     assert.equal(JSON.stringify(records).includes('PRIVATE_USER'), false)
     assert.equal(JSON.stringify(records).includes('private-capability'), false)
+  })
+
+  test('a hold deadline kill is classified by its closed reason and keeps the commands that ran', async () => {
+    const abort = new AbortController()
+    const maestroLog = 'Tap on id: share-card-watermark RUNNING'
+    const { result, records, timings, progress, killed } = runHeldFlow({
+      signal: abort.signal,
+      maestroLog,
+    })
+    abort.abort(new Error('rapid_watermark_hold_deadline'))
+    await assert.rejects(result, { message: 'rapid_watermark_hold_deadline' })
+    assert.deepEqual(killed, ['SIGTERM'])
+    assert.deepEqual(records, [
+      {
+        file: 'native-flow-failure-ios.json',
+        record: {
+          flow: 'rapid-watermark-held.yaml',
+          classification: 'holddeadline',
+          durationMs: records[0].record.durationMs,
+          platform: 'ios',
+        },
+      },
+    ])
+    // The killed Maestro wrote no command trace: its progressive log is handed to both records.
+    assert.equal(progress.length, 1)
+    assert.equal(progress[0].flow, 'maestro/story68/rapid-watermark-held.yaml')
+    assert.equal(progress[0].maestroLog, maestroLog)
+    assert.equal(progress[0].apiLogFromByte, 77)
+    assert.equal(progress[0].appId, 'com.couturecast.story68')
+    assert.equal(timings[0].maestroLog, maestroLog)
   })
 })

@@ -5,6 +5,8 @@ export type NativeFlowFailure = {
     | 'elementtimeout'
     | 'driverconnection'
     | 'assertion'
+    | 'holddeadline'
+    | 'harnessstop'
     | 'unknown'
   durationMs: number
   platform: 'android' | 'ios'
@@ -19,4 +21,5 @@ export declare function summarizeNativeFlowFailure(input: {
   platform: 'android' | 'ios'
   durationMs: number
   log: string
+  harnessStop?: string | null
 }): NativeFlowFailure

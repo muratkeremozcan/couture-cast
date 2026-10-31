@@ -9,6 +9,11 @@ import {
   assertBrowserWatermarkEvidence,
   browserWatermarkChecks,
 } from '../lib/story68-browser-watermark.mjs'
+import {
+  RAPID_WATERMARK_FAILURE_CODES,
+  RAPID_WATERMARK_STAGES,
+} from '../lib/story68-rapid-watermark-control.mjs'
+import { holdLimitMs, liveRequestLimitMs } from '../lib/story68-rapid-watermark.mjs'
 import { assertWebStartupEvidence } from './wait-web.mjs'
 import { WEB_MATRIX_SUMMARY_FILE, assertWebMatrixSummary } from './assert-web-matrix.mjs'
 import {
@@ -246,10 +251,10 @@ for (const platform of ['android', 'ios']) {
         summary[field] = true
       }
       if (kind === 'rapid-watermark') {
+        const within = (ms, limit) => Number.isFinite(ms) && ms >= 0 && ms < limit
         if (
-          !Number.isFinite(value.heldMs) ||
-          value.heldMs < 0 ||
-          value.heldMs >= 12000 ||
+          !within(value.heldMs, holdLimitMs) ||
+          !within(value.longestLiveRequestMs, liveRequestLimitMs) ||
           !Number.isSafeInteger(value.requests) ||
           value.requests < 3 ||
           value.unavailableResponses !== 0
@@ -257,12 +262,22 @@ for (const platform of ['android', 'ios']) {
           invalid()
         Object.assign(summary, {
           heldMs: value.heldMs,
+          longestLiveRequestMs: value.longestLiveRequestMs,
           requests: value.requests,
           unavailableResponses: 0,
         })
       } else {
         if (value.actualCursor !== (platform === 'android')) invalid()
         summary.actualCursor = value.actualCursor
+      }
+    } else if (kind === 'rapid-watermark') {
+      // A failed proof names its closed stage and, unless the runner was killed before it
+      // could write one, its closed failure code. Anything else fails the whole selection.
+      if (!RAPID_WATERMARK_STAGES.includes(value.stage)) invalid()
+      summary.stage = value.stage
+      if (value.code !== undefined) {
+        if (!RAPID_WATERMARK_FAILURE_CODES.includes(value.code)) invalid()
+        summary.code = value.code
       }
     }
     proofs.set(name, summary)

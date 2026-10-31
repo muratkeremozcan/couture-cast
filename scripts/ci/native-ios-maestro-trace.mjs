@@ -52,17 +52,24 @@ export function slowMaestroCommands(output, minMs = 1000) {
   })
 }
 
-/** Append one flow's slow commands to the run's timing receipt (nonfatal). */
+/**
+ * Append one flow's slow commands to the run's timing receipt (nonfatal). A flow killed before
+ * Maestro wrote its command trace falls back to the progressive `maestroLog`, marked by source.
+ */
 export function recordIosCommandTimings({
   platform,
   flow,
   output,
   directory,
   minMs = 1000,
+  maestroLog = '',
   log = console.log,
 }) {
   if (platform !== 'ios') return null
-  const entry = { flow, commands: slowMaestroCommands(output, minMs) }
+  const entry =
+    commandFiles(output).length || !maestroLog
+      ? { flow, commands: slowMaestroCommands(output, minMs) }
+      : { flow, source: 'maestro-log', commands: maestroLogCommands(maestroLog, minMs) }
   const file = path.join(directory, 'native-ios-flow-command-timings.json')
   try {
     const record = fs.existsSync(file)
@@ -83,6 +90,47 @@ const PROGRESS_LINE =
 // Only the leading words of a command label are kept: never its quoted text or coordinates.
 const verbOf = (label) => /^[A-Za-z]+(?: [A-Za-z]+){0,2}/.exec(label)?.[0] ?? 'unknown'
 
+const progressSeconds = (h, m, sec, ms) =>
+  Number(h) * 3600 + Number(m) * 60 + Number(sec) + Number(ms) / 1000
+
+/**
+ * Per-command costs from the progressive Maestro log, the same row shape as the command trace
+ * with the label's leading words as its name. Each RUNNING line pairs with the next terminal
+ * line of the same label. A command still open when the log ends keeps status RUNNING and the
+ * time it had run by the last progress line.
+ */
+export function maestroLogCommands(log, minMs = 1000) {
+  const rows = []
+  const open = []
+  let base = 0
+  let lastAt = null
+  for (const line of String(log ?? '').split('\n')) {
+    const match = PROGRESS_LINE.exec(line)
+    if (!match) continue
+    const [, h, m, sec, ms, label, status] = match
+    // Midnight passes between two progress lines.
+    if (lastAt !== null && progressSeconds(h, m, sec, ms) + base < lastAt) base += 86400
+    const at = progressSeconds(h, m, sec, ms) + base
+    lastAt = at
+    if (status === 'RUNNING') {
+      const row = { sequence: rows.length, depth: open.length, name: verbOf(label) }
+      rows.push(row)
+      open.push({ label, at, row })
+      continue
+    }
+    const index = open.findLastIndex((entry) => entry.label === label)
+    if (index < 0) continue
+    const [entry] = open.splice(index, 1)
+    entry.row.status = status
+    entry.row.durationMs = Math.round((at - entry.at) * 1000)
+  }
+  for (const entry of open) {
+    entry.row.status = 'RUNNING'
+    entry.row.durationMs = Math.round((lastAt - entry.at) * 1000)
+  }
+  return rows.filter((row) => row.durationMs >= minMs)
+}
+
 /**
  * Where a flow was when it ended, from the progressive Maestro log: per command verb the
  * count of each status, the last command line and the seconds from the first to the last
@@ -96,7 +144,7 @@ export function maestroFlowProgress(log) {
     const match = PROGRESS_LINE.exec(line)
     if (!match) continue
     const [, h, m, sec, ms, label, status] = match
-    const at = Number(h) * 3600 + Number(m) * 60 + Number(sec) + Number(ms) / 1000
+    const at = progressSeconds(h, m, sec, ms)
     first ??= at
     const verb = verbOf(label)
     const key = `${verb}\0${status}`

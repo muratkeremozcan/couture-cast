@@ -1197,6 +1197,23 @@ failure is inferred from its pending state.
   confirming each command line still matches, and fails fast naming the PID when a process it
   does not own holds port 7001.
 
+- 2026-10-31 rapid watermark hold clocks (iOS shard 2 flake, PR #167): the native proof timed its
+  `OutfitRecommendation` hold with one 12 s limit counted from LOCK. Passing CI runs held it for
+  8.2 to 11.3 s (Android 8.7 to 10.1 s), and a starved runner crossed 12 s in two of the last four
+  main runs. The watchdog then killed Maestro, which wrote no command trace, so the public record
+  read `unknown` with zero commands. The 12 s exists so the hold can never cause the product's
+  own 503: the API refuses a preparation 15 s after it arrives, queue time included. That deadline
+  starts per request at arrival, and a request the client superseded and aborted has no deadline
+  left to protect. The harness now reads the owned API log during the hold and fails
+  `rapid_watermark_request_deadline` once any prepare request still in flight has waited 12 s.
+  `rapid_watermark_hold_deadline` bounds the whole hold at 30 s, repeated by the server-side idle
+  timeout. Raising the single LOCK limit was rejected: the first request arrives about 1 s after
+  LOCK, so a limit near 15 s leaves it no time to settle. The source barrier, every held assertion,
+  the three fresh requests and the zero-503 check are unchanged. Evidence reports `heldMs` and
+  `longestLiveRequestMs`. A harness kill now publishes classification `holddeadline` or
+  `harnessstop`, the failed proof's closed stage and code, and the commands Maestro logged before
+  the kill.
+
 ## Review Triage Log
 
 - Astra round 1 on `cfed026c7709c31a1d80970ff3ed074174358ecdd50a135c8dce96a5b248c02b`:

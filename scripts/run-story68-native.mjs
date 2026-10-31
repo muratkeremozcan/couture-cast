@@ -72,6 +72,7 @@ import {
   MAESTRO_ANDROID_DRIVER_PORT,
 } from './lib/maestro-android-driver-session.mjs'
 import {
+  apiPrepareRequestClock,
   assertRapidWatermarkRuntime,
   rapidWatermarkRequests,
   withRapidWatermarkLock,
@@ -558,9 +559,16 @@ async function signin() {
 }
 function rapidWatermarkFlow(signal, control) {
   const started = Date.now()
+  const flow = 'maestro/story68/rapid-watermark-held.yaml'
+  const apiLogFile = path.join(directory, 'api.log')
+  const apiLogFromByte = fs.existsSync(apiLogFile) ? fs.statSync(apiLogFile).size : 0
   reverse()
   const output = path.join(directory, `maestro-${platform}-rapid-${Date.now()}`)
   fs.mkdirSync(output, { mode: 0o700 })
+  const maestroLog = () => {
+    const file = path.join(output, 'maestro.log')
+    return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
+  }
   const fd = fs.openSync(path.join(output, 'process.log'), 'wx', 0o600)
   return new Promise((resolve, reject) => {
     const process = spawn(
@@ -577,7 +585,7 @@ function rapidWatermarkFlow(signal, control) {
         '--debug-output',
         output,
         '--flatten-debug-output',
-        path.join(root, 'maestro/story68/rapid-watermark-held.yaml'),
+        path.join(root, flow),
       ],
       {
         cwd: root,
@@ -626,31 +634,43 @@ function rapidWatermarkFlow(signal, control) {
     })
   })
     .catch((error) => {
-      const logs = ['maestro.log', 'process.log']
-        .map((name) => {
-          const file = path.join(output, name)
-          return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
-        })
-        .join('\n')
+      const processLog = path.join(output, 'process.log')
+      const logs = `${maestroLog()}\n${fs.existsSync(processLog) ? fs.readFileSync(processLog, 'utf8') : ''}`
       privateJson(
         `native-flow-failure-${platform}.json`,
         summarizeNativeFlowFailure({
-          flow: 'maestro/story68/rapid-watermark-held.yaml',
+          flow,
           platform,
           durationMs: Math.max(0, Date.now() - started),
           log: logs,
+          // The harness killed Maestro, so its own reason is the only failure text there is.
+          harnessStop: signal.aborted ? closedRapidWatermarkFailure(signal.reason) : null,
         })
       )
+      // A killed Maestro writes no command trace; its progressive log still shows how far it got.
+      recordIosFlowProgress({
+        platform,
+        flow,
+        maestroLog: maestroLog(),
+        directory,
+        apiLogFile,
+        apiLogFromByte,
+        output,
+        root,
+        device,
+        appId,
+      })
       throw error
     })
     .finally(() => {
-      // The 12 s hold leaves little slack, so keep every command's cost, pass or fail.
+      // The hold is timed per prepare request, so keep every command's cost, pass or fail.
       recordIosCommandTimings({
         platform,
-        flow: 'maestro/story68/rapid-watermark-held.yaml',
+        flow,
         output,
         directory,
         minMs: 0,
+        maestroLog: maestroLog(),
       })
       redactRapidWatermarkControl(output, control.url)
     })
@@ -1358,6 +1378,11 @@ if (command === 'prebuild') {
               query_timeout: 2000,
             }),
           whileLocked,
+          // Each prepare request's own deadline starts when the API logs its arrival.
+          oldestLiveRequestMs: apiPrepareRequestClock({
+            file: logPath,
+            fromByte: offset,
+          }),
         }),
       runFlow: (control, signal) => rapidWatermarkFlow(signal, control),
     })
