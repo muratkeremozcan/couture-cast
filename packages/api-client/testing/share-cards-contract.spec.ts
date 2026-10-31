@@ -167,4 +167,11 @@ describe('share-card contract', () => {
     )
     expect(purposes).toContain('"share"')
   })
+  it('U-SHARE-CONTRACT: the prepare 403 names share_disabled', () => {
+    const doc = generateHttpOpenApiDocument()
+    const responses = doc.paths?.['/api/v1/share-cards/prepare']?.post?.responses as
+      | Record<string, { description?: string }>
+      | undefined
+    expect(responses?.['403']?.description).toMatch(/\bshare_disabled\b/)
+  })
 })

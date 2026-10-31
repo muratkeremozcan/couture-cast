@@ -28303,7 +28303,7 @@
             "description": "Authentication required"
           },
           "403": {
-            "description": "Access denied"
+            "description": "share_disabled: native share is off for this member (share purpose only), or access denied"
           },
           "404": {
             "description": "source_unavailable"

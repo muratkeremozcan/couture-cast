@@ -109,7 +109,10 @@ export function registerShareCardsContracts(registry: OpenAPIRegistry) {
       },
       400: { description: 'Invalid request' },
       401: { description: 'Authentication required' },
-      403: { description: 'Access denied' },
+      403: {
+        description:
+          'share_disabled: native share is off for this member (share purpose only), or access denied',
+      },
       404: { description: 'source_unavailable' },
       409: { description: 'preview_changed' },
       503: { description: 'Preparation unavailable' },
