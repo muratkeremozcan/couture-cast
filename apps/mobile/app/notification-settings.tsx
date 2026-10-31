@@ -247,7 +247,10 @@ export default function NotificationSettingsScreen() {
       AccessibilityInfo.announceForAccessibility(t(message))
   }, [message, t])
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      testID="notification-settings-screen"
+    >
       {draft && (
         <>
           <View style={styles.row}>

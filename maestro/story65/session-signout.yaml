@@ -3,6 +3,11 @@
 # gets the same window to load before absence is asserted.
 appId: ${MAESTRO_APP_ID}
 ---
+# Sign out is the last control; on an iPhone SE it starts below the fold.
+- scrollUntilVisible:
+    element: ${MAESTRO_SIGNOUT}
+    direction: DOWN
+    timeout: 15000
 - tapOn: ${MAESTRO_SIGNOUT}
 - runFlow: open-notification-settings.yaml
 - extendedWaitUntil:

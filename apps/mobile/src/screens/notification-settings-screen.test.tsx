@@ -114,6 +114,14 @@ beforeEach(() => {
   process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
 })
 describe('R11 native settings journeys', () => {
+  it('names the screen for native flows before the preferences load', async () => {
+    // Maestro waits on this id: Sign out, the last control, can sit below the fold.
+    session.hold = true
+    await render(<NotificationSettingsScreen />)
+    const root = screen.getByTestId('notification-settings-screen')
+    expect(root).toContainElement(screen.getByText(label('signout')))
+    expect(screen.queryByLabelText(label('enabled'))).toBeNull()
+  })
   it('waits for verification and clears old account settings immediately on switch/signout', async () => {
     const headers: string[] = []
     server.use(

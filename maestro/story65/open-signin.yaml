@@ -1,4 +1,9 @@
 # Story 6.5 owner: Settings tab > Community notifications > Sign in, through the product UI.
+# Ends with Sign in on screen; on an iPhone SE it starts below the fold.
 appId: ${MAESTRO_APP_ID}
 ---
 - runFlow: open-notification-settings.yaml
+- scrollUntilVisible:
+    element: ${MAESTRO_SIGNIN}
+    direction: DOWN
+    timeout: 15000
