@@ -1042,8 +1042,23 @@ describe('Story 6.9 composer layout', () => {
     expect(actionRowTier([line(300)], 327, 1)).toBe('halves')
     expect(actionRowTier([line(100), undefined], 327, 1)).toBeNull()
   })
-  // Tiers of the Save and Share row, then the Refresh and Cancel row, measured with the browser's
-  // SF Pro: an iPhone SE column (375-pt window) and an iPhone 17 Pro column (402-pt window).
+  // One-line widths of the Save, Share, Refresh and Cancel labels in SF Pro at 16 pt, the iOS
+  // system font, measured with macOS Chromium. The browser tests below cannot pin tiers: CI
+  // Chromium has no SF Pro, and its fallback moved tr-TR Refresh across the half boundary.
+  const labelWidths: Record<string, [number, number, number, number]> = {
+    'en-US': [108.14, 41.88, 116.52, 49.89],
+    'en-CA': [108.14, 41.88, 116.52, 49.89],
+    'es-419': [121.61, 72.72, 158.39, 64.19],
+    'fr-CA': [173.52, 62.06, 133.39, 55.89],
+    'fr-FR': [173.52, 62.06, 133.39, 55.89],
+    'tr-TR': [140.7, 46.44, 126.17, 31.17],
+    'de-DE': [115.17, 42.33, 163.22, 79.47],
+    'it-IT': [92.25, 67.63, 142.08, 53.53],
+    'pt-BR': [115.86, 94.08, 111.56, 64.19],
+    'pt-PT': [174.45, 60.27, 186.22, 64.19],
+  }
+  // Tiers of the Save and Share row, then the Refresh and Cancel row: an iPhone SE column
+  // (375-pt window) and an iPhone 17 Pro column (402-pt window). No locale stacks on either.
   const tiers: Record<string, Record<number, [string, string]>> = {
     'en-US': { 375: ['halves', 'halves'], 402: ['halves', 'halves'] },
     'en-CA': { 375: ['halves', 'halves'], 402: ['halves', 'halves'] },
@@ -1061,7 +1076,25 @@ describe('Story 6.9 composer layout', () => {
       [375, 402].map((width) => [locale, width] as const)
     )
   )(
-    'C-COMP-LAYOUT-PAIRS: %s at a %i-pt window takes each row tier and never stacks',
+    'U-COMP-ROW-TIER: %s on iOS at a %i-pt window takes each row tier and never stacks',
+    (locale, width) => {
+      const [save, share, refresh, cancel] = labelWidths[locale]!.map((label) => ({
+        width: label,
+        height: 19,
+      }))
+      const column = width - 48
+      expect([
+        actionRowTier([save, share], column, 1),
+        actionRowTier([refresh, cancel], column, 1),
+      ]).toEqual(tiers[locale]?.[width])
+    }
+  )
+  it.each(
+    supportedLocales.flatMap((locale) =>
+      [375, 402].map((width) => [locale, width] as const)
+    )
+  )(
+    'C-COMP-LAYOUT-PAIRS: %s at a %i-pt window lays each row out in the tier its measured labels take',
     async (locale, width) => {
       vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       // The stale state fills both rows.
@@ -1092,7 +1125,17 @@ describe('Story 6.9 composer layout', () => {
           : 'content'
       }
       const actual = [tierOf(['save', 'share']), tierOf(['refresh', 'cancel'])]
-      expect(actual).toEqual(tiers[locale]?.[width])
+      // The tier follows this browser's font, so derive it from the labels as measured here.
+      const label = (name: string) => {
+        const { width, height } = screen
+          .getByTestId(`share-card-${name}`)
+          .firstElementChild!.getBoundingClientRect()
+        return { width, height }
+      }
+      expect(actual).toEqual([
+        actionRowTier([label('save'), label('share')], column, 1),
+        actionRowTier([label('refresh'), label('cancel')], column, 1),
+      ])
       // Two halves rows share one vertical split.
       if (actual.every((tier) => tier === 'halves'))
         expect(frame('share-card-save').right).toBeCloseTo(
