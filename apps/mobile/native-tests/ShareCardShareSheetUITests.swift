@@ -174,6 +174,15 @@ final class ShareCardShareSheetUITests: XCTestCase {
     XCTAssertTrue(anchor.mainThread, "presented on the main thread")
     XCTAssertTrue(anchor.sourceViewSet, "popover sourceView set")
     XCTAssertTrue(anchor.sourceViewIsPresenterView, "sourceView is the presenter's view")
+    // The header names the card by its public name; the cache file name never shows.
+    let labelled = { (format: String, value: String) in
+      self.app.descendants(matching: .any).matching(NSPredicate(format: format, value)).firstMatch
+    }
+    XCTAssertTrue(
+      labelled("label == %@", "couturecast-card.png").waitForExistence(timeout: 10),
+      "header shows couturecast-card.png")
+    XCTAssertFalse(labelled("label CONTAINS %@", "cc69-share").exists, "header hides the cache file name")
+    print("CC69_PRESENTER_PUBLIC_NAME_PASS")
 
     dismissShareSheetIfPresent()
     let feedback = element("share-card-feedback")

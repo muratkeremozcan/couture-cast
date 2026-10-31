@@ -11,8 +11,11 @@ let package = Package(
     .target(
       name: "ShareCardShareCore",
       path: ".",
-      exclude: ["ShareCardNativeShareModule.swift", "ShareCardNativeShare.podspec", "Tests", "Package.swift"],
-      sources: ["ShareCardShareResult.swift", "ShareCardAnchorConfiguration.swift", "ShareCardShareFile.swift"]
+      exclude: ["ShareCardNativeShareModule.swift", "ShareCardActivityItem.swift", "ShareCardNativeShare.podspec", "Tests", "Package.swift"],
+      sources: [
+        "ShareCardShareResult.swift", "ShareCardAnchorConfiguration.swift", "ShareCardShareFile.swift",
+        "ShareCardShareMetadata.swift",
+      ]
     ),
     .testTarget(name: "ShareCardShareCoreTests", dependencies: ["ShareCardShareCore"], path: "Tests"),
   ]

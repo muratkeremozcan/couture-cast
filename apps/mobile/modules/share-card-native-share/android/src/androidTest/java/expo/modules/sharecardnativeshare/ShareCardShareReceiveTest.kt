@@ -26,7 +26,8 @@ import org.junit.runner.RunWith
  * N-AND-RECEIVE on a real device. The receiving Activity gets the exact `ACTION_SEND` the chooser
  * wraps and reads the PNG through the module's provider; its SHA256 equals the previewed digest.
  * The shell then stands in for another app's UID: the granted URI is readable, while a sibling
- * `cc69-share-*` file that was never granted and every out-of-scope URI are denied.
+ * `cc69-share-*` file that was never granted and every out-of-scope URI are denied. Receivers see
+ * the card as `couturecast-card.png` with its real size, never its cache name.
  */
 @RunWith(AndroidJUnit4::class)
 class ShareCardShareReceiveTest {
@@ -49,6 +50,12 @@ class ShareCardShareReceiveTest {
 
   private fun sha256(bytes: ByteArray) =
     MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+  /** Queries a content URI's columns as the shell UID, a different app from the provider's. */
+  private fun queryAsShell(target: Uri): String {
+    val output = instrumentation.uiAutomation.executeShellCommand("content query --uri $target")
+    return ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes().decodeToString() }
+  }
 
   /** Reads a content URI as the shell UID, a different app from the provider's. */
   private fun readAsShell(target: Uri): ByteArray {
@@ -99,6 +106,9 @@ class ShareCardShareReceiveTest {
       assertEquals(setOf(Intent.EXTRA_STREAM), received.extras)
       assertEquals(null, received.readError)
       assertEquals(expected, received.sha256)
+      assertEquals("couturecast-card.png", received.displayName)
+      assertEquals(shared.length(), received.size)
+      assertTrue(shared.name.startsWith("cc69-share-"))
     } finally {
       callback.teardown()
     }
@@ -110,6 +120,10 @@ class ShareCardShareReceiveTest {
     assertTrue("no grant yet", sha256(readAsShell(uri)) != expected)
     context.grantUriPermission(shell, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
     assertEquals(expected, sha256(readAsShell(uri)))
+    val columns = queryAsShell(uri)
+    assertTrue(columns, columns.contains("_display_name=couturecast-card.png"))
+    assertTrue(columns, columns.contains("_size=${shared.length()}"))
+    assertFalse(columns, columns.contains("cc69-share"))
     assertNotEquals(ShareCardShareFiles.sha256(sibling), sha256(readAsShell(siblingUri)))
     for (target in
       listOf(

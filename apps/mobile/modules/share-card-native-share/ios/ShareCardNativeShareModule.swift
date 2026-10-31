@@ -49,7 +49,8 @@ public final class ShareCardNativeShareModule: Module {
       settle(attempt, .failed(.presenterUnavailable))
       return
     }
-    let controller = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    let controller = UIActivityViewController(
+      activityItems: [ShareCardActivityItem(file: url)], applicationActivities: nil)
     let popoverController = controller.popoverPresentationController
     popoverController?.sourceView = popover.sourceView
     popoverController?.sourceRect = popover.sourceRect

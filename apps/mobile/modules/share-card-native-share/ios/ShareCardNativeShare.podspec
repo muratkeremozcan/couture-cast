@@ -11,8 +11,8 @@ Pod::Spec.new do |s|
   s.source = { git: 'https://github.com/muratkeremozcan/couture-cast.git' }
   s.static_framework = true
   s.dependency 'ExpoModulesCore'
-  s.frameworks = 'UIKit', 'CryptoKit'
+  s.frameworks = 'UIKit', 'CryptoKit', 'LinkPresentation'
   s.source_files = '*.swift'
-  # Package.swift and Tests/ run the pure mapping, anchor and file decisions under XCTest alone.
+  # Package.swift and Tests/ run the pure mapping, anchor, file and header decisions under XCTest alone.
   s.exclude_files = ['Tests/**/*', 'Package.swift']
 end

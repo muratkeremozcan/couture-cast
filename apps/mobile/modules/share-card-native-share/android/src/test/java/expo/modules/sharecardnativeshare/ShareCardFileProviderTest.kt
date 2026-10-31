@@ -3,6 +3,9 @@ package expo.modules.sharecardnativeshare
 import android.app.Application
 import android.content.ComponentName
 import android.content.pm.PackageManager
+import android.database.Cursor
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
@@ -15,6 +18,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.w3c.dom.Element
@@ -111,6 +115,76 @@ class ShareCardFileProviderTest {
       assertThrows(outside.path, IllegalArgumentException::class.java) {
         FileProvider.getUriForFile(application, authority, outside)
       }
+    }
+  }
+
+  /** A granted share file plus its content URI, served by the registered module provider. */
+  private fun sharedFile(bytes: ByteArray): Pair<File, Uri> {
+    resetFileProviderRoots()
+    val authority = ShareCardShareFiles.authority(application)
+    // The merged manifest's own ProviderInfo, so the provider runs with its declared grant policy.
+    val info =
+      application.packageManager.getProviderInfo(
+        ComponentName(application, ShareCardFileProvider::class.java),
+        PackageManager.GET_META_DATA,
+      )
+    Robolectric.buildContentProvider(ShareCardFileProvider::class.java).create(info)
+    val file =
+      File(application.cacheDir, "share-cards/cc69-share-${UUID.randomUUID()}.png").apply {
+        parentFile!!.mkdirs()
+        writeBytes(bytes)
+      }
+    return file to FileProvider.getUriForFile(application, authority, file)
+  }
+
+  private fun Cursor.row(): Map<String, Any?> {
+    assertEquals(1, count)
+    assertTrue(moveToFirst())
+    return columnNames.indices.associate { at ->
+      columnNames[at] to if (getType(at) == Cursor.FIELD_TYPE_INTEGER) getLong(at) else getString(at)
+    }
+  }
+
+  @Test
+  fun receiversSeeThePublicNameAndTheRealSize() {
+    val bytes = byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10) + UUID.randomUUID().toString().toByteArray()
+    val (file, uri) = sharedFile(bytes)
+    val row = application.contentResolver.query(uri, null, null, null, null)!!.use { it.row() }
+    assertEquals(
+      mapOf(OpenableColumns.DISPLAY_NAME to "couturecast-card.png", OpenableColumns.SIZE to bytes.size.toLong()),
+      row,
+    )
+    assertFalse(row.values.any { it.toString().contains("cc69-share") })
+    // The name is presented only: the file on disk and the bytes a receiver reads are unchanged.
+    assertTrue(file.name.startsWith("cc69-share-"))
+    assertEquals("/share_cards/${file.name}", uri.path)
+    assertTrue(bytes.contentEquals(application.contentResolver.openInputStream(uri)!!.use { it.readBytes() }))
+  }
+
+  @Test
+  fun eachRequestedColumnKeepsItsOrderAndUnknownColumnsStayDropped() {
+    val (_, uri) = sharedFile(ByteArray(42))
+    val resolver = application.contentResolver
+    assertEquals(
+      mapOf(OpenableColumns.DISPLAY_NAME to "couturecast-card.png"),
+      resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)!!.use { it.row() },
+    )
+    assertEquals(
+      mapOf(OpenableColumns.SIZE to 42L),
+      resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)!!.use { it.row() },
+    )
+    resolver.query(uri, arrayOf(OpenableColumns.SIZE, "_data", OpenableColumns.DISPLAY_NAME), null, null, null)!!.use {
+      assertEquals(listOf(OpenableColumns.SIZE, OpenableColumns.DISPLAY_NAME), it.columnNames.toList())
+      assertEquals(mapOf(OpenableColumns.SIZE to 42L, OpenableColumns.DISPLAY_NAME to "couturecast-card.png"), it.row())
+    }
+  }
+
+  @Test
+  fun anOutOfScopeUriIsStillRefusedBeforeAnyNameIsPresented() {
+    sharedFile(ByteArray(1))
+    val authority = ShareCardShareFiles.authority(application)
+    assertThrows(IllegalArgumentException::class.java) {
+      application.contentResolver.query(Uri.parse("content://$authority/cache/x.png"), null, null, null, null)
     }
   }
 }

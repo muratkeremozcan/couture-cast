@@ -12,6 +12,8 @@ import java.security.MessageDigest
 object ShareCardShareFiles {
   const val DIRECTORY = "share-cards"
   const val MAXIMUM_BYTES = 3L * 1024 * 1024
+  /** The name receivers see, as Story 6.8's iOS save and the web download name the card. */
+  const val PUBLIC_NAME = "couturecast-card.png"
   private val name =
     Regex("^cc69-share-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.png$")
 

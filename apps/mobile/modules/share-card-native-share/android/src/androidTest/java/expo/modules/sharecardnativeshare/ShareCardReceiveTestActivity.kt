@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.core.content.IntentCompat
 import java.security.MessageDigest
 import java.util.concurrent.CompletableFuture
@@ -19,6 +20,8 @@ class ShareCardReceiveTestActivity : Activity() {
     val extras: Set<String>,
     val sha256: String?,
     val readError: String?,
+    val displayName: String?,
+    val size: Long?,
   )
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,9 +30,18 @@ class ShareCardReceiveTestActivity : Activity() {
     val clip = intent.clipData
     var sha256: String? = null
     var readError: String? = null
+    var displayName: String? = null
+    var size: Long? = null
     try {
       val bytes = contentResolver.openInputStream(stream!!)!!.use { it.readBytes() }
       sha256 = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+      // The name and size a receiver shows for the attachment.
+      contentResolver.query(stream, null, null, null, null)!!.use { cursor ->
+        if (cursor.moveToFirst()) {
+          displayName = cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+          size = cursor.getLong(cursor.getColumnIndexOrThrow(OpenableColumns.SIZE))
+        }
+      }
     } catch (error: Exception) {
       readError = error.javaClass.simpleName
     }
@@ -43,6 +55,8 @@ class ShareCardReceiveTestActivity : Activity() {
         extras = intent.extras?.keySet().orEmpty().toSet(),
         sha256 = sha256,
         readError = readError,
+        displayName = displayName,
+        size = size,
       ),
     )
     finish()
