@@ -1,3 +1,5 @@
+// Story 5.1 Task 4 step 1 owner: deduplicate clicks and mint attribution in `apps/api/src/modules/commerce/affiliate-click.service.ts`
+// Story 6.7b click owner: the community branch and re-check in `apps/api/src/modules/commerce/affiliate-click.service.ts`
 import { randomUUID } from 'node:crypto'
 import {
   ForbiddenException,

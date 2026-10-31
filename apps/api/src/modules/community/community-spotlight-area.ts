@@ -1,4 +1,5 @@
 // Story 6.6 owner: hierarchical coarse areas for the City Spotlight.
+// Story 6.6 level owner: hierarchical levels and area hashes in `apps/api/src/modules/community/community-spotlight-area.ts`
 import { createHash } from 'node:crypto'
 import type { PrismaClient } from '@prisma/client'
 import { canonicalSpotlightArea } from '@couture/utils'

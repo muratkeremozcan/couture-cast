@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the web community reads opt in to sponsorship blocks, and the
 // commerce helper keys the shown event by the server's region rule.
 import { http, HttpResponse } from 'msw'

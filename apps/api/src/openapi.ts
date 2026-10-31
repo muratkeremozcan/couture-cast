@@ -1,3 +1,4 @@
+// Story 0.9 Task 1 step 2 owner: serve or render the API-facing contract outputs in `apps/api/src/openapi.ts`
 import type { INestApplication } from '@nestjs/common'
 import { generateHttpOpenApiDocument } from '@couture/api-client/contracts/http'
 import { type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'

@@ -1,3 +1,4 @@
+// Story 6.1 moderation owner: own the screeners and the combined verdict in `apps/api/src/modules/community/community-moderation.engine.ts`, the fixture screener in `fixture-nsfw-image-screener.ts`, the dispatcher in `community-moderation.outbox.ts`, and the job in `community-moderation.processor.ts`, wired through `community-worker-runtime.ts`
 import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
 import { FIXTURE_ENGINE_VERSION_SUFFIX } from './community-screening-policy.js'
 import {

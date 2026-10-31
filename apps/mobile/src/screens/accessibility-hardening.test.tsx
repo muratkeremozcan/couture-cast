@@ -1,5 +1,6 @@
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
+// Story 3.8 Task 7 step 1 owner: unit-test mobile accessibility announcer and reduced motion hook in `apps/mobile/src/screens/accessibility-hardening.test.tsx`
 import type { PropsWithChildren } from 'react'
 import type * as ReactNativeModule from 'react-native'
 import { act, renderHook } from '@testing-library/react'

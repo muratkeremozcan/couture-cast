@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the owner's operator command end to end. `runCommunitySponsorshipCli`
 // is driven with real arguments and a real Prisma client against a database this
 // file owns, so every refusal is proven to leave that database untouched.

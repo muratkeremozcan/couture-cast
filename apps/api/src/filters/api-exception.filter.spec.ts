@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-18-telemetry-and-audit-baseline
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
+// Learning path Step 41: Curated reactions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiExceptionFilter } from './api-exception.filter.js'
 import { HttpException, HttpStatus, type ArgumentsHost } from '@nestjs/common'

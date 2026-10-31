@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the sponsored "Shop this look" CTA on feed cards, spotlight cards
 // and the detail dialog, through the real web transport and MSW.
 import axe from 'axe-core'

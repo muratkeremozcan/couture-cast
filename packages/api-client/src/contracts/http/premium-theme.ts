@@ -1,4 +1,5 @@
 // Story 5.3 Task 3 owner: premium theme HTTP contracts.
+// Story 5.3 Task 3 step 1 owner: define the premium theme HTTP contracts and the disabled message constant in `packages/api-client/src/contracts/http/premium-theme.ts`, registered through `packages/api-client/src/contracts/http/openapi.ts`
 //
 // Design decisions that are load-bearing and easy to undo by accident:
 //

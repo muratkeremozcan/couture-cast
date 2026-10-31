@@ -1,4 +1,5 @@
 // Step 13 step 3 owner: searchable owner anchor
+// Story 1.1 Task 5 step 2 owner: register `GET /api/v1/weather/{locationKey}` in `packages/api-client/src/contracts/http/openapi.ts`
 import {
   OpenAPIRegistry,
   OpenApiGeneratorV31,

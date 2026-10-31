@@ -1,3 +1,7 @@
+// Story 0.4 Task 4 owner: apply per-queue concurrency and rate-limit policy during worker startup in `apps/api/src/workers/bootstrap.ts`
+// Story 0.4 Task 5 owner: bootstrap and shut down the dedicated worker process group cleanly in `apps/api/src/workers/bootstrap.ts`
+// Story 1.1 Task 4 step 4 owner: wire the real weather worker processor and scheduler startup in `apps/api/src/workers/bootstrap.ts`
+// Story 1.4 Task 3 step 2 owner: coordinate posthogService cleanup in worker shutdown routine in `apps/api/src/workers/bootstrap.ts`
 import type { PrismaClient } from '@prisma/client'
 import type { AlertRealtimePublisher } from '../modules/alerts/alert-fanout.types.js'
 import { startCommunityEngagementRuntime } from '../modules/community/community-engagement.runtime.js'

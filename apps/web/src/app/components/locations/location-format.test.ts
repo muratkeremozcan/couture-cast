@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 import { describe, expect, it } from 'vitest'
 import { errorKey, formatPlace, safeReturnPath } from './location-format'
 

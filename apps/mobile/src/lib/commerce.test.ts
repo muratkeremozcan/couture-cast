@@ -1,5 +1,7 @@
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 5.1 Task 6: the mobile commerce network boundary.
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'

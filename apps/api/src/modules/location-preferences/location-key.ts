@@ -1,3 +1,4 @@
+// Story 1.2b location key owner: folded, coordinate-suffixed keys and `isSearchLocationKey` in `apps/api/src/modules/location-preferences/location-key.ts`
 import { foldAreaComponent } from '@couture/utils'
 import { savedLocationSchema } from '../../contracts/http'
 

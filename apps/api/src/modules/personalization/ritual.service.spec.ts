@@ -10,6 +10,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 // Learning path Step 31: Outfit capsule builder.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
+// Story 2.1 Task 5 step 1 owner: unit-test the algorithm, fallbacks, badges, and segment resolution in `apps/api/src/modules/personalization/ritual.service.spec.ts`
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 // Step 22 step 4 owner: verify translation key parity and placeholder replacements in apps/api/src/modules/personalization/ritual.service.spec.ts
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'

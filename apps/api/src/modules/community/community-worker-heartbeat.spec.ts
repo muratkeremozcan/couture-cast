@@ -1,3 +1,5 @@
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Story 6.2b review (RF15): the worker's presence heartbeat refreshes, expires
 // on its TTL when refreshes stop, and is removed on a graceful shutdown.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

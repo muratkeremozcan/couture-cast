@@ -1,3 +1,4 @@
+// Story 5.5 Task 3 step 3 owner: own the planner fixture in `packages/testing/src/factories/planner.factory.ts`, registered through `packages/testing/src/factories/registry.ts`, `packages/testing/src/factories/index.ts` and `packages/testing/src/cleanup.ts`
 import type {
   PlannerDayPlan,
   PlannerOutfitSource,

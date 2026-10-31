@@ -1,5 +1,7 @@
 // Learning path Step 23: Home and lock-screen widgets.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-23-home-and-lock-screen-widgets
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 

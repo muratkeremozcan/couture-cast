@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 /* eslint-disable @typescript-eslint/await-thenable */
 // Home on a shared device: member A loads today's ritual, then member B signs in within the
 // 15-minute cache window. The identity reload must fetch B's ritual. A's cached location,

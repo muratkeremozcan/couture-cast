@@ -1,3 +1,4 @@
+// Story 6.2b evidence owner: build the gates and the fail-closed verdict in `scripts/generate-community-screening-readiness.mjs`
 /*
  * Generates the Community Beta model-readiness evidence: one JSON payload and the
  * Markdown view of it, from the same run.

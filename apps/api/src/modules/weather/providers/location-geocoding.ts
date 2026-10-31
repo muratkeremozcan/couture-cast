@@ -1,3 +1,4 @@
+// Story 1.2b geocoding owner: provider selection and candidate normalization in `apps/api/src/modules/weather/providers/location-geocoding.ts`
 import {
   classifyFetchFailure,
   classifyHttpFailure,

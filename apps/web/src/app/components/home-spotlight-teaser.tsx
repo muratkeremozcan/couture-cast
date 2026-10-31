@@ -1,3 +1,4 @@
+// Story 6.7 web teaser owner: the teaser and its layout-level lifecycle in `apps/web/src/app/components/home-spotlight-teaser.tsx`, mounted by `apps/web/src/app/components/lookbook-prism-layout.tsx`
 'use client'
 
 // Story 6.7 owner: the Home spotlight teaser inside the Hero Ritual Canvas, for

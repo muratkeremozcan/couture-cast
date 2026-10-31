@@ -1,5 +1,7 @@
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createHmac } from 'node:crypto'
 import type { PrismaClient } from '@prisma/client'

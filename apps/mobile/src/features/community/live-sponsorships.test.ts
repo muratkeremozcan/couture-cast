@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the latest live sponsorship answer per post, which every rendered
 // copy takes, and which resolve-path copies inherit.
 import { describe, expect, it, vi } from 'vitest'

@@ -1,3 +1,5 @@
+// Learning path Step 42: Screened threaded comments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 import { beforeEach, expect, it, vi } from 'vitest'
 import { CommunityCommentsOutbox } from './community-comments.outbox.js'
 const log = vi.hoisted(() => ({ warn: vi.fn() }))

@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import fs from 'node:fs'
 import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'

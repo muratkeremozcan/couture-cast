@@ -1,3 +1,5 @@
+// Learning path Step 48: Safe branded share-card export.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ShareCardSourceRepository } from './share-card-source.repository.js'
 const member = 'member'

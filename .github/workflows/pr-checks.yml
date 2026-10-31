@@ -1,4 +1,5 @@
 # Step 7 step 1 owner: searchable owner anchor
+# Step 7 step 7 owner: wire monorepo workspace coverage directories and badge inputs in `.github/workflows/pr-checks.yml`
 name: PR checks
 on:
   pull_request:

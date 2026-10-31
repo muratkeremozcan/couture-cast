@@ -1,3 +1,4 @@
+// Story 1.1 Task 3 step 1 owner: implement bounded provider retry and failover in `apps/api/src/modules/weather/weather-ingestion.service.ts`
 import { Injectable, Inject, Optional } from '@nestjs/common'
 
 import { createBaseLogger } from '../../logger/pino.config.js'

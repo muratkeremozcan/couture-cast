@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OpenWeatherGeocodingClient } from './openweather-geocoding.client'
 import { OpenWeatherProvider } from './openweather.provider'

@@ -1,3 +1,4 @@
+// Story 5.2 Task 3 step 2 owner: serialize status and run the ledger refresh in `apps/api/src/modules/commerce/subscription.service.ts`
 import { Inject, Injectable, ServiceUnavailableException } from '@nestjs/common'
 import { randomUUID } from 'node:crypto'
 import {

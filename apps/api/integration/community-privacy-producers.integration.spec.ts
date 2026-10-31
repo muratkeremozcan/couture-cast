@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import { GuardianService } from '../src/modules/guardian/guardian.service.js'
 import 'reflect-metadata'
 import { ServiceUnavailableException } from '@nestjs/common'

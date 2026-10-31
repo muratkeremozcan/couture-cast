@@ -1,3 +1,7 @@
+# Learning path Step 42: Screened threaded comments.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
+# Learning path Step 43: Realtime engagement and push notifications.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 # Story 6.4 owner: real native compose, keyboard, draft reopening and private status.
 appId: ${MAESTRO_APP_ID}
 name: 'Screened community comments'

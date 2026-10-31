@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-22-localization-infrastructure-and-quality-gates
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Step 22 step 7 owner: verify Settings screen layout boundaries in headless Chromium in apps/mobile/src/screens/tab-two-screen.test.tsx
 /* eslint-disable @typescript-eslint/await-thenable */
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'

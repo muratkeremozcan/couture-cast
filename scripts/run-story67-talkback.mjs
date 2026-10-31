@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Story 6.7 owner: device evidence that the Home teaser moves real TalkBack focus.
+// Story 6.7 device evidence owner: the local TalkBack runner `scripts/run-story67-talkback.mjs` with `maestro/story67/`, and the CI lane `.github/workflows/pr-accessibility-focus.yml` with `scripts/ci/accessibility-focus-device-tests.sh`
 
 /**
  * Drives the Home spotlight teaser on an Android development build that carries the local

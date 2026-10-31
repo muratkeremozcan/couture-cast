@@ -1,3 +1,5 @@
+// Learning path Step 42: Screened threaded comments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { CommunityCommentsRepository } from '../src/modules/community/community-comments.repository.js'

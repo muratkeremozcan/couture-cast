@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Story 1.2b: the Web settings Locations section, through MSW so the request
 // shapes, the platform header and the contract parsing are exercised with the UI.
 // Interactions go through user-event, so typing reaches the debounce one key at a

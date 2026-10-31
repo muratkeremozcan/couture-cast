@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Story 1.2b: the mobile Locations screen through MSW, so the request shapes,
 // the platform header and the contract parsing run with the UI. Input goes
 // through the browser runner's real user events.

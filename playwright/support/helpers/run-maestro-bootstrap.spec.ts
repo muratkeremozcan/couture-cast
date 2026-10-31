@@ -1,3 +1,5 @@
+// Learning path Step 42: Screened threaded comments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 /** Actual runner CLI with isolated workspace outputs and synthetic preparation. */
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'

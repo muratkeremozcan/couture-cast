@@ -1,3 +1,5 @@
+// Story 6.3 route owner: validate the request, mark consent as checked in the transaction and set `Retry-After` in `apps/api/src/modules/community/community.controller.ts`
+// Story 6.7b projection owner: header negotiation and block attachment in `apps/api/src/modules/community/community.controller.ts`, with `Vary` in `apps/api/src/modules/community/community-cache-headers.middleware.ts`
 import {
   BadRequestException,
   Body,

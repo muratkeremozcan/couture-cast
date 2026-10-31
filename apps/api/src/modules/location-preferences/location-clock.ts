@@ -1,3 +1,4 @@
+// Story 1.2b clock owner: the injected `LOCATION_CLOCK` shared by both location services in `apps/api/src/modules/location-preferences/location-clock.ts`
 /**
  * Story 1.2b: the one clock the location capture and preference services read.
  *

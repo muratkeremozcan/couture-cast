@@ -1,3 +1,5 @@
+// Learning path Step 48: Safe branded share-card export.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import { beforeEach, expect, it, vi } from 'vitest'
 const bridge = vi.hoisted(() => ({ focus: vi.fn(), fallback: vi.fn() }))
 vi.mock('react-native', () => ({

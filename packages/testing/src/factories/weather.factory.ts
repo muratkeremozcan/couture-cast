@@ -1,3 +1,4 @@
+// Story 1.1 Task 2 step 3 owner: keep shared weather factories aligned with the migrated persistence shape in `packages/testing/src/factories/weather.factory.ts`
 import type { Prisma, PrismaClient, WeatherSnapshot } from '@prisma/client'
 
 import { createFactory, faker } from './factory.js'

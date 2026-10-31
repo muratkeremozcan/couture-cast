@@ -1,3 +1,4 @@
+// Story 6.7 native focus owner: OS focus report and move in `apps/mobile/modules/accessibility-focus/index.native.ts`, its Android sources under `apps/mobile/modules/accessibility-focus/android/` and iOS sources under `apps/mobile/modules/accessibility-focus/ios/`
 // Story 6.7 owner: native build of the accessibility-focus module. React Native
 // reports no screen-reader focus, and TalkBack ignores its Android focus call for
 // a view that cannot take input focus, so this local module talks to the OS. It

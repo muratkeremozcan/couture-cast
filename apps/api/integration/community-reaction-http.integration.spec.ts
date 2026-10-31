@@ -1,3 +1,5 @@
+// Learning path Step 41: Curated reactions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
 import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 import { communityReactionResponseSchema } from '@couture/api-client/contracts/http'
 import { Test } from '@nestjs/testing'

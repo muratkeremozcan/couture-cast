@@ -1,3 +1,5 @@
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Story 6.2b: static and pure-function checks for the community worker release
 // gate. The scripts under test are operations commands; what is asserted here is
 // the logic that decides whether they refuse, so a regression in a refusal

@@ -1,3 +1,4 @@
+// Story 2.1 Task 1 step 2 owner: register the ritual contract in the api-client barrel in `packages/api-client/src/contracts/http/index.ts`
 export * from './alerts'
 export * from './auth'
 export * from './comfort'

@@ -1,3 +1,4 @@
+// Story 1.3 Task 2 step 1 owner: declare alerts HTTP schemas and routes in `packages/api-client/src/contracts/http/alerts.ts`
 import {
   extendZodWithOpenApi,
   type OpenAPIRegistry,

@@ -1,3 +1,4 @@
+<!-- Story 1.1 Task 4 step 5 owner: document the non-serverless weather worker runtime in `apps/api/README.md` -->
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>

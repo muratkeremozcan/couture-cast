@@ -1,3 +1,4 @@
+// Story 5.4 Task 6 step 2 owner: own the terminal branches, the purge and the telemetry in `apps/api/src/modules/commerce/palette-analysis.processor.ts`, enqueued through `apps/api/src/modules/commerce/palette-analysis-processing.queue.ts` and registered in `apps/api/src/config/queues.ts` and `apps/api/src/workers/wardrobe.bootstrap.ts`
 // Story 5.4 Task 6: BullMQ processor for palette analysis (both sources),
 // mirroring silhouette-photo.processor.ts's shape.
 import { type PaletteProfile, type PrismaClient } from '@prisma/client'

@@ -1,3 +1,4 @@
+// Story 1.1 Task 5 step 1 owner: define the shared latest-weather HTTP contract in `packages/api-client/src/contracts/http/weather.ts`
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import {

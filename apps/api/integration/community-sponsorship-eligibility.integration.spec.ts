@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the sponsorship eligibility rule against real PostgreSQL. Every
 // data row of the I/O matrix runs through the one batched query the community
 // reads and the click re-check share, in a database this file owns.

@@ -1,3 +1,4 @@
+// Story 6.1 web owner: own transport and failure classification in `apps/web/src/lib/community.ts`, and the surface in `apps/web/src/app/components/community-lookbook-grid.tsx`
 'use client'
 
 import { webSessionIdentity } from './web-session'

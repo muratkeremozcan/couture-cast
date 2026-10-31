@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5: a stale local binding from a previous owner never blocks the next owner's
 // registration. Native boundaries are controlled; registration uses the actual HTTP wrappers.
 import { http, HttpResponse } from 'msw'

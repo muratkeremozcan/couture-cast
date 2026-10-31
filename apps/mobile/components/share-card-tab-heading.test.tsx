@@ -1,3 +1,5 @@
+// Learning path Step 48: Safe branded share-card export.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import React from 'react'
 import type * as ReactNative from 'react-native'
 import { render, screen } from '@testing-library/react'

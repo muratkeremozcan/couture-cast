@@ -1,3 +1,5 @@
+# Learning path Step 43: Realtime engagement and push notifications.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 # Story 6.5 owner: sign out once the member's preferences have loaded, then prove the
 # reopened screen has no member controls.
 appId: ${MAESTRO_APP_ID}

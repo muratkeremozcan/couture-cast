@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1.7
+# Story 6.2b container owner: build the pruned worker image, enforce the 150 MB budget and run as `node` under `tini -s` in `apps/api/Dockerfile.community-worker`
 #
 # Community moderation worker (Story 6.2b, ADR-013).
 #

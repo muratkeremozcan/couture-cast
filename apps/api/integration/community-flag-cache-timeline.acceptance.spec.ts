@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 acceptance lane A (D1/PERF-003): real wall-clock 45/60 flag cache timeline.
 //
 // Two compiled evaluator processes with their own pools share one UUID database and one

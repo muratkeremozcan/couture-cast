@@ -1,3 +1,5 @@
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 /* eslint-disable @typescript-eslint/await-thenable */
 import {
   SDK_ERROR_MESSAGE,

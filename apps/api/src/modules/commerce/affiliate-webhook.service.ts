@@ -1,3 +1,4 @@
+// Story 5.1 Task 5 step 1 owner: verify signatures and persist conversions in `apps/api/src/modules/commerce/affiliate-webhook.service.ts`
 import {
   BadRequestException,
   Inject,

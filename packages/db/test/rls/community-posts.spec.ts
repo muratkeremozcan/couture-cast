@@ -1,3 +1,9 @@
+// Learning path Step 41: Curated reactions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
+// Learning path Step 42: Screened threaded comments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.1 actor matrix for the community tables.
 //
 // This suite used to assert the opposite of what it asserts now. It proved that

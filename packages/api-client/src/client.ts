@@ -1,3 +1,4 @@
+// Story 6.3 negotiation owner: send `x-couture-reactions: 1` when a client opts in, in `packages/api-client/src/client.ts`
 import {
   communityCommentsResponseSchema,
   communityCommentSubmissionResponseSchema,

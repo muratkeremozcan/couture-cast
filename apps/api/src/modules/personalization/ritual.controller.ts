@@ -1,3 +1,5 @@
+// Story 2.1 Task 2 step 2 owner: implement the ritual GET route with Zod-validated query and response in `apps/api/src/modules/personalization/ritual.controller.ts`
+// Story 5.1 Task 3 step 3 owner: assemble `shopThisLook` after the cached service result in `apps/api/src/modules/personalization/ritual.controller.ts`
 import {
   Controller,
   Get,

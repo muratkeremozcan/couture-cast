@@ -1,3 +1,5 @@
+// Learning path Step 46: Home spotlight teaser.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
 // Story 6.7: the Home spotlight teaser in the Hero Ritual Canvas on stacked layouts.
 import type { Page, Request } from '@playwright/test'
 import { checkA11y } from '../support/helpers/accessibility'

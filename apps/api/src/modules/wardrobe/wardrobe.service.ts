@@ -1,4 +1,5 @@
 // Story 4.2 Task 5 step 1 owner: implement suggestGarmentTags and updateGarmentTags service methods in apps/api/src/modules/wardrobe/wardrobe.service.ts
+// Story 4.1 Task 5 step 2 owner: implement HMAC upload tokens, checksum validation, and garment commit logic in `apps/api/src/modules/wardrobe/wardrobe.service.ts`
 import { createHash, randomUUID } from 'node:crypto'
 import {
   BadRequestException,

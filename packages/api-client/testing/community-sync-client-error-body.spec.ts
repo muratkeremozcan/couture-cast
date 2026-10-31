@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import { describe, expect, it } from 'vitest'
 import { Configuration, DefaultApi, ResponseError } from '../src/generated'
 import { communitySyncClient } from '../src/community-sync-client'

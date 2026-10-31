@@ -1,3 +1,4 @@
+// Story 6.3 mobile owner: render the controls in `apps/mobile/components/community/community-reactions.tsx` and coordinate them in `apps/mobile/src/features/community/community-screen.tsx`
 import { Pressable, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { ReactionControls } from '@couture/api-client'

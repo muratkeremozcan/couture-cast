@@ -1,3 +1,5 @@
+// Learning path Step 41: Curated reactions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
 import { delay, http, HttpResponse } from 'msw'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

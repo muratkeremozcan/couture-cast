@@ -1,3 +1,4 @@
+// Story 5.3 Task 4 step 1 owner: resolve entitlement, the kill switch, and the stored preference in `apps/api/src/modules/commerce/premium-theme.service.ts`
 import {
   Inject,
   Injectable,

@@ -1,3 +1,4 @@
+// Story 5.4 Task 2 step 2 owner: own the CIELAB conversion, the Individual Typology Angle, the depth bands, the circular hue statistics and the undertone wedges in `packages/utils/src/skin-tone.ts`
 /**
  * Story 5.4 Decision 3 owner: skin-tone (undertone + depth) classification
  * over closed-form CIELAB colour science. No model, no colour library

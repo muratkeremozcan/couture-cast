@@ -1,3 +1,5 @@
+// Learning path Step 46: Home spotlight teaser.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
 import UIKit
 import XCTest
 

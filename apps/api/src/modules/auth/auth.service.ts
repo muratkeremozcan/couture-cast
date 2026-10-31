@@ -1,4 +1,5 @@
 // Step 8 API analytics owner: searchable owner anchor
+// Story 1.4 Task 4 step 1 owner: integrate signup telemetry in `apps/api/src/modules/auth/auth.service.ts`
 import {
   BadRequestException,
   ForbiddenException,

@@ -1,3 +1,4 @@
+// Story 1.1 Task 6 step 1 owner: define privacy-safe weather metrics and log events in `apps/api/src/modules/weather/weather-telemetry.ts`
 import { metrics } from '@opentelemetry/api'
 import type { WeatherProviderName } from './providers/weather.types'
 

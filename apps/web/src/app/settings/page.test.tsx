@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 // Learning path Step 35: Premium theme switcher.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Story 5.1 Task 7 owner: Web settings page and commerce opt-out section.
 //
 // These go through MSW rather than a mocked `lib/commerce`, so the request

@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: the pure City Spotlight rules. Database and Redis behavior is proven
 // against real services in integration/community-spotlight*.integration.spec.ts.
 import { describe, expect, it } from 'vitest'

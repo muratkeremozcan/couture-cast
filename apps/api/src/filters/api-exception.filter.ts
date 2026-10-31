@@ -1,3 +1,4 @@
+// Story 1.4 Task 5 step 1 owner: implement global api exception filter in `apps/api/src/filters/api-exception.filter.ts`
 import {
   Catch,
   ArgumentsHost,

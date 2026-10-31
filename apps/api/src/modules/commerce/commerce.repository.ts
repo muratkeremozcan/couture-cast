@@ -1,3 +1,4 @@
+// Story 6.7b eligibility owner: the batched query in `apps/api/src/modules/commerce/commerce.repository.ts` and the per-viewer chain in `apps/api/src/modules/commerce/community-sponsorship.service.ts`
 import { Inject, Injectable } from '@nestjs/common'
 import {
   Prisma,

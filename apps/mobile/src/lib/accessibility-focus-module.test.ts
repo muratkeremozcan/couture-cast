@@ -1,3 +1,5 @@
+// Learning path Step 46: Home spotlight teaser.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
 // Story 6.7: the native build of the accessibility-focus wrapper. The module is
 // faked at expo-modules-core, the only native boundary the wrapper has.
 import { afterEach, describe, expect, it, vi } from 'vitest'

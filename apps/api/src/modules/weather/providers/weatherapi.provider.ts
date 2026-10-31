@@ -1,3 +1,4 @@
+// Story 1.1 Task 1 step 3 owner: implement the secondary WeatherAPI adapter in `apps/api/src/modules/weather/providers/weatherapi.provider.ts`
 import { Injectable } from '@nestjs/common'
 import type { z } from 'zod'
 import {

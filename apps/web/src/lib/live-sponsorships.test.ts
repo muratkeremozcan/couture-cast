@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b R12: the web live sponsorship ledger orders answers by read start.
 import { describe, expect, it } from 'vitest'
 import type { CommunitySponsorship } from '@couture/api-client/contracts/http'

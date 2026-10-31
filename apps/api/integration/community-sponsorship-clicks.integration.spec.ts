@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the community click branch of POST /api/v1/commerce/affiliate/clicks
 // over real HTTP, through the real CommerceModule, against a database this file
 // owns. Every community click re-runs the full eligibility rule before the

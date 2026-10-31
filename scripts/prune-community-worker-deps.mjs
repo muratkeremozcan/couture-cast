@@ -1,3 +1,4 @@
+// Story 6.2b dependency-trace owner: derive the worker's runtime tree from its import graph in `scripts/prune-community-worker-deps.mjs`
 /*
  * Assembles the community worker's runtime tree from a fully installed and built
  * checkout, keeping only what the compiled worker can actually load, and fails

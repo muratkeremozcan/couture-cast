@@ -1,3 +1,7 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
+// Learning path Step 46: Home spotlight teaser.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
 // Story 6.6: the spotlight route and the opened endpoint's branch dispatch. The
 // real guarded route runs in integration/community-spotlight-http.integration.spec.ts.
 import { BadRequestException } from '@nestjs/common'

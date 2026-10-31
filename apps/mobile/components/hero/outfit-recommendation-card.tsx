@@ -1,3 +1,4 @@
+// Story 5.1 Task 6 step 1 owner: render the disclosed Mobile CTA in `apps/mobile/components/hero/outfit-recommendation-card.tsx`
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import React, { type ComponentRef, useRef, useState } from 'react'

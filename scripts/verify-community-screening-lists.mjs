@@ -1,3 +1,4 @@
+// Story 6.2b text list owner: vendor LDNOOBW at one commit and verify drift in `apps/api/policies/community-screening/vendor/ldnoobw/` and `scripts/verify-community-screening-lists.mjs`
 /*
  * Verifies, and with --write regenerates, the community text screening lists.
  *

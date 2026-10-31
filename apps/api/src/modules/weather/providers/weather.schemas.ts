@@ -1,3 +1,5 @@
+// Story 1.1 Task 1 step 4 owner: validate provider payloads and normalized forecasts in `apps/api/src/modules/weather/providers/weather.schemas.ts`
+// Story 5.5 Task 1 step 1 owner: own the daily provider and normalized schemas in `apps/api/src/modules/weather/providers/weather.schemas.ts` and `weather.types.ts`, and the local-date helper in `apps/api/src/modules/weather/providers/weather-date.util.ts`
 import { z } from 'zod'
 import { WEATHER_CONDITIONS } from './weather.types.js'
 

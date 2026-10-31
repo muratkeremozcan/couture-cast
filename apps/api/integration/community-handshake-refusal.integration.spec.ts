@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 owner: a socket handshake refusal never blanks a feed HTTP is serving.
 //
 // The real realtime server refuses this handshake before verifying any identity (the bearer

@@ -1,3 +1,4 @@
+// Story 6.7b mobile ledger owner: read-start ordering in `apps/mobile/src/features/community/live-sponsorships.ts`, applied in `apps/mobile/src/features/community/community-screen.tsx`
 // Story 6.7b owner: what the latest live, opted-in read said about each post's
 // sponsorship block, for one Community screen and one member.
 //

@@ -1,3 +1,4 @@
+// Story 6.2b crash-recovery owner: set the 120-second stalled check, lock and idle block in `apps/api/src/modules/community/community-moderation.worker.ts`
 import { createBaseLogger } from '../../logger/pino.config.js'
 import type { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import { CommunityCommentsProcessor } from './community-comments.processor.js'

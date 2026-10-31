@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: the City Spotlight module that heads the community section on `/`.
 import type { Page } from '@playwright/test'
 import { COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT } from '@couture/api-client/contracts/http'

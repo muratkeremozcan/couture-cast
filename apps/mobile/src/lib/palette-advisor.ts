@@ -1,3 +1,4 @@
+// Story 5.4 Task 8 step 1 owner: own transport and failure classification in `apps/mobile/src/lib/palette-advisor.ts`
 // Story 5.4 Task 8 owner: the mobile app's colour palette & beauty/accessory advisor
 // client.
 //

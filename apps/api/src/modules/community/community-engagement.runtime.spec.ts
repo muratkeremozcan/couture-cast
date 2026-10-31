@@ -1,3 +1,7 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 import 'reflect-metadata'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'

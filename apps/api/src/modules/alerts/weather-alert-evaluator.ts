@@ -1,3 +1,4 @@
+// Story 1.3 Task 5 step 1 owner: evaluate temperature, precipitation, and severe alert rules in `apps/api/src/modules/alerts/weather-alert-evaluator.ts`
 import type {
   NormalizedWeatherAlert,
   NormalizedWeatherForecast,

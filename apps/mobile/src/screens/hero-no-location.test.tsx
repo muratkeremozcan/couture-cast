@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 /* eslint-disable @typescript-eslint/await-thenable */
 // Home without a saved location: GET /ritual answers 400 "No location preferences found for
 // user". That is a setup gap, so Home shows a localized hint with no Retry (retrying cannot

@@ -1,3 +1,5 @@
+// Learning path Step 48: Safe branded share-card export.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import { deflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import { decodeShareCardBase64, validateShareCardPng } from '../src/share-card-png'

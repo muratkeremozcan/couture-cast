@@ -1,3 +1,5 @@
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 import { describe, expect, it } from 'vitest'
 import { CLIMATE_BANDS } from '@couture/utils'
 import {

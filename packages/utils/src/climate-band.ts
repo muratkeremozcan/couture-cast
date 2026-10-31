@@ -1,3 +1,4 @@
+// Story 6.1 classification owner: own the band classifier, its usable-day rule and the `CLIMATE_BANDS` tuple in `packages/utils/src/climate-band.ts`
 /**
  * Story 6.1 Task 1: Canonical climate band vocabulary and classifier.
  *

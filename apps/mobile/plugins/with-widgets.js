@@ -1,4 +1,5 @@
 // Story 3.3 Task 2 owner: generate both native widget integrations during Expo prebuild.
+// Story 3.3 Task 2 step 2 owner: configure iOS App Group entitlements and Swift bridge files copy during prebuilds in `apps/mobile/plugins/with-widgets.js`
 const {
   AndroidConfig,
   withAndroidManifest,

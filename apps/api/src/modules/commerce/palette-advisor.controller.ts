@@ -1,3 +1,4 @@
+// Story 5.4 Task 5 step 2 owner: own the routes, the guard stacks and response parsing in `apps/api/src/modules/commerce/palette-advisor.controller.ts`, registered in `apps/api/src/modules/commerce/commerce.module.ts`
 // Story 5.4 Task 5/6: the palette advisor HTTP surface, mirroring
 // wardrobe-silhouette.controller.ts's route shape and premium-theme.controller.ts's
 // response-schema-parsing-in-the-handler discipline.

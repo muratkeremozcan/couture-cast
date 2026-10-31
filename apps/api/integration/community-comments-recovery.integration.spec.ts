@@ -1,3 +1,5 @@
+// Learning path Step 42: Screened threaded comments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 import { CommunityCommentsOutbox } from '../src/modules/community/community-comments.outbox.js'

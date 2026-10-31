@@ -1,3 +1,5 @@
+# Learning path Step 43: Realtime engagement and push notifications.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 # Story 6.5 owner: after the runner ends the app process and reopens it, the secure session
 # must restore without a new sign-in. Home must load for the restored member (P2: no
 # hero error state), the iOS back button must carry the localized label (P3), and the

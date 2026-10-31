@@ -1,3 +1,4 @@
+// Story 6.8 Task 1 step 1 owner: define the prepare contract in `packages/api-client/src/contracts/http/share-cards.ts`
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { supportedLocaleSchema } from './localization'

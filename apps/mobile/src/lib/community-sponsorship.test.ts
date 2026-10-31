@@ -1,3 +1,5 @@
+// Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b owner: the mobile community reads opt into the sponsorship block
 // and parse the sponsored variants at the trust boundary. Requests go through
 // the real SDK to MSW, so the assertions read the headers that left the device.

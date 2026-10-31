@@ -1,3 +1,4 @@
+// Story 5.4 Task 6 step 1 owner: own the Sharp pipeline, the skin-chroma gate and the confidence terms in `apps/api/src/modules/commerce/heuristic-palette-analysis.engine.ts`, behind the interface in `apps/api/src/modules/commerce/palette-analysis.engine.ts`
 // Story 5.4 Decision 3: the selfie skin-pixel isolation and classification
 // pipeline. No face detector and no ML model: a published, deterministic
 // chroma gate (Chai-Ngan YCbCr skin-chroma bounds) isolates candidate skin

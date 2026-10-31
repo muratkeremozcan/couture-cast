@@ -1,3 +1,4 @@
+// Story 6.3 Hermes owner: polyfill plural rules before i18next loads in `apps/mobile/src/lib/intl-polyfills.ts`
 // Load dependencies before plural rules. Hermes in Expo SDK 54 lacks these APIs.
 import '@formatjs/intl-getcanonicallocales/polyfill.js'
 import '@formatjs/intl-locale/polyfill.js'

@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6 code review round 2: spotlight single-post refresh and per-surface
 // image failures, through the real web transport and MSW.
 import { http } from 'msw'

@@ -1,3 +1,4 @@
+// Story 6.7b operator owner: targeting, actor resolution and refusals in `apps/api/src/modules/commerce/community-sponsorship.cli.ts`, with closed codes in `apps/api/src/modules/commerce/community-sponsorship.constants.ts`
 import { readFileSync } from 'node:fs'
 import { parseArgs, parseEnv } from 'node:util'
 import type { PrismaClient } from '@prisma/client'

@@ -1,3 +1,4 @@
+// Story 1.2b provider origin owner: double-only origin overrides and production detection in `apps/api/src/modules/weather/providers/weather-provider-origin.ts`
 import { allowsTestOnlySecrets } from '../../../config/runtime-environment.js'
 import type { WeatherProviderName } from './weather.types.js'
 

@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import { UserController } from '../src/modules/user/user.controller.js'
 import { UserService } from '../src/modules/user/user.service.js'
 import { bindRequestContext } from '../src/logger/request-context.js'

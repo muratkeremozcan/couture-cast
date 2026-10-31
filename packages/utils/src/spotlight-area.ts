@@ -1,3 +1,4 @@
+// Story 6.6 area owner: canonical country codes and region and city folding in `packages/utils/src/spotlight-area.ts`
 // Story 6.6: canonical coarse area components for the City Spotlight.
 //
 // Members type their saved location freely, so `USA` and `United States`, or

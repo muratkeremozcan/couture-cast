@@ -1,3 +1,4 @@
+// Story 6.8 Task 4 step 2 owner: prepare a real ritual card on web in `apps/web/src/app/components/ritual-share-card-launcher.tsx`
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'

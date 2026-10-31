@@ -1,5 +1,7 @@
 // Learning path Step 9: Observability bootstrap with OpenTelemetry.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-9-observability-bootstrap-with-opentelemetry
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadEnvKeepingCallerOwned } from '../../../scripts/lib/caller-owned-env.mjs'

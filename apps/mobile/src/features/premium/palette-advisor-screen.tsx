@@ -1,4 +1,5 @@
 // Story 5.4 Task 8 owner: the mobile colour palette & beauty/accessory advisor screen.
+// Story 5.4 Task 8 step 2 owner: own the screen states and the `expo-image-picker` capture in `apps/mobile/src/features/premium/palette-advisor-screen.tsx`, reached from the thin route `apps/mobile/app/palette-advisor.tsx` and the link row in `apps/mobile/app/(tabs)/settings.tsx`
 //
 // The mobile counterpart of `apps/web/src/app/components/palette-advisor-panel.tsx`,
 // with the same state machine, the same `data-testid`/`testID` vocabulary and the same

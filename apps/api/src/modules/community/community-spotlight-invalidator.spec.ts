@@ -1,3 +1,5 @@
+// Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: the invalidator's failure branches. The happy paths, the retention
 // floor and the Redis retry run against real services in
 // integration/community-spotlight-invalidation.integration.spec.ts.

@@ -1,3 +1,4 @@
+// Story 6.2b signature owner: record and verify the one owner verdict in `scripts/sign-community-screening-readiness.mjs`
 /*
  * Records the repository owner's verdict on the community screening readiness
  * evidence, bound to the payload's SHA-256, and verifies a recorded signature.

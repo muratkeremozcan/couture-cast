@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 /**
  * Story 1.2b R28: a flow killed at the runner's watchdog leaves no JUnit report.
  * The summary must name the kill and where Maestro stopped, never only the

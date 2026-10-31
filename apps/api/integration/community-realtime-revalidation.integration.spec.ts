@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 owner (D1/D10): 100 sockets that connect together stay connected through
 // revalidation and doorbells on a bounded database pool.
 //

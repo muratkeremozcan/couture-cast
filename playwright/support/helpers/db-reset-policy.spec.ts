@@ -1,3 +1,5 @@
+// Learning path Step 46: Home spotlight teaser.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
 /**
  * The teardown's `db:reset` is opt-in. On 2026-10-23 a raw `npx playwright test`
  * run, with no skip flag, reset the shared default database at 127.0.0.1:54322:

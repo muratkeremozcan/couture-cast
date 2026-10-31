@@ -1,4 +1,5 @@
 // Story 6.6 owner: the City Spotlight module heading the Community tab list.
+// Story 6.6 mobile module owner: the horizontal carousel in `apps/mobile/components/community/community-spotlight-module.tsx`
 import React, { useCallback, useEffect, useRef } from 'react'
 import {
   AccessibilityInfo,

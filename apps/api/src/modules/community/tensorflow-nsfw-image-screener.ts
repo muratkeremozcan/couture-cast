@@ -1,4 +1,5 @@
 // Learning path Step 39: Production content-screening readiness.
+// Story 6.2b image policy owner: pass on safe mass with every unsafe bound held at v1 in `apps/api/policies/community-screening/policy-v2.json` and `apps/api/src/modules/community/tensorflow-nsfw-image-screener.ts`
 // Story 6.2 Task 2: the production ADR-013 NSFW image screener.
 //
 // It is split in two on purpose. This file is the supervisor: it owns the

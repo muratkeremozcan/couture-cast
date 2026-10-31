@@ -1,3 +1,5 @@
+// Learning path Step 42: Screened threaded comments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 // Story 6.4 owner: both platforms use authenticated generated transport and strict thread projections.
 import { describe, expect, it, vi } from 'vitest'
 import { ZodError } from 'zod'

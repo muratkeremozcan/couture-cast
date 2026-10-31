@@ -1,4 +1,5 @@
 // Story 5.2 Task 2 owner: premium subscription HTTP contracts.
+// Story 5.2 Task 2 step 1 owner: define the subscription HTTP contracts in `packages/api-client/src/contracts/http/subscription.ts`
 //
 // Design decisions that are load-bearing and easy to undo by accident:
 //

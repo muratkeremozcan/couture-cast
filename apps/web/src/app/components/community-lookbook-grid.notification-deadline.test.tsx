@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5: a notification target's first attempt always dispatches, and no retry
 // starts once it could no longer answer inside the operation's 10 s bound.
 import { screen, waitFor } from '@testing-library/react'

@@ -1,3 +1,4 @@
+// Story 6.7 lifecycle owner: the member-scoped read, re-read, expiry, floor and deferral in `packages/api-client/src/community-spotlight-teaser-state.ts`
 // Story 6.7 owner: the Home spotlight teaser's member-scoped read lifecycle,
 // shared by web and mobile so both clients follow one set of timing rules.
 import type {

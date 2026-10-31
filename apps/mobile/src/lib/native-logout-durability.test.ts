@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 (PR #157 review P1): native logout removes the persisted session even while
 // push registration is stalled on the OS token, and a late token never registers or
 // stores a binding for the signed-out account. The actual session, notification module

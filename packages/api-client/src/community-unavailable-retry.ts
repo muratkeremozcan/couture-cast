@@ -1,4 +1,5 @@
 // Story 6.6 owner: one bounded retry of a read the community gate refused as unavailable.
+// Story 6.6 retry owner: one bounded retry after the read gate's unavailable 503 in `packages/api-client/src/community-unavailable-retry.ts`
 import { ResponseError } from './generated/runtime'
 import { abortError } from './request-deadline'
 

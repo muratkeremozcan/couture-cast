@@ -1,3 +1,6 @@
+// Story 6.1 service owner: own feed assembly, band resolution, aliasing, upload allocation and replay, publication, reporting, withdrawal and challenges in `apps/api/src/modules/community/community.service.ts`
+// Story 6.3 eligibility owner: resolve flags before locks and check age and consent inside them in `apps/api/src/modules/community/community.service.ts`
+// Story 6.6 stamping owner: copy the author's coarse area at submission in `apps/api/src/modules/community/community.service.ts`
 import {
   CommunityAuthorizationBudget,
   communityDependency,

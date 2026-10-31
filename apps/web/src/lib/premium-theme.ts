@@ -1,4 +1,5 @@
 // Story 5.3 Task 5 owner: the web app's premium theme client.
+// Story 5.3 Task 5 step 1 owner: own transport, failure classification, and the root attribute write in `apps/web/src/lib/premium-theme.ts`
 //
 // Mirrors `premium.ts` deliberately: the same `sessionStorage` bearer token, the same
 // `.strict()`-envelope message reading, and Zod-parsed responses at the trust boundary.

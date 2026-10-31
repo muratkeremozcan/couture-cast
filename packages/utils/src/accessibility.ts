@@ -1,3 +1,4 @@
+// Story 3.8 Task 1 step 1 owner: implement shared localized accessibility formatting, alt text, and live announcement urgency helpers in `packages/utils/src/accessibility.ts`
 /** Locale-aware accessibility descriptions shared by web and mobile. */
 
 export interface WeatherAltTextInput {

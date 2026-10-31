@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
+// Story 3.6 Task 6 step 1 owner: E2E test sticky bottom nav viewport visibility, chip keyboard navigation, and reduced motion in `playwright/tests/chip-navigation-bottom-nav.spec.ts`
 import { communityTest as test, expect } from '../support/helpers/community-session'
 
 /**

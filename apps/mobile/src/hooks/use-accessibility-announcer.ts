@@ -1,3 +1,4 @@
+// Story 3.8 Task 4 step 1 owner: implement native mobile accessibility announcer hook in `apps/mobile/src/hooks/use-accessibility-announcer.ts`
 import {
   createElement,
   createContext,

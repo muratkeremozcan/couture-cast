@@ -1,3 +1,5 @@
+// Learning path Step 43: Realtime engagement and push notifications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 acceptance lane D (D10/PERF-001): realtime envelope under load.
 //
 // Two compiled API processes (`dist/src/main.js`, realtime attached as production attaches

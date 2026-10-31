@@ -1,4 +1,5 @@
 // Story 5.5 Task 8 owner: the mobile 7-day outfit planner screen.
+// Story 5.5 Task 8 step 2 owner: own the screen states, the themed day cards and the per-date reshuffle in `apps/mobile/src/features/premium/planner-screen.tsx`, reached from the thin route `apps/mobile/app/planner.tsx` and the `PlannerLinkRow` in `apps/mobile/app/(tabs)/settings.tsx`
 //
 // The mobile counterpart of `apps/web/src/app/components/planner-rail.tsx` (Decision 7),
 // built on the same state-machine shape `palette-advisor-screen.tsx` and

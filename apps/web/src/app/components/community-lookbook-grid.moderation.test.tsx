@@ -1,3 +1,5 @@
+// Learning path Step 40: Community screening release gate and hosted worker.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Community grid journeys through the real web transport and MSW.
 import { http, HttpResponse } from 'msw'
 import { screen, waitFor, within } from '@testing-library/react'

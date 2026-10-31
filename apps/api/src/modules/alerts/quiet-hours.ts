@@ -1,3 +1,4 @@
+// Story 1.3 Task 6 step 1 owner: implement quiet-hours checks using cached formatters in `apps/api/src/modules/alerts/quiet-hours.ts`
 export interface NotificationPreferenceSnapshot {
   pushEnabled: boolean
   quietHoursEnabled: boolean

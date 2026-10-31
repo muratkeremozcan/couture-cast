@@ -1,3 +1,5 @@
+// Story 1.1 Task 1 step 2 owner: implement the primary OpenWeather adapter in `apps/api/src/modules/weather/providers/openweather.provider.ts`
+// Story 5.5 Task 1 step 2 owner: own the OpenWeather daily mapping and the `exclude` parameter in `apps/api/src/modules/weather/providers/openweather.provider.ts`, and the WeatherAPI depth config `WEATHERAPI_FORECAST_DAYS` in `apps/api/src/modules/weather/providers/weather.config.ts` with its mapping in `weatherapi.provider.ts`
 import { Injectable } from '@nestjs/common'
 import type { z } from 'zod'
 import { mapOpenWeatherCondition } from './weather-condition.mapper.js'

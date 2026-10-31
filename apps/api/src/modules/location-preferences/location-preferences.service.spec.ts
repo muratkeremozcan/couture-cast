@@ -1,3 +1,5 @@
+// Learning path Step 45: Client location capture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { UpdateSavedLocationInput } from '../../contracts/http'

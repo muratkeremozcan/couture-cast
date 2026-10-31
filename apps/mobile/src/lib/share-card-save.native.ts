@@ -1,3 +1,4 @@
+// Story 6.8 Task 5 step 3 owner: check permission and commit the save in `apps/mobile/src/lib/share-card-save.native.ts`
 import {
   shareCardFixtureMode,
   runShareCardNativeAdapter,

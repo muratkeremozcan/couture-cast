@@ -1,3 +1,6 @@
+// Story 6.1 repository owner: own the advisory-locked quota transaction, the report transaction and SQLSTATE mapping in `apps/api/src/modules/community/community.repository.ts`
+// Story 6.2b canary-visibility owner: exclude `canary-user-` accounts from every public read in `apps/api/src/modules/community/community.repository.ts`
+// Story 6.3 mutation owner: lock, check visibility, replay receipts, compare revisions, enforce the quota and enqueue analytics in `apps/api/src/modules/community/community.repository.ts`
 import type { CommunityAuthorizationBudget } from './community-availability.js'
 import {
   assertCommunityDatabaseAccess,

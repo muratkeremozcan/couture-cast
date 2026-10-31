@@ -1,3 +1,7 @@
+// Learning path Step 41: Curated reactions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
+// Learning path Step 42: Screened threaded comments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 import { describe, expect, it } from 'vitest'
 import { CLIMATE_BANDS } from '@couture/utils'
 import {

@@ -1,4 +1,5 @@
 // Story 6.6 owner: signed spotlight cursors bound to member, area and snapshot.
+// Story 6.6 cursor owner: signed cursors bound to member, area and snapshot in `apps/api/src/modules/community/community-spotlight-cursor.ts`
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { BadRequestException } from '@nestjs/common'
 import { z } from 'zod'

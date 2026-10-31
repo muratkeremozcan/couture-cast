@@ -1,3 +1,4 @@
+// Story 6.3 outbox owner: lease, deliver, settle and retain in `apps/api/src/modules/community/community-reaction.outbox.ts`, which already carries a `Story 6.3 owner` comment
 import { randomUUID } from 'node:crypto'
 import { analyticsDeliveryFailureReason } from './community-analytics-delivery.js'
 import { Inject, Injectable } from '@nestjs/common'

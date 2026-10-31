@@ -1,3 +1,4 @@
+// Story 6.3 delivery owner: post acknowledged analytics with a stable UUID in `apps/api/src/posthog/posthog.service.ts`, called from `apps/api/src/modules/telemetry/telemetry.service.ts`
 import { z } from 'zod'
 import { Injectable, OnApplicationShutdown } from '@nestjs/common'
 import type { FeatureFlagEvaluationSubject, FeatureFlagKey } from '@couture/config'

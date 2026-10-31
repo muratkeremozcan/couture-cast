@@ -1,3 +1,4 @@
+// Story 6.3 consent-withdrawal owner: withdraw a teen's counted votes under the member lock in `apps/api/src/modules/guardian/guardian.service.ts`
 import {
   guardCommunitySubject,
   forgetCommunitySubject,
