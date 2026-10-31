@@ -16,6 +16,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
@@ -111,6 +112,25 @@ const sharePreviewChanged = (failure: unknown) =>
 const errorNamed = (failure: unknown, name: string) =>
   failure instanceof Error && (failure.name === name || failure.message === name)
 const ANCHOR_TIMEOUT_MS = 1000
+/** The app's 420-pt tablet convention (modals, spotlight cards): content stays phone-sized. */
+const CONTENT_MAX_WIDTH = 420
+const CONTENT_INSET = 24
+const PREVIEW_ASPECT = 1080 / 1350
+/** Share of a wide window's height the preview may take, so every action stays on screen. */
+const WIDE_PREVIEW_HEIGHT_SHARE = 0.45
+/**
+ * A window wider than the capped content (a tablet) centers the column and caps the preview's
+ * height. Phones are at most 440 pt wide, so their content never reaches the cap and keeps the
+ * full-width preview.
+ */
+function useWidePreviewWidth() {
+  const { width, height } = useWindowDimensions()
+  if (width - 2 * CONTENT_INSET <= CONTENT_MAX_WIDTH) return null
+  return Math.min(
+    CONTENT_MAX_WIDTH,
+    Math.floor(height * WIDE_PREVIEW_HEIGHT_SHARE * PREVIEW_ASPECT)
+  )
+}
 /** The Share button frame in window coordinates, the iPad popover anchor. */
 function measureWindowFrame(node: View | null) {
   return new Promise<ShareCardShareAnchor | null>((resolve) => {
@@ -236,6 +256,7 @@ export function ShareCardComposer({
   const [saving, setSaving] = useState(false)
   const activeSave = useRef<SaveOwner | null>(null)
   const insets = useModalInsets()
+  const widePreviewWidth = useWidePreviewWidth()
   const systemBarsReady = useShareCardStatusBar(
     open && source !== null,
     modalSystemBarsAvailable()
@@ -622,6 +643,7 @@ export function ShareCardComposer({
           <CardPreview
             key={presentation}
             current={current}
+            width={widePreviewWidth}
             loaded={valid && loaded === presentation}
             onLoad={() => setLoaded(presentation)}
             onError={() => {
@@ -722,11 +744,13 @@ function PhotoPrivacyHelp({
 }
 function CardPreview({
   current,
+  width,
   loaded,
   onLoad,
   onError,
 }: {
   current: PreparedPreview | null
+  width: number | null
   loaded: boolean
   onLoad: () => void
   onError: () => void
@@ -737,7 +761,7 @@ function CardPreview({
       key={current.key}
       source={{ uri: `data:image/png;base64,${current.card.pngBase64}` }}
       accessibilityLabel={current.card.accessibilityLabel}
-      style={styles.preview}
+      style={[styles.preview, width !== null && { width, alignSelf: 'center' }]}
       resizeMode="contain"
       testID={shareCardPreviewTestId(loaded, current.card.sha256)}
       onLoad={onLoad}
@@ -784,9 +808,13 @@ function ComposerFeedback({
       queue: available && !error,
     })
   }, [visible, scope, available, error, pending, message, t, onFocusResult])
+  const status = Boolean(pending || message)
+  const failure = !available || Boolean(error)
+  // The slot always holds at least one line at the current font scale, so a status or error
+  // line replacing it never moves Save and Share (the iPad popover anchors on Share).
   return (
-    <>
-      {(pending || message) && (
+    <View style={styles.feedbackSlot}>
+      {status && (
         <Text
           testID="share-card-feedback"
           accessibilityLiveRegion="polite"
@@ -795,7 +823,7 @@ function ComposerFeedback({
           {pending ? t('shareCard.finishingSave') : t(`shareCard.${message}`)}
         </Text>
       )}
-      {(!available || error) && (
+      {failure && (
         <Text
           testID="share-card-error"
           accessibilityRole="alert"
@@ -805,7 +833,18 @@ function ComposerFeedback({
           {t(`shareCard.${available ? error : 'nativeSaveUnavailable'}`)}
         </Text>
       )}
-    </>
+      {!status && !failure && (
+        <Text
+          accessible={false}
+          aria-hidden
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.text}
+        >
+          {'\u00A0'}
+        </Text>
+      )}
+    </View>
   )
 }
 /**
@@ -900,7 +939,13 @@ function RecoveryActions({
 
 const styles = StyleSheet.create({
   sheet: { flex: 1, backgroundColor: '#F7F3E8' },
-  content: { paddingHorizontal: 24, gap: 16 },
+  content: {
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH + 2 * CONTENT_INSET,
+    alignSelf: 'center',
+    paddingHorizontal: CONTENT_INSET,
+    gap: 16,
+  },
   heading: { color: '#292724', fontSize: 26, fontWeight: '600' },
   text: { color: '#292724', fontSize: 16, flexShrink: 1 },
   row: {
@@ -915,8 +960,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  preview: { width: '100%', aspectRatio: 1080 / 1350 },
+  preview: { width: '100%', aspectRatio: PREVIEW_ASPECT },
   error: { color: '#7A1F2D', fontSize: 16 },
+  feedbackSlot: { gap: 16 },
   button: {
     minHeight: 48,
     padding: 14,

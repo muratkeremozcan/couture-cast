@@ -2,7 +2,7 @@ import type * as ReactNativeModule from 'react-native'
 import React, { createElement, useEffect, useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { userEvent } from 'vitest/browser'
+import { page as browserPage, userEvent } from 'vitest/browser'
 import {
   abortError,
   ResponseError,
@@ -142,18 +142,23 @@ vi.mock('react-native', async (original) => {
     Image: ({
       testID,
       accessibilityLabel,
+      style,
       onLoad,
       onError,
     }: {
       testID: string
       accessibilityLabel: string
+      style: ReactNativeModule.StyleProp<ReactNativeModule.ImageStyle>
       onLoad: () => void
       onError: () => void
     }) => {
       boundary.imageLoads.push(onLoad)
+      // The composer's own size and alignment, so layout cases measure the real frame.
+      const { width, aspectRatio, alignSelf } = actual.StyleSheet.flatten(style)
       return createElement('img', {
         'data-testid': testID,
         alt: accessibilityLabel,
+        style: { width, aspectRatio, alignSelf },
         onLoad,
         onError,
       })
@@ -1346,7 +1351,7 @@ describe('Story 6.9 composer Share', () => {
       width: 343,
       height: 48,
     })
-    // The feedback line moved the button: the next attempt measures again.
+    // Long copy that wraps can still move the button: the next attempt measures again.
     attempt = 1
     await waitFor(() => expect(shareCaptures()).toHaveLength(1))
     await tapShare()
@@ -1411,4 +1416,90 @@ describe('Story 6.9 composer Share', () => {
     })
     expect(announced('shared')).toHaveLength(1)
   })
+})
+
+describe('Story 6.9 composer layout', () => {
+  afterEach(async () => {
+    await browserPage.viewport(414, 896)
+  })
+  const frame = (id: string) => screen.getByTestId(id).getBoundingClientRect()
+  const tops = () => ({
+    save: frame('share-card-save').top,
+    share: frame('share-card-share').top,
+  })
+  it('C-COMP-LAYOUT-STABLE: Save and Share keep their frames while feedback appears and changes', async () => {
+    const shared = deferred<unknown>()
+    boundary.shareFile.mockReturnValue(shared.promise)
+    const saved = deferred<void>()
+    boundary.save.mockReturnValue(saved.promise)
+    await readyShare()
+    // The resting slot is one hidden line: no feedback element, nothing announced.
+    expect(screen.queryByTestId('share-card-feedback')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('share-card-error')).not.toBeInTheDocument()
+    const resting = tops()
+    await tapShare()
+    expect(await screen.findByText(i18n.t('shareCard.sharing'))).toBeInTheDocument()
+    expect(tops()).toEqual(resting)
+    await act(async () => {
+      shared.resolve({ target: 'none', outcome: 'cancelled' })
+      await shared.promise
+    })
+    expect(await screen.findByText(i18n.t('shareCard.shareClosed'))).toBeInTheDocument()
+    expect(tops()).toEqual(resting)
+    await waitFor(expectSaveUsable)
+    await userEvent.click(screen.getByTestId('share-card-save'))
+    expect(await screen.findByText(i18n.t('shareCard.saving'))).toBeInTheDocument()
+    expect(tops()).toEqual(resting)
+    await act(async () => {
+      saved.resolve()
+      await saved.promise
+    })
+    expect(await screen.findByText(i18n.t('shareCard.saved'))).toBeInTheDocument()
+    expect(tops()).toEqual(resting)
+  })
+  it('C-COMP-LAYOUT-STABLE: a one-line error takes the same slot and Retry follows Share', async () => {
+    boundary.save.mockRejectedValue(new Error('render'))
+    await readyShare()
+    const resting = tops()
+    await userEvent.click(screen.getByTestId('share-card-save'))
+    expect(await screen.findByTestId('share-card-error')).toHaveTextContent(
+      i18n.t('shareCard.render')
+    )
+    expect(screen.getByTestId('share-card-retry')).toBeInTheDocument()
+    expect(tops()).toEqual(resting)
+  })
+  it.each([
+    ['a phone', 414, 896],
+    ['the largest phone', 440, 956],
+  ])(
+    'C-COMP-LAYOUT-WIDTH: %s keeps the full-width column and preview',
+    async (_name, width, height) => {
+      await browserPage.viewport(width, height)
+      await readyShare()
+      const column = screen.getByRole('dialog').getBoundingClientRect().width - 48
+      expect(frame('share-card-save').width).toBeCloseTo(column, 0)
+      expect(frame('share-card-preview-loaded').width).toBeCloseTo(column, 0)
+    }
+  )
+  it.each([
+    ['an iPad in portrait', 820, 1180, 420],
+    // 45% of an 820-pt-high window: a 369-pt-high preview, 295 pt wide.
+    ['an iPad in landscape', 1180, 820, 295],
+  ])(
+    'C-COMP-LAYOUT-WIDTH: %s centers a 420-pt column and keeps every action on screen',
+    async (_name, width, height, preview) => {
+      await browserPage.viewport(width, height)
+      await readyShare()
+      const dialog = screen.getByRole('dialog').getBoundingClientRect()
+      for (const id of ['share-card-save', 'share-card-share', 'share-card-cancel']) {
+        const action = frame(id)
+        expect(action.width).toBeCloseTo(420, 0)
+        expect(action.left - dialog.left).toBeCloseTo(dialog.right - action.right, 0)
+      }
+      const image = frame('share-card-preview-loaded')
+      expect(image.width).toBeCloseTo(preview, 0)
+      expect(image.left - dialog.left).toBeCloseTo(dialog.right - image.right, 0)
+      expect(frame('share-card-cancel').bottom).toBeLessThanOrEqual(window.innerHeight)
+    }
+  )
 })
