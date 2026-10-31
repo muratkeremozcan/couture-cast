@@ -400,7 +400,7 @@ describe('browser dependency workflow', () => {
     assert.ok(iosSteps.indexOf(mac) < bridge(iosSteps))
   })
 
-  test('the independent browser acceptance job retains all three pinned engines before the matrix', async () => {
+  test('the independent browser acceptance job retains all three pinned engines and runs the bridge on pull requests', async () => {
     const steps = (await read()).jobs['browser-acceptance'].steps
     const provisioning = provisioningOf(steps)
     assert.equal(provisioning.length, 1)
@@ -422,6 +422,14 @@ describe('browser dependency workflow', () => {
           (item) => item.name === 'Genuine browser share-card acceptance matrix'
         )
     )
-    assert.equal(bridge(steps), -1)
+    // The device lanes skip pull requests, so this job is the only PR run of the
+    // bridge. It needs the built packages and the provisioned Chromium.
+    const runtime = steps.findIndex((item) => item.id === 'runtime')
+    assert.ok(runtime >= 0 && runtime < bridge(steps))
+    assert.ok(steps.indexOf(step) < bridge(steps))
+    assert.equal(
+      steps[bridge(steps)].if,
+      "${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}"
+    )
   })
 })
