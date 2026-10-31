@@ -9,13 +9,17 @@ import {
   SHARE_COPY_ENV,
   SHARE_FIXTURE_MODES,
   SHARE_LEASE_MS,
+  SHARE_FORBIDDEN_PERMISSIONS,
   SHARE_RECEIVE_APK,
+  SHARE_RECEIVE_MANIFESTS,
   SHARE_SHEET_NATIVE_CASE,
   SHARE_SHEET_STEPS,
+  SHARE_SHEET_UITEST_MARKERS,
   androidShareFileStore,
   assertFreshShareFile,
   assertLeasedShareFile,
   assertShareReceiveInstrumentation,
+  assertShareReceiveManifest,
   assertShareSheetUITestResult,
   closedShareSheetFailure,
   iosShareFileStore,
@@ -23,7 +27,9 @@ import {
   runStory69ShareSheet,
   shareCopyEnv,
   shareModuleNamespace,
+  shareReceiveExpectedTests,
   shareReceiveFailureSummary,
+  shareReceiveTestSource,
   shareSheetFlowRuns,
   shareAnchorHandler,
   shareSheetUITestProject,
@@ -59,6 +65,47 @@ const tempDir = (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc69-share-sheet-'))
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
   return directory
+}
+/** A receive androidTest source with the given annotated methods, comments included. */
+const receiveTestSource = (annotations) =>
+  [
+    'import org.junit.Ignore',
+    'import org.junit.Test',
+    '/** A commented @Test never counts. */',
+    'class ShareCardShareReceiveTest {',
+    '  // @Test fun disabled() {}',
+    ...annotations.map((annotation, index) => `  ${annotation}\n  fun case${index}() {}`),
+    '}',
+    '',
+  ].join('\n')
+const writeReceiveTest = (root, namespace, annotations) => {
+  const file = path.join(root, shareReceiveTestSource(namespace))
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, receiveTestSource(annotations))
+}
+/** A generated manifest shaped like the module's merged library manifest. */
+const shareManifest = ({
+  provider = '<provider android:name="expo.modules.sharecardnativeshare.ShareCardFileProvider" android:authorities="${applicationId}.sharecardnativeshare.fileprovider" android:exported="false" android:grantUriPermissions="true" >',
+  extra = '',
+} = {}) =>
+  [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="expo.modules.sharecardnativeshare" >',
+    '    <uses-permission android:name="android.permission.REORDER_TASKS" />',
+    '    <!-- <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" /> -->',
+    extra,
+    '    <application>',
+    `        ${provider}`,
+    '            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/share_card_native_share_paths" />',
+    '        </provider>',
+    '    </application>',
+    '</manifest>',
+  ].join('\n')
+const writeShareManifests = (root, xml = shareManifest()) => {
+  for (const manifest of SHARE_RECEIVE_MANIFESTS) {
+    fs.mkdirSync(path.dirname(path.join(root, manifest)), { recursive: true })
+    fs.writeFileSync(path.join(root, manifest), xml)
+  }
 }
 const memoryStore = (files, ages = {}) => ({
   list: () => Object.keys(files).sort(),
@@ -423,23 +470,126 @@ describe('native receiver and presenter tests', () => {
     assert.match(SHARE_RECEIVE_APK, /share-card-native-share-debug-androidTest\.apk$/)
   })
 
-  test('instrumentation passes only with at least one test and no failure or crash', () => {
-    assert.deepEqual(assertShareReceiveInstrumentation('...\n\nOK (3 tests)\n'), {
+  test('instrumentation passes only when every declared test ran and nothing failed or crashed', () => {
+    assert.deepEqual(assertShareReceiveInstrumentation('...\n\nOK (3 tests)\n', 3), {
       tests: 3,
     })
-    assert.deepEqual(assertShareReceiveInstrumentation('OK (1 test)\n'), { tests: 1 })
-    for (const log of [
-      'OK (0 tests)\n',
-      '',
-      'Tests run: 3,  Failures: 1\nFAILURES!!!\n',
-      'INSTRUMENTATION_FAILED: expo.modules.x.test/androidx.test.runner.AndroidJUnitRunner\n',
-      'INSTRUMENTATION_RESULT: shortMsg=Process crashed.\nOK (2 tests)\n',
+    assert.deepEqual(assertShareReceiveInstrumentation('OK (1 test)\n', 1), { tests: 1 })
+    for (const [log, expected] of [
+      // One declared test did not run: an @Ignore or a filtered method is not a pass.
+      ['OK (1 test)\n', 2],
+      ['OK (2 tests)\n', 3],
+      // More tests than declared means the count came from somewhere else.
+      ['OK (3 tests)\n', 2],
+      ['OK (0 tests)\n', 0],
+      ['OK (2 tests)\n', undefined],
+      ['', 2],
+      ['Tests run: 3,  Failures: 1\nFAILURES!!!\n', 3],
+      [
+        'INSTRUMENTATION_FAILED: expo.modules.x.test/androidx.test.runner.AndroidJUnitRunner\n',
+        2,
+      ],
+      ['INSTRUMENTATION_RESULT: shortMsg=Process crashed.\nOK (2 tests)\n', 2],
     ])
       assert.throws(
-        () => assertShareReceiveInstrumentation(log),
+        () => assertShareReceiveInstrumentation(log, expected),
         /share_receive_android_test_failed/,
-        log
+        `${log} expected ${expected}`
       )
+  })
+
+  test('the expected count is every @Test in the receive class, ignored ones included', (t) => {
+    const root = tempDir(t)
+    const namespace = 'expo.modules.share'
+    assert.throws(
+      () => shareReceiveExpectedTests(root, namespace),
+      /share_receive_android_test_failed/
+    )
+    writeReceiveTest(root, namespace, ['@Test', '@Test'])
+    assert.equal(shareReceiveExpectedTests(root, namespace), 2)
+    // An @Ignore keeps the test declared, so JUnit's run count falls one short and fails.
+    writeReceiveTest(root, namespace, ['@Test', '@Ignore("flaky")\n  @Test'])
+    const expected = shareReceiveExpectedTests(root, namespace)
+    assert.equal(expected, 2)
+    assert.throws(
+      () => assertShareReceiveInstrumentation('OK (1 test)\n', expected),
+      /share_receive_android_test_failed/
+    )
+    writeReceiveTest(root, namespace, [])
+    assert.throws(
+      () => shareReceiveExpectedTests(root, namespace),
+      /share_receive_android_test_failed/
+    )
+  })
+
+  test('the real receive class declares the sibling and out-of-scope cases it must run', () => {
+    const namespace = shareModuleNamespace(repo)
+    const source = fs.readFileSync(
+      path.join(repo, shareReceiveTestSource(namespace)),
+      'utf8'
+    )
+    assert.equal(
+      shareReceiveExpectedTests(repo, namespace),
+      (source.match(/^\s*@Test\b/gm) ?? []).length
+    )
+    assert.ok(shareReceiveExpectedTests(repo, namespace) >= 2)
+  })
+
+  test('a generated manifest has one unexported share provider and no broad permission', () => {
+    assert.deepEqual(assertShareReceiveManifest(shareManifest()), { providers: 1 })
+    const resolved = shareManifest({
+      provider:
+        '<provider android:name="expo.modules.sharecardnativeshare.ShareCardFileProvider" android:authorities="expo.modules.sharecardnativeshare.test.sharecardnativeshare.fileprovider" android:exported="false" >',
+    })
+    assert.deepEqual(assertShareReceiveManifest(resolved), { providers: 1 })
+    const second =
+      '<provider android:name="expo.modules.sharecardnativeshare.ShareCardFileProvider" android:authorities="com.other.sharecardnativeshare.fileprovider" android:exported="false" ></provider>'
+    for (const [name, xml] of [
+      [
+        'no provider',
+        shareManifest({
+          provider:
+            '<provider android:name="x.Other" android:authorities="x.other" android:exported="false" >',
+        }),
+      ],
+      [
+        'exported provider',
+        shareManifest({
+          provider:
+            '<provider android:name="expo.modules.sharecardnativeshare.ShareCardFileProvider" android:authorities="${applicationId}.sharecardnativeshare.fileprovider" android:exported="true" >',
+        }),
+      ],
+      [
+        'export unspecified',
+        shareManifest({
+          provider:
+            '<provider android:name="expo.modules.sharecardnativeshare.ShareCardFileProvider" android:authorities="${applicationId}.sharecardnativeshare.fileprovider" >',
+        }),
+      ],
+      ['two providers', shareManifest({ extra: second })],
+      ...SHARE_FORBIDDEN_PERMISSIONS.map((permission) => [
+        permission,
+        shareManifest({ extra: `    <uses-permission android:name="${permission}" />` }),
+      ]),
+      [
+        'sdk-23 storage permission',
+        shareManifest({
+          extra:
+            '    <uses-permission-sdk-23 android:name="android.permission.READ_MEDIA_IMAGES" />',
+        }),
+      ],
+    ])
+      assert.throws(
+        () => assertShareReceiveManifest(xml),
+        /share_receive_manifest_invalid/,
+        name
+      )
+    assert.deepEqual([...SHARE_FORBIDDEN_PERMISSIONS].sort(), [
+      'android.permission.QUERY_ALL_PACKAGES',
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.READ_MEDIA_IMAGES',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+    ])
   })
 
   test('a failed instrumentation is summarized by counts only', () => {
@@ -609,7 +759,13 @@ describe('runStory69ShareSheet', () => {
   function fakeDevice(
     t,
     platform,
-    { breakAt, markers = 'CC69_PRESENTER_ANCHOR_PASS\nCC69_PRESENTER_CLOSED_PASS\n' } = {}
+    {
+      breakAt,
+      markers = `${SHARE_SHEET_UITEST_MARKERS.join('\n')}\n`,
+      receiveTests = ['@Test', '@Test'],
+      instrumentLog = 'OK (2 tests)\n',
+      manifest = shareManifest(),
+    } = {}
   ) {
     const root = tempDir(t)
     const directory = path.join(root, 'runtime')
@@ -620,6 +776,8 @@ describe('runStory69ShareSheet', () => {
       path.join(android, 'build.gradle'),
       'namespace "expo.modules.share"\n'
     )
+    writeReceiveTest(root, 'expo.modules.share', receiveTests)
+    if (manifest !== null) writeShareManifests(root, manifest)
     const tests = path.join(root, 'apps/mobile/native-tests')
     fs.mkdirSync(tests, { recursive: true })
     fs.writeFileSync(path.join(tests, 'ShareCardShareSheetUITests.swift'), '// test\n')
@@ -683,7 +841,7 @@ describe('runStory69ShareSheet', () => {
         events.push(
           `spawn ${path.basename(binary)} ${args.includes('instrument') ? 'instrument' : args[0]}`
         )
-        if (args.includes('instrument')) fs.writeSync(options.stdio[1], 'OK (2 tests)\n')
+        if (args.includes('instrument')) fs.writeSync(options.stdio[1], instrumentLog)
         return { status: 0 }
       },
       spawn: (binary, args, options) => {
@@ -761,15 +919,68 @@ describe('runStory69ShareSheet', () => {
     await assert.rejects(runStory69ShareSheet(ctx), /share_handoff_file_removed/)
   })
 
-  test('ios: an XCUITest run without both phase markers fails even when xcodebuild passed', async (t) => {
-    const { ctx, reports } = fakeDevice(t, 'ios', {
-      markers: 'CC69_PRESENTER_ANCHOR_PASS\n',
+  test('ios: the XCUITest must print the public name, anchor and closed phase markers', () => {
+    assert.deepEqual(SHARE_SHEET_UITEST_MARKERS, [
+      'CC69_PRESENTER_PUBLIC_NAME_PASS',
+      'CC69_PRESENTER_ANCHOR_PASS',
+      'CC69_PRESENTER_CLOSED_PASS',
+    ])
+    const source = fs.readFileSync(
+      path.join(repo, 'apps/mobile/native-tests/ShareCardShareSheetUITests.swift'),
+      'utf8'
+    )
+    for (const marker of SHARE_SHEET_UITEST_MARKERS)
+      assert.ok(source.includes(`print("${marker}")`), marker)
+  })
+
+  for (const missing of SHARE_SHEET_UITEST_MARKERS)
+    test(`ios: an XCUITest run without ${missing} fails even when xcodebuild passed`, async (t) => {
+      const { ctx, reports } = fakeDevice(t, 'ios', {
+        markers: `${SHARE_SHEET_UITEST_MARKERS.filter((marker) => marker !== missing).join('\n')}\n`,
+      })
+      t.mock.method(console, 'log', () => undefined)
+      await assert.rejects(runStory69ShareSheet(ctx), /share_sheet_ios_uitest_failed/)
+      assert.equal(reports.at(-1)[1].code, 'share_sheet_ios_uitest_failed')
+      assert.equal(reports.at(-1)[1].cases.includes('N-IOS-PRESENTER-UI'), false)
+    })
+
+  test('android: an instrumentation run that skipped a declared receive test fails', async (t) => {
+    const { ctx, reports } = fakeDevice(t, 'android', {
+      receiveTests: ['@Test', '@Ignore\n  @Test'],
+      instrumentLog: 'OK (1 test)\n',
     })
     t.mock.method(console, 'log', () => undefined)
-    await assert.rejects(runStory69ShareSheet(ctx), /share_sheet_ios_uitest_failed/)
-    assert.equal(reports.at(-1)[1].code, 'share_sheet_ios_uitest_failed')
-    assert.equal(reports.at(-1)[1].cases.includes('N-IOS-PRESENTER-UI'), false)
+    await assert.rejects(runStory69ShareSheet(ctx), /share_receive_android_test_failed/)
+    assert.equal(reports.at(-1)[1].code, 'share_receive_android_test_failed')
+    assert.equal(reports.at(-1)[1].cases.includes('N-AND-RECEIVE'), false)
   })
+
+  for (const [name, manifest] of [
+    ['is missing', null],
+    [
+      'exports the provider',
+      shareManifest({
+        provider:
+          '<provider android:name="expo.modules.sharecardnativeshare.ShareCardFileProvider" android:authorities="${applicationId}.sharecardnativeshare.fileprovider" android:exported="true" >',
+      }),
+    ],
+    [
+      'asks for QUERY_ALL_PACKAGES',
+      shareManifest({
+        extra: '<uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />',
+      }),
+    ],
+  ])
+    test(`android: a generated manifest that ${name} fails before the test APK is installed`, async (t) => {
+      const { ctx, events, reports } = fakeDevice(t, 'android', { manifest })
+      t.mock.method(console, 'log', () => undefined)
+      await assert.rejects(runStory69ShareSheet(ctx), /share_receive_manifest_invalid/)
+      const afterBuild = events.slice(events.indexOf('run gradlew -p') + 1)
+      assert.ok(events.includes('run gradlew -p'))
+      // Neither the install nor the instrumentation runs after a bad manifest.
+      assert.deepEqual(afterBuild, [])
+      assert.equal(reports.at(-1)[1].code, 'share_receive_manifest_invalid')
+    })
 
   test('a changed preview digest fails the step as a composition change', async (t) => {
     const { ctx } = fakeDevice(t, 'ios')

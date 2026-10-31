@@ -307,18 +307,87 @@ export const SHARE_RECEIVE_APK =
   'apps/mobile/modules/share-card-native-share/android/build/outputs/apk/androidTest/debug/share-card-native-share-debug-androidTest.apk'
 export const SHARE_RECEIVE_TEST_CLASS = 'ShareCardShareReceiveTest'
 
-/** Passes only an instrumentation run that reported at least one test and nothing else. */
-export function assertShareReceiveInstrumentation(log) {
+/** The receive androidTest source, under the module's namespace package. */
+export const shareReceiveTestSource = (namespace) =>
+  `apps/mobile/modules/share-card-native-share/android/src/androidTest/java/${namespace.replaceAll('.', '/')}/${SHARE_RECEIVE_TEST_CLASS}.kt`
+
+/**
+ * How many tests the receive class declares: every `@Test` annotation outside comments, ignored
+ * or not. JUnit's `OK (n tests)` counts only tests that ran, so an `@Ignore` on the sibling or
+ * out-of-scope denial test leaves the run one short of this and fails it.
+ */
+export function shareReceiveExpectedTests(root, namespace) {
+  let source
+  try {
+    source = fs.readFileSync(path.join(root, shareReceiveTestSource(namespace)), 'utf8')
+  } catch {
+    throw new Error('share_receive_android_test_failed')
+  }
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+  const expected = (code.match(/@Test\b/g) ?? []).length
+  if (expected < 1) throw new Error('share_receive_android_test_failed')
+  return expected
+}
+
+/** Passes only an instrumentation run that ran every declared test and reported nothing else. */
+export function assertShareReceiveInstrumentation(log, expected) {
   const ok = /^OK \((\d+) tests?\)\s*$/m.exec(log)
   if (
+    !Number.isSafeInteger(expected) ||
+    expected < 1 ||
     !ok ||
-    Number(ok[1]) < 1 ||
+    Number(ok[1]) !== expected ||
     /FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_RESULT: shortMsg=|Process crashed/.test(
       log
     )
   )
     throw new Error('share_receive_android_test_failed')
   return { tests: Number(ok[1]) }
+}
+
+/**
+ * The manifests `SHARE_RECEIVE_GRADLE_TASK` generates: the module's merged library manifest (what
+ * it contributes to the app) and the androidTest package the receive test runs in. The app's own
+ * manifest keeps READ/WRITE_EXTERNAL_STORAGE for the legacy picker and add-only save, so the
+ * module's contribution is checked here and never the app's.
+ */
+export const SHARE_RECEIVE_MANIFESTS = Object.freeze([
+  'apps/mobile/modules/share-card-native-share/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml',
+  'apps/mobile/modules/share-card-native-share/android/build/intermediates/packaged_manifests/debugAndroidTest/processDebugAndroidTestManifest/AndroidManifest.xml',
+])
+export const SHARE_FORBIDDEN_PERMISSIONS = Object.freeze([
+  'android.permission.QUERY_ALL_PACKAGES',
+  'android.permission.READ_EXTERNAL_STORAGE',
+  'android.permission.WRITE_EXTERNAL_STORAGE',
+  'android.permission.READ_MEDIA_IMAGES',
+])
+const SHARE_PROVIDER_AUTHORITY = '.sharecardnativeshare.fileprovider'
+
+/**
+ * A generated manifest carries exactly one share-card FileProvider, unexported, and none of the
+ * broad package or storage permissions the share path must never need.
+ */
+export function assertShareReceiveManifest(xml) {
+  const text = String(xml).replace(/<!--[\s\S]*?-->/g, '')
+  const attribute = (tag, name) =>
+    new RegExp(`\\s${name}\\s*=\\s*"([^"]*)"`).exec(tag)?.[1]
+  const providers = (text.match(/<provider\b[^>]*>/g) ?? []).filter(
+    (tag) =>
+      /\.ShareCardFileProvider$/.test(attribute(tag, 'android:name') ?? '') ||
+      (attribute(tag, 'android:authorities') ?? '')
+        .split(';')
+        .some((authority) => authority.trim().endsWith(SHARE_PROVIDER_AUTHORITY))
+  )
+  const permissions = (text.match(/<uses-permission(?:-sdk-23)?\b[^>]*>/g) ?? []).map(
+    (tag) => attribute(tag, 'android:name')
+  )
+  if (
+    providers.length !== 1 ||
+    attribute(providers[0], 'android:exported') !== 'false' ||
+    permissions.some((name) => SHARE_FORBIDDEN_PERMISSIONS.includes(name))
+  )
+    throw new Error('share_receive_manifest_invalid')
+  return { providers: providers.length }
 }
 
 /** The closed shape of a failed instrumentation run: counts only, no test output. */
@@ -334,6 +403,7 @@ export function shareReceiveFailureSummary(log) {
 
 export const SHARE_SHEET_UITEST_CLASS = 'ShareCardShareSheetUITests'
 export const SHARE_SHEET_UITEST_MARKERS = Object.freeze([
+  'CC69_PRESENTER_PUBLIC_NAME_PASS',
   'CC69_PRESENTER_ANCHOR_PASS',
   'CC69_PRESENTER_CLOSED_PASS',
 ])
@@ -415,6 +485,7 @@ const CLOSED_CODES = Object.freeze([
   'share_handoff_lease_invalid',
   'share_sheet_ios_uitest_failed',
   'share_receive_android_test_failed',
+  'share_receive_manifest_invalid',
   'share_receive_namespace_required',
   'share_sheet_platform_required',
   'loaded_approved_preview_required',
@@ -698,7 +769,7 @@ export async function runShareSheetUITest(ctx) {
       'share-sheet-ios.log'
     )
   )
-  // Each phase of the test prints its marker once it passed; a run without both proved nothing.
+  // Each phase of the test prints its marker once it passed; a run missing one proved nothing.
   if (!log.ok || SHARE_SHEET_UITEST_MARKERS.some((marker) => !log.log.includes(marker))) {
     console.log(
       JSON.stringify({ iosShareSheetFailure: xcodebuildFailureReport(log.log) })
@@ -745,6 +816,7 @@ function recordedAsync(ctx, args, name, timeout = 300_000) {
 /** N-AND-RECEIVE: the module's receiving-Activity androidTest on the owned emulator. */
 export function runShareReceiveTest(ctx) {
   const namespace = shareModuleNamespace(ctx.root)
+  const expected = shareReceiveExpectedTests(ctx.root, namespace)
   const env = {
     ...ctx.read('public-build-env.json'),
     ANDROID_SERIAL: ctx.device,
@@ -760,6 +832,15 @@ export function runShareReceiveTest(ctx) {
     ],
     env
   )
+  for (const manifest of SHARE_RECEIVE_MANIFESTS) {
+    let xml
+    try {
+      xml = fs.readFileSync(path.join(ctx.root, manifest), 'utf8')
+    } catch {
+      throw new Error('share_receive_manifest_invalid')
+    }
+    assertShareReceiveManifest(xml)
+  }
   ctx.run(ctx.adb, [
     '-s',
     ctx.device,
@@ -788,7 +869,7 @@ export function runShareReceiveTest(ctx) {
   )
   try {
     if (!instrument.ok) throw new Error('share_receive_android_test_failed')
-    return assertShareReceiveInstrumentation(instrument.log)
+    return assertShareReceiveInstrumentation(instrument.log, expected)
   } catch (error) {
     // The instrumentation output stays private; the job log gets counts only.
     console.log(
