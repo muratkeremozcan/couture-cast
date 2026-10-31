@@ -1,6 +1,5 @@
 // Learning path Step 46: Home spotlight teaser.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
-/* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.7: the InfoBanner contract the Community spotlight notice relies on.
 import { createRef } from 'react'
 import type { View } from 'react-native'

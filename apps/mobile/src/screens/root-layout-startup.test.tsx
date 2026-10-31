@@ -141,7 +141,7 @@ async function settleTasks() {
 }
 
 async function mountLayout() {
-  render(<RootLayout />)
+  await render(<RootLayout />)
   await waitFor(() => expect(layout.screens.length).toBeGreaterThan(0))
 }
 

@@ -4,7 +4,6 @@ import React, { createElement } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { page as browserPage } from 'vitest/browser'
 import * as ReactNative from 'react-native'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { CommunityCommentsState } from '@couture/api-client'
@@ -27,6 +26,7 @@ import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
 import { CommunityCommentDrafts } from '@/src/features/community/community-comment-drafts'
 import { press } from '@/src/test-utils/press'
+import { setViewport } from '@/src/test-utils/viewport'
 import {
   EDGE_TO_EDGE_MODAL_PROPS,
   TEST_SAFE_AREA_INSETS,
@@ -1071,7 +1071,7 @@ describe('R51 comments sheet with the keyboard open', () => {
     server.use(http.get(`${base}/comments`, () => HttpResponse.json(page(roots))))
   })
   afterEach(async () => {
-    await browserPage.viewport(414, 896)
+    await setViewport(414, 896)
   })
 
   async function replyToLongRoot() {
@@ -1121,7 +1121,7 @@ describe('R51 comments sheet with the keyboard open', () => {
   ])(
     'hides the thread region for a root comment with the keyboard up in %s',
     async (_name, width, height) => {
-      await browserPage.viewport(width, height)
+      await setViewport(width, height)
       renderSheet()
       await screen.findByTestId('comment-root-long')
       act(() => composer().focus())

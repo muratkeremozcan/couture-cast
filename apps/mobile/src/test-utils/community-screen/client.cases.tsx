@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/await-thenable */
 import { imagePicker, FEED_ROUTE, item, feed, errorEnvelope } from './harness'
 import { http, HttpResponse } from 'msw'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'

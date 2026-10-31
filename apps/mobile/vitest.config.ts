@@ -15,9 +15,23 @@ const expoConstantsWebModule = path.join(
   'build/ExponentConstants.web.js'
 )
 
+// The MSW browser shim registers its Service Worker from `/mockServiceWorker.js`. Vitest 4
+// resolved that path to msw's worker internally; Vitest 5 dropped it, and the mobile app has
+// no public directory, so the path is served here from the installed msw. The worker script
+// then always matches the msw version that runs the handlers.
+const mswServiceWorkerScript = resolveFromMobile('msw/mockServiceWorker.js')
+
 const isWatchMode = !process.argv.includes('run') && !process.argv.includes('--run')
 
 export default defineConfig({
+  plugins: [
+    {
+      name: 'couture:msw-service-worker',
+      resolveId(id) {
+        return id === '/mockServiceWorker.js' ? mswServiceWorkerScript : undefined
+      },
+    },
+  ],
   esbuild: {
     jsx: 'automatic',
     loader: 'tsx',

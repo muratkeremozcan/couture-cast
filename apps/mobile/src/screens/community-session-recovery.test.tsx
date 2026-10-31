@@ -1,6 +1,5 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
-/* eslint-disable @typescript-eslint/await-thenable */
 // T07 controls external SDK/storage/native/HTTP boundaries. Production session,
 // canonical profile client, initial screen effects and community wrappers execute.
 import type * as ReactNativeModule from 'react-native'
@@ -192,7 +191,7 @@ it('T07 C01 cold initial screen suppliers recover without a false signed-out fee
       })
     })
   )
-  let unmount: (() => void) | undefined
+  let unmount: (() => Promise<void>) | undefined
   const outcomes: boolean[] = []
   const actual = await vi.importActual<typeof community>('@/src/lib/community')
   const pending: Promise<unknown>[] = []
@@ -239,7 +238,7 @@ it('T07 C01 cold initial screen suppliers recover without a false signed-out fee
     await act(async () => {
       await Promise.allSettled(pending)
     })
-    unmount?.()
+    await unmount?.()
     cleanup()
   }
 })

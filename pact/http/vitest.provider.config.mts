@@ -7,19 +7,34 @@ const projectRoot = path.resolve(__dirname, '../..')
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@couture/api-client/contracts/http': path.resolve(
-        projectRoot,
-        'packages/api-client/src/contracts/http/index.ts'
-      ),
-      '@couture/api-client': path.resolve(
-        projectRoot,
-        'packages/api-client/src/index.ts'
-      ),
-      '@couture/utils': path.resolve(projectRoot, 'packages/utils/src/index.ts'),
-      '@couture/config': path.resolve(projectRoot, 'packages/config/src/index.ts'),
-      '@couture/testing': path.resolve(projectRoot, 'packages/testing/src/index.ts'),
-    },
+    alias: [
+      // Exact matches only. Vitest 5 applies a string alias to every subpath as well, so
+      // `@couture/api-client/testing/...` would become `.../src/index.ts/testing/...`;
+      // subpaths keep resolving through each package's exports map.
+      {
+        find: /^@couture\/api-client\/contracts\/http$/,
+        replacement: path.resolve(
+          projectRoot,
+          'packages/api-client/src/contracts/http/index.ts'
+        ),
+      },
+      {
+        find: /^@couture\/api-client$/,
+        replacement: path.resolve(projectRoot, 'packages/api-client/src/index.ts'),
+      },
+      {
+        find: /^@couture\/utils$/,
+        replacement: path.resolve(projectRoot, 'packages/utils/src/index.ts'),
+      },
+      {
+        find: /^@couture\/config$/,
+        replacement: path.resolve(projectRoot, 'packages/config/src/index.ts'),
+      },
+      {
+        find: /^@couture\/testing$/,
+        replacement: path.resolve(projectRoot, 'packages/testing/src/index.ts'),
+      },
+    ],
   },
   test: {
     environment: 'node',

@@ -7,7 +7,6 @@
 // section through all five purchase outcomes and the per-status renders. The
 // bounded poll is mocked at the boundary (its timing contract is fake-timer
 // tested in the lib suite), so nothing here sleeps.
-/* eslint-disable @typescript-eslint/await-thenable */
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'

@@ -424,7 +424,7 @@ async function scenario(outage: Outage) {
   return result
 }
 
-describe.sequential('quiet-hour herd of max(500, H) due tokens', () => {
+describe('quiet-hour herd of max(500, H) due tokens', { concurrent: false }, () => {
   it('dispatches every released token within 60 s alongside normal traffic', async () => {
     await scenario('none')
   }, 600_000)

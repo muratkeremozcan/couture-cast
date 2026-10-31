@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/await-thenable */
 // T05: actual screen/coordinator/HTTP wiring; only the external socket and native surfaces are controlled.
 import { CommunitySyncState } from '@couture/api-client'
 import type { ResolveCommunityTargetsInput } from '@couture/api-client/contracts/http'

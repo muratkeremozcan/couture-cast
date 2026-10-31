@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.7 owner: a Home teaser activation resolved by the mobile Community screen.
 import { item, setMockParams } from './harness'
 import { CommunitySyncState, type CommunitySyncCallbacks } from '@couture/api-client'

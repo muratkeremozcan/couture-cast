@@ -3,7 +3,7 @@
 import type * as ReactNativeModule from 'react-native'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { page as browserPage, userEvent } from 'vitest/browser'
+import { userEvent } from 'vitest/browser'
 import {
   abortError,
   ResponseError,
@@ -60,6 +60,7 @@ import {
 import { nativeShareCardSavePending } from '@/src/lib/share-card-save-operations'
 import { drainMacrotask } from '@/src/test-utils/drain-macrotask'
 import { unhandledRejectionsDuring } from '@/src/test-utils/unhandled-rejections'
+import { setViewport } from '@/src/test-utils/viewport'
 import {
   announced,
   boundary,
@@ -650,7 +651,7 @@ describe('Story 6.9 composer Share', () => {
 
 describe('Story 6.9 composer layout', () => {
   afterEach(async () => {
-    await browserPage.viewport(414, 896)
+    await setViewport(414, 896)
   })
   const frame = (id: string) => screen.getByTestId(id).getBoundingClientRect()
   const tops = () => ({
@@ -778,7 +779,7 @@ describe('Story 6.9 composer layout', () => {
     expect(slot?.getBoundingClientRect().height).toBe(44)
   })
   it('C-COMP-LAYOUT-STABLE: a 320-pt window reserves three lines and keeps the actions still', async () => {
-    await browserPage.viewport(320, 700)
+    await setViewport(320, 700)
     await i18n.changeLanguage('de-DE')
     boundary.save.mockRejectedValue(new Error('storage'))
     await readyShare()
@@ -814,7 +815,7 @@ describe('Story 6.9 composer layout', () => {
     // not hittable).
     const unbound = boundToWindow()
     try {
-      await browserPage.viewport(390, 560)
+      await setViewport(390, 560)
       boundary.save.mockRejectedValue(new Error('storage'))
       await readyShare()
       await previewWidthSettles(240)
@@ -839,16 +840,13 @@ describe('Story 6.9 composer layout', () => {
     // shareClosed, and a reveal with its 8-pt margin scrolled the whole composer up 6 pt.
     const unbound = boundToWindow()
     try {
-      await browserPage.viewport(390, 520)
+      await setViewport(390, 520)
       boundary.shareFile.mockResolvedValue({ target: 'none', outcome: 'cancelled' })
       await readyShare()
       await previewWidthSettles(240)
       const scroller = scrollerOf(screen.getByTestId('share-card-share'))
       const padding = window.innerHeight - scroller.getBoundingClientRect().bottom
-      await browserPage.viewport(
-        390,
-        Math.ceil(frame('share-card-share').bottom + 4 + padding)
-      )
+      await setViewport(390, Math.ceil(frame('share-card-share').bottom + 4 + padding))
       await previewWidthSettles(240)
       const fold = scroller.getBoundingClientRect().bottom
       expect(frame('share-card-share').bottom).toBeLessThanOrEqual(fold)
@@ -898,7 +896,7 @@ describe('Story 6.9 composer layout', () => {
   ])(
     'C-COMP-LAYOUT-WIDTH: %s keeps the full-width column and preview',
     async (_name, width, height) => {
-      await browserPage.viewport(width, height)
+      await setViewport(width, height)
       await readyShare()
       const dialog = screen.getByRole('dialog').getBoundingClientRect()
       const column = dialog.width - 48
@@ -917,7 +915,7 @@ describe('Story 6.9 composer layout', () => {
   ])(
     'C-COMP-LAYOUT-WIDTH: %s centers a 420-pt column and keeps every action on screen',
     async (_name, width, height, preview) => {
-      await browserPage.viewport(width, height)
+      await setViewport(width, height)
       await readyShare()
       const dialog = screen.getByRole('dialog').getBoundingClientRect()
       const row = {
@@ -961,7 +959,7 @@ describe('Story 6.9 composer layout', () => {
       vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       const unbound = boundToWindow()
       try {
-        await browserPage.viewport(width, height)
+        await setViewport(width, height)
         await readyShare()
         const column = width - 48
         await waitFor(() => {
@@ -1100,7 +1098,7 @@ describe('Story 6.9 composer layout', () => {
     async (locale, width) => {
       vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       // The stale state fills both rows.
-      await browserPage.viewport(width, 667)
+      await setViewport(width, 667)
       await i18n.changeLanguage(locale)
       await readyShare()
       boundary.prepare.mockRejectedValueOnce(
@@ -1157,7 +1155,7 @@ describe('Story 6.9 composer layout', () => {
     // widths instead.
     const unbound = boundToWindow()
     try {
-      await browserPage.viewport(375, 667)
+      await setViewport(375, 667)
       await i18n.changeLanguage('fr-FR')
       await readyShare()
       // Save wraps in its half first; the row then settles at content widths and the preview at
@@ -1195,7 +1193,7 @@ describe('Story 6.9 composer layout', () => {
   it('C-COMP-LAYOUT-PAIRS: a pair that does not fit stacks full width and truncates nothing', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     // A 320-pt window: de-DE Vorschau aktualisieren and Abbrechen need 315 pt of a 272-pt column.
-    await browserPage.viewport(320, 700)
+    await setViewport(320, 700)
     await i18n.changeLanguage('de-DE')
     await readyShare()
     boundary.prepare.mockRejectedValueOnce(
@@ -1216,7 +1214,7 @@ describe('Story 6.9 composer layout', () => {
   })
   it('C-COMP-LAYOUT-PAIRS: a lone Save or Cancel fills its row', async () => {
     // Without share capability Save has no partner, and Cancel has none before an error.
-    await browserPage.viewport(375, 667)
+    await setViewport(375, 667)
     render(<Harness />)
     await ready()
     await settleLayout()

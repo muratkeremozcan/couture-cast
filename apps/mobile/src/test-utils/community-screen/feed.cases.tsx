@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/await-thenable */
 import {
   mockCapture,
   SDK_ERROR_MESSAGE,
@@ -627,7 +626,7 @@ export function registerCommunityFeedCases() {
     )
 
     await render(<CommunityScreen />)
-    cleanup()
+    await cleanup()
 
     // The resolution outlived the screen, so it must neither report a failure nor
     // set state on a component that is gone.
