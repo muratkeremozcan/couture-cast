@@ -1,6 +1,6 @@
 # Story 6.9 evidence
 
-Updated: 2026-10-31 - X-IPAD-ANCHOR re-record rule.
+Updated: 2026-10-31: the X-IPAD-ANCHOR proof is keyed on the anchor source blobs.
 
 This folder holds the committed evidence for CC-6.9 native platform sharing that CI cannot
 produce. The spec is
@@ -21,14 +21,18 @@ node scripts/lib/story69-ipad-evidence.mjs record \
 
 `--environment` is `simulator` or `device`. `--os` is the iPadOS version shown in Settings or in
 the simulator's device name. The commit defaults to the checkout's HEAD; pass `--commit <sha>` to
-name the build you proved. The command computes the screenshot SHA256, writes
-`ipad-anchor-proof.json` and verifies it. Commit both files.
+name the build you proved. The command reads the git blob SHA of each anchor source from that
+commit, computes the screenshot SHA256, writes `ipad-anchor-proof.json` and verifies it. Commit
+both files.
 
 Only record what you observed. If the sheet did not anchor to Share, do not write a record: the
 check keeps failing, which is the correct state.
 
-The recorded commit must be an ancestor of HEAD, and the anchor sources (`IPAD_ANCHOR_SOURCES` in
-the check) must be unchanged since it, so any change to those three files needs a re-record.
+The check passes while every anchor source (`IPAD_ANCHOR_SOURCES` in the check) in HEAD has the
+blob SHA the record names, so any change to those three files needs a re-record. The recorded
+commit is provenance: a squash merge leaves it outside the default branch's history, and the proof
+stays valid as long as the anchor sources match. Reading HEAD's tree needs no history, so a
+depth-1 CI checkout runs the check.
 
 ## Record format
 
@@ -41,6 +45,7 @@ the check) must be unchanged since it, so any change to those three files needs 
 | `environment`       | `simulator` or `device`                                          |
 | `osVersion`         | iPadOS version, for example `18.1` or `26`                       |
 | `commit`            | full 40-character SHA of the proven build                        |
+| `sources`           | each anchor source path mapped to its git blob SHA at `commit`   |
 | `result`            | `anchored_to_share`                                              |
 | `screenshot.file`   | screenshot file name in this folder (lowercase, `.png`, no path) |
 | `screenshot.sha256` | SHA256 of that file, lowercase hex                               |

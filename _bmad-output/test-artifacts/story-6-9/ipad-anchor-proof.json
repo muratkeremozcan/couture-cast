@@ -4,6 +4,11 @@
   "environment": "simulator",
   "osVersion": "26.1",
   "commit": "eab74b0d59ef9e31d14985a5fb8c9905a84a0219",
+  "sources": {
+    "apps/mobile/components/share-card-composer.tsx": "8d1bbdb60ae1702e12f82ce996530d1b683c8032",
+    "apps/mobile/modules/share-card-native-share/ios/ShareCardAnchorConfiguration.swift": "d27ceb30edd710ada5513edeb17b91790286db8b",
+    "apps/mobile/modules/share-card-native-share/ios/ShareCardNativeShareModule.swift": "637a94aaebae0df89f07aede56d0c7f47ce1c199"
+  },
   "result": "anchored_to_share",
   "screenshot": {
     "file": "ipad-anchor-proof.png",

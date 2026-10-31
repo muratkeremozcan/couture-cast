@@ -327,6 +327,10 @@ Result model, the single policy for UI, analytics and tests:
   - V17 low, patch: a sign-out and return as the same member while an unmounted composer holds a
     committed share still emits, because only the current id is compared; a process-level
     identity epoch now supersedes the attempt.
+- 2026-10-31, after merge: the V8 ancestry rule failed `main` once PR #167 was squash-merged as
+  `6d92598f`, because the recorded commit `eab74b0d` lives only in the deleted branch's history.
+  The record now carries the git blob SHA of each anchor source, the check compares those blobs
+  with HEAD, and the commit stays as provenance. The native-harness jobs check out depth 1 again.
 
 ## Design Notes
 
