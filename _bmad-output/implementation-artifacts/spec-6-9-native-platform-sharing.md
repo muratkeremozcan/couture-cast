@@ -2,7 +2,7 @@
 title: 'CC-6.9 Native platform sharing'
 type: 'feature'
 created: '2026-10-30'
-status: 'in-progress'
+status: 'review'
 baseline_commit: '185e827c949a5a038b18f6c1fd1feb22f3aad3e9'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -195,23 +195,23 @@ Result model, the single policy for UI, analytics and tests:
 
 **Execution:**
 
-- [ ] `packages/config/src/flags.ts`, `packages/db/prisma/seeds/feature-flags.ts` -- the flag, default false, seed true -- D4.
-- [ ] `packages/api-client/src/contracts/http/share-cards.ts`, `share-cards-client.ts` -- add the `share` purpose and the capabilities contract and client (missing means off), then regenerate OpenAPI and the SDK -- D3, D4.
-- [ ] `apps/api/src/modules/share-cards/*` -- import `FeatureFlagsModule`. Add the capabilities route. Treat share like save. Return 403 with no audit when the flag is off. Put `purpose` in the audit `event_data` -- server truth.
-- [ ] `pact/http/consumer/interactions/share-cards.ts` -- share and capabilities scenarios -- contract.
-- [ ] `packages/api-client/src/types/analytics-events.ts` -- `share_card_shared` strict schema with valid outcome-to-target pairs and `duration_ms`, plus `trackShareCardShared` -- result model.
-- [ ] `apps/mobile/src/config/posthog.ts`, `apps/web/src/analytics/browser-analytics.ts` -- an event-specific final allowlist hook and `$geoip_disable` -- D5.
-- [ ] `apps/mobile/modules/share-card-native-share/` -- the new module.
+- [x] `packages/config/src/flags.ts`, `packages/db/prisma/seeds/feature-flags.ts` -- the flag, default false, seed true -- D4.
+- [x] `packages/api-client/src/contracts/http/share-cards.ts`, `share-cards-client.ts` -- add the `share` purpose and the capabilities contract and client (missing means off), then regenerate OpenAPI and the SDK -- D3, D4.
+- [x] `apps/api/src/modules/share-cards/*` -- import `FeatureFlagsModule`. Add the capabilities route. Treat share like save. Return 403 with no audit when the flag is off. Put `purpose` in the audit `event_data` -- server truth.
+- [x] `pact/http/consumer/interactions/share-cards.ts` -- share and capabilities scenarios -- contract.
+- [x] `packages/api-client/src/types/analytics-events.ts` -- `share_card_shared` strict schema with valid outcome-to-target pairs and `duration_ms`, plus `trackShareCardShared` -- result model.
+- [x] `apps/mobile/src/config/posthog.ts`, `apps/web/src/analytics/browser-analytics.ts` -- an event-specific final allowlist hook and `$geoip_disable` -- D5.
+- [x] `apps/mobile/modules/share-card-native-share/` -- the new module.
   - iOS: a presenter, a validated file-URL activity item, the completion mapping, and a Swift package for the mappers and file validation.
   - Android: a module-owned FileProvider scoped to `cache/share-cards/`, the chooser state machine, the package mapper, Robolectric tests, and an androidTest with a receiving test Activity. The test reads the granted URI, compares the SHA256, and checks that sibling and out-of-scope URIs are denied.
   - The module returns only `{target, outcome, code?}` -- D1.
-- [ ] `apps/mobile/src/lib/share-card-share(.native).ts`, `share-card-save.native.ts`, `share-card-save-operations.ts`, fixtures -- shared prepare-file helper, lease and sweep, share flow. Fixture modes: `share_completed_instagram` (iOS), `share_chosen_pinterest` (Android), `share_target_other`, `share_closed`, `share_not_confirmed` (Android), `share_failed`, `share_unavailable`.
-- [ ] `apps/mobile/components/share-card-composer.tsx` -- Share action gated by capability and module, an anchor measurement, the focus router, one event at settlement -- ACs.
-- [ ] `apps/web/src/lib/share-cards.ts`, `share-card-dialog.tsx` -- `canShare` gate, the bounded handoff authorization, the synchronous share on tap -- D2.
-- [ ] 20 locale files -- keys `share`, `sharing`, `shared`, `sentToApp`, `shareClosed`, `shareFailed`, `shareUnavailable`, `shareTapAgain` -- parity.
-- [ ] Tests: every test ID in the Test Design section below, including the serialized-request privacy tests with a sensitive URL and a registered super property.
-- [ ] `.github/workflows/pr-share-native-unit.yml` (new, path-filtered) -- Swift `swift test` and Gradle `testDebugUnitTest` for the module, failing on zero tests -- TEA G2.
-- [ ] Native lanes:
+- [x] `apps/mobile/src/lib/share-card-share(.native).ts`, `share-card-save.native.ts`, `share-card-save-operations.ts`, fixtures -- shared prepare-file helper, lease and sweep, share flow. Fixture modes: `share_completed_instagram` (iOS), `share_chosen_pinterest` (Android), `share_target_other`, `share_closed`, `share_not_confirmed` (Android), `share_failed`, `share_unavailable`.
+- [x] `apps/mobile/components/share-card-composer.tsx` -- Share action gated by capability and module, an anchor measurement, the focus router, one event at settlement -- ACs.
+- [x] `apps/web/src/lib/share-cards.ts`, `share-card-dialog.tsx` -- `canShare` gate, the bounded handoff authorization, the synchronous share on tap -- D2.
+- [x] 20 locale files -- keys `share`, `sharing`, `shared`, `sentToApp`, `shareClosed`, `shareFailed`, `shareUnavailable`, `shareTapAgain` -- parity.
+- [x] Tests: every test ID in the Test Design section below, including the serialized-request privacy tests with a sensitive URL and a registered super property.
+- [x] `.github/workflows/pr-share-native-unit.yml` (new, path-filtered) -- Swift `swift test` and Gradle `testDebugUnitTest` for the module, failing on zero tests -- TEA G2.
+- [x] Native lanes:
   - Add a `share-sheet` runner command in `scripts/run-story68-native.mjs`. It covers the fixture outcomes plus a real-sheet open-and-dismiss smoke per platform.
   - Add `share-sheet` to the dispatchable post-matrix command list in `native-ios-shards.mjs`, and replace shard 2's spread of `AFTER_MATRIX` with its explicit existing commands. Tests assert that `share-sheet` appears exactly once in `commandsForShard(1)` and never in `commandsForShard(2)`.
   - Add `share-sheet` to the interaction branch of `share-card-android.sh`.
@@ -219,7 +219,7 @@ Result model, the single policy for UI, analytics and tests:
   - The Robolectric PendingIntent construction test runs at SDK 34 and 36.
   - Run the androidTest in android36-interaction.
   - Update the timeouts and the partition tests -- TEA G1.
-- [ ] Playwright: at most 5 shared cases with share and canShare stubbed per engine, plus the matrix list update -- web ACs.
+- [x] Playwright: at most 5 shared cases with share and canShare stubbed per engine, plus the matrix list update -- web ACs.
 
 **Acceptance Criteria:**
 
@@ -257,6 +257,31 @@ Result model, the single policy for UI, analytics and tests:
 
 ## Review Triage Log
 
+- 2026-10-30, independent code review of `185e827c..` (6 findings, no byte or privacy leak found):
+  - R1 medium, fixed in `7fa049ba`: a mobile share that hit the 16 s request deadline returned
+    early as a silent AbortError and left `sharing` on screen. It now settles as `failed` with
+    `shareFailed` and focus on Save.
+  - R2 medium, fixed in `9ac2938b`: web dropped the event when the dialog closed or the
+    composition changed before handoff. Only identity change suppresses the event now. Owner
+    ruling: after handoff, a close keeps the browser-reported outcome (`handed_off`).
+  - R3 high, closed in `f33b3f31`: the iPad evidence check failed by design until the X-IPAD-ANCHOR
+    record was committed.
+  - R4 low, fixed in `bc32db6a`: an Android 15+ chooser result with no selected component (Copy,
+    Edit) reported `other/target_chosen`. It now settles as `not_confirmed/none`.
+  - R5 low, fixed in `9ac2938b`: web events now carry `locale`.
+  - R6 low, fixed in `9ac2938b`: the web handoff authorization binds to the presentation key.
+- Device and browser runs found further defects, each fixed with a regression test: iOS 26 presents
+  the activity sheet after a delay, which the presenter check read as a refusal (`2be1b14b`); the
+  web production build failed on the new analytics import (`e75ffb61`); stale-state Download and
+  Share looked enabled (`77a2c43e`); Retry and Refresh took focus below the fold (`9c367920`,
+  `cf05ed77`); a hidden placeholder stole TalkBack title focus (`07299847`); share sheet headers
+  and Android receivers showed the cache name `cc69-share-<uuid>.png`, now `couturecast-card.png`
+  (`032c0ced`, iPad proof re-recorded in `bdca18cd`).
+- Owner request, fixed in `a359d0d8`: the Android light-theme headers showed white status bar icons
+  on white, because React Native's edge-to-edge setup never sets status bar icon contrast. The info
+  modal header also showed the raw route name "modal". Before and after screenshots are under
+  `_bmad-output/test-artifacts/story-6-9/android-status-bar-*.png`.
+
 ## Design Notes
 
 Allowlists, exact match, unknown values mapped to other:
@@ -282,6 +307,32 @@ prove the bytes.
 - tsc in every touched workspace, and lint -- clean.
 
 ## Implementation Notes
+
+- RG1 to RG6 implemented as the spec's edge rulings. Flag-off share returns 403 with code
+  `share_disabled`. The capabilities client resolves `{nativeShare:false}` on every failure and
+  never rejects.
+- The shared prepare-file helper lives in `apps/mobile/src/lib/share-card-file.ts`, so the share
+  path does not import the photo-save module. Share and save hold one global operation through
+  `commitShareCardShare` and `commitShareCardSave`; share files skip settlement cleanup and age
+  out under the 30-minute mtime lease.
+- Android tests: the module's `android/unit-tests` project compiles the pure Kotlin with no Expo
+  dependency, so `pr-share-native-unit.yml` runs Robolectric without a prebuild. Tests run on a
+  Java 21 launcher because Robolectric's SDK 36 runtime refuses Java 17.
+- iOS: the test-build anchor report (`Documents/cc69-share-anchor.json`) exists only in DEBUG builds
+  with the story68 bundle id. It records the assigned sourceView and sourceRect in window points,
+  because compact iPhone presentation replaces UIKit's read-back values.
+- Composer layout: the status line reserves one line of height, so Save and Share stay still for
+  one-line copy; the column is capped at 468 pt on wide windows. The web dialog uses one action row
+  from `sm` up and caps the preview so the resting dialog fits 1280x720 without scrolling.
+- `finishingSave` copy is operation-neutral ("Finishing up") in all 20 catalogs.
+- iOS presents the share file through a `UIActivityItemSource` whose item is still the validated
+  file URL, with `LPLinkMetadata` titled `couturecast-card.png`. `originalURL` stays unset: with
+  it, iOS 26.1 showed the cache name as the header subtitle. Receivers that save by URL (Files,
+  AirDrop) may still see the cache name; this was not checked on a device.
+- Android dark mode is incomplete outside this story: the tab header title stays near-black on the
+  dark header and the feed filter band stays white. The status bar is correct in both schemes.
+- Firefox cannot launch locally on this Mac ("Could not find profile folder"); local Playwright
+  proof covers Chromium and WebKit, and CI runs all three engines.
 
 ## Test Design (TEA)
 
