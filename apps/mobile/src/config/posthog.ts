@@ -43,7 +43,8 @@ type PostHogEventProperties = NonNullable<PostHogCaptureEvent['properties']>
  * merged super properties and device enrichment. For `share_card_shared` only, the
  * envelope stays intact (event, uuid, timestamp; the SDK keeps distinct_id, type, library
  * and library_version outside this hook), `properties` become the sanitized allowlist with
- * `$geoip_disable: true`, and top-level and nested `$set`/`$set_once` are removed. A
+ * `$geoip_disable: true`, `$ip: null` and `$process_person_profile: false`, and top-level
+ * and nested `$set`/`$set_once` are removed. A
  * sanitizer refusal or any error drops the event and logs a closed code; the SDK would
  * otherwise send the unsanitized event after a throwing hook, so this never throws.
  * Every other event passes through unchanged.
