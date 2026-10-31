@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
+import { parse } from 'yaml'
 import {
   SHARE_COPY_ENV,
   SHARE_FIXTURE_MODES,
@@ -32,6 +33,7 @@ import {
   shareReceiveTestSource,
   shareSheetFlowRuns,
   shareAnchorHandler,
+  shareItemHandler,
   shareSheetUITestProject,
   withShareFixtureIngress,
 } from './story69-share-sheet.mjs'
@@ -210,6 +212,28 @@ describe('share-sheet plan', () => {
           `${platform}: ${steps[index - 1].flow} then ${step.flow}`
         )
       })
+  })
+
+  test('a failed or unavailable share never shows the success or handoff copy', () => {
+    for (const flow of ['share-failed.yaml', 'share-unavailable.yaml']) {
+      const [, steps] = fs
+        .readFileSync(path.join(repo, 'maestro/story68', flow), 'utf8')
+        .split(/^---$/m)
+        .map((document) => parse(document))
+      const absent = steps
+        .filter((step) => typeof step?.assertNotVisible === 'string')
+        .map((step) => step.assertNotVisible)
+      for (const copy of ['${MAESTRO_SHARED}', '${MAESTRO_SENT_TO_APP}'])
+        assert.ok(absent.includes(copy), `${flow} asserts ${copy} is not visible`)
+      // The absence is checked once the error copy has settled, never before the tap.
+      const settled = steps.findIndex((step) => step?.extendedWaitUntil)
+      assert.ok(settled >= 0, flow)
+      for (const copy of ['${MAESTRO_SHARED}', '${MAESTRO_SENT_TO_APP}'])
+        assert.ok(
+          steps.findIndex((step) => step?.assertNotVisible === copy) > settled,
+          `${flow} checks ${copy} after settling`
+        )
+    }
   })
 
   test('failures and unavailability prove Save, the real sheet and the Android choice prove the bytes', () => {
@@ -718,6 +742,88 @@ describe('native receiver and presenter tests', () => {
     ])
   })
 
+  test('the ingress serves the activity item report read-only, without any path', async (t) => {
+    const container = containerOf(tempDir(t))
+    fs.mkdirSync(path.join(container, 'Documents'), { recursive: true })
+    const report = path.join(container, 'Documents/cc69-share-item.json')
+    const item = {
+      id: '7c2e0b63-7b1f-4c6f-8c1f-3c9d0e2f1b22',
+      itemIsFileURL: true,
+      itemSha256: 'a'.repeat(64),
+    }
+    await withShareFixtureIngress(
+      {
+        device: UDID,
+        appId: 'com.couturecast.story68',
+        openUrl: () => undefined,
+        readContainer: async () => `${container}\n`,
+        fixturePort: 0,
+      },
+      async (port) => {
+        const get = (init) => fetch(`http://127.0.0.1:${port}/share-item`, init)
+        // Before the first sheet the report does not exist yet.
+        assert.equal((await get()).status, 404)
+        fs.writeFileSync(
+          report,
+          JSON.stringify({ ...item, path: '/private/cache/x.png' })
+        )
+        const served = await get()
+        assert.equal(served.status, 200)
+        assert.equal(served.headers.get('cache-control'), 'no-store')
+        assert.deepEqual(await served.json(), item)
+        fs.writeFileSync(
+          report,
+          JSON.stringify({ ...item, itemIsFileURL: false, itemSha256: null })
+        )
+        assert.deepEqual(await (await get()).json(), {
+          ...item,
+          itemIsFileURL: false,
+          itemSha256: null,
+        })
+        assert.equal((await get({ method: 'POST' })).status, 405)
+        for (const invalid of [
+          { ...item, itemSha256: 'A'.repeat(64) },
+          { ...item, itemSha256: '/private/cache/x.png' },
+          { ...item, itemIsFileURL: 'yes' },
+          { ...item, id: 'x' },
+        ]) {
+          fs.writeFileSync(report, JSON.stringify(invalid))
+          assert.equal((await get()).status, 503, JSON.stringify(invalid))
+        }
+        fs.writeFileSync(report, '{')
+        assert.equal((await get()).status, 503)
+      }
+    )
+    const foreign = path.join(
+      tempDir(t),
+      'Devices/OTHER/data/Containers/Data/Application/APP'
+    )
+    fs.mkdirSync(path.join(foreign, 'Documents'), { recursive: true })
+    fs.writeFileSync(
+      path.join(foreign, 'Documents/cc69-share-item.json'),
+      JSON.stringify(item)
+    )
+    await withShareFixtureIngress(
+      {
+        device: UDID,
+        appId: 'com.couturecast.story68',
+        openUrl: () => undefined,
+        readContainer: () => foreign,
+        fixturePort: 0,
+      },
+      async (port) =>
+        assert.equal((await fetch(`http://127.0.0.1:${port}/share-item`)).status, 503)
+    )
+    for (const owner of [
+      { device: 'x', appId: 'com.couturecast.story68' },
+      { device: UDID, appId: 'com.couturecast.app' },
+    ])
+      assert.throws(
+        () => shareItemHandler({ ...owner, readContainer: () => foreign }),
+        /owned_ios_share_anchor_required/
+      )
+  })
+
   test('the anchor route refuses a container outside the owned simulator', async (t) => {
     const foreign = path.join(
       tempDir(t),
@@ -919,11 +1025,13 @@ describe('runStory69ShareSheet', () => {
     await assert.rejects(runStory69ShareSheet(ctx), /share_handoff_file_removed/)
   })
 
-  test('ios: the XCUITest must print the public name, anchor and closed phase markers', () => {
+  test('ios: the XCUITest must print the item, public name, anchor, closed and failed-focus markers', () => {
     assert.deepEqual(SHARE_SHEET_UITEST_MARKERS, [
+      'CC69_PRESENTER_ITEM_PASS',
       'CC69_PRESENTER_PUBLIC_NAME_PASS',
       'CC69_PRESENTER_ANCHOR_PASS',
       'CC69_PRESENTER_CLOSED_PASS',
+      'CC69_PRESENTER_FAILED_FOCUS_PASS',
     ])
     const source = fs.readFileSync(
       path.join(repo, 'apps/mobile/native-tests/ShareCardShareSheetUITests.swift'),

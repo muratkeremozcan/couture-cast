@@ -152,4 +152,33 @@ final class ShareCardShareFileTests: XCTestCase {
     let large = try write(oversize, "share-cards/\(shareName())", in: root)
     XCTAssertThrowsError(try ShareCardShareFile.validateFile(large.absoluteString, digest(oversize), root))
   }
+
+  /// G04: the test build records what `itemForActivityType: nil` hands a receiver. A file URL
+  /// reports the SHA256 of the bytes it names, so the XCUITest can compare it to the preview digest.
+  func testHandedItemDigestsTheBytesAtAFileURL() throws {
+    let root = try cacheRoot()
+    let data = png()
+    let file = try write(data, "share-cards/\(shareName())", in: root)
+    let handed = ShareCardShareFile.handedItem(file)
+    XCTAssertTrue(handed.isFileURL)
+    XCTAssertEqual(handed.sha256, digest(data))
+    XCTAssertEqual(handed.sha256, ShareCardShareFile.sha256(data))
+    XCTAssertNotEqual(handed.sha256, digest(Data(file.path.utf8)), "the bytes, never the path")
+    let other = png(idat: [0x78, 0x9c, 0x63, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01])
+    let second = try write(other, "share-cards/\(shareName())", in: root)
+    XCTAssertEqual(ShareCardShareFile.handedItem(second).sha256, digest(other))
+  }
+
+  func testHandedItemReportsNoDigestForAnythingButAReadableFileURL() throws {
+    let root = try cacheRoot()
+    let file = try write(png(), "share-cards/\(shareName())", in: root)
+    for item: Any? in [nil, file.absoluteString, file.path, URL(string: "https://example.invalid/couturecast-card.png")!] {
+      let handed = ShareCardShareFile.handedItem(item)
+      XCTAssertFalse(handed.isFileURL, String(describing: item))
+      XCTAssertNil(handed.sha256, String(describing: item))
+    }
+    let missing = root.appendingPathComponent("share-cards/\(shareName())")
+    XCTAssertTrue(ShareCardShareFile.handedItem(missing).isFileURL)
+    XCTAssertNil(ShareCardShareFile.handedItem(missing).sha256)
+  }
 }

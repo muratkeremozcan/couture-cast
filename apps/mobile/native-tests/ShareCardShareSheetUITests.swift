@@ -6,8 +6,10 @@ import XCTest
 /// (`Documents/cc69-share-anchor.json`, served by the harness at `/share-anchor`) proves the
 /// presenter wiring: presented on the main thread from the top-most controller, sourceView set to
 /// that controller's view, sourceRect equal to the Share button frame at handoff. Closing the
-/// sheet must settle `shareClosed` and return focus to Share. The local iPad proof covers the real
-/// popover.
+/// sheet must settle `shareClosed` and return focus to Share. The activity item's test-build report
+/// (`Documents/cc69-share-item.json`, served at `/share-item`) proves the item a receiver gets is a
+/// file URL holding the previewed bytes. A failed share settles on the error and moves focus to
+/// Save. The local iPad proof covers the real popover.
 @MainActor
 final class ShareCardShareSheetUITests: XCTestCase {
   let app = XCUIApplication(bundleIdentifier: "com.couturecast.story68")
@@ -25,6 +27,14 @@ final class ShareCardShareSheetUITests: XCTestCase {
     let sourceRect: Rect
   }
 
+  /// What the activity item records when UIKit first asks for it: the SHA256 of the bytes
+  /// `itemForActivityType: nil` names, nil when it is not a readable file URL.
+  struct ItemReport: Decodable {
+    let id: String
+    let itemIsFileURL: Bool
+    let itemSha256: String?
+  }
+
   /// The accessibility-focus module's record of the last posted focus request.
   struct FocusObservation: Decodable {
     let session: String
@@ -35,7 +45,7 @@ final class ShareCardShareSheetUITests: XCTestCase {
     let posted: Bool
   }
 
-  struct Copy: Decodable { let share: String; let shareClosed: String }
+  struct Copy: Decodable { let share: String; let shareClosed: String; let save: String }
 
   enum ReadError: Error { case unavailable, timedOut }
 
@@ -126,15 +136,30 @@ final class ShareCardShareSheetUITests: XCTestCase {
     throw ReadError.timedOut
   }
 
-  func openCard() {
+  /// Opens the composer and returns the loaded preview's digest, which its identifier carries.
+  @discardableResult
+  func openCard() throws -> String {
     if element("share-card-cancel").exists { element("share-card-cancel").tap() }
     element("tab-home").tap()
     let opener = app.buttons.matching(identifier: "outfit-share-card-open").firstMatch
     for _ in 0..<8 where !opener.isHittable { app.swipeUp() }
     XCTAssertTrue(opener.waitForExistence(timeout: 20))
     opener.tap()
-    let loaded = app.images.matching(NSPredicate(format: "identifier BEGINSWITH %@", "share-card-preview-loaded-")).firstMatch
+    let prefix = "share-card-preview-loaded-"
+    let loaded = app.images.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
     XCTAssertTrue(loaded.waitForExistence(timeout: 20))
+    let digest = String(loaded.identifier.dropFirst(prefix.count))
+    XCTAssertNotNil(digest.range(of: "^[a-f0-9]{64}$", options: .regularExpression), "preview digest")
+    return digest
+  }
+
+  /// Scrolls Share into view and waits until it can be pressed.
+  func readyShare() -> XCUIElement {
+    let share = element("share-card-share")
+    for _ in 0..<8 where !share.isHittable { app.swipeUp() }
+    let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND hittable == true"), object: share)
+    XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 20), .completed)
+    return share
   }
 
   /// The sheet's own Close button (`header.closeButton`, verified on iOS 26.1), else the older
@@ -156,13 +181,11 @@ final class ShareCardShareSheetUITests: XCTestCase {
   func testSheetPresentsFromTheTopMostControllerAnchoredToShareAndClosesBackToShare() throws {
     let labels = try localizedCopy()
     fixture("real")
-    openCard()
-    let share = element("share-card-share")
-    for _ in 0..<8 where !share.isHittable { app.swipeUp() }
-    let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND hittable == true"), object: share)
-    XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 20), .completed)
+    let previewDigest = try openCard()
+    let share = readyShare()
     XCTAssertEqual(share.label, labels.share)
     let previousAnchor = try read("/share-anchor", as: AnchorReport.self)
+    let previousItem = try read("/share-item", as: ItemReport.self)
     // nil when no focus request was posted yet: the harness answers 503 until the record exists,
     // so a short poll rides out a busy host and an absent record no longer fails the test.
     let previousFocus = try? poll("/focus-observation", as: FocusObservation.self, within: 5) { _ in true }
@@ -172,6 +195,11 @@ final class ShareCardShareSheetUITests: XCTestCase {
 
     share.tap()
     XCTAssertTrue(waitForShareSheet(true, timeout: 20), "UIActivityViewController presented")
+    // AC1 on iOS: what UIKit hands a receiver is the file holding the exact previewed bytes.
+    let item = try poll("/share-item", as: ItemReport.self) { $0.id != previousItem?.id }
+    XCTAssertTrue(item.itemIsFileURL, "the activity item is a file URL")
+    XCTAssertEqual(item.itemSha256, previewDigest, "the activity item holds the previewed bytes")
+    print("CC69_PRESENTER_ITEM_PASS")
     let anchor = try poll("/share-anchor", as: AnchorReport.self) {
       $0.session != previousAnchor?.session || $0.sequence != previousAnchor?.sequence
     }
@@ -207,5 +235,27 @@ final class ShareCardShareSheetUITests: XCTestCase {
     XCTAssertEqual(focus.label, labels.share, "focus returns to Share")
     XCTAssertTrue(share.isHittable, "Share stays available")
     print("CC69_PRESENTER_CLOSED_PASS")
+  }
+
+  /// M-SHARE-FAILED's focus half, which Maestro cannot observe: a failed share shows the error and
+  /// moves focus to Save (IO5). Android device focus stays covered at component level.
+  func testFailedShareShowsTheErrorAndMovesFocusToSave() throws {
+    let labels = try localizedCopy()
+    fixture("share_failed")
+    try openCard()
+    let share = readyShare()
+    let previousFocus = try? poll("/focus-observation", as: FocusObservation.self, within: 5) { _ in true }
+
+    share.tap()
+    XCTAssertTrue(element("share-card-error").waitForExistence(timeout: 20), "the share error shows")
+    XCTAssertFalse(shareSheetPresented(), "a failed share presents no sheet")
+    let focus = try poll("/focus-observation", as: FocusObservation.self) {
+      (previousFocus == nil || $0.session == previousFocus?.session)
+        && $0.sequence > (previousFocus?.sequence ?? -1)
+        && $0.posted && $0.attached && $0.identifier == "share-card-save"
+    }
+    XCTAssertEqual(focus.label, labels.save, "focus moves to Save")
+    XCTAssertTrue(element("share-card-save").isEnabled, "Save stays usable")
+    print("CC69_PRESENTER_FAILED_FOCUS_PASS")
   }
 }

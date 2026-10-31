@@ -403,9 +403,11 @@ export function shareReceiveFailureSummary(log) {
 
 export const SHARE_SHEET_UITEST_CLASS = 'ShareCardShareSheetUITests'
 export const SHARE_SHEET_UITEST_MARKERS = Object.freeze([
+  'CC69_PRESENTER_ITEM_PASS',
   'CC69_PRESENTER_PUBLIC_NAME_PASS',
   'CC69_PRESENTER_ANCHOR_PASS',
   'CC69_PRESENTER_CLOSED_PASS',
+  'CC69_PRESENTER_FAILED_FOCUS_PASS',
 ])
 
 /**
@@ -530,20 +532,13 @@ function recorded(ctx, binary, args, name, { timeout, env = {} }) {
 }
 
 /**
- * The share module's test-build anchor report, `Documents/cc69-share-anchor.json` in the owned
- * app's container, served read-only at `/share-anchor`: 404 before the first presentation, the
- * closed record after it, 503 for anything malformed or outside the owned container.
+ * A read-only route over one test-build report in the owned app's `Documents`: 404 before the
+ * report exists, the closed record `project` returns after it, 503 for anything malformed or
+ * outside the owned container.
  */
-export function shareAnchorHandler({
-  device,
-  appId,
-  readContainer,
-  readFile = fs.readFileSync,
-}) {
-  if (appId !== 'com.couturecast.story68' || !/^[A-Fa-f0-9-]{36}$/.test(device))
-    throw new Error('owned_ios_share_anchor_required')
+function ownedReportHandler({ device, readContainer, readFile, route, file, project }) {
   return (request, response) => {
-    if (request.url !== '/share-anchor') return false
+    if (request.url !== route) return false
     if (request.method !== 'GET') {
       response.writeHead(405).end()
       return true
@@ -558,51 +553,19 @@ export function shareAnchorHandler({
           throw new Error('owned_container_required')
         let text
         try {
-          text = readFile(
-            path.join(directory, 'Documents/cc69-share-anchor.json'),
-            'utf8'
-          )
+          text = readFile(path.join(directory, 'Documents', file), 'utf8')
         } catch (error) {
           if (error?.code !== 'ENOENT') throw error
           response.writeHead(404).end()
           return
         }
-        const record = JSON.parse(text)
-        const rect = record.sourceRect
-        if (
-          !/^[a-f0-9-]{36}$/i.test(record.session) ||
-          !Number.isSafeInteger(record.sequence) ||
-          record.sequence < 0 ||
-          ![
-            'presented',
-            'mainThread',
-            'sourceViewSet',
-            'sourceViewIsPresenterView',
-          ].every((key) => typeof record[key] === 'boolean') ||
-          !['x', 'y', 'width', 'height'].every((key) => Number.isFinite(rect?.[key]))
-        )
-          throw new Error('invalid_record')
+        const record = project(JSON.parse(text))
         response
           .writeHead(200, {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-store',
           })
-          .end(
-            JSON.stringify({
-              session: record.session,
-              sequence: record.sequence,
-              presented: record.presented,
-              mainThread: record.mainThread,
-              sourceViewSet: record.sourceViewSet,
-              sourceViewIsPresenterView: record.sourceViewIsPresenterView,
-              sourceRect: {
-                x: rect.x,
-                y: rect.y,
-                width: rect.width,
-                height: rect.height,
-              },
-            })
-          )
+          .end(JSON.stringify(record))
       } catch {
         response.writeHead(503).end()
       }
@@ -617,6 +580,87 @@ export function shareAnchorHandler({
     }
     return true
   }
+}
+
+const ownedShareReport = (device, appId) => {
+  if (appId !== 'com.couturecast.story68' || !/^[A-Fa-f0-9-]{36}$/.test(device))
+    throw new Error('owned_ios_share_anchor_required')
+}
+
+/**
+ * The share module's test-build anchor report, `Documents/cc69-share-anchor.json` in the owned
+ * app's container, served read-only at `/share-anchor`.
+ */
+export function shareAnchorHandler({
+  device,
+  appId,
+  readContainer,
+  readFile = fs.readFileSync,
+}) {
+  ownedShareReport(device, appId)
+  return ownedReportHandler({
+    device,
+    readContainer,
+    readFile,
+    route: '/share-anchor',
+    file: 'cc69-share-anchor.json',
+    project: (record) => {
+      const rect = record.sourceRect
+      if (
+        !/^[a-f0-9-]{36}$/i.test(record.session) ||
+        !Number.isSafeInteger(record.sequence) ||
+        record.sequence < 0 ||
+        !['presented', 'mainThread', 'sourceViewSet', 'sourceViewIsPresenterView'].every(
+          (key) => typeof record[key] === 'boolean'
+        ) ||
+        !['x', 'y', 'width', 'height'].every((key) => Number.isFinite(rect?.[key]))
+      )
+        throw new Error('invalid_record')
+      return {
+        session: record.session,
+        sequence: record.sequence,
+        presented: record.presented,
+        mainThread: record.mainThread,
+        sourceViewSet: record.sourceViewSet,
+        sourceViewIsPresenterView: record.sourceViewIsPresenterView,
+        sourceRect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      }
+    },
+  })
+}
+
+/**
+ * The activity item's test-build report, `Documents/cc69-share-item.json`, served read-only at
+ * `/share-item`: a fresh id per item, whether `itemForActivityType: nil` returned a file URL and
+ * the SHA256 of the bytes it names (null for anything else). No path is ever served.
+ */
+export function shareItemHandler({
+  device,
+  appId,
+  readContainer,
+  readFile = fs.readFileSync,
+}) {
+  ownedShareReport(device, appId)
+  return ownedReportHandler({
+    device,
+    readContainer,
+    readFile,
+    route: '/share-item',
+    file: 'cc69-share-item.json',
+    project: (record) => {
+      if (
+        !/^[a-f0-9-]{36}$/i.test(record.id) ||
+        typeof record.itemIsFileURL !== 'boolean' ||
+        !(record.itemSha256 === null || /^[a-f0-9]{64}$/.test(record.itemSha256))
+      )
+        throw new Error('invalid_record')
+      return {
+        id: record.id,
+        itemIsFileURL: record.itemIsFileURL,
+        itemSha256: record.itemSha256,
+      }
+    },
+  })
 }
 
 const execFileText = promisify(execFile)
@@ -651,7 +695,8 @@ function cachedContainer(ctx) {
 /**
  * The loopback ingress ShareCardShareSheetUITests talks to while it runs: `/fixture?mode=` for the
  * share modes (as the a11y runner serves its own modes), `/focus-observation` for the posted
- * focus request and `/share-anchor` for the presenter's anchor report.
+ * focus request, `/share-anchor` for the presenter's anchor report and `/share-item` for the
+ * activity item's report.
  */
 export async function withShareFixtureIngress(
   ctx,
@@ -666,6 +711,7 @@ export async function withShareFixtureIngress(
       readContainer,
     }),
     shareAnchorHandler({ device: ctx.device, appId: ctx.appId, readContainer }),
+    shareItemHandler({ device: ctx.device, appId: ctx.appId, readContainer }),
   ]
   const server = createServer((request, response) => {
     if (routes.some((route) => route(request, response))) return

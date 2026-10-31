@@ -21,11 +21,22 @@ enum ShareCardShareFile {
       (try url.resourceValues(forKeys: [.isSymbolicLinkKey])).isSymbolicLink == false
     else { throw InvalidFile() }
     let data = try Data(contentsOf: url, options: .mappedIfSafe)
-    guard data.count <= maximumBytes,
-      SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == digest
-    else { throw InvalidFile() }
+    guard data.count <= maximumBytes, sha256(data) == digest else { throw InvalidFile() }
     try validatePng(data)
     return url
+  }
+
+  static func sha256(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+  }
+
+  /// What a receiver gets from an activity item: whether it is a file URL, and the SHA256 of the
+  /// bytes at that URL. `sha256` is nil for any other item or an unreadable file. The test build
+  /// records this for the item `itemForActivityType: nil` returns (G04).
+  static func handedItem(_ item: Any?) -> (isFileURL: Bool, sha256: String?) {
+    guard let url = item as? URL, url.isFileURL else { return (false, nil) }
+    guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return (true, nil) }
+    return (true, sha256(data))
   }
 
   static func isShareDirectoryName(_ name: String) -> Bool {
