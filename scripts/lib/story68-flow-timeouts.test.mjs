@@ -248,8 +248,8 @@ describe('Story 6.9 share flow timeouts', () => {
       assert.match(text, /file: tap-share\.yaml/, `${flow} taps through tap-share`)
       assert.equal(
         (text.match(/file: tap-share\.yaml/g) ?? []).length,
-        flow.endsWith('share-other.yaml') ? 2 : 1,
-        `${flow}: one tap per platform branch`
+        1,
+        `${flow}: one tap`
       )
     }
     assert.equal(

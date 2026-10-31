@@ -1,31 +1,16 @@
 appId: ${MAESTRO_APP_ID}
 ---
 # M-SHARE-OTHER: fixture share_target_other reports an app outside the allowlist, {other,
-# completed} on iOS and {other, target_chosen} on Android. Each platform shows its own copy:
-# `shared` on iOS, `sentToApp` on Android, which never claims a post was published.
+# completed} on iOS and {other, target_chosen} on Android. Both show `sentToApp`, never `shared`:
+# an app outside the allowlist (Copy, Print, Drive, Files) may post nothing.
 - runFlow:
-    when:
-      platform: iOS
-    commands:
-      - runFlow:
-          file: tap-share.yaml
-          env:
-            MAESTRO_SHARE_OUTCOME: ${MAESTRO_SHARED}
-      - extendedWaitUntil:
-          visible: ${MAESTRO_SHARED}
-          timeout: 20000
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - runFlow:
-          file: tap-share.yaml
-          env:
-            MAESTRO_SHARE_OUTCOME: ${MAESTRO_SENT_TO_APP}
-      - extendedWaitUntil:
-          visible: ${MAESTRO_SENT_TO_APP}
-          timeout: 20000
-      - assertNotVisible: ${MAESTRO_SHARED}
+    file: tap-share.yaml
+    env:
+      MAESTRO_SHARE_OUTCOME: ${MAESTRO_SENT_TO_APP}
+- extendedWaitUntil:
+    visible: ${MAESTRO_SENT_TO_APP}
+    timeout: 20000
+- assertNotVisible: ${MAESTRO_SHARED}
 - assertVisible:
     id: share-card-feedback
 - assertNotVisible:

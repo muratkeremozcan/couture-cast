@@ -1118,6 +1118,16 @@ describe('Story 6.9 composer Share', () => {
     expect(shareFiles()).toHaveLength(1)
     expectSaveUsable()
   })
+  it('C-COMP-SHARE-OTHER: iOS completed into an unknown target says Sent to the app, never Shared', async () => {
+    boundary.shareFile.mockResolvedValue({ target: 'other', outcome: 'completed' })
+    await readyShare()
+    await tapShare()
+    expect(await screen.findByText(i18n.t('shareCard.sentToApp'))).toBeInTheDocument()
+    expect(screen.queryByText(i18n.t('shareCard.shared'))).not.toBeInTheDocument()
+    await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(45))
+    await settledEvent({ client: 'ios', target: 'other', outcome: 'completed' })
+    expectSaveUsable()
+  })
   it.each([
     ['ios', { target: 'pinterest', outcome: 'cancelled' }],
     ['ios', { target: 'none', outcome: 'cancelled' }],
@@ -1464,7 +1474,7 @@ describe('Story 6.9 composer Share', () => {
         'true'
       )
     )
-    boundary.shareFile.mockResolvedValue({ target: 'other', outcome: 'completed' })
+    boundary.shareFile.mockResolvedValue({ target: 'facebook', outcome: 'completed' })
     await tapShare()
     expect(await screen.findByText(i18n.t('shareCard.shared'))).toBeInTheDocument()
     await act(async () => {

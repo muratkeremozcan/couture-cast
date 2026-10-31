@@ -107,7 +107,9 @@ describe('share-card catalog parity', () => {
           flatten(baseline.client)[key]!.match(/{{[^}]+}}/g) ?? []
         )
       }
-      // A handoff or a closed sheet never reads as a finished post.
+      // A handoff or a closed sheet never reads as a finished post. The chosen app may be
+      // Drive, Gmail or Files, so `sentToApp` is one sentence that claims only the handoff.
+      expect(values.sentToApp!.match(/[.!?](\s|$)/g)).toHaveLength(1)
       expect(values.sentToApp).not.toBe(values.shared)
       expect(values.shareClosed).not.toBe(values.shared)
       expect(values.sentToApp).not.toBe(values.shareClosed)

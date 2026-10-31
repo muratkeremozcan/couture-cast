@@ -103,6 +103,11 @@ const shareFeedback: Record<
   failed: { key: 'shareFailed', error: true },
   unavailable: { key: 'shareUnavailable', error: true },
 }
+/** iOS completed into an app outside the allowlist (Copy, Print, Files) claims only the handoff. */
+const shareFeedbackFor = ({ outcome, target }: ShareCardShareSettlement) =>
+  outcome === 'completed' && target === 'other'
+    ? shareFeedback.handed_off
+    : shareFeedback[outcome]
 /** Every share outcome except failed and unavailable returns focus to Share. */
 const focusShareAfter = new Set(['shared', 'sentToApp', 'shareClosed'])
 const focusSaveAfter = new Set(['saved', 'shareFailed', 'shareUnavailable'])
@@ -596,7 +601,7 @@ export function ShareCardComposer({
         return
       }
     }
-    const feedback = shareFeedback[settlement.outcome]
+    const feedback = shareFeedbackFor(settlement)
     setError(feedback.error ? feedback.key : null)
     setMessage(feedback.error ? null : feedback.key)
   }

@@ -164,7 +164,10 @@ describe('share-card catalog parity', () => {
           english[key].match(/{{[^}]+}}/g) ?? []
         )
       }
-      // `shared` is iOS completed only. Chosen and closed must never read as posted.
+      // `shared` is iOS completed into a known app only. Chosen, other and closed must never
+      // read as posted. Drive, Gmail, Files, Copy and Print post nothing, so `sentToApp` is one
+      // sentence that claims only the handoff.
+      expect(client.sentToApp.match(/[.!?](\s|$)/g)).toHaveLength(1)
       expect(client.sentToApp).not.toBe(client.shared)
       expect(client.shareClosed).not.toBe(client.shared)
       expect(client.sentToApp).not.toContain(client.shared)

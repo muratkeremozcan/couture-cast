@@ -44,7 +44,7 @@ const catalog = {
     share: 'Share',
     sharing: 'Opening share options…',
     shared: 'Shared',
-    sentToApp: 'Sent to the app you chose. Finish posting there.',
+    sentToApp: 'Sent to the app you chose.',
     shareClosed: 'Share closed. Your card is still here.',
     shareFailed: "Sharing didn't work. Your card is still here; you can save it instead.",
     shareUnavailable:
@@ -69,10 +69,7 @@ describe('share copy', () => {
   test('every share key becomes an escaped Maestro text selector', () => {
     const env = shareCopyEnv(catalog)
     assert.deepEqual(Object.keys(env).sort(), Object.values(SHARE_COPY_ENV).sort())
-    assert.equal(
-      env.MAESTRO_SENT_TO_APP,
-      'Sent to the app you chose\\. Finish posting there\\.'
-    )
+    assert.equal(env.MAESTRO_SENT_TO_APP, 'Sent to the app you chose\\.')
     for (const [key, name] of Object.entries(SHARE_COPY_ENV))
       assert.ok(new RegExp(`^${env[name]}$`).test(catalog.shareCard[key]), key)
     assert.equal(
@@ -99,7 +96,7 @@ describe('share-sheet plan', () => {
       'share-failed.yaml': 'shareFailed',
       'share-completed.yaml': 'shared',
       'share-closed.yaml': 'shareClosed',
-      'share-other.yaml': 'shared',
+      'share-other.yaml': 'sentToApp',
       'share-sheet.yaml': 'shareClosed',
     },
     android: {
