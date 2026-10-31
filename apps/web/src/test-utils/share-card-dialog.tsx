@@ -6,7 +6,7 @@ import { webcrypto } from 'node:crypto'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { beforeEach, vi } from 'vitest'
+import { beforeEach, vi, type Mock } from 'vitest'
 import { preparedShareCardFixture } from '@couture/api-client/testing/share-card-fixture'
 import { ShareCardControl } from '../app/components/share-card-dialog'
 import { currentI18n } from '../i18n'
@@ -18,7 +18,8 @@ export const source = {
 } as const
 export const endpoint = 'http://localhost:3001/api/v1/share-cards/prepare'
 export const requests: unknown[] = []
-export const handoff = vi.fn()
+// Annotated: the inferred `vi.fn()` type names an internal Vitest chunk.
+export const handoff: Mock = vi.fn()
 
 export const handler = () =>
   http.post(endpoint, async ({ request }) => {

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/await-thenable */
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
@@ -25,12 +24,15 @@ vi.mock('expo-localization', () => ({
 
 const mockCapture = vi.fn()
 const mockGetDistinctId = vi.fn(() => 'test-user-id')
+// The real hook memoizes its client, and the screen's deep-link effect depends on it. A fresh
+// object per render would re-run that effect on every render and re-raise a dismissed banner.
+const mockAnalytics = {
+  capture: mockCapture,
+  getDistinctId: mockGetDistinctId,
+  screen: vi.fn(),
+}
 vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
-    capture: mockCapture,
-    getDistinctId: mockGetDistinctId,
-    screen: vi.fn(),
-  }),
+  useMobileAnalytics: () => mockAnalytics,
   MobileAnalyticsDiagnosticsPanel: () => null,
 }))
 
@@ -107,7 +109,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
       timestamp: Date.now(),
     })
 
-    renderScreen()
+    await renderScreen()
 
     await waitFor(() => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
@@ -127,7 +129,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
       timestamp: Date.now(),
     })
 
-    renderScreen()
+    await renderScreen()
 
     await waitFor(() => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
@@ -143,7 +145,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
       timestamp: Date.now() - 16 * 60 * 1000,
     })
 
-    renderScreen()
+    await renderScreen()
 
     await waitFor(() => {
       expect(ritualRequestCount).toBe(1)
@@ -156,7 +158,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
   it('3.3-MOB-HERO-13 recovers from the error state via Retry and announces the refreshed conditions', async () => {
     server.use(http.get('*/api/v1/ritual', () => new HttpResponse(null, { status: 500 })))
 
-    renderScreen()
+    await renderScreen()
     await waitFor(() => {
       expect(screen.getByTestId('hero-error-state')).toBeTruthy()
     })
@@ -180,7 +182,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
   it('3.3-MOB-HERO-14 hands a community notification to the community route without clearing its params', async () => {
     mockParams = { source: 'notification', type: 'community', cardId: 'look-42' }
 
-    renderScreen()
+    await renderScreen()
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith({
@@ -196,7 +198,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
   it('3.3-MOB-HERO-15 lets the user dismiss the invalid deep-link banner', async () => {
     mockParams = { source: 'invalid_source', slot: 'bad_slot' }
 
-    renderScreen()
+    await renderScreen()
     await waitFor(() => {
       expect(screen.getByTestId('deep-link-info-banner')).toBeTruthy()
     })
@@ -211,7 +213,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
   })
 
   it('3.3-MOB-HERO-16 returns focus to the garment that opened the swap sheet when it is cancelled', async () => {
-    renderScreen()
+    await renderScreen()
     await waitFor(() => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })

@@ -62,15 +62,30 @@ function withPinnedPoolSize(url: string): string {
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@couture/api-client/contracts/http': resolve(
-        __dirname,
-        '../../packages/api-client/src/contracts/http/index.ts'
-      ),
-      '@couture/utils': resolve(__dirname, '../../packages/utils/src/index.ts'),
-      '@couture/config': resolve(__dirname, '../../packages/config/src/index.ts'),
-      '@couture/api-client': resolve(__dirname, '../../packages/api-client/src/index.ts'),
-    },
+    alias: [
+      // Exact matches only. Vitest 5 applies a string alias to every subpath as well, so
+      // `@couture/api-client/testing/...` would become `.../src/index.ts/testing/...`;
+      // subpaths keep resolving through each package's exports map.
+      {
+        find: /^@couture\/api-client\/contracts\/http$/,
+        replacement: resolve(
+          __dirname,
+          '../../packages/api-client/src/contracts/http/index.ts'
+        ),
+      },
+      {
+        find: /^@couture\/utils$/,
+        replacement: resolve(__dirname, '../../packages/utils/src/index.ts'),
+      },
+      {
+        find: /^@couture\/config$/,
+        replacement: resolve(__dirname, '../../packages/config/src/index.ts'),
+      },
+      {
+        find: /^@couture\/api-client$/,
+        replacement: resolve(__dirname, '../../packages/api-client/src/index.ts'),
+      },
+    ],
   },
   test: {
     // At most four test files at once, whatever the core count. The DB-backed

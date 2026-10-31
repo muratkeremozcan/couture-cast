@@ -1,6 +1,5 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
-/* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.5: after a native cold start, Home's first load can run before the stored
 // session is restored. It must load once the identity is ready rather than leave the
 // "unable to load" state up for good.

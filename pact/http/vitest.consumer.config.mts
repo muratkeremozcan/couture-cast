@@ -7,23 +7,33 @@ const projectRoot = path.resolve(__dirname, '../..')
 
 export default defineConfig({
   resolve: {
-    alias: {
+    alias: [
+      // Exact matches only. Vitest 5 applies a string alias to every subpath as well, so
+      // `@couture/api-client/testing/...` would become `.../src/index.ts/testing/...`;
+      // subpaths keep resolving through each package's exports map.
+      //
       // HTTP consumers import the mobile community adapter, whose native picker
       // capability is outside this Node protocol runner. Resolve before Vite
       // transforms React Native's Flow entrypoint; a runtime mock is too late.
-      'react-native': path.resolve(
-        projectRoot,
-        'pact/http/consumer/react-native-platform.ts'
-      ),
-      '@couture/api-client/contracts/http': path.resolve(
-        projectRoot,
-        'packages/api-client/src/contracts/http/index.ts'
-      ),
-      '@couture/api-client': path.resolve(
-        projectRoot,
-        'packages/api-client/src/index.ts'
-      ),
-    },
+      {
+        find: /^react-native$/,
+        replacement: path.resolve(
+          projectRoot,
+          'pact/http/consumer/react-native-platform.ts'
+        ),
+      },
+      {
+        find: /^@couture\/api-client\/contracts\/http$/,
+        replacement: path.resolve(
+          projectRoot,
+          'packages/api-client/src/contracts/http/index.ts'
+        ),
+      },
+      {
+        find: /^@couture\/api-client$/,
+        replacement: path.resolve(projectRoot, 'packages/api-client/src/index.ts'),
+      },
+    ],
   },
   test: {
     environment: 'node',

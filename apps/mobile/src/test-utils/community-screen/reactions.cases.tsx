@@ -1,6 +1,5 @@
 // Learning path Step 41: Curated reactions.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
-/* eslint-disable @typescript-eslint/await-thenable */
 import {
   imageEvents,
   item,

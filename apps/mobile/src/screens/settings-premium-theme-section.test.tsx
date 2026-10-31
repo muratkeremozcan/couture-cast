@@ -11,7 +11,6 @@
 // applied palette, so the preview card re-coloring on selection is what proves AC 4's
 // instant apply end to end; a mocked context would prove only that the section calls a
 // setter.
-/* eslint-disable @typescript-eslint/await-thenable */
 import { http, HttpResponse } from 'msw'
 import { screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'

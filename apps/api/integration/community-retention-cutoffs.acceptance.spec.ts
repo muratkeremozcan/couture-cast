@@ -134,7 +134,7 @@ afterAll(async () => {
   expect(outcomes.filter((outcome) => outcome.status === 'rejected')).toEqual([])
 }, 120_000)
 
-describe.sequential('retention cutoffs', () => {
+describe('retention cutoffs', { concurrent: false }, () => {
   it('deletes exactly what is past each cutoff and keeps what is one minute inside it', async () => {
     const actor = await active()
     const [oldDetail, newDetail, oldToken, newToken] = await Promise.all([

@@ -14,10 +14,8 @@
 // NOT mocked; `palette-advisor.ts` imports `withRequestTimeout` from it, and replacing
 // that with a `vi.fn()` would silently stop every request this suite is meant to make.
 /*
- * `vitest-browser-react`'s `render` and this repo's `press` helper both return
- * plain values rather than promises, but every sibling screen suite awaits them
- * so the call sites read the same whichever helper is in use. Same disable, same
- * reason, as `settings-premium-theme-section.test.tsx`.
+ * This repo's `press` helper returns a plain value, but the suite awaits it like the
+ * promise-returning `render` so every interaction step reads the same way.
  */
 /* eslint-disable @typescript-eslint/await-thenable */
 import { http, HttpResponse } from 'msw'

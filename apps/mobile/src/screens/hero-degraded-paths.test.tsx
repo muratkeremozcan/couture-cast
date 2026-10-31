@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/await-thenable */
 // Covers the hero screen's degraded and native-only paths: a durable cache
 // that refuses writes, a widget slot that maps to a named scenario, and the
 // iOS accessibility-focus routes the web renderer never takes.
@@ -145,7 +144,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
     // cost the user the recommendation they already fetched.
     saveRitualCacheMock.mockRejectedValue(new Error('quota exceeded'))
 
-    renderScreen()
+    await renderScreen()
 
     await waitFor(() => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
@@ -159,7 +158,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
   it('3.3-MOB-HERO-18 keeps a garment swap applied when the cache write fails', async () => {
     saveRitualCacheMock.mockRejectedValue(new Error('quota exceeded'))
 
-    renderScreen()
+    await renderScreen()
     await waitFor(() => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })
@@ -184,7 +183,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
     // outright and take a different branch of the widget handler.
     mockParams = { source: 'widget', size: 'small', slot: 'evening' }
 
-    renderScreen()
+    await renderScreen()
 
     await waitFor(() => {
       expect(screen.getByTestId('garment-tile-crewneck-sweater')).toBeTruthy()
@@ -210,7 +209,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
       )
     )
 
-    renderScreen()
+    await renderScreen()
 
     await waitFor(() => {
       expect(screen.getByTestId('severe-weather-alert-focused')).toBeTruthy()
@@ -226,7 +225,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
   it('3.3-MOB-HERO-21 moves native accessibility focus into the swap sheet', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
 
-    renderScreen()
+    await renderScreen()
     await waitFor(() => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })
@@ -249,7 +248,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
   })
 
   it('R52 the swap sheet covers the system bars and stays above the gesture bar', async () => {
-    renderScreen()
+    await renderScreen()
     await waitFor(() => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })
@@ -286,7 +285,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
       })
     )
 
-    renderScreen()
+    await renderScreen()
     await act(async () => {
       await i18n.changeLanguage('tr-TR')
     })

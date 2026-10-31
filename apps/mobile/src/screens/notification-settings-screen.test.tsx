@@ -1,6 +1,5 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
-/* eslint-disable @typescript-eslint/await-thenable */
 // R11: native settings rendering with actual generated HTTP and a controlled verified session.
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'

@@ -1,6 +1,5 @@
 // Learning path Step 44: Community city spotlight.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
-/* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.6 owner: City Spotlight code review round 2 remedies through the real HTTP boundary.
 import { item, feedJson, imageEvents, serveFeed } from './harness'
 import { CommunitySyncState } from '@couture/api-client'
