@@ -46,6 +46,18 @@ const SHARE_KEYS = [
   'shareTapAgain',
 ] as const
 const SURFACE_KEYS = ['shareFailed', 'shareUnavailable'] as const
+// U-SHARE-LOCALES truthfulness: the handoff, closed-sheet and tap-again copy never claims
+// that a post was published, in the locale's own words.
+const OUTCOME_KEYS = ['sentToApp', 'shareClosed', 'shareTapAgain'] as const
+const PUBLISHED_CLAIM: Record<string, RegExp> = {
+  en: /\b(posted|published)\b/i,
+  de: /veröffentlicht|gepostet/i,
+  fr: /publié/i,
+  es: /publicad/i,
+  pt: /publicad/i,
+  it: /pubblicat/i,
+  tr: /yayınlandı/i,
+}
 const withoutSurfaceKeys = (catalog: Catalog) =>
   Object.fromEntries(
     Object.entries(catalog).filter(
@@ -98,7 +110,7 @@ describe('share-card catalog parity', () => {
   )
   it.each(catalogs)(
     'U-SHARE-LOCALES: $locale has every share key, truthful outcome copy and Download wording',
-    ({ client, other }) => {
+    ({ locale, client, other }) => {
       const values = flatten(client)
       for (const key of SHARE_KEYS) {
         expect(typeof values[key]).toBe('string')
@@ -113,6 +125,9 @@ describe('share-card catalog parity', () => {
       expect(values.sentToApp).not.toBe(values.shared)
       expect(values.shareClosed).not.toBe(values.shared)
       expect(values.sentToApp).not.toBe(values.shareClosed)
+      const claim = PUBLISHED_CLAIM[locale.slice(0, 2)]
+      expect(claim).toBeDefined()
+      for (const key of OUTCOME_KEYS) expect(values[key]).not.toMatch(claim!)
       // The tap-again prompt names the visible Share button.
       expect(values.shareTapAgain).toContain(values.share!)
       // Web offers Download where mobile offers Save.

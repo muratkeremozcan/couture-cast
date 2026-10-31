@@ -161,6 +161,11 @@ describe('I-SHARE-WIRE-WEB: the serialized posthog-js batch', () => {
     // The envelope: event, uuid and the SDK's own time field; no person updates.
     expect(share!.uuid).toMatch(/^[0-9a-f-]{36}$/)
     expect(share!.timestamp ?? share!.offset).toBeDefined()
+    expect(
+      Object.keys(share!)
+        .filter((key) => key !== 'timestamp' && key !== 'offset')
+        .sort()
+    ).toEqual(['event', 'properties', 'uuid'])
     expect(share).not.toHaveProperty('$set')
     expect(share).not.toHaveProperty('$set_once')
     const serialized = JSON.stringify(share)
