@@ -1460,3 +1460,15 @@ file's own Code Review Findings section.
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
   summary: Locally verified the final Community-entry and Comments-action prefix on the Medium phone.
   evidence: A short actual-prefix probe passed1/1in1m1s with the final helper, filter selection, exact Comments search/tap, required sheet-open assertion, real close and Community return. Its readable sheet screenshot was independently inspected. The probe omits unchanged typing; the full new-head remote comments journey remains required.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`
+  summary: Android dark mode is incomplete app-wide.
+  evidence: PR167 screenshots show the header title staying near-black on the dark header and the PERSONAL/COMMUNITY/SPONSORED band staying white. Story 6.9 fixed only the light-theme status bar icons.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`
+  summary: The X-SHARE-DEVICE physical-device rows are not run.
+  evidence: Target mapping for the Pinterest, Instagram, Facebook and TikTok apps is proven by unit tests only, because simulators and emulators lack those apps. iOS Files and AirDrop may still show the cache name cc69-share-…. Run these rows on physical devices before share_card_native_share_enabled goes on beyond dev.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`
+  summary: Firefox does not launch locally for the share-card Playwright suite.
+  evidence: Local runs fail with "Could not find profile folder", so Firefox coverage for the web Share action comes from CI only.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`
+  summary: Two existing layout defects remain in the share-card composer and web dialog.
+  evidence: Two-line composer errors still move the Save and Share buttons. The web stale state scrolls 53 px at 720 and 768 px tall, unchanged since Story 6.8.

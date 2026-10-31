@@ -2,7 +2,7 @@
 title: 'CC-6.9 Native platform sharing'
 type: 'feature'
 created: '2026-10-30'
-status: 'in-review'
+status: 'done'
 baseline_commit: '185e827c949a5a038b18f6c1fd1feb22f3aad3e9'
 route: 'dispatch'
 review_loop_iteration: 0
