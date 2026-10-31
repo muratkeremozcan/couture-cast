@@ -95,4 +95,5 @@ _bmad-output/test-artifacts/story-*/**
 !_bmad-output/test-artifacts/story-6-9/ipad-anchor-*.png
 !_bmad-output/test-artifacts/story-6-9/android-status-bar-*.png
 !_bmad-output/test-artifacts/story-6-9/composer-status-*.png
+!_bmad-output/test-artifacts/story-6-9/composer-fit-*.png
 !_bmad-output/test-artifacts/story-6-9/web-stale-*.png

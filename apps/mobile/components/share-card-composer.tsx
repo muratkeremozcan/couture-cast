@@ -9,6 +9,7 @@ import {
   AccessibilityInfo,
   AppState,
   Image,
+  type LayoutChangeEvent,
   Linking,
   PixelRatio,
   Pressable,
@@ -137,6 +138,8 @@ const ANCHOR_TIMEOUT_MS = 1000
 /** The app's 420-pt tablet convention (modals, spotlight cards): content stays phone-sized. */
 const CONTENT_MAX_WIDTH = 420
 const CONTENT_INSET = 24
+const CONTENT_GAP = 16
+const ACTION_GAP = 12
 const PREVIEW_ASPECT = 1080 / 1350
 /** Share of a wide window's height the preview may take, so every action stays on screen. */
 const WIDE_PREVIEW_HEIGHT_SHARE = 0.45
@@ -179,6 +182,63 @@ function useWidePreviewWidth() {
     Math.floor(height * WIDE_PREVIEW_HEIGHT_SHARE * PREVIEW_ASPECT)
   )
 }
+/**
+ * The narrowest preview the fit may leave: the card's 36-px body text still renders at 8 pt. A
+ * composer that does not fit even then (large text sizes) keeps this width and scrolls.
+ */
+const PREVIEW_MIN_WIDTH = 240
+/**
+ * The preview width that keeps every action on screen at rest: the height the viewport has left
+ * after the rest of the composer, at the card's aspect ratio, within the column (or a wide
+ * window's cap) and the legible floor. Null keeps the full-width preview. On a 375-by-667 iPhone
+ * the full-width card alone takes 409 of the 615 pt the composer can show, so it gives way; an
+ * iPhone 17 Pro or a 411-dp Android phone keeps the full width.
+ */
+export function fittedPreviewWidth(
+  column: number,
+  viewport: number,
+  chrome: number,
+  cap: number | null
+): number | null {
+  const fit = Math.floor((viewport - chrome) * PREVIEW_ASPECT)
+  const limit = cap ?? column
+  if (fit >= limit) return cap
+  return Math.min(limit, Math.max(PREVIEW_MIN_WIDTH, fit))
+}
+type FitFrames = { viewport: number; above: number; below: number }
+/**
+ * Measures the scroll viewport and the blocks above and below the preview. Neither block depends
+ * on the preview's size, so a measurement never feeds back into itself. Copy that grows a block
+ * (a wrapped recovery row, feedback past its reserved lines) takes its height from the preview.
+ */
+function usePreviewFit() {
+  const { width } = useWindowDimensions()
+  const cap = useWidePreviewWidth()
+  const [frames, setFrames] = useState<FitFrames>({ viewport: 0, above: 0, below: 0 })
+  const measure =
+    (key: keyof FitFrames) =>
+    ({ nativeEvent }: LayoutChangeEvent) => {
+      const { height } = nativeEvent.layout
+      setFrames((current) =>
+        Math.abs(current[key] - height) < 0.5 ? current : { ...current, [key]: height }
+      )
+    }
+  const column = Math.min(width - 2 * CONTENT_INSET, CONTENT_MAX_WIDTH)
+  const measured = frames.viewport > 0 && frames.above > 0 && frames.below > 0
+  return {
+    width: measured
+      ? fittedPreviewWidth(
+          column,
+          frames.viewport,
+          frames.above + frames.below + 2 * CONTENT_GAP,
+          cap
+        )
+      : cap,
+    onViewport: measure('viewport'),
+    onAbove: measure('above'),
+    onBelow: measure('below'),
+  }
+}
 /** The Share button frame in window coordinates, the iPad popover anchor. */
 function measureWindowFrame(node: View | null) {
   return new Promise<ShareCardShareAnchor | null>((resolve) => {
@@ -197,12 +257,11 @@ function measureWindowFrame(node: View | null) {
 
 /**
  * The scroll offset that shows all of a focus target, or null when it is in view already. A result
- * can move focus to an action under the fold (Retry after a storage failure sits below Save and
- * Share on a phone), and a sighted member must see the control that has focus. A target already
- * fully in view never scrolls: Share can rest just above the fold (iPhone 17 Pro), and a result
- * that returns focus to it must not move the actions. A rubber-band pull, the negative offset a
- * swipe that dismisses the iOS share sheet can leave, springs back to 0, so visibility is judged
- * where the content comes to rest.
+ * can move focus to an action under the fold (Retry, at a text size where the composer scrolls),
+ * and a sighted member must see the control that has focus. A target already fully in view never
+ * scrolls: Share can rest just above the fold, and a result that returns focus to it must not
+ * move the actions. A rubber-band pull, the negative offset a swipe that dismisses the iOS share
+ * sheet can leave, springs back to 0, so visibility is judged where the content comes to rest.
  */
 type WindowSpan = { y: number; height: number }
 export function revealScrollOffset(
@@ -347,7 +406,7 @@ export function ShareCardComposer({
   const [saving, setSaving] = useState(false)
   const activeSave = useRef<SaveOwner | null>(null)
   const insets = useModalInsets()
-  const widePreviewWidth = useWidePreviewWidth()
+  const previewFit = usePreviewFit()
   const systemBarsReady = useShareCardStatusBar(
     open && source !== null,
     modalSystemBarsAvailable()
@@ -709,48 +768,51 @@ export function ShareCardComposer({
           onScroll={(event) => {
             scrollOffset.current = event.nativeEvent.contentOffset.y
           }}
+          onLayout={previewFit.onViewport}
           contentContainerStyle={styles.content}
         >
-          <Text
-            ref={title}
-            accessibilityRole="header"
-            style={styles.heading}
-            testID="share-card-title"
-          >
-            {t('shareCard.title')}
-          </Text>
-          <PhotoPrivacyHelp source={source} t={t} />
-          <View style={styles.row}>
-            <Text style={styles.text}>{t('shareCard.watermark')}</Text>
-            <Pressable
-              accessibilityRole="switch"
-              aria-checked={watermark}
-              aria-disabled={saving}
-              accessibilityLabel={t('shareCard.watermark')}
-              accessibilityState={{ checked: watermark, disabled: saving }}
-              disabled={saving}
-              onPress={() => {
-                setWatermark((value) => !value)
-                setLoaded(null)
-                setChanged(false)
-              }}
-              style={styles.toggleTarget}
-              testID="share-card-watermark"
+          <View style={styles.block} onLayout={previewFit.onAbove}>
+            <Text
+              ref={title}
+              accessibilityRole="header"
+              style={styles.heading}
+              testID="share-card-title"
             >
-              <View
-                aria-hidden
-                style={{ pointerEvents: 'none' }}
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
+              {t('shareCard.title')}
+            </Text>
+            <PhotoPrivacyHelp source={source} t={t} />
+            <View style={styles.row}>
+              <Text style={styles.text}>{t('shareCard.watermark')}</Text>
+              <Pressable
+                accessibilityRole="switch"
+                aria-checked={watermark}
+                aria-disabled={saving}
+                accessibilityLabel={t('shareCard.watermark')}
+                accessibilityState={{ checked: watermark, disabled: saving }}
+                disabled={saving}
+                onPress={() => {
+                  setWatermark((value) => !value)
+                  setLoaded(null)
+                  setChanged(false)
+                }}
+                style={styles.toggleTarget}
+                testID="share-card-watermark"
               >
-                <Switch value={watermark} disabled={saving} />
-              </View>
-            </Pressable>
+                <View
+                  aria-hidden
+                  style={{ pointerEvents: 'none' }}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  <Switch value={watermark} disabled={saving} />
+                </View>
+              </Pressable>
+            </View>
           </View>
           <CardPreview
             key={presentation}
             current={current}
-            width={widePreviewWidth}
+            width={previewFit.width}
             loaded={valid && loaded === presentation}
             onLoad={() => setLoaded(presentation)}
             onError={() => {
@@ -758,84 +820,91 @@ export function ShareCardComposer({
               setError('render')
             }}
           />
-          <ComposerFeedback
-            onFocusResult={(status) => {
-              const target = focusSaveAfter.has(status)
-                ? saveTarget.current
-                : focusShareAfter.has(status)
-                  ? shareTarget.current
-                  : status === 'finishingSave'
-                    ? cancelTarget.current
-                    : recoveryTarget.current
-              const captured = generation.current
-              const isCurrent = () =>
-                latest.current.open &&
-                latest.current.member === member &&
-                latest.current.key === key &&
-                generation.current === captured
-              focusShareCardElement(safeFindNodeHandle(target), isCurrent)
-              void revealInScroll(scroll.current, scrollOffset.current, target).then(
-                (offset) => {
-                  if (offset !== null && isCurrent())
-                    scroll.current?.scrollTo({ y: offset, animated: false })
-                }
-              )
-            }}
-            visible={open}
-            scope={`${member}:${key}:${presentationEpoch}`}
-            pending={pendingOtherSave}
-            message={ownsFeedback ? message : null}
-            error={ownsFeedback ? error : null}
-            available={available}
-            t={t}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{
-              disabled,
-            }}
-            disabled={disabled}
-            onPress={() => void save()}
-            style={styles.button}
-            ref={saveTarget}
-            testID="share-card-save"
-          >
-            <Text style={styles.buttonText}>{t('shareCard.save')}</Text>
-          </Pressable>
-          <ShareAction
-            target={shareTarget}
-            capable={shareCapable}
-            present={shareModule}
-            disabled={shareDisabled}
-            onPress={() => void share()}
-            t={t}
-          />
-          <RecoveryActions
-            target={recoveryTarget}
-            permission={permission}
-            error={error}
-            changed={changed}
-            disabled={busy || pendingNative}
-            t={t}
-            retry={() => {
-              if (permission === 'denied') {
-                void save()
-              } else {
-                setPreview(null)
-                setChanged(false)
-                setRefresh((n) => n + 1)
-              }
-            }}
-          />
-          <Pressable
-            accessibilityRole="button"
-            style={styles.button}
-            onPress={close}
-            ref={cancelTarget}
-            testID="share-card-cancel"
-          >
-            <Text style={styles.buttonText}>{t('shareCard.cancel')}</Text>
-          </Pressable>
+          <View style={styles.block} onLayout={previewFit.onBelow}>
+            <ComposerFeedback
+              onFocusResult={(status) => {
+                const target = focusSaveAfter.has(status)
+                  ? saveTarget.current
+                  : focusShareAfter.has(status)
+                    ? shareTarget.current
+                    : status === 'finishingSave'
+                      ? cancelTarget.current
+                      : recoveryTarget.current
+                const captured = generation.current
+                const isCurrent = () =>
+                  latest.current.open &&
+                  latest.current.member === member &&
+                  latest.current.key === key &&
+                  generation.current === captured
+                focusShareCardElement(safeFindNodeHandle(target), isCurrent)
+                void revealInScroll(scroll.current, scrollOffset.current, target).then(
+                  (offset) => {
+                    if (offset !== null && isCurrent())
+                      scroll.current?.scrollTo({ y: offset, animated: false })
+                  }
+                )
+              }}
+              visible={open}
+              scope={`${member}:${key}:${presentationEpoch}`}
+              pending={pendingOtherSave}
+              message={ownsFeedback ? message : null}
+              error={ownsFeedback ? error : null}
+              available={available}
+              t={t}
+            />
+            <View style={styles.actions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{
+                  disabled,
+                }}
+                disabled={disabled}
+                onPress={() => void save()}
+                style={styles.button}
+                ref={saveTarget}
+                testID="share-card-save"
+              >
+                <Text style={styles.buttonText}>{t('shareCard.save')}</Text>
+              </Pressable>
+              <ShareAction
+                target={shareTarget}
+                capable={shareCapable}
+                present={shareModule}
+                disabled={shareDisabled}
+                onPress={() => void share()}
+                t={t}
+              />
+            </View>
+            <ShareUnavailable capable={shareCapable} present={shareModule} t={t} />
+            <View style={styles.actions}>
+              <RecoveryActions
+                target={recoveryTarget}
+                permission={permission}
+                error={error}
+                changed={changed}
+                disabled={busy || pendingNative}
+                t={t}
+                retry={() => {
+                  if (permission === 'denied') {
+                    void save()
+                  } else {
+                    setPreview(null)
+                    setChanged(false)
+                    setRefresh((n) => n + 1)
+                  }
+                }}
+              />
+              <Pressable
+                accessibilityRole="button"
+                style={styles.button}
+                onPress={close}
+                ref={cancelTarget}
+                testID="share-card-cancel"
+              >
+                <Text style={styles.buttonText}>{t('shareCard.cancel')}</Text>
+              </Pressable>
+            </View>
+          </View>
         </ScrollView>
       </View>
     </EdgeToEdgeModal>
@@ -955,7 +1024,8 @@ function ComposerFeedback({
 }
 /**
  * Story 6.9: Share sits after Save with its own ref. Without the native module it stays
- * visible but statically disabled with a localized reason, and pressing it does nothing.
+ * visible but statically disabled, its localized reason below the row, and pressing it does
+ * nothing.
  */
 function ShareAction({
   target,
@@ -974,25 +1044,35 @@ function ShareAction({
 }) {
   if (!capable) return null
   return (
-    <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ disabled: disabled || !present }}
-        accessibilityHint={present ? undefined : t('shareCard.shareUnavailable')}
-        disabled={disabled || !present}
-        onPress={present ? onPress : undefined}
-        style={styles.button}
-        ref={target}
-        testID="share-card-share"
-      >
-        <Text style={styles.buttonText}>{t('shareCard.share')}</Text>
-      </Pressable>
-      {!present && (
-        <Text testID="share-card-share-unavailable" style={styles.text}>
-          {t('shareCard.shareUnavailable')}
-        </Text>
-      )}
-    </>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: disabled || !present }}
+      accessibilityHint={present ? undefined : t('shareCard.shareUnavailable')}
+      disabled={disabled || !present}
+      onPress={present ? onPress : undefined}
+      style={styles.button}
+      ref={target}
+      testID="share-card-share"
+    >
+      <Text style={styles.buttonText}>{t('shareCard.share')}</Text>
+    </Pressable>
+  )
+}
+/** The reason a statically disabled Share gives, below its row so it never joins the pair. */
+function ShareUnavailable({
+  capable,
+  present,
+  t,
+}: {
+  capable: boolean
+  present: boolean
+  t: Translation
+}) {
+  if (!capable || present) return null
+  return (
+    <Text testID="share-card-share-unavailable" style={styles.text}>
+      {t('shareCard.shareUnavailable')}
+    </Text>
   )
 }
 function RecoveryActions({
@@ -1050,7 +1130,19 @@ const styles = StyleSheet.create({
     maxWidth: CONTENT_MAX_WIDTH + 2 * CONTENT_INSET,
     alignSelf: 'center',
     paddingHorizontal: CONTENT_INSET,
-    gap: 16,
+    gap: CONTENT_GAP,
+  },
+  block: { gap: CONTENT_GAP },
+  /**
+   * Save and Share, then a recovery action and Cancel, share a row when both labels fit on one
+   * line each; otherwise the row wraps and stacks them as full-width buttons. On a 327-pt column
+   * the widest pairs (fr Save and Share, pt-PT Refresh and Cancel) leave 15 and 5 pt to spare.
+   */
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: CONTENT_GAP,
+    columnGap: ACTION_GAP,
   },
   heading: { color: '#292724', fontSize: 26, fontWeight: '600' },
   text: { color: '#292724', fontSize: 16, flexShrink: 1 },
@@ -1071,6 +1163,8 @@ const styles = StyleSheet.create({
   feedbackSlot: { gap: 16 },
   feedbackLine: { lineHeight: FEEDBACK_LINE_HEIGHT },
   button: {
+    flexGrow: 1,
+    flexShrink: 1,
     minHeight: 48,
     padding: 14,
     borderWidth: 1,

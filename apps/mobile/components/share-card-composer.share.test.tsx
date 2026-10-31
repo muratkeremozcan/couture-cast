@@ -8,7 +8,7 @@ import {
   type PrepareShareCardInput,
 } from '@couture/api-client'
 import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
-import i18n from '@/src/lib/i18n'
+import i18n, { supportedLocales } from '@/src/lib/i18n'
 const loadMocks = vi.hoisted(() => {
   // Expo packages read process.env.EXPO_OS when they load; the suite default is 'web'.
   process.env.EXPO_OS = 'ios'
@@ -49,7 +49,11 @@ vi.mock('./edge-to-edge-modal', async () => (await loadMocks()).modal())
 vi.mock('react-native', async (original) =>
   (await loadMocks()).reactNative(await original<typeof ReactNativeModule>())
 )
-import { feedbackSlotHeight, revealScrollOffset } from './share-card-composer'
+import {
+  feedbackSlotHeight,
+  fittedPreviewWidth,
+  revealScrollOffset,
+} from './share-card-composer'
 import { nativeShareCardSavePending } from '@/src/lib/share-card-save-operations'
 import { drainMacrotask } from '@/src/test-utils/drain-macrotask'
 import { unhandledRejectionsDuring } from '@/src/test-utils/unhandled-rejections'
@@ -650,6 +654,29 @@ describe('Story 6.9 composer layout', () => {
     save: frame('share-card-save').top,
     share: frame('share-card-share').top,
   })
+  // The reserved feedback slot sits just before the Save and Share row.
+  const feedbackSlot = () =>
+    screen.getByTestId('share-card-save').parentElement?.previousElementSibling
+  /**
+   * The mocked modal is a plain div, so a layout case bounds it to the window like the native
+   * modal, making the ScrollView scroll. Returns the scroll viewport and the cleanup.
+   */
+  const boundToWindow = () => {
+    const bounded = document.createElement('style')
+    bounded.textContent =
+      '[role="dialog"] { height: 100vh; display: flex; flex-direction: column; }'
+    document.head.append(bounded)
+    return () => bounded.remove()
+  }
+  const scrollerOf = (node: HTMLElement) => {
+    let scroller = node.parentElement
+    while (scroller && !['auto', 'scroll'].includes(getComputedStyle(scroller).overflowY))
+      scroller = scroller.parentElement
+    return scroller!
+  }
+  /** Settles once the measured fit has given the preview its width. */
+  const previewWidthSettles = (width: number) =>
+    waitFor(() => expect(frame('share-card-preview-loaded').width).toBeCloseTo(width, 0))
   it('C-COMP-LAYOUT-STABLE: Save and Share keep their frames while feedback appears and changes', async () => {
     const shared = deferred<unknown>()
     boundary.shareFile.mockReturnValue(shared.promise)
@@ -660,7 +687,7 @@ describe('Story 6.9 composer layout', () => {
     // Android TalkBack leave the title for the next element when the composer opened.
     expect(screen.queryByTestId('share-card-feedback')).not.toBeInTheDocument()
     expect(screen.queryByTestId('share-card-error')).not.toBeInTheDocument()
-    const slot = screen.getByTestId('share-card-save').previousElementSibling
+    const slot = feedbackSlot()
     expect(slot?.childElementCount).toBe(0)
     expect(slot?.textContent).toBe('')
     expect(slot?.getBoundingClientRect().height).toBeGreaterThan(0)
@@ -698,7 +725,7 @@ describe('Story 6.9 composer layout', () => {
   })
   it('C-COMP-LAYOUT-STABLE: the slot reserves exactly two lines and two-line copy moves nothing', async () => {
     await readyShare()
-    const slot = screen.getByTestId('share-card-save').previousElementSibling
+    const slot = feedbackSlot()
     expect(slot?.getBoundingClientRect().height).toBe(44)
     const resting = tops()
     boundary.shareFile.mockResolvedValue({ target: 'none', outcome: 'cancelled' })
@@ -729,7 +756,7 @@ describe('Story 6.9 composer layout', () => {
     await i18n.changeLanguage('de-DE')
     boundary.save.mockRejectedValue(new Error('storage'))
     await readyShare()
-    const slot = screen.getByTestId('share-card-save').previousElementSibling
+    const slot = feedbackSlot()
     expect(slot?.getBoundingClientRect().height).toBe(66)
     const resting = tops()
     await userEvent.click(screen.getByTestId('share-card-save'))
@@ -754,19 +781,17 @@ describe('Story 6.9 composer layout', () => {
     expect(feedbackSlotHeight(1180, 2, 2)).toBeCloseTo(132)
   })
   it('C-COMP-LAYOUT-REVEAL: a failure that focuses Retry below the fold scrolls Retry into view', async () => {
-    // A short phone window: Share, added after Save, leaves Retry under the fold. Focus moves to
-    // Retry, so a sighted member must see it too (iOS 26.1, ShareCardAccessibilityUITests
-    // storage-failure: Retry existed but was not hittable). The mocked modal is a plain div, so
-    // this test bounds it to the window like the native modal, making the ScrollView scroll.
-    const bounded = document.createElement('style')
-    bounded.textContent =
-      '[role="dialog"] { height: 100vh; display: flex; flex-direction: column; }'
-    document.head.append(bounded)
+    // A window too short even for the preview's 240-pt floor (as large text makes a phone):
+    // Retry, beside Cancel, lands under the fold. Focus moves to Retry, so a sighted member must
+    // see it too (iOS 26.1, ShareCardAccessibilityUITests storage-failure: Retry existed but was
+    // not hittable).
+    const unbound = boundToWindow()
     try {
-      await browserPage.viewport(390, 700)
+      await browserPage.viewport(390, 560)
       boundary.save.mockRejectedValue(new Error('storage'))
       await readyShare()
-      expect(frame('share-card-share').bottom).toBeGreaterThan(window.innerHeight)
+      await previewWidthSettles(240)
+      expect(frame('share-card-cancel').bottom).toBeGreaterThan(window.innerHeight)
       await userEvent.click(screen.getByTestId('share-card-save'))
       expect(await screen.findByTestId('share-card-error')).toHaveTextContent(
         i18n.t('shareCard.storage')
@@ -778,32 +803,27 @@ describe('Story 6.9 composer layout', () => {
         expect(retry.bottom).toBeLessThanOrEqual(window.innerHeight)
       })
     } finally {
-      bounded.remove()
+      unbound()
     }
   })
   it('C-COMP-LAYOUT-REVEAL: a result that focuses Share resting just above the fold scrolls nothing', async () => {
-    // iPhone 17 Pro: Share rests 2 pt above the fold. Focus returns to it after shareClosed, and
-    // a reveal with its 8-pt margin scrolled the whole composer up 6 pt.
-    const bounded = document.createElement('style')
-    bounded.textContent =
-      '[role="dialog"] { height: 100vh; display: flex; flex-direction: column; }'
-    document.head.append(bounded)
+    // Where the composer scrolls (the preview at its floor), Share can rest just above the fold,
+    // as it did at 2 pt on an iPhone 17 Pro before the fit. Focus returns to it after
+    // shareClosed, and a reveal with its 8-pt margin scrolled the whole composer up 6 pt.
+    const unbound = boundToWindow()
     try {
-      await browserPage.viewport(390, 1200)
+      await browserPage.viewport(390, 520)
       boundary.shareFile.mockResolvedValue({ target: 'none', outcome: 'cancelled' })
       await readyShare()
-      let scroller = screen.getByTestId('share-card-share').parentElement
-      while (
-        scroller &&
-        !['auto', 'scroll'].includes(getComputedStyle(scroller).overflowY)
-      )
-        scroller = scroller.parentElement
-      const padding = window.innerHeight - scroller!.getBoundingClientRect().bottom
+      await previewWidthSettles(240)
+      const scroller = scrollerOf(screen.getByTestId('share-card-share'))
+      const padding = window.innerHeight - scroller.getBoundingClientRect().bottom
       await browserPage.viewport(
         390,
         Math.ceil(frame('share-card-share').bottom + 4 + padding)
       )
-      const fold = scroller!.getBoundingClientRect().bottom
+      await previewWidthSettles(240)
+      const fold = scroller.getBoundingClientRect().bottom
       expect(frame('share-card-share').bottom).toBeLessThanOrEqual(fold)
       expect(frame('share-card-share').bottom).toBeGreaterThan(fold - 8)
       const resting = tops()
@@ -826,10 +846,10 @@ describe('Story 6.9 composer layout', () => {
       await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(45))
       await waitFor(() => expect(measured).toBe(2))
       await act(drainMacrotask)
-      expect(scroller!.scrollTop).toBe(0)
+      expect(scroller.scrollTop).toBe(0)
       expect(tops()).toEqual(resting)
     } finally {
-      bounded.remove()
+      unbound()
     }
   })
   it('U-COMP-LAYOUT-REVEAL: visibility is judged where the content rests, never mid-bounce', () => {
@@ -853,8 +873,13 @@ describe('Story 6.9 composer layout', () => {
     async (_name, width, height) => {
       await browserPage.viewport(width, height)
       await readyShare()
-      const column = screen.getByRole('dialog').getBoundingClientRect().width - 48
-      expect(frame('share-card-save').width).toBeCloseTo(column, 0)
+      const dialog = screen.getByRole('dialog').getBoundingClientRect()
+      const column = dialog.width - 48
+      // Save and Share share one row that spans the column; Cancel spans it alone.
+      expect(frame('share-card-save').left - dialog.left).toBeCloseTo(24, 0)
+      expect(dialog.right - frame('share-card-share').right).toBeCloseTo(24, 0)
+      expect(frame('share-card-share').top).toBe(frame('share-card-save').top)
+      expect(frame('share-card-cancel').width).toBeCloseTo(column, 0)
       expect(frame('share-card-preview-loaded').width).toBeCloseTo(column, 0)
     }
   )
@@ -868,9 +893,12 @@ describe('Story 6.9 composer layout', () => {
       await browserPage.viewport(width, height)
       await readyShare()
       const dialog = screen.getByRole('dialog').getBoundingClientRect()
-      for (const id of ['share-card-save', 'share-card-share', 'share-card-cancel']) {
-        const action = frame(id)
-        expect(action.width).toBeCloseTo(420, 0)
+      const row = {
+        left: frame('share-card-save').left,
+        right: frame('share-card-share').right,
+      }
+      for (const action of [row, frame('share-card-cancel')]) {
+        expect(action.right - action.left).toBeCloseTo(420, 0)
         expect(action.left - dialog.left).toBeCloseTo(dialog.right - action.right, 0)
       }
       const image = frame('share-card-preview-loaded')
@@ -879,4 +907,143 @@ describe('Story 6.9 composer layout', () => {
       expect(frame('share-card-cancel').bottom).toBeLessThanOrEqual(window.innerHeight)
     }
   )
+  it('U-COMP-PREVIEW-FIT: the preview gives way to the actions down to a legible floor', () => {
+    // iPhone SE (375 by 667): a 327-pt column and a 615-pt viewport, 301.67 pt of it the title,
+    // watermark row, feedback slot and two action rows with their gaps.
+    expect(fittedPreviewWidth(327, 615, 301.67, null)).toBe(250)
+    // iPhone 17 Pro: 746 pt leaves the full 354-pt column, so the preview keeps its width.
+    expect(fittedPreviewWidth(354, 746, 301.67, null)).toBeNull()
+    // Large text: the preview stops at 240 pt and the composer scrolls.
+    expect(fittedPreviewWidth(327, 615, 500, null)).toBe(240)
+    // A window narrower than the floor keeps the column.
+    expect(fittedPreviewWidth(200, 300, 250, null)).toBe(200)
+    // An iPad keeps its 45% cap when the fit allows more, and the fit below it.
+    expect(fittedPreviewWidth(420, 768, 301.67, 295)).toBe(295)
+    expect(fittedPreviewWidth(420, 620, 301.67, 295)).toBe(254)
+  })
+  it.each([
+    // The mocked modal's insets (10 pt) and the sheet padding (16 pt) leave each window the
+    // device's scroll viewport: 615 pt on an iPhone SE, 746 pt on an iPhone 17 Pro. The SE's
+    // preview gives way (250 pt on the device, a few points more with the browser's line
+    // heights); the 17 Pro's keeps the column.
+    ['an iPhone SE', 375, 667, true],
+    ['an iPhone 17 Pro', 402, 798, false],
+  ])(
+    'C-COMP-LAYOUT-FIT: %s shows every action without scrolling at rest, with status, error and stale copy',
+    async (_name, width, height, fitted) => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      const unbound = boundToWindow()
+      try {
+        await browserPage.viewport(width, height)
+        await readyShare()
+        const column = width - 48
+        await waitFor(() => {
+          const preview = frame('share-card-preview-loaded').width
+          if (fitted) expect(preview).toBeLessThan(column - 40)
+          else expect(preview).toBeCloseTo(column, 0)
+          expect(preview).toBeGreaterThanOrEqual(240)
+        })
+        const image = frame('share-card-preview-loaded')
+        expect(image.width / image.height).toBeCloseTo(1080 / 1350, 2)
+        const scroller = scrollerOf(screen.getByTestId('share-card-cancel'))
+        const resting = tops()
+        const expectEveryActionInView = () => {
+          const fold = scroller.getBoundingClientRect().bottom
+          expect(scroller.scrollTop).toBe(0)
+          const ids = ['save', 'share', 'retry', 'refresh', 'cancel']
+          for (const id of ids.map((name) => `share-card-${name}`)) {
+            const action = screen.queryByTestId(id)
+            if (action)
+              expect(action.getBoundingClientRect().bottom).toBeLessThanOrEqual(fold)
+          }
+          expect(frame('share-card-share').top).toBe(frame('share-card-save').top)
+          expect(tops()).toEqual(resting)
+        }
+        expectEveryActionInView()
+        boundary.shareFile.mockResolvedValueOnce({ target: 'none', outcome: 'cancelled' })
+        await tapShare()
+        expect(await screen.findByTestId('share-card-feedback')).toHaveTextContent(
+          i18n.t('shareCard.shareClosed')
+        )
+        await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(45))
+        expectEveryActionInView()
+        await waitFor(expectSaveUsable)
+        boundary.shareFile.mockResolvedValueOnce({ target: 'none', outcome: 'failed' })
+        await tapShare()
+        expect(await screen.findByTestId('share-card-error')).toHaveTextContent(
+          i18n.t('shareCard.shareFailed')
+        )
+        expect(frame('share-card-error').height).toBe(44)
+        await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(42))
+        expectEveryActionInView()
+        await waitFor(() =>
+          expect(screen.getByTestId('share-card-share')).not.toHaveAttribute(
+            'aria-disabled',
+            'true'
+          )
+        )
+        boundary.prepare.mockRejectedValueOnce(
+          new ResponseError(new Response('{}', { status: 409 }))
+        )
+        await tapShare()
+        expect(await screen.findByTestId('share-card-error')).toHaveTextContent(
+          i18n.t('shareCard.previewChanged')
+        )
+        // Refresh joins Cancel's row, so the stale state adds no height.
+        await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(46))
+        expect(frame('share-card-refresh').top).toBe(frame('share-card-cancel').top)
+        await settleShareAttempt()
+        expectEveryActionInView()
+      } finally {
+        unbound()
+      }
+    }
+  )
+  it.each(supportedLocales)(
+    'C-COMP-LAYOUT-PAIRS: %s pairs the actions on one line each in a 327-pt column',
+    async (locale) => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      // An iPhone SE column. The widest pairs, fr Save and Share and pt-PT Refresh and Cancel,
+      // leave 15 and 5 pt to spare.
+      await browserPage.viewport(375, 667)
+      await i18n.changeLanguage(locale)
+      await readyShare()
+      boundary.prepare.mockRejectedValueOnce(
+        new ResponseError(new Response('{}', { status: 409 }))
+      )
+      await tapShare()
+      expect(await screen.findByTestId('share-card-refresh')).toBeInTheDocument()
+      await settleShareAttempt()
+      expect(frame('share-card-share').top).toBe(frame('share-card-save').top)
+      expect(frame('share-card-cancel').top).toBe(frame('share-card-refresh').top)
+      // One line each: a wrapped label would make its button, and its row, taller.
+      for (const name of ['save', 'share', 'refresh'])
+        expect(frame(`share-card-${name}`).height, name).toBe(
+          frame('share-card-cancel').height
+        )
+      expect(frame('share-card-cancel').height).toBeLessThan(52)
+    }
+  )
+  it('C-COMP-LAYOUT-PAIRS: a pair that does not fit stacks full width and truncates nothing', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    // A 320-pt window: de-DE Vorschau aktualisieren and Abbrechen need 315 pt of a 272-pt column.
+    await browserPage.viewport(320, 700)
+    await i18n.changeLanguage('de-DE')
+    await readyShare()
+    boundary.prepare.mockRejectedValueOnce(
+      new ResponseError(new Response('{}', { status: 409 }))
+    )
+    await tapShare()
+    expect(await screen.findByTestId('share-card-refresh')).toBeInTheDocument()
+    await settleShareAttempt()
+    const refresh = frame('share-card-refresh')
+    const cancel = frame('share-card-cancel')
+    expect(cancel.top).toBeGreaterThanOrEqual(refresh.bottom + 16)
+    expect(refresh.width).toBeCloseTo(272, 0)
+    expect(cancel.width).toBeCloseTo(272, 0)
+    expect(refresh.height).toBe(cancel.height)
+    expect(screen.getByTestId('share-card-refresh')).toHaveTextContent(
+      'Vorschau aktualisieren'
+    )
+  })
 })
