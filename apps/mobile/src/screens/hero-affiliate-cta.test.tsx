@@ -4,7 +4,6 @@
 // draws is covered in `components/hero/outfit-recommendation-card.test.tsx`;
 // what belongs here is the screen-owned behaviour: one impression per
 // recommendation, and a device cache that cannot resurrect a withdrawn CTA.
-/* eslint-disable @typescript-eslint/await-thenable */
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'

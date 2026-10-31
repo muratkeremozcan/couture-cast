@@ -31,20 +31,20 @@ beforeAll(async () => {
   await server.listen(options)
 })
 
-beforeEach(() => {
+beforeEach(async () => {
   Reflect.deleteProperty(AbortSignal, 'any')
   Reflect.deleteProperty(AbortSignal, 'timeout')
   Reflect.deleteProperty(globalThis, 'DOMException')
   // Clear the DOM before each test to prevent pollution/leaks when running tests sequentially
   cleanupDom()
-  cleanupBrowser()
+  await cleanupBrowser()
 })
 
-afterEach(() => {
+afterEach(async () => {
   // Skip cleanup in watch mode (Vitest UI) to keep the last test's component UI mounted for visual inspection
   if (!__VITEST_WATCH__) {
     cleanupDom()
-    cleanupBrowser()
+    await cleanupBrowser()
   }
   server.resetHandlers()
 })

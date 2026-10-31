@@ -147,8 +147,8 @@
     "@typescript-eslint/eslint-plugin": "8.46.3",
     "@typescript-eslint/parser": "8.46.3",
     "@useoptic/optic": "1.0.9",
-    "@vitest/coverage-v8": "4.0.9",
-    "@vitest/ui": "4.0.9",
+    "@vitest/coverage-v8": "5.0.5",
+    "@vitest/ui": "5.0.5",
     "axe-core": "4.10.0",
     "cross-env": "10.1.0",
     "dotenv": "17.2.3",
@@ -177,7 +177,7 @@
     "tsx": "4.20.6",
     "turbo": "2.6.1",
     "typescript": "5.9.3",
-    "vitest": "4.0.9"
+    "vitest": "5.0.5"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.7: shared harness for the mobile Home teaser suites. Reads are deferred
 // through MSW so each test decides when one settles, and "settled" is read from
 // the wrapper's own promise, never from a sleep. A suite using `settledRead` or

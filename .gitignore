@@ -38,6 +38,8 @@ playwright/.auth/
 .lighthouseci/
 .auth/
 blob-report/
+# Vitest 5 writes failure screenshots, attachments and reporter output under .vitest/.
+.vitest/
 .real-session-e2e/
 downloads/
 pacts/

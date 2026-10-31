@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/await-thenable */
 import {
   UPLOAD_URL,
   PIXEL,

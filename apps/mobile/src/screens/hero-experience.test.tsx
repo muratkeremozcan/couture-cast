@@ -2,7 +2,6 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-21-reasoning-badges-and-explanations
 // Learning path Step 26: Chip navigation and sticky bottom nav.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
-/* eslint-disable @typescript-eslint/await-thenable */
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import type * as ReactNativeModule from 'react-native'
 import React from 'react'
@@ -317,9 +316,16 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       expect(screen.queryByText('Classic Trench Coat')).toBeNull()
       expect(screen.getByText('Leather Jacket')).toBeTruthy()
       // The modal leaves on its real exit animation; only the app's focus timer is faked.
-      await expect
-        .poll(() => screen.queryByTestId('garment-swap-modal'), { timeout: 5000 })
-        .toBeNull()
+      // expect.poll and vi.waitFor advance fake timers between retries, which would fire
+      // that timer early, so the exit is awaited on real animation frames instead.
+      for (
+        let frames = 0;
+        frames < 300 && screen.queryByTestId('garment-swap-modal');
+        frames += 1
+      ) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      }
+      expect(screen.queryByTestId('garment-swap-modal')).toBeNull()
       await act(async () => {
         await vi.advanceTimersByTimeAsync(focusReturnDelayMs - 1)
       })

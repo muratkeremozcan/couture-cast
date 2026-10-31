@@ -57,147 +57,157 @@ async function probeSchema(): Promise<void> {
   }
 }
 
-describe.sequential('Weather alert rolling cooldown Prisma integration', () => {
-  let prisma: PrismaClient
-  let repository: PrismaWeatherAlertProcessingRepository
-  let testPrefix: string
+describe(
+  'Weather alert rolling cooldown Prisma integration',
+  { concurrent: false },
+  () => {
+    let prisma: PrismaClient
+    let repository: PrismaWeatherAlertProcessingRepository
+    let testPrefix: string
 
-  beforeAll(probeSchema)
+    beforeAll(probeSchema)
 
-  function buildCandidate(
-    deduplicationKey: string,
-    createdAt: Date,
-    idSuffix: string = randomUUID()
-  ): WeatherAlertEventCandidate {
-    const userId = `${testPrefix}-user`
+    function buildCandidate(
+      deduplicationKey: string,
+      createdAt: Date,
+      idSuffix: string = randomUUID()
+    ): WeatherAlertEventCandidate {
+      const userId = `${testPrefix}-user`
 
-    return {
-      id: `${testPrefix}-event-${idSuffix}`,
-      channel: 'alert:weather',
-      userId,
-      createdAt,
-      deduplicationKey,
-      payload: {
-        version: '1',
-        timestamp: createdAt.toISOString(),
+      return {
+        id: `${testPrefix}-event-${idSuffix}`,
+        channel: 'alert:weather',
         userId,
-        data: {
-          alertType: 'temperature',
-          location: 'Chicago, IL',
-          message: 'Temperature will rise above your configured threshold.',
-          severity: 'warning',
+        createdAt,
+        deduplicationKey,
+        payload: {
+          version: '1',
+          timestamp: createdAt.toISOString(),
+          userId,
+          data: {
+            alertType: 'temperature',
+            location: 'Chicago, IL',
+            message: 'Temperature will rise above your configured threshold.',
+            severity: 'warning',
+          },
         },
-      },
+      }
     }
-  }
 
-  beforeEach(async (context) => {
-    if (!schemaReady) {
-      context.skip()
-      return
-    }
-    testPrefix = `rolling-cooldown-${randomUUID()}`
-    // Same explicitly resolved URL the probe used, so the suite can never assert
-    // against a different database than the one it declared ready.
-    prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
-    await prisma.$connect()
-    // Every candidate this suite builds carries `${testPrefix}-user` as its
-    // `userId`, and `EventEnvelope.user_id` is a real foreign key onto `User`.
-    // Without this row the very first `createEvents` call dies on
-    // `EventEnvelope_user_id_fkey` (P2003) and all three tests fail before
-    // asserting anything about cooldown behaviour. Nothing reported it because
-    // nothing ever ran the suite; see the gate note at the top of this file.
-    await prisma.user.create({
-      data: { id: `${testPrefix}-user`, email: `${testPrefix}@couture-cast.test` },
+    beforeEach(async (context) => {
+      if (!schemaReady) {
+        context.skip()
+        return
+      }
+      testPrefix = `rolling-cooldown-${randomUUID()}`
+      // Same explicitly resolved URL the probe used, so the suite can never assert
+      // against a different database than the one it declared ready.
+      prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
+      await prisma.$connect()
+      // Every candidate this suite builds carries `${testPrefix}-user` as its
+      // `userId`, and `EventEnvelope.user_id` is a real foreign key onto `User`.
+      // Without this row the very first `createEvents` call dies on
+      // `EventEnvelope_user_id_fkey` (P2003) and all three tests fail before
+      // asserting anything about cooldown behaviour. Nothing reported it because
+      // nothing ever ran the suite; see the gate note at the top of this file.
+      await prisma.user.create({
+        data: { id: `${testPrefix}-user`, email: `${testPrefix}@couture-cast.test` },
+      })
+      repository = new PrismaWeatherAlertProcessingRepository(prisma)
     })
-    repository = new PrismaWeatherAlertProcessingRepository(prisma)
-  })
 
-  afterEach(async () => {
-    await prisma.eventEnvelope.deleteMany({
-      where: { id: { startsWith: `${testPrefix}-event-` } },
+    afterEach(async () => {
+      await prisma.eventEnvelope.deleteMany({
+        where: { id: { startsWith: `${testPrefix}-event-` } },
+      })
+      await prisma.alertCooldownReservation.deleteMany({
+        where: { deduplication_key: { startsWith: `${testPrefix}-key-` } },
+      })
+      // Last, and only after the envelopes above: the outbox rows cascade from the
+      // envelopes and the envelopes cascade from the user, so deleting the user
+      // first would take the rows this cleanup is auditing with it.
+      await prisma.user.deleteMany({ where: { id: `${testPrefix}-user` } })
+      await prisma.$disconnect()
     })
-    await prisma.alertCooldownReservation.deleteMany({
-      where: { deduplication_key: { startsWith: `${testPrefix}-key-` } },
-    })
-    // Last, and only after the envelopes above: the outbox rows cascade from the
-    // envelopes and the envelopes cascade from the user, so deleting the user
-    // first would take the rows this cleanup is auditing with it.
-    await prisma.user.deleteMany({ where: { id: `${testPrefix}-user` } })
-    await prisma.$disconnect()
-  })
 
-  it('suppresses the same fingerprint across an hour boundary and stale replays', async () => {
-    const deduplicationKey = `${testPrefix}-key-rise`
-    const distinctKey = `${testPrefix}-key-drop`
-    const firstAt = new Date('2026-07-13T14:59:00.000Z')
-    const boundaryAt = new Date('2026-07-13T15:00:00.000Z')
-    const eligibleAt = new Date(firstAt.getTime() + HOUR_MS)
+    it('suppresses the same fingerprint across an hour boundary and stale replays', async () => {
+      const deduplicationKey = `${testPrefix}-key-rise`
+      const distinctKey = `${testPrefix}-key-drop`
+      const firstAt = new Date('2026-07-13T14:59:00.000Z')
+      const boundaryAt = new Date('2026-07-13T15:00:00.000Z')
+      const eligibleAt = new Date(firstAt.getTime() + HOUR_MS)
 
-    await expect(
-      repository.createEvents([buildCandidate(deduplicationKey, firstAt, 'first')])
-    ).resolves.toHaveLength(1)
-    await expect(
-      repository.createEvents([buildCandidate(deduplicationKey, boundaryAt, 'boundary')])
-    ).resolves.toEqual([])
-    await expect(
-      repository.createEvents([buildCandidate(distinctKey, boundaryAt, 'distinct')])
-    ).resolves.toHaveLength(1)
-    await expect(
-      repository.createEvents([buildCandidate(deduplicationKey, eligibleAt, 'eligible')])
-    ).resolves.toHaveLength(1)
-    await expect(
-      repository.createEvents([buildCandidate(deduplicationKey, firstAt, 'replay')])
-    ).resolves.toEqual([])
+      await expect(
+        repository.createEvents([buildCandidate(deduplicationKey, firstAt, 'first')])
+      ).resolves.toHaveLength(1)
+      await expect(
+        repository.createEvents([
+          buildCandidate(deduplicationKey, boundaryAt, 'boundary'),
+        ])
+      ).resolves.toEqual([])
+      await expect(
+        repository.createEvents([buildCandidate(distinctKey, boundaryAt, 'distinct')])
+      ).resolves.toHaveLength(1)
+      await expect(
+        repository.createEvents([
+          buildCandidate(deduplicationKey, eligibleAt, 'eligible'),
+        ])
+      ).resolves.toHaveLength(1)
+      await expect(
+        repository.createEvents([buildCandidate(deduplicationKey, firstAt, 'replay')])
+      ).resolves.toEqual([])
 
-    const reservation = await prisma.alertCooldownReservation.findUniqueOrThrow({
-      where: { deduplication_key: deduplicationKey },
-    })
-    expect(reservation.next_eligible_at).toEqual(new Date(eligibleAt.getTime() + HOUR_MS))
-  })
-
-  it('atomically admits one event when identical reservations race', async () => {
-    const deduplicationKey = `${testPrefix}-key-race`
-    const triggeredAt = new Date('2026-07-13T16:10:00.000Z')
-    const candidates = Array.from({ length: 8 }, (_, index) =>
-      buildCandidate(deduplicationKey, triggeredAt, `race-${index}`)
-    )
-
-    const results = await Promise.all(
-      candidates.map((candidate) => repository.createEvents([candidate]))
-    )
-
-    expect(results.flat()).toHaveLength(1)
-    await expect(
-      prisma.alertDeliveryOutbox.count({
+      const reservation = await prisma.alertCooldownReservation.findUniqueOrThrow({
         where: { deduplication_key: deduplicationKey },
       })
-    ).resolves.toBe(1)
-  })
-
-  it('rolls back a reservation when envelope persistence fails', async () => {
-    const deduplicationKey = `${testPrefix}-key-rollback`
-    const triggeredAt = new Date('2026-07-13T17:20:00.000Z')
-    const collidingId = `${testPrefix}-event-collision`
-
-    await prisma.eventEnvelope.create({
-      data: {
-        id: collidingId,
-        channel: 'test:collision',
-        payload: {},
-        created_at: triggeredAt,
-      },
+      expect(reservation.next_eligible_at).toEqual(
+        new Date(eligibleAt.getTime() + HOUR_MS)
+      )
     })
 
-    await expect(
-      repository.createEvents([
-        buildCandidate(deduplicationKey, triggeredAt, 'collision'),
-      ])
-    ).rejects.toMatchObject({ code: 'P2002' })
-    await expect(
-      repository.createEvents([
-        buildCandidate(deduplicationKey, triggeredAt, 'after-rollback'),
-      ])
-    ).resolves.toHaveLength(1)
-  })
-})
+    it('atomically admits one event when identical reservations race', async () => {
+      const deduplicationKey = `${testPrefix}-key-race`
+      const triggeredAt = new Date('2026-07-13T16:10:00.000Z')
+      const candidates = Array.from({ length: 8 }, (_, index) =>
+        buildCandidate(deduplicationKey, triggeredAt, `race-${index}`)
+      )
+
+      const results = await Promise.all(
+        candidates.map((candidate) => repository.createEvents([candidate]))
+      )
+
+      expect(results.flat()).toHaveLength(1)
+      await expect(
+        prisma.alertDeliveryOutbox.count({
+          where: { deduplication_key: deduplicationKey },
+        })
+      ).resolves.toBe(1)
+    })
+
+    it('rolls back a reservation when envelope persistence fails', async () => {
+      const deduplicationKey = `${testPrefix}-key-rollback`
+      const triggeredAt = new Date('2026-07-13T17:20:00.000Z')
+      const collidingId = `${testPrefix}-event-collision`
+
+      await prisma.eventEnvelope.create({
+        data: {
+          id: collidingId,
+          channel: 'test:collision',
+          payload: {},
+          created_at: triggeredAt,
+        },
+      })
+
+      await expect(
+        repository.createEvents([
+          buildCandidate(deduplicationKey, triggeredAt, 'collision'),
+        ])
+      ).rejects.toMatchObject({ code: 'P2002' })
+      await expect(
+        repository.createEvents([
+          buildCandidate(deduplicationKey, triggeredAt, 'after-rollback'),
+        ])
+      ).resolves.toHaveLength(1)
+    })
+  }
+)

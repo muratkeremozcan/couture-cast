@@ -1,6 +1,5 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
-/* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.5: native sign-in tells denial, a wrong code and a temporary failure apart.
 import { fireEvent, screen } from '@testing-library/react'
 import { render } from 'vitest-browser-react'

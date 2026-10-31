@@ -4,7 +4,6 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-24-watchos-glance-companion-app-and-complications
 // Learning path Step 27: Widget and notification deep-link handling.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
-/* eslint-disable @typescript-eslint/await-thenable */
 // Story 3.3 Task 5 step 1 owner: verify the production now/next widget link contract.
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'

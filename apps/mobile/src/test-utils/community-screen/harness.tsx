@@ -38,11 +38,6 @@ import { server } from '@/src/test-utils/msw/server'
 // through `ImageLoader` and renders a second `<img src>` for the context menu, so an
 // unreachable host fires the card's `onError`, which asks the screen to refetch the
 // feed and puts phantom requests into every request-count assertion in this file.
-/*
- * `vitest-browser-react`'s `render` and this repo's `press` helper return plain values;
- * every sibling screen suite awaits them so the call sites read the same way.
- */
-/* eslint-disable @typescript-eslint/await-thenable */
 
 imageEvents.createElement = createElement
 

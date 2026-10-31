@@ -2,7 +2,7 @@
 // lifecycle. A suite that uses `teaserCalls` must mock `lib/community` with
 // `{ spy: true }` itself, so the wrapper's calls are recorded.
 import { act, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, expect, vi } from 'vitest'
+import { afterEach, beforeEach, expect, vi, type Mock } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import {
   communityReactionSpotlightResponseSchema,
@@ -154,7 +154,8 @@ export function setupHomeTeaserSuite() {
     HTMLElement.prototype,
     'scrollIntoView'
   )
-  const scrollIntoViewStub = vi.fn()
+  // Annotated: the inferred `vi.fn()` type names an internal Vitest chunk.
+  const scrollIntoViewStub: Mock = vi.fn()
   beforeEach(() => {
     vi.clearAllMocks()
     // jsdom has no layout, so it has no scrollIntoView; the mobile preview and the

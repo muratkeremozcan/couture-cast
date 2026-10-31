@@ -7,7 +7,6 @@
 // the four native modules `src/lib/community.ts` imports lazily are mocked.
 import React, { createElement, useState } from 'react'
 import { run as runAxe } from 'axe-core'
-import { page as browserPage } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
 import type * as CommunityModule from '@/src/lib/community'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
@@ -134,6 +133,7 @@ import {
 } from '@/src/lib/community'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { press } from '@/src/test-utils/press'
+import { setViewport } from '@/src/test-utils/viewport'
 import { drainMacrotask } from '@/src/test-utils/drain-macrotask'
 import { server } from '@/src/test-utils/msw/server'
 import {
@@ -862,13 +862,13 @@ describe('R52 CommunityPostSheet over the system bars', () => {
 
 describe('R16 CommunityPostSheet keeps the focused field in view', () => {
   afterEach(async () => {
-    await browserPage.viewport(414, 896)
+    await setViewport(414, 896)
   })
 
   it('6.7b-MOB-075 a frame shrunk by the keyboard scrolls the focused caption and its counter into view', async () => {
     // A short window stands in for the keyboard view's shrink: the sheet's scroll
     // frame is too short for the caption, which starts below it.
-    await browserPage.viewport(414, 420)
+    await setViewport(414, 420)
     renderSheet()
     const caption = screen.getByTestId('community-caption-input')
     await waitFor(() =>
@@ -901,7 +901,7 @@ describe('R16 CommunityPostSheet keeps the focused field in view', () => {
     // member makes must not snap the frame back to the field.
     // Tall enough for the whole photo section, short enough that the caption
     // starts below the frame.
-    await browserPage.viewport(414, 600)
+    await setViewport(414, 600)
     renderSheet()
     const caption = screen.getByTestId('community-caption-input')
     await waitFor(() =>

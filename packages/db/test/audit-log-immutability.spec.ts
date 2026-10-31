@@ -14,7 +14,7 @@ const adminPool = new Pool({
   max: 2,
 })
 
-describe.sequential('audit log immutability', () => {
+describe('audit log immutability', { concurrent: false }, () => {
   beforeAll(async () => {
     let client: PoolClient | undefined
 

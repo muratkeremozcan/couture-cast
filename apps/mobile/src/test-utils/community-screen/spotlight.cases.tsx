@@ -1,6 +1,5 @@
 // Learning path Step 44: Community city spotlight.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
-/* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.6 owner: the mobile City Spotlight module through the real HTTP boundary.
 import { item, errorEnvelope, feedJson, imageEvents, serveFeed } from './harness'
 import { refreshEvents } from './mock-state'

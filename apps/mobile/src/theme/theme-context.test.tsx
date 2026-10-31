@@ -5,9 +5,6 @@
 // render state, and the no-provider fallback that keeps a stray consumer on Default
 // instead of throwing. Both are AC 6 surface area: the section renders them, but this
 // is where the decision is made.
-// `render` from vitest-browser-react is typed as non-thenable but must be awaited for
-// the effects it triggers to flush, exactly as the screen suites do.
-/* eslint-disable @typescript-eslint/await-thenable */
 import { http, HttpResponse } from 'msw'
 import { screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'

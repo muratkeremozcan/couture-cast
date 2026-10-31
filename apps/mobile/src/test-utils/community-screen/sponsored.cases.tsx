@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.7b owner: sponsored community CTAs on the Community screen, through the
 // real HTTP boundary. Each card is found by its loaded content first, so every
 // absence asserted below is an absence on a rendered card.
