@@ -36,15 +36,11 @@ import org.robolectric.annotation.Config
 class ShareCardShareResultTest {
   private class FakeClock {
     val pending = mutableListOf<Pair<Long, () -> Unit>>()
-    var cancelled = 0
 
     fun schedule(delayMs: Long, action: () -> Unit): () -> Unit {
       val entry = delayMs to action
       pending += entry
-      return {
-        cancelled++
-        pending.remove(entry)
-      }
+      return { pending.remove(entry) }
     }
 
     fun fire() = pending.toList().also { pending.clear() }.forEach { it.second() }
@@ -84,7 +80,7 @@ class ShareCardShareResultTest {
     assertEquals(ShareCardShareResult.notConfirmed, settled.last())
     assertEquals(mapOf("target" to "none", "outcome" to "not_confirmed"), settled.last().toBridge())
     // It wins like any callback: the grace is cancelled and a late callback is ignored.
-    assertEquals(1, clock.cancelled)
+    assertTrue(clock.pending.isEmpty())
     session.chooserCallback("a2", app("com.pinterest"))
     clock.fire()
     assertEquals(2, settled.size)
@@ -108,11 +104,31 @@ class ShareCardShareResultTest {
   fun resumeBeforeTheChooserCoveredTheHostStartsNoGrace() {
     begin()
     session.hostResumed()
-    assertTrue(clock.pending.isEmpty())
+    assertEquals(listOf(ShareCardShareSession.START_MS), clock.pending.map { it.first })
     session.hostPaused()
     session.hostResumed()
     session.hostResumed()
-    assertEquals(1, clock.pending.size)
+    assertEquals(listOf(ShareCardShareSession.GRACE_MS), clock.pending.map { it.first })
+  }
+
+  @Test
+  fun aHostThatNeverLeavesAfterBeginSettlesNotConfirmedAtTheStartDeadline() {
+    begin()
+    assertEquals(listOf(ShareCardShareSession.START_MS), clock.pending.map { it.first })
+    clock.fire()
+    assertEquals(listOf(ShareCardShareResult.notConfirmed), settled)
+    assertEquals(1, teardowns)
+    assertFalse(session.isActive)
+  }
+
+  @Test
+  fun theHostLeavingCancelsTheStartDeadline() {
+    begin()
+    session.hostPaused()
+    assertTrue(clock.pending.isEmpty())
+    clock.fire()
+    assertTrue(settled.isEmpty())
+    assertTrue(session.isActive)
   }
 
   @Test
@@ -122,7 +138,7 @@ class ShareCardShareResultTest {
     session.hostResumed()
     session.chooserCallback("a1", app("com.pinterest"))
     assertEquals(listOf(ShareCardShareResult.chosen(ShareCardShareTarget.PINTEREST)), settled)
-    assertEquals(1, clock.cancelled)
+    assertTrue(clock.pending.isEmpty())
     clock.fire()
     assertEquals(1, settled.size)
   }
@@ -274,6 +290,20 @@ class ShareCardShareResultTest {
     assertFalse(send.hasExtra(Intent.EXTRA_TEXT))
     assertFalse(send.hasExtra(Intent.EXTRA_SUBJECT))
     assertFalse(send.hasExtra(Intent.EXTRA_HTML_TEXT))
+  }
+
+  @Test
+  fun controllerSettlesNotConfirmedWhenTheChooserNeverCoversTheHost() {
+    val results = mutableListOf<Map<String, String>>()
+    val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+    val controller = ShareCardShareController(Handler(Looper.getMainLooper())) { "attempt-7" }
+    controller.share(application, activity, file.toURI().toString(), digest) { results += it }
+    idle(ShareCardShareSession.START_MS - 1)
+    assertTrue(results.isEmpty())
+    idle(1)
+    assertEquals(listOf(mapOf("target" to "none", "outcome" to "not_confirmed")), results)
+    assertFalse(registered(ShareCardChooserCallback.action(application, "attempt-7")))
+    assertFalse(controller.session.isActive)
   }
 
   @Test

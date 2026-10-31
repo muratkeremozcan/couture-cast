@@ -5,6 +5,8 @@ package expo.modules.sharecardnativeshare
  * - the chooser callback, as `target_chosen` with the mapped app, or as `not_confirmed` when an
  *   Android 15+ result selects no app;
  * - the host resuming after the chooser plus [graceMs] with no callback, as `not_confirmed`;
+ * - the host not leaving within [startMs] of begin (backgrounded during prepare, a blocked
+ *   background start), as `not_confirmed`;
  * - host recreation or destruction mid-attempt, as `not_confirmed`;
  * - a start error, as `failed` or `unavailable`.
  * Settlement tears the attempt down once; later, duplicate or old-attempt events are ignored.
@@ -14,6 +16,7 @@ class ShareCardShareSession(
   /** Runs `action` after `delayMs` and returns a canceller. */
   private val schedule: (delayMs: Long, action: () -> Unit) -> () -> Unit,
   private val graceMs: Long = GRACE_MS,
+  private val startMs: Long = START_MS,
 ) {
   private class Attempt(
     val id: String,
@@ -21,6 +24,7 @@ class ShareCardShareSession(
     val settle: (ShareCardShareResult) -> Unit,
   ) {
     var hostLeft = false
+    var cancelStart: (() -> Unit)? = null
     var cancelGrace: (() -> Unit)? = null
   }
 
@@ -39,7 +43,10 @@ class ShareCardShareSession(
     settle: (ShareCardShareResult) -> Unit,
   ): Boolean {
     if (active != null) return false
-    active = Attempt(attemptId, teardown, settle)
+    val attempt = Attempt(attemptId, teardown, settle)
+    active = attempt
+    attempt.cancelStart =
+      schedule(startMs) { if (active === attempt) this.settle(ShareCardShareResult.notConfirmed) }
     return true
   }
 
@@ -56,7 +63,10 @@ class ShareCardShareSession(
 
   /** The chooser covering the host pauses it; only a resume after that can close the attempt. */
   fun hostPaused() {
-    active?.hostLeft = true
+    val attempt = active ?: return
+    attempt.hostLeft = true
+    attempt.cancelStart?.invoke()
+    attempt.cancelStart = null
   }
 
   fun hostResumed() {
@@ -77,6 +87,7 @@ class ShareCardShareSession(
   private fun settle(result: ShareCardShareResult) {
     val attempt = active ?: return
     active = null
+    attempt.cancelStart?.invoke()
     attempt.cancelGrace?.invoke()
     attempt.teardown()
     attempt.settle(result)
@@ -84,5 +95,6 @@ class ShareCardShareSession(
 
   companion object {
     const val GRACE_MS = 750L
+    const val START_MS = 5_000L
   }
 }
