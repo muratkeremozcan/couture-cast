@@ -99,7 +99,7 @@ export function shareCardCapabilitiesFromWeb(signal: AbortSignal) {
  * digest; a different digest means the composition changed on the server.
  */
 export async function authorizeShareCardFile(
-  input: Omit<Extract<PrepareShareCardInput, { purpose: 'share' }>, 'purpose'>,
+  input: Omit<Extract<PrepareShareCardInput, { purpose: 'save' | 'share' }>, 'purpose'>,
   signal: AbortSignal
 ) {
   const card = await prepareShareCardFromWeb({ ...input, purpose: 'share' }, signal)

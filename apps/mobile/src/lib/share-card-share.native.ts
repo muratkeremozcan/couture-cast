@@ -40,7 +40,7 @@ export type ShareCardShareSettlement = {
 }
 /** The share prepare request without its purpose; `expectedSha256` is the previewed digest. */
 export type ShareCardShareInput = Omit<
-  Extract<PrepareShareCardInput, { purpose: 'share' }>,
+  Extract<PrepareShareCardInput, { purpose: 'save' | 'share' }>,
   'purpose'
 >
 

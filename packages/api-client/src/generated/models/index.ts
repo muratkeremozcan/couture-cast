@@ -10417,7 +10417,6 @@ export type PrepareShareCard200ResponseDataTemplateVersionEnum =
 export type PrepareShareCardInput =
   | PrepareShareCardInputOneOf
   | PrepareShareCardRequestOneOf1
-  | PrepareShareCardRequestOneOf2
 /**
  *
  * @export
@@ -10485,7 +10484,6 @@ export type PrepareShareCardInputOneOfPurposeEnum =
 export type PrepareShareCardRequest =
   | PrepareShareCardRequestOneOf
   | PrepareShareCardRequestOneOf1
-  | PrepareShareCardRequestOneOf2
 /**
  *
  * @export
@@ -10606,6 +10604,7 @@ export type PrepareShareCardRequestOneOf1LocaleEnum =
  */
 export const PrepareShareCardRequestOneOf1PurposeEnum = {
   save: 'save',
+  share: 'share',
 } as const
 export type PrepareShareCardRequestOneOf1PurposeEnum =
   (typeof PrepareShareCardRequestOneOf1PurposeEnum)[keyof typeof PrepareShareCardRequestOneOf1PurposeEnum]
@@ -10675,71 +10674,6 @@ export const PrepareShareCardRequestOneOf1SourceOneOf1KindEnum = {
 } as const
 export type PrepareShareCardRequestOneOf1SourceOneOf1KindEnum =
   (typeof PrepareShareCardRequestOneOf1SourceOneOf1KindEnum)[keyof typeof PrepareShareCardRequestOneOf1SourceOneOf1KindEnum]
-
-/**
- *
- * @export
- * @interface PrepareShareCardRequestOneOf2
- */
-export interface PrepareShareCardRequestOneOf2 {
-  /**
-   *
-   * @type {PrepareShareCardRequestOneOf1Source}
-   * @memberof PrepareShareCardRequestOneOf2
-   */
-  source: PrepareShareCardRequestOneOf1Source
-  /**
-   *
-   * @type {PrepareShareCardRequestOneOf2LocaleEnum}
-   * @memberof PrepareShareCardRequestOneOf2
-   */
-  locale: PrepareShareCardRequestOneOf2LocaleEnum
-  /**
-   *
-   * @type {boolean}
-   * @memberof PrepareShareCardRequestOneOf2
-   */
-  watermark: boolean
-  /**
-   *
-   * @type {PrepareShareCardRequestOneOf2PurposeEnum}
-   * @memberof PrepareShareCardRequestOneOf2
-   */
-  purpose: PrepareShareCardRequestOneOf2PurposeEnum
-  /**
-   *
-   * @type {string}
-   * @memberof PrepareShareCardRequestOneOf2
-   */
-  expectedSha256: string
-}
-
-/**
- * @export
- */
-export const PrepareShareCardRequestOneOf2LocaleEnum = {
-  en_US: 'en-US',
-  en_CA: 'en-CA',
-  es_419: 'es-419',
-  fr_CA: 'fr-CA',
-  fr_FR: 'fr-FR',
-  tr_TR: 'tr-TR',
-  de_DE: 'de-DE',
-  it_IT: 'it-IT',
-  pt_BR: 'pt-BR',
-  pt_PT: 'pt-PT',
-} as const
-export type PrepareShareCardRequestOneOf2LocaleEnum =
-  (typeof PrepareShareCardRequestOneOf2LocaleEnum)[keyof typeof PrepareShareCardRequestOneOf2LocaleEnum]
-
-/**
- * @export
- */
-export const PrepareShareCardRequestOneOf2PurposeEnum = {
-  share: 'share',
-} as const
-export type PrepareShareCardRequestOneOf2PurposeEnum =
-  (typeof PrepareShareCardRequestOneOf2PurposeEnum)[keyof typeof PrepareShareCardRequestOneOf2PurposeEnum]
 
 /**
  * @type PrepareShareCardRequestOneOfSource

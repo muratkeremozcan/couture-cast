@@ -33,20 +33,14 @@ const options = {
 export const shareCardDigestSchema = z.string().regex(/^[a-f0-9]{64}$/)
 export const prepareShareCardInputSchema = z.discriminatedUnion('purpose', [
   z.object({ ...options, purpose: z.literal('preview') }).strict(),
+  // Story 6.9 D3: `share` reauthorizes the previewed bytes for the OS share sheet
+  // with the same shape as `save`, so both stay one variant: a separate variant
+  // would widen the published request union. The server answers a share with 403
+  // and no audit row when the per-member `share_card_native_share_enabled` flag is off.
   z
     .object({
       ...options,
-      purpose: z.literal('save'),
-      expectedSha256: shareCardDigestSchema,
-    })
-    .strict(),
-  // Story 6.9 D3: reauthorizes the previewed bytes for the OS share sheet. Same
-  // shape as `save`; the server answers 403 with no audit row when the
-  // per-member `share_card_native_share_enabled` flag is off.
-  z
-    .object({
-      ...options,
-      purpose: z.literal('share'),
+      purpose: z.enum(['save', 'share']),
       expectedSha256: shareCardDigestSchema,
     })
     .strict(),
