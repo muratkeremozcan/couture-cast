@@ -1,21 +1,33 @@
 package expo.modules.sharecardnativeshare
 
+import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
+import android.os.Bundle
 import android.os.ParcelFileDescriptor
+import android.os.Process
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.content.IntentCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -28,6 +40,10 @@ import org.junit.runner.RunWith
  * The shell then stands in for another app's UID: the granted URI is readable, while a sibling
  * share file that was never granted and every out-of-scope URI are denied. Receivers see the card
  * as `couturecast-card.png` with its real size, never its per-share directory name.
+ *
+ * A second app, `test-receiver` (its own package and UID), is picked in the real system chooser:
+ * it reads the card with only the grant the chooser forwarded, and the same app started without
+ * the grant is refused. The lane installs it before this class runs.
  */
 @RunWith(AndroidJUnit4::class)
 class ShareCardShareReceiveTest {
@@ -136,6 +152,101 @@ class ShareCardShareReceiveTest {
     }
   }
 
+  /** Collects the one report `test-receiver` broadcasts after it handled a share. */
+  private fun receiverReport(): Pair<CompletableFuture<Bundle>, () -> Unit> {
+    val report = CompletableFuture<Bundle>()
+    val receiver =
+      object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+          report.complete(intent.extras ?: Bundle())
+        }
+      }
+    // Exported: the report comes from the receiver app's UID.
+    ContextCompat.registerReceiver(context, receiver, IntentFilter(RECEIVER_RESULT_ACTION), ContextCompat.RECEIVER_EXPORTED)
+    return report to { context.unregisterReceiver(receiver) }
+  }
+
+  private fun receiverUid() = context.packageManager.getApplicationInfo(RECEIVER_PACKAGE, 0).uid
+
+  private fun assertReceiverInstalled() {
+    try {
+      receiverUid()
+    } catch (error: Exception) {
+      fail("install the test-receiver APK before this class runs")
+    }
+  }
+
+  /** Taps the receiver's label in the system chooser, expanding the sheet when it is below it. */
+  private fun pickInChooser(label: String) {
+    val device = UiDevice.getInstance(instrumentation)
+    repeat(4) {
+      val target = device.wait(Until.findObject(By.text(label)), 5_000)
+      if (target != null) {
+        target.click()
+        return
+      }
+      device.swipe(device.displayWidth / 2, device.displayHeight * 9 / 10, device.displayWidth / 2, device.displayHeight / 4, 20)
+    }
+    fail("$label never appeared in the system chooser")
+  }
+
+  @Test
+  fun anotherAppPickedInTheSystemChooserReadsTheCardWithOnlyTheForwardedGrant() {
+    assertReceiverInstalled()
+    val (report, stopReport) = receiverReport()
+    val selection = CompletableFuture<ShareCardChooserSelection>()
+    val callback = ShareCardChooserCallback.register(context, "receive-chooser") { _, picked -> selection.complete(picked) }
+    try {
+      context.startActivity(
+        ShareCardChooserIntent.build(uri, callback.pendingIntent.intentSender).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+      )
+      pickInChooser(RECEIVER_LABEL)
+      val seen = report.get(30, TimeUnit.SECONDS)
+      assertNotEquals("the reader is another app", Process.myUid(), seen.getInt("uid"))
+      assertEquals(receiverUid(), seen.getInt("uid"))
+      assertEquals(Intent.ACTION_SEND, seen.getString("action"))
+      assertEquals("image/png", seen.getString("type"))
+      assertEquals(uri.toString(), seen.getString("stream"))
+      assertEquals(1, seen.getInt("clipItems"))
+      assertEquals(null, seen.getString("readError"))
+      assertEquals(expected, seen.getString("sha256"))
+      assertEquals("couturecast-card.png", seen.getString("displayName"))
+      assertEquals(shared.length(), seen.getLong("size"))
+      assertFalse(seen.getStringArrayList("extras").orEmpty().contains(Intent.EXTRA_TEXT))
+      assertFalse(seen.getStringArrayList("extras").orEmpty().contains(Intent.EXTRA_SUBJECT))
+      // The real chooser reported the app it launched through the attempt's callback.
+      assertEquals(ShareCardChooserSelection.App(RECEIVER_PACKAGE), selection.get(30, TimeUnit.SECONDS))
+    } finally {
+      callback.teardown()
+      stopReport()
+    }
+  }
+
+  @Test
+  fun theSameAppStartedWithoutTheGrantCannotReadTheCard() {
+    assertReceiverInstalled()
+    val (report, stopReport) = receiverReport()
+    val callback = ShareCardChooserCallback.register(context, "receive-no-grant") { _, _ -> }
+    try {
+      val chooser = ShareCardChooserIntent.build(uri, callback.pendingIntent.intentSender)
+      val send = IntentCompat.getParcelableExtra(chooser, Intent.EXTRA_INTENT, Intent::class.java)!!
+      // The exact send with its ClipData, so Android adds no grant of its own; only the flags go.
+      assertNotNull(send.clipData)
+      context.startActivity(
+        Intent(send).setComponent(ComponentName(RECEIVER_PACKAGE, RECEIVER_ACTIVITY)).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+      )
+      val seen = report.get(30, TimeUnit.SECONDS)
+      assertNotEquals(Process.myUid(), seen.getInt("uid"))
+      assertEquals(receiverUid(), seen.getInt("uid"))
+      assertEquals(uri.toString(), seen.getString("stream"))
+      assertEquals("SecurityException", seen.getString("readError"))
+      assertNull(seen.getString("sha256"))
+    } finally {
+      callback.teardown()
+      stopReport()
+    }
+  }
+
   @Test
   fun theProviderRefusesOutOfScopeUrisEvenToItsOwnApp() {
     try {
@@ -156,5 +267,12 @@ class ShareCardShareReceiveTest {
         assertTrue(target.toString(), expected is SecurityException || expected is IllegalArgumentException || expected is java.io.FileNotFoundException)
       }
     }
+  }
+
+  private companion object {
+    const val RECEIVER_PACKAGE = "expo.modules.sharecardnativeshare.receiver"
+    const val RECEIVER_ACTIVITY = "expo.modules.sharecardnativeshare.receiver.ShareCardTestReceiverActivity"
+    const val RECEIVER_RESULT_ACTION = "expo.modules.sharecardnativeshare.receiver.RECEIVED"
+    const val RECEIVER_LABEL = "CC69 Receiver"
   }
 }

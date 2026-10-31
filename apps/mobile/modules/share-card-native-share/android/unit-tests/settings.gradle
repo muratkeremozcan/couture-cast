@@ -17,3 +17,7 @@ dependencyResolutionManagement {
   }
 }
 rootProject.name = 'share-card-native-share-unit-tests'
+
+// The second app the N-AND-RECEIVE androidTest picks in the chooser; see test-receiver/build.gradle.
+include ':test-receiver'
+project(':test-receiver').projectDir = file('../test-receiver')

@@ -12,7 +12,12 @@ import {
   SHARE_LEASE_MS,
   SHARE_FORBIDDEN_PERMISSIONS,
   SHARE_RECEIVE_APK,
+  SHARE_RECEIVE_GRADLE_TASK,
   SHARE_RECEIVE_MANIFESTS,
+  SHARE_RECEIVER_APK,
+  SHARE_RECEIVER_GRADLE_TASK,
+  SHARE_RECEIVER_PACKAGE,
+  SHARE_RECEIVER_PROJECT,
   SHARE_SHEET_NATIVE_CASE,
   SHARE_SHEET_STEPS,
   SHARE_SHEET_UITEST_MARKERS,
@@ -492,6 +497,50 @@ describe('native receiver and presenter tests', () => {
     )
     assert.equal(shareModuleNamespace(root), 'expo.modules.share')
     assert.match(SHARE_RECEIVE_APK, /share-card-native-share-debug-androidTest\.apk$/)
+  })
+
+  test('V15: the second app the receive test picks is the project the lane builds and installs', () => {
+    const android = path.join(repo, 'apps/mobile/modules/share-card-native-share/android')
+    const settings = fs.readFileSync(
+      path.join(repo, SHARE_RECEIVER_PROJECT, 'settings.gradle'),
+      'utf8'
+    )
+    assert.match(settings, /^include ':test-receiver'$/m)
+    assert.match(
+      settings,
+      /project\(':test-receiver'\)\.projectDir = file\('\.\.\/test-receiver'\)/
+    )
+    assert.equal(SHARE_RECEIVER_GRADLE_TASK, ':test-receiver:assembleDebug')
+    assert.ok(
+      SHARE_RECEIVER_APK.startsWith(
+        `${path.relative(repo, android)}/test-receiver/build/`
+      )
+    )
+    const gradle = fs.readFileSync(
+      path.join(android, 'test-receiver/build.gradle'),
+      'utf8'
+    )
+    assert.ok(gradle.includes(`applicationId '${SHARE_RECEIVER_PACKAGE}'`))
+    const manifest = fs.readFileSync(
+      path.join(android, 'test-receiver/src/main/AndroidManifest.xml'),
+      'utf8'
+    )
+    assert.match(manifest, /android:label="CC69 Receiver"/)
+    assert.match(manifest, /android\.intent\.action\.SEND/)
+    const receiveTest = fs.readFileSync(
+      path.join(repo, shareReceiveTestSource('expo.modules.sharecardnativeshare')),
+      'utf8'
+    )
+    assert.ok(receiveTest.includes(`RECEIVER_PACKAGE = "${SHARE_RECEIVER_PACKAGE}"`))
+    assert.ok(receiveTest.includes('RECEIVER_LABEL = "CC69 Receiver"'))
+    // The test APK may start the receiver directly only when it can see the package.
+    const testManifest = fs.readFileSync(
+      path.join(android, 'src/androidTest/AndroidManifest.xml'),
+      'utf8'
+    )
+    assert.ok(
+      testManifest.includes(`<package android:name="${SHARE_RECEIVER_PACKAGE}" />`)
+    )
   })
 
   test('instrumentation passes only when every declared test ran and nothing failed or crashed', () => {
@@ -1062,6 +1111,52 @@ describe('runStory69ShareSheet', () => {
     assert.equal(reports.at(-1)[1].code, 'share_receive_android_test_failed')
     assert.equal(reports.at(-1)[1].cases.includes('N-AND-RECEIVE'), false)
   })
+
+  for (const [outcome, instrumentLog] of [
+    ['passes', 'OK (2 tests)\n'],
+    ['fails', 'FAILURES!!!\nTests run: 2,  Failures: 1\n'],
+  ])
+    test(`android: the second app is installed before a receive run that ${outcome} and removed after it`, async (t) => {
+      const { ctx } = fakeDevice(t, 'android', { instrumentLog })
+      t.mock.method(console, 'log', () => undefined)
+      const calls = []
+      const relative = (arg) =>
+        arg.startsWith(ctx.root) ? path.relative(ctx.root, arg) : arg
+      const run = ctx.run
+      ctx.run = (binary, args, env) => {
+        calls.push([path.basename(binary), ...args.map(relative)])
+        return run(binary, args, env)
+      }
+      const spawnSync = ctx.spawnSync
+      ctx.spawnSync = (binary, args, options) => {
+        if (args.includes('instrument')) calls.push(['instrument'])
+        return spawnSync(binary, args, options)
+      }
+      const result = runStory69ShareSheet(ctx)
+      if (outcome === 'passes') await result
+      else await assert.rejects(result, /share_receive_android_test_failed/)
+      const device = ctx.device
+      assert.deepEqual(calls.slice(calls.findIndex(([binary]) => binary === 'gradlew')), [
+        [
+          'gradlew',
+          '-p',
+          'apps/mobile/android',
+          SHARE_RECEIVE_GRADLE_TASK,
+          '--max-workers=2',
+        ],
+        [
+          'gradlew',
+          '-p',
+          SHARE_RECEIVER_PROJECT,
+          SHARE_RECEIVER_GRADLE_TASK,
+          '--max-workers=2',
+        ],
+        ['adb', '-s', device, 'install', '-r', '-t', SHARE_RECEIVER_APK],
+        ['adb', '-s', device, 'install', '-r', '-t', SHARE_RECEIVE_APK],
+        ['instrument'],
+        ['adb', '-s', device, 'uninstall', SHARE_RECEIVER_PACKAGE],
+      ])
+    })
 
   for (const [name, manifest] of [
     ['is missing', null],

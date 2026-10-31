@@ -307,6 +307,18 @@ export const SHARE_RECEIVE_APK =
   'apps/mobile/modules/share-card-native-share/android/build/outputs/apk/androidTest/debug/share-card-native-share-debug-androidTest.apk'
 export const SHARE_RECEIVE_TEST_CLASS = 'ShareCardShareReceiveTest'
 
+/**
+ * V15: the second app the receive test picks in the real chooser, so another UID reads the card
+ * through the forwarded grant. It builds from the module's standalone Gradle project, never the
+ * app's, and leaves the device once the instrumentation is done.
+ */
+export const SHARE_RECEIVER_PROJECT =
+  'apps/mobile/modules/share-card-native-share/android/unit-tests'
+export const SHARE_RECEIVER_GRADLE_TASK = ':test-receiver:assembleDebug'
+export const SHARE_RECEIVER_APK =
+  'apps/mobile/modules/share-card-native-share/android/test-receiver/build/outputs/apk/debug/test-receiver-debug.apk'
+export const SHARE_RECEIVER_PACKAGE = 'expo.modules.sharecardnativeshare.receiver'
+
 /** The receive androidTest source, under the module's namespace package. */
 export const shareReceiveTestSource = (namespace) =>
   `apps/mobile/modules/share-card-native-share/android/src/androidTest/java/${namespace.replaceAll('.', '/')}/${SHARE_RECEIVE_TEST_CLASS}.kt`
@@ -887,6 +899,24 @@ export function runShareReceiveTest(ctx) {
     }
     assertShareReceiveManifest(xml)
   }
+  ctx.run(
+    path.join(ctx.root, 'apps/mobile/android/gradlew'),
+    [
+      '-p',
+      path.join(ctx.root, SHARE_RECEIVER_PROJECT),
+      SHARE_RECEIVER_GRADLE_TASK,
+      '--max-workers=2',
+    ],
+    env
+  )
+  ctx.run(ctx.adb, [
+    '-s',
+    ctx.device,
+    'install',
+    '-r',
+    '-t',
+    path.join(ctx.root, SHARE_RECEIVER_APK),
+  ])
   ctx.run(ctx.adb, [
     '-s',
     ctx.device,
@@ -913,6 +943,7 @@ export function runShareReceiveTest(ctx) {
     'share-receive-android.log',
     { timeout: 300_000 }
   )
+  ctx.run(ctx.adb, ['-s', ctx.device, 'uninstall', SHARE_RECEIVER_PACKAGE])
   try {
     if (!instrument.ok) throw new Error('share_receive_android_test_failed')
     return assertShareReceiveInstrumentation(instrument.log, expected)

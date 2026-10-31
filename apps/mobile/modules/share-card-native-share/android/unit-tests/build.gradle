@@ -1,8 +1,10 @@
 // Versions follow the app's React Native 0.81 toolchain (AGP 8.11, Kotlin 2.1.20, SDK 36).
 //   gradle testDebugUnitTest          Robolectric tests (pr-share-native-unit)
 //   gradle assembleDebugAndroidTest   the N-AND-RECEIVE instrumentation APK
+//   gradle :test-receiver:assembleDebug   the second app that test picks in the chooser
 plugins {
   id 'com.android.library' version '8.11.0'
+  id 'com.android.application' version '8.11.0' apply false
   id 'org.jetbrains.kotlin.android' version '2.1.20'
 }
 
@@ -64,4 +66,6 @@ dependencies {
   androidTestImplementation 'androidx.test:core:1.6.1'
   androidTestImplementation 'androidx.test:runner:1.6.2'
   androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+  // Picks the second app in the real system chooser (N-AND-RECEIVE).
+  androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.3.0'
 }
