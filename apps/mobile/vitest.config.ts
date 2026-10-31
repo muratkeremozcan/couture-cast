@@ -104,6 +104,14 @@ export default defineConfig({
         ),
       },
       {
+        // Only `app/_layout.tsx` imports it, as a side effect; see the stub's header.
+        find: /^react-native-reanimated$/,
+        replacement: path.resolve(
+          __dirname,
+          './src/test-utils/mocks/react-native-reanimated.js'
+        ),
+      },
+      {
         find: /^react-native-svg$/,
         replacement: path.resolve(
           __dirname,

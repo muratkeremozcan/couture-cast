@@ -8,7 +8,7 @@
  *
  * Requires `react-native-reanimated` aliased to a stub in `vitest.config.ts`: the layout's
  * side-effect import reaches React Native's Flow-typed `ReactFabric` shim, which Vite's
- * dependency pre-bundling cannot parse, and the factory mock below cannot stop the scan.
+ * dependency scan cannot parse, and a `vi.mock` factory cannot stop that scan.
  */
 import type { ReactNode } from 'react'
 import { waitFor } from '@testing-library/react'
@@ -90,7 +90,6 @@ vi.mock('expo-router', () => {
 vi.mock('expo-notifications', () => ({
   addNotificationReceivedListener: () => ({ remove: () => undefined }),
 }))
-vi.mock('react-native-reanimated', () => ({}))
 vi.mock('@react-navigation/native', () => ({
   DarkTheme: {},
   DefaultTheme: {},
