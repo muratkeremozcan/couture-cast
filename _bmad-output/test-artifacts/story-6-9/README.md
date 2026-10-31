@@ -1,6 +1,6 @@
 # Story 6.9 evidence
 
-Updated: 2026-10-30 - X-IPAD-ANCHOR record format and check.
+Updated: 2026-10-31 - X-IPAD-ANCHOR re-record rule.
 
 This folder holds the committed evidence for CC-6.9 native platform sharing that CI cannot
 produce. The spec is
@@ -26,6 +26,9 @@ name the build you proved. The command computes the screenshot SHA256, writes
 
 Only record what you observed. If the sheet did not anchor to Share, do not write a record: the
 check keeps failing, which is the correct state.
+
+The recorded commit must be an ancestor of HEAD, and the anchor sources (`IPAD_ANCHOR_SOURCES` in
+the check) must be unchanged since it, so any change to those three files needs a re-record.
 
 ## Record format
 
