@@ -2,10 +2,16 @@ import fs from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 export const requiredShareCardJobs = Object.freeze([
+  // The API32 journey runs as two shards; its evidence job proves both reported their cases.
   'original-resource',
+  'original-resource-evidence',
   'browser-acceptance',
   'android36-native-matrix',
+  // Both API36 matrix shards reported exactly their cases (a matrix job succeeds only when both
+  // legs do, so this job also catches a leg that passed without its full report).
+  'android36-matrix-evidence',
   'android36-original',
+  'android36-controls',
   'android36-interaction',
   // The iOS journey: one build, two shards (a matrix job succeeds only when both legs do) and
   // the job that proves both shards reported their exact cases.

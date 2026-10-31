@@ -38,12 +38,17 @@ const boundary = vi.hoisted(() => {
 })
 vi.mock('@/src/lib/mobile-auth', () => ({
   mobileApplicationUserId: () => boundary.member,
+  mobileIdentityEpoch: () => 0,
   subscribeMobileApplicationUser: (listener: () => void) => {
     boundary.subscribers.add(listener)
     return () => boundary.subscribers.delete(listener)
   },
 }))
-vi.mock('@/src/lib/share-cards', () => ({ prepareShareCardFromMobile: boundary.prepare }))
+vi.mock('@/src/lib/share-cards', () => ({
+  prepareShareCardFromMobile: boundary.prepare,
+  // Story 6.9: native share stays off here; the composer suite covers it.
+  shareCardCapabilitiesFromMobile: () => Promise.resolve({ nativeShare: false }),
+}))
 vi.mock('@/src/lib/share-card-save', () => ({
   nativeShareCardSaveAvailable: () => boundary.available,
   shareCardSavePermission: boundary.permission,

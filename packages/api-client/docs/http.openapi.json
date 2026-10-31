@@ -17931,7 +17931,8 @@
               "purpose": {
                 "type": "string",
                 "enum": [
-                  "save"
+                  "save",
+                  "share"
                 ]
               },
               "expectedSha256": {
@@ -18012,6 +18013,27 @@
               "mimeType",
               "filename",
               "templateVersion"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ShareCardCapabilitiesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "nativeShare": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "nativeShare"
             ],
             "additionalProperties": false
           }
@@ -27996,7 +28018,8 @@
                       "purpose": {
                         "type": "string",
                         "enum": [
-                          "save"
+                          "save",
+                          "share"
                         ]
                       },
                       "expectedSha256": {
@@ -28020,7 +28043,7 @@
         },
         "responses": {
           "200": {
-            "description": "Exact preview bytes or fresh save authorization",
+            "description": "Exact preview bytes or fresh save or share authorization",
             "content": {
               "application/json": {
                 "schema": {
@@ -28104,7 +28127,7 @@
             "description": "Authentication required"
           },
           "403": {
-            "description": "Access denied"
+            "description": "share_disabled: native share is off for this member (share purpose only), or access denied"
           },
           "404": {
             "description": "source_unavailable"
@@ -28114,6 +28137,53 @@
           },
           "503": {
             "description": "Preparation unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/share-cards/capabilities": {
+      "get": {
+        "operationId": "getShareCardCapabilities",
+        "tags": [
+          "share-cards"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The caller's share-card capabilities (private, no-store)",
+        "responses": {
+          "200": {
+            "description": "Whether native share is enabled for this member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "nativeShare": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "nativeShare"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
           }
         }
       }

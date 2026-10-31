@@ -1,7 +1,7 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import { Buffer } from 'node:buffer'
-import { ConflictException, ForbiddenException } from '@nestjs/common'
+import { ConflictException, ForbiddenException, type HttpException } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { preparedShareCardFixture } from '@couture/api-client/testing/share-card-fixture'
 import { SHARE_CARD_GLOBAL_LIMIT, ShareCardsService } from './share-cards.service.js'
@@ -21,6 +21,9 @@ const renderer = {
     >(),
 }
 const storage = { downloadBounded: vi.fn() }
+const flags = {
+  getFeatureFlag: vi.fn<(key: string, member: string) => Promise<unknown>>(),
+}
 const prisma = {
   auditLog: { create: vi.fn() },
   $transaction: vi.fn(async (work: (tx: unknown) => Promise<unknown>) => work(prisma)),
@@ -37,7 +40,8 @@ beforeEach(() => {
     prisma as never,
     sources as never,
     renderer as never,
-    storage as never
+    storage as never,
+    flags as never
   )
   sources.resolve.mockReset().mockResolvedValue(projected)
   sources.resolveGuarded.mockReset().mockResolvedValue(projected)
@@ -47,6 +51,7 @@ beforeEach(() => {
   })
   prisma.auditLog.create.mockReset().mockResolvedValue({})
   storage.downloadBounded.mockReset()
+  flags.getFeatureFlag.mockReset().mockResolvedValue(true)
 })
 afterEach(() => {
   vi.useRealTimers()
@@ -109,6 +114,7 @@ describe('share-card preparation boundaries', () => {
           locale: 'en-US',
           watermark: true,
           templateVersion: 1,
+          purpose: 'save',
         },
       },
     })
@@ -322,4 +328,152 @@ describe('share-card preparation boundaries', () => {
     await expect(attempt).rejects.toMatchObject({ status: 403 })
     expect(sources.resolveGuarded).toHaveBeenCalledOnce()
   })
+})
+describe('Story 6.9 share purpose', () => {
+  const share = {
+    ...input,
+    purpose: 'share',
+    expectedSha256: preparedShareCardFixture.sha256,
+  } as const
+  it('U-SHARE-SVC-AUTH: flag on and a matching digest returns the bytes and audits purpose share', async () => {
+    await expect(service.prepare('share-member', share)).resolves.toEqual(
+      preparedShareCardFixture
+    )
+    expect(flags.getFeatureFlag).toHaveBeenCalledWith(
+      'share_card_native_share_enabled',
+      'share-member'
+    )
+    expect(prisma.auditLog.create).toHaveBeenCalledOnce()
+    const audit = prisma.auditLog.create.mock.calls[0]![0] as {
+      data: { event_data: Record<string, unknown> }
+    }
+    expect(audit).toEqual({
+      data: {
+        user_id: 'share-member',
+        event_type: 'share_card_export_authorized',
+        event_data: {
+          sourceKind: 'outfit',
+          locale: 'en-US',
+          watermark: true,
+          templateVersion: 1,
+          purpose: 'share',
+        },
+      },
+    })
+    expect(Object.keys(audit.data.event_data).sort()).toEqual([
+      'locale',
+      'purpose',
+      'sourceKind',
+      'templateVersion',
+      'watermark',
+    ])
+    expect(JSON.stringify(audit)).not.toContain(preparedShareCardFixture.sha256)
+    expect(JSON.stringify(audit)).not.toContain('owned')
+    expect(sources.resolveGuarded).toHaveBeenCalledOnce()
+  })
+  it.each([
+    ['resolves false', () => Promise.resolve(false)],
+    ['resolves a non-boolean', () => Promise.resolve('true')],
+    ['throws', () => Promise.reject(new Error('posthog and postgres down'))],
+  ])(
+    'U-SHARE-SVC-FLAG: a flag read that %s refuses share with 403 before any work',
+    async (_name, read) => {
+      flags.getFeatureFlag.mockImplementation(read)
+      await expect(service.prepare('share-member', share)).rejects.toMatchObject({
+        status: 403,
+        response: { statusCode: 403, code: 'share_disabled', message: 'share_disabled' },
+      })
+      expect(sources.resolve).not.toHaveBeenCalled()
+      expect(storage.downloadBounded).not.toHaveBeenCalled()
+      expect(renderer.prepare).not.toHaveBeenCalled()
+      expect(prisma.auditLog.create).not.toHaveBeenCalled()
+    }
+  )
+  it('U-SHARE-SVC-FLAG: a refused share holds no admission slot', async () => {
+    flags.getFeatureFlag.mockResolvedValue(false)
+    await expect(service.prepare('busy-member', share)).rejects.toMatchObject({
+      status: 403,
+    })
+    await expect(service.prepare('busy-member', input)).resolves.toEqual(
+      preparedShareCardFixture
+    )
+  })
+  it('U-SHARE-SVC-FLAG: capabilities reports the member flag and a failed read as off', async () => {
+    await expect(service.capabilities('cap-member')).resolves.toEqual({
+      nativeShare: true,
+    })
+    expect(flags.getFeatureFlag).toHaveBeenCalledWith(
+      'share_card_native_share_enabled',
+      'cap-member'
+    )
+    flags.getFeatureFlag.mockResolvedValueOnce(false)
+    await expect(service.capabilities('cap-member')).resolves.toEqual({
+      nativeShare: false,
+    })
+    flags.getFeatureFlag.mockRejectedValueOnce(new Error('provider down'))
+    await expect(service.capabilities('cap-member')).resolves.toEqual({
+      nativeShare: false,
+    })
+  })
+  it('U-SHARE-SVC-STALE: a changed digest refuses share with 409, no audit and no bytes', async () => {
+    await expect(
+      service.prepare('member', { ...share, expectedSha256: 'f'.repeat(64) })
+    ).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'preview_changed' },
+    })
+    expect(prisma.auditLog.create).not.toHaveBeenCalled()
+  })
+  it('U-SHARE-SVC-STALE: a changed source refuses share with 409 and no audit', async () => {
+    sources.resolve
+      .mockReset()
+      .mockResolvedValueOnce(projected)
+      .mockResolvedValueOnce({ ...projected, categories: ['dress'] })
+    await expect(service.prepare('member', share)).rejects.toBeInstanceOf(
+      ConflictException
+    )
+    expect(prisma.auditLog.create).not.toHaveBeenCalled()
+  })
+  it('U-SHARE-SVC-STALE: a source that changes inside the audit transaction refuses share', async () => {
+    sources.resolveGuarded.mockResolvedValueOnce({ ...projected, categories: ['dress'] })
+    await expect(service.prepare('member', share)).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'preview_changed' },
+    })
+  })
+  it('I-SHARE-AUDIT: an audit outage blocks the share with a closed 503 and no internal text', async () => {
+    prisma.auditLog.create.mockRejectedValueOnce(new Error('private audit payload'))
+    const failure = (await service
+      .prepare('member', share)
+      .catch((error: unknown) => error)) as HttpException
+    expect(prisma.auditLog.create).toHaveBeenCalledOnce()
+    expect(failure).toMatchObject({
+      status: 503,
+      response: { code: 'render_unavailable' },
+    })
+    expect(JSON.stringify(failure.getResponse())).not.toContain('private audit payload')
+    expect(failure.message).not.toContain('private audit payload')
+  })
+  it.each([true, false])(
+    'U-SHARE-SVC-SAVE-REGRESSION: preview and save are unchanged with the flag %s',
+    async (on) => {
+      flags.getFeatureFlag.mockResolvedValue(on)
+      const preview = await service.prepare('regression-member', input)
+      // The 6.8 fixture is the byte-for-byte response a deployed client parses.
+      expect(JSON.stringify(preview)).toBe(JSON.stringify(preparedShareCardFixture))
+      const save = await service.prepare('regression-member', {
+        ...input,
+        purpose: 'save',
+        expectedSha256: preview.sha256,
+      })
+      expect(JSON.stringify(save)).toBe(JSON.stringify(preparedShareCardFixture))
+      // Preview writes no audit row; save writes exactly one, now labelled save.
+      expect(prisma.auditLog.create).toHaveBeenCalledOnce()
+      expect(prisma.auditLog.create.mock.calls[0]![0]).toMatchObject({
+        data: { event_data: { purpose: 'save' } },
+      })
+      // Save and preview never consult the share flag.
+      expect(flags.getFeatureFlag).not.toHaveBeenCalled()
+    }
+  )
 })

@@ -4,6 +4,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const repository = fileURLToPath(new URL('../../', import.meta.url))
 export const SPEC_FILE = 'playwright/tests/share-card-export.spec.ts'
+/** Story 6.9 Web Share cases: top-level only, each titled `P-SHARE-...`. */
+export const SHARE_SPEC_FILE = 'playwright/tests/share-card-native-share.spec.ts'
 const LOCALE_FILE = 'packages/api-client/src/contracts/http/supported-locales.json'
 export const BROWSERS = ['chromium', 'firefox', 'webkit']
 /**
@@ -30,6 +32,20 @@ export const SHARED_BEHAVIORS = [
   'P-CANCEL-SAVE:',
   'P-MODAL-STACK:',
 ]
+/**
+ * Story 6.9 Web Share behaviors. Each runs once per browser as a shared case, never per
+ * locale, and the lane carries at most SHARE_TITLE_BUDGET share titles so the
+ * browser-acceptance job stays inside its time budget.
+ */
+export const SHARE_BEHAVIORS = [
+  'P-SHARE-BYTES:',
+  'P-SHARE-DISMISS:',
+  'P-SHARE-TAP-AGAIN:',
+  'P-SHARE-CAPABILITY-OFF:',
+  'P-SHARE-REVALIDATE:',
+]
+export const SHARE_TITLE_BUDGET = 5
+const SHARE_TITLE = 'P-SHARE-'
 
 function assertSpecBehaviors(perLocale, shared) {
   const proofs = (titles, behavior) =>
@@ -37,45 +53,70 @@ function assertSpecBehaviors(perLocale, shared) {
   for (const behavior of LOCALE_BEHAVIORS)
     if (proofs(perLocale, behavior) !== 1)
       throw new Error(`web_matrix_spec_behavior_missing: ${behavior}`)
-  for (const behavior of SHARED_BEHAVIORS)
+  for (const behavior of [...SHARED_BEHAVIORS, ...SHARE_BEHAVIORS])
     if (proofs(shared, behavior) < 1)
       throw new Error(`web_matrix_spec_behavior_missing: ${behavior}`)
+  if (proofs(perLocale, SHARE_TITLE) !== 0)
+    throw new Error('web_matrix_spec_share_per_locale')
+  if (proofs(shared, SHARE_TITLE) > SHARE_TITLE_BUDGET)
+    throw new Error('web_matrix_spec_share_budget')
   for (const titles of [perLocale, shared])
     if (new Set(titles).size !== titles.length)
       throw new Error('web_matrix_spec_duplicate_title')
 }
 
+const TITLE = /^(\s*)test\('((?:[^'\\]|\\.)*)'/
+const UNSUPPORTED = /\btest\.(skip|fixme|only)\(|\btest\(`/
+
+/** The share spec's titles: top-level tests only, every one a `P-SHARE-` case. */
+function shareSpecTitles(source) {
+  if (UNSUPPORTED.test(source)) throw new Error('web_matrix_spec_unsupported_declaration')
+  const titles = []
+  for (const line of source.split('\n')) {
+    const match = TITLE.exec(line)
+    if (!match) continue
+    if (match[1] !== '' || !match[2].startsWith(SHARE_TITLE))
+      throw new Error(`web_matrix_spec_share_misplaced: ${match[2]}`)
+    titles.push(match[2])
+  }
+  return titles
+}
+
 /**
- * The case titles the spec declares: tests inside its per-locale describe and
- * top-level tests. The expected matrix comes from the spec itself, so a split or a
- * removed body changes the expectation instead of hiding behind a fixed count.
+ * The case titles the specs declare: tests inside the export spec's per-locale describe,
+ * its top-level tests, and the share spec's top-level tests. The expected matrix comes
+ * from the specs themselves, so a split or a removed body changes the expectation
+ * instead of hiding behind a fixed count. Web Share cases live only in the share spec.
  */
-export function specCases(source) {
+export function specCases(source, shareSource) {
   const lines = source.split('\n')
   const start = lines.findIndex((line) =>
     /^for \(const locale of supportedLocales\)$/.test(line)
   )
   if (start === -1 || !/^\s+test\.describe\(locale, /.test(lines[start + 1] ?? ''))
     throw new Error('web_matrix_spec_locale_block_missing')
-  if (/\btest\.(skip|fixme|only)\(|\btest\(`/.test(source))
-    throw new Error('web_matrix_spec_unsupported_declaration')
-  const title = /^(\s*)test\('((?:[^'\\]|\\.)*)'/
+  if (UNSUPPORTED.test(source)) throw new Error('web_matrix_spec_unsupported_declaration')
   const perLocale = []
   const shared = []
   for (const [index, line] of lines.entries()) {
-    const match = title.exec(line)
+    const match = TITLE.exec(line)
     if (!match) continue
-    if (match[1] === '') shared.push(match[2])
-    else if (index > start && match[1] === '    ') perLocale.push(match[2])
+    if (match[1] === '') {
+      if (match[2].startsWith(SHARE_TITLE))
+        throw new Error(`web_matrix_spec_share_misplaced: ${match[2]}`)
+      shared.push(match[2])
+    } else if (index > start && match[1] === '    ') perLocale.push(match[2])
     else throw new Error(`web_matrix_spec_unplaced_test: ${match[2]}`)
   }
+  shared.push(...shareSpecTitles(shareSource))
   assertSpecBehaviors(perLocale, shared)
   return { perLocale, shared }
 }
 
 /** The expected matrix from the checked-in spec and the supported locale catalog. */
 export function expectedWebMatrix({ root = repository } = {}) {
-  const cases = specCases(fs.readFileSync(path.join(root, SPEC_FILE), 'utf8'))
+  const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
+  const cases = specCases(read(SPEC_FILE), read(SHARE_SPEC_FILE))
   const locales = Object.keys(
     JSON.parse(fs.readFileSync(path.join(root, LOCALE_FILE), 'utf8'))
   )

@@ -38,7 +38,13 @@ vi.mock('posthog-react-native', () => {
   return { __esModule: true, default: FakePostHog }
 })
 
-import { isPostHogEnabled, posthog, posthogProviderClient } from './posthog'
+import {
+  isPostHogEnabled,
+  mobilePostHogBeforeSend,
+  posthog,
+  posthogProviderClient,
+} from './posthog'
+import { SHARE_CARD_SHARED_ALLOWED_PROPERTIES } from '@couture/api-client'
 
 bootstrap.restoreConsole()
 
@@ -91,5 +97,135 @@ describe('mobile PostHog provider configuration', () => {
   /** The legacy alias must stay the same instance while the facade rolls out. */
   it('exposes the legacy alias as the same client instance', () => {
     expect(posthog).toBe(posthogProviderClient)
+  })
+})
+
+type HookEvent = NonNullable<Parameters<typeof mobilePostHogBeforeSend>[0]>
+const timestamp = new Date('2026-10-30T12:00:00.000Z')
+function shareEvent(properties: Record<string, unknown>): HookEvent {
+  return {
+    uuid: '0192f0c4-0000-7000-8000-000000000001',
+    event: 'share_card_shared',
+    timestamp,
+    properties: properties as HookEvent['properties'],
+    $set: { email: 'member@example.com' } as HookEvent['$set'],
+    $set_once: { first_seen_url: 'https://couturecast.app/p/1' } as HookEvent['$set'],
+  }
+}
+const enriched = {
+  client: 'ios',
+  target: 'instagram',
+  outcome: 'completed',
+  duration_ms: 1840,
+  locale: 'en-US',
+  token: 'phc_project',
+  distinct_id: 'anon-1',
+  $lib: 'posthog-react-native',
+  $lib_version: '4.36.1',
+  $os: 'iOS',
+  $device_type: 'Mobile',
+  $screen_name: 'community/post-123',
+  $current_url: 'https://couturecast.app/share/post-123?token=secret',
+  $app_build: '42',
+  $session_id: 'session-1',
+  registered_super_property: 'plan-premium',
+  $set: { email: 'member@example.com' },
+  $set_once: { first_seen: 'yesterday' },
+  caption: 'Tall boots for a wet morning',
+  sha256: 'a'.repeat(64),
+}
+
+describe('U-SHARE-SANITIZER-MOBILE: before_send for share_card_shared', () => {
+  it('installs the exported hook as the SDK before_send option', () => {
+    expect(bootstrap.constructions[0]?.options.before_send).toBe(mobilePostHogBeforeSend)
+  })
+
+  it('keeps the envelope, allowlists properties and removes every $set', () => {
+    const result = mobilePostHogBeforeSend(shareEvent(enriched))
+    expect(result).toEqual({
+      uuid: '0192f0c4-0000-7000-8000-000000000001',
+      event: 'share_card_shared',
+      timestamp,
+      properties: {
+        client: 'ios',
+        target: 'instagram',
+        outcome: 'completed',
+        duration_ms: 1840,
+        locale: 'en-US',
+        token: 'phc_project',
+        distinct_id: 'anon-1',
+        $lib: 'posthog-react-native',
+        $lib_version: '4.36.1',
+        $os: 'iOS',
+        $device_type: 'Mobile',
+        $geoip_disable: true,
+        $ip: null,
+        $process_person_profile: false,
+      },
+    })
+    expect(result).not.toHaveProperty('$set')
+    expect(result).not.toHaveProperty('$set_once')
+    expect(
+      Object.keys(result?.properties ?? {}).every((key) =>
+        (SHARE_CARD_SHARED_ALLOWED_PROPERTIES as readonly string[]).includes(key)
+      )
+    ).toBe(true)
+  })
+
+  it.each([
+    ['an invalid outcome pair', { ...enriched, client: 'android' }],
+    ['a missing business key', { ...enriched, duration_ms: undefined }],
+    ['a raw package target', { ...enriched, target: 'com.instagram.android' }],
+  ])('drops the event on %s and logs a closed code', (_name, properties) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    expect(mobilePostHogBeforeSend(shareEvent(properties))).toBeNull()
+    expect(warn.mock.calls).toEqual([['[cc69-analytics] share_event_dropped']])
+  })
+
+  it('returns null instead of throwing when reading the event fails', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const hostile = {
+      event: 'share_card_shared',
+      get properties(): never {
+        throw new Error(`file:///cache/share-cards/cc69-share-1.png ${'b'.repeat(64)}`)
+      },
+    } as unknown as HookEvent
+    expect(() => mobilePostHogBeforeSend(hostile)).not.toThrow()
+    expect(mobilePostHogBeforeSend(hostile)).toBeNull()
+    expect(warn.mock.calls.flat().join(' ')).not.toMatch(/file:|[a-f0-9]{64}/)
+  })
+
+  it('drops an event whose required key holds a cyclic value, with one closed code', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const cyclic: Record<string, unknown> = { path: 'file:///cache/cc69-share-1.png' }
+    cyclic.self = cyclic
+    expect(
+      mobilePostHogBeforeSend(shareEvent({ ...enriched, outcome: cyclic }))
+    ).toBeNull()
+    expect(warn.mock.calls).toEqual([['[cc69-analytics] share_event_dropped']])
+  })
+
+  it('strips a cyclic value under a non-allowlisted key and keeps the event serializable', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const properties: Record<string, unknown> = { ...enriched }
+    properties.self = properties
+    const result = mobilePostHogBeforeSend(shareEvent(properties))
+    expect(result?.properties).not.toHaveProperty('self')
+    expect(result?.properties).toMatchObject({
+      outcome: 'completed',
+      $geoip_disable: true,
+    })
+    expect(() => JSON.stringify(result)).not.toThrow()
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('passes every other event through unchanged, by reference', () => {
+    const other: HookEvent = {
+      event: 'ritual_created',
+      properties: { $current_url: 'https://couturecast.app', locale: 'en-US' },
+      $set: { plan: 'premium' },
+    }
+    expect(mobilePostHogBeforeSend(other)).toBe(other)
+    expect(mobilePostHogBeforeSend(null)).toBeNull()
   })
 })

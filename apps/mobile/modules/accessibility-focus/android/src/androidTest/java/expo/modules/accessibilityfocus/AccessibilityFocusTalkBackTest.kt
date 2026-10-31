@@ -6,6 +6,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityEvent
@@ -62,12 +63,24 @@ class AccessibilityFocusTalkBackTest {
       mainHandler = Handler(Looper.getMainLooper()),
     )
 
+  private val clock = TreeSettling.Clock({ SystemClock.uptimeMillis() }, { SystemClock.sleep(it) })
+
+  /**
+   * Launches the activity and returns once TalkBack has put its own focus in the new window.
+   * TalkBack does that after the window appears, so a focus action taken earlier is overwritten
+   * by it: run 41208356725 read the second view after TalkBack had moved to the first.
+   */
   private fun launch(): View {
     val launched = ActivityScenario.launch(FocusTestActivity::class.java)
     scenario = launched
     lateinit var decor: View
     launched.onActivity { decor = it.window.decorView }
     instrumentation.waitForIdleSync()
+    TreeSettling.initialFocusSettled("TalkBack placed its focus in the test window", clock) {
+      var focused: Int? = null
+      instrumentation.runOnMainSync { focused = AccessibilityFocusObserver.focusedView(decor)?.id }
+      focused
+    }
     return decor
   }
 

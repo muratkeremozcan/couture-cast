@@ -1,0 +1,23 @@
+// Standalone build of the module's pure Android sources and Robolectric tests. The module's own
+// build.gradle needs the generated app and expo-modules-core; this one needs neither, so CI runs
+// the tests without a prebuild:
+//   gradle -p apps/mobile/modules/share-card-native-share/android/unit-tests testDebugUnitTest
+pluginManagement {
+  repositories {
+    google()
+    mavenCentral()
+    gradlePluginPortal()
+  }
+}
+dependencyResolutionManagement {
+  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  repositories {
+    google()
+    mavenCentral()
+  }
+}
+rootProject.name = 'share-card-native-share-unit-tests'
+
+// The second app the N-AND-RECEIVE androidTest picks in the chooser; see test-receiver/build.gradle.
+include ':test-receiver'
+project(':test-receiver').projectDir = file('../test-receiver')

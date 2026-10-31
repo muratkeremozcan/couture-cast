@@ -172,21 +172,35 @@ async function restoredState(
   let stableSince
   let stableActivity
   let lastFailure = new Error('release_applied_font_configuration_required')
+  let assessed = false
+  // Each read is bounded by what is left of the deadline. A read cut off by that bound reports
+  // why the after state never settled (CI run 41179795488 showed only the cut-off snapshot);
+  // before any after state was assessed, the read's own failure stands.
+  const bounded = async (read) => {
+    try {
+      return await read()
+    } catch (error) {
+      if (assessed && now() >= deadline)
+        throw new Error(lastFailure.message, { cause: error })
+      throw error
+    }
+  }
   do {
     const remaining = () => Math.max(1, deadline - now())
     const activity = appliedActivity(
-      await io.shell(['dumpsys', 'activity', 'top', '-a'], remaining())
+      await bounded(() => io.shell(['dumpsys', 'activity', 'top', '-a'], remaining()))
     )
     if (now() > deadline) fail('release_restore_deadline')
     if (activity) {
-      const tree = await io.hierarchy(remaining(), 'after')
+      const tree = await bounded(() => io.hierarchy(remaining(), 'after'))
       await io.recordTree('after', tree)
       if (!noErrorSurface(tree)) fail('release_error_surface')
       const current = appliedActivity(
-        await io.shell(['dumpsys', 'activity', 'top', '-a'], remaining())
+        await bounded(() => io.shell(['dumpsys', 'activity', 'top', '-a'], remaining()))
       )
       if (now() > deadline) fail('release_restore_deadline')
       try {
+        assessed = true
         if (activity !== current) fail('release_applied_font_configuration_required')
         const state = {
           ...releaseState(tree, expected),

@@ -76,6 +76,18 @@ describe('AccessibleModal', () => {
     }
   })
 
+  it('lays the surface out as a flex column only when asked', () => {
+    const { unmount } = renderModal()
+    expect(screen.getByRole('dialog').firstElementChild).not.toHaveClass('flex')
+    unmount()
+    renderModal({ columnLayout: true })
+    expect(screen.getByRole('dialog').firstElementChild).toHaveClass(
+      'flex',
+      'flex-col',
+      'overflow-y-auto'
+    )
+  })
+
   it('pairs a theme surface with the existing light-surface keyboard focus token', () => {
     renderModal({ surface: 'theme' })
     expect(screen.getByRole('dialog').firstElementChild).toHaveAttribute(

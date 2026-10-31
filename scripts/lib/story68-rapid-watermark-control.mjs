@@ -3,22 +3,49 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
+/** Every closed failure code a rapid watermark record may carry, public evidence included. */
+export const RAPID_WATERMARK_FAILURE_CODES = Object.freeze([
+  'rapid_watermark_hold_deadline',
+  'rapid_watermark_request_deadline',
+  'rapid_watermark_request_clock_required',
+  'native_rapid_watermark_flow_timeout',
+  'native_rapid_watermark_flow_failed',
+  'rapid_watermark_acquire_required',
+  'rapid_watermark_release_required',
+  'blocked_outfit_source_required',
+  'rapid_watermark_prepare_503',
+  'three_fresh_prepare_requests_required',
+  'effective_owned_database_mismatch',
+  'owned_uuid_loopback_database_required',
+  'pinned_owned_native_runtime_required',
+  'effective_owned_api_database_proof_required',
+  'rapid_watermark_lock_timeout',
+  'rapid_watermark_idle_session_timeout',
+  'rapid_watermark_query_timeout',
+  'native_rapid_watermark_failed',
+])
+
+/** The runner's stages, in order. A failed record names the stage it stopped in. */
+export const RAPID_WATERMARK_STAGES = Object.freeze([
+  'validating_runtime',
+  'fresh_runtime',
+  'ready_opener',
+  'held_flow',
+  'fresh_preview',
+  'requests',
+])
+
+// PostgreSQL ends the held transaction itself for these: its own SQLSTATE or pg's fixed text.
+const databaseFailures = new Map([
+  ['55P03', 'rapid_watermark_lock_timeout'],
+  ['25P03', 'rapid_watermark_idle_session_timeout'],
+])
+
 export function closedRapidWatermarkFailure(error) {
-  const codes = [
-    'rapid_watermark_hold_deadline',
-    'native_rapid_watermark_flow_timeout',
-    'native_rapid_watermark_flow_failed',
-    'rapid_watermark_acquire_required',
-    'rapid_watermark_release_required',
-    'blocked_outfit_source_required',
-    'rapid_watermark_prepare_503',
-    'three_fresh_prepare_requests_required',
-    'effective_owned_database_mismatch',
-    'owned_uuid_loopback_database_required',
-    'pinned_owned_native_runtime_required',
-    'effective_owned_api_database_proof_required',
-  ]
-  return error instanceof Error && codes.includes(error.message)
+  if (!(error instanceof Error)) return 'native_rapid_watermark_failed'
+  if (databaseFailures.has(error.code)) return databaseFailures.get(error.code)
+  if (error.message === 'Query read timeout') return 'rapid_watermark_query_timeout'
+  return RAPID_WATERMARK_FAILURE_CODES.includes(error.message)
     ? error.message
     : 'native_rapid_watermark_failed'
 }
@@ -119,7 +146,7 @@ export async function withRapidWatermarkControl({ withLock, runFlow }) {
     server.once('error', reject)
     server.listen(0, '127.0.0.1', resolve)
   })
-  // This is the existing general Maestro flow timeout. The SQL hold has its own 12s clock.
+  // This is the existing general Maestro flow timeout. The SQL hold has its own two clocks.
   const timer = setTimeout(
     () => fail(new Error('native_rapid_watermark_flow_timeout')),
     120_000

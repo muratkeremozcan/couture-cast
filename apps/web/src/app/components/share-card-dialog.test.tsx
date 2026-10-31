@@ -1,45 +1,24 @@
-import { webcrypto } from 'node:crypto'
-import { fireEvent, render, screen, waitFor, act } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { preparedShareCardFixture } from '@couture/api-client/testing/share-card-fixture'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import {
+  endpoint,
+  handoff,
+  open,
+  requests,
+  setupShareCardDialog,
+  source,
+} from '../../test-utils/share-card-dialog'
 import { currentI18n } from '../../i18n'
 import enUS from '../../i18n/locales/en-US.json'
 import { ShareCardControl } from './share-card-dialog'
+// Story 6.8 save tests. The Story 6.9 Web Share tests live in share-card-dialog.share.test.tsx.
 const identity = vi.hoisted(() => ({ member: 'member-one' as string | null }))
 vi.mock('../../lib/web-session', () => ({ webSessionIdentity: () => identity.member }))
-const source = { kind: 'outfit', recommendationId: 'owned-recommendation' } as const
-const endpoint = 'http://localhost:3001/api/v1/share-cards/prepare'
-const requests: unknown[] = []
-const handoff = vi.fn()
-beforeEach(async () => {
-  identity.member = 'member-one'
-  requests.length = 0
-  vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', 'http://localhost:3001')
-  vi.stubGlobal('crypto', webcrypto)
-  Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
-  Object.defineProperty(URL, 'createObjectURL', {
-    configurable: true,
-    value: vi.fn(() => 'blob:approved'),
-  })
-  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
-  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(handoff)
-  await currentI18n().changeLanguage('en-US')
-  useMswHandlers(handler())
-})
-async function open(target: Parameters<typeof ShareCardControl>[0]['source'] = source) {
-  render(<ShareCardControl source={target} />)
-  await userEvent.click(screen.getByTestId('share-card-open'))
-  const image = await screen.findByTestId('share-card-preview')
-  return image
-}
-const handler = () =>
-  http.post(endpoint, async ({ request }) => {
-    requests.push(await request.json())
-    return HttpResponse.json({ data: preparedShareCardFixture })
-  })
+setupShareCardDialog(identity)
 describe('exact-byte share-card dialog', () => {
   it('M5 R2-L2: handoff Retry retains focus while pending, then removes recovery and focuses Save', async () => {
     const image = await open()

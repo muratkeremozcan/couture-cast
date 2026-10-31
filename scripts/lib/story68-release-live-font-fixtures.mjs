@@ -130,11 +130,12 @@ export function adapterFixture(proof, timedOut = false) {
   const writes = []
   const kills = []
   const removals = []
+  const logs = []
   let nativeTime = 0
   const context = {
     path,
     createHash,
-    console: { log: () => undefined },
+    console: { log: (line) => logs.push(line) },
     performance: { now: () => nativeTime },
     process: { kill: (...args) => kills.push(args) },
     failures: new Set(['release_font_native_command_failed']),
@@ -187,5 +188,5 @@ export function adapterFixture(proof, timedOut = false) {
     maestro: () => undefined,
     privateJson: (name, record) => records.push({ name, record }),
   }
-  return { invoke: () => invoke(ctx), records, processes, writes, kills, removals }
+  return { invoke: () => invoke(ctx), records, processes, writes, kills, removals, logs }
 }

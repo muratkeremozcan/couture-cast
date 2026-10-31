@@ -4,13 +4,13 @@
 
 ## Goal
 
-Deliver climate-relevant community inspiration through posts, reactions, comments, ranked highlights,
-and branded sharing, backed by safe publication and accountable moderation. Community Beta opens
-only when staffing, SLA alerts, privacy, deletion, localization, accessibility, model, and rollback
-evidence are signed. Production read and write rollout controls stay disabled for the general
-population until all eight release gates close. The one sanctioned exception is a complimentary
-full-access grant that lets owner-selected family testers use premium and community features in
-production without payment.
+Deliver climate-relevant community inspiration through posts, reactions, comments, ranked
+highlights, and branded export and sharing, backed by safe publication and accountable moderation.
+Every lane ships behind disabled production read and write controls. Community Beta opens only after
+Stories 6.2 through 6.13 and every signed release-gate item are complete. The one sanctioned
+exception is complimentary full access, which lets owner-selected family testers use premium and
+community features in production without payment. Stories 6.1 through 6.8 are done; the current
+story is 6.9, native platform sharing of the card that 6.8 prepares.
 
 ## Stories
 
@@ -22,7 +22,7 @@ production without payment.
 - Story 6.5: Realtime engagement and notifications
 - Story 6.6: Community City Spotlight
 - Story 6.7: Home spotlight teaser
-- Story 6.7b: Sponsored community highlights (post-to-offer link, disclosed CTA on cards, spotlight and teaser)
+- Story 6.7b: Sponsored community highlights
 - Story 6.8: Safe branded share-card export
 - Story 6.9: Native platform sharing
 - Story 6.10: Moderator queue and case detail
@@ -30,81 +30,83 @@ production without payment.
 - Story 6.12: SLA monitoring and escalation
 - Story 6.13: Immutable moderation history
 - Story 6.14: Complimentary full access
+- Story 6.15: Expo SDK 58 upgrade for live font-scale layout
 
 ## Requirements & Constraints
 
-- Community participation requires age 13+. Uploads also enforce the guardian-consent policy for
-  under-16 members.
-- Climate-band feeds support photo posts, locale metadata, and editorial weekly challenges.
-  Reactions use a closed emoji palette, one current reaction per member and post, exact aggregates,
-  and retry-safe replacement and removal. Visibility changes invalidate feed and highlight caches.
-- Comments support one reply level, stable pagination, screening before publication, deletion
-  tombstones, and reporting. Accepted reports reach moderation within five minutes; human review
-  has a 24-hour SLA with at-risk and breach escalation.
-- Moderator access is role restricted. Decisions require an attributed reason, serialize conflicts,
-  and keep immutable history for at least 12 months. Account erasure removes personal content and
-  anonymizes subject and reporter identities within 72 hours.
-- Spotlight ranking is deterministic from reactions and recency, uses coarse location and a defined
-  privacy cohort, and shows affiliate CTAs only when an eligible sponsorship exists.
-- Exported cards keep luxury branding and an optional watermark while stripping personal data,
-  exact location, source metadata, identifiers, and signed media URLs. Cancellation keeps the
-  composition; failed sharing offers camera-roll save or web download.
+- Participation requires age 13+; uploads and export also enforce guardian consent for under-16
+  members. Flag-off, revoked consent, suspension, or erasure blocks community actions and export.
+- Feeds group photo posts by climate band with locale metadata and editorial weekly challenges.
+  Reactions use a closed palette, one current reaction per member and post, exact aggregates, and
+  idempotent replace and remove. Visibility changes invalidate feed and highlight caches.
+- Comments: one reply level, stable keyset paging, screening before publication, deletion
+  tombstones, report on every visible comment. Accepted reports reach moderation within five
+  minutes; human review has a 24-hour SLA with at-risk and breach escalation.
+- Moderation is role restricted; decisions carry an attributed reason, serialize conflicts, and keep
+  immutable history for at least 12 months. Erasure removes personal content and anonymizes subject
+  and reporter identity within 72 hours.
+- Spotlight ranking is deterministic from reactions and recency, uses coarse location and a
+  minimum privacy cohort. Affiliate CTAs appear only for an eligible, disclosed sponsorship.
+- Sharing (6.8 and 6.9): cards go to Pinterest, Instagram, Facebook, and TikTok through the native
+  share sheet only when the OS exposes those targets, with a generic system-share path for other
+  compatible apps. Cards keep luxury branding and an optional watermark and carry no personal data.
+  Cancel, absent target, or handoff failure must lose nothing: the prepared card and composition
+  survive. If a platform share fails, notify the member and offer the 6.8 save path (camera roll on
+  iOS and Android, download on web). Sharing workflows count toward the 99.5% availability target.
+- Analytics privacy: event tracking is anonymous and covers community actions. Community analytics
+  are privacy-safe and deduplicated, and identity uses the PostHog pseudonym discipline. Share
+  analytics record platform, outcome, and duration only: no image bytes, digests, captions, source
+  or post IDs, URLs, filenames, native asset IDs, location, or other personal data. Operational logs
+  use closed failure codes. Analytics ingestion stays idempotent, and an analytics outage must not
+  break the share flow. Story 6.8 added no analytics events, so 6.9 introduces the share events.
 - Engagement pushes require opt-in and quiet hours, dispatch within 60 seconds, and clean up invalid
-  tokens. Community analytics use anonymous, privacy-safe, deduplicated signals.
-- Complimentary access grants every premium capability with no billing provider, customer record,
-  or charge. It enables community rollout flags and push dispatch for complimentary members only;
-  every other member, cohort, and production default stays unchanged. Grant and revoke are
-  owner-only and audited (actor, member, reason, time); revoke restores the prior paid or free
-  state on the next request; erasure removes the grant and its audit subject identity.
-- English, Spanish, and French are launch locales. Screening handles obfuscation and escalates
-  unsupported language or uncertain results. Web and mobile controls are localized and accessible,
-  with upload alternative text, clear focus, and screen-reader feedback.
+  tokens.
+- Complimentary access grants every premium capability with no billing provider, customer, or
+  charge; enables community flags and push only for those members; grant and revoke are owner-only
+  and audited; revoke restores the prior state on the next request.
+- English, Spanish, and French at launch. Every web and mobile state is localized and accessible
+  (WCAG 2.2 AA), with clear focus and screen-reader announcements.
 
 ## Technical Decisions
 
-- NestJS owns community decisions; Supabase PostgreSQL and Prisma provide persistence with RLS
-  isolation and role guards. Next.js hosts the moderator console. Audit records are append-only at
-  the database boundary.
-- Public HTTP contracts start as shared Zod schemas under `packages/api-client/src/contracts/http`;
-  controllers, OpenAPI, SDKs, and wrappers derive from them. `/api/v1` stays stable; incompatible
-  changes need `/api/v2`. Use the shared success, pagination, and error envelopes.
-- Moderation uses an in-house console and a standalone BullMQ worker deployed as an unprivileged
-  container under `tini` on an always-on host: Northflank first, Oracle Always Free if memory
-  requires it, then Railway. Serverless HTTP functions cannot host it.
-- Screening uses a pinned NSFWJS model on TensorFlow.js WASM with bounded execution and fail-closed
-  unavailability: one replica, concurrency one, 512 MiB, a traced dependency budget, and build
-  identity proven by a deployed canary. Readiness evidence is an immutable payload signed by the
-  owner against its hash; stale or partial evidence fails closed. Thresholds live in that payload.
-- Production Redis is Upstash Pay as You Go. Worker blocking and stalled checks are tuned so the
-  screening worker's projected monthly cost stays at or below USD 5.
+- NestJS owns community decisions over Supabase PostgreSQL and Prisma with RLS and role guards.
+  Next.js hosts the moderator console. Audit records are append-only at the database boundary.
+- Public REST contracts start as shared Zod schemas; controllers, OpenAPI, and SDKs derive from
+  them. `/api/v1` stays stable; incompatible changes go to `/api/v2`. Use the shared envelopes.
+- Moderation screening runs in a standalone BullMQ worker container on an always-on host with a
+  pinned NSFWJS model, bounded execution, and fail-closed behavior. Serverless functions cannot
+  host it. Readiness evidence is an owner-signed, hash-bound payload.
 - Highlight read models live in Redis with engagement and moderation invalidation. Realtime events
-  publish after durable commits with version and timestamp; reconnect and ordered polling fallback
-  suppress duplicates.
-- Paid entitlement truth has one writer: the RevenueCat webhook plus its refresh and reconciliation
-  pulls, mirrored into our database and enforced by the premium entitlement guard. The
-  complimentary source must sit beside that mirror so webhooks, renewals, reconciliation, and
-  expiry jobs can never downgrade, overwrite, or bill it.
-- Feature flags are checked through PostHog with a Postgres toggle fallback.
+  publish after durable commits; reconnect and ordered polling suppress duplicates.
+- Feature flags check PostHog with a Postgres toggle fallback. Product analytics go to PostHog;
+  operational telemetry goes through OpenTelemetry to Grafana.
+- The 6.8 share card is the only shareable asset: a server-rendered, deterministic 1080x1350 PNG
+  with only core chunks, so it holds no EXIF, GPS, or text metadata. The member previews its exact
+  bytes and SHA256. Never screenshot UI or hand the OS bytes the member has not previewed; a
+  composition change requires a fresh preview. Prepared bytes live in session-memory composition
+  only, never in server or durable client storage. OS-owned asset bookkeeping stays out of
+  telemetry and out of the PNG.
+- Paid entitlement truth has one writer (the RevenueCat webhook plus reconciliation); the
+  complimentary source sits beside that mirror so billing jobs can never downgrade or bill it.
 
 ## UX & Interaction Patterns
 
-- Lookbook Prism shows ritual and community side by side on desktop and stacked on smaller screens.
-  Loading, empty, stale, disabled, and failed community states preserve the daily ritual.
-- Cards show weather and location context, engagement counts, accessible applause and report
-  actions, and sponsorship disclosure. Use gold success and focus cues, merlot errors, and fog
-  informational states. Focus order follows hero, chips, garments, community cards.
-- Community deep links focus the referenced visible card. Invalid targets fall back to the ritual
-  with informational feedback. Disabled filters state their availability clearly.
+- Community states (loading, empty, stale, disabled, failed) never disrupt the daily ritual. Focus
+  order runs hero, chips, garments, community cards.
+- Feedback uses gold for success, merlot for errors, fog for informational states. Toasts sit
+  top-center on mobile and top-right on desktop and auto-dismiss after 6 seconds; ARIA live regions
+  announce key feedback.
+- Share flows report only outcomes the platform actually confirms. A failed share shows truthful
+  merlot feedback with the save path offered beside the retained preview.
+- Community deep links focus the referenced visible card; invalid targets fall back to the ritual.
 
 ## Cross-Story Dependencies
 
-- Story 6.1 is the community foundation. Stories 6.2 and 6.2b supply production screening and
-  release evidence; comments consume that screening boundary.
-- Reactions feed City Spotlight, then the Home teaser, then sponsored highlights (6.7b). Realtime consumes durable reaction and
-  comment writes. Safe export precedes native sharing.
-- Moderator queue precedes decisions and SLA monitoring; decisions precede immutable-history proof.
-- Story 6.14 builds on the Story 5.2 billing and entitlement stack and on Story 6.5 push dispatch.
-- Localization, accessibility, deep links, consent, image capture, and affiliate infrastructure come
-  from earlier epics, including the already-delivered Epics 4 and 5.
-- Following stays disabled until product either adds sized follow-graph and profile stories or
-  amends the brief and UX to drop it. Close this before Community Beta sign-off.
+- 6.1 is the community foundation; 6.2 and 6.2b supply screening and release evidence that 6.4
+  consumes. 6.3 feeds 6.6, then 6.7, then 6.7b; 6.3 and 6.4 feed 6.5.
+- 6.8 feeds 6.9 directly: 6.9 reuses 6.8's composer, prepared bytes, eligibility checks, and save
+  path, and must keep 6.8's privacy and cancellation guarantees intact. 6.15 (Expo SDK 58) also
+  touches the share-card composer and its native journeys, so coordinate if both are in flight.
+- 6.10 precedes 6.11 and 6.12; 6.11 precedes 6.13. 6.14 builds on 5.2 billing, 6.5 push, and 1.2b.
+- Following stays disabled until product adds follow-graph stories or drops it from the brief and
+  UX. This must close before Community Beta sign-off.

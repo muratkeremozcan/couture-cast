@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- The second app the receive test picks in the chooser and starts without a grant. -->
+  <queries>
+    <package android:name="expo.modules.sharecardnativeshare.receiver" />
+  </queries>
+  <application>
+    <activity
+      android:name="expo.modules.sharecardnativeshare.ShareCardReceiveTestActivity"
+      android:exported="false" />
+  </application>
+</manifest>

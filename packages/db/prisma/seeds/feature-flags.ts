@@ -56,6 +56,10 @@ const canonicalFlagOverrides: Record<FeatureFlagKey, FeatureFlagStoredValue> = {
   // until someone flips it deliberately. Same reasoning as
   // color_analysis_enabled above.
   premium_planner_enabled: true,
+  // Story 6.9 D4: the registry default is `false` (fail-closed), so this seed
+  // override is what turns native share-card sharing on in seeded test and
+  // local environments; production never runs this seed.
+  share_card_native_share_enabled: true,
 }
 
 const supplementalFeatureFlags: SeededFeatureFlag[] = [

@@ -104,11 +104,16 @@ export async function resolveMobileAccessToken() {
 }
 
 let applicationUserId: string | null = null
+// Advances on every identity change, sign-out included, so a work item snapshotted before a
+// sign-out and return as the same member still reads as superseded.
+let identityEpoch = 0
 const identityListeners = new Set<() => void>()
 export const mobileApplicationUserId = () => applicationUserId
+export const mobileIdentityEpoch = () => identityEpoch
 export function setMobileApplicationUserId(value: string | null) {
   if (applicationUserId === value) return
   applicationUserId = value
+  identityEpoch++
   identityListeners.forEach((listener) => listener())
 }
 export function subscribeMobileApplicationUser(listener: () => void) {

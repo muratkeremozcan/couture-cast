@@ -352,6 +352,7 @@ describe('browser dependency workflow', () => {
       'original-resource',
       'android36-native-matrix',
       'android36-original',
+      'android36-controls',
       'android36-interaction',
     ]
     for (const name of jobs) {

@@ -1,0 +1,57 @@
+appId: ${MAESTRO_APP_ID}
+---
+# M-SHARE-SHEET-ANDROID, fixture mode real: Share opens the real chooser for the previewed card
+# and the member presses Back without choosing an app (no callback, so not_confirmed). It settles
+# on `shareClosed` with the preview, Share and Save intact. The runner hashes the handed-off
+# cc69-share file against the preview digest after this flow. M-SHARE-SHEET-IOS runs inside
+# ShareCardShareSheetUITests: Maestro cannot see UIActivityViewController on the CI simulator.
+- assertNotVisible: ${MAESTRO_SHARE_CLOSED}
+- scrollUntilVisible:
+    element:
+      id: share-card-share
+    direction: DOWN
+    centerElement: false
+    visibilityPercentage: 95
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - retry:
+          maxRetries: 3
+          commands:
+            - runFlow:
+                when:
+                  visible:
+                    id: share-card-share
+                    enabled: true
+                  notVisible:
+                    id: '.*(chooser|resolver).*'
+                commands:
+                  - tapOn:
+                      id: share-card-share
+            - extendedWaitUntil:
+                visible:
+                  id: '.*(chooser|resolver).*'
+                timeout: 8000
+      # Back closes the chooser only: the retry above proved it is the top window.
+      - back
+      - extendedWaitUntil:
+          notVisible:
+            id: '.*(chooser|resolver).*'
+          timeout: 10000
+- extendedWaitUntil:
+    visible: ${MAESTRO_SHARE_CLOSED}
+    timeout: 20000
+- assertNotVisible: ${MAESTRO_SHARED}
+- assertNotVisible:
+    id: share-card-error
+- assertVisible:
+    id: share-card-preview-loaded-.*
+- assertVisible:
+    id: share-card-share
+    enabled: true
+- assertVisible:
+    id: share-card-save
+    enabled: true

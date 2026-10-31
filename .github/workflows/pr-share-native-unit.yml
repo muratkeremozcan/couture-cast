@@ -1,0 +1,126 @@
+# Story 6.9: unit tests for the share-card native modules, without a prebuild. The native app
+# lanes skip pull requests, so this path-filtered workflow runs, on every PR that touches them:
+# - the share module's Swift package (activity mapper, outcome reducer, anchor configuration,
+#   ShareCardShareFile) and the photo-save package with its cross-prefix test (TEA RG3);
+# - the share module's Robolectric tests, from its standalone Gradle project, which compiles the
+#   pure Android sources without Expo or the generated app.
+# Each test step fails when it ran zero tests, skipped tests not counted. PR Gate makes every job
+# that runs here required.
+name: Share native unit tests
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/modules/share-card-native-share/**'
+      - 'apps/mobile/modules/share-card-photo-save/**'
+      - '.github/workflows/pr-share-native-unit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/modules/share-card-native-share/**'
+      - 'apps/mobile/modules/share-card-photo-save/**'
+      - '.github/workflows/pr-share-native-unit.yml'
+  schedule:
+    - cron: '43 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: share-native-unit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  swift:
+    name: Swift packages (share and photo-save)
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Share module Swift package
+        working-directory: apps/mobile/modules/share-card-native-share/ios
+        run: |
+          set -euo pipefail
+          swift test 2>&1 | tee "$RUNNER_TEMP/share-swift-test.log"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/share-swift-test.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "swift test ran $ran tests (${skipped:-0} skipped)"
+
+      - name: Photo-save Swift package, with the cross-prefix test
+        if: ${{ !cancelled() }}
+        working-directory: apps/mobile/modules/share-card-photo-save/ios
+        run: |
+          set -euo pipefail
+          swift test 2>&1 | tee "$RUNNER_TEMP/photo-save-swift-test.log"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/photo-save-swift-test.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "swift test ran $ran tests (${skipped:-0} skipped)"
+
+  robolectric:
+    name: Android Robolectric tests (SDK 34 and 36)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Robolectric's SDK 35+ runtimes need Java 21.
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-36
+
+      # The version the app's React Native 0.81 wrapper pins; AGP 8.11 does not support Gradle 9.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Cache Robolectric Android runtimes
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('apps/mobile/modules/share-card-native-share/android/unit-tests/build.gradle') }}
+
+      - name: Robolectric tests for the share module
+        run: |
+          set -euo pipefail
+          project=apps/mobile/modules/share-card-native-share/android/unit-tests
+          gradle -p "$project" testDebugUnitTest --console=plain
+          shopt -s nullglob
+          reports=("$project"/build/test-results/testDebugUnitTest/TEST-*.xml)
+          count=0
+          skipped=0
+          for report in "${reports[@]}"; do
+            suite=$(grep -Eo '<testsuite [^>]*>' "$report" | head -1 || true)
+            tests=$(echo "$suite" | grep -Eo ' tests="[0-9]+"' | grep -Eo '[0-9]+' || true)
+            skips=$(echo "$suite" | grep -Eo ' skipped="[0-9]+"' | grep -Eo '[0-9]+' || true)
+            count=$((count + ${tests:-0}))
+            skipped=$((skipped + ${skips:-0}))
+          done
+          ran=$((count - skipped))
+          if [ "$ran" -le 0 ]; then echo "::error::testDebugUnitTest ran zero tests ($count reported, $skipped skipped)"; exit 1; fi
+          echo "testDebugUnitTest ran $ran tests ($skipped skipped)"
+
+      - name: Upload Robolectric reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-native-robolectric-reports
+          path: apps/mobile/modules/share-card-native-share/android/unit-tests/build/reports/tests
+          if-no-files-found: warn

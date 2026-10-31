@@ -5,7 +5,8 @@ appId: ${MAESTRO_APP_ID}
     env:
       MAESTRO_RAPID_ACTION: acquire
 # rapid-ready-outfit.yaml proved this opener unique on this same screen just before the
-# hold, so index 0 is that single opener. The whole flow must fit the 12 s hold.
+# hold, so index 0 is that single opener. Each press below supersedes a prepare request,
+# and none may wait at the held source for 12 s, so the steps between presses stay minimal.
 - tapOn:
     id: outfit-share-card-open
     index: 0

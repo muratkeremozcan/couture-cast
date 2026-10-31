@@ -141,6 +141,7 @@ describe('FeatureFlagsService', () => {
       ['commerce_affiliate_enabled', true],
       ['commerce_subscription_enabled', true],
       ['premium_planner_enabled', true],
+      ['share_card_native_share_enabled', false],
     ])
 
     const cachedValues = new Map<string, boolean | null>([
@@ -152,6 +153,7 @@ describe('FeatureFlagsService', () => {
       ['commerce_affiliate_enabled', null],
       ['commerce_subscription_enabled', null],
       ['premium_planner_enabled', null],
+      ['share_card_native_share_enabled', null],
     ])
 
     const findValue = vi
@@ -173,7 +175,7 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 8, fallbackCount: 0 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 9, fallbackCount: 0 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: true },
       { key: 'community_read_enabled', value: false },
@@ -183,6 +185,7 @@ describe('FeatureFlagsService', () => {
       { key: 'commerce_affiliate_enabled', value: true },
       { key: 'commerce_subscription_enabled', value: true },
       { key: 'premium_planner_enabled', value: true },
+      { key: 'share_card_native_share_enabled', value: false },
     ])
   })
 
@@ -208,7 +211,7 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 8, fallbackCount: 8 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 9, fallbackCount: 9 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: false },
       { key: 'community_read_enabled', value: false },
@@ -225,6 +228,8 @@ describe('FeatureFlagsService', () => {
       { key: 'commerce_subscription_enabled', value: false },
       // Story 5.5: identical fail-closed reasoning for the premium planner.
       { key: 'premium_planner_enabled', value: false },
+      // Story 6.9: identical fail-closed reasoning for native share-card sharing.
+      { key: 'share_card_native_share_enabled', value: false },
     ])
   })
 })

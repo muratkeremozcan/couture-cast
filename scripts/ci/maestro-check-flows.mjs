@@ -10,9 +10,13 @@ import { MAESTRO_BIN } from '../maestro-version.mjs'
 
 export const CHECKED_FLOWS = Object.freeze([
   'maestro/story65/open-app.yaml',
+  'maestro/story65/open-notification-settings.yaml',
+  'maestro/story65/open-signin.yaml',
+  'maestro/story65/session-signout.yaml',
   'maestro/story65/set-locale.yaml',
   'maestro/story65/signin-verify.yaml',
   'maestro/story65/wait-notification-settings.yaml',
+  'maestro/story67/teaser-signout.yaml',
   'maestro/story68/position-outfit-open.yaml',
   'maestro/story68/settings.yaml',
   'maestro/story68/wait-os-settings-ios.yaml',
@@ -34,7 +38,17 @@ export const CHECKED_FLOWS = Object.freeze([
   'maestro/story68/pending.yaml',
   'maestro/story68/release-watermark-off.yaml',
   'maestro/story68/prefs-failed.yaml',
+  'maestro/story68/signout.yaml',
   'maestro/story68/community-draft-background-ios.yaml',
+  'maestro/story68/tap-share.yaml',
+  'maestro/story68/share-completed.yaml',
+  'maestro/story68/share-chosen.yaml',
+  'maestro/story68/share-closed.yaml',
+  'maestro/story68/share-not-confirmed.yaml',
+  'maestro/story68/share-failed.yaml',
+  'maestro/story68/share-unavailable.yaml',
+  'maestro/story68/share-other.yaml',
+  'maestro/story68/share-sheet.yaml',
 ])
 
 // The pinned install on CI, the PATH binary on a developer machine.

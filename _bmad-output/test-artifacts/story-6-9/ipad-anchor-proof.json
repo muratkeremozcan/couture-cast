@@ -1,0 +1,13 @@
+{
+  "test": "X-IPAD-ANCHOR",
+  "deviceClass": "iPad",
+  "environment": "simulator",
+  "osVersion": "26.1",
+  "commit": "eab74b0d59ef9e31d14985a5fb8c9905a84a0219",
+  "result": "anchored_to_share",
+  "screenshot": {
+    "file": "ipad-anchor-proof.png",
+    "sha256": "09604c734b70232428036f44c39a8ad35733654703ce39a32824ddae485511ed"
+  },
+  "recordedAt": "2026-10-31T15:35:35.719Z"
+}

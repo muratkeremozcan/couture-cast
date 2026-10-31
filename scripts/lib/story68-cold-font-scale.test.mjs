@@ -15,7 +15,7 @@ function matrixFontBlock() {
   )
   // The large-text section is one shard-gated block; the slice stops before its closing brace.
   const end = source.indexOf(
-    "\n  }\n  if (\n    inMatrixSection(shard, 'precommit-lifecycle')",
+    "\n  }\n  if (\n    inMatrixSection(plan, shard, 'precommit-lifecycle')",
     start
   )
   assert.ok(start > 0 && end > start)

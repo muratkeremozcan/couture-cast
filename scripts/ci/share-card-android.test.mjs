@@ -7,6 +7,7 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
+import { commandsForShard } from './native-matrix-shards.mjs'
 
 async function journey(
   t,
@@ -14,7 +15,7 @@ async function journey(
   expected = '36',
   status = 0,
   accel = 'KVM (version 12) is installed and usable.',
-  { suite = sdk.trim() === '32' ? 'all' : 'matrix', failOn = '' } = {}
+  { suite = sdk.trim() === '32' ? 'all-1' : 'matrix-1', failOn = '' } = {}
 ) {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'cc68-sdk-guard-'))
   t.after(() => rm(directory, { recursive: true, force: true }))
@@ -67,17 +68,28 @@ describe('Android SDK guard', () => {
 
   // Every selectable suite and the exact commands it owns after install, open and signin.
   const suites = [
-    ['32', 'all', ['proof', 'matrix', 'rapid-watermark'], []],
-    ['36', 'matrix', ['matrix'], []],
+    ['32', 'all-1', ['proof', 'matrix', 'rapid-watermark'], []],
+    ['32', 'all-2', ['permission-baseline', 'matrix'], []],
+    ['36', 'matrix-1', ['matrix'], []],
+    ['36', 'matrix-2', ['matrix'], []],
     ['36', 'original', ['proof'], []],
+    ['36', 'controls', ['rapid-watermark', 'a11y', 'fallback-focus'], []],
     [
       '36',
       'interaction',
-      ['rapid-watermark', 'a11y', 'fallback-focus'],
+      ['share-sheet'],
       ['bash scripts/ci/share-card-android-release-font.sh'],
     ],
   ]
-  const owned = ['proof', 'matrix', 'rapid-watermark', 'a11y', 'fallback-focus']
+  const owned = [
+    'proof',
+    'permission-baseline',
+    'matrix',
+    'rapid-watermark',
+    'a11y',
+    'fallback-focus',
+    'share-sheet',
+  ]
   const font = 'bash scripts/ci/share-card-android-release-font.sh'
 
   for (const [sdk, suite, expected, extra] of suites) {
@@ -105,9 +117,9 @@ describe('Android SDK guard', () => {
     })
   }
 
-  test('the Android36 partitions together cover every proof command exactly once', async (t) => {
+  test('the Android36 partitions together cover every proof command once and the matrix once per shard', async (t) => {
     const ran = []
-    for (const suite of ['matrix', 'original', 'interaction']) {
+    for (const suite of ['matrix-1', 'matrix-2', 'original', 'controls', 'interaction']) {
       const { result, commands } = await journey(t, '36', '36', 0, undefined, { suite })
       assert.equal(result.status, 0, result.stderr)
       ran.push(
@@ -116,24 +128,137 @@ describe('Android SDK guard', () => {
         )
       )
     }
-    // The pre-split API36 journey: proof, matrix, rapid, a11y, fallback and Release font.
+    // The pre-split API36 journey (proof, matrix, rapid, a11y, fallback and Release font) and
+    // the Story 6.9 share-sheet command.
     assert.deepEqual([...ran].sort(), [
       'a11y',
       'fallback-focus',
       'font',
       'matrix',
+      'matrix',
+      'proof',
+      'rapid-watermark',
+      'share-sheet',
+    ])
+  })
+
+  // The API32 journey was proof, the matrix and rapid-watermark in one lane. Its two shards
+  // together run each of those once and the matrix once per shard.
+  test('the API32 shards together cover proof and rapid-watermark once and the matrix once per shard', async (t) => {
+    const ran = []
+    for (const suite of ['all-1', 'all-2']) {
+      const { result, commands } = await journey(t, '32', '32', 0, undefined, { suite })
+      assert.equal(result.status, 0, result.stderr)
+      ran.push(...owned.filter((command) => commands.includes(`mjs ${command} `)))
+    }
+    assert.deepEqual([...ran].sort(), [
+      'matrix',
+      'matrix',
+      'permission-baseline',
       'proof',
       'rapid-watermark',
     ])
   })
 
+  // The shard plan names each shard's commands; the journey script runs exactly those, in order.
+  for (const [sdk, plan, prefix] of [
+    ['32', 'android-32', 'all'],
+    ['36', 'android-36', 'matrix'],
+  ])
+    for (const shard of [1, 2])
+      test(`API${sdk} shard ${shard} runs the commands its ${plan} plan names, in order`, async (t) => {
+        const { result, commands } = await journey(t, sdk, sdk, 0, undefined, {
+          suite: `${prefix}-${shard}`,
+        })
+        assert.equal(result.status, 0, result.stderr)
+        const after = commands.slice(commands.indexOf('run-story68-native.mjs signin '))
+        const ran = [...after.matchAll(/run-story68-native\.mjs (\S+) /g)]
+          .map((m) => m[1])
+          .slice(1)
+        assert.deepEqual(ran, commandsForShard(plan, shard))
+        assert.match(
+          commands,
+          new RegExp(`mjs matrix --platform android --device \\S+ --shard ${shard}/2\\n`)
+        )
+      })
+
+  // U-HARNESS-ANDROID-LANES (Story 6.9): share-sheet runs once, on API36 interaction only.
+  test('share-sheet runs exactly once on API36 interaction, after sign-in and before the Release font proof', async (t) => {
+    const { result, commands } = await journey(t, '36', '36', 0, undefined, {
+      suite: 'interaction',
+    })
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(commands.match(/mjs share-sheet /g)?.length, 1)
+    assert.match(commands, /mjs share-sheet --platform android --device \S+\n/)
+    const at = (needle) => commands.indexOf(needle)
+    // The Release font proof replaces the debug dev client that share-sheet drives. The rapid
+    // watermark, TalkBack and fallback focus proofs run in android36-controls.
+    assert.ok(at('mjs share-sheet ') > at('mjs signin '))
+    assert.ok(at('mjs share-sheet ') < at(font))
+    for (const [sdk, suite] of [
+      ['32', 'all-1'],
+      ['32', 'all-2'],
+      ['36', 'controls'],
+      ['36', 'matrix-1'],
+      ['36', 'matrix-2'],
+      ['36', 'original'],
+    ]) {
+      const other = await journey(t, sdk, sdk, 0, undefined, { suite })
+      assert.equal(other.result.status, 0, other.result.stderr)
+      assert.equal(other.commands.includes('share-sheet'), false, `${sdk} ${suite}`)
+    }
+  })
+
+  // Spec Never: the android36-native-matrix workload does not change. Each shard runs the exact
+  // pre-Story-6.9 command list, byte for byte, with only its own shard added to the matrix command;
+  // native-matrix-shards.test.mjs proves the two shards report all 43 matrix cases.
+  for (const shard of [1, 2])
+    test(`API36 matrix shard ${shard} runs exactly the pre-Story-6.9 command list for its shard`, async (t) => {
+      const { result, commands } = await journey(t, '36', '36', 0, undefined, {
+        suite: `matrix-${shard}`,
+      })
+      assert.equal(result.status, 0, result.stderr)
+      const serial = process.env.ANDROID_SERIAL ?? 'emulator-5554'
+      assert.equal(
+        commands,
+        [
+          `adb -s ${serial} shell getprop ro.build.version.sdk`,
+          'emulator -accel-check',
+          `adb -s ${serial} install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`,
+          `node scripts/run-story68-native.mjs open --platform android --device ${serial}`,
+          `node scripts/run-story68-native.mjs signin --platform android --device ${serial}`,
+          `node scripts/run-story68-native.mjs matrix --platform android --device ${serial} --shard ${shard}/2`,
+          '',
+        ].join('\n')
+      )
+    })
+
+  test('API32 shard 1 reinitializes the owned app for its proof; shard 2 never does', async (t) => {
+    const one = await journey(t, '32', '32', 0, undefined, { suite: 'all-1' })
+    const two = await journey(t, '32', '32', 0, undefined, { suite: 'all-2' })
+    assert.equal(one.result.status, 0, one.result.stderr)
+    assert.equal(two.result.status, 0, two.result.stderr)
+    assert.match(
+      one.commands,
+      /mjs proof --platform android --device \S+ --reinitialize-owned-app yes\n/
+    )
+    assert.doesNotMatch(two.commands, /reinitialize-owned-app|mjs proof /)
+  })
+
   for (const [name, sdk, suite] of [
     ['an unpartitioned API36 run', '36', 'all'],
+    ['an unsharded API32 run', '32', 'all'],
+    ['a third API32 shard', '32', 'all-3'],
+    ['an API32 shard on API36', '36', 'all-1'],
+    ['the controls suite on API32', '32', 'controls'],
     ['an empty API36 suite', '36', ''],
     ['an unknown API36 suite', '36', 'browser'],
-    ['an Android36 suite on API32', '32', 'matrix'],
+    ['an Android36 suite on API32', '32', 'matrix-1'],
+    ['an unsharded API36 matrix', '36', 'matrix'],
+    ['a third API36 matrix shard', '36', 'matrix-3'],
+    ['an API36 matrix shard zero', '36', 'matrix-0'],
     ['an empty API32 suite', '32', ''],
-    ['a mixed-case suite', '36', 'Matrix'],
+    ['a mixed-case suite', '36', 'Matrix-1'],
   ]) {
     test(`${name} stops before install`, async (t) => {
       const { result, commands } = await journey(t, sdk, sdk, 0, undefined, { suite })
@@ -143,26 +268,39 @@ describe('Android SDK guard', () => {
     })
   }
 
-  for (const [suite, failOn] of [
-    ['matrix', 'mjs matrix '],
-    ['original', 'mjs proof '],
-    ['interaction', 'mjs a11y '],
-    ['interaction', 'android-release-font'],
+  for (const [sdk, suite, failOn, later] of [
+    ['36', 'matrix-1', 'mjs matrix ', null],
+    ['36', 'matrix-2', 'mjs matrix ', null],
+    ['36', 'original', 'mjs proof ', null],
+    ['36', 'controls', 'mjs a11y ', 'fallback-focus'],
+    ['36', 'interaction', 'mjs share-sheet ', 'android-release-font'],
+    ['36', 'interaction', 'android-release-font', null],
+    ['32', 'all-1', 'mjs proof ', 'mjs matrix '],
+    ['32', 'all-1', 'mjs matrix ', 'rapid-watermark'],
+    ['32', 'all-2', 'mjs permission-baseline ', 'mjs matrix '],
   ]) {
-    test(`a failing ${failOn.trim()} command fails the ${suite} suite and stops later proofs`, async (t) => {
-      const { result, commands } = await journey(t, '36', '36', 0, undefined, {
+    test(`a failing ${failOn.trim()} command fails the API${sdk} ${suite} suite and stops later proofs`, async (t) => {
+      const { result, commands } = await journey(t, sdk, sdk, 0, undefined, {
         suite,
         failOn,
       })
       assert.notEqual(result.status, 0)
       assert.ok(commands.includes(failOn))
-      if (failOn === 'mjs a11y ') assert.equal(commands.includes('fallback-focus'), false)
+      if (later) assert.equal(commands.includes(later), false, later)
     })
   }
 
   test('a failing sign-in stops every suite before its proofs', async (t) => {
-    for (const suite of ['matrix', 'original', 'interaction']) {
-      const { result, commands } = await journey(t, '36', '36', 0, undefined, {
+    for (const [sdk, suite] of [
+      ['36', 'matrix-1'],
+      ['36', 'matrix-2'],
+      ['36', 'original'],
+      ['36', 'controls'],
+      ['36', 'interaction'],
+      ['32', 'all-1'],
+      ['32', 'all-2'],
+    ]) {
+      const { result, commands } = await journey(t, sdk, sdk, 0, undefined, {
         suite,
         failOn: 'mjs signin ',
       })

@@ -76,6 +76,7 @@ export const pactAdminHeaders = {
 export type ContractApiClient = Pick<
   DefaultApi,
   | 'prepareShareCard'
+  | 'getShareCardCapabilities'
   | 'getCommunityComments'
   | 'getCommunityCommentReplies'
   | 'getCommunityCommentSubmissions'

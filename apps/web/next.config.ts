@@ -68,6 +68,11 @@ const nextConfig: NextConfig = {
   // The real-session E2E harness (scripts/e2e-real-session/run.mjs) builds a
   // real-auth web into its own output so the fixture-auth build stays intact.
   distDir: process.env.WEB_NEXT_DIST_DIR || '.next',
+  // tsconfig paths resolve these workspace packages to their TypeScript sources outside
+  // apps/web. Next compiles out-of-directory sources for app routes, but the client
+  // instrumentation entry (instrumentation-client.ts -> browser-analytics.ts) needs them
+  // listed here or the production build fails to parse packages/api-client/src.
+  transpilePackages: ['@couture/config', '@couture/utils', '@couture/api-client'],
   env: {
     BUILD_GIT_SHA: buildGitSha ?? '',
     BUILD_GIT_BRANCH: buildGitBranch ?? '',

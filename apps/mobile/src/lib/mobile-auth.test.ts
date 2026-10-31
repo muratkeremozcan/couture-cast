@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { resolveMobileAccessToken, setMobileAccessTokenResolver } from './mobile-auth'
+import {
+  mobileIdentityEpoch,
+  resolveMobileAccessToken,
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from './mobile-auth'
 
 const native = vi.hoisted(() => ({
   token: vi.fn<() => Promise<string | undefined>>().mockResolvedValue(undefined),
@@ -118,5 +123,17 @@ describe('resolveMobileAccessToken', () => {
     native.token.mockResolvedValue('verified-real-mode-token')
     await expect(resolveMobileAccessToken()).resolves.toBe('verified-real-mode-token')
     expect(native.token).toHaveBeenCalledOnce()
+  })
+})
+
+describe('mobileIdentityEpoch', () => {
+  it('advances on every identity change, sign-out included, and never on a repeat', () => {
+    const start = mobileIdentityEpoch()
+    setMobileApplicationUserId('member-a')
+    setMobileApplicationUserId('member-a')
+    setMobileApplicationUserId(null)
+    setMobileApplicationUserId('member-a')
+    expect(mobileIdentityEpoch() - start).toBe(3)
+    setMobileApplicationUserId(null)
   })
 })

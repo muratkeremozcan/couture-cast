@@ -6,24 +6,13 @@ import { createHash } from 'node:crypto'
 import pg from 'pg'
 import {
   withBrowserWatermarkLock,
-  afterInitialCommunityVerification,
   browserWatermarkChecks,
   assertBrowserWatermarkEvidence,
   closedBrowserWatermarkFailure,
 } from '../../scripts/lib/story68-browser-watermark.mjs'
 import { COMMUNITY_AUTHORIZATION_BUDGET_MS } from '../../apps/api/src/modules/community/community-authorization-budget'
-import { createClient, type Session } from '@supabase/supabase-js'
 import AxeBuilder from '@axe-core/playwright'
-import type {
-  APIResponse,
-  BrowserContext,
-  Download,
-  Page,
-  Locator,
-  Request,
-  Response,
-  Route,
-} from '@playwright/test'
+import type { APIResponse, Page, Request, Response, Route } from '@playwright/test'
 import {
   interceptNetworkCall as interceptPageNetworkCall,
   type InterceptNetworkCallFn,
@@ -36,94 +25,24 @@ import {
   resolveCommunityTargetsResponseSchema,
   userProfileResponseSchema,
 } from '@couture/api-client/contracts/http'
-import { decodeShareCardBase64, validateShareCardPng } from '@couture/api-client'
 import { test, expect } from '../support/fixtures/share-card-fixtures'
-const directory = path.resolve(
-  process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
-)
-const read = (name: string): unknown =>
-  JSON.parse(fs.readFileSync(path.join(directory, name), 'utf8'))
-const env = read('owned-env.json') as {
-  DATABASE_URL: string
-  API_BASE_URL: string
-}
-if (!/^\/tea_community_[a-f0-9]{32}$/.test(new URL(env.DATABASE_URL).pathname))
-  throw new Error('owned_uuid_required')
-const fixture = read('fixtures.json') as {
-  postId: string
-  identities: { email: string; appUserId: string; authUserId: string; label: string }[]
-}
-const build = read('public-build-env.json') as {
-  EXPO_PUBLIC_SUPABASE_ANON_KEY: string
-  EXPO_PUBLIC_API_BASE_URL: string
-}
-const proxy = read('auth-harness.json') as { proxyUrl: string; otpDir: string }
-async function session(account: number): Promise<Session> {
-  const auth = createClient(proxy.proxyUrl, build.EXPO_PUBLIC_SUPABASE_ANON_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-  const filename = `session-${account === 0 ? 'primary' : 'secondary'}.json`
-  if (fs.existsSync(path.join(directory, filename))) {
-    const existing = read(filename) as Session
-    if ((existing.expires_at ?? 0) * 1000 > Date.now() + 60000) {
-      // An earlier genuine UI sign-out revokes this session before its JWT expires.
-      const current = await auth.auth.getUser(existing.access_token)
-      if (current.data.user) {
-        expect(current.data.user.id).toBe(existing.user.id)
-        return existing
-      }
-      if (
-        current.error?.code !== 'session_not_found' &&
-        !(
-          current.error?.name === 'AuthSessionMissingError' &&
-          current.error.status === 400
-        )
-      )
-        throw new Error('owned_cached_session_verification_failed')
-    }
-  }
-  const identity = fixture.identities[account]!
-  const since = Date.now()
-  const issued = await auth.auth.signInWithOtp({
-    email: identity.email,
-    options: { shouldCreateUser: false },
-  })
-  expect(issued.error).toBeNull()
-  const code = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        proxy.otpDir,
-        createHash('sha256').update(identity.email).digest('hex') + '.json'
-      ),
-      'utf8'
-    )
-  ) as { issuedAt: number; code: string }
-  expect(code.issuedAt).toBeGreaterThanOrEqual(since)
-  const verified = await auth.auth.verifyOtp({
-    email: identity.email,
-    token: code.code,
-    type: 'email',
-  })
-  expect(verified.error).toBeNull()
-  expect(verified.data.session).toBeTruthy()
-  fs.writeFileSync(
-    path.join(directory, filename),
-    JSON.stringify(verified.data.session),
-    { mode: 0o600 }
-  )
-  return verified.data.session!
-}
-async function identify(context: BrowserContext, account = 0) {
-  const member = await session(account)
-  await context.addInitScript((value) => {
-    if (!sessionStorage.getItem('cc68-session-initialized')) {
-      localStorage.setItem('couturecast.auth-session', JSON.stringify(value))
-      sessionStorage.setItem('cc68-session-initialized', 'true')
-    }
-  }, member)
-  return member
-}
-const modal = (page: Page) => page.locator('[aria-labelledby="share-card-title"]')
+import {
+  activateFocused,
+  build,
+  directory,
+  downloadedDigest,
+  env,
+  fixture,
+  identify,
+  loadOwnFeed,
+  modal,
+  nextDownload,
+  ownPhoto,
+  previewBytes,
+  proxy,
+  sha256,
+} from '../support/share-card-owned-runtime'
+import { expectDialogFits, openForShare } from '../support/share-card-web-share'
 const cancellationWitness = (page: Page, request: Request) =>
   page
     .waitForEvent('requestfailed', {
@@ -211,48 +130,6 @@ async function expectNoLateDownload(page: Page) {
   // The probe settles only after every continuation of the save path has run.
   expect(await page.evaluate(settleHandoffProbe), 'late download handoffs').toBe(0)
 }
-// Loads the home feed once the owned post is verified, and returns the API origin.
-async function loadOwnFeed(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
-  const profile = interceptNetworkCall({ method: 'GET', url: '**/api/v1/user/profile' })
-  // The feed settles only after the owned target resolves and the cursor replay lands,
-  // and the spotlight above it grows past its skeleton's height when its cards land.
-  // A click pressed before both can release over another element and never open.
-  await afterInitialCommunityVerification({
-    page,
-    postId: fixture.postId,
-    navigate: () => page.goto('/').then(() => undefined),
-  })
-  await expect(page.getByTestId('community-spotlight-loading')).toHaveCount(0)
-  const verified = await profile
-  expect(verified.status).toBe(200)
-  return new URL(verified.request!.url()).origin
-}
-async function ownPhoto(
-  page: Page,
-  interceptNetworkCall: InterceptNetworkCallFn | null,
-  preparationJourney?: (open: () => Promise<void>, apiOrigin: string) => Promise<void>
-) {
-  const apiOrigin = interceptNetworkCall
-    ? await loadOwnFeed(page, interceptNetworkCall)
-    : ''
-  const opener = page
-    .locator(`[data-testid$="lookbook-card-${fixture.postId}"]`)
-    .first()
-    .getByTestId('share-card-open')
-  await expect(opener).toBeVisible()
-  if (preparationJourney) await preparationJourney(() => opener.click(), apiOrigin)
-  else await opener.click()
-  const preview = modal(page).getByTestId('share-card-preview')
-  await expect(preview).toHaveAttribute('data-loaded', 'true')
-  return { opener, preview, dialog: modal(page) }
-}
-async function previewBytes(preview: Locator) {
-  const bytes = decodeShareCardBase64((await preview.getAttribute('src'))!.split(',')[1]!)
-  validateShareCardPng(bytes)
-  return bytes
-}
-const sha256 = (bytes: Uint8Array | Buffer) =>
-  createHash('sha256').update(bytes).digest('hex')
 function renderCatalog(locale: string) {
   const catalog = JSON.parse(
     fs.readFileSync(
@@ -466,11 +343,6 @@ async function markDocument(page: Page) {
   return () =>
     expect(page.locator('html')).toHaveAttribute('data-share-card-document', token)
 }
-async function activateFocused(control: Locator) {
-  await control.focus()
-  await expect(control).toBeFocused()
-  await control.press('Enter')
-}
 // One held route step: the handler records the request, signals entry and waits for
 // the test to release it.
 function routeGate() {
@@ -587,14 +459,6 @@ async function holdThenFulfill(
     gate.settle()
   }
 }
-// playwright-utils deviation: handleDownload saves the file but does not expose
-// Download.suggestedFilename, which these cases assert.
-const nextDownload = (page: Page) => page.waitForEvent('download')
-async function downloadedDigest(download: Download, file: string) {
-  // saveAs works for local and remote browsers; Download.path() only for local ones.
-  await download.saveAs(file)
-  return sha256(fs.readFileSync(file))
-}
 // The settings form loads above the page's links; click them only once it is in place.
 const settingsLoaded = (page: Page) =>
   expect(page.getByRole('button', { name: 'Save settings', exact: true })).toBeVisible()
@@ -665,8 +529,23 @@ for (const locale of supportedLocales)
       page,
       interceptNetworkCall,
     }, info) => {
-      await identify(context)
-      const { preview, dialog } = await ownPhoto(page, interceptNetworkCall)
+      // Share sits beside Download, and its preparation answers preview_changed so the
+      // stale layout is measured with every action this dialog can show.
+      const { preview, dialog, share } = await openForShare(
+        context,
+        page,
+        interceptNetworkCall,
+        { canShare: true, outcomes: ['resolve'] },
+        (route) =>
+          route.fulfill({
+            status: 409,
+            json: {
+              code: 'preview_changed',
+              statusCode: 409,
+              message: 'preview_changed',
+            },
+          })
+      )
       await expect(preview).toHaveAttribute('alt', renderCatalog(locale).watermarked)
       await expect(
         dialog.getByText(webCatalog(locale).shareCard.photoPrivacyHelp, { exact: true })
@@ -685,6 +564,12 @@ for (const locale of supportedLocales)
           path: info.outputPath(`${locale}-${width}.png`),
         })
       }
+      // In every locale the stale alert and Refresh still fit short desktop viewports,
+      // so focusing Refresh never scrolls the dialog.
+      await page.setViewportSize({ width: 1366, height: 768 })
+      await activateFocused(share)
+      await expect(dialog.getByTestId('share-card-recovery')).toBeFocused()
+      await expectDialogFits(page, dialog, info, 'stale')
     })
     test('P-WATERMARK: OFF then ON returns the original approved digest', async ({
       context,

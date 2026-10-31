@@ -1,0 +1,31 @@
+appId: ${MAESTRO_APP_ID}
+---
+# Taps Share until the app shows what a received press does, like tap-save.yaml does for Save.
+# MAESTRO_SHARE_OUTCOME is the copy this attempt must settle on. It may not be on screen before
+# the tap: the guard would then never tap and the wait would pass on an earlier attempt's copy.
+# MAESTRO_SHARING is the in-flight copy, so a press that landed late is never repeated.
+- assertNotVisible: ${MAESTRO_SHARE_OUTCOME}
+# Share sits after Save. A small screen or large text can leave it below the fold.
+- scrollUntilVisible:
+    element:
+      id: share-card-share
+    direction: DOWN
+    centerElement: false
+    visibilityPercentage: 95
+    timeout: 10000
+- waitForAnimationToEnd
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: share-card-share
+              enabled: true
+            notVisible: '${MAESTRO_SHARING}|${MAESTRO_SHARE_OUTCOME}'
+          commands:
+            - tapOn:
+                id: share-card-share
+      - extendedWaitUntil:
+          visible: '${MAESTRO_SHARING}|${MAESTRO_SHARE_OUTCOME}'
+          timeout: 8000

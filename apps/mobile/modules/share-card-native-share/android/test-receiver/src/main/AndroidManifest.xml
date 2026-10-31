@@ -1,0 +1,18 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- The result goes back to the receive androidTest's package by name. -->
+  <queries>
+    <package android:name="expo.modules.sharecardnativeshare.test" />
+  </queries>
+  <application android:label="CC69 Receiver" android:allowBackup="false">
+    <activity
+      android:name=".ShareCardTestReceiverActivity"
+      android:exported="true"
+      android:label="CC69 Receiver">
+      <intent-filter>
+        <action android:name="android.intent.action.SEND" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="image/png" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>

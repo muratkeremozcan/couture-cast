@@ -22,5 +22,17 @@ export function passingReport(expected) {
     title,
     tests: pass(),
   }))
-  return { suites: [{ title: 'share-card-export.spec.ts', specs, suites }], errors: [] }
+  // One file suite per spec, as Playwright reports them; Web Share cases sit in their own.
+  const isShare = (spec) => spec.title.startsWith('P-SHARE-')
+  return {
+    suites: [
+      {
+        title: 'share-card-export.spec.ts',
+        specs: specs.filter((spec) => !isShare(spec)),
+        suites,
+      },
+      { title: 'share-card-native-share.spec.ts', specs: specs.filter(isShare) },
+    ],
+    errors: [],
+  }
 }

@@ -79,6 +79,8 @@ export function HourlyForecastRibbon({
         </Text>
         <Pressable
           onPress={handleToggle}
+          accessibilityRole="button"
+          aria-expanded={isExpanded}
           style={[styles.toggleButton, { backgroundColor: palette.subtleSurface }]}
           testID="ribbon-expand-toggle"
         >
@@ -179,7 +181,10 @@ const styles = StyleSheet.create({
     color: '#111111',
   },
   toggleButton: {
+    // Centered, so the 44-pt box no longer hangs below a top-aligned label.
     minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 4,

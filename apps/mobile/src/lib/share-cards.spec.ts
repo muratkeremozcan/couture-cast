@@ -5,7 +5,10 @@ import { http, HttpResponse } from 'msw'
 import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
 import { server } from '../test-utils/msw/server'
 import { setMobileAccessTokenResolver } from './mobile-auth'
-import { prepareShareCardFromMobile } from './share-cards'
+import {
+  prepareShareCardFromMobile,
+  shareCardCapabilitiesFromMobile,
+} from './share-cards'
 const fixture = vi.hoisted(() => ({ mode: 'real' }))
 vi.mock('./share-card-native-fixture', () => ({
   shareCardFixtureMode: () => fixture.mode,
@@ -82,5 +85,52 @@ describe('mobile approved byte transport', () => {
     await expect(
       prepareShareCardFromMobile(input, new AbortController().signal)
     ).rejects.toMatchObject({ response: { status: 503 } })
+  })
+})
+const capabilitiesEndpoint = 'http://localhost:4000/api/v1/share-cards/capabilities'
+describe('Story 6.9 share transport', () => {
+  it('U-SHARE-CAP-CLIENT: reads the member capability with the session token', async () => {
+    server.use(
+      http.get(capabilitiesEndpoint, ({ request }) => {
+        expect(request.headers.get('Authorization')).toBe('Bearer owned-session')
+        return HttpResponse.json({ data: { nativeShare: true } })
+      })
+    )
+    expect(await shareCardCapabilitiesFromMobile(new AbortController().signal)).toEqual({
+      nativeShare: true,
+    })
+  })
+  it.each([
+    ['404', () => new HttpResponse(null, { status: 404 })],
+    ['malformed', () => HttpResponse.json({ data: { nativeShare: 'yes' } })],
+    ['missing', () => HttpResponse.json({ data: {} })],
+    ['offline', () => HttpResponse.error()],
+  ])('U-SHARE-CAP-CLIENT: a %s answer reads as off', async (_name, reply) => {
+    server.use(http.get(capabilitiesEndpoint, reply))
+    expect(await shareCardCapabilitiesFromMobile(new AbortController().signal)).toEqual({
+      nativeShare: false,
+    })
+  })
+  it('U-SHARE-CAP-CLIENT: a missing API base URL reads as off without throwing', async () => {
+    vi.stubEnv('EXPO_PUBLIC_API_BASE_URL', '')
+    delete process.env.EXPO_PUBLIC_API_BASE_URL
+    expect(await shareCardCapabilitiesFromMobile(new AbortController().signal)).toEqual({
+      nativeShare: false,
+    })
+  })
+  it('U-SHARE-LIB-BYTES: the share purpose sends the previewed digest and checks the bytes', async () => {
+    let body: unknown
+    server.use(
+      http.post(endpoint, async ({ request }) => {
+        body = await request.json()
+        return HttpResponse.json({ data: card })
+      })
+    )
+    const shared = await prepareShareCardFromMobile(
+      { ...input, purpose: 'share', expectedSha256: card.sha256 },
+      new AbortController().signal
+    )
+    expect(shared).toEqual(card)
+    expect(body).toMatchObject({ purpose: 'share', expectedSha256: card.sha256 })
   })
 })

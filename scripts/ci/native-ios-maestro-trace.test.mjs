@@ -21,6 +21,7 @@ import {
   failedStepHierarchy,
   systemSurfaceSummary,
   logSize,
+  maestroLogCommands,
   slowMaestroCommands,
 } from './native-ios-maestro-trace.mjs'
 
@@ -120,6 +121,77 @@ test('a killed flow shows which commands ran, how often and where it stopped, wi
     last: null,
     spanSeconds: null,
   })
+})
+
+// The rapid watermark hold deadline kills Maestro mid-flow, before it writes commands.json.
+const heldKilledLog = [
+  stamped('23:59:58.000', 'Run rapid-watermark-control.js RUNNING'),
+  stamped('23:59:58.120', 'Run rapid-watermark-control.js COMPLETED'),
+  stamped('23:59:58.121', 'Tap on id: outfit-share-card-open, Index: 0 RUNNING'),
+  stamped('23:59:58.200', 'Tap on id: outfit-share-card-open, Index: 0 metadata x(y)'),
+  stamped('00:00:01.021', 'Tap on id: outfit-share-card-open, Index: 0 COMPLETED'),
+  stamped('00:00:01.022', 'Assert that "Avery Private" is visible RUNNING'),
+  stamped('00:00:01.270', 'Assert that "Avery Private" is visible COMPLETED'),
+  stamped('00:00:01.271', 'Tap on id: share-card-watermark RUNNING'),
+  stamped('00:00:03.771', 'Tap on id: share-card-watermark RUNNING'),
+].join('\n')
+
+test('a killed flow keeps each command it ran and its cost from the progressive log', () => {
+  assert.deepEqual(maestroLogCommands(heldKilledLog, 0), [
+    { sequence: 0, depth: 0, name: 'Run rapid', status: 'COMPLETED', durationMs: 120 },
+    { sequence: 1, depth: 0, name: 'Tap on id', status: 'COMPLETED', durationMs: 2900 },
+    { sequence: 2, depth: 0, name: 'Assert that', status: 'COMPLETED', durationMs: 248 },
+    // The same label opened twice before the kill: both stay open at the last line.
+    { sequence: 3, depth: 0, name: 'Tap on id', status: 'RUNNING', durationMs: 2500 },
+    { sequence: 4, depth: 1, name: 'Tap on id', status: 'RUNNING', durationMs: 0 },
+  ])
+  assert.deepEqual(
+    maestroLogCommands(heldKilledLog).map((c) => c.durationMs),
+    [2900, 2500]
+  )
+  assert.doesNotMatch(JSON.stringify(maestroLogCommands(heldKilledLog, 0)), /Avery/)
+  assert.deepEqual(maestroLogCommands(undefined), [])
+})
+
+test('a flow killed before its command trace falls back to its progressive log', (t) => {
+  const directory = outputWith(t, [])
+  const killed = path.join(directory, 'killed')
+  fs.mkdirSync(killed)
+  const traced = outputWith(t, [row('tapOnElement', 1500)])
+  recordIosCommandTimings({
+    platform: 'ios',
+    flow: 'held.yaml',
+    output: killed,
+    directory,
+    minMs: 0,
+    maestroLog: heldKilledLog,
+  })
+  // A written trace wins over the log, and an absent log keeps the empty trace.
+  recordIosCommandTimings({
+    platform: 'ios',
+    flow: 'traced.yaml',
+    output: traced,
+    directory,
+    minMs: 0,
+    maestroLog: heldKilledLog,
+  })
+  recordIosCommandTimings({
+    platform: 'ios',
+    flow: 'quiet.yaml',
+    output: killed,
+    directory,
+  })
+  const record = JSON.parse(
+    fs.readFileSync(path.join(directory, 'native-ios-flow-command-timings.json'))
+  )
+  assert.deepEqual(
+    record.flows.map((f) => [f.flow, f.source ?? 'commands', f.commands.length]),
+    [
+      ['held.yaml', 'maestro-log', 5],
+      ['traced.yaml', 'commands', 1],
+      ['quiet.yaml', 'commands', 0],
+    ]
+  )
 })
 
 test('failed iOS flows append their progress and other platforms record nothing', (t) => {

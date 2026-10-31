@@ -5,23 +5,21 @@ import {
 } from './share-card-native-fixture'
 import { Platform } from 'react-native'
 import * as FileSystem from 'expo-file-system/legacy'
-import * as Crypto from 'expo-crypto'
 import { requireOptionalNativeModule } from 'expo-modules-core'
-import {
-  abortError,
-  decodeShareCardBase64,
-  type PreparedShareCard,
-} from '@couture/api-client'
+import { abortError, type PreparedShareCard } from '@couture/api-client'
 import { shareCardPhotoSaveModule } from '../../modules/share-card-photo-save'
 import {
   commitShareCardSave,
   liveShareCardFiles,
   nativeShareCardSavePending,
   retryShareCardCleanup,
-  reserveShareCardFile,
   ownsCommittedShareCardFile,
-  enqueueShareCardCleanup,
 } from './share-card-save-operations'
+import {
+  deleteShareCardFile,
+  shareCardCacheDirectory,
+  writeVerifiedShareCardFile,
+} from './share-card-file'
 
 export const nativeShareCardSaveAvailable = () =>
   shareCardFixtureMode() !== 'unavailable' &&
@@ -45,13 +43,10 @@ export async function shareCardSavePermission(request: boolean) {
   const asked = await MediaLibrary.requestPermissionsAsync(true)
   return { ...asked, granted: asked.granted || asked.accessPrivileges === 'limited' }
 }
-function cacheDirectory() {
-  if (!FileSystem.cacheDirectory) throw new Error('storage')
-  return `${FileSystem.cacheDirectory}share-cards/`
-}
+/** Removes only abandoned `cc68-*` save files. Leased `cc69-share-*` files are never touched. */
 export async function cleanOrphanShareCards() {
   await retryShareCardCleanup()
-  const directory = cacheDirectory()
+  const directory = shareCardCacheDirectory()
   if (!(await FileSystem.getInfoAsync(directory)).exists) return
   for (const name of await FileSystem.readDirectoryAsync(directory)) {
     const uri = directory + name
@@ -68,24 +63,9 @@ export async function saveShareCard(
 ) {
   if (!nativeShareCardSaveAvailable()) throw new Error('nativeSaveUnavailable')
   if (nativeShareCardSavePending()) throw new Error('finishingSave')
-  const bytes = decodeShareCardBase64(card.pngBase64)
-  const digest = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, bytes)
-  if (
-    Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(
-      ''
-    ) !== card.sha256
-  )
-    throw new Error('render')
-  const directory = cacheDirectory()
-  const fileUri = `${directory}cc68-${Crypto.randomUUID()}.png`
-  const releaseFile = reserveShareCardFile(fileUri)
+  const { fileUri, releaseFile } = await writeVerifiedShareCardFile(card, 'cc68')
   let committed = false
   try {
-    if (shareCardFixtureMode() === 'cache_failure') throw new Error('storage')
-    await FileSystem.makeDirectoryAsync(directory, { intermediates: true })
-    await FileSystem.writeAsStringAsync(fileUri, card.pngBase64, {
-      encoding: FileSystem.EncodingType.Base64,
-    })
     if (signal.aborted || !isCurrent()) throw abortError('Save cancelled')
     // Every check above happens before atomic ownership transfer. Nothing below cancels it.
     const adapter = shareCardPhotoSaveModule()
@@ -107,14 +87,6 @@ export async function saveShareCard(
     await pending
   } finally {
     releaseFile()
-    if (!committed) {
-      try {
-        await FileSystem.deleteAsync(fileUri, { idempotent: true })
-      } catch {
-        enqueueShareCardCleanup(fileUri, () =>
-          FileSystem.deleteAsync(fileUri, { idempotent: true })
-        )
-      }
-    }
+    if (!committed) await deleteShareCardFile(fileUri)
   }
 }

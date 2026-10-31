@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Header,
   HttpCode,
   Inject,
@@ -13,6 +14,7 @@ import type { Request, Response } from 'express'
 import {
   prepareShareCardInputSchema,
   prepareShareCardResponseSchema,
+  shareCardCapabilitiesResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { toBadRequest } from '../../controllers/error-helpers.js'
 import { AuthContext } from '../auth/security.decorators.js'
@@ -24,6 +26,14 @@ import { ShareCardsService } from './share-cards.service.js'
 @UseGuards(RequestAuthGuard)
 export class ShareCardsController {
   constructor(@Inject(ShareCardsService) private readonly service: ShareCardsService) {}
+  // Story 6.9 D4: per-member, so never cacheable by a shared intermediary.
+  @Get('capabilities')
+  @Header('Cache-Control', 'private, no-store')
+  async capabilities(@AuthContext() auth: RequestAuthContext) {
+    return shareCardCapabilitiesResponseSchema.parse({
+      data: await this.service.capabilities(auth.userId),
+    })
+  }
   @Post('prepare')
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')

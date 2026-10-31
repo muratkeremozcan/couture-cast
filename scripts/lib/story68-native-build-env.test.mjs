@@ -156,7 +156,7 @@ describe('original-resource proof', () => {
       assert.equal(dialogOpen, false, 'completed proof must leave tabs reachable')
       const matrixStart = end + "} else if (command === 'matrix') {".length
       const matrixSetupEnd = source.indexOf(
-        "  if (inMatrixSection(shard, 'pre-locale')) {",
+        "  if (inMatrixSection(plan, shard, 'pre-locale')) {",
         matrixStart
       )
       const setup = source
@@ -366,6 +366,7 @@ describe('Maestro driver port', () => {
           directory: '/owned/runtime',
           root: '/owned/repo',
           device: 'owned-device',
+          appId: 'owned.app',
           maestroBinary: 'maestro',
           requireDevice: () => undefined,
           reverse: () => undefined,
@@ -375,6 +376,7 @@ describe('Maestro driver port', () => {
           fs: { mkdirSync: () => undefined, openSync: () => 1, existsSync: () => false },
           privateJson: () => undefined,
           summarizeNativeFlowFailure: () => ({}),
+          closedRapidWatermarkFailure: () => 'native_rapid_watermark_failed',
           redactRapidWatermarkControl: () => undefined,
           recordIosCommandTimings: () => undefined,
           spawnSync: capture,

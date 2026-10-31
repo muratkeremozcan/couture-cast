@@ -1,197 +1,40 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import 'reflect-metadata'
-import { createHash, randomUUID } from 'node:crypto'
-import { Test } from '@nestjs/testing'
-import type { INestApplication } from '@nestjs/common'
-import { PrismaClient, type Prisma, type CommunityPostStatus } from '@prisma/client'
+import { randomUUID } from 'node:crypto'
+import type { Prisma } from '@prisma/client'
 import request from 'supertest'
 import sharp from 'sharp'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { decodeShareCardBase64 } from '@couture/api-client'
 import { prepareShareCardResponseSchema } from '@couture/api-client/contracts/http'
-import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
-import { listenHttpApp, listenHttpHandler } from '../src/testing/loopback-http-app.js'
-import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
-import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service.js'
-import { CommunityRepository } from '../src/modules/community/community.repository.js'
-import { CommunityService } from '../src/modules/community/community.service.js'
-import { SupabaseCommunityStorageAdapter } from '../src/modules/community/community-storage.adapter.js'
-import { ShareCardSourceRepository } from '../src/modules/share-cards/share-card-source.repository.js'
-import { ShareCardRenderer } from '../src/modules/share-cards/share-card-renderer.js'
+import type { ShareCardRenderer } from '../src/modules/share-cards/share-card-renderer.js'
 import { ShareCardsService } from '../src/modules/share-cards/share-cards.service.js'
-import { ShareCardsController } from '../src/modules/share-cards/share-cards.controller.js'
-
-const database = isolatedCommunityDatabase()
-const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
-const flags = {
-  communityReadEvaluation: vi.fn(() =>
-    Promise.resolve({
-      value: true,
-      expiresAt: new Date('2099-01-01'),
-      validUntil: Number.MAX_SAFE_INTEGER,
-    })
-  ),
-}
-const repository = new CommunityRepository(prisma)
-const storage = new SupabaseCommunityStorageAdapter()
-const community = new CommunityService(
-  repository,
-  flags as never,
-  {} as never,
-  {} as never,
+import {
+  cutShort,
+  delivery,
+  digest,
+  featureFlags,
+  flags,
+  member,
+  objects,
+  other,
+  outfit,
+  photoPost,
+  post,
+  preview,
+  prisma,
+  reads,
+  renderer,
+  service,
+  sources,
   storage,
-  {} as never
-)
-const sources = new ShareCardSourceRepository(prisma, community)
-const renderer = new ShareCardRenderer()
-const service = new ShareCardsService(prisma, sources, renderer, storage)
-const objects = new Map<string, Buffer>()
-const delivery = new Map<string, 'slow' | 'oversized'>()
-const cutShort = new Set<string>()
-let reads = 0
-let app: INestApplication
-let url: string
-let storageServer: Awaited<ReturnType<typeof listenHttpHandler>>
-let member: string
-let other: string
-let photo: Buffer
-const preview = (source: Record<string, string>) => ({
-  source,
-  locale: 'en-US',
-  watermark: true,
-  purpose: 'preview',
-})
-const post = (body: object | string, actor = member) =>
-  request(url)
-    .post('/api/v1/share-cards/prepare')
-    .set('Authorization', `Bearer ${actor}`)
-    .send(body)
-const digest = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
-/** Fifteen years before the live clock the age rule reads, so the member stays a teen. */
-function teenBirthdate() {
-  const birthdate = new Date()
-  birthdate.setUTCFullYear(birthdate.getUTCFullYear() - 15)
-  return birthdate
-}
-async function user(birthdate = new Date('1990-01-01')) {
-  return (
-    await prisma.user.create({
-      data: {
-        email: `${randomUUID()}@cc68.test`,
-        profile: {
-          create: { birthdate, preferences: { compliance: { accountStatus: 'active' } } },
-        },
-      },
-    })
-  ).id
-}
-async function outfit(
-  actor = member,
-  garmentIds: string[] = ['default-top', 'default-bottom']
-) {
-  return prisma.outfitRecommendation.create({
-    data: { user_id: actor, scenario: 'morning', garment_ids: garmentIds },
-  })
-}
-async function photoPost(status: CommunityPostStatus = 'published', actor = member) {
-  const id = `cc68-${randomUUID()}`
-  const path = `community/${id}/${randomUUID()}.png`
-  objects.set(`/storage/v1/object/authenticated/community-images/${path}`, photo)
-  return prisma.lookbookPost.create({
-    data: {
-      id,
-      user_id: actor,
-      status,
-      published_at: status === 'published' ? new Date() : null,
-      submitted_at: new Date(),
-      alt_text: 'Private original filename https://private.invalid',
-      alt_text_confirmed_at: new Date(),
-      caption: 'Private NAME GPS and https://private.invalid',
-      image_object_path: path,
-      image_checksum: digest(photo),
-      image_byte_size: photo.length,
-      image_content_type: 'image/png',
-    },
-  })
-}
-beforeAll(async () => {
-  await database.migrate()
-  await prisma.$queryRaw`SELECT 1 FROM "CommunitySubject" LIMIT 1`
-  photo = await sharp({
-    create: { width: 600, height: 900, channels: 3, background: '#24688a' },
-  })
-    .withMetadata({
-      exif: { IFD0: { Artist: 'GPS NAME https://private.invalid/name.png' } },
-    })
-    .png()
-    .toBuffer()
-  storageServer = await listenHttpHandler((req, res) => {
-    reads++
-    const bytes = objects.get(req.url ?? '')
-    if (!bytes) {
-      res.writeHead(404)
-      res.end()
-      return
-    }
-    if (delivery.get(req.url ?? '') === 'oversized') {
-      res.writeHead(200)
-      res.end(Buffer.alloc(10 * 1024 * 1024 + 1))
-      return
-    }
-    if (delivery.get(req.url ?? '') === 'slow') {
-      res.writeHead(200)
-      res.write(bytes.subarray(0, 1))
-      const timeout = setTimeout(() => res.end(bytes.subarray(1)), 7000)
-      res.once('close', () => {
-        clearTimeout(timeout)
-        if (!res.writableFinished) cutShort.add(req.url ?? '')
-      })
-      return
-    }
-    res.writeHead(200, { 'Content-Length': bytes.length })
-    res.end(bytes)
-  })
-  vi.stubEnv('SUPABASE_URL', storageServer.url)
-  vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'cc68-local-storage-fixture')
-  const module = await Test.createTestingModule({
-    controllers: [ShareCardsController],
-    providers: [
-      { provide: ShareCardsService, useValue: service },
-      {
-        provide: AccessTokenIdentityService,
-        useValue: {
-          resolveIdentity: (token: string) =>
-            Promise.resolve({ userId: token, role: 'adult' }),
-        },
-      },
-      {
-        provide: GuardianConsentStateService,
-        useValue: { canTeenAccess: () => Promise.resolve(true) },
-      },
-    ],
-  }).compile()
-  app = module.createNestApplication()
-  app.useLogger(false)
-  url = await listenHttpApp(app)
-}, 60000)
-beforeEach(async () => {
-  flags.communityReadEvaluation.mockResolvedValue({
-    value: true,
-    expiresAt: new Date('2099-01-01'),
-    validUntil: Number.MAX_SAFE_INTEGER,
-  })
-  member = await user()
-  other = await user()
-  reads = 0
-})
-afterAll(async () => {
-  await app?.close()
-  await storageServer?.close()
-  await prisma.$disconnect()
-  await database.drop()
-  vi.unstubAllEnvs()
-})
+  teenBirthdate,
+  url,
+  useShareCardApi,
+} from './helpers/share-card-api.js'
+
+useShareCardApi()
 
 describe('share-card actual API and isolated database', () => {
   it('I-OUTFIT I-DETERMINISTIC I-AUDIT: original PNG response, fresh save authorization and closed audit', async () => {
@@ -215,6 +58,7 @@ describe('share-card actual API and isolated database', () => {
       locale: 'en-US',
       watermark: true,
       templateVersion: 1,
+      purpose: 'save',
     })
     expect(reads).toBe(0)
   })
@@ -333,7 +177,8 @@ describe('share-card actual API and isolated database', () => {
         transactional as never,
         sources,
         renderer,
-        storage
+        storage,
+        featureFlags
       )
       const prepare = vi
         .spyOn(service, 'prepare')

@@ -4,7 +4,7 @@ import { defineConfig } from '@playwright/test'
 // invokes the general database reset/setup or creates a shared test account.
 export default defineConfig({
   testDir: './tests',
-  testMatch: 'share-card-export.spec.ts',
+  testMatch: ['share-card-export.spec.ts', 'share-card-native-share.spec.ts'],
   workers: 1,
   fullyParallel: false,
   // A committed test.only would otherwise skip every other acceptance case on CI.

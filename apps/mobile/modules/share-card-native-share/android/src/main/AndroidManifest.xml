@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!-- Module-owned authority: never shared with expo-file-system or any other FileProvider. -->
+    <provider
+      android:name="expo.modules.sharecardnativeshare.ShareCardFileProvider"
+      android:authorities="${applicationId}.sharecardnativeshare.fileprovider"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/share_card_native_share_paths" />
+    </provider>
+  </application>
+</manifest>

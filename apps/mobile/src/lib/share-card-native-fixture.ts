@@ -15,9 +15,13 @@ export function runShareCardNativeAdapter(
   return save()
 }
 
+export function runShareCardNativeShare(share: () => Promise<unknown>): Promise<unknown> {
+  return share()
+}
+
 export function waitShareCardNativePreparation(
   _signal: AbortSignal,
-  _purpose?: 'preview' | 'save'
+  _purpose?: 'preview' | 'save' | 'share'
 ): Promise<void> {
   return Promise.resolve()
 }

@@ -1,8 +1,8 @@
 package expo.modules.accessibilityfocus
 
 /**
- * The waiting logic of the TalkBack composer test, free of Android types so JVM unit tests can
- * prove it against a fake accessibility tree. The instrumented test and the unit tests both
+ * The waiting logic of the TalkBack device tests, free of Android types so JVM unit tests can
+ * prove it against a fake accessibility tree. The instrumented tests and the unit tests both
  * compile this file (see build.gradle sourceSets).
  */
 object TreeSettling {
@@ -117,6 +117,29 @@ object TreeSettling {
       }
     }
     return last
+  }
+
+  /**
+   * Returns once TalkBack has placed its own focus in a newly shown window and kept it there for
+   * [samples] reads [intervalMs] apart. TalkBack focuses the first focusable view of a window
+   * after the window appears, 10 to 630 ms after ActivityScenario.launch returns on a local API
+   * 35 emulator, and later on a slow one. A focus action taken before that lands is overwritten
+   * by it (run 41208356725). [focused] reads which view holds TalkBack focus, or null. Fails with
+   * [message] when TalkBack places no focus within [FOCUS_BOUND_MS] or keeps moving it.
+   */
+  fun initialFocusSettled(
+    message: String,
+    clock: Clock,
+    samples: Int = 3,
+    intervalMs: Long = 100,
+    diagnostic: () -> String = { "" },
+    focused: () -> Any?,
+  ) {
+    val began = clock.now()
+    waitForFocus(message, clock, diagnostic = diagnostic) { focused() != null }
+    val left = FOCUS_BOUND_MS - (clock.now() - began)
+    val moving = "$message: TalkBack kept moving its focus"
+    settled(moving, clock, samples, intervalMs, maxOf(left, 0L)) { focused()?.toString() ?: "" }
   }
 
   /** True when every [expected] id is present and they appear in this order. */

@@ -3,6 +3,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   commitShareCardSave,
+  commitShareCardShare,
+  ownsPendingShareCardSave,
+  subscribeShareCardSave,
   enqueueShareCardCleanup,
   liveShareCardFiles,
   nativeShareCardSavePending,
@@ -206,5 +209,151 @@ describe('process-lifetime native save ownership', () => {
     removal.resolve()
     await retry
     expect(liveShareCardFiles().has('cache/cc68-cleaning.png')).toBe(false)
+  })
+})
+function deferredValue<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((yes) => {
+    resolve = yes
+  })
+  return { promise, resolve }
+}
+describe('Story 6.9 one global native operation', () => {
+  it('U-SHARE-OPS: a pending share blocks save and another share; the lock releases once', async () => {
+    const native = deferredValue<{ outcome: string }>()
+    const owner = {}
+    const notifications = vi.fn()
+    const unsubscribe = subscribeShareCardSave(notifications)
+    const share = vi.fn(() => native.promise)
+    const shared = commitShareCardShare({
+      fileUri: 'cache/cc69-share-a.png',
+      owner,
+      share,
+    })
+    try {
+      expect(nativeShareCardSavePending()).toBe(true)
+      expect(ownsPendingShareCardSave(owner)).toBe(true)
+      const save = vi.fn(() => Promise.resolve())
+      await expect(
+        commitShareCardSave({ fileUri: 'cache/cc68-b.png', save, cleanup: save })
+      ).rejects.toThrow('finishingSave')
+      const duplicate = vi.fn(() => Promise.resolve({ outcome: 'duplicate' }))
+      await expect(
+        commitShareCardShare({ fileUri: 'cache/cc69-share-c.png', share: duplicate })
+      ).rejects.toThrow('finishingSave')
+      expect(save).not.toHaveBeenCalled()
+      expect(duplicate).not.toHaveBeenCalled()
+      await Promise.resolve()
+      expect(share).toHaveBeenCalledOnce()
+      native.resolve({ outcome: 'completed' })
+      await expect(shared).resolves.toEqual({ outcome: 'completed' })
+      expect(nativeShareCardSavePending()).toBe(false)
+      // One notification at commit and exactly one at release.
+      expect(notifications).toHaveBeenCalledTimes(2)
+    } finally {
+      unsubscribe()
+    }
+  })
+  it('U-SHARE-OPS: a bridge that fires its completion twice settles once and releases once', async () => {
+    // The double reports through a callback the way the native bridge does, and the
+    // second callback is a late duplicate with a different outcome.
+    let complete!: (value: { outcome: string }) => void
+    const bridge: PromiseLike<{ outcome: string }> = {
+      then(onFulfilled, onRejected) {
+        return new Promise<{ outcome: string }>((resolve) => {
+          complete = resolve
+        }).then((value) => {
+          onFulfilled?.(value)
+          // A misbehaving bridge delivers the callback again for the same attempt.
+          onFulfilled?.({ outcome: 'failed' })
+          return value
+        }, onRejected) as never
+      },
+    }
+    const share = vi.fn(() => bridge as Promise<{ outcome: string }>)
+    const notifications = vi.fn()
+    const settlements = vi.fn()
+    const unsubscribe = subscribeShareCardSave(notifications)
+    try {
+      const owner = {}
+      const shared = commitShareCardShare({
+        fileUri: 'cache/cc69-share-twice.png',
+        owner,
+        share,
+      }).then((value) => {
+        settlements(value)
+        return value
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(share).toHaveBeenCalledOnce()
+      expect(notifications).toHaveBeenCalledTimes(1)
+      complete({ outcome: 'completed' })
+      await expect(shared).resolves.toEqual({ outcome: 'completed' })
+      expect(settlements).toHaveBeenCalledOnce()
+      expect(settlements).toHaveBeenCalledWith({ outcome: 'completed' })
+      expect(nativeShareCardSavePending()).toBe(false)
+      expect(ownsPendingShareCardSave(owner)).toBe(false)
+      // Exactly two notifications: commit and release. A second release would notify again.
+      expect(notifications).toHaveBeenCalledTimes(2)
+      // The released lock stays released: the next operation commits normally.
+      const next = commitShareCardShare({
+        fileUri: 'cache/cc69-share-after.png',
+        share: () => Promise.resolve({ outcome: 'completed' }),
+      })
+      expect(nativeShareCardSavePending()).toBe(true)
+      await expect(next).resolves.toEqual({ outcome: 'completed' })
+      expect(notifications).toHaveBeenCalledTimes(4)
+    } finally {
+      unsubscribe()
+    }
+  })
+  it('U-SHARE-OPS: a pending save blocks a share until it settles', async () => {
+    const native = deferred()
+    const saving = commitShareCardSave({
+      fileUri: 'cache/cc68-first.png',
+      save: () => native.promise,
+      cleanup: () => Promise.resolve(),
+    })
+    const share = vi.fn(() => Promise.resolve('completed'))
+    await expect(
+      commitShareCardShare({ fileUri: 'cache/cc69-share-blocked.png', share })
+    ).rejects.toThrow('finishingSave')
+    expect(share).not.toHaveBeenCalled()
+    native.resolve()
+    await saving
+    await expect(
+      commitShareCardShare({ fileUri: 'cache/cc69-share-after.png', share })
+    ).resolves.toBe('completed')
+    expect(share).toHaveBeenCalledOnce()
+  })
+  it('U-SHARE-LEASE: settlement releases the lock and hands the file to its lease', async () => {
+    const native = deferredValue<string>()
+    const shared = commitShareCardShare({
+      fileUri: 'cache/cc69-share-leased.png',
+      share: () => native.promise,
+    })
+    expect(liveShareCardFiles().has('cache/cc69-share-leased.png')).toBe(true)
+    native.resolve('target_chosen')
+    await shared
+    expect(nativeShareCardSavePending()).toBe(false)
+    // No cleanup ran or was queued: only the age sweep may remove a leased file.
+    expect(liveShareCardFiles().has('cache/cc69-share-leased.png')).toBe(false)
+  })
+  it('U-SHARE-OPS: a rejected share still releases the lock exactly once', async () => {
+    const notifications = vi.fn()
+    const unsubscribe = subscribeShareCardSave(notifications)
+    try {
+      await expect(
+        commitShareCardShare({
+          fileUri: 'cache/cc69-share-rejected.png',
+          share: () => Promise.reject(new Error('bridge')),
+        })
+      ).rejects.toThrow('bridge')
+      expect(nativeShareCardSavePending()).toBe(false)
+      expect(notifications).toHaveBeenCalledTimes(2)
+    } finally {
+      unsubscribe()
+    }
   })
 })

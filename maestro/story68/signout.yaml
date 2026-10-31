@@ -1,6 +1,11 @@
 appId: ${MAESTRO_APP_ID}
 ---
 - runFlow: ../story65/open-notification-settings.yaml
+# Sign out is the last control; on an iPhone SE it starts below the fold.
+- scrollUntilVisible:
+    element: ${MAESTRO_SIGNOUT}
+    direction: DOWN
+    timeout: 15000
 - tapOn: ${MAESTRO_SIGNOUT}
 # Sign out returns to Settings, whose shopping section reads the signed-out session.
 - extendedWaitUntil:

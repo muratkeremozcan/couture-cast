@@ -1,12 +1,24 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, test } from 'node:test'
 import {
+  PREPARE_DEADLINE_MS,
+  PREPARE_SETTLE_MARGIN_MS,
+  apiPrepareRequestClock,
   assertRapidWatermarkRuntime,
+  createPrepareRequestTracker,
+  holdLimitMs,
+  liveRequestLimitMs,
   rapidWatermarkRequests,
   withRapidWatermarkLock,
 } from './story68-rapid-watermark.mjs'
+
+// No prepare request in flight: the per-request clock stays at zero.
+const idle = () => 0
 
 const name = `tea_community_${'a'.repeat(32)}`
 const connectionString = `postgresql://postgres:owned@127.0.0.1:54322/${name}`
@@ -131,6 +143,7 @@ describe('withRapidWatermarkLock', () => {
       withRapidWatermarkLock({
         connectionString,
         createClient: f.createClient,
+        oldestLiveRequestMs: idle,
         whileLocked: async () => assert.fail('UI must not run'),
       }),
       /effective_owned_database/
@@ -147,18 +160,22 @@ describe('withRapidWatermarkLock', () => {
     const result = await withRapidWatermarkLock({
       connectionString,
       createClient: f.createClient,
+      oldestLiveRequestMs: idle,
       whileLocked: async () => undefined,
       now: () => 10,
     })
     assert.equal(result.blockedSourceObserved, true)
     assert.equal(result.heldMs, 0)
+    assert.equal(result.longestLiveRequestMs, 0)
     assert.ok(
       f.queries.some(
         ([, sql]) => sql === 'LOCK TABLE "OutfitRecommendation" IN ACCESS EXCLUSIVE MODE'
       )
     )
     assert.ok(
-      f.queries.some(([, sql]) => sql.includes('idle_in_transaction_session_timeout'))
+      f.queries.some(
+        ([, sql]) => sql === "SET LOCAL idle_in_transaction_session_timeout = '30000ms'"
+      )
     )
     assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
     assert.deepEqual(f.ended.sort(), [0, 1])
@@ -171,6 +188,7 @@ describe('withRapidWatermarkLock', () => {
       withRapidWatermarkLock({
         connectionString,
         createClient: f.createClient,
+        oldestLiveRequestMs: idle,
         whileLocked: async () => {
           throw original
         },
@@ -187,6 +205,7 @@ describe('withRapidWatermarkLock', () => {
       withRapidWatermarkLock({
         connectionString,
         createClient: f.createClient,
+        oldestLiveRequestMs: idle,
         whileLocked: async () => undefined,
       }),
       /blocked_outfit_source_required/
@@ -194,15 +213,16 @@ describe('withRapidWatermarkLock', () => {
     assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
   })
 
-  test('12 seconds of held time fails with rollback while the service budget stays unchanged', async () => {
+  test('30 seconds of held time fails with rollback while the service budget stays unchanged', async () => {
     const f = clients()
     let clock = 0
     await assert.rejects(
       withRapidWatermarkLock({
         connectionString,
         createClient: f.createClient,
+        oldestLiveRequestMs: idle,
         whileLocked: async () => {
-          clock = 12000
+          clock = 30000
         },
         now: () => clock,
       }),
@@ -211,8 +231,115 @@ describe('withRapidWatermarkLock', () => {
     assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
   })
 
-  test('the actual watchdog aborts pending UI work and releases the lock at 12 seconds', async (t) => {
-    t.mock.timers.enable({ apis: ['setTimeout'] })
+  test('a long hold passes while each request the user superseded leaves within 12 seconds', async () => {
+    // CI held 8.2 to 11.3 s from LOCK to release, and a 12 s limit on that span failed two of
+    // the last four main runs on a starved host. Each request waited about a third of it.
+    const f = clients()
+    let clock = 0
+    let age = 0
+    const result = await withRapidWatermarkLock({
+      connectionString,
+      createClient: f.createClient,
+      oldestLiveRequestMs: () => age,
+      whileLocked: async () => {
+        clock = 16000
+        age = 4000
+      },
+      now: () => clock,
+    })
+    assert.equal(result.heldMs, 16000)
+    assert.equal(result.longestLiveRequestMs, 4000)
+    assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
+  })
+
+  test('a request still waiting at release fails the proof once it has waited 12 seconds', async () => {
+    const f = clients()
+    let age = 0
+    await assert.rejects(
+      withRapidWatermarkLock({
+        connectionString,
+        createClient: f.createClient,
+        oldestLiveRequestMs: () => age,
+        whileLocked: async () => {
+          age = 12000
+        },
+      }),
+      /rapid_watermark_request_deadline/
+    )
+    assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
+  })
+
+  test('the request watchdog aborts pending UI work and releases the lock at 12 seconds of one request', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+    const f = clients()
+    let age = 0
+    let markStarted
+    const started = new Promise((resolve) => {
+      markStarted = resolve
+    })
+    let aborted = false
+    const run = withRapidWatermarkLock({
+      connectionString,
+      createClient: f.createClient,
+      oldestLiveRequestMs: () => age,
+      whileLocked: (signal) =>
+        new Promise((_, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => {
+              aborted = true
+              reject(signal.reason)
+            },
+            { once: true }
+          )
+          markStarted()
+        }),
+    })
+    const failure = assert.rejects(run, /rapid_watermark_request_deadline/)
+    await started
+    age = 11999
+    t.mock.timers.tick(50)
+    assert.equal(aborted, false)
+    age = 12000
+    t.mock.timers.tick(50)
+    await failure
+    assert.equal(aborted, true)
+    assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
+    assert.deepEqual(f.ended.sort(), [0, 1])
+  })
+
+  test('a broken request clock fails closed with rollback', async () => {
+    for (const oldestLiveRequestMs of [
+      () => Number.NaN,
+      () => -1,
+      () => {
+        throw new Error('rapid_watermark_request_clock_required')
+      },
+    ]) {
+      const f = clients()
+      await assert.rejects(
+        withRapidWatermarkLock({
+          connectionString,
+          createClient: f.createClient,
+          oldestLiveRequestMs,
+          whileLocked: async () => undefined,
+        }),
+        /rapid_watermark_request_clock_required/
+      )
+      assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
+    }
+    await assert.rejects(
+      withRapidWatermarkLock({
+        connectionString,
+        createClient: () => assert.fail('must guard before client construction'),
+        whileLocked: async () => assert.fail('must guard before UI'),
+      }),
+      /rapid_watermark_request_clock_required/
+    )
+  })
+
+  test('the actual watchdog aborts pending UI work and releases the lock at 30 seconds', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
     const f = clients()
     let markStarted
     const started = new Promise((resolve) => {
@@ -222,6 +349,7 @@ describe('withRapidWatermarkLock', () => {
     const run = withRapidWatermarkLock({
       connectionString,
       createClient: f.createClient,
+      oldestLiveRequestMs: idle,
       whileLocked: (signal) =>
         new Promise((_, reject) => {
           signal.addEventListener(
@@ -237,7 +365,9 @@ describe('withRapidWatermarkLock', () => {
     })
     const failure = assert.rejects(run, /rapid_watermark_hold_deadline/)
     await started
-    t.mock.timers.tick(12000)
+    t.mock.timers.tick(29999)
+    assert.equal(aborted, false)
+    t.mock.timers.tick(1)
     await failure
     assert.equal(aborted, true)
     assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
@@ -281,5 +411,79 @@ describe('rapidWatermarkRequests', () => {
         ),
       /prepare_503/
     )
+  })
+})
+
+describe('prepare request clock', () => {
+  const at = (ms) => new Date(Date.UTC(2026, 9, 31, 12, 0, 0) + ms).toISOString()
+  const row = (message, requestId, ms, extra = {}) =>
+    JSON.stringify({
+      path: '/api/v1/share-cards/prepare',
+      method: 'POST',
+      message,
+      requestId,
+      timestamp: at(ms),
+      ...extra,
+    }) + '\n'
+
+  test('the per-request limit leaves every held request the time to settle before the product deadline', () => {
+    const service = fs.readFileSync(
+      'apps/api/src/modules/share-cards/share-cards.service.ts',
+      'utf8'
+    )
+    // The service refuses a preparation this long after it arrives, queue time included.
+    assert.match(service, new RegExp(`\\}, ${PREPARE_DEADLINE_MS}\\)`))
+    assert.equal(liveRequestLimitMs, 12000)
+    assert.equal(liveRequestLimitMs + PREPARE_SETTLE_MARGIN_MS, PREPARE_DEADLINE_MS)
+    assert.ok(holdLimitMs > liveRequestLimitMs)
+  })
+
+  test('a request counts from its own arrival until the API answers or the client aborts it', () => {
+    const base = Date.UTC(2026, 9, 31, 12, 0, 0)
+    const tracker = createPrepareRequestTracker()
+    tracker.update(row('request_received', 'first', 800))
+    assert.equal(tracker.oldestAgeMs(base + 2800), 2000)
+    // The toggle aborts the first request; the API logs that as its completion.
+    tracker.update(row('request_completed', 'first', 2850, { statusCode: 200 }))
+    tracker.update(row('request_received', 'second', 2860))
+    assert.equal(tracker.oldestAgeMs(base + 4860), 2000)
+    tracker.update(row('request_failed', 'second', 4900, { statusCode: 503 }))
+    assert.equal(tracker.oldestAgeMs(base + 9000), 0)
+    // Other paths, malformed rows and a line still being written are not requests yet.
+    const partial = row('request_received', 'third', 9100)
+    tracker.update(
+      JSON.stringify({
+        path: '/api/v1/user/profile',
+        message: 'request_received',
+        requestId: 'x',
+        timestamp: at(0),
+      }) +
+        '\nnot json\n' +
+        partial.slice(0, 20)
+    )
+    assert.equal(tracker.oldestAgeMs(base + 10000), 0)
+    tracker.update(partial.slice(20))
+    assert.equal(tracker.oldestAgeMs(base + 10100), 1000)
+  })
+
+  test('the clock reads only the API log written since the hold began', (t) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-request-clock-'))
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+    const file = path.join(directory, 'api.log')
+    const base = Date.UTC(2026, 9, 31, 12, 0, 0)
+    // A request from before the hold never answered in this log: it is not this hold's.
+    fs.writeFileSync(file, row('request_received', 'earlier', -60000))
+    let now = base
+    const oldest = apiPrepareRequestClock({
+      file,
+      fromByte: fs.statSync(file).size,
+      clock: () => now,
+    })
+    assert.equal(oldest(), 0)
+    fs.appendFileSync(file, row('request_received', 'held', 500))
+    now = base + 3500
+    assert.equal(oldest(), 3000)
+    fs.appendFileSync(file, row('request_completed', 'held', 3600))
+    assert.equal(oldest(), 0)
   })
 })

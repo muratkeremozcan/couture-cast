@@ -1,7 +1,10 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import {
@@ -21,7 +24,12 @@ const mutate = (change) => {
   return shareCardLaneProblems(workflow)
 }
 const step = (job, predicate) => job.steps.find(predicate)
-const native = ['android36-native-matrix', 'android36-original', 'android36-interaction']
+const native = [
+  'android36-native-matrix',
+  'android36-original',
+  'android36-controls',
+  'android36-interaction',
+]
 const deviceLanes = Object.keys(android36Lanes).filter(
   (name) => name !== 'browser-acceptance'
 )
@@ -512,18 +520,18 @@ describe('share-card parallel lane validator', () => {
         })
   })
 
-  test('the legacy API32 row must stay complete and alone', () => {
+  test('the API32 shards stay Android API32 rows of the full Google APIs image', () => {
     for (const change of [
-      (rows) => rows.pop(),
-      (rows) => (rows[0].suite = 'matrix'),
       (rows) =>
-        rows.push({ os: 'macos-15-intel', platform: 'ios', api: 0, suite: 'all' }),
+        rows.push({ os: 'macos-15-intel', platform: 'ios', api: 0, suite: 'all-3' }),
+      (rows) => (rows[0].platform = 'ios'),
+      (rows) => (rows[1].target = 'google_apis_playstore'),
     ]) {
       const problems = mutate((jobs) =>
         change(jobs['original-resource'].strategy.matrix.include)
       )
       assert.ok(
-        problems.some((problem) => /legacy API32 journey must remain/.test(problem)),
+        problems.some((problem) => /original-resource: exact API32 shards/.test(problem)),
         problems.join('\n')
       )
     }
@@ -806,34 +814,154 @@ describe('share-card parallel lane validator', () => {
       )
   })
 
-  test('giving the legacy API32 journey a new step timeout is rejected', () => {
-    for (const change of [
-      (jobs) =>
-        (jobs['original-resource'].strategy.matrix.include[0].journey_timeout = 65),
-      (jobs) =>
-        (jobs['original-resource'].steps.find(
-          (row) => row.uses === 'reactivecircus/android-emulator-runner@v2'
-        )['timeout-minutes'] = 65),
-    ]) {
-      const problems = mutate(change)
-      assert.ok(
-        problems.some((problem) => /must not gain a step timeout/.test(problem)),
-        problems.join('\n') || 'no problem raised'
+  // Each sharded Android lane: its job, its evidence job, the row suite prefix and the API.
+  for (const [shardJob, evidenceJob, prefix, api] of [
+    ['android36-native-matrix', 'android36-matrix-evidence', 'matrix', 36],
+    ['original-resource', 'original-resource-evidence', 'all', 32],
+  ])
+    describe(`${shardJob} shards`, () => {
+      const rejected = (title, expected, change) =>
+        test(`${title} is rejected`, () => {
+          const problems = mutate(change)
+          assert.ok(
+            problems.some((problem) => expected.test(problem)),
+            problems.join('\n') || 'no problem raised'
+          )
+        })
+      const rows = (jobs) => jobs[shardJob].strategy.matrix.include
+      const mergeStep = (jobs) =>
+        step(jobs[evidenceJob], (row) => row.run?.includes('native-matrix-shards.mjs'))
+      const evidence = new RegExp(
+        `${evidenceJob}: both shards must report their exact cases`
       )
-    }
-    const row = source.jobs['original-resource'].strategy.matrix.include
-    assert.equal(
-      row.some((item) => item.journey_timeout !== undefined),
-      false
-    )
-  })
 
-  test('raising the legacy 90 minute limit is rejected', () => {
+      test('the job runs one row per shard and the evidence job merges both', () => {
+        assert.deepEqual(
+          source.jobs[shardJob].strategy.matrix.include.map((row) => row.suite),
+          [`${prefix}-1`, `${prefix}-2`]
+        )
+        assert.deepEqual(source.jobs[evidenceJob].needs, shardJob)
+        assert.ok(
+          mergeStep(source.jobs).run.includes(
+            `native-matrix-shards.mjs merge android-${api} `
+          )
+        )
+        assert.ok(
+          source.jobs[gateJobName].needs.includes(evidenceJob),
+          'the lanes gate requires the evidence job'
+        )
+      })
+
+      rejected(`removing ${evidenceJob}`, /required job missing/, (jobs) => {
+        delete jobs[evidenceJob]
+      })
+      rejected('a single shard', /one row per shard/, (jobs) => {
+        rows(jobs).pop()
+      })
+      rejected('the unsharded suite', /one row per shard/, (jobs) => {
+        rows(jobs).splice(0, 2, { ...rows(jobs)[0], suite: prefix })
+      })
+      rejected(
+        'two rows for the same shard',
+        /one row per shard|artifact name must be unique/,
+        (jobs) => {
+          rows(jobs)[1].suite = `${prefix}-1`
+        }
+      )
+      rejected('a third shard', /one row per shard/, (jobs) => {
+        rows(jobs).push({ ...rows(jobs)[1], suite: `${prefix}-3` })
+      })
+      rejected('a shard on another API', /one row per shard/, (jobs) => {
+        rows(jobs)[1].api = api === 32 ? 36 : 32
+      })
+      rejected(
+        'a shard without a journey budget',
+        /preparation and cleanup budget/,
+        (jobs) => {
+          delete rows(jobs)[1].journey_timeout
+        }
+      )
+      rejected(
+        'a journey budget that crowds out preparation',
+        /preparation and cleanup budget/,
+        (jobs) => {
+          rows(jobs)[0].journey_timeout = jobs[shardJob]['timeout-minutes'] - 10
+        }
+      )
+      rejected('an unbounded journey step', /preparation and cleanup budget/, (jobs) => {
+        delete step(
+          jobs[shardJob],
+          (row) => row.uses === 'reactivecircus/android-emulator-runner@v2'
+        )['timeout-minutes']
+      })
+      rejected(
+        'an evidence job skipped after a failed shard',
+        new RegExp(`${evidenceJob} must run after`),
+        (jobs) => {
+          jobs[evidenceJob].if = "github.event_name != 'pull_request'"
+        }
+      )
+      rejected(
+        'an evidence job that also runs on pull_request',
+        new RegExp(`${evidenceJob} must run after`),
+        (jobs) => {
+          jobs[evidenceJob].if = 'always()'
+        }
+      )
+      rejected(
+        'an evidence job that waits on another job',
+        new RegExp(`${evidenceJob} must run after`),
+        (jobs) => {
+          jobs[evidenceJob].needs = ['android36-original']
+        }
+      )
+      rejected(
+        'an evidence job that does not check the shard result',
+        evidence,
+        (jobs) => {
+          const row = mergeStep(jobs)
+          row.run = row.run.replace('test "$CC68_SHARD_RESULT" = success', 'true')
+        }
+      )
+      rejected('an evidence job that merges another plan', evidence, (jobs) => {
+        const row = mergeStep(jobs)
+        row.run = row.run.replace(`merge android-${api} `, 'merge ios ')
+      })
+      rejected('an evidence job that reads the other job result', evidence, (jobs) => {
+        mergeStep(jobs).env.CC68_SHARD_RESULT = '${{ needs.android36-original.result }}'
+      })
+      rejected(
+        'an evidence job that downloads other artifacts',
+        new RegExp(`${evidenceJob}: download every shard artifact`),
+        (jobs) => {
+          step(
+            jobs[evidenceJob],
+            (row) => row.uses === 'actions/download-artifact@v4'
+          ).with.pattern = 'share-card-android-*'
+        }
+      )
+      rejected(
+        'an evidence job that hides a failure',
+        new RegExp(`${evidenceJob}: failures must remain visible`),
+        (jobs) => {
+          jobs[evidenceJob]['continue-on-error'] = true
+        }
+      )
+      rejected(
+        'an evidence job on another runner',
+        new RegExp(`${evidenceJob}: free ubuntu-latest runner required`),
+        (jobs) => {
+          jobs[evidenceJob]['runs-on'] = 'macos-15'
+        }
+      )
+    })
+
+  test('raising the API32 90 minute limit is rejected', () => {
     const problems = mutate(
       (jobs) => (jobs['original-resource']['timeout-minutes'] = 120)
     )
     assert.ok(
-      problems.some((problem) => /existing 90 minute limit/.test(problem)),
+      problems.some((problem) => /keeps its 90 minute limit/.test(problem)),
       problems.join('\n')
     )
   })
@@ -847,9 +975,193 @@ describe('share-card parallel lane validator', () => {
       source.jobs['android36-native-matrix'].steps,
       source.jobs['android36-interaction'].steps
     )
+    assert.deepEqual(
+      source.jobs['android36-controls'].steps,
+      source.jobs['android36-interaction'].steps
+    )
     const problems = mutate(
       (jobs) => (jobs['android36-original'].steps[0].id = 'changed')
     )
     assert.deepEqual(problems, [])
+  })
+})
+
+/** Runs one step's script with stub tools on PATH; returns the exit status. */
+const runWithStubs = (row, stubs) => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'share-native-unit-'))
+  try {
+    const bin = path.join(scratch, 'bin')
+    fs.mkdirSync(bin)
+    for (const [name, body] of Object.entries(stubs)) {
+      fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, {
+        mode: 0o755,
+      })
+    }
+    const cwd = path.join(scratch, row['working-directory'] ?? '.')
+    fs.mkdirSync(cwd, { recursive: true })
+    return spawnSync('bash', ['-c', row.run], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: scratch },
+    }).status
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true })
+  }
+}
+
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`
+// XCTest's own summary; with skips it reads "with S tests skipped and F failures".
+const swiftSummary = (count, failures = 0, skipped = 0) =>
+  `echo "Test Suite 'All tests' passed."; echo "\t Executed ${plural(count, 'test')}, with ${skipped ? `${plural(skipped, 'test')} skipped and ` : ''}${plural(failures, 'failure')} (0 unexpected) in 0.1 (0.1) seconds"; exit ${failures ? 1 : 0}`
+
+// U-HARNESS-PR-WORKFLOW: the share native unit lane runs on every PR that touches either native
+// share-card module, each test step fails on zero tests, and no job outlives the PR budget.
+describe('share native unit workflow', () => {
+  const unit = parse(
+    fs.readFileSync('.github/workflows/pr-share-native-unit.yml', 'utf8')
+  )
+  const paths = [
+    'apps/mobile/modules/share-card-native-share/**',
+    'apps/mobile/modules/share-card-photo-save/**',
+    '.github/workflows/pr-share-native-unit.yml',
+  ]
+  const testSteps = Object.values(unit.jobs).flatMap((job) =>
+    job.steps.filter((row) => /swift test|testDebugUnitTest/.test(row.run ?? ''))
+  )
+
+  /** One JUnit XML report per entry: a test count, or [tests, skipped]. */
+  const gradleReports = (counts, status = 0) =>
+    [
+      'dir=apps/mobile/modules/share-card-native-share/android/unit-tests/build/test-results/testDebugUnitTest',
+      'mkdir -p "$dir"',
+      ...counts.map((entry, index) => {
+        const [count, skipped] = Array.isArray(entry) ? entry : [entry, 0]
+        return `echo '<?xml version="1.0"?><testsuite name="S${index}" tests="${count}" skipped="${skipped}" failures="0" errors="0" timestamp="2026-10-30T12:00:00"></testsuite>' > "$dir/TEST-S${index}.xml"`
+      }),
+      `exit ${status}`,
+    ].join('\n')
+
+  test('runs on pull requests, main, nightly and on demand for both modules', () => {
+    // The YAML `on` key parses as the string "on".
+    const on = unit.on
+    assert.deepEqual(on.pull_request.paths, paths)
+    assert.deepEqual(on.push.paths, paths)
+    assert.deepEqual(on.push.branches, ['main'])
+    assert.equal(on.schedule.length, 1)
+    assert.ok('workflow_dispatch' in on)
+  })
+
+  test('every job is unconditional, visible on failure and within 20 minutes', () => {
+    const jobs = Object.entries(unit.jobs)
+    assert.deepEqual(jobs.map(([name]) => name).sort(), ['robolectric', 'swift'])
+    for (const [name, job] of jobs) {
+      assert.ok(job['timeout-minutes'] > 0 && job['timeout-minutes'] <= 20, name)
+      assert.equal(job.if, undefined, `${name} runs on pull requests`)
+      assert.notEqual(job['continue-on-error'], true, name)
+      assert.ok(
+        job.steps.every((row) => row['continue-on-error'] !== true),
+        name
+      )
+    }
+  })
+
+  test('tests both Swift packages and the standalone Robolectric project', () => {
+    const swift = unit.jobs.swift.steps.filter((row) => /swift test/.test(row.run ?? ''))
+    assert.deepEqual(
+      swift.map((row) => row['working-directory']),
+      [
+        'apps/mobile/modules/share-card-native-share/ios',
+        'apps/mobile/modules/share-card-photo-save/ios',
+      ]
+    )
+    const gradle = unit.jobs.robolectric.steps.filter((row) =>
+      /testDebugUnitTest/.test(row.run ?? '')
+    )
+    assert.equal(gradle.length, 1)
+    assert.match(
+      gradle[0].run,
+      /apps\/mobile\/modules\/share-card-native-share\/android\/unit-tests/
+    )
+    assert.equal(
+      unit.jobs.robolectric.steps.find((row) =>
+        row.uses?.startsWith('actions/setup-java')
+      ).with['java-version'],
+      '21'
+    )
+    assert.equal(testSteps.length, 3)
+  })
+
+  test('each test step passes with tests and fails on zero tests, all skipped or a failure', () => {
+    for (const row of testSteps) {
+      const swift = /swift test/.test(row.run)
+      const tool = swift ? 'swift' : 'gradle'
+      const pass = swift ? swiftSummary(21) : gradleReports([4, 11])
+      assert.equal(runWithStubs(row, { [tool]: pass }), 0, `${row.name} passes`)
+      if (swift) assert.equal(runWithStubs(row, { swift: swiftSummary(1) }), 0, row.name)
+      const zero = swift
+        ? [swiftSummary(0), 'echo "no summary"', 'exit 0']
+        : [gradleReports([]), gradleReports([0, 0]), 'exit 0']
+      for (const body of zero) {
+        assert.notEqual(runWithStubs(row, { [tool]: body }), 0, `${row.name}: zero tests`)
+      }
+      // Skipped tests did not run: an all-skipped run is a zero-test run, a partial one passes.
+      const allSkipped = swift
+        ? [swiftSummary(21, 0, 21), swiftSummary(1, 0, 1)]
+        : [
+            gradleReports([
+              [4, 4],
+              [11, 11],
+            ]),
+            gradleReports([[1, 1]]),
+          ]
+      for (const body of allSkipped) {
+        assert.notEqual(
+          runWithStubs(row, { [tool]: body }),
+          0,
+          `${row.name}: all skipped`
+        )
+      }
+      const partlySkipped = swift
+        ? swiftSummary(21, 0, 20)
+        : gradleReports([
+            [4, 4],
+            [11, 10],
+          ])
+      assert.equal(
+        runWithStubs(row, { [tool]: partlySkipped }),
+        0,
+        `${row.name}: one test ran`
+      )
+      const failing = swift ? swiftSummary(21, 1) : gradleReports([4], 1)
+      assert.notEqual(runWithStubs(row, { [tool]: failing }), 0, `${row.name}: failure`)
+    }
+  })
+})
+
+describe('ios-build photo-save guard', () => {
+  const guard = step(source.jobs['ios-build'], (row) => row.id === 'png_file_guards')
+
+  test('passes on any nonzero count and fails on zero tests, a skip or a failure', () => {
+    // A literal count breaks the lane whenever the suite grows.
+    assert.doesNotMatch(guard.run, /Executed \d+ tests/)
+    for (const count of [1, 4, 5, 21])
+      assert.equal(
+        runWithStubs(guard, { swift: swiftSummary(count) }),
+        0,
+        `${count} tests`
+      )
+    const skipped =
+      'echo "\t Executed 5 tests, with 1 test skipped and 0 failures (0 unexpected) in 0.1 (0.1) seconds"'
+    for (const body of [swiftSummary(0), 'echo "no summary"', 'exit 0', skipped])
+      assert.notEqual(runWithStubs(guard, { swift: body }), 0, body)
+    assert.notEqual(runWithStubs(guard, { swift: swiftSummary(5, 1) }), 0, 'failure')
+    // A failure summary from a tool that still exits zero.
+    assert.notEqual(
+      runWithStubs(guard, {
+        swift: swiftSummary(5, 1).replace(/exit \d+$/, 'exit 0'),
+      }),
+      0,
+      'failure with exit 0'
+    )
   })
 })

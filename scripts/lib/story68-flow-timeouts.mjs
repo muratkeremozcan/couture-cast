@@ -152,8 +152,73 @@ export const SET_LOCALE_TAP_WORST_CASE_MS =
   SET_LOCALE_TAP_ATTEMPTS * SET_LOCALE_TAP_ATTEMPT_MS
 export const SET_LOCALE_OTHER_STEPS_MS = 4 * 17_000 + 15_000 + 2_000
 
+/**
+ * tap-share.yaml, which every Story 6.9 fixture outcome flow runs for its one Share tap: the
+ * precondition that the outcome copy is not yet on screen, the scroll that brings Share into view
+ * (10 s and its poll) and the settle wait, then a retry of maxRetries 3 (4 attempts) shaped like
+ * tap-save.yaml: the guard (its two condition checks), the 8 s wait for what a received press shows
+ * and that wait's poll. share-sheet.yaml (Android only) runs the same scroll and retry against the
+ * chooser, then dismisses it: Back and the 10 s wait for the chooser to leave plus its poll. A test
+ * reads both flows and keeps these numbers equal to what they declare.
+ */
+export const SHARE_TAP_SCROLL_MS = 10_000 + 3 * CONDITION_CHECK_MS
+export const SHARE_TAP_ATTEMPTS = 4
+export const SHARE_TAP_ATTEMPT_MS = 2 * CONDITION_CHECK_MS + 8_000 + CONDITION_CHECK_MS
+export const SHARE_TAP_WORST_CASE_MS =
+  SHARE_TAP_SCROLL_MS + SHARE_TAP_ATTEMPTS * SHARE_TAP_ATTEMPT_MS
+export const SHARE_SHEET_DISMISS_WAIT_MS = 10_000
+export const SHARE_SHEET_DISMISS_MS = SHARE_SHEET_DISMISS_WAIT_MS + 5 * CONDITION_CHECK_MS
+export const SHARE_TAP_FLOWS = Object.freeze([
+  'maestro/story68/share-completed.yaml',
+  'maestro/story68/share-chosen.yaml',
+  'maestro/story68/share-closed.yaml',
+  'maestro/story68/share-not-confirmed.yaml',
+  'maestro/story68/share-failed.yaml',
+  'maestro/story68/share-unavailable.yaml',
+  'maestro/story68/share-other.yaml',
+])
+export const SHARE_SHEET_FLOW = 'maestro/story68/share-sheet.yaml'
+const shareTapTimeoutMs = Math.ceil(
+  (DEFAULT_FLOW_TIMEOUT_MS + SHARE_TAP_WORST_CASE_MS) * FLOW_TIMEOUT_MARGIN
+)
+const shareSheetTimeoutMs = Math.ceil(
+  (DEFAULT_FLOW_TIMEOUT_MS + SHARE_TAP_WORST_CASE_MS + SHARE_SHEET_DISMISS_MS) *
+    FLOW_TIMEOUT_MARGIN
+)
+
+/**
+ * What the Story 6.9 `share-sheet` command may add to the lane that runs it. On Android that lane
+ * is android36-interaction, which runs share-sheet and the Release font proof; the rapid
+ * watermark, TalkBack and fallback focus proofs moved to android36-controls. On run 41202706840
+ * the interaction journey step took 27 min 42 s, of which those three proofs took 6 min 30 s and
+ * share-sheet 7 min 53 s, so the lane without share-sheet is 13 min 19 s of its 45 min
+ * journey_timeout, leaving 31 min 41 s. iOS shard 1 finished in 49 min of its 100 min job on main
+ * run 41104845732, leaving 51 min.
+ */
+export const ANDROID_SHARE_LANE_BASE_MS = 13 * 60_000 + 19_000
+export const SHARE_SHEET_LANE_HEADROOM_MS = Object.freeze({
+  android: 31 * 60_000 + 41_000,
+  ios: 51 * 60_000,
+})
+/**
+ * Expected cost of one Maestro flow in the share-sheet command, hierarchy reads between flows
+ * included, from the same run: Android rapid-watermark ran its 6 flows in 126 s and iOS shard 1 ran
+ * its last 29 matrix flows in 630 s, both about 21 s a flow, budgeted at 30 s. A Save proof adds
+ * the runner's extract step (20 s). The native test is a module build plus its run: the Android
+ * a11y step (androidTest build, install, TalkBack and instrumentation) took 3 min 48 s; the iOS
+ * XCUITest build-for-testing and run are budgeted at 6 min.
+ */
+export const SHARE_SHEET_FLOW_ESTIMATE_MS = 30_000
+export const SHARE_SHEET_EXTRACT_ESTIMATE_MS = 20_000
+export const SHARE_SHEET_NATIVE_TEST_ESTIMATE_MS = Object.freeze({
+  android: 4 * 60_000,
+  ios: 6 * 60_000,
+})
+
 const flowTimeouts = {
   ...Object.fromEntries(SAVE_TAP_FLOWS.map((flow) => [flow, saveTapTimeoutMs])),
+  ...Object.fromEntries(SHARE_TAP_FLOWS.map((flow) => [flow, shareTapTimeoutMs])),
+  [SHARE_SHEET_FLOW]: shareSheetTimeoutMs,
   ...Object.fromEntries(WAIT_SETTINGS_FLOWS.map((flow) => [flow, waitSettingsTimeoutMs])),
   [SET_LOCALE_FLOW]: Math.ceil(
     (FLOW_STARTUP_MS + SET_LOCALE_OTHER_STEPS_MS + SET_LOCALE_TAP_WORST_CASE_MS) *

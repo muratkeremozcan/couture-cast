@@ -38,7 +38,12 @@ import {
 } from './ci/native-ios-maestro-trace.mjs'
 import { recordIosStackPop } from './ci/native-ios-stack-pop.mjs'
 import { beginExpoGoProbe, readExpoGoVersion } from './ci/native-ios-expo-go-probe.mjs'
-import { inMatrixSection, localesForShard, parseShard } from './ci/native-ios-shards.mjs'
+import {
+  inMatrixSection,
+  localesForShard,
+  parseShard,
+  shardPlanFor,
+} from './ci/native-matrix-shards.mjs'
 import {
   iosDriverGlobalArgs,
   iosDriverTestArgs,
@@ -69,6 +74,7 @@ import {
   MAESTRO_ANDROID_DRIVER_PORT,
 } from './lib/maestro-android-driver-session.mjs'
 import {
+  apiPrepareRequestClock,
   assertRapidWatermarkRuntime,
   rapidWatermarkRequests,
   withRapidWatermarkLock,
@@ -78,6 +84,11 @@ import {
   redactRapidWatermarkControl,
   closedRapidWatermarkFailure,
 } from './lib/story68-rapid-watermark-control.mjs'
+import {
+  SHARE_FIXTURE_MODES,
+  readComposerLayout,
+  runStory69ShareSheet,
+} from './lib/story69-share-sheet.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -93,6 +104,7 @@ if (
     'rapid-watermark',
     'fallback-focus',
     'release-live-font',
+    'share-sheet',
   ].includes(command)
 )
   assertStory68DiskSpace(root)
@@ -246,6 +258,10 @@ function previewDigest() {
   if (!digest) throw new Error('loaded_approved_preview_required')
   return digest
 }
+function composerLayout() {
+  requireDevice()
+  return readComposerLayout(hierarchyOutput())
+}
 // settings.yaml asserts the destination in Maestro; this reads it again from the OS.
 function openOsSettings() {
   maestro('maestro/story68/settings.yaml')
@@ -313,6 +329,14 @@ function terminateDevClient() {
   spawnSync('xcrun', ['simctl', 'terminate', device, DEV_CLIENT_APP_ID], {
     encoding: 'utf8',
   })
+}
+/** The emulator's SDK level on Android; iOS has none. */
+function androidSdk() {
+  if (platform !== 'android') return undefined
+  requireDevice()
+  return Number(
+    run(adb, ['-s', device, 'shell', 'getprop', 'ro.build.version.sdk']).trim()
+  )
 }
 function openUrl(url) {
   requireDevice()
@@ -545,9 +569,16 @@ async function signin() {
 }
 function rapidWatermarkFlow(signal, control) {
   const started = Date.now()
+  const flow = 'maestro/story68/rapid-watermark-held.yaml'
+  const apiLogFile = path.join(directory, 'api.log')
+  const apiLogFromByte = fs.existsSync(apiLogFile) ? fs.statSync(apiLogFile).size : 0
   reverse()
   const output = path.join(directory, `maestro-${platform}-rapid-${Date.now()}`)
   fs.mkdirSync(output, { mode: 0o700 })
+  const maestroLog = () => {
+    const file = path.join(output, 'maestro.log')
+    return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
+  }
   const fd = fs.openSync(path.join(output, 'process.log'), 'wx', 0o600)
   return new Promise((resolve, reject) => {
     const process = spawn(
@@ -564,7 +595,7 @@ function rapidWatermarkFlow(signal, control) {
         '--debug-output',
         output,
         '--flatten-debug-output',
-        path.join(root, 'maestro/story68/rapid-watermark-held.yaml'),
+        path.join(root, flow),
       ],
       {
         cwd: root,
@@ -613,31 +644,43 @@ function rapidWatermarkFlow(signal, control) {
     })
   })
     .catch((error) => {
-      const logs = ['maestro.log', 'process.log']
-        .map((name) => {
-          const file = path.join(output, name)
-          return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
-        })
-        .join('\n')
+      const processLog = path.join(output, 'process.log')
+      const logs = `${maestroLog()}\n${fs.existsSync(processLog) ? fs.readFileSync(processLog, 'utf8') : ''}`
       privateJson(
         `native-flow-failure-${platform}.json`,
         summarizeNativeFlowFailure({
-          flow: 'maestro/story68/rapid-watermark-held.yaml',
+          flow,
           platform,
           durationMs: Math.max(0, Date.now() - started),
           log: logs,
+          // The harness killed Maestro, so its own reason is the only failure text there is.
+          harnessStop: signal.aborted ? closedRapidWatermarkFailure(signal.reason) : null,
         })
       )
+      // A killed Maestro writes no command trace; its progressive log still shows how far it got.
+      recordIosFlowProgress({
+        platform,
+        flow,
+        maestroLog: maestroLog(),
+        directory,
+        apiLogFile,
+        apiLogFromByte,
+        output,
+        root,
+        device,
+        appId,
+      })
       throw error
     })
     .finally(() => {
-      // The 12 s hold leaves little slack, so keep every command's cost, pass or fail.
+      // The hold is timed per prepare request, so keep every command's cost, pass or fail.
       recordIosCommandTimings({
         platform,
-        flow: 'maestro/story68/rapid-watermark-held.yaml',
+        flow,
         output,
         directory,
         minMs: 0,
+        maestroLog: maestroLog(),
       })
       redactRapidWatermarkControl(output, control.url)
     })
@@ -1277,6 +1320,36 @@ if (command === 'prebuild') {
     privateJson,
     openUrl,
   })
+} else if (command === 'share-sheet') {
+  requireDevice()
+  activeLocale = 'en-US'
+  await runStory69ShareSheet({
+    root,
+    directory,
+    device,
+    platform,
+    appId,
+    adb,
+    maestro,
+    run,
+    read,
+    privateJson,
+    openUrl,
+    composerLayout,
+    captureApproved,
+    catalog: readLocale(),
+    extract: () =>
+      run(process.execPath, [
+        fileURLToPath(import.meta.url),
+        'extract',
+        '--harness',
+        directory,
+        '--platform',
+        platform,
+        '--device',
+        device,
+      ]),
+  })
 } else if (command === 'rapid-watermark') {
   requireDevice()
   const report = { platform, passed: false, stage: 'validating_runtime' }
@@ -1315,6 +1388,11 @@ if (command === 'prebuild') {
               query_timeout: 2000,
             }),
           whileLocked,
+          // Each prepare request's own deadline starts when the API logs its arrival.
+          oldestLiveRequestMs: apiPrepareRequestClock({
+            file: logPath,
+            fromByte: offset,
+          }),
         }),
       runFlow: (control, signal) => rapidWatermarkFlow(signal, control),
     })
@@ -1462,7 +1540,10 @@ if (command === 'prebuild') {
 } else if (command === 'matrix') {
   requireDevice()
   const report = { platform, cases: [], completed: false }
-  const shard = option('shard') === undefined ? undefined : parseShard(option('shard'))
+  // Each sharded lane has its own plan: iOS, or the Android plan of the emulator's API.
+  const plan =
+    option('shard') === undefined ? undefined : shardPlanFor(platform, androidSdk())
+  const shard = plan === undefined ? undefined : parseShard(plan, option('shard'))
   let before
   const mark = (id) => {
     report.cases.push({ id, passed: true })
@@ -1508,7 +1589,7 @@ if (command === 'prebuild') {
   // Real Settings controls establish locale; no direct i18n test setter is used.
   activeLocale = 'en-US'
   maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
-  if (inMatrixSection(shard, 'pre-locale')) {
+  if (inMatrixSection(plan, shard, 'pre-locale')) {
     const beforePreparation = originals()
     fixture('prepare_deferred')
     maestro('maestro/story68/preparing-cancel.yaml')
@@ -1575,7 +1656,7 @@ if (command === 'prebuild') {
     close()
   }
   fixture('real')
-  for (const locale of localesForShard(shard)) {
+  for (const locale of localesForShard(plan, shard)) {
     activeLocale = locale
     if (platform === 'ios') recordIosHostSample('locale-loop', { root })
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: locale })
@@ -1628,7 +1709,7 @@ if (command === 'prebuild') {
     mark(`M-LOCALE:${locale}`)
     close()
   }
-  if (inMatrixSection(shard, 'large-text')) {
+  if (inMatrixSection(plan, shard, 'large-text')) {
     activeLocale = 'pt-PT'
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
     const previousFont =
@@ -1657,13 +1738,13 @@ if (command === 'prebuild') {
     }
   }
   if (
-    inMatrixSection(shard, 'precommit-lifecycle') ||
-    inMatrixSection(shard, 'save-lifecycle')
+    inMatrixSection(plan, shard, 'precommit-lifecycle') ||
+    inMatrixSection(plan, shard, 'save-lifecycle')
   ) {
     activeLocale = 'en-US'
     maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
   }
-  if (inMatrixSection(shard, 'precommit-lifecycle')) {
+  if (inMatrixSection(plan, shard, 'precommit-lifecycle')) {
     for (const lifecycle of ['close', 'navigation']) {
       fixture('real')
       open('outfit')
@@ -1692,7 +1773,7 @@ if (command === 'prebuild') {
       mark(`M-CANCEL M-SINGLE-WRITE:precommit-authorization-${lifecycle}`)
     }
   }
-  if (inMatrixSection(shard, 'save-lifecycle')) {
+  if (inMatrixSection(plan, shard, 'save-lifecycle')) {
     for (const lifecycle of ['close', 'navigation', 'signout']) {
       fixture('deferred')
       open('outfit')
@@ -1741,7 +1822,7 @@ if (command === 'prebuild') {
       ])
     await new Promise((resolve) => setTimeout(resolve, 2000))
   }
-  if (inMatrixSection(shard, 'prefs-failed')) {
+  if (inMatrixSection(plan, shard, 'prefs-failed')) {
     fixture('prefs_unavailable')
     try {
       maestro('maestro/story68/prefs-failed.yaml')
@@ -1759,8 +1840,9 @@ if (command === 'prebuild') {
   privateJson(`native-matrix-${platform}.json`, report)
   console.log(`Native ${platform} matrix passed ${report.cases.length} cases.`)
 } else if (command === 'permission-baseline') {
-  // The Photos state `proof` leaves behind (read denied, add-only granted), for the iOS shard that
-  // does not run `proof`. Without it the first Save shows the add-only prompt instead of Saving.
+  // The permission state `proof` leaves behind, for the shard that does not run `proof`. On iOS
+  // that is Photos read denied and add-only granted: without it the first Save shows the add-only
+  // prompt instead of Saving. On API32 it is WRITE_EXTERNAL_STORAGE, which Saves need there.
   requireDevice()
   if (platform === 'ios') {
     run('xcrun', ['simctl', 'privacy', device, 'revoke', 'photos', appId])
@@ -1768,6 +1850,26 @@ if (command === 'prebuild') {
     assertIosReadDenied(iosPhotoPermissions(), true)
     // proof relaunches the dev client after its grant; do the same so the app reads the
     // permission in a fresh JS runtime and the next flow starts on the tabs.
+    openUrl(
+      `couturecast-story68://expo-development-client/?url=${encodeURIComponent('http://127.0.0.1:8089')}`
+    )
+    maestro('maestro/story65/open-app.yaml')
+  } else if (androidSdk() < 33) {
+    run(adb, [
+      '-s',
+      device,
+      'shell',
+      'pm',
+      'grant',
+      appId,
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+    ])
+    const granted = run(adb, ['-s', device, 'shell', 'dumpsys', 'package', appId])
+    if (!granted.includes('android.permission.WRITE_EXTERNAL_STORAGE: granted=true'))
+      throw new Error('android_storage_permission_not_granted')
+    // Reopen the dev client cold, as the large-text section does, so the next flow starts on
+    // the tabs of a runtime that has the permission.
+    run(adb, ['-s', device, 'shell', 'am', 'force-stop', appId])
     openUrl(
       `couturecast-story68://expo-development-client/?url=${encodeURIComponent('http://127.0.0.1:8089')}`
     )
@@ -1789,6 +1891,7 @@ if (command === 'prebuild') {
       'unavailable',
       'deferred',
       'release',
+      ...SHARE_FIXTURE_MODES,
     ].includes(mode)
   )
     throw new Error('fixture_mode_required')

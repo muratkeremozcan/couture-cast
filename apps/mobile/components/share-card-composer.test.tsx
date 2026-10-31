@@ -1,198 +1,69 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import type * as ReactNativeModule from 'react-native'
-import React, { createElement, useEffect, useState } from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { ResponseError, type PrepareShareCardInput } from '@couture/api-client'
 import { supportedLocales } from '@couture/api-client/contracts/http'
 import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
-import i18n, { initI18n } from '@/src/lib/i18n'
+import i18n from '@/src/lib/i18n'
+const loadMocks = vi.hoisted(() => {
+  // Expo packages read process.env.EXPO_OS when they load; the suite default is 'web'.
+  process.env.EXPO_OS = 'ios'
+  return () =>
+    import('./share-card-composer.test-boundary.js').then(
+      ({ composerMocks }) => composerMocks
+    )
+})
 vi.mock('expo-status-bar', () => ({ StatusBar: () => null }))
+// The Android status-bar stack is a native window concern; Story 6.9 cases simulate Android.
+vi.mock('@/src/lib/use-share-card-status-bar', () => ({
+  useShareCardStatusBar: (open: boolean) => open,
+}))
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
-const boundary = vi.hoisted(() => {
-  process.env.EXPO_OS = 'ios'
-  return {
-    prepare: vi.fn(),
-    permission: vi.fn(),
-    save: vi.fn(),
-    available: true,
-    member: 'member-a' as string | null,
-    subscribers: new Set<() => void>(),
-    appState: new Set<(state: string) => void>(),
-    focus: vi.fn(),
-    announce: vi.fn(),
-    settings: vi.fn(),
-    imageLoads: [] as (() => void)[],
-  }
-})
-vi.mock('@/src/lib/mobile-auth', () => ({
-  mobileApplicationUserId: () => boundary.member,
-  subscribeMobileApplicationUser: (listener: () => void) => {
-    boundary.subscribers.add(listener)
-    return () => boundary.subscribers.delete(listener)
-  },
-}))
-vi.mock('@/src/lib/share-cards', () => ({ prepareShareCardFromMobile: boundary.prepare }))
-vi.mock('@/src/lib/share-card-save', () => ({
-  nativeShareCardSaveAvailable: () => boundary.available,
-  shareCardSavePermission: boundary.permission,
-  saveShareCard: boundary.save,
-}))
-vi.mock('@/src/lib/accessibility-focus', () => ({
-  safeFindNodeHandle: (node: HTMLElement | null) =>
-    ({
-      'share-card-title': 41,
-      'share-card-save': 42,
-      'share-card-retry': 43,
-      'share-card-refresh': 43,
-      'share-card-settings': 43,
-      'share-card-cancel': 44,
-    })[node?.getAttribute('data-testid') ?? ''] ?? 41,
-}))
-vi.mock('../modules/accessibility-focus', () => ({
-  focusAccessibilityElement: (tag: number) => {
-    boundary.focus(tag)
-    return Promise.resolve(true)
-  },
-}))
-vi.mock('./edge-to-edge-modal', () => ({
-  useModalInsets: () => ({ top: 10, bottom: 10, left: 0, right: 0 }),
-  EdgeToEdgeModal: ({
-    visible,
-    children,
-    onShow,
-    onDismiss,
-  }: {
-    visible: boolean
-    children: React.ReactNode
-    onShow?: () => void
-    onDismiss?: () => void
-  }) => {
-    useEffect(() => {
-      if (visible) onShow?.()
-      return () => {
-        if (visible) onDismiss?.()
-      }
-    }, [visible])
-    return visible ? createElement('div', { role: 'dialog' }, children) : null
-  },
-}))
-vi.mock('react-native', async (original) => {
-  const actual = await original<typeof ReactNativeModule>()
-  return {
-    ...actual,
-    Platform: { ...actual.Platform, OS: 'ios' },
-    Image: ({
-      testID,
-      accessibilityLabel,
-      onLoad,
-      onError,
-    }: {
-      testID: string
-      accessibilityLabel: string
-      onLoad: () => void
-      onError: () => void
-    }) => {
-      boundary.imageLoads.push(onLoad)
-      return createElement('img', {
-        'data-testid': testID,
-        alt: accessibilityLabel,
-        onLoad,
-        onError,
-      })
-    },
-    AccessibilityInfo: {
-      ...actual.AccessibilityInfo,
-      setAccessibilityFocus: boundary.focus,
-      announceForAccessibilityWithOptions: boundary.announce,
-    },
-    Linking: { ...actual.Linking, openSettings: boundary.settings },
-    AppState: {
-      ...actual.AppState,
-      addEventListener: (_event: string, listener: (state: string) => void) => {
-        boundary.appState.add(listener)
-        return { remove: () => boundary.appState.delete(listener) }
-      },
-    },
-  }
-})
+// Every mock below reads the shared boundary in share-card-composer.test-boundary.ts.
+vi.mock('@/src/lib/mobile-auth', async () => (await loadMocks()).mobileAuth())
+vi.mock('@/src/lib/share-cards', async () => (await loadMocks()).shareCards())
+// Story 6.9: the real share flow runs against a mocked file system, digest and module.
+vi.mock('@/src/lib/share-card-share', () =>
+  vi.importActual('../src/lib/share-card-share.native')
+)
+vi.mock('../modules/share-card-native-share', async () =>
+  (await loadMocks()).nativeShare()
+)
+vi.mock('@/src/analytics/mobile-analytics', async () => (await loadMocks()).analytics())
+vi.mock('expo-file-system/legacy', async () => (await loadMocks()).fileSystem())
+vi.mock('expo-crypto', async () => (await loadMocks()).crypto())
+vi.mock('@/src/lib/share-card-save', async () => (await loadMocks()).save())
+vi.mock('@/src/lib/accessibility-focus', async () =>
+  (await loadMocks()).accessibilityFocusHandles()
+)
+vi.mock('../modules/accessibility-focus', async () =>
+  (await loadMocks()).accessibilityFocusModule()
+)
+vi.mock('./edge-to-edge-modal', async () => (await loadMocks()).modal())
+vi.mock('react-native', async (original) =>
+  (await loadMocks()).reactNative(await original<typeof ReactNativeModule>())
+)
 import { Platform } from 'react-native'
-import { ShareCardComposer } from './share-card-composer'
 import {
   commitShareCardSave,
   nativeShareCardSavePending,
   liveShareCardFiles,
 } from '@/src/lib/share-card-save-operations'
-const source = { kind: 'outfit', recommendationId: 'owned-outfit' } as const
-// The save manager's pending guard is process-wide, so a test that fails while a native
-// save is held would make every later save in this file fail with finishingSave.
-const unsettled = new Set<() => void>()
-function deferred<T>() {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((yes) => {
-    resolve = yes
-  })
-  unsettled.add(() => resolve(undefined as T))
-  return { promise, resolve }
-}
-function Harness({ restore = vi.fn() }: { restore?: () => void }) {
-  const [open, setOpen] = useState(true)
-  return (
-    <>
-      <button onClick={() => setOpen(true)}>Reopen</button>
-      <ShareCardComposer
-        source={source}
-        open={open}
-        onClose={() => setOpen(false)}
-        onRestoreFocus={restore}
-      />
-    </>
-  )
-}
-async function ready() {
-  const image = await screen.findByTestId('share-card-preview')
-  fireEvent.load(image)
-  await waitFor(() =>
-    expect(screen.getByTestId('share-card-save')).not.toHaveAttribute(
-      'aria-disabled',
-      'true'
-    )
-  )
-  return image
-}
-function changeIdentity(member: string | null) {
-  act(() => {
-    boundary.member = member
-    boundary.subscribers.forEach((listener) => listener())
-  })
-}
-beforeEach(async () => {
-  await initI18n()
-  await i18n.changeLanguage('en-US')
-  boundary.member = 'member-a'
-  boundary.available = true
-  boundary.prepare.mockReset().mockResolvedValue(card)
-  boundary.permission.mockReset().mockResolvedValue({ granted: true, canAskAgain: true })
-  boundary.save.mockReset().mockResolvedValue(undefined)
-  boundary.focus.mockClear()
-  boundary.announce.mockClear()
-  boundary.settings.mockClear()
-  boundary.imageLoads.length = 0
-})
-afterEach(async () => {
-  cleanup()
-  await act(async () => {
-    unsettled.forEach((settle) => settle())
-    unsettled.clear()
-    await Promise.resolve()
-  })
-  await waitFor(() => expect(nativeShareCardSavePending()).toBe(false))
-  expect(liveShareCardFiles().size).toBe(0)
-})
+import {
+  boundary,
+  changeIdentity,
+  deferred,
+  Harness,
+  installComposerHooks,
+  ready,
+} from './share-card-composer.test-support'
+
+installComposerHooks()
 describe('share-card composer lifecycle', () => {
   it('simulates iOS for Expo packages as well as react-native', () => {
     // Expo packages read process.env.EXPO_OS when they load; the suite default is 'web'.
@@ -598,14 +469,15 @@ describe('share-card composer lifecycle', () => {
   it.each(
     supportedLocales.flatMap((locale) =>
       // The modal show focuses the title (41); the result then moves focus to Save (42),
-      // the recovery action (43) or Cancel (44). Unavailable moves nothing past the title.
+      // Retry (43), Open Settings (47) or Cancel (44). Unavailable moves nothing past the
+      // title.
       (
         [
           ['saved', true, 42],
           ['storage', false, 43],
           ['offline', false, 43],
           ['permissionDenied', false, 43],
-          ['permissionPermanent', false, 43],
+          ['permissionPermanent', false, 47],
           ['limited', true, 42],
           ['finishingSave', true, 44],
           ['nativeSaveUnavailable', false, null],

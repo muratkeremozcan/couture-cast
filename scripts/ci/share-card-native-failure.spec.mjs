@@ -91,6 +91,33 @@ describe('native flow failure classifier', () => {
     }
   })
 
+  test('a harness that killed Maestro names the closed reason, whatever the partial log says', async () => {
+    const { summarizeNativeFlowFailure, assertNativeFlowFailure } = await helper()
+    const flow = 'maestro/story68/rapid-watermark-held.yaml'
+    // The hold deadline kill leaves no Maestro failure text: before this, the record read unknown.
+    for (const [harnessStop, log, classification] of [
+      ['rapid_watermark_hold_deadline', '', 'holddeadline'],
+      ['rapid_watermark_hold_deadline', 'Assertion is false', 'holddeadline'],
+      ['rapid_watermark_lock_timeout', personal, 'harnessstop'],
+      [null, '', 'unknown'],
+    ]) {
+      const record = summarizeNativeFlowFailure({ ...input, flow, log, harnessStop })
+      assert.deepEqual(record, {
+        flow: 'rapid-watermark-held.yaml',
+        classification,
+        durationMs: 1234,
+        platform: 'android',
+      })
+      assertNativeFlowFailure(record)
+    }
+    for (const harnessStop of [{ personal }, 12]) {
+      assert.throws(
+        () => summarizeNativeFlowFailure({ ...input, flow, log: '', harnessStop }),
+        { message: 'invalid_native_flow_failure' }
+      )
+    }
+  })
+
   test('accepts repository rapid flow and rejects spoofed paths and invalid input without echoing it', async () => {
     const { summarizeNativeFlowFailure } = await helper()
     assert.equal(
@@ -355,12 +382,77 @@ describe('native public evidence', () => {
     assert.deepEqual(fs.readdirSync(path.join(directory, 'public-evidence')), [])
   })
 
+  test('a passed rapid proof must show both hold clocks inside their limits', (t) => {
+    const passed = {
+      platform: 'ios',
+      passed: true,
+      heldMs: 9000,
+      longestLiveRequestMs: 3000,
+      blockedSourceObserved: true,
+      requests: 3,
+      unavailableResponses: 0,
+      freshAppRuntime: true,
+      readyOpenerBeforeLock: true,
+    }
+    for (const change of [
+      { longestLiveRequestMs: undefined },
+      { longestLiveRequestMs: 12000 },
+      { longestLiveRequestMs: -1 },
+      { heldMs: 30000 },
+    ]) {
+      const { write, run } = evidenceFixture(t)
+      write('native-rapid-watermark-ios.json', { ...passed, ...change })
+      const result = run()
+      assert.notEqual(result.status, 0)
+      assert.match(result.stderr, /invalid_native_proof_summary/)
+    }
+  })
+
+  test('a failed rapid proof publishes its closed stage, and a killed runner may lack a code', (t) => {
+    const { directory, write, run } = evidenceFixture(t)
+    write('native-rapid-watermark-ios.json', {
+      platform: 'ios',
+      passed: false,
+      stage: 'held_flow',
+    })
+    assert.equal(run().status, 0)
+    assert.deepEqual(
+      JSON.parse(
+        fs.readFileSync(
+          path.join(directory, 'public-evidence', 'native-rapid-watermark-ios.json')
+        )
+      ),
+      { platform: 'ios', passed: false, stage: 'held_flow' }
+    )
+  })
+
+  test('a failed rapid proof with an open stage or code fails closed without echoing it', (t) => {
+    for (const record of [
+      { stage: 'held_flow', code: personal },
+      { stage: personal, code: 'rapid_watermark_hold_deadline' },
+      { code: 'rapid_watermark_hold_deadline' },
+    ]) {
+      const { directory, write, run } = evidenceFixture(t)
+      write('native-rapid-watermark-ios.json', {
+        platform: 'ios',
+        passed: false,
+        ...record,
+      })
+      const result = run()
+      assert.notEqual(result.status, 0)
+      assert.match(result.stderr, /invalid_native_proof_summary/)
+      assert.equal(result.stderr.includes('Avery'), false)
+      assert.deepEqual(fs.readdirSync(path.join(directory, 'public-evidence')), [])
+    }
+  })
+
   test('public evidence includes closed rapid and fallback proof summaries', (t) => {
     const { directory, write, run } = evidenceFixture(t)
     write('native-rapid-watermark-ios.json', {
       platform: 'ios',
       passed: true,
-      heldMs: 6972.05,
+      heldMs: 16972.05,
+      longestLiveRequestMs: 3108,
       blockedSourceObserved: true,
       requests: 3,
       unavailableResponses: 0,
@@ -391,7 +483,9 @@ describe('native public evidence', () => {
     write('native-rapid-watermark-android.json', {
       platform: 'android',
       passed: false,
-      code: personal,
+      stage: 'held_flow',
+      code: 'rapid_watermark_hold_deadline',
+      privateLog: personal,
     })
     assert.equal(run().status, 0)
     const read = (name) =>
@@ -399,7 +493,8 @@ describe('native public evidence', () => {
     assert.deepEqual(read('native-rapid-watermark-ios.json'), {
       platform: 'ios',
       passed: true,
-      heldMs: 6972.05,
+      heldMs: 16972.05,
+      longestLiveRequestMs: 3108,
       blockedSourceObserved: true,
       requests: 3,
       unavailableResponses: 0,
@@ -409,6 +504,8 @@ describe('native public evidence', () => {
     assert.deepEqual(read('native-rapid-watermark-android.json'), {
       platform: 'android',
       passed: false,
+      stage: 'held_flow',
+      code: 'rapid_watermark_hold_deadline',
     })
     assert.deepEqual(read('native-fallback-focus-ios.json'), {
       platform: 'ios',

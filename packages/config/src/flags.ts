@@ -127,6 +127,17 @@ const FEATURE_FLAG_DEFINITIONS = {
     kind: 'boolean',
     defaultValue: false,
   },
+  // Story 6.9: the kill switch for handing a share card to the OS share sheet
+  // (and the Web Share API). Same defaults-false reasoning as every flag above:
+  // a degraded PostHog can never switch native sharing ON by accident, and the
+  // `true` lives only in packages/db/prisma/seeds/feature-flags.ts. Scope: it
+  // gates `purpose:'share'` prepares (403, no audit row, when off) and the
+  // per-member GET /api/v1/share-cards/capabilities answer. Preview and save
+  // never read it, so 6.8 export keeps working with the flag off.
+  share_card_native_share_enabled: {
+    kind: 'boolean',
+    defaultValue: false,
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<FeatureFlagStoredValue>>
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAG_DEFINITIONS

@@ -34,10 +34,14 @@ const options = {
 export const shareCardDigestSchema = z.string().regex(/^[a-f0-9]{64}$/)
 export const prepareShareCardInputSchema = z.discriminatedUnion('purpose', [
   z.object({ ...options, purpose: z.literal('preview') }).strict(),
+  // Story 6.9 D3: `share` reauthorizes the previewed bytes for the OS share sheet
+  // with the same shape as `save`, so both stay one variant: a separate variant
+  // would widen the published request union. The server answers a share with 403
+  // and no audit row when the per-member `share_card_native_share_enabled` flag is off.
   z
     .object({
       ...options,
-      purpose: z.literal('save'),
+      purpose: z.enum(['save', 'share']),
       expectedSha256: shareCardDigestSchema,
     })
     .strict(),
@@ -65,13 +69,21 @@ export const preparedShareCardSchema = z
 export const prepareShareCardResponseSchema = z
   .object({ data: preparedShareCardSchema })
   .strict()
+// Story 6.9 D4: a dedicated capabilities read. Preview and save responses stay
+// strict and unchanged, so a deployed 6.8 client never sees a new field.
+export const shareCardCapabilitiesSchema = z.object({ nativeShare: z.boolean() }).strict()
+export const shareCardCapabilitiesResponseSchema = z
+  .object({ data: shareCardCapabilitiesSchema })
+  .strict()
 export type ShareCardSource = z.infer<typeof shareCardSourceSchema>
 export type PrepareShareCardInput = z.infer<typeof prepareShareCardInputSchema>
 export type PreparedShareCard = z.infer<typeof preparedShareCardSchema>
+export type ShareCardCapabilities = z.infer<typeof shareCardCapabilitiesSchema>
 
 export function registerShareCardsContracts(registry: OpenAPIRegistry) {
   registry.register('PrepareShareCardInput', prepareShareCardInputSchema)
   registry.register('PrepareShareCardResponse', prepareShareCardResponseSchema)
+  registry.register('ShareCardCapabilitiesResponse', shareCardCapabilitiesResponseSchema)
   registry.registerPath({
     method: 'post',
     path: '/api/v1/share-cards/prepare',
@@ -87,15 +99,33 @@ export function registerShareCardsContracts(registry: OpenAPIRegistry) {
     },
     responses: {
       200: {
-        description: 'Exact preview bytes or fresh save authorization',
+        description: 'Exact preview bytes or fresh save or share authorization',
         content: { 'application/json': { schema: prepareShareCardResponseSchema } },
       },
       400: { description: 'Invalid request' },
       401: { description: 'Authentication required' },
-      403: { description: 'Access denied' },
+      403: {
+        description:
+          'share_disabled: native share is off for this member (share purpose only), or access denied',
+      },
       404: { description: 'source_unavailable' },
       409: { description: 'preview_changed' },
       503: { description: 'Preparation unavailable' },
+    },
+  })
+  registry.registerPath({
+    method: 'get',
+    path: '/api/v1/share-cards/capabilities',
+    operationId: 'getShareCardCapabilities',
+    tags: ['share-cards'],
+    security: [{ bearerAuth: [] }],
+    summary: "The caller's share-card capabilities (private, no-store)",
+    responses: {
+      200: {
+        description: 'Whether native share is enabled for this member',
+        content: { 'application/json': { schema: shareCardCapabilitiesResponseSchema } },
+      },
+      401: { description: 'Authentication required' },
     },
   })
 }

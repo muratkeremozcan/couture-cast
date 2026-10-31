@@ -7219,6 +7219,32 @@ export interface GetPushRegistrationsResponseData {
 /**
  *
  * @export
+ * @interface GetShareCardCapabilities200Response
+ */
+export interface GetShareCardCapabilities200Response {
+  /**
+   *
+   * @type {GetShareCardCapabilities200ResponseData}
+   * @memberof GetShareCardCapabilities200Response
+   */
+  data: GetShareCardCapabilities200ResponseData
+}
+/**
+ *
+ * @export
+ * @interface GetShareCardCapabilities200ResponseData
+ */
+export interface GetShareCardCapabilities200ResponseData {
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetShareCardCapabilities200ResponseData
+   */
+  nativeShare: boolean
+}
+/**
+ *
+ * @export
  * @interface GuardianConsentInput
  */
 export interface GuardianConsentInput {
@@ -10578,6 +10604,7 @@ export type PrepareShareCardRequestOneOf1LocaleEnum =
  */
 export const PrepareShareCardRequestOneOf1PurposeEnum = {
   save: 'save',
+  share: 'share',
 } as const
 export type PrepareShareCardRequestOneOf1PurposeEnum =
   (typeof PrepareShareCardRequestOneOf1PurposeEnum)[keyof typeof PrepareShareCardRequestOneOf1PurposeEnum]
@@ -12163,6 +12190,32 @@ export interface SetPrimarySavedLocationResponse {
    * @memberof SetPrimarySavedLocationResponse
    */
   data: ListSavedLocationsResponseDataInner
+}
+/**
+ *
+ * @export
+ * @interface ShareCardCapabilitiesResponse
+ */
+export interface ShareCardCapabilitiesResponse {
+  /**
+   *
+   * @type {ShareCardCapabilitiesResponseData}
+   * @memberof ShareCardCapabilitiesResponse
+   */
+  data: ShareCardCapabilitiesResponseData
+}
+/**
+ *
+ * @export
+ * @interface ShareCardCapabilitiesResponseData
+ */
+export interface ShareCardCapabilitiesResponseData {
+  /**
+   *
+   * @type {boolean}
+   * @memberof ShareCardCapabilitiesResponseData
+   */
+  nativeShare: boolean
 }
 /**
  *
