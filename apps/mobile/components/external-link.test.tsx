@@ -8,11 +8,11 @@ const { captureMock, openBrowserAsyncMock, preventDefaultMock } = vi.hoisted(() 
   preventDefaultMock: vi.fn(),
 }))
 
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
     capture: captureMock,
-  }),
-}))
+  })
+)
 
 vi.mock('expo-web-browser', () => ({
   openBrowserAsync: openBrowserAsyncMock,

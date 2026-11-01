@@ -13,13 +13,12 @@ const analyticsMocks = vi.hoisted(() => ({
   announce: vi.fn(),
 }))
 
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
     capture: analyticsMocks.capture,
-    getDistinctId: vi.fn(),
-    screen: vi.fn(),
-  }),
-}))
+    getDistinctId: () => undefined,
+  })
+)
 
 vi.mock('@/src/hooks/use-accessibility-announcer', () => ({
   useAccessibilityAnnouncer: () => ({ announce: analyticsMocks.announce }),

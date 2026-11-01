@@ -26,6 +26,13 @@ const {
   hookGetDistinctIdMock: vi.fn(() => 'hook-user'),
   providerRenderSpy: vi.fn(),
 }))
+const hookPostHog = vi.hoisted(() => ({
+  current: {
+    capture: hookCaptureMock,
+    screen: hookScreenMock,
+    getDistinctId: hookGetDistinctIdMock,
+  },
+}))
 
 vi.mock('../config/posthog', () => ({
   posthogProviderClient: {
@@ -44,11 +51,8 @@ vi.mock('posthog-react-native', () => ({
     providerRenderSpy(props)
     return <>{props.children}</>
   },
-  usePostHog: () => ({
-    capture: hookCaptureMock,
-    screen: hookScreenMock,
-    getDistinctId: hookGetDistinctIdMock,
-  }),
+  // The provider's context hands every render the same PostHog instance.
+  usePostHog: () => hookPostHog.current,
 }))
 
 import {
@@ -134,6 +138,25 @@ describe('mobile analytics facade', () => {
       locale: 'en-US',
     })
     expect(result.current.getDistinctId()).toBe('hook-user')
+  })
+
+  it('keeps one client across renders until the PostHog instance changes', async () => {
+    // Screens list this client in effect dependencies, and test mocks of the hook mirror it
+    // through mobileAnalyticsModuleMock in src/test-utils/mobile-analytics.ts.
+    const initial = hookPostHog.current
+    const { result, rerender } = await renderHook(() => useMobileAnalytics())
+    const firstClient = result.current
+
+    await rerender()
+    expect(result.current).toBe(firstClient)
+
+    hookPostHog.current = { ...initial }
+    try {
+      await rerender()
+      expect(result.current).not.toBe(firstClient)
+    } finally {
+      hookPostHog.current = initial
+    }
   })
 
   it('C-COMP-SHARE-ANALYTICS-DOWN: a provider throw or rejection never reaches the caller', async () => {

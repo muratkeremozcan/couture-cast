@@ -99,3 +99,5 @@ _bmad-output/test-artifacts/story-*/**
 !_bmad-output/test-artifacts/story-6-9/composer-status-*.png
 !_bmad-output/test-artifacts/story-6-9/composer-fit-*.png
 !_bmad-output/test-artifacts/story-6-9/web-stale-*.png
+!_bmad-output/test-artifacts/story-6-9/android-dark-*.png
+!_bmad-output/test-artifacts/story-6-9/android-light-*.png

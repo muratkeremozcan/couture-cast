@@ -6,11 +6,12 @@
     "api/index.ts": {
       "maxDuration": 25,
       "memory": 1024,
-      "includeFiles": "dist/src/modules/share-cards/assets/**"
+      "includeFiles": "{dist/src/modules/share-cards/assets/**,certs/supabase-root-2021-ca.pem}"
     },
     "api/realtime.ts": {
       "maxDuration": 300,
-      "memory": 1024
+      "memory": 1024,
+      "includeFiles": "certs/supabase-root-2021-ca.pem"
     }
   },
   "rewrites": [

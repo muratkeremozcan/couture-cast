@@ -19,22 +19,26 @@ export const OPEN_APP_WORST_CASE_MS =
   FLOW_STARTUP_MS + 4 * (100_000 + 17 * CONDITION_CHECK_MS)
 
 /**
- * expo-go-open.yaml, the iOS Expo Go proof opener, on a fresh simulator and a fresh Expo Go. Three
- * waits run once each, in order: the iOS open prompt (30 s, optional), the Home header that shows
- * once the project has loaded (180 s, named) and the tab bar after the developer-menu sheet is
- * dismissed (30 s, named). A wait that Maestro ran a second time returned in 0.4 s in run
- * 41019906459, so no wait sits in a `retry` or `repeat`. The one `when` check costs 0.3 to 0.6 s
- * when absent (run 41019906459) and up to 7.4 s in run 40992501585, budgeted at 8 s, plus 4 s for
- * each of the two taps (the open prompt and the sheet backdrop).
+ * expo-go-open.yaml, the iOS Expo Go proof opener, on a fresh simulator and a fresh Expo Go. Five
+ * waits run once each, in order: the iOS open prompt (30 s, optional), the prompt leaving after the
+ * Open tap (15 s, optional), the prompt gone after the one guarded second tap (15 s, named), the
+ * Home header that shows once the project has loaded (180 s, named) and the tab bar after the
+ * developer-menu sheet is dismissed (30 s, named). A wait that Maestro ran a second time returned
+ * in 0.4 s in run 41019906459, so no wait sits in a `retry` or `repeat`. Each `when` check costs
+ * 0.3 to 0.6 s when absent (run 41019906459) and up to 7.4 s in run 40992501585, budgeted at 8 s;
+ * there are two, one per open-prompt tap. Each of the three taps (the open prompt, the second tap
+ * on it when the first was lost as in run 41244230213, and the sheet backdrop) is budgeted at 4 s.
  * open-app.yaml, which this replaces for Expo Go, declares 100 s of waits per attempt and was pinned
  * to 120 s on iOS: the Maestro process was killed before it could name a failure.
  */
 export const EXPO_GO_OPEN_FLOW = 'maestro/story68/expo-go-open.yaml'
-export const EXPO_GO_OPEN_WAITS_MS = Object.freeze([30_000, 180_000, 30_000])
+export const EXPO_GO_OPEN_WAITS_MS = Object.freeze([
+  30_000, 15_000, 15_000, 180_000, 30_000,
+])
 export const EXPO_GO_CONDITION_CHECK_MS = 8_000
-export const EXPO_GO_CONDITION_CHECKS = 1
+export const EXPO_GO_CONDITION_CHECKS = 2
 export const EXPO_GO_TAP_MS = 4_000
-export const EXPO_GO_TAPS = 2
+export const EXPO_GO_TAPS = 3
 export const EXPO_GO_OPEN_WORST_CASE_MS =
   FLOW_STARTUP_MS +
   EXPO_GO_OPEN_WAITS_MS.reduce((total, wait) => total + wait, 0) +

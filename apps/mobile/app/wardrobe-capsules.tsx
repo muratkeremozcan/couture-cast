@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native'
 import { Stack } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import type {
   CapsuleOccasion,
@@ -23,6 +24,7 @@ import {
   type MobileCapsuleSaveOptions,
 } from '@/components/wardrobe/capsule-builder-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { createSchemeStyles, useSchemeColors } from '@/components/themed'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
 import {
   capsuleETag,
@@ -58,6 +60,9 @@ const OCCASION_FILTERS: (CapsuleOccasion | 'all')[] = [
  */
 export default function WardrobeCapsulesScreen() {
   const { t } = useTranslation()
+  const colors = useSchemeColors()
+  const themed = useThemedStyles()
+  const insets = useSafeAreaInsets()
   const [accessToken, setAccessToken] = useState('')
   const [ownerUserId, setOwnerUserId] = useState('')
   const [capsules, setCapsules] = useState<OutfitCapsuleContract[]>([])
@@ -240,7 +245,7 @@ export default function WardrobeCapsulesScreen() {
   const hiddenCount = Math.max(0, total - capsules.length)
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, themed.screen]}>
       <Stack.Screen options={{ title: t('wardrobe.capsules.title') }} />
 
       {/* Polite status so success does not interrupt a screen reader mid-sentence. */}
@@ -258,7 +263,8 @@ export default function WardrobeCapsulesScreen() {
           onChangeText={setSearchInput}
           placeholder={t('wardrobe.capsules.searchPlaceholder')}
           accessibilityLabel={t('wardrobe.capsules.searchLabel')}
-          style={styles.searchInput}
+          placeholderTextColor={colors.mutedText}
+          style={[styles.searchInput, themed.field]}
           testID="capsule-search-input"
         />
         <Pressable
@@ -282,16 +288,21 @@ export default function WardrobeCapsulesScreen() {
           }}
           accessibilityRole="button"
           accessibilityLabel={t('wardrobe.capsules.create')}
-          style={styles.primaryButton}
+          style={[styles.primaryButton, themed.primaryButton]}
           testID="create-capsule-button"
         >
-          <Text style={styles.primaryButtonText}>{t('wardrobe.capsules.create')}</Text>
+          <Text style={[styles.primaryButtonText, themed.primaryButtonText]}>
+            {t('wardrobe.capsules.create')}
+          </Text>
         </Pressable>
       </View>
 
+      {/* flexGrow 0: a ScrollView grows by default, and this one stretched every chip down
+          to the bottom of the screen and pushed the empty state under the gesture bar. */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.filterScroller}
         contentContainerStyle={styles.filterRow}
       >
         {OCCASION_FILTERS.map((occasion) => {
@@ -307,10 +318,20 @@ export default function WardrobeCapsulesScreen() {
                   ? t('wardrobe.capsules.filterAll')
                   : t(`wardrobe.capsules.occasions.${occasion}`)
               }
-              style={[styles.filterChip, selected && styles.filterChipSelected]}
+              style={[
+                styles.filterChip,
+                themed.filterChip,
+                selected && themed.filterChipSelected,
+              ]}
               testID={`capsule-occasion-filter-${occasion}`}
             >
-              <Text style={[styles.filterText, selected && styles.filterTextSelected]}>
+              <Text
+                style={[
+                  styles.filterText,
+                  themed.filterText,
+                  selected && themed.filterTextSelected,
+                ]}
+              >
                 {occasion === 'all'
                   ? t('wardrobe.capsules.filterAll')
                   : t(`wardrobe.capsules.occasions.${occasion}`)}
@@ -323,10 +344,20 @@ export default function WardrobeCapsulesScreen() {
           accessibilityRole="checkbox"
           accessibilityState={{ checked: favoriteOnly }}
           accessibilityLabel={t('wardrobe.capsules.filterFavorites')}
-          style={[styles.filterChip, favoriteOnly && styles.filterChipSelected]}
+          style={[
+            styles.filterChip,
+            themed.filterChip,
+            favoriteOnly && themed.filterChipSelected,
+          ]}
           testID="capsule-favorite-filter"
         >
-          <Text style={[styles.filterText, favoriteOnly && styles.filterTextSelected]}>
+          <Text
+            style={[
+              styles.filterText,
+              themed.filterText,
+              favoriteOnly && themed.filterTextSelected,
+            ]}
+          >
             ★ {t('wardrobe.capsules.filterFavorites')}
           </Text>
         </Pressable>
@@ -334,32 +365,42 @@ export default function WardrobeCapsulesScreen() {
 
       {errorMessage && (
         <View
-          style={styles.errorBox}
+          style={[styles.errorBox, themed.errorBox]}
           accessibilityLiveRegion="assertive"
           accessibilityRole="alert"
           testID="capsule-error-banner"
         >
-          <Text style={styles.errorText}>{errorMessage}</Text>
+          <Text style={[styles.errorText, themed.errorText]}>{errorMessage}</Text>
         </View>
       )}
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} testID="capsule-loading-state" />
+        <ActivityIndicator
+          color={colors.text}
+          style={styles.loader}
+          testID="capsule-loading-state"
+        />
       ) : capsules.length === 0 ? (
         <View style={styles.emptyState} testID="capsule-empty-state">
-          <Text style={styles.emptyTitle}>{t('wardrobe.capsules.emptyTitle')}</Text>
-          <Text style={styles.emptyBody}>{t('wardrobe.capsules.emptyBody')}</Text>
+          <Text style={[styles.emptyTitle, themed.text]}>
+            {t('wardrobe.capsules.emptyTitle')}
+          </Text>
+          <Text style={[styles.emptyBody, themed.mutedText]}>
+            {t('wardrobe.capsules.emptyBody')}
+          </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView
+          contentContainerStyle={[styles.list, { paddingBottom: 16 + insets.bottom }]}
+        >
           {capsules.map((capsule) => (
             <View
               key={capsule.id}
-              style={styles.card}
+              style={[styles.card, themed.card]}
               testID={`capsule-card-${capsule.id}`}
             >
               <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{capsule.name}</Text>
+                <Text style={[styles.cardTitle, themed.text]}>{capsule.name}</Text>
                 <Pressable
                   onPress={() => void handleToggleFavorite(capsule)}
                   accessibilityRole="button"
@@ -373,17 +414,19 @@ export default function WardrobeCapsulesScreen() {
               </View>
 
               {capsule.description ? (
-                <Text style={styles.cardBody}>{capsule.description}</Text>
+                <Text style={[styles.cardBody, themed.mutedText]}>
+                  {capsule.description}
+                </Text>
               ) : null}
 
-              <Text style={styles.cardMeta}>
+              <Text style={[styles.cardMeta, themed.mutedText]}>
                 {capsule.garments.length} garments ·{' '}
                 {capsule.availabilityStatus === 'ready' ? 'Ready' : 'Needs repair'}
               </Text>
 
               {capsule.unavailableGarmentCount > 0 && (
                 <Text
-                  style={styles.repairText}
+                  style={[styles.repairText, themed.repairText]}
                   testID={`capsule-unavailable-count-${capsule.id}`}
                 >
                   {capsule.unavailableGarmentCount === 1
@@ -404,10 +447,10 @@ export default function WardrobeCapsulesScreen() {
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={`${t('wardrobe.capsules.edit')}: ${capsule.name}`}
-                  style={styles.secondaryButton}
+                  style={[styles.secondaryButton, themed.secondaryButton]}
                   testID={`edit-capsule-button-${capsule.id}`}
                 >
-                  <Text style={styles.secondaryButtonText}>
+                  <Text style={[styles.secondaryButtonText, themed.text]}>
                     {t('wardrobe.capsules.edit')}
                   </Text>
                 </Pressable>
@@ -415,10 +458,10 @@ export default function WardrobeCapsulesScreen() {
                   onPress={() => confirmDelete(capsule)}
                   accessibilityRole="button"
                   accessibilityLabel={`${t('wardrobe.capsules.delete')}: ${capsule.name}`}
-                  style={styles.destructiveButton}
+                  style={[styles.destructiveButton, themed.destructiveButton]}
                   testID={`delete-capsule-button-${capsule.id}`}
                 >
-                  <Text style={styles.destructiveButtonText}>
+                  <Text style={[styles.destructiveButtonText, themed.errorText]}>
                     {t('wardrobe.capsules.delete')}
                   </Text>
                 </Pressable>
@@ -427,7 +470,10 @@ export default function WardrobeCapsulesScreen() {
           ))}
 
           {hiddenCount > 0 && (
-            <Text style={styles.truncation} testID="capsule-truncation-notice">
+            <Text
+              style={[styles.truncation, themed.mutedText]}
+              testID="capsule-truncation-notice"
+            >
               Showing {capsules.length} of {total}. Refine your search to see the rest.
             </Text>
           )}
@@ -447,11 +493,10 @@ export default function WardrobeCapsulesScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#ffffff', flex: 1 },
+  screen: { flex: 1 },
   visuallyHidden: { height: 0, opacity: 0, width: 0 },
   toolbar: { flexDirection: 'row', gap: 12, padding: 16 },
   searchInput: {
-    borderColor: '#d4d4d8',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -460,18 +505,17 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#18181b',
     borderRadius: 8,
     justifyContent: 'center',
     minHeight: 44,
     minWidth: 88,
     paddingHorizontal: 16,
   },
-  primaryButtonText: { color: '#ffffff', fontWeight: '600' },
+  primaryButtonText: { fontWeight: '600' },
+  filterScroller: { flexGrow: 0 },
   filterRow: { gap: 8, paddingBottom: 8, paddingHorizontal: 16 },
   filterChip: {
     alignItems: 'center',
-    borderColor: '#d4d4d8',
     borderRadius: 999,
     borderWidth: 1,
     justifyContent: 'center',
@@ -479,18 +523,15 @@ const styles = StyleSheet.create({
     minWidth: 44,
     paddingHorizontal: 14,
   },
-  filterChipSelected: { backgroundColor: '#18181b', borderColor: '#18181b' },
-  filterText: { color: '#3f3f46', fontSize: 13, textTransform: 'capitalize' },
-  filterTextSelected: { color: '#ffffff' },
-  errorBox: { backgroundColor: '#fee2e2', margin: 16, padding: 12 },
-  errorText: { color: '#991b1b', fontSize: 13 },
+  filterText: { fontSize: 13, textTransform: 'capitalize' },
+  errorBox: { margin: 16, padding: 12 },
+  errorText: { fontSize: 13 },
   loader: { marginTop: 40 },
   emptyState: { alignItems: 'center', marginTop: 48, paddingHorizontal: 24 },
   emptyTitle: { fontSize: 16, fontWeight: '600' },
-  emptyBody: { color: '#71717a', marginTop: 4, textAlign: 'center' },
+  emptyBody: { marginTop: 4, textAlign: 'center' },
   list: { gap: 12, padding: 16 },
   card: {
-    borderColor: '#e4e4e7',
     borderRadius: 12,
     borderWidth: 1,
     gap: 6,
@@ -502,9 +543,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardTitle: { flex: 1, fontSize: 16, fontWeight: '600' },
-  cardBody: { color: '#52525b', fontSize: 13 },
-  cardMeta: { color: '#71717a', fontSize: 12 },
-  repairText: { color: '#b45309', fontSize: 12 },
+  cardBody: { fontSize: 13 },
+  cardMeta: { fontSize: 12 },
+  repairText: { fontSize: 12 },
   cardActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   iconButton: {
     alignItems: 'center',
@@ -515,7 +556,6 @@ const styles = StyleSheet.create({
   iconText: { color: '#eab308', fontSize: 20 },
   secondaryButton: {
     alignItems: 'center',
-    borderColor: '#d4d4d8',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -523,10 +563,9 @@ const styles = StyleSheet.create({
     minWidth: 44,
     paddingHorizontal: 16,
   },
-  secondaryButtonText: { color: '#3f3f46', fontSize: 13 },
+  secondaryButtonText: { fontSize: 13 },
   destructiveButton: {
     alignItems: 'center',
-    borderColor: '#fecaca',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -534,6 +573,29 @@ const styles = StyleSheet.create({
     minWidth: 44,
     paddingHorizontal: 16,
   },
-  destructiveButtonText: { color: '#dc2626', fontSize: 13 },
-  truncation: { color: '#71717a', fontSize: 12, textAlign: 'center' },
+  destructiveButtonText: { fontSize: 13 },
+  truncation: { fontSize: 12, textAlign: 'center' },
 })
+
+/** The OS light/dark colors for the layout above. */
+const useThemedStyles = createSchemeStyles((colors) => ({
+  screen: { backgroundColor: colors.background },
+  text: { color: colors.text },
+  mutedText: { color: colors.mutedText },
+  field: { borderColor: colors.strongBorder, color: colors.text },
+  primaryButton: { backgroundColor: colors.inverseSurface },
+  primaryButtonText: { color: colors.onInverse },
+  filterChip: { borderColor: colors.strongBorder },
+  filterChipSelected: {
+    backgroundColor: colors.inverseSurface,
+    borderColor: colors.inverseSurface,
+  },
+  filterText: { color: colors.text },
+  filterTextSelected: { color: colors.onInverse },
+  errorBox: { backgroundColor: colors.dangerSurface },
+  errorText: { color: colors.dangerText },
+  card: { backgroundColor: colors.surface, borderColor: colors.border },
+  secondaryButton: { borderColor: colors.strongBorder },
+  destructiveButton: { borderColor: colors.dangerBorder },
+  repairText: { color: colors.noticeText },
+}))

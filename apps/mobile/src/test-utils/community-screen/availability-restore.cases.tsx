@@ -5,6 +5,7 @@
 // R48: and only on Community, when access returns while another tab is on screen.
 import { CommunitySyncState } from '@couture/api-client'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { actStep } from '@/src/test-utils/act-step'
 import { View } from 'react-native'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
@@ -133,7 +134,7 @@ async function typeThroughStaleHide(whileHidden?: () => void) {
   // catch-up still cannot verify access.
   const clock = vi.spyOn(Date, 'now').mockReturnValue(verifiedFrom + 7_800)
   try {
-    await act(() => {
+    await actStep(() => {
       const sync = feed.sync()
       sync.foreground()
       pending = sync.catchUp()
@@ -157,7 +158,7 @@ export function registerCommunityAvailabilityRestoreCases() {
     const release = feed.hold()
     let pending!: Promise<void>
     try {
-      await act(() => {
+      await actStep(() => {
         pending = feed.sync().catchUp()
       })
       await act(() => pending)
@@ -184,7 +185,7 @@ export function registerCommunityAvailabilityRestoreCases() {
     // The last successful authorization is now older than the 8 s bound (D3).
     const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 9000)
     try {
-      await act(() => {
+      await actStep(() => {
         const sync = feed.sync()
         sync.foreground()
         pending = sync.catchUp()

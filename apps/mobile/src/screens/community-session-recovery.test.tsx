@@ -59,14 +59,11 @@ vi.mock('expo-haptics', () => ({ selectionAsync: () => Promise.resolve() }))
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
-    capture: vi.fn(),
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
     getDistinctId: () => 'cold-screen',
-    screen: vi.fn(),
-  }),
-  MobileAnalyticsDiagnosticsPanel: () => null,
-}))
+  })
+)
 vi.mock('@/src/lib/community', { spy: true })
 vi.mock('socket.io-client', () => ({
   io: () => {

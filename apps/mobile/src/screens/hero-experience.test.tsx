@@ -70,16 +70,16 @@ vi.mock('@/src/lib/use-share-card-status-bar', () => ({
   useShareCardStatusBar: () => true,
 }))
 
-const mockCapture = vi.fn()
-const mockGetDistinctId = vi.fn(() => 'test-user-id')
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
+const { mockCapture, mockGetDistinctId } = vi.hoisted(() => ({
+  mockCapture: vi.fn(),
+  mockGetDistinctId: vi.fn(() => 'test-user-id'),
+}))
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
     capture: mockCapture,
     getDistinctId: mockGetDistinctId,
-    screen: vi.fn(),
-  }),
-  MobileAnalyticsDiagnosticsPanel: () => null,
-}))
+  })
+)
 
 describe('Mobile Hero Experience (TabOneScreen)', () => {
   failOnConsoleWarnOrError()

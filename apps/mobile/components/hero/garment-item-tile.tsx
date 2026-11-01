@@ -201,7 +201,7 @@ export function GarmentItemTile({
             { backgroundColor: palette.subtleSurface, borderColor: palette.divider },
           ]}
         >
-          <Text style={styles.swapIcon}>⇄</Text>
+          <Text style={[styles.swapIcon, { color: palette.accentText }]}>⇄</Text>
         </View>
       </View>
     </Pressable>
@@ -278,7 +278,6 @@ const styles = StyleSheet.create({
   },
   swapIcon: {
     fontSize: 14,
-    color: '#8A691F',
     fontWeight: 'bold',
   },
 })

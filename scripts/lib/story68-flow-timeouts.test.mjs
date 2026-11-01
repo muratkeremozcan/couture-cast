@@ -155,7 +155,7 @@ describe('Maestro flow timeouts', () => {
     const waits = [...commands.matchAll(/^\s*timeout:\s*(\d+)\s*$/gm)].map((m) =>
       Number(m[1])
     )
-    // One `when` check guards the open-prompt tap; the second tap is the sheet backdrop.
+    // Two `when` checks guard the open-prompt taps; the third tap is the sheet backdrop.
     const checks = (commands.match(/^\s*when:\s*$/gm) ?? []).length
     const taps = (commands.match(/^\s*- tapOn:/gm) ?? []).length
     assert.deepEqual(waits, [...EXPO_GO_OPEN_WAITS_MS])
@@ -163,8 +163,21 @@ describe('Maestro flow timeouts', () => {
     assert.equal(taps, EXPO_GO_TAPS)
     // A wait Maestro runs again returns at once (run 41019906459), so none may be in a loop.
     assert.doesNotMatch(commands, /^\s*-?\s*(?:retry|repeat):/m)
-    // Only the open prompt may be absent; the project load and the dismissed sheet are named.
-    assert.equal((commands.match(/optional: true/g) ?? []).length, 1)
+    // Only the open prompt, its first leave check and the guarded second tap on it may be
+    // absent; the prompt gone, the project load and the dismissed sheet are named.
+    assert.equal((commands.match(/optional: true/g) ?? []).length, 3)
+    assert.match(commands, /label: 'expo_go_open_prompt_left_up'/)
+    // The second Open tap fires only while the prompt is still up after the first one.
+    const firstTap = commands.indexOf("- tapOn: 'Open'")
+    const leaveCheck = commands.indexOf("notVisible: 'Open in .*'", firstTap)
+    const secondGuard = commands.indexOf("visible: 'Open in .*'", leaveCheck + 1)
+    const secondTap = commands.indexOf("text: 'Open'", secondGuard)
+    const namedLeave = commands.indexOf("label: 'expo_go_open_prompt_left_up'")
+    assert.ok(firstTap > -1 && firstTap < leaveCheck)
+    assert.ok(
+      leaveCheck < secondGuard && secondGuard < secondTap && secondTap < namedLeave
+    )
+    assert.ok(namedLeave < commands.indexOf("label: 'expo_go_project_not_loaded'"))
     assert.match(commands, /label: 'expo_go_project_not_loaded'/)
     assert.match(commands, /label: 'expo_go_developer_menu_left_open'\s*$/)
     // The developer-menu sheet is not in the hierarchy, so nothing may wait on its text.

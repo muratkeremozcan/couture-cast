@@ -203,7 +203,7 @@ export function OutfitRecommendationCard({
               ]}
               testID="badge-details-panel"
             >
-              <Text style={styles.detailsTitle}>
+              <Text style={[styles.detailsTitle, { color: palette.accentText }]}>
                 {t('hero.badge_justification', {
                   label: activeBadgeInfo.label,
                   defaultValue: `${activeBadgeInfo.label} justification:`,
@@ -398,7 +398,6 @@ const styles = StyleSheet.create({
   detailsTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#8A691F',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     marginBottom: 4,

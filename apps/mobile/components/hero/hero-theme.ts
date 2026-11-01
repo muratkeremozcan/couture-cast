@@ -10,18 +10,22 @@ const heroPalettes = {
     subtleSurface: 'rgba(0,0,0,0.02)',
     skeleton: '#E6E6ED',
     danger: '#B42318',
+    accentText: '#8A691F',
   },
   dark: {
     background: '#000000',
     surface: '#111111',
     text: '#FFFFFF',
     mutedText: '#C7C7CC',
-    divider: '#E6E6ED',
+    // The light divider read as a bright rule across every dark band and card outline.
+    divider: '#3A3A3C',
     subtleSurface: 'rgba(255,255,255,0.08)',
     skeleton: '#2C2C2E',
     // The light scheme's #B42318 falls to roughly 4:1 on the dark hero surface,
     // under the WCAG 2.2 AA floor for body text, so the dark scheme lightens it.
     danger: '#FF9A8F',
+    // #8A691F is 3.5:1 on the dark surface; the accent gold itself clears AA there.
+    accentText: '#C9A14A',
   },
 } as const
 

@@ -3,9 +3,14 @@
  * https://docs.expo.io/guides/color-schemes/
  */
 
-import { Text as DefaultText, View as DefaultView, useColorScheme } from 'react-native'
+import {
+  Text as DefaultText,
+  View as DefaultView,
+  StyleSheet,
+  useColorScheme,
+} from 'react-native'
 
-import Colors from '@/constants/colors'
+import Colors, { type SchemeColors } from '@/constants/colors'
 
 type ThemeProps = {
   lightColor?: string
@@ -26,6 +31,25 @@ export function useThemeColor(
     return colorFromProps
   } else {
     return Colors[theme][colorName]
+  }
+}
+
+/** The OS scheme's chrome tokens (`constants/colors.ts`), for styles a themed View or Text cannot carry. */
+export function useSchemeColors() {
+  return Colors[useColorScheme() === 'dark' ? 'dark' : 'light']
+}
+
+/**
+ * A stylesheet per OS scheme, created once at module load: the returned hook hands back the
+ * active scheme's sheet, so a screen keeps its layout in one static sheet and its colors here.
+ */
+export function createSchemeStyles<T extends StyleSheet.NamedStyles<T>>(
+  factory: (colors: SchemeColors) => T
+) {
+  const light = StyleSheet.create(factory(Colors.light))
+  const dark = StyleSheet.create(factory(Colors.dark))
+  return function useSchemeStyles() {
+    return useColorScheme() === 'dark' ? dark : light
   }
 }
 
