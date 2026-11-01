@@ -14,9 +14,11 @@ import {
   Pressable,
   StyleSheet,
   Switch,
-  Text,
   View,
 } from 'react-native'
+// The themed Text follows the OS scheme, so copy without its own color stays legible on the
+// dark screen; a plain react-native Text paints black there.
+import { Text, createSchemeStyles, useSchemeColors } from '@/components/themed'
 import {
   uploadGarmentBytes,
   type SilhouetteMode,
@@ -88,6 +90,7 @@ function SliderRow({
 }: SliderRowProps) {
   const atMin = value <= SLIDER_MIN
   const atMax = value >= SLIDER_MAX
+  const themed = useThemedStyles()
   return (
     <View style={styles.sliderRow} testID={`${testIdPrefix}-row`}>
       <Text style={styles.sliderLabel}>{label}</Text>
@@ -104,10 +107,14 @@ function SliderRow({
           accessibilityState={{ disabled: disabled || atMin }}
           disabled={disabled || atMin}
           testID={`${testIdPrefix}-decrement`}
-          style={[styles.stepperButton, (disabled || atMin) && styles.stepperDisabled]}
+          style={[
+            styles.stepperButton,
+            themed.inverse,
+            (disabled || atMin) && styles.stepperDisabled,
+          ]}
           onPress={onDecrement}
         >
-          <Text style={styles.stepperText}>−</Text>
+          <Text style={[styles.stepperText, themed.onInverse]}>−</Text>
         </Pressable>
         <Text style={styles.sliderValue} testID={`${testIdPrefix}-value`}>
           {value}
@@ -118,10 +125,14 @@ function SliderRow({
           accessibilityState={{ disabled: disabled || atMax }}
           disabled={disabled || atMax}
           testID={`${testIdPrefix}-increment`}
-          style={[styles.stepperButton, (disabled || atMax) && styles.stepperDisabled]}
+          style={[
+            styles.stepperButton,
+            themed.inverse,
+            (disabled || atMax) && styles.stepperDisabled,
+          ]}
           onPress={onIncrement}
         >
-          <Text style={styles.stepperText}>+</Text>
+          <Text style={[styles.stepperText, themed.onInverse]}>+</Text>
         </Pressable>
       </View>
     </View>
@@ -136,6 +147,8 @@ export function SilhouetteEditor({
 }: SilhouetteEditorProps) {
   const { t } = useTranslation()
   const { announce } = useAccessibilityAnnouncer()
+  const colors = useSchemeColors()
+  const themed = useThemedStyles()
 
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -490,7 +503,10 @@ export function SilhouetteEditor({
   if (isLoading) {
     return (
       <View testID="silhouette-editor-loading" style={styles.container}>
-        <ActivityIndicator accessibilityLabel={t('wardrobe.silhouette.title')} />
+        <ActivityIndicator
+          color={colors.text}
+          accessibilityLabel={t('wardrobe.silhouette.title')}
+        />
       </View>
     )
   }
@@ -498,16 +514,16 @@ export function SilhouetteEditor({
   if (loadError) {
     return (
       <View testID="silhouette-editor-error" style={styles.container}>
-        <View accessibilityRole="alert" style={styles.errorBox}>
-          <Text>{loadError}</Text>
+        <View accessibilityRole="alert" style={[styles.errorBox, themed.errorBox]}>
+          <Text style={themed.errorText}>{loadError}</Text>
         </View>
         <Pressable
           accessibilityRole="button"
           testID="silhouette-load-retry"
-          style={styles.primaryButton}
+          style={[styles.primaryButton, themed.inverse]}
           onPress={() => void load()}
         >
-          <Text style={styles.primaryButtonText}>
+          <Text style={[styles.primaryButtonText, themed.onInverse]}>
             {t('common.retry', { defaultValue: 'Retry' })}
           </Text>
         </Pressable>
@@ -521,24 +537,40 @@ export function SilhouetteEditor({
 
   return (
     <View testID="silhouette-editor" style={styles.container}>
+      {/* The selected tab is filled; both tabs looked identical before. */}
       <View accessibilityRole="tablist" style={styles.tabRow}>
         <Pressable
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'default_mannequin' }}
           testID="silhouette-tab-default"
-          style={styles.tabButton}
+          style={[
+            styles.tabButton,
+            activeTab === 'default_mannequin' ? themed.inverse : themed.tab,
+          ]}
           onPress={() => setActiveTab('default_mannequin')}
         >
-          <Text style={styles.tabText}>{t('wardrobe.silhouette.mode_default')}</Text>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'default_mannequin' && themed.onInverse,
+            ]}
+          >
+            {t('wardrobe.silhouette.mode_default')}
+          </Text>
         </Pressable>
         <Pressable
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'my_form' }}
           testID="silhouette-tab-my-form"
-          style={styles.tabButton}
+          style={[
+            styles.tabButton,
+            activeTab === 'my_form' ? themed.inverse : themed.tab,
+          ]}
           onPress={() => setActiveTab('my_form')}
         >
-          <Text style={styles.tabText}>{t('wardrobe.silhouette.mode_my_form')}</Text>
+          <Text style={[styles.tabText, activeTab === 'my_form' && themed.onInverse]}>
+            {t('wardrobe.silhouette.mode_my_form')}
+          </Text>
         </Pressable>
       </View>
 
@@ -561,8 +593,8 @@ export function SilhouetteEditor({
             testIdPrefix="silhouette-build"
           />
           {sliderError ? (
-            <View accessibilityRole="alert" style={styles.errorBox}>
-              <Text>{sliderError}</Text>
+            <View accessibilityRole="alert" style={[styles.errorBox, themed.errorBox]}>
+              <Text style={themed.errorText}>{sliderError}</Text>
               <Pressable
                 accessibilityRole="button"
                 testID="silhouette-slider-retry"
@@ -570,7 +602,7 @@ export function SilhouetteEditor({
                   void saveSliders(heightSlider, buildSlider, lastChangedFieldRef.current)
                 }
               >
-                <Text style={styles.link}>
+                <Text style={[styles.link, themed.link]}>
                   {t('common.retry', { defaultValue: 'Retry' })}
                 </Text>
               </Pressable>
@@ -593,8 +625,8 @@ export function SilhouetteEditor({
           </View>
 
           {myFormError ? (
-            <View accessibilityRole="alert" style={styles.errorBox}>
-              <Text>{myFormError}</Text>
+            <View accessibilityRole="alert" style={[styles.errorBox, themed.errorBox]}>
+              <Text style={themed.errorText}>{myFormError}</Text>
             </View>
           ) : null}
 
@@ -607,11 +639,12 @@ export function SilhouetteEditor({
                 testID="silhouette-my-form-camera"
                 style={[
                   styles.primaryButton,
+                  themed.inverse,
                   !guidanceConfirmed && styles.stepperDisabled,
                 ]}
                 onPress={() => void openMyFormCamera()}
               >
-                <Text style={styles.primaryButtonText}>
+                <Text style={[styles.primaryButtonText, themed.onInverse]}>
                   {t('wardrobe.capture.camera')}
                 </Text>
               </Pressable>
@@ -622,11 +655,12 @@ export function SilhouetteEditor({
                 testID="silhouette-my-form-library"
                 style={[
                   styles.primaryButton,
+                  themed.inverse,
                   !guidanceConfirmed && styles.stepperDisabled,
                 ]}
                 onPress={() => void openMyFormLibrary()}
               >
-                <Text style={styles.primaryButtonText}>
+                <Text style={[styles.primaryButtonText, themed.onInverse]}>
                   {t('wardrobe.silhouette.my_form_upload')}
                 </Text>
               </Pressable>
@@ -639,6 +673,7 @@ export function SilhouetteEditor({
                   testID="silhouette-my-form-fixture-source"
                   style={[
                     styles.secondaryButton,
+                    themed.outline,
                     !guidanceConfirmed && styles.stepperDisabled,
                   ]}
                   onPress={() => void selectMyFormFixture()}
@@ -653,23 +688,25 @@ export function SilhouetteEditor({
 
           {myFormPhase === 'uploading' || myFormPhase === 'processing' ? (
             <View style={styles.uploadState} testID="silhouette-my-form-processing">
-              <ActivityIndicator />
+              <ActivityIndicator color={colors.text} />
               <Text>{t('wardrobe.silhouette.processing')}</Text>
             </View>
           ) : null}
 
           {myFormPhase === 'failed' ? (
             <View testID="silhouette-my-form-failed">
-              <View accessibilityRole="alert" style={styles.errorBox}>
-                <Text>{myFormErrorKey ? t(myFormErrorKey) : myFormError}</Text>
+              <View accessibilityRole="alert" style={[styles.errorBox, themed.errorBox]}>
+                <Text style={themed.errorText}>
+                  {myFormErrorKey ? t(myFormErrorKey) : myFormError}
+                </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
                 testID="silhouette-my-form-retry"
-                style={styles.primaryButton}
+                style={[styles.primaryButton, themed.inverse]}
                 onPress={retryMyForm}
               >
-                <Text style={styles.primaryButtonText}>
+                <Text style={[styles.primaryButtonText, themed.onInverse]}>
                   {t('wardrobe.silhouette.my_form_retry')}
                 </Text>
               </Pressable>
@@ -690,7 +727,7 @@ export function SilhouetteEditor({
               <Pressable
                 accessibilityRole="button"
                 testID="silhouette-my-form-remove"
-                style={styles.secondaryButton}
+                style={[styles.secondaryButton, themed.outline]}
                 onPress={() => void removeMyForm()}
               >
                 <Text style={styles.secondaryButtonText}>
@@ -707,8 +744,8 @@ export function SilhouetteEditor({
 
 const styles = StyleSheet.create({
   container: { gap: 16 },
-  errorBox: { borderRadius: 12, backgroundColor: '#FEE2E2', padding: 12, gap: 8 },
-  link: { color: '#8A5A00', fontWeight: '700', paddingVertical: 8 },
+  errorBox: { borderRadius: 12, padding: 12, gap: 8 },
+  link: { fontWeight: '700', paddingVertical: 8 },
   tabRow: { flexDirection: 'row', gap: 8 },
   tabButton: {
     flex: 1,
@@ -716,7 +753,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
-    backgroundColor: '#E4E4E7',
   },
   tabText: { fontWeight: '700' },
   sliderRow: { gap: 8, marginBottom: 12 },
@@ -728,10 +764,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
-    backgroundColor: '#111111',
   },
   stepperDisabled: { opacity: 0.4 },
-  stepperText: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
+  stepperText: { fontSize: 20, fontWeight: '700' },
   sliderValue: { minWidth: 36, textAlign: 'center', fontVariant: ['tabular-nums'] },
   guidanceText: { marginBottom: 8 },
   confirmRow: {
@@ -747,20 +782,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    backgroundColor: '#111111',
     paddingHorizontal: 18,
     paddingVertical: 12,
   },
-  primaryButtonText: { color: '#FFFFFF', fontWeight: '700' },
+  primaryButtonText: { fontWeight: '700' },
   secondaryButton: {
     minHeight: 44,
     alignItems: 'center',
-    borderColor: '#d4d4d8',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
     paddingHorizontal: 12,
   },
-  secondaryButtonText: { color: '#3f3f46', fontWeight: '600' },
+  secondaryButtonText: { fontWeight: '600' },
   myFormImage: { width: '100%', aspectRatio: 0.75, borderRadius: 16, marginVertical: 12 },
 })
+
+/** The OS light/dark colors for the layout above. */
+const useThemedStyles = createSchemeStyles((colors) => ({
+  errorBox: { backgroundColor: colors.dangerSurface },
+  errorText: { color: colors.dangerText },
+  link: { color: colors.noticeText },
+  tab: { backgroundColor: colors.border },
+  inverse: { backgroundColor: colors.inverseSurface },
+  onInverse: { color: colors.onInverse },
+  outline: { borderColor: colors.strongBorder },
+}))

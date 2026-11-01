@@ -13,7 +13,7 @@ import {
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
 
-import { Text, View } from '@/components/themed'
+import { Text, View, createSchemeStyles } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import {
   MobileAnalyticsDiagnosticsPanel,
@@ -140,6 +140,7 @@ function useMemberSignedIn(): boolean | null {
 }
 
 export default function SettingsScreen() {
+  const tone = useSettingsTone()
   const analytics = useMobileAnalytics()
   const { announce } = useAccessibilityAnnouncer()
   const { t, i18n } = useTranslation()
@@ -403,6 +404,7 @@ export default function SettingsScreen() {
                     key={locale.code}
                     style={[
                       styles.localeButton,
+                      tone.localeButton,
                       isSelected && styles.selectedLocaleButton,
                     ]}
                     disabled={isChangingLocale || isSelected}
@@ -417,7 +419,14 @@ export default function SettingsScreen() {
                     }}
                   >
                     <Text
-                      style={[styles.localeText, isSelected && styles.selectedLocaleText]}
+                      style={[
+                        styles.localeText,
+                        tone.localeText,
+                        isSelected && [
+                          styles.selectedLocaleText,
+                          tone.selectedLocaleText,
+                        ],
+                      ]}
                     >
                       {t(`settings.languages.${locale.code}`, {
                         defaultValue: locale.label,
@@ -431,7 +440,7 @@ export default function SettingsScreen() {
 
           {localeError ? (
             <Text
-              style={styles.errorText}
+              style={[styles.errorText, tone.errorText]}
               accessibilityRole="alert"
               accessibilityLiveRegion="assertive"
             >
@@ -445,11 +454,17 @@ export default function SettingsScreen() {
               always be able to read and set their own preference. */}
           <View style={styles.settingsSection} testID="commerce-settings-section">
             <Text style={styles.sectionTitle}>{t('commerce.settings.sectionTitle')}</Text>
-            <Text style={styles.disclosureText} testID="commerce-settings-disclosure">
+            <Text
+              style={[styles.disclosureText, tone.disclosureText]}
+              testID="commerce-settings-disclosure"
+            >
               {t('commerce.settings.disclosure')}
             </Text>
             {signedIn === false ? (
-              <Text style={styles.helpText} testID="commerce-settings-signed-out">
+              <Text
+                style={[styles.helpText, tone.helpText]}
+                testID="commerce-settings-signed-out"
+              >
                 {t('commerce.settings.signedOutHint')}
               </Text>
             ) : (
@@ -457,6 +472,7 @@ export default function SettingsScreen() {
                 <Pressable
                   style={[
                     styles.commerceToggle,
+                    tone.commerceToggle,
                     affiliateCtasEnabled ? styles.commerceToggleOn : null,
                   ]}
                   disabled={affiliateCtasEnabled === null}
@@ -481,10 +497,12 @@ export default function SettingsScreen() {
                     {t('commerce.settings.optOutLabel')}
                   </Text>
                 </Pressable>
-                <Text style={styles.helpText}>{t('commerce.settings.optOutHelp')}</Text>
+                <Text style={[styles.helpText, tone.helpText]}>
+                  {t('commerce.settings.optOutHelp')}
+                </Text>
                 {commerceStatus ? (
                   <Text
-                    style={styles.statusText}
+                    style={[styles.statusText, tone.statusText]}
                     testID="commerce-settings-status"
                     accessibilityLiveRegion="polite"
                   >
@@ -493,7 +511,7 @@ export default function SettingsScreen() {
                 ) : null}
                 {commerceError ? (
                   <Text
-                    style={styles.errorText}
+                    style={[styles.errorText, tone.errorText]}
                     testID="commerce-settings-error"
                     accessibilityRole="alert"
                     accessibilityLiveRegion="assertive"
@@ -573,6 +591,7 @@ function isPremiumFlowBusy(premiumFlow: PremiumFlowState): boolean {
  * decides whether any subscribe control exists at all.
  */
 function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
+  const tone = useSettingsTone()
   const analytics = useMobileAnalytics()
   const { t, i18n } = useTranslation()
   const [subscription, setSubscription] = useState<Subscription | null>(null)
@@ -757,7 +776,10 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
   return (
     <View style={styles.settingsSection} testID="premium-settings-section">
       <Text style={styles.sectionTitle}>{t('commerce.premium.sectionTitle')}</Text>
-      <Text style={styles.disclosureText} testID="premium-settings-disclosure">
+      <Text
+        style={[styles.disclosureText, tone.disclosureText]}
+        testID="premium-settings-disclosure"
+      >
         {t('commerce.premium.disclosure')}
       </Text>
       {signedIn === false ? (
@@ -767,7 +789,7 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
       ) : null}
       {signedIn === true && renderState.kind === 'load-error' ? (
         <Text
-          style={styles.errorText}
+          style={[styles.errorText, tone.errorText]}
           testID="premium-load-error"
           accessibilityRole="alert"
           accessibilityLiveRegion="assertive"
@@ -784,7 +806,7 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
         <>
           {renderState.showGraceBanner ? (
             <Text
-              style={styles.premiumGraceBanner}
+              style={[styles.premiumGraceBanner, tone.premiumGraceBanner]}
               testID="premium-grace-banner"
               accessibilityLiveRegion="polite"
             >
@@ -804,7 +826,10 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
             </Pressable>
           ) : null}
           {renderState.manageEntry === 'web' ? (
-            <Text style={styles.helpText} testID="premium-manage-web-hint">
+            <Text
+              style={[styles.helpText, tone.helpText]}
+              testID="premium-manage-web-hint"
+            >
               {t('commerce.premium.manageInStore')}
             </Text>
           ) : null}
@@ -813,12 +838,12 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
       {renderState.kind === 'subscribe' ? (
         <>
           {renderState.ended ? (
-            <Text style={styles.helpText} testID="premium-ended-note">
+            <Text style={[styles.helpText, tone.helpText]} testID="premium-ended-note">
               {t('commerce.premium.endedNote')}
             </Text>
           ) : null}
           {renderState.purchasesEnabled && purchasesAvailability === 'unavailable' ? (
-            <Text style={styles.helpText} testID="premium-unavailable">
+            <Text style={[styles.helpText, tone.helpText]} testID="premium-unavailable">
               {t('commerce.premium.unavailableInBuild')}
             </Text>
           ) : null}
@@ -861,6 +886,7 @@ function PremiumSubscribeControls({
   onPurchase: (plan: SubscriptionPlan) => void
   onRestore: () => void
 }) {
+  const tone = useSettingsTone()
   const { t } = useTranslation()
   const plans = [
     { plan: 'premium_monthly' as const, labelKey: 'commerce.premium.planMonthly' },
@@ -878,7 +904,9 @@ function PremiumSubscribeControls({
         CTA"; AC 1 lists restore as its own entry point.
       */}
       {purchasesEnabled ? (
-        <Text style={styles.helpText}>{t('commerce.premium.subscribe')}</Text>
+        <Text style={[styles.helpText, tone.helpText]}>
+          {t('commerce.premium.subscribe')}
+        </Text>
       ) : null}
       {(purchasesEnabled ? plans : []).map(({ plan, labelKey }) => (
         <Pressable
@@ -918,13 +946,14 @@ function PremiumSubscribeControls({
  * (Decision 11) while the informational states announce politely.
  */
 function PremiumFlowMessages({ premiumFlow }: { premiumFlow: PremiumFlowState }) {
+  const tone = useSettingsTone()
   const { t } = useTranslation()
 
   return (
     <>
       {premiumFlow === 'activating' ? (
         <Text
-          style={styles.statusText}
+          style={[styles.statusText, tone.statusText]}
           testID="premium-activating"
           accessibilityLiveRegion="polite"
         >
@@ -933,7 +962,7 @@ function PremiumFlowMessages({ premiumFlow }: { premiumFlow: PremiumFlowState })
       ) : null}
       {premiumFlow === 'still-processing' ? (
         <Text
-          style={styles.statusText}
+          style={[styles.statusText, tone.statusText]}
           testID="premium-still-processing"
           accessibilityLiveRegion="polite"
         >
@@ -942,7 +971,7 @@ function PremiumFlowMessages({ premiumFlow }: { premiumFlow: PremiumFlowState })
       ) : null}
       {premiumFlow === 'pending-approval' ? (
         <Text
-          style={styles.statusText}
+          style={[styles.statusText, tone.statusText]}
           testID="premium-pending-approval"
           accessibilityLiveRegion="polite"
         >
@@ -951,7 +980,7 @@ function PremiumFlowMessages({ premiumFlow }: { premiumFlow: PremiumFlowState })
       ) : null}
       {premiumFlow === 'purchase-error' ? (
         <Text
-          style={styles.errorText}
+          style={[styles.errorText, tone.errorText]}
           testID="premium-purchase-error"
           accessibilityRole="alert"
           accessibilityLiveRegion="assertive"
@@ -1067,6 +1096,7 @@ function usePaletteNameList(): string {
  * the applied palette is the same fact here as everywhere else in the app.
  */
 function PremiumThemeSection() {
+  const tone = useSettingsTone()
   const { t } = useTranslation()
   const {
     themeKey,
@@ -1158,7 +1188,10 @@ function PremiumThemeSection() {
         change. A sibling text node in reading order before the gallery, never a
         tooltip and never only an accessible name.
       */}
-      <Text style={styles.disclosureText} testID="premium-theme-disclosure">
+      <Text
+        style={[styles.disclosureText, tone.disclosureText]}
+        testID="premium-theme-disclosure"
+      >
         {t('commerce.premium.theme.disclosure')}
       </Text>
 
@@ -1169,7 +1202,7 @@ function PremiumThemeSection() {
       */}
       {showUnavailableNote ? (
         <Text
-          style={styles.helpText}
+          style={[styles.helpText, tone.helpText]}
           nativeID={THEME_UNAVAILABLE_HINT_ID}
           testID="premium-theme-unavailable"
         >
@@ -1229,11 +1262,14 @@ function PremiumThemeSection() {
         signed-in reader and false for a signed-out one, who has to sign in first.
       */}
       {showLocked ? (
-        <View style={styles.themeLockedPanel} testID="premium-theme-locked">
+        <View
+          style={[styles.themeLockedPanel, tone.themeLockedPanel]}
+          testID="premium-theme-locked"
+        >
           <Text style={styles.themeLockedTitle}>
             {t('commerce.premium.theme.locked.title')}
           </Text>
-          <Text style={styles.helpText}>
+          <Text style={[styles.helpText, tone.helpText]}>
             {t(
               status === 'signed-out'
                 ? 'commerce.premium.theme.locked.signedOutBody'
@@ -1246,7 +1282,7 @@ function PremiumThemeSection() {
 
       {errorMessage ? (
         <Text
-          style={styles.errorText}
+          style={[styles.errorText, tone.errorText]}
           testID="premium-theme-error"
           accessibilityRole="alert"
           accessibilityLiveRegion="assertive"
@@ -1471,7 +1507,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#e6e6ed',
     borderRadius: 8,
     backgroundColor: 'transparent',
   },
@@ -1481,16 +1516,13 @@ const styles = StyleSheet.create({
   },
   localeText: {
     fontSize: 13,
-    color: '#5C5C66',
   },
   selectedLocaleText: {
-    color: '#8A691F',
     fontWeight: 'bold',
   },
   disclosureText: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#5C5C66',
     marginBottom: 12,
   },
   commerceToggle: {
@@ -1501,7 +1533,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#e6e6ed',
     borderRadius: 8,
     backgroundColor: 'transparent',
   },
@@ -1517,7 +1548,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 12,
     lineHeight: 16,
-    color: '#5C5C66',
   },
   premiumStatusLine: {
     fontSize: 14,
@@ -1529,9 +1559,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#B54708',
     backgroundColor: 'rgba(181, 71, 8, 0.08)',
-    color: '#B54708',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1539,11 +1567,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
     fontWeight: '600',
-    color: '#276749',
   },
   errorText: {
     marginTop: 12,
-    color: '#B42318',
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
@@ -1641,7 +1667,6 @@ const styles = StyleSheet.create({
     gap: 4,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#e6e6ed',
     borderRadius: 8,
     backgroundColor: 'transparent',
   },
@@ -1650,3 +1675,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 })
+
+/** The OS light/dark colors for the settings styles above. */
+const useSettingsTone = createSchemeStyles((colors) => ({
+  localeButton: { borderColor: colors.border },
+  localeText: { color: colors.mutedText },
+  selectedLocaleText: { color: colors.accentText },
+  disclosureText: { color: colors.mutedText },
+  helpText: { color: colors.mutedText },
+  commerceToggle: { borderColor: colors.border },
+  premiumGraceBanner: { borderColor: colors.noticeBorder, color: colors.noticeText },
+  statusText: { color: colors.successText },
+  errorText: { color: colors.dangerText },
+  themeLockedPanel: { borderColor: colors.border },
+}))

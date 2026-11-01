@@ -40,7 +40,6 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets()
   const analytics = useMobileAnalytics()
   const { t } = useTranslation()
-  const inactiveTintColor = colorScheme === 'dark' ? '#B8B8C2' : '#5C5C66'
   const tabLabels = {
     home: t('tabs.home', { defaultValue: 'Home' }),
     wardrobe: t('tabs.wardrobe', { defaultValue: 'Wardrobe' }),
@@ -65,9 +64,9 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: palette.text,
-        tabBarInactiveTintColor: inactiveTintColor,
+        tabBarInactiveTintColor: palette.mutedText,
         tabBarStyle: {
-          borderTopColor: '#E6E6ED',
+          borderTopColor: palette.border,
           backgroundColor: palette.background,
           height: 56 + insets.bottom,
           paddingBottom: insets.bottom,

@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  StyleSheet,
   Platform,
 } from 'react-native'
 import type {
@@ -26,6 +25,7 @@ import {
 import { useAccessibilityAnnouncer } from '../../src/hooks/use-accessibility-announcer'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { createSchemeStyles, useSchemeColors } from '@/components/themed'
 
 export interface MobileGarmentTaggingModalProps {
   visible: boolean
@@ -82,6 +82,7 @@ interface TaggingErrorProps {
 }
 
 function TaggingError({ message, isLoading, retryLabel, onRetry }: TaggingErrorProps) {
+  const styles = useStyles()
   if (!message) return null
 
   return (
@@ -115,6 +116,8 @@ export function MobileGarmentTaggingModal({
 }: MobileGarmentTaggingModalProps) {
   const { t } = useTranslation()
   const insets = useModalInsets()
+  const styles = useStyles()
+  const colors = useSchemeColors()
   const { announce } = useAccessibilityAnnouncer()
   const [selectedCategory, setSelectedCategory] = useState<GarmentCategory | null>(null)
   const [selectedMaterial, setSelectedMaterial] = useState<GarmentMaterial | null>(null)
@@ -332,7 +335,7 @@ export function MobileGarmentTaggingModal({
             <ActivityIndicator
               accessibilityLabel={t('wardrobe.tagging.loading_suggestions')}
               size="large"
-              color="#000"
+              color={colors.text}
               style={{ marginVertical: 20 }}
             />
           ) : !isAnalysisPending ? (
@@ -551,13 +554,14 @@ export function MobileGarmentTaggingModal({
   )
 }
 
-const styles = StyleSheet.create({
+/** The sheet's layout, in the OS light/dark colors. */
+const useStyles = createSchemeStyles((colors) => ({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   container: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     maxHeight: '85%',
@@ -569,12 +573,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111',
+    color: colors.text,
   },
   closeBtn: {
     minWidth: 44,
@@ -584,11 +588,11 @@ const styles = StyleSheet.create({
   },
   closeText: {
     fontSize: 18,
-    color: '#666',
+    color: colors.mutedText,
   },
   errorText: {
-    color: '#d32f2f',
-    backgroundColor: '#ffebee',
+    color: colors.dangerText,
+    backgroundColor: colors.dangerSurface,
     padding: 10,
     borderRadius: 8,
     marginVertical: 10,
@@ -601,7 +605,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   retryText: {
-    color: '#8A5A00',
+    color: colors.noticeText,
     fontWeight: '700',
   },
   content: {
@@ -610,12 +614,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: colors.text,
     marginTop: 12,
     marginBottom: 8,
   },
   suggestionText: {
-    color: '#556B2F',
+    color: colors.mutedText,
     fontSize: 12,
     marginBottom: 8,
   },
@@ -631,22 +635,22 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#f9f9f9',
+    borderColor: colors.strongBorder,
+    backgroundColor: colors.subtleSurface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   chipSelected: {
-    borderColor: '#c5a059',
-    backgroundColor: '#fef9ef',
+    borderColor: colors.noticeBorder,
+    backgroundColor: colors.noticeSurface,
   },
   chipText: {
     fontSize: 13,
-    color: '#333',
+    color: colors.text,
   },
   chipTextSelected: {
     fontWeight: 'bold',
-    color: '#111',
+    color: colors.text,
   },
   comfortList: {
     gap: 8,
@@ -656,17 +660,17 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#f9f9f9',
+    borderColor: colors.strongBorder,
+    backgroundColor: colors.subtleSurface,
     justifyContent: 'center',
   },
   comfortCardSelected: {
-    borderColor: '#c5a059',
-    backgroundColor: '#fef9ef',
+    borderColor: colors.noticeBorder,
+    backgroundColor: colors.noticeSurface,
   },
   comfortText: {
     fontSize: 14,
-    color: '#333',
+    color: colors.text,
   },
   footer: {
     flexDirection: 'row',
@@ -674,7 +678,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: colors.border,
   },
   cancelBtn: {
     minWidth: 44,
@@ -684,11 +688,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: colors.strongBorder,
   },
   cancelText: {
     fontSize: 14,
-    color: '#555',
+    color: colors.mutedText,
   },
   saveBtn: {
     minWidth: 44,
@@ -697,14 +701,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 8,
-    backgroundColor: '#111',
+    backgroundColor: colors.inverseSurface,
   },
   saveBtnDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.border,
   },
   saveText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.onInverse,
   },
-})
+}))

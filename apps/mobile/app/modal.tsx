@@ -4,13 +4,14 @@ import { StatusBar } from 'expo-status-bar'
 import { Platform, Pressable, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
 
-import { Text, View } from '@/components/themed'
+import { Text, View, useSchemeColors } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 
 export default function ModalScreen() {
   const analytics = useMobileAnalytics()
   const router = useRouter()
   const { t } = useTranslation()
+  const colors = useSchemeColors()
 
   useEffect(() => {
     analytics.capture('modal_opened')
@@ -31,10 +32,12 @@ export default function ModalScreen() {
         accessibilityRole="button"
         accessibilityLabel={t('common.cancel')}
         onPress={() => router.back()}
-        style={styles.closeButton}
+        style={[styles.closeButton, { backgroundColor: colors.inverseSurface }]}
         testID="information-modal-close"
       >
-        <Text style={styles.closeButtonText}>{t('common.cancel')}</Text>
+        <Text style={[styles.closeButtonText, { color: colors.onInverse }]}>
+          {t('common.cancel')}
+        </Text>
       </Pressable>
       <StatusBar style={Platform.OS === 'ios' ? 'light' : 'auto'} />
     </View>
@@ -63,13 +66,11 @@ const styles = StyleSheet.create({
     minWidth: 120,
     minHeight: 44,
     borderRadius: 999,
-    backgroundColor: '#111111',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
   closeButtonText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
