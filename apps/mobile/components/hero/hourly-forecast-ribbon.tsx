@@ -84,7 +84,7 @@ export function HourlyForecastRibbon({
           style={[styles.toggleButton, { backgroundColor: palette.subtleSurface }]}
           testID="ribbon-expand-toggle"
         >
-          <Text style={styles.toggleText}>
+          <Text style={[styles.toggleText, { color: palette.accentText }]}>
             {isExpanded
               ? t('hero.collapse', { defaultValue: 'Collapse' })
               : t('hero.expand_hours', {
@@ -193,7 +193,6 @@ const styles = StyleSheet.create({
   toggleText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#8A691F',
   },
   scrollContent: {
     paddingHorizontal: 16,

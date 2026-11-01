@@ -924,7 +924,13 @@ export default function TabOneScreen() {
             const localizedCategory = t(categoryKey, { defaultValue: swapCategory })
             return (
               <View
-                style={[styles.modalContent, { paddingBottom: 20 + modalInsets.bottom }]}
+                style={[
+                  styles.modalContent,
+                  {
+                    backgroundColor: palette.surface,
+                    paddingBottom: 20 + modalInsets.bottom,
+                  },
+                ]}
                 testID="garment-swap-modal"
                 accessibilityViewIsModal
                 role="dialog"
@@ -936,7 +942,7 @@ export default function TabOneScreen() {
               >
                 <Text
                   nativeID="garment-swap-title"
-                  style={styles.modalTitle}
+                  style={[styles.modalTitle, { color: palette.text }]}
                   accessibilityRole="header"
                 >
                   {t('hero.garment_swap_title', {
@@ -961,7 +967,11 @@ export default function TabOneScreen() {
                       <Pressable
                         ref={index === 0 ? firstSwapOptionRef : undefined}
                         key={option}
-                        style={[styles.modalItem, isCurrent && styles.modalItemCurrent]}
+                        style={[
+                          styles.modalItem,
+                          { borderBottomColor: palette.divider },
+                          isCurrent && styles.modalItemCurrent,
+                        ]}
                         onPress={() => performSwap(option)}
                         testID={`swap-option-${option}`}
                         accessibilityRole="radio"
@@ -971,23 +981,30 @@ export default function TabOneScreen() {
                         <Text
                           style={[
                             styles.modalItemText,
+                            { color: isCurrent ? palette.accentText : palette.text },
                             isCurrent && styles.modalItemTextCurrent,
                           ]}
                         >
                           {optionTitle}
                         </Text>
-                        {isCurrent && <Text style={styles.modalItemCheck}>✓</Text>}
+                        {isCurrent && (
+                          <Text
+                            style={[styles.modalItemCheck, { color: palette.accentText }]}
+                          >
+                            ✓
+                          </Text>
+                        )}
                       </Pressable>
                     )
                   })}
                 </ScrollView>
                 <Pressable
-                  style={styles.closeButton}
+                  style={[styles.closeButton, { backgroundColor: palette.text }]}
                   onPress={closeSwapModal}
                   accessibilityRole="button"
                   accessibilityLabel={t('common.cancel')}
                 >
-                  <Text style={styles.closeButtonText}>
+                  <Text style={[styles.closeButtonText, { color: palette.background }]}>
                     {t('common.cancel', { defaultValue: 'Cancel' })}
                   </Text>
                 </Pressable>
@@ -1097,7 +1114,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingTop: 20,
@@ -1107,7 +1123,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111111',
     marginBottom: 16,
     textAlign: 'center',
     fontFamily: Platform.select({
@@ -1123,7 +1138,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E6E6ED',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1133,25 +1147,20 @@ const styles = StyleSheet.create({
   },
   modalItemText: {
     fontSize: 15,
-    color: '#111111',
   },
   modalItemTextCurrent: {
     fontWeight: '700',
-    color: '#8A691F',
   },
   modalItemCheck: {
-    color: '#8A691F',
     fontWeight: '700',
   },
   closeButton: {
-    backgroundColor: '#111111',
     borderRadius: 999, // Pill corner radius
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeButtonText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
     textTransform: 'uppercase',

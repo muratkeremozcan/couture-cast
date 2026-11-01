@@ -9,7 +9,7 @@ import { router } from 'expo-router'
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 
-import { Text, View } from '@/components/themed'
+import { Text, View, useSchemeColors } from '@/components/themed'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
 import { safeFindNodeHandle } from '@/src/lib/expo-native-helpers'
 
@@ -28,6 +28,13 @@ export interface WardrobeHubScreenProps {
 
 export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}) {
   const { t } = useTranslation()
+  const colors = useSchemeColors()
+  const secondaryButton = [styles.secondaryButton, { borderColor: colors.strongBorder }]
+  const secondaryButtonText = [styles.secondaryButtonText, { color: colors.text }]
+  const notice = {
+    backgroundColor: colors.noticeSurface,
+    borderColor: colors.noticeBorder,
+  }
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCaptureOpen, setIsCaptureOpen] = useState(false)
@@ -182,32 +189,30 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
                 accessibilityRole="link"
                 accessibilityLabel={t('wardrobe.capsules.title')}
                 testID="wardrobe-capsules-link"
-                style={styles.secondaryButton}
+                style={secondaryButton}
                 onPress={() => router.push('/wardrobe-capsules')}
               >
-                <Text style={styles.secondaryButtonText}>
-                  {t('wardrobe.capsules.title')}
-                </Text>
+                <Text style={secondaryButtonText}>{t('wardrobe.capsules.title')}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="link"
                 accessibilityLabel={t('wardrobe.silhouette.title')}
                 testID="wardrobe-silhouette-link"
-                style={styles.secondaryButton}
+                style={secondaryButton}
                 onPress={() => router.push('/wardrobe-silhouette')}
               >
-                <Text style={styles.secondaryButtonText}>
-                  {t('wardrobe.silhouette.title')}
-                </Text>
+                <Text style={secondaryButtonText}>{t('wardrobe.silhouette.title')}</Text>
               </Pressable>
               <Pressable
                 ref={addGarmentButtonRef}
                 accessibilityRole="button"
                 testID="garment-capture-open"
-                style={styles.primaryButton}
+                style={[styles.primaryButton, { backgroundColor: colors.inverseSurface }]}
                 onPress={() => setIsCaptureOpen(true)}
               >
-                <Text style={styles.primaryButtonText}>{t('wardrobe.add_garment')}</Text>
+                <Text style={[styles.primaryButtonText, { color: colors.onInverse }]}>
+                  {t('wardrobe.add_garment')}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -216,13 +221,13 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
             <Pressable
               accessibilityRole="link"
               testID="wardrobe-onboarding-card"
-              style={styles.onboardingCard}
+              style={[styles.onboardingCard, notice]}
               onPress={() => router.push('/wardrobe-onboarding')}
             >
-              <Text style={styles.onboardingCardTitle}>
+              <Text style={[styles.onboardingCardTitle, { color: colors.noticeText }]}>
                 {t('wardrobe.onboarding.title')}
               </Text>
-              <Text style={styles.onboardingCardBody}>
+              <Text style={[styles.onboardingCardBody, { color: colors.noticeText }]}>
                 {t('wardrobe.onboarding.permission_body')}
               </Text>
             </Pressable>
@@ -230,12 +235,12 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
 
           {errorMessage ? (
             <View
-              style={styles.errorBox}
+              style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
               accessibilityLiveRegion="assertive"
               accessibilityRole="alert"
               testID="wardrobe-error-banner"
             >
-              <Text>{errorMessage}</Text>
+              <Text style={{ color: colors.dangerText }}>{errorMessage}</Text>
             </View>
           ) : null}
 
@@ -269,7 +274,7 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
                       accessibilityLabel={t('wardrobe.tagging.needs_tags', {
                         defaultValue: 'Needs tags',
                       })}
-                      style={styles.needsTagsBtn}
+                      style={[styles.needsTagsBtn, notice]}
                       onPress={(event) => {
                         void openTaggingGarment(
                           garment.id,
@@ -277,7 +282,7 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
                         )
                       }}
                     >
-                      <Text style={styles.needsTagsText}>
+                      <Text style={[styles.needsTagsText, { color: colors.noticeText }]}>
                         {t('wardrobe.tagging.needs_tags', { defaultValue: 'Needs tags' })}
                       </Text>
                     </Pressable>
@@ -324,8 +329,6 @@ const styles = StyleSheet.create({
   needsTagsBtn: {
     minHeight: 44,
     minWidth: 44,
-    backgroundColor: '#FEF9EF',
-    borderColor: '#C5A059',
     borderWidth: 1,
     borderRadius: 8,
     alignItems: 'center',
@@ -334,7 +337,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   needsTagsText: {
-    color: '#8A5A00',
     fontWeight: '700',
     fontSize: 12,
   },
@@ -345,7 +347,6 @@ const styles = StyleSheet.create({
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   secondaryButton: {
     alignItems: 'center',
-    borderColor: '#d4d4d8',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -353,21 +354,18 @@ const styles = StyleSheet.create({
     minWidth: 44,
     paddingHorizontal: 12,
   },
-  secondaryButtonText: { color: '#3f3f46', fontSize: 13, fontWeight: '600' },
+  secondaryButtonText: { fontSize: 13, fontWeight: '600' },
   primaryButton: {
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    backgroundColor: '#111111',
     paddingHorizontal: 18,
     paddingVertical: 12,
   },
-  primaryButtonText: { color: '#FFFFFF', fontWeight: '700' },
+  primaryButtonText: { fontWeight: '700' },
   onboardingCard: {
     borderRadius: 16,
-    backgroundColor: '#FEF9EF',
-    borderColor: '#C5A059',
     borderWidth: 1,
     padding: 16,
     gap: 6,
@@ -380,5 +378,5 @@ const styles = StyleSheet.create({
   garmentCard: { width: '47%', overflow: 'hidden', borderRadius: 12, padding: 10 },
   garmentImage: { width: '100%', aspectRatio: 0.75, borderRadius: 8 },
   garmentId: { marginTop: 8, fontSize: 12 },
-  errorBox: { borderRadius: 12, backgroundColor: '#FEE2E2', padding: 12, gap: 8 },
+  errorBox: { borderRadius: 12, padding: 12, gap: 8 },
 })
