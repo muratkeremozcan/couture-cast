@@ -41,13 +41,28 @@ export const CACHE_VERSION = 'v1'
 /** Harness files whose content decides the binary, beyond what the fingerprint sees. */
 export const HARNESS_BUILD_FILES = Object.freeze([
   'scripts/ci/native-build-cache.mjs',
+  'scripts/ci/native-ios-app-secret-scan.mjs',
   'scripts/lib/story68-native-build.mjs',
   'scripts/lib/story68-public-build-env.mjs',
   'scripts/lib/story68-worklets-staging.mjs',
 ])
 
-/** Directories the config plugins read at prebuild that the fingerprint does not hash itself. */
-export const PLUGIN_SOURCE_DIRECTORIES = Object.freeze(['apps/mobile/targets'])
+/**
+ * Files the config plugins turn into native content at prebuild that the fingerprint does not hash
+ * itself: the widget and watch target sources, the localized permission strings `locales` maps to,
+ * and the notification icon expo-notifications receives as an option.
+ */
+export const PLUGIN_SOURCE_DIRECTORIES = Object.freeze([
+  'apps/mobile/targets',
+  'apps/mobile/locales',
+])
+export const PLUGIN_SOURCE_FILES = Object.freeze([
+  'apps/mobile/assets/images/notification-icon.png',
+])
+/** The font the widget and watchOS plugins copy into their targets, resolved as they resolve it. */
+export const PLUGIN_PACKAGE_FILES = Object.freeze([
+  '@expo-google-fonts/space-grotesk/400Regular/SpaceGrotesk_400Regular.ttf',
+])
 
 export const PLATFORMS = Object.freeze(['ios', 'android'])
 
@@ -106,11 +121,28 @@ export async function fingerprintOf(platform, anonKey = 'cc68-fingerprint-placeh
   return createFingerprintAsync(mobileRoot, {
     platforms: [platform],
     sourceSkips: SourceSkips.ExpoConfigExtraSection,
-    extraSources: PLUGIN_SOURCE_DIRECTORIES.map((directory) => ({
-      type: 'dir',
-      filePath: path.relative(mobileRoot, path.join(root, directory)),
-      reasons: ['story68ConfigPluginSources'],
-    })),
+    extraSources: [
+      ...PLUGIN_SOURCE_DIRECTORIES.map((directory) => ({
+        type: 'dir',
+        filePath: path.relative(mobileRoot, path.join(root, directory)),
+        reasons: ['story68ConfigPluginSources'],
+      })),
+      ...PLUGIN_SOURCE_FILES.map((file) => ({
+        type: 'file',
+        filePath: path.relative(mobileRoot, path.join(root, file)),
+        reasons: ['story68ConfigPluginSources'],
+      })),
+      ...PLUGIN_PACKAGE_FILES.map((request) => ({
+        type: 'contents',
+        id: request,
+        contents: sha256(
+          fs.readFileSync(
+            createRequire(import.meta.url).resolve(request, { paths: [mobileRoot] })
+          )
+        ),
+        reasons: ['story68ConfigPluginSources'],
+      })),
+    ],
   })
 }
 

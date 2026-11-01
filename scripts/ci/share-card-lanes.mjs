@@ -113,6 +113,7 @@ function gateProblems(jobs, check) {
 /** The API32 journey: one row per shard of the android-32 plan, each with a journey budget. */
 function legacyProblems(jobs, check) {
   const legacy = jobs['original-resource']
+  androidClientCacheProblems('original-resource', legacy?.steps ?? [], check)
   const rows = matrixRows(legacy?.strategy?.matrix) ?? []
   const suites = shardSuites('original-resource')
   check(
@@ -616,7 +617,57 @@ function browserProblems(name, steps, check) {
   )
 }
 
+/**
+ * An Android lane restores the APK of its native key and builds only on a miss; it caches only an
+ * APK it built, tested and scanned; and its journey runs only on a build or a hit.
+ */
+function androidClientCacheProblems(name, steps, check) {
+  const at = (predicate) => steps.findIndex(predicate)
+  const key = at((step) => step.id === 'native_key')
+  const restore = at(
+    (step) =>
+      step.id === 'native_cache' &&
+      step.uses === 'actions/cache/restore@v4' &&
+      step.with?.key === '${{ steps.native_key.outputs.key }}'
+  )
+  const build = at((step) => step.id === 'native_build')
+  const scan = at((step) => step.id === 'apk_scan')
+  const save = at(
+    (step) =>
+      step.uses === 'actions/cache/save@v4' &&
+      step.with?.key === '${{ steps.native_key.outputs.key }}'
+  )
+  const journey = at((step) => step.uses === emulatorAction)
+  check(
+    key >= 0 &&
+      steps[key].run?.startsWith(
+        'node scripts/ci/native-build-cache.mjs key --platform '
+      ) &&
+      restore > key &&
+      build > restore &&
+      steps[build].if?.includes("steps.native_cache.outputs.cache-hit != 'true'"),
+    `${name}: restore the client of its native key and build only on a miss`
+  )
+  check(
+    scan > build &&
+      steps[scan].run?.includes('native-ios-app-secret-scan.mjs') &&
+      steps[scan].if?.includes("steps.native_build.outcome == 'success'") &&
+      steps[scan].if?.includes("steps.modal_system_bars.outcome == 'success'") &&
+      save > scan &&
+      steps[save].if?.includes("steps.apk_scan.outcome == 'success'"),
+    `${name}: cache only a built, tested and scanned client`
+  )
+  check(
+    journey > save &&
+      steps[journey].if?.includes(
+        "(steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true')"
+      ),
+    `${name}: run the journey only on a built or restored client`
+  )
+}
+
 function nativeProblems(name, job, rows, check) {
+  androidClientCacheProblems(name, job.steps ?? [], check)
   const steps = job.steps ?? []
   const prepare = steps.find((step) => step.id === 'runtime')
   const engines = steps.find((step) => step.id === 'browser_deps')?.run ?? ''

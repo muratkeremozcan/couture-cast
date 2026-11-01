@@ -541,6 +541,60 @@ describe('share-card parallel lane validator', () => {
     }
   })
 
+  describe('Android client cache', () => {
+    const rejected = (title, expected, change) =>
+      test(`${title} is rejected`, () => {
+        const problems = mutate(change)
+        assert.ok(
+          problems.some((problem) => expected.test(problem)),
+          problems.join('\n') || 'no problem raised'
+        )
+      })
+    // android36 lanes share one step list through the YAML alias; original-resource keeps its own.
+    for (const name of ['original-resource', 'android36-native-matrix']) {
+      const byId = (jobs, id) => step(jobs[name], (row) => row.id === id)
+      rejected(
+        `${name} building on a hit`,
+        new RegExp(
+          `${name}: restore the client of its native key and build only on a miss`
+        ),
+        (jobs) => {
+          byId(jobs, 'native_build').if =
+            "${{ !cancelled() && steps.prebuild.outcome == 'success' }}"
+        }
+      )
+      rejected(
+        `${name} caching an unscanned client`,
+        new RegExp(`${name}: cache only a built, tested and scanned client`),
+        (jobs) => {
+          const steps = jobs[name].steps
+          steps.splice(
+            steps.findIndex((row) => row.id === 'apk_scan'),
+            1
+          )
+        }
+      )
+      rejected(
+        `${name} scanning before the module test passed`,
+        new RegExp(`${name}: cache only a built, tested and scanned client`),
+        (jobs) => {
+          byId(jobs, 'apk_scan').if =
+            "${{ !cancelled() && steps.native_build.outcome == 'success' }}"
+        }
+      )
+      rejected(
+        `${name} running the journey without a client`,
+        new RegExp(`${name}: run the journey only on a built or restored client`),
+        (jobs) => {
+          step(
+            jobs[name],
+            (row) => row.uses === 'reactivecircus/android-emulator-runner@v2'
+          ).if = "${{ !cancelled() && steps.kvm.outcome == 'success' }}"
+        }
+      )
+    }
+  })
+
   describe('iOS journey', () => {
     const iosJobs = ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-evidence']
     const rejected = (title, expected, change) =>

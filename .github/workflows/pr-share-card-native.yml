@@ -158,8 +158,17 @@ jobs:
           ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
           # Both SDK branches ran, and none was skipped.
           grep -q 'tests="2" skipped="0" failures="0" errors="0"' ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml
-      - name: Save the development client of this fingerprint
+      # A fork's pull request can restore this cache, so the APK is scanned like the iOS client:
+      # only the publishable anon key of this job's loopback stack may ride along.
+      - name: Refuse to cache a development client that embeds a secret
+        id: apk_scan
         if: ${{ !cancelled() && steps.native_build.outcome == 'success' && steps.modal_system_bars.outcome == 'success' }}
+        run: |
+          rm -rf "$RUNNER_TEMP/cc68-apk"
+          unzip -q "${{ steps.native_key.outputs.path }}" -d "$RUNNER_TEMP/cc68-apk"
+          node scripts/ci/native-ios-app-secret-scan.mjs "$RUNNER_TEMP/cc68-apk" "$CC68_HARNESS_DIR"
+      - name: Save the development client of this fingerprint
+        if: ${{ !cancelled() && steps.apk_scan.outcome == 'success' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native_key.outputs.path }}
@@ -359,8 +368,17 @@ jobs:
           ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
           # Both SDK branches ran, and none was skipped.
           grep -q 'tests="2" skipped="0" failures="0" errors="0"' ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml
-      - name: Save the development client of this fingerprint
+      # A fork's pull request can restore this cache, so the APK is scanned like the iOS client:
+      # only the publishable anon key of this job's loopback stack may ride along.
+      - name: Refuse to cache a development client that embeds a secret
+        id: apk_scan
         if: ${{ !cancelled() && steps.native_build.outcome == 'success' && steps.modal_system_bars.outcome == 'success' }}
+        run: |
+          rm -rf "$RUNNER_TEMP/cc68-apk"
+          unzip -q "${{ steps.native_key.outputs.path }}" -d "$RUNNER_TEMP/cc68-apk"
+          node scripts/ci/native-ios-app-secret-scan.mjs "$RUNNER_TEMP/cc68-apk" "$CC68_HARNESS_DIR"
+      - name: Save the development client of this fingerprint
+        if: ${{ !cancelled() && steps.apk_scan.outcome == 'success' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native_key.outputs.path }}
