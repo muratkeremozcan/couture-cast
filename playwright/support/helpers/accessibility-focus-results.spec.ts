@@ -117,6 +117,8 @@ describe('TalkBack lane runner', () => {
     fs.writeFileSync(
       path.join(android, 'gradlew'),
       `#!/usr/bin/env bash
+echo "gradle $*" >> "$FAKE_RESULTS/calls.log"
+case "$*" in *assembleDebugAndroidTest*) exit 0 ;; esac
 out=../modules/accessibility-focus/android/build/outputs/androidTest-results/connected/debug
 run=positive
 for arg in "$@"; do case "$arg" in *suppressFocus=true) run=suppressed ;; esac; done
@@ -126,16 +128,26 @@ exit "$(cat "$FAKE_RESULTS/$run.status")"
 `,
       { mode: 0o755 }
     )
-    // An adb with TalkBack's touch-exploration setting following enable and disable.
+    // An adb with TalkBack's touch-exploration setting following enable and disable, and
+    // accessibility tracking the Settings backdrop once it starts, unless no-app-window is set.
     fs.writeFileSync(
       path.join(work, 'adb'),
       `#!/usr/bin/env bash
+echo "adb $*" >> "$FAKE_RESULTS/calls.log"
 state="$FAKE_RESULTS/touch"
 case "$*" in
   *getprop*) echo x86_64 ;;
   *"settings put secure enabled_accessibility_services"*) echo 1 > "$state" ;;
   *"settings delete secure enabled_accessibility_services"*) echo 0 > "$state" ;;
   *"settings get secure touch_exploration_enabled"*) cat "$state" 2>/dev/null || echo 0 ;;
+  *"am start -W -a android.settings.SETTINGS"*)
+    [ -f "$FAKE_RESULTS/no-app-window" ] || touch "$FAKE_RESULTS/backdrop" ;;
+  *"dumpsys accessibility"*)
+    if [ -f "$FAKE_RESULTS/backdrop" ]; then
+      echo 'A11yWindow[AccessibilityWindowInfo[title=Settings, id=12, type=TYPE_APPLICATION, focused=true, active=true]]'
+    else
+      echo 'A11yWindow[AccessibilityWindowInfo[title=null, id=8, type=TYPE_SYSTEM, focused=false, active=false]]'
+    fi ;;
 esac
 exit 0
 `,
@@ -164,10 +176,14 @@ exit 0
           ...process.env,
           ADB: path.join(work, 'adb'),
           FAKE_RESULTS: path.join(work, 'fake'),
+          ACCESSIBILITY_FOCUS_WINDOW_WAIT: '1',
         },
         encoding: 'utf8',
       }
     )
+
+  const calls = () =>
+    fs.readFileSync(path.join(work, 'fake', 'calls.log'), 'utf8').split('\n')
 
   it('passes a lane whose control fails on the OS focus report', () => {
     scenario('positive', 0, allPass())
@@ -175,6 +191,35 @@ exit 0
     const lane = runLane()
     expect(lane.stdout).toContain('Suppressed-focus control: the 4 tests')
     expect(lane.status).toBe(0)
+  })
+
+  // Run 41238053357: a test activity closing onto the launcher left every app window
+  // hidden from accessibility, so TalkBack focused none of the later test windows.
+  it('runs the tests over the Settings backdrop, after TalkBack is on', () => {
+    scenario('positive', 0, allPass())
+    scenario('suppressed', 1, controlFails())
+    expect(runLane().status).toBe(0)
+    const log = calls()
+    const at = (pattern: RegExp) => log.findIndex((line) => pattern.test(line))
+    const talkBack = at(/settings put secure enabled_accessibility_services/)
+    const backdrop = at(/am start -W -a android\.settings\.SETTINGS/)
+    const firstRun = at(/connectedDebugAndroidTest/)
+    expect(at(/assembleDebugAndroidTest/)).toBeLessThan(talkBack)
+    expect(talkBack).toBeLessThan(backdrop)
+    expect(backdrop).toBeLessThan(firstRun)
+  })
+
+  it('fails before any run when accessibility tracks no app window', () => {
+    fs.writeFileSync(path.join(work, 'fake', 'no-app-window'), '')
+    scenario('positive', 0, allPass())
+    scenario('suppressed', 1, controlFails())
+    const lane = runLane()
+    expect(lane.stderr).toContain(
+      '::error::accessibility tracks no active app window under the Settings backdrop'
+    )
+    expect(lane.status).toBe(1)
+    expect(calls().some((line) => line.includes('connectedDebugAndroidTest'))).toBe(false)
+    expect(lane.stdout).toContain('TalkBack off.')
   })
 
   it('fails a lane whose control never ran, even with an old control result on disk', () => {

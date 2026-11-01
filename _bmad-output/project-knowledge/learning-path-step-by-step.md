@@ -8695,7 +8695,9 @@ Hard-won lessons from the implementation and code review of this story:
    The focus-observation harness resolved the app container with a synchronous `simctl` call on every request, which blocked the Node event loop past the 2-second client timeout on a host with load1 above 100; it now resolves once, asynchronously.
 10. **A Maestro wait that runs a second time returns at once.**
     In run 41019906459 attempts 2 to 4 of a 45-second wait took 54.4 seconds in all, so a retry or repeat cannot hold a time window.
-    `expo-go-open.yaml` uses three one-shot waits in order, and its flow tests refuse both patterns.
+    `expo-go-open.yaml` uses five one-shot waits in order, and its flow tests refuse both patterns.
+    In run 41244230213 its tap on the iOS open prompt was lost: Cancel and Open were still on screen 180 seconds later and Expo Go never started.
+    The flow now waits for the prompt to leave and taps Open once more only while it is still up.
 11. **The Expo Go proof never passed in CI until it ran alone and Metro ran offline.**
     It failed in every run that reached it as the last step of iOS shard 2, where the host had 74 MB free.
     PR #165 moved it to its own `ios-expo-go` job.
