@@ -28,6 +28,7 @@ const layout = vi.hoisted(() => {
     // which would handle a rejection the layout forgot to catch and hide the bug.
     sweepCalls: 0,
     cleanupCalls: 0,
+    notificationListeners: 0,
     startupResult: (): Promise<void> => Promise.resolve(),
   }
 })
@@ -90,7 +91,10 @@ vi.mock('expo-router', () => {
   }
 })
 vi.mock('expo-notifications', () => ({
-  addNotificationReceivedListener: () => ({ remove: () => undefined }),
+  addNotificationReceivedListener: () => {
+    layout.notificationListeners += 1
+    return { remove: () => undefined }
+  },
 }))
 vi.mock('@react-navigation/native', () => ({
   DarkTheme: {},
@@ -143,6 +147,11 @@ async function settleTasks() {
 async function mountLayout() {
   await render(<RootLayout />)
   await waitFor(() => expect(layout.screens.length).toBeGreaterThan(0))
+  // On a native OS the layout subscribes to notifications through a dynamic import. A test
+  // that ends first leaves that import to settle after the file's mocks are gone, and the
+  // layout then logs "listener unavailable" against no test.
+  const expectedListeners = Platform.OS === 'web' ? 0 : 1
+  await waitFor(() => expect(layout.notificationListeners).toBe(expectedListeners))
 }
 
 describe('RootLayout startup', () => {
@@ -151,6 +160,7 @@ describe('RootLayout startup', () => {
     layout.statusBars.length = 0
     layout.sweepCalls = 0
     layout.cleanupCalls = 0
+    layout.notificationListeners = 0
     layout.startupResult = () => Promise.resolve()
     setOS(originalOS)
   })

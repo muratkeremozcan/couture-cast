@@ -1,5 +1,14 @@
+import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { defineConfig } from '@playwright/test'
+
+function firefoxAppData() {
+  const directory = path.join(os.tmpdir(), 'couture-cast-playwright-firefox-app-data')
+  fs.mkdirSync(directory, { recursive: true })
+  return directory
+}
+
 // This lane consumes only scripts/e2e-share-card's owned UUID runtime. It never
 // invokes the general database reset/setup or creates a shared test account.
 export default defineConfig({
@@ -19,10 +28,22 @@ export default defineConfig({
     screenshot: 'off',
     video: 'off',
   },
-  projects: ['chromium', 'firefox', 'webkit'].map((name) => ({
-    name,
-    use: { browserName: name as 'chromium' | 'firefox' | 'webkit' },
-  })),
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' } },
+    {
+      name: 'firefox',
+      use: {
+        browserName: 'firefox',
+        // Firefox reads its app data folder at startup even with an explicit -profile.
+        // On macOS that folder is ~/Library/Application Support/Firefox, which an
+        // installed Firefox owns: App Data protection denies the ad hoc signed Playwright
+        // build, and it exits with "Could not find profile folder". MOZ_APP_DATA points
+        // it at a folder of its own on every platform.
+        launchOptions: { env: { ...process.env, MOZ_APP_DATA: firefoxAppData() } },
+      },
+    },
+    { name: 'webkit', use: { browserName: 'webkit' } },
+  ],
   reporter: [
     ['list'],
     [

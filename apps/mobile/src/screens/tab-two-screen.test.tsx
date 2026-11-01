@@ -73,12 +73,12 @@ vi.mock('@/src/lib/mobile-auth', () => ({
   setMobileAccessTokenResolver: vi.fn(),
 }))
 
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
     capture: analyticsCaptureMock,
     getDistinctId: analyticsDistinctIdMock,
-  }),
-}))
+  })
+)
 
 vi.mock('@/src/lib/api-health', () => ({
   loadMobileApiHealth: loadMobileApiHealthMock,

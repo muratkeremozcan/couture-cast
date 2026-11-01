@@ -91,6 +91,19 @@ module.exports = {
         '@typescript-eslint/no-unsafe-call': 'off',
         '@typescript-eslint/no-unsafe-member-access': 'off',
         '@typescript-eslint/no-unsafe-assignment': 'off',
+        // The real useMobileAnalytics memoizes its client, and screens list that client in
+        // effect dependencies. A mock hook that builds the client on each call re-runs those
+        // effects on every render; under Vitest 5 that brought a dismissed deep-link banner
+        // back while the app was correct.
+        'no-restricted-syntax': [
+          'error',
+          {
+            selector:
+              "Property[key.name='useMobileAnalytics'] > ArrowFunctionExpression > ObjectExpression.body",
+            message:
+              'A mocked useMobileAnalytics must return one client per module. Use mobileAnalyticsModuleMock from @/src/test-utils/mobile-analytics.',
+          },
+        ],
       },
     },
     {

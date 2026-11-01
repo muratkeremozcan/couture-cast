@@ -44,16 +44,12 @@ vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
 
-const mockCapture = vi.fn()
-const mockAnalytics = {
-  capture: mockCapture,
-  getDistinctId: () => 'test-user-id',
-  screen: vi.fn(),
-}
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => mockAnalytics,
-  MobileAnalyticsDiagnosticsPanel: () => null,
-}))
+const mockCapture = vi.hoisted(() => vi.fn())
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
+    capture: mockCapture,
+  })
+)
 
 let restoreAccessTokenResolver: (() => void) | undefined
 

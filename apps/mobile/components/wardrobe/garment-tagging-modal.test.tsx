@@ -32,7 +32,9 @@ vi.mock('react-i18next', () => ({
 
 /** Held on a plain object so assertions never reference an unbound method. */
 const backHandler = vi.hoisted(() => ({
-  addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  addEventListener: vi.fn((_event: string, _listener: () => boolean) => ({
+    remove: vi.fn(),
+  })),
 }))
 
 vi.mock('react-native-safe-area-context', async (importOriginal) => {
@@ -118,6 +120,46 @@ describe('MobileGarmentTaggingModal Component', () => {
     })
 
     expect(findNodeHandle).not.toHaveBeenCalled()
+  })
+
+  it('answers hardware Back on a native OS and leaves the web stub alone', () => {
+    const onClose = vi.fn()
+    const webSheet = render(
+      <MobileGarmentTaggingModal
+        visible={true}
+        onClose={onClose}
+        garmentId={null}
+        accessToken="test_token"
+      />
+    )
+    expect(backHandler.addEventListener).not.toHaveBeenCalled()
+    webSheet.unmount()
+
+    Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+    const remove = vi.fn()
+    let onBack: (() => boolean) | undefined
+    backHandler.addEventListener.mockImplementationOnce(
+      (_event: string, listener: () => boolean) => {
+        onBack = listener
+        return { remove }
+      }
+    )
+    const nativeSheet = render(
+      <MobileGarmentTaggingModal
+        visible={true}
+        onClose={onClose}
+        garmentId={null}
+        accessToken="test_token"
+      />
+    )
+    expect(backHandler.addEventListener).toHaveBeenCalledWith(
+      'hardwareBackPress',
+      expect.any(Function)
+    )
+    expect(onBack?.()).toBe(true)
+    expect(onClose).toHaveBeenCalledTimes(1)
+    nativeSheet.unmount()
+    expect(remove).toHaveBeenCalledTimes(1)
   })
 
   it('focuses the modal title after the native accessibility delay', () => {
