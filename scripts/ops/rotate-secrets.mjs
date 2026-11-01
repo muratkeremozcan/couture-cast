@@ -68,12 +68,32 @@ const prod = readEnv('.env.prod')
 const local = readEnv('.env.local')
 const vercelBin = findVercel()
 
+// Every key a selected part reads must be set before anything remote is touched: a missing
+// value would otherwise remove a Vercel variable or write the literal "undefined".
+const REQUIRED = {
+  db: ['SUPABASE_DB_PROD_PW', 'DATABASE_URL', 'DIRECT_URL'],
+  redis: ['REDIS_URL', 'UPSTASH_REDIS_REST_TOKEN'],
+  analytics: ['ANALYTICS_ID_SECRET'],
+  supabase: [
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  ],
+}
+const missing = [...parts].flatMap((part) => REQUIRED[part].filter((key) => !prod[key]))
+if (!local.NORTHFLANK_API_TOKEN) missing.push('NORTHFLANK_API_TOKEN (.env.local)')
+if (missing.length) {
+  console.error(`missing values in .env.prod: ${missing.join(', ')}`)
+  process.exit(1)
+}
+
 function vercelSet(project, name, value) {
   const base = ['--project', project, '--scope', SCOPE, '--non-interactive']
   // Remove first so a variable stored as Config can come back as a secret.
-  spawnSync(vercelBin, ['env', 'rm', name, 'production', '--yes', ...base], {
-    cwd: '/tmp',
-  })
+  const removed =
+    spawnSync(vercelBin, ['env', 'rm', name, 'production', '--yes', ...base], {
+      cwd: '/tmp',
+    }).status === 0
   const kind = name.startsWith('NEXT_PUBLIC_') ? '--no-sensitive' : '--sensitive'
   const add = ['env', 'add', name, '-e', 'production', kind, '--force', '--yes', ...base]
   const result = spawnSync(vercelBin, add, {
@@ -81,7 +101,12 @@ function vercelSet(project, name, value) {
     input: value,
     encoding: 'utf8',
   })
-  if (result.status !== 0) throw new Error(`vercel ${project} ${name} failed`)
+  if (result.status !== 0)
+    throw new Error(
+      removed
+        ? `vercel ${project} ${name}: add failed after the old value was removed; production has no ${name} until this is rerun`
+        : `vercel ${project} ${name}: add failed; the previous value is still in production`
+    )
   console.log(`vercel ${project} ${name}: set`)
 }
 
@@ -98,10 +123,25 @@ function withPassword(url, password) {
   return url.replace(/(\/\/[^:]+:)[^@]*@/, `$1${encodeURIComponent(password)}@`)
 }
 
-async function northflank(updates) {
-  const headers = { Authorization: `Bearer ${local.NORTHFLANK_API_TOKEN}` }
-  const current = (await (await fetch(WORKER_ENV_URL, { headers })).json()).data
-    .runtimeEnvironment
+const northflankHeaders = { Authorization: `Bearer ${local.NORTHFLANK_API_TOKEN}` }
+
+async function workerEnv() {
+  const response = await fetch(WORKER_ENV_URL, { headers: northflankHeaders })
+  if (!response.ok)
+    throw new Error(
+      `northflank: reading the worker environment returned HTTP ${response.status}`
+    )
+  return (await response.json()).data.runtimeEnvironment
+}
+
+// The POST replaces the whole environment, so stop if it changed since the first read.
+async function northflank(updates, snapshot) {
+  const headers = northflankHeaders
+  const current = await workerEnv()
+  if (JSON.stringify(current) !== JSON.stringify(snapshot))
+    throw new Error(
+      'northflank: the worker environment changed during the rotation; rerun'
+    )
   if (updates.DATABASE_URL === null) {
     const [base, query = ''] = current.DATABASE_URL.split('?')
     const params = query
@@ -120,6 +160,11 @@ async function northflank(updates) {
     `northflank community-worker: set ${Object.keys(updates).sort().join(', ')}`
   )
 }
+
+// Check every destination before the first write, so a bad token cannot leave a partial rotation.
+const ghAuth = spawnSync('gh', ['auth', 'status'], { stdio: 'ignore' })
+if (parts.has('db') && ghAuth.status !== 0) throw new Error('gh is not authenticated')
+const workerSnapshot = await workerEnv()
 
 const worker = {}
 if (parts.has('db')) {
@@ -159,7 +204,7 @@ if (parts.has('supabase')) {
       vercelSet(project, name, prod[name])
   worker.SUPABASE_SERVICE_ROLE_KEY = prod.SUPABASE_SERVICE_ROLE_KEY
 }
-if (Object.keys(worker).length) await northflank(worker)
+if (Object.keys(worker).length) await northflank(worker, workerSnapshot)
 
 if (redeploy) {
   for (const project of [API, WEB]) {
