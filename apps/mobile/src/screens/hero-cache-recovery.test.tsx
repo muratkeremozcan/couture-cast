@@ -22,19 +22,16 @@ vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
 
-const mockCapture = vi.fn()
-const mockGetDistinctId = vi.fn(() => 'test-user-id')
-// The real hook memoizes its client, and the screen's deep-link effect depends on it. A fresh
-// object per render would re-run that effect on every render and re-raise a dismissed banner.
-const mockAnalytics = {
-  capture: mockCapture,
-  getDistinctId: mockGetDistinctId,
-  screen: vi.fn(),
-}
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => mockAnalytics,
-  MobileAnalyticsDiagnosticsPanel: () => null,
+const { mockCapture, mockGetDistinctId } = vi.hoisted(() => ({
+  mockCapture: vi.fn(),
+  mockGetDistinctId: vi.fn(() => 'test-user-id'),
 }))
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
+    capture: mockCapture,
+    getDistinctId: mockGetDistinctId,
+  })
+)
 
 import TabOneScreen from '@/app/(tabs)/index'
 import { server } from '@/src/test-utils/msw/server'

@@ -5,6 +5,7 @@ import { press } from '@/src/test-utils/press'
 import { CommunitySyncState } from '@couture/api-client'
 import type { CommunityReactionSummary } from '@couture/api-client/contracts/http'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { actStep } from '@/src/test-utils/act-step'
 import { AppState } from 'react-native'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
@@ -195,7 +196,7 @@ export function registerCommunityRealtimeCases() {
     // The last successful authorization is now older than the 8 s bound (D3).
     const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 9000)
     try {
-      await act(() => {
+      await actStep(() => {
         sync.foreground()
         pending = sync.catchUp()
       })
@@ -221,7 +222,7 @@ export function registerCommunityRealtimeCases() {
     const release = holdEvents()
     let pending!: Promise<void>
     try {
-      await act(() => {
+      await actStep(() => {
         lifecycle.forEach((listener) => listener('active'))
         pending = recover.sync().catchUp()
       })
@@ -253,7 +254,7 @@ export function registerCommunityRealtimeCases() {
     // foreground() reports 'recovering' and starts a catch-up that is still in flight.
     const sync = recover.sync()
     let pending!: Promise<void>
-    await act(() => {
+    await actStep(() => {
       sync.foreground()
       pending = sync.catchUp()
     })
@@ -386,7 +387,7 @@ export function registerCommunityRealtimeCases() {
     const release = holdEvents()
     let pending!: Promise<void>
     try {
-      await act(() => {
+      await actStep(() => {
         lifecycle.forEach((listener) => listener('background'))
         lifecycle.forEach((listener) => listener('active'))
         pending = recover.sync().catchUp()

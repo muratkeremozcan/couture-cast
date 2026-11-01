@@ -3,11 +3,10 @@
 // absence asserted below is an absence on a rendered card.
 import { feedJson, feedUrls, item, serveFeed, setMockParams } from './harness'
 import { mockCapture, refreshEvents, webBrowser } from './mock-state'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { userEvent as browserUser } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
-import { act } from 'react'
 import { expect, it, vi } from 'vitest'
 import { CommunitySyncState } from '@couture/api-client'
 import type { CommunitySponsorship } from '@couture/api-client/contracts/http'

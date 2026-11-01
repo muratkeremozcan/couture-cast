@@ -89,14 +89,9 @@ vi.mock('@/components/hero/outfit-recommendation-card', async (importOriginal) =
   }
   return { ...actual, OutfitRecommendationCard: CountingOutfitRecommendationCard }
 })
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
-    capture: vi.fn(),
-    getDistinctId: () => 'test-user-id',
-    screen: vi.fn(),
-  }),
-  MobileAnalyticsDiagnosticsPanel: () => null,
-}))
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock()
+)
 vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
   const actual = await importOriginal<typeof RitualCacheModule>()
   return {

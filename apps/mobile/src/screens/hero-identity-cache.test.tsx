@@ -33,14 +33,11 @@ vi.mock('expo-router', async () => ({
 }))
 
 // One analytics identity for the device, whoever is signed in: the cache must not key on it.
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
-    capture: vi.fn(),
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
     getDistinctId: () => 'shared-device-distinct-id',
-    screen: vi.fn(),
-  }),
-  MobileAnalyticsDiagnosticsPanel: () => null,
-}))
+  })
+)
 
 // Member B lives somewhere 10°C (50°F); member A's mock ritual is 21°C (70°F).
 const memberBRitual = {

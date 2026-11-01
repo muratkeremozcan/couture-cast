@@ -102,7 +102,8 @@ describe('Localization Formatters', () => {
 
     /** Hermes builds without full ICU throw here; a price must still render. */
     it('should fall back to a plain amount when Intl cannot format', () => {
-      vi.spyOn(Intl, 'NumberFormat').mockImplementation(() => {
+      // A function implementation: the formatter constructs Intl.NumberFormat with `new`.
+      vi.spyOn(Intl, 'NumberFormat').mockImplementation(function () {
         throw new RangeError('Incorrect locale information provided')
       })
 

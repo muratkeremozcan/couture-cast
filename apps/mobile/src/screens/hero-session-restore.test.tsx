@@ -21,14 +21,9 @@ vi.mock('expo-router', async () => ({
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
-    capture: vi.fn(),
-    getDistinctId: () => 'test-user-id',
-    screen: vi.fn(),
-  }),
-  MobileAnalyticsDiagnosticsPanel: () => null,
-}))
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock()
+)
 vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
   const actual = await importOriginal<typeof RitualCacheModule>()
   return {
