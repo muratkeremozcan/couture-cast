@@ -49,6 +49,7 @@ jobs:
       - uses: actions/checkout@v4
         id: checkout
       - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/free-runner-disk
       - uses: ./.github/actions/install
         id: install
       - name: Provision pinned share-card browser dependencies
@@ -225,6 +226,7 @@ jobs:
       - uses: actions/checkout@v4
         id: checkout
       - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/free-runner-disk
       - uses: ./.github/actions/install
         id: install
       - name: Provision pinned share-card browser dependencies
@@ -430,6 +432,7 @@ jobs:
       - uses: actions/checkout@v4
         id: checkout
       - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/free-runner-disk
       - uses: ./.github/actions/install
         id: install
       - name: Provision pinned share-card browser dependencies

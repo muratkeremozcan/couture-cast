@@ -1,0 +1,78 @@
+name: Free runner disk
+description: >-
+  Delete preinstalled toolchains this repository never uses, so an Android
+  build, an emulator and local Supabase fit on any ubuntu-latest runner. Free
+  space on / differs by host: an Azure runner had 80 GiB free in scheduled run
+  41297785476, while the AWS runner beside it had under 15 GiB and failed the
+  story 6.8 disk guard (scripts/lib/test-disk-space.mjs) before building
+  anything. Four Maestro shards on 2026-10-31 and 2026-11-01 died with "No space
+  left on device" on the same kind of host. Run this right after checkout (and
+  after reserve-supabase-ports where a job has it) in every Linux job that
+  builds the Android app, boots an emulator or runs the disk guard. It makes no
+  network connection. Every path is optional, so an image that drops one, or
+  the coming Ubuntu 26.04 ubuntu-latest, still passes. The image ships no
+  cached Docker images, so there is nothing to prune there. A non-Linux runner
+  skips, by design.
+
+runs:
+  using: composite
+  steps:
+    - name: Delete unused preinstalled toolchains
+      shell: bash
+      run: |
+        set -u -o pipefail
+        if [ "$(uname -s)" != Linux ]; then
+          echo "Not a Linux runner ($(uname -s)): nothing to delete."
+          exit 0
+        fi
+
+        # Nothing here is used by any job in this repository. The Android NDKs go
+        # because React Native 0.81 pins NDK 27.1.12297006, which no runner image
+        # ships, so Gradle installs that version itself and never reads the
+        # preinstalled ones. The rest of the Android SDK stays: the emulator jobs
+        # install their own system images, and the builds use its platforms and
+        # build tools. Java, Node, Python, the browsers and Docker stay as well.
+        targets=(
+          /usr/share/dotnet
+          /opt/ghc
+          /usr/local/.ghcup
+          /usr/share/swift
+          /usr/local/julia*
+          /usr/share/miniconda
+          /opt/hostedtoolcache/CodeQL
+          /usr/local/share/powershell
+          /usr/local/share/boost
+          /opt/az
+          "$HOME/.rustup"
+          "$HOME/.cargo"
+          "${ANDROID_HOME:-/usr/local/lib/android/sdk}/ndk"
+        )
+
+        avail_bytes() { df --output=avail -B1 / | tail -n 1 | tr -d ' '; }
+        echo "Before:"
+        df -h /
+        before=$(avail_bytes)
+        started=$SECONDS
+
+        # One background deletion per tree; they are independent, so the step
+        # takes as long as the largest tree instead of the sum of all of them.
+        pids=()
+        for target in "${targets[@]}"; do
+          [ -e "$target" ] || continue
+          sudo rm -rf -- "$target" &
+          pids+=("$!")
+        done
+        status=0
+        for pid in "${pids[@]}"; do
+          wait "$pid" || status=1
+        done
+
+        after=$(avail_bytes)
+        echo "After:"
+        df -h /
+        freed=$(( (after - before) / 1024 / 1024 ))
+        echo "Freed ${freed} MiB on / in $(( SECONDS - started )) s; $(( after / 1024 / 1024 / 1024 )) GiB now free."
+        if [ "$status" -ne 0 ]; then
+          echo "::error::Deleting a preinstalled toolchain failed; see the rm output above."
+          exit 1
+        fi

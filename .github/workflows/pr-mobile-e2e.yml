@@ -173,6 +173,11 @@ jobs:
       - name: Reserve the local Supabase host ports
         uses: ./.github/actions/reserve-supabase-ports
 
+      # Some ubuntu-latest hosts start with under 15 GiB free; the emulator
+      # snapshot restore has died with "No space left on device" on them.
+      - name: Free runner disk
+        uses: ./.github/actions/free-runner-disk
+
       - name: Setup Node environment
         uses: ./.github/actions/install
         with:

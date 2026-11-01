@@ -29,6 +29,7 @@ on:
       - 'scripts/ci/check-accessibility-focus-builds.sh'
       - 'scripts/run-story67-talkback.mjs'
       - '.github/workflows/pr-accessibility-focus.yml'
+      - '.github/actions/free-runner-disk/**'
   push:
     branches: [main]
     paths:
@@ -46,6 +47,7 @@ on:
       - 'scripts/ci/check-accessibility-focus-builds.sh'
       - 'scripts/run-story67-talkback.mjs'
       - '.github/workflows/pr-accessibility-focus.yml'
+      - '.github/actions/free-runner-disk/**'
   schedule:
     - cron: '17 4 * * *'
   workflow_dispatch:
@@ -71,6 +73,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
+      - name: Free runner disk
+        uses: ./.github/actions/free-runner-disk
 
       - name: Setup Node environment
         uses: ./.github/actions/install
@@ -207,6 +212,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+
+      - name: Free runner disk
+        uses: ./.github/actions/free-runner-disk
 
       - name: Setup Node environment
         uses: ./.github/actions/install

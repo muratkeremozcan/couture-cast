@@ -307,10 +307,6 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: node --test scripts/ci/workflow-step-shadowing.test.mjs
 
-      - name: Require later checks to run after an earlier check fails
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node --test scripts/ci/workflow-step-shadowing.test.mjs
-
       # `always()` so this runs even when the coverage-comment step above has
       # already failed. `continue-on-error` on the test step is deliberate and
       # should stay: it is what lets the coverage comment post on a red run,
