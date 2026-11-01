@@ -13,6 +13,9 @@
  * - The Vercel API build runs it too, so it migrates through DIRECT_URL when
  *   that reaches the same database and retries a pooler that is out of client
  *   slots (`scripts/lib/prisma-migrate-connection.mjs` says why).
+ * - A remote migration connection verifies the database certificate against
+ *   the committed Supabase CA, as the API runtime does
+ *   (`scripts/lib/database-tls.mjs`).
  */
 import { existsSync } from 'node:fs'
 import path from 'node:path'
@@ -20,6 +23,7 @@ import { spawn } from 'node:child_process'
 import { config as loadEnv } from 'dotenv'
 import { applyLocalE2eDatabaseUrl } from './local-e2e-database.mjs'
 import { loadEnvKeepingCallerOwned } from './lib/caller-owned-env.mjs'
+import { withVerifiedDatabaseTls } from './lib/database-tls.mjs'
 import {
   OUTPUT_TAIL_LIMIT,
   poolRetryBaseDelay,
@@ -135,10 +139,9 @@ try {
   if (migration.ignoredDirectUrl)
     log('Ignoring DIRECT_URL: it reaches a different database than DATABASE_URL')
   if (migration.source === 'DIRECT_URL') log('Migrating through DIRECT_URL')
-  const env =
-    migration.url === undefined
-      ? process.env
-      : { ...process.env, DATABASE_URL: migration.url }
+  const url = migration.url ? withVerifiedDatabaseTls(migration.url) : migration.url
+  if (url !== migration.url) log('Verifying the database certificate (sslaccept=strict)')
+  const env = url === undefined ? process.env : { ...process.env, DATABASE_URL: url }
 
   const result = await runWithPoolRetry({
     runAttempt: () => runMigrateDeploy(env),
