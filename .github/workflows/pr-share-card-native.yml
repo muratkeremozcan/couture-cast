@@ -476,6 +476,12 @@ jobs:
               report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
             throw new Error('Incomplete API entry guard execution')
           JS
+      # The device lanes run this too, but they skip pull requests. Running it here makes
+      # a test title change (a Vitest upgrade reformatting test.each names) fail the PR.
+      - name: Verify localized native accessibility announcements and focus bridge
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
+        run: |
+          node scripts/e2e-share-card/bridge-a11y.mjs
       - name: Genuine browser share-card acceptance matrix
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
         run: |

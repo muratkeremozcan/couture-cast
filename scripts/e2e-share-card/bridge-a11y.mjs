@@ -41,12 +41,14 @@ const states = [
   'finishingSave',
   'nativeSaveUnavailable',
 ]
+// These are the titles Vitest 5 renders for the spec's test.each templates. Vitest 5
+// prints a string $value without quotes; Vitest 4 rendered `$locale` as 'en-US'.
 const cases = shareCardAuditLocales
   .flatMap((locale) => [
     ...states.map((state) => ({
       locale,
       state,
-      name: `U-A11Y: '${locale}' '${state}' posts its exact localized announcement with the correct queue`,
+      name: `U-A11Y: ${locale} ${state} posts its exact localized announcement with the correct queue`,
     })),
     {
       locale,
