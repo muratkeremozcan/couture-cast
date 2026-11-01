@@ -1,3 +1,4 @@
+// Story 4.3 Task 3 step 1 owner: implement the shared capsule lock protocol in apps/api/src/modules/wardrobe/wardrobe-capsule.locks.ts
 import { Prisma } from '@prisma/client'
 
 /**

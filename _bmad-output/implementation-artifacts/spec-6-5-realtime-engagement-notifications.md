@@ -81,36 +81,47 @@ contracts, numeric limits and evidence. D1-D10 identify implementation and revie
 
 **Execution:**
 
-- [ ] D2/D8: schema/migrations for transactional domain outboxes, public/private stream heads/events,
+Reconciled 2026-10-31 against the merge `4be0be64` (PR #157) and its green CI rollup. A box is
+ticked when its code merged and an executed test proves it, in CI or in the local acceptance lanes
+PR #157 recorded; the three open boxes say what has not run.
+
+- [x] D2/D8: schema/migrations for transactional domain outboxes, public/private stream heads/events,
       per-post revisions, notification state, subject generations/links, API-only RLS and retention.
-- [ ] D2/D3: all publication/engagement/removal producers take existing member/post locks;
+- [x] D2/D3: all publication/engagement/removal producers take existing member/post locks;
       append committed outboxes under counter locks through commit. Worker, gateway and catch-up
       can assist with bounded idempotent batches. Implement snapshot/replay and typed resync.
 - [ ] D1: deployable dedicated Vercel Socket.IO function, websocket-only clients, authenticated
       eligibility, cross-instance head checks, duration reconnect and measured preview preflight.
-- [ ] D3/D4/D5: canonical community sync/preferences/target and owned token-registration contracts;
+      Open: no protected-preview probe has run, so the hosted 101 upgrade, cross-instance delivery on
+      Vercel and duration reconnect are unproven; lane D proved cross-instance doorbells locally.
+- [x] D3/D4/D5: canonical community sync/preferences/target and owned token-registration contracts;
       real wrappers, OpenAPI/SDK generation and legacy compatibility.
-- [ ] D5: verified Supabase session bridge on web/mobile, native secure persistence/refresh,
+- [x] D5: verified Supabase session bridge on web/mobile, native secure persistence/refresh,
       OS permission, Expo registration/rotation/unbind, startup and response listeners.
-- [ ] D6/D7: qualifying intent identities, recipient union, token fanout, coalescing, quiet-hour/DST
+- [x] D6/D7: qualifying intent identities, recipient union, token fanout, coalescing, quiet-hour/DST
       evaluator, expiry, guarded dispatch, terminal uncertainty, tickets/receipts and conditional cleanup.
-- [ ] D7/D8: dedicated privacy lock namespaces and verified global order, server-bounded guard
+- [x] D7/D8: dedicated privacy lock namespaces and verified global order, server-bounded guard
       lifetime, per-subject fences for every recipient/actor/author, erasure of identifying
       artifacts and late-callback suppression; retain required moderation audit.
-- [ ] D3/D9: shared reconciliation, revisions/request ownership, fallback and teardown;
+- [x] D3/D9: shared reconciliation, revisions/request ownership, fallback and teardown;
       passive reaction/comment updates, accessible new-look insertion and preserved drafts.
-- [ ] D4/D5/D9: localized controls and exact paginated target routing, warm/background/cold
+- [x] D4/D5/D9: localized controls and exact paginated target routing, warm/background/cold
       notification taps and safe inaccessible-target fallback.
-- [ ] D1/D8: shared per-member remote-only flag cache, bounded refresh/expiry, fail-closed
+      The taps are proven on an Android emulator and an iOS simulator by the local native runner.
+- [x] D1/D8: shared per-member remote-only flag cache, bounded refresh/expiry, fail-closed
       outage behavior, cohort-preserving authorization and cache erasure.
-- [ ] D5/D7: canonical profile-resolved native app identity and generation/owner-conditional
+- [x] D5/D7: canonical profile-resolved native app identity and generation/owner-conditional
       token cleanup across every shared weather/community caller and both worker compositions.
-- [ ] D7/D10: align affected local/CI isolated database services with PostgreSQL17+; assert
+- [x] D7/D10: align affected local/CI isolated database services with PostgreSQL17+; assert
       runtime server version and effective timeout/pooler behavior in the guard lane.
 - [ ] D8/D10: content-free deduplicated telemetry, backlog/uncertainty/latency metrics,
       independent worker loops and measured supported capacity.
+      Open: capacity was measured at the 500-token floor; the largest real timezone herd needs a
+      production cohort count, and production pool and Supavisor limits are unmeasured.
 - [ ] D10: factories, policy/unit, real database/worker fault tests, Pact, two-identity Playwright,
       native iOS/Android notification builds and protected-preview WebSocket evidence.
+      Open: no physical device received a push (N3), no protected-preview WebSocket run exists, and
+      the acceptance specs and `scripts/run-story65-native.mjs` run in no CI workflow.
 
 **Acceptance Criteria:**
 

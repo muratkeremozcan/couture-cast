@@ -1,3 +1,4 @@
+// Story 4.4 Task 3 step 2 owner: expose WardrobeOnboardingController REST endpoints in apps/api/src/modules/wardrobe/wardrobe-onboarding.controller.ts
 // Story 4.4 Task 3: onboarding state machine HTTP surface
 import {
   BadRequestException,
