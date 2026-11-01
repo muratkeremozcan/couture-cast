@@ -31,9 +31,9 @@ vi.mock('expo-router', () => ({
   Stack: { Screen: () => null },
 }))
 
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({ capture: vi.fn(), getDistinctId: () => 'test-user-id' }),
-}))
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock()
+)
 
 vi.mock('@/src/hooks/use-accessibility-announcer', () => ({
   useAccessibilityAnnouncer: () => ({ announce: vi.fn() }),
