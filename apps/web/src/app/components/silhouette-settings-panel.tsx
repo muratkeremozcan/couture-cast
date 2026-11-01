@@ -1,3 +1,4 @@
+// Story 4.4 Task 5 step 2 owner: implement the shared web silhouette settings panel in apps/web/src/app/components/silhouette-settings-panel.tsx
 // Story 4.4 Task 5 owner: web silhouette sliders + "My Form" photo settings panel,
 // reachable both inline as the onboarding silhouette step and standalone (decision 3).
 'use client'

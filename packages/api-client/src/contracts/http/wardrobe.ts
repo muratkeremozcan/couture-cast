@@ -1,3 +1,5 @@
+// Story 4.4 Task 2 step 1 owner: define onboarding-state and silhouette HTTP contracts and Zod schemas in packages/api-client/src/contracts/http/wardrobe.ts
+// Story 4.3 Task 2 step 1 owner: define Outfit Capsule HTTP contracts and Zod schemas in packages/api-client/src/contracts/http/wardrobe.ts
 import { withRequestDeadline } from '../../request-deadline'
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 // Story 4.1 Task 4 step 1 owner: define Zod request and response envelope schemas and uploadGarmentBytes helper

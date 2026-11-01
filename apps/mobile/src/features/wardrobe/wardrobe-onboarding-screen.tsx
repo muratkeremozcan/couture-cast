@@ -1,3 +1,4 @@
+// Story 4.4 Task 6 step 1 owner: implement the mobile guided onboarding screen in apps/mobile/src/features/wardrobe/wardrobe-onboarding-screen.tsx
 // Story 4.4 Task 6 owner: guided mobile wardrobe onboarding, mirroring the Web
 // flow (Task 5): a permission step, a capture/tagging loop that reuses the
 // extracted MobileGarmentCaptureModal and the existing MobileGarmentTaggingModal

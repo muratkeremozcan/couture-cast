@@ -25,6 +25,9 @@ Moved Step 49 to completed after PR #167 merged as `6d92598f`.
 Moved Step 39 to completed, since PR #151 closed Story 6.2.
 Corrected `Current position`, which said six of the eight Community Beta signatures stay open; the Story 6.2b payload lists seven.
 Rewrote the whole document in plain voice, one sentence per line.
+Added the missing source owner anchors for Steps 30 to 33 and pointed two descriptive Step 33 labels at real files.
+Replaced the absent `apps/api/src/admin/admin.cron.spec.ts` in Step 5's test map with the maintenance processor and scheduler specs that replaced it.
+Recorded in Step 39 that PR #151 closed Story 6.2, and in Step 44 that the schema comment on the area columns now names the NFKD fold.
 
 Earlier (2026-09-08): added Step 39 for Story 6.2, production content-screening readiness, from `feat/epic6-story2` (PR #144) while the story was `in-progress` and its test-architecture review was in flight.
 It covers the bundled NSFW model, the supervised inference process, the seven-language text screener and the measurement payload Story 6.2b consumes.
@@ -737,9 +740,12 @@ Worker and operator unit tests:
   proves bounded DLQ listing, queue filtering, retention, replay, and preservation of a failed record when requeueing fails.
 - [`apps/api/src/admin/admin.controller.spec.ts`](../../apps/api/src/admin/admin.controller.spec.ts):
   proves the operator controller delegates list and replay requests to the service with the requested queue and job identity.
-- Historical reference: `apps/api/src/admin/admin.cron.spec.ts`:
-  the original test map assigns scheduled 30-day pruning and scheduler survival after pruning failure to this suite.
-  This file is absent from the current checkout, so that direct coverage remains unverified.
+- [`apps/api/src/workers/maintenance.processor.spec.ts`](../../apps/api/src/workers/maintenance.processor.spec.ts):
+  proves the `maintenance` queue job prunes dead-letter records against the 30-day retention window, and that a prune failure is logged and rethrown so BullMQ retries it.
+  It replaced `admin.cron.spec.ts` when `283b7896` (PR #133) moved the `@Cron` sweeps onto BullMQ job schedulers.
+- [`apps/api/src/workers/maintenance.scheduler.spec.ts`](../../apps/api/src/workers/maintenance.scheduler.spec.ts):
+  proves the scheduler registers exactly the five sweeps, the prune among them, and stays idempotent across worker restarts.
+  Neither maintenance spec carries a Step cross-link comment, because `apps/api/src/workers` is in the Story 6.2b screening input set.
 - [`apps/api/src/workers/shutdown-resources.spec.ts`](../../apps/api/src/workers/shutdown-resources.spec.ts):
   proves dependency-ordered shutdown, continued cleanup after rejection, and forced disconnect after the graceful deadline.
 
@@ -4201,9 +4207,9 @@ Task owner map:
 - Story 5.1 Task 5 step 1 owner: verify signatures and persist conversions in `apps/api/src/modules/commerce/affiliate-webhook.service.ts`.
 - Story 5.1 Task 6 step 1 owner: render the disclosed Mobile CTA in `apps/mobile/components/hero/outfit-recommendation-card.tsx`.
 - Story 5.1 Task 6 step 2 owner: strip commerce before device caching in `apps/mobile/app/(tabs)/index.tsx`.
-- Story 5.1 Tasks 6 and 7 step 1 owner: implement Mobile and Web preference controls in their settings surfaces.
+- Story 5.1 Tasks 6 and 7 step 1 owner: implement Mobile and Web preference controls in `apps/mobile/app/(tabs)/settings.tsx` and `apps/web/src/app/components/commerce-preferences-section.tsx`.
 - Story 5.1 Task 8 step 1 owner: prove consumer and provider compatibility in `pact/http/consumer/` and `pact/http/provider/`.
-- Story 5.1 Tasks 9 and 10 step 1 owner: record E2E, accessibility, query-plan, performance, and verification evidence in the test suites and release QA artifact.
+- Story 5.1 Tasks 9 and 10 step 1 owner: record E2E, accessibility, query-plan, performance, and verification evidence in the test suites and `_bmad-output/test-artifacts/story-5.1-release-qa.md`.
 
 Tests that cover this step:
 
@@ -6124,6 +6130,7 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/6-2-production-content-screening-readiness.md`.
   Its Decision 2 and Decision 7 were both corrected during implementation to match executed behaviour.
+  The story merged as `1a678c51` (PR #144), and `abfdf88a` (PR #151) closed it by landing its Task 6 regression gate and Task 8 localized reason copy and setting its status to `done`.
 - `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md` for the deployment, the corpus and the signature this story leaves to 6.2b.
 
 Cross-links:
@@ -7645,7 +7652,7 @@ Cross-links:
 Sequence to follow:
 
 1. `packages/utils/src/spotlight-area.ts`: how text becomes an ISO country and folded region and city.
-   The doc comment on the area columns in `packages/db/prisma/schema.prisma` still says NFKC; the code folds with NFKD.
+   The doc comment on the area columns in `packages/db/prisma/schema.prisma` said NFKC until 2026-10-31; it now names the NFKD fold the code runs.
 2. `packages/db/prisma/migrations/20261022120000_community_city_spotlight/migration.sql`, `20261022130000_community_spotlight_read_limit/migration.sql` and `20261022140000_community_spotlight_window_indexes/migration.sql`: columns, CHECKs, RLS and the indexes each level reads through.
 3. `apps/api/src/modules/community/community-spotlight-ranking.ts`: the pinned constants and the pure score.
 4. `apps/api/src/modules/community/community-spotlight.repository.ts`: cohort and ranking in one repeatable-read transaction, and the locked read window.

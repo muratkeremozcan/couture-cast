@@ -1,3 +1,4 @@
+// Story 4.4 Task 4 step 1 owner: implement the heuristic silhouette photo moderation engine in apps/api/src/modules/wardrobe/heuristic-silhouette-photo-moderation.engine.ts
 // Story 4.4 Task 4: conservative safety-net heuristic (decisions 8-9). This is
 // NOT a substitute for a vendor-grade moderation service -- it is a
 // first-line guardrail using the same Sharp region-stats primitive

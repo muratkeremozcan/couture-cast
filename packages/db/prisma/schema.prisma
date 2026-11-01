@@ -627,11 +627,13 @@ model LookbookPost {
   location_key                 String?
   locale                       String?
   climate_band                 ClimateBand?
-  /// Story 6.6 coarse area components, normalized (trimmed, NFKC, lowercased)
-  /// and stamped at submission from the author's chosen saved location. Only a
-  /// hierarchical prefix is stored (CHECK `LookbookPost_area_hierarchical`), and
-  /// anonymization clears them with `location_key` (CHECK
-  /// `LookbookPost_area_cleared_when_anonymized`).
+  /// Story 6.6 coarse area components, stamped at submission from the author's
+  /// chosen saved location by `canonicalSpotlightArea` in `@couture/utils`:
+  /// the country as its ISO 3166-1 alpha-2 code, region and city folded by
+  /// `foldAreaComponent` (trimmed, NFKD with combining marks removed, NFC,
+  /// lowercased, whitespace collapsed). Only a hierarchical prefix is stored
+  /// (CHECK `LookbookPost_area_hierarchical`), and anonymization clears them
+  /// with `location_key` (CHECK `LookbookPost_area_cleared_when_anonymized`).
   area_country                 String?
   area_region                  String?
   area_city                    String?
@@ -884,6 +886,7 @@ model JobFailure {
   @@index([job_id, queue_name])
 }
 
+// Story 4.4 Task 1 step 1 owner: define WardrobeOnboardingState and SilhouetteProfile models, enums, and RLS policies in packages/db/prisma/schema.prisma
 /// RLS: one row per user recording server-authoritative onboarding progress
 /// (decision 3). Absent or `not_started` means the client renders the virtual
 /// default; a row is created only once the flow actually starts.
@@ -1040,6 +1043,7 @@ model TelemetryEvent {
   @@map("telemetry_events")
 }
 
+// Story 4.3 Task 1 step 1 owner: define OutfitCapsule and OutfitCapsuleGarment models in packages/db/prisma/schema.prisma
 /// RLS: outfit capsules are scoped to user_id
 model OutfitCapsule {
   id                       String                 @id @default(cuid())

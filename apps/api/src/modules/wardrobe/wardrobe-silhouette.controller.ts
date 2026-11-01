@@ -1,3 +1,4 @@
+// Story 4.4 Task 3 step 4 owner: expose WardrobeSilhouetteController REST endpoints in apps/api/src/modules/wardrobe/wardrobe-silhouette.controller.ts
 // Story 4.4 Task 3 + 4: silhouette sliders and "My Form" photo HTTP surface
 import {
   BadRequestException,

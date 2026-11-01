@@ -1,4 +1,5 @@
 <!-- markdownlint-disable MD013 -->
+<!-- Story 5.1 Tasks 9 and 10 step 1 owner: record E2E, accessibility, query-plan, performance, and verification evidence in the test suites and `_bmad-output/test-artifacts/story-5.1-release-qa.md` -->
 
 # Story 5.1 Release QA Artifact — Affiliate "Shop this look" CTA
 

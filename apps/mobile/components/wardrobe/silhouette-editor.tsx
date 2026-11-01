@@ -1,3 +1,4 @@
+// Story 4.4 Task 6 step 2 owner: implement the shared mobile silhouette editor in apps/mobile/components/wardrobe/silhouette-editor.tsx
 // Story 4.4 Task 6 owner: shared silhouette editor (sliders + "My Form" photo
 // pipeline). Reused as-is by both the standalone settings screen
 // (wardrobe-silhouette.tsx) and the onboarding silhouette step
