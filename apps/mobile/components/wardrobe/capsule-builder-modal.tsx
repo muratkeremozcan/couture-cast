@@ -1,3 +1,4 @@
+// Story 4.3 Task 6 step 1 owner: implement native mobile CapsuleBuilderModal component in apps/mobile/components/wardrobe/capsule-builder-modal.tsx
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 

@@ -1,3 +1,4 @@
+// Story 4.4 Task 5 step 1 owner: implement the web guided onboarding screen in apps/web/src/app/wardrobe/onboarding/page.tsx
 // Story 4.4 Task 5 owner: guided wardrobe onboarding route. Thin by design: Next.js's
 // generated route types require this file to export nothing but the whitelisted route
 // exports (`default`, `metadata`, ...), so the actual implementation lives in

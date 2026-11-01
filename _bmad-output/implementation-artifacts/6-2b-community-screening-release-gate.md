@@ -254,10 +254,12 @@ that made the three-signature scheme worth having in the first place.
         host-specific steps for Northflank, with Oracle Cloud Always Free and Railway as the recorded
         fallbacks.
 
-- [ ] Task 2: Deploy the worker and wire the canary (AC: 1, 2)
-  - [ ] Deploy the image to Northflank, pointed at production Redis and PostgreSQL, at one replica
+- [x] Task 2: Deploy the worker and wire the canary (AC: 1, 2)
+  - [x] Deploy the image to Northflank, pointed at production Redis and PostgreSQL, at one replica
         with concurrency one inside the sandbox memory envelope. Fall back to Oracle Cloud Always Free
         if the measured RSS does not fit, and to Railway if neither is worth the setup time.
+        Ticked 2026-10-31 from the payload at `abfdf88a`: `deployment.status` is `deployed` on the
+        Northflank Developer Sandbox at one replica and concurrency one.
   - [x] Add `scripts/community-screening-canary.mjs` that enqueues one synthetic safe job, polls the
         post to its terminal state within a bounded wait, and prints queue latency, inference
         duration, disposition, and the persisted engine identity.
@@ -330,10 +332,13 @@ that made the three-signature scheme worth having in the first place.
   - [x] Record which Community Beta gate signatures close here and which remain open, and confirm both
         rollout flags are still disabled.
 
-- [ ] Task 7: Run all applicable quality gates (AC: 1 through 8)
+- [x] Task 7: Run all applicable quality gates (AC: 1 through 8)
   - [x] Run the policy sweep, calibration, safe-corpus evaluation, text evaluation, local canary,
         restart drill, runtime, memory and Redis measurements, and evidence generation end to end.
-  - [ ] Run the hosted canary (waits on Task 2).
+  - [x] Run the hosted canary (waits on Task 2).
+        Ticked 2026-10-31: gate `canary-hosted` reads `passed` in the payload at `abfdf88a`, run at
+        2026-10-17T18:46Z by the sole consumer `community-worker@73670667` with deployed inputs
+        equal to the evidence commit. The completion notes below predate that run.
   - [x] Run `npm run verify:changed` and `npm run validate`.
   - [x] Confirm the story's own documents pass `prettier --check` and `markdownlint-cli2`, because
         `_bmad-output` is not in `.prettierignore` and a malformed story file breaks `npm run lint`.
