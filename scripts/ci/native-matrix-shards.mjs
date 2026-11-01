@@ -1,9 +1,10 @@
 /**
- * Two-way split of the native share-card matrix, one plan per lane that shards it: iOS, the
- * Android API36 matrix and the Android API32 journey. Each shard boots its own simulator or
- * emulator, Supabase, Metro and signed-in account and runs the sections and locales its plan
- * gives it. The runner picks the plan from the platform and the emulator SDK and reads this table
- * through `--shard N/2`; an unsharded run (local runs) runs every section and locale.
+ * The split of the native share-card matrix, one plan per lane that shards it: iOS, the Android
+ * API36 matrix and the Android API32 journey. Each plan names its own shard count. Each shard boots
+ * its own simulator or emulator, Supabase, Metro and signed-in account and runs the sections and
+ * locales its plan gives it. The runner picks the plan from the platform and the emulator SDK and
+ * reads this table through `--shard N/<count>`; an unsharded run (local runs) runs every section
+ * and locale.
  *
  * The split is data, and the tests prove it is a partition: every section and locale belongs to
  * exactly one shard per plan, and the cases a shard must report come from the same table the
@@ -13,8 +14,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-
-export const SHARD_COUNT = 2
 
 export const LOCALES = Object.freeze([
   'en-US',
@@ -89,24 +88,49 @@ const lifecycle = ['large-text', 'precommit-lifecycle', 'save-lifecycle']
  * it); iOS names its commands in native-ios-shards.mjs. `minutes` is what each part took on the
  * run named beside it: `shardSetup` is what every shard repeats (emulator boot inside the journey
  * step, install and open, sign-in and the en-US Settings locale the matrix starts from), and
- * `save-lifecycle` includes its sign-in after sign-out.
+ * `save-lifecycle` includes its sign-in after sign-out. iOS measures from job start, because its
+ * shard step also boots the simulator and opens the app before the first command.
  */
 export const MATRIX_SHARD_PLANS = Object.freeze({
+  // Four shards: the free plan runs five macOS jobs at once, and ios-expo-go takes the fifth. Two
+  // shards took 50 and 58 minutes on main run 41312266186. Shard 1 proves the original beside the
+  // pre-locale section; the other three set the same Photos permission with permission-baseline.
+  // Nominal jobs from job start: 30.0, 32.0, 32.8 and 30.8 minutes.
   ios: Object.freeze({
     platform: 'ios',
     shards: Object.freeze({
-      1: shard(['pre-locale', 'prefs-failed'], LOCALES.slice(0, 5)),
-      2: shard(lifecycle, LOCALES.slice(5)),
+      1: shard(['pre-locale', 'prefs-failed'], []),
+      2: shard(lifecycle, LOCALES.slice(0, 3)),
+      3: shard([], LOCALES.slice(3, 5)),
+      4: shard([], LOCALES.slice(5)),
+    }),
+    // Main runs 41246754892 and 41312266186, from the shard job logs: the job start to the first
+    // signed-in account, then each command; the locale is the matrix remainder per locale.
+    minutes: Object.freeze({
+      shardSetup: 13.0,
+      proof: 5.0,
+      'permission-baseline': 0.3,
+      'rapid-watermark': 2.7,
+      a11y: 9.0,
+      'fallback-focus': 3.0,
+      'share-sheet': 5.5,
+      'pre-locale': 11.5,
+      locale: 2.4,
+      'large-text': 1.0,
+      'precommit-lifecycle': 4.5,
+      'save-lifecycle': 6.0,
+      'prefs-failed': 0.5,
     }),
   }),
-  // The iOS sections with one more locale in shard 1, because the lifecycle sections weigh 13.0
-  // minutes against 7.5 for pre-locale and prefs-failed. Nominal journey steps: shard 1 23.8
-  // minutes, shard 2 25.9. Run 41202706840 took 32.0 and 34.3.
+  // Three shards: pre-locale and prefs-failed with three locales, the lifecycle sections, and the
+  // other seven locales. Two shards took 33.8 and 34.1 minute journey steps on main run
+  // 41312266186. Nominal journey steps: 18.7, 19.2 and 18.0 minutes.
   'android-36': Object.freeze({
     platform: 'android',
     shards: Object.freeze({
-      1: shard(['pre-locale', 'prefs-failed'], LOCALES.slice(0, 6)),
-      2: shard(lifecycle, LOCALES.slice(6)),
+      1: shard(['pre-locale', 'prefs-failed'], LOCALES.slice(0, 3)),
+      2: shard(lifecycle, []),
+      3: shard([], LOCALES.slice(3)),
     }),
     unsharded: Object.freeze(['matrix']),
     // Main run 41104845732: the whole matrix in one 43.4 minute journey step.
@@ -120,19 +144,21 @@ export const MATRIX_SHARD_PLANS = Object.freeze({
       'prefs-failed': 0.5,
     }),
   }),
-  // proof and rapid-watermark ride with pre-locale and prefs-failed, which balances at five
-  // locales each. proof grants WRITE_EXTERNAL_STORAGE through Settings, so shard 2 sets the same
-  // grant with permission-baseline before its Saves. Nominal journey steps: shard 1 35.6
-  // minutes, shard 2 34.4.
+  // Three shards: proof and rapid-watermark ride with pre-locale and prefs-failed, the lifecycle
+  // sections take one locale and the third shard the other eight. proof grants
+  // WRITE_EXTERNAL_STORAGE through Settings, so shards 2 and 3 set the same grant with
+  // permission-baseline before their matrix. Two shards took 30.4 and 34.0 minute journey steps on
+  // main run 41312266186. Nominal journey steps: 26.7, 25.5 and 25.1 minutes.
   'android-32': Object.freeze({
     platform: 'android',
     shards: Object.freeze({
-      1: shard(['pre-locale', 'prefs-failed'], LOCALES.slice(0, 5), [
+      1: shard(['pre-locale', 'prefs-failed'], LOCALES.slice(0, 1), [
         'proof',
         'matrix',
         'rapid-watermark',
       ]),
-      2: shard(lifecycle, LOCALES.slice(5), ['permission-baseline', 'matrix']),
+      2: shard(lifecycle, LOCALES.slice(1, 2), ['permission-baseline', 'matrix']),
+      3: shard([], LOCALES.slice(2), ['permission-baseline', 'matrix']),
     }),
     unsharded: Object.freeze(['proof', 'matrix', 'rapid-watermark']),
     // Run 41202706840: proof, the matrix and rapid-watermark in one 62.7 minute journey step.
@@ -172,11 +198,14 @@ export function shardPlanFor(platform, sdk) {
 
 export const shardsOf = (plan) => Object.keys(planOf(plan).shards).map(Number)
 
-/** `1/2` or `2/2` to the shard number; anything else throws. */
+/** How many shards the plan runs. */
+export const shardCountOf = (plan) => shardsOf(plan).length
+
+/** `N/<count>` to the shard number N of the plan; anything else throws. */
 export function parseShard(plan, value) {
   const { shards } = planOf(plan)
   const m = /^([1-9])\/([1-9])$/.exec(String(value ?? ''))
-  if (!m || Number(m[2]) !== SHARD_COUNT || !shards[Number(m[1])])
+  if (!m || Number(m[2]) !== shardCountOf(plan) || !shards[Number(m[1])])
     throw new Error(`${plan}_shard_invalid:${value}`)
   return Number(m[1])
 }
@@ -205,15 +234,18 @@ export function expectedMatrixCases(plan, shard) {
   ].sort()
 }
 
-/** Expected journey-step minutes of an Android shard, or of the unsharded lane with none. */
-export function nominalMinutes(plan, shard) {
+/**
+ * Expected minutes of a shard, or of the unsharded lane with none: the journey step on Android,
+ * the job on iOS. iOS passes the harness commands its own plan names.
+ */
+export function nominalMinutes(plan, shard, commands = commandsForShard(plan, shard)) {
   const { minutes } = planOf(plan)
   if (!minutes) throw new Error(`shard_plan_unmeasured:${plan}`)
   const work = [
     ...Object.keys(MATRIX_SECTIONS[planPlatform(plan)]).filter((section) =>
       inMatrixSection(plan, shard, section)
     ),
-    ...commandsForShard(plan, shard).filter((command) => command !== 'matrix'),
+    ...commands.filter((command) => command !== 'matrix'),
   ].reduce((sum, part) => sum + minutes[part], 0)
   const total =
     minutes.shardSetup + work + localesForShard(plan, shard).length * minutes.locale
@@ -270,7 +302,9 @@ if (
     const [action, plan, value] = process.argv.slice(2)
     if (action === 'merge') {
       const total = assertShardEvidence(plan, readShardReports(plan, value))
-      console.log(`Both ${plan} matrix shards reported ${total} cases.`)
+      console.log(
+        `All ${shardCountOf(plan)} ${plan} matrix shards reported ${total} cases.`
+      )
     } else if (action === 'cases')
       console.log(expectedMatrixCases(plan, parseShard(plan, value)).join('\n'))
     else throw new Error('matrix_shard_action_invalid')

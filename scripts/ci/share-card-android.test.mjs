@@ -72,8 +72,10 @@ describe('Android SDK guard', () => {
   const suites = [
     ['32', 'all-1', ['proof', 'matrix', 'rapid-watermark'], []],
     ['32', 'all-2', ['permission-baseline', 'matrix'], []],
+    ['32', 'all-3', ['permission-baseline', 'matrix'], []],
     ['36', 'matrix-1', ['matrix'], []],
     ['36', 'matrix-2', ['matrix'], []],
+    ['36', 'matrix-3', ['matrix'], []],
     ['36', 'original', ['proof'], []],
     ['36', 'controls', ['rapid-watermark', 'a11y', 'fallback-focus'], []],
     [
@@ -121,7 +123,14 @@ describe('Android SDK guard', () => {
 
   test('the Android36 partitions together cover every proof command once and the matrix once per shard', async (t) => {
     const ran = []
-    for (const suite of ['matrix-1', 'matrix-2', 'original', 'controls', 'interaction']) {
+    for (const suite of [
+      'matrix-1',
+      'matrix-2',
+      'matrix-3',
+      'original',
+      'controls',
+      'interaction',
+    ]) {
       const { result, commands } = await journey(t, '36', '36', 0, undefined, { suite })
       assert.equal(result.status, 0, result.stderr)
       ran.push(
@@ -138,17 +147,18 @@ describe('Android SDK guard', () => {
       'font',
       'matrix',
       'matrix',
+      'matrix',
       'proof',
       'rapid-watermark',
       'share-sheet',
     ])
   })
 
-  // The API32 journey was proof, the matrix and rapid-watermark in one lane. Its two shards
+  // The API32 journey was proof, the matrix and rapid-watermark in one lane. Its three shards
   // together run each of those once and the matrix once per shard.
   test('the API32 shards together cover proof and rapid-watermark once and the matrix once per shard', async (t) => {
     const ran = []
-    for (const suite of ['all-1', 'all-2']) {
+    for (const suite of ['all-1', 'all-2', 'all-3']) {
       const { result, commands } = await journey(t, '32', '32', 0, undefined, { suite })
       assert.equal(result.status, 0, result.stderr)
       ran.push(...owned.filter((command) => commands.includes(`mjs ${command} `)))
@@ -156,6 +166,8 @@ describe('Android SDK guard', () => {
     assert.deepEqual([...ran].sort(), [
       'matrix',
       'matrix',
+      'matrix',
+      'permission-baseline',
       'permission-baseline',
       'proof',
       'rapid-watermark',
@@ -167,7 +179,7 @@ describe('Android SDK guard', () => {
     ['32', 'android-32', 'all'],
     ['36', 'android-36', 'matrix'],
   ])
-    for (const shard of [1, 2])
+    for (const shard of [1, 2, 3])
       test(`API${sdk} shard ${shard} runs the commands its ${plan} plan names, in order`, async (t) => {
         const { result, commands } = await journey(t, sdk, sdk, 0, undefined, {
           suite: `${prefix}-${shard}`,
@@ -180,7 +192,7 @@ describe('Android SDK guard', () => {
         assert.deepEqual(ran, commandsForShard(plan, shard))
         assert.match(
           commands,
-          new RegExp(`mjs matrix --platform android --device \\S+ --shard ${shard}/2\\n`)
+          new RegExp(`mjs matrix --platform android --device \\S+ --shard ${shard}/3\\n`)
         )
       })
 
@@ -200,9 +212,11 @@ describe('Android SDK guard', () => {
     for (const [sdk, suite] of [
       ['32', 'all-1'],
       ['32', 'all-2'],
+      ['32', 'all-3'],
       ['36', 'controls'],
       ['36', 'matrix-1'],
       ['36', 'matrix-2'],
+      ['36', 'matrix-3'],
       ['36', 'original'],
     ]) {
       const other = await journey(t, sdk, sdk, 0, undefined, { suite })
@@ -214,7 +228,7 @@ describe('Android SDK guard', () => {
   // Spec Never: the android36-native-matrix workload does not change. Each shard runs the exact
   // pre-Story-6.9 command list, byte for byte, with only its own shard added to the matrix command;
   // native-matrix-shards.test.mjs proves the two shards report all 43 matrix cases.
-  for (const shard of [1, 2])
+  for (const shard of [1, 2, 3])
     test(`API36 matrix shard ${shard} runs exactly the pre-Story-6.9 command list for its shard`, async (t) => {
       const { result, commands } = await journey(t, '36', '36', 0, undefined, {
         suite: `matrix-${shard}`,
@@ -229,35 +243,37 @@ describe('Android SDK guard', () => {
           `adb -s ${serial} install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`,
           `node scripts/run-story68-native.mjs open --platform android --device ${serial}`,
           `node scripts/run-story68-native.mjs signin --platform android --device ${serial}`,
-          `node scripts/run-story68-native.mjs matrix --platform android --device ${serial} --shard ${shard}/2`,
+          `node scripts/run-story68-native.mjs matrix --platform android --device ${serial} --shard ${shard}/3`,
           '',
         ].join('\n')
       )
     })
 
-  test('API32 shard 1 reinitializes the owned app for its proof; shard 2 never does', async (t) => {
+  test('API32 shard 1 reinitializes the owned app for its proof; shards 2 and 3 never do', async (t) => {
     const one = await journey(t, '32', '32', 0, undefined, { suite: 'all-1' })
-    const two = await journey(t, '32', '32', 0, undefined, { suite: 'all-2' })
     assert.equal(one.result.status, 0, one.result.stderr)
-    assert.equal(two.result.status, 0, two.result.stderr)
     assert.match(
       one.commands,
       /mjs proof --platform android --device \S+ --reinitialize-owned-app yes\n/
     )
-    assert.doesNotMatch(two.commands, /reinitialize-owned-app|mjs proof /)
+    for (const suite of ['all-2', 'all-3']) {
+      const other = await journey(t, '32', '32', 0, undefined, { suite })
+      assert.equal(other.result.status, 0, other.result.stderr)
+      assert.doesNotMatch(other.commands, /reinitialize-owned-app|mjs proof /)
+    }
   })
 
   for (const [name, sdk, suite] of [
     ['an unpartitioned API36 run', '36', 'all'],
     ['an unsharded API32 run', '32', 'all'],
-    ['a third API32 shard', '32', 'all-3'],
+    ['a fourth API32 shard', '32', 'all-4'],
     ['an API32 shard on API36', '36', 'all-1'],
     ['the controls suite on API32', '32', 'controls'],
     ['an empty API36 suite', '36', ''],
     ['an unknown API36 suite', '36', 'browser'],
     ['an Android36 suite on API32', '32', 'matrix-1'],
     ['an unsharded API36 matrix', '36', 'matrix'],
-    ['a third API36 matrix shard', '36', 'matrix-3'],
+    ['a fourth API36 matrix shard', '36', 'matrix-4'],
     ['an API36 matrix shard zero', '36', 'matrix-0'],
     ['an empty API32 suite', '32', ''],
     ['a mixed-case suite', '36', 'Matrix-1'],
@@ -280,6 +296,8 @@ describe('Android SDK guard', () => {
     ['32', 'all-1', 'mjs proof ', 'mjs matrix '],
     ['32', 'all-1', 'mjs matrix ', 'rapid-watermark'],
     ['32', 'all-2', 'mjs permission-baseline ', 'mjs matrix '],
+    ['32', 'all-3', 'mjs permission-baseline ', 'mjs matrix '],
+    ['36', 'matrix-3', 'mjs matrix ', null],
   ]) {
     test(`a failing ${failOn.trim()} command fails the API${sdk} ${suite} suite and stops later proofs`, async (t) => {
       const { result, commands } = await journey(t, sdk, sdk, 0, undefined, {
@@ -296,11 +314,13 @@ describe('Android SDK guard', () => {
     for (const [sdk, suite] of [
       ['36', 'matrix-1'],
       ['36', 'matrix-2'],
+      ['36', 'matrix-3'],
       ['36', 'original'],
       ['36', 'controls'],
       ['36', 'interaction'],
       ['32', 'all-1'],
       ['32', 'all-2'],
+      ['32', 'all-3'],
     ]) {
       const { result, commands } = await journey(t, sdk, sdk, 0, undefined, {
         suite,

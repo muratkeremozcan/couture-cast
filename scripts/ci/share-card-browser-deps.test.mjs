@@ -443,12 +443,13 @@ describe('browser dependency workflow', () => {
     }
     const original = workflow.jobs['original-resource'].steps
     assert.equal(provisioningOf(original)[0].if, "matrix.platform == 'android'")
-    const iosSteps = workflow.jobs['ios-build'].steps
+    // ios-expo-go runs the client-free iOS checks after its proof, whatever the proof's outcome.
+    const iosSteps = workflow.jobs['ios-expo-go'].steps
     const mac = iosSteps.find((item) =>
       item.run?.includes('npx --no-install playwright install chromium')
     )
     assert.ok(mac)
-    assert.equal(mac.if, undefined)
+    assert.equal(mac.if, '${{ !cancelled() }}')
     assert.equal(mac['timeout-minutes'], 6)
     assert.equal(mac['continue-on-error'], undefined)
     assert.ok(iosSteps.indexOf(mac) < bridge(iosSteps))

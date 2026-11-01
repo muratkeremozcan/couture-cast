@@ -73,8 +73,8 @@ describe('share-card native step conditions', () => {
     )
   })
 
-  test('the iOS build bridge runs once its runtime and browser succeeded', () => {
-    const iosBridge = workflow.jobs['ios-build'].steps.find(
+  test('the iOS bridge runs once its runtime and browser succeeded', () => {
+    const iosBridge = workflow.jobs['ios-expo-go'].steps.find(
       (row) => row.name === bridge.name
     )
     const iosRuns = (outcomes) =>

@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import test from 'node:test'
-import { spawnIosFlow } from './native-ios-flow-deadline.mjs'
+import { recordIosFlowTiming, spawnIosFlow } from './native-ios-flow-deadline.mjs'
 
 const delayedTermination =
   "process.on('SIGTERM',()=>setTimeout(()=>process.exit(143),300));setInterval(()=>{},1000)"
@@ -69,4 +69,24 @@ test('a failed child launch retains a closed error and timing record', (t) => {
   assert.equal(result.status, 127)
   assert.match(result.stderr, /owned_flow_launch_failed/)
   assert.equal(result.deadline.timedOut, false)
+})
+
+test('the timing log line names the flow while the timing file keeps its shape', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-timing-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const file = path.join(directory, 'flow-timing.json')
+  const deadline = { timeoutMs: 120000, childMs: 900, timedOut: false, wrapperMs: 950 }
+  const lines = []
+  const log = console.log
+  console.log = (line) => lines.push(line)
+  try {
+    recordIosFlowTiming(file, { deadline }, 1000, 'maestro/story68/save.yaml')
+  } finally {
+    console.log = log
+  }
+  const record = JSON.parse(fs.readFileSync(file, 'utf8'))
+  assert.deepEqual(record, { ...deadline, setupMs: 50, harnessMs: 1000 })
+  assert.deepEqual(JSON.parse(lines[0]), {
+    iosFlowDeadline: { flow: 'maestro/story68/save.yaml', ...record },
+  })
 })

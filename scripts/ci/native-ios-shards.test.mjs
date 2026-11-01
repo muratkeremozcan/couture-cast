@@ -8,25 +8,33 @@ import {
   AFTER_MATRIX,
   LOCALES,
   MATRIX_SECTIONS,
+  SHARD_COUNT,
   SHARD_PLAN,
   assertShardEvidence,
   commandsForShard,
   expectedMatrixCases,
   inMatrixSection,
   localesForShard,
+  nominalMinutes,
   parseShard,
   runsCommand,
 } from './native-ios-shards.mjs'
 
+const shards = Object.keys(SHARD_PLAN).map(Number)
 const report = (shard, patch = {}) => ({
   platform: 'ios',
   completed: true,
   cases: expectedMatrixCases(shard).map((id) => ({ id, passed: true })),
   ...patch,
 })
+const all = () => Object.fromEntries(shards.map((shard) => [shard, report(shard)]))
+
+test('four shards: with ios-expo-go they fill the five macOS jobs the free plan runs at once', () => {
+  assert.equal(SHARD_COUNT, 4)
+  assert.deepEqual(shards, [1, 2, 3, 4])
+})
 
 test('every matrix section, locale and command belongs to exactly one shard', () => {
-  const shards = Object.keys(SHARD_PLAN).map(Number)
   for (const section of Object.keys(MATRIX_SECTIONS))
     assert.equal(shards.filter((s) => inMatrixSection(s, section)).length, 1, section)
   for (const locale of LOCALES)
@@ -35,8 +43,32 @@ test('every matrix section, locale and command belongs to exactly one shard', ()
       1,
       locale
     )
-  for (const command of ['proof', 'permission-baseline', ...AFTER_MATRIX])
+  // permission-baseline sets what proof grants, in every shard that does not run proof.
+  for (const command of ['proof', ...AFTER_MATRIX])
     assert.equal(shards.filter((s) => runsCommand(s, command)).length, 1, command)
+  assert.deepEqual(
+    shards.filter((s) => runsCommand(s, 'permission-baseline')),
+    shards.filter((s) => !runsCommand(s, 'proof'))
+  )
+})
+
+test('the shards are balanced by measured minutes and fit their job limit on a runner 1.5x slower', () => {
+  const minutes = shards.map(nominalMinutes)
+  assert.ok(
+    Math.max(...minutes) - Math.min(...minutes) <= 3,
+    `shard minutes ${minutes.join(', ')}`
+  )
+  const workflow = fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
+  const limit = Number(
+    /\n {2}ios-shard:\n(?:.*\n)*? {4}timeout-minutes: (\d+)/.exec(workflow)[1]
+  )
+  for (const shard of shards)
+    assert.ok(
+      nominalMinutes(shard) * 1.5 < limit,
+      `shard ${shard}: ${nominalMinutes(shard)} min`
+    )
+  // The two shards of main run 41312266186 took 50 and 58 minutes.
+  assert.ok(Math.max(...minutes) < 35)
 })
 
 test('no shard runs the Expo Go proof: the ios-expo-go job runs it alone', () => {
@@ -44,7 +76,7 @@ test('no shard runs the Expo Go proof: the ios-expo-go job runs it alone', () =>
     assert.ok(!SHARD_PLAN[shard].commands.includes('expo-go-proof'), `shard ${shard}`)
     assert.ok(!commandsForShard(shard).includes('expo-go-proof'), `shard ${shard}`)
   }
-  assert.deepEqual(commandsForShard(2).at(-1), 'fallback-focus')
+  assert.deepEqual(commandsForShard(3).at(-1), 'fallback-focus')
   assert.ok(!AFTER_MATRIX.includes('expo-go-proof'))
 })
 
@@ -73,50 +105,64 @@ test('no shard is given the unsharded plan by accident', () => {
 })
 
 test('parseShard accepts only a shard of this plan', () => {
-  assert.equal(parseShard('1/2'), 1)
-  assert.equal(parseShard('2/2'), 2)
-  for (const bad of ['3/2', '1/3', '0/2', '', undefined, '1', '1/2; rm'])
+  for (const shard of shards) assert.equal(parseShard(`${shard}/4`), shard)
+  for (const bad of ['5/4', '1/2', '2/2', '1/5', '0/4', '', undefined, '1', '1/4; rm'])
     assert.throws(() => parseShard(bad), /ios_shard_invalid/)
 })
 
-test('merged evidence passes only when both shards completed their exact cases', () => {
-  assert.equal(assertShardEvidence({ 1: report(1), 2: report(2) }), 34)
+test('merged evidence passes only when every shard completed its exact cases', () => {
+  assert.equal(assertShardEvidence(all()), 34)
+})
+
+test('every shard runs matrix work, so no shard reports an empty matrix', () => {
+  for (const shard of shards)
+    assert.ok(SHARD_PLAN[shard].sections.length + SHARD_PLAN[shard].locales.length > 0)
 })
 
 test('a missing, incomplete, failed or foreign shard report fails the merge', () => {
-  assert.throws(() => assertShardEvidence({ 1: report(1) }), /ios_shard_missing:2/)
   assert.throws(
-    () => assertShardEvidence({ 1: report(1, { completed: false }), 2: report(2) }),
-    /ios_shard_evidence_incomplete:1/
+    () => assertShardEvidence({ ...all(), 4: undefined }),
+    /ios_shard_missing:4/
+  )
+  assert.throws(
+    () => assertShardEvidence({ ...all(), 1: report(1, { completed: false }) }),
+    /ios_shard_evidence_incomplete:1$/
   )
   const failed = report(2)
   failed.cases[0].passed = false
   assert.throws(
-    () => assertShardEvidence({ 1: report(1), 2: failed }),
-    /ios_shard_evidence_incomplete:2/
+    () => assertShardEvidence({ ...all(), 2: failed }),
+    /ios_shard_evidence_incomplete:2$/
   )
-  const truncated = report(2)
+  const truncated = report(4)
   truncated.cases.pop()
   assert.throws(
-    () => assertShardEvidence({ 1: report(1), 2: truncated }),
-    /ios_shard_evidence_incomplete:2/
+    () => assertShardEvidence({ ...all(), 4: truncated }),
+    /ios_shard_evidence_incomplete:4$/
   )
   assert.throws(
-    () => assertShardEvidence({ 1: report(2), 2: report(1) }),
-    /ios_shard_evidence_incomplete:1,2/
+    () => assertShardEvidence({ ...all(), 1: report(2), 2: report(1) }),
+    /ios_shard_evidence_incomplete:1,2$/
   )
-  assert.throws(() => assertShardEvidence(undefined), /ios_shard_missing:1,2/)
+  assert.throws(() => assertShardEvidence(undefined), /ios_shard_missing:1,2,3,4/)
 })
 
-test('each shard signs in, only shard 1 proves the original and shard 2 sets the same permissions', () => {
-  assert.deepEqual(commandsForShard(1), ['signin', 'proof', 'matrix', 'share-sheet'])
-  assert.deepEqual(commandsForShard(2), [
+test('each shard signs in, only shard 1 proves the original and the others set the same permissions', () => {
+  assert.deepEqual(commandsForShard(1), ['signin', 'proof', 'matrix'])
+  assert.deepEqual(commandsForShard(2), ['signin', 'permission-baseline', 'matrix'])
+  assert.deepEqual(commandsForShard(3), [
     'signin',
     'permission-baseline',
     'matrix',
     'rapid-watermark',
     'a11y',
     'fallback-focus',
+  ])
+  assert.deepEqual(commandsForShard(4), [
+    'signin',
+    'permission-baseline',
+    'matrix',
+    'share-sheet',
   ])
 })
 
@@ -179,15 +225,16 @@ test('permission-baseline revokes read, grants add-only and asserts both, on iOS
   assert.ok(grant >= 0 && relaunch > grant && tabs > relaunch)
 })
 
-// U-HARNESS-IOS-SHARDS (Story 6.9): share-sheet is dispatchable after the matrix, runs once and in
-// shard 1 only, and shard 2 keeps exactly the commands its AFTER_MATRIX spread gave it before.
-test('share-sheet is a dispatchable post-matrix command that runs exactly once, in shard 1', () => {
+// U-HARNESS-IOS-SHARDS (Story 6.9): share-sheet is dispatchable after the matrix and runs once, in
+// shard 4 after permission-baseline gives its Save the post-proof Photos permission.
+test('share-sheet is a dispatchable post-matrix command that runs exactly once, in shard 4', () => {
   assert.ok(AFTER_MATRIX.includes('share-sheet'))
-  assert.equal(commandsForShard(1).filter((c) => c === 'share-sheet').length, 1)
-  assert.equal(commandsForShard(2).includes('share-sheet'), false)
-  assert.ok(SHARD_PLAN[1].commands.includes('share-sheet'), 'named explicitly in shard 1')
+  assert.equal(commandsForShard(4).filter((c) => c === 'share-sheet').length, 1)
+  for (const shard of [1, 2, 3])
+    assert.equal(commandsForShard(shard).includes('share-sheet'), false)
+  assert.ok(SHARD_PLAN[4].commands.includes('share-sheet'), 'named explicitly in shard 4')
   assert.ok(
-    commandsForShard(1).indexOf('share-sheet') > commandsForShard(1).indexOf('matrix'),
+    commandsForShard(4).indexOf('share-sheet') > commandsForShard(4).indexOf('matrix'),
     'after the matrix'
   )
   assert.equal(
@@ -197,10 +244,10 @@ test('share-sheet is a dispatchable post-matrix command that runs exactly once, 
   )
 })
 
-test('shard 2 lists its commands explicitly and they equal its previous AFTER_MATRIX spread', () => {
-  // Before Story 6.9 shard 2 was ['permission-baseline', ...AFTER_MATRIX] with AFTER_MATRIX
-  // ['rapid-watermark', 'a11y', 'fallback-focus'].
-  assert.deepEqual(SHARD_PLAN[2].commands, [
+test('shard 3 lists its commands explicitly and they equal the old shard 2 AFTER_MATRIX spread', () => {
+  // Before Story 6.9 shard 2 of two was ['permission-baseline', ...AFTER_MATRIX] with AFTER_MATRIX
+  // ['rapid-watermark', 'a11y', 'fallback-focus']; shard 3 of four keeps that list.
+  assert.deepEqual(SHARD_PLAN[3].commands, [
     'permission-baseline',
     'rapid-watermark',
     'a11y',

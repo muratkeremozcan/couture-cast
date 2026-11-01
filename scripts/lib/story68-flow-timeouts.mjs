@@ -196,13 +196,15 @@ const shareSheetTimeoutMs = Math.ceil(
  * watermark, TalkBack and fallback focus proofs moved to android36-controls. On run 41202706840
  * the interaction journey step took 27 min 42 s, of which those three proofs took 6 min 30 s and
  * share-sheet 7 min 53 s, so the lane without share-sheet is 13 min 19 s of its 45 min
- * journey_timeout, leaving 31 min 41 s. iOS shard 1 finished in 49 min of its 100 min job on main
- * run 41104845732, leaving 51 min.
+ * journey_timeout, leaving 31 min 41 s. On iOS share-sheet runs in shard 4, after
+ * permission-baseline and five locales: from the measured parts in native-matrix-shards.mjs that
+ * shard takes 25 min 18 s without share-sheet, leaving 44 min 42 s of its 70 min job.
  */
 export const ANDROID_SHARE_LANE_BASE_MS = 13 * 60_000 + 19_000
+export const IOS_SHARE_LANE_BASE_MS = 25 * 60_000 + 18_000
 export const SHARE_SHEET_LANE_HEADROOM_MS = Object.freeze({
   android: 31 * 60_000 + 41_000,
-  ios: 51 * 60_000,
+  ios: 44 * 60_000 + 42_000,
 })
 /**
  * Expected cost of one Maestro flow in the share-sheet command, hierarchy reads between flows

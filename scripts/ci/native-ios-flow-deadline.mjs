@@ -38,7 +38,11 @@ export function spawnIosFlow(binary, args, options, timingFile) {
   }
 }
 
-export function recordIosFlowTiming(timingFile, result, harnessMs) {
+/**
+ * Writes the flow's timing record and logs it. The log line also names the flow, so the shard
+ * plan can be rebalanced from the job log by measured flow durations; the file keeps its shape.
+ */
+export function recordIosFlowTiming(timingFile, result, harnessMs, flow) {
   if (!result.deadline) return
   const timing = {
     ...result.deadline,
@@ -46,7 +50,9 @@ export function recordIosFlowTiming(timingFile, result, harnessMs) {
     harnessMs,
   }
   fs.writeFileSync(timingFile, JSON.stringify(timing) + '\n', { mode: 0o600 })
-  console.log(JSON.stringify({ iosFlowDeadline: timing }))
+  console.log(
+    JSON.stringify({ iosFlowDeadline: flow === undefined ? timing : { flow, ...timing } })
+  )
 }
 
 export async function runDeadlineWorker(request, timingFile) {
