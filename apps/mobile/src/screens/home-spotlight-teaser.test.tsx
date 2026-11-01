@@ -60,14 +60,11 @@ vi.mock('expo-localization', () => ({
 // Passthrough spies: reads stay on the real HTTP boundary, and the wrapper's own
 // promises tell a test when a read has settled.
 vi.mock('@/src/lib/community', { spy: true })
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
     capture,
-    getDistinctId: () => 'test-user-id',
-    screen: vi.fn(),
-  }),
-  MobileAnalyticsDiagnosticsPanel: () => null,
-}))
+  })
+)
 vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
   const actual = await importOriginal<typeof RitualCacheModule>()
   return {

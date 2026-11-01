@@ -83,6 +83,16 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # Expo's generated gradle.properties gives the Gradle daemon 2 GiB of heap and
+      # 512 MiB of metaspace. The release app, its lint and the module's test APK in one
+      # build ran out of both: D8 hit OutOfMemoryError in run 41251255523, and the daemon
+      # ran out of metaspace before packageDebugAndroidTest failed in run 41256192629.
+      # The user-level gradle.properties takes precedence over the project's.
+      - name: Size the Gradle daemon for the release build
+        run: |
+          mkdir -p ~/.gradle
+          echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:

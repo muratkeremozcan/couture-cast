@@ -146,13 +146,18 @@ export function MobileGarmentTaggingModal({
             const node = safeFindNodeHandle(titleRef.current)
             if (node) AccessibilityInfo.setAccessibilityFocus(node)
           }, 150)
-    const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      onCloseRef.current()
-      return true
-    })
+    // react-native-web's BackHandler is a stub that warns on every call; a browser has no
+    // hardware Back for the sheet to answer.
+    const backSubscription =
+      Platform.OS === 'web'
+        ? null
+        : BackHandler.addEventListener('hardwareBackPress', () => {
+            onCloseRef.current()
+            return true
+          })
     return () => {
       if (focusTimer !== null) clearTimeout(focusTimer)
-      backSubscription.remove()
+      backSubscription?.remove()
       const invoker = invokingNodeHandleRef.current
       if (Platform.OS !== 'web' && invoker) {
         AccessibilityInfo.setAccessibilityFocus(invoker)

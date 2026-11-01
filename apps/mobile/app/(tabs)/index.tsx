@@ -13,6 +13,7 @@ import {
 } from '@couture/api-client'
 import {
   type ComponentRef,
+  type RefObject,
   useCallback,
   useEffect,
   useRef,
@@ -270,6 +271,10 @@ export default function TabOneScreen() {
   // toggle away and back re-renders the same card. One card is one impression.
   const trackedCtaImpressions = useRef(new Set<string>())
   const scrollViewRef = useRef<ScrollView>(null)
+  // The scroll content's host view. measureLayout takes a host component ref under the new
+  // architecture; a node handle from getInnerViewNode() is rejected with a warning, and
+  // neither callback runs.
+  const scrollContentRef = useRef<NativeView>(null)
   const focusedAlertRef = useRef<NativeView>(null)
   const focusedAlertY = useRef(0)
   const firstSwapOptionRef = useRef<ComponentRef<typeof Pressable>>(null)
@@ -543,18 +548,14 @@ export default function TabOneScreen() {
       }
 
       const focusedAlert = focusedAlertRef.current
-      const contentNode = scrollViewRef.current?.getInnerViewNode() as
-        | number
-        | NativeView
-        | null
-        | undefined
-      if (!focusedAlert || contentNode === undefined || contentNode === null) {
+      const content = scrollContentRef.current
+      if (!focusedAlert || !content) {
         scrollToAlert(focusedAlertY.current)
         return
       }
 
       focusedAlert.measureLayout(
-        contentNode,
+        content,
         (_x, y) => {
           focusedAlertY.current = y
           scrollToAlert(y)
@@ -739,6 +740,8 @@ export default function TabOneScreen() {
     >
       <ScrollView
         ref={scrollViewRef}
+        // React Native's typings predate React 19's nullable RefObject.
+        innerViewRef={scrollContentRef as RefObject<NativeView>}
         style={[styles.container, { backgroundColor: palette.background }]}
         contentContainerStyle={styles.contentContainer}
         stickyHeaderIndices={[0]}

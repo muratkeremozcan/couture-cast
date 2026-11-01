@@ -6,7 +6,8 @@ import type { View } from 'react-native'
 import { act, screen } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { initI18n } from '@/src/lib/i18n'
 import { InfoBanner } from './info-banner'
 
 const banner = () => screen.getByTestId('deep-link-info-banner')
@@ -14,6 +15,11 @@ const dismissButton = () =>
   banner().querySelector<HTMLElement>('[role="button"]') as HTMLElement
 
 describe('6.7 InfoBanner', () => {
+  // The dismiss control's label comes from the app's i18n instance.
+  beforeAll(async () => {
+    await initI18n()
+  })
+
   it('6.7-MOB-042 forwards its ref to the message node a caller moves focus to', async () => {
     const ref = createRef<View>()
     await render(<InfoBanner ref={ref} message="Look unavailable." />)

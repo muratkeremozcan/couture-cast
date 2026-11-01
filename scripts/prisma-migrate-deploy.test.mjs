@@ -14,6 +14,8 @@ const wrapperFiles = [
   'scripts/local-e2e-database.mjs',
   'scripts/lib/caller-owned-env.mjs',
   'scripts/lib/prisma-migrate-connection.mjs',
+  'scripts/lib/database-tls.mjs',
+  'apps/api/certs/supabase-root-2021-ca.pem',
 ]
 const EXHAUSTED =
   'FATAL: (EMAXCONNSESSION) max clients reached in session mode - max clients are limited to pool_size: 15'
@@ -21,8 +23,19 @@ const SESSION =
   'postgresql://postgres.abcref:pw@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require'
 const TRANSACTION =
   'postgresql://postgres.abcref:pw@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=5'
+const LOCAL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
 let directory
+
+/** The URL the wrapper hands prisma for `url`: verified against the copied CA. */
+function verified(url) {
+  // Node runs the copied wrapper from its real path (macOS tmpdir is a symlink).
+  const ca = path.join(
+    fs.realpathSync(directory),
+    'apps/api/certs/supabase-root-2021-ca.pem'
+  )
+  return `${url}&sslcert=${ca}&sslaccept=strict`
+}
 
 beforeEach(() => {
   directory = fs.mkdtempSync(path.join(os.tmpdir(), 'prisma-migrate-deploy-'))
@@ -106,8 +119,30 @@ describe('prisma-migrate-deploy wrapper', () => {
   test('migrates through DIRECT_URL while the runtime uses the transaction pooler', () => {
     const result = runWrapper({ DATABASE_URL: TRANSACTION, DIRECT_URL: SESSION })
     assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(result.calls, [SESSION])
+    assert.deepEqual(result.calls, [verified(SESSION)])
     assert.match(result.stdout, /Migrating through DIRECT_URL/)
+    assert.match(result.stdout, /Verifying the database certificate/)
+  })
+
+  test('verifies the database certificate against the committed CA', () => {
+    const result = runWrapper({ DATABASE_URL: SESSION })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(result.calls, [verified(SESSION)])
+  })
+
+  test('leaves a local database URL as configured', () => {
+    const result = runWrapper({ DATABASE_URL: LOCAL })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(result.calls, [LOCAL])
+    assert.doesNotMatch(result.stdout, /Verifying the database certificate/)
+  })
+
+  test('refuses a remote URL when the CA is missing, without running prisma', () => {
+    fs.rmSync(path.join(directory, 'apps/api/certs/supabase-root-2021-ca.pem'))
+    const result = runWrapper({ DATABASE_URL: SESSION })
+    assert.equal(result.status, 1)
+    assert.deepEqual(result.calls, [])
+    assert.match(result.stderr, /DatabaseTlsRefusedError: The Supabase Root 2021 CA/)
   })
 
   test('refuses the transaction pooler without running prisma', () => {

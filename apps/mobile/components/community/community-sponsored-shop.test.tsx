@@ -40,13 +40,11 @@ vi.mock('expo-router', async () => ({
   useRouter: () => ({ setParams: vi.fn(), push: vi.fn() }),
   useFocusEffect: (await import('../../src/test-utils/focus-effect.js')).useFocusEffect,
 }))
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
     capture: captureMock,
-    getDistinctId: () => 'test-user-id',
-    screen: vi.fn(),
-  }),
-}))
+  })
+)
 // `accessibilityHint` and `accessibilityState` are native-only props that
 // react-native-web never writes to the DOM, so they are asserted where they are
 // handed over.

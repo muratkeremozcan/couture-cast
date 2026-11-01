@@ -713,7 +713,6 @@ export function CommunityPostSheet({
             <View
               testID="community-caption-in-view"
               collapsable={false}
-              pointerEvents="none"
               style={styles.marker}
             />
           ) : null}
@@ -723,7 +722,6 @@ export function CommunityPostSheet({
             <View
               testID="community-photo-in-view"
               collapsable={false}
-              pointerEvents="none"
               style={styles.marker}
             />
           ) : null}
@@ -844,6 +842,8 @@ const styles = StyleSheet.create({
     left: 0,
     width: 1,
     height: 1,
+    // The style form: react-native-web deprecates the `pointerEvents` prop.
+    pointerEvents: 'none',
   },
   section: {
     marginBottom: 16,
