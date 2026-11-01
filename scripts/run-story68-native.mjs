@@ -722,7 +722,7 @@ if (command === 'prebuild') {
     'w',
     0o600
   )
-  const arch = option('arch') ?? hostNativeArch(platform)
+  const arch = option('arch') ?? hostNativeArch(platform, process.arch)
   const workletsStaging =
     platform === 'android'
       ? prepareWorkletsStaging({
