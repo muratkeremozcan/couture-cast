@@ -46,15 +46,17 @@ export class CommunityAccessService {
     await communityDependency(() =>
       budget.run(() =>
         tx === this.prisma
-          ? interactiveTransaction(
-              this.prisma,
-              async (connection) => {
-                await connection.$executeRawUnsafe(
-                  `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
-                )
-                await this.assertDatabase(member, connection)
-              },
-              () => ({ timeout: budget.remaining(), maxWait: budget.remaining() })
+          ? budget.connection(() =>
+              interactiveTransaction(
+                this.prisma,
+                async (connection) => {
+                  await connection.$executeRawUnsafe(
+                    `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
+                  )
+                  await this.assertDatabase(member, connection)
+                },
+                () => ({ timeout: budget.remaining(), maxWait: budget.remaining() })
+              )
             )
           : this.assertDatabase(member, tx)
       )
@@ -83,15 +85,17 @@ export async function assertCommunitySubjectPresent(
 ): Promise<void> {
   await communityDependency(() =>
     budget.run(() =>
-      interactiveTransaction(
-        prisma,
-        async (tx) => {
-          await tx.$executeRawUnsafe(
-            `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
-          )
-          await assertCommunitySubjectAvailable(tx, member)
-        },
-        () => ({ timeout: budget.remaining(), maxWait: budget.remaining() })
+      budget.connection(() =>
+        interactiveTransaction(
+          prisma,
+          async (tx) => {
+            await tx.$executeRawUnsafe(
+              `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
+            )
+            await assertCommunitySubjectAvailable(tx, member)
+          },
+          () => ({ timeout: budget.remaining(), maxWait: budget.remaining() })
+        )
       )
     )
   )
@@ -134,15 +138,17 @@ export async function assertCommunityReadEligibility(
 ) {
   await communityDependency(() =>
     budget.run(() =>
-      interactiveTransaction(
-        prisma,
-        async (tx) => {
-          await tx.$executeRawUnsafe(
-            `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
-          )
-          await assertCommunityDatabaseReadAccess(tx, member, true)
-        },
-        () => ({ timeout: budget.remaining(), maxWait: budget.remaining() })
+      budget.connection(() =>
+        interactiveTransaction(
+          prisma,
+          async (tx) => {
+            await tx.$executeRawUnsafe(
+              `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
+            )
+            await assertCommunityDatabaseReadAccess(tx, member, true)
+          },
+          () => ({ timeout: budget.remaining(), maxWait: budget.remaining() })
+        )
       )
     )
   )

@@ -5,6 +5,7 @@ import { ForbiddenException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import {
   CommunityAuthorizationBudget,
+  CommunityConnectionGate,
   CommunityUnavailableException,
   communityAvailabilityLogger,
   communityDependency,
@@ -94,5 +95,84 @@ describe('community dependency and final authorization ownership', () => {
     await vi.advanceTimersByTimeAsync(5)
     await flight
     expect(vi.getTimerCount()).toBe(0)
+  })
+})
+describe('community connection gate', () => {
+  const held = () => {
+    let release!: () => void
+    const done = new Promise<void>((resolve) => (release = resolve))
+    return { done, release }
+  }
+  it('runs work at once on a budget without a gate', async () => {
+    await expect(
+      new CommunityAuthorizationBudget().connection(() => Promise.resolve('ran'))
+    ).resolves.toBe('ran')
+  })
+  it('admits up to its capacity, then hands each freed slot to the earliest deadline', async () => {
+    const gate = new CommunityConnectionGate(2)
+    const now = performance.now()
+    const order: string[] = []
+    const first = held()
+    const second = held()
+    const busy = [
+      new CommunityAuthorizationBudget(now + 1000, gate).connection(() => first.done),
+      new CommunityAuthorizationBudget(now + 1000, gate).connection(() => second.done),
+    ]
+    const queued = (name: string, deadline: number) =>
+      new CommunityAuthorizationBudget(deadline, gate).connection(() => {
+        order.push(name)
+        return Promise.resolve()
+      })
+    // Arrival order is late, tied-first, early, tied-second.
+    const late = queued('late', now + 900)
+    const tiedFirst = queued('tied first', now + 600)
+    const early = queued('early', now + 300)
+    const tiedSecond = queued('tied second', now + 600)
+    await Promise.resolve()
+    expect(order).toEqual([])
+    first.release()
+    second.release()
+    await Promise.all([...busy, late, tiedFirst, early, tiedSecond])
+    expect(order).toEqual(['early', 'tied first', 'tied second', 'late'])
+  })
+  it('releases its slot when the work fails', async () => {
+    const gate = new CommunityConnectionGate(1)
+    const budget = () => new CommunityAuthorizationBudget(performance.now() + 1000, gate)
+    const failure = new Error('transaction failed')
+    await expect(budget().connection(() => Promise.reject(failure))).rejects.toBe(failure)
+    await expect(budget().connection(() => Promise.resolve('next'))).resolves.toBe('next')
+  })
+  it('refuses an expired budget and drops a waiter at its deadline', async () => {
+    vi.useFakeTimers()
+    let clock = 100
+    vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    const gate = new CommunityConnectionGate(1)
+    await expect(
+      new CommunityAuthorizationBudget(50, gate).connection(() => Promise.resolve())
+    ).rejects.toBeInstanceOf(CommunityUnavailableException)
+    const holder = held()
+    const holding = new CommunityAuthorizationBudget(10_000, gate).connection(
+      () => holder.done
+    )
+    const ran = vi.fn(() => Promise.resolve())
+    const waiting = expect(
+      new CommunityAuthorizationBudget(120, gate).connection(ran)
+    ).rejects.toBeInstanceOf(CommunityUnavailableException)
+    // A timer that fires before the monotonic deadline waits again.
+    clock = 110
+    await vi.advanceTimersByTimeAsync(20)
+    clock = 121
+    await vi.advanceTimersByTimeAsync(10)
+    await waiting
+    expect(vi.getTimerCount()).toBe(0)
+    holder.release()
+    await holding
+    expect(ran).not.toHaveBeenCalled()
+    // The expired waiter no longer holds a place: the slot is free again.
+    await expect(
+      new CommunityAuthorizationBudget(10_000, gate).connection(() =>
+        Promise.resolve('free')
+      )
+    ).resolves.toBe('free')
   })
 })
