@@ -1467,8 +1467,8 @@ file's own Code Review Findings section.
   summary: The X-SHARE-DEVICE physical-device rows are not run.
   evidence: Target mapping for the Pinterest, Instagram, Facebook and TikTok apps is proven by unit tests only, because simulators and emulators lack those apps. iOS Files and AirDrop may still show the cache name cc69-share-…. Run these rows on physical devices before share_card_native_share_enabled goes on beyond dev.
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`
-  summary: Firefox does not launch locally for the share-card Playwright suite.
-  evidence: Local runs fail with "Could not find profile folder", so Firefox coverage for the web Share action comes from CI only.
+  summary: ~~Firefox does not launch locally for the share-card Playwright suite.~~ Resolved in PR #175 (2026-10-31).
+  evidence: Local runs failed with "Could not find profile folder", so Firefox coverage for the web Share action came from CI only. Root cause: Firefox reads its app data folder at startup even with an explicit -profile, and on macOS App Data protection denies the ad hoc signed Playwright build an installed Firefox's ~/Library/Application Support/Firefox. playwright/share-card.config.ts now points MOZ_APP_DATA at a folder of its own, and the Firefox project launches locally.
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`
   summary: Two existing layout defects remain in the share-card composer and web dialog.
   evidence: Two-line composer errors still move the Save and Share buttons. The web stale state scrolls 53 px at 720 and 768 px tall, unchanged since Story 6.8.
