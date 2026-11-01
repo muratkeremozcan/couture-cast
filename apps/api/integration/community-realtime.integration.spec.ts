@@ -19,6 +19,7 @@ import { communityRealtimeInstance } from '../src/realtime/community-realtime-in
 import { communityRealtimeConnectedSchema } from '@couture/api-client/contracts/http'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { CommunityAccessService } from '../src/modules/community/community-access.service.js'
+import type { CommunityAuthorizationBudget } from '../src/modules/community/community-availability.js'
 import { CommunityStreamRepository } from '../src/modules/community/community-stream.repository.js'
 import { CommunityFlagEvaluationService } from '../src/modules/feature-flags/community-flag-evaluation.service.js'
 import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
@@ -113,40 +114,40 @@ function next<T>(socket: Socket, event: string): Promise<T> {
 }
 
 describe('Story 6.5 real local websocket-only transport with isolated fixture auth', () => {
-  it('uses all five bounded authorization slots and keeps the sixth real handshake queued', async () => {
+  it('holds no connection slot outside the database and queues the sixth transaction', async () => {
     const member = await fixture()
+    let releaseRemote!: () => void
+    const remoteAnswered = new Promise<void>((resolve) => (releaseRemote = resolve))
     const releases: (() => void)[] = []
     let gated = true
+    let awaitingRemote = 0
     let active = 0
     let maximum = 0
-    const authorize = vi.fn(async () => {
-      active++
-      maximum = Math.max(maximum, active)
-      try {
-        if (gated) await new Promise<void>((resolve) => releases.push(resolve))
+    const authorize = vi.fn(
+      async (_member: string, budget: CommunityAuthorizationBudget) => {
+        // A remote flag call: no connection is held while it is outstanding.
+        awaitingRemote++
+        await remoteAnswered
+        await budget.connection(async () => {
+          active++
+          maximum = Math.max(maximum, active)
+          try {
+            if (gated) await new Promise<void>((resolve) => releases.push(resolve))
+          } finally {
+            active--
+          }
+        })
         return {
           value: true,
           expiresAt: new Date('2099-01-01'),
           validUntil: Number.MAX_SAFE_INTEGER,
         }
-      } finally {
-        active--
       }
-    })
-    // A resolved identity is the last step before a handshake takes an authorization slot.
-    const verified = new AccessTokenIdentityService(prisma)
-    let identified = 0
-    const identity = {
-      resolveIdentity: async (token: string) => {
-        const resolved = await verified.resolveIdentity(token)
-        identified++
-        return resolved
-      },
-    } as AccessTokenIdentityService
+    )
     const runtime = createCommunityRealtimeServer(() =>
       Promise.resolve({
         prisma,
-        identity,
+        identity: new AccessTokenIdentityService(prisma),
         access: { assert: () => Promise.resolve(), authorize },
         streams,
         origins: ['https://story65.synthetic.test'],
@@ -159,20 +160,25 @@ describe('Story 6.5 real local websocket-only transport with isolated fixture au
       connect(client(base, fixtureToken(member.id)))
     )
     try {
+      // All six wait on the remote call at once: none of them holds one of the five slots.
+      await vi.waitFor(() => expect(awaitingRemote).toBe(6), { timeout: 1000 })
+      releaseRemote()
       await vi.waitFor(() => expect(releases).toHaveLength(5), { timeout: 1000 })
-      // The sixth handshake has reached the server and is queued behind the five slots.
-      await vi.waitFor(() => expect(identified).toBe(6), { timeout: 1000 })
-      expect(authorize).toHaveBeenCalledTimes(5)
+      // The sixth reached its transaction and waits for a connection.
+      expect(maximum).toBe(5)
+      releases.shift()?.()
+      await vi.waitFor(() => expect(releases).toHaveLength(5), { timeout: 1000 })
       expect(maximum).toBe(5)
       gated = false
-      releases.forEach((release) => release())
+      releases.splice(0).forEach((release) => release())
       await Promise.all(connected)
       expect(authorize).toHaveBeenCalledTimes(6)
       expect(sockets.every((socket) => socket.connected)).toBe(true)
       expect(maximum).toBe(5)
     } finally {
       gated = false
-      releases.forEach((release) => release())
+      releaseRemote()
+      releases.splice(0).forEach((release) => release())
       await Promise.allSettled(connected)
     }
   })

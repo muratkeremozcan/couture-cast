@@ -27,6 +27,22 @@ type CacheRow = {
   now: Date
 }
 
+/**
+ * Settings for a transaction that writes only the shared evaluation cache: its claim
+ * lease, its refreshed value or a lease release. Each waits at most 100 ms for a lock.
+ *
+ * None of them waits for its commit to reach disk. Commit visibility and lock release
+ * are unchanged, so a lease stays exclusive across instances; only a database crash in
+ * the next few hundred milliseconds can undo one, and Postgres then rolls it back as if
+ * it had aborted, leaving the row as the transaction found it, to be claimed again.
+ * Waiting for the flush made every cold authorization hold a pooled connection for two
+ * WAL flushes; on a slow disk that was 100 ms each, which by itself spent a burst's
+ * whole budget on a five-connection pool.
+ */
+async function cacheWriteSettings(tx: Prisma.TransactionClient) {
+  await tx.$executeRaw`SELECT set_config('lock_timeout', '100ms', true), set_config('synchronous_commit', 'off', true)`
+}
+
 @Injectable()
 export class CommunityFlagEvaluationService {
   private readonly flights = new Map<
@@ -80,24 +96,26 @@ export class CommunityFlagEvaluationService {
     budget: CommunityAuthorizationBudget
   ): Promise<CacheRow | undefined> {
     return budget.run(() =>
-      interactiveTransaction(
-        this.prisma,
-        async (tx) => {
-          await tx.$executeRawUnsafe(
-            `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
-          )
-          return (
-            await tx.$queryRaw<CacheRow[]>`
+      budget.connection(() =>
+        interactiveTransaction(
+          this.prisma,
+          async (tx) => {
+            await tx.$executeRawUnsafe(
+              `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
+            )
+            return (
+              await tx.$queryRaw<CacheRow[]>`
         SELECT e.*,clock_timestamp() AS now FROM "CommunityFlagEvaluation" e
         JOIN "CommunitySubject" s ON s.member_id=e.member_id AND s.generation=e.subject_generation
         WHERE e.member_id=${member} AND e.flag_key='community_read_enabled'
       `
-          )[0]
-        },
-        () => ({
-          timeout: Math.min(500, budget.remaining()),
-          maxWait: budget.remaining(),
-        })
+            )[0]
+          },
+          () => ({
+            timeout: Math.min(500, budget.remaining()),
+            maxWait: budget.remaining(),
+          })
+        )
       )
     )
   }
@@ -176,21 +194,22 @@ export class CommunityFlagEvaluationService {
       budget.check()
       let inserting = false
       try {
-        return await interactiveTransaction(
-          this.prisma,
-          async (tx) => {
-            inserting = false
-            await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
-            await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
-            inserting = true
-            await tx.$executeRaw`
+        return await budget.connection(() =>
+          interactiveTransaction(
+            this.prisma,
+            async (tx) => {
+              inserting = false
+              await cacheWriteSettings(tx)
+              await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
+              inserting = true
+              await tx.$executeRaw`
             INSERT INTO "CommunityFlagEvaluation" (member_id,flag_key,subject_generation)
               SELECT member_id,'community_read_enabled',generation FROM "CommunitySubject" WHERE member_id = ${member}
               ON CONFLICT DO NOTHING
           `
-            inserting = false
-            return (
-              await tx.$queryRaw<CacheRow[]>`
+              inserting = false
+              return (
+                await tx.$queryRaw<CacheRow[]>`
             UPDATE "CommunityFlagEvaluation" e SET refresh_owner = ${owner}::uuid,
               refresh_until = clock_timestamp() + interval '2 seconds',
               remote_evaluated_at = CASE WHEN remote_value IS NULL THEN NULL ELSE remote_evaluated_at END,
@@ -200,12 +219,13 @@ export class CommunityFlagEvaluationService {
               AND e.next_claim_at <= clock_timestamp() AND (e.refresh_until IS NULL OR e.refresh_until <= clock_timestamp())
             RETURNING e.*, next_claim_at - interval '45 seconds' AS now
           `
-            )[0]
-          },
-          () => ({
-            timeout: Math.min(400, budget.remaining()),
-            maxWait: budget.remaining(),
-          })
+              )[0]
+            },
+            () => ({
+              timeout: Math.min(400, budget.remaining()),
+              maxWait: budget.remaining(),
+            })
+          )
         )
       } catch (error) {
         if (
@@ -260,14 +280,15 @@ export class CommunityFlagEvaluationService {
     }
     try {
       return await budget.run(() =>
-        interactiveTransaction(
-          this.prisma,
-          async (tx) => {
-            await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
-            await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
-            // No upsert: erasure or an expired owner can never recreate a cache result.
-            return (
-              await tx.$queryRaw<CacheRow[]>`
+        budget.connection(() =>
+          interactiveTransaction(
+            this.prisma,
+            async (tx) => {
+              await cacheWriteSettings(tx)
+              await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
+              // No upsert: erasure or an expired owner can never recreate a cache result.
+              return (
+                await tx.$queryRaw<CacheRow[]>`
         UPDATE "CommunityFlagEvaluation" e SET remote_value = ${value}, remote_evaluated_at = ${origin},
           expires_at = ${origin} + interval '60 seconds', refresh_until = NULL, refresh_owner = NULL
         FROM "CommunitySubject" s WHERE e.member_id = ${member} AND e.flag_key = 'community_read_enabled'
@@ -276,12 +297,13 @@ export class CommunityFlagEvaluationService {
           AND s.generation = e.subject_generation
         RETURNING e.*,clock_timestamp() AS now
       `
-            )[0]
-          },
-          () => ({
-            timeout: Math.min(400, budget.remaining()),
-            maxWait: budget.remaining(),
-          })
+              )[0]
+            },
+            () => ({
+              timeout: Math.min(400, budget.remaining()),
+              maxWait: budget.remaining(),
+            })
+          )
         )
       )
     } catch (error) {
@@ -295,7 +317,7 @@ export class CommunityFlagEvaluationService {
     await interactiveTransaction(
       this.prisma,
       async (tx) => {
-        await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
+        await cacheWriteSettings(tx)
         await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
         // Failure finishes this claim without changing its original cadence or authorization.
         await tx.$executeRaw`
