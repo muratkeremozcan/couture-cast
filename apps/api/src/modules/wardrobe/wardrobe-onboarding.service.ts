@@ -1,3 +1,4 @@
+// Story 4.4 Task 3 step 1 owner: implement the advisory-lock onboarding state machine in apps/api/src/modules/wardrobe/wardrobe-onboarding.service.ts
 // Story 4.4 Task 3: server-authoritative onboarding step state machine
 import {
   ConflictException,

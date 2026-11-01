@@ -1,3 +1,4 @@
+// Story 4.4 Task 3 step 3 owner: implement silhouette slider persistence and My Form lifecycle in apps/api/src/modules/wardrobe/wardrobe-silhouette.service.ts
 // Story 4.4 Task 3 + 4: silhouette sliders and "My Form" photo lifecycle.
 import { randomUUID } from 'node:crypto'
 import {

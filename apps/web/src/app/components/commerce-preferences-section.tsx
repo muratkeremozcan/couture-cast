@@ -1,3 +1,4 @@
+// Story 5.1 Tasks 6 and 7 step 1 owner: implement Mobile and Web preference controls in `apps/mobile/app/(tabs)/settings.tsx` and `apps/web/src/app/components/commerce-preferences-section.tsx`
 // Story 5.1 Task 7 owner: the "Shopping and partners" section of Web settings.
 //
 // This section is the Web half of the story's opt-out. There is deliberately no
