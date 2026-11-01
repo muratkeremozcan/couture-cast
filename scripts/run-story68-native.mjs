@@ -62,7 +62,7 @@ import {
   IOS_DERIVED_DATA,
   IOS_POD_INSTALL,
   MOBILE_DIRECTORY,
-  hostNativeArch,
+  buildSelection,
   nativeBuildCommand,
   nativeBuildEnv,
   nativeProjectDirectory,
@@ -725,19 +725,21 @@ if (command === 'prebuild') {
     )
 } else if (command === 'build') {
   ownedEnv()
-  const configuration = option('configuration') ?? 'Debug'
-  if (!['Debug', 'Release'].includes(configuration))
-    throw new Error('build_configuration_required')
+  const { configuration, arch } = buildSelection({
+    platform,
+    configuration: option('configuration'),
+    arch: option('arch'),
+    hostArch: process.arch,
+  })
   const fd = fs.openSync(
     path.join(directory, `build-${platform}-${configuration}.log`),
     'w',
     0o600
   )
-  const arch = option('arch') ?? hostNativeArch(platform, process.arch)
   const workletsStaging =
     platform === 'android'
       ? prepareWorkletsStaging({
-          projectRoot: path.join(root, 'apps/mobile/android'),
+          projectRoot: path.join(root, nativeProjectDirectory('android')),
           configuration,
           architectures: arch,
           evidenceDirectory: directory,

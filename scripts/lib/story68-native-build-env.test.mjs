@@ -12,7 +12,7 @@ import {
 import vm from 'node:vm'
 import {
   IOS_DERIVED_DATA,
-  hostNativeArch,
+  buildSelection,
   nativeBuildCommand,
   nativeBuildEnv,
   nativeProjectDirectory,
@@ -290,7 +290,7 @@ describe('Android build environment', () => {
           process: { arch: 'arm64', env: explicit ? { ANDROID_HOME: explicit } : {} },
           read: () => ({ STORY68_NATIVE_TEST_BUILD: '1' }),
           IOS_DERIVED_DATA,
-          hostNativeArch,
+          buildSelection,
           nativeBuildCommand,
           nativeBuildEnv,
           nativeProjectDirectory,

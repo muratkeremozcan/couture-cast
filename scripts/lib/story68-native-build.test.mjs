@@ -5,6 +5,7 @@ import {
   IOS_DERIVED_DATA,
   IOS_POD_INSTALL,
   MOBILE_DIRECTORY,
+  buildSelection,
   hostNativeArch,
   nativeBuildCommand,
   nativeBuildEnv,
@@ -117,5 +118,25 @@ describe('Story 6.8 native build commands', () => {
       A: 'host',
       B: 'build',
     })
+  })
+
+  test('a build is Debug for the host architecture unless the harness names others', () => {
+    assert.deepEqual(buildSelection({ platform: 'android', hostArch: 'x64' }), {
+      configuration: 'Debug',
+      arch: 'x86_64',
+    })
+    assert.deepEqual(
+      buildSelection({
+        platform: 'ios',
+        configuration: 'Release',
+        arch: 'x86_64',
+        hostArch: 'arm64',
+      }),
+      { configuration: 'Release', arch: 'x86_64' }
+    )
+    assert.throws(
+      () => buildSelection({ platform: 'ios', configuration: 'Profile' }),
+      /build_configuration_required/
+    )
   })
 })

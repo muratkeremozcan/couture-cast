@@ -26,6 +26,22 @@ export function nativeDevClientPath(platform, root = '.') {
   throw new Error('native_build_platform_required')
 }
 
+/**
+ * The configuration and architecture a build uses: Debug and the host's own architecture unless
+ * the harness names others. The lanes name neither, so the cached client is always this default.
+ */
+export function buildSelection({
+  platform,
+  configuration,
+  arch,
+  hostArch = process.arch,
+}) {
+  const selected = configuration ?? 'Debug'
+  if (!['Debug', 'Release'].includes(selected))
+    throw new Error('build_configuration_required')
+  return { configuration: selected, arch: arch ?? hostNativeArch(platform, hostArch) }
+}
+
 /** `expo prebuild` arguments; iOS then runs IOS_POD_INSTALL in the generated project. */
 export const prebuildArgs = (platform, { clean = false } = {}) => [
   'prebuild',
