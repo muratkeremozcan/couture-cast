@@ -85,18 +85,39 @@ export async function provisionShareCardBrowsers({
   if (failure) throw failure
 }
 
-/** Use the installed lockfile-matched Playwright CLI; OS browser versions are independent. */
+/**
+ * Use the installed lockfile-matched Playwright CLI; OS browser versions are independent.
+ *
+ * A failed install gets one more attempt after a pause. While an Ubuntu archive mirror
+ * is syncing it serves index files of the wrong size and apt exits with
+ * "Mirror sync in progress?"; the sync settles within seconds.
+ * A deadline hit is not retried, because the step's time is already spent.
+ */
 export function installPinnedPlaywrightBrowsers({
   run = spawnSync,
   node = process.execPath,
   cli = createRequire(import.meta.url).resolve('@playwright/test/cli'),
   browsers = ['chromium', 'firefox', 'webkit'],
+  retryPauseSeconds = 45,
 } = {}) {
   if (
     !Array.isArray(browsers) ||
     !['chromium', 'chromium,firefox,webkit'].includes(browsers.join(','))
   )
     throw new Error('browser_dependency_engine_selection_required')
+  try {
+    installOnce({ run, node, cli, browsers })
+  } catch (error) {
+    if (error.message !== 'browser_dependency_install_failed') throw error
+    console.log(
+      `Browser dependency install failed; retrying once in ${retryPauseSeconds}s in case an Ubuntu mirror sync was in progress.`
+    )
+    run('sleep', [String(retryPauseSeconds)], { stdio: 'inherit' })
+    installOnce({ run, node, cli, browsers })
+  }
+}
+
+function installOnce({ run, node, cli, browsers }) {
   const result = run(
     'timeout',
     [
