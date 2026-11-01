@@ -10,7 +10,9 @@
 //   analytics  ANALYTICS_ID_SECRET (any 64-char hex: openssl rand -hex 32)
 //   supabase   SUPABASE_SERVICE_ROLE_KEY (sb_secret_...) and SUPABASE_ANON_KEY plus
 //              NEXT_PUBLIC_SUPABASE_ANON_KEY (sb_publishable_...), from Settings, API Keys
-// .env.local must hold NORTHFLANK_API_TOKEN for the community worker.
+// .env.local must hold NORTHFLANK_API_TOKEN for the community worker. For db it should also hold
+// POSTHOG_PERSONAL_API_KEY (scopes external_data_source:read and :write); without it the PostHog
+// warehouse source is skipped with a warning and its syncs pause on the next run.
 //
 // Where each secret lives:
 //   Vercel couture-cast-api   DATABASE_URL, DIRECT_URL, REDIS_URL, UPSTASH_REDIS_REST_TOKEN,
@@ -18,6 +20,7 @@
 //   Vercel couture-cast-web   REDIS_URL, UPSTASH_REDIS_REST_TOKEN, SUPABASE_* keys
 //   GitHub secret             DATABASE_URL_PROD (the Prod E2E database URL)
 //   Northflank worker         DATABASE_URL, REDIS_URL, ANALYTICS_ID_SECRET, SUPABASE_SERVICE_ROLE_KEY
+//   PostHog warehouse source  the database password ("sb prod db", 5432 session pooler)
 //
 // The worker uses the transaction pooler (6543, pgbouncer=true, connection_limit=3) and keeps the
 // TLS parameters already on its URL. Vercel does not store NEXT_PUBLIC_* values as Sensitive.
@@ -33,6 +36,8 @@ const API = 'couture-cast-api'
 const WEB = 'couture-cast-web'
 const WORKER_ENV_URL =
   'https://api.northflank.com/v1/projects/couture-cast/services/community-worker/runtime-environment'
+const POSTHOG_SOURCE_URL =
+  'https://us.posthog.com/api/environments/329012/external_data_sources/019caf40-3a3f-0000-5db6-acdf0e2e620a'
 const PARTS = new Set(['db', 'redis', 'analytics', 'supabase'])
 
 const args = process.argv.slice(2)
@@ -161,10 +166,69 @@ async function northflank(updates, snapshot) {
   )
 }
 
+const posthogHeaders = { Authorization: `Bearer ${local.POSTHOG_PERSONAL_API_KEY}` }
+
+async function posthogSource() {
+  const response = await fetch(`${POSTHOG_SOURCE_URL}/`, { headers: posthogHeaders })
+  if (!response.ok)
+    throw new Error(
+      `posthog: reading the warehouse source returned HTTP ${response.status}`
+    )
+  return response.json()
+}
+
+// PostHog pauses a schema after an auth failure, so turn those back on and resync everything.
+async function posthog(source) {
+  const json = { 'Content-Type': 'application/json' }
+  const update = await fetch(`${POSTHOG_SOURCE_URL}/`, {
+    method: 'PATCH',
+    headers: { ...posthogHeaders, ...json },
+    body: JSON.stringify({
+      job_inputs: { ...source.job_inputs, password: prod.SUPABASE_DB_PROD_PW },
+    }),
+  })
+  if (!update.ok)
+    throw new Error(`posthog: updating the source returned HTTP ${update.status}`)
+  const schemasUrl = POSTHOG_SOURCE_URL.replace(
+    /external_data_sources\/.*/,
+    'external_data_schemas'
+  )
+  const paused = source.schemas.filter(
+    (schema) => !schema.should_sync && /password/i.test(schema.latest_error ?? '')
+  )
+  for (const schema of paused) {
+    const response = await fetch(`${schemasUrl}/${schema.id}/`, {
+      method: 'PATCH',
+      headers: { ...posthogHeaders, ...json },
+      body: JSON.stringify({ should_sync: true }),
+    })
+    if (!response.ok)
+      throw new Error(
+        `posthog: re-enabling ${schema.name} returned HTTP ${response.status}`
+      )
+  }
+  const reload = await fetch(`${POSTHOG_SOURCE_URL}/reload/`, {
+    method: 'POST',
+    headers: posthogHeaders,
+  })
+  if (!reload.ok)
+    throw new Error(`posthog: starting the resync returned HTTP ${reload.status}`)
+  const resumed = paused.length
+    ? `, re-enabled ${paused.map((s) => s.name).join(', ')}`
+    : ''
+  console.log(`posthog warehouse source: password set, resync started${resumed}`)
+}
+
 // Check every destination before the first write, so a bad token cannot leave a partial rotation.
 const ghAuth = spawnSync('gh', ['auth', 'status'], { stdio: 'ignore' })
 if (parts.has('db') && ghAuth.status !== 0) throw new Error('gh is not authenticated')
 const workerSnapshot = await workerEnv()
+const posthogSnapshot =
+  parts.has('db') && local.POSTHOG_PERSONAL_API_KEY ? await posthogSource() : null
+if (parts.has('db') && !posthogSnapshot)
+  console.warn(
+    'posthog: POSTHOG_PERSONAL_API_KEY is not in .env.local; the warehouse source keeps the old password'
+  )
 
 const worker = {}
 if (parts.has('db')) {
@@ -205,6 +269,7 @@ if (parts.has('supabase')) {
   worker.SUPABASE_SERVICE_ROLE_KEY = prod.SUPABASE_SERVICE_ROLE_KEY
 }
 if (Object.keys(worker).length) await northflank(worker, workerSnapshot)
+if (posthogSnapshot) await posthog(posthogSnapshot)
 
 if (redeploy) {
   for (const project of [API, WEB]) {
