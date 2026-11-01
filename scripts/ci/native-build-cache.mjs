@@ -59,6 +59,20 @@ export const PLUGIN_SOURCE_DIRECTORIES = Object.freeze([
 export const PLUGIN_SOURCE_FILES = Object.freeze([
   'apps/mobile/assets/images/notification-icon.png',
 ])
+/**
+ * The tools that generate the native projects at prebuild. Expo's fingerprint leaves its own
+ * @expo tooling out, so a lockfile update to any of them would otherwise keep the key while the
+ * generated project changes. Their resolved versions join the key.
+ */
+export const PROJECT_GENERATOR_PACKAGES = Object.freeze([
+  '@expo/cli',
+  '@expo/config',
+  '@expo/config-plugins',
+  '@expo/prebuild-config',
+  'expo-modules-autolinking',
+  '@react-native/gradle-plugin',
+])
+
 /** The font the widget and watchOS plugins copy into their targets, resolved as they resolve it. */
 export const PLUGIN_PACKAGE_FILES = Object.freeze([
   '@expo-google-fonts/space-grotesk/400Regular/SpaceGrotesk_400Regular.ttf',
@@ -146,6 +160,27 @@ export async function fingerprintOf(platform, anonKey = 'cc68-fingerprint-placeh
   })
 }
 
+/** Each generator package's version, resolved through expo first and then the app. */
+export function generatorVersions() {
+  const resolver = createRequire(import.meta.url)
+  const expoDirectory = path.dirname(
+    resolver.resolve('expo/package.json', { paths: [mobileRoot] })
+  )
+  return Object.fromEntries(
+    PROJECT_GENERATOR_PACKAGES.map((name) => [
+      name,
+      JSON.parse(
+        fs.readFileSync(
+          resolver.resolve(`${name}/package.json`, {
+            paths: [expoDirectory, mobileRoot],
+          }),
+          'utf8'
+        )
+      ).version,
+    ])
+  )
+}
+
 export async function resolveCacheKey(platform, read = command) {
   if (!PLATFORMS.includes(platform)) throw new Error('native_build_platform_required')
   const fingerprint = await fingerprintOf(platform)
@@ -155,7 +190,7 @@ export async function resolveCacheKey(platform, read = command) {
       sha256(fs.readFileSync(path.join(root, file))),
     ])
   )
-  const tools = toolchain(platform, read)
+  const tools = { ...toolchain(platform, read), generators: generatorVersions() }
   return {
     key: cacheKey({ platform, fingerprint: fingerprint.hash, harnessFiles, tools }),
     path: nativeDevClientPath(platform, root),

@@ -15,6 +15,7 @@ import {
   hostNativeArch,
   nativeBuildCommand,
   nativeBuildEnv,
+  nativeProjectDirectory,
 } from './story68-native-build.mjs'
 import { LOCALES } from '../ci/native-ios-shards.mjs'
 import { describe, test } from 'node:test'
@@ -292,6 +293,7 @@ describe('Android build environment', () => {
           hostNativeArch,
           nativeBuildCommand,
           nativeBuildEnv,
+          nativeProjectDirectory,
           prepareWorkletsStaging: (input) => {
             events.push('prepare')
             selected = prepareWorkletsStaging(input)

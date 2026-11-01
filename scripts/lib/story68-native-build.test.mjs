@@ -4,11 +4,14 @@ import {
   IOS_APP_NAME,
   IOS_DERIVED_DATA,
   IOS_POD_INSTALL,
+  MOBILE_DIRECTORY,
   hostNativeArch,
   nativeBuildCommand,
   nativeBuildEnv,
+  nativeProjectDirectory,
   nativeDevClientPath,
   prebuildArgs,
+  prebuildEnv,
 } from './story68-native-build.mjs'
 
 describe('Story 6.8 native build commands', () => {
@@ -103,5 +106,16 @@ describe('Story 6.8 native build commands', () => {
       nativeBuildEnv({ ANDROID_HOME: '/host-sdk' }, {}, '/sdk').ANDROID_HOME,
       '/host-sdk'
     )
+  })
+
+  test('prebuild runs in the app with the public build env over the host env', () => {
+    assert.equal(MOBILE_DIRECTORY, 'apps/mobile')
+    assert.equal(nativeProjectDirectory('ios'), 'apps/mobile/ios')
+    assert.equal(nativeProjectDirectory('android'), 'apps/mobile/android')
+    assert.throws(() => nativeProjectDirectory('web'), /platform_required/)
+    assert.deepEqual(prebuildEnv({ A: 'host', B: 'host' }, { B: 'build' }), {
+      A: 'host',
+      B: 'build',
+    })
   })
 })

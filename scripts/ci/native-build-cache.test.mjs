@@ -9,6 +9,8 @@ import {
   cacheKey,
   expoFingerprint,
   fingerprintOf,
+  generatorVersions,
+  PROJECT_GENERATOR_PACKAGES,
   javaMajor,
   resolveCacheKey,
   toolchain,
@@ -127,6 +129,7 @@ describe('native development client cache key', () => {
       assert.match(resolved.key, /^cc68-native-android-v\d+-[a-f0-9]{40}$/)
       assert.equal(resolved.path, nativeDevClientPath('android', process.cwd()))
       assert.equal(resolved.tools.java, '21')
+      assert.deepEqual(resolved.tools.generators, generatorVersions())
       const other = await resolveCacheKey('android', () => 'openjdk version "17.0.2"')
       assert.notEqual(other.key, resolved.key)
       assert.equal(other.fingerprint, resolved.fingerprint)
@@ -166,5 +169,15 @@ describe('native development client cache key', () => {
       assert.equal(bad.status, 1, args.join(' '))
       assert.equal(bad.stdout, '')
     }
+  })
+
+  // Expo's fingerprint leaves its own @expo tooling out of the hash.
+  test('keys the resolved version of every native project generator', () => {
+    const versions = generatorVersions()
+    assert.deepEqual(Object.keys(versions), [...PROJECT_GENERATOR_PACKAGES])
+    for (const [name, version] of Object.entries(versions))
+      assert.match(version, /^\d+\.\d+\.\d+/, name)
+    assert.ok(PROJECT_GENERATOR_PACKAGES.includes('@expo/prebuild-config'))
+    assert.ok(PROJECT_GENERATOR_PACKAGES.includes('@expo/config-plugins'))
   })
 })

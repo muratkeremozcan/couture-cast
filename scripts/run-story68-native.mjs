@@ -61,10 +61,13 @@ import { assertStory68DiskSpace } from './lib/test-disk-space.mjs'
 import {
   IOS_DERIVED_DATA,
   IOS_POD_INSTALL,
+  MOBILE_DIRECTORY,
   hostNativeArch,
   nativeBuildCommand,
   nativeBuildEnv,
+  nativeProjectDirectory,
   prebuildArgs,
+  prebuildEnv,
 } from './lib/story68-native-build.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
 import {
@@ -706,8 +709,8 @@ if (command === 'prebuild') {
     path.join(root, 'node_modules/.bin/expo'),
     prebuildArgs(platform, { clean: option('clean') === 'yes' }),
     {
-      cwd: path.join(root, 'apps/mobile'),
-      env: { ...process.env, ...env },
+      cwd: path.join(root, MOBILE_DIRECTORY),
+      env: prebuildEnv(process.env, env),
       stdio: ['ignore', fd, fd],
     }
   )
@@ -718,7 +721,7 @@ if (command === 'prebuild') {
       IOS_POD_INSTALL.binary,
       [...IOS_POD_INSTALL.args],
       {},
-      path.join(root, 'apps/mobile/ios')
+      path.join(root, nativeProjectDirectory('ios'))
     )
 } else if (command === 'build') {
   ownedEnv()
@@ -748,7 +751,7 @@ if (command === 'prebuild') {
     workletsArgs: workletsStaging?.args ?? [],
   })
   const result = spawnSync(binary, args, {
-    cwd: path.join(root, `apps/mobile/${platform === 'ios' ? 'ios' : 'android'}`),
+    cwd: path.join(root, nativeProjectDirectory(platform)),
     env: nativeBuildEnv(
       process.env,
       read('public-build-env.json'),

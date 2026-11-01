@@ -35,6 +35,20 @@ export const prebuildArgs = (platform, { clean = false } = {}) => [
   '--no-install',
 ]
 
+/** Where prebuild runs, and the generated native project each platform builds in. */
+export const MOBILE_DIRECTORY = 'apps/mobile'
+export const nativeProjectDirectory = (platform) => {
+  if (!['ios', 'android'].includes(platform))
+    throw new Error('native_build_platform_required')
+  return `${MOBILE_DIRECTORY}/${platform}`
+}
+
+/** The prebuild environment: the host's, then the public build environment app.config.ts reads. */
+export const prebuildEnv = (hostEnv, publicBuildEnv) => ({
+  ...hostEnv,
+  ...publicBuildEnv,
+})
+
 /** The CocoaPods step of the iOS prebuild, run in apps/mobile/ios. */
 export const IOS_POD_INSTALL = Object.freeze({
   binary: 'pod',
