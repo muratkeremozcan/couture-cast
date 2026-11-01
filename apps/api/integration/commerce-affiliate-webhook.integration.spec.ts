@@ -593,12 +593,23 @@ describe('Story 5.1 affiliate conversion webhook against real PostgreSQL', () =>
       const partner = await createPartner()
       const eventId = `evt-${randomUUID()}`
 
+      // An exact-boundary timestamp only stays at the boundary if the server reads
+      // the same second the test signed in. On a slow runner the request crossed a
+      // second boundary, the skew read 301 s and the webhook answered 401, so the
+      // clock is frozen mid-second for the signature and the server's freshness check.
+      const nowSeconds = Math.floor(Date.now() / 1000)
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(nowSeconds * 1000 + 500)
+      onTestFinished(() => {
+        vi.useRealTimers()
+      })
+
       const response = await post(
         sign(
           partner.secret,
           partner.slug,
           { ...VALID_PAYLOAD, eventId, clickToken: 'unmatched' },
-          { timestampSeconds: Math.floor(Date.now() / 1000) + offset }
+          { timestampSeconds: nowSeconds + offset }
         )
       )
 
