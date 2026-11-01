@@ -38,6 +38,7 @@ const REQUIRED = [
   'scripts/ci/check-accessibility-focus-builds.sh',
   'scripts/run-story67-talkback.mjs',
   '.github/workflows/pr-accessibility-focus.yml',
+  '.github/actions/free-runner-disk/**',
 ]
 
 describe('accessibility-focus workflow triggers', () => {
