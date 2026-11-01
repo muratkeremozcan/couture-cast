@@ -179,20 +179,6 @@
     "typescript": "5.9.3",
     "vitest": "5.0.5"
   },
-  "lint-staged": {
-    "*.{ts,tsx}": [
-      "sh -c \"npm run build --workspace @couture/utils && npm run build --workspace @couture/api-client\"",
-      "eslint --max-warnings=0 --cache --cache-location node_modules/.cache/eslint --fix --no-ignore",
-      "npm run prettier:ci -- --write"
-    ],
-    "*.{mjs,cjs}": [
-      "eslint --max-warnings=0 --cache --cache-location node_modules/.cache/eslint --fix --no-ignore",
-      "npm run prettier:ci -- --write"
-    ],
-    "*.{json,md}": [
-      "npm run prettier:ci -- --write"
-    ]
-  },
   "dependencies": {
     "@prisma/client": "6.19.0"
   },
