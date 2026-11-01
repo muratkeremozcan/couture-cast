@@ -9,11 +9,11 @@ if [[ ! "$sdk" =~ ^[1-9][0-9]*$ ]] || [[ ! "${CC68_ANDROID_API:-}" =~ ^[1-9][0-9
   exit 2
 fi
 # Every lane names an explicit suite; each fresh runner authenticates itself. The API32 journey
-# and the API36 matrix run as two shards each (all-1 and all-2, matrix-1 and matrix-2), planned
+# and the API36 matrix run as three shards each (all-1 to all-3, matrix-1 to matrix-3), planned
 # in scripts/ci/native-matrix-shards.mjs.
 suite="${CC68_ANDROID_SUITE:-}"
 case "$sdk:$suite" in
-  32:all-1|32:all-2|36:matrix-1|36:matrix-2|36:original|36:controls|36:interaction) ;;
+  32:all-1|32:all-2|32:all-3|36:matrix-1|36:matrix-2|36:matrix-3|36:original|36:controls|36:interaction) ;;
   *) echo 'Explicit native CI suite must match the verified Android API' >&2; exit 2 ;;
 esac
 # Device permissions alone do not prove the emulator can use KVM.
@@ -28,16 +28,16 @@ native() {
 case "$suite" in
   all-1)
     native proof --reinitialize-owned-app yes
-    native matrix --shard 1/2
+    native matrix --shard 1/3
     native rapid-watermark
     ;;
-  all-2)
-    # proof grants the API32 storage permission in shard 1; this shard sets it directly.
+  all-2|all-3)
+    # proof grants the API32 storage permission in shard 1; these shards set it directly.
     native permission-baseline
-    native matrix --shard 2/2
+    native matrix --shard "${suite#all-}/3"
     ;;
   matrix-*)
-    native matrix --shard "${suite#matrix-}/2"
+    native matrix --shard "${suite#matrix-}/3"
     ;;
   original)
     native proof --reinitialize-owned-app yes

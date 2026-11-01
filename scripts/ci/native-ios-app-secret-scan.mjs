@@ -1,7 +1,7 @@
 /**
- * The built iOS development client is uploaded once and downloaded by each shard. The repository
- * is public, so any signed-in user can fetch that artifact. This scan runs before the upload and
- * fails if the app carries anything but a publishable client key:
+ * The built development clients (the iOS app and the extracted Android APK) are cached by their
+ * native fingerprint, and the repository is public, so a fork's pull request can restore them. This
+ * scan runs before each save and fails if the client carries anything but a publishable client key:
  *
  * - a JWT whose role is not `anon` (the service role key, for one),
  * - a long value from the private owned environment file (database URLs, tokens, secrets).

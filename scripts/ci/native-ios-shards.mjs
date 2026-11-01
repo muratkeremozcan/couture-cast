@@ -1,8 +1,10 @@
 /**
- * Two-way split of the iOS native journey. Run 28 needed about 120 minutes on one runner (85
- * flows passed in 90). Each shard boots its own simulator, Supabase, Metro and signed-in account,
- * installs the app one build job produced, and runs the sections below. `open` and `signin`
- * run in every shard; nothing else repeats.
+ * Four-way split of the iOS native journey. Run 28 needed about 120 minutes on one runner (85
+ * flows passed in 90), and two shards still took 50 and 58 minutes on main run 41312266186. Each
+ * shard boots its own simulator, Supabase, Metro and signed-in account, installs the development
+ * client the build job keyed by its native fingerprint, and runs the sections below. `open` and
+ * `signin` run in every shard, and every shard but the one that runs `proof` sets the post-proof
+ * Photos permission with `permission-baseline`; nothing else repeats.
  *
  * The matrix sections and locales each shard runs live in native-matrix-shards.mjs, which plans
  * both platforms. This module adds the iOS harness commands around the matrix, and the tests
@@ -13,17 +15,20 @@ import { pathToFileURL } from 'node:url'
 import {
   MATRIX_SECTIONS as PLATFORM_MATRIX_SECTIONS,
   MATRIX_SHARD_PLANS,
-  SHARD_COUNT,
   LOCALES,
   assertShardEvidence as assertPlatformShardEvidence,
   expectedMatrixCases as platformMatrixCases,
   inMatrixSection as inPlatformMatrixSection,
   localesForShard as platformLocalesForShard,
+  nominalMinutes as platformNominalMinutes,
   parseShard as parsePlatformShard,
   readShardReports,
+  shardCountOf,
 } from './native-matrix-shards.mjs'
 
-export { SHARD_COUNT, LOCALES }
+export { LOCALES }
+
+export const SHARD_COUNT = shardCountOf('ios')
 
 /** iOS matrix sections in runner order with the case ids each one marks. */
 export const MATRIX_SECTIONS = PLATFORM_MATRIX_SECTIONS.ios
@@ -42,23 +47,31 @@ export const AFTER_MATRIX = Object.freeze([
   'share-sheet',
 ])
 
-/** The iOS harness commands of each shard, with its matrix sections and locales. */
+/**
+ * The iOS harness commands of each shard, with its matrix sections and locales. `proof` denies and
+ * then grants Photos add-only through the real UI and simctl, and runs in shard 1 only; the other
+ * shards reach the same permission state directly with `permission-baseline` before their matrix.
+ * Each list is written out, never spread from AFTER_MATRIX, so a new post-matrix command lands in
+ * one shard by choice. rapid-watermark sets en-US before a11y, which sets no locale itself.
+ */
 export const SHARD_PLAN = Object.freeze({
-  1: {
-    ...MATRIX_SHARD_PLANS.ios.shards[1],
-    // Shard 1 finished in 49 of its 100 minutes on main run 41104845732; shard 2 is the longer.
-    commands: ['proof', 'share-sheet'],
-  },
-  2: {
-    ...MATRIX_SHARD_PLANS.ios.shards[2],
-    // `proof` denies and then grants Photos add-only through the real UI and simctl, and runs in
-    // shard 1 only. Shard 2 reaches the same permission state directly. Its commands are listed,
-    // never spread from AFTER_MATRIX, so a new post-matrix command lands in one shard by choice.
+  1: { ...MATRIX_SHARD_PLANS.ios.shards[1], commands: ['proof'] },
+  2: { ...MATRIX_SHARD_PLANS.ios.shards[2], commands: ['permission-baseline'] },
+  3: {
+    ...MATRIX_SHARD_PLANS.ios.shards[3],
     commands: ['permission-baseline', 'rapid-watermark', 'a11y', 'fallback-focus'],
+  },
+  4: {
+    ...MATRIX_SHARD_PLANS.ios.shards[4],
+    commands: ['permission-baseline', 'share-sheet'],
   },
 })
 
-/** `1/2` or `2/2` to the shard number; anything else throws. */
+/** Expected job minutes of a shard from the measured parts in MATRIX_SHARD_PLANS.ios. */
+export const nominalMinutes = (shard) =>
+  platformNominalMinutes('ios', shard, SHARD_PLAN[shard].commands)
+
+/** `N/4` to the shard number N; anything else throws. */
 export const parseShard = (value) => parsePlatformShard('ios', value)
 
 /** With no shard (local runs) every section, locale and command runs. */
@@ -88,7 +101,8 @@ export const commandsForShard = (shard) => [
 /**
  * The merged verdict across shard reports (`native-matrix-ios.json` of each shard). A missing
  * shard, an incomplete report or a case set that differs from the plan is a failure, so a skipped
- * or truncated shard can never pass for the whole journey.
+ * or truncated shard can never pass for the whole journey. A shard with no section and no locale
+ * still runs the matrix, which reports its exact empty case set.
  */
 export const assertShardEvidence = (byShard) =>
   assertPlatformShardEvidence('ios', byShard)
@@ -102,7 +116,7 @@ if (
     if (action === 'commands') console.log(commandsForShard(parseShard(value)).join('\n'))
     else if (action === 'merge')
       console.log(
-        `Both iOS shards reported ${assertShardEvidence(readShardReports('ios', value))} cases.`
+        `All ${SHARD_COUNT} iOS shards reported ${assertShardEvidence(readShardReports('ios', value))} cases.`
       )
     else throw new Error('ios_shard_action_invalid')
   } catch (error) {

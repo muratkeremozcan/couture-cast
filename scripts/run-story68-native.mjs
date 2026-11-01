@@ -58,6 +58,17 @@ import {
   assertOwnedStory68EmulatorPort,
 } from './lib/story68-native-safety.mjs'
 import { assertStory68DiskSpace } from './lib/test-disk-space.mjs'
+import {
+  IOS_DERIVED_DATA,
+  IOS_POD_INSTALL,
+  MOBILE_DIRECTORY,
+  buildSelection,
+  nativeBuildCommand,
+  nativeBuildEnv,
+  nativeProjectDirectory,
+  prebuildArgs,
+  prebuildEnv,
+} from './lib/story68-native-build.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
 import {
   IOS_RETRYABLE_DENIAL_EVIDENCE,
@@ -459,7 +470,12 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   const driverLog = path.join(output, 'maestro.log')
   const snapshotLog = fs.existsSync(driverLog) ? fs.readFileSync(driverLog, 'utf8') : ''
   const failureDurationMs = Math.max(0, Date.now() - started)
-  recordIosFlowTiming(path.join(output, 'flow-timing.json'), result, failureDurationMs)
+  recordIosFlowTiming(
+    path.join(output, 'flow-timing.json'),
+    result,
+    failureDurationMs,
+    flow
+  )
   const recoverSnapshot =
     result.status !== 0 &&
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })
@@ -691,27 +707,30 @@ if (command === 'prebuild') {
   const fd = fs.openSync(path.join(directory, `prebuild-${platform}.log`), 'w', 0o600)
   const result = spawnSync(
     path.join(root, 'node_modules/.bin/expo'),
-    [
-      'prebuild',
-      ...(option('clean') === 'yes' ? ['--clean'] : []),
-      '--platform',
-      platform,
-      '--no-install',
-    ],
+    prebuildArgs(platform, { clean: option('clean') === 'yes' }),
     {
-      cwd: path.join(root, 'apps/mobile'),
-      env: { ...process.env, ...env },
+      cwd: path.join(root, MOBILE_DIRECTORY),
+      env: prebuildEnv(process.env, env),
       stdio: ['ignore', fd, fd],
     }
   )
   fs.closeSync(fd)
   if (result.status !== 0) throw new Error('native_prebuild_failed')
-  if (platform === 'ios') run('pod', ['install'], {}, path.join(root, 'apps/mobile/ios'))
+  if (platform === 'ios')
+    run(
+      IOS_POD_INSTALL.binary,
+      [...IOS_POD_INSTALL.args],
+      {},
+      path.join(root, nativeProjectDirectory('ios'))
+    )
 } else if (command === 'build') {
   ownedEnv()
-  const configuration = option('configuration') ?? 'Debug'
-  if (!['Debug', 'Release'].includes(configuration))
-    throw new Error('build_configuration_required')
+  const { configuration, arch } = buildSelection({
+    platform,
+    configuration: option('configuration'),
+    arch: option('arch'),
+    hostArch: process.arch,
+  })
   const fd = fs.openSync(
     path.join(directory, `build-${platform}-${configuration}.log`),
     'w',
@@ -720,51 +739,26 @@ if (command === 'prebuild') {
   const workletsStaging =
     platform === 'android'
       ? prepareWorkletsStaging({
-          projectRoot: path.join(root, 'apps/mobile/android'),
+          projectRoot: path.join(root, nativeProjectDirectory('android')),
           configuration,
-          architectures:
-            option('arch') ?? (process.arch === 'arm64' ? 'arm64-v8a' : 'x86_64'),
+          architectures: arch,
           evidenceDirectory: directory,
         })
       : undefined
-  const binary = platform === 'ios' ? 'xcodebuild' : './gradlew'
-  const args =
-    platform === 'ios'
-      ? [
-          '-workspace',
-          'CoutureCastStory68.xcworkspace',
-          '-scheme',
-          'CoutureCastStory68',
-          '-configuration',
-          configuration,
-          '-destination',
-          'generic/platform=iOS Simulator',
-          '-derivedDataPath',
-          option('derived-data') ?? '/tmp/cc68-ios-build',
-          '-jobs',
-          '2',
-          `ARCHS=${process.arch === 'arm64' ? 'arm64' : 'x86_64'}`,
-          'ONLY_ACTIVE_ARCH=YES',
-          'CODE_SIGN_IDENTITY=-',
-          'CODE_SIGN_LOCAL_EXECUTION_IDENTITY=Ad Hoc',
-          'CODE_SIGNING_ALLOWED=YES',
-          'CODE_SIGNING_REQUIRED=NO',
-          'build',
-        ]
-      : [
-          `assemble${configuration}`,
-          ...workletsStaging.args,
-          '--no-daemon',
-          '--max-workers=2',
-          `-PreactNativeArchitectures=${option('arch') ?? (process.arch === 'arm64' ? 'arm64-v8a' : 'x86_64')}`,
-        ]
+  const { binary, args } = nativeBuildCommand({
+    platform,
+    configuration,
+    arch,
+    derivedData: option('derived-data') ?? IOS_DERIVED_DATA,
+    workletsArgs: workletsStaging?.args ?? [],
+  })
   const result = spawnSync(binary, args, {
-    cwd: path.join(root, `apps/mobile/${platform === 'ios' ? 'ios' : 'android'}`),
-    env: {
-      ...process.env,
-      ...read('public-build-env.json'),
-      ANDROID_HOME: process.env.ANDROID_HOME ?? path.dirname(path.dirname(adb)),
-    },
+    cwd: path.join(root, nativeProjectDirectory(platform)),
+    env: nativeBuildEnv(
+      process.env,
+      read('public-build-env.json'),
+      path.dirname(path.dirname(adb))
+    ),
     stdio: ['ignore', fd, fd],
   })
   fs.closeSync(fd)

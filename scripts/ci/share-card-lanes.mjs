@@ -12,7 +12,7 @@ import {
 
 /**
  * The sharded Android lanes: each runs one row per shard of its plan, suites `<suite>-N`, and an
- * evidence job proves both shards reported exactly their cases.
+ * evidence job proves every shard reported exactly its cases.
  */
 export const shardedAndroidLanes = Object.freeze({
   'original-resource': Object.freeze({
@@ -113,6 +113,7 @@ function gateProblems(jobs, check) {
 /** The API32 journey: one row per shard of the android-32 plan, each with a journey budget. */
 function legacyProblems(jobs, check) {
   const legacy = jobs['original-resource']
+  androidClientCacheProblems('original-resource', legacy?.steps ?? [], check)
   const rows = matrixRows(legacy?.strategy?.matrix) ?? []
   const suites = shardSuites('original-resource')
   check(
@@ -200,9 +201,9 @@ function iosShapeProblems({ build, shard, evidence, expoGo }, check) {
     'ios-evidence must run after any ios-shard result, except on pull_request'
   )
   check(
-    JSON.stringify(shard?.strategy?.matrix?.shard) === JSON.stringify([1, 2]) &&
+    JSON.stringify(shard?.strategy?.matrix?.shard) === JSON.stringify(shardsOf('ios')) &&
       shard?.strategy?.['fail-fast'] === false,
-    'ios-shard must run shards 1 and 2 without cancelling the sibling'
+    'ios-shard must run every shard of the iOS plan without cancelling a sibling'
   )
   check(
     includesRun(shard?.steps ?? [], 'native-ios-shards.mjs commands') &&
@@ -212,7 +213,7 @@ function iosShapeProblems({ build, shard, evidence, expoGo }, check) {
   check(
     includesRun(evidence?.steps ?? [], 'native-ios-shards.mjs merge') &&
       includesRun(evidence?.steps ?? [], 'test "$CC68_SHARD_RESULT" = success'),
-    'ios-evidence: both shards must report their exact cases'
+    'ios-evidence: every shard must report its exact cases'
   )
   expoGoProblems({ shard, expoGo }, check)
 }
@@ -289,56 +290,137 @@ function iosEvidenceProblems(jobs, check) {
   }
 }
 
-function iosAppProblems(build, check) {
-  // The built app is downloadable by any signed-in user: scan first, keep it one day.
+const iosClient =
+  '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app'
+const keyOutput = '${{ steps.native_key.outputs.key }}'
+const pathOutput = '${{ steps.native_key.outputs.path }}'
+const cacheStep = (job, action, predicate = () => true) =>
+  stepIndex(
+    job,
+    (step) =>
+      step.uses === `actions/cache/${action}@v4` &&
+      step.with?.key === keyOutput &&
+      step.with?.path === pathOutput &&
+      predicate(step)
+  )
+
+/** ios-build keys the client, looks the key up and builds only on a miss. */
+function iosBuildKeyProblems(build, check) {
+  const steps = build?.steps ?? []
+  const key = stepIndex(build, (step) => step.id === 'native_key')
+  check(
+    key >= 0 &&
+      steps[key].run ===
+        'node scripts/ci/native-build-cache.mjs key --platform ios >> "$GITHUB_OUTPUT"',
+    'ios-build: the client must be keyed by scripts/ci/native-build-cache.mjs'
+  )
+  const lookup = cacheStep(build, 'restore', (step) => step.with['lookup-only'] === true)
+  check(
+    lookup > key && steps[lookup]?.id === 'native_cache',
+    'ios-build: look the key up before building'
+  )
+  check(
+    build?.outputs?.['app-key'] === keyOutput &&
+      build?.outputs?.['app-path'] === pathOutput,
+    'ios-build: publish the key and path the shards restore'
+  )
+  const native = stepIndex(build, (step) =>
+    step.run?.includes('run-story68-native.mjs build --platform ios')
+  )
+  // Every step of the build path waits on a miss: java starts it and each later step needs it.
+  const java = stepIndex(build, (step) => step.id === 'java')
+  check(
+    java > lookup &&
+      steps[java]?.if?.includes("steps.native_cache.outputs.cache-hit != 'true'") &&
+      native > java &&
+      steps[native]?.if?.includes("steps.build_window.outcome == 'success'"),
+    'ios-build: build only when the key is not cached'
+  )
+  return native
+}
+
+/** The repository is public and a fork's pull request can restore this cache: scan first. */
+function iosClientScanProblems(build, native, check) {
+  const steps = build?.steps ?? []
+  // The scan compares the client with the private owned environment; with no harness directory it
+  // would compare nothing and pass.
   const scan = stepIndex(build, (step) =>
     step.run?.includes('native-ios-app-secret-scan.mjs')
   )
-  const appUpload = stepIndex(build, (step) => step.with?.name === 'cc68-ios-app')
+  const save = cacheStep(build, 'save')
   check(
-    scan >= 0 && appUpload > scan,
-    'ios-build: the app must be secret-scanned before it is uploaded'
+    native >= 0 && scan > native && save > scan,
+    'ios-build: the client must be secret-scanned before it is cached'
   )
-  // The scan compares the app with the private owned environment; with no harness directory it
-  // would compare nothing and pass.
   check(
     build?.env?.CC68_HARNESS_DIR === iosHarnessDirectory &&
-      /native-ios-app-secret-scan\.mjs \S+ "\$CC68_HARNESS_DIR"/.test(
-        build?.steps?.[scan]?.run ?? ''
-      ),
-    'ios-build: the app scan must run with the harness directory set'
+      steps[scan]?.run ===
+        `node scripts/ci/native-ios-app-secret-scan.mjs ${iosClient} "$CC68_HARNESS_DIR"` &&
+      steps[save]?.if?.includes("steps.app_scan.outcome == 'success'") &&
+      steps[scan]?.id === 'app_scan',
+    'ios-build: cache exactly the scanned client, scanned with the harness directory set'
   )
-  // The artifact is exactly the packaged app the scan read: the scan, the tar and the upload
-  // name the same files, so nothing else can ride along in a public artifact.
-  const products = '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator'
   check(
-    build?.steps?.[appUpload]?.with?.path === '/tmp/cc68-ios-app.tar' &&
-      (build?.steps ?? []).some(
+    cacheStep(
+      build,
+      'restore',
+      (step) =>
+        step.with['lookup-only'] === true && step.with['fail-on-cache-miss'] === true
+    ) > save,
+    'ios-build: prove the saved key exists before the shards need it'
+  )
+  check(
+    !steps.some(
+      (step) =>
+        step.uses === 'actions/upload-artifact@v4' &&
+        step.with?.path !== `${iosHarnessDirectory}/public-evidence/`
+    ),
+    'ios-build: the client travels by cache only, never as a public artifact'
+  )
+}
+
+/** The jobs that install the client restore the resolved key; the client-free checks run in Expo Go. */
+function iosClientConsumerProblems({ shard, expoGo }, check) {
+  for (const [name, job] of [
+    ['ios-shard', shard],
+    [expoGoJobName, expoGo],
+  ])
+    check(
+      (job?.steps ?? []).some(
         (step) =>
-          step.run?.trim() ===
-          `tar -C ${products} -cf /tmp/cc68-ios-app.tar CoutureCastStory68.app`
+          step.uses === 'actions/cache/restore@v4' &&
+          step.with?.key === '${{ needs.ios-build.outputs.app-key }}' &&
+          step.with?.path === '${{ needs.ios-build.outputs.app-path }}' &&
+          step.with?.['fail-on-cache-miss'] === true
       ) &&
-      build?.steps?.[scan]?.run?.startsWith(
-        `node scripts/ci/native-ios-app-secret-scan.mjs ${products}/CoutureCastStory68.app `
-      ),
-    'ios-build: the app artifact must be the scanned app, packaged to its one pinned path'
-  )
+        !(job?.steps ?? []).some((step) => step.uses === 'actions/download-artifact@v4'),
+      `${name}: restore exactly the key ios-build resolved and fail on a miss`
+    )
+  const checks = expoGo?.steps ?? []
   check(
-    build?.steps?.[appUpload]?.with?.['retention-days'] === 1,
-    'ios-build: the app artifact keeps one day'
-  )
-  check(
-    includesRun(build?.steps ?? [], 'swift test --package-path') &&
-      includesRun(build?.steps ?? [], 'e2e-share-card/bridge-a11y.mjs') &&
-      includesRun(build?.steps ?? [], 'run-story68-native.mjs build --platform ios'),
-    'ios-build: PNG guards, accessibility bridge and native build required'
+    includesRun(checks, 'swift test --package-path') &&
+      includesRun(checks, 'e2e-share-card/bridge-a11y.mjs') &&
+      includesRun(checks, 'maestro-check-flows.mjs') &&
+      includesRun(checks, 'share-card-header-semantics.sh'),
+    `${expoGoJobName}: PNG guards, accessibility bridge, flow check and heading semantics required`
   )
 }
 
 /**
- * The iOS journey: one build job, a two-way shard matrix and a job that proves both shards
- * reported their exact cases, plus the Expo Go proof job outside the gate. All run on the free
- * macos-15 runner (evidence on Ubuntu).
+ * The iOS development client: ios-build keys it by its native fingerprint and builds, scans and
+ * saves it only when no client of that key is cached; every job that installs it restores exactly
+ * that key and fails on a miss, so no job can run a client it did not get from the scanned build.
+ */
+function iosAppProblems(parts, check) {
+  const native = iosBuildKeyProblems(parts.build, check)
+  iosClientScanProblems(parts.build, native, check)
+  iosClientConsumerProblems(parts, check)
+}
+
+/**
+ * The iOS journey: one job that keys and, on a miss, builds the client, a shard matrix and a job
+ * that proves every shard reported its exact cases, plus the Expo Go proof job. All run on the
+ * free macos-15 runner (evidence on Ubuntu).
  */
 function iosProblems(jobs, check) {
   const parts = {
@@ -350,7 +432,7 @@ function iosProblems(jobs, check) {
   iosJobProblems(jobs, check)
   iosShapeProblems(parts, check)
   iosEvidenceProblems(jobs, check)
-  iosAppProblems(parts.build, check)
+  iosAppProblems(parts, check)
 }
 
 /** A shell glob such as an artifact download pattern, as a whole-string regular expression. */
@@ -363,7 +445,7 @@ const globPattern = (glob) =>
   )
 
 /**
- * The job that proves both shards of a sharded lane reported exactly their cases: it runs after
+ * The job that proves every shard of a sharded lane reported exactly its cases: it runs after
  * any shard result, downloads exactly the shard artifacts and fails unless the shard job
  * succeeded and the merged reports equal the plan.
  */
@@ -408,7 +490,7 @@ function shardEvidenceProblems(shardJob, jobs, artifactsByJob, check) {
     merge?.env?.CC68_SHARD_RESULT === `\${{ needs.${shardJob}.result }}` &&
       merge.run.includes('test "$CC68_SHARD_RESULT" = success') &&
       merge.run.includes(`node scripts/ci/native-matrix-shards.mjs merge ${plan} `),
-    `${name}: both shards must report their exact cases`
+    `${name}: every shard must report its exact cases`
   )
 }
 
@@ -536,7 +618,57 @@ function browserProblems(name, steps, check) {
   )
 }
 
+/**
+ * An Android lane restores the APK of its native key and builds only on a miss; it caches only an
+ * APK it built, tested and scanned; and its journey runs only on a build or a hit.
+ */
+function androidClientCacheProblems(name, steps, check) {
+  const at = (predicate) => steps.findIndex(predicate)
+  const key = at((step) => step.id === 'native_key')
+  const restore = at(
+    (step) =>
+      step.id === 'native_cache' &&
+      step.uses === 'actions/cache/restore@v4' &&
+      step.with?.key === '${{ steps.native_key.outputs.key }}'
+  )
+  const build = at((step) => step.id === 'native_build')
+  const scan = at((step) => step.id === 'apk_scan')
+  const save = at(
+    (step) =>
+      step.uses === 'actions/cache/save@v4' &&
+      step.with?.key === '${{ steps.native_key.outputs.key }}'
+  )
+  const journey = at((step) => step.uses === emulatorAction)
+  check(
+    key >= 0 &&
+      steps[key].run?.startsWith(
+        'node scripts/ci/native-build-cache.mjs key --platform '
+      ) &&
+      restore > key &&
+      build > restore &&
+      steps[build].if?.includes("steps.native_cache.outputs.cache-hit != 'true'"),
+    `${name}: restore the client of its native key and build only on a miss`
+  )
+  check(
+    scan > build &&
+      steps[scan].run?.includes('native-ios-app-secret-scan.mjs') &&
+      steps[scan].if?.includes("steps.native_build.outcome == 'success'") &&
+      steps[scan].if?.includes("steps.modal_system_bars.outcome == 'success'") &&
+      save > scan &&
+      steps[save].if?.includes("steps.apk_scan.outcome == 'success'"),
+    `${name}: cache only a built, tested and scanned client`
+  )
+  check(
+    journey > save &&
+      steps[journey].if?.includes(
+        "(steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true')"
+      ),
+    `${name}: run the journey only on a built or restored client`
+  )
+}
+
 function nativeProblems(name, job, rows, check) {
+  androidClientCacheProblems(name, job.steps ?? [], check)
   const steps = job.steps ?? []
   const prepare = steps.find((step) => step.id === 'runtime')
   const engines = steps.find((step) => step.id === 'browser_deps')?.run ?? ''

@@ -26,6 +26,7 @@ import {
   SHARE_SHEET_FLOW,
   SHARE_SHEET_FLOW_ESTIMATE_MS,
   ANDROID_SHARE_LANE_BASE_MS,
+  IOS_SHARE_LANE_BASE_MS,
   SHARE_SHEET_LANE_HEADROOM_MS,
   SHARE_SHEET_NATIVE_TEST_ESTIMATE_MS,
   SHARE_TAP_ATTEMPTS,
@@ -38,6 +39,11 @@ import {
   WAIT_SETTINGS_WORST_CASE_MS,
   flowTimeoutMs,
 } from './story68-flow-timeouts.mjs'
+import { MATRIX_SHARD_PLANS } from '../ci/native-matrix-shards.mjs'
+import {
+  commandsForShard as iosCommandsForShard,
+  nominalMinutes as iosNominalMinutes,
+} from '../ci/native-ios-shards.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const openApp = 'maestro/story65/open-app.yaml'
@@ -343,7 +349,7 @@ describe('Story 6.9 share flow timeouts', () => {
     }
   })
 
-  test('the share-sheet command fits the measured headroom of android36-interaction and iOS shard 1', () => {
+  test('the share-sheet command fits the measured headroom of android36-interaction and iOS shard 4', () => {
     for (const platform of ['android', 'ios']) {
       const flows = shareSheetFlowRuns(platform)
       for (const flow of flows) assert.ok(fs.existsSync(`${root}${flow}`), flow)
@@ -382,7 +388,15 @@ describe('Story 6.9 share flow timeouts', () => {
     )
     assert.equal(
       SHARE_SHEET_LANE_HEADROOM_MS.ios,
-      workflow.jobs['ios-shard']['timeout-minutes'] * 60_000 - 49 * 60_000
+      workflow.jobs['ios-shard']['timeout-minutes'] * 60_000 - IOS_SHARE_LANE_BASE_MS
     )
+    // The base is shard 4's measured minutes without share-sheet.
+    assert.equal(
+      IOS_SHARE_LANE_BASE_MS,
+      Math.round(
+        (iosNominalMinutes(4) - MATRIX_SHARD_PLANS.ios.minutes['share-sheet']) * 60_000
+      )
+    )
+    assert.ok(iosCommandsForShard(4).includes('share-sheet'))
   })
 })

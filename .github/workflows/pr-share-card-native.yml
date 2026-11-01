@@ -15,12 +15,13 @@ concurrency:
   group: share-card-native-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  # The API32 journey runs as two shards (scripts/ci/native-matrix-shards.mjs), each on its own
+  # The API32 journey runs as three shards (scripts/ci/native-matrix-shards.mjs), each on its own
   # emulator with its own services and sign-in. Run 41202706840 ran it as one 62.7 minute
-  # journey in an 83 minute job. Shard 1 runs proof, half the matrix and rapid-watermark (35.6
-  # minutes at that run's pace); shard 2 grants storage and runs the other half (34.4 minutes).
-  # The 55 minute budget still holds on a runner 1.5x slower. original-resource-evidence proves
-  # both shards reported their exact cases.
+  # journey in an 83 minute job, and two shards still took 30.4 and 34.0 minute journeys on main
+  # run 41312266186. Shard 1 runs proof, pre-locale and rapid-watermark; shards 2 and 3 grant
+  # storage and run the rest (26.7, 25.5 and 25.1 nominal minutes). The 45 minute budget still
+  # holds on a runner 1.5x slower. original-resource-evidence proves every shard reported its
+  # exact cases.
   original-resource:
     if: github.event_name != 'pull_request'
     strategy:
@@ -32,13 +33,19 @@ jobs:
             api: 32
             target: google_apis
             suite: all-1
-            journey_timeout: 55
+            journey_timeout: 45
           - os: ubuntu-latest
             platform: android
             api: 32
             target: google_apis
             suite: all-2
-            journey_timeout: 55
+            journey_timeout: 45
+          - os: ubuntu-latest
+            platform: android
+            api: 32
+            target: google_apis
+            suite: all-3
+            journey_timeout: 45
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env: &runtime_env
@@ -79,6 +86,15 @@ jobs:
         if: ${{ !cancelled() && matrix.platform == 'android' }}
         with:
           packages: platform-tools
+      # A restored client skips the Debug build, so the Gradle work left in the journey (the
+      # share-sheet androidTest, the Release font build, the TalkBack androidTest) starts cold:
+      # 13 minutes more in android36-interaction on run 41332254336. This restores Gradle's
+      # dependencies and transforms; main writes the cache, every other ref reads it.
+      - uses: gradle/actions/setup-gradle@v4
+        id: gradle_cache
+        if: ${{ !cancelled() && steps.java.outcome == 'success' }}
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Verify startup deadline controls
         id: deadline_controls
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -116,26 +132,56 @@ jobs:
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
         run: |
           node scripts/e2e-share-card/bridge-a11y.mjs
+      # Most commits change no native input, so each lane restores the development client of its
+      # native fingerprint and builds it only on a miss (scripts/ci/native-build-cache.mjs). The
+      # client loads its JavaScript from this job's Metro, so the journey still tests this commit.
+      - name: Key the native development client by its native inputs
+        id: native_key
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.java.outcome == 'success' }}
+        run: node scripts/ci/native-build-cache.mjs key --platform ${{ matrix.platform }} >> "$GITHUB_OUTPUT"
       - name: Generate native development client
         id: prebuild
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
         run: node scripts/run-story68-native.mjs prebuild --platform ${{ matrix.platform }}
+      - name: Restore the development client of this fingerprint
+        id: native_cache
+        if: ${{ !cancelled() && steps.native_key.outcome == 'success' && steps.prebuild.outcome == 'success' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native_key.outputs.path }}
+          key: ${{ steps.native_key.outputs.key }}
       - name: Verify fresh Worklets variant and ABI staging
         if: ${{ !cancelled() && matrix.platform == 'android' && steps.prebuild.outcome == 'success' }}
         run: node scripts/ci/node-test-gate.mjs worklets-staging
       - name: Build native development client
         id: native_build
-        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
         run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
       - name: Verify modal status-bar styling on both Android SDK branches
         id: modal_system_bars
         # Robolectric compiles the module inside the generated Android project.
-        if: ${{ !cancelled() && matrix.platform == 'android' && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        # Its inputs are part of the fingerprint, so a restored client already passed it.
+        if: ${{ !cancelled() && matrix.platform == 'android' && steps.native_build.outcome == 'success' }}
         working-directory: apps/mobile/android
         run: |
           ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
           # Both SDK branches ran, and none was skipped.
           grep -q 'tests="2" skipped="0" failures="0" errors="0"' ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml
+      # A fork's pull request can restore this cache, so the APK is scanned like the iOS client:
+      # only the publishable anon key of this job's loopback stack may ride along.
+      - name: Refuse to cache a development client that embeds a secret
+        id: apk_scan
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' && steps.modal_system_bars.outcome == 'success' }}
+        run: |
+          rm -rf "$RUNNER_TEMP/cc68-apk"
+          unzip -q "${{ steps.native_key.outputs.path }}" -d "$RUNNER_TEMP/cc68-apk"
+          node scripts/ci/native-ios-app-secret-scan.mjs "$RUNNER_TEMP/cc68-apk" "$CC68_HARNESS_DIR"
+      - name: Save the development client of this fingerprint
+        if: ${{ !cancelled() && steps.apk_scan.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native_key.outputs.path }}
+          key: ${{ steps.native_key.outputs.key }}
       - name: Enable and verify Android hardware acceleration
         id: kvm
         if: ${{ !cancelled() && matrix.platform == 'android' }}
@@ -149,7 +195,7 @@ jobs:
           test -r /dev/kvm && test -w /dev/kvm
       - name: Android isolated native journey
         timeout-minutes: ${{ matrix.journey_timeout }}
-        if: ${{ !cancelled() && matrix.platform == 'android' && steps.native_build.outcome == 'success' && steps.kvm.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.platform == 'android' && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.kvm.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CC68_ANDROID_API: ${{ matrix.api }}
@@ -197,10 +243,11 @@ jobs:
   # other. Each one prepares, signs in and cleans up its own UUID runtime, so they share
   # steps (the alias) but never state. API32 stays in original-resource above; this list
   # is its Android path.
-  # The matrix runs as two shards (scripts/ci/native-matrix-shards.mjs), each on its own
-  # emulator with its own services and sign-in. Their journey steps take 23.8 and 25.9 minutes
-  # at main run 41104845732's pace; the 45 minute budget still holds on a runner 1.5x slower.
-  # android36-matrix-evidence proves both shards reported their exact cases.
+  # The matrix runs as three shards (scripts/ci/native-matrix-shards.mjs), each on its own
+  # emulator with its own services and sign-in. Two shards took 33.8 and 34.1 minute journeys on
+  # main run 41312266186; three are 18.7, 19.2 and 18.0 nominal minutes, and the 35 minute budget
+  # still holds on a runner 1.5x slower. android36-matrix-evidence proves every shard reported its
+  # exact cases.
   android36-native-matrix:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -214,13 +261,19 @@ jobs:
             api: 36
             target: google_apis_playstore
             suite: matrix-1
-            journey_timeout: 45
+            journey_timeout: 35
           - os: ubuntu-latest
             platform: android
             api: 36
             target: google_apis_playstore
             suite: matrix-2
-            journey_timeout: 45
+            journey_timeout: 35
+          - os: ubuntu-latest
+            platform: android
+            api: 36
+            target: google_apis_playstore
+            suite: matrix-3
+            journey_timeout: 35
     env: *runtime_env
     steps: &android36_steps
       - uses: actions/checkout@v4
@@ -252,6 +305,15 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           packages: platform-tools
+      # A restored client skips the Debug build, so the Gradle work left in the journey (the
+      # share-sheet androidTest, the Release font build, the TalkBack androidTest) starts cold:
+      # 13 minutes more in android36-interaction on run 41332254336. This restores Gradle's
+      # dependencies and transforms; main writes the cache, every other ref reads it.
+      - uses: gradle/actions/setup-gradle@v4
+        id: gradle_cache
+        if: ${{ !cancelled() && steps.java.outcome == 'success' }}
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Verify startup deadline controls
         id: deadline_controls
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -289,26 +351,56 @@ jobs:
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
         run: |
           node scripts/e2e-share-card/bridge-a11y.mjs
+      # Most commits change no native input, so each lane restores the development client of its
+      # native fingerprint and builds it only on a miss (scripts/ci/native-build-cache.mjs). The
+      # client loads its JavaScript from this job's Metro, so the journey still tests this commit.
+      - name: Key the native development client by its native inputs
+        id: native_key
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.java.outcome == 'success' }}
+        run: node scripts/ci/native-build-cache.mjs key --platform ${{ matrix.platform }} >> "$GITHUB_OUTPUT"
       - name: Generate native development client
         id: prebuild
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
         run: node scripts/run-story68-native.mjs prebuild --platform ${{ matrix.platform }}
+      - name: Restore the development client of this fingerprint
+        id: native_cache
+        if: ${{ !cancelled() && steps.native_key.outcome == 'success' && steps.prebuild.outcome == 'success' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native_key.outputs.path }}
+          key: ${{ steps.native_key.outputs.key }}
       - name: Verify fresh Worklets variant and ABI staging
         if: ${{ !cancelled() && steps.prebuild.outcome == 'success' }}
         run: node scripts/ci/node-test-gate.mjs worklets-staging
       - name: Build native development client
         id: native_build
-        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
         run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
       - name: Verify modal status-bar styling on both Android SDK branches
         id: modal_system_bars
         # Robolectric compiles the module inside the generated Android project.
-        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        # Its inputs are part of the fingerprint, so a restored client already passed it.
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
         working-directory: apps/mobile/android
         run: |
           ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
           # Both SDK branches ran, and none was skipped.
           grep -q 'tests="2" skipped="0" failures="0" errors="0"' ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml
+      # A fork's pull request can restore this cache, so the APK is scanned like the iOS client:
+      # only the publishable anon key of this job's loopback stack may ride along.
+      - name: Refuse to cache a development client that embeds a secret
+        id: apk_scan
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' && steps.modal_system_bars.outcome == 'success' }}
+        run: |
+          rm -rf "$RUNNER_TEMP/cc68-apk"
+          unzip -q "${{ steps.native_key.outputs.path }}" -d "$RUNNER_TEMP/cc68-apk"
+          node scripts/ci/native-ios-app-secret-scan.mjs "$RUNNER_TEMP/cc68-apk" "$CC68_HARNESS_DIR"
+      - name: Save the development client of this fingerprint
+        if: ${{ !cancelled() && steps.apk_scan.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native_key.outputs.path }}
+          key: ${{ steps.native_key.outputs.key }}
       - name: Enable and verify Android hardware acceleration
         id: kvm
         if: ${{ !cancelled() }}
@@ -322,7 +414,7 @@ jobs:
           test -r /dev/kvm && test -w /dev/kvm
       - name: Android isolated native journey
         timeout-minutes: ${{ matrix.journey_timeout }}
-        if: ${{ !cancelled() && steps.native_build.outcome == 'success' && steps.kvm.outcome == 'success' }}
+        if: ${{ !cancelled() && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.kvm.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CC68_ANDROID_API: ${{ matrix.api }}
@@ -523,15 +615,19 @@ jobs:
       - name: Clean exact owned runtime
         if: always()
         run: node scripts/e2e-share-card/cleanup.mjs
-  # The iOS journey runs on the free macos-15 runner as native processes (no Docker): one job
-  # builds the development client, two shards each boot their own Supabase, Metro and signed-in
-  # account and run their share of the matrix, and one job proves both shards reported their exact
+  # The iOS journey runs on the free macos-15 runner as native processes (no Docker). ios-build
+  # keys the development client by its native fingerprint and builds it only when no client of that
+  # key is cached; four shards each boot their own Supabase, Metro and signed-in account, restore
+  # the client and run their share of the matrix; ios-evidence proves every shard reported its exact
   # cases. The lanes gate requires all three; a skipped shard never passes.
   ios-build:
     if: github.event_name != 'pull_request'
     runs-on: macos-15
     timeout-minutes: 60
     env: *runtime_env
+    outputs:
+      app-key: ${{ steps.native_key.outputs.key }}
+      app-path: ${{ steps.native_key.outputs.path }}
     steps:
       - uses: actions/checkout@v4
       - name: Disable Spotlight indexing on the disposable iOS runner
@@ -554,37 +650,35 @@ jobs:
         run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
       - uses: ./.github/actions/install
         id: install
-      - name: Provision pinned iOS accessibility browser
-        id: ios_browser
-        timeout-minutes: 6
-        run: npx --no-install playwright install chromium
-      # These suites need only the installed dependencies, so a later Supabase, browser or build
-      # failure cannot hide them.
-      - name: Verify share-card harness and plugin suites
-        id: harness_suites
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: |
-          node scripts/ci/node-test-gate.mjs share-card-plugins
-          node scripts/ci/node-test-gate.mjs native-harness
-      - uses: actions/setup-java@v4
-        id: java
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        with:
-          distribution: temurin
-          java-version: '21'
       - name: Verify startup deadline controls
         id: deadline_controls
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: node scripts/ci/node-test-gate.mjs startup-deadline
-      - name: Install the iOS project generator
-        id: xcodegen
+      # Most commits change no native input. Then the client of this key is already cached, this
+      # job ends here and the shards restore it. On a miss the steps below build, scan and save it.
+      - name: Key the iOS development client by its native inputs
+        id: native_key
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: brew install xcodegen
+        run: node scripts/ci/native-build-cache.mjs key --platform ios >> "$GITHUB_OUTPUT"
+      - name: Look up the development client of this fingerprint
+        id: native_cache
+        if: ${{ !cancelled() && steps.native_key.outcome == 'success' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native_key.outputs.path }}
+          key: ${{ steps.native_key.outputs.key }}
+          lookup-only: true
+      - uses: actions/setup-java@v4
+        id: java
+        if: ${{ !cancelled() && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
+        with:
+          distribution: temurin
+          java-version: '21'
       # The macOS lane runs Supabase as native processes built from pinned,
       # checksum-verified sources (scripts/ci/native-supabase.mjs). Each build is
       # saved to the cache as soon as it exists, so a failed job still keeps it.
       - name: Pin the native Supabase build inputs
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.java.outcome == 'success' }}
         id: native
         run: node scripts/ci/native-supabase.mjs cache-keys >> "$GITHUB_OUTPUT"
       - name: Restore PostgreSQL
@@ -666,7 +760,7 @@ jobs:
           key: ${{ steps.native.outputs.storage-key }}
       - name: Start the native Supabase stack
         id: supabase
-        if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' && steps.java.outcome == 'success' && steps.xcodegen.outcome == 'success' && steps.postgres_build.outcome != 'failure' && steps.redis_build.outcome != 'failure' && steps.gotrue_build.outcome != 'failure' && steps.storage_build.outcome != 'failure' }}
+        if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' && steps.java.outcome == 'success' && steps.native.outcome == 'success' && steps.postgres_build.outcome != 'failure' && steps.redis_build.outcome != 'failure' && steps.gotrue_build.outcome != 'failure' && steps.storage_build.outcome != 'failure' }}
         timeout-minutes: 8
         run: node scripts/ci/native-supabase.mjs start
       - name: Provision the local Storage buckets
@@ -688,35 +782,9 @@ jobs:
           (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
           (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
-      - name: Check the iOS Maestro flows with the pinned CLI
-        id: maestro_flows
-        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
-        run: node scripts/ci/maestro-check-flows.mjs
-      - name: Verify localized native accessibility announcements and focus bridge
-        id: bridge
-        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.ios_browser.outcome == 'success' }}
-        run: |
-          node scripts/e2e-share-card/bridge-a11y.mjs
-      - name: Verify native paragraph heading semantics
-        id: heading
-        if: ${{ !cancelled() }}
-        run: bash scripts/ci/share-card-header-semantics.sh
-      - name: Verify the iOS original PNG and cache-file guards
-        if: ${{ !cancelled() }}
-        id: png_file_guards
-        # SwiftPM builds the validator from the checkout alone.
-        run: |
-          set -euo pipefail
-          swift test --package-path apps/mobile/modules/share-card-photo-save/ios 2>&1 | tee "$RUNNER_TEMP/cc68-png-file-tests.log"
-          # Some tests ran and none failed or was skipped: a skip changes the summary wording.
-          summary=$(grep -Eo 'Executed [0-9]+ tests?, with [0-9]+ failures?' "$RUNNER_TEMP/cc68-png-file-tests.log" | tail -1 || true)
-          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
-          failures=$(echo "$summary" | grep -Eo 'with [0-9]+' | grep -Eo '[0-9]+' || true)
-          if [ "${count:-0}" -eq 0 ] || [ "${failures:-1}" -ne 0 ]; then echo "::error::swift test ran zero tests or had failures"; exit 1; fi
-          echo "swift test ran $count tests"
       - name: Generate native development client
         id: prebuild
-        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.maestro_flows.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
         run: node scripts/run-story68-native.mjs prebuild --platform ios
       - name: Mark the owned iOS build-service window
         id: build_window
@@ -729,26 +797,30 @@ jobs:
       - name: Release the owned iOS build services
         if: ${{ !cancelled() && steps.build_window.outcome == 'success' }}
         run: node scripts/ci/native-build-daemons.mjs stop
-      - name: Package the built development client
-        id: package
-        if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-        run: tar -C /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator -cf /tmp/cc68-ios-app.tar CoutureCastStory68.app
-      # The repository is public, so any signed-in user can download this artifact. It may carry
-      # the anon key of this job's loopback stack (a client key, signed by a secret that dies
+      # The repository is public, and a fork's pull request can restore this cache. The client may
+      # carry the anon key of this job's loopback stack (a client key, signed by a secret that dies
       # with the job) and nothing else: no service role key, no owned environment value.
-      - name: Refuse to upload a development client that embeds a secret
+      - name: Refuse to cache a development client that embeds a secret
         id: app_scan
-        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
         run: node scripts/ci/native-ios-app-secret-scan.mjs /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app "$CC68_HARNESS_DIR"
-      - name: Upload the built development client
+      - name: Save the scanned development client of this fingerprint
+        id: native_save
         if: ${{ !cancelled() && steps.app_scan.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/cache/save@v4
         with:
-          name: cc68-ios-app
-          path: /tmp/cc68-ios-app.tar
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
+          path: ${{ steps.native_key.outputs.path }}
+          key: ${{ steps.native_key.outputs.key }}
+      # A save that lost a race to a concurrent run leaves no entry of this run's own; the shards
+      # need one, so the job fails here instead of in four shards.
+      - name: Require the saved development client for the shards
+        if: ${{ !cancelled() && steps.native_save.outcome == 'success' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native_key.outputs.path }}
+          key: ${{ steps.native_key.outputs.key }}
+          lookup-only: true
+          fail-on-cache-miss: true
       - name: Report owned background service exits
         if: always()
         # Logs stay private: they can carry owned-runtime credentials.
@@ -784,15 +856,18 @@ jobs:
       - name: Stop the owned native Supabase stack
         if: always()
         run: node scripts/ci/native-supabase.mjs stop
+  # Four shards balanced by measured minutes (scripts/ci/native-matrix-shards.mjs): nominal jobs of
+  # 30.0 to 32.8 minutes against 50 and 58 for the two shards of main run 41312266186. With
+  # ios-expo-go they fill the five macOS jobs the free plan runs at once.
   ios-shard:
     needs: ios-build
     if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     runs-on: macos-15
-    timeout-minutes: 100
+    timeout-minutes: 70
     env: *runtime_env
     steps:
       - uses: actions/checkout@v4
@@ -815,6 +890,7 @@ jobs:
       - name: Record the Node 22 binary for the native storage-api
         run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
       - uses: ./.github/actions/install
+        id: install
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -902,6 +978,7 @@ jobs:
       - name: Provision the local Storage buckets
         run: node scripts/local-storage-buckets.mjs provision
       - name: Prepare isolated UUID runtime and built renderer
+        id: runtime
         run: |
           npm run db:generate
           npm run build:packages
@@ -914,19 +991,16 @@ jobs:
           (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
           (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
-      - name: Download the built development client
-        uses: actions/download-artifact@v4
+      # ios-build resolved the key and, on a miss, saved the scanned client before this job started.
+      - name: Restore the development client of this fingerprint
+        uses: actions/cache/restore@v4
         with:
-          name: cc68-ios-app
-          path: /tmp/cc68-ios-app
-      - name: Place the built development client
-        run: |
-          mkdir -p /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator
-          tar -C /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator -xf /tmp/cc68-ios-app/cc68-ios-app.tar
-          test -d /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app
+          path: ${{ needs.ios-build.outputs.app-path }}
+          key: ${{ needs.ios-build.outputs.app-key }}
+          fail-on-cache-miss: true
       - name: iOS shard flows
         run: |
-          shard='${{ matrix.shard }}/2'
+          shard='${{ matrix.shard }}/4'
           node scripts/e2e-share-card/warm-metro.mjs --platform ios
           node scripts/ci/native-ios-startup-probe.mjs --for-native-flow
           device=$(cat /tmp/cc68-simulator)
@@ -984,7 +1058,8 @@ jobs:
         run: node scripts/ci/native-ios-device-cleanup.mjs
 
   # The Expo Go proof runs alone on a fresh simulator, skipped on pull requests like every other
-  # device lane and required by share-card-lanes-gate.
+  # device lane and required by share-card-lanes-gate. The iOS checks that need no development
+  # client follow it.
   ios-expo-go:
     needs: ios-build
     if: github.event_name != 'pull_request'
@@ -1012,6 +1087,7 @@ jobs:
       - name: Record the Node 22 binary for the native storage-api
         run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
       - uses: ./.github/actions/install
+        id: install
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -1099,6 +1175,7 @@ jobs:
       - name: Provision the local Storage buckets
         run: node scripts/local-storage-buckets.mjs provision
       - name: Prepare isolated UUID runtime and built renderer
+        id: runtime
         run: |
           npm run db:generate
           npm run build:packages
@@ -1111,16 +1188,13 @@ jobs:
           (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
           (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
-      - name: Download the built development client
-        uses: actions/download-artifact@v4
+      # ios-build resolved the key and, on a miss, saved the scanned client before this job started.
+      - name: Restore the development client of this fingerprint
+        uses: actions/cache/restore@v4
         with:
-          name: cc68-ios-app
-          path: /tmp/cc68-ios-app
-      - name: Place the built development client
-        run: |
-          mkdir -p /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator
-          tar -C /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator -xf /tmp/cc68-ios-app/cc68-ios-app.tar
-          test -d /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app
+          path: ${{ needs.ios-build.outputs.app-path }}
+          key: ${{ needs.ios-build.outputs.app-key }}
+          fail-on-cache-miss: true
       - name: Expo Go proof on a fresh simulator
         run: |
           node scripts/e2e-share-card/warm-metro.mjs --platform ios
@@ -1135,6 +1209,41 @@ jobs:
             node scripts/ci/native-host-evidence.mjs sample failure --platform ios
           fi
           node scripts/ci/native-host-evidence.mjs metro --platform ios
+      # The iOS checks that need no development client run here, after the proof, so ios-build
+      # stays a key lookup on most runs and the shards start minutes after the workflow does.
+      - name: Provision pinned iOS accessibility browser
+        id: ios_browser
+        if: ${{ !cancelled() }}
+        timeout-minutes: 6
+        run: npx --no-install playwright install chromium
+      - name: Verify share-card harness and plugin suites
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          node scripts/ci/node-test-gate.mjs share-card-plugins
+          node scripts/ci/node-test-gate.mjs native-harness
+      - name: Check the iOS Maestro flows with the pinned CLI
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
+        run: node scripts/ci/maestro-check-flows.mjs
+      - name: Verify localized native accessibility announcements and focus bridge
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.ios_browser.outcome == 'success' }}
+        run: |
+          node scripts/e2e-share-card/bridge-a11y.mjs
+      - name: Verify native paragraph heading semantics
+        if: ${{ !cancelled() }}
+        run: bash scripts/ci/share-card-header-semantics.sh
+      - name: Verify the iOS original PNG and cache-file guards
+        id: png_file_guards
+        if: ${{ !cancelled() }}
+        # SwiftPM builds the validator from the checkout alone.
+        run: |
+          set -euo pipefail
+          swift test --package-path apps/mobile/modules/share-card-photo-save/ios 2>&1 | tee "$RUNNER_TEMP/cc68-png-file-tests.log"
+          # Some tests ran and none failed or was skipped: a skip changes the summary wording.
+          summary=$(grep -Eo 'Executed [0-9]+ tests?, with [0-9]+ failures?' "$RUNNER_TEMP/cc68-png-file-tests.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          failures=$(echo "$summary" | grep -Eo 'with [0-9]+' | grep -Eo '[0-9]+' || true)
+          if [ "${count:-0}" -eq 0 ] || [ "${failures:-1}" -ne 0 ]; then echo "::error::swift test ran zero tests or had failures"; exit 1; fi
+          echo "swift test ran $count tests"
       - name: Report owned background service exits
         if: always()
         # Logs stay private: they can carry owned-runtime credentials.
@@ -1187,12 +1296,12 @@ jobs:
         with:
           pattern: share-card-android-32-all-*
           path: /tmp/android32-shards
-      - name: Require both API32 shards to report their exact cases
+      - name: Require every API32 shard to report its exact cases
         env:
           CC68_SHARD_RESULT: ${{ needs.original-resource.result }}
         run: |
           test "$CC68_SHARD_RESULT" = success
-          for shard in 1 2; do mv "/tmp/android32-shards/share-card-android-32-all-$shard" "/tmp/android32-shards/shard-$shard"; done
+          for artifact in /tmp/android32-shards/share-card-android-32-all-*; do mv "$artifact" "/tmp/android32-shards/shard-${artifact##*-}"; done
           node scripts/ci/native-matrix-shards.mjs merge android-32 /tmp/android32-shards
   android36-matrix-evidence:
     if: always() && github.event_name != 'pull_request'
@@ -1205,12 +1314,12 @@ jobs:
         with:
           pattern: share-card-android-36-matrix-*
           path: /tmp/android-matrix-shards
-      - name: Require both Android matrix shards to report their exact cases
+      - name: Require every Android matrix shard to report its exact cases
         env:
           CC68_SHARD_RESULT: ${{ needs.android36-native-matrix.result }}
         run: |
           test "$CC68_SHARD_RESULT" = success
-          for shard in 1 2; do mv "/tmp/android-matrix-shards/share-card-android-36-matrix-$shard" "/tmp/android-matrix-shards/shard-$shard"; done
+          for artifact in /tmp/android-matrix-shards/share-card-android-36-matrix-*; do mv "$artifact" "/tmp/android-matrix-shards/shard-${artifact##*-}"; done
           node scripts/ci/native-matrix-shards.mjs merge android-36 /tmp/android-matrix-shards
   # A skipped shard has no report, so this job fails; the lanes gate also requires its result.
   ios-evidence:
@@ -1224,12 +1333,12 @@ jobs:
         with:
           pattern: share-card-ios-shard-*
           path: /tmp/ios-shards
-      - name: Require both iOS shards to report their exact cases
+      - name: Require every iOS shard to report its exact cases
         env:
           CC68_SHARD_RESULT: ${{ needs.ios-shard.result }}
         run: |
           test "$CC68_SHARD_RESULT" = success
-          for shard in 1 2; do mv "/tmp/ios-shards/share-card-ios-shard-$shard" "/tmp/ios-shards/shard-$shard"; done
+          for artifact in /tmp/ios-shards/share-card-ios-shard-*; do mv "$artifact" "/tmp/ios-shards/shard-${artifact##*-}"; done
           node scripts/ci/native-ios-shards.mjs merge /tmp/ios-shards
   # Not named gate: the required ruleset context gate is a commit status from pr-gate.yml,
   # and a check run with that name could satisfy or fail it independently.

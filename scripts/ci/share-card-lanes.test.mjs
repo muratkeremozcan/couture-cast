@@ -26,6 +26,8 @@ const mutate = (change) => {
   return shareCardLaneProblems(workflow)
 }
 const step = (job, predicate) => job.steps.find(predicate)
+const clientKey = '${{ steps.native_key.outputs.key }}'
+const restoredKey = '${{ needs.ios-build.outputs.app-key }}'
 const native = [
   'android36-native-matrix',
   'android36-original',
@@ -539,6 +541,60 @@ describe('share-card parallel lane validator', () => {
     }
   })
 
+  describe('Android client cache', () => {
+    const rejected = (title, expected, change) =>
+      test(`${title} is rejected`, () => {
+        const problems = mutate(change)
+        assert.ok(
+          problems.some((problem) => expected.test(problem)),
+          problems.join('\n') || 'no problem raised'
+        )
+      })
+    // android36 lanes share one step list through the YAML alias; original-resource keeps its own.
+    for (const name of ['original-resource', 'android36-native-matrix']) {
+      const byId = (jobs, id) => step(jobs[name], (row) => row.id === id)
+      rejected(
+        `${name} building on a hit`,
+        new RegExp(
+          `${name}: restore the client of its native key and build only on a miss`
+        ),
+        (jobs) => {
+          byId(jobs, 'native_build').if =
+            "${{ !cancelled() && steps.prebuild.outcome == 'success' }}"
+        }
+      )
+      rejected(
+        `${name} caching an unscanned client`,
+        new RegExp(`${name}: cache only a built, tested and scanned client`),
+        (jobs) => {
+          const steps = jobs[name].steps
+          steps.splice(
+            steps.findIndex((row) => row.id === 'apk_scan'),
+            1
+          )
+        }
+      )
+      rejected(
+        `${name} scanning before the module test passed`,
+        new RegExp(`${name}: cache only a built, tested and scanned client`),
+        (jobs) => {
+          byId(jobs, 'apk_scan').if =
+            "${{ !cancelled() && steps.native_build.outcome == 'success' }}"
+        }
+      )
+      rejected(
+        `${name} running the journey without a client`,
+        new RegExp(`${name}: run the journey only on a built or restored client`),
+        (jobs) => {
+          step(
+            jobs[name],
+            (row) => row.uses === 'reactivecircus/android-emulator-runner@v2'
+          ).if = "${{ !cancelled() && steps.kvm.outcome == 'success' }}"
+        }
+      )
+    }
+  })
+
   describe('iOS journey', () => {
     const iosJobs = ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-evidence']
     const rejected = (title, expected, change) =>
@@ -571,12 +627,19 @@ describe('share-card parallel lane validator', () => {
         jobs['ios-build'].needs = ['original-resource']
       }
     )
-    rejected('a single shard', /shards 1 and 2/, (jobs) => {
+    rejected('a single shard', /every shard of the iOS plan/, (jobs) => {
       jobs['ios-shard'].strategy.matrix.shard = [1]
     })
-    rejected('a shard matrix that cancels its sibling', /shards 1 and 2/, (jobs) => {
-      delete jobs['ios-shard'].strategy['fail-fast']
+    rejected('the two-shard matrix', /every shard of the iOS plan/, (jobs) => {
+      jobs['ios-shard'].strategy.matrix.shard = [1, 2]
     })
+    rejected(
+      'a shard matrix that cancels its sibling',
+      /every shard of the iOS plan/,
+      (jobs) => {
+        delete jobs['ios-shard'].strategy['fail-fast']
+      }
+    )
     rejected(
       'an evidence job skipped after a failed shard',
       /ios-evidence must run after/,
@@ -727,14 +790,14 @@ describe('share-card parallel lane validator', () => {
     )
     rejected(
       'an app scan without the harness directory env',
-      /scan must run with the harness directory/,
+      /scanned with the harness directory set/,
       (jobs) => {
         delete jobs['ios-build'].env
       }
     )
     rejected(
       'an app scan with an empty harness argument',
-      /scan must run with the harness directory/,
+      /scanned with the harness directory set/,
       (jobs) => {
         const row = step(jobs['ios-build'], (item) =>
           item.run?.includes('native-ios-app-secret-scan')
@@ -742,41 +805,114 @@ describe('share-card parallel lane validator', () => {
         row.run = row.run.replace('"$CC68_HARNESS_DIR"', '""')
       }
     )
-    for (const [title, change] of [
-      [
-        'uploading a broader path than the packaged app',
-        (jobs) => {
-          step(jobs['ios-build'], (row) => row.with?.name === 'cc68-ios-app').with.path =
-            '/tmp/'
-        },
-      ],
-      [
-        'packaging something besides the app',
-        (jobs) => {
-          const row = step(jobs['ios-build'], (item) =>
-            item.run?.includes('-cf /tmp/cc68-ios-app.tar')
-          )
-          row.run = row.run.replace('CoutureCastStory68.app', '.')
-        },
-      ],
-      [
-        'scanning a different directory than the one packaged',
-        (jobs) => {
-          const row = step(jobs['ios-build'], (item) =>
-            item.run?.includes('native-ios-app-secret-scan')
-          )
-          row.run = row.run.replace('/CoutureCastStory68.app', '')
-        },
-      ],
-    ])
-      rejected(title, /must be the scanned app, packaged to its one pinned path/, change)
     rejected(
-      'keeping the app artifact for longer',
-      /app artifact keeps one day/,
+      'scanning a different directory than the one cached',
+      /scanned with the harness directory set/,
       (jobs) => {
-        step(jobs['ios-build'], (row) => row.with?.name === 'cc68-ios-app').with[
-          'retention-days'
-        ] = 7
+        const row = step(jobs['ios-build'], (item) =>
+          item.run?.includes('native-ios-app-secret-scan')
+        )
+        row.run = row.run.replace('/CoutureCastStory68.app', '')
+      }
+    )
+    rejected(
+      'saving the client without waiting on the scan',
+      /scanned with the harness directory set/,
+      (jobs) => {
+        step(
+          jobs['ios-build'],
+          (row) => row.uses === 'actions/cache/save@v4' && row.with.key === clientKey
+        ).if = "${{ !cancelled() && steps.native_build.outcome == 'success' }}"
+      }
+    )
+    rejected(
+      'saving the client before the scan',
+      /secret-scanned before it is cached/,
+      (jobs) => {
+        const steps = jobs['ios-build'].steps
+        const save = steps.findIndex(
+          (row) => row.uses === 'actions/cache/save@v4' && row.with.key === clientKey
+        )
+        const [row] = steps.splice(save, 1)
+        steps.splice(
+          steps.findIndex((item) => item.run?.includes('native-ios-app-secret-scan')),
+          0,
+          row
+        )
+      }
+    )
+    rejected(
+      'a build that ignores the cache',
+      /build only when the key is not cached/,
+      (jobs) => {
+        step(jobs['ios-build'], (row) => row.id === 'java').if = '${{ !cancelled() }}'
+      }
+    )
+    rejected(
+      'a build step that no longer waits on the miss-only build window',
+      /build only when the key is not cached/,
+      (jobs) => {
+        step(jobs['ios-build'], (row) => row.id === 'native_build').if =
+          '${{ !cancelled() }}'
+      }
+    )
+    rejected(
+      'a client keyed by something else',
+      /keyed by scripts\/ci\/native-build-cache/,
+      (jobs) => {
+        step(jobs['ios-build'], (row) => row.id === 'native_key').run =
+          'echo "key=cc68-ios-${{ github.sha }}" >> "$GITHUB_OUTPUT"'
+      }
+    )
+    rejected(
+      'a build job that no longer proves its saved key exists',
+      /prove the saved key exists/,
+      (jobs) => {
+        const steps = jobs['ios-build'].steps
+        steps.splice(
+          steps.findIndex((row) => row.with?.['fail-on-cache-miss'] === true),
+          1
+        )
+      }
+    )
+    rejected(
+      'uploading the client as a public artifact',
+      /travels by cache only/,
+      (jobs) => {
+        jobs['ios-build'].steps.push({
+          uses: 'actions/upload-artifact@v4',
+          with: { name: 'cc68-ios-app', path: '/tmp/cc68-ios-app.tar' },
+        })
+      }
+    )
+    for (const name of ['ios-shard', 'ios-expo-go']) {
+      rejected(
+        `${name} restoring without failing on a miss`,
+        new RegExp(`${name}: restore exactly the key ios-build resolved`),
+        (jobs) => {
+          delete step(jobs[name], (row) => row.with?.key === restoredKey).with[
+            'fail-on-cache-miss'
+          ]
+        }
+      )
+      rejected(
+        `${name} restoring a key of its own`,
+        new RegExp(`${name}: restore exactly the key ios-build resolved`),
+        (jobs) => {
+          step(jobs[name], (row) => row.with?.key === restoredKey).with.key =
+            'cc68-native-ios-latest'
+        }
+      )
+    }
+    rejected(
+      'an Expo Go job without the PNG guards',
+      /PNG guards, accessibility bridge/,
+      (jobs) => {
+        const steps = jobs['ios-expo-go'].steps
+        steps.splice(
+          steps.findIndex((row) => row.run?.includes('swift test --package-path')),
+          1
+        )
       }
     )
     for (const path of [
@@ -834,13 +970,13 @@ describe('share-card parallel lane validator', () => {
       const mergeStep = (jobs) =>
         step(jobs[evidenceJob], (row) => row.run?.includes('native-matrix-shards.mjs'))
       const evidence = new RegExp(
-        `${evidenceJob}: both shards must report their exact cases`
+        `${evidenceJob}: every shard must report its exact cases`
       )
 
-      test('the job runs one row per shard and the evidence job merges both', () => {
+      test('the job runs one row per shard and the evidence job merges them all', () => {
         assert.deepEqual(
           source.jobs[shardJob].strategy.matrix.include.map((row) => row.suite),
-          [`${prefix}-1`, `${prefix}-2`]
+          [`${prefix}-1`, `${prefix}-2`, `${prefix}-3`]
         )
         assert.deepEqual(source.jobs[evidenceJob].needs, shardJob)
         assert.ok(
@@ -1140,8 +1276,8 @@ describe('share native unit workflow', () => {
   })
 })
 
-describe('ios-build photo-save guard', () => {
-  const guard = step(source.jobs['ios-build'], (row) => row.id === 'png_file_guards')
+describe('ios-expo-go photo-save guard', () => {
+  const guard = step(source.jobs['ios-expo-go'], (row) => row.id === 'png_file_guards')
 
   test('passes on any nonzero count and fails on zero tests, a skip or a failure', () => {
     // A literal count breaks the lane whenever the suite grows.

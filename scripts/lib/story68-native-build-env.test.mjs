@@ -10,6 +10,13 @@ import {
   verifyWorkletsStaging,
 } from './story68-worklets-staging.mjs'
 import vm from 'node:vm'
+import {
+  IOS_DERIVED_DATA,
+  buildSelection,
+  nativeBuildCommand,
+  nativeBuildEnv,
+  nativeProjectDirectory,
+} from './story68-native-build.mjs'
 import { LOCALES } from '../ci/native-ios-shards.mjs'
 import { describe, test } from 'node:test'
 import { talkbackFailureSummary } from './story68-talkback-failure.mjs'
@@ -282,6 +289,11 @@ describe('Android build environment', () => {
           adb: '/owned/android-sdk/platform-tools/adb',
           process: { arch: 'arm64', env: explicit ? { ANDROID_HOME: explicit } : {} },
           read: () => ({ STORY68_NATIVE_TEST_BUILD: '1' }),
+          IOS_DERIVED_DATA,
+          buildSelection,
+          nativeBuildCommand,
+          nativeBuildEnv,
+          nativeProjectDirectory,
           prepareWorkletsStaging: (input) => {
             events.push('prepare')
             selected = prepareWorkletsStaging(input)

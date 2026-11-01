@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
 import { planRedis, resolveSupabase } from './runtime-sources.mjs'
 import { pinNativeJourneyWeather } from '../lib/native-journey-weather.mjs'
+import { story68PublicBuildEnv } from '../lib/story68-public-build-env.mjs'
 
 const root = process.cwd()
 const directory = path.resolve(
@@ -138,14 +139,7 @@ const owned = {
 }
 owned.E2E_CALLER_OWNED_ENV_KEYS = Object.keys(owned).sort().join(',')
 privateJson('owned-env.json', owned)
-privateJson('public-build-env.json', {
-  STORY68_NATIVE_TEST_BUILD: '1',
-  TEST_ENV: 'local',
-  EXPO_PUBLIC_API_BASE_URL: 'http://127.0.0.1:4088',
-  EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:53068',
-  EXPO_PUBLIC_SUPABASE_ANON_KEY: supabase.SUPABASE_ANON_KEY,
-  POSTHOG_API_KEY: '',
-})
+privateJson('public-build-env.json', story68PublicBuildEnv(supabase.SUPABASE_ANON_KEY))
 function run(label, cmd, args) {
   const output = fs.openSync(path.join(directory, `${label}.log`), 'w', 0o600)
   const child = spawnSync(cmd, args, {
