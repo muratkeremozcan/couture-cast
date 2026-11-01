@@ -397,6 +397,8 @@ jobs:
           SQL
       # One test worker, its own runner and services, no concurrent builds or suites.
       # The product keeps its 1950 ms deadline, five-connection pool and 100 cold members.
+      # Each proof runs the burst twice: on this runner's own disk, then with 100 ms
+      # durable commits and a 150 ms flag provider, the production shape.
       - name: Require five independent cold-start budget proofs
         id: proofs
         working-directory: apps/api
@@ -414,7 +416,7 @@ jobs:
           import fs from 'node:fs'
           for (let attempt = 1; attempt <= 5; attempt++) {
             const report = JSON.parse(fs.readFileSync(`.cache/realtime-budget/run-${attempt}.json`, 'utf8'))
-            if (report.numTotalTests !== 1 || report.numPassedTests !== 1 ||
+            if (report.numTotalTests !== 2 || report.numPassedTests !== 2 ||
                 report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
               throw new Error(`Incomplete realtime budget proof: ${attempt}`)
           }

@@ -7,6 +7,7 @@ import type { AccessTokenIdentityService } from '../modules/auth/access-token-id
 import type { CommunityAccessService } from '../modules/community/community-access.service.js'
 import {
   CommunityAuthorizationBudget,
+  CommunityConnectionGate,
   type CommunityGrant,
 } from '../modules/community/community-availability.js'
 import type { CommunityStreamRepository } from '../modules/community/community-stream.repository.js'
@@ -40,26 +41,14 @@ type Connection = {
  */
 const revalidationInterval = () => 4000 + Math.random() * 2000
 /**
- * Concurrent member authorizations per instance, across handshakes and ticks. Match the
- * five-connection bounded pool used by the reconnect regression. Three slots left two
- * connections idle while cold flag transactions consumed queued handshakes' budgets.
- * Keep work bounded and count queue time against the original authorization deadline.
+ * Authorization and stream-head transactions one instance runs at once, across
+ * handshakes and ticks: the runtime pool's connection_limit (5 per instance on the
+ * transaction pooler). Each waits for a slot in deadline order, so queue time still
+ * counts against its member's original authorization deadline; see
+ * CommunityConnectionGate. Identity resolution stays outside: it is an HTTP call to
+ * Supabase Auth plus at most two single-row reads.
  */
-const AUTHORIZATION_CONCURRENCY = 5
-function concurrencyLimit(limit: number) {
-  let active = 0
-  const waiting: (() => void)[] = []
-  return async <T>(work: () => Promise<T>): Promise<T> => {
-    while (active >= limit) await new Promise<void>((resolve) => waiting.push(resolve))
-    active++
-    try {
-      return await work()
-    } finally {
-      active--
-      waiting.shift()?.()
-    }
-  }
-}
+const DATABASE_CONNECTIONS = 5
 /** Why a check failed, for logs: an error class or code, never an identifier. */
 function failureReason(error: unknown): string {
   if (error instanceof ForbiddenException) return 'denied'
@@ -136,7 +125,7 @@ export function attachCommunityRealtime(
   })
   const namespace = io.of('/community')
   const logger = createBaseLogger().child({ feature: 'community-realtime' })
-  const limited = concurrencyLimit(AUTHORIZATION_CONCURRENCY)
+  const gate = new CommunityConnectionGate(DATABASE_CONNECTIONS)
   const connections = new Map<Socket, Connection>()
   const authorized = new WeakMap<Socket, Connection>()
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -186,23 +175,22 @@ export function attachCommunityRealtime(
     deps: CommunityRealtimeDependencies,
     member: string,
     budget: CommunityAuthorizationBudget
-  ): Promise<CommunityGrant> =>
-    limited(async () => {
-      budget.check()
-      if (deps.access.authorize) return deps.access.authorize(member, budget)
-      // Explicit injected test adapters retain the existing assert-only interface.
-      await budget.run(() => deps.access.assert(member))
-      return {
-        value: true,
-        expiresAt: new Date(Date.now() + budget.remaining()),
-        validUntil: budget.deadline,
-      }
-    })
+  ): Promise<CommunityGrant> => {
+    budget.check()
+    if (deps.access.authorize) return deps.access.authorize(member, budget)
+    // Explicit injected test adapters retain the existing assert-only interface.
+    await budget.run(() => budget.connection(() => deps.access.assert(member)))
+    return {
+      value: true,
+      expiresAt: new Date(Date.now() + budget.remaining()),
+      validUntil: budget.deadline,
+    }
+  }
   const tick = async () => {
     if (running || closing) return
     running = true
     const started = performance.now()
-    const budget = new CommunityAuthorizationBudget()
+    const budget = new CommunityAuthorizationBudget(undefined, gate)
     try {
       const deps = await budget.run(dependencies)
       lastDependencies = deps
@@ -225,7 +213,13 @@ export function attachCommunityRealtime(
       const check = (member: string) => {
         let existing = checks.get(member)
         if (!existing) {
-          existing = authorize(deps, member, budget)
+          // One tick deadline, but each member keeps its own place at the gate, so the
+          // members checked first finish first.
+          existing = authorize(
+            deps,
+            member,
+            new CommunityAuthorizationBudget(budget.deadline, gate)
+          )
           checks.set(member, existing)
         }
         return existing
@@ -253,9 +247,11 @@ export function attachCommunityRealtime(
       if (!connections.size) return
       const members = [...new Set([...connections.values()].map((c) => c.member))]
       const heads = await budget.run(() =>
-        deps.prisma.communityStreamHead.findMany({
-          where: { OR: [{ id: 'public' }, { owner_id: { in: members } }] },
-        })
+        budget.connection(() =>
+          deps.prisma.communityStreamHead.findMany({
+            where: { OR: [{ id: 'public' }, { owner_id: { in: members } }] },
+          })
+        )
       )
       const publicHead = heads.find((h) => h.id === 'public')
       const key = (head: typeof publicHead) =>
@@ -306,7 +302,7 @@ export function attachCommunityRealtime(
     handshakes++
     if (idleTimer) clearTimeout(idleTimer)
     void (async () => {
-      const budget = new CommunityAuthorizationBudget()
+      const budget = new CommunityAuthorizationBudget(undefined, gate)
       const deps = await budget.run(dependencies)
       lastDependencies = deps
       const origin = socket.handshake.headers.origin
@@ -326,9 +322,11 @@ export function attachCommunityRealtime(
       const checkedAt = performance.now()
       const grant = await authorize(deps, identity.userId, budget)
       const heads = await budget.run(() =>
-        deps.prisma.communityStreamHead.findMany({
-          where: { OR: [{ id: 'public' }, { owner_id: identity.userId }] },
-        })
+        budget.connection(() =>
+          deps.prisma.communityStreamHead.findMany({
+            where: { OR: [{ id: 'public' }, { owner_id: identity.userId }] },
+          })
+        )
       )
       budget.check(grant)
       // The bearer lapsed during the handshake: a fresh token on reconnect resolves it.
