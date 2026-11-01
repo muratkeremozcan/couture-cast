@@ -86,6 +86,15 @@ jobs:
         if: ${{ !cancelled() && matrix.platform == 'android' }}
         with:
           packages: platform-tools
+      # A restored client skips the Debug build, so the Gradle work left in the journey (the
+      # share-sheet androidTest, the Release font build, the TalkBack androidTest) starts cold:
+      # 13 minutes more in android36-interaction on run 41332254336. This restores Gradle's
+      # dependencies and transforms; main writes the cache, every other ref reads it.
+      - uses: gradle/actions/setup-gradle@v4
+        id: gradle_cache
+        if: ${{ !cancelled() && steps.java.outcome == 'success' }}
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Verify startup deadline controls
         id: deadline_controls
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -296,6 +305,15 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           packages: platform-tools
+      # A restored client skips the Debug build, so the Gradle work left in the journey (the
+      # share-sheet androidTest, the Release font build, the TalkBack androidTest) starts cold:
+      # 13 minutes more in android36-interaction on run 41332254336. This restores Gradle's
+      # dependencies and transforms; main writes the cache, every other ref reads it.
+      - uses: gradle/actions/setup-gradle@v4
+        id: gradle_cache
+        if: ${{ !cancelled() && steps.java.outcome == 'success' }}
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Verify startup deadline controls
         id: deadline_controls
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
