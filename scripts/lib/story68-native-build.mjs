@@ -26,7 +26,7 @@ export function nativeDevClientPath(platform, root = '.') {
   throw new Error('native_build_platform_required')
 }
 
-/** `expo prebuild` arguments; iOS then runs `pod install` in the generated project. */
+/** `expo prebuild` arguments; iOS then runs IOS_POD_INSTALL in the generated project. */
 export const prebuildArgs = (platform, { clean = false } = {}) => [
   'prebuild',
   ...(clean ? ['--clean'] : []),
@@ -34,6 +34,22 @@ export const prebuildArgs = (platform, { clean = false } = {}) => [
   platform,
   '--no-install',
 ]
+
+/** The CocoaPods step of the iOS prebuild, run in apps/mobile/ios. */
+export const IOS_POD_INSTALL = Object.freeze({
+  binary: 'pod',
+  args: Object.freeze(['install']),
+})
+
+/**
+ * The environment of the native build: the host's, then the public build environment, then the
+ * Android SDK the harness found when the host names none.
+ */
+export const nativeBuildEnv = (hostEnv, publicBuildEnv, androidHome) => ({
+  ...hostEnv,
+  ...publicBuildEnv,
+  ANDROID_HOME: hostEnv.ANDROID_HOME ?? androidHome,
+})
 
 /**
  * The build binary and arguments. Android appends the Worklets staging arguments the harness

@@ -14,6 +14,7 @@ import {
   IOS_DERIVED_DATA,
   hostNativeArch,
   nativeBuildCommand,
+  nativeBuildEnv,
 } from './story68-native-build.mjs'
 import { LOCALES } from '../ci/native-ios-shards.mjs'
 import { describe, test } from 'node:test'
@@ -290,6 +291,7 @@ describe('Android build environment', () => {
           IOS_DERIVED_DATA,
           hostNativeArch,
           nativeBuildCommand,
+          nativeBuildEnv,
           prepareWorkletsStaging: (input) => {
             events.push('prepare')
             selected = prepareWorkletsStaging(input)

@@ -849,6 +849,14 @@ describe('share-card parallel lane validator', () => {
       }
     )
     rejected(
+      'a build step that no longer waits on the miss-only build window',
+      /build only when the key is not cached/,
+      (jobs) => {
+        step(jobs['ios-build'], (row) => row.id === 'native_build').if =
+          '${{ !cancelled() }}'
+      }
+    )
+    rejected(
       'a client keyed by something else',
       /keyed by scripts\/ci\/native-build-cache/,
       (jobs) => {

@@ -1,6 +1,6 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
-import { prebuildArgs } from './story68-native-build.mjs'
+import { IOS_POD_INSTALL, prebuildArgs } from './story68-native-build.mjs'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -259,6 +259,7 @@ describe('Release live-font native runner commands', () => {
       vm.runInNewContext(`(() => {${source.slice(start, end)}})()`, {
         ownedEnv: () => undefined,
         prebuildArgs,
+        IOS_POD_INSTALL,
         read: () => ({ STORY68_NATIVE_TEST_BUILD: '1' }),
         option: (name) => (name === 'clean' ? clean : undefined),
         path,

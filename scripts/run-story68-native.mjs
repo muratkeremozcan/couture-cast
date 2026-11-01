@@ -60,8 +60,10 @@ import {
 import { assertStory68DiskSpace } from './lib/test-disk-space.mjs'
 import {
   IOS_DERIVED_DATA,
+  IOS_POD_INSTALL,
   hostNativeArch,
   nativeBuildCommand,
+  nativeBuildEnv,
   prebuildArgs,
 } from './lib/story68-native-build.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
@@ -711,7 +713,13 @@ if (command === 'prebuild') {
   )
   fs.closeSync(fd)
   if (result.status !== 0) throw new Error('native_prebuild_failed')
-  if (platform === 'ios') run('pod', ['install'], {}, path.join(root, 'apps/mobile/ios'))
+  if (platform === 'ios')
+    run(
+      IOS_POD_INSTALL.binary,
+      [...IOS_POD_INSTALL.args],
+      {},
+      path.join(root, 'apps/mobile/ios')
+    )
 } else if (command === 'build') {
   ownedEnv()
   const configuration = option('configuration') ?? 'Debug'
@@ -741,11 +749,11 @@ if (command === 'prebuild') {
   })
   const result = spawnSync(binary, args, {
     cwd: path.join(root, `apps/mobile/${platform === 'ios' ? 'ios' : 'android'}`),
-    env: {
-      ...process.env,
-      ...read('public-build-env.json'),
-      ANDROID_HOME: process.env.ANDROID_HOME ?? path.dirname(path.dirname(adb)),
-    },
+    env: nativeBuildEnv(
+      process.env,
+      read('public-build-env.json'),
+      path.dirname(path.dirname(adb))
+    ),
     stdio: ['ignore', fd, fd],
   })
   fs.closeSync(fd)

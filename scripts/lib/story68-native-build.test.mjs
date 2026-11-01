@@ -3,8 +3,10 @@ import { describe, test } from 'node:test'
 import {
   IOS_APP_NAME,
   IOS_DERIVED_DATA,
+  IOS_POD_INSTALL,
   hostNativeArch,
   nativeBuildCommand,
+  nativeBuildEnv,
   nativeDevClientPath,
   prebuildArgs,
 } from './story68-native-build.mjs'
@@ -82,6 +84,24 @@ describe('Story 6.8 native build commands', () => {
     assert.equal(
       nativeDevClientPath('android', '/repo'),
       '/repo/apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk'
+    )
+  })
+
+  test('iOS prebuild installs the pods, and the build env layers host, public build env and SDK', () => {
+    assert.deepEqual(
+      { ...IOS_POD_INSTALL, args: [...IOS_POD_INSTALL.args] },
+      {
+        binary: 'pod',
+        args: ['install'],
+      }
+    )
+    assert.deepEqual(
+      nativeBuildEnv({ PATH: '/bin', TEST_ENV: 'host' }, { TEST_ENV: 'local' }, '/sdk'),
+      { PATH: '/bin', TEST_ENV: 'local', ANDROID_HOME: '/sdk' }
+    )
+    assert.equal(
+      nativeBuildEnv({ ANDROID_HOME: '/host-sdk' }, {}, '/sdk').ANDROID_HOME,
+      '/host-sdk'
     )
   })
 })

@@ -332,7 +332,8 @@ function iosBuildKeyProblems(build, check) {
   check(
     java > lookup &&
       steps[java]?.if?.includes("steps.native_cache.outputs.cache-hit != 'true'") &&
-      native > java,
+      native > java &&
+      steps[native]?.if?.includes("steps.build_window.outcome == 'success'"),
     'ios-build: build only when the key is not cached'
   )
   return native
