@@ -22,12 +22,11 @@ vi.mock('expo-status-bar', () => ({
   },
 }))
 
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
     capture: analyticsCaptureMock,
-    getDistinctId: () => 'test-user-id',
-  }),
-}))
+  })
+)
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBackMock }),

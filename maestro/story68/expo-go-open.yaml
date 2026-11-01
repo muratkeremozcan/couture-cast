@@ -16,6 +16,27 @@ appId: ${MAESTRO_APP_ID}
       visible: 'Open in .*'
     commands:
       - tapOn: 'Open'
+# The open prompt belongs to SpringBoard, and a completed tap on its Open button can be lost. In
+# run 41244230213 SpringBoard sat at 95% CPU, the tap completed, and 180 s later the prompt's Cancel
+# and Open were still on screen: Expo Go logged nothing and Metro saw no socket and no bundle
+# request. So the prompt has to leave, and Open is tapped once more only while it is still up.
+# The second tap is optional because a prompt still fading out can leave the hierarchy before the
+# tap finds it.
+- extendedWaitUntil:
+    notVisible: 'Open in .*'
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible: 'Open in .*'
+    commands:
+      - tapOn:
+          text: 'Open'
+          optional: true
+- extendedWaitUntil:
+    notVisible: 'Open in .*'
+    timeout: 15000
+    label: 'expo_go_open_prompt_left_up'
 # The Home chip row sits above the sheet, so it shows once the project has loaded.
 - extendedWaitUntil:
     visible:

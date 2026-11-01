@@ -499,8 +499,15 @@ without `sslaccept=strict` the connection succeeds unverified. Under `NODE_ENV=p
 launcher refuses to start when a non-local `DATABASE_URL` lacks `sslmode=require` or
 `sslaccept=strict`, or its `sslcert` is relative or names a missing file
 (`community_worker_database_tls_refused`). Local container runs against
-`host.docker.internal` are exempt. The Vercel API still connects with `sslmode=require` alone;
-that is recorded in deferred work.
+`host.docker.internal` are exempt.
+
+The Vercel API verifies the same certificate with its configured `DATABASE_URL` unchanged.
+`createPrismaClient` ([`database-tls.ts`](../../apps/api/src/prisma/database-tls.ts)) completes
+every non-local URL with `sslmode=require`, `sslaccept=strict` and an absolute `sslcert` naming the
+CA, which `includeFiles` in `apps/api/vercel.json` bundles into both functions. `pgbouncer`,
+`connection_limit` and the credentials stay as configured. When the CA is missing or the URL does
+not parse, the client throws `DatabaseTlsRefusedError` at startup. `prisma migrate deploy` applies
+the same rules to its `DIRECT_URL` connection through `scripts/lib/database-tls.mjs`.
 
 The canary, which reaches production from an operator's machine, verifies the certificate chain
 (`verify-full`) against the same committed CA (`--db-ca` names another). It strips every `ssl*`

@@ -52,14 +52,9 @@ vi.mock('expo-router', async () => ({
   ).useFocusEffect,
 }))
 
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
-    capture: vi.fn(),
-    getDistinctId: () => 'test-user-id',
-    screen: vi.fn(),
-  }),
-  MobileAnalyticsDiagnosticsPanel: () => null,
-}))
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock()
+)
 
 function answerRitualWithNoLocation() {
   server.use(http.get('*/api/v1/ritual', noLocationResponse))

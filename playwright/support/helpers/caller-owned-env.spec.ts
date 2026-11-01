@@ -50,6 +50,7 @@ const migrateFiles = [
   'scripts/local-e2e-database.mjs',
   'scripts/lib/caller-owned-env.mjs',
   'scripts/lib/prisma-migrate-connection.mjs',
+  'scripts/lib/database-tls.mjs',
 ]
 let directory: string
 

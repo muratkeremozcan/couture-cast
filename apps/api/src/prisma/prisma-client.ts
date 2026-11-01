@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from '@prisma/client'
+import { withVerifiedDatasource } from './database-tls.js'
 
 /**
  * The Supabase Postgres image preloads plpgsql_check, whose pldbgapi2 layer hooks every
@@ -116,9 +117,12 @@ export async function retryTopLevelOperation(params: {
 /**
  * The only constructor of a production Prisma client. The extended client keeps
  * PrismaClient's runtime API apart from `$on`, which the API never calls.
+ *
+ * A remote datasource is completed to verify the database certificate, and a
+ * client that cannot verify it is refused here, at startup (database-tls.ts).
  */
 export function createPrismaClient(options?: Prisma.PrismaClientOptions): PrismaClient {
-  return new PrismaClient(options).$extends({
+  return new PrismaClient(withVerifiedDatasource(options)).$extends({
     name: 'pldbgapi2-retry',
     query: { $allOperations: (params) => retryTopLevelOperation(params) },
   }) as unknown as PrismaClient

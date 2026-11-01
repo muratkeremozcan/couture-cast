@@ -62,15 +62,12 @@ vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
 
-const mockCapture = vi.fn()
-vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
+const mockCapture = vi.hoisted(() => vi.fn())
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock({
     capture: mockCapture,
-    getDistinctId: () => 'test-user-id',
-    screen: vi.fn(),
-  }),
-  MobileAnalyticsDiagnosticsPanel: () => null,
-}))
+  })
+)
 
 const { readLatestRitualCacheMock, saveRitualCacheMock } = vi.hoisted(() => ({
   readLatestRitualCacheMock: vi.fn(),

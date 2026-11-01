@@ -20,9 +20,12 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
+  Text as NativeText,
   View,
 } from 'react-native'
+// The themed Text follows the OS scheme, so copy without its own color stays legible on the
+// dark sheet; a plain react-native Text paints black there.
+import { Text, createSchemeStyles, useSchemeColors } from '@/components/themed'
 import {
   createGarmentItemResponseSchema,
   createGarmentUploadUrlResponseSchema,
@@ -84,6 +87,8 @@ export function MobileGarmentCaptureModal({
   invokingNodeHandle,
 }: MobileGarmentCaptureModalProps) {
   const { t } = useTranslation()
+  const colors = useSchemeColors()
+  const themed = useThemedStyles()
   const insets = useModalInsets()
   const [step, setStep] = useState<CaptureStep>('source')
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null)
@@ -92,7 +97,7 @@ export function MobileGarmentCaptureModal({
   const [uploadStatus, setUploadStatus] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const uploadAbortRef = useRef<AbortController | null>(null)
-  const titleRef = useRef<ElementRef<typeof Text> | null>(null)
+  const titleRef = useRef<ElementRef<typeof NativeText> | null>(null)
   const invokingNodeHandleRef = useRef(invokingNodeHandle)
   invokingNodeHandleRef.current = invokingNodeHandle
 
@@ -326,6 +331,7 @@ export function MobileGarmentCaptureModal({
       <View
         style={[
           styles.modal,
+          themed.modal,
           { paddingTop: Math.max(64, insets.top), paddingBottom: 20 + insets.bottom },
         ]}
         testID="garment-capture-modal"
@@ -333,30 +339,33 @@ export function MobileGarmentCaptureModal({
         onAccessibilityEscape={handleClose}
       >
         <View style={styles.modalHeader}>
-          <Text
+          {/* A native Text: the themed one forwards no ref, and focus lands on this title. */}
+          <NativeText
             ref={titleRef}
-            style={styles.modalTitle}
+            style={[styles.modalTitle, themed.text]}
             accessible={true}
             accessibilityRole="header"
           >
             {t('wardrobe.capture.title')}
-          </Text>
+          </NativeText>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('common.close', { defaultValue: 'Close' })}
             testID="garment-capture-close"
             onPress={handleClose}
           >
-            <Text style={styles.closeButton}>✕</Text>
+            <Text style={[styles.closeButton, themed.text]}>✕</Text>
           </Pressable>
         </View>
 
         {errorMessage ? (
-          <View accessibilityRole="alert" style={styles.errorBox}>
-            <Text>{errorMessage}</Text>
+          <View accessibilityRole="alert" style={[styles.errorBox, themed.errorBox]}>
+            <Text style={themed.errorText}>{errorMessage}</Text>
             {errorMessage === t('wardrobe.permission.camera_blocked') ? (
               <Pressable onPress={() => void Linking.openSettings()}>
-                <Text style={styles.link}>{t('wardrobe.permission.open_settings')}</Text>
+                <Text style={[styles.link, themed.link]}>
+                  {t('wardrobe.permission.open_settings')}
+                </Text>
               </Pressable>
             ) : null}
           </View>
@@ -367,7 +376,7 @@ export function MobileGarmentCaptureModal({
             <Pressable
               accessibilityRole="button"
               testID="garment-source-camera"
-              style={styles.sourceButton}
+              style={[styles.sourceButton, themed.outline]}
               onPress={() => void openCamera()}
             >
               <Text style={styles.sourceButtonText}>{t('wardrobe.capture.camera')}</Text>
@@ -375,7 +384,7 @@ export function MobileGarmentCaptureModal({
             <Pressable
               accessibilityRole="button"
               testID="garment-source-library"
-              style={styles.sourceButton}
+              style={[styles.sourceButton, themed.outline]}
               onPress={() => void openLibrary()}
             >
               <Text style={styles.sourceButtonText}>{t('wardrobe.capture.library')}</Text>
@@ -408,14 +417,14 @@ export function MobileGarmentCaptureModal({
             <View style={styles.row}>
               <Pressable
                 testID="garment-aspect-square"
-                style={styles.optionButton}
+                style={[styles.optionButton, themed.option]}
                 onPress={() => setAspectRatio('1:1')}
               >
                 <Text>{t('wardrobe.crop.aspect_square')}</Text>
               </Pressable>
               <Pressable
                 testID="garment-aspect-portrait"
-                style={styles.optionButton}
+                style={[styles.optionButton, themed.option]}
                 onPress={() => setAspectRatio('4:3')}
               >
                 <Text>{t('wardrobe.crop.aspect_four_three')}</Text>
@@ -433,10 +442,10 @@ export function MobileGarmentCaptureModal({
             <Pressable
               accessibilityRole="button"
               testID="garment-confirm-image"
-              style={styles.primaryButton}
+              style={[styles.primaryButton, themed.inverse]}
               onPress={() => void uploadSelectedImage()}
             >
-              <Text style={styles.primaryButtonText}>
+              <Text style={[styles.primaryButtonText, themed.onInverse]}>
                 {t('wardrobe.confirm.use_image')}
               </Text>
             </Pressable>
@@ -445,7 +454,7 @@ export function MobileGarmentCaptureModal({
 
         {step === 'uploading' ? (
           <View style={styles.uploadState} testID="garment-upload-progress">
-            <ActivityIndicator />
+            <ActivityIndicator color={colors.text} />
             <Text>{uploadStatus}</Text>
             <Pressable
               testID="garment-upload-cancel"
@@ -454,7 +463,9 @@ export function MobileGarmentCaptureModal({
                 setStep('crop')
               }}
             >
-              <Text style={styles.link}>{t('wardrobe.upload.cancel')}</Text>
+              <Text style={[styles.link, themed.link]}>
+                {t('wardrobe.upload.cancel')}
+              </Text>
             </Pressable>
           </View>
         ) : null}
@@ -465,10 +476,10 @@ export function MobileGarmentCaptureModal({
             <Text style={styles.sectionTitle}>{t('wardrobe.upload.processing')}</Text>
             <Pressable
               testID="garment-capture-done"
-              style={styles.primaryButton}
+              style={[styles.primaryButton, themed.inverse]}
               onPress={handleClose}
             >
-              <Text style={styles.primaryButtonText}>
+              <Text style={[styles.primaryButtonText, themed.onInverse]}>
                 {t('common.done', { defaultValue: 'Done' })}
               </Text>
             </Pressable>
@@ -489,15 +500,14 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 24, fontWeight: '700' },
   closeButton: { fontSize: 24, padding: 8 },
-  errorBox: { borderRadius: 12, backgroundColor: '#FEE2E2', padding: 12, gap: 8 },
-  link: { color: '#8A5A00', fontWeight: '700', paddingVertical: 8 },
+  errorBox: { borderRadius: 12, padding: 12, gap: 8 },
+  link: { fontWeight: '700', paddingVertical: 8 },
   sourceActions: { gap: 16 },
   sourceButton: {
     minHeight: 96,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#D4D4D8',
     borderStyle: 'dashed',
     borderRadius: 16,
   },
@@ -514,7 +524,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
-    backgroundColor: '#E4E4E7',
   },
   cleanupRow: {
     minHeight: 52,
@@ -527,12 +536,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    backgroundColor: '#111111',
     paddingHorizontal: 18,
     paddingVertical: 12,
   },
-  primaryButtonText: { color: '#FFFFFF', fontWeight: '700' },
+  primaryButtonText: { fontWeight: '700' },
   uploadState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   completeState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },
   completeIcon: { fontSize: 56, color: '#059669' },
 })
+
+/** The OS light/dark colors for the layout above. */
+const useThemedStyles = createSchemeStyles((colors) => ({
+  modal: { backgroundColor: colors.background },
+  text: { color: colors.text },
+  errorBox: { backgroundColor: colors.dangerSurface },
+  errorText: { color: colors.dangerText },
+  link: { color: colors.noticeText },
+  outline: { borderColor: colors.strongBorder },
+  option: { backgroundColor: colors.border },
+  inverse: { backgroundColor: colors.inverseSurface },
+  onInverse: { color: colors.onInverse },
+}))

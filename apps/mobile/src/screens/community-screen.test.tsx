@@ -38,10 +38,8 @@ vi.mock('expo-localization', () => ({
 }))
 vi.mock('@/src/analytics/mobile-analytics', async () => {
   const { mockAnalytics } = await import('../test-utils/community-screen/mock-state.js')
-  return {
-    useMobileAnalytics: () => mockAnalytics,
-    MobileAnalyticsDiagnosticsPanel: () => null,
-  }
+  const { mobileAnalyticsModuleMock } = await import('../test-utils/mobile-analytics.js')
+  return mobileAnalyticsModuleMock(mockAnalytics)
 })
 vi.mock('expo-web-browser', async () => {
   const { webBrowser } = await import('../test-utils/community-screen/mock-state.js')

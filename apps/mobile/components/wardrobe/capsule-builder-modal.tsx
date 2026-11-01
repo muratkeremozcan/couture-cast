@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { randomUuidV4 } from '@/src/lib/uuid'
+import { createSchemeStyles } from '@/components/themed'
 import {
   AccessibilityInfo,
   View,
@@ -10,7 +11,6 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  StyleSheet,
   Platform,
 } from 'react-native'
 import type {
@@ -78,6 +78,7 @@ export function MobileCapsuleBuilderModal({
   invokingNodeHandle,
 }: MobileCapsuleBuilderModalProps) {
   const { t } = useTranslation()
+  const styles = useStyles()
   const insets = useModalInsets()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -505,13 +506,14 @@ export function MobileCapsuleBuilderModal({
   )
 }
 
-const styles = StyleSheet.create({
+/** The sheet's layout, in the OS light/dark colors. */
+const useStyles = createSchemeStyles((colors) => ({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     maxHeight: '90%',
@@ -523,12 +525,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111',
+    color: colors.text,
   },
   closeButton: {
     minWidth: 44,
@@ -538,26 +540,26 @@ const styles = StyleSheet.create({
   },
   closeText: {
     fontSize: 18,
-    color: '#666',
+    color: colors.mutedText,
   },
   repairBox: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: colors.noticeSurface,
     borderRadius: 8,
     marginBottom: 12,
     padding: 12,
   },
   repairText: {
-    color: '#78350f',
+    color: colors.noticeText,
     fontSize: 12,
   },
   errorBox: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: colors.dangerSurface,
     padding: 10,
     borderRadius: 8,
     marginTop: 8,
   },
   errorText: {
-    color: '#991b1b',
+    color: colors.dangerText,
     fontSize: 12,
     fontWeight: '500',
   },
@@ -570,17 +572,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: colors.text,
     marginTop: 12,
     marginBottom: 6,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: colors.strongBorder,
     borderRadius: 8,
     padding: 10,
     fontSize: 14,
-    color: '#111',
+    color: colors.text,
   },
   multilineInput: {
     height: 60,
@@ -596,42 +598,42 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
-    backgroundColor: '#f9f9f9',
+    borderColor: colors.strongBorder,
+    backgroundColor: colors.subtleSurface,
     minWidth: 44,
     minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
   chipSelected: {
-    backgroundColor: '#111',
-    borderColor: '#111',
+    backgroundColor: colors.inverseSurface,
+    borderColor: colors.inverseSurface,
   },
   chipText: {
     fontSize: 12,
-    color: '#333',
+    color: colors.text,
     textTransform: 'capitalize',
   },
   chipTextSelected: {
-    color: '#fff',
+    color: colors.onInverse,
     fontWeight: '600',
   },
   garmentListContainer: {
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: colors.border,
     borderRadius: 8,
     maxHeight: 180,
   },
   garmentRow: {
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.border,
     minHeight: 44,
     justifyContent: 'center',
   },
   garmentText: {
     fontSize: 14,
-    color: '#222',
+    color: colors.text,
   },
   reorderSection: {
     marginTop: 12,
@@ -642,12 +644,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomColor: colors.border,
   },
   reorderText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
+    color: colors.text,
   },
   reorderButtons: {
     flexDirection: 'row',
@@ -657,13 +659,14 @@ const styles = StyleSheet.create({
     minWidth: 44,
     minHeight: 44,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: colors.strongBorder,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
   reorderBtnText: {
     fontSize: 12,
+    color: colors.text,
   },
   favoriteRow: {
     marginTop: 16,
@@ -672,7 +675,7 @@ const styles = StyleSheet.create({
   favoriteText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111',
+    color: colors.text,
   },
   footer: {
     flexDirection: 'row',
@@ -680,7 +683,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: colors.border,
   },
   cancelButton: {
     minWidth: 44,
@@ -690,11 +693,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: colors.strongBorder,
   },
   cancelText: {
     fontSize: 14,
-    color: '#444',
+    color: colors.mutedText,
   },
   saveButton: {
     minWidth: 44,
@@ -703,14 +706,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 8,
-    backgroundColor: '#111',
+    backgroundColor: colors.inverseSurface,
   },
   saveText: {
     fontSize: 14,
-    color: '#fff',
+    color: colors.onInverse,
     fontWeight: '600',
   },
   btnDisabled: {
     opacity: 0.4,
   },
-})
+}))

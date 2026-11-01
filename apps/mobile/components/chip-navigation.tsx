@@ -4,6 +4,7 @@ import { ScrollView, Pressable, Text, StyleSheet, View } from 'react-native'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { useTranslation } from 'react-i18next'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
+import { useSchemeColors } from '@/components/themed'
 
 export type ChipCategory = 'Personal' | 'Community' | 'Sponsored'
 
@@ -21,6 +22,7 @@ export function MobileChipNavigation({
   const analytics = useMobileAnalytics()
   const { t } = useTranslation()
   const { announce } = useAccessibilityAnnouncer()
+  const colors = useSchemeColors()
 
   const handleSelect = (category: ChipCategory) => {
     if (category === activeCategory) {
@@ -46,7 +48,13 @@ export function MobileChipNavigation({
   }
 
   return (
-    <View style={styles.container} testID="mobile-chip-navigation">
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.background, borderBottomColor: colors.border },
+      ]}
+      testID="mobile-chip-navigation"
+    >
       {/* Chips size to their localized label, so there is no fixed snap interval. */}
       <ScrollView
         horizontal
@@ -73,7 +81,9 @@ export function MobileChipNavigation({
               onPress={() => handleSelect(category)}
               style={({ pressed }) => [
                 styles.chip,
-                isActive ? styles.chipActive : styles.chipInactive,
+                isActive
+                  ? styles.chipActive
+                  : { backgroundColor: colors.subtleSurface, borderColor: colors.border },
                 pressed && styles.chipPressed,
               ]}
             >
@@ -81,7 +91,7 @@ export function MobileChipNavigation({
                 numberOfLines={1}
                 style={[
                   styles.chipText,
-                  isActive ? styles.chipTextActive : styles.chipTextInactive,
+                  isActive ? styles.chipTextActive : { color: colors.mutedText },
                 ]}
               >
                 {localizedCategory}
@@ -97,9 +107,7 @@ export function MobileChipNavigation({
 const styles = StyleSheet.create({
   container: {
     paddingVertical: 8,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E6E6ED',
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -124,10 +132,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#C9A14A',
     borderColor: '#C9A14A',
   },
-  chipInactive: {
-    backgroundColor: '#F5F5F7',
-    borderColor: '#E6E6ED',
-  },
   chipPressed: {
     opacity: 0.8,
   },
@@ -139,8 +143,5 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#111111',
-  },
-  chipTextInactive: {
-    color: '#5C5C66',
   },
 })
