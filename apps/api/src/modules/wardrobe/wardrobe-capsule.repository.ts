@@ -1,3 +1,4 @@
+// Story 4.3 Task 3 step 2 owner: implement WardrobeCapsuleRepository persistence and locking in apps/api/src/modules/wardrobe/wardrobe-capsule.repository.ts
 import {
   BadRequestException,
   ConflictException,

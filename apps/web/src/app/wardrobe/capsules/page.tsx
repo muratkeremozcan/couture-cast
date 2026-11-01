@@ -1,4 +1,5 @@
 'use client'
+// Story 4.3 Task 5 step 2 owner: implement web wardrobe capsules page in apps/web/src/app/wardrobe/capsules/page.tsx
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { I18nextProvider, useTranslation } from 'react-i18next'

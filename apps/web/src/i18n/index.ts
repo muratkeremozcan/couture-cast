@@ -1,4 +1,5 @@
 'use client'
+// Story 4.3 Task 5 step 3 owner: implement web locale resolution in apps/web/src/i18n/index.ts
 
 import { createInstance, type i18n as I18nInstance } from 'i18next'
 import { initReactI18next } from 'react-i18next'

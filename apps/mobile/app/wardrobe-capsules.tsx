@@ -1,3 +1,4 @@
+// Story 4.3 Task 6 step 2 owner: implement the mobile capsule screen in apps/mobile/app/wardrobe-capsules.tsx
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,

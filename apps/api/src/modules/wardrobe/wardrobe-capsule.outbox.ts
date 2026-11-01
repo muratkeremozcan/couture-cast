@@ -1,3 +1,4 @@
+// Story 4.3 Task 3 step 5 owner: persist and dispatch durable telemetry claims in apps/api/src/modules/wardrobe/wardrobe-capsule.outbox.ts
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 import {

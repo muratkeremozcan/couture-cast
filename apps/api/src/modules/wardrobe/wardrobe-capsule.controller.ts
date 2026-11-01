@@ -1,3 +1,4 @@
+// Story 4.3 Task 3 step 4 owner: expose WardrobeCapsuleController REST endpoints in apps/api/src/modules/wardrobe/wardrobe-capsule.controller.ts
 import {
   BadRequestException,
   Body,

@@ -1,3 +1,4 @@
+// Story 4.4 Task 4 step 3 owner: implement the moderation-review worker consumer in apps/api/src/modules/wardrobe/silhouette-photo.processor.ts
 // Story 4.4 Task 4: BullMQ processor for "My Form" photo moderation,
 // mirroring wardrobe-color.processor.ts's shape.
 import { type Prisma, type PrismaClient, type SilhouetteProfile } from '@prisma/client'

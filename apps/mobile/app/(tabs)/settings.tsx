@@ -1,3 +1,4 @@
+// Story 5.1 Tasks 6 and 7 step 1 owner: implement Mobile and Web preference controls in `apps/mobile/app/(tabs)/settings.tsx` and `apps/web/src/app/components/commerce-preferences-section.tsx`
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
 import { router } from 'expo-router'

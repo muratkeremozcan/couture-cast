@@ -1,3 +1,4 @@
+// Story 4.3 Task 3 step 3 owner: implement WardrobeCapsuleService domain rules and ETag semantics in apps/api/src/modules/wardrobe/wardrobe-capsule.service.ts
 import { createHash } from 'node:crypto'
 import type { Prisma } from '@prisma/client'
 import {

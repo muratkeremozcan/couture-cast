@@ -1,3 +1,4 @@
+// Story 4.3 Task 4 step 1 owner: implement pure capsule scoring and slot filling in apps/api/src/modules/personalization/capsule-recommendation.engine.ts
 import type { GarmentItem, OutfitCapsule, OutfitCapsuleGarment } from '@prisma/client'
 
 export type CapsuleWithJoins = OutfitCapsule & {

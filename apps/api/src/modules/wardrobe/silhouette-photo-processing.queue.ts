@@ -1,3 +1,4 @@
+// Story 4.4 Task 4 step 2 owner: implement the BullMQ producer with per-attempt job ids in apps/api/src/modules/wardrobe/silhouette-photo-processing.queue.ts
 // Story 4.4 Task 4: BullMQ producer for "My Form" photo processing, mirroring
 // wardrobe-processing.queue.ts exactly but enqueuing onto the existing
 // moderation-review queue, keyed per commit rather than per profile (decision 5).
