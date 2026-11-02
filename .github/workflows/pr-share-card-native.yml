@@ -440,9 +440,10 @@ jobs:
         if: ${{ !cancelled() && steps.share_receive_build.outcome == 'success' }}
         run: |
           rm -rf "$RUNNER_TEMP/cc69-share-receive"
+          # unzip creates only the last directory of -d, so the scan root exists first.
+          mkdir -p "$RUNNER_TEMP/cc69-share-receive/manifests"
           unzip -q apps/mobile/modules/share-card-native-share/android/build/outputs/apk/androidTest/debug/share-card-native-share-debug-androidTest.apk -d "$RUNNER_TEMP/cc69-share-receive/receive-test"
           unzip -q apps/mobile/modules/share-card-native-share/android/test-receiver/build/outputs/apk/debug/test-receiver-debug.apk -d "$RUNNER_TEMP/cc69-share-receive/receiver"
-          mkdir "$RUNNER_TEMP/cc69-share-receive/manifests"
           cp apps/mobile/modules/share-card-native-share/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml "$RUNNER_TEMP/cc69-share-receive/manifests/library.xml"
           cp apps/mobile/modules/share-card-native-share/android/build/intermediates/packaged_manifests/debugAndroidTest/processDebugAndroidTestManifest/AndroidManifest.xml "$RUNNER_TEMP/cc69-share-receive/manifests/android-test.xml"
           node scripts/ci/native-ios-app-secret-scan.mjs "$RUNNER_TEMP/cc69-share-receive" "$CC68_HARNESS_DIR"
