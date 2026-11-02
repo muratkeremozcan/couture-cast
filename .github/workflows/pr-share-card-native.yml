@@ -239,7 +239,7 @@ jobs:
       - name: Clean exact owned runtime
         if: always()
         run: node scripts/e2e-share-card/cleanup.mjs
-  # The four API36 partitions run on separate free runners with no dependency on each
+  # The API36 partitions run on separate free runners with no dependency on each
   # other. Each one prepares, signs in and cleans up its own UUID runtime, so they share
   # steps (the alias) but never state. API32 stays in original-resource above; this list
   # is its Android path.
@@ -305,10 +305,10 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           packages: platform-tools
-      # A restored client skips the Debug build, so the Gradle work left in the journey (the
-      # share-sheet androidTest, the Release font build, the TalkBack androidTest) starts cold:
-      # 13 minutes more in android36-interaction on run 41332254336. This restores Gradle's
-      # dependencies and transforms; main writes the cache, every other ref reads it.
+      # A restored client skips the Debug build, so the Gradle work left (the share-receive APKs,
+      # the Release font build, the TalkBack androidTest) starts cold: 13 minutes more in
+      # android36-interaction on run 41332254336. This restores Gradle's dependencies and
+      # transforms; main writes the cache, every other ref reads it.
       - uses: gradle/actions/setup-gradle@v4
         id: gradle_cache
         if: ${{ !cancelled() && steps.java.outcome == 'success' }}
@@ -401,6 +401,58 @@ jobs:
         with:
           path: ${{ steps.native_key.outputs.path }}
           key: ${{ steps.native_key.outputs.key }}
+      # The share-sheet receive test needs two more Gradle builds: the module's androidTest APK and
+      # the second app it shares to. Inside the journey they started cold and took about 11 of the
+      # 17.1 share-sheet minutes on main run 41352898854. The lane that runs share-sheet builds them
+      # here, before the emulator, and caches them with the manifests the test asserts, keyed by the
+      # client's native key and the harness that names the Gradle tasks.
+      - name: Key the share-receive APKs of the share-sheet lane
+        id: share_receive_key
+        if: ${{ !cancelled() && steps.native_key.outcome == 'success' && steps.prebuild.outcome == 'success' }}
+        env:
+          CC68_ANDROID_SUITE: ${{ matrix.suite }}
+          CC68_SHARE_RECEIVE_KEY: ${{ steps.native_key.outputs.key }}-share-receive-${{ hashFiles('scripts/lib/story69-share-sheet.mjs') }}
+        # Only the interaction suite runs share-sheet (scripts/ci/share-card-android.sh); every
+        # other lane leaves the key empty and skips the share-receive steps.
+        run: |
+          if [ "$CC68_ANDROID_SUITE" = interaction ]; then
+            echo "key=$CC68_SHARE_RECEIVE_KEY" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Restore the share-receive APKs of this fingerprint
+        id: share_receive_cache
+        if: ${{ !cancelled() && steps.share_receive_key.outcome == 'success' && steps.share_receive_key.outputs.key != '' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: &share_receive_files |
+            apps/mobile/modules/share-card-native-share/android/build/outputs/apk/androidTest/debug/share-card-native-share-debug-androidTest.apk
+            apps/mobile/modules/share-card-native-share/android/test-receiver/build/outputs/apk/debug/test-receiver-debug.apk
+            apps/mobile/modules/share-card-native-share/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml
+            apps/mobile/modules/share-card-native-share/android/build/intermediates/packaged_manifests/debugAndroidTest/processDebugAndroidTestManifest/AndroidManifest.xml
+          key: ${{ steps.share_receive_key.outputs.key }}
+      # Built only for a journey that can run: a client restored or built on this runner.
+      - name: Build the share-receive APKs
+        id: share_receive_build
+        if: ${{ !cancelled() && steps.share_receive_cache.outcome == 'success' && steps.share_receive_cache.outputs.cache-hit != 'true' && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        run: node scripts/run-story68-native.mjs share-receive-build --platform ${{ matrix.platform }}
+      # A fork's pull request can restore these like the client, so they are scanned the same way.
+      - name: Refuse to cache share-receive APKs that embed a secret
+        id: share_receive_scan
+        if: ${{ !cancelled() && steps.share_receive_build.outcome == 'success' }}
+        run: |
+          rm -rf "$RUNNER_TEMP/cc69-share-receive"
+          unzip -q apps/mobile/modules/share-card-native-share/android/build/outputs/apk/androidTest/debug/share-card-native-share-debug-androidTest.apk -d "$RUNNER_TEMP/cc69-share-receive/receive-test"
+          unzip -q apps/mobile/modules/share-card-native-share/android/test-receiver/build/outputs/apk/debug/test-receiver-debug.apk -d "$RUNNER_TEMP/cc69-share-receive/receiver"
+          mkdir "$RUNNER_TEMP/cc69-share-receive/manifests"
+          cp apps/mobile/modules/share-card-native-share/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml "$RUNNER_TEMP/cc69-share-receive/manifests/library.xml"
+          cp apps/mobile/modules/share-card-native-share/android/build/intermediates/packaged_manifests/debugAndroidTest/processDebugAndroidTestManifest/AndroidManifest.xml "$RUNNER_TEMP/cc69-share-receive/manifests/android-test.xml"
+          node scripts/ci/native-ios-app-secret-scan.mjs "$RUNNER_TEMP/cc69-share-receive" "$CC68_HARNESS_DIR"
+      - name: Save the share-receive APKs of this fingerprint
+        id: share_receive_save
+        if: ${{ !cancelled() && steps.share_receive_scan.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: *share_receive_files
+          key: ${{ steps.share_receive_key.outputs.key }}
       - name: Enable and verify Android hardware acceleration
         id: kvm
         if: ${{ !cancelled() }}
@@ -412,13 +464,16 @@ jobs:
           sudo udevadm settle --timeout=30
           ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
+      # The share-sheet lane runs only with both share-receive APKs restored or built and scanned;
+      # CC68_SHARE_RECEIVE_PREBUILT tells share-sheet to install them without building.
       - name: Android isolated native journey
         timeout-minutes: ${{ matrix.journey_timeout }}
-        if: ${{ !cancelled() && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.kvm.outcome == 'success' }}
+        if: ${{ !cancelled() && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.share_receive_key.outcome == 'success' && (steps.share_receive_key.outputs.key == '' || steps.share_receive_cache.outputs.cache-hit == 'true' || steps.share_receive_save.outcome == 'success') && steps.kvm.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CC68_ANDROID_API: ${{ matrix.api }}
           CC68_ANDROID_SUITE: ${{ matrix.suite }}
+          CC68_SHARE_RECEIVE_PREBUILT: ${{ (steps.share_receive_cache.outputs.cache-hit == 'true' || steps.share_receive_save.outcome == 'success') && '1' || '0' }}
         with:
           api-level: ${{ matrix.api }}
           avd-name: cc68-api${{ matrix.api }}
@@ -492,11 +547,15 @@ jobs:
             journey_timeout: 25
     env: *runtime_env
     steps: *android36_steps
-  # Story 6.9 share-sheet and the Release font proof: 21.2 minutes on run 41202706840.
+  # Story 6.9 share-sheet. On main run 41352898854 this lane also ran the Release font proof and
+  # took 48 minutes: setup 10.5, emulator boot, install, open and signin 7, share-sheet 17.1 (about
+  # 11 of it the two share-receive Gradle builds, cold) and the Release font proof 13. The proof
+  # now runs in android36-release-font and the share-receive APKs come from their cache, so this
+  # lane takes about 24 minutes on a hit. A miss builds them before the emulator starts.
   android36-interaction:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -506,7 +565,27 @@ jobs:
             api: 36
             target: google_apis_playstore
             suite: interaction
-            journey_timeout: 45
+            journey_timeout: 30
+    env: *runtime_env
+    steps: *android36_steps
+  # The Release font proof on its own emulator. On main run 41352898854 it took 13 minutes inside
+  # android36-interaction: about 11 for the Release prebuild --clean and Gradle build, then the
+  # install and the proof. Every suite first spends about 17.5 minutes on setup (10.5) and the
+  # emulator boot, install, open and signin (7), so this lane takes about 30 minutes.
+  android36-release-font:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+            api: 36
+            target: google_apis_playstore
+            suite: release-font
+            journey_timeout: 35
     env: *runtime_env
     steps: *android36_steps
   browser-acceptance:
@@ -1358,6 +1437,7 @@ jobs:
       - android36-original
       - android36-controls
       - android36-interaction
+      - android36-release-font
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

@@ -16,6 +16,7 @@ import {
   SHARE_RECEIVE_APK,
   SHARE_RECEIVE_GRADLE_TASK,
   SHARE_RECEIVE_MANIFESTS,
+  SHARE_RECEIVE_PREBUILT_FILES,
   SHARE_RECEIVER_APK,
   SHARE_RECEIVER_GRADLE_TASK,
   SHARE_RECEIVER_PACKAGE,
@@ -28,8 +29,10 @@ import {
   assertFreshShareFile,
   assertLeasedShareFile,
   assertShareReceiveInstrumentation,
+  assertShareReceivePrebuilt,
   assertShareReceiveManifest,
   assertShareSheetUITestResult,
+  buildShareReceiveApks,
   closedShareSheetFailure,
   iosShareFileStore,
   readComposerLayout,
@@ -1338,6 +1341,86 @@ describe('runStory69ShareSheet', () => {
       assert.equal(reports.at(-1)[1].code, 'share_receive_manifest_invalid')
     })
 
+  /** The four files CI restores or builds before the emulator, written into the fake root. */
+  const writePrebuilt = (root, skip) => {
+    for (const file of SHARE_RECEIVE_PREBUILT_FILES) {
+      if (file === skip) continue
+      fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
+      if (!fs.existsSync(path.join(root, file)))
+        fs.writeFileSync(path.join(root, file), 'apk')
+    }
+  }
+
+  test('android: prebuilt share-receive APKs skip both Gradle builds and are installed as built ones', async (t) => {
+    const { ctx, reports } = fakeDevice(t, 'android')
+    t.mock.method(console, 'log', () => undefined)
+    writePrebuilt(ctx.root)
+    ctx.shareReceivePrebuilt = true
+    const calls = []
+    const run = ctx.run
+    ctx.run = (binary, args, env) => {
+      calls.push([path.basename(binary), ...args])
+      return run(binary, args, env)
+    }
+    await runStory69ShareSheet(ctx)
+    assert.equal(
+      calls.some(([binary]) => binary === 'gradlew'),
+      false
+    )
+    const installs = calls.filter((call) => call.includes('install'))
+    assert.deepEqual(
+      installs.map((call) => path.relative(ctx.root, call.at(-1))),
+      [SHARE_RECEIVER_APK, SHARE_RECEIVE_APK]
+    )
+    assert.equal(reports.at(-1)[1].passed, true)
+  })
+
+  for (const missing of SHARE_RECEIVE_PREBUILT_FILES)
+    test(`android: a prebuilt run without ${path.basename(path.dirname(missing))}/${path.basename(missing)} fails closed before any build or install`, async (t) => {
+      const { ctx, events, reports } = fakeDevice(t, 'android', {
+        manifest: SHARE_RECEIVE_MANIFESTS.includes(missing) ? null : shareManifest(),
+      })
+      t.mock.method(console, 'log', () => undefined)
+      // A missing manifest leaves the other one in place, so only the named file is absent.
+      if (SHARE_RECEIVE_MANIFESTS.includes(missing)) {
+        writeShareManifests(ctx.root)
+        fs.rmSync(path.join(ctx.root, missing))
+      }
+      writePrebuilt(ctx.root, missing)
+      ctx.shareReceivePrebuilt = true
+      const calls = []
+      const run = ctx.run
+      ctx.run = (binary, args, env) => {
+        calls.push([path.basename(binary), ...args])
+        return run(binary, args, env)
+      }
+      await assert.rejects(runStory69ShareSheet(ctx), /share_receive_prebuilt_missing/)
+      assert.equal(
+        calls.some(
+          ([binary, ...args]) => binary === 'gradlew' || args.includes('install')
+        ),
+        false
+      )
+      assert.equal(events.includes('spawn adb instrument'), false)
+      assert.equal(reports.at(-1)[1].code, 'share_receive_prebuilt_missing')
+      assert.equal(reports.at(-1)[1].passed, false)
+      assert.equal(reports.at(-1)[1].cases.includes('N-AND-RECEIVE'), false)
+    })
+
+  test('android: a prebuilt manifest that exports the provider still fails the run', async (t) => {
+    const { ctx, events } = fakeDevice(t, 'android', {
+      manifest: shareManifest({
+        provider:
+          '<provider android:name="expo.modules.sharecardnativeshare.ShareCardFileProvider" android:authorities="${applicationId}.sharecardnativeshare.fileprovider" android:exported="true" >',
+      }),
+    })
+    t.mock.method(console, 'log', () => undefined)
+    writePrebuilt(ctx.root)
+    ctx.shareReceivePrebuilt = true
+    await assert.rejects(runStory69ShareSheet(ctx), /share_receive_manifest_invalid/)
+    assert.equal(events.includes('spawn adb instrument'), false)
+  })
+
   test('a changed preview digest fails the step as a composition change', async (t) => {
     const { ctx } = fakeDevice(t, 'ios')
     t.mock.method(console, 'log', () => undefined)
@@ -1431,6 +1514,115 @@ describe('runStory69ShareSheet', () => {
       'share_sheet_failed'
     )
     assert.equal(closedShareSheetFailure('text'), 'share_sheet_failed')
+    assert.equal(
+      closedShareSheetFailure(new Error('share_receive_prebuilt_missing')),
+      'share_receive_prebuilt_missing'
+    )
+  })
+})
+
+describe('share-receive build', () => {
+  const buildRoot = (t, manifest = shareManifest()) => {
+    const root = tempDir(t)
+    if (manifest !== null) writeShareManifests(root, manifest)
+    return root
+  }
+  const recorder = (root) => {
+    const calls = []
+    return {
+      calls,
+      ctx: {
+        root,
+        adb: '/owned/sdk/platform-tools/adb',
+        read: (name) => {
+          assert.equal(name, 'public-build-env.json')
+          return { EXPO_PUBLIC_API_BASE_URL: 'http://127.0.0.1:4000' }
+        },
+        run: (binary, args, env) => {
+          calls.push({ binary: path.relative(root, binary), args, env })
+          return ''
+        },
+      },
+    }
+  }
+
+  test('runs exactly the two Gradle builds of the receive test, with the owned public env and no device', (t) => {
+    const root = buildRoot(t)
+    const { ctx, calls } = recorder(root)
+    // Without ANDROID_HOME the SDK is the directory that holds the owned adb's platform-tools.
+    const home = process.env.ANDROID_HOME
+    delete process.env.ANDROID_HOME
+    t.after(() => {
+      if (home !== undefined) process.env.ANDROID_HOME = home
+    })
+    buildShareReceiveApks(ctx)
+    assert.deepEqual(
+      calls.map(({ binary, args }) => [
+        binary,
+        ...args.map((arg) => (arg.startsWith(root) ? path.relative(root, arg) : arg)),
+      ]),
+      [
+        [
+          'apps/mobile/android/gradlew',
+          '-p',
+          'apps/mobile/android',
+          SHARE_RECEIVE_GRADLE_TASK,
+          '--max-workers=2',
+        ],
+        [
+          'apps/mobile/android/gradlew',
+          '-p',
+          SHARE_RECEIVER_PROJECT,
+          SHARE_RECEIVER_GRADLE_TASK,
+          '--max-workers=2',
+        ],
+      ]
+    )
+    for (const { env } of calls)
+      assert.deepEqual(env, {
+        EXPO_PUBLIC_API_BASE_URL: 'http://127.0.0.1:4000',
+        ANDROID_HOME: '/owned/sdk',
+      })
+  })
+
+  test('a generated manifest that asks for a forbidden permission stops before the second build', (t) => {
+    const root = buildRoot(
+      t,
+      shareManifest({
+        extra: '<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />',
+      })
+    )
+    const { ctx, calls } = recorder(root)
+    assert.throws(() => buildShareReceiveApks(ctx), /share_receive_manifest_invalid/)
+    assert.equal(calls.length, 1)
+  })
+
+  test('the prebuilt check requires all four files and valid manifests', (t) => {
+    const root = buildRoot(t)
+    assert.throws(
+      () => assertShareReceivePrebuilt(root),
+      /share_receive_prebuilt_missing/
+    )
+    for (const file of [SHARE_RECEIVE_APK, SHARE_RECEIVER_APK]) {
+      fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
+      fs.writeFileSync(path.join(root, file), 'apk')
+    }
+    assert.doesNotThrow(() => assertShareReceivePrebuilt(root))
+    // A directory where an APK should be is not a file.
+    fs.rmSync(path.join(root, SHARE_RECEIVER_APK))
+    fs.mkdirSync(path.join(root, SHARE_RECEIVER_APK))
+    assert.throws(
+      () => assertShareReceivePrebuilt(root),
+      /share_receive_prebuilt_missing/
+    )
+  })
+
+  test('the prebuilt files are both APKs and both asserted manifests', () => {
+    assert.deepEqual(SHARE_RECEIVE_PREBUILT_FILES, [
+      SHARE_RECEIVE_APK,
+      SHARE_RECEIVER_APK,
+      ...SHARE_RECEIVE_MANIFESTS,
+    ])
   })
 })
 
@@ -1468,6 +1660,27 @@ describe('runner wiring', () => {
       assert.match(branch, new RegExp(`\\n\\s+${key},\\n`), key)
     assert.match(branch, /catalog: readLocale\(\)/)
     assert.match(branch, /'extract',\n\s+'--harness',/)
+    // Only the exact CI flag skips the builds; any other value builds as a local run does.
+    assert.match(
+      branch,
+      /shareReceivePrebuilt: process\.env\.CC68_SHARE_RECEIVE_PREBUILT === '1',/
+    )
+  })
+
+  test('share-receive-build is a disk-checked, Android-only runner command that runs only the two builds', () => {
+    const disk = source.slice(0, source.indexOf('assertStory68DiskSpace(root)'))
+    assert.match(disk, /'share-receive-build',\n/)
+    const start = source.indexOf("} else if (command === 'share-receive-build') {")
+    const end = source.indexOf('} else if (command ===', start + 1)
+    assert.ok(start > 0 && end > start)
+    const branch = source.slice(start, end)
+    assert.match(
+      branch,
+      /if \(platform !== 'android'\) throw new Error\('share_receive_build_android_only'\)/
+    )
+    assert.match(branch, /ownedEnv\(\)/)
+    assert.match(branch, /buildShareReceiveApks\(\{ root, adb, run, read \}\)/)
+    assert.doesNotMatch(branch, /requireDevice\(\)|maestro|openUrl/)
   })
 
   test('the fixture command accepts every share mode', () => {
@@ -1479,7 +1692,7 @@ describe('runner wiring', () => {
     assert.match(branch, /\.\.\.SHARE_FIXTURE_MODES,/)
     assert.match(
       source,
-      /import \{\n\s+SHARE_FIXTURE_MODES,\n\s+readComposerLayout,\n\s+runStory69ShareSheet,\n\} from/
+      /import \{\n\s+SHARE_FIXTURE_MODES,\n\s+buildShareReceiveApks,\n\s+readComposerLayout,\n\s+runStory69ShareSheet,\n\} from/
     )
   })
 })

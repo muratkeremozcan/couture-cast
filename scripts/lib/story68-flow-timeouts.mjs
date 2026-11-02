@@ -192,18 +192,19 @@ const shareSheetTimeoutMs = Math.ceil(
 
 /**
  * What the Story 6.9 `share-sheet` command may add to the lane that runs it. On Android that lane
- * is android36-interaction, which runs share-sheet and the Release font proof; the rapid
- * watermark, TalkBack and fallback focus proofs moved to android36-controls. On run 41202706840
- * the interaction journey step took 27 min 42 s, of which those three proofs took 6 min 30 s and
- * share-sheet 7 min 53 s, so the lane without share-sheet is 13 min 19 s of its 45 min
- * journey_timeout, leaving 31 min 41 s. On iOS share-sheet runs in shard 4, after
- * permission-baseline and five locales: from the measured parts in native-matrix-shards.mjs that
- * shard takes 25 min 18 s without share-sheet, leaving 44 min 42 s of its 70 min job.
+ * is android36-interaction, which runs share-sheet alone: the rapid watermark, TalkBack and
+ * fallback focus proofs moved to android36-controls and the Release font proof to
+ * android36-release-font. On main run 41352898854 the emulator boot, install, open and signin
+ * before share-sheet took 7 min, leaving 23 min of the lane's 30 min journey_timeout. CI builds
+ * the share-receive APKs before the journey starts, outside this budget.
+ * On iOS share-sheet runs in shard 4, after permission-baseline and five locales: from the
+ * measured parts in native-matrix-shards.mjs that shard takes 25 min 18 s without share-sheet,
+ * leaving 44 min 42 s of its 70 min job.
  */
-export const ANDROID_SHARE_LANE_BASE_MS = 13 * 60_000 + 19_000
+export const ANDROID_SHARE_LANE_BASE_MS = 7 * 60_000
 export const IOS_SHARE_LANE_BASE_MS = 25 * 60_000 + 18_000
 export const SHARE_SHEET_LANE_HEADROOM_MS = Object.freeze({
-  android: 31 * 60_000 + 41_000,
+  android: 23 * 60_000,
   ios: 44 * 60_000 + 42_000,
 })
 /**

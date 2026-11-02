@@ -78,12 +78,8 @@ describe('Android SDK guard', () => {
     ['36', 'matrix-3', ['matrix'], []],
     ['36', 'original', ['proof'], []],
     ['36', 'controls', ['rapid-watermark', 'a11y', 'fallback-focus'], []],
-    [
-      '36',
-      'interaction',
-      ['share-sheet'],
-      ['bash scripts/ci/share-card-android-release-font.sh'],
-    ],
+    ['36', 'interaction', ['share-sheet'], []],
+    ['36', 'release-font', [], ['bash scripts/ci/share-card-android-release-font.sh']],
   ]
   const owned = [
     'proof',
@@ -130,6 +126,7 @@ describe('Android SDK guard', () => {
       'original',
       'controls',
       'interaction',
+      'release-font',
     ]) {
       const { result, commands } = await journey(t, '36', '36', 0, undefined, { suite })
       assert.equal(result.status, 0, result.stderr)
@@ -197,7 +194,7 @@ describe('Android SDK guard', () => {
       })
 
   // U-HARNESS-ANDROID-LANES (Story 6.9): share-sheet runs once, on API36 interaction only.
-  test('share-sheet runs exactly once on API36 interaction, after sign-in and before the Release font proof', async (t) => {
+  test('share-sheet runs exactly once on API36 interaction, after sign-in and alone', async (t) => {
     const { result, commands } = await journey(t, '36', '36', 0, undefined, {
       suite: 'interaction',
     })
@@ -205,10 +202,10 @@ describe('Android SDK guard', () => {
     assert.equal(commands.match(/mjs share-sheet /g)?.length, 1)
     assert.match(commands, /mjs share-sheet --platform android --device \S+\n/)
     const at = (needle) => commands.indexOf(needle)
-    // The Release font proof replaces the debug dev client that share-sheet drives. The rapid
-    // watermark, TalkBack and fallback focus proofs run in android36-controls.
+    // The Release font proof runs in android36-release-font. The rapid watermark, TalkBack and
+    // fallback focus proofs run in android36-controls.
     assert.ok(at('mjs share-sheet ') > at('mjs signin '))
-    assert.ok(at('mjs share-sheet ') < at(font))
+    assert.equal(commands.includes(font), false)
     for (const [sdk, suite] of [
       ['32', 'all-1'],
       ['32', 'all-2'],
@@ -218,11 +215,34 @@ describe('Android SDK guard', () => {
       ['36', 'matrix-2'],
       ['36', 'matrix-3'],
       ['36', 'original'],
+      ['36', 'release-font'],
     ]) {
       const other = await journey(t, sdk, sdk, 0, undefined, { suite })
       assert.equal(other.result.status, 0, other.result.stderr)
       assert.equal(other.commands.includes('share-sheet'), false, `${sdk} ${suite}`)
     }
+  })
+
+  // The Release font proof's set-locale flow needs the profile signin creates, so its own lane
+  // still installs the dev client, opens and signs in first, then runs only the proof.
+  test('the Release font proof runs once on API36 release-font, after sign-in and alone', async (t) => {
+    const { result, commands } = await journey(t, '36', '36', 0, undefined, {
+      suite: 'release-font',
+    })
+    assert.equal(result.status, 0, result.stderr)
+    const serial = process.env.ANDROID_SERIAL ?? 'emulator-5554'
+    assert.equal(
+      commands,
+      [
+        `adb -s ${serial} shell getprop ro.build.version.sdk`,
+        'emulator -accel-check',
+        `adb -s ${serial} install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`,
+        `node scripts/run-story68-native.mjs open --platform android --device ${serial}`,
+        `node scripts/run-story68-native.mjs signin --platform android --device ${serial}`,
+        font,
+        '',
+      ].join('\n')
+    )
   })
 
   // Spec Never: the android36-native-matrix workload does not change. Each shard runs the exact
@@ -269,6 +289,8 @@ describe('Android SDK guard', () => {
     ['a fourth API32 shard', '32', 'all-4'],
     ['an API32 shard on API36', '36', 'all-1'],
     ['the controls suite on API32', '32', 'controls'],
+    ['the release-font suite on API32', '32', 'release-font'],
+    ['the interaction suite on API32', '32', 'interaction'],
     ['an empty API36 suite', '36', ''],
     ['an unknown API36 suite', '36', 'browser'],
     ['an Android36 suite on API32', '32', 'matrix-1'],
@@ -291,8 +313,8 @@ describe('Android SDK guard', () => {
     ['36', 'matrix-2', 'mjs matrix ', null],
     ['36', 'original', 'mjs proof ', null],
     ['36', 'controls', 'mjs a11y ', 'fallback-focus'],
-    ['36', 'interaction', 'mjs share-sheet ', 'android-release-font'],
-    ['36', 'interaction', 'android-release-font', null],
+    ['36', 'interaction', 'mjs share-sheet ', null],
+    ['36', 'release-font', 'android-release-font', null],
     ['32', 'all-1', 'mjs proof ', 'mjs matrix '],
     ['32', 'all-1', 'mjs matrix ', 'rapid-watermark'],
     ['32', 'all-2', 'mjs permission-baseline ', 'mjs matrix '],
@@ -318,6 +340,7 @@ describe('Android SDK guard', () => {
       ['36', 'original'],
       ['36', 'controls'],
       ['36', 'interaction'],
+      ['36', 'release-font'],
       ['32', 'all-1'],
       ['32', 'all-2'],
       ['32', 'all-3'],
@@ -329,6 +352,7 @@ describe('Android SDK guard', () => {
       assert.notEqual(result.status, 0)
       for (const command of owned)
         assert.equal(commands.includes(`mjs ${command} `), false)
+      assert.equal(commands.includes(font), false, suite)
     }
   })
 })

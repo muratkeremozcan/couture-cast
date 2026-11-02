@@ -97,6 +97,7 @@ import {
 } from './lib/story68-rapid-watermark-control.mjs'
 import {
   SHARE_FIXTURE_MODES,
+  buildShareReceiveApks,
   readComposerLayout,
   runStory69ShareSheet,
 } from './lib/story69-share-sheet.mjs'
@@ -115,6 +116,7 @@ if (
     'rapid-watermark',
     'fallback-focus',
     'release-live-font',
+    'share-receive-build',
     'share-sheet',
   ].includes(command)
 )
@@ -1332,6 +1334,8 @@ if (command === 'prebuild') {
     composerLayout,
     captureApproved,
     catalog: readLocale(),
+    // CI built, scanned and placed both share-receive APKs before the emulator started.
+    shareReceivePrebuilt: process.env.CC68_SHARE_RECEIVE_PREBUILT === '1',
     extract: () =>
       run(process.execPath, [
         fileURLToPath(import.meta.url),
@@ -1344,6 +1348,13 @@ if (command === 'prebuild') {
         device,
       ]),
   })
+} else if (command === 'share-receive-build') {
+  // The two Gradle builds of the share-sheet receive test, without a device, so CI can run them
+  // before the emulator starts and cache them by the native fingerprint.
+  if (platform !== 'android') throw new Error('share_receive_build_android_only')
+  ownedEnv()
+  buildShareReceiveApks({ root, adb, run, read })
+  console.log('Owned Android share-receive APKs built.')
 } else if (command === 'rapid-watermark') {
   requireDevice()
   const report = { platform, passed: false, stage: 'validating_runtime' }

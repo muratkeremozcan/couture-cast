@@ -180,6 +180,7 @@ describe('free-runner-disk callers', () => {
       'pr-share-card-native.yml:android36-original',
       'pr-share-card-native.yml:android36-controls',
       'pr-share-card-native.yml:android36-interaction',
+      'pr-share-card-native.yml:android36-release-font',
       'pr-share-card-native.yml:browser-acceptance',
     ])
       assert.ok(ids.includes(expected), `${expected} in ${ids.join(', ')}`)

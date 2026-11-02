@@ -537,6 +537,7 @@ const CLOSED_CODES = Object.freeze([
   'share_sheet_ios_uitest_failed',
   'share_receive_android_test_failed',
   'share_receive_manifest_invalid',
+  'share_receive_prebuilt_missing',
   'share_receive_namespace_required',
   'share_sheet_platform_required',
   'loaded_approved_preview_required',
@@ -983,15 +984,42 @@ function recordedAsync(ctx, args, name, timeout = 300_000) {
   }).finally(() => fs.closeSync(fd))
 }
 
-/** N-AND-RECEIVE: the module's receiving-Activity androidTest on the owned emulator. */
-export function runShareReceiveTest(ctx) {
-  const namespace = shareModuleNamespace(ctx.root)
-  const expected = shareReceiveExpectedTests(ctx.root, namespace)
-  const env = {
-    ...ctx.read('public-build-env.json'),
-    ANDROID_SERIAL: ctx.device,
-    ANDROID_HOME: process.env.ANDROID_HOME ?? path.dirname(path.dirname(ctx.adb)),
+/** Each generated manifest exists and passes `assertShareReceiveManifest`. */
+function assertShareReceiveManifests(root) {
+  for (const manifest of SHARE_RECEIVE_MANIFESTS) {
+    let xml
+    try {
+      xml = fs.readFileSync(path.join(root, manifest), 'utf8')
+    } catch {
+      throw new Error('share_receive_manifest_invalid')
+    }
+    assertShareReceiveManifest(xml)
   }
+}
+
+/**
+ * Everything the receive test takes from its two Gradle builds: both APKs and the manifests it
+ * asserts. CI builds these before the emulator starts and caches them by the native fingerprint
+ * (pr-share-card-native.yml), so the four paths are also the cached paths.
+ */
+export const SHARE_RECEIVE_PREBUILT_FILES = Object.freeze([
+  SHARE_RECEIVE_APK,
+  SHARE_RECEIVER_APK,
+  ...SHARE_RECEIVE_MANIFESTS,
+])
+
+/** The Gradle environment of both builds: the owned public build env and the SDK. */
+export const shareReceiveBuildEnv = (ctx) => ({
+  ...ctx.read('public-build-env.json'),
+  ANDROID_HOME: process.env.ANDROID_HOME ?? path.dirname(path.dirname(ctx.adb)),
+})
+
+/**
+ * The two Gradle builds the receive test needs: the module's androidTest APK, its generated
+ * manifests checked before anything else builds, then the second app from the module's standalone
+ * project. No device is needed, so CI runs this as `share-receive-build` before the emulator.
+ */
+export function buildShareReceiveApks(ctx, env = shareReceiveBuildEnv(ctx)) {
   ctx.run(
     path.join(ctx.root, 'apps/mobile/android/gradlew'),
     [
@@ -1002,15 +1030,7 @@ export function runShareReceiveTest(ctx) {
     ],
     env
   )
-  for (const manifest of SHARE_RECEIVE_MANIFESTS) {
-    let xml
-    try {
-      xml = fs.readFileSync(path.join(ctx.root, manifest), 'utf8')
-    } catch {
-      throw new Error('share_receive_manifest_invalid')
-    }
-    assertShareReceiveManifest(xml)
-  }
+  assertShareReceiveManifests(ctx.root)
   ctx.run(
     path.join(ctx.root, 'apps/mobile/android/gradlew'),
     [
@@ -1021,6 +1041,39 @@ export function runShareReceiveTest(ctx) {
     ],
     env
   )
+}
+
+/**
+ * A prebuilt run (`CC68_SHARE_RECEIVE_PREBUILT=1`) skips both builds, so every file they would
+ * have written must already be there. A missing one fails the run with a closed code.
+ */
+export function assertShareReceivePrebuilt(root) {
+  if (
+    !SHARE_RECEIVE_PREBUILT_FILES.every((file) => {
+      try {
+        return fs.statSync(path.join(root, file)).isFile()
+      } catch {
+        return false
+      }
+    })
+  )
+    throw new Error('share_receive_prebuilt_missing')
+  assertShareReceiveManifests(root)
+}
+
+/**
+ * N-AND-RECEIVE: the module's receiving-Activity androidTest on the owned emulator. It builds both
+ * APKs first unless `ctx.shareReceivePrebuilt` says CI already built, scanned and placed them.
+ */
+export function runShareReceiveTest(ctx) {
+  const namespace = shareModuleNamespace(ctx.root)
+  const expected = shareReceiveExpectedTests(ctx.root, namespace)
+  if (ctx.shareReceivePrebuilt) assertShareReceivePrebuilt(ctx.root)
+  else
+    buildShareReceiveApks(ctx, {
+      ...shareReceiveBuildEnv(ctx),
+      ANDROID_SERIAL: ctx.device,
+    })
   ctx.run(ctx.adb, [
     '-s',
     ctx.device,
