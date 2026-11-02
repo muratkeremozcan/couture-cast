@@ -42,3 +42,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Gradle project caches that a module-level gradlew run writes beside its build.gradle.
+/modules/*/android/.gradle/
