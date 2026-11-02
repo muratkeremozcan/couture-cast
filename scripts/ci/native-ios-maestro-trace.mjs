@@ -498,6 +498,8 @@ const OPENER_EVENTS = new Set([
   'prefs-stale',
   'prefs-retry',
   'press',
+  'opener-press-in',
+  'opener-touch-cancel',
   'state-open',
   'composer-idle',
   'composer-cached',

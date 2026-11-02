@@ -26,6 +26,9 @@ export function installShareCardPresentationTrace(
  */
 export type ShareCardOpenerEvent =
   | 'press'
+  // The opener's press began, and iOS cancelled its touch: a press-in without a press.
+  | 'opener-press-in'
+  | 'opener-touch-cancel'
   | 'state-open'
   | 'composer-idle'
   | 'composer-cached'

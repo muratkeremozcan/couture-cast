@@ -7,10 +7,26 @@ appId: ${MAESTRO_APP_ID}
 # rapid-ready-outfit.yaml proved this opener unique on this same screen just before the
 # hold, so index 0 is that single opener. Each press below supersedes a prepare request,
 # and none may wait at the held source for 12 s, so the steps between presses stay minimal.
-- tapOn:
-    id: outfit-share-card-open
-    index: 0
-- assertVisible: ${MAESTRO_PREPARING}
+# iOS cancels the opener's touch now and then: 7 of 54 burn-in attempts (runs 41426869137
+# and 41433511439) got a press-in and no press, on hosts as idle as load 6, and the composer
+# never opened; all 3 traced in the second run were a touch-cancel. A cancelled press starts
+# no prepare request, so only the opener may be pressed again, and only while the composer
+# is closed. The whole hold ends at 30 s (holdLimitMs), so a lost press must show within 5 s,
+# not the 17 s an assertVisible waits: Preparing follows a landed press in under a second.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: share-card-title
+          commands:
+            - tapOn:
+                id: outfit-share-card-open
+                index: 0
+      - extendedWaitUntil:
+          visible: ${MAESTRO_PREPARING}
+          timeout: 5000
 - assertNotVisible:
     id: share-card-preview-loaded-.*
 - assertVisible:
