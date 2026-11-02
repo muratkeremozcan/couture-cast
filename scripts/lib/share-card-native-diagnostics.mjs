@@ -7,6 +7,7 @@ import {
   assertNativeFlowFailure,
   summarizeNativeFlowFailure,
 } from './share-card-native-failure.mjs'
+import { authOtpRows, validAuthOtpRows } from './story68-auth-otp-observations.mjs'
 
 const repository = fileURLToPath(new URL('../../', import.meta.url))
 const locales = [
@@ -460,6 +461,7 @@ export function projectNativeFlowDiagnostics(input) {
     recentCommands: rows.slice(-12).map((row) => commandRecord(row, labels)),
     interactions: projectInteractions(input.log, screen),
     presentationTrace: projectPresentationTrace(input.logcat),
+    authOtp: authOtpRows({ directory: input.directory, since: input.startedAt }),
     signatures: [...signatures]
       .filter(([, pattern]) => pattern.test(log))
       .map(([name]) => name),
@@ -607,6 +609,7 @@ export function assertNativeFlowDiagnostics(value, { root = repository } = {}) {
       'recentCommands',
       'interactions',
       'presentationTrace',
+      'authOtp',
       'signatures',
       'screen',
       'resources',
@@ -629,7 +632,8 @@ export function assertNativeFlowDiagnostics(value, { root = repository } = {}) {
   if (
     !nullableInteger(value.exitCode) ||
     ![null, 'SIGTERM', 'SIGKILL', 'SIGABRT'].includes(value.signal) ||
-    !integer(value.capturedAfterFailureMs)
+    !integer(value.capturedAfterFailureMs) ||
+    !validAuthOtpRows(value.authOtp)
   )
     invalid()
   const labels = bundledLabels(root)
