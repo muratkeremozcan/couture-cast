@@ -23,8 +23,9 @@ export const INSTALL_CLIENT_TIMEOUT_MS = 300000
  * carry a 1-minute load of 130 or more from boot, install and Metro work: every failed first flow
  * on record started at load1 136 to 156 (runs 41297785476 and 41352898854, burn-in 41426869137),
  * the app never fetched its bundle and logged nothing, and load1 fell to 33 to 59 within two
- * minutes. First flows that started at 35 to 113 passed. So the flow waits until two load1 readings
- * in a row are at most 80, and starts anyway after five minutes so a host that never settles fails on its own evidence.
+ * minutes. First flows that started at 35 to 113 passed. So the flow waits until two load1
+ * readings in a row are at most 80, and starts anyway after five minutes so a host that never
+ * settles fails on its own evidence.
  */
 export const HOST_LOAD_POLICY = Object.freeze({
   maxLoad1: 80,
