@@ -33,6 +33,7 @@ const native = [
   'android36-original',
   'android36-controls',
   'android36-interaction',
+  'android36-release-font',
 ]
 const deviceLanes = Object.keys(android36Lanes).filter(
   (name) => name !== 'browser-acceptance'
@@ -595,6 +596,125 @@ describe('share-card parallel lane validator', () => {
     }
   })
 
+  describe('share-receive APK cache', () => {
+    const rejected = (title, expected, change) =>
+      test(`${title} is rejected`, () => {
+        const problems = mutate(change)
+        assert.ok(
+          problems.some((problem) => expected.test(problem)),
+          problems.join('\n') || 'no problem raised'
+        )
+      })
+    const name = 'android36-interaction'
+    const byId = (jobs, id) => step(jobs[name], (row) => row.id === id)
+    const journeyOf = (jobs) =>
+      step(jobs[name], (row) => row.uses === 'reactivecircus/android-emulator-runner@v2')
+    const keyed = new RegExp(
+      `${name}: key the share-receive APKs of the share-sheet lane and build them only on a miss`
+    )
+    const scanned = new RegExp(`${name}: cache only built and scanned share-receive APKs`)
+    const gated = new RegExp(
+      `${name}: run share-sheet only on restored or scanned share-receive APKs`
+    )
+
+    test('the key step keys only the interaction suite, by the client key and the harness', () => {
+      const key = step(source.jobs[name], (row) => row.id === 'share_receive_key')
+      assert.equal(key.env.CC68_SHARE_RECEIVE_KEY.startsWith(clientKey), true)
+      for (const [suite, keyed] of [
+        ['interaction', true],
+        ['release-font', false],
+        ['controls', false],
+        ['matrix-1', false],
+      ]) {
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'share-receive-key-'))
+        try {
+          const output = path.join(scratch, 'output')
+          const result = spawnSync('bash', ['-e', '-c', key.run], {
+            encoding: 'utf8',
+            env: {
+              PATH: process.env.PATH,
+              GITHUB_OUTPUT: output,
+              CC68_ANDROID_SUITE: suite,
+              CC68_SHARE_RECEIVE_KEY: 'cc68-native-android-v1-abc-share-receive-def',
+            },
+          })
+          assert.equal(result.status, 0, result.stderr)
+          const written = fs.existsSync(output) ? fs.readFileSync(output, 'utf8') : ''
+          assert.equal(
+            written,
+            keyed ? 'key=cc68-native-android-v1-abc-share-receive-def\n' : '',
+            suite
+          )
+        } finally {
+          fs.rmSync(scratch, { recursive: true, force: true })
+        }
+      }
+    })
+
+    rejected('a key that ignores the harness', keyed, (jobs) => {
+      byId(jobs, 'share_receive_key').env.CC68_SHARE_RECEIVE_KEY = clientKey
+    })
+    rejected('keying every lane', keyed, (jobs) => {
+      byId(jobs, 'share_receive_key').run =
+        'echo "key=$CC68_SHARE_RECEIVE_KEY" >> "$GITHUB_OUTPUT"'
+    })
+    rejected('keying before the development client is restored', keyed, (jobs) => {
+      const steps = jobs[name].steps
+      const [key] = steps.splice(
+        steps.findIndex((row) => row.id === 'share_receive_key'),
+        1
+      )
+      steps.splice(
+        steps.findIndex((row) => row.id === 'native_key'),
+        0,
+        key
+      )
+    })
+    rejected('caching only one of the four files', keyed, (jobs) => {
+      byId(jobs, 'share_receive_cache').with.path = byId(jobs, 'share_receive_cache')
+        .with.path.split('\n')
+        .slice(0, 1)
+        .join('\n')
+    })
+    rejected('building on a hit', keyed, (jobs) => {
+      byId(jobs, 'share_receive_build').if =
+        "${{ !cancelled() && steps.share_receive_cache.outcome == 'success' }}"
+    })
+    rejected('caching unscanned APKs', scanned, (jobs) => {
+      const steps = jobs[name].steps
+      steps.splice(
+        steps.findIndex((row) => row.id === 'share_receive_scan'),
+        1
+      )
+    })
+    rejected('scanning without the harness directory', scanned, (jobs) => {
+      byId(jobs, 'share_receive_scan').run = byId(jobs, 'share_receive_scan').run.replace(
+        ' "$CC68_HARNESS_DIR"',
+        ''
+      )
+    })
+    rejected('scanning only one APK', scanned, (jobs) => {
+      byId(jobs, 'share_receive_scan').run = byId(jobs, 'share_receive_scan')
+        .run.split('\n')
+        .filter((line) => !line.includes('test-receiver-debug.apk'))
+        .join('\n')
+    })
+    rejected('saving what the scan did not pass', scanned, (jobs) => {
+      byId(jobs, 'share_receive_save').if =
+        "${{ !cancelled() && steps.share_receive_build.outcome == 'success' }}"
+    })
+    rejected('saving other paths than it restores', scanned, (jobs) => {
+      byId(jobs, 'share_receive_save').with.path = 'apps/mobile/modules'
+    })
+    rejected('a journey that ignores the share-receive APKs', gated, (jobs) => {
+      journeyOf(jobs).if =
+        "${{ !cancelled() && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.kvm.outcome == 'success' }}"
+    })
+    rejected('a journey that always claims prebuilt APKs', gated, (jobs) => {
+      journeyOf(jobs).env.CC68_SHARE_RECEIVE_PREBUILT = '1'
+    })
+  })
+
   describe('iOS journey', () => {
     const iosJobs = ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-evidence']
     const rejected = (title, expected, change) =>
@@ -1115,6 +1235,10 @@ describe('share-card parallel lane validator', () => {
     )
     assert.deepEqual(
       source.jobs['android36-controls'].steps,
+      source.jobs['android36-interaction'].steps
+    )
+    assert.deepEqual(
+      source.jobs['android36-release-font'].steps,
       source.jobs['android36-interaction'].steps
     )
     const problems = mutate(

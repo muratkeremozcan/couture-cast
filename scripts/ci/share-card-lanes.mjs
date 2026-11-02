@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
 import { matrixRows } from './workflow-step-shadowing.mjs'
 import { shardsOf } from './native-matrix-shards.mjs'
+import { SHARE_RECEIVE_PREBUILT_FILES } from '../lib/story69-share-sheet.mjs'
 import {
   pullRequestEvent,
   pullRequestShareCardJobs,
@@ -37,6 +38,7 @@ export const android36Lanes = Object.freeze({
   'android36-original': ['original'],
   'android36-controls': ['controls'],
   'android36-interaction': ['interaction'],
+  'android36-release-font': ['release-font'],
 })
 // pr-gate.yml publishes the required ruleset context gate as a commit status; no job or
 // check run may take that name.
@@ -667,8 +669,110 @@ function androidClientCacheProblems(name, steps, check) {
   )
 }
 
+const shareReceiveKey = '${{ steps.share_receive_key.outputs.key }}'
+const shareReceiveReady =
+  "(steps.share_receive_key.outputs.key == '' || steps.share_receive_cache.outputs.cache-hit == 'true' || steps.share_receive_save.outcome == 'success')"
+const shareReceivePrebuilt =
+  "${{ (steps.share_receive_cache.outputs.cache-hit == 'true' || steps.share_receive_save.outcome == 'success') && '1' || '0' }}"
+const cachedPaths = (step) =>
+  String(step?.with?.path ?? '')
+    .trim()
+    .split('\n')
+
+/** The share-receive steps of a lane, by position, as `steps.findIndex` reports them. */
+function shareReceiveSteps(steps) {
+  const at = (predicate) => steps.findIndex(predicate)
+  const cache = (id, action) =>
+    at(
+      (step) =>
+        step.id === id &&
+        step.uses === `actions/cache/${action}@v4` &&
+        step.with?.key === shareReceiveKey
+    )
+  return {
+    restoreClient: at((step) => step.id === 'native_cache'),
+    key: at((step) => step.id === 'share_receive_key'),
+    restore: cache('share_receive_cache', 'restore'),
+    build: at((step) => step.id === 'share_receive_build'),
+    scan: at((step) => step.id === 'share_receive_scan'),
+    save: cache('share_receive_save', 'save'),
+    journey: at((step) => step.uses === emulatorAction),
+  }
+}
+
+/** Only the interaction suite keys, after the client restore, by the client key and the harness. */
+function shareReceiveKeyProblems(name, steps, { restoreClient, key }, check) {
+  const env = steps[key]?.env ?? {}
+  check(
+    restoreClient >= 0 &&
+      key > restoreClient &&
+      env.CC68_ANDROID_SUITE === '${{ matrix.suite }}' &&
+      String(env.CC68_SHARE_RECEIVE_KEY).startsWith(keyOutput) &&
+      String(env.CC68_SHARE_RECEIVE_KEY).includes(
+        "hashFiles('scripts/lib/story69-share-sheet.mjs')"
+      ) &&
+      steps[key].run?.includes('if [ "$CC68_ANDROID_SUITE" = interaction ]; then'),
+    `${name}: key the share-receive APKs of the share-sheet lane and build them only on a miss`
+  )
+}
+
+/** The keyed lane restores all four files and builds them only on a miss. */
+function shareReceiveBuildProblems(name, steps, { key, restore, build }, check) {
+  check(
+    restore > key &&
+      steps[restore].if?.includes("steps.share_receive_key.outputs.key != ''") &&
+      JSON.stringify(cachedPaths(steps[restore])) ===
+        JSON.stringify([...SHARE_RECEIVE_PREBUILT_FILES]) &&
+      build > restore &&
+      steps[build].run ===
+        'node scripts/run-story68-native.mjs share-receive-build --platform ${{ matrix.platform }}' &&
+      steps[build].if?.includes("steps.share_receive_cache.outputs.cache-hit != 'true'"),
+    `${name}: key the share-receive APKs of the share-sheet lane and build them only on a miss`
+  )
+}
+
+/** A fork can restore the cache, so only what this job built and scanned is saved. */
+function shareReceiveScanProblems(name, steps, { restore, build, scan, save }, check) {
+  const run = steps[scan]?.run ?? ''
+  check(
+    scan > build &&
+      steps[scan].if?.includes("steps.share_receive_build.outcome == 'success'") &&
+      run.includes(
+        'node scripts/ci/native-ios-app-secret-scan.mjs "$RUNNER_TEMP/cc69-share-receive" "$CC68_HARNESS_DIR"'
+      ) &&
+      SHARE_RECEIVE_PREBUILT_FILES.every((file) => run.includes(file)) &&
+      save > scan &&
+      steps[save].if?.includes("steps.share_receive_scan.outcome == 'success'") &&
+      JSON.stringify(cachedPaths(steps[save])) ===
+        JSON.stringify(cachedPaths(steps[restore])),
+    `${name}: cache only built and scanned share-receive APKs`
+  )
+}
+
+/**
+ * The lane that runs share-sheet keys its two share-receive APKs by the client's native key and the
+ * harness, restores them, builds them only on a miss, caches only what it built and scanned, and
+ * starts its journey, told the APKs are prebuilt, only once they are restored or saved. Every other
+ * lane leaves the key empty.
+ */
+function shareReceiveCacheProblems(name, steps, check) {
+  const at = shareReceiveSteps(steps)
+  shareReceiveKeyProblems(name, steps, at, check)
+  shareReceiveBuildProblems(name, steps, at, check)
+  shareReceiveScanProblems(name, steps, at, check)
+  const journey = steps[at.journey]
+  check(
+    at.journey > at.save &&
+      journey.if?.includes("steps.share_receive_key.outcome == 'success'") &&
+      journey.if.includes(shareReceiveReady) &&
+      journey.env?.CC68_SHARE_RECEIVE_PREBUILT === shareReceivePrebuilt,
+    `${name}: run share-sheet only on restored or scanned share-receive APKs`
+  )
+}
+
 function nativeProblems(name, job, rows, check) {
   androidClientCacheProblems(name, job.steps ?? [], check)
+  shareReceiveCacheProblems(name, job.steps ?? [], check)
   const steps = job.steps ?? []
   const prepare = steps.find((step) => step.id === 'runtime')
   const engines = steps.find((step) => step.id === 'browser_deps')?.run ?? ''

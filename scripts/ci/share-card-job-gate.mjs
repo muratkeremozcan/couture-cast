@@ -13,6 +13,7 @@ export const requiredShareCardJobs = Object.freeze([
   'android36-original',
   'android36-controls',
   'android36-interaction',
+  'android36-release-font',
   // The iOS journey: one build, two shards (a matrix job succeeds only when both legs do) and
   // the job that proves both shards reported their exact cases.
   'ios-build',

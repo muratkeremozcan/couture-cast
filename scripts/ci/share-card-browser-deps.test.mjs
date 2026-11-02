@@ -408,6 +408,7 @@ describe('browser dependency workflow', () => {
       'android36-original',
       'android36-controls',
       'android36-interaction',
+      'android36-release-font',
     ]
     for (const name of jobs) {
       const steps = workflow.jobs[name].steps

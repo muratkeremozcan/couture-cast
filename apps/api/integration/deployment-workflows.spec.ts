@@ -287,10 +287,10 @@ describe('deployment workflows', () => {
         expect(reserve, `${file} ${job}`).toBeLessThan(start)
       }
     }
-    // pr-share-card-native.yml starts it in six jobs: the API32 original-resource job, the
-    // browser lane and the four Android 36 partitions (three of them reuse the first one's
+    // pr-share-card-native.yml starts it in seven jobs: the API32 original-resource job, the
+    // browser lane and the five Android 36 partitions (four of them reuse the first one's
     // anchored steps). The iOS shards start Supabase from scripts/ci/native-supabase.mjs.
-    expect(startingJobs).toBe(12)
+    expect(startingJobs).toBe(13)
   })
 
   it('the share-card native workflow runs only the browser lane on pull requests', () => {
@@ -318,6 +318,7 @@ describe('deployment workflows', () => {
       'android36-matrix-evidence',
       'android36-native-matrix',
       'android36-original',
+      'android36-release-font',
       'ios-build',
       'ios-evidence',
       'ios-expo-go',

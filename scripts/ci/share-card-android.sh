@@ -13,7 +13,7 @@ fi
 # in scripts/ci/native-matrix-shards.mjs.
 suite="${CC68_ANDROID_SUITE:-}"
 case "$sdk:$suite" in
-  32:all-1|32:all-2|32:all-3|36:matrix-1|36:matrix-2|36:matrix-3|36:original|36:controls|36:interaction) ;;
+  32:all-1|32:all-2|32:all-3|36:matrix-1|36:matrix-2|36:matrix-3|36:original|36:controls|36:interaction|36:release-font) ;;
   *) echo 'Explicit native CI suite must match the verified Android API' >&2; exit 2 ;;
 esac
 # Device permissions alone do not prove the emulator can use KVM.
@@ -49,8 +49,12 @@ case "$suite" in
     ;;
   interaction)
     # Story 6.9 native share: fixture outcomes, the real chooser smoke and the receiving
-    # androidTest. The Release font proof then replaces the debug dev client share-sheet drives.
+    # androidTest. CI builds the receiving APKs before the emulator starts.
     native share-sheet
+    ;;
+  release-font)
+    # The Release font proof replaces the debug dev client with a Release build. Its set-locale
+    # flow needs the profile that signin created above.
     bash scripts/ci/share-card-android-release-font.sh
     ;;
 esac
