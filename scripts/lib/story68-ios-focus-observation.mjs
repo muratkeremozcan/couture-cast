@@ -1,5 +1,43 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+
+const execFileText = promisify(execFile)
+
+/**
+ * The data container of the installed app, read without blocking the event loop that answers the
+ * XCUITest. A synchronous simctl call holds the loop for as long as a starved host takes to answer
+ * (run 40984431884: -1001 after the client timeout in the fallback lane; run 41341524306: the same
+ * in the accessibility lane, whose 6 s focus read paid the call on every request). One call serves
+ * every request that arrives before it answers and its answer is kept, since the path stays the
+ * same until the app is reinstalled; a failed call is forgotten so the next request asks again.
+ */
+export function iosAppContainerReader({
+  device,
+  appId,
+  lookup = async () =>
+    (
+      await execFileText(
+        'xcrun',
+        ['simctl', 'get_app_container', device, appId, 'data'],
+        {
+          timeout: 60_000,
+        }
+      )
+    ).stdout,
+}) {
+  let pending
+  return () => {
+    const attempt = (pending ??= Promise.resolve()
+      .then(lookup)
+      .catch((error) => {
+        if (pending === attempt) pending = undefined
+        throw error
+      }))
+    return attempt
+  }
+}
 
 /** Private read-only simulator ingress. No focus request is issued by this reader. */
 export function story68FocusObservationHandler({

@@ -2,7 +2,10 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { story68FocusObservationHandler } from './story68-ios-focus-observation.mjs'
+import {
+  iosAppContainerReader,
+  story68FocusObservationHandler,
+} from './story68-ios-focus-observation.mjs'
 const device = 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE'
 const container = `/Users/test/Library/Developer/CoreSimulator/Devices/${device}/data/Containers/Data/Application/owned`
 const record = {
@@ -97,5 +100,76 @@ describe('story68FocusObservationHandler async container lookup', () => {
       throw new Error('simctl_failed')
     })
     assert.equal(refused.status, 503)
+  })
+})
+
+describe('iosAppContainerReader', () => {
+  test('one lookup answers concurrent and later reads without blocking the event loop', async () => {
+    let calls = 0
+    let release
+    const read = iosAppContainerReader({
+      device,
+      appId: 'com.couturecast.story68',
+      lookup: () => {
+        calls++
+        return new Promise((resolve) => (release = () => resolve(container)))
+      },
+    })
+    const first = read()
+    const second = read()
+    // A timer still fires while the lookup is outstanding: nothing holds the loop.
+    await new Promise((resolve) => setTimeout(resolve, 1))
+    release()
+    assert.deepEqual(await Promise.all([first, second]), [container, container])
+    assert.equal(await read(), container)
+    assert.equal(calls, 1)
+  })
+
+  test('a failed lookup is forgotten so the next read asks again', async () => {
+    let calls = 0
+    const read = iosAppContainerReader({
+      device,
+      appId: 'com.couturecast.story68',
+      lookup: async () => {
+        calls++
+        if (calls === 1) throw new Error('simctl_unavailable')
+        return container
+      },
+    })
+    await assert.rejects(read(), /simctl_unavailable/)
+    assert.equal(await read(), container)
+    assert.equal(calls, 2)
+  })
+
+  test('the handler serves a warmed container without another lookup', async () => {
+    let calls = 0
+    const read = iosAppContainerReader({
+      device,
+      appId: 'com.couturecast.story68',
+      lookup: async () => {
+        calls++
+        return container
+      },
+    })
+    await read()
+    const response = await new Promise((resolve) => {
+      const result = {
+        writeHead(status) {
+          this.status = status
+          return this
+        },
+        end() {
+          resolve(this)
+        },
+      }
+      story68FocusObservationHandler({
+        device,
+        appId: 'com.couturecast.story68',
+        readContainer: read,
+        readFile: () => JSON.stringify(record),
+      })({ url: '/focus-observation', method: 'GET' }, result)
+    })
+    assert.equal(response.status, 200)
+    assert.equal(calls, 1)
   })
 })
