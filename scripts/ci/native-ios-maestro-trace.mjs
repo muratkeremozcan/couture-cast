@@ -2,6 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawn as spawnChild, spawnSync } from 'node:child_process'
+import { authOtpRows } from '../lib/story68-auth-otp-observations.mjs'
 
 function commandFiles(directory) {
   let entries = []
@@ -692,6 +693,7 @@ export function recordIosFlowProgress({
   directory,
   apiLogFile = null,
   apiLogFromByte = 0,
+  startedAt = null,
   output = null,
   root = process.cwd(),
   device = null,
@@ -730,6 +732,7 @@ export function recordIosFlowProgress({
       shareCardApi: apiLogFile
         ? shareCardApiRows(logTail(apiLogFile, apiLogFromByte))
         : [],
+      authOtp: authOtpRows({ directory, since: startedAt }),
     }
     const file = path.join(directory, 'native-ios-flow-progress.json')
     try {
