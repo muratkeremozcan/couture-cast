@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** One disposable hosted VM diagnoses startup tuning and the mandatory settle gate. */
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { simulatorCommandRecorder } from './native-ios-command-evidence.mjs'
@@ -16,11 +17,50 @@ import { cleanupOwnedDevice } from './native-ios-device-cleanup.mjs'
  */
 export const INSTALL_CLIENT_TIMEOUT_MS = 300000
 
+/**
+ * The first native flow opens the app on a 120 s deadline, so it must not start while the host is
+ * saturated. The CPU gate above settles three named simulator daemons, yet the hosted VM can still
+ * carry a 1-minute load of 130 or more from boot, install and Metro work: every failed first flow
+ * on record started at load1 136 to 156 (runs 41297785476 and 41352898854, burn-in 41426869137),
+ * the app never fetched its bundle and logged nothing, and load1 fell to 33 to 59 within two
+ * minutes. First flows that started at 35 to 113 passed. So the flow waits until load1 is at most
+ * 80, and starts anyway after five minutes so a host that never settles fails on its own evidence.
+ */
+export const HOST_LOAD_POLICY = Object.freeze({
+  maxLoad1: 80,
+  pollSeconds: 5,
+  maxWaitSeconds: 300,
+})
+export async function settleHostLoad({
+  loadavg = () => os.loadavg()[0],
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now = () => Date.now(),
+  policy = HOST_LOAD_POLICY,
+} = {}) {
+  const started = now()
+  const startLoad1 = loadavg()
+  let load1 = startLoad1
+  while (load1 > policy.maxLoad1 && now() - started < policy.maxWaitSeconds * 1000) {
+    await sleep(policy.pollSeconds * 1000)
+    load1 = loadavg()
+  }
+  const record = {
+    maxLoad1: policy.maxLoad1,
+    startLoad1: Math.round(startLoad1),
+    load1: Math.round(load1),
+    waitedSeconds: Math.round((now() - started) / 1000),
+    outcome: load1 <= policy.maxLoad1 ? 'settled' : 'cap',
+  }
+  console.log(JSON.stringify({ hostLoadGate: record }))
+  return record
+}
+
 export async function finishOwnedStartup({
   device,
   command,
   sample,
   quiesce = quiesceOwnedSimulator,
+  settleHost = settleHostLoad,
   prepareForFlow = false,
   appPath,
   afterBoot = () => undefined,
@@ -57,6 +97,7 @@ export async function finishOwnedStartup({
         timeout: INSTALL_CLIENT_TIMEOUT_MS,
       })
     await quiesce(device, command)
+    if (prepareForFlow) await settleHost()
     snapshot('before-first-flow')
     ready = true
   } finally {
