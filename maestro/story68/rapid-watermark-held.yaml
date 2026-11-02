@@ -7,10 +7,11 @@ appId: ${MAESTRO_APP_ID}
 # rapid-ready-outfit.yaml proved this opener unique on this same screen just before the
 # hold, so index 0 is that single opener. Each press below supersedes a prepare request,
 # and none may wait at the held source for 12 s, so the steps between presses stay minimal.
-# iOS cancels the opener's touch now and then: burn-in runs 41426869137 and 41433511439
-# traced press-in, touch-cancel and press-out with no press on an idle host (load 6), in 3
-# of 26 attempts, and the composer never opened. A cancelled press starts no prepare
-# request, so only the opener may be pressed again, and only while the composer is closed.
+# iOS cancels the opener's touch now and then: 7 of 54 burn-in attempts (runs 41426869137
+# and 41433511439) got a press-in and no press, on hosts as idle as load 6, and the composer
+# never opened; all 3 traced in the second run were a touch-cancel. A cancelled press starts
+# no prepare request, so only the opener may be pressed again, and only while the composer
+# is closed.
 - retry:
     maxRetries: 2
     commands:
