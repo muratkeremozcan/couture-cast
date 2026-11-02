@@ -6,7 +6,10 @@ description: >-
   41297785476, while the AWS runner beside it had under 15 GiB and failed the
   story 6.8 disk guard (scripts/lib/test-disk-space.mjs) before building
   anything. Four Maestro shards on 2026-10-31 and 2026-11-01 died with "No space
-  left on device" on the same kind of host. Run this right after checkout (and
+  left on device" on the same kind of host. Mobile e2e shards in runs 41311372033
+  and 41429432878 still failed the 20 GiB guard: such a host had 13 GiB free, 39
+  after this step, and the install, emulator, AVD and Supabase images used 19 more
+  before the flows. So the unused Go, PyPy and Ruby caches and the cloud CLIs go too. Run this right after checkout (and
   after reserve-supabase-ports where a job has it) in every Linux job that
   builds the Android app, boots an emulator or runs the disk guard. It makes no
   network connection. Every path is optional, so an image that drops one, or
@@ -43,6 +46,14 @@ runs:
           /usr/local/share/powershell
           /usr/local/share/boost
           /opt/az
+          /usr/share/az_*
+          /opt/hostedtoolcache/go
+          /opt/hostedtoolcache/PyPy
+          /opt/hostedtoolcache/Ruby
+          /usr/lib/google-cloud-sdk
+          /usr/local/aws-cli
+          /usr/local/aws-sam-cli
+          /opt/microsoft
           "$HOME/.rustup"
           "$HOME/.cargo"
           "${ANDROID_HOME:-/usr/local/lib/android/sdk}/ndk"
