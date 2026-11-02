@@ -490,6 +490,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
       directory,
       apiLogFile: path.join(directory, 'api.log'),
       apiLogFromByte,
+      startedAt: started,
       output,
       root,
       device,
