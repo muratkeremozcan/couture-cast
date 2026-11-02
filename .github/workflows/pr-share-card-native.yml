@@ -857,8 +857,9 @@ jobs:
         if: always()
         run: node scripts/ci/native-supabase.mjs stop
   # Four shards balanced by measured minutes (scripts/ci/native-matrix-shards.mjs): nominal jobs of
-  # 30.0 to 32.8 minutes against 50 and 58 for the two shards of main run 41312266186. With
-  # ios-expo-go they fill the five macOS jobs the free plan runs at once.
+  # 33.7 to 35.3 minutes, from per-flow times of runs 41352898854 and 41429581850, where the
+  # longest shard took 40.9 and 41.8. With ios-expo-go they fill the five macOS jobs the free plan
+  # runs at once.
   ios-shard:
     needs: ios-build
     if: github.event_name != 'pull_request'

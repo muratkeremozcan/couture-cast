@@ -67,8 +67,8 @@ test('the shards are balanced by measured minutes and fit their job limit on a r
       nominalMinutes(shard) * 1.5 < limit,
       `shard ${shard}: ${nominalMinutes(shard)} min`
     )
-  // The two shards of main run 41312266186 took 50 and 58 minutes.
-  assert.ok(Math.max(...minutes) < 35)
+  // Shard 2 took 40.9 and 41.8 minutes on runs 41352898854 and 41429581850 before this split.
+  assert.ok(Math.max(...minutes) < 36)
 })
 
 test('no shard runs the Expo Go proof: the ios-expo-go job runs it alone', () => {
@@ -76,7 +76,7 @@ test('no shard runs the Expo Go proof: the ios-expo-go job runs it alone', () =>
     assert.ok(!SHARD_PLAN[shard].commands.includes('expo-go-proof'), `shard ${shard}`)
     assert.ok(!commandsForShard(shard).includes('expo-go-proof'), `shard ${shard}`)
   }
-  assert.deepEqual(commandsForShard(3).at(-1), 'fallback-focus')
+  assert.deepEqual(commandsForShard(2).at(-1), 'fallback-focus')
   assert.ok(!AFTER_MATRIX.includes('expo-go-proof'))
 })
 
@@ -149,14 +149,18 @@ test('a missing, incomplete, failed or foreign shard report fails the merge', ()
 
 test('each shard signs in, only shard 1 proves the original and the others set the same permissions', () => {
   assert.deepEqual(commandsForShard(1), ['signin', 'proof', 'matrix'])
-  assert.deepEqual(commandsForShard(2), ['signin', 'permission-baseline', 'matrix'])
+  assert.deepEqual(commandsForShard(2), [
+    'signin',
+    'permission-baseline',
+    'matrix',
+    'fallback-focus',
+  ])
   assert.deepEqual(commandsForShard(3), [
     'signin',
     'permission-baseline',
     'matrix',
     'rapid-watermark',
     'a11y',
-    'fallback-focus',
   ])
   assert.deepEqual(commandsForShard(4), [
     'signin',
@@ -244,15 +248,16 @@ test('share-sheet is a dispatchable post-matrix command that runs exactly once, 
   )
 })
 
-test('shard 3 lists its commands explicitly and they equal the old shard 2 AFTER_MATRIX spread', () => {
+test('shards 2 and 3 list their commands explicitly and together hold the old AFTER_MATRIX spread', () => {
   // Before Story 6.9 shard 2 of two was ['permission-baseline', ...AFTER_MATRIX] with AFTER_MATRIX
-  // ['rapid-watermark', 'a11y', 'fallback-focus']; shard 3 of four keeps that list.
+  // ['rapid-watermark', 'a11y', 'fallback-focus']. Shard 3 of four keeps rapid-watermark before
+  // a11y (which sets no locale itself); fallback-focus sets its own and moved to shard 2.
   assert.deepEqual(SHARD_PLAN[3].commands, [
     'permission-baseline',
     'rapid-watermark',
     'a11y',
-    'fallback-focus',
   ])
+  assert.deepEqual(SHARD_PLAN[2].commands, ['permission-baseline', 'fallback-focus'])
   assert.deepEqual(AFTER_MATRIX.slice(0, 3), [
     'rapid-watermark',
     'a11y',
