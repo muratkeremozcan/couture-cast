@@ -1,6 +1,9 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, test } from 'node:test'
 import {
   iosAppContainerReader,
@@ -123,6 +126,31 @@ describe('iosAppContainerReader', () => {
     assert.deepEqual(await Promise.all([first, second]), [container, container])
     assert.equal(await read(), container)
     assert.equal(calls, 1)
+  })
+
+  test('the default simctl lookup leaves the event loop free while simctl is slow', async (t) => {
+    // A stand-in xcrun that answers after 400 ms, like simctl on a starved host.
+    const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-xcrun-'))
+    fs.writeFileSync(
+      path.join(bin, 'xcrun'),
+      `#!/bin/sh\nsleep 0.4\necho '${container}'\n`,
+      { mode: 0o755 }
+    )
+    const savedPath = process.env.PATH
+    process.env.PATH = `${bin}${path.delimiter}${savedPath}`
+    t.after(() => {
+      process.env.PATH = savedPath
+      fs.rmSync(bin, { recursive: true, force: true })
+    })
+    const read = iosAppContainerReader({ device, appId: 'com.couturecast.story68' })
+    let ticks = 0
+    const timer = setInterval(() => ticks++, 20)
+    try {
+      assert.equal((await read()).trim(), container)
+    } finally {
+      clearInterval(timer)
+    }
+    assert.ok(ticks >= 5, `the event loop ran ${ticks} timer ticks during the lookup`)
   })
 
   test('a failed lookup is forgotten so the next read asks again', async () => {
