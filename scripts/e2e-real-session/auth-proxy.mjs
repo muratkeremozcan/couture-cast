@@ -125,6 +125,9 @@ export async function startAuthProxy({
     for await (const chunk of req) chunks.push(chunk)
     const body = Buffer.concat(chunks)
     const url = new URL(req.url ?? '/', origin)
+    // Recorded on arrival as well, so a request whose answer never comes still shows up.
+    if (url.pathname === '/auth/v1/otp')
+      observe({ path: url.pathname, mode: 'request-received', status: null })
 
     if (url.pathname === '/auth/v1/otp' && req.method === 'POST') {
       const { email } = /** @type {{ email?: unknown }} */ (JSON.parse(body.toString()))

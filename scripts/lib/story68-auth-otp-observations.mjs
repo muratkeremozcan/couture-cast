@@ -5,10 +5,13 @@ import path from 'node:path'
  * Sign-in code requests the owned auth proxy saw while one flow ran. A failed sign-in flow
  * (runs 41332254336 and 41341524306) could not tell a Send press that never reached the app from
  * a request that reached the proxy and failed or stalled; these rows tell them apart. Closed
- * values only: the proxy's mode name, the HTTP status and the milliseconds since the flow began.
+ * values only: the proxy's mode name, the HTTP status (none on arrival) and the milliseconds since
+ * the flow began.
  */
 export const AUTH_OTP_PATH = '/auth/v1/otp'
 export const AUTH_OTP_MODES = Object.freeze([
+  // Logged as the request arrives, with no status; every other mode is an answer.
+  'request-received',
   'owned-admin-generateLink',
   'real-local-auth',
   'refused-unrecorded-email',
@@ -16,6 +19,10 @@ export const AUTH_OTP_MODES = Object.freeze([
 ])
 export const AUTH_OTP_ROW_LIMIT = 8
 const integer = (value) => Number.isSafeInteger(value) && value >= 0
+const validStatus = (mode, status) =>
+  mode === 'request-received'
+    ? status === null
+    : Number.isInteger(status) && status >= 100 && status <= 599
 
 export function authOtpRows({ directory, since, read = fs.readFileSync }) {
   if (!integer(since)) return []
@@ -35,9 +42,7 @@ export function authOtpRows({ directory, since, read = fs.readFileSync }) {
         integer(row.at) &&
         row.at >= since &&
         AUTH_OTP_MODES.includes(row.mode) &&
-        Number.isInteger(row.status) &&
-        row.status >= 100 &&
-        row.status <= 599
+        validStatus(row.mode, row.status)
     )
     .map((row) => ({ mode: row.mode, status: row.status, afterMs: row.at - since }))
     .slice(-AUTH_OTP_ROW_LIMIT)
@@ -53,9 +58,7 @@ export function validAuthOtpRows(rows) {
         typeof row === 'object' &&
         Object.keys(row).sort().join() === 'afterMs,mode,status' &&
         AUTH_OTP_MODES.includes(row.mode) &&
-        Number.isInteger(row.status) &&
-        row.status >= 100 &&
-        row.status <= 599 &&
+        validStatus(row.mode, row.status) &&
         integer(row.afterMs)
     )
   )

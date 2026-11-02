@@ -79,6 +79,20 @@ describe('authOtpRows', () => {
   })
 })
 
+test('a held request shows as received with no answer', () => {
+  const rows = authOtpRows({
+    directory: '/owned',
+    since: 0,
+    read: reader([
+      { path: '/auth/v1/otp', mode: 'request-received', status: null, at: 40 },
+      { path: '/auth/v1/otp', mode: 'request-received', status: 200, at: 41 },
+      { path: '/auth/v1/otp', mode: 'owned-admin-generateLink', status: null, at: 42 },
+    ]),
+  })
+  assert.deepEqual(rows, [{ mode: 'request-received', status: null, afterMs: 40 }])
+  assert.equal(validAuthOtpRows(rows), true)
+})
+
 describe('validAuthOtpRows', () => {
   test('rejects an extra key, an open mode and too many rows', () => {
     const row = { mode: 'real-local-auth', status: 200, afterMs: 5 }
