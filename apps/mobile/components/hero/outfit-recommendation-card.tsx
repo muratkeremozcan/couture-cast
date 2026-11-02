@@ -138,6 +138,8 @@ export function OutfitRecommendationCard({
             borderWidth: 1,
             borderRadius: 8,
           }}
+          onPressIn={() => traceShareCardOpener('opener-press-in')}
+          onTouchCancel={() => traceShareCardOpener('opener-touch-cancel')}
           onPress={() => {
             traceShareCardOpener('press')
             onExport(outfit.id, () => safeFindNodeHandle(shareOpener.current))

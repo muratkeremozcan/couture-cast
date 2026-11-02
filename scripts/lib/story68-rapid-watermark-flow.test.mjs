@@ -14,20 +14,38 @@ test('the warmed held flow acquires before every original assertion and releases
   assert.equal(commands[0].runScript.env.MAESTRO_RAPID_ACTION, 'acquire')
   assert.equal(commands.at(-1).runScript?.env.MAESTRO_RAPID_ACTION, 'release')
   const held = commands.slice(1, -1)
-  assert.equal(held.length, 12)
-  assert.equal(held.filter((c) => c.assertVisible === '${MAESTRO_PREPARING}').length, 3)
+  // Only the opener may be pressed again (a cancelled touch starts no prepare request), and
+  // only while the composer is closed; the retry carries the first Preparing check itself.
+  const [opener, ...presses] = held
+  assert.equal(opener.retry.maxRetries, 2)
+  assert.deepEqual(opener.retry.commands, [
+    {
+      runFlow: {
+        when: { notVisible: { id: 'share-card-title' } },
+        commands: [{ tapOn: { id: 'outfit-share-card-open', index: 0 } }],
+      },
+    },
+    { assertVisible: '${MAESTRO_PREPARING}' },
+  ])
+  assert.equal(presses.length, 10)
   assert.equal(
-    held.filter((c) => c.assertNotVisible?.id === 'share-card-preview-loaded-.*').length,
+    presses.filter((c) => c.assertVisible === '${MAESTRO_PREPARING}').length,
+    2
+  )
+  assert.equal(
+    presses.filter((c) => c.assertNotVisible?.id === 'share-card-preview-loaded-.*')
+      .length,
     3
   )
   assert.deepEqual(
-    held.flatMap((c) =>
+    presses.flatMap((c) =>
       typeof c.assertVisible?.checked === 'boolean' ? [c.assertVisible.checked] : []
     ),
     [true, false, true]
   )
+  // The watermark presses run against the held source, so nothing between them may wait or retry.
   assert.equal(
-    held.some((c) => c.runScript || c.extendedWaitUntil || c.runFlow),
+    presses.some((c) => c.runScript || c.extendedWaitUntil || c.runFlow || c.retry),
     false
   )
 })
