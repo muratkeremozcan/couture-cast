@@ -82,7 +82,8 @@ export async function startAuthProxy({
   /** Every code minted this run, kept for output redaction after the files are gone. */
   const minted = []
   const observe = (entry) => {
-    observations.push(entry)
+    // When it was seen, so a failed flow can count only the requests made while it ran.
+    observations.push({ ...entry, at: Date.now() })
     fs.writeFileSync(
       path.join(directory, 'auth-observations.json'),
       `${JSON.stringify(observations, null, 2)}\n`
@@ -91,6 +92,15 @@ export async function startAuthProxy({
 
   const server = http.createServer((req, res) => {
     void handle(req, res).catch(() => {
+      try {
+        observe({
+          path: new URL(req.url ?? '/', origin).pathname,
+          mode: 'harness-error',
+          status: 503,
+        })
+      } catch {
+        // The 503 below still answers the request.
+      }
       if (!res.headersSent) {
         res.setHeader('content-type', 'application/json')
         res.writeHead(503)
