@@ -11,7 +11,8 @@ appId: ${MAESTRO_APP_ID}
 # and 41433511439) got a press-in and no press, on hosts as idle as load 6, and the composer
 # never opened; all 3 traced in the second run were a touch-cancel. A cancelled press starts
 # no prepare request, so only the opener may be pressed again, and only while the composer
-# is closed.
+# is closed. The whole hold ends at 30 s (holdLimitMs), so a lost press must show within 5 s,
+# not the 17 s an assertVisible waits: Preparing follows a landed press in under a second.
 - retry:
     maxRetries: 2
     commands:
@@ -23,7 +24,9 @@ appId: ${MAESTRO_APP_ID}
             - tapOn:
                 id: outfit-share-card-open
                 index: 0
-      - assertVisible: ${MAESTRO_PREPARING}
+      - extendedWaitUntil:
+          visible: ${MAESTRO_PREPARING}
+          timeout: 5000
 - assertNotVisible:
     id: share-card-preview-loaded-.*
 - assertVisible:

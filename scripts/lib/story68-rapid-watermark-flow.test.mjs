@@ -5,6 +5,7 @@ import test from 'node:test'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import { parseAllDocuments } from 'yaml'
+import { holdLimitMs } from './story68-rapid-watermark.mjs'
 
 test('the warmed held flow acquires before every original assertion and releases after all of them', () => {
   const documents = parseAllDocuments(
@@ -25,8 +26,10 @@ test('the warmed held flow acquires before every original assertion and releases
         commands: [{ tapOn: { id: 'outfit-share-card-open', index: 0 } }],
       },
     },
-    { assertVisible: '${MAESTRO_PREPARING}' },
+    { extendedWaitUntil: { visible: '${MAESTRO_PREPARING}', timeout: 5000 } },
   ])
+  // Two lost presses and the third that lands still end well inside the 30 s hold.
+  assert.ok(3 * opener.retry.commands[1].extendedWaitUntil.timeout <= holdLimitMs / 2)
   assert.equal(presses.length, 10)
   assert.equal(
     presses.filter((c) => c.assertVisible === '${MAESTRO_PREPARING}').length,
