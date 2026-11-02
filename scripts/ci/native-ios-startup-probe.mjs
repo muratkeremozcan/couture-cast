@@ -23,11 +23,13 @@ export const INSTALL_CLIENT_TIMEOUT_MS = 300000
  * carry a 1-minute load of 130 or more from boot, install and Metro work: every failed first flow
  * on record started at load1 136 to 156 (runs 41297785476 and 41352898854, burn-in 41426869137),
  * the app never fetched its bundle and logged nothing, and load1 fell to 33 to 59 within two
- * minutes. First flows that started at 35 to 113 passed. So the flow waits until load1 is at most
- * 80, and starts anyway after five minutes so a host that never settles fails on its own evidence.
+ * minutes. First flows that started at 35 to 113 passed. So the flow waits until two load1 readings
+ * in a row are at most 80, and starts anyway after five minutes so a host that never settles fails on its own evidence.
  */
 export const HOST_LOAD_POLICY = Object.freeze({
   maxLoad1: 80,
+  // load1 is a smoothed average, so one low reading can be a dip: two in a row, 5 s apart.
+  settledSamples: 2,
   pollSeconds: 5,
   maxWaitSeconds: 300,
 })
@@ -40,16 +42,21 @@ export async function settleHostLoad({
   const started = now()
   const startLoad1 = loadavg()
   let load1 = startLoad1
-  while (load1 > policy.maxLoad1 && now() - started < policy.maxWaitSeconds * 1000) {
+  let below = load1 <= policy.maxLoad1 ? 1 : 0
+  while (
+    below < policy.settledSamples &&
+    now() - started < policy.maxWaitSeconds * 1000
+  ) {
     await sleep(policy.pollSeconds * 1000)
     load1 = loadavg()
+    below = load1 <= policy.maxLoad1 ? below + 1 : 0
   }
   const record = {
     maxLoad1: policy.maxLoad1,
     startLoad1: Math.round(startLoad1),
     load1: Math.round(load1),
     waitedSeconds: Math.round((now() - started) / 1000),
-    outcome: load1 <= policy.maxLoad1 ? 'settled' : 'cap',
+    outcome: below >= policy.settledSamples ? 'settled' : 'cap',
   }
   console.log(JSON.stringify({ hostLoadGate: record }))
   return record

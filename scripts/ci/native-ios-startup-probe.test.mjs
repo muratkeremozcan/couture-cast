@@ -127,29 +127,37 @@ function loadClock(loads) {
   }
 }
 
-test('a quiet host starts the first flow at once', async () => {
-  const clock = loadClock([35])
+test('a quiet host starts the first flow after one confirming sample', async () => {
+  const clock = loadClock([35, 36])
   const record = await settleHostLoad(clock)
-  assert.equal(clock.sleeps.length, 0)
+  assert.equal(clock.sleeps.length, 1)
   assert.deepEqual(record, {
     maxLoad1: 80,
     startLoad1: 35,
-    load1: 35,
-    waitedSeconds: 0,
+    load1: 36,
+    waitedSeconds: 5,
     outcome: 'settled',
   })
 })
 
-test('a saturated host waits until load1 falls to the bound', async () => {
-  // The decay a failed first flow saw: 136 at start, 59 two minutes later.
-  const clock = loadClock([136, 120, 101, 88, 80])
+test('a single low reading between high ones does not count as settled', async () => {
+  const clock = loadClock([136, 79, 130, 78, 70])
   const record = await settleHostLoad(clock)
   assert.equal(clock.sleeps.length, 4)
+  assert.equal(record.load1, 70)
+  assert.equal(record.outcome, 'settled')
+})
+
+test('a saturated host waits until load1 falls to the bound', async () => {
+  // The decay a failed first flow saw: 136 at start, 59 two minutes later.
+  const clock = loadClock([136, 120, 101, 88, 80, 74])
+  const record = await settleHostLoad(clock)
+  assert.equal(clock.sleeps.length, 5)
   assert.ok(clock.sleeps.every((ms) => ms === HOST_LOAD_POLICY.pollSeconds * 1000))
   assert.equal(record.outcome, 'settled')
   assert.equal(record.startLoad1, 136)
-  assert.equal(record.load1, 80)
-  assert.equal(record.waitedSeconds, 20)
+  assert.equal(record.load1, 74)
+  assert.equal(record.waitedSeconds, 25)
 })
 
 test('a host that never settles starts after the cap and says so', async () => {
