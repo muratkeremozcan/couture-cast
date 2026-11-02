@@ -139,7 +139,10 @@ describe('free-runner-disk action', () => {
       '/usr/local/aws-sam-cli',
       '/opt/microsoft',
     ])
-      assert.ok(targets.split('\n').some((line) => line.trim() === target), target)
+      assert.ok(
+        targets.split('\n').some((line) => line.trim() === target),
+        target
+      )
   })
 
   test('keeps every SDK part, runtime and service the jobs use', () => {
