@@ -128,6 +128,23 @@ describe('free-runner-disk action', () => {
       assert.ok(calls.includes(`rm -rf -- ${target}`), `${target} in ${calls.join(', ')}`)
   })
 
+  test('deletes the unused tool caches and cloud CLIs a 13 GiB host needs gone', () => {
+    for (const target of [
+      '/usr/share/az_*',
+      '/opt/hostedtoolcache/go',
+      '/opt/hostedtoolcache/PyPy',
+      '/opt/hostedtoolcache/Ruby',
+      '/usr/lib/google-cloud-sdk',
+      '/usr/local/aws-cli',
+      '/usr/local/aws-sam-cli',
+      '/opt/microsoft',
+    ])
+      assert.ok(
+        targets.split('\n').some((line) => line.trim() === target),
+        target
+      )
+  })
+
   test('keeps every SDK part, runtime and service the jobs use', () => {
     for (const kept of [
       '/usr/lib/jvm',
