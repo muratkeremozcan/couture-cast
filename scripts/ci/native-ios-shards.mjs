@@ -52,14 +52,18 @@ export const AFTER_MATRIX = Object.freeze([
  * then grants Photos add-only through the real UI and simctl, and runs in shard 1 only; the other
  * shards reach the same permission state directly with `permission-baseline` before their matrix.
  * Each list is written out, never spread from AFTER_MATRIX, so a new post-matrix command lands in
- * one shard by choice. rapid-watermark sets en-US before a11y, which sets no locale itself.
+ * one shard by choice. rapid-watermark sets en-US before a11y, which sets no locale itself;
+ * fallback-focus opens a fresh runtime and sets en-US, so it runs after shard 2's lifecycle.
  */
 export const SHARD_PLAN = Object.freeze({
   1: { ...MATRIX_SHARD_PLANS.ios.shards[1], commands: ['proof'] },
-  2: { ...MATRIX_SHARD_PLANS.ios.shards[2], commands: ['permission-baseline'] },
+  2: {
+    ...MATRIX_SHARD_PLANS.ios.shards[2],
+    commands: ['permission-baseline', 'fallback-focus'],
+  },
   3: {
     ...MATRIX_SHARD_PLANS.ios.shards[3],
-    commands: ['permission-baseline', 'rapid-watermark', 'a11y', 'fallback-focus'],
+    commands: ['permission-baseline', 'rapid-watermark', 'a11y'],
   },
   4: {
     ...MATRIX_SHARD_PLANS.ios.shards[4],

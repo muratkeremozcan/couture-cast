@@ -92,33 +92,37 @@ const lifecycle = ['large-text', 'precommit-lifecycle', 'save-lifecycle']
  * shard step also boots the simulator and opens the app before the first command.
  */
 export const MATRIX_SHARD_PLANS = Object.freeze({
-  // Four shards: the free plan runs five macOS jobs at once, and ios-expo-go takes the fifth. Two
-  // shards took 50 and 58 minutes on main run 41312266186. Shard 1 proves the original beside the
-  // pre-locale section; the other three set the same Photos permission with permission-baseline.
-  // Nominal jobs from job start: 30.0, 32.0, 32.8 and 30.8 minutes.
+  // Four shards: the free plan runs five macOS jobs at once, and ios-expo-go takes the fifth. Shard
+  // 1 proves the original beside the pre-locale section; the other three set the same Photos
+  // permission with permission-baseline. With three locales beside the lifecycle sections, shard
+  // 2 was the longest on main run 41352898854 and dispatch run 41429581850 (40.9 and 41.8
+  // minutes against 32 to 39 for the rest), so one of its locales moved to shard 3 and one to
+  // shard 4, and fallback-focus moved from shard 3 to shard 2 (native-ios-shards.mjs). Nominal
+  // jobs from job start: 34.9, 35.3, 34.7 and 33.7 minutes.
   ios: Object.freeze({
     platform: 'ios',
     shards: Object.freeze({
       1: shard(['pre-locale', 'prefs-failed'], []),
-      2: shard(lifecycle, LOCALES.slice(0, 3)),
-      3: shard([], LOCALES.slice(3, 5)),
-      4: shard([], LOCALES.slice(5)),
+      2: shard(lifecycle, LOCALES.slice(0, 1)),
+      3: shard([], LOCALES.slice(1, 4)),
+      4: shard([], LOCALES.slice(4)),
     }),
-    // Main runs 41246754892 and 41312266186, from the shard job logs: the job start to the first
-    // signed-in account, then each command; the locale is the matrix remainder per locale.
+    // Main run 41352898854 and dispatch run 41429581850, from the iosFlowDeadline lines of the
+    // shard job logs (each names its flow): the job start to the first signed-in account, then
+    // each command; the locale is the matrix remainder per locale.
     minutes: Object.freeze({
-      shardSetup: 13.0,
-      proof: 5.0,
+      shardSetup: 15.4,
+      proof: 6.0,
       'permission-baseline': 0.3,
-      'rapid-watermark': 2.7,
-      a11y: 9.0,
-      'fallback-focus': 3.0,
-      'share-sheet': 5.5,
-      'pre-locale': 11.5,
-      locale: 2.4,
-      'large-text': 1.0,
-      'precommit-lifecycle': 4.5,
-      'save-lifecycle': 6.0,
+      'rapid-watermark': 3.0,
+      a11y: 8.5,
+      'fallback-focus': 2.0,
+      'share-sheet': 3.0,
+      'pre-locale': 13.0,
+      locale: 2.5,
+      'large-text': 2.7,
+      'precommit-lifecycle': 5.4,
+      'save-lifecycle': 7.0,
       'prefs-failed': 0.5,
     }),
   }),

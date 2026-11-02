@@ -14,7 +14,10 @@ import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
-import { story68FocusObservationHandler } from './lib/story68-ios-focus-observation.mjs'
+import {
+  iosAppContainerReader,
+  story68FocusObservationHandler,
+} from './lib/story68-ios-focus-observation.mjs'
 import { startWeatherProviderDouble } from './weather-provider-double.mjs'
 import {
   closedShareCardAuditReport,
@@ -489,6 +492,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
       directory,
       apiLogFile: path.join(directory, 'api.log'),
       apiLogFromByte,
+      startedAt: started,
       output,
       root,
       device,
@@ -966,11 +970,11 @@ if (command === 'prebuild') {
     '--project',
     generated,
   ])
+  const readContainer = iosAppContainerReader({ device, appId })
   const focusObservation = story68FocusObservationHandler({
     device,
     appId,
-    readContainer: () =>
-      run('xcrun', ['simctl', 'get_app_container', device, appId, 'data']),
+    readContainer,
   })
   const control = createServer((request, response) => {
     if (focusObservation(request, response)) return
@@ -1003,6 +1007,8 @@ if (command === 'prebuild') {
     }
   })
   await new Promise((resolve) => control.listen(63068, '127.0.0.1', resolve))
+  // Resolve the container before the first focus read; a failure is retried by the next request.
+  await readContainer().catch(() => undefined)
   const result = path.join(directory, `accessibility-ios-${Date.now()}.xcresult`)
   const auditLog = path.join(directory, 'accessibility-ios.log')
   const offset = fs.existsSync(auditLog) ? fs.statSync(auditLog).size : 0

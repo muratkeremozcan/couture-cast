@@ -197,15 +197,15 @@ const shareSheetTimeoutMs = Math.ceil(
  * android36-release-font. On main run 41352898854 the emulator boot, install, open and signin
  * before share-sheet took 7 min, leaving 23 min of the lane's 30 min journey_timeout. CI builds
  * the share-receive APKs before the journey starts, outside this budget.
- * On iOS share-sheet runs in shard 4, after permission-baseline and five locales: from the
- * measured parts in native-matrix-shards.mjs that shard takes 25 min 18 s without share-sheet,
- * leaving 44 min 42 s of its 70 min job.
+ * On iOS share-sheet runs in shard 4, after permission-baseline and six locales: from the
+ * measured parts in native-matrix-shards.mjs that shard takes 30 min 42 s without share-sheet,
+ * leaving 39 min 18 s of its 70 min job.
  */
 export const ANDROID_SHARE_LANE_BASE_MS = 7 * 60_000
-export const IOS_SHARE_LANE_BASE_MS = 25 * 60_000 + 18_000
+export const IOS_SHARE_LANE_BASE_MS = 30 * 60_000 + 42_000
 export const SHARE_SHEET_LANE_HEADROOM_MS = Object.freeze({
   android: 23 * 60_000,
-  ios: 44 * 60_000 + 42_000,
+  ios: 39 * 60_000 + 18_000,
 })
 /**
  * Expected cost of one Maestro flow in the share-sheet command, hierarchy reads between flows
