@@ -11,8 +11,10 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# The nightly run has its own group: GitHub starts the 03:17 cron hours late, and a merge to main
+# during it cancelled it (scheduled run 41435261779), which kept the README badge from turning green.
 concurrency:
-  group: share-card-native-${{ github.ref }}
+  group: share-card-native-${{ github.ref }}-${{ github.event_name == 'schedule' && 'nightly' || 'run' }}
   cancel-in-progress: true
 jobs:
   # The API32 journey runs as three shards (scripts/ci/native-matrix-shards.mjs), each on its own
