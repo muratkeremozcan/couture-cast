@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { PlainText } from './moderation-plain-text'
+import { PlainText, revealBidiControls } from './moderation-plain-text'
 
 const RLO = String.fromCodePoint(0x202e)
 const PDF = String.fromCodePoint(0x202c)
@@ -18,12 +18,16 @@ const hostile = [
   '[click](javascript:alert(1))',
   '**bold** _italic_ `code` # heading',
   '&lt;b&gt;entity&lt;/b&gt;',
-  `${RLO}evil${PDF}`,
   `zero${ZWSP}width${ZWJ}joiner`,
   'line one\nline two\n\n\nline five',
   'x'.repeat(500),
   '',
 ]
+
+const BIDI_CONTROLS = [
+  0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069,
+] as const
+const hex = (code: number) => code.toString(16).toUpperCase()
 
 describe('PlainText', () => {
   it.each(hostile)('renders %j as one text node and nothing else', (value) => {
@@ -35,6 +39,37 @@ describe('PlainText', () => {
     expect(bdi.childNodes).toHaveLength(value === '' ? 0 : 1)
     expect(bdi.textContent).toBe(value)
     expect(container.innerHTML).not.toContain('<script')
+  })
+
+  it.each(BIDI_CONTROLS)(
+    'shows U+%s as a visible marker and never renders the character',
+    (code) => {
+      const control = String.fromCodePoint(code)
+      const { container } = render(<PlainText value={`before${control}after`} />)
+      const bdi = container.querySelector('bdi')!
+      expect(bdi.childNodes).toHaveLength(1)
+      expect(bdi.textContent).toBe(`before<U+${hex(code)}>after`)
+      expect(container.textContent).not.toContain(control)
+    }
+  )
+
+  it('marks a spoofing override such as RLO ... PDF so the moderator reads the real order', () => {
+    const { container } = render(<PlainText value={`${RLO}evil.exe${PDF}`} />)
+    expect(container.textContent).toBe('<U+202E>evil.exe<U+202C>')
+  })
+
+  it('leaves ordinary right-to-left text, zero-width characters and emoji unchanged', () => {
+    const plain = `שלום עולם مرحبا zero${ZWSP}width${ZWJ}joiner 👨‍👩‍👧`
+    expect(revealBidiControls(plain)).toBe(plain)
+    const { container } = render(<PlainText value={plain} />)
+    expect(container.textContent).toBe(plain)
+  })
+
+  it('reveals every control in a string that carries several, and is idempotent on its output', () => {
+    const all = BIDI_CONTROLS.map((code) => String.fromCodePoint(code)).join('')
+    const shown = revealBidiControls(all)
+    expect(shown).toBe(BIDI_CONTROLS.map((code) => `<U+${hex(code)}>`).join(''))
+    expect(revealBidiControls(shown)).toBe(shown)
   })
 
   it('wraps, preserves line breaks and isolates bidi', () => {

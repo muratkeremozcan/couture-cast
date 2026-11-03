@@ -174,4 +174,27 @@ describe('C-WEB-Q-A11Y: the case view', () => {
     await userEvent.tab()
     expect(document.activeElement).toHaveAccessibleName('Reload case')
   })
+
+  it('gives the header Reload and the expired-image Reload different names', async () => {
+    mockApi(
+      detailHandler(() =>
+        json({
+          data: detail({
+            media: {
+              state: 'available',
+              url: 'https://storage.test/object/sign/community/p1/a.jpg?token=SIGNED',
+              expiresAt: '2026-11-03T11:59:59.000Z',
+              altText: 'Alt',
+            },
+          }),
+        })
+      )
+    )
+    render(<ModerationCaseDetailView caseId="post.p1" />)
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.getByText('The image link expired.')).toBeInTheDocument()
+    const names = screen.getAllByRole('button').map((button) => button.textContent)
+    expect(names).toEqual(['Reload case', 'Reload image'])
+    expect(new Set(names).size).toBe(names.length)
+  })
 })

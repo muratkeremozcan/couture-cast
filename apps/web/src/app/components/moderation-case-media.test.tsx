@@ -86,7 +86,7 @@ describe('C-WEB-Q-MEDIA: expiry on the server clock', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(screen.getByText('The image link expired.')).toBeInTheDocument()
     vi.useRealTimers()
-    await userEvent.click(screen.getByRole('button', { name: 'Reload case' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Reload image' }))
     expect(onReload).toHaveBeenCalledTimes(1)
   })
 
@@ -157,7 +157,7 @@ describe('C-WEB-Q-MEDIA: failure and unavailable states', () => {
     fireEvent.error(screen.getByRole('img'))
     expect(screen.getByText('The image could not be loaded.')).toBeInTheDocument()
     vi.useRealTimers()
-    await userEvent.click(screen.getByRole('button', { name: 'Reload case' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Reload image' }))
     expect(onReload).toHaveBeenCalledTimes(1)
   })
 
