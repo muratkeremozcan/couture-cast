@@ -122,8 +122,8 @@ export function createHttpOpenApiRegistry() {
   registerPlannerContracts(registry, commonSchemas)
   registerCommunityContracts(registry, commonSchemas)
   registerCommunitySyncContracts(registry, commonSchemas)
-  registerShareCardsContracts(registry)
   registerModerationQueueContracts(registry)
+  registerShareCardsContracts(registry)
 
   return registry
 }
