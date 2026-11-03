@@ -815,5 +815,142 @@
       "warm_dry": "Warm and dry",
       "warm_wet": "Warm and wet"
     }
+  },
+  "moderation": {
+    "title": "Moderation queue",
+    "subtitle": "Reported posts and comments, highest risk and oldest first.",
+    "backToQueue": "Back to queue",
+    "riskLabel": "Risk: {{risk}}",
+    "filters": {
+      "label": "Filter cases",
+      "source": "Source",
+      "locale": "Locale",
+      "risk": "Risk",
+      "status": "Status",
+      "sla": "Time",
+      "any": "Any",
+      "localeUnknown": "No locale"
+    },
+    "source": {
+      "post": "Post",
+      "comment": "Comment"
+    },
+    "risk": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "status": {
+      "open": "Open",
+      "resolved": "Resolved"
+    },
+    "slaState": {
+      "on_track": "On track",
+      "at_risk": "At risk",
+      "breached": "Breached",
+      "resolved": "Resolved"
+    },
+    "sla": {
+      "left": "{{time}} left",
+      "over": "Overdue by {{time}}",
+      "resolved": "Resolved"
+    },
+    "duration": {
+      "dh": "{{days}} d {{hours}} h",
+      "hm": "{{hours}} h {{minutes}} min",
+      "m": "{{minutes}} min"
+    },
+    "reason": {
+      "spam": "Spam",
+      "harassment": "Harassment",
+      "inappropriate_content": "Inappropriate content",
+      "hate_speech": "Hate speech",
+      "violence": "Violence",
+      "other": "Other"
+    },
+    "category": {
+      "language": "Language",
+      "textUnreadable": "Text could not be read",
+      "photo": "Photo",
+      "photoUnconfirmed": "Photo not confirmed",
+      "incomplete": "Screening incomplete",
+      "upload": "Upload problem"
+    },
+    "actor": {
+      "screening": "Screening",
+      "reporter": "Reporter",
+      "operator": "Operator"
+    },
+    "alias": {
+      "erased": "Erased member",
+      "unknown": "Unnamed member"
+    },
+    "mediaReason": {
+      "target_erased": "The post was erased, so its image is gone.",
+      "anonymized": "The post was anonymized, so its image is gone.",
+      "purged": "The image was purged.",
+      "no_image": "This case has no image.",
+      "signing_failed": "The image could not be loaded."
+    },
+    "media": {
+      "expired": "The image link expired.",
+      "failed": "The image could not be loaded.",
+      "reload": "Reload case",
+      "noAlt": "No description provided"
+    },
+    "state": {
+      "loading": "Loading",
+      "retry": "Try again",
+      "stale": "Could not refresh. Showing the last result.",
+      "forbidden": "This account cannot open the moderation console.",
+      "disabled": "The moderation console is turned off.",
+      "not_found": "This case no longer exists. It may have been re-keyed after an erasure.",
+      "signed_out": "Sign in again to continue.",
+      "invalid_cursor": "The page link is no longer valid. Refresh the queue.",
+      "invalid_filter": "That filter is not valid.",
+      "audit_unavailable": "The case view could not be recorded, so it was not opened. Try again.",
+      "unavailable": "The moderation queue is unavailable. Try again."
+    },
+    "queue": {
+      "count": "Cases shown: {{count}}",
+      "empty": "No open cases.",
+      "filteredEmpty": "No cases match these filters.",
+      "listLabel": "Cases",
+      "refresh": "Refresh",
+      "loadMore": "Load more",
+      "loadingMore": "Loading more",
+      "caseTitle": "{{source}} case",
+      "reports": "Reports: {{count}}",
+      "finding": "Screening finding"
+    },
+    "detail": {
+      "title": "{{source}} case",
+      "accepted": "Reported {{when}}",
+      "conflict": "You wrote this content or filed one of its reports. A decision on it needs another moderator.",
+      "reload": "Reload case",
+      "media": "Image",
+      "altText": "Alt text",
+      "content": "Reported content",
+      "subject": "Author",
+      "reportedVersion": "What the reporter saw",
+      "snapshotUnavailable": "The content of this report is not available.",
+      "snapshotEmpty": "The report holds no text.",
+      "capturedAt": "Captured {{when}}",
+      "currentState": "Current state",
+      "targetErased": "The content has been erased.",
+      "targetStatus": "Status",
+      "publishedAt": "Published {{when}}",
+      "parentComment": "Parent comment",
+      "findings": "Machine findings",
+      "noFindings": "No machine findings.",
+      "categories": "Categories",
+      "codes": "Codes",
+      "engine": "Engine version",
+      "operatorNote": "Operator note",
+      "heldNoCodes": "Held for review without a recorded code.",
+      "reporters": "Reporters",
+      "priorActions": "Prior actions",
+      "noPriorActions": "No prior actions."
+    }
   }
 }

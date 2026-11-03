@@ -815,5 +815,142 @@
       "warm_dry": "Warm und trocken",
       "warm_wet": "Warm und feucht"
     }
+  },
+  "moderation": {
+    "title": "Moderationswarteschlange",
+    "subtitle": "Gemeldete Beiträge und Kommentare, höchstes Risiko und älteste zuerst.",
+    "backToQueue": "Zurück zur Warteschlange",
+    "riskLabel": "Risiko: {{risk}}",
+    "filters": {
+      "label": "Fälle filtern",
+      "source": "Quelle",
+      "locale": "Sprache",
+      "risk": "Risiko",
+      "status": "Status",
+      "sla": "Zeit",
+      "any": "Alle",
+      "localeUnknown": "Keine Sprache"
+    },
+    "source": {
+      "post": "Beitrag",
+      "comment": "Kommentar"
+    },
+    "risk": {
+      "low": "Niedrig",
+      "medium": "Mittel",
+      "high": "Hoch"
+    },
+    "status": {
+      "open": "Offen",
+      "resolved": "Erledigt"
+    },
+    "slaState": {
+      "on_track": "Im Plan",
+      "at_risk": "Gefährdet",
+      "breached": "Überschritten",
+      "resolved": "Erledigt"
+    },
+    "sla": {
+      "left": "noch {{time}}",
+      "over": "{{time}} überfällig",
+      "resolved": "Erledigt"
+    },
+    "duration": {
+      "dh": "{{days}} T {{hours}} Std.",
+      "hm": "{{hours}} Std. {{minutes}} Min.",
+      "m": "{{minutes}} Min."
+    },
+    "reason": {
+      "spam": "Spam",
+      "harassment": "Belästigung",
+      "inappropriate_content": "Unangemessener Inhalt",
+      "hate_speech": "Hassrede",
+      "violence": "Gewalt",
+      "other": "Sonstiges"
+    },
+    "category": {
+      "language": "Sprache",
+      "textUnreadable": "Text nicht lesbar",
+      "photo": "Foto",
+      "photoUnconfirmed": "Foto nicht bestätigt",
+      "incomplete": "Prüfung unvollständig",
+      "upload": "Upload-Problem"
+    },
+    "actor": {
+      "screening": "Prüfung",
+      "reporter": "Meldende Person",
+      "operator": "Moderation"
+    },
+    "alias": {
+      "erased": "Gelöschtes Mitglied",
+      "unknown": "Unbenanntes Mitglied"
+    },
+    "mediaReason": {
+      "target_erased": "Der Beitrag wurde gelöscht, das Bild ist nicht mehr vorhanden.",
+      "anonymized": "Der Beitrag wurde anonymisiert, das Bild ist nicht mehr vorhanden.",
+      "purged": "Das Bild wurde entfernt.",
+      "no_image": "Dieser Fall hat kein Bild.",
+      "signing_failed": "Das Bild konnte nicht geladen werden."
+    },
+    "media": {
+      "expired": "Der Bildlink ist abgelaufen.",
+      "failed": "Das Bild konnte nicht geladen werden.",
+      "reload": "Fall neu laden",
+      "noAlt": "Keine Beschreibung angegeben"
+    },
+    "state": {
+      "loading": "Wird geladen",
+      "retry": "Erneut versuchen",
+      "stale": "Aktualisierung fehlgeschlagen. Das letzte Ergebnis wird angezeigt.",
+      "forbidden": "Dieses Konto kann die Moderationskonsole nicht öffnen.",
+      "disabled": "Die Moderationskonsole ist ausgeschaltet.",
+      "not_found": "Dieser Fall existiert nicht mehr. Er wurde möglicherweise nach einer Löschung neu zugeordnet.",
+      "signed_out": "Bitte erneut anmelden.",
+      "invalid_cursor": "Der Seitenlink ist nicht mehr gültig. Aktualisiere die Warteschlange.",
+      "invalid_filter": "Dieser Filter ist ungültig.",
+      "audit_unavailable": "Der Aufruf konnte nicht protokolliert werden und wurde nicht geöffnet. Versuche es erneut.",
+      "unavailable": "Die Moderationswarteschlange ist nicht verfügbar. Versuche es erneut."
+    },
+    "queue": {
+      "count": "Angezeigte Fälle: {{count}}",
+      "empty": "Keine offenen Fälle.",
+      "filteredEmpty": "Keine Fälle entsprechen diesen Filtern.",
+      "listLabel": "Fälle",
+      "refresh": "Aktualisieren",
+      "loadMore": "Mehr laden",
+      "loadingMore": "Weitere werden geladen",
+      "caseTitle": "Fall: {{source}}",
+      "reports": "Meldungen: {{count}}",
+      "finding": "Prüfbefund"
+    },
+    "detail": {
+      "title": "Fall: {{source}}",
+      "accepted": "Gemeldet {{when}}",
+      "conflict": "Du hast diesen Inhalt verfasst oder eine Meldung dazu eingereicht. Die Entscheidung muss eine andere Moderation treffen.",
+      "reload": "Fall neu laden",
+      "media": "Bild",
+      "altText": "Alternativtext",
+      "content": "Gemeldeter Inhalt",
+      "subject": "Autor",
+      "reportedVersion": "Das hat die meldende Person gesehen",
+      "snapshotUnavailable": "Der Inhalt dieser Meldung ist nicht verfügbar.",
+      "snapshotEmpty": "Die Meldung enthält keinen Text.",
+      "capturedAt": "Erfasst {{when}}",
+      "currentState": "Aktuell",
+      "targetErased": "Der Inhalt wurde gelöscht.",
+      "targetStatus": "Status",
+      "publishedAt": "Veröffentlicht {{when}}",
+      "parentComment": "Übergeordneter Kommentar",
+      "findings": "Maschinelle Befunde",
+      "noFindings": "Keine maschinellen Befunde.",
+      "categories": "Kategorien",
+      "codes": "Codes",
+      "engine": "Engine-Version",
+      "operatorNote": "Hinweis der Moderation",
+      "heldNoCodes": "Zur Prüfung zurückgehalten, ohne gespeicherten Code.",
+      "reporters": "Meldende",
+      "priorActions": "Frühere Maßnahmen",
+      "noPriorActions": "Keine früheren Maßnahmen."
+    }
   }
 }

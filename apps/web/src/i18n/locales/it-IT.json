@@ -815,5 +815,142 @@
       "warm_dry": "Caldo e secco",
       "warm_wet": "Caldo e umido"
     }
+  },
+  "moderation": {
+    "title": "Coda di moderazione",
+    "subtitle": "Post e commenti segnalati, prima il rischio più alto e i più vecchi.",
+    "backToQueue": "Torna alla coda",
+    "riskLabel": "Rischio: {{risk}}",
+    "filters": {
+      "label": "Filtra i casi",
+      "source": "Origine",
+      "locale": "Lingua",
+      "risk": "Rischio",
+      "status": "Stato",
+      "sla": "Tempo",
+      "any": "Qualsiasi",
+      "localeUnknown": "Nessuna lingua"
+    },
+    "source": {
+      "post": "Post",
+      "comment": "Commento"
+    },
+    "risk": {
+      "low": "Basso",
+      "medium": "Medio",
+      "high": "Alto"
+    },
+    "status": {
+      "open": "Aperto",
+      "resolved": "Risolto"
+    },
+    "slaState": {
+      "on_track": "Nei tempi",
+      "at_risk": "A rischio",
+      "breached": "Scaduto",
+      "resolved": "Risolto"
+    },
+    "sla": {
+      "left": "Restano {{time}}",
+      "over": "In ritardo di {{time}}",
+      "resolved": "Risolto"
+    },
+    "duration": {
+      "dh": "{{days}} g {{hours}} h",
+      "hm": "{{hours}} h {{minutes}} min",
+      "m": "{{minutes}} min"
+    },
+    "reason": {
+      "spam": "Spam",
+      "harassment": "Molestie",
+      "inappropriate_content": "Contenuto inappropriato",
+      "hate_speech": "Incitamento all’odio",
+      "violence": "Violenza",
+      "other": "Altro"
+    },
+    "category": {
+      "language": "Linguaggio",
+      "textUnreadable": "Testo illeggibile",
+      "photo": "Foto",
+      "photoUnconfirmed": "Foto non confermata",
+      "incomplete": "Controllo incompleto",
+      "upload": "Problema di caricamento"
+    },
+    "actor": {
+      "screening": "Controllo automatico",
+      "reporter": "Chi segnala",
+      "operator": "Operatore"
+    },
+    "alias": {
+      "erased": "Membro eliminato",
+      "unknown": "Membro senza nome"
+    },
+    "mediaReason": {
+      "target_erased": "Il post è stato eliminato, quindi la sua immagine non esiste più.",
+      "anonymized": "Il post è stato anonimizzato, quindi la sua immagine non esiste più.",
+      "purged": "L’immagine è stata eliminata.",
+      "no_image": "Questo caso non ha un’immagine.",
+      "signing_failed": "Impossibile caricare l’immagine."
+    },
+    "media": {
+      "expired": "Il link dell’immagine è scaduto.",
+      "failed": "Impossibile caricare l’immagine.",
+      "reload": "Ricarica il caso",
+      "noAlt": "Nessuna descrizione fornita"
+    },
+    "state": {
+      "loading": "Caricamento",
+      "retry": "Riprova",
+      "stale": "Impossibile aggiornare. Viene mostrato l’ultimo risultato.",
+      "forbidden": "Questo account non può aprire la console di moderazione.",
+      "disabled": "La console di moderazione è disattivata.",
+      "not_found": "Questo caso non esiste più. Il suo identificativo potrebbe essere cambiato dopo una cancellazione.",
+      "signed_out": "Accedi di nuovo per continuare.",
+      "invalid_cursor": "Il link della pagina non è più valido. Aggiorna la coda.",
+      "invalid_filter": "Questo filtro non è valido.",
+      "audit_unavailable": "Non è stato possibile registrare la visualizzazione, quindi il caso non è stato aperto. Riprova.",
+      "unavailable": "La coda di moderazione non è disponibile. Riprova."
+    },
+    "queue": {
+      "count": "Casi mostrati: {{count}}",
+      "empty": "Nessun caso aperto.",
+      "filteredEmpty": "Nessun caso corrisponde a questi filtri.",
+      "listLabel": "Casi",
+      "refresh": "Aggiorna",
+      "loadMore": "Carica altro",
+      "loadingMore": "Caricamento in corso",
+      "caseTitle": "Caso: {{source}}",
+      "reports": "Segnalazioni: {{count}}",
+      "finding": "Rilevamento del controllo"
+    },
+    "detail": {
+      "title": "Caso: {{source}}",
+      "accepted": "Segnalato {{when}}",
+      "conflict": "Hai scritto questo contenuto o presentato una segnalazione su di esso. La decisione spetta a un altro moderatore.",
+      "reload": "Ricarica il caso",
+      "media": "Immagine",
+      "altText": "Testo alternativo",
+      "content": "Contenuto segnalato",
+      "subject": "Autore",
+      "reportedVersion": "Ciò che ha visto chi segnala",
+      "snapshotUnavailable": "Il contenuto di questa segnalazione non è disponibile.",
+      "snapshotEmpty": "La segnalazione non contiene testo.",
+      "capturedAt": "Acquisito {{when}}",
+      "currentState": "Adesso",
+      "targetErased": "Il contenuto è stato eliminato.",
+      "targetStatus": "Stato",
+      "publishedAt": "Pubblicato {{when}}",
+      "parentComment": "Commento principale",
+      "findings": "Rilevamenti automatici",
+      "noFindings": "Nessun rilevamento automatico.",
+      "categories": "Categorie",
+      "codes": "Codici",
+      "engine": "Versione del motore",
+      "operatorNote": "Nota dell’operatore",
+      "heldNoCodes": "Trattenuto per revisione senza codice registrato.",
+      "reporters": "Chi ha segnalato",
+      "priorActions": "Azioni precedenti",
+      "noPriorActions": "Nessuna azione precedente."
+    }
   }
 }

@@ -815,5 +815,142 @@
       "warm_dry": "Sıcak ve kuru",
       "warm_wet": "Sıcak ve nemli"
     }
+  },
+  "moderation": {
+    "title": "Moderasyon kuyruğu",
+    "subtitle": "Bildirilen gönderiler ve yorumlar, önce en yüksek riskli ve en eski olanlar.",
+    "backToQueue": "Kuyruğa dön",
+    "riskLabel": "Risk: {{risk}}",
+    "filters": {
+      "label": "Vakaları filtrele",
+      "source": "Kaynak",
+      "locale": "Dil",
+      "risk": "Risk",
+      "status": "Durum",
+      "sla": "Süre",
+      "any": "Hepsi",
+      "localeUnknown": "Dil yok"
+    },
+    "source": {
+      "post": "Gönderi",
+      "comment": "Yorum"
+    },
+    "risk": {
+      "low": "Düşük",
+      "medium": "Orta",
+      "high": "Yüksek"
+    },
+    "status": {
+      "open": "Açık",
+      "resolved": "Çözüldü"
+    },
+    "slaState": {
+      "on_track": "Zamanında",
+      "at_risk": "Risk altında",
+      "breached": "Aşıldı",
+      "resolved": "Çözüldü"
+    },
+    "sla": {
+      "left": "{{time}} kaldı",
+      "over": "{{time}} gecikti",
+      "resolved": "Çözüldü"
+    },
+    "duration": {
+      "dh": "{{days}} g {{hours}} sa",
+      "hm": "{{hours}} sa {{minutes}} dk",
+      "m": "{{minutes}} dk"
+    },
+    "reason": {
+      "spam": "Spam",
+      "harassment": "Taciz",
+      "inappropriate_content": "Uygunsuz içerik",
+      "hate_speech": "Nefret söylemi",
+      "violence": "Şiddet",
+      "other": "Diğer"
+    },
+    "category": {
+      "language": "Dil",
+      "textUnreadable": "Metin okunamadı",
+      "photo": "Fotoğraf",
+      "photoUnconfirmed": "Fotoğraf doğrulanamadı",
+      "incomplete": "Tarama tamamlanmadı",
+      "upload": "Yükleme sorunu"
+    },
+    "actor": {
+      "screening": "Otomatik tarama",
+      "reporter": "Bildiren",
+      "operator": "Operatör"
+    },
+    "alias": {
+      "erased": "Silinmiş üye",
+      "unknown": "Adsız üye"
+    },
+    "mediaReason": {
+      "target_erased": "Gönderi silindiği için görseli artık yok.",
+      "anonymized": "Gönderi anonimleştirildiği için görseli artık yok.",
+      "purged": "Görsel temizlendi.",
+      "no_image": "Bu vakanın görseli yok.",
+      "signing_failed": "Görsel yüklenemedi."
+    },
+    "media": {
+      "expired": "Görsel bağlantısının süresi doldu.",
+      "failed": "Görsel yüklenemedi.",
+      "reload": "Vakayı yeniden yükle",
+      "noAlt": "Açıklama verilmedi"
+    },
+    "state": {
+      "loading": "Yükleniyor",
+      "retry": "Tekrar dene",
+      "stale": "Yenilenemedi. Son sonuç gösteriliyor.",
+      "forbidden": "Bu hesap moderasyon konsolunu açamaz.",
+      "disabled": "Moderasyon konsolu kapalı.",
+      "not_found": "Bu vaka artık yok. Bir silme işleminden sonra kimliği değişmiş olabilir.",
+      "signed_out": "Devam etmek için tekrar giriş yap.",
+      "invalid_cursor": "Sayfa bağlantısı artık geçerli değil. Kuyruğu yenile.",
+      "invalid_filter": "Bu filtre geçerli değil.",
+      "audit_unavailable": "Görüntüleme kaydedilemedi, bu yüzden vaka açılmadı. Tekrar dene.",
+      "unavailable": "Moderasyon kuyruğu kullanılamıyor. Tekrar dene."
+    },
+    "queue": {
+      "count": "Gösterilen vaka: {{count}}",
+      "empty": "Açık vaka yok.",
+      "filteredEmpty": "Bu filtrelerle eşleşen vaka yok.",
+      "listLabel": "Vakalar",
+      "refresh": "Yenile",
+      "loadMore": "Daha fazla yükle",
+      "loadingMore": "Daha fazlası yükleniyor",
+      "caseTitle": "{{source}} vakası",
+      "reports": "Bildirim: {{count}}",
+      "finding": "Tarama bulgusu"
+    },
+    "detail": {
+      "title": "{{source}} vakası",
+      "accepted": "Bildirilme: {{when}}",
+      "conflict": "Bu içeriği sen yazdın ya da bununla ilgili bir bildirim yaptın. Karara başka bir moderatör varmalı.",
+      "reload": "Vakayı yeniden yükle",
+      "media": "Görsel",
+      "altText": "Alternatif metin",
+      "content": "Bildirilen içerik",
+      "subject": "Yazar",
+      "reportedVersion": "Bildirenin gördüğü",
+      "snapshotUnavailable": "Bu bildirimin içeriği kullanılamıyor.",
+      "snapshotEmpty": "Bildirimde metin yok.",
+      "capturedAt": "Yakalanma: {{when}}",
+      "currentState": "Şimdi",
+      "targetErased": "İçerik silindi.",
+      "targetStatus": "Durum",
+      "publishedAt": "Yayınlanma: {{when}}",
+      "parentComment": "Üst yorum",
+      "findings": "Otomatik bulgular",
+      "noFindings": "Otomatik bulgu yok.",
+      "categories": "Kategoriler",
+      "codes": "Kodlar",
+      "engine": "Motor sürümü",
+      "operatorNote": "Operatör notu",
+      "heldNoCodes": "Kayıtlı kod olmadan incelemeye alındı.",
+      "reporters": "Bildirenler",
+      "priorActions": "Önceki işlemler",
+      "noPriorActions": "Önceki işlem yok."
+    }
   }
 }
