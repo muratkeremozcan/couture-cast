@@ -110,7 +110,6 @@ export function createHttpOpenApiRegistry() {
   registerGuardianContracts(registry, commonSchemas)
   registerLocationsContracts(registry, commonSchemas)
   registerModerationContracts(registry, commonSchemas)
-  registerModerationQueueContracts(registry)
   registerUserContracts(registry, commonSchemas)
   registerWeatherContracts(registry, commonSchemas)
   registerRitualContracts(registry, commonSchemas)
@@ -124,6 +123,7 @@ export function createHttpOpenApiRegistry() {
   registerCommunityContracts(registry, commonSchemas)
   registerCommunitySyncContracts(registry, commonSchemas)
   registerShareCardsContracts(registry)
+  registerModerationQueueContracts(registry)
 
   return registry
 }
