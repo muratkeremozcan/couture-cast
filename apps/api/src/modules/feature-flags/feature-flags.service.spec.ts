@@ -142,6 +142,7 @@ describe('FeatureFlagsService', () => {
       ['commerce_subscription_enabled', true],
       ['premium_planner_enabled', true],
       ['share_card_native_share_enabled', false],
+      ['moderation_console_enabled', false],
     ])
 
     const cachedValues = new Map<string, boolean | null>([
@@ -154,6 +155,7 @@ describe('FeatureFlagsService', () => {
       ['commerce_subscription_enabled', null],
       ['premium_planner_enabled', null],
       ['share_card_native_share_enabled', null],
+      ['moderation_console_enabled', null],
     ])
 
     const findValue = vi
@@ -175,7 +177,7 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 9, fallbackCount: 0 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 10, fallbackCount: 0 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: true },
       { key: 'community_read_enabled', value: false },
@@ -186,6 +188,7 @@ describe('FeatureFlagsService', () => {
       { key: 'commerce_subscription_enabled', value: true },
       { key: 'premium_planner_enabled', value: true },
       { key: 'share_card_native_share_enabled', value: false },
+      { key: 'moderation_console_enabled', value: false },
     ])
   })
 
@@ -211,7 +214,7 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 9, fallbackCount: 9 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 10, fallbackCount: 10 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: false },
       { key: 'community_read_enabled', value: false },
@@ -230,6 +233,7 @@ describe('FeatureFlagsService', () => {
       { key: 'premium_planner_enabled', value: false },
       // Story 6.9: identical fail-closed reasoning for native share-card sharing.
       { key: 'share_card_native_share_enabled', value: false },
+      { key: 'moderation_console_enabled', value: false },
     ])
   })
 })

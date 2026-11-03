@@ -32,16 +32,16 @@ import { interactiveTransaction } from '../../prisma/prisma-client.js'
  * action against a safety verdict that cannot be attributed is worth less than
  * one that can.
  *
- * NOTHING ROUTES TO ANY OF THIS YET, AND THAT IS A REAL LIMITATION. There is no
- * HTTP path, no contract entry and no operator surface: until Story 6.5 lands
- * the moderation queue and SLA tracking, a flagged post can only be released,
- * and a published one only taken down, by calling these methods directly from a
- * script or a REPL against the production database. Anyone operating this
- * feature before 6.5 should know that up front.
+ * ONLY THE READ HALF ROUTES TODAY. Story 6.10 added the moderator queue and case detail
+ * (`GET /api/v1/moderation/cases` and `.../cases/:caseId`, `moderation-queue.controller.ts`),
+ * which read the report tables and change nothing. The methods below still have no HTTP path:
+ * a flagged post can only be released, and a published one only taken down, by calling them from
+ * a script against the production database, until Story 6.11 routes the decision actions through
+ * canonical contracts. Anyone operating this feature before 6.11 should know that up front.
  *
- * The endpoint was left out deliberately rather than forgotten. Story 6.5 owns
- * the operator contract, and inventing an admin API here would be committing 6.5
- * to a shape drawn without its requirements.
+ * The write endpoint was left out deliberately rather than forgotten. Story 6.11 owns the
+ * decision contract, and inventing it before the queue existed would have committed 6.11 to a
+ * shape drawn without its requirements.
  */
 @Injectable()
 export class CommunityModerationActionsService {

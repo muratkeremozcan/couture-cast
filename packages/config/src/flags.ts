@@ -138,6 +138,17 @@ const FEATURE_FLAG_DEFINITIONS = {
     kind: 'boolean',
     defaultValue: false,
   },
+  // Story 6.10: the kill switch for the moderator queue and case detail reads
+  // (`GET /api/v1/moderation/cases`, `.../cases/:caseId`). It is separate from
+  // `community_read_enabled` on purpose: an incident can close the feed while
+  // reports still need review. Same defaults-false reasoning as every flag
+  // above, and the `true` lives only in packages/db/prisma/seeds/feature-flags.ts.
+  // It is evaluated after the role check, so a non-moderator never learns its
+  // state. Off answers 503 `moderation_console_disabled`.
+  moderation_console_enabled: {
+    kind: 'boolean',
+    defaultValue: false,
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<FeatureFlagStoredValue>>
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAG_DEFINITIONS

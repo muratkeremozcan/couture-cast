@@ -60,6 +60,9 @@ const canonicalFlagOverrides: Record<FeatureFlagKey, FeatureFlagStoredValue> = {
   // override is what turns native share-card sharing on in seeded test and
   // local environments; production never runs this seed.
   share_card_native_share_enabled: true,
+  // Story 6.10: the registry default is false; this seed turns the moderator
+  // console reads on in seeded and local environments. Production never runs it.
+  moderation_console_enabled: true,
 }
 
 const supplementalFeatureFlags: SeededFeatureFlag[] = [

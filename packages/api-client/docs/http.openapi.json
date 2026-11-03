@@ -2327,6 +2327,600 @@
           "reason"
         ]
       },
+      "ModerationCasesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "caseId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "post",
+                        "comment"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "open",
+                        "resolved"
+                      ]
+                    },
+                    "risk": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    },
+                    "slaState": {
+                      "type": "string",
+                      "enum": [
+                        "on_track",
+                        "at_risk",
+                        "breached",
+                        "resolved"
+                      ]
+                    },
+                    "slaDueAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "acceptedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "reportCount": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "spam",
+                          "harassment",
+                          "inappropriate_content",
+                          "hate_speech",
+                          "violence",
+                          "other"
+                        ]
+                      },
+                      "minItems": 1
+                    },
+                    "locale": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1,
+                      "maxLength": 35
+                    },
+                    "hasFinding": {
+                      "type": "boolean"
+                    },
+                    "excerpt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 280
+                    }
+                  },
+                  "required": [
+                    "caseId",
+                    "source",
+                    "status",
+                    "risk",
+                    "slaState",
+                    "slaDueAt",
+                    "acceptedAt",
+                    "reportCount",
+                    "reasons",
+                    "locale",
+                    "hasFinding",
+                    "excerpt"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 50
+              },
+              "nextCursor": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "serverNow": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "items",
+              "nextCursor",
+              "serverNow"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationCaseDetailResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "caseId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "post",
+                  "comment"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "resolved"
+                ]
+              },
+              "risk": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              },
+              "slaState": {
+                "type": "string",
+                "enum": [
+                  "on_track",
+                  "at_risk",
+                  "breached",
+                  "resolved"
+                ]
+              },
+              "slaDueAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "acceptedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "serverNow": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "reportCount": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "locale": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 35
+              },
+              "subject": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "alias",
+                      "erased",
+                      "unknown"
+                    ]
+                  },
+                  "alias": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "state",
+                  "alias"
+                ],
+                "additionalProperties": false
+              },
+              "snapshot": {
+                "type": "object",
+                "properties": {
+                  "available": {
+                    "type": "boolean"
+                  },
+                  "caption": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "altText": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "body": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "climateBand": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "capturedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "available",
+                  "caption",
+                  "altText",
+                  "body",
+                  "climateBand",
+                  "capturedAt"
+                ],
+                "additionalProperties": false
+              },
+              "target": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "live",
+                      "erased"
+                    ]
+                  },
+                  "status": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "publishedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "parentBody": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "state",
+                  "status",
+                  "publishedAt",
+                  "parentBody"
+                ],
+                "additionalProperties": false
+              },
+              "findings": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "codes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
+                  },
+                  "categories": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32
+                    }
+                  },
+                  "engineVersion": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "operatorNote": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "codes",
+                  "categories",
+                  "engineVersion",
+                  "operatorNote"
+                ],
+                "additionalProperties": false
+              },
+              "reporters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "identity": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "alias",
+                            "erased",
+                            "unknown"
+                          ]
+                        },
+                        "alias": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "alias"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "spam",
+                        "harassment",
+                        "inappropriate_content",
+                        "hate_speech",
+                        "violence",
+                        "other"
+                      ]
+                    },
+                    "details": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 500
+                    },
+                    "reportedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "resolved": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "identity",
+                    "reason",
+                    "details",
+                    "reportedAt",
+                    "resolved"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1
+              },
+              "priorActions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "actorKind": {
+                      "type": "string",
+                      "enum": [
+                        "screening",
+                        "reporter",
+                        "operator"
+                      ]
+                    },
+                    "action": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "reason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 2000
+                    },
+                    "occurredAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "actorKind",
+                    "action",
+                    "reason",
+                    "occurredAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "media": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "available"
+                        ]
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "expiresAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "altText": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "url",
+                      "expiresAt",
+                      "altText"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "unavailable"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "target_erased",
+                          "anonymized",
+                          "purged",
+                          "no_image",
+                          "signing_failed"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "viewerConflict": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "caseId",
+              "source",
+              "status",
+              "risk",
+              "slaState",
+              "slaDueAt",
+              "acceptedAt",
+              "serverNow",
+              "reportCount",
+              "locale",
+              "subject",
+              "snapshot",
+              "target",
+              "findings",
+              "reporters",
+              "priorActions",
+              "media",
+              "viewerConflict"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationQueueError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "invalid_filter",
+              "invalid_cursor",
+              "case_not_found",
+              "moderation_console_disabled",
+              "audit_unavailable"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      },
       "LinkedGuardian": {
         "type": "object",
         "properties": {
@@ -19306,6 +19900,871 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/moderation/cases": {
+      "get": {
+        "operationId": "listModerationCases",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The moderator case queue (private, no-store)",
+        "description": "Moderator and admin only. Read-only. Ordered by risk, earliest open due time and case key, with a signed keyset cursor bound to the filters.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "post",
+                "comment"
+              ]
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 35,
+              "pattern": "^[A-Za-z0-9-]+$"
+            },
+            "required": false,
+            "name": "locale",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "required": false,
+            "name": "risk",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "resolved"
+              ],
+              "default": "open"
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "on_track",
+                "at_risk",
+                "breached",
+                "resolved"
+              ]
+            },
+            "required": false,
+            "name": "sla",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of cases",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "caseId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+                              },
+                              "source": {
+                                "type": "string",
+                                "enum": [
+                                  "post",
+                                  "comment"
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "open",
+                                  "resolved"
+                                ]
+                              },
+                              "risk": {
+                                "type": "string",
+                                "enum": [
+                                  "low",
+                                  "medium",
+                                  "high"
+                                ]
+                              },
+                              "slaState": {
+                                "type": "string",
+                                "enum": [
+                                  "on_track",
+                                  "at_risk",
+                                  "breached",
+                                  "resolved"
+                                ]
+                              },
+                              "slaDueAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "acceptedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "reportCount": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "reasons": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "spam",
+                                    "harassment",
+                                    "inappropriate_content",
+                                    "hate_speech",
+                                    "violence",
+                                    "other"
+                                  ]
+                                },
+                                "minItems": 1
+                              },
+                              "locale": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "minLength": 1,
+                                "maxLength": 35
+                              },
+                              "hasFinding": {
+                                "type": "boolean"
+                              },
+                              "excerpt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "maxLength": 280
+                              }
+                            },
+                            "required": [
+                              "caseId",
+                              "source",
+                              "status",
+                              "risk",
+                              "slaState",
+                              "slaDueAt",
+                              "acceptedAt",
+                              "reportCount",
+                              "reasons",
+                              "locale",
+                              "hasFinding",
+                              "excerpt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "maxItems": 50
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "minLength": 1,
+                          "maxLength": 1024
+                        },
+                        "serverNow": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "nextCursor",
+                        "serverNow"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_filter or invalid_cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_filter",
+                        "invalid_cursor",
+                        "case_not_found",
+                        "moderation_console_disabled",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient role"
+          },
+          "503": {
+            "description": "moderation_console_disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_filter",
+                        "invalid_cursor",
+                        "case_not_found",
+                        "moderation_console_disabled",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/moderation/cases/{caseId}": {
+      "get": {
+        "operationId": "getModerationCase",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "One moderation case with its full context (private, no-store)",
+        "description": "Moderator and admin only. Read-only except for one audit row per successful read.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+            },
+            "required": true,
+            "name": "caseId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The case detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "caseId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "post",
+                            "comment"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "open",
+                            "resolved"
+                          ]
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "slaState": {
+                          "type": "string",
+                          "enum": [
+                            "on_track",
+                            "at_risk",
+                            "breached",
+                            "resolved"
+                          ]
+                        },
+                        "slaDueAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "acceptedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "serverNow": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "reportCount": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "locale": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "minLength": 1,
+                          "maxLength": 35
+                        },
+                        "subject": {
+                          "type": "object",
+                          "properties": {
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "alias",
+                                "erased",
+                                "unknown"
+                              ]
+                            },
+                            "alias": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "minLength": 1,
+                              "maxLength": 64
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "alias"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "snapshot": {
+                          "type": "object",
+                          "properties": {
+                            "available": {
+                              "type": "boolean"
+                            },
+                            "caption": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "altText": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "body": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "climateBand": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "capturedAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "available",
+                            "caption",
+                            "altText",
+                            "body",
+                            "climateBand",
+                            "capturedAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "target": {
+                          "type": "object",
+                          "properties": {
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "live",
+                                "erased"
+                              ]
+                            },
+                            "status": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "publishedAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            },
+                            "parentBody": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "status",
+                            "publishedAt",
+                            "parentBody"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "findings": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "codes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              }
+                            },
+                            "categories": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 32
+                              }
+                            },
+                            "engineVersion": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "operatorNote": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "maxLength": 2000
+                            }
+                          },
+                          "required": [
+                            "codes",
+                            "categories",
+                            "engineVersion",
+                            "operatorNote"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "reporters": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "identity": {
+                                "type": "object",
+                                "properties": {
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "alias",
+                                      "erased",
+                                      "unknown"
+                                    ]
+                                  },
+                                  "alias": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  }
+                                },
+                                "required": [
+                                  "state",
+                                  "alias"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "reason": {
+                                "type": "string",
+                                "enum": [
+                                  "spam",
+                                  "harassment",
+                                  "inappropriate_content",
+                                  "hate_speech",
+                                  "violence",
+                                  "other"
+                                ]
+                              },
+                              "details": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "maxLength": 500
+                              },
+                              "reportedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "resolved": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "identity",
+                              "reason",
+                              "details",
+                              "reportedAt",
+                              "resolved"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "minItems": 1
+                        },
+                        "priorActions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "actorKind": {
+                                "type": "string",
+                                "enum": [
+                                  "screening",
+                                  "reporter",
+                                  "operator"
+                                ]
+                              },
+                              "action": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "reason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "maxLength": 2000
+                              },
+                              "occurredAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "actorKind",
+                              "action",
+                              "reason",
+                              "occurredAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "media": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "available"
+                                  ]
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "format": "uri"
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "altText": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "state",
+                                "url",
+                                "expiresAt",
+                                "altText"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "unavailable"
+                                  ]
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "target_erased",
+                                    "anonymized",
+                                    "purged",
+                                    "no_image",
+                                    "signing_failed"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "state",
+                                "reason"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "viewerConflict": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "caseId",
+                        "source",
+                        "status",
+                        "risk",
+                        "slaState",
+                        "slaDueAt",
+                        "acceptedAt",
+                        "serverNow",
+                        "reportCount",
+                        "locale",
+                        "subject",
+                        "snapshot",
+                        "target",
+                        "findings",
+                        "reporters",
+                        "priorActions",
+                        "media",
+                        "viewerConflict"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient role"
+          },
+          "404": {
+            "description": "case_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_filter",
+                        "invalid_cursor",
+                        "case_not_found",
+                        "moderation_console_disabled",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "moderation_console_disabled or audit_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_filter",
+                        "invalid_cursor",
+                        "case_not_found",
+                        "moderation_console_disabled",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
                 }
               }
             }

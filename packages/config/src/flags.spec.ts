@@ -25,6 +25,7 @@ describe('feature flag registry', () => {
       'commerce_subscription_enabled',
       'premium_planner_enabled',
       'share_card_native_share_enabled',
+      'moderation_console_enabled',
     ])
   })
 
@@ -47,6 +48,27 @@ describe('feature flag registry', () => {
     // Only the dev seed turns it on, so a degraded PostHog with no cache row can
     // never expose the OS share sheet.
     expect(getDefaultFeatureFlagValue('share_card_native_share_enabled')).toBe(false)
+  })
+
+  it('6.10-CFG-001: defaults the moderator console kill switch to off and keeps it apart from community_read_enabled', () => {
+    // Story 6.10 D4: an incident can close the feed while reports still need review, so the
+    // console flag is its own control. A degraded PostHog with no cache row must never open it.
+    expect(getDefaultFeatureFlagValue('moderation_console_enabled')).toBe(false)
+    expect(FEATURE_FLAG_KEYS).toContain('moderation_console_enabled')
+    expect(FEATURE_FLAG_KEYS.filter((key) => key.startsWith('moderation_'))).toEqual([
+      'moderation_console_enabled',
+    ])
+  })
+
+  it('6.10-CFG-002: resolves the console flag to false when PostHog and the cache both fail', async () => {
+    const readRemoteFlag = vi.fn().mockRejectedValue(new Error('posthog down'))
+    const readFallbackFlag = vi.fn().mockResolvedValue(null)
+    await expect(
+      getFeatureFlag('moderation_console_enabled', 'moderator-1', {
+        readRemoteFlag,
+        readFallbackFlag,
+      })
+    ).resolves.toBe(false)
   })
 
   it('defaults the commerce kill switch to off', () => {
