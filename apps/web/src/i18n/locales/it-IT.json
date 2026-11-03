@@ -895,7 +895,7 @@
     "media": {
       "expired": "Il link dell’immagine è scaduto.",
       "failed": "Impossibile caricare l’immagine.",
-      "reload": "Ricarica il caso",
+      "reload": "Ricarica l’immagine",
       "noAlt": "Nessuna descrizione fornita"
     },
     "state": {

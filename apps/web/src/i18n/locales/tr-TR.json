@@ -895,7 +895,7 @@
     "media": {
       "expired": "Görsel bağlantısının süresi doldu.",
       "failed": "Görsel yüklenemedi.",
-      "reload": "Vakayı yeniden yükle",
+      "reload": "Görseli yeniden yükle",
       "noAlt": "Açıklama verilmedi"
     },
     "state": {

@@ -895,7 +895,7 @@
     "media": {
       "expired": "Der Bildlink ist abgelaufen.",
       "failed": "Das Bild konnte nicht geladen werden.",
-      "reload": "Fall neu laden",
+      "reload": "Bild neu laden",
       "noAlt": "Keine Beschreibung angegeben"
     },
     "state": {

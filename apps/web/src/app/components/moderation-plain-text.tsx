@@ -3,6 +3,20 @@
 // They render as a single React text node: never markdown, never HTML, never a link.
 import type { ElementType } from 'react'
 
+const BIDI_CONTROLS = /[\u202A-\u202E\u2066-\u2069]/g
+
+/**
+ * Bidirectional controls would let the author reorder what the moderator reads, so each one shows
+ * as a visible marker such as `<U+202E>` inside the same text node. The characters themselves are
+ * never rendered.
+ */
+export function revealBidiControls(value: string): string {
+  return value.replace(
+    BIDI_CONTROLS,
+    (control) => `<U+${control.codePointAt(0)?.toString(16).toUpperCase()}>`
+  )
+}
+
 export function PlainText({
   value,
   as: Tag = 'span',
@@ -19,7 +33,7 @@ export function PlainText({
       style={{ unicodeBidi: 'isolate' }}
       dir="auto"
     >
-      <bdi>{value}</bdi>
+      <bdi>{revealBidiControls(value)}</bdi>
     </Tag>
   )
 }
