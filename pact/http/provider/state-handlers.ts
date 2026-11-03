@@ -11,6 +11,11 @@ import {
   type ShareCardNativeShare,
   type ShareCardOutcome,
 } from './doubles/share-cards'
+import {
+  configureModerationConsole,
+  configureModerationScenario,
+  type ModerationScenario,
+} from './doubles/moderation'
 import type {
   EntitlementStore,
   PremiumThemeKey,
@@ -120,7 +125,53 @@ const nativeShareState = (value: ShareCardNativeShare, description: string) => (
   return Promise.resolve({ description })
 }
 
+/** Story 6.10: the moderator console world a state names. */
+const moderationState =
+  (scenario: ModerationScenario, description: string, enabled = true) =>
+  () => {
+    configureModerationScenario(scenario)
+    configureModerationConsole(enabled)
+    return Promise.resolve({ description })
+  }
+
 export const stateHandlers: StateHandlers = {
+  'A moderator reads a queue with open cases': moderationState(
+    'queue',
+    'Configured a queue with two open cases and a next page'
+  ),
+  'A moderator reads a queue with an erased comment': moderationState(
+    'orphan_queue',
+    'Configured a queue holding one orphan comment case'
+  ),
+  'A moderator reads an empty queue': moderationState(
+    'empty',
+    'Configured an empty queue'
+  ),
+  'A moderator holds a cursor that no longer matches': moderationState(
+    'stale_cursor',
+    'Configured a queue that refuses the presented cursor'
+  ),
+  'A moderator opens a case with an image': moderationState(
+    'detail_with_image',
+    'Configured a case whose image can be signed'
+  ),
+  'A moderator opens a case whose target was erased': moderationState(
+    'detail_without_image',
+    'Configured a case whose target and image are gone'
+  ),
+  'A moderator opens a case that does not exist': moderationState(
+    'unknown_case',
+    'Configured an unknown case id'
+  ),
+  'A moderator opens a case that cannot be audited': moderationState(
+    'audit_unavailable',
+    'Configured an audit write failure'
+  ),
+  'The moderation console is turned off': moderationState(
+    'queue',
+    'Configured moderation_console_enabled off',
+    false
+  ),
   'An eligible member prepares a share card': shareCardState(
     'prepared',
     'An eligible member prepares a share card'

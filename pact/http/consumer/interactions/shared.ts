@@ -73,6 +73,17 @@ export const pactAdminHeaders = {
   Authorization: `Bearer ${pactAdminAuth.accessToken}`,
 }
 
+/** Story 6.10: the moderator the queue interactions authenticate as. */
+export const pactModeratorAuth = {
+  accessToken: 'pact-moderator-token',
+  userId: 'moderator-1',
+  role: 'moderator',
+} as const
+
+export const pactModeratorHeaders = {
+  Authorization: `Bearer ${pactModeratorAuth.accessToken}`,
+}
+
 export type ContractApiClient = Pick<
   DefaultApi,
   | 'prepareShareCard'
