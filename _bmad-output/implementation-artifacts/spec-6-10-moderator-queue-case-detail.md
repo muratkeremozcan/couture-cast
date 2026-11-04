@@ -312,6 +312,17 @@ Full reasoning and guards sit in `_bmad-output/test-artifacts/test-design/cc610-
   - N2: the Try again of a failed first load shows `Trying again`, sets `aria-busy` and ignores a second click.
   - N3 and N4 (TEA): the flag independence check and the disabled-body stub can now fail.
   - Design notes: when Load more returns only known cases and the list ends, focus moves to Refresh. `operatorNote` and finding codes are cut without splitting a surrogate pair.
+- 2026-11-03, CodeRabbit review of `b3846908` (8 threads, 2 nitpicks). Fixed, each with a test:
+  - The detail takes the earliest due and accepted time with a reduce, so a target with over 100,000 reports no longer throws a `RangeError` before the audit row.
+  - A whitespace-only alt text reads "No description provided".
+  - A non-default status counts as an active filter, so an empty Resolved page says no cases match.
+  - A failed Load more retries its own cursor; only an invalid cursor restarts from the first page.
+  - Refresh stays on an empty ready queue.
+  - A case link names itself from its source label plus the excerpt, or the case id when there is no excerpt.
+  - The countdown tick on an exact minute is immediate, because the shown minute is stale a millisecond later.
+  - The filtered pact queue returns only the requested source and risk, and every console source is checked for a direct `fetch(`.
+  - Declined: the server clock offset keeps the arrival time. The error equals the response latency and the display resolves whole minutes. The thread carries the reasoning.
+  - Declined: the English-only page title matches the root layout, which is also static. The server cannot know the browser-resolved locale.
 - Decision: finding 8's version-skew item overrides TEA's earlier rule that an extra key makes the console unavailable. The console renders only declared fields, so a dropped key leaks nothing.
 
 ## Test Design (TEA)

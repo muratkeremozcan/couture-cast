@@ -97,15 +97,18 @@ describe('C-WEB-Q-COUNTDOWN: ticking and announcing', () => {
     const mutations: string[] = []
     const observer = new MutationObserver(() => mutations.push(readout.textContent ?? ''))
     observer.observe(readout, { childList: true, characterData: true, subtree: true })
+    // The shown minute is a floor, so an exact minute is stale a millisecond later and the first tick is immediate.
+    await advance(BOUNDARY_SLACK_MS)
+    expect(readout.textContent).toBe('1 h 29 min left')
     await advance(59_000)
-    expect(readout.textContent).toBe('1 h 30 min left')
-    // The shown minute is a floor, so it changes on the minute boundary of the remaining time.
-    await advance(1_000 + BOUNDARY_SLACK_MS)
+    expect(readout.textContent).toBe('1 h 29 min left')
+    await advance(1_000)
     expect(readout.textContent).toBe('1 h 28 min left')
     await advance(3 * MINUTE)
     expect(readout.textContent).toBe('1 h 25 min left')
     await Promise.resolve()
-    expect(mutations.length).toBeLessThanOrEqual(4)
+    // One change per minute at most: 29, 28, 27, 26, 25.
+    expect(mutations.length).toBeLessThanOrEqual(5)
     observer.disconnect()
   })
 

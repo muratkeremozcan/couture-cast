@@ -72,6 +72,7 @@ const queueItems = [
     risk: 'low',
     slaState: 'on_track',
   },
+  { ...fullItem, caseId: 'post.pactpost2' },
 ]
 /** An erased comment: no locale and no excerpt survive, and both fields are null on the wire. */
 const orphanItem = {
@@ -143,7 +144,10 @@ const baseDetail = {
 }
 
 export const moderationQueueServiceDouble = {
-  listCases: (_auth: unknown, query: { cursor?: string }) => {
+  listCases: (
+    _auth: unknown,
+    query: { cursor?: string; source?: string; risk?: string }
+  ) => {
     if (scenario === 'stale_cursor' && query.cursor)
       throw new BadRequestException({
         statusCode: 400,
@@ -158,7 +162,11 @@ export const moderationQueueServiceDouble = {
               ? []
               : scenario === 'orphan_queue'
                 ? [orphanItem]
-                : queueItems,
+                : queueItems.filter(
+                    (item) =>
+                      (!query.source || item.source === query.source) &&
+                      (!query.risk || item.risk === query.risk)
+                  ),
           nextCursor: scenario === 'queue' ? PACT_QUEUE_CURSOR : null,
           serverNow: PACT_SERVER_NOW,
         },

@@ -198,7 +198,7 @@ export async function verifyModerationQueueInteraction(pact: PactV4) {
         headers: { 'Cache-Control': 'private, no-store' },
         body: {
           data: {
-            items: eachLike(summary, 2),
+            items: eachLike({ ...summary, source: 'post', risk: 'high' }, 2),
             nextCursor: regex('[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+', CURSOR),
             serverNow: iso(SERVER_NOW),
           },

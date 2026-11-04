@@ -75,7 +75,7 @@ describe('C-WEB-Q-QUEUE', () => {
 
   it('links each case to its detail with an encoded id and gives the link an accessible name', async () => {
     await openQueue()
-    const links = screen.getAllByRole('link', { name: /case$/ })
+    const links = screen.getAllByRole('link', { name: /^(Post|Comment) case/ })
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
       '/moderation/cases/orphan-post.r9',
       '/moderation/cases/comment.c1',
@@ -136,7 +136,7 @@ describe('C-WEB-Q-DEDUPE', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
     await screen.findByText('Fresh')
     const hrefs = screen
-      .getAllByRole('link', { name: /case$/ })
+      .getAllByRole('link', { name: /^(Post|Comment) case/ })
       .map((a) => a.getAttribute('href'))
     expect(hrefs.filter((href) => href === '/moderation/cases/post.p3')).toHaveLength(1)
     expect(screen.getAllByRole('listitem')).toHaveLength(4)
@@ -327,7 +327,10 @@ describe('C-WEB-Q-HOSTILE-TEXT: the excerpt', () => {
     await openQueue([summary({ excerpt: hostile })])
     expect(document.querySelector('script')).toBeNull()
     expect(document.querySelector('img')).toBeNull()
-    expect(screen.queryByRole('link', { name: /x/ })).toBeNull()
+    // The only link is the case link; the excerpt's markdown link is text.
+    expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      '/moderation/cases/post.p1',
+    ])
     expect(screen.getByText(/alert\(1\)/)).toBeInTheDocument()
     const holder = screen.getByText(/alert\(1\)/).closest('[dir]')
     expect(holder).toHaveAttribute('dir', 'auto')
@@ -547,5 +550,65 @@ describe('round 2: retry feedback and focus at the end of the list', () => {
     await userEvent.click(more)
     await waitFor(() => expect(more).toHaveAttribute('aria-disabled', 'false'))
     expect(document.activeElement).toBe(more)
+  })
+})
+
+describe('CodeRabbit review: empty state, retry and link names', () => {
+  it('says no cases match when the Resolved status is chosen and nothing is resolved', async () => {
+    mockApi(queueHandler((query) => json(page(query.status === 'resolved' ? [] : three))))
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    await userEvent.selectOptions(screen.getByLabelText('Status'), 'resolved')
+    expect(await screen.findByText('No cases match these filters.')).toBeInTheDocument()
+    expect(screen.queryByText('No open cases.')).not.toBeInTheDocument()
+  })
+
+  it('keeps Refresh on an empty queue so a new report can be picked up', async () => {
+    let calls = 0
+    mockApi(queueHandler(() => json(page(++calls === 1 ? [] : three))))
+    render(<ModerationQueueView />)
+    expect(await screen.findByText('No open cases.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await screen.findByRole('list', { name: 'Cases' })
+    expect(screen.queryByText('No open cases.')).not.toBeInTheDocument()
+  })
+
+  it('retries a failed Load more with the same cursor and keeps the loaded cases', async () => {
+    const more = [summary({ caseId: 'post.p4' })]
+    const seen: RecordedQuery[] = []
+    let failedOnce = false
+    mockApi(
+      queueHandler((query) => {
+        if (!query.cursor) return json(page(three, 'c1'))
+        if (!failedOnce) {
+          failedOnce = true
+          return json({ statusCode: 500 }, 500)
+        }
+        return json(page(more))
+      }, seen)
+    )
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    const alert = await screen.findByRole('alert')
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(4))
+    expect(seen.map((query) => query.cursor)).toEqual([undefined, 'c1', 'c1'])
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('gives two cases from one source different link names', async () => {
+    await openQueue([
+      summary({ caseId: 'post.a', excerpt: 'First caption' }),
+      summary({ caseId: 'post.b', excerpt: 'Second caption' }),
+      summary({ caseId: 'post.c', excerpt: null }),
+    ])
+    expect(screen.getByRole('link', { name: 'Post case First caption' })).toHaveAttribute(
+      'href',
+      '/moderation/cases/post.a'
+    )
+    expect(screen.getByRole('link', { name: 'Post case Second caption' })).toBeVisible()
+    // With no excerpt the case id tells the case apart.
+    expect(screen.getByRole('link', { name: 'Post case Case post.c' })).toBeVisible()
   })
 })

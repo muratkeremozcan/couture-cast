@@ -925,6 +925,7 @@
       "loadMore": "Load more",
       "loadingMore": "Loading more",
       "caseTitle": "{{source}} case",
+      "caseRef": "Case {{id}}",
       "reports": "Reports: {{count}}",
       "finding": "Screening finding",
       "refreshing": "Refreshing",

@@ -925,6 +925,7 @@
       "loadMore": "Carica altro",
       "loadingMore": "Caricamento in corso",
       "caseTitle": "Caso: {{source}}",
+      "caseRef": "Caso {{id}}",
       "reports": "Segnalazioni: {{count}}",
       "finding": "Rilevamento del controllo",
       "refreshing": "Aggiornamento in corso",

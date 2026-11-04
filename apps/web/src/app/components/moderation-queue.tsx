@@ -44,6 +44,8 @@ function useModerationQueue(filters: ModerationQueueFilters) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [failure, setFailure] = useState<ModerationFailureReason | null>(null)
   const [stale, setStale] = useState(false)
+  // A failed Load more retries its own cursor. Any other stale state retries from the first page.
+  const [retryMore, setRetryMore] = useState(false)
   const [busy, setBusy] = useState<'refresh' | 'more' | null>(null)
   const [refreshed, setRefreshed] = useState(false)
   const [focus, setFocus] = useState<{ id: string; at: number } | null>(null)
@@ -82,6 +84,7 @@ function useModerationQueue(filters: ModerationQueueFilters) {
         setPhase('ready')
         setFailure(null)
         setStale(false)
+        setRetryMore(false)
       } catch (error) {
         if (controller.signal.aborted) return
         const reason = queueReason(moderationFailureReason(error))
@@ -92,9 +95,12 @@ function useModerationQueue(filters: ModerationQueueFilters) {
           setItems([])
           setCursor(null)
           setStale(false)
+          setRetryMore(false)
           setPhase('failed')
         } else if (more || countRef.current > 0) {
           setStale(true)
+          // The cursor is stateless and does not expire, so only an invalid cursor sends the moderator back.
+          setRetryMore(more && reason !== 'invalid_cursor')
         } else {
           setPhase('failed')
         }
@@ -108,6 +114,7 @@ function useModerationQueue(filters: ModerationQueueFilters) {
     itemsRef.current = []
     setItems([])
     setCursor(null)
+    setRetryMore(false)
     setRefreshed(false)
     setFocus(null)
     setPhase('loading')
@@ -122,11 +129,23 @@ function useModerationQueue(filters: ModerationQueueFilters) {
     phase,
     failure,
     stale,
+    retryMore,
     busy,
     refreshed,
     focus,
     load,
   }
+}
+
+/** Any choice beyond the default open queue counts, so an empty page says no cases match. */
+function hasActiveFilter(filters: ModerationQueueFilters): boolean {
+  return Boolean(
+    filters.status !== 'open' ||
+      filters.source ||
+      filters.locale ||
+      filters.risk ||
+      filters.sla
+  )
 }
 
 function queueStatus(
@@ -143,7 +162,18 @@ export function ModerationQueueView() {
   const { t } = useModerationTranslation()
   const [filters, setFilters] = useState<ModerationQueueFilters>({ status: 'open' })
   const queue = useModerationQueue(filters)
-  const { items, cursor, offset, phase, failure, stale, busy, refreshed, load } = queue
+  const {
+    items,
+    cursor,
+    offset,
+    phase,
+    failure,
+    stale,
+    retryMore,
+    busy,
+    refreshed,
+    load,
+  } = queue
   const refresh = () => {
     if (busy === null) void load(filters, null, true)
   }
@@ -157,9 +187,7 @@ export function ModerationQueueView() {
 
   // Access reasons replace the whole console. An invalid filter keeps the filters visible so it can be fixed.
   const terminal = failure !== null && isTerminalFailure(failure)
-  const filtersActive = Boolean(
-    filters.source || filters.locale || filters.risk || filters.sla
-  )
+  const filtersActive = hasActiveFilter(filters)
   const status = queueStatus(t, phase, refreshed, items.length)
 
   return (
@@ -190,7 +218,11 @@ export function ModerationQueueView() {
             />
           ) : null}
           {stale && failure ? (
-            <StaleNotice failure={failure} busy={busy !== null} onRetry={refresh} />
+            <StaleNotice
+              failure={failure}
+              busy={busy !== null}
+              onRetry={retryMore && cursor ? more : refresh}
+            />
           ) : null}
           <QueueEmpty
             show={phase === 'ready' && items.length === 0}
@@ -275,16 +307,18 @@ function QueueList({
   onMore: () => void
 }) {
   const { t } = useModerationTranslation()
-  if (items.length === 0) return null
+  if (items.length === 0 && !ready) return null
   return (
     <>
-      <ol aria-label={t('moderation.queue.listLabel')} className="flex flex-col gap-3">
-        {items.map((item) => (
-          <li key={item.caseId}>
-            <CaseRow item={item} clockOffsetMs={offset} />
-          </li>
-        ))}
-      </ol>
+      {items.length > 0 ? (
+        <ol aria-label={t('moderation.queue.listLabel')} className="flex flex-col gap-3">
+          {items.map((item) => (
+            <li key={item.caseId}>
+              <CaseRow item={item} clockOffsetMs={offset} />
+            </li>
+          ))}
+        </ol>
+      ) : null}
       {ready ? (
         <div className="flex flex-wrap gap-3">
           <button
@@ -350,6 +384,7 @@ function CaseRow({
       <h2 id={`case-${item.caseId}`} className="mt-3 text-lg font-semibold">
         <Link
           id={`case-link-${item.caseId}`}
+          aria-labelledby={`case-link-${item.caseId} case-hint-${item.caseId}`}
           href={`/moderation/cases/${encodeURIComponent(item.caseId)}`}
           className="rounded after:absolute after:inset-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)]"
         >
@@ -358,11 +393,16 @@ function CaseRow({
           })}
         </Link>
       </h2>
+      {/* The hint completes the link name, so two cases from one source never share a name. */}
       {item.excerpt ? (
-        <p className="mt-1 line-clamp-2 text-sm">
+        <p id={`case-hint-${item.caseId}`} className="mt-1 line-clamp-2 text-sm">
           <PlainText value={item.excerpt} />
         </p>
-      ) : null}
+      ) : (
+        <span id={`case-hint-${item.caseId}`} className="sr-only">
+          {t('moderation.queue.caseRef', { id: item.caseId })}
+        </span>
+      )}
       <p className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">
         {t('moderation.queue.reports', { count: item.reportCount })}
         {' · '}

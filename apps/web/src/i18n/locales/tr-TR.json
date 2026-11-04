@@ -925,6 +925,7 @@
       "loadMore": "Daha fazla yükle",
       "loadingMore": "Daha fazlası yükleniyor",
       "caseTitle": "{{source}} vakası",
+      "caseRef": "Vaka {{id}}",
       "reports": "Bildirim: {{count}}",
       "finding": "Tarama bulgusu",
       "refreshing": "Yenileniyor",

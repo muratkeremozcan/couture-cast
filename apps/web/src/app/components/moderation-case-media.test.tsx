@@ -200,7 +200,7 @@ describe('review findings: the image always has a text alternative', () => {
     expect(screen.getByRole('img')).toHaveAttribute('alt', 'No description provided')
   })
 
-  it('a whitespace-only alt text is kept as the author wrote it', () => {
+  it('a whitespace-only alt text reads as the no-description fallback', () => {
     pinBrowserClock()
     render(
       <CaseMedia
@@ -209,6 +209,9 @@ describe('review findings: the image always has a text alternative', () => {
         onReload={() => undefined}
       />
     )
-    expect(screen.getByRole('img')).toHaveAttribute('alt', ' ')
+    expect(screen.getByRole('img', { name: 'No description provided' })).toHaveAttribute(
+      'alt',
+      'No description provided'
+    )
   })
 })

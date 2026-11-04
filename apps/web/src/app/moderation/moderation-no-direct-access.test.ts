@@ -65,6 +65,9 @@ describe('U-WEB-Q-NO-DIRECT', () => {
     expect(lib).toMatch(/createWebApiClient/)
     expect(lib).toMatch(/listModerationCases/)
     expect(lib).toMatch(/getModerationCase/)
-    expect(lib).not.toMatch(/\bfetch\(/)
+    // No console source reaches the network on its own.
+    for (const path of consoleSources) {
+      expect(readFileSync(path, 'utf8'), relative(SRC, path)).not.toMatch(/\bfetch\(/)
+    }
   })
 })

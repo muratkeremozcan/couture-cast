@@ -590,3 +590,20 @@ describe('round 2: an operator note is cut without splitting a surrogate pair', 
     expect(/[\ud800-\udbff]$/.test(detail.findings!.operatorNote!)).toBe(false)
   })
 })
+
+describe('round 3: a case with very many reports', () => {
+  it('reads the earliest due and accepted time without spreading the reports into Math.min', async () => {
+    const base = postCase().reports[0]!
+    const reports = Array.from({ length: 150_000 }, (_, index) => ({
+      ...base,
+      id: `rep-${index}`,
+      reporterId: `reporter-${index}`,
+      dueAt: new Date(NOW.getTime() + (index + 3) * 60_000),
+      acceptedAt: new Date(NOW.getTime() - (index === 777 ? 9 : 1) * 3_600_000),
+    }))
+    const { service } = build(postCase({ reports }))
+    const detail = (await service.getCase(AUTH, 'post.p1')).data
+    expect(detail.slaDueAt).toBe(new Date(NOW.getTime() + 3 * 60_000).toISOString())
+    expect(detail.acceptedAt).toBe(new Date(NOW.getTime() - 9 * 3_600_000).toISOString())
+  })
+})

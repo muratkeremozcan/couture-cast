@@ -224,9 +224,15 @@ export class ModerationQueueService {
 
     const findings = this.findings(loaded)
     const hasFinding = this.hasFinding(loaded)
-    const dueAt = new Date(Math.min(...relevant.map((report) => report.dueAt.getTime())))
+    // A reduce takes any number of reports; spreading them into Math.min would hit the argument limit.
+    const dueAt = new Date(
+      relevant.reduce((min, report) => Math.min(min, report.dueAt.getTime()), Infinity)
+    )
     const acceptedAt = new Date(
-      Math.min(...relevant.map((report) => report.acceptedAt.getTime()))
+      relevant.reduce(
+        (min, report) => Math.min(min, report.acceptedAt.getTime()),
+        Infinity
+      )
     )
     const first = relevant[0] as ReportRecord
     const live = loaded.post ?? loaded.comment

@@ -52,10 +52,9 @@ export function useServerClock(dueAt: string, clockOffsetMs: number, resolved: b
       const remaining = Date.parse(dueAt) - (Date.now() + clockOffsetMs)
       // The shown minute changes on a minute boundary of the remaining (or overdue) time, so ticks
       // never drift. A timer also fires at the next state boundary (at risk, breached).
+      // On an exact minute the shown minute is already stale a millisecond later, so the delay is zero.
       const untilTextChange =
-        remaining > 0
-          ? remaining % MINUTE_MS || MINUTE_MS
-          : MINUTE_MS - (-remaining % MINUTE_MS)
+        remaining > 0 ? remaining % MINUTE_MS : MINUTE_MS - (-remaining % MINUTE_MS)
       const boundaries = [remaining - SLA_AT_RISK_WINDOW_MS, remaining].filter(
         (ms) => ms > 0
       )
