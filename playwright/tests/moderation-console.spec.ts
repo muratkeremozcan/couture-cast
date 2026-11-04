@@ -110,14 +110,21 @@ async function signInAs(page: Page, userId: string, role: ApiRole = 'moderator')
   if (!isNonLocalEnvironment(testInfo)) return
   await installApiProxy(page, testInfo)
   // A web build without fixture auth (`NEXT_PUBLIC_E2E_AUTH`) verifies the session with Supabase and clears a
-  // token it does not recognise a moment after hydration. The console reads that token for every request,
-  // so a deployed preview keeps it in place. A local stack runs the fixture build and needs none of this.
+  // token it does not recognise a moment after hydration (`removeItem`). The console reads that token for every
+  // request, so a deployed preview must never see it gone. The token is set before any page script runs and
+  // removal of that one key is refused, so no request can land between a clear and a restore.
+  // A local stack runs the fixture build and needs none of this.
   await page.addInitScript(
     ({ key, token }) => {
       if (window.location.origin === 'null') return
-      const keep = () => window.sessionStorage.setItem(key, token)
-      keep()
-      window.setInterval(keep, 50)
+      window.sessionStorage.setItem(key, token)
+      // Patch the prototype: assigning a property on a Storage instance writes a storage item.
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- called back with the caller's own `this`
+      const removeItem = Storage.prototype.removeItem
+      Storage.prototype.removeItem = function (this: Storage, name: string) {
+        if (this === window.sessionStorage && name === key) return
+        removeItem.call(this, name)
+      }
     },
     { key: WEB_ACCESS_TOKEN_STORAGE_KEY, token: localE2EAccessToken(userId, role) }
   )
