@@ -526,7 +526,6 @@ Two preview facts shaped the specs:
   P-Q-DEEPLINK accepts either that 400 or the console not-found state.
 - The Playwright stack seeds `LookbookPost.published_at` at seed time while reports are back-dated, so a screenshot can show a post published after it was reported.
   This is fixture timing and has no product effect.
-- Pre-existing typecheck errors outside this story: `pact/http/consumer/interactions/community/publishing.ts(99)` and `pact/http/provider/state.ts(731,740)`.
 
 ---
 
