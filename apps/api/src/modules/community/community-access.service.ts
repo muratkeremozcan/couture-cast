@@ -148,6 +148,13 @@ export async function assertCommunityMemberNotSanctioned(
   throw new ForbiddenException(body)
 }
 
+/** True for the refusal `assertCommunityMemberNotSanctioned` throws. */
+export function isCommunityBannedRefusal(error: unknown): boolean {
+  if (!(error instanceof ForbiddenException)) return false
+  const body = error.getResponse()
+  return typeof body === 'object' && 'code' in body && body.code === 'community_banned'
+}
+
 export async function assertCommunityDatabaseReadAccess(
   tx: Prisma.TransactionClient,
   member: string,

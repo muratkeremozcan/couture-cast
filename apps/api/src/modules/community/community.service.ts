@@ -923,8 +923,6 @@ export class CommunityService {
     platform: CommunityPlatform
     input: OpenCommunityFeedPostInput
   }): Promise<OpenCommunityPostResponse> {
-    // Ahead of the read, because the 404 below would tell a banned member which posts are live.
-    await this.repository.assertNotSanctioned(params.userId)
     const post = await this.assertPublicPostReadable(params.userId, params.postId)
 
     await this.capture(params.userId, 'community_card_opened', {
@@ -959,6 +957,8 @@ export class CommunityService {
    * not confirmed to exist).
    */
   async assertPublicPostReadable(userId: string, postId: string): Promise<LookbookPost> {
+    // Ahead of the read, because the 404 below would tell a banned member which posts are live.
+    await this.repository.assertNotSanctioned(userId)
     await this.assertReadEnabled(userId)
     const post = await this.repository.findPostById(postId)
     if (!post || !isPubliclyVisiblePost(post)) {
@@ -978,6 +978,8 @@ export class CommunityService {
 
     await this.assertWriteEnabled(userId)
     await this.assertAgeGateAllows(userId, role)
+    // Ahead of the replay below, which would otherwise hand a banned member a fresh upload URL.
+    await this.repository.assertNotSanctioned(userId)
 
     const { viewerBand } = await this.resolveViewerBand(userId)
     const altTextSuggestion = buildAltTextSuggestion({
@@ -1110,6 +1112,8 @@ export class CommunityService {
 
     await this.assertWriteEnabled(userId)
     await this.assertAgeGateAllows(userId, role)
+    // A replay refuses like every other engagement replay.
+    await this.repository.assertNotSanctioned(userId)
 
     const { post, altText, objectPath } = await this.loadPublishablePost(userId, input)
 
