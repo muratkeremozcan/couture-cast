@@ -498,3 +498,81 @@ describe('U-Q-SVC-LOGGING', () => {
     expect(text).not.toMatch(/db\.internal|5432|Seen caption/)
   })
 })
+
+describe('review findings: stored values never make the output parse fail', () => {
+  const row = (overrides: Record<string, unknown> = {}) => ({
+    caseKey: 'post.p1',
+    source: 'post' as const,
+    reportCount: 1,
+    reasons: ['spam'],
+    riskRank: 0,
+    hasFinding: false,
+    openCount: 1,
+    dueAt: new Date(NOW.getTime() + 3_600_000),
+    dueKey: '2026-11-03T13:00:00.000000Z',
+    acceptedAt: NOW,
+    locale: 'en-US',
+    excerpt: 'short',
+    slaState: 'on_track' as const,
+    ...overrides,
+  })
+  const query = { status: 'open' as const, limit: 25 }
+
+  it('cuts an excerpt of 281 astral code points to the contract bound without splitting a pair', async () => {
+    const { service, repository } = build()
+    // SQL `left(excerpt, 280)` counts code points, zod counts UTF-16 units: 280 emoji are 560 units.
+    repository.listCases.mockResolvedValue([row({ excerpt: '😀'.repeat(280) })])
+    const result = await service.listCases(AUTH, query)
+    const excerpt = result.data.items[0]!.excerpt!
+    expect(excerpt.length).toBeLessThanOrEqual(280)
+    expect(excerpt).toBe('😀'.repeat(140))
+    expect(/[\ud800-\udbff]$/.test(excerpt)).toBe(false)
+  })
+
+  it('keeps an excerpt that already fits, and an odd cut never ends on half a pair', async () => {
+    const { service, repository } = build()
+    repository.listCases.mockResolvedValue([
+      row({ caseKey: 'post.a', excerpt: 'a'.repeat(279) + '😀' }),
+      row({ caseKey: 'post.b', excerpt: 'plain' }),
+    ])
+    const result = await service.listCases(AUTH, query)
+    const [first, second] = result.data.items
+    expect(first!.excerpt).toBe('a'.repeat(279))
+    expect(second!.excerpt).toBe('plain')
+  })
+
+  it.each([
+    ['a locale over 35 characters', 'x'.repeat(36)],
+    ['a non-ASCII locale', 'ｅｎ-ＵＳ'],
+    ['an astral locale inside 35 code points', '😀'.repeat(20)],
+    ['an underscore locale', 'en_US'],
+    ['an empty locale', ''],
+  ])('reads %s as no locale instead of failing the page', async (_label, locale) => {
+    const { service, repository } = build()
+    repository.listCases.mockResolvedValue([row({ locale })])
+    const result = await service.listCases(AUTH, query)
+    expect(result.data.items[0]!.locale).toBeNull()
+  })
+
+  it('takes the locale of the earliest relevant report, then the live locale, never another report', async () => {
+    const report = (id: string, locale: unknown, ageMinutes: number) => ({
+      ...postCase().reports[0]!,
+      id,
+      snapshot: { caption: 'c', locale },
+      acceptedAt: new Date(NOW.getTime() - ageMinutes * 60_000),
+    })
+    // Earliest first: the loaders order by accepted time and id.
+    const { service } = build(
+      postCase({ reports: [report('r1', 'es-419', 30), report('r2', 'de-DE', 10)] })
+    )
+    expect((await service.getCase(AUTH, 'post.p1')).data.locale).toBe('es-419')
+
+    const invalidFirst = build(
+      postCase({ reports: [report('r1', 'x'.repeat(40), 30), report('r2', 'de-DE', 10)] })
+    )
+    // The earliest report has no usable snapshot locale, so the live locale answers (not report 2).
+    expect((await invalidFirst.service.getCase(AUTH, 'post.p1')).data.locale).toBe(
+      'en-US'
+    )
+  })
+})

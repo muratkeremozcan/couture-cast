@@ -350,7 +350,7 @@ describe('C-WEB-Q-STATES', () => {
       'The case view could not be recorded, so it was not opened.',
       true,
     ],
-    [500, { statusCode: 500 }, 'The moderation queue is unavailable. Try again.', true],
+    [500, { statusCode: 500 }, 'This case could not be opened. Try again.', true],
   ])(
     'renders the closed state for %s with no case data and the right retry',
     async (status, body, message, retry) => {
@@ -496,5 +496,201 @@ describe('C-WEB-Q-HOSTILE-TEXT: every user-authored string is inert', () => {
     expect(holder.className).toContain('whitespace-pre-wrap')
     expect(holder).toHaveAttribute('dir', 'auto')
     expect(holder).toHaveStyle({ unicodeBidi: 'isolate' })
+  })
+})
+
+describe('review findings: a failed reload never keeps data the viewer may no longer see', () => {
+  async function loadThenFail(status: number, body: unknown) {
+    mockApi(
+      detailHandler((_id, call) =>
+        call === 1 ? json({ data: detail() }) : json(body as never, status)
+      )
+    )
+    render(<ModerationCaseDetailView caseId="post.p1" />)
+    await screen.findByRole('heading', { level: 1 })
+    expect(document.querySelector('img')).not.toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Reload case' }))
+    return screen.findByRole('alert')
+  }
+  const gone = () => {
+    expect(screen.queryByText('quiet-fox-1234')).not.toBeInTheDocument()
+    expect(screen.queryByText('brave-owl-9876')).not.toBeInTheDocument()
+    expect(screen.queryByText('Reporter typed this')).not.toBeInTheDocument()
+    expect(document.querySelector('img')).toBeNull()
+    expect(screen.queryByRole('region')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to queue' })).toBeInTheDocument()
+  }
+
+  it.each([
+    [401, { statusCode: 401, message: 'Unauthorized' }, 'Sign in again to continue.'],
+    [
+      403,
+      { statusCode: 403, message: 'Insufficient role' },
+      'This account cannot open the moderation console.',
+    ],
+    [
+      503,
+      errorBody(503, 'moderation_console_disabled'),
+      'The moderation console is turned off.',
+    ],
+    [
+      404,
+      errorBody(404, 'case_not_found'),
+      'This case no longer exists. It may have been re-keyed after an erasure.',
+    ],
+  ])(
+    'a %i on Reload removes the case and shows the terminal state',
+    async (status, body, text) => {
+      const alert = await loadThenFail(status, body)
+      expect(alert).toHaveTextContent(text)
+      expect(
+        screen.queryByText('Could not refresh. Showing the last result.')
+      ).not.toBeInTheDocument()
+      gone()
+    }
+  )
+
+  it('an audit failure on Reload keeps the case, marked stale, with a working Reload', async () => {
+    const alert = await loadThenFail(503, errorBody(503, 'audit_unavailable'))
+    expect(alert).toHaveTextContent('Could not refresh. Showing the last result.')
+    expect(screen.getByText('quiet-fox-1234')).toBeInTheDocument()
+  })
+
+  it('shows a sign-in link when the session is gone', async () => {
+    mockApi(detailHandler(() => json({ statusCode: 401, message: 'Unauthorized' }, 401)))
+    render(<ModerationCaseDetailView caseId="post.p1" />)
+    expect(await screen.findByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    )
+  })
+
+  it('429 asks the moderator to wait and offers Try again', async () => {
+    let call = 0
+    mockApi(
+      detailHandler(() =>
+        ++call === 1 ? json({ statusCode: 429 }, 429) : json({ data: detail() })
+      )
+    )
+    render(<ModerationCaseDetailView caseId="post.p1" />)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Too many requests. Wait a moment, then try again.')
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+    await screen.findByRole('heading', { level: 1, name: 'Post case' })
+  })
+
+  it('a 400 on a case read is a server fault, never "That filter is not valid."', async () => {
+    mockApi(detailHandler(() => json(errorBody(400, 'invalid_filter'), 400)))
+    render(<ModerationCaseDetailView caseId="post.p1" />)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('This case could not be opened. Try again.')
+    expect(alert).not.toHaveTextContent('filter')
+  })
+})
+
+describe('review findings: reload feedback and a changing case', () => {
+  it('Reload stays focusable and inert while it reads, and sends one read', async () => {
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const reads: string[] = []
+    mockApi(
+      detailHandler(async (_id, call) => {
+        if (call > 1) await gate
+        return json({ data: detail() })
+      }, reads)
+    )
+    render(<ModerationCaseDetailView caseId="post.p1" />)
+    await screen.findByRole('heading', { level: 1 })
+    const reload = screen.getByRole('button', { name: 'Reload case' })
+    reload.focus()
+    await userEvent.click(reload)
+    expect(reload).toHaveAttribute('aria-disabled', 'true')
+    expect(reload).not.toBeDisabled()
+    expect(document.activeElement).toBe(reload)
+    await userEvent.click(reload)
+    expect(reads).toHaveLength(2)
+    act(() => release())
+    await waitFor(() => expect(reload).toHaveAttribute('aria-disabled', 'false'))
+  })
+
+  it('a new case id clears the old case at once and shows only the new one', async () => {
+    mockApi(
+      detailHandler((id) =>
+        json({
+          data: detail({
+            caseId: id as never,
+            subject: { state: 'alias', alias: `alias-of-${id}` },
+          }),
+        })
+      )
+    )
+    const view = render(<ModerationCaseDetailView caseId="post.p1" />)
+    await screen.findByText('alias-of-post.p1')
+    view.rerender(<ModerationCaseDetailView caseId="post.p2" />)
+    expect(screen.queryByText('alias-of-post.p1')).not.toBeInTheDocument()
+    expect(await screen.findByText('alias-of-post.p2')).toBeInTheDocument()
+  })
+
+  it('an answer for the old case that arrives late never overwrites the new case', async () => {
+    let releaseOld: () => void = () => undefined
+    const oldGate = new Promise<void>((resolve) => (releaseOld = resolve))
+    mockApi(
+      detailHandler(async (id) => {
+        if (id === 'post.p1') await oldGate
+        return json({
+          data: detail({ subject: { state: 'alias', alias: `alias-of-${id}` } }),
+        })
+      })
+    )
+    const view = render(<ModerationCaseDetailView caseId="post.p1" />)
+    view.rerender(<ModerationCaseDetailView caseId="post.p2" />)
+    await screen.findByText('alias-of-post.p2')
+    act(() => releaseOld())
+    expect(screen.getByText('alias-of-post.p2')).toBeInTheDocument()
+    expect(screen.queryByText('alias-of-post.p1')).not.toBeInTheDocument()
+  })
+})
+
+describe('review findings: findings that a newer server may send', () => {
+  it('shows a neutral label for a category it does not know, never the raw key', async () => {
+    mockApi(
+      detailHandler(() =>
+        json({
+          data: detail({
+            findings: {
+              codes: [],
+              categories: ['somethingNew', 'language'],
+              engineVersion: null,
+              operatorNote: null,
+            },
+          }),
+        })
+      )
+    )
+    render(<ModerationCaseDetailView caseId="post.p1" />)
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.getByText('Other finding, Language')).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('moderation.category')
+  })
+
+  it('says the case was held with no recorded code, outside any definition list', async () => {
+    mockApi(
+      detailHandler(() =>
+        json({
+          data: detail({
+            findings: {
+              codes: [],
+              categories: [],
+              engineVersion: null,
+              operatorNote: null,
+            },
+          }),
+        })
+      )
+    )
+    const { container } = render(<ModerationCaseDetailView caseId="post.p1" />)
+    const text = await screen.findByText('Held for review without a recorded code.')
+    expect(text.closest('dl')).toBeNull()
+    expect(container.querySelectorAll('dl > p')).toHaveLength(0)
   })
 })

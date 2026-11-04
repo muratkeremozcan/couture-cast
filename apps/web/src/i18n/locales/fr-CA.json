@@ -874,7 +874,8 @@
       "photo": "Photo",
       "photoUnconfirmed": "Photo non confirmée",
       "incomplete": "Analyse incomplète",
-      "upload": "Problème de téléversement"
+      "upload": "Problème de téléversement",
+      "unknown": "Autre constat"
     },
     "actor": {
       "screening": "Analyse automatique",
@@ -909,7 +910,10 @@
       "invalid_cursor": "Le lien de la page n’est plus valide. Actualisez la file.",
       "invalid_filter": "Ce filtre n’est pas valide.",
       "audit_unavailable": "La consultation n’a pas pu être enregistrée, le cas n’a donc pas été ouvert. Réessayez.",
-      "unavailable": "La file de modération est indisponible. Réessayez."
+      "unavailable": "La file de modération est indisponible. Réessayez.",
+      "rate_limited": "Trop de requêtes. Patientez un instant, puis réessayez.",
+      "signInLink": "Se connecter",
+      "caseUnavailable": "Ce cas n’a pas pu être ouvert. Réessayez."
     },
     "queue": {
       "count": "Cas affichés : {{count}}",
@@ -921,7 +925,9 @@
       "loadingMore": "Chargement en cours",
       "caseTitle": "Cas : {{source}}",
       "reports": "Signalements : {{count}}",
-      "finding": "Constat d’analyse"
+      "finding": "Constat d’analyse",
+      "refreshing": "Actualisation en cours",
+      "refreshed": "Actualisé depuis la première page. Cas affichés : {{count}}"
     },
     "detail": {
       "title": "Cas : {{source}}",

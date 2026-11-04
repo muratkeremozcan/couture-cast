@@ -183,3 +183,32 @@ describe('C-WEB-Q-MEDIA: failure and unavailable states', () => {
     if (reason.includes('_')) expect(document.body.textContent).not.toContain(reason)
   })
 })
+
+describe('review findings: the image always has a text alternative', () => {
+  it('an empty alt text from the author still reads as "No description provided"', () => {
+    pinBrowserClock()
+    render(
+      <CaseMedia
+        media={available(120_000, '')}
+        clockOffsetMs={0}
+        onReload={() => undefined}
+      />
+    )
+    expect(
+      screen.getByRole('img', { name: 'No description provided' })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('img')).toHaveAttribute('alt', 'No description provided')
+  })
+
+  it('a whitespace-only alt text is kept as the author wrote it', () => {
+    pinBrowserClock()
+    render(
+      <CaseMedia
+        media={available(120_000, ' ')}
+        clockOffsetMs={0}
+        onReload={() => undefined}
+      />
+    )
+    expect(screen.getByRole('img')).toHaveAttribute('alt', ' ')
+  })
+})

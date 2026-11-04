@@ -874,7 +874,8 @@
       "photo": "Fotoğraf",
       "photoUnconfirmed": "Fotoğraf doğrulanamadı",
       "incomplete": "Tarama tamamlanmadı",
-      "upload": "Yükleme sorunu"
+      "upload": "Yükleme sorunu",
+      "unknown": "Diğer bulgu"
     },
     "actor": {
       "screening": "Otomatik tarama",
@@ -909,7 +910,10 @@
       "invalid_cursor": "Sayfa bağlantısı artık geçerli değil. Kuyruğu yenile.",
       "invalid_filter": "Bu filtre geçerli değil.",
       "audit_unavailable": "Görüntüleme kaydedilemedi, bu yüzden vaka açılmadı. Tekrar dene.",
-      "unavailable": "Moderasyon kuyruğu kullanılamıyor. Tekrar dene."
+      "unavailable": "Moderasyon kuyruğu kullanılamıyor. Tekrar dene.",
+      "rate_limited": "Çok fazla istek. Biraz bekleyip tekrar dene.",
+      "signInLink": "Giriş yap",
+      "caseUnavailable": "Bu vaka açılamadı. Tekrar dene."
     },
     "queue": {
       "count": "Gösterilen vaka: {{count}}",
@@ -921,7 +925,9 @@
       "loadingMore": "Daha fazlası yükleniyor",
       "caseTitle": "{{source}} vakası",
       "reports": "Bildirim: {{count}}",
-      "finding": "Tarama bulgusu"
+      "finding": "Tarama bulgusu",
+      "refreshing": "Yenileniyor",
+      "refreshed": "İlk sayfadan yenilendi. Gösterilen vaka: {{count}}"
     },
     "detail": {
       "title": "{{source}} vakası",

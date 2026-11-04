@@ -25,9 +25,10 @@ const hostile = [
 ]
 
 const BIDI_CONTROLS = [
-  0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069,
+  0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068,
+  0x2069,
 ] as const
-const hex = (code: number) => code.toString(16).toUpperCase()
+const hex = (code: number) => code.toString(16).toUpperCase().padStart(4, '0')
 
 describe('PlainText', () => {
   it.each(hostile)('renders %j as one text node and nothing else', (value) => {
@@ -65,11 +66,37 @@ describe('PlainText', () => {
     expect(container.textContent).toBe(plain)
   })
 
-  it('reveals every control in a string that carries several, and is idempotent on its output', () => {
+  it('reveals every control in a string that carries several', () => {
     const all = BIDI_CONTROLS.map((code) => String.fromCodePoint(code)).join('')
-    const shown = revealBidiControls(all)
-    expect(shown).toBe(BIDI_CONTROLS.map((code) => `<U+${hex(code)}>`).join(''))
-    expect(revealBidiControls(shown)).toBe(shown)
+    expect(revealBidiControls(all)).toBe(
+      BIDI_CONTROLS.map((code) => `<U+${hex(code)}>`).join('')
+    )
+  })
+
+  it('reveals the directional marks and the Arabic letter mark, not only embeddings and isolates', () => {
+    for (const code of [0x200e, 0x200f, 0x061c]) {
+      const { container } = render(
+        <PlainText value={`a${String.fromCodePoint(code)}b`} />
+      )
+      expect(container.textContent).toBe(`a<U+${hex(code)}>b`)
+    }
+  })
+
+  it('escapes a marker the author typed, so a bare marker always means a real control', () => {
+    // Typed by hand: shown with a leading backslash.
+    expect(revealBidiControls('<U+202E>')).toBe('\\<U+202E>')
+    // Typed with its own backslash: the backslashes double, so the escape stays countable.
+    expect(revealBidiControls('\\<U+202E>')).toBe('\\\\\\<U+202E>')
+    // A real control next to a typed marker: only the real one stays bare.
+    expect(revealBidiControls(`<U+202E>${RLO}`)).toBe('\\<U+202E><U+202E>')
+    const { container } = render(<PlainText value={`<U+202E>${RLO}`} />)
+    expect(container.querySelector('bdi')!.childNodes).toHaveLength(1)
+  })
+
+  it('leaves text that merely mentions U+ alone', () => {
+    expect(revealBidiControls('see U+202E or <U+> or <U+12>')).toBe(
+      'see U+202E or <U+> or <U+12>'
+    )
   })
 
   it('wraps, preserves line breaks and isolates bidi', () => {

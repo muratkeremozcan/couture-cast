@@ -381,7 +381,8 @@ describe('hostile and malformed stored values never fail a read', () => {
       cursor = page.nextCursor
     } while (cursor)
     const big = items.find((item) => item.caseId.includes('biglocale'))!
-    expect(big.locale).toBeNull()
+    // An unusable snapshot locale falls back to the live locale (review finding 12).
+    expect(big.locale).toBe('en-US')
     expect(big.excerpt!.length).toBeLessThanOrEqual(280)
   })
 

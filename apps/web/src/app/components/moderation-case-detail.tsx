@@ -5,20 +5,24 @@
 // because every read writes one audit row. Reload is a user action.
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ModerationCaseDetail } from '@couture/api-client/contracts/http'
+import {
+  communityModerationReasonCategorySchema,
+  type ModerationCaseDetail,
+} from '@couture/api-client/contracts/http'
 import {
   useModerationTranslation,
   getModerationCaseFromWeb,
+  isTerminalFailure,
   moderationFailureReason,
   type ModerationCaseResult,
   type ModerationFailureReason,
 } from '../../lib/moderation'
 import { CaseMedia } from './moderation-case-media'
+import { FailureNotice, moderationControl } from './moderation-failure-notice'
 import { PlainText } from './moderation-plain-text'
 import { SlaCountdown } from './moderation-sla-countdown'
 
-const control =
-  'min-h-[44px] min-w-[44px] rounded border border-neutral-500 px-4 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)]'
+const control = moderationControl
 const card =
   'rounded-lg border border-neutral-400 bg-white p-4 text-neutral-900 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100'
 const RISK_CLASS = {
@@ -37,6 +41,13 @@ function useDateFormat() {
     }).format(new Date(iso))
 }
 
+/** A case read has no filter or cursor, so a 400 there is a server fault. */
+function detailReason(reason: ModerationFailureReason | null): ModerationFailureReason {
+  return reason === null || reason === 'invalid_filter' || reason === 'invalid_cursor'
+    ? 'unavailable'
+    : reason
+}
+
 export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
   const { t } = useModerationTranslation()
   const [detail, setDetail] = useState<ModerationCaseResult | null>(null)
@@ -46,23 +57,36 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
   const started = useRef<string | null>(null)
   const alive = useRef(true)
   const hasDetail = useRef(false)
+  const sequence = useRef(0)
+  const abortRef = useRef<AbortController | null>(null)
   hasDetail.current = detail !== null
 
   const read = useCallback(async () => {
+    // A newer read, or a new case id, makes every older answer stale. It is dropped, never applied.
+    const mine = (sequence.current += 1)
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     setLoading(true)
     try {
-      const next = await getModerationCaseFromWeb(caseId)
-      if (!alive.current) return
+      const next = await getModerationCaseFromWeb(caseId, controller.signal)
+      if (!alive.current || mine !== sequence.current) return
       setDetail(next)
       setFailure(null)
       setStale(false)
     } catch (error) {
-      if (!alive.current) return
+      if (!alive.current || mine !== sequence.current) return
       const reason = moderationFailureReason(error)
       setFailure(reason)
-      if (hasDetail.current) setStale(true)
+      if (isTerminalFailure(reason)) {
+        // Access is gone or the case was re-keyed: nothing from the last read may stay on screen.
+        setDetail(null)
+        setStale(false)
+      } else if (hasDetail.current) {
+        setStale(true)
+      }
     } finally {
-      if (alive.current) setLoading(false)
+      if (alive.current && mine === sequence.current) setLoading(false)
     }
   }, [caseId])
 
@@ -71,12 +95,19 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
     // A ref survives the strict-mode remount, so the same navigation never reads twice.
     if (started.current !== caseId) {
       started.current = caseId
+      setDetail(null)
+      setFailure(null)
+      setStale(false)
       void read()
     }
     return () => {
       alive.current = false
     }
   }, [caseId, read])
+
+  const reload = () => {
+    if (!loading) void read()
+  }
 
   const back = (
     <Link
@@ -94,17 +125,12 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
         {loading ? (
           <p aria-busy="true">{t('moderation.state.loading')}</p>
         ) : (
-          <div
-            role="alert"
-            className="flex flex-col items-start gap-3 rounded border border-neutral-500 p-4"
-          >
-            <p>{t(`moderation.state.${failure ?? 'unavailable'}`)}</p>
-            {failure === 'audit_unavailable' || failure === 'unavailable' ? (
-              <button type="button" className={control} onClick={() => void read()}>
-                {t('moderation.state.retry')}
-              </button>
-            ) : null}
-          </div>
+          <FailureNotice
+            reason={detailReason(failure)}
+            onRetry={reload}
+            busy={loading}
+            scope="case"
+          />
         )}
       </div>
     )
@@ -116,12 +142,7 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
       aria-labelledby="case-heading"
     >
       {back}
-      <DetailHeader
-        detail={detail}
-        stale={stale}
-        loading={loading}
-        onReload={() => void read()}
-      />
+      <DetailHeader detail={detail} stale={stale} loading={loading} onReload={reload} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <ContentSection detail={detail} />
@@ -132,7 +153,7 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
             <CaseMedia
               media={detail.media}
               clockOffsetMs={detail.clockOffsetMs}
-              onReload={() => void read()}
+              onReload={reload}
             />
           </section>
         </div>
@@ -199,13 +220,23 @@ function DetailHeader({
           className="flex flex-wrap items-center gap-3 rounded border border-amber-700 p-3 text-sm"
         >
           <p>{t('moderation.state.stale')}</p>
-          <button type="button" className={control} disabled={loading} onClick={onReload}>
+          <button
+            type="button"
+            className={control}
+            aria-disabled={loading}
+            onClick={onReload}
+          >
             {t('moderation.state.retry')}
           </button>
         </div>
       ) : (
         <div>
-          <button type="button" className={control} disabled={loading} onClick={onReload}>
+          <button
+            type="button"
+            className={control}
+            aria-disabled={loading}
+            onClick={onReload}
+          >
             {t('moderation.detail.reload')}
           </button>
         </div>
@@ -304,24 +335,36 @@ function ContentSection({ detail }: { detail: ModerationCaseDetail }) {
   )
 }
 
+const KNOWN_CATEGORIES: readonly string[] =
+  communityModerationReasonCategorySchema.options
+
+/** An unknown category from a newer server reads as a neutral label, never as a raw key. */
+const categoryKey = (category: string) =>
+  KNOWN_CATEGORIES.includes(category)
+    ? `moderation.category.${category}`
+    : 'moderation.category.unknown'
+
 function FindingsSection({ detail }: { detail: ModerationCaseDetail }) {
   const { t } = useModerationTranslation()
   const { findings } = detail
+  const empty =
+    findings !== null &&
+    findings.categories.length === 0 &&
+    findings.codes.length === 0 &&
+    !findings.operatorNote
   return (
     <section aria-labelledby="findings-heading" className={card}>
       <h2 id="findings-heading" className="mb-3 text-lg font-semibold">
         {t('moderation.detail.findings')}
       </h2>
-      {!findings ? (
-        <p className="text-sm">{t('moderation.detail.noFindings')}</p>
-      ) : (
+      {!findings ? <p className="text-sm">{t('moderation.detail.noFindings')}</p> : null}
+      {empty ? <p className="text-sm">{t('moderation.detail.heldNoCodes')}</p> : null}
+      {findings && !empty ? (
         <dl className="grid grid-cols-1 gap-3 text-sm">
           {findings.categories.length > 0 ? (
             <div>
               <dt className="font-medium">{t('moderation.detail.categories')}</dt>
-              <dd>
-                {findings.categories.map((c) => t(`moderation.category.${c}`)).join(', ')}
-              </dd>
+              <dd>{findings.categories.map((c) => t(categoryKey(c))).join(', ')}</dd>
             </div>
           ) : null}
           {findings.codes.length > 0 ? (
@@ -348,13 +391,8 @@ function FindingsSection({ detail }: { detail: ModerationCaseDetail }) {
               </dd>
             </div>
           ) : null}
-          {findings.categories.length === 0 &&
-          findings.codes.length === 0 &&
-          !findings.operatorNote ? (
-            <p>{t('moderation.detail.heldNoCodes')}</p>
-          ) : null}
         </dl>
-      )}
+      ) : null}
     </section>
   )
 }

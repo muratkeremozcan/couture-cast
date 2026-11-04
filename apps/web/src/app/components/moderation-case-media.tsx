@@ -65,7 +65,7 @@ export function CaseMedia({
       {/* eslint-disable-next-line @next/next/no-img-element -- the signed URL must not pass through the image optimizer */}
       <img
         src={media.url}
-        alt={media.altText ?? t('moderation.media.noAlt')}
+        alt={media.altText || t('moderation.media.noAlt')}
         referrerPolicy="no-referrer"
         decoding="async"
         onError={() => setFailed(true)}

@@ -93,10 +93,18 @@ export function projectSnapshot(raw: unknown): Snapshot {
 }
 
 /** Stored data never causes a 500: every value is clamped to its contract bound before the output parse. */
-const clamp = (value: string | null | undefined, max: number): string | null =>
-  value === null || value === undefined || value.length === 0 ? null : value.slice(0, max)
+const clamp = (value: string | null | undefined, max: number): string | null => {
+  if (value === null || value === undefined || value.length === 0) return null
+  if (value.length <= max) return value
+  let out = value.slice(0, max)
+  // The contract counts UTF-16 units, so a cut must not leave half of a surrogate pair.
+  const last = out.charCodeAt(out.length - 1)
+  if (last >= 0xd800 && last <= 0xdbff) out = out.slice(0, -1)
+  return out
+}
+/** The same rule the queue SQL applies: ASCII letters, digits and hyphens, 1 to 35 characters. */
 const clampLocale = (value: string | null | undefined): string | null =>
-  value && value.length <= 35 ? value : null
+  value && /^[A-Za-z0-9-]{1,35}$/.test(value) ? value : null
 
 function snapshotLocale(raw: unknown): string | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null
@@ -151,7 +159,7 @@ export class ModerationQueueService {
         reasons: row.reasons as CommunityReportReason[],
         locale: clampLocale(row.locale),
         hasFinding: row.hasFinding,
-        excerpt: row.excerpt,
+        excerpt: clamp(row.excerpt, 280),
       }
     })
 
@@ -301,12 +309,16 @@ export class ModerationQueueService {
     return { state: 'erased', status: null, publishedAt: null, parentBody: null }
   }
 
+  /**
+   * The case locale is the locale of its earliest relevant report: that report's snapshot locale,
+   * else the live target's. The queue SQL applies the same rule, so a filter and the detail agree.
+   */
   private locale(loaded: LoadedCase, relevant: ReportRecord[]): string | null {
-    for (const report of relevant) {
-      const fromSnapshot = snapshotLocale(report.snapshot)
-      if (fromSnapshot) return fromSnapshot
-    }
-    return loaded.post?.locale ?? loaded.comment?.locale ?? null
+    const first = relevant[0]
+    return (
+      (first ? snapshotLocale(first.snapshot) : null) ??
+      clampLocale(loaded.post?.locale ?? loaded.comment?.locale)
+    )
   }
 
   private hasFinding(loaded: LoadedCase): boolean {

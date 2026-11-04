@@ -874,7 +874,8 @@
       "photo": "Foto",
       "photoUnconfirmed": "Foto non confermata",
       "incomplete": "Controllo incompleto",
-      "upload": "Problema di caricamento"
+      "upload": "Problema di caricamento",
+      "unknown": "Altro rilevamento"
     },
     "actor": {
       "screening": "Controllo automatico",
@@ -909,7 +910,10 @@
       "invalid_cursor": "Il link della pagina non è più valido. Aggiorna la coda.",
       "invalid_filter": "Questo filtro non è valido.",
       "audit_unavailable": "Non è stato possibile registrare la visualizzazione, quindi il caso non è stato aperto. Riprova.",
-      "unavailable": "La coda di moderazione non è disponibile. Riprova."
+      "unavailable": "La coda di moderazione non è disponibile. Riprova.",
+      "rate_limited": "Troppe richieste. Attendi un momento e riprova.",
+      "signInLink": "Accedi",
+      "caseUnavailable": "Impossibile aprire questo caso. Riprova."
     },
     "queue": {
       "count": "Casi mostrati: {{count}}",
@@ -921,7 +925,9 @@
       "loadingMore": "Caricamento in corso",
       "caseTitle": "Caso: {{source}}",
       "reports": "Segnalazioni: {{count}}",
-      "finding": "Rilevamento del controllo"
+      "finding": "Rilevamento del controllo",
+      "refreshing": "Aggiornamento in corso",
+      "refreshed": "Aggiornato dalla prima pagina. Casi mostrati: {{count}}"
     },
     "detail": {
       "title": "Caso: {{source}}",

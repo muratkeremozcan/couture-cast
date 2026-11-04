@@ -1,7 +1,7 @@
 // Learning path Step 50: Moderator queue and case detail.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-50-moderator-queue-and-case-detail
 // Story 6.10 test owner: C-WEB-Q-QUEUE, -STATES, -FORBIDDEN-NO-DATA, -DEDUPE, -FILTERS, -HOSTILE-TEXT, -NO-ACTIONS.
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useMswHandlers as mockApi } from '../../test-utils/msw/runtime'
@@ -332,5 +332,172 @@ describe('C-WEB-Q-HOSTILE-TEXT: the excerpt', () => {
     const holder = screen.getByText(/alert\(1\)/).closest('[dir]')
     expect(holder).toHaveAttribute('dir', 'auto')
     expect(holder).toHaveStyle({ unicodeBidi: 'isolate' })
+  })
+})
+
+describe('review findings: a failed refresh never keeps data the viewer may no longer see', () => {
+  it.each([
+    [401, { statusCode: 401, message: 'Unauthorized' }, 'Sign in again to continue.'],
+    [
+      403,
+      { statusCode: 403, message: 'Insufficient role' },
+      'This account cannot open the moderation console.',
+    ],
+    [
+      503,
+      errorBody(503, 'moderation_console_disabled'),
+      'The moderation console is turned off.',
+    ],
+  ])(
+    'a %i on Refresh clears every case and shows the terminal state',
+    async (status, body, text) => {
+      let attempts = 0
+      mockApi(
+        queueHandler(() => (++attempts === 1 ? json(page(three)) : json(body, status)))
+      )
+      render(<ModerationQueueView />)
+      await screen.findByRole('list', { name: 'Cases' })
+      await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent(text)
+      expect(screen.queryByRole('list')).not.toBeInTheDocument()
+      expect(screen.queryByText('Orphan caption')).not.toBeInTheDocument()
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+      expect(
+        screen.queryByText('Could not refresh. Showing the last result.')
+      ).not.toBeInTheDocument()
+    }
+  )
+
+  it('a 404 on a queue read is a server fault, never the re-keyed copy', async () => {
+    mockApi(queueHandler(() => json({ statusCode: 404 }, 404)))
+    render(<ModerationQueueView />)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('The moderation queue is unavailable. Try again.')
+    expect(alert).not.toHaveTextContent('re-keyed')
+    expect(within(alert).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+  })
+
+  it('offers a sign-in link when the session is gone', async () => {
+    mockApi(queueHandler(() => json({ statusCode: 401, message: 'Unauthorized' }, 401)))
+    render(<ModerationQueueView />)
+    const link = await screen.findByRole('link', { name: 'Sign in' })
+    expect(link).toHaveAttribute('href', '/signin')
+  })
+})
+
+describe('review findings: closed error states', () => {
+  it('429 on the first read says to wait and offers Try again', async () => {
+    let attempts = 0
+    mockApi(
+      queueHandler(() =>
+        ++attempts === 1 ? json({ statusCode: 429 }, 429) : json(page(three))
+      )
+    )
+    render(<ModerationQueueView />)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Too many requests. Wait a moment, then try again.')
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+    await screen.findByRole('list', { name: 'Cases' })
+  })
+
+  it('an invalid filter on the first page keeps the filters visible and offers no pointless retry', async () => {
+    mockApi(queueHandler(() => json(errorBody(400, 'invalid_filter'), 400)))
+    render(<ModerationQueueView />)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('That filter is not valid.')
+    expect(within(alert).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Source' })).toBeInTheDocument()
+  })
+
+  it('an invalid cursor on Load more keeps the list and offers a refresh from the first page', async () => {
+    const seen: RecordedQuery[] = []
+    mockApi(
+      queueHandler(
+        (query) =>
+          query.cursor
+            ? json(errorBody(400, 'invalid_cursor'), 400)
+            : json(page(three, 'c1')),
+        seen
+      )
+    )
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(
+      'The page link is no longer valid. Refresh the queue.'
+    )
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(seen.at(-1)?.cursor).toBeUndefined())
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  })
+})
+
+describe('review findings: focus and busy feedback', () => {
+  it('moves focus to the first new case after Load more, even when Load more goes away', async () => {
+    const more = [summary({ caseId: 'post.p4' }), summary({ caseId: 'post.p5' })]
+    mockApi(
+      queueHandler((query) => (query.cursor ? json(page(more)) : json(page(three, 'c1'))))
+    )
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(5))
+    expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(document.getElementById('case-link-post.p4'))
+  })
+
+  it('Load more stays focusable and inert while it loads, and sends one request', async () => {
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const seen: RecordedQuery[] = []
+    mockApi(
+      queueHandler(async (query) => {
+        if (!query.cursor) return json(page(three, 'c1'))
+        await gate
+        return json(page([summary({ caseId: 'post.p4' })]))
+      }, seen)
+    )
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    const button = screen.getByRole('button', { name: 'Load more' })
+    button.focus()
+    await userEvent.click(button)
+    const busy = await screen.findByRole('button', { name: 'Loading more' })
+    expect(busy).toHaveAttribute('aria-disabled', 'true')
+    expect(busy).not.toBeDisabled()
+    expect(document.activeElement).toBe(busy)
+    await userEvent.click(busy)
+    act(() => release())
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(4))
+    expect(seen.filter((query) => query.cursor)).toHaveLength(1)
+  })
+
+  it('Refresh shows it is busy, ignores a second click, and says the list restarted', async () => {
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const seen: RecordedQuery[] = []
+    mockApi(
+      queueHandler(async (query, call) => {
+        if (call > 1) await gate
+        return query.cursor
+          ? json(page([summary({ caseId: 'post.p4' })]))
+          : json(page(three, 'c1'))
+      }, seen)
+    )
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    const busy = await screen.findByRole('button', { name: 'Refreshing' })
+    expect(busy).toHaveAttribute('aria-busy', 'true')
+    expect(busy).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(busy)
+    expect(seen).toHaveLength(2)
+    act(() => release())
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Refreshed from the first page. Cases shown: 3'
+    )
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
   })
 })

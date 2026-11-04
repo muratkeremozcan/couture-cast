@@ -874,7 +874,8 @@
       "photo": "Foto",
       "photoUnconfirmed": "Foto não confirmada",
       "incomplete": "Análise incompleta",
-      "upload": "Problema de envio"
+      "upload": "Problema de envio",
+      "unknown": "Outro achado"
     },
     "actor": {
       "screening": "Análise automática",
@@ -909,7 +910,10 @@
       "invalid_cursor": "O link da página não é mais válido. Atualize a fila.",
       "invalid_filter": "Esse filtro não é válido.",
       "audit_unavailable": "Não foi possível registrar a visualização, então o caso não foi aberto. Tente de novo.",
-      "unavailable": "A fila de moderação está indisponível. Tente de novo."
+      "unavailable": "A fila de moderação está indisponível. Tente de novo.",
+      "rate_limited": "Muitas solicitações. Aguarde um momento e tente de novo.",
+      "signInLink": "Entrar",
+      "caseUnavailable": "Não foi possível abrir este caso. Tente de novo."
     },
     "queue": {
       "count": "Casos exibidos: {{count}}",
@@ -921,7 +925,9 @@
       "loadingMore": "Carregando mais",
       "caseTitle": "Caso de {{source}}",
       "reports": "Denúncias: {{count}}",
-      "finding": "Achado da análise"
+      "finding": "Achado da análise",
+      "refreshing": "Atualizando",
+      "refreshed": "Atualizado desde a primeira página. Casos exibidos: {{count}}"
     },
     "detail": {
       "title": "Caso de {{source}}",

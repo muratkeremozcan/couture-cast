@@ -874,7 +874,8 @@
       "photo": "Foto",
       "photoUnconfirmed": "Foto sin confirmar",
       "incomplete": "Revisión incompleta",
-      "upload": "Problema de carga"
+      "upload": "Problema de carga",
+      "unknown": "Otro hallazgo"
     },
     "actor": {
       "screening": "Revisión automática",
@@ -909,7 +910,10 @@
       "invalid_cursor": "El enlace de la página ya no es válido. Actualiza la cola.",
       "invalid_filter": "Ese filtro no es válido.",
       "audit_unavailable": "No se pudo registrar la vista del caso, así que no se abrió. Inténtalo de nuevo.",
-      "unavailable": "La cola de moderación no está disponible. Inténtalo de nuevo."
+      "unavailable": "La cola de moderación no está disponible. Inténtalo de nuevo.",
+      "rate_limited": "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo.",
+      "signInLink": "Iniciar sesión",
+      "caseUnavailable": "No se pudo abrir este caso. Inténtalo de nuevo."
     },
     "queue": {
       "count": "Casos mostrados: {{count}}",
@@ -921,7 +925,9 @@
       "loadingMore": "Cargando más",
       "caseTitle": "Caso de {{source}}",
       "reports": "Reportes: {{count}}",
-      "finding": "Hallazgo de revisión"
+      "finding": "Hallazgo de revisión",
+      "refreshing": "Actualizando",
+      "refreshed": "Actualizado desde la primera página. Casos mostrados: {{count}}"
     },
     "detail": {
       "title": "Caso de {{source}}",

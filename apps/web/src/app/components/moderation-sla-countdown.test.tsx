@@ -1,10 +1,14 @@
 // Learning path Step 50: Moderator queue and case detail.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-50-moderator-queue-and-case-detail
-// Story 6.10 test owner: C-WEB-Q-COUNTDOWN. The DOM ticks once a minute, assistive technology hears
-// only a change of SLA state, and the browser clock never decides the answer.
+// Story 6.10 test owner: C-WEB-Q-COUNTDOWN. The DOM ticks on the minute and at each state boundary,
+// assistive technology hears only a change of SLA state, and the browser clock never decides the answer.
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SlaCountdown, formatDuration } from './moderation-sla-countdown'
+import {
+  BOUNDARY_SLACK_MS,
+  SlaCountdown,
+  formatDuration,
+} from './moderation-sla-countdown'
 
 const SERVER = Date.parse('2026-11-03T12:00:00.000Z')
 const iso = (offsetMs: number) => new Date(SERVER + offsetMs).toISOString()
@@ -12,7 +16,7 @@ const HOUR = 3_600_000
 const MINUTE = 60_000
 
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
   vi.setSystemTime(new Date(SERVER))
 })
 afterEach(() => vi.useRealTimers())
@@ -95,10 +99,11 @@ describe('C-WEB-Q-COUNTDOWN: ticking and announcing', () => {
     observer.observe(readout, { childList: true, characterData: true, subtree: true })
     await advance(59_000)
     expect(readout.textContent).toBe('1 h 30 min left')
-    await advance(1_000)
-    expect(readout.textContent).toBe('1 h 29 min left')
+    // The shown minute is a floor, so it changes on the minute boundary of the remaining time.
+    await advance(1_000 + BOUNDARY_SLACK_MS)
+    expect(readout.textContent).toBe('1 h 28 min left')
     await advance(3 * MINUTE)
-    expect(readout.textContent).toBe('1 h 26 min left')
+    expect(readout.textContent).toBe('1 h 25 min left')
     await Promise.resolve()
     expect(mutations.length).toBeLessThanOrEqual(4)
     observer.disconnect()
@@ -130,7 +135,7 @@ describe('C-WEB-Q-COUNTDOWN: ticking and announcing', () => {
     observer.observe(region, { childList: true, characterData: true, subtree: true })
 
     // Ten minutes of ticks inside one state: the live region does not change.
-    await advance(2 * MINUTE)
+    await advance(2 * MINUTE + BOUNDARY_SLACK_MS)
     expect(region).toHaveTextContent('At risk')
     const afterTransition = seen.length
     await advance(3 * MINUTE)
@@ -146,19 +151,44 @@ describe('C-WEB-Q-COUNTDOWN: ticking and announcing', () => {
     )
     const region = screen.getByRole('status')
     expect(region).toHaveTextContent('At risk')
-    await advance(2 * MINUTE)
+    await advance(2 * MINUTE + BOUNDARY_SLACK_MS)
     expect(region).toHaveTextContent('Breached')
     await advance(5 * MINUTE)
     expect(region).toHaveTextContent('Breached')
   })
 
-  it('clears its interval on unmount', () => {
+  it('clears its timer on unmount', () => {
     const { unmount } = render(
       <SlaCountdown dueAt={iso(HOUR)} clockOffsetMs={0} resolved={false} />
     )
     expect(vi.getTimerCount()).toBe(1)
     unmount()
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('flips to at risk at the boundary, not at the next minute tick', async () => {
+    render(
+      <SlaCountdown
+        dueAt={iso(6 * HOUR + 30_000)}
+        clockOffsetMs={0}
+        resolved={false}
+        announce
+      />
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('On track')
+    await advance(30_000 + BOUNDARY_SLACK_MS)
+    expect(screen.getByRole('status')).toHaveTextContent('At risk')
+  })
+
+  it('resyncs at once when a throttled tab becomes visible again', () => {
+    render(<SlaCountdown dueAt={iso(HOUR)} clockOffsetMs={0} resolved={false} />)
+    expect(screen.getByText('1 h 0 min left')).toBeInTheDocument()
+    // A background tab never ran its timers: the clock moved, nothing fired.
+    vi.setSystemTime(new Date(SERVER + 30 * MINUTE))
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(screen.getByText('30 min left')).toBeInTheDocument()
   })
 
   it('honors reduced motion by animating nothing', () => {

@@ -5,7 +5,9 @@ import { HttpResponse, http, type JsonBodyType } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 import {
+  MODERATION_FAILURE_REASONS,
   getModerationCaseFromWeb,
+  isTerminalFailure,
   listModerationCasesFromWeb,
   moderationFailureReason,
   type ModerationRequestError,
@@ -200,11 +202,50 @@ describe('U-WEB-Q-CLIENT: closed failure states', () => {
     expect((await failureOf(list)).reason).toBe('unavailable')
     useMswHandlers(queueHandler(() => json({ data: { items: [{ caseId: 'post.p1' }] } })))
     expect((await failureOf(list)).reason).toBe('unavailable')
-    useMswHandlers(
-      queueHandler(() => json({ data: { ...page([]).data, leak: 'userId' } }))
-    )
-    expect((await failureOf(list)).reason).toBe('unavailable')
     expect(moderationFailureReason(new Error('anything'))).toBe('unavailable')
+  })
+
+  it('maps 429 to rate_limited and 400 with each closed code to its own reason', async () => {
+    useMswHandlers(
+      queueHandler(() => json({ statusCode: 429, message: 'slow down' }, 429))
+    )
+    expect((await failureOf(list)).reason).toBe('rate_limited')
+    useMswHandlers(
+      queueHandler(() =>
+        json({ statusCode: 400, code: 'invalid_cursor', message: 'x' }, 400)
+      )
+    )
+    expect((await failureOf(list)).reason).toBe('invalid_cursor')
+    useMswHandlers(
+      queueHandler(() =>
+        json({ statusCode: 400, code: 'invalid_filter', message: 'x' }, 400)
+      )
+    )
+    expect((await failureOf(list)).reason).toBe('invalid_filter')
+  })
+
+  it('drops a key a newer server added and keeps every declared field (version skew)', async () => {
+    useMswHandlers(
+      queueHandler(() =>
+        json({ data: { ...page([]).data, addedLater: 'x', items: [] }, alsoNew: 1 })
+      )
+    )
+    const result = await list()
+    expect(result.items).toEqual([])
+    expect(JSON.stringify(result)).not.toContain('addedLater')
+  })
+
+  it('lists every failure reason once, and a reason is terminal only when access or the case is gone', () => {
+    expect(new Set(MODERATION_FAILURE_REASONS).size).toBe(
+      MODERATION_FAILURE_REASONS.length
+    )
+    expect(MODERATION_FAILURE_REASONS).toContain('rate_limited')
+    expect(MODERATION_FAILURE_REASONS.filter(isTerminalFailure)).toEqual([
+      'signed_out',
+      'forbidden',
+      'disabled',
+      'not_found',
+    ])
   })
 
   it('never copies a response body into the error message', async () => {

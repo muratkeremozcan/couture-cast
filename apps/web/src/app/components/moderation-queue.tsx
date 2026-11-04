@@ -6,12 +6,14 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ModerationCaseSummary } from '@couture/api-client/contracts/http'
 import {
-  useModerationTranslation,
+  isTerminalFailure,
   listModerationCasesFromWeb,
   moderationFailureReason,
+  useModerationTranslation,
   type ModerationFailureReason,
   type ModerationQueueFilters,
 } from '../../lib/moderation'
+import { FailureNotice, moderationControl } from './moderation-failure-notice'
 import { ModerationFilters } from './moderation-filters'
 import { PlainText } from './moderation-plain-text'
 import { SlaCountdown } from './moderation-sla-countdown'
@@ -23,9 +25,6 @@ const RISK_CLASS = {
   low: 'bg-neutral-100 text-neutral-900 ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-500',
 } as const
 
-const control =
-  'min-h-[44px] min-w-[44px] rounded border border-neutral-500 px-4 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)]'
-
 type Phase = 'loading' | 'ready' | 'failed'
 
 function useModerationQueue(filters: ModerationQueueFilters) {
@@ -35,67 +34,122 @@ function useModerationQueue(filters: ModerationQueueFilters) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [failure, setFailure] = useState<ModerationFailureReason | null>(null)
   const [stale, setStale] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const [busy, setBusy] = useState<'refresh' | 'more' | null>(null)
+  const [refreshed, setRefreshed] = useState(false)
+  const [focusCaseId, setFocusCaseId] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const itemsRef = useRef<ModerationCaseSummary[]>([])
   const countRef = useRef(0)
   countRef.current = items.length
 
-  const load = useCallback(async (next: ModerationQueueFilters, after: string | null) => {
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    const more = after !== null
-    if (more) setLoadingMore(true)
-    try {
-      const page = await listModerationCasesFromWeb({
-        filters: next,
-        cursor: after,
-        signal: controller.signal,
-      })
-      if (controller.signal.aborted) return
-      setItems((current) => {
-        const base = more ? current : []
+  const load = useCallback(
+    async (next: ModerationQueueFilters, after: string | null, manual = false) => {
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+      const more = after !== null
+      if (more) setBusy('more')
+      else if (manual) setBusy('refresh')
+      try {
+        const page = await listModerationCasesFromWeb({
+          filters: next,
+          cursor: after,
+          signal: controller.signal,
+        })
+        if (controller.signal.aborted) return
+        const base = more ? itemsRef.current : []
         const seen = new Set(base.map((item) => item.caseId))
-        return [...base, ...page.items.filter((item) => !seen.has(item.caseId))]
-      })
-      setCursor(page.nextCursor)
-      setOffset(page.clockOffsetMs)
-      setPhase('ready')
-      setFailure(null)
-      setStale(false)
-    } catch (error) {
-      if (controller.signal.aborted) return
-      setFailure(moderationFailureReason(error))
-      // A failure after a good load keeps the list and marks it stale.
-      if (more || countRef.current > 0) setStale(true)
-      else setPhase('failed')
-    } finally {
-      if (!controller.signal.aborted) setLoadingMore(false)
-    }
-  }, [])
-
+        const added = page.items.filter((item) => !seen.has(item.caseId))
+        itemsRef.current = [...base, ...added]
+        setItems(itemsRef.current)
+        // The first new row takes focus, so a Load more that vanished or disabled never strands it.
+        setFocusCaseId(more ? (added[0]?.caseId ?? null) : null)
+        setRefreshed(manual && !more)
+        setCursor(page.nextCursor)
+        setOffset(page.clockOffsetMs)
+        setPhase('ready')
+        setFailure(null)
+        setStale(false)
+      } catch (error) {
+        if (controller.signal.aborted) return
+        const reason = queueReason(moderationFailureReason(error))
+        setFailure(reason)
+        if (isTerminalFailure(reason)) {
+          // Access is gone: no case data may stay on screen.
+          itemsRef.current = []
+          setItems([])
+          setCursor(null)
+          setStale(false)
+          setPhase('failed')
+        } else if (more || countRef.current > 0) {
+          setStale(true)
+        } else {
+          setPhase('failed')
+        }
+      } finally {
+        if (!controller.signal.aborted) setBusy(null)
+      }
+    },
+    []
+  )
   useEffect(() => {
+    itemsRef.current = []
     setItems([])
     setCursor(null)
+    setRefreshed(false)
+    setFocusCaseId(null)
     setPhase('loading')
     void load(filters, null)
     return () => abortRef.current?.abort()
   }, [filters, load])
 
-  return { items, cursor, offset, phase, failure, stale, loadingMore, load }
+  return {
+    items,
+    cursor,
+    offset,
+    phase,
+    failure,
+    stale,
+    busy,
+    refreshed,
+    focusCaseId,
+    load,
+  }
+}
+
+function queueStatus(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  phase: Phase,
+  refreshed: boolean,
+  count: number
+): string {
+  if (phase !== 'ready') return ''
+  return t(refreshed ? 'moderation.queue.refreshed' : 'moderation.queue.count', { count })
 }
 
 export function ModerationQueueView() {
   const { t } = useModerationTranslation()
   const [filters, setFilters] = useState<ModerationQueueFilters>({ status: 'open' })
-  const { items, cursor, offset, phase, failure, stale, loadingMore, load } =
-    useModerationQueue(filters)
-  const retry = () => void load(filters, null)
+  const queue = useModerationQueue(filters)
+  const { items, cursor, offset, phase, failure, stale, busy, refreshed, load } = queue
+  const refresh = () => {
+    if (busy === null) void load(filters, null, true)
+  }
+  const more = () => {
+    if (busy === null && cursor) void load(filters, cursor)
+  }
 
-  const terminal = phase === 'failed' && failure !== null && failure !== 'unavailable'
+  useEffect(() => {
+    if (queue.focusCaseId)
+      document.getElementById(`case-link-${queue.focusCaseId}`)?.focus()
+  }, [queue.focusCaseId])
+
+  // Access reasons replace the whole console. An invalid filter keeps the filters visible so it can be fixed.
+  const terminal = failure !== null && isTerminalFailure(failure)
   const filtersActive = Boolean(
     filters.source || filters.locale || filters.risk || filters.sla
   )
+  const status = queueStatus(t, phase, refreshed, items.length)
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
@@ -106,36 +160,38 @@ export function ModerationQueueView() {
         </p>
       </header>
 
-      {terminal ? (
-        <p role="alert" className="rounded border border-neutral-500 p-4">
-          {t(`moderation.state.${failure}`)}
-        </p>
+      {terminal && failure ? (
+        <FailureNotice reason={failure} />
       ) : (
         <>
           <ModerationFilters value={filters} onChange={setFilters} />
           <p role="status" aria-live="polite" className="text-sm">
-            {phase === 'ready'
-              ? t('moderation.queue.count', { count: items.length })
-              : ''}
+            {status}
           </p>
-          <QueueNotices phase={phase} stale={stale} onRetry={retry} />
-          {phase === 'ready' && items.length === 0 ? (
-            <p className="rounded border border-dashed border-neutral-500 p-6">
-              {t(
-                filtersActive
-                  ? 'moderation.queue.filteredEmpty'
-                  : 'moderation.queue.empty'
-              )}
-            </p>
+          {phase === 'loading' ? (
+            <p aria-busy="true">{t('moderation.state.loading')}</p>
           ) : null}
+          {phase === 'failed' && failure ? (
+            <FailureNotice
+              reason={failure}
+              onRetry={() => void load(filters, null, true)}
+            />
+          ) : null}
+          {stale && failure ? (
+            <StaleNotice failure={failure} busy={busy !== null} onRetry={refresh} />
+          ) : null}
+          <QueueEmpty
+            show={phase === 'ready' && items.length === 0}
+            filtered={filtersActive}
+          />
           <QueueList
             items={items}
             offset={offset}
             ready={phase === 'ready'}
             cursor={cursor}
-            loadingMore={loadingMore}
-            onRefresh={retry}
-            onMore={() => void load(filters, cursor)}
+            busy={busy}
+            onRefresh={refresh}
+            onMore={more}
           />
         </>
       )}
@@ -143,12 +199,58 @@ export function ModerationQueueView() {
   )
 }
 
+function QueueEmpty({ show, filtered }: { show: boolean; filtered: boolean }) {
+  const { t } = useModerationTranslation()
+  if (!show) return null
+  return (
+    <p className="rounded border border-dashed border-neutral-500 p-6">
+      {t(filtered ? 'moderation.queue.filteredEmpty' : 'moderation.queue.empty')}
+    </p>
+  )
+}
+
+function StaleNotice({
+  failure,
+  busy,
+  onRetry,
+}: {
+  failure: ModerationFailureReason
+  busy: boolean
+  onRetry: () => void
+}) {
+  const { t } = useModerationTranslation()
+  const specific = failure === 'invalid_cursor' || failure === 'rate_limited'
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center gap-3 rounded border border-amber-700 p-3 text-sm"
+    >
+      <p>{t(specific ? `moderation.state.${failure}` : 'moderation.state.stale')}</p>
+      <button
+        type="button"
+        className={moderationControl}
+        aria-disabled={busy}
+        onClick={() => {
+          if (!busy) onRetry()
+        }}
+      >
+        {t('moderation.state.retry')}
+      </button>
+    </div>
+  )
+}
+
+/** A queue read has no case to be missing, so a 404 here is a server fault. */
+function queueReason(reason: ModerationFailureReason): ModerationFailureReason {
+  return reason === 'not_found' ? 'unavailable' : reason
+}
+
 function QueueList({
   items,
   offset,
   ready,
   cursor,
-  loadingMore,
+  busy,
   onRefresh,
   onMore,
 }: {
@@ -156,7 +258,7 @@ function QueueList({
   offset: number
   ready: boolean
   cursor: string | null
-  loadingMore: boolean
+  busy: 'refresh' | 'more' | null
   onRefresh: () => void
   onMore: () => void
 }) {
@@ -173,62 +275,34 @@ function QueueList({
       </ol>
       {ready ? (
         <div className="flex flex-wrap gap-3">
-          <button type="button" className={control} onClick={onRefresh}>
-            {t('moderation.queue.refresh')}
+          <button
+            type="button"
+            className={moderationControl}
+            aria-disabled={busy !== null}
+            aria-busy={busy === 'refresh'}
+            onClick={onRefresh}
+          >
+            {t(
+              busy === 'refresh'
+                ? 'moderation.queue.refreshing'
+                : 'moderation.queue.refresh'
+            )}
           </button>
           {cursor ? (
             <button
               type="button"
-              className={control}
-              disabled={loadingMore}
+              className={moderationControl}
+              aria-disabled={busy !== null}
+              aria-busy={busy === 'more'}
               onClick={onMore}
             >
               {t(
-                loadingMore ? 'moderation.queue.loadingMore' : 'moderation.queue.loadMore'
+                busy === 'more'
+                  ? 'moderation.queue.loadingMore'
+                  : 'moderation.queue.loadMore'
               )}
             </button>
           ) : null}
-        </div>
-      ) : null}
-    </>
-  )
-}
-
-function QueueNotices({
-  phase,
-  stale,
-  onRetry,
-}: {
-  phase: Phase
-  stale: boolean
-  onRetry: () => void
-}) {
-  const { t } = useModerationTranslation()
-  return (
-    <>
-      {phase === 'loading' ? (
-        <p aria-busy="true">{t('moderation.state.loading')}</p>
-      ) : null}
-      {phase === 'failed' ? (
-        <div
-          role="alert"
-          className="flex flex-col items-start gap-3 rounded border border-red-800 p-4"
-        >
-          <p>{t('moderation.state.unavailable')}</p>
-          <button type="button" className={control} onClick={onRetry}>
-            {t('moderation.state.retry')}
-          </button>
-        </div>
-      ) : null}
-      {stale ? (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center gap-3 rounded border border-amber-700 p-3 text-sm"
-        >
-          <p>{t('moderation.state.stale')}</p>
-          <button type="button" className={control} onClick={onRetry}>
-            {t('moderation.state.retry')}
-          </button>
         </div>
       ) : null}
     </>
@@ -262,6 +336,7 @@ function CaseRow({
       </div>
       <h2 id={`case-${item.caseId}`} className="mt-3 text-lg font-semibold">
         <Link
+          id={`case-link-${item.caseId}`}
           href={`/moderation/cases/${encodeURIComponent(item.caseId)}`}
           className="rounded after:absolute after:inset-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)]"
         >

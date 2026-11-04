@@ -874,7 +874,8 @@
       "photo": "Photo",
       "photoUnconfirmed": "Photo not confirmed",
       "incomplete": "Screening incomplete",
-      "upload": "Upload problem"
+      "upload": "Upload problem",
+      "unknown": "Other finding"
     },
     "actor": {
       "screening": "Screening",
@@ -909,7 +910,10 @@
       "invalid_cursor": "The page link is no longer valid. Refresh the queue.",
       "invalid_filter": "That filter is not valid.",
       "audit_unavailable": "The case view could not be recorded, so it was not opened. Try again.",
-      "unavailable": "The moderation queue is unavailable. Try again."
+      "unavailable": "The moderation queue is unavailable. Try again.",
+      "rate_limited": "Too many requests. Wait a moment, then try again.",
+      "signInLink": "Sign in",
+      "caseUnavailable": "This case could not be opened. Try again."
     },
     "queue": {
       "count": "Cases shown: {{count}}",
@@ -921,7 +925,9 @@
       "loadingMore": "Loading more",
       "caseTitle": "{{source}} case",
       "reports": "Reports: {{count}}",
-      "finding": "Screening finding"
+      "finding": "Screening finding",
+      "refreshing": "Refreshing",
+      "refreshed": "Refreshed from the first page. Cases shown: {{count}}"
     },
     "detail": {
       "title": "{{source}} case",

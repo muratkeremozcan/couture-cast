@@ -1,15 +1,18 @@
 'use client'
 
 // Story 6.10 web owner: the time-remaining readout of a case.
-// The DOM updates once a minute. Assistive technology hears only a change of SLA state.
+// The text updates once a minute and at each state boundary. Assistive technology hears only a change of SLA state.
 import { useEffect, useState } from 'react'
 import {
   deriveSlaState,
+  SLA_AT_RISK_WINDOW_MS,
   type ModerationCaseSlaState,
 } from '@couture/api-client/contracts/http'
 import { remainingMs, useModerationTranslation } from '../../lib/moderation'
 
 const MINUTE_MS = 60_000
+/** Exported so tests can step the clock past a boundary exactly. */
+export const BOUNDARY_SLACK_MS = 25
 
 export function formatDuration(
   ms: number,
@@ -35,13 +38,49 @@ export const SLA_BADGE_CLASS: Record<ModerationCaseSlaState, string> = {
     'bg-emerald-100 text-emerald-950 ring-emerald-800 dark:bg-emerald-950 dark:text-emerald-100 dark:ring-emerald-400',
 }
 
+/**
+ * The clock of one countdown. The text re-renders once a minute, but a timer also fires at the next
+ * state boundary (at risk, breached), so the state and its announcement are never a minute late.
+ * A hidden tab throttles timers, so coming back to the tab resyncs at once.
+ */
 export function useServerClock(dueAt: string, clockOffsetMs: number, resolved: boolean) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (resolved) return
+    let timer: number | undefined
+    const schedule = () => {
+      const remaining = Date.parse(dueAt) - (Date.now() + clockOffsetMs)
+      // The shown minute changes on a minute boundary of the remaining (or overdue) time, so ticks
+      // never drift. A timer also fires at the next state boundary (at risk, breached).
+      const untilTextChange =
+        remaining > 0
+          ? remaining % MINUTE_MS || MINUTE_MS
+          : MINUTE_MS - (-remaining % MINUTE_MS)
+      const boundaries = [remaining - SLA_AT_RISK_WINDOW_MS, remaining].filter(
+        (ms) => ms > 0
+      )
+      // A little slack makes sure the boundary has passed when the timer fires.
+      const delay = Math.min(untilTextChange, ...boundaries) + BOUNDARY_SLACK_MS
+      timer = window.setTimeout(() => {
+        setNow(Date.now())
+        schedule()
+      }, delay)
+    }
+    const resync = () => {
+      if (document.visibilityState !== 'visible') return
+      window.clearTimeout(timer)
+      setNow(Date.now())
+      schedule()
+    }
     setNow(Date.now())
-    const timer = window.setInterval(() => setNow(Date.now()), MINUTE_MS)
-    return () => window.clearInterval(timer)
+    schedule()
+    document.addEventListener('visibilitychange', resync)
+    window.addEventListener('focus', resync)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', resync)
+      window.removeEventListener('focus', resync)
+    }
   }, [dueAt, clockOffsetMs, resolved])
   const remaining = remainingMs(dueAt, clockOffsetMs, now)
   const state: ModerationCaseSlaState = resolved

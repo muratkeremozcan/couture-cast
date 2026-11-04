@@ -3,11 +3,13 @@
 'use client'
 
 import { useTranslation } from 'react-i18next'
+import type { z } from 'zod'
 import { ResponseError } from '@couture/api-client'
 import {
   moderationCaseDetailResponseSchema,
   moderationCasesResponseSchema,
   moderationQueueErrorCodeSchema,
+  type ModerationQueueErrorCode,
   type ModerationCaseDetail,
   type ModerationCasesPage,
   type ModerationCasesQuery,
@@ -22,15 +24,18 @@ export function useModerationTranslation() {
 }
 
 /** The reason travels and the words do not: the console maps each reason onto a localized string. */
-export type ModerationFailureReason =
-  | 'signed_out'
-  | 'forbidden'
-  | 'disabled'
-  | 'not_found'
-  | 'invalid_cursor'
-  | 'invalid_filter'
-  | 'audit_unavailable'
-  | 'unavailable'
+export const MODERATION_FAILURE_REASONS = [
+  'signed_out',
+  'forbidden',
+  'disabled',
+  'not_found',
+  'invalid_cursor',
+  'invalid_filter',
+  'audit_unavailable',
+  'rate_limited',
+  'unavailable',
+] as const
+export type ModerationFailureReason = (typeof MODERATION_FAILURE_REASONS)[number]
 
 export class ModerationRequestError extends Error {
   constructor(
@@ -47,6 +52,20 @@ export function moderationFailureReason(error: unknown): ModerationFailureReason
   return error instanceof ModerationRequestError ? error.reason : 'unavailable'
 }
 
+/**
+ * Reasons after which no earlier data may stay on screen: the viewer lost access, the console was
+ * closed or the case no longer exists. Every other reason can keep the last good result.
+ */
+export const TERMINAL_FAILURES: readonly ModerationFailureReason[] = [
+  'signed_out',
+  'forbidden',
+  'disabled',
+  'not_found',
+]
+
+export const isTerminalFailure = (reason: ModerationFailureReason) =>
+  TERMINAL_FAILURES.includes(reason)
+
 /** Filters the console can set. `status` is always sent, the rest only when chosen. */
 export type ModerationQueueFilters = Pick<
   ModerationCasesQuery,
@@ -58,6 +77,35 @@ export type ModerationQueueResult = ModerationCasesPage & {
   clockOffsetMs: number
 }
 export type ModerationCaseResult = ModerationCaseDetail & { clockOffsetMs: number }
+
+/**
+ * Parses a strict contract schema but drops keys a newer server added. Version skew between a
+ * deployed API and an older console must not turn every read into "unavailable". Any other schema
+ * issue still fails the parse.
+ */
+export function parseTolerant<T>(schema: z.ZodType<T>, data: unknown): T {
+  const current = structuredClone(data)
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const result = schema.safeParse(current)
+    if (result.success) return result.data
+    const unknownKeys = result.error.issues.flatMap((issue) =>
+      issue.code === 'unrecognized_keys' ? [issue] : []
+    )
+    if (unknownKeys.length === 0 || unknownKeys.length !== result.error.issues.length) {
+      throw result.error
+    }
+    for (const issue of unknownKeys) {
+      let node: unknown = current
+      for (const key of issue.path) {
+        node = (node as Record<string | number, unknown> | null)?.[key]
+      }
+      if (typeof node === 'object' && node !== null) {
+        for (const key of issue.keys) delete (node as Record<string, unknown>)[key]
+      }
+    }
+  }
+  return schema.parse(current)
+}
 
 function readAccessToken(): string {
   const token = window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim()
@@ -76,27 +124,27 @@ async function readErrorCode(response: Response) {
   }
 }
 
+function reasonForResponse(
+  status: number,
+  code: ModerationQueueErrorCode | null
+): ModerationFailureReason {
+  if (status === 401) return 'signed_out'
+  if (status === 403) return 'forbidden'
+  if (status === 404) return 'not_found'
+  if (status === 429) return 'rate_limited'
+  if (status === 400)
+    return code === 'invalid_cursor' ? 'invalid_cursor' : 'invalid_filter'
+  if (status === 503 && code === 'moderation_console_disabled') return 'disabled'
+  if (status === 503 && code === 'audit_unavailable') return 'audit_unavailable'
+  return 'unavailable'
+}
+
 async function moderationError(error: unknown): Promise<ModerationRequestError> {
   if (error instanceof ModerationRequestError) return error
   if (error instanceof ResponseError) {
     const { status } = error.response
     const code = await readErrorCode(error.response)
-    const reason: ModerationFailureReason =
-      status === 401
-        ? 'signed_out'
-        : status === 403
-          ? 'forbidden'
-          : status === 404
-            ? 'not_found'
-            : status === 400
-              ? code === 'invalid_cursor'
-                ? 'invalid_cursor'
-                : 'invalid_filter'
-              : status === 503 && code === 'moderation_console_disabled'
-                ? 'disabled'
-                : status === 503 && code === 'audit_unavailable'
-                  ? 'audit_unavailable'
-                  : 'unavailable'
+    const reason = reasonForResponse(status, code)
     return new ModerationRequestError(
       reason,
       `Moderation request failed (${status}).`,
@@ -131,7 +179,7 @@ export async function listModerationCasesFromWeb(params: {
       },
       { signal: params.signal }
     )
-    const data = moderationCasesResponseSchema.parse(response).data
+    const data = parseTolerant(moderationCasesResponseSchema, response).data
     return { ...data, clockOffsetMs: Date.parse(data.serverNow) - Date.now() }
   } catch (error: unknown) {
     throw await moderationError(error)
@@ -149,7 +197,7 @@ export async function getModerationCaseFromWeb(
       { caseId },
       { signal }
     )
-    const data = moderationCaseDetailResponseSchema.parse(response).data
+    const data = parseTolerant(moderationCaseDetailResponseSchema, response).data
     return { ...data, clockOffsetMs: Date.parse(data.serverNow) - Date.now() }
   } catch (error: unknown) {
     throw await moderationError(error)

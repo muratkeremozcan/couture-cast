@@ -147,6 +147,37 @@ describe('C-WEB-Q-A11Y: the case view', () => {
     expect(await violations(forbidden.container)).toEqual([])
   })
 
+  it.each([
+    [
+      'held with no recorded code',
+      { codes: [], categories: [], engineVersion: null, operatorNote: null },
+    ],
+    [
+      'codes, categories and a note',
+      {
+        codes: ['text_policy_match'],
+        categories: ['language'],
+        engineVersion: 'v1',
+        operatorNote: 'Held by the team',
+      },
+    ],
+    [
+      'a category a newer server added',
+      {
+        codes: [],
+        categories: ['somethingNew'],
+        engineVersion: null,
+        operatorNote: null,
+      },
+    ],
+  ])('has no axe violation with findings: %s', async (_label, findings) => {
+    mockApi(detailHandler(() => json({ data: detail({ findings }) })))
+    const view = render(<ModerationCaseDetailView caseId="post.p1" />)
+    await screen.findByRole('heading', { level: 1 })
+    expect(view.container.querySelectorAll('dl > p')).toHaveLength(0)
+    expect(await violations(view.container)).toEqual([])
+  })
+
   it('gives each section a heading name and keeps the h1 first and focusable by script', async () => {
     await openDetail()
     const h1 = screen.getByRole('heading', { level: 1 })

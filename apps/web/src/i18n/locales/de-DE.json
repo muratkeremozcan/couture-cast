@@ -874,7 +874,8 @@
       "photo": "Foto",
       "photoUnconfirmed": "Foto nicht bestätigt",
       "incomplete": "Prüfung unvollständig",
-      "upload": "Upload-Problem"
+      "upload": "Upload-Problem",
+      "unknown": "Anderer Befund"
     },
     "actor": {
       "screening": "Prüfung",
@@ -909,7 +910,10 @@
       "invalid_cursor": "Der Seitenlink ist nicht mehr gültig. Aktualisiere die Warteschlange.",
       "invalid_filter": "Dieser Filter ist ungültig.",
       "audit_unavailable": "Der Aufruf konnte nicht protokolliert werden und wurde nicht geöffnet. Versuche es erneut.",
-      "unavailable": "Die Moderationswarteschlange ist nicht verfügbar. Versuche es erneut."
+      "unavailable": "Die Moderationswarteschlange ist nicht verfügbar. Versuche es erneut.",
+      "rate_limited": "Zu viele Anfragen. Warte einen Moment und versuche es erneut.",
+      "signInLink": "Anmelden",
+      "caseUnavailable": "Dieser Fall konnte nicht geöffnet werden. Versuche es erneut."
     },
     "queue": {
       "count": "Angezeigte Fälle: {{count}}",
@@ -921,7 +925,9 @@
       "loadingMore": "Weitere werden geladen",
       "caseTitle": "Fall: {{source}}",
       "reports": "Meldungen: {{count}}",
-      "finding": "Prüfbefund"
+      "finding": "Prüfbefund",
+      "refreshing": "Wird aktualisiert",
+      "refreshed": "Ab der ersten Seite aktualisiert. Angezeigte Fälle: {{count}}"
     },
     "detail": {
       "title": "Fall: {{source}}",

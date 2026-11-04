@@ -104,6 +104,10 @@ const REASON_RANK_SQL = Prisma.raw(
 )
 const KNOWN_FINDING_CODES = Object.keys(COMMUNITY_MODERATION_REASON_CATEGORY)
 const MAX_RISK_RANK = MODERATION_RISK_BY_RANK.length - 1
+/** A locale the contract can carry: ASCII letters, digits and hyphens, 1 to 35 characters. */
+const LOCALE_PATTERN = '^[A-Za-z0-9-]{1,35}$'
+const validLocale = (column: string) =>
+  Prisma.raw(`(CASE WHEN ${column} ~ '${LOCALE_PATTERN}' THEN ${column} END)`)
 const DUE_KEY_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
 
 /** True when a post's `moderation_reason` holds at least one code and every code is a known screening code. */
@@ -141,9 +145,9 @@ export class ModerationQueueRepository {
       branches.push(Prisma.sql`
         SELECT 'post'::text AS source,
           CASE WHEN r.post_id IS NOT NULL THEN 'post.' || r.post_id ELSE 'orphan-post.' || r.id END AS case_key,
-          r.reporter_id, r.reason::text AS reason, r.created_at AS accepted_at,
+          r.id AS report_id, r.reporter_id, r.reason::text AS reason, r.created_at AS accepted_at,
           r.sla_due_at, r.resolved_at,
-          COALESCE(r.content_snapshot->>'locale', p.locale) AS locale,
+          COALESCE(${validLocale("(r.content_snapshot->>'locale')")}, ${validLocale('p.locale')}) AS locale,
           NULLIF(r.content_snapshot->>'caption', '') AS excerpt,
           ${POST_FINDING_SQL} AS finding
         FROM "CommunityPostReport" r
@@ -154,9 +158,9 @@ export class ModerationQueueRepository {
       branches.push(Prisma.sql`
         SELECT 'comment'::text AS source,
           CASE WHEN r.comment_id IS NOT NULL THEN 'comment.' || r.comment_id ELSE 'orphan-comment.' || r.id END AS case_key,
-          r.reporter_id, r.reason::text AS reason, r.accepted_at AS accepted_at,
+          r.id AS report_id, r.reporter_id, r.reason::text AS reason, r.accepted_at AS accepted_at,
           r.sla_due_at, r.resolved_at,
-          COALESCE(r.content_snapshot->>'locale', c.locale) AS locale,
+          COALESCE(${validLocale("(r.content_snapshot->>'locale')")}, ${validLocale('c.locale')}) AS locale,
           NULLIF(r.content_snapshot->>'body', '') AS excerpt,
           COALESCE(c.status::text IN ('held_for_review', 'blocked'), false) AS finding
         FROM "CommunityCommentReport" r
@@ -215,8 +219,8 @@ export class ModerationQueueRepository {
           count(*) FILTER (WHERE resolved_at IS NULL)::int AS open_count,
           min(sla_due_at) AS due,
           min(accepted_at) AS accepted_at,
-          min(locale) AS locale,
-          (array_agg(excerpt ORDER BY accepted_at ASC, case_key ASC) FILTER (WHERE excerpt IS NOT NULL))[1] AS excerpt
+          (array_agg(locale ORDER BY accepted_at ASC, report_id ASC))[1] AS locale,
+          (array_agg(excerpt ORDER BY accepted_at ASC, report_id ASC) FILTER (WHERE excerpt IS NOT NULL))[1] AS excerpt
         FROM rep
         GROUP BY source, case_key
         ${resolvedOnly}
