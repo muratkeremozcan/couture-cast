@@ -492,6 +492,33 @@ The flag read lives in the controller body after the guards, so the only way to 
 The first Playwright run of the keyboard test flaked twice because it used programmatic `focus()`, which never shows a focus-visible ring.
 The test now reaches the link with real Tab presses and ran green three times after the fix.
 
+### Deployed preview coverage (2026-11-03)
+
+The Vercel preview run has no database secret, so the specs split into two groups.
+Live tests sign up a throwaway moderator through the product API and need no database.
+Seeded tests need direct database access and skip themselves on a preview.
+
+The preview API has `moderation_console_enabled` off (the preview database row is `false`, as in production).
+A moderator therefore passes the role check and meets the closed console, and the live tests assert exactly that on the preview:
+
+- The API answers 503 `moderation_console_disabled`, parsed by the shipped error schema, with `private, no-store`, for the queue, an unknown id, a malformed id and a bad filter.
+  The flag is read before the id and the query, so the closed console reveals nothing about which cases exist.
+- Guardian and teen get 403, and an anonymous caller gets 401, on both routes.
+- The browser shows "The moderation console is turned off." for a moderator, with an axe check on that state.
+- A guardian, a teen and a visitor see no case data in the browser.
+- Unknown and malformed case ids fail closed, and the 320, 768 and 1280 pixel layouts fit.
+
+Run locally against the real preview (31 tests, one worker, database and service-role key unset to match CI): 20 passed, 11 skipped.
+The 11 skips are the 9 seeded tests plus the live queue, filter and keyboard journey and the live axe test, which need the console on.
+Turning the preview flag on runs those four against the preview without a spec change.
+
+Two preview facts shaped the specs:
+
+- A web build without `NEXT_PUBLIC_E2E_AUTH=true` verifies the session with Supabase and clears a fixture token a moment after hydration.
+  The specs keep the token in place on a preview, and the owner lever that removes the workaround is `NEXT_PUBLIC_E2E_AUTH=true` on the preview web build.
+- The browser proxy forwarded the web origin cookie to the protected API origin, which rejected it.
+  The helper now drops that cookie so the jar's API cookie is used.
+
 ### Observations for the owner
 
 - Next.js answers a malformed percent escape in the case path (`%`, `%zz`, `%E0%A4%A`) with its own 400 before the page renders, so the `readCaseId` catch only runs for segments Next lets through.
