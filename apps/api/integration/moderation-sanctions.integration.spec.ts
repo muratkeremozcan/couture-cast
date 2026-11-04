@@ -2349,6 +2349,50 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
       })
     })
 
+    describe('R9-2: drafts kept only for cleanup stay out of the author section', () => {
+      it('shows the flagged post behind fifty retained expired drafts, and a live draft', async () => {
+        const author = await fx.member('author')
+        const flagged = await fx.post({ authorId: author.id, status: 'flagged' })
+        await prisma.lookbookPost.update({
+          where: { id: flagged.id },
+          data: { created_at: new Date(Date.now() - 2 * 60 * 60 * 1000) },
+        })
+        const expired = new Date(Date.now() - 100 * 60 * 1000)
+        const retained: string[] = []
+        for (let index = 0; index < 50; index += 1) {
+          const draft = await fx.post({ authorId: author.id, status: 'draft' })
+          await prisma.lookbookPost.update({
+            where: { id: draft.id },
+            data: { published_at: null, upload_expires_at: expired },
+          })
+          retained.push(draft.id)
+        }
+        const live = await fx.post({ authorId: author.id, status: 'draft' })
+        await prisma.lookbookPost.update({
+          where: { id: live.id },
+          data: {
+            published_at: null,
+            upload_expires_at: new Date(Date.now() + 10 * 60 * 1000),
+          },
+        })
+
+        const feed = await member(author.id).get(
+          '/api/v1/community/feed?mode=all&limit=30'
+        )
+        expect(feed.status, dump(feed)).toBe(200)
+        const ids = (
+          feed.body as { data: { authorStates: { id: string }[] } }
+        ).data.authorStates.map((state) => state.id)
+        expect(ids).toContain(flagged.id)
+        expect(ids).toContain(live.id)
+        expect(ids.filter((id) => retained.includes(id))).toEqual([])
+        expect(
+          await prisma.lookbookPost.count({ where: { id: { in: retained } } }),
+          'cleanup still needs these rows'
+        ).toBe(50)
+      })
+    })
+
     it('R5-2 an old final failure held across recovery leaves the new generation claimable', async () => {
       const { seeded, post, storage } = await pendingAuthor()
       const hold = gated()

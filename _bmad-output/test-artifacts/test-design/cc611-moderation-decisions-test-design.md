@@ -893,6 +893,17 @@ Seeded defects at `61d635c6`, in a throwaway worktree, with the real suite 10 of
 | Replay does not renew                       | 2                                                                |
 | Replay mints for an erased row              | 1                                                                |
 
+### Codex round 9
+
+R9-2 reads the real feed: a flagged post behind fifty retained expired drafts still shows, a live draft shows, and the fifty rows stay for cleanup.
+It went red at `e3f5c27a` with the flagged post missing.
+
+The diff read of `3aa1fbcb` found the 70 hour window starving new requests.
+With 201 older open rows on real Postgres, a post requested 1 hour later stayed unanonymized, published and in the bucket until 70.5 hours.
+`community-erasure-fairness.integration.spec.ts` went 3 of 5 red there: no first pass, repeats never reaching row 201, and overdue reporting 200 of 205.
+
+Unmeasured remains what the spec records: the hosted gateway route, whether a timeout ends the underlying write, and any whole-request limit.
+
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
 Those failures were my setup, and the rerun below is the evidence.
