@@ -1,8 +1,12 @@
 // Learning path Step 12: Cross-surface E2E confidence.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-12-cross-surface-e2e-confidence
+import { randomUUID } from 'node:crypto'
+import { PrismaClient } from '@prisma/client'
 import type { APIRequestContext, APIResponse, TestInfo } from '@playwright/test'
 import {
   forbiddenHttpErrorSchema,
+  moderationCaseDetailResponseSchema,
+  moderationDecisionErrorSchema,
   moderationQueueErrorSchema,
   trackedResponseSchema,
   unauthorizedHttpErrorSchema,
@@ -16,6 +20,13 @@ import {
   isProdEnvironment,
   resolveApiBaseUrl,
 } from '../../support/helpers/api-test'
+import {
+  newRunId,
+  SEED_DAY_MS,
+  seedMember,
+  seedPost,
+  seedPostReport,
+} from '../../../apps/api/integration/helpers/moderation-queue-seed'
 
 type GuardianConsentPayload = {
   guardianId: string
@@ -375,6 +386,368 @@ test.describe('Moderator queue read routes (Story 6.10)', () => {
     for (const method of ['post', 'put', 'patch', 'delete'] as const) {
       const response = await request[method](`${baseUrl}${QUEUE_PATH}`, { headers })
       expect([404, 405], method).toContain(response.status())
+    }
+  })
+})
+
+// Story 6.11 test owner: P-D-ROLES, the role matrix of the two decision routes against the running API.
+// The order is bearer, role, flags, input, so a non-moderator learns nothing about flags or cases.
+// A preview may have either flag off. A moderator then gets the closed contract in place of the input check.
+test.describe('P-D-ROLES moderation decision write routes (Story 6.11)', () => {
+  const decisionPath = (caseId: string) => `/api/v1/moderation/cases/${caseId}/decisions`
+  const appealPath = (sanctionId: string) =>
+    `/api/v1/moderation/sanctions/${sanctionId}/appeal`
+  const databaseUrl =
+    process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+  const NIL_REVISION = '0000000000000000'
+
+  const decisionBody = () => ({
+    action: 'resolve',
+    reason: 'Role matrix probe.',
+    mutationId: randomUUID(),
+    expectedRevision: NIL_REVISION,
+  })
+  const appealBody = () => ({
+    status: 'requested',
+    reason: 'Role matrix probe.',
+    mutationId: randomUUID(),
+  })
+  const routes = (caseId: string, sanctionId: string) => [
+    { path: decisionPath(caseId), body: decisionBody },
+    { path: appealPath(sanctionId), body: appealBody },
+  ]
+
+  /** Every status from these routes carries the same header, so a proxy can never store a decision. */
+  async function postDecisionRoute(
+    request: APIRequestContext,
+    testInfo: TestInfo,
+    path: string,
+    body: unknown,
+    headers: Record<string, string> = {}
+  ) {
+    const response = await request.post(`${resolveApiBaseUrl(testInfo)}${path}`, {
+      data: body as object,
+      headers,
+    })
+    expect(response.headers()['cache-control'], path).toBe('private, no-store')
+    return response
+  }
+
+  /**
+   * Whether both flags are open for a moderator. A valid body on an unknown case answers 404 when open.
+   * A closed route answers 503 with one of the two closed codes, and a local stack must be open.
+   */
+  async function routeIsOpen(request: APIRequestContext, testInfo: TestInfo) {
+    const response = await postDecisionRoute(
+      request,
+      testInfo,
+      decisionPath('post.never-existed-probe'),
+      decisionBody(),
+      authHeaders(buildUniqueId('moderator-probe', testInfo), 'moderator')
+    )
+    const body = moderationDecisionErrorSchema.parse(await response.json())
+    if (response.status() === 404) {
+      expect(body.code).toBe('case_not_found')
+      return true
+    }
+    expect(response.status(), JSON.stringify(body)).toBe(503)
+    expect(['moderation_decisions_disabled', 'moderation_console_disabled']).toContain(
+      body.code
+    )
+    expect(isNonLocalEnvironment(testInfo), 'a local stack seeds the flags on').toBe(true)
+    return false
+  }
+
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      isProdEnvironment(testInfo),
+      'Synthetic moderator identities are not provisioned in production.'
+    )
+  })
+
+  test('[P0] P-D-ROLES returns 401 with no bearer token on both routes', async ({
+    apiRequest,
+    validateSchema,
+  }, testInfo) => {
+    for (const { path, body } of routes('post.anything', 'anything')) {
+      const result = await apiRequest({
+        method: 'POST',
+        path,
+        baseUrl: resolveApiBaseUrl(testInfo),
+        body: body(),
+        retryConfig: { maxRetries: 0 },
+      })
+      expect(result.status, path).toBe(401)
+      await validateSchema(unauthorizedHttpErrorSchema, result.body, {
+        shape: { statusCode: 401, error: 'Unauthorized' },
+      })
+    }
+  })
+
+  test('[P0] P-D-ROLES gives a guardian and a teen one 403 body for unknown and malformed ids on both routes', async ({
+    apiRequest,
+    validateSchema,
+  }, testInfo) => {
+    const expectedMessage = {
+      guardian: 'Insufficient role',
+      teen: 'Guardian consent required',
+    }
+    for (const role of ['guardian', 'teen'] as const) {
+      const headers = authHeaders(buildUniqueId(`${role}-writer`, testInfo), role)
+      const bodies = new Set<string>()
+      for (const [caseId, sanctionId] of [
+        ['post.cmreal0000000000000000000', 'cmreal0000000000000000000'],
+        ['post.does-not-exist', 'does-not-exist'],
+        ['not-a-case', '%20'],
+        ['orphan-comment.x', 'x'],
+      ] as const) {
+        for (const { path, body } of routes(caseId, sanctionId)) {
+          const result = await apiRequest({
+            method: 'POST',
+            path,
+            baseUrl: resolveApiBaseUrl(testInfo),
+            body: body(),
+            headers,
+            retryConfig: { maxRetries: 0 },
+          })
+          expect(result.status, `${role} ${path}`).toBe(403)
+          await validateSchema(forbiddenHttpErrorSchema, result.body, {
+            shape: { statusCode: 403, error: 'Forbidden' },
+          })
+          expect(extractErrorMessage(result.body)).toContain(expectedMessage[role])
+          bodies.add(JSON.stringify(result.body))
+        }
+      }
+      expect(bodies.size, `${role} bodies`).toBe(1)
+    }
+  })
+
+  test('[P0] P-D-ROLES an invalid body changes nothing about the 403 a non-moderator sees', async ({
+    request,
+  }, testInfo) => {
+    // Role comes before input: a body the schema refuses must not reveal that the schema ran.
+    const headers = authHeaders(buildUniqueId('guardian-writer', testInfo), 'guardian')
+    const bodies = new Set<string>()
+    for (const body of [
+      decisionBody(),
+      {},
+      { ...decisionBody(), moderatorId: buildUniqueId('forged', testInfo) },
+    ]) {
+      const response = await postDecisionRoute(
+        request,
+        testInfo,
+        decisionPath('post.anything'),
+        body,
+        headers
+      )
+      expect(response.status()).toBe(403)
+      bodies.add(await response.text())
+    }
+    expect(bodies.size).toBe(1)
+  })
+
+  test('[P0] P-D-ROLES refuses a forged moderatorId and an unknown key on both routes', async ({
+    request,
+  }, testInfo) => {
+    const open = await routeIsOpen(request, testInfo)
+    const moderatorId = buildUniqueId('moderator-writer', testInfo)
+    const forgedId = buildUniqueId('forged-moderator', testInfo)
+    const headers = authHeaders(moderatorId, 'moderator')
+    for (const { path, body } of routes('post.anything', 'anything')) {
+      for (const extra of [
+        { moderatorId: forgedId },
+        { userId: forgedId },
+        { role: 'admin' },
+      ]) {
+        const response = await postDecisionRoute(
+          request,
+          testInfo,
+          path,
+          { ...body(), ...extra },
+          headers
+        )
+        const parsed = moderationDecisionErrorSchema.parse(await response.json())
+        if (open) {
+          expect(response.status(), path).toBe(400)
+          expect(parsed.code).toBe('invalid_decision')
+        } else {
+          // Flags come before input, so a closed route answers the same for any body.
+          expect(response.status(), path).toBe(503)
+        }
+        // Nothing the request sent is echoed back.
+        expect(JSON.stringify(parsed)).not.toContain(forgedId)
+      }
+    }
+  })
+
+  // A real case needs a seeded row, so a preview run skips this one.
+  test('[P0] P-D-ROLES gives one 403 body for a real case and sanction, and a forged moderator writes nothing', async ({
+    apiRequest,
+    request,
+  }, testInfo) => {
+    test.skip(
+      isNonLocalEnvironment(testInfo),
+      'Seeding needs direct database access, which a preview run does not have.'
+    )
+    const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
+    try {
+      const runId = newRunId()
+      const author = await seedMember(prisma, runId, 'author')
+      const reporter = await seedMember(prisma, runId, 'reporter')
+      const moderator = await seedMember(prisma, runId, 'moderator', { alias: false })
+      const now = new Date()
+      const post = await seedPost(prisma, {
+        runId,
+        label: 'roles',
+        authorId: author.id,
+        now,
+      })
+      await seedPostReport(prisma, {
+        runId,
+        label: 'roles',
+        postId: post.id,
+        reporterId: reporter.id,
+        reason: 'spam',
+        createdAt: now,
+        dueAt: new Date(now.getTime() + SEED_DAY_MS),
+      })
+      const caseId = `post.${post.id}`
+      const decision = await prisma.moderationDecision.create({
+        data: {
+          case_key: `${caseId}-seeded`,
+          sequence: 1,
+          source: 'post',
+          report_ids: [],
+          action: 'ban',
+          reason: 'Seeded ban.',
+          moderator_role: 'admin',
+          subject_user_id: author.id,
+          mutation_id: randomUUID(),
+          payload_hash: 'seeded',
+          response: {},
+          is_terminal: true,
+          decided_at: now,
+        },
+      })
+      const sanction = await prisma.communitySanction.create({
+        data: {
+          user_id: author.id,
+          decision_id: decision.id,
+          case_key: `${caseId}-seeded`,
+          kind: 'temporary',
+          expires_at: new Date(now.getTime() + 7 * SEED_DAY_MS),
+          created_at: now,
+        },
+      })
+      const counts = async () => ({
+        decisions: await prisma.moderationDecision.count({
+          where: { case_key: caseId },
+        }),
+        audit: await prisma.auditLog.count({
+          where: {
+            user_id: { in: [moderator.id, reporter.id] },
+            event_type: 'moderation_decision_applied',
+          },
+        }),
+        open: await prisma.communityPostReport.count({
+          where: { post_id: post.id, resolved_at: null },
+        }),
+        status: (await prisma.lookbookPost.findUniqueOrThrow({ where: { id: post.id } }))
+          .status,
+        appeal: (
+          await prisma.communitySanction.findUniqueOrThrow({
+            where: { id: sanction.id },
+          })
+        ).appeal_status,
+      })
+      const before = await counts()
+      expect(before).toEqual({
+        decisions: 0,
+        audit: 0,
+        open: 1,
+        status: 'published',
+        appeal: 'not_requested',
+      })
+
+      for (const role of ['guardian', 'teen'] as const) {
+        const headers = authHeaders(buildUniqueId(`${role}-writer`, testInfo), role)
+        const bodies = new Set<string>()
+        for (const [realCase, realSanction] of [
+          [caseId, sanction.id],
+          ['post.does-not-exist', 'does-not-exist'],
+        ] as const) {
+          for (const { path, body } of routes(realCase, realSanction)) {
+            const result = await apiRequest({
+              method: 'POST',
+              path,
+              baseUrl: resolveApiBaseUrl(testInfo),
+              body: body(),
+              headers,
+              retryConfig: { maxRetries: 0 },
+            })
+            expect(result.status, `${role} ${path}`).toBe(403)
+            bodies.add(JSON.stringify(result.body))
+          }
+        }
+        expect(bodies.size, `${role} bodies`).toBe(1)
+      }
+
+      // A forged id on a real case: 400, and no row names anyone.
+      const detail = await request.get(
+        `${resolveApiBaseUrl(testInfo)}/api/v1/moderation/cases/${caseId}`,
+        { headers: authHeaders(moderator.id, 'moderator') }
+      )
+      expect(detail.status()).toBe(200)
+      const { revision } = moderationCaseDetailResponseSchema.parse(
+        await detail.json()
+      ).data
+      const forged = await postDecisionRoute(
+        request,
+        testInfo,
+        decisionPath(caseId),
+        { ...decisionBody(), expectedRevision: revision, moderatorId: reporter.id },
+        authHeaders(moderator.id, 'moderator')
+      )
+      expect(forged.status()).toBe(400)
+      expect(moderationDecisionErrorSchema.parse(await forged.json()).code).toBe(
+        'invalid_decision'
+      )
+      const forgedAppeal = await postDecisionRoute(
+        request,
+        testInfo,
+        appealPath(sanction.id),
+        { ...appealBody(), moderatorId: reporter.id },
+        authHeaders(moderator.id, 'moderator')
+      )
+      expect(forgedAppeal.status()).toBe(400)
+      expect(moderationDecisionErrorSchema.parse(await forgedAppeal.json()).code).toBe(
+        'invalid_decision'
+      )
+      expect(await counts()).toEqual(before)
+    } finally {
+      await prisma.$disconnect()
+    }
+  })
+
+  test('[P1] P-D-ROLES lets a moderator and an admin past the guards, and exposes no other write method', async ({
+    request,
+  }, testInfo) => {
+    const open = await routeIsOpen(request, testInfo)
+    const baseUrl = resolveApiBaseUrl(testInfo)
+    for (const role of ['moderator', 'admin'] as const) {
+      const headers = authHeaders(buildUniqueId(`${role}-writer`, testInfo), role)
+      for (const { path, body } of routes('post.never-existed', 'never-existed')) {
+        const response = await postDecisionRoute(request, testInfo, path, body(), headers)
+        // A role the guards let through reaches the service, which knows no such id.
+        expect(response.status(), `${role} ${path}`).toBe(open ? 404 : 503)
+      }
+    }
+    const headers = authHeaders(buildUniqueId('moderator-writer', testInfo), 'moderator')
+    for (const method of ['get', 'put', 'patch', 'delete'] as const) {
+      for (const { path } of routes('post.never-existed', 'never-existed')) {
+        const response = await request[method](`${baseUrl}${path}`, { headers })
+        expect([404, 405], `${method} ${path}`).toContain(response.status())
+      }
     }
   })
 })
