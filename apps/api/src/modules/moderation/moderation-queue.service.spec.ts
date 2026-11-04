@@ -30,6 +30,7 @@ const postCase = (overrides: Overrides = {}): LoadedCase => ({
     {
       id: 'rep-1',
       reporterId: 'reporter-1',
+      origin: 'member',
       reason: 'harassment',
       details: 'reporter typed this',
       snapshot: {
@@ -67,15 +68,27 @@ function build(loaded: LoadedCase | null = postCase()) {
     loadCase: vi.fn().mockResolvedValue(loaded),
     listCases: vi.fn().mockResolvedValue([]),
     recordCaseView: vi.fn().mockResolvedValue(undefined),
+    escalatedCaseKeys: vi.fn().mockResolvedValue(new Set<string>()),
+  }
+  const decisions = {
+    describeCase: vi.fn().mockResolvedValue({
+      revision: '0123456789abcdef',
+      allowedActions: [],
+      banKinds: [],
+      escalated: false,
+      firstDecisionAt: null,
+      subjectStanding: null,
+    }),
   }
   const storage = { signReadUrl: vi.fn().mockResolvedValue(SIGNED) }
   const clock = vi.fn(() => new Date(NOW))
   const service = new ModerationQueueService(
     repository as unknown as ModerationQueueRepository,
     storage,
-    clock
+    clock,
+    decisions as never
   )
-  return { service, repository, storage, clock }
+  return { service, repository, storage, clock, decisions }
 }
 
 let logged: unknown[][]
@@ -251,6 +264,19 @@ describe('U-Q-SVC-IDENTITY', () => {
     expect(JSON.stringify(data)).not.toMatch(
       /reporter-1|reporter-no-alias|author-user-1|mod-user-1/
     )
+  })
+
+  it('reads a screening report as screening and keeps an erased reporter erased (D11)', async () => {
+    const loaded = postCase()
+    loaded.reports = [
+      { ...loaded.reports[0]!, id: 'r1', reporterId: null, origin: 'screening' },
+      { ...loaded.reports[0]!, id: 'r2', reporterId: null, origin: 'member' },
+    ]
+    const { data } = await build(loaded).service.getCase(AUTH, 'post.p1')
+    expect(data.reporters.map((entry) => entry.identity)).toEqual([
+      { state: 'screening', alias: null },
+      { state: 'erased', alias: null },
+    ])
   })
 
   it('takes a post subject from the report row and a comment subject from the live author alias', async () => {

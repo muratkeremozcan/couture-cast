@@ -11,6 +11,7 @@ import {
   MODERATION_OPERATOR_TAKEDOWN_REASON,
   communityBannedErrorSchema,
   deriveAllowedActions,
+  deriveAllowedAppealSteps,
   isOperatorHoldReason,
   moderationActionAvailability,
   moderationAppealInputSchema,
@@ -531,6 +532,44 @@ describe('U-D-ALLOWED-RULES: the closed refusal for each state (D4, TEA-08, TEA-
   })
 })
 
+describe('U-D-ALLOWED-RULES: deriveAllowedAppealSteps (D2, D10, TEA-07)', () => {
+  const steps = (patch: Partial<Parameters<typeof deriveAllowedAppealSteps>[0]> = {}) =>
+    deriveAllowedAppealSteps({
+      role: 'moderator',
+      viewerConflict: false,
+      operatorSanctioned: false,
+      sanctionActive: true,
+      appealStatus: 'not_requested',
+      ...patch,
+    })
+
+  it('offers each role only its legal next step', () => {
+    expect(steps()).toEqual(['requested'])
+    expect(steps({ role: 'admin' })).toEqual(['requested'])
+    expect(steps({ appealStatus: 'requested' })).toEqual([])
+    expect(steps({ role: 'admin', appealStatus: 'requested' })).toEqual([
+      'upheld',
+      'overturned',
+    ])
+  })
+
+  it.each(['upheld', 'overturned'] as const)(
+    'offers nothing after %s',
+    (appealStatus) => {
+      expect(steps({ role: 'admin', appealStatus })).toEqual([])
+    }
+  )
+
+  it.each([
+    ['a conflicted viewer', { viewerConflict: true }],
+    ['a sanctioned operator', { operatorSanctioned: true }],
+    ['an expired or lifted ban', { sanctionActive: false }],
+  ])('offers nothing to %s', (_label, patch) => {
+    expect(steps({ role: 'admin', appealStatus: 'requested', ...patch })).toEqual([])
+    expect(steps(patch)).toEqual([])
+  })
+})
+
 const FORBIDDEN_KEYS = [
   'moderatorId',
   'moderator_id',
@@ -671,7 +710,12 @@ describe('U-D-RESPONSE-STRICT: nothing private leaves the API (D1, D6, D9)', () 
       banKinds: [],
       escalated: false,
       firstDecisionAt: null,
-      subjectStanding: { active: false, sanction: null, priorBanCount: 0 },
+      subjectStanding: {
+        active: false,
+        sanction: null,
+        priorBanCount: 0,
+        allowedAppealSteps: [],
+      },
     }
     expect(moderationCaseDecisionStateSchema.safeParse(state).success).toBe(true)
     for (const key of ['subjectUserId', 'moderatorId', 'marker'])

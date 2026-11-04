@@ -214,7 +214,9 @@ describe('U-Q-READSET: the repository reads only the tables the RLS suite proves
         'CommunityCommentAudit',
         'CommunityCommentReport',
         'CommunityPostReport',
+        'CommunitySanction',
         'LookbookPost',
+        'ModerationDecision',
         'ModerationEvent',
       ].sort()
     )

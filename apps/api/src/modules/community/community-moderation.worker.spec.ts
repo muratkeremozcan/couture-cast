@@ -79,6 +79,8 @@ describe('CommunityModerationProcessor & Worker', () => {
   const mockPostUpdateMany = vi.fn().mockResolvedValue({ count: 1 })
   const mockOutboxUpdateMany = vi.fn().mockResolvedValue({ count: 1 })
   const mockModerationEventCreate = vi.fn().mockResolvedValue({ id: 'mod-1' })
+  const mockAliasFindUnique = vi.fn().mockResolvedValue(null)
+  const mockPostReportCreate = vi.fn().mockResolvedValue({ id: 'report-1' })
   const mockTransaction = vi
     .fn()
     .mockImplementation((callback: (tx: PrismaClient) => Promise<unknown>) =>
@@ -92,6 +94,7 @@ describe('CommunityModerationProcessor & Worker', () => {
   const mockPrisma = {
     $executeRaw: vi.fn().mockResolvedValue(1),
     $queryRaw: vi.fn().mockResolvedValue([{ id: 'post-fixture' }]),
+    communitySanction: { findFirst: vi.fn().mockResolvedValue(null) },
     userProfile: { findUnique: vi.fn().mockResolvedValue(eligibleProfile) },
     user: {
       findUnique: vi.fn().mockResolvedValue({ profile: eligibleProfile, teen_roles: [] }),
@@ -107,6 +110,8 @@ describe('CommunityModerationProcessor & Worker', () => {
     moderationEvent: {
       create: mockModerationEventCreate,
     },
+    communityAlias: { findUnique: mockAliasFindUnique },
+    communityPostReport: { create: mockPostReportCreate },
     $transaction: mockTransaction,
   } as unknown as PrismaClient
 
@@ -176,6 +181,8 @@ describe('CommunityModerationProcessor & Worker', () => {
     mockPostUpdateMany.mockResolvedValue({ count: 1 })
     mockOutboxUpdateMany.mockResolvedValue({ count: 1 })
     mockModerationEventCreate.mockResolvedValue({ id: 'mod-1' })
+    mockAliasFindUnique.mockResolvedValue(null)
+    mockPostReportCreate.mockResolvedValue({ id: 'report-1' })
     mockDownload.mockResolvedValue(jpegBytes)
   })
 
@@ -590,6 +597,86 @@ describe('CommunityModerationProcessor & Worker', () => {
       expect(mockOutboxUpdateMany).toHaveBeenCalledWith({
         where: { post_id: 'post-flagged-outbox' },
         data: { dispatched_at: expect.any(Date) },
+      })
+    })
+
+    // Story 6.11 test owner: U-S-FLAG-REPORT. A flagged post enters the moderator queue (D11).
+    describe('U-S-FLAG-REPORT', () => {
+      const flagging = () =>
+        createProcessor(
+          new FixtureCommunityModerationEngine({
+            textOutcome: { passed: false, reasons: ['profanity'] },
+            imageOutcome: { passed: true, reasons: [] },
+          })
+        )
+      const flaggedPost = (overrides: Record<string, unknown> = {}) =>
+        pendingPost({
+          id: 'post-intake',
+          user_id: 'user-intake',
+          caption: 'Seen caption',
+          alt_text: 'Seen alt',
+          image_object_path: 'community/post-intake/session-i.jpg',
+          ...overrides,
+        })
+      const reportData = () =>
+        (mockPostReportCreate.mock.calls[0] as [{ data: Record<string, unknown> }])[0]
+          .data
+
+      it('writes one screening report with a null reporter, the snapshot, the path and a 24-hour due time', async () => {
+        mockFindUnique.mockResolvedValue(flaggedPost())
+        await flagging().process({ postId: 'post-intake', uploadSessionId: 'session-i' })
+
+        expect(mockPostReportCreate).toHaveBeenCalledTimes(1)
+        const data = reportData()
+        expect(data).toMatchObject({
+          post_id: 'post-intake',
+          reason: 'inappropriate_content',
+          origin: 'screening',
+          subject_alias: null,
+          image_object_path: 'community/post-intake/session-i.jpg',
+        })
+        // A null reporter reads as screening or erased, so the key must be absent or null.
+        expect(data.reporter_id ?? null).toBeNull()
+        expect(data.content_snapshot).toMatchObject({
+          caption: 'Seen caption',
+          altText: 'Seen alt',
+        })
+        const createdAt = data.created_at as Date
+        const dueAt = data.sla_due_at as Date
+        expect(dueAt.getTime() - createdAt.getTime()).toBe(24 * 3_600_000)
+      })
+
+      it('copies an existing alias and creates none', async () => {
+        mockFindUnique.mockResolvedValue(flaggedPost())
+        mockAliasFindUnique.mockResolvedValue({ alias: 'quiet-fox' })
+        await flagging().process({ postId: 'post-intake', uploadSessionId: 'session-i' })
+
+        expect(mockAliasFindUnique).toHaveBeenCalledWith({
+          where: { user_id: 'user-intake' },
+          select: { alias: true },
+        })
+        expect(reportData().subject_alias).toBe('quiet-fox')
+      })
+
+      it('writes no report when the status update lost the race', async () => {
+        mockFindUnique.mockResolvedValue(flaggedPost())
+        mockPostUpdateMany.mockResolvedValue({ count: 0 })
+        await flagging().process({ postId: 'post-intake', uploadSessionId: 'session-i' })
+
+        expect(mockPostUpdateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ status: 'flagged' }),
+          })
+        )
+        expect(mockPostReportCreate).not.toHaveBeenCalled()
+      })
+
+      it('sends the operations canary to no human reviewer', async () => {
+        mockFindUnique.mockResolvedValue(flaggedPost({ user_id: 'canary-user-1' }))
+        await flagging().process({ postId: 'post-intake', uploadSessionId: 'session-i' })
+
+        expect(mockModerationEventCreate).toHaveBeenCalledTimes(1)
+        expect(mockPostReportCreate).not.toHaveBeenCalled()
       })
     })
 

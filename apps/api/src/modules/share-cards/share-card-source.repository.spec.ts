@@ -5,6 +5,7 @@ import { ShareCardSourceRepository } from './share-card-source.repository.js'
 const member = 'member'
 const db = {
   user: { findUnique: vi.fn() },
+  communitySanction: { findFirst: vi.fn().mockResolvedValue(null) },
   userProfile: { findUnique: vi.fn() },
   outfitRecommendation: { findFirst: vi.fn() },
   outfitCapsule: { findFirst: vi.fn() },

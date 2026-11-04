@@ -19,6 +19,7 @@ describe('CommunityModerationActionsService', () => {
   }
   const prisma = {
     $executeRaw: vi.fn().mockResolvedValue(1),
+    communitySanction: { findFirst: vi.fn().mockResolvedValue(null) },
     userProfile: { findUnique: vi.fn().mockResolvedValue(eligibleProfile) },
     user: {
       findUnique: vi.fn().mockResolvedValue({ profile: eligibleProfile, teen_roles: [] }),

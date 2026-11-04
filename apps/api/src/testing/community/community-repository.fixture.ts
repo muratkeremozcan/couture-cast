@@ -33,6 +33,7 @@ export const createRepo = () => {
   const transaction = vi.fn()
 
   const client = {
+    communitySanction: { findFirst: vi.fn().mockResolvedValue(null) },
     communitySubject: { findUnique: vi.fn().mockResolvedValue({ generation: 0 }) },
     userProfile: {
       findUnique: vi.fn().mockResolvedValue({

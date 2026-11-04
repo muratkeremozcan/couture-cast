@@ -135,6 +135,8 @@ export function moderationDecisionsTestContext() {
       > &
         Partial<CommunitySpotlightService>
       streams?: Pick<CommunityStreamRepository, 'assist'>
+      /** Feed and post reads need these. Decision and report routes do not. */
+      community?: { weather?: unknown; telemetry?: unknown; storage?: unknown }
     } = {}
   ) {
     const guardian = new GuardianService(
@@ -146,9 +148,9 @@ export function moderationDecisionsTestContext() {
     const posts = new CommunityService(
       new CommunityRepository(prisma),
       flags as never,
-      storage as never,
-      {} as never,
-      {} as never,
+      (overrides.community?.weather ?? {}) as never,
+      (overrides.community?.telemetry ?? {}) as never,
+      (overrides.community?.storage ?? storage) as never,
       guardian
     )
     const comments = new CommunityCommentsService(

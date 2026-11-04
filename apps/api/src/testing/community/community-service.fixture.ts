@@ -334,7 +334,9 @@ export const createService = (
       return { summary: reactionSummary }
     })
   const reactionSummaries = vi.fn().mockResolvedValue(new Map())
+  const assertNotSanctioned = vi.fn().mockResolvedValue(undefined)
   const repository = {
+    assertNotSanctioned,
     assertReadEligibility: vi.fn().mockResolvedValue(undefined),
     assertSubjectAvailable: vi.fn().mockResolvedValue(undefined),
     setReaction,
@@ -411,6 +413,7 @@ export const createService = (
 
   return {
     service,
+    assertNotSanctioned,
     setReaction,
     reactionSummaries,
     getFeatureFlag,
