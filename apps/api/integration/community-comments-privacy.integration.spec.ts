@@ -60,7 +60,7 @@ describe('Story 6.4 comment consent gates', () => {
       { id: root.id, status: 'consent_suspended', body: null },
       { id: pending.id, status: 'consent_suspended', body: null },
     ])
-    await processor.process(pending.id)
+    await processor.process(pending.id, 0)
     expect((await roots(adult.userId, adult.postId)).items[0]).toMatchObject({
       unavailable: true,
       body: null,
@@ -125,7 +125,7 @@ describe('Story 6.4 comment consent gates', () => {
       },
       flags
     )
-    const screening = delayed.process(pending.id)
+    const screening = delayed.process(pending.id, 0)
     await ready
     await guardian.revokeConsent(owner.userId, teen.userId)
     release()
@@ -137,7 +137,7 @@ describe('Story 6.4 comment consent gates', () => {
     const frozen = await create(owner.userId, owner.postId)
     try {
       flags.getFeatureFlag.mockResolvedValue(false)
-      await processor.process(frozen.id)
+      await processor.process(frozen.id, 0)
       expect(
         (await prisma.communityComment.findUniqueOrThrow({ where: { id: frozen.id } }))
           .status

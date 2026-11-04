@@ -134,8 +134,16 @@ describe('Story 6.5 cross-feature privacy producers', () => {
           Promise.reject(new ServiceUnavailableException('fixture unavailable')),
       }
     )
-    await expect(processor.process(comment.id)).resolves.toBeUndefined()
-    await expect(processor.markFailed(comment.id, true)).resolves.toBeUndefined()
+    await expect(processor.process(comment.id, 0)).resolves.toBeUndefined()
+    const deferred = await prisma.communityCommentScreeningOutbox.findUniqueOrThrow({
+      where: { comment_id: comment.id },
+    })
+    await expect(
+      processor.failStale(comment.id, {
+        generation: deferred.generation,
+        updatedAt: deferred.updated_at,
+      })
+    ).resolves.toBeUndefined()
     expect(
       await prisma.communityComment.findUnique({ where: { id: comment.id } })
     ).toMatchObject({ status: 'pending_screening' })

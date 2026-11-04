@@ -148,6 +148,7 @@ describe('CommunityModerationQueue', () => {
         postId: 'post-1',
         uploadSessionId: 'session-1',
         platform: 'web',
+        generation: 0,
       },
       {
         jobId: 'post-1__session-1',
@@ -165,6 +166,8 @@ describe('CommunityModerationQueue', () => {
       expect.anything(),
       expect.objectContaining({ jobId: 'post-1__session-1__g1' })
     )
+    // The processor needs the generation too, because only the job id carried it before.
+    expect(queueAdd.mock.lastCall?.[1]).toMatchObject({ generation: 1 })
   })
 
   it('reuses same BullMQ Queue client across multiple enqueues', async () => {

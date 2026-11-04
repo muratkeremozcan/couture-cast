@@ -32,6 +32,7 @@ import {
 import { ModerationDecisionsRepository } from '../src/modules/moderation/moderation-decisions.repository.js'
 import { ModerationQueueRepository } from '../src/modules/moderation/moderation-queue.repository.js'
 import { CommunityCommentsOutbox } from '../src/modules/community/community-comments.outbox.js'
+import { CommunityCommentsProcessor } from '../src/modules/community/community-comments.processor.js'
 import { CommunityMaintenanceService } from '../src/modules/community/community-maintenance.service.js'
 import { checksumTables } from './helpers/moderation-queue-context.js'
 import {
@@ -2023,6 +2024,8 @@ describe('I-C-END-RESTORE: the sweep that returns held content when a ban ends (
     while ((await sweep(farFuture)).subjects > 0);
   })
 
+  const OLD_OUTBOX = new Date(Date.now() - 60 * MINUTE_MS)
+
   /** A ban already past its expiry, with one post and one comment still under its marker. */
   async function endedBan() {
     const author = await fx.member('author')
@@ -2157,6 +2160,158 @@ describe('I-C-END-RESTORE: the sweep that returns held content when a ban ends (
     })
   })
 
+  describe('R5-3: a stale sweep held across recovery', () => {
+    const OLD = new Date(NOW.getTime() - 60 * MINUTE_MS)
+    const staleSweep = () =>
+      new CommunityMaintenanceService(prisma, {} as never).sweepStalePendingReview(NOW)
+
+    /** A post that has sat in review past the stall deadline. */
+    async function agedPost() {
+      const author = await fx.member('author')
+      const post = await fx.post({
+        authorId: author.id,
+        status: 'pending_review',
+        publishedAt: null,
+      })
+      await prisma.lookbookPost.update({
+        where: { id: post.id },
+        data: { updated_at: OLD },
+      })
+      return { author, post }
+    }
+
+    it('leaves a post recovery freshened after the sweep selected it', async () => {
+      const { author, post } = await agedPost()
+      await withHeldConnection(async (lock) => {
+        await holdSubjectGuard(lock, author.id)
+        await holdPostGuard(lock, post.id)
+        // Recovery, uncommitted: the sweep still reads an aged pending post and selects it.
+        await lock.query('UPDATE "LookbookPost" SET updated_at = $1 WHERE id = $2', [
+          NOW,
+          post.id,
+        ])
+        const run = staleSweep()
+        await waitForBlocked(1)
+        await lock.query('COMMIT')
+        await lock.query('BEGIN')
+        await run
+      })
+      expect(
+        await prisma.lookbookPost.findUniqueOrThrow({ where: { id: post.id } })
+      ).toMatchObject({ status: 'pending_review', moderation_reason: null })
+      expect(await prisma.jobFailure.count({ where: { job_id: post.id } })).toBe(0)
+    })
+
+    it('still fails a post that really stalled', async () => {
+      const { post } = await agedPost()
+      await staleSweep()
+      expect(
+        await prisma.lookbookPost.findUniqueOrThrow({ where: { id: post.id } })
+      ).toMatchObject({
+        status: 'review_failed',
+        moderation_reason: 'moderation_stalled',
+      })
+    })
+  })
+
+  describe('R5-3: a stale comment failure held across recovery', () => {
+    const processor = () =>
+      new CommunityCommentsProcessor(
+        prisma,
+        {} as never,
+        {
+          getFeatureFlag: () => Promise.resolve(true),
+        } as never
+      )
+
+    it('leaves a comment whose outbox recovery re-armed after the sweep selected it', async () => {
+      const held = await endedBan()
+      await prisma.communityCommentScreeningOutbox.create({
+        data: { comment_id: held.comment.id, generation: 0 },
+      })
+      await prisma.communityCommentScreeningOutbox.updateMany({
+        where: { comment_id: held.comment.id },
+        data: { updated_at: OLD_OUTBOX },
+      })
+      await prisma.communityComment.update({
+        where: { id: held.comment.id },
+        data: { status: 'pending_screening', screening_reason: null },
+      })
+      await withHeldConnection(async (lock) => {
+        await lock.query('SELECT pg_advisory_xact_lock(hashtext($1::text))', [
+          `community_member:${held.author.id}`,
+        ])
+        const run = processor().failStale(held.comment.id, {
+          generation: 0,
+          updatedAt: OLD_OUTBOX,
+        })
+        await waitForBlocked(1)
+        await lock.query(
+          `UPDATE "CommunityCommentScreeningOutbox"
+           SET generation = generation + 1, dispatched_at = NULL, updated_at = now()
+           WHERE comment_id = $1`,
+          [held.comment.id]
+        )
+        await lock.query('COMMIT')
+        await lock.query('BEGIN')
+        await run
+      })
+      expect(
+        await prisma.communityComment.findUniqueOrThrow({
+          where: { id: held.comment.id },
+        })
+      ).toMatchObject({ status: 'pending_screening', screening_reason: null })
+    })
+
+    it('still fails a comment that really stalled, with or without an outbox row', async () => {
+      for (const withOutbox of [true, false]) {
+        const held = await endedBan()
+        await prisma.communityComment.update({
+          where: { id: held.comment.id },
+          data: { status: 'pending_screening', screening_reason: null },
+        })
+        if (withOutbox) {
+          await prisma.communityCommentScreeningOutbox.create({
+            data: { comment_id: held.comment.id, generation: 0 },
+          })
+          await prisma.communityCommentScreeningOutbox.updateMany({
+            where: { comment_id: held.comment.id },
+            data: { updated_at: OLD_OUTBOX },
+          })
+        }
+        await processor().failStale(
+          held.comment.id,
+          withOutbox ? { generation: 0, updatedAt: OLD_OUTBOX } : null
+        )
+        expect(
+          await prisma.communityComment.findUniqueOrThrow({
+            where: { id: held.comment.id },
+          })
+        ).toMatchObject({
+          status: 'screening_failed',
+          screening_reason: 'screening_unavailable',
+        })
+      }
+    })
+
+    it('leaves a comment that gained an outbox row after the sweep saw none', async () => {
+      const held = await endedBan()
+      await prisma.communityComment.update({
+        where: { id: held.comment.id },
+        data: { status: 'pending_screening', screening_reason: null },
+      })
+      await prisma.communityCommentScreeningOutbox.create({
+        data: { comment_id: held.comment.id, generation: 1 },
+      })
+      await processor().failStale(held.comment.id, null)
+      expect(
+        await prisma.communityComment.findUniqueOrThrow({
+          where: { id: held.comment.id },
+        })
+      ).toMatchObject({ status: 'pending_screening', screening_reason: null })
+    })
+  })
+
   describe('R3-2: the comment outbox cleanup', () => {
     const cleanup = () =>
       new CommunityCommentsOutbox(
@@ -2166,8 +2321,18 @@ describe('I-C-END-RESTORE: the sweep that returns held content when a ban ends (
         {} as never
       ).sweepStale()
 
-    it('keeps the row recovery re-armed after the cleanup selected it', async () => {
+    /** A comment screening itself held, which is finished work with no ban in it. */
+    async function machineHeld() {
       const held = await endedBan()
+      await prisma.communityComment.update({
+        where: { id: held.comment.id },
+        data: { screening_reason: 'language' },
+      })
+      return held
+    }
+
+    it('keeps the row recovery re-armed after the cleanup selected it', async () => {
+      const held = await machineHeld()
       await prisma.communityCommentScreeningOutbox.create({
         data: { comment_id: held.comment.id, generation: 0, dispatched_at: NOW },
       })
@@ -2228,8 +2393,21 @@ describe('I-C-END-RESTORE: the sweep that returns held content when a ban ends (
       expect(jobs).toContainEqual([held.comment.id, 1])
     })
 
-    it('still deletes the row of a comment that really finished', async () => {
+    it('keeps the row of a comment a ban still holds, so its next generation moves past it', async () => {
       const held = await endedBan()
+      await prisma.communityCommentScreeningOutbox.create({
+        data: { comment_id: held.comment.id, generation: 3, dispatched_at: NOW },
+      })
+      await cleanup()
+      expect(
+        await prisma.communityCommentScreeningOutbox.findUnique({
+          where: { comment_id: held.comment.id },
+        })
+      ).toMatchObject({ generation: 3 })
+    })
+
+    it('still deletes the row of a comment that really finished', async () => {
+      const held = await machineHeld()
       await prisma.communityCommentScreeningOutbox.create({
         data: { comment_id: held.comment.id, generation: 0, dispatched_at: NOW },
       })

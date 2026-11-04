@@ -1119,7 +1119,7 @@ describe('I-S-LOOP: the first path out of a held item with no script (E1, S1)', 
         },
       }),
       flags as never
-    ).process(commentId)
+    ).process(commentId, 0)
     const held = await prisma.communityComment.findUniqueOrThrow({
       where: { id: commentId },
     })
@@ -1220,7 +1220,9 @@ describe('I-S-IDENTITY: who a null reporter is (S1, D11, TEA-16)', () => {
   it('review_failed stays with the retry workers and out of the queue', async () => {
     const author = await fx.member('author')
     const { postId } = await pendingPost(author)
-    await postProcessor().markFailed(postId, 'STORAGE_PERMISSION_DENIED')
+    await postProcessor().markFailed(postId, 'STORAGE_PERMISSION_DENIED', {
+      generation: 0,
+    })
     expect(
       (await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })).status
     ).toBe('review_failed')

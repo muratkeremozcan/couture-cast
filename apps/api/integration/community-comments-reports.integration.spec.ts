@@ -129,7 +129,7 @@ describe('Story 6.4 comment report intake', () => {
     const { postId, reporter, params } = await reportFixture()
     const author = await fixture()
     const held = await create(author.userId, postId, input('damn'))
-    await processor.process(held.id)
+    await processor.process(held.id, 0)
     expect(
       (await prisma.communityComment.findUniqueOrThrow({ where: { id: held.id } })).status
     ).toBe('held_for_review')

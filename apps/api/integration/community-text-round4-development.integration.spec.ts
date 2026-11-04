@@ -24,7 +24,7 @@ describe('round4 disguised and cross-clause text through guarded HTTP', () => {
       ).send({ ...input(row.text), locale: row.locale })
       expect(response.status).toBe(200)
       const { id } = communityCommentSubmissionResponseSchema.parse(response.body).data
-      await processor.process(id)
+      await processor.process(id, 0)
       expect(
         (await prisma.communityComment.findUniqueOrThrow({ where: { id } })).status
       ).not.toBe('published')

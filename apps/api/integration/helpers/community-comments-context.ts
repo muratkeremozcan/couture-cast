@@ -143,7 +143,7 @@ export function commentsTestContext() {
     service.list({ userId, postId, parentId: null, cursor, limit })
   async function publish(userId: string, postId: string, request = input()) {
     const pending = await create(userId, postId, request)
-    await processor.process(pending.id)
+    await processor.process(pending.id, 0)
     return pending
   }
   async function enableCommunityFlags() {

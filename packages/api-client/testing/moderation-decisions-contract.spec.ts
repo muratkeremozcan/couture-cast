@@ -661,6 +661,12 @@ const bannedRefusal = {
     appealStatus: 'not_requested',
   },
 } as const
+/** What `community-comments.service.ts` answers when the read rollout is closed. */
+const rolloutDenial = {
+  statusCode: 403,
+  code: 'denied',
+  message: COMMUNITY_FEED_DISABLED_MESSAGE,
+} as const
 const ordinaryRefusal = {
   statusCode: 403,
   error: 'Forbidden',
@@ -669,6 +675,9 @@ const ordinaryRefusal = {
 export const refusalsFitTheSdk: {
   commentsBanned: GetCommunityComments403Response
   commentsOrdinary: GetCommunityComments403Response
+  commentsDenied: GetCommunityComments403Response
+  feedDenied: ApiV1CommunityFeedGet403Response
+  postDenied: ApiV1CommunityPostsPostIdGet403Response
   feedBanned: ApiV1CommunityFeedGet403Response
   feedOrdinary: ApiV1CommunityFeedGet403Response
   postBanned: ApiV1CommunityPostsPostIdGet403Response
@@ -676,6 +685,9 @@ export const refusalsFitTheSdk: {
 } = {
   commentsBanned: bannedRefusal,
   commentsOrdinary: ordinaryRefusal,
+  commentsDenied: rolloutDenial,
+  feedDenied: rolloutDenial,
+  postDenied: rolloutDenial,
   feedBanned: bannedRefusal,
   feedOrdinary: ordinaryRefusal,
   postBanned: bannedRefusal,

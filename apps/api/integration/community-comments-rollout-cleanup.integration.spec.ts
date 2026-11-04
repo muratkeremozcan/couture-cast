@@ -33,7 +33,7 @@ describe('Story 6.4 comment rollout authority, cleanup and real worker', () => {
         where: { key: { in: COMMUNITY_FLAG_KEYS } },
         data: { value: false },
       })
-      await remote.process(pending.id)
+      await remote.process(pending.id, 0)
       expect(
         (await prisma.communityComment.findUniqueOrThrow({ where: { id: pending.id } }))
           .status
@@ -49,7 +49,7 @@ describe('Story 6.4 comment rollout authority, cleanup and real worker', () => {
       })
     }
     const missing = await create(actor.userId, actor.postId)
-    await new CommunityCommentsProcessor(prisma, engine).process(missing.id)
+    await new CommunityCommentsProcessor(prisma, engine).process(missing.id, 0)
     expect(
       (await prisma.communityComment.findUniqueOrThrow({ where: { id: missing.id } }))
         .status

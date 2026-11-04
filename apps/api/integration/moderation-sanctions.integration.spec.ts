@@ -36,6 +36,7 @@ import {
 } from 'vitest'
 import {
   COMMUNITY_POST_NOT_FOUND_MESSAGE,
+  generateHttpOpenApiDocument,
   communityBannedErrorSchema,
   moderationAppealResponseSchema,
   moderationDecisionResponseSchema,
@@ -1074,8 +1075,8 @@ describe('I-B-PENDING: held content never publishes (D8, D9)', () => {
         processor
       ).dispatchPending()
       expect(commentJobs).not.toContain(comment.id)
-      await processor.process(comment.id)
-      await processor.markFailed(comment.id)
+      await processor.process(comment.id, 0)
+      await processor.markFailed(comment.id, 0)
 
       expect(screening).not.toHaveBeenCalled()
       expect(await postOf(post.id)).toMatchObject({
@@ -1143,7 +1144,7 @@ describe('I-B-PENDING: held content never publishes (D8, D9)', () => {
       } as never,
       rolloutOpen
     )
-    await processor.process(comment.id)
+    await processor.process(comment.id, 0)
     expect(await commentOf(comment.id)).toMatchObject({
       status: 'held_for_review',
       screening_reason: banMarker(sanctionId),
@@ -1335,7 +1336,7 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         passingEngine() as never,
         undefined,
         rolloutOpen
-      ).process({ postId: held.post.id, uploadSessionId: held.post.id })
+      ).process({ postId: held.post.id, uploadSessionId: held.post.id, generation: 1 })
       expect((await postOf(held.post.id)).status).toBe('published')
 
       // A re-armed comment row waits out the outbox's 30 s pause, then dispatches.
@@ -1362,7 +1363,7 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
           processor
         ).dispatchPending()
         expect(commentJobs).toContain(held.comment.id)
-        await processor.process(held.comment.id)
+        await processor.process(held.comment.id, 1)
         expect((await commentOf(held.comment.id)).status).toBe('published')
       })
     })
@@ -1736,7 +1737,7 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
             passingEngine() as never,
             undefined,
             rolloutOpen
-          ).process({ postId: post.id, uploadSessionId: post.id })
+          ).process({ postId: post.id, uploadSessionId: post.id, generation: 1 })
           expect((await postOf(post.id)).status).toBe('published')
         })
       }
@@ -1771,6 +1772,262 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         expect(withdrawn.status, dump(withdrawn)).toBe(200)
       })
       expect(storage.objects.has(post.image_object_path!)).toBe(false)
+    })
+  })
+
+  describe('Round 5: work from an old generation never touches a newer one', () => {
+    const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
+    const gated = () => {
+      let entered!: () => void
+      let release!: () => void
+      const inside = new Promise<void>((resolve) => (entered = resolve))
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      return { entered, release, inside, gate }
+    }
+    const overturnNow = async (sanctionId: string) => {
+      const staff = await admin()
+      for (const status of ['requested', 'overturned'] as const) {
+        const appeal = await staff.appeal(sanctionId, { status, reason: REASON })
+        expect(appeal.status, dump(appeal)).toBe(200)
+      }
+    }
+    const processorWith = (storage: InMemoryCommunityStorage, engine: unknown) =>
+      new CommunityModerationProcessor(
+        prisma,
+        storage,
+        moderationTelemetry,
+        engine as never,
+        undefined,
+        rolloutOpen
+      )
+    const job = (post: { id: string }, generation: number) => ({
+      postId: post.id,
+      uploadSessionId: post.id,
+      generation,
+    })
+    const outboxOf = (post: { id: string }) =>
+      prisma.communityModerationOutbox.findUniqueOrThrow({ where: { post_id: post.id } })
+
+    /** A held post, banned and overturned while generation 0 is still running. */
+    async function pendingAuthor() {
+      const author = await fx.member('author')
+      const seeded = await fx.postCase({ author })
+      const { post, storage } = await pendingPostWithImage(author.id)
+      return { author, seeded, post, storage }
+    }
+    const banAndRecover = async (seeded: { caseId: string }, post: { id: string }) => {
+      const applied = await ban(seeded.caseId, 'temporary')
+      expect((await postOf(post.id)).status).toBe('flagged')
+      await overturnNow(applied.sanctionId)
+      expect(await postOf(post.id)).toMatchObject({
+        status: 'pending_review',
+        moderation_reason: null,
+      })
+      expect((await outboxOf(post)).generation).toBe(1)
+    }
+
+    it('R5-1 a late upload after the newer generation published leaves the image and declarations', async () => {
+      const { seeded, post, storage } = await pendingAuthor()
+      const hold = gated()
+      let uploads = 0
+      storage.upload = async (objectPath: string, bytes: Buffer) => {
+        uploads += 1
+        if (uploads === 1) {
+          hold.entered()
+          await hold.gate
+        }
+        storage.objects.set(objectPath, bytes)
+      }
+      const old = processorWith(storage, passingEngine())
+        .process(job(post, 0))
+        .catch(() => undefined)
+      await hold.inside
+
+      await banAndRecover(seeded, post)
+      await processorWith(storage, passingEngine()).process(job(post, 1))
+      expect((await postOf(post.id)).status).toBe('published')
+
+      hold.release()
+      await old
+
+      const after = await postOf(post.id)
+      expect(after.status).toBe('published')
+      const stored = storage.objects.get(after.image_object_path!)
+      expect(stored, 'the published image').toBeDefined()
+      expect(storage.removed).not.toContain(after.image_object_path)
+      expect(after.image_checksum).toBe(sha256(stored!))
+      expect(after.image_byte_size).toBe(stored!.length)
+    })
+
+    it('R5-2 an old final failure held across recovery leaves the new generation claimable', async () => {
+      const { seeded, post, storage } = await pendingAuthor()
+      const hold = gated()
+      const failing = {
+        moderatePost: async () => {
+          hold.entered()
+          await hold.gate
+          throw new Error('dependency unavailable')
+        },
+        screenText: () => Promise.reject(new Error('unused')),
+      }
+      const oldProcessor = processorWith(storage, failing)
+      const old = oldProcessor.process(job(post, 0), { attempt: 3, maxAttempts: 3 })
+      await hold.inside
+
+      await banAndRecover(seeded, post)
+      hold.release()
+      await expect(old).rejects.toThrow()
+      await oldProcessor.markFailed(post.id, 'inference_timeout', {
+        attempt: 3,
+        maxAttempts: 3,
+        generation: 0,
+      })
+
+      expect(await postOf(post.id)).toMatchObject({
+        status: 'pending_review',
+        moderation_reason: null,
+      })
+      expect(await outboxOf(post)).toMatchObject({ generation: 1, dispatched_at: null })
+
+      await processorWith(storage, passingEngine()).process(job(post, 1))
+      expect((await postOf(post.id)).status).toBe('published')
+    })
+
+    it.each([
+      ['pass', passingEngine],
+      [
+        'block',
+        () => ({
+          moderatePost: () =>
+            Promise.resolve({
+              disposition: 'block',
+              passed: false,
+              reasons: ['unsafe_class'],
+              engineVersion: 'old',
+            }),
+          screenText: () => Promise.reject(new Error('unused')),
+        }),
+      ],
+    ] as const)(
+      'an old %s verdict that lands after recovery changes nothing',
+      async (_name, verdict) => {
+        const { seeded, post, storage } = await pendingAuthor()
+        const hold = gated()
+        const engine = verdict() as {
+          moderatePost: (input: never) => Promise<unknown>
+          screenText: (input: never) => Promise<unknown>
+        }
+        const old = processorWith(storage, {
+          ...engine,
+          moderatePost: async (input: never) => {
+            hold.entered()
+            await hold.gate
+            return engine.moderatePost(input)
+          },
+        })
+          .process(job(post, 0))
+          .catch(() => undefined)
+        await hold.inside
+        await banAndRecover(seeded, post)
+        const events = () => prisma.moderationEvent.count({ where: { post_id: post.id } })
+        const before = await events()
+        hold.release()
+        await old
+
+        expect(await postOf(post.id)).toMatchObject({
+          status: 'pending_review',
+          moderation_reason: null,
+          published_at: null,
+        })
+        expect(await outboxOf(post)).toMatchObject({ generation: 1, dispatched_at: null })
+        expect(await events()).toBe(before)
+      }
+    )
+
+    it('treats a job queued in the old payload shape as generation 0', async () => {
+      const { seeded, post, storage } = await pendingAuthor()
+      await banAndRecover(seeded, post)
+      await processorWith(storage, passingEngine()).process({
+        postId: post.id,
+        uploadSessionId: post.id,
+      })
+      expect((await postOf(post.id)).status).toBe('pending_review')
+
+      const fresh = await pendingAuthor()
+      await processorWith(fresh.storage, passingEngine()).process({
+        postId: fresh.post.id,
+        uploadSessionId: fresh.post.id,
+      })
+      expect((await postOf(fresh.post.id)).status).toBe('published')
+    })
+
+    describe('comments', () => {
+      const commentOutbox = (comment: { id: string }) =>
+        prisma.communityCommentScreeningOutbox.findUniqueOrThrow({
+          where: { comment_id: comment.id },
+        })
+      async function pendingCommenter() {
+        const author = await fx.member('author')
+        const seeded = await fx.postCase({ author })
+        const comment = await pendingComment(author.id)
+        return { author, seeded, comment }
+      }
+      const recoverComment = async (
+        seeded: { caseId: string },
+        comment: { id: string }
+      ) => {
+        const applied = await ban(seeded.caseId, 'temporary')
+        expect((await commentOf(comment.id)).status).toBe('held_for_review')
+        await overturnNow(applied.sanctionId)
+        expect((await commentOf(comment.id)).status).toBe('pending_screening')
+        expect((await commentOutbox(comment)).generation).toBe(1)
+      }
+      const commentProcessor = (engine: unknown) =>
+        new CommunityCommentsProcessor(prisma, engine as never, rolloutOpen)
+
+      it.each(['pass', 'block'] as const)(
+        'an old %s verdict that lands after recovery changes nothing',
+        async (verdict) => {
+          const { seeded, comment } = await pendingCommenter()
+          const hold = gated()
+          const old = commentProcessor({
+            screenText: async () => {
+              hold.entered()
+              await hold.gate
+              return {
+                disposition: verdict,
+                passed: verdict === 'pass',
+                reasons: verdict === 'pass' ? [] : ['language'],
+                engineVersion: 'old',
+              }
+            },
+          })
+            .process(comment.id, 0)
+            .catch(() => undefined)
+          await hold.inside
+          await recoverComment(seeded, comment)
+          hold.release()
+          await old
+
+          expect(await commentOf(comment.id)).toMatchObject({
+            status: 'pending_screening',
+            screening_reason: null,
+            publication_sequence: null,
+          })
+          expect((await commentOutbox(comment)).generation).toBe(1)
+          await commentProcessor(passingEngine()).process(comment.id, 1)
+          expect((await commentOf(comment.id)).status).toBe('published')
+        }
+      )
+
+      it('an old final failure leaves the new generation pending', async () => {
+        const { seeded, comment } = await pendingCommenter()
+        await recoverComment(seeded, comment)
+        await commentProcessor(passingEngine()).markFailed(comment.id, 0)
+        expect((await commentOf(comment.id)).status).toBe('pending_screening')
+        await commentProcessor(passingEngine()).process(comment.id, 1)
+        expect((await commentOf(comment.id)).status).toBe('published')
+      })
     })
   })
 
@@ -1871,7 +2128,7 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         passingEngine() as never,
         undefined,
         rolloutOpen
-      ).process({ postId: post.id, uploadSessionId: post.id })
+      ).process({ postId: post.id, uploadSessionId: post.id, generation: 1 })
       expect(await postOf(post.id)).toMatchObject({
         status: 'published',
         moderation_reason: null,
@@ -2853,6 +3110,125 @@ describe('I-B-TEEN: a ban and guardian consent never touch each other', () => {
     ).toBe(1)
     expect(await sanctionOf(applied.sanctionId)).toEqual(sanctionBefore)
     expectBanned(await client.get('/api/v1/community/feed'), refusal)
+  })
+})
+
+describe('R5-4: a real 403 body fits the 403 the document publishes for its route', () => {
+  type Schema = {
+    $ref?: string
+    oneOf?: Schema[]
+    anyOf?: Schema[]
+    required?: string[]
+    properties?: Record<string, Schema & { enum?: unknown[] }>
+    additionalProperties?: boolean
+  }
+  const document = generateHttpOpenApiDocument() as unknown as {
+    paths: Record<
+      string,
+      Record<
+        string,
+        {
+          responses?: Record<
+            string,
+            { content?: Record<string, { schema?: Schema }> } | undefined
+          >
+        }
+      >
+    >
+    components: { schemas: Record<string, Schema> }
+  }
+  const resolve = (schema: Schema): Schema =>
+    schema.$ref
+      ? resolve(document.components.schemas[schema.$ref.split('/').pop()!]!)
+      : schema
+  const branches = (schema: Schema): Schema[] => {
+    const resolved = resolve(schema)
+    const union = resolved.oneOf ?? resolved.anyOf
+    return union ? union.flatMap(branches) : [resolved]
+  }
+  const fits = (schema: Schema, body: Record<string, unknown>) =>
+    (schema.required ?? []).every((key) => key in body) &&
+    Object.entries(schema.properties ?? {}).every(([key, property]) => {
+      const allowed = (resolve(property) as { enum?: unknown[] }).enum
+      return !(key in body) || !allowed || allowed.includes(body[key])
+    }) &&
+    (schema.additionalProperties !== false ||
+      Object.keys(body).every((key) => key in (schema.properties ?? {})))
+
+  /** The route's published 403 branches, found by matching the request against the templates. */
+  function published403(response: Response): Schema[] {
+    const { method, path } = (
+      response as unknown as { req: { method: string; path: string } }
+    ).req
+    const bare = path.split('?')[0]!
+    // An exact path wins, since /posts/publish also matches the /posts/{postId} template.
+    const exact = document.paths[bare]
+    const match: [string, (typeof document.paths)[string]] | undefined = exact
+      ? [bare, exact]
+      : Object.entries(document.paths).find(([template]) =>
+          new RegExp(`^${template.replace(/\{[^}]+\}/g, '[^/]+')}$`).test(bare)
+        )
+    expect(match, `no document path for ${bare}`).toBeDefined()
+    const schema =
+      match![1][method.toLowerCase()]?.responses?.['403']?.content?.['application/json']
+        ?.schema
+    expect(schema, `no 403 published for ${method} ${bare}`).toBeDefined()
+    return branches(schema!)
+  }
+  const expectPublished = (response: Response) => {
+    const body = response.body as Record<string, unknown>
+    expect(
+      published403(response).some((branch) => fits(branch, body)),
+      dump(response)
+    ).toBe(true)
+  }
+
+  describe('a banned member', () => {
+    let client: Member
+    let ids: RouteIds
+    beforeAll(async () => {
+      const subject = await fx.member('banned')
+      client = member(subject.id)
+      ids = await seedRoutes(client)
+      await fx.sanction(subject, { kind: 'temporary' })
+    }, 60_000)
+
+    it.each(ROUTES)('%s', async (_name, call) => {
+      const response = await call(client, ids)
+      expect(response.status, dump(response)).toBe(403)
+      expectPublished(response)
+    })
+  })
+
+  describe('a member the read rollout refuses', () => {
+    let client: Member
+    let ids: RouteIds
+    beforeAll(async () => {
+      const subject = await fx.member('rollout')
+      client = member(subject.id)
+      ids = await seedRoutes(client)
+    }, 60_000)
+    afterEach(() => {
+      flagValues.delete('community_read_enabled')
+    })
+
+    it.each(ROUTES.filter(([name]) => name.startsWith('GET')))(
+      '%s',
+      async (_name, call) => {
+        flagValues.set('community_read_enabled', false)
+        const response = await call(client, ids)
+        // A route that answers something other than 403 here publishes that separately.
+        if (response.status === 403) expectPublished(response)
+      }
+    )
+
+    it('reaches the comments route, the one the review found the gap on', async () => {
+      flagValues.set('community_read_enabled', false)
+      const response = await client.get(`/api/v1/community/posts/${ids.postId}/comments`)
+      expect(response.status, dump(response)).toBe(403)
+      expect(response.body).toMatchObject({ code: 'denied' })
+      expectPublished(response)
+    })
   })
 })
 

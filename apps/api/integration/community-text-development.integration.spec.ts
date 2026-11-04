@@ -19,7 +19,7 @@ describe('development fashion text through guarded HTTP and persisted screening'
         expect(response.status).toBe(200)
         const { id } = communityCommentSubmissionResponseSchema.parse(response.body).data
         expect(id).toBeTruthy()
-        await processor.process(id)
+        await processor.process(id, 0)
         const stored = await prisma.communityComment.findUniqueOrThrow({ where: { id } })
         expect(stored.status).toBe('published')
         const visible = await authorized(

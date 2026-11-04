@@ -87,7 +87,11 @@ describe('CommunityMaintenanceService', () => {
 
       expect(result).toEqual({ stalled: 1 })
       expect(updateMany).toHaveBeenCalledWith({
-        where: { id: 'post-stalled', status: 'pending_review' },
+        where: {
+          id: 'post-stalled',
+          status: 'pending_review',
+          updated_at: new Date('2026-09-05T11:00:00.000Z'),
+        },
         data: { status: 'review_failed', moderation_reason: 'moderation_stalled' },
       })
       // The alert lands in the repository's existing dead-letter surface, so

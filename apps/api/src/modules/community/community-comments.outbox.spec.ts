@@ -149,7 +149,10 @@ it('R14 continues the stale sweep after one dependency failure', async () => {
     .mockResolvedValue(undefined)
   const prisma = {
     communityComment: {
-      findMany: vi.fn().mockResolvedValue([{ id: 'first' }, { id: 'second' }]),
+      findMany: vi.fn().mockResolvedValue([
+        { id: 'first', screening_outbox: null },
+        { id: 'second', screening_outbox: null },
+      ]),
     },
     communityCommentAnalyticsOutbox: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -164,8 +167,8 @@ it('R14 continues the stale sweep after one dependency failure', async () => {
     prisma as never,
     {} as never,
     {} as never,
-    { markFailed: failed } as never
+    { failStale: failed } as never
   )
   await expect(box.sweepStale()).resolves.toBeUndefined()
-  expect(failed).toHaveBeenNthCalledWith(2, 'second', true)
+  expect(failed).toHaveBeenNthCalledWith(2, 'second', null)
 })

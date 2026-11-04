@@ -785,6 +785,26 @@ Codex round 4: R4-1 is the P, ineligible overturn, sweep, passing screen, Q, ove
 R4-2 makes the rollback test assert the first sweep rejects.
 R4-3 runs an ineligible permanent overturn through the fallback sweep and checks statuses, markers, outboxes and the hold-release stamp.
 
+### Codex round 5
+
+Returning content to pending made old screening work look current, because only the job id carried the generation.
+The fix makes generation ownership explicit, so these tests pin the result on real databases.
+
+| Finding                                                   | Test                                                                                   | Red at `391c8828`                                |
+| :-------------------------------------------------------- | :------------------------------------------------------------------------------------- | :----------------------------------------------- |
+| R5-1 A late upload removes a newer generation's image     | Round 5 in I-B-END-RESTORE                                                             | Red: image gone                                  |
+| R5-2 An old final failure takes the new generation        | Round 5 in I-B-END-RESTORE                                                             | Red: `review_failed`                             |
+| An old passing verdict publishes over the new generation  | Round 5 in I-B-END-RESTORE                                                             | Red: published                                   |
+| A job with the old payload shape screens a recovered post | Round 5 in I-B-END-RESTORE                                                             | Red: published                                   |
+| R5-3 A stale post sweep held across recovery              | R5-3 in I-C-END-RESTORE, a real blocked update                                         | Red: `review_failed`                             |
+| R5-4 Real 403 bodies against the published 403            | R5-4 in `moderation-sanctions.integration.spec.ts`, real requests against the document | Red on comments, replies and comment-submissions |
+
+The comment path was already fenced on generation, so its verdict, final failure and stale tests passed before the fix and stay as guards.
+An old `block` verdict on a post also passed before the fix.
+R5-4 first reported a missing 403 on the publish route, which was a bug in my route matcher: `/posts/publish` matched the `/posts/{postId}` template.
+
+The full API tier passes at the round 5 source: 7988 passed, 28 skipped.
+
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
 Those failures were my setup, and the rerun below is the evidence.

@@ -421,7 +421,7 @@ describe('6.1 community moderation pipeline', () => {
       expect(midFlight.status).toBe('pending_review')
 
       // The worker calls this once the retry budget is spent.
-      await processor.markFailed(postId, 'STORAGE_PERMISSION_DENIED')
+      await processor.markFailed(postId, 'STORAGE_PERMISSION_DENIED', { generation: 0 })
 
       const terminal = await prisma.lookbookPost.findUniqueOrThrow({
         where: { id: postId },
@@ -457,7 +457,7 @@ describe('6.1 community moderation pipeline', () => {
       const { postId } = await createPendingPost(storage)
       await processor.process({ postId, uploadSessionId: postId })
 
-      await processor.markFailed(postId, 'LATE_RETRY')
+      await processor.markFailed(postId, 'LATE_RETRY', { generation: 0 })
 
       const post = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
       expect(post.status).toBe('published')
@@ -1130,6 +1130,7 @@ describe('6.2 screening dispositions and attempt evidence', () => {
     await processor.markFailed(postId, 'inference_timeout', {
       attempt: 3,
       maxAttempts: 3,
+      generation: 0,
     })
 
     const failed = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
