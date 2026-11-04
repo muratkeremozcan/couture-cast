@@ -48,7 +48,7 @@ function signedUploadExpiry(token: string): Date {
 }
 
 const fetchWithUploadTimeout = (
-  input: Parameters<typeof fetch>[0],
+  input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<Response> =>
   fetch(input, {
