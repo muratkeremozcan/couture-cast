@@ -19,6 +19,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import {
+  deploymentBuiltFromBranch,
   deterministicBranchAliasUrl,
   gitBranchAliasForDeployment,
 } from './vercel-branch-alias.mjs'
@@ -146,12 +147,19 @@ function secondsFromEnv(name, fallback) {
  * @param {() => Promise<Array<Record<string, any>>>} listDeployments
  * @param {string | undefined} expectedSha
  * @param {boolean} poll
+ * @param {string} [branch] when set, only a deployment built from exactly this branch counts
  */
-export async function listDeploymentsAwaitingSha(listDeployments, expectedSha, poll) {
+export async function listDeploymentsAwaitingSha(
+  listDeployments,
+  expectedSha,
+  poll,
+  branch
+) {
   const timeoutMs = poll ? secondsFromEnv('RESOLVE_SHA_TIMEOUT_SECONDS', 600) * 1000 : 0
   const intervalMs = secondsFromEnv('RESOLVE_SHA_INTERVAL_SECONDS', 15) * 1000
   const deadline = Date.now() + timeoutMs
   const matchesSha = (deployment) =>
+    (!branch || deploymentBuiltFromBranch(deployment, branch)) &&
     typeof deployment?.meta?.githubCommitSha === 'string' &&
     deployment.meta.githubCommitSha.startsWith(expectedSha)
   for (;;) {
@@ -179,8 +187,8 @@ async function findDeploymentUrl(projectId, teamId, branch) {
     limit: '20',
   })
   if (teamId) searchParams.set('teamId', teamId)
-  const branchSlug = slugifyBranch(branch)
-  if (branch) searchParams.set('meta', `githubCommitRef=${branch}`)
+  // `meta-<key>` is the filter Vercel applies; a bare `meta` value is ignored and lists every branch.
+  if (branch) searchParams.set('meta-githubCommitRef', branch)
   const url = `https://api.vercel.com/v6/deployments?${searchParams.toString()}`
   const expectedSha =
     env('EXPECTED_SHA') ??
@@ -189,13 +197,18 @@ async function findDeploymentUrl(projectId, teamId, branch) {
     env('COMMIT_SHA')
   const matchesSha = (deployment) => {
     const deploymentSha = deployment?.meta?.githubCommitSha
-    return typeof deploymentSha === 'string' && deploymentSha.startsWith(expectedSha)
+    return (
+      (!branch || deploymentBuiltFromBranch(deployment, branch)) &&
+      typeof deploymentSha === 'string' &&
+      deploymentSha.startsWith(expectedSha)
+    )
   }
 
   const deployments = await listDeploymentsAwaitingSha(
     async () => (await fetchJson(url))?.deployments ?? [],
     expectedSha,
-    Boolean(env('EXPECTED_SHA'))
+    Boolean(env('EXPECTED_SHA')),
+    branch
   )
 
   // Commit matching is the critical safeguard for preview E2E: after a PR push,
@@ -221,10 +234,9 @@ async function findDeploymentUrl(projectId, teamId, branch) {
   // deployment URL from the same branch. Use the mutable git-branch alias so
   // the waiter can observe the alias switch to the new deployment when Vercel
   // finishes the rollout.
-  const branchCandidates = deployments.filter((deployment) => {
-    const metaRef = deployment.meta?.githubCommitRef
-    return !branch || !metaRef || metaRef === branch || metaRef === branchSlug
-  })
+  const branchCandidates = deployments.filter(
+    (deployment) => !branch || deploymentBuiltFromBranch(deployment, branch)
+  )
 
   for (const deployment of branchCandidates) {
     const aliasUrl = await gitBranchAliasForDeployment(deployment, (id) =>

@@ -376,7 +376,7 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
   // the SHA wait time out. So poll until the expected deployment exists.
   const expectedSha = env('EXPECTED_SHA')
   if (expectedSha) {
-    const exactUrl = await waitForDeploymentWithSha(fetchDeployments, expectedSha)
+    const exactUrl = await waitForDeploymentWithSha(fetchDeployments, expectedSha, branch)
     if (exactUrl) return exactUrl
   }
 
@@ -434,10 +434,12 @@ function secondsFromEnv(name, fallback) {
  * Poll until a deployment built from `expectedSha` is listed, then return its
  * canonical URL. Gives up after RESOLVE_SHA_TIMEOUT_SECONDS (default 600).
  * @param {() => Promise<Array<Record<string, any>>>} fetchDeployments
+ * A deployment of another branch at the same commit does not count: the unfiltered listing can contain it.
  * @param {string} expectedSha
+ * @param {string} branch
  * @returns {Promise<string | undefined>}
  */
-export async function waitForDeploymentWithSha(fetchDeployments, expectedSha) {
+export async function waitForDeploymentWithSha(fetchDeployments, expectedSha, branch) {
   const timeoutMs = secondsFromEnv('RESOLVE_SHA_TIMEOUT_SECONDS', 600) * 1000
   const intervalMs = secondsFromEnv('RESOLVE_SHA_INTERVAL_SECONDS', 15) * 1000
   const deadline = Date.now() + timeoutMs
@@ -446,6 +448,7 @@ export async function waitForDeploymentWithSha(fetchDeployments, expectedSha) {
     const match = deployments.find(
       (deployment) =>
         deployment?.url &&
+        deploymentBuiltFromBranch(deployment, branch) &&
         typeof deployment.meta?.githubCommitSha === 'string' &&
         deployment.meta.githubCommitSha.startsWith(expectedSha)
     )
