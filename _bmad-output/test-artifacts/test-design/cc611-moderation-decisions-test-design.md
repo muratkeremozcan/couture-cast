@@ -20,7 +20,7 @@ lastSaved: '2026-11-04'
 
 **Date:** 2026-11-04
 **Author:** Murat (TEA), non-interactive run, owner unavailable, decisions recorded in the spec
-**Status:** Task 1 plan. No tests written. Reconciled to the spec and its Spec Change Log entries TEA-01 to TEA-22.
+**Status:** Task 1 plan, built and executed. Signed off at `3a23e2cc`, results under Execution results. Reconciled to the spec and its Spec Change Log entries TEA-01 to TEA-22.
 
 **Precedence:** the spec at `_bmad-output/implementation-artifacts/spec-6-11-moderation-decisions-account-sanctions.md` wins wherever this document and the spec disagree.
 The frozen block is byte-identical to the builder's draft.
@@ -624,6 +624,52 @@ The concurrency author also ran 19 mutations of its own, all red. Its attempt-li
 
 ---
 
+### Execution results (2026-11-04, Chicago time)
+
+Three consecutive full runs at commit `3a23e2cc`, serial, every tier, on a migrated stock Postgres 17 with no failure, retry or flake.
+
+| Suite                                                                 | Result on each of three runs              |
+| --------------------------------------------------------------------- | ----------------------------------------- |
+| `apps/api` whole tier, units and integration                          | 7879 passed, 28 skipped, 362 of 365 files |
+| `packages/api-client`                                                 | 1580 passed                               |
+| `packages/config`                                                     | 29 passed                                 |
+| `packages/db`, RLS, constraints and backfill                          | 266 passed, 1 skipped                     |
+| `apps/web`                                                            | 1807 passed                               |
+| `apps/mobile`                                                         | 1905 passed                               |
+| Pact consumer and provider                                            | 444 passed and verification passed        |
+| Playwright: `moderation-decisions`, `moderation-console`, role matrix | 62 passed, 1 skipped                      |
+
+The Playwright skip is the P-D-PREVIEW-CLOSED browser test, which needs the flags off, while a local stack has them on.
+No moderation or sanction test is among the API or database skips.
+TypeScript is clean in `apps/api`, `apps/web`, `apps/mobile`, `packages/api-client`, `packages/db`, `pact` and `playwright`.
+ESLint is clean on every changed source and test file. All five `node-test-gate` suites pass.
+The PR changes 99 files, under the limit of 100 with none to spare.
+
+Measured on the final code:
+
+- I-B-SCALE: a permanent ban with 2,000 related posts took 479 to 531 ms, with a peak of 2,006 advisory locks, far inside the 7-second transaction.
+- I-B-REALTIME: a live socket received `denied` in about 2 seconds, inside the 8-second bound.
+
+Known limits of this evidence:
+
+- Nothing ran against a deployed preview. P-D-PREVIEW-CLOSED ran only on a local stack with TEST_ENV=preview and flipped flags, and its expected code is inferred from the 6.10 preview run. The PR's preview job is its first real run.
+- I-C-DEADLOCK cannot force `40P01`. `community-privacy.spec.ts` proves that retry.
+- S-2 was not run against P-D-ROLES. Its unit and integration tests went red.
+- I-B-REALTIME proves the live denial for a temporary ban, and a permanent ban at the handshake.
+- I-B-SEND-GUARD runs on real time, because its rows use the database clock.
+- Test review finding 22 was declined: splitting files over 1,000 lines would add paths the file limit does not allow.
+
+Defects these tests found and the builder fixed: F1 to F7 and F21 to F22 in the API and contract, F8 to F20 and G1 to G6 in the console and the banned page.
+
+Outside this PR, for the coordinator:
+
+- `fix/notification-settings-auth-links` holds the auth link fix.
+- `epic-6-context.md` needs its story update after merge.
+- `chip-navigation.tsx` pills overrun at 375 px, and a 1 px dark line shows at x=0 (unverified).
+- The `faker` email collision in `packages/testing` can still hit other suites that create many users.
+
+---
+
 ## Quality Gate Criteria
 
 ### Pass/Fail Thresholds
@@ -670,8 +716,9 @@ Attributed audit (E3) is carried by I-D-AUDIT-SHAPE, I-D-PRIOR-ACTIONS and D-RLS
 
 ### Gap status
 
-No uncovered criterion in the plan.
-No test exists yet, so coverage is planned and unproven until the build.
+No uncovered criterion.
+Every planned P0 and P1 scenario has a test that passed three consecutive runs at `3a23e2cc`, except the one local skip named under Execution results.
+The criteria rows above list executed tests.
 
 ---
 
