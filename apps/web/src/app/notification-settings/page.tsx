@@ -36,8 +36,6 @@ export default function NotificationSettingsPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(false)
-  // Null until the first session read, so a signed-in member never sees Sign in flash past.
-  const [signedIn, setSignedIn] = useState<boolean | null>(null)
   const suggestedTimezone = useRef<string | undefined>(undefined)
   const generation = useRef(0)
   const clientRef = useRef<ReturnType<typeof communitySyncFromWeb> | null>(null)
@@ -61,24 +59,18 @@ export default function NotificationSettingsPage() {
         // form's place until it names a member (a new update) or settles without one.
         const pending = initial && hasStoredWebSession()
         setLoading(pending)
-        setSignedIn(pending)
-        const settle = () => {
-          setLoading(false)
-          setSignedIn(false)
-        }
         if (pending)
           void resolveWebSessionToken().then(
             (token) => {
-              if (!token && current()) settle()
+              if (!token && current()) setLoading(false)
             },
             () => {
-              if (current()) settle()
+              if (current()) setLoading(false)
             }
           )
         return
       }
       setLoading(true)
-      setSignedIn(true)
       void (async () => {
         const token = await resolveWebSessionToken()
         if (!current() || webSessionIdentity() !== next || !token) {
@@ -254,23 +246,19 @@ export default function NotificationSettingsPage() {
       <p role="status" aria-live="polite">
         {message ? t(message) : ''}
       </p>
-      {signedIn === false ? (
-        <Link href="/signin" className="min-h-12 self-start py-3 underline">
-          {t('community.notifications.signin')}
-        </Link>
-      ) : null}
-      {signedIn ? (
-        <button
-          type="button"
-          onClick={() => {
-            void signOutWebSession().then(() => window.location.assign('/'))
-          }}
-          className="min-h-12 self-start py-3 underline"
-        >
-          {t('community.notifications.signout')}
-        </button>
-      ) : null}
-      <Link href="/" className="min-h-12 self-start py-3 underline">
+      <Link href="/signin" className="min-h-12 underline">
+        {t('community.notifications.signin')}
+      </Link>
+      <button
+        type="button"
+        onClick={() => {
+          void signOutWebSession().then(() => window.location.assign('/'))
+        }}
+        className="min-h-12 underline"
+      >
+        {t('community.notifications.signout')}
+      </button>
+      <Link href="/" className="min-h-12 underline">
         {t('community.notifications.back')}
       </Link>
     </main>
