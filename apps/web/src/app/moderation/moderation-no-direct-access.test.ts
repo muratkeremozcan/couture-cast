@@ -31,22 +31,21 @@ const consoleSources = [
  * 'fetch' (`globalThis['fetch']`). A parsed tree ignores comments and strings, so no spelling
  * of the call slips past the way a pattern would.
  */
-function fetchReferences(source: string): string[] {
-  const tree = ts.createSourceFile(
-    'scan.tsx',
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX
-  )
+function fetchReferences(source: string, fileName = 'scan.tsx'): string[] {
+  // The extension picks the script kind, so a generic arrow in a .ts file is not read as JSX.
+  const tree = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true)
   const found: string[] = []
+  const namesFetch = (node: ts.Node | undefined) =>
+    node !== undefined && ts.isStringLiteralLike(node) && node.text === 'fetch'
   const visit = (node: ts.Node) => {
     const isName = ts.isIdentifier(node) && node.text === 'fetch'
-    const isElement =
-      ts.isElementAccessExpression(node) &&
-      ts.isStringLiteralLike(node.argumentExpression) &&
-      node.argumentExpression.text === 'fetch'
-    if (isName || isElement) found.push(node.getText(tree))
+    const isLiteralKey =
+      namesFetch(node) &&
+      (ts.isElementAccessExpression(node.parent) ||
+        ts.isComputedPropertyName(node.parent) ||
+        (ts.isPropertyAssignment(node.parent) && node.parent.name === node) ||
+        (ts.isBindingElement(node.parent) && node.parent.propertyName === node))
+    if (isName || isLiteralKey) found.push(node.getText(tree))
     ts.forEachChild(node, visit)
   }
   visit(tree)
@@ -74,9 +73,19 @@ describe('U-WEB-Q-NO-DIRECT', () => {
     'const get = fetch; get(url)',
     'const { fetch: get } = globalThis',
     'const get = globalThis.fetch',
+    "const { 'fetch': get } = globalThis",
+    "const { ['fetch']: get } = globalThis",
+    "const table = { 'fetch': 1 }",
+    "const table = { ['fetch']: 1 }",
     'export const view = () => <a onClick={() => fetch(url)} />',
   ])('the network scan catches %j', (source) => {
     expect(fetchReferences(source)).not.toEqual([])
+  })
+
+  it('reads a .ts source as TypeScript and a .tsx source as JSX', () => {
+    const generic = 'const wrap = <T>(value: T) => value\nconst call = () => fetch(url)'
+    expect(fetchReferences(generic, 'queue.ts')).toEqual(['fetch'])
+    expect(fetchReferences('const view = <a>fetch</a>', 'queue.tsx')).toEqual([])
   })
 
   it.each([
@@ -89,6 +98,9 @@ describe('U-WEB-Q-NO-DIRECT', () => {
     '// fetch(url) is not allowed here',
     '/* globalThis.fetch(url) */ const ok = 1',
     "globalThis['fetchCases'](url)",
+    "const { 'fetchCases': get } = globalThis",
+    "const note = { text: 'fetch' }",
+    "const label = 'fetch'",
     'client.fetchCases(url)',
   ])('the network scan leaves %j alone', (source) => {
     expect(fetchReferences(source)).toEqual([])
@@ -136,7 +148,10 @@ describe('U-WEB-Q-NO-DIRECT', () => {
     expect(lib).toMatch(/getModerationCase/)
     // No console source reaches the network on its own.
     for (const path of consoleSources) {
-      expect(fetchReferences(readFileSync(path, 'utf8')), relative(SRC, path)).toEqual([])
+      expect(
+        fetchReferences(readFileSync(path, 'utf8'), path),
+        relative(SRC, path)
+      ).toEqual([])
     }
   })
 })
