@@ -920,6 +920,21 @@ At `56aea39a`, with only the new column added so the client matches, 5 of its 13
 The new request, the 8 retries from 70 to 72 hours and overdue stay green there and pin the invariants through the change.
 R10-3 in the adapter spec goes red twice at `56aea39a`: an advertised expiry past the token's when the clock runs during the mint, and an already expired token accepted.
 
+### Codex round 11
+
+The fairness spec fakes only Date, so storage settles when a test says and Postgres keeps real timers.
+At `47aaf893`, 5 of the 6 new tests go red:
+
+| Test                                              | Failure at `47aaf893`                         |
+| :------------------------------------------------ | :-------------------------------------------- |
+| A delete settling at 00:16 after a slow first row | Stamped 00:00, repeating 30 seconds later     |
+| A rejected delete                                 | Stamped at the sweep's start                  |
+| An older sweep finishing last                     | Stamp moved backward                          |
+| Abandoned draft with a rejecting delete           | No attempt recorded, retried every 30 seconds |
+| Abandoned draft retained by a status change       | No stamp                                      |
+
+A successful delete of an abandoned draft leaves no row, which stays green.
+
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
 Those failures were my setup, and the rerun below is the evidence.

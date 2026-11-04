@@ -11,7 +11,16 @@ import {
   createUser,
   persistUser,
 } from '@couture/testing'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
 import {
   COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS,
@@ -340,6 +349,184 @@ describe('erasure work is one queue ordered by due time', () => {
         later(start, COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS - HOUR_MS)
       )
       expect(result.overdue).toBe(0)
+    })
+  })
+})
+
+describe('R11: every delete attempt is stamped when it settles, and paces both sweeps', () => {
+  const SETTLE_START = new Date('2026-11-04T00:00:00.000Z')
+
+  // Only Date is faked: storage settles when a test says so, and Postgres keeps real timers.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'], now: SETTLE_START })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const advanceTo = (at: Date) => vi.setSystemTime(at)
+  const wallClock = (minutes: number, seconds = 0) =>
+    later(SETTLE_START, minutes * MINUTE_MS + seconds * 1000)
+
+  async function openRow(storage: InMemoryCommunityStorage, at: Date) {
+    const post = await prisma.lookbookPost.create({
+      data: {
+        ...buildLookbookPostCreateInput(
+          createLookbookPost({ userId: authorId, status: 'published' })
+        ),
+        erasure_requested_at: at,
+      },
+    })
+    storage.put(post.image_object_path!, Buffer.from('image'))
+    return post
+  }
+
+  const stampOf = async (id: string) =>
+    (await prisma.lookbookPost.findUniqueOrThrow({ where: { id } }))
+      .image_delete_attempted_at
+
+  describe('R11-1: the erasure sweep', () => {
+    it('a slow first delete leaves the next row not due until 15 minutes after its own settle', async () => {
+      const storage = new InMemoryCommunityStorage()
+      const service = new CommunityMaintenanceService(prisma, storage)
+      const first = await openRow(storage, later(SETTLE_START, -2))
+      const second = await openRow(storage, later(SETTLE_START, -1))
+      const calls: string[] = []
+      storage.remove = (paths: string[]) => {
+        calls.push(paths[0]!)
+        // The first delete takes 16 minutes, so the second row runs and settles at 00:16.
+        if (calls.length === 1) advanceTo(wallClock(16))
+        return Promise.resolve()
+      }
+
+      await service.sweepErasureRequests()
+      expect(calls).toEqual([first.image_object_path, second.image_object_path])
+      expect(await stampOf(second.id)).toEqual(wallClock(16))
+
+      advanceTo(wallClock(16, 30))
+      await service.sweepErasureRequests()
+      expect(calls, 'repeated 30 seconds after it settled').toHaveLength(2)
+
+      advanceTo(wallClock(30, 59))
+      await service.sweepErasureRequests()
+      expect(calls, 'repeated before its pace').toHaveLength(2)
+
+      advanceTo(wallClock(31))
+      await service.sweepErasureRequests()
+      expect(calls, 'due 15 minutes after settling').toHaveLength(4)
+    })
+
+    it('stamps a rejected delete when it settles too', async () => {
+      const storage = new InMemoryCommunityStorage()
+      const service = new CommunityMaintenanceService(prisma, storage)
+      const row = await openRow(storage, SETTLE_START)
+      storage.remove = () => {
+        advanceTo(wallClock(3))
+        return Promise.reject(new Error('storage down'))
+      }
+      await service.sweepErasureRequests()
+      expect(await stampOf(row.id)).toEqual(wallClock(3))
+    })
+
+    it('an older sweep finishing last leaves the newer stamp in place', async () => {
+      const storage = new InMemoryCommunityStorage()
+      const service = new CommunityMaintenanceService(prisma, storage)
+      const row = await openRow(storage, SETTLE_START)
+      let release!: () => void
+      const held = new Promise<void>((done) => {
+        release = done
+      })
+      let calls = 0
+      storage.remove = () => {
+        calls += 1
+        return calls === 1 ? held : Promise.resolve()
+      }
+      const older = service.sweepErasureRequests()
+      await vi.waitFor(() => expect(calls).toBe(1))
+
+      advanceTo(wallClock(2))
+      await service.sweepErasureRequests()
+      expect(await stampOf(row.id)).toEqual(wallClock(2))
+
+      // The older worker's clock reads earlier when it settles, as a skewed host would.
+      advanceTo(wallClock(1))
+      release()
+      await older
+      expect(await stampOf(row.id), 'the stamp moved backward').toEqual(wallClock(2))
+    })
+  })
+
+  describe('R11-2: an abandoned draft', () => {
+    async function abandonedDraft(storage: InMemoryCommunityStorage) {
+      const post = await prisma.lookbookPost.create({
+        data: {
+          ...buildLookbookPostCreateInput(
+            createLookbookPost({ userId: authorId, status: 'draft' })
+          ),
+          published_at: null,
+          upload_expires_at: later(
+            SETTLE_START,
+            -COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS - MINUTE_MS
+          ),
+        },
+      })
+      storage.put(post.image_object_path!, Buffer.from('image'))
+      return post
+    }
+
+    it('a rejecting delete runs once in 15 minutes across both sweeps', async () => {
+      const storage = new InMemoryCommunityStorage()
+      const service = new CommunityMaintenanceService(prisma, storage)
+      const draft = await abandonedDraft(storage)
+      let attempts = 0
+      storage.remove = () => {
+        attempts += 1
+        return Promise.reject(new Error('storage down'))
+      }
+
+      await service.sweepExpiredUploads()
+      expect(attempts).toBe(1)
+      expect(await stampOf(draft.id), 'the attempt went unrecorded').toEqual(SETTLE_START)
+
+      for (const at of [wallClock(0, 30), wallClock(1), wallClock(14, 59)]) {
+        advanceTo(at)
+        await service.sweepExpiredUploads()
+        await service.sweepErasureRequests()
+      }
+      expect(attempts, 'retried inside the pace').toBe(1)
+
+      advanceTo(wallClock(15))
+      await service.sweepExpiredUploads()
+      await service.sweepErasureRequests()
+      expect(attempts, 'one delete at the pace, across both sweeps').toBe(2)
+      expect(await stampOf(draft.id)).toEqual(wallClock(15))
+    })
+
+    it('a row retained by a concurrent status change keeps its stamp', async () => {
+      const storage = new InMemoryCommunityStorage()
+      const service = new CommunityMaintenanceService(prisma, storage)
+      const draft = await abandonedDraft(storage)
+      storage.remove = async (paths: string[]) => {
+        await prisma.lookbookPost.update({
+          where: { id: draft.id },
+          data: { status: 'uploading' },
+        })
+        advanceTo(wallClock(2))
+        for (const path of paths) storage.objects.delete(path)
+      }
+
+      await service.sweepExpiredUploads()
+      expect(await stampOf(draft.id)).toEqual(wallClock(2))
+    })
+
+    it('a successful delete leaves no row to stamp', async () => {
+      const storage = new InMemoryCommunityStorage()
+      const service = new CommunityMaintenanceService(prisma, storage)
+      const draft = await abandonedDraft(storage)
+      expect(await service.sweepExpiredUploads()).toMatchObject({ draftsDeleted: 1 })
+      expect(await prisma.lookbookPost.findUnique({ where: { id: draft.id } })).toBeNull()
+      expect(storage.objects.has(draft.image_object_path!)).toBe(false)
     })
   })
 })
