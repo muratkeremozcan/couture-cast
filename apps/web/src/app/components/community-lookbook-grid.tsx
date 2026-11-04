@@ -434,21 +434,27 @@ export interface LookbookFilterNavProps {
   onTabChange: (tab: FilterCategory) => void
   /** The band `auto` resolved to, so that chip can name it instead of saying "your climate". */
   viewerBand?: ClimateBand | null
-  /** Story 6.11: a banned member has no feed to filter. The chips keep their place and do nothing. */
-  disabled?: boolean
+  /** Story 6.11: a banned member has no feed to filter, so the nav and its heading leave the page. */
+  closed?: boolean
 }
+
+// A phone row scrolls and fades at its right edge, so a chip the edge cuts reads as more to scroll
+// to. From 768 pixels the column has room for whole chips, so they wrap.
+const CHIP_ROW_SCROLL =
+  'flex items-center gap-2 overflow-x-auto pb-1 pr-6 scrollbar-thin [mask-image:linear-gradient(to_right,black_calc(100%-1.5rem),transparent)]'
+const CHIP_ROW = `${CHIP_ROW_SCROLL} min-[768px]:flex-wrap min-[768px]:overflow-visible min-[768px]:pr-0 min-[768px]:[mask-image:none]`
 
 export function LookbookFilterNav({
   activeTab,
   isMobilePreview = false,
   onTabChange,
   viewerBand = null,
-  disabled = false,
+  closed = false,
 }: LookbookFilterNavProps) {
   const { t } = useCommunityTranslation()
+  if (closed) return null
 
   const handleTabClick = (tab: FilterCategory) => {
-    if (disabled) return
     onTabChange(tab)
     try {
       if (typeof window !== 'undefined' && typeof posthog.capture === 'function') {
@@ -475,7 +481,7 @@ export function LookbookFilterNav({
       >
         {t('community.heading')}
       </h2>
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+      <div className={isMobilePreview ? CHIP_ROW_SCROLL : CHIP_ROW}>
         {COMMUNITY_FEED_MODES.map((mode) => {
           const isActive = activeTab === mode
           const tabletStyles = isMobilePreview
@@ -496,8 +502,7 @@ export function LookbookFilterNav({
                 handleTabClick(mode)
               }}
               aria-pressed={isActive}
-              aria-disabled={disabled || undefined}
-              className={`${disabled ? 'cursor-not-allowed opacity-50 ' : ''}min-h-[44px] shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-xs uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${tabletStyles} ${activeStyles}`}
+              className={`min-h-[44px] shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-xs uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${tabletStyles} ${activeStyles}`}
             >
               {modeLabel(mode, viewerBand, t, isActive)}
             </button>
@@ -2028,6 +2033,10 @@ function communityPresentation(
       : 'community.notifications.signin',
   }
 }
+
+/** Story 6.11: the notifications link holds the section off the divider, and a ban removes it. */
+const communityAsideClass = (banned: boolean) =>
+  banned ? 'flex flex-col gap-6 pt-6' : 'flex flex-col gap-6'
 
 /** Story 6.11: a banned member has no community notifications to manage. */
 function CommunitySettingsLink({
@@ -3567,11 +3576,14 @@ export function CommunityLookbookGrid({
 
   return (
     <ShareCardHostContext.Provider value={shareHost}>
-      <aside aria-label={t('community.sectionLabel')} className="flex flex-col gap-6">
+      <aside
+        aria-label={t('community.sectionLabel')}
+        className={communityAsideClass(banned)}
+      >
         <SpotlightFocusNotice notice={spotlightNotice} t={t} />
         <CommunitySpotlightSection
           state={spotlight.state}
-          available={communityAvailable}
+          available={feedVisible(communityAvailable, bannedSanction)}
           isMobilePreview={isMobilePreview}
           t={t}
           onLoadMore={() => {
@@ -3617,7 +3629,7 @@ export function CommunityLookbookGrid({
             isMobilePreview={isMobilePreview}
             onTabChange={handleModeChange}
             viewerBand={viewerBand}
-            disabled={banned}
+            closed={banned}
           />
         )}
 

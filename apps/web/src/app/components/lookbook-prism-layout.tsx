@@ -508,7 +508,7 @@ export function LookbookPrismLayout() {
             isMobilePreview={isMobilePreview}
             onTabChange={setActiveTab}
             viewerBand={viewerBand}
-            disabled={communityBanned}
+            closed={communityBanned}
           />
 
           {/* Outfit Tiles */}
