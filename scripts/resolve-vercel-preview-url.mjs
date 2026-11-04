@@ -477,18 +477,6 @@ function getPreviewDeploymentsForBranch(owner, repo, branch) {
   return Array.isArray(deployments) ? deployments : []
 }
 
-function getAnyPreviewDeployments(owner, repo) {
-  const deployments = runGh([
-    `/repos/${owner}/${repo}/deployments`,
-    '-F',
-    'environment=Preview',
-    '-F',
-    'per_page=20',
-  ])
-
-  return Array.isArray(deployments) ? deployments : []
-}
-
 /**
  * URL supplied explicitly through the environment, which wins over any lookup.
  * @returns {string | undefined}
@@ -545,31 +533,6 @@ async function resolveUrlFromVercelApi(branch) {
   return undefined
 }
 
-/**
- * Whether VERCEL_PREVIEW_STRICT asks us to refuse cross-branch fallbacks.
- * @returns {boolean}
- */
-function isStrictMode() {
-  return env('VERCEL_PREVIEW_STRICT') === '1' || env('VERCEL_PREVIEW_STRICT') === 'true'
-}
-
-/**
- * Abort with the strict-mode guidance for a branch we could not resolve.
- * @param {string} branch
- */
-function failStrict(branch) {
-  fail(
-    [
-      `Strict mode: no URL found in GitHub deployment statuses for branch "${branch}".`,
-      'Provide one of:',
-      '- VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app',
-      '- VERCEL_PREVIEW_URL=https://<your-preview>.vercel.app',
-      '- PREVIEW_WEB_E2E_BASE_URL=https://<your-preview>.vercel.app',
-      'Or disable strict mode by unsetting VERCEL_PREVIEW_STRICT.',
-    ].join('\n')
-  )
-}
-
 async function main() {
   await loadLocalEnv()
   const manual = getManualPreviewUrl()
@@ -606,26 +569,16 @@ async function main() {
     }
   }
 
-  const strict = isStrictMode()
-
-  // If we can see deployments for the branch but none of their statuses include a URL,
-  // you almost certainly want to provide an explicit alias rather than falling back to some other branch.
-  if (!url && strict) {
-    failStrict(branch)
-  }
-
-  // Fallback: any latest Preview deployment (e.g., when Vercel truncates branch names or ref differs)
-  if (!url) {
-    logDebug(
-      'No branch-scoped Preview with URL found; falling back to latest Preview deployment.'
-    )
-    const deployments = getAnyPreviewDeployments(owner, repo)
-    url = findUrlFromDeployments(owner, repo, deployments)
-  }
-
+  // No other branch's build stands in: a preview run against another branch tests the wrong code.
   if (!url) {
     fail(
-      `No Preview deployments found for branch "${branch}". Push a commit and wait for Vercel to create one.`
+      [
+        `No Preview deployment found for branch "${branch}". Push a commit and wait for Vercel to create one,`,
+        'or provide one of:',
+        '- VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app',
+        '- VERCEL_PREVIEW_URL=https://<your-preview>.vercel.app',
+        '- PREVIEW_WEB_E2E_BASE_URL=https://<your-preview>.vercel.app',
+      ].join('\n')
     )
   }
 
