@@ -190,6 +190,7 @@ const summary = {
   locale: 'es-419',
   hasFinding: true,
   excerpt: 'Caption',
+  escalated: false,
 } as const
 const identity = { state: 'alias', alias: 'quiet-fox-1234' } as const
 const detail = {
@@ -243,6 +244,17 @@ const detail = {
     altText: 'a',
   },
   viewerConflict: false,
+  revision: '0123456789abcdef',
+  allowedActions: ['resolve'],
+  banKinds: [],
+  escalated: false,
+  firstDecisionAt: null,
+  subjectStanding: {
+    active: false,
+    sanction: null,
+    priorBanCount: 0,
+    allowedAppealSteps: [],
+  },
 } as const
 
 /** Every key the spec forbids on the wire (D9, Never list). */
