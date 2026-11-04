@@ -1,7 +1,7 @@
 // Story 6.11 test owner: serialization, idempotency and the first decision time against a real, migrated Postgres.
 // I-C-CONFLICT, I-C-REPORT-RACE, I-C-WITHDRAW-RACE, I-C-REPLAY-RACE, I-C-RETRY, I-C-RETRY-MOVED, I-C-KEY-REUSE,
 // I-C-KEY-SCOPE, I-C-FIRST-DECISION, I-C-FIRST-ESCALATE, I-C-RESOLVED-AT, I-C-REKEY, I-C-BAN-RACE, I-C-DB-BACKSTOP,
-// I-C-DEADLOCK.
+// I-C-DEADLOCK, I-C-SPLIT-READ, I-C-RECIPROCAL-BAN, I-C-ERASE-IN-FLIGHT.
 // Interleavings are forced with a lock held from a second connection.
 // pg_stat_activity confirms each waiter before the lock is released, so no test sleeps.
 import { randomUUID } from 'node:crypto'
@@ -21,6 +21,7 @@ import {
   guardCommunityPost,
 } from '../src/modules/community/community-privacy.js'
 import { ModerationDecisionsRepository } from '../src/modules/moderation/moderation-decisions.repository.js'
+import { ModerationQueueRepository } from '../src/modules/moderation/moderation-queue.repository.js'
 import { checksumTables } from './helpers/moderation-queue-context.js'
 import {
   banMarker,
@@ -1625,6 +1626,438 @@ describe('I-C-BAN-RACE: one member banned from two cases at once (D5)', () => {
     expect(await decisionsOf(loserCase.caseId)).toEqual([])
     expect((await postReports(loserCase.postId)).map((row) => row.resolved_at)).toEqual([
       null,
+    ])
+  })
+})
+
+/**
+ * Runs `work` once, right after the first read of a case through either repository.
+ * The hook does not care which read comes second, so a GET that reads once still runs it once.
+ */
+function afterFirstCaseRead(work: () => Promise<void>) {
+  const queue: ModerationQueueRepository = boot.app.get(ModerationQueueRepository)
+  // `bind` answers `any` under this tsconfig, so each original keeps its signature by name.
+  const queueLoad = queue.loadCase.bind(queue) as ModerationQueueRepository['loadCase']
+  const decisionLoad = repository.loadCase.bind(
+    repository
+  ) as ModerationDecisionsRepository['loadCase']
+  let fired = false
+  const once = async () => {
+    if (fired) return
+    fired = true
+    await work()
+  }
+  const spies = [
+    vi
+      .spyOn(queue, 'loadCase')
+      .mockImplementation(async (...args: Parameters<typeof queueLoad>) => {
+        const loaded = await queueLoad(...args)
+        await once()
+        return loaded
+      }),
+    vi
+      .spyOn(repository, 'loadCase')
+      .mockImplementation(async (...args: Parameters<typeof decisionLoad>) => {
+        const loaded = await decisionLoad(...args)
+        await once()
+        return loaded
+      }),
+  ]
+  return {
+    fired: () => fired,
+    restore: () => spies.forEach((spy) => spy.mockRestore()),
+  }
+}
+
+describe('I-C-SPLIT-READ: a report commits inside the GET (D5)', () => {
+  /** Whatever the GET returned, a decision on its revision may only touch the reports it displayed. */
+  async function decideOnSplitRead(params: {
+    caseId: string
+    firstReportId: string
+    firstReporterAlias: string
+    lateReporterAlias: string
+    commitLateReport: () => Promise<string>
+    loadStamps: () => Promise<{ id: string; resolved: boolean }[]>
+  }) {
+    const staff = await moderator()
+    let lateReportId = ''
+    const hook = afterFirstCaseRead(async () => {
+      lateReportId = await params.commitLateReport()
+    })
+    const detail = await staff.detail(params.caseId).finally(hook.restore)
+    expect(hook.fired(), 'the case read never ran, so nothing interleaved').toBe(true)
+
+    const shown = detail.reporters.map((reporter) => reporter.identity.alias)
+    expect(shown).toContain(params.firstReporterAlias)
+    const lateShown = shown.includes(params.lateReporterAlias)
+    const displayed = lateShown
+      ? [params.firstReportId, lateReportId]
+      : [params.firstReportId]
+
+    const response = await staff.decide(params.caseId, {
+      action: 'resolve',
+      reason: REASON,
+      expectedRevision: detail.revision,
+    })
+
+    const rows = await decisionsOf(params.caseId)
+    const stamps = await params.loadStamps()
+    const touched = new Set([
+      ...rows.flatMap((row) => row.report_ids),
+      ...stamps.filter((stamp) => stamp.resolved).map((stamp) => stamp.id),
+    ])
+    expect(
+      [...touched].filter((id) => !displayed.includes(id)),
+      'reports the decision touched that the GET never displayed'
+    ).toEqual([])
+
+    if (lateShown) {
+      applied(response)
+      expect(rows.flatMap((row) => row.report_ids).sort()).toEqual([...displayed].sort())
+      return
+    }
+    expect(response.status, JSON.stringify(response.body)).toBe(409)
+    expect(refusal(response).code).toBe('case_conflict')
+    expect(rows).toEqual([])
+    expect(stamps).toEqual(
+      expect.arrayContaining([{ id: lateReportId, resolved: false }]) as unknown
+    )
+  }
+
+  it('never stamps a post report the GET did not display', async () => {
+    const seeded = await fx.postCase()
+    const late = await fx.member('reporter')
+    await decideOnSplitRead({
+      caseId: seeded.caseId,
+      firstReportId: seeded.reportIds[0]!,
+      firstReporterAlias: seeded.reporters[0]!.alias,
+      lateReporterAlias: late.alias,
+      commitLateReport: () =>
+        withHeldConnection(async (held) => {
+          const id = await openPostReportInsert(held, seeded.postId, late.id)
+          await held.query('COMMIT')
+          return id
+        }),
+      loadStamps: async () =>
+        (await postReports(seeded.postId)).map((report) => ({
+          id: report.id,
+          resolved: report.resolved_at !== null,
+        })),
+    })
+  })
+
+  it('never stamps a comment report the GET did not display', async () => {
+    const seeded = await fx.commentCase()
+    const late = await fx.member('reporter')
+    await decideOnSplitRead({
+      caseId: seeded.caseId,
+      firstReportId: seeded.reportIds[0]!,
+      firstReporterAlias: seeded.reporters[0]!.alias,
+      lateReporterAlias: late.alias,
+      commitLateReport: () =>
+        withHeldConnection(async (held) => {
+          const id = await openCommentReportInsert(
+            held,
+            seeded.postId,
+            seeded.commentId,
+            late.id
+          )
+          await held.query('COMMIT')
+          return id
+        }),
+      loadStamps: async () =>
+        (
+          await prisma.communityCommentReport.findMany({
+            where: { comment_id: seeded.commentId },
+          })
+        ).map((report) => ({ id: report.id, resolved: report.resolved_at !== null })),
+    })
+  })
+})
+
+describe('I-C-RECIPROCAL-BAN: two operators ban each other at once (D2, D5)', () => {
+  /** The two-key form of the advisory lock the test holds and the trigger waits on. */
+  const GATE_KEY = [6110, 2] as const
+  /** Below the 7 s decision transaction timeout, so a held request is still alive at release. */
+  const GATE_DEADLINE_MS = 5_000
+
+  /** Holds every `CommunitySanction` insert until the work commits `gate`, by a trigger the test owns. */
+  async function withSanctionGate<T>(
+    work: (gate: HeldConnection) => Promise<T>
+  ): Promise<T> {
+    await prisma.$executeRawUnsafe(`
+      CREATE FUNCTION tea_gate_sanction() RETURNS trigger LANGUAGE plpgsql AS $fn$
+      BEGIN PERFORM pg_advisory_xact_lock_shared(${GATE_KEY[0]}, ${GATE_KEY[1]}); RETURN NEW; END $fn$`)
+    await prisma.$executeRawUnsafe(
+      'CREATE TRIGGER tea_gate_sanction BEFORE INSERT ON "CommunitySanction" FOR EACH ROW EXECUTE FUNCTION tea_gate_sanction()'
+    )
+    try {
+      return await withHeldConnection(async (gate) => {
+        await gate.query('SELECT pg_advisory_xact_lock($1::int, $2::int)', [...GATE_KEY])
+        return work(gate)
+      })
+    } finally {
+      await prisma.$executeRawUnsafe(
+        'DROP TRIGGER tea_gate_sanction ON "CommunitySanction"'
+      )
+      await prisma.$executeRawUnsafe('DROP FUNCTION tea_gate_sanction()')
+    }
+  }
+
+  /** Sessions waiting on the held gate, and every other session a lock holds back. */
+  async function lockWaiters(): Promise<{ atGate: number; elsewhere: number }> {
+    const { rows } = await monitor.query<{ at_gate: string; blocked: string }>(
+      `SELECT
+         (SELECT count(*) FROM pg_locks
+          WHERE locktype = 'advisory' AND NOT granted AND objsubid = 2
+            AND classid = $1::int::oid AND objid = $2::int::oid
+            AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
+         )::text AS at_gate,
+         (SELECT count(*) FROM pg_stat_activity
+          WHERE datname = current_database() AND cardinality(pg_blocking_pids(pid)) > 0
+         )::text AS blocked`,
+      [...GATE_KEY]
+    )
+    const atGate = Number(rows[0]!.at_gate)
+    return { atGate, elsewhere: Number(rows[0]!.blocked) - atGate }
+  }
+
+  /** Bounded, and each pass is one database round trip. False at the deadline, so the caller still releases. */
+  async function pollWaiters(
+    reached: (waiters: { atGate: number; elsewhere: number }) => boolean
+  ): Promise<boolean> {
+    const deadline = performance.now() + GATE_DEADLINE_MS
+    while (performance.now() < deadline) {
+      if (reached(await lockWaiters())) return true
+    }
+    return false
+  }
+
+  /** Each operator wrote a reported post and reads the other's, with unrelated reporters and no shared engagement. */
+  async function reciprocalPair() {
+    const authorA = await fx.member('operator')
+    const authorB = await fx.member('operator')
+    const postA = await fx.postCase({ author: authorA })
+    const postB = await fx.postCase({ author: authorB })
+    const staffA = boot.staff('moderator', authorA)
+    const staffB = boot.staff('moderator', authorB)
+    return {
+      sides: [
+        {
+          staff: staffA,
+          target: postB,
+          revision: (await staffA.detail(postB.caseId)).revision,
+        },
+        {
+          staff: staffB,
+          target: postA,
+          revision: (await staffB.detail(postA.caseId)).revision,
+        },
+      ] as const,
+    }
+  }
+
+  type ReciprocalSides = Awaited<ReturnType<typeof reciprocalPair>>['sides']
+
+  const sendBans = (sides: ReciprocalSides) =>
+    sides.map((side) =>
+      side.staff.decide(side.target.caseId, {
+        action: 'ban',
+        reason: REASON,
+        ban: SEVEN_DAY_BAN,
+        expectedRevision: side.revision,
+      })
+    )
+
+  it('applies one ban and answers operator_sanctioned to the other when both pass their first reads', async () => {
+    const { sides } = await reciprocalPair()
+
+    const { responses, forced } = await withSanctionGate(async (gate) => {
+      const pending = sendBans(sides)
+      // Both at the insert is the unserialized shape. One at the insert and one behind a lock is the serialized shape.
+      const forced = await pollWaiters(
+        ({ atGate, elsewhere }) => atGate === 2 || (atGate === 1 && elsewhere >= 1)
+      )
+      await gate.query('COMMIT')
+      return { responses: await Promise.all(pending), forced }
+    })
+
+    expect(forced, 'the two bans never reached the forced interleaving').toBe(true)
+    expect(
+      responses.map((response) => response.status).sort(),
+      JSON.stringify(responses.map((response) => response.body as unknown))
+    ).toEqual([200, 403])
+    const winnerIndex = responses.findIndex((response) => response.status === 200)
+    const winner = sides[winnerIndex]!
+    const loser = sides[1 - winnerIndex]!
+    expect(refusal(responses[1 - winnerIndex]!).code).toBe('operator_sanctioned')
+
+    const active = await prisma.communitySanction.findMany({
+      where: {
+        user_id: { in: sides.map((side) => side.staff.id) },
+        lifted_at: null,
+      },
+    })
+    expect(active.map((row) => row.user_id)).toEqual([loser.staff.id])
+    expect(
+      (await decisionsOf(winner.target.caseId)).map((row) => [
+        row.action,
+        row.moderator_id,
+      ])
+    ).toEqual([['ban', winner.staff.id]])
+
+    expect(await decisionsOf(loser.target.caseId)).toEqual([])
+    expect(
+      await prisma.moderationDecision.count({ where: { moderator_id: loser.staff.id } })
+    ).toBe(0)
+    expect(await auditCount(loser.staff.id)).toBe(0)
+    expect(await postStatus(loser.target.postId)).toBe('published')
+    expect(
+      (await postReports(loser.target.postId)).map((report) => report.resolved_at)
+    ).toEqual([null])
+  })
+
+  it('never lets both apply over ten unforced rounds with fresh operators', async () => {
+    for (let round = 0; round < 10; round++) {
+      const { sides } = await reciprocalPair()
+      const responses = await Promise.all(sendBans(sides))
+      const message = `round ${round}: ${JSON.stringify(
+        responses.map((response) => [response.status, response.body as unknown])
+      )}`
+      expect(responses.map((response) => response.status).sort(), message).toEqual([
+        200, 403,
+      ])
+      const loserIndex = responses.findIndex((response) => response.status === 403)
+      expect(refusal(responses[loserIndex]!).code, message).toBe('operator_sanctioned')
+      expect(
+        await prisma.communitySanction.count({
+          where: {
+            user_id: { in: sides.map((side) => side.staff.id) },
+            lifted_at: null,
+          },
+        }),
+        message
+      ).toBe(1)
+      expect(await decisionsOf(sides[loserIndex]!.target.caseId), message).toEqual([])
+    }
+  })
+
+  it('holds an appeal step behind an in-flight ban of its operator, then answers operator_sanctioned', async () => {
+    const authorA = await fx.member('operator')
+    const reported = await fx.postCase({ author: authorA })
+    const staffA = boot.staff('moderator', authorA)
+    const staffB = await moderator()
+    const unrelated = await fx.sanction(await fx.member('member'))
+    const revision = (await staffB.detail(reported.caseId)).revision
+
+    const { ban, appeal, banHeld, appealWaited } = await withSanctionGate(
+      async (gate) => {
+        const banPending = staffB.decide(reported.caseId, {
+          action: 'ban',
+          reason: REASON,
+          ban: SEVEN_DAY_BAN,
+          expectedRevision: revision,
+        })
+        const banHeld = await pollWaiters(({ atGate }) => atGate === 1)
+
+        let appealSettled = false
+        const appealPending = staffA
+          .appeal(unrelated.id, { status: 'requested', reason: REASON })
+          .then((response) => {
+            appealSettled = true
+            return response
+          })
+        const appealWaited = await pollWaiters(
+          ({ elsewhere }) => elsewhere >= 1 || appealSettled
+        ).then((reached) => reached && !appealSettled)
+
+        await gate.query('COMMIT')
+        const [ban, appeal] = await Promise.all([banPending, appealPending])
+        return { ban, appeal, banHeld, appealWaited }
+      }
+    )
+
+    expect(banHeld, 'the ban never reached the sanction insert').toBe(true)
+    applied(ban)
+    expect(appeal.status, JSON.stringify(appeal.body)).toBe(403)
+    expect(refusal(appeal).code).toBe('operator_sanctioned')
+    expect(appealWaited, 'the appeal step did not wait on the in-flight ban').toBe(true)
+
+    expect(
+      await prisma.moderationDecision.count({ where: { moderator_id: staffA.id } })
+    ).toBe(0)
+    expect(
+      await prisma.auditLog.count({
+        where: { user_id: staffA.id, event_type: 'moderation_appeal_recorded' },
+      })
+    ).toBe(0)
+    const sanctionAfter = await prisma.communitySanction.findUniqueOrThrow({
+      where: { id: unrelated.id },
+    })
+    expect(sanctionAfter.appeal_status).toBe('not_requested')
+  })
+})
+
+describe('I-C-ERASE-IN-FLIGHT: erasure lands while a decision takes its locks (D5)', () => {
+  /** Erases right after the decision's first case read, then expects the closed answer and no record. */
+  async function decideThroughErasure(
+    seeded: { caseId: string; postId: string; author: { id: string } },
+    decision: Pick<DecisionRequest, 'action' | 'ban'>
+  ) {
+    const staff = await moderator()
+    const { revision } = await staff.detail(seeded.caseId)
+    ctx.afterCommit.mockClear()
+    const hook = afterFirstCaseRead(() => erasePost(seeded.postId))
+    const response = await staff
+      .decide(seeded.caseId, { ...decision, reason: REASON, expectedRevision: revision })
+      .finally(hook.restore)
+    expect(hook.fired(), 'the decision never read the case').toBe(true)
+    expect(
+      await prisma.lookbookPost.findUnique({ where: { id: seeded.postId } })
+    ).toBeNull()
+
+    const body = JSON.stringify(response.body)
+    expect(response.status, body).toBe(404)
+    const closed = moderationDecisionErrorSchema.safeParse(response.body)
+    expect(closed.success, body).toBe(true)
+    expect(closed.data?.code, body).toBe('case_not_found')
+
+    expect(await decisionsOf(seeded.caseId)).toEqual([])
+    expect(await auditCount(staff.id)).toBe(0)
+    expect(
+      await prisma.moderationEvent.count({ where: { reviewed_by_id: staff.id } })
+    ).toBe(0)
+    expect(
+      await prisma.communitySanction.count({ where: { user_id: seeded.author.id } })
+    ).toBe(0)
+    expect(ctx.afterCommit).not.toHaveBeenCalled()
+  }
+
+  it.each([
+    ['resolve', { action: 'resolve' }],
+    ['ban', { action: 'ban', ban: SEVEN_DAY_BAN }],
+  ] as const)(
+    'answers case_not_found to a %s on the erased post',
+    async (_name, decision) => {
+      const seeded = await fx.postCase()
+      await decideThroughErasure(seeded, decision)
+      const reports = await prisma.communityPostReport.findMany({
+        where: { id: { in: seeded.reportIds } },
+      })
+      expect(reports.map((report) => [report.post_id, report.resolved_at])).toEqual([
+        [null, null],
+      ])
+    }
+  )
+
+  it('answers case_not_found to a takedown of a comment whose post was erased', async () => {
+    const seeded = await fx.commentCase()
+    await decideThroughErasure(seeded, { action: 'takedown' })
+    const reports = await prisma.communityCommentReport.findMany({
+      where: { id: { in: seeded.reportIds } },
+    })
+    expect(reports.map((report) => [report.comment_id, report.resolved_at])).toEqual([
+      [null, null],
     ])
   })
 })

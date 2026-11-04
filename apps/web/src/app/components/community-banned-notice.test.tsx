@@ -1,6 +1,7 @@
 // Learning path Step 50: Moderator queue and case detail.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-50-moderator-queue-and-case-detail
 // Story 6.11 test owner: C-WEB-D-BANNED-NOTICE, the D14 author state, and the TEA-22 banned state in the grid and the teaser.
+// Fix round 1: the sanction leaves with the session that owned it, and a live ban takes the weekly challenge with it.
 // The grid runs through the real web transport and MSW.
 import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -21,6 +22,7 @@ import {
 import { getI18n } from '../../i18n'
 import deDE from '../../i18n/locales/de-DE.json'
 import enUS from '../../i18n/locales/en-US.json'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
   CHALLENGE,
@@ -28,6 +30,7 @@ import {
   REMOVED_COPY,
   STATUS_COPY,
   authorState,
+  errorBody,
   feedBody,
   item,
   renderGrid,
@@ -220,6 +223,33 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
   setupCommunityGridClock()
   setupCommunityGridSurface()
 
+  const signOut = () =>
+    act(() => {
+      window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+      window.dispatchEvent(new Event('couture:session'))
+    })
+
+  const eraseAccount = () =>
+    act(() => {
+      window.dispatchEvent(new Event('couture:account-erased'))
+    })
+
+  /** The whole page, so the live region that announced the ban counts too. */
+  function expectNoSanctionOnPage() {
+    const copy = enUS.community.banned
+    expect(queryNotice()).not.toBeInTheDocument()
+    const page = document.body.textContent ?? ''
+    for (const words of [
+      copy.title,
+      copy.scope,
+      copy.permanent,
+      copy.temporary.split('{{until}}')[0] ?? '',
+      longDate('en-US'),
+      ...Object.values(copy.appeal),
+    ])
+      expect(page).not.toContain(words)
+  }
+
   const cardsShown = () =>
     within(screen.getByTestId('community-card-grid')).queryAllByRole('article').length +
     within(screen.getByTestId('community-card-grid')).queryAllByRole('img').length
@@ -314,10 +344,13 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     serve(state)
     renderGrid()
     await screen.findByTestId('create-post-button')
+    expect(screen.getByTestId('weekly-challenge-banner')).toBeInTheDocument()
     state.banned = true
     await userEvent.click(screen.getByTestId('community-filter-all'))
     await screen.findByTestId('community-banned-notice')
     expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('weekly-challenge-banner')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('challenge-participate-button')).not.toBeInTheDocument()
     expect(document.body.textContent).not.toContain(CHALLENGE.title)
   })
 
@@ -356,6 +389,106 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     expect(queryNotice()).not.toBeInTheDocument()
   })
 
+  describe('a change of identity while the notice shows', () => {
+    const OTHER_TOKEN = 'other-member-token'
+    const FEED_ERROR = enUS.community.error.load
+
+    /**
+     * Answers by bearer, as the API does.
+     * The banned member is refused, the other account gets `other`, and no bearer gets a 401.
+     */
+    function serveAccounts(
+      other: () => Response | Promise<Response> = () => feedBody({ items: [item()] })
+    ) {
+      const install = useMswHandlers
+      install(
+        http.get(FEED_PATH, ({ request }) => {
+          const bearer = request.headers.get('authorization')
+          if (bearer === `Bearer ${OTHER_TOKEN}`) return other()
+          return bearer
+            ? bannedResponse()
+            : errorBody(401, 'Unauthorized', 'Unauthorized')
+        }),
+        http.get(SPOTLIGHT_PATH, emptySpotlight)
+      )
+    }
+
+    async function showBannedMember() {
+      signIn()
+      const onBannedChange = vi.fn()
+      renderGrid({ onBannedChange })
+      await screen.findByTestId('community-banned-notice')
+      expect(notice()).toHaveTextContent(longDate('en-US'))
+      expect(notice()).toHaveTextContent(enUS.community.banned.appeal.not_requested)
+      expect(onBannedChange).toHaveBeenLastCalledWith(true)
+      return onBannedChange
+    }
+
+    const switchAccount = () =>
+      act(() => {
+        window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, OTHER_TOKEN)
+        window.dispatchEvent(new Event('couture:session'))
+      })
+
+    it('takes every sanction detail with it on sign-out', async () => {
+      serveAccounts()
+      const onBannedChange = await showBannedMember()
+      signOut()
+      await settle()
+      expectNoSanctionOnPage()
+      expect(onBannedChange).toHaveBeenLastCalledWith(false)
+    })
+
+    it('takes every sanction detail with it on account erasure', async () => {
+      serveAccounts()
+      const onBannedChange = await showBannedMember()
+      eraseAccount()
+      await settle()
+      expectNoSanctionOnPage()
+      expect(onBannedChange).toHaveBeenLastCalledWith(false)
+    })
+
+    it('never shows the old sanction to the next account, whose feed then loads', async () => {
+      let release: () => void = () => undefined
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      serveAccounts(async () => {
+        await gate
+        return feedBody({ items: [item()] })
+      })
+      const onBannedChange = await showBannedMember()
+      switchAccount()
+      // The next account's read is held, so this is what they see before any answer.
+      await settle()
+      expectNoSanctionOnPage()
+      expect(onBannedChange).toHaveBeenLastCalledWith(false)
+      act(() => release())
+      await screen.findByText(item().caption!)
+      expectNoSanctionOnPage()
+      expect(screen.getByTestId('community-filter-all')).toBeInTheDocument()
+    })
+
+    it('shows the next account its own error and retry, with no old sanction', async () => {
+      let reads = 0
+      serveAccounts(() => {
+        reads += 1
+        return reads === 1
+          ? errorBody(500, 'ECONNRESET reading community_posts', 'Internal Server Error')
+          : feedBody({ items: [item()] })
+      })
+      const onBannedChange = await showBannedMember()
+      switchAccount()
+      expect(await screen.findByTestId('community-feed-error')).toHaveTextContent(
+        FEED_ERROR
+      )
+      expectNoSanctionOnPage()
+      expect(onBannedChange).toHaveBeenLastCalledWith(false)
+      await userEvent.click(screen.getByTestId('community-feed-retry-button'))
+      await screen.findByText(item().caption!)
+      expect(reads).toBe(2)
+      expect(screen.queryByTestId('community-feed-error')).not.toBeInTheDocument()
+    })
+  })
+
   describe('a denied socket control', () => {
     function captureSync() {
       const syncs: CommunitySyncState[] = []
@@ -372,7 +505,9 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       install(
         http.get(FEED_PATH, () => {
           state.reads += 1
-          return state.banned ? bannedResponse() : feedBody({ items: [item()] })
+          return state.banned
+            ? bannedResponse()
+            : feedBody({ items: [item()], activeChallenge: CHALLENGE })
         }),
         http.get(SPOTLIGHT_PATH, emptySpotlight),
         http.get('/api/v1/community/events', () =>
@@ -408,6 +543,83 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       expect(screen.queryByText(item().caption!)).not.toBeInTheDocument()
       await passRetryWindow(FEED_RETRY_WINDOW_MS)
       expect(state.reads).toBe(readsBefore + 1)
+    })
+
+    it('takes the weekly challenge and its Participate button with it', async () => {
+      signIn()
+      const sync = captureSync()
+      const state = { banned: false, reads: 0, denied: false }
+      serveWithEvents(state)
+      renderGrid()
+      await screen.findByTestId('weekly-challenge-banner')
+      expect(screen.getByTestId('challenge-participate-button')).toBeInTheDocument()
+      state.banned = true
+      state.denied = true
+      await act(async () => {
+        await sync().catchUp()
+      })
+      await screen.findByTestId('community-banned-notice')
+      expect(screen.queryByTestId('weekly-challenge-banner')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('challenge-participate-button')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
+      expect(document.body.textContent).not.toContain(CHALLENGE.title)
+    })
+
+    describe('a probe still out when its answer lands', () => {
+      /** The denied callback's probe is the one read for a single post, and it waits for `release`. */
+      async function startHeldProbe() {
+        let started = 0
+        let release: () => void = () => undefined
+        const gate = new Promise<void>((resolve) => (release = resolve))
+        const install = useMswHandlers
+        install(
+          http.get(FEED_PATH, async ({ request }) => {
+            if (new URL(request.url).searchParams.get('limit') !== '1')
+              return feedBody({ items: [item()] })
+            started += 1
+            await gate
+            return bannedResponse()
+          }),
+          http.get(SPOTLIGHT_PATH, emptySpotlight),
+          http.get('/api/v1/community/events', () =>
+            HttpResponse.json({ statusCode: 403, message: 'Denied' }, { status: 403 })
+          )
+        )
+        signIn()
+        const sync = captureSync()
+        const onBannedChange = vi.fn()
+        renderGrid({ onBannedChange })
+        await screen.findByText(item().caption!)
+        await act(async () => {
+          await sync().catchUp()
+        })
+        await waitFor(() => expect(started).toBe(1))
+        return { onBannedChange, release: () => act(() => release()) }
+      }
+
+      it.each<[string, () => void]>([
+        ['account erasure', eraseAccount],
+        ['sign-out', signOut],
+      ])('shows nothing of a ban that answers after %s', async (_label, retire) => {
+        const { onBannedChange, release } = await startHeldProbe()
+        retire()
+        release()
+        await settle()
+        expectNoSanctionOnPage()
+        expect(screen.getByTestId('community-live-region')).not.toHaveTextContent(
+          enUS.community.error.banned
+        )
+        expect(onBannedChange).toHaveBeenLastCalledWith(false)
+        expect(onBannedChange).not.toHaveBeenCalledWith(true)
+      })
+
+      it('still reaches the notice when the scope has not changed', async () => {
+        const { onBannedChange, release } = await startHeldProbe()
+        expect(queryNotice()).not.toBeInTheDocument()
+        release()
+        expect(await screen.findByTestId('community-banned-notice')).toBeInTheDocument()
+        expect(onBannedChange).toHaveBeenLastCalledWith(true)
+      })
     })
 
     it('shows no notice when the denial is not a ban', async () => {

@@ -1,6 +1,7 @@
 // Learning path Step 50: Moderator queue and case detail.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-50-moderator-queue-and-case-detail
 // Story 6.11 test owner: C-WEB-D-PANEL, -MUTATION, -STATES, -KEEP-REASON, -CONFIRM, -ANNOUNCE, -RELOAD-ONE, -HOSTILE, -A11Y.
+// Fix round 1: a retry never carries terms the admin has not confirmed.
 // Every journey runs through the real web transport against MSW, inside the real case view.
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -876,6 +877,133 @@ describe('C-WEB-D-KEEP-REASON', () => {
     await waitFor(() => expect(reads).toHaveLength(2))
     await settle()
     expect(reasonBox()).toHaveValue('')
+  })
+})
+
+describe('C-WEB-D-CONFIRM: a retry once the confirmed terms have changed', () => {
+  const NEW_REASON = `${REASON} and spam`
+  const ASK_TEMPORARY =
+    'Ban this author for the chosen time? Their community access closes at once.'
+  const ASK_PERMANENT =
+    'Ban this author permanently? All their community content is hidden and their reactions are withdrawn.'
+  const ASK_TAKEDOWN = 'Take this content down now? Readers lose it on their next read.'
+  const BAN_CASE: Overrides = {
+    allowedActions: ['ban'],
+    banKinds: ['temporary', 'permanent'],
+  }
+  const TAKEDOWN_CASE: Overrides = { allowedActions: ['takedown'], banKinds: [] }
+  const FIRST_BAN = { action: 'ban', ban: { kind: 'temporary', durationDays: 7 } }
+  const FIRST_TAKEDOWN = { action: 'takedown' }
+
+  const pick = (name: string, value: string) => () =>
+    userEvent.selectOptions(screen.getByRole('combobox', { name }), value)
+  const reword = () => {
+    typeReason(NEW_REASON)
+    return Promise.resolve()
+  }
+
+  const CHANGES: {
+    label: string
+    overrides: Overrides
+    first: object
+    change: () => Promise<void>
+    ask: string
+    changed: object
+  }[] = [
+    {
+      label: 'the ban kind to permanent',
+      overrides: BAN_CASE,
+      first: FIRST_BAN,
+      change: pick('Ban type', 'permanent'),
+      ask: ASK_PERMANENT,
+      changed: { action: 'ban', reason: REASON, ban: { kind: 'permanent' } },
+    },
+    {
+      label: 'the ban duration',
+      overrides: BAN_CASE,
+      first: FIRST_BAN,
+      change: pick('Duration', '90'),
+      ask: ASK_TEMPORARY,
+      changed: {
+        action: 'ban',
+        reason: REASON,
+        ban: { kind: 'temporary', durationDays: 90 },
+      },
+    },
+    {
+      label: 'the ban reason',
+      overrides: BAN_CASE,
+      first: FIRST_BAN,
+      change: reword,
+      ask: ASK_TEMPORARY,
+      changed: { ...FIRST_BAN, reason: NEW_REASON },
+    },
+    {
+      label: 'the takedown reason',
+      overrides: TAKEDOWN_CASE,
+      first: FIRST_TAKEDOWN,
+      change: reword,
+      ask: ASK_TAKEDOWN,
+      changed: { ...FIRST_TAKEDOWN, reason: NEW_REASON },
+    },
+  ]
+
+  const confirmFirstAttempt = async () => {
+    typeReason()
+    await userEvent.click(submitButton())
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, apply it' }))
+    return screen.findByRole('alert')
+  }
+
+  describe.each<[string, () => Response]>([
+    ['offline', offline],
+    ['audit unavailable', closed(503, 'audit_unavailable')],
+  ])('after %s', (_label, fail) => {
+    it.each(CHANGES)(
+      'sends nothing unconfirmed after changing $label',
+      async ({ overrides, first, change, ask, changed }) => {
+        const { bodies } = await openCase(fail, overrides)
+        await confirmFirstAttempt()
+        expect(bodies).toHaveLength(1)
+        expect(bodies[0]).toMatchObject({ ...first, reason: REASON })
+
+        await change()
+        // A fix can drop the control, or keep it for the confirmed payload, so this tolerates both.
+        const retry = screen.queryByRole('button', { name: 'Try again' })
+        if (retry) await userEvent.click(retry)
+        await settle()
+        expect(bodies.length).toBeLessThanOrEqual(2)
+        for (const sent of bodies.slice(1)) expect(sent).toEqual(bodies[0])
+
+        // The changed terms stay reachable, and only behind a question that names them.
+        const sentBefore = bodies.length
+        if (!confirmation()) await userEvent.click(submitButton())
+        await settle()
+        expect(bodies).toHaveLength(sentBefore)
+        const group = screen.getByRole('group', { name: ask })
+        await userEvent.click(
+          within(group).getByRole('button', { name: 'Yes, apply it' })
+        )
+        await waitFor(() => expect(bodies).toHaveLength(sentBefore + 1))
+        expect(bodies.at(-1)).toMatchObject(changed)
+        expect(bodies.at(-1)?.mutationId).not.toBe(bodies[0]?.mutationId)
+      }
+    )
+
+    it('resends the same payload and id when nothing changed', async () => {
+      const { bodies } = await openCase(
+        (_body, call) => (call === 1 ? fail() : json(decisionBody({ action: 'ban' }))),
+        BAN_CASE
+      )
+      const alert = await confirmFirstAttempt()
+      await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+      await waitFor(() => expect(bodies).toHaveLength(2))
+      expect(bodies[1]).toEqual(bodies[0])
+      expect(bodies[1]).toMatchObject({ ...FIRST_BAN, reason: REASON })
+      await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+      await settle()
+      expect(bodies).toHaveLength(2)
+    })
   })
 })
 
