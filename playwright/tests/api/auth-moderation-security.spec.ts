@@ -1,8 +1,9 @@
 // Learning path Step 12: Cross-surface E2E confidence.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-12-cross-surface-e2e-confidence
-import type { TestInfo } from '@playwright/test'
+import type { APIRequestContext, APIResponse, TestInfo } from '@playwright/test'
 import {
   forbiddenHttpErrorSchema,
+  moderationQueueErrorSchema,
   trackedResponseSchema,
   unauthorizedHttpErrorSchema,
 } from '@couture/api-client/contracts/http'
@@ -11,6 +12,7 @@ import {
   authHeaders,
   buildUniqueId,
   extractErrorMessage,
+  isNonLocalEnvironment,
   isProdEnvironment,
   resolveApiBaseUrl,
 } from '../../support/helpers/api-test'
@@ -262,14 +264,46 @@ test.describe('Moderator queue read routes (Story 6.10)', () => {
     }
   })
 
+  // The flag is environment configuration: a local stack seeds it on and a preview may have it off.
+  // A moderator passes the role check either way, so the queue answers 200 when the console is on and
+  // 503 `moderation_console_disabled` when it is off. Each test asserts the state it finds, and a local
+  // stack must be on, so neither state hides a defect.
+  async function consoleIsOn(request: APIRequestContext, testInfo: TestInfo) {
+    const probe = await request.get(
+      `${resolveApiBaseUrl(testInfo)}${QUEUE_PATH}?limit=1`,
+      { headers: authHeaders(buildUniqueId('moderator-probe', testInfo), 'moderator') }
+    )
+    if (probe.status() === 200) return true
+    await expectClosedConsole(probe)
+    expect(isNonLocalEnvironment(testInfo), 'a local stack seeds the console on').toBe(
+      true
+    )
+    return false
+  }
+
+  /** The closed console is a typed 503 that is never cached and carries no queue data. */
+  async function expectClosedConsole(response: APIResponse) {
+    expect(response.status(), await response.text()).toBe(503)
+    expect(response.headers()['cache-control']).toBe('private, no-store')
+    const body = moderationQueueErrorSchema.parse(await response.json())
+    expect(body.code).toBe('moderation_console_disabled')
+    expect(JSON.stringify(body)).not.toContain('items')
+    return JSON.stringify(body)
+  }
+
   test('[P0] P-Q-ROLES lets a moderator and an admin read the queue with private, no-store headers', async ({
     request,
   }, testInfo) => {
+    const on = await consoleIsOn(request, testInfo)
     const baseUrl = resolveApiBaseUrl(testInfo)
     for (const role of ['moderator', 'admin'] as const) {
       const response = await request.get(`${baseUrl}${QUEUE_PATH}?limit=5`, {
         headers: authHeaders(buildUniqueId(`${role}-reader`, testInfo), role),
       })
+      if (!on) {
+        await expectClosedConsole(response)
+        continue
+      }
       expect(response.status(), role).toBe(200)
       expect(response.headers()['cache-control']).toBe('private, no-store')
       const body = (await response.json()) as {
@@ -287,6 +321,7 @@ test.describe('Moderator queue read routes (Story 6.10)', () => {
   test('[P0] P-Q-ROLES answers 404 case_not_found with one body for unknown and malformed ids', async ({
     request,
   }, testInfo) => {
+    const on = await consoleIsOn(request, testInfo)
     const baseUrl = resolveApiBaseUrl(testInfo)
     const headers = authHeaders(buildUniqueId('moderator-reader', testInfo), 'moderator')
     const bodies = new Set<string>()
@@ -297,24 +332,37 @@ test.describe('Moderator queue read routes (Story 6.10)', () => {
       'orphan-post.never',
     ]) {
       const response = await request.get(`${baseUrl}${detailPath(id)}`, { headers })
+      if (!on) {
+        // The flag is read before the id, so a closed console cannot reveal which ids exist.
+        bodies.add(await expectClosedConsole(response))
+        continue
+      }
       expect(response.status(), id).toBe(404)
       expect(response.headers()['cache-control']).toBe('private, no-store')
       bodies.add(JSON.stringify(await response.json()))
     }
     expect(bodies.size).toBe(1)
-    expect([...bodies][0]).toContain('case_not_found')
+    expect([...bodies][0]).toContain(
+      on ? 'case_not_found' : 'moderation_console_disabled'
+    )
   })
 
   test('[P1] P-Q-ROLES refuses a bad filter with a closed code and exposes no write method', async ({
     request,
   }, testInfo) => {
+    const on = await consoleIsOn(request, testInfo)
     const baseUrl = resolveApiBaseUrl(testInfo)
     const headers = authHeaders(buildUniqueId('moderator-reader', testInfo), 'moderator')
     const bad = await request.get(`${baseUrl}${QUEUE_PATH}?risk=critical&limit=500`, {
       headers,
     })
-    expect(bad.status()).toBe(400)
-    expect(await bad.json()).toMatchObject({ statusCode: 400, code: 'invalid_filter' })
+    if (on) {
+      expect(bad.status()).toBe(400)
+      expect(await bad.json()).toMatchObject({ statusCode: 400, code: 'invalid_filter' })
+    } else {
+      // The flag is read before the query, so a closed console answers the same for any input.
+      await expectClosedConsole(bad)
+    }
     for (const method of ['post', 'put', 'patch', 'delete'] as const) {
       const response = await request[method](`${baseUrl}${QUEUE_PATH}`, { headers })
       expect([404, 405], method).toContain(response.status())
