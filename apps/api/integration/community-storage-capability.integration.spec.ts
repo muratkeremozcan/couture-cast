@@ -410,7 +410,7 @@ describe.runIf(process.env.COMMUNITY_REAL_STORAGE_TEST === 'true')(
 
         storage.removeRefused = false
         expect(
-          await eraser(storage).sweepErasureRequests(later(at, MINUTE_MS))
+          await eraser(storage).sweepErasureRequests(later(at, 15 * MINUTE_MS))
         ).toMatchObject({ overdue: 0 })
         expect(await stored(path)).toBeNull()
       }, 30_000)

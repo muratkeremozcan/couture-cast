@@ -904,6 +904,22 @@ With 201 older open rows on real Postgres, a post requested 1 hour later stayed 
 
 Unmeasured remains what the spec records: the hosted gateway route, whether a timeout ends the underlying write, and any whole-request limit.
 
+### Codex round 10
+
+`community-erasure-fairness.integration.spec.ts` now pins one queue ordered by due time, on real Postgres.
+At `56aea39a`, with only the new column added so the client matches, 5 of its 13 tests go red:
+
+| Test                                           | Failure at `56aea39a`                  |
+| :--------------------------------------------- | :------------------------------------- |
+| Final delete with 200 new requests every sweep | Open after 8 sweeps                    |
+| Healthy row behind 200 always-failing rows     | Held out past 72 hours                 |
+| Worker dies before its delete settles          | Counted as serviced, no second attempt |
+| Unrelated update moves `updated_at` forward    | Repeat postponed                       |
+| Old `updated_at`                               | Repeated before the pace               |
+
+The new request, the 8 retries from 70 to 72 hours and overdue stay green there and pin the invariants through the change.
+R10-3 in the adapter spec goes red twice at `56aea39a`: an advertised expiry past the token's when the clock runs during the mint, and an already expired token accepted.
+
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
 Those failures were my setup, and the rerun below is the evidence.

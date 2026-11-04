@@ -2302,7 +2302,7 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         expect((await postOf(post.id)).objects_purged_at).toBeNull()
 
         down = false
-        await eraser(storage).sweepErasureRequests(LATER(late, 60_000))
+        await eraser(storage).sweepErasureRequests(LATER(late, 15 * 60_000))
         expect(storage.objects.has(post.image_object_path!)).toBe(false)
         expect((await postOf(post.id)).objects_purged_at).not.toBeNull()
       })
