@@ -13,7 +13,7 @@ Added Steps 40 to 50:
 - Step 47: Story 6.7b, sponsored community highlights, `1d7b9848` (PR #161).
 - Step 48: Story 6.8, safe branded share-card export, `67806196` (PR #162), with native-lane fixes `3112efbd` (PR #165) and `185e827c` (PR #166).
 - Step 49: Story 6.9, native platform sharing, `6d92598f` (PR #167), merged on 2026-10-31.
-- Step 50: Story 6.10, moderator queue and case detail, in review on `feat/cc-6-10-moderator-queue`, not yet merged.
+- Step 50: Story 6.10, moderator queue and case detail, in PR review on `feat/cc-6-10-moderator-queue`, not yet merged.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -102,7 +102,7 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- In review: Step 50, Story 6.10, Moderator queue and case detail, status `review`, on `feat/cc-6-10-moderator-queue`.
+- In PR review: Step 50, Story 6.10, Moderator queue and case detail, status `done` in sprint tracking and not yet merged, on `feat/cc-6-10-moderator-queue`.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-10-moderator-queue-case-detail.md`.
   Production stays dark because `moderation_console_enabled` defaults to false.
 - Latest completed step: Step 49, Story 6.9, Native platform sharing, status `done`, merged as `6d92598f` (PR #167) on 2026-10-31.
@@ -9325,6 +9325,11 @@ Hard-won lessons from the implementation and review of this story:
 14. **Disable with `aria-disabled`, not `disabled`, when the control holds focus.**
     A `disabled` Load more or Reload drops keyboard focus mid-task; `aria-disabled` plus a guard keeps it, and the first new case takes focus when Load more goes away.
 
+15. **A control that changes with state must stay one element.**
+    The case Reload button sat in two different branches (`stale ? alert+button : button`), so React remounted it and keyboard focus fell to the body when a reload failed.
+    One button now keeps its place and only its label and the banner beside it change.
+    The same round made a failed first load's Try again show `Trying again`, and sent focus to Refresh when Load more ended the list with nothing new.
+
 Story/Task mapping:
 
 - Story 6.10
@@ -9431,6 +9436,7 @@ Evidence boundaries:
   TEA's final run at `e884d62a`, three consecutive times where noted: API unit tests 87 (6 files), API integration `moderation-queue*` 92 (8 files) against stock PostgreSQL 17 with the real guards, the contract spec 88, the config flag spec 26, the database specs 8, web `vitest run moderation` 225 (11 files), the web Pact 230 with the provider verification passing, Playwright 27 three times, and tsc with 0 errors in `apps/api`, `apps/web`, `packages/db`, `packages/api-client` and `pact`.
   A production `next build` of `apps/web` passed at the first commit of the console.
   TEA's seeded-defect proofs S-1 to S-10 all went red, and so did S-11 to S-17 on the review fixes, except S-13, an equivalent mutant: the terminal notice replaces the whole console, so a retained row could never render.
+  Review round 2 added four web tests and one API unit test after those counts, and TEA re-ran its Playwright console spec (14) and the flag spec (27) at `ec9afad2`.
   This step did not re-run any of it.
 - **A real browser walk used doubles for the edges.**
   The built API ran against an isolated migrated database seeded with the shared test seed, a mock storage origin served the image, and sign-in used the `NEXT_PUBLIC_E2E_AUTH` fixture token.

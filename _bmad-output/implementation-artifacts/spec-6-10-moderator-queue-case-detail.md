@@ -2,7 +2,7 @@
 title: 'CC-6.10 Moderator queue and case detail'
 type: 'feature'
 created: '2026-11-03'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'b959e4c6a300c37d5d97c8fd4519c63b6a20fd8e'
 baseline_revision: 'b959e4c6a300c37d5d97c8fd4519c63b6a20fd8e'
 route: 'dispatch'
@@ -307,6 +307,11 @@ Full reasoning and guards sit in `_bmad-output/test-artifacts/test-design/cc610-
   - 11 minor, fixed: the service clamps the excerpt to the contract bound without splitting a surrogate pair.
   - 12 minor, fixed: the list and the detail both take the locale of the earliest report (its snapshot locale, else the live target's), and an unusable locale reads as none in both.
   - 3 and 13 belong to TEA.
+- 2026-11-03, review round 2 of `e884d62a` (4 new minors, no blocker). Fixed in `9b9435ce` and `ec9afad2`, each with a test:
+  - N1: the case Reload control is one element in one place, so keyboard focus survives the stale banner appearing and clearing.
+  - N2: the Try again of a failed first load shows `Trying again`, sets `aria-busy` and ignores a second click.
+  - N3 and N4 (TEA): the flag independence check and the disabled-body stub can now fail.
+  - Design notes: when Load more returns only known cases and the list ends, focus moves to Refresh. `operatorNote` and finding codes are cut without splitting a surrogate pair.
 - Decision: finding 8's version-skew item overrides TEA's earlier rule that an extra key makes the console unavailable. The console renders only declared fields, so a dropped key leaks nothing.
 
 ## Test Design (TEA)
