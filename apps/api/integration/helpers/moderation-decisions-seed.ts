@@ -31,7 +31,6 @@ import {
   SEED_DAY_MS,
   newRunId,
   seedCommentReport,
-  seedMember,
   seedPostReport,
 } from './moderation-queue-seed.js'
 import { bearer, moderationQueueTestContext } from './moderation-queue-context.js'
@@ -318,20 +317,35 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
   const label = () => `${++counter}`
   let sequence = 0
 
+  /**
+   * The factory's faker email comes from a small name pool, and `User.email` is unique. These
+   * suites create many users per database, which collided about once in 80 runs.
+   */
+  const uniqueEmail = () => `${randomUUID()}@example.test`
+
+  async function seedOwnMember(alias: string | null): Promise<SeededMember> {
+    const user = await persistUser(prisma, createUser({ email: uniqueEmail() }))
+    const name = alias ?? `${runId}-operator${label()}`
+    if (alias) await prisma.communityAlias.create({ data: { user_id: user.id, alias } })
+    return { id: user.id, alias: name }
+  }
+
   const member = (name = 'member'): Promise<SeededMember> =>
-    seedMember(prisma, runId, `${name}${label()}`)
+    seedOwnMember(`${runId}-${name}${label()}`)
 
   /** A staff identity with a `User` row and no alias, as a real moderator has. */
-  const operator = (): Promise<SeededMember> =>
-    seedMember(prisma, runId, `operator${label()}`, { alias: false })
+  const operator = (): Promise<SeededMember> => seedOwnMember(null)
 
   /** A teen with an active guardian consent, which is what lets a teen take part. */
   async function teen(): Promise<SeededMember & { guardianId: string }> {
     const user = await persistUser(
       prisma,
-      createTeenUser({ profilePreferences: { compliance: { accountStatus: 'active' } } })
+      createTeenUser({
+        email: uniqueEmail(),
+        profilePreferences: { compliance: { accountStatus: 'active' } },
+      })
     )
-    const guardian = await persistUser(prisma, createUser())
+    const guardian = await persistUser(prisma, createUser({ email: uniqueEmail() }))
     const alias = `${runId}-teen${label()}`
     await prisma.communityAlias.create({ data: { user_id: user.id, alias } })
     await prisma.guardianConsent.create({
