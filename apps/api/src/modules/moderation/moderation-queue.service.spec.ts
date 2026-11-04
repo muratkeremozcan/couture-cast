@@ -544,7 +544,7 @@ describe('U-Q-SVC-LOGGING', () => {
     repository.recordCaseView.mockRejectedValue(
       new Error('connection to db.internal:5432 refused')
     )
-    await service.getCase(AUTH, 'post.p1').catch(() => undefined)
+    await expect(service.getCase(AUTH, 'post.p1')).rejects.toThrow()
     const text = JSON.stringify(logged)
     expect(text).toContain('audit_unavailable')
     expect(text).not.toMatch(/db\.internal|5432|Seen caption/)
