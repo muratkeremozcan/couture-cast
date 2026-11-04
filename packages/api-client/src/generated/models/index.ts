@@ -1379,6 +1379,103 @@ export interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCou
 /**
  *
  * @export
+ * @interface ApiV1CommunityFeedGet403Response
+ */
+export interface ApiV1CommunityFeedGet403Response {
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet403ResponseStatusCodeEnum}
+   * @memberof ApiV1CommunityFeedGet403Response
+   */
+  statusCode: ApiV1CommunityFeedGet403ResponseStatusCodeEnum
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet403ResponseCodeEnum}
+   * @memberof ApiV1CommunityFeedGet403Response
+   */
+  code: ApiV1CommunityFeedGet403ResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet403Response
+   */
+  message: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet403Response
+   */
+  error?: string
+  /**
+   *
+   * @type {CommunityBannedErrorSanction}
+   * @memberof ApiV1CommunityFeedGet403Response
+   */
+  sanction: CommunityBannedErrorSanction
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet403ResponseStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type ApiV1CommunityFeedGet403ResponseStatusCodeEnum =
+  (typeof ApiV1CommunityFeedGet403ResponseStatusCodeEnum)[keyof typeof ApiV1CommunityFeedGet403ResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet403ResponseCodeEnum = {
+  community_banned: 'community_banned',
+} as const
+export type ApiV1CommunityFeedGet403ResponseCodeEnum =
+  (typeof ApiV1CommunityFeedGet403ResponseCodeEnum)[keyof typeof ApiV1CommunityFeedGet403ResponseCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityFeedGet403ResponseAnyOf
+ */
+export interface ApiV1CommunityFeedGet403ResponseAnyOf {
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet403ResponseAnyOfStatusCodeEnum}
+   * @memberof ApiV1CommunityFeedGet403ResponseAnyOf
+   */
+  statusCode: ApiV1CommunityFeedGet403ResponseAnyOfStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet403ResponseAnyOf
+   */
+  code?: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet403ResponseAnyOf
+   */
+  message: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet403ResponseAnyOf
+   */
+  error?: string
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet403ResponseAnyOfStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type ApiV1CommunityFeedGet403ResponseAnyOfStatusCodeEnum =
+  (typeof ApiV1CommunityFeedGet403ResponseAnyOfStatusCodeEnum)[keyof typeof ApiV1CommunityFeedGet403ResponseAnyOfStatusCodeEnum]
+
+/**
+ *
+ * @export
  * @interface ApiV1CommunityPostsPostIdGet200Response
  */
 export interface ApiV1CommunityPostsPostIdGet200Response {
@@ -1555,6 +1652,103 @@ export const ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactionsViewerReac
   } as const
 export type ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactionsViewerReactionEnum =
   (typeof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactionsViewerReactionEnum)[keyof typeof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactionsViewerReactionEnum]
+
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityPostsPostIdGet403Response
+ */
+export interface ApiV1CommunityPostsPostIdGet403Response {
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet403ResponseStatusCodeEnum}
+   * @memberof ApiV1CommunityPostsPostIdGet403Response
+   */
+  statusCode: ApiV1CommunityPostsPostIdGet403ResponseStatusCodeEnum
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet403ResponseCodeEnum}
+   * @memberof ApiV1CommunityPostsPostIdGet403Response
+   */
+  code: ApiV1CommunityPostsPostIdGet403ResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet403Response
+   */
+  message: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet403Response
+   */
+  error?: string
+  /**
+   *
+   * @type {CommunityBannedErrorSanction}
+   * @memberof ApiV1CommunityPostsPostIdGet403Response
+   */
+  sanction: CommunityBannedErrorSanction
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdGet403ResponseStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type ApiV1CommunityPostsPostIdGet403ResponseStatusCodeEnum =
+  (typeof ApiV1CommunityPostsPostIdGet403ResponseStatusCodeEnum)[keyof typeof ApiV1CommunityPostsPostIdGet403ResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdGet403ResponseCodeEnum = {
+  community_banned: 'community_banned',
+} as const
+export type ApiV1CommunityPostsPostIdGet403ResponseCodeEnum =
+  (typeof ApiV1CommunityPostsPostIdGet403ResponseCodeEnum)[keyof typeof ApiV1CommunityPostsPostIdGet403ResponseCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityPostsPostIdGet403ResponseAnyOf
+ */
+export interface ApiV1CommunityPostsPostIdGet403ResponseAnyOf {
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet403ResponseAnyOfStatusCodeEnum}
+   * @memberof ApiV1CommunityPostsPostIdGet403ResponseAnyOf
+   */
+  statusCode: ApiV1CommunityPostsPostIdGet403ResponseAnyOfStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet403ResponseAnyOf
+   */
+  code?: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet403ResponseAnyOf
+   */
+  message: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet403ResponseAnyOf
+   */
+  error?: string
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdGet403ResponseAnyOfStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type ApiV1CommunityPostsPostIdGet403ResponseAnyOfStatusCodeEnum =
+  (typeof ApiV1CommunityPostsPostIdGet403ResponseAnyOfStatusCodeEnum)[keyof typeof ApiV1CommunityPostsPostIdGet403ResponseAnyOfStatusCodeEnum]
 
 /**
  *
@@ -7186,6 +7380,71 @@ export interface GetAlertPreferencesResponseDataPreferences {
 /**
  *
  * @export
+ * @interface GetCommunityComments403Response
+ */
+export interface GetCommunityComments403Response {
+  /**
+   *
+   * @type {GetCommunityComments403ResponseStatusCodeEnum}
+   * @memberof GetCommunityComments403Response
+   */
+  statusCode: GetCommunityComments403ResponseStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityComments403Response
+   */
+  message: string
+  /**
+   *
+   * @type {GetCommunityComments403ResponseErrorEnum}
+   * @memberof GetCommunityComments403Response
+   */
+  error: GetCommunityComments403ResponseErrorEnum
+  /**
+   *
+   * @type {GetCommunityComments403ResponseCodeEnum}
+   * @memberof GetCommunityComments403Response
+   */
+  code: GetCommunityComments403ResponseCodeEnum
+  /**
+   *
+   * @type {CommunityBannedErrorSanction}
+   * @memberof GetCommunityComments403Response
+   */
+  sanction: CommunityBannedErrorSanction
+}
+
+/**
+ * @export
+ */
+export const GetCommunityComments403ResponseStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type GetCommunityComments403ResponseStatusCodeEnum =
+  (typeof GetCommunityComments403ResponseStatusCodeEnum)[keyof typeof GetCommunityComments403ResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GetCommunityComments403ResponseErrorEnum = {
+  Forbidden: 'Forbidden',
+} as const
+export type GetCommunityComments403ResponseErrorEnum =
+  (typeof GetCommunityComments403ResponseErrorEnum)[keyof typeof GetCommunityComments403ResponseErrorEnum]
+
+/**
+ * @export
+ */
+export const GetCommunityComments403ResponseCodeEnum = {
+  community_banned: 'community_banned',
+} as const
+export type GetCommunityComments403ResponseCodeEnum =
+  (typeof GetCommunityComments403ResponseCodeEnum)[keyof typeof GetCommunityComments403ResponseCodeEnum]
+
+/**
+ *
+ * @export
  * @interface GetCommunityEvents400Response
  */
 export interface GetCommunityEvents400Response {
@@ -7854,47 +8113,6 @@ export const GetCommunitySpotlight400ResponseAnyOfCodeEnum = {
 } as const
 export type GetCommunitySpotlight400ResponseAnyOfCodeEnum =
   (typeof GetCommunitySpotlight400ResponseAnyOfCodeEnum)[keyof typeof GetCommunitySpotlight400ResponseAnyOfCodeEnum]
-
-/**
- *
- * @export
- * @interface GetCommunitySpotlight403Response
- */
-export interface GetCommunitySpotlight403Response {
-  /**
-   *
-   * @type {GetCommunitySpotlight403ResponseStatusCodeEnum}
-   * @memberof GetCommunitySpotlight403Response
-   */
-  statusCode: GetCommunitySpotlight403ResponseStatusCodeEnum
-  /**
-   *
-   * @type {string}
-   * @memberof GetCommunitySpotlight403Response
-   */
-  code?: string
-  /**
-   *
-   * @type {string}
-   * @memberof GetCommunitySpotlight403Response
-   */
-  message: string
-  /**
-   *
-   * @type {string}
-   * @memberof GetCommunitySpotlight403Response
-   */
-  error?: string
-}
-
-/**
- * @export
- */
-export const GetCommunitySpotlight403ResponseStatusCodeEnum = {
-  NUMBER_403: 403,
-} as const
-export type GetCommunitySpotlight403ResponseStatusCodeEnum =
-  (typeof GetCommunitySpotlight403ResponseStatusCodeEnum)[keyof typeof GetCommunitySpotlight403ResponseStatusCodeEnum]
 
 /**
  *

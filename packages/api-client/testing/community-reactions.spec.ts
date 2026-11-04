@@ -55,7 +55,6 @@ describe('Story 6.3 reaction contracts', () => {
     for (const [status, schema] of [
       ['400', 'BadRequestHttpError'],
       ['401', 'UnauthorizedHttpError'],
-      ['403', 'ForbiddenHttpError'],
       ['404', 'NotFoundHttpError'],
       ['429', 'TooManyRequestsHttpError'],
       ['500', 'InternalServerErrorHttpError'],
@@ -67,6 +66,18 @@ describe('Story 6.3 reaction contracts', () => {
         },
       })
     }
+    expect(operation?.responses?.['403']).toMatchObject({
+      content: {
+        'application/json': {
+          schema: {
+            anyOf: [
+              { $ref: '#/components/schemas/ForbiddenHttpError' },
+              { $ref: '#/components/schemas/CommunityBannedError' },
+            ],
+          },
+        },
+      },
+    })
     expect(operation?.responses?.['429']).toMatchObject({
       headers: {
         'Retry-After': { schema: { type: 'integer', minimum: 1 } },

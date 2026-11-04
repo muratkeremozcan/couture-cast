@@ -135,12 +135,12 @@ describe('community HTTP contracts', () => {
       {
         method: 'get',
         path: '/api/v1/community/feed',
-        statuses: ['200', '400', '401', '500', '503'],
+        statuses: ['200', '400', '401', '403', '500', '503'],
       },
       {
         method: 'get',
         path: '/api/v1/community/posts/{postId}',
-        statuses: ['200', '400', '401', '404', '500', '503'],
+        statuses: ['200', '400', '401', '403', '404', '500', '503'],
       },
       {
         method: 'post',
@@ -167,7 +167,7 @@ describe('community HTTP contracts', () => {
       {
         method: 'post',
         path: '/api/v1/community/posts/{postId}/opened',
-        statuses: ['200', '400', '401', '404', '500', '503'],
+        statuses: ['200', '400', '401', '403', '404', '500', '503'],
       },
       {
         method: 'post',
@@ -238,10 +238,12 @@ describe('community HTTP contracts', () => {
       // reached. It was undocumented until 2026-09-06; this path was one of only
       // three operations in the whole published spec that took a required header
       // and documented no 400.
+      // Story 6.11: a banned member's open is refused with a 403 that names the ban.
       expect(Object.keys(openedPath?.post?.responses ?? {}).sort()).toEqual([
         '200',
         '400',
         '401',
+        '403',
         '404',
         '500',
         '503',

@@ -5,8 +5,12 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { communityModerationReasonCategories } from './community'
+export {
+  COMMUNITY_BANNED_MESSAGE,
+  communityBannedErrorSchema,
+  type CommunityBannedError,
+} from './community-banned'
 import {
-  moderationAppealStatusSchema,
   moderationAppealStepSchema,
   moderationCaseIdSchema,
   moderationCaseStatusSchema,
@@ -216,35 +220,6 @@ export const moderationDecisionErrorSchema = z
   .strict()
 export type ModerationDecisionError = z.infer<typeof moderationDecisionErrorSchema>
 
-/** Distinct from the rollout copy, because both clients still match 403 messages after reading `code`. */
-export const COMMUNITY_BANNED_MESSAGE = 'Community access is suspended for this account.'
-
-/** The member's view of their own ban. It names no reason, moderator, case or sanction id. */
-export const communityBannedErrorSchema = z
-  .object({
-    statusCode: z.literal(403),
-    code: z.literal('community_banned'),
-    message: z.string().min(1),
-    sanction: z.discriminatedUnion('kind', [
-      z
-        .object({
-          kind: z.literal('temporary'),
-          expiresAt: z.string().datetime(),
-          appealStatus: moderationAppealStatusSchema,
-        })
-        .strict(),
-      z
-        .object({
-          kind: z.literal('permanent'),
-          expiresAt: z.null(),
-          appealStatus: moderationAppealStatusSchema,
-        })
-        .strict(),
-    ]),
-  })
-  .strict()
-export type CommunityBannedError = z.infer<typeof communityBannedErrorSchema>
-
 // --- The availability rule ---------------------------------------------------
 
 const RELEASABLE_POST_STATUSES: readonly string[] = ['flagged']
@@ -420,7 +395,6 @@ export function registerModerationDecisionContracts(registry: OpenAPIRegistry) {
   registry.register('ModerationAppealInput', moderationAppealInputSchema)
   registry.register('ModerationAppealResponse', moderationAppealResponseSchema)
   registry.register('ModerationDecisionError', moderationDecisionErrorSchema)
-  registry.register('CommunityBannedError', communityBannedErrorSchema)
   const error = (description: string) => ({
     description,
     content: { 'application/json': { schema: moderationDecisionErrorSchema } },

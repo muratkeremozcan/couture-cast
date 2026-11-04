@@ -5,6 +5,16 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { communityReportReasonSchema, type CommunityReportReason } from './community'
+import {
+  moderationAppealStatusSchema,
+  moderationSanctionKindSchema,
+} from './community-banned'
+export {
+  moderationAppealStatusSchema,
+  moderationSanctionKindSchema,
+  type ModerationAppealStatus,
+  type ModerationSanctionKind,
+} from './community-banned'
 
 // --- Vocabulary -------------------------------------------------------------
 
@@ -78,17 +88,6 @@ export const moderationDecisionActionSchema = z.enum([
   'ban',
 ])
 export type ModerationDecisionAction = z.infer<typeof moderationDecisionActionSchema>
-
-export const moderationSanctionKindSchema = z.enum(['temporary', 'permanent'])
-export type ModerationSanctionKind = z.infer<typeof moderationSanctionKindSchema>
-
-export const moderationAppealStatusSchema = z.enum([
-  'not_requested',
-  'requested',
-  'upheld',
-  'overturned',
-])
-export type ModerationAppealStatus = z.infer<typeof moderationAppealStatusSchema>
 
 /** The steps an operator can record. `not_requested` is only ever the starting state. */
 export const moderationAppealStepSchema = z.enum(['requested', 'upheld', 'overturned'])

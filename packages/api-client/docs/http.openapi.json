@@ -19140,97 +19140,6 @@
         ],
         "additionalProperties": false
       },
-      "CommunityBannedError": {
-        "type": "object",
-        "properties": {
-          "statusCode": {
-            "type": "number",
-            "enum": [
-              403
-            ]
-          },
-          "code": {
-            "type": "string",
-            "enum": [
-              "community_banned"
-            ]
-          },
-          "message": {
-            "type": "string",
-            "minLength": 1
-          },
-          "sanction": {
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "temporary"
-                    ]
-                  },
-                  "expiresAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "appealStatus": {
-                    "type": "string",
-                    "enum": [
-                      "not_requested",
-                      "requested",
-                      "upheld",
-                      "overturned"
-                    ]
-                  }
-                },
-                "required": [
-                  "kind",
-                  "expiresAt",
-                  "appealStatus"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "permanent"
-                    ]
-                  },
-                  "expiresAt": {
-                    "type": "null"
-                  },
-                  "appealStatus": {
-                    "type": "string",
-                    "enum": [
-                      "not_requested",
-                      "requested",
-                      "upheld",
-                      "overturned"
-                    ]
-                  }
-                },
-                "required": [
-                  "kind",
-                  "expiresAt",
-                  "appealStatus"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "required": [
-          "statusCode",
-          "code",
-          "message",
-          "sanction"
-        ],
-        "additionalProperties": false
-      },
       "PrepareShareCardInput": {
         "oneOf": [
           {
@@ -19498,6 +19407,97 @@
         },
         "required": [
           "data"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityBannedError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              403
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "community_banned"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sanction": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "temporary"
+                    ]
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "appealStatus": {
+                    "type": "string",
+                    "enum": [
+                      "not_requested",
+                      "requested",
+                      "upheld",
+                      "overturned"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "expiresAt",
+                  "appealStatus"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "permanent"
+                    ]
+                  },
+                  "expiresAt": {
+                    "type": "null"
+                  },
+                  "appealStatus": {
+                    "type": "string",
+                    "enum": [
+                      "not_requested",
+                      "requested",
+                      "upheld",
+                      "overturned"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "expiresAt",
+                  "appealStatus"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message",
+          "sanction"
         ],
         "additionalProperties": false
       }
@@ -24967,7 +24967,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -25083,7 +25090,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -25249,7 +25263,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -25378,7 +25399,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -25620,7 +25648,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -25766,7 +25801,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -26487,6 +26529,46 @@
               }
             }
           },
+          "403": {
+            "description": "The read rollout refuses this viewer, or the member is banned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error occurred.",
             "content": {
@@ -26674,30 +26756,37 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "enum": [
-                        403
-                      ]
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
                     },
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "error": {
-                      "type": "string"
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
                     }
-                  },
-                  "required": [
-                    "statusCode",
-                    "message"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -26859,7 +26948,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -27180,6 +27276,46 @@
               }
             }
           },
+          "403": {
+            "description": "The read rollout refuses this viewer, or the member is banned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
           "404": {
             "description": "Post not found or not visible to the caller.",
             "content": {
@@ -27296,7 +27432,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -27445,7 +27588,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -27585,6 +27735,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The read rollout refuses this viewer, or the member is banned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -28024,7 +28214,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -28209,7 +28436,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -28401,7 +28665,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -28595,7 +28896,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -28789,7 +29127,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -28972,7 +29347,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -29176,7 +29588,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -31872,7 +32321,44 @@
             "description": "Authentication required"
           },
           "403": {
-            "description": "share_disabled: native share is off for this member (share purpose only), or access denied"
+            "description": "share_disabled: native share is off for this member (share purpose only), access denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "404": {
             "description": "source_unavailable"
