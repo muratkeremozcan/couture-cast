@@ -56,6 +56,7 @@ import {
   CommunityImageValidationError,
   verifyAndNormalizeCommunityImage,
   type CommunityMimeType,
+  verifyCommunityImage,
 } from './community-image-validation.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
 import { createHash } from 'node:crypto'
@@ -389,21 +390,25 @@ export class CommunityModerationProcessor {
       )
     }
 
-    const normalized = await verifyAndNormalizeCommunityImage(rawBytes, {
-      byteSize,
-      mimeType: mimeType as CommunityMimeType,
-      sha256,
-    })
-
-    if (match.state === 'normalized') return rawBytes
-    const settlement = { post, objectPath, generation, mimeType: normalized.mimeType }
-    if (match.state === 'pending')
+    const declaration = { byteSize, mimeType: mimeType as CommunityMimeType, sha256 }
+    if (match.state === 'normalized') {
+      await verifyCommunityImage(rawBytes, declaration)
+      return rawBytes
+    }
+    if (match.state === 'pending') {
+      const verified = await verifyCommunityImage(rawBytes, declaration)
       return this.settleNormalization({
-        ...settlement,
+        post,
+        objectPath,
+        generation,
+        mimeType: verified.mimeType,
         sha256,
         byteSize,
         bytes: rawBytes,
       })
+    }
+
+    const normalized = await verifyAndNormalizeCommunityImage(rawBytes, declaration)
     if (normalized.sha256 === sha256) return normalized.bytes
 
     const reserved = await this.withImageOwnership(
@@ -424,7 +429,10 @@ export class CommunityModerationProcessor {
 
     await this.storage.upload(objectPath, normalized.bytes, normalized.mimeType)
     return this.settleNormalization({
-      ...settlement,
+      post,
+      objectPath,
+      generation,
+      mimeType: normalized.mimeType,
       sha256: normalized.sha256,
       byteSize: normalized.byteSize,
       bytes: normalized.bytes,

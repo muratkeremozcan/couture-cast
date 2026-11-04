@@ -826,6 +826,19 @@ deployment selection, database restore, release tagging, or rollback verificatio
 provider-console rollback capability is outside the evidence in this scan and must not be treated
 as a repository procedure.
 
+## Story 6.11 moderation decisions rollout
+
+The migration `20261104140000_community_pending_image_declaration` and its screening protocol cannot fence a worker running the previous build.
+While an old worker can still upload, a recovered post can end up declaring bytes that are not stored.
+`moderation_decisions_enabled` is the fence: no ban means no recovery, and it stays off at deploy.
+
+1. Stop the process consuming `community-moderation` before starting the new one, for this release only.
+2. Apply the migration, then start the new build.
+3. Before enabling `moderation_decisions_enabled`, verify that no old worker is alive:
+   - The hosting console shows every worker service on the release SHA, with no older instance running.
+   - `new Queue('community-moderation', { connection }).getWorkers()` lists only connections whose `age` in seconds is younger than the new build's start.
+4. Enable `moderation_console_enabled` and `moderation_decisions_enabled` only after both checks pass.
+
 ## Concrete gaps
 
 1. **Workers have no deployment target yet.** The community worker has a container image, a

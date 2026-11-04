@@ -147,6 +147,10 @@ function missingReactionSnapshot(
   return include && isPubliclyVisiblePost(post) && summary === undefined
 }
 
+/** Erasure keeps the path for a while to catch a late write. It is never readable from then on. */
+const readableObjectPath = (post: LookbookPost): string | null =>
+  post.erasure_requested_at || post.anonymized_at ? null : post.image_object_path
+
 @Injectable()
 export class CommunityService {
   private readonly logger = new Logger(CommunityService.name)
@@ -741,9 +745,8 @@ export class CommunityService {
     const signedUrls = await this.signPage(posts)
 
     return posts.map((post) => {
-      const signedUrl = post.image_object_path
-        ? signedUrls.get(post.image_object_path)
-        : undefined
+      const objectPath = readableObjectPath(post)
+      const signedUrl = objectPath ? signedUrls.get(objectPath) : undefined
 
       return {
         id: post.id,
@@ -785,9 +788,7 @@ export class CommunityService {
   private async signPage(posts: LookbookPost[]): Promise<Map<string, string>> {
     const objectPaths = Array.from(
       new Set(
-        posts
-          .map((post) => post.image_object_path)
-          .filter((path): path is string => Boolean(path))
+        posts.map(readableObjectPath).filter((path): path is string => Boolean(path))
       )
     )
     if (objectPaths.length === 0) {

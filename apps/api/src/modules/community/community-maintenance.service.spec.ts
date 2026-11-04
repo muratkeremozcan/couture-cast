@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
 import {
+  COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS,
   CommunityMaintenanceService,
   ERASURE_DEADLINE_HOURS,
   STALE_PENDING_REVIEW_MINUTES,
@@ -145,7 +146,10 @@ describe('CommunityMaintenanceService', () => {
       status: 'published',
       image_object_path: 'community/post-erase/s.jpg',
       anonymized_at: null,
-      erasure_requested_at: new Date('2026-09-05T11:00:00.000Z'),
+      // Past the late-write window, so a pass finishes the row. The window has its own cases.
+      erasure_requested_at: new Date(
+        now.getTime() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS - 1
+      ),
       ...overrides,
     })
 
@@ -157,7 +161,10 @@ describe('CommunityMaintenanceService', () => {
 
       expect(findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { erasure_requested_at: { not: null }, objects_purged_at: null },
+          where: expect.objectContaining({
+            erasure_requested_at: { not: null },
+            objects_purged_at: null,
+          }) as unknown,
         })
       )
     })
@@ -204,6 +211,7 @@ describe('CommunityMaintenanceService', () => {
         where: { id: 'post-erase' },
         data: {
           status: 'withdrawn',
+          updated_at: now,
           caption: null,
           alt_text: null,
           locale: null,
@@ -270,7 +278,7 @@ describe('CommunityMaintenanceService', () => {
       expect(result).toEqual({ hidden: 0, anonymized: 0, objectsPurged: 0, overdue: 1 })
       expect(update).toHaveBeenCalledWith({
         where: { id: 'post-erase' },
-        data: { status: 'withdrawn' },
+        data: { status: 'withdrawn', updated_at: now },
       })
     })
 

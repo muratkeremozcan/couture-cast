@@ -33,6 +33,18 @@ export const MODERATION_STALLED_REASON = 'moderation_stalled'
  */
 export const ERASURE_DEADLINE_HOURS = 72
 
+/**
+ * How long after an erasure request a write that started before it could still land. Screening
+ * takes its image reservation only while no erasure is requested, so its upload began before the
+ * request, and a signed client upload lasts 15 minutes. A storage request cannot commit long after
+ * its connection and the server's own limits end, so this is hours of margin, and well inside the
+ * 72-hour deadline. It runs from the request, so a late first delete never pushes it out.
+ */
+export const COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS = 6 * 60 * 60 * 1000
+
+/** How often a row inside the window has its object deleted again. The sweep runs far more often. */
+const ERASURE_REPEAT_DELETE_MS = 15 * 60 * 1000
+
 const MAX_SWEEP_BATCH = 200
 
 export interface CommunityStaleReviewSweepResult {
@@ -251,6 +263,11 @@ export class CommunityMaintenanceService {
    * `image_object_path` with both foreign keys nulled, which is what "retain
    * anonymized moderation audit metadata" means: the fact survives, the person
    * does not.
+   *
+   * A worker lost mid-upload can recreate the object after a delete, with no owner left to remove
+   * it. So the row keeps its path and stays open until the late-write window has passed: the object
+   * is deleted again on the way, and once more past the window before `objects_purged_at` is
+   * stamped. Anonymization has already closed every read of that path.
    */
   async sweepErasureRequests(
     now: Date = new Date()
@@ -259,6 +276,15 @@ export class CommunityMaintenanceService {
       where: {
         erasure_requested_at: { not: null },
         objects_purged_at: null,
+        OR: [
+          { anonymized_at: null },
+          { updated_at: { lte: new Date(now.getTime() - ERASURE_REPEAT_DELETE_MS) } },
+          {
+            erasure_requested_at: {
+              lte: new Date(now.getTime() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS),
+            },
+          },
+        ],
       },
       orderBy: { erasure_requested_at: 'asc' },
       take: MAX_SWEEP_BATCH,
@@ -310,6 +336,14 @@ export class CommunityMaintenanceService {
         }
       }
 
+      if (
+        metadata.image_object_path &&
+        post.erasure_requested_at &&
+        now.getTime() <
+          post.erasure_requested_at.getTime() + COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS
+      )
+        continue
+
       const purged = await communityPrivacyTransaction(this.prisma, async (tx) => {
         await guardCommunityPost(tx, post.id)
         return tx.lookbookPost.updateMany({
@@ -356,6 +390,8 @@ export class CommunityMaintenanceService {
         where: { id },
         data: {
           status: 'withdrawn',
+          // On the sweep's clock, because it paces the next delete of this object.
+          updated_at: now,
           ...(anonymized
             ? {
                 caption: null,
