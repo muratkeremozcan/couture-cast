@@ -49,14 +49,15 @@ const MAX_SWEEP_BATCH = 200
 /**
  * The sweep's clock at a later moment, to the whole minute. Deletes run one at a time, so a slow one
  * must not backdate the attempts after it to when the sweep began. Whole minutes keep a batch's first
- * minute on the sweep's own time: a row stamped seconds later would miss the 15-minute cron's next
- * pass by those seconds and wait a whole extra cycle. So a retry can run up to a minute early.
+ * minute on the cron's tick: a stamp seconds past the tick, from a slow batch or a job that starts a
+ * little late, would miss the next pass by those seconds and wait a whole extra cycle. So a repeat can
+ * run up to a minute under the pace.
  */
 function sweepClock(now: Date): () => Date {
   const startedAt = Date.now()
   return () => {
-    const elapsed = Date.now() - startedAt
-    return new Date(now.getTime() + elapsed - (elapsed % 60_000))
+    const settled = now.getTime() + Date.now() - startedAt
+    return new Date(settled - (settled % 60_000))
   }
 }
 
