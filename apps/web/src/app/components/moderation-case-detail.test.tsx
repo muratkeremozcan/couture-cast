@@ -1,6 +1,7 @@
 // Learning path Step 50: Moderator queue and case detail.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-50-moderator-queue-and-case-detail
-// Story 6.10 test owner: C-WEB-Q-DETAIL, -DETAIL-ONE-READ, -STATES, -NO-ACTIONS, -CONFLICT-NOTICE, -HOSTILE-TEXT.
+// Story 6.10 test owner: C-WEB-Q-DETAIL, -DETAIL-ONE-READ, -STATES, -CONFLICT-NOTICE, -HOSTILE-TEXT.
+// Story 6.11 retired C-WEB-Q-NO-ACTIONS because the controls now exist: the empty-list rule stands in its place.
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
@@ -166,7 +167,8 @@ describe('C-WEB-Q-DETAIL', () => {
     const items = within(actions).getAllByRole('listitem')
     expect(items).toHaveLength(2)
     expect(within(items[0]!).getByText(/Screening/)).toBeInTheDocument()
-    expect(within(items[0]!).getByText('flagged')).toBeInTheDocument()
+    expect(within(items[0]!).getByText(/Flagged by screening/)).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/\b(flagged|released_by_operator)\b/)
     expect(within(items[1]!).getByText(/Operator/)).toBeInTheDocument()
     expect(within(items[1]!).getByText('Looks fine')).toBeInTheDocument()
   })
@@ -405,17 +407,15 @@ describe('C-WEB-Q-STATES', () => {
   })
 })
 
-describe('C-WEB-Q-NO-ACTIONS: the detail view decides nothing', () => {
+describe('C-WEB-D-PANEL: the detail shows no action control when allowedActions is empty', () => {
   it('offers only navigation and reload, with no decision control or placeholder', async () => {
-    await openCase()
+    await openCase({ allowedActions: [], banKinds: [] })
     const buttons = screen.getAllByRole('button').map((button) => button.textContent)
     expect(buttons).toEqual(['Reload case'])
+    expect(screen.queryByRole('region', { name: 'Decision' })).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
-    expect(document.body.textContent?.toLowerCase()).not.toMatch(
-      /\b(resolve case|release|take ?down|escalate|ban|sanction|decision)\b/
-    )
     expect(document.querySelectorAll('button[disabled]')).toHaveLength(0)
   })
 })
