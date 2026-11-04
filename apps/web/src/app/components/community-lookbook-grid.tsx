@@ -2626,6 +2626,9 @@ export function CommunityLookbookGrid({
       setSpotlightNotice(null)
       // A sanction names one member's ban, its expiry and appeal, so it leaves with that member.
       setBannedSanction(null)
+      setAnnouncements((previous) =>
+        previous.filter((message) => message.key !== 'community.error.banned')
+      )
       setItems([])
       itemsRef.current = []
       setAuthorStates([])
@@ -2901,14 +2904,17 @@ export function CommunityLookbookGrid({
           setNewLooks([])
           // A denied socket says nothing about why. One read asks, so a member banned while
           // the page was open sees the notice. A member already told needs no second answer.
-          if (!bannedRef.current)
+          if (!bannedRef.current) {
+            // Erasure keeps the identity and retires the scope, so the answer checks the scope too.
+            const scope = feedScopeRef.current
             void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
               (error: unknown) => {
                 const sanction = communitySanctionOf(error)
-                if (!active || !sanction) return
+                if (!active || scope !== feedScopeRef.current || !sanction) return
                 closeForBan(sanction)
               }
             )
+          }
         }
       },
     })
