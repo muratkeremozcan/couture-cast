@@ -152,6 +152,7 @@ const detailBody = {
   }),
   reporters: eachLike({
     identity: identity('brave-owl-9876'),
+    origin: 'member',
     reason: regex(
       'spam|harassment|inappropriate_content|hate_speech|violence|other',
       'harassment'
