@@ -272,18 +272,19 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.roles.outcome == 'success' }}
         run: node scripts/prisma-migrate-deploy.mjs
 
-      - name: Build packages
+      # Together, because this job normally takes about 19 of its 20 minutes and a slow apt mirror
+      # once added 2 minutes to the Chromium install and cancelled a run whose tests had all passed.
+      - name: Build packages and install Playwright Chromium
         id: build
-        if: ${{ !cancelled() && steps.prisma.outcome == 'success' }}
-        run: npm run build
-
-      - name: Install Playwright Chromium
-        id: chromium
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: npx playwright install --with-deps chromium
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.prisma.outcome == 'success' }}
+        run: |
+          npx playwright install --with-deps chromium &
+          chromium=$!
+          npm run build
+          wait "$chromium"
 
       - name: Run tests with coverage
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.migrations.outcome == 'success' && steps.chromium.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.migrations.outcome == 'success' }}
         id: tests
         continue-on-error: true
         run: npm run test:coverage
