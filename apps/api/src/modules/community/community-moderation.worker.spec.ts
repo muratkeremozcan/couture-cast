@@ -121,6 +121,11 @@ describe('CommunityModerationProcessor & Worker', () => {
   const mockStorage: CommunityStorage = {
     download: mockDownload,
     upload: mockUpload,
+    createOverwriteCapability: vi
+      .fn()
+      .mockImplementation((objectPath: string) =>
+        Promise.resolve({ objectPath, token: 'token', expiresAt: new Date(0) })
+      ),
     signReadUrl: vi.fn(),
     signReadUrls: vi.fn(),
     createUploadSession: vi.fn(),
@@ -504,7 +509,8 @@ describe('CommunityModerationProcessor & Worker', () => {
       expect(mockUpload).toHaveBeenCalledWith(
         'community/post-reencode/session-r.jpg',
         expect.any(Buffer),
-        'image/jpeg'
+        'image/jpeg',
+        expect.objectContaining({ token: 'token' })
       )
       expect(mockPostUpdate).toHaveBeenCalledWith({
         where: { id: 'post-reencode' },

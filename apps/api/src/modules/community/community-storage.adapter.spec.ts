@@ -12,9 +12,16 @@ vi.mock('@supabase/supabase-js', () => ({
 }))
 
 import {
+  COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS,
   COMMUNITY_IMAGES_BUCKET,
   SupabaseCommunityStorageAdapter,
 } from './community-storage.adapter'
+
+const capability = {
+  objectPath: 'community/p/s.jpg',
+  token: 'signed-token',
+  expiresAt: new Date('2026-11-04T12:00:00.000Z'),
+}
 
 describe('SupabaseCommunityStorageAdapter', () => {
   const originalUrl = process.env.SUPABASE_URL
@@ -28,6 +35,7 @@ describe('SupabaseCommunityStorageAdapter', () => {
     createSignedUploadUrl: vi.fn(),
     download: vi.fn(),
     upload: vi.fn(),
+    uploadToSignedUrl: vi.fn(),
     remove: vi.fn(),
   }
 
@@ -87,7 +95,7 @@ describe('SupabaseCommunityStorageAdapter', () => {
         ServiceUnavailableException
       )
       await expect(
-        adapter.upload('community/p/s.jpg', Buffer.from('x'), 'image/jpeg')
+        adapter.upload('community/p/s.jpg', Buffer.from('x'), 'image/jpeg', capability)
       ).rejects.toThrow(ServiceUnavailableException)
       await expect(adapter.remove(['community/p/s.jpg'])).rejects.toThrow(
         ServiceUnavailableException
@@ -242,25 +250,67 @@ describe('SupabaseCommunityStorageAdapter', () => {
   })
 
   describe('upload', () => {
-    it('overwrites the object in place for the re-encode step', async () => {
-      bucketApi.upload.mockResolvedValueOnce({ error: null })
+    it('mints an overwriting token for the path, with the lifetime storage enforces', async () => {
+      bucketApi.createSignedUploadUrl.mockResolvedValueOnce({
+        data: { token: 'minted', signedUrl: 'https://x/y', path: 'community/p/s.jpg' },
+        error: null,
+      })
 
       const adapter = new SupabaseCommunityStorageAdapter()
-      await adapter.upload('community/p/s.jpg', Buffer.from('bytes'), 'image/jpeg')
+      const minted = await adapter.createOverwriteCapability('community/p/s.jpg')
 
-      expect(bucketApi.upload).toHaveBeenCalledWith(
-        'community/p/s.jpg',
-        expect.any(Buffer),
-        { cacheControl: 'private, max-age=0', contentType: 'image/jpeg', upsert: true }
+      expect(bucketApi.createSignedUploadUrl).toHaveBeenCalledWith('community/p/s.jpg', {
+        upsert: true,
+      })
+      expect(minted.token).toBe('minted')
+      expect(minted.expiresAt.getTime()).toBeLessThanOrEqual(
+        Date.now() + COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS
       )
     })
 
-    it('raises STORAGE_PERMISSION_DENIED on an error result', async () => {
-      bucketApi.upload.mockResolvedValueOnce({ error: { message: 'denied' } })
+    it('raises STORAGE_PERMISSION_DENIED when no token can be minted', async () => {
+      bucketApi.createSignedUploadUrl.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'denied' },
+      })
 
       const adapter = new SupabaseCommunityStorageAdapter()
       await expect(
-        adapter.upload('community/p/s.jpg', Buffer.from('bytes'), 'image/jpeg')
+        adapter.createOverwriteCapability('community/p/s.jpg')
+      ).rejects.toThrow('STORAGE_PERMISSION_DENIED')
+    })
+
+    it('overwrites through the signed token and never with service-role authority', async () => {
+      bucketApi.uploadToSignedUrl.mockResolvedValueOnce({ error: null })
+
+      const adapter = new SupabaseCommunityStorageAdapter()
+      await adapter.upload(
+        'community/p/s.jpg',
+        Buffer.from('bytes'),
+        'image/jpeg',
+        capability
+      )
+
+      expect(bucketApi.uploadToSignedUrl).toHaveBeenCalledWith(
+        'community/p/s.jpg',
+        capability.token,
+        expect.any(Buffer),
+        { cacheControl: 'private, max-age=0', contentType: 'image/jpeg', upsert: true }
+      )
+      expect(bucketApi.upload).not.toHaveBeenCalled()
+    })
+
+    it('raises STORAGE_PERMISSION_DENIED on an error result', async () => {
+      bucketApi.uploadToSignedUrl.mockResolvedValueOnce({ error: { message: 'denied' } })
+
+      const adapter = new SupabaseCommunityStorageAdapter()
+      await expect(
+        adapter.upload(
+          'community/p/s.jpg',
+          Buffer.from('bytes'),
+          'image/jpeg',
+          capability
+        )
       ).rejects.toThrow('STORAGE_PERMISSION_DENIED')
     })
   })

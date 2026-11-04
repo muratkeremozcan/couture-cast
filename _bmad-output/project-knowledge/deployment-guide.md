@@ -828,16 +828,26 @@ as a repository procedure.
 
 ## Story 6.11 moderation decisions rollout
 
-The migration `20261104140000_community_pending_image_declaration` and its screening protocol cannot fence a worker running the previous build.
-While an old worker can still upload, a recovered post can end up declaring bytes that are not stored.
-`moderation_decisions_enabled` is the fence: no ban means no recovery, and it stays off at deploy.
+The screening protocol from migration `20261104140000_community_pending_image_declaration` cannot fence a worker running the previous build.
+While an old worker can still upload, a recovered post can end up declaring bytes that are not stored, and an erased image can come back through its service-role upload.
+Confirmed shutdown of every old process carries this guarantee, and nothing else does.
 
-1. Stop the process consuming `community-moderation` before starting the new one, for this release only.
-2. Apply the migration, then start the new build.
-3. Before enabling `moderation_decisions_enabled`, verify that no old worker is alive:
-   - The hosting console shows every worker service on the release SHA, with no older instance running.
-   - `new Queue('community-moderation', { connection }).getWorkers()` lists only connections whose `age` in seconds is younger than the new build's start.
-4. Enable `moderation_console_enabled` and `moderation_decisions_enabled` only after both checks pass.
+`moderation_decisions_enabled` narrows the exposure and proves nothing about it:
+
+- Decision and appeal routes evaluate it per moderator, so a targeted rule can open them for one person while the default is off.
+- `sweepExpiredBanHolds` runs with no flag lookup, so an ended sanction returns content to screening while the flag is off.
+- No production path creates a sanction except the decision route, so with the flag off for everyone there are none to recover.
+
+Steps:
+
+1. Stop every process group consuming `community-moderation` before starting the new build, for this release only.
+   That is the general worker or the hosted community worker, whichever runs against this Redis, including any replica.
+2. Get authoritative confirmation that each old process exited: the host's own record of the instance stopping, with its active jobs ended. A worker missing from Redis is unknown, because a disconnected process can still hold an upload in memory.
+3. Apply the migration, then start the new build.
+4. Cross-check each running worker's release identity:
+   - The BullMQ worker name `community-worker@<COMMIT_SHA>` equals the release SHA for every name `getWorkers()` returns.
+   - Every `community-worker:heartbeat:*` key has that `commitSha`, and a `startedAt` after the old processes' confirmed exit.
+5. Enable `moderation_console_enabled` and `moderation_decisions_enabled` only after steps 2 and 4 pass.
 
 ## Concrete gaps
 

@@ -411,6 +411,8 @@ export class CommunityModerationProcessor {
     const normalized = await verifyAndNormalizeCommunityImage(rawBytes, declaration)
     if (normalized.sha256 === sha256) return normalized.bytes
 
+    // Before the reservation: every write this reservation permits has to start before this expires.
+    const capability = await this.storage.createOverwriteCapability(objectPath)
     const reserved = await this.withImageOwnership(
       post,
       objectPath,
@@ -427,7 +429,12 @@ export class CommunityModerationProcessor {
     )
     if (reserved !== 'owner') return null
 
-    await this.storage.upload(objectPath, normalized.bytes, normalized.mimeType)
+    await this.storage.upload(
+      objectPath,
+      normalized.bytes,
+      normalized.mimeType,
+      capability
+    )
     return this.settleNormalization({
       post,
       objectPath,

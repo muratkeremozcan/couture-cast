@@ -1054,7 +1054,12 @@ describe('I-S-LOOP: the first path out of a held item with no script (E1, S1)', 
     const draft = await prisma.lookbookPost.findUniqueOrThrow({
       where: { id: session.postId },
     })
-    await media.upload(draft.image_object_path!, jpegBytes, 'image/jpeg')
+    await media.upload(
+      draft.image_object_path!,
+      jpegBytes,
+      'image/jpeg',
+      await media.createOverwriteCapability(draft.image_object_path!)
+    )
     const published = await member
       .post('/api/v1/community/posts/publish')
       .set('Idempotency-Key', randomUUID())

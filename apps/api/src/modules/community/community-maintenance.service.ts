@@ -34,11 +34,12 @@ export const MODERATION_STALLED_REASON = 'moderation_stalled'
 export const ERASURE_DEADLINE_HOURS = 72
 
 /**
- * How long after an erasure request a write that started before it could still land. Screening
- * takes its image reservation only while no erasure is requested, so its upload began before the
- * request, and a signed client upload lasts 15 minutes. A storage request cannot commit long after
- * its connection and the server's own limits end, so this is hours of margin, and well inside the
- * 72-hour deadline. It runs from the request, so a late first delete never pushes it out.
+ * How long after an erasure request a write could still land. Screening mints its overwrite token
+ * before its reservation, and a reservation is refused once erasure is requested, so storage refuses
+ * any such write that starts later than 2 hours after the request
+ * (`COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS`). The other 4 hours are margin for a request already running,
+ * which Storage does not cut and the adapter's timeout and the gateway's limits end. It runs from the
+ * request, so a late first delete never pushes it out, and it stays well inside the 72-hour deadline.
  */
 export const COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS = 6 * 60 * 60 * 1000
 

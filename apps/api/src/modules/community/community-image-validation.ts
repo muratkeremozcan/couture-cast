@@ -152,8 +152,10 @@ export async function verifyCommunityImage(
 ): Promise<{ mimeType: GarmentMimeType }> {
   const sniffedMime = verifyDeclaration(bytes, declaration)
   try {
-    const { metadata } = await openVerifiedImage(bytes, sniffedMime)
+    const { metadata, pipeline } = await openVerifiedImage(bytes, sniffedMime)
     assertDimensionsInRange(metadata.width ?? 0, metadata.height ?? 0)
+    // Headers can read fine over truncated pixels, so decode every one, to raw and not to a format.
+    await pipeline.raw().toBuffer()
     return { mimeType: sniffedMime }
   } catch (error) {
     if (error instanceof CommunityImageValidationError) throw error

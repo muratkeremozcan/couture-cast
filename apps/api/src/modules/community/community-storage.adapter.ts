@@ -10,6 +10,34 @@ export interface CommunityUploadSession {
   expiresAt: string
 }
 
+/**
+ * How long a signed upload token lets a request start. Storage sets this per deployment and clients
+ * cannot shorten it: Supabase documents 2 hours, and the storage server checks the token's expiry
+ * when a request starts, before it reads the body.
+ */
+export const COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS = 2 * 60 * 60 * 1000
+
+/**
+ * Storage checks the token once and does not cut a request already running, so this process ends its
+ * own. A frozen process cannot run this timer, and then only the gateway's limits end the request.
+ */
+export const COMMUNITY_SIGNED_UPLOAD_REQUEST_TIMEOUT_MS = 5 * 60 * 1000
+
+const fetchWithUploadTimeout = (
+  input: Parameters<typeof fetch>[0],
+  init?: RequestInit
+): Promise<Response> =>
+  fetch(input, {
+    ...init,
+    signal: AbortSignal.timeout(COMMUNITY_SIGNED_UPLOAD_REQUEST_TIMEOUT_MS),
+  })
+
+export interface CommunityOverwriteCapability {
+  objectPath: string
+  token: string
+  expiresAt: Date
+}
+
 export interface CommunityStorage {
   signReadUrl(objectPath: string, expiresInSeconds: number): Promise<string>
   /** One round trip for a whole feed page. Resolves to a path -> URL map. */
@@ -22,8 +50,19 @@ export interface CommunityStorage {
     expiresInSeconds?: number
   ): Promise<CommunityUploadSession>
   download(objectPath: string): Promise<Buffer>
+  /**
+   * Authority to overwrite one object, which storage itself stops honoring when it expires. Mint it
+   * before the reservation it serves: a pause can follow any check this process makes, so only
+   * storage refusing the request bounds when that write can start.
+   */
+  createOverwriteCapability(objectPath: string): Promise<CommunityOverwriteCapability>
   /** Overwrites an object in place, used by the re-encode step. */
-  upload(objectPath: string, bytes: Buffer, mimeType: string): Promise<void>
+  upload(
+    objectPath: string,
+    bytes: Buffer,
+    mimeType: string,
+    capability: CommunityOverwriteCapability
+  ): Promise<void>
   remove(objectPaths: string[]): Promise<void>
 }
 
@@ -51,6 +90,8 @@ function storageUnavailable(): ServiceUnavailableException {
 @Injectable()
 export class SupabaseCommunityStorageAdapter implements CommunityStorage {
   private readonly client: SupabaseClient | null
+  /** Its own client, because storage-js takes no abort signal on a signed upload. */
+  private readonly uploadClient: SupabaseClient | null
 
   constructor() {
     const url = process.env.SUPABASE_URL?.trim()
@@ -63,11 +104,15 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
         )
       }
       this.client = null
+      this.uploadClient = null
       return
     }
 
-    this.client = createClient(url, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
+    const auth = { autoRefreshToken: false, persistSession: false }
+    this.client = createClient(url, serviceRoleKey, { auth })
+    this.uploadClient = createClient(url, serviceRoleKey, {
+      auth,
+      global: { fetch: fetchWithUploadTimeout },
     })
   }
 
@@ -220,12 +265,35 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
     }
   }
 
-  async upload(objectPath: string, bytes: Buffer, mimeType: string): Promise<void> {
-    const { error } = await this.storage().upload(objectPath, bytes, {
-      cacheControl: 'private, max-age=0',
-      contentType: mimeType,
+  async createOverwriteCapability(
+    objectPath: string
+  ): Promise<CommunityOverwriteCapability> {
+    const expiresAt = new Date(Date.now() + COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS)
+    const { data, error } = await this.storage().createSignedUploadUrl(objectPath, {
       upsert: true,
     })
+    if (error || !data?.token) {
+      throw storageUnavailable()
+    }
+    return { objectPath, token: data.token, expiresAt }
+  }
+
+  async upload(
+    objectPath: string,
+    bytes: Buffer,
+    mimeType: string,
+    capability: CommunityOverwriteCapability
+  ): Promise<void> {
+    if (!this.uploadClient) {
+      throw storageUnavailable()
+    }
+    const { error } = await this.uploadClient.storage
+      .from(COMMUNITY_IMAGES_BUCKET)
+      .uploadToSignedUrl(objectPath, capability.token, bytes, {
+        cacheControl: 'private, max-age=0',
+        contentType: mimeType,
+        upsert: true,
+      })
     if (error) {
       throw storageUnavailable()
     }

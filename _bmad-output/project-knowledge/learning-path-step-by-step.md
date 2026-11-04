@@ -9608,7 +9608,7 @@ Hard-won lessons from the implementation and review of this story:
     The fix is one rule: the job payload names its generation, and every settlement proves that generation under the outbox row lock, failures, acknowledgements and storage removal included.
     Removal asks a different question from settlement: losing ownership means stop, and only a row that no longer owns the object may delete it.
     A write outside the transaction needs its own answer: record the intent under the fence first, so a worker lost between the two leaves bytes the next owner can recognize.
-    The same write can outlive its owner entirely, as a late upload after erasure can, so deletion keeps its obligation until no such write can still land.
+    The same write can outlive its owner entirely, so a timer on our side bounds nothing: a pause can follow any check, and only the system taking the write can refuse it. A signed token minted before the reservation gives storage that refusal, and the delete obligation lasts until it has expired.
 
 Story/Task mapping:
 
