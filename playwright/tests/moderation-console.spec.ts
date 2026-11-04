@@ -11,6 +11,7 @@ import type { Locator, Page, Route } from '@playwright/test'
 import {
   moderationCaseDetailResponseSchema,
   moderationMediaUnavailableReasonSchema,
+  moderationQueueErrorSchema,
 } from '@couture/api-client/contracts/http'
 import { test as base, expect } from '../support/fixtures/merged-fixtures'
 import { checkA11y } from '../support/helpers/accessibility'
@@ -478,12 +479,12 @@ test.describe('Moderator console (Story 6.10)', () => {
           status: 503,
           contentType: 'application/json',
           headers: { 'cache-control': 'private, no-store' },
-          // The exact body the controller throws, which the contract requires to carry a message.
-          json: {
+          // Parsed by the shipped error schema, so a body the contract rejects fails this test.
+          json: moderationQueueErrorSchema.parse({
             statusCode: 503,
             code: 'moderation_console_disabled',
             message: 'The moderation console is not available.',
-          },
+          }),
         })
       })
       await page.goto(QUEUE_URL)

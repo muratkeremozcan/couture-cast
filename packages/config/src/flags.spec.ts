@@ -55,9 +55,27 @@ describe('feature flag registry', () => {
     // console flag is its own control. A degraded PostHog with no cache row must never open it.
     expect(getDefaultFeatureFlagValue('moderation_console_enabled')).toBe(false)
     expect(FEATURE_FLAG_KEYS).toContain('moderation_console_enabled')
-    // Separate keys are the whole point of D4: one flag can close while the other stays open.
     expect(FEATURE_FLAG_KEYS).toContain('community_read_enabled')
-    expect('moderation_console_enabled').not.toBe('community_read_enabled')
+  })
+
+  it('6.10-CFG-003: resolves the console flag and the feed flag independently', async () => {
+    // Story 6.10 D4: an incident can close the feed while reports still need review, and the
+    // reverse. One provider answer per key must reach only that key.
+    const answers: Record<string, boolean> = {
+      community_read_enabled: false,
+      moderation_console_enabled: true,
+    }
+    const readRemoteFlag = vi.fn((key: string) => Promise.resolve(answers[key]))
+    await expect(
+      getFeatureFlag('moderation_console_enabled', 'moderator-1', { readRemoteFlag })
+    ).resolves.toBe(true)
+    await expect(
+      getFeatureFlag('community_read_enabled', 'moderator-1', { readRemoteFlag })
+    ).resolves.toBe(false)
+    expect(readRemoteFlag.mock.calls.map(([key]) => key)).toEqual([
+      'moderation_console_enabled',
+      'community_read_enabled',
+    ])
   })
 
   it('6.10-CFG-002: resolves the console flag to false when PostHog and the cache both fail', async () => {
