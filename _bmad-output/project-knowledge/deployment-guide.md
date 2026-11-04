@@ -836,7 +836,7 @@ Confirmed shutdown of every old process carries this guarantee, and nothing else
 
 - Decision and appeal routes evaluate it per moderator, so a targeted rule can open them for one person while the default is off.
 - `sweepExpiredBanHolds` runs with no flag lookup, so an ended sanction returns content to screening while the flag is off.
-- No production path creates a sanction except the decision route, so with the flag off for everyone there are none to recover.
+- No production path creates a sanction except the decision route, so with the flag off for everyone no new one appears. Turning the flag off does not remove sanctions that already exist.
 
 Steps:
 
@@ -845,7 +845,7 @@ Steps:
 2. Get authoritative confirmation that each old process exited: the host's own record of the instance stopping, with its active jobs ended. A worker missing from Redis is unknown, because a disconnected process can still hold an upload in memory.
 3. Apply the migration, then start the new build.
 4. Cross-check each running worker's release identity:
-   - The BullMQ worker name `community-worker@<COMMIT_SHA>` equals the release SHA for every name `getWorkers()` returns.
+   - For every entry `getWorkers()` returns, `rawname` carries `community-worker@<COMMIT_SHA>` with the release SHA. Its `name` is only the queue name.
    - Every `community-worker:heartbeat:*` key has that `commitSha`, and a `startedAt` after the old processes' confirmed exit.
 5. Enable `moderation_console_enabled` and `moderation_decisions_enabled` only after steps 2 and 4 pass.
 

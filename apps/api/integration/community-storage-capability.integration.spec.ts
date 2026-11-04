@@ -461,7 +461,10 @@ describe.runIf(process.env.COMMUNITY_REAL_STORAGE_TEST === 'true')(
           COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS + MINUTE_MS
         )
         expect(
-          await repository.renewDraftUpload(post.id, later(renewedAt, 15 * MINUTE_MS))
+          await repository.confirmAllocationReplay(
+            post.id,
+            later(renewedAt, 15 * MINUTE_MS)
+          )
         ).toBe(true)
         expect(await eraser(storage).sweepExpiredUploads(renewedAt)).toMatchObject({
           draftsDeleted: 0,
@@ -470,7 +473,7 @@ describe.runIf(process.env.COMMUNITY_REAL_STORAGE_TEST === 'true')(
 
         await repository.requestErasureForUser(user.id, renewedAt)
         expect(
-          await repository.renewDraftUpload(post.id, later(renewedAt, HOUR_MS))
+          await repository.confirmAllocationReplay(post.id, later(renewedAt, HOUR_MS))
         ).toBe(false)
         await eraser(storage).sweepErasureRequests(
           later(renewedAt, COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS + 1)

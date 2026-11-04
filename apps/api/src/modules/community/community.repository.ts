@@ -446,6 +446,13 @@ export class CommunityRepository {
       where: {
         user_id: userId,
         status: { in: [...AUTHOR_STATE_STATUSES] as never },
+        // An expired draft waits for storage cleanup and can no longer publish. Filtered before the
+        // limit, so a pile of them cannot push out a held or failed post.
+        OR: [
+          { status: { not: 'draft' } },
+          { upload_expires_at: null },
+          { upload_expires_at: { gte: new Date() } },
+        ],
       },
       orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
       take: MAX_AUTHOR_STATES,
@@ -680,13 +687,25 @@ export class CommunityRepository {
     })
   }
 
-  /** False when the draft has gone or the expiry sweep has claimed it. */
-  async renewDraftUpload(postId: string, expiresAt: Date): Promise<boolean> {
-    const { count } = await this.prisma.lookbookPost.updateMany({
-      where: { id: postId, status: 'draft', erasure_requested_at: null },
+  /**
+   * Run after a replay mints its token, because the row can change while minting waits. A draft's
+   * expiry only moves forward, since two replays can finish in either order. False means the row has
+   * gone or erasure has taken it, and the token must never reach the client.
+   */
+  async confirmAllocationReplay(postId: string, expiresAt: Date): Promise<boolean> {
+    await this.prisma.lookbookPost.updateMany({
+      where: {
+        id: postId,
+        status: 'draft',
+        erasure_requested_at: null,
+        OR: [{ upload_expires_at: null }, { upload_expires_at: { lt: expiresAt } }],
+      },
       data: { upload_expires_at: expiresAt },
     })
-    return count === 1
+    const live = await this.prisma.lookbookPost.count({
+      where: { id: postId, erasure_requested_at: null, anonymized_at: null },
+    })
+    return live === 1
   }
 
   async createModerationOutbox(postId: string): Promise<CommunityModerationOutbox> {

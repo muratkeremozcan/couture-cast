@@ -19,7 +19,7 @@ export const COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS = 2 * 60 * 60 * 1000
 
 /**
  * Storage checks the token once and does not cut a request already running, so this process ends its
- * own. A frozen process cannot run this timer, and then only the gateway's limits end the request.
+ * own. A frozen process cannot run this timer; erasure's delete window does not rely on it.
  */
 export const COMMUNITY_SIGNED_UPLOAD_REQUEST_TIMEOUT_MS = 5 * 60 * 1000
 
@@ -199,7 +199,6 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
     objectPath: string,
     expiresInSeconds = 900
   ): Promise<CommunityUploadSession> {
-    const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString()
     const { data, error } = await this.storage().createSignedUploadUrl(objectPath)
 
     if (error || !data?.signedUrl) {
@@ -211,7 +210,8 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
     return {
       uploadUrl: data.signedUrl,
       uploadToken: data.token,
-      expiresAt,
+      // From after the mint, so a slow mint cannot leave a live token behind an old expiry.
+      expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
     }
   }
 

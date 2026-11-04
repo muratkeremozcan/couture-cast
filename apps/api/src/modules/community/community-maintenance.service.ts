@@ -34,14 +34,12 @@ export const MODERATION_STALLED_REASON = 'moderation_stalled'
 export const ERASURE_DEADLINE_HOURS = 72
 
 /**
- * How long after an erasure request a write could still land. Screening mints its overwrite token
- * before its reservation, and a reservation is refused once erasure is requested, so storage refuses
- * any such write that starts later than 2 hours after the request
- * (`COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS`). The other 4 hours are margin for a request already running,
- * which Storage does not cut and the adapter's timeout and the gateway's limits end. It runs from the
- * request, so a late first delete never pushes it out, and it stays well inside the 72-hour deadline.
+ * How long erasure keeps deleting after a request. Storage refuses a write that starts more than
+ * 2 hours later (`COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS`), and no measured limit proves when a write
+ * already running ends, so this runs as far as the 72-hour deadline allows and leaves 2 hours for a
+ * failed final delete to retry. It runs from the request, so a late first delete never pushes it out.
  */
-export const COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS = 6 * 60 * 60 * 1000
+export const COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS = 70 * 60 * 60 * 1000
 
 /** How often a row inside the window has its object deleted again. The sweep runs far more often. */
 const ERASURE_REPEAT_DELETE_MS = 15 * 60 * 1000

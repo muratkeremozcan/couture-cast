@@ -1089,11 +1089,8 @@ export class CommunityService {
       objectPath,
       UPLOAD_URL_EXPIRES_IN_SECONDS
     )
-    // A new token restarts the time the draft's row has to outlive. Losing to the expiry sweep means
-    // this token must never reach the client.
     if (
-      existingPost.status === 'draft' &&
-      !(await this.repository.renewDraftUpload(
+      !(await this.repository.confirmAllocationReplay(
         existingPost.id,
         new Date(uploadSession.expiresAt)
       ))
