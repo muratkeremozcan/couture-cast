@@ -70,7 +70,7 @@ describe('Story 6.3 reaction contracts', () => {
       content: {
         'application/json': {
           schema: {
-            anyOf: [
+            oneOf: [
               { $ref: '#/components/schemas/ForbiddenHttpError' },
               { $ref: '#/components/schemas/CommunityBannedError' },
             ],

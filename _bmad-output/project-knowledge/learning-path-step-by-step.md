@@ -9594,7 +9594,12 @@ Hard-won lessons from the implementation and review of this story:
 16. **A half-pixel transform paints a line.**
     A full-bleed wrapper centered with `left-1/2 -translate-x-1/2` lands on -187.5 pixels at 375, and column 0 blends the dark page into white.
     Margins bleed to the same place, and layout snaps them to a pixel.
-17. **Deferring for a budget hid real gaps.**
+17. **Re-arming a row makes every older reader of that row a suspect.**
+    Once recovery could bump a generation, the post dispatcher's stamp by id and the comment cleanup's delete by id could each undo it, and normalization could delete the object recovery needed.
+    Each now re-checks the generation or the hold it expects.
+18. **A generator can turn a correct union into an impossible type.**
+    The TypeScript generator flattened `anyOf` into one interface requiring both bodies' fields, so the document publishes those 403 unions as `oneOf`.
+19. **Deferring for a budget hid real gaps.**
     Held content with no way back, undocumented 403 bodies and a mobile screen with no explanation all sat as follow-ups under a file limit until the owner lifted it.
 
 Story/Task mapping:

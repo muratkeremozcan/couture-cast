@@ -348,6 +348,7 @@ Residuals RG1 to RG8 are in the test design under Assumptions.
 The bmad-build lens fan-out did not run: TEA reviewed every commit as the independent reader, and the coordinator runs the Codex review after this log.
 C1 to C6 are the Codex review of `4cf4b128`, each checked against the code before its fix.
 R2-1 is the Codex re-review of `1d49278a`, which confirmed the other five fixed.
+R3-1 to R3-5 are the Codex review of `6ee348f3`, each checked against the current head first. Overturn recovery shares that path, so it gains the same fixes.
 All rows below were real and fixed.
 
 | Id           | Sev    | Finding                                                                                                                                                | Fix                                                                                                                                                                                    |
@@ -400,6 +401,11 @@ All rows below were real and fixed.
 | CR-13        | medium | `moderationSanctionSchema` accepted a kind and expiry the database forbids                                                                             | Discriminated union on `kind`, also on the banned body                                                                                                                                 |
 | CR-14        | low    | The engine version disappeared for held comments with no codes                                                                                         | The row renders whenever the version is set                                                                                                                                            |
 | CR-15        | low    | The banned-feed Pact double never read the forwarded member                                                                                            | TEA: the double asserts it                                                                                                                                                             |
+| R3-1         | high   | An old post dispatch could stamp a generation it never enqueued, stranding a recovered post                                                            | The stamp matches the dispatched generation and an undispatched row                                                                                                                    |
+| R3-2         | high   | Comment outbox cleanup could delete a row recovery had just re-armed                                                                                   | Each delete re-checks generation and current status, so a waiting delete finds the new generation and matches nothing                                                                  |
+| R3-3         | high   | A ban during image normalization deleted the object recovery needs                                                                                     | The metadata update also matches a post flagged with a ban marker, so bytes and declaration stay together; erased and anonymized posts still lose the late object                      |
+| R3-4         | high   | Mobile stayed closed after a successful refresh once a ban ended, because a denial stops the sync for good                                             | An authorized read after a denial restores availability and starts a new sync                                                                                                          |
+| R3-5         | medium | Generated 403 models required every member's fields, so neither real body satisfied them                                                               | The document publishes these unions as `oneOf`, which generates a union type; both bodies compile and Optic passes                                                                     |
 
 ## Design Notes
 

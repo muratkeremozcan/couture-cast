@@ -90,8 +90,10 @@ export class CommunityModerationOutboxDispatcher {
       if (generation > 0)
         await this.queue.enqueue(postId, uploadSessionId, undefined, generation)
       else await this.queue.enqueue(postId, uploadSessionId)
-      await this.prisma.communityModerationOutbox.update({
-        where: { id: outboxId },
+      // Only the generation this call enqueued. Recovery may have re-armed the row meanwhile, and
+      // that newer generation still needs its own job.
+      await this.prisma.communityModerationOutbox.updateMany({
+        where: { id: outboxId, generation, dispatched_at: null },
         data: {
           dispatched_at: new Date(),
           attempts: { increment: 1 },

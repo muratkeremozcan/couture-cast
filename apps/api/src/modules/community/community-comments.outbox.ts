@@ -94,15 +94,22 @@ export class CommunityCommentsOutbox {
       this.prisma.communityCommentScreeningOutbox.findMany({
         where: { comment: { status: { not: 'pending_screening' } } },
         take: 100,
-        select: { id: true },
+        select: { id: true, generation: true },
       }),
     ])
     await this.prisma.communityCommentAnalyticsOutbox.deleteMany({
       where: { id: { in: expired.map((row) => row.id) } },
     })
-    await this.prisma.communityCommentScreeningOutbox.deleteMany({
-      where: { id: { in: finished.map((row) => row.id) } },
-    })
+    // By generation and current status: recovery may have re-armed a row since it was selected, and
+    // that row is live work. If recovery holds its row lock, the delete waits and then re-checks.
+    for (const row of finished)
+      await this.prisma.communityCommentScreeningOutbox.deleteMany({
+        where: {
+          id: row.id,
+          generation: row.generation,
+          comment: { status: { not: 'pending_screening' } },
+        },
+      })
   }
 
   private async deliverAnalytics(): Promise<void> {

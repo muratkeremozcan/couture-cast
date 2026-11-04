@@ -12,6 +12,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
+  COMMUNITY_BAN_MARKER_PREFIX,
   communityImageValidationCodeSchema,
   SLA_DURATION_MS,
 } from '@couture/api-client/contracts/http'
@@ -351,7 +352,15 @@ export class CommunityModerationProcessor {
           where: {
             id: postId,
             user_id: userId,
-            status: 'pending_review',
+            // A ban can hold the post mid-upload. It may return to screening, so its object and
+            // declaration must keep describing the same bytes.
+            OR: [
+              { status: 'pending_review' },
+              {
+                status: 'flagged',
+                moderation_reason: { startsWith: COMMUNITY_BAN_MARKER_PREFIX },
+              },
+            ],
             image_object_path: objectPath,
             erasure_requested_at: null,
             anonymized_at: null,

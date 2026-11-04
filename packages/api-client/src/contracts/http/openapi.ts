@@ -130,6 +130,28 @@ export function createHttpOpenApiRegistry() {
   return registry
 }
 
+/**
+ * Story 6.11: `z.union` publishes `anyOf`, and the TypeScript generator flattens `anyOf` into one
+ * interface that requires every member's fields, which neither real 403 body satisfies. A body is
+ * exactly one of these members, so `oneOf` is the true shape, and it generates a union type.
+ */
+function publishBannedRefusalsAsOneOf(document: {
+  paths?: Record<string, unknown>
+}): void {
+  for (const path of Object.values(document.paths ?? {})) {
+    for (const operation of Object.values(path as Record<string, unknown>)) {
+      const forbidden = (operation as { responses?: Record<string, unknown> } | null)
+        ?.responses?.['403'] as
+        | { content?: Record<string, { schema?: Record<string, unknown> }> }
+        | undefined
+      const schema = forbidden?.content?.['application/json']?.schema
+      if (!schema?.anyOf) continue
+      schema.oneOf = schema.anyOf
+      delete schema.anyOf
+    }
+  }
+}
+
 export function generateHttpOpenApiDocument() {
   const registry = createHttpOpenApiRegistry()
   const generator = new OpenApiGeneratorV31(registry.definitions)
@@ -185,5 +207,6 @@ export function generateHttpOpenApiDocument() {
     ],
   })
   preserveNullableEnumValues(document)
+  publishBannedRefusalsAsOneOf(document)
   return document
 }

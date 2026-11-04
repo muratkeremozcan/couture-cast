@@ -269,6 +269,9 @@ export function CommunityScreen() {
     CommunityBannedError['sanction'] | null
   >(null)
   const bannedRef = useRef(false)
+  // A denial stops the sync for good, so an authorized read has to start a new one.
+  const syncDeniedRef = useRef(false)
+  const [syncEpoch, setSyncEpoch] = useState(0)
   const communityAvailable = realtimeAvailable && !bannedSanction
   // Undefined until the first identity resolution, so the spotlight can tell a
   // later sign-in apart from the first one.
@@ -943,6 +946,11 @@ export function CommunityScreen() {
             setActiveChallenge(feed.activeChallenge)
             setFeedError(null)
             setBannedSanction(null)
+            if (syncDeniedRef.current) {
+              syncDeniedRef.current = false
+              setCommunityAvailable(true)
+              setSyncEpoch((epoch) => epoch + 1)
+            }
             setFeedState('ready')
             return
           } catch (error: unknown) {
@@ -1253,6 +1261,7 @@ export function CommunityScreen() {
           setBannedSanction(null)
         }
         if (state === 'denied') {
+          syncDeniedRef.current = true
           setIsPostSheetVisible(false)
           actionControllerRef.current?.abort()
           setIsSubmittingReport(false)
@@ -1293,7 +1302,7 @@ export function CommunityScreen() {
       comments.setRealtimeHealthy(false)
       lifecycle.remove()
     }
-  }, [comments, mode, reactionState, sessionScope])
+  }, [comments, mode, reactionState, sessionScope, syncEpoch])
 
   const modeLabel = useMemo(
     () =>
