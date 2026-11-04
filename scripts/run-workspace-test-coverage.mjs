@@ -3,6 +3,7 @@
 import { spawn } from 'node:child_process'
 import { appendFileSync, existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { COVERAGE_SHARDS, coverageShardOf } from './ci/coverage-shards.mjs'
 import { classifyWorkspaceOutput } from '../.github/actions/unit-test-coverage-comment/test-failures.mjs'
 
 const workspaceRoots = ['apps', 'packages']
@@ -40,7 +41,15 @@ function findCoverageWorkspaces() {
   return workspaces.sort((left, right) => left.path.localeCompare(right.path))
 }
 
-const workspaces = findCoverageWorkspaces()
+const shard = process.env.COVERAGE_SHARD
+if (shard && !COVERAGE_SHARDS.includes(shard)) {
+  console.error(`Unknown coverage shard ${shard}. Known: ${COVERAGE_SHARDS.join(', ')}.`)
+  process.exit(1)
+}
+
+const workspaces = findCoverageWorkspaces().filter(
+  (workspace) => !shard || coverageShardOf(workspace.path) === shard
+)
 const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const coverageDirs = JSON.stringify(
   workspaces.map((workspace) => `${workspace.path}/coverage`)
