@@ -9428,8 +9428,10 @@ Evidence boundaries:
   The code and tests are committed on `feat/cc-6-10-moderator-queue` and nothing was pushed when this step was written.
   No PR job has run, and the Codex review that follows is not recorded here.
 - **What ran locally.**
-  The moderation API unit and integration suites (183 tests against stock PostgreSQL 17, including the real guards), the contract spec (88), the web moderation suites (270 across 20 files), the config flag spec (26) and a production `next build` passed.
-  TEA wrote and ran the Pact and Playwright specs; this step did not re-run them.
+  TEA's final run at `e884d62a`, three consecutive times where noted: API unit tests 87 (6 files), API integration `moderation-queue*` 92 (8 files) against stock PostgreSQL 17 with the real guards, the contract spec 88, the config flag spec 26, the database specs 8, web `vitest run moderation` 225 (11 files), the web Pact 230 with the provider verification passing, Playwright 27 three times, and tsc with 0 errors in `apps/api`, `apps/web`, `packages/db`, `packages/api-client` and `pact`.
+  A production `next build` of `apps/web` passed at the first commit of the console.
+  TEA's seeded-defect proofs S-1 to S-10 all went red, and so did S-11 to S-17 on the review fixes, except S-13, an equivalent mutant: the terminal notice replaces the whole console, so a retained row could never render.
+  This step did not re-run any of it.
 - **A real browser walk used doubles for the edges.**
   The built API ran against an isolated migrated database seeded with the shared test seed, a mock storage origin served the image, and sign-in used the `NEXT_PUBLIC_E2E_AUTH` fixture token.
   No real Supabase Auth session or real storage object was involved, and a moderator account in a hosted environment was not tried.
