@@ -461,6 +461,18 @@ Every defect turned the named tests red, and the worktree was clean after each r
 | S-9  | Role set widened to include `guardian`            | U-Q-CTRL-ROLES exact set and parity with the write controller (2)                     |
 | S-10 | Focus refetch added to the case view              | C-WEB-Q-DETAIL-ONE-READ (1)                                                           |
 
+Review-fix proofs, run the same way at commit `0bb770f6` after the independent review fixes:
+
+| ID   | Defect injected                                        | Red tests (failed count)                                                                       |
+| ---- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| S-11 | Case stays on screen after a 401, 403 or 503 on reload | C-WEB-Q-DETAIL terminal states (4)                                                             |
+| S-12 | Case locale from `min(locale)` again                   | I-Q-LOCALE multi-report, filter agreement, unusable snapshot locale (3)                        |
+| S-13 | Queue rows kept in state after a terminal failure      | Survives. Equivalent mutant: the terminal notice replaces the whole console, so no row renders |
+| S-14 | Author-typed `<U+202E>` no longer escaped              | C-WEB-Q-HOSTILE-TEXT typed marker (1)                                                          |
+| S-15 | Excerpt cut in the middle of a surrogate pair          | U-Q-SVC clamp (1)                                                                              |
+| S-16 | Newer server field fails the parse again               | U-WEB-Q-CLIENT version skew (1)                                                                |
+| S-17 | 429 mapping removed                                    | U-WEB-Q-CLIENT 429 to `rate_limited` (1)                                                       |
+
 S-9 is the closest mutation the code allows to "flag before role".
 The flag read lives in the controller body after the guards, so the only way to let a non-moderator reach it is to widen the role set.
 
@@ -468,14 +480,14 @@ The flag read lives in the controller body after the guards, so the only way to 
 
 | Suite                                                | Result                |
 | ---------------------------------------------------- | --------------------- |
-| API units (`apps/api/src/modules/moderation`)        | 79 passed, 6 files    |
-| API integration (`moderation-queue*`, real Postgres) | 87 passed, 7 files    |
+| API units (`apps/api/src/modules/moderation`)        | 87 passed, 6 files    |
+| API integration (`moderation-queue*`, real Postgres) | 92 passed, 8 files    |
 | Contract units (`packages/api-client/testing`)       | 88 passed             |
 | Flags (`packages/config`)                            | 26 passed             |
 | Database (RLS and flag seed)                         | 8 passed              |
-| Web (client, components, page, locales)              | 165 passed, 10 files  |
+| Web (`vitest run moderation`)                        | 225 passed, 11 files  |
 | Pact consumer (three-run determinism) and provider   | passed                |
-| Playwright (`moderation-console` plus role matrix)   | 26 passed, three runs |
+| Playwright (`moderation-console` plus role matrix)   | 27 passed, three runs |
 
 The first Playwright run of the keyboard test flaked twice because it used programmatic `focus()`, which never shows a focus-visible ring.
 The test now reaches the link with real Tab presses and ran green three times after the fix.
