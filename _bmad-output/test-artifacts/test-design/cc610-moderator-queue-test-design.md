@@ -509,8 +509,8 @@ A moderator therefore passes the role check and meets the closed console, and th
 - Unknown and malformed case ids fail closed, and the 320, 768 and 1280 pixel layouts fit.
 
 Run locally against the real preview (31 tests, one worker, database and service-role key unset to match CI): 20 passed, 11 skipped.
-The 11 skips are the 9 seeded tests plus the live queue, filter and keyboard journey and the live axe test, which need the console on.
-Turning the preview flag on runs those four against the preview without a spec change.
+The 11 skips are the 8 seeded tests plus 3 live tests that need the console on: the queue, filter and case journey, the keyboard journey and the queue axe check.
+Turning the preview flag on runs those three against the preview without a spec change.
 
 Two preview facts shaped the specs:
 
