@@ -938,6 +938,14 @@ A successful delete of an abandoned draft leaves no row, which stays green.
 Stamping the exact settle time cut retries to 4 in 2 hours on the 15 minute cron, because the stamp passed the next tick by milliseconds.
 Flooring only the elapsed time left the same miss from cron start jitter, so the jitter test pins 8 retries, and the 30 second worker tick pins 8 to 10.
 
+### Burn-in at `07dce93c`
+
+`community-comments.spec.ts:439` failed on its third repeat with the replies read answering 200 and the Replies button still collapsed.
+The trace shows the replies read at 54.657 and a reconcile refresh starting 37 ms later, which never read the replies again.
+`refresh` invalidates every read in flight and only re-reads parents with a page or the focus target, so a first expansion is lost.
+This is a product bug in the store web and mobile share, predating this story, so a rerun could not have fixed it.
+`community-comments-recovery.spec.ts` goes 2 of 3 red there, with the first read answering after the refresh settled and while it reads; the third pins a parent the refresh found gone staying collapsed.
+
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
 Those failures were my setup, and the rerun below is the evidence.
