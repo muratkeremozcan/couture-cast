@@ -1977,7 +1977,7 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         expect(after.image_normalized_at).toBeNull()
       })
 
-      it('a later generation does not re-encode what one generation already normalized', async () => {
+      it('a later generation does not re-encode what an earlier one normalized', async () => {
         const { seeded, post, storage } = await pendingAuthor()
         let uploads = 0
         storage.upload = (objectPath: string, bytes: Buffer) => {
@@ -1985,18 +1985,35 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
           storage.objects.set(objectPath, bytes)
           return Promise.resolve()
         }
-        const applied = await ban(seeded.caseId, 'temporary')
-        await overturnNow(applied.sanctionId)
-        await processorWith(storage, passingEngine()).process(job(post, 1))
+        // Generation 0 normalizes, then waits in screening while the ban comes and goes.
+        const hold = gated()
+        const old = processorWith(storage, {
+          moderatePost: async () => {
+            hold.entered()
+            await hold.gate
+            throw new Error('dependency unavailable')
+          },
+          screenText: () => Promise.reject(new Error('unused')),
+        })
+          .process(job(post, 0))
+          .catch(() => undefined)
+        await hold.inside
+        const normalized = await postOf(post.id)
+        expect(normalized.image_normalized_at).not.toBeNull()
         expect(uploads).toBe(1)
-        const first = await postOf(post.id)
-        expect(first.image_normalized_at).not.toBeNull()
 
-        const second = await fx.postCase({ author: { id: first.user_id } as never })
-        const again = await ban(second.caseId, 'permanent')
-        await overturnNow(again.sanctionId)
-        expect((await postOf(post.id)).status).toBe('published')
+        await banAndRecover(seeded, post)
+        hold.release()
+        await old
+
+        await processorWith(storage, passingEngine()).process(job(post, 1))
+        const after = await postOf(post.id)
+        expect(after.status).toBe('published')
         expect(uploads).toBe(1)
+        expect(after.image_checksum).toBe(normalized.image_checksum)
+        expect(after.image_checksum).toBe(
+          sha256(storage.objects.get(post.image_object_path!)!)
+        )
       })
     })
 
