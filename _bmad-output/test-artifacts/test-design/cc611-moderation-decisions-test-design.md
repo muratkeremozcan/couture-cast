@@ -805,6 +805,11 @@ R5-4 first reported a missing 403 on the publish route, which was a bug in my ro
 
 The full API tier passes at the round 5 source: 7988 passed, 28 skipped.
 
+Reading the full diff found one more: an upload that landed before recovery left normalized bytes against the original checksum, so generation 1 failed the post.
+A crash in the same window would fail a retry the same way, which predates this story.
+Builder fixed it with a pending declaration recorded before the write, in `02c8c35e`, and `R5-1 an upload that landed before recovery` went red at `32a03b73` and passes on it.
+`the pending declaration around an object write` pins a worker lost before the write, a worker lost after it, bytes matching neither declaration, and no second encode by a later generation.
+
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
 Those failures were my setup, and the rerun below is the evidence.

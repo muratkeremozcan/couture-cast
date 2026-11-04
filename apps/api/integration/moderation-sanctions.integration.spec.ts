@@ -1859,6 +1859,147 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
       expect(after.image_byte_size).toBe(stored!.length)
     })
 
+    it('R5-1 an upload that landed before recovery leaves the new generation able to screen', async () => {
+      const { seeded, post, storage } = await pendingAuthor()
+      const hold = gated()
+      let uploads = 0
+      storage.upload = async (objectPath: string, bytes: Buffer) => {
+        uploads += 1
+        // The bytes are in storage, and the old work has not settled its declarations yet.
+        storage.objects.set(objectPath, bytes)
+        if (uploads === 1) {
+          hold.entered()
+          await hold.gate
+        }
+      }
+      const old = processorWith(storage, passingEngine())
+        .process(job(post, 0))
+        .catch(() => undefined)
+      await hold.inside
+
+      await banAndRecover(seeded, post)
+      await processorWith(storage, passingEngine()).process(job(post, 1))
+      expect((await postOf(post.id)).status).toBe('published')
+
+      hold.release()
+      await old
+
+      const after = await postOf(post.id)
+      expect(after.status).toBe('published')
+      const stored = storage.objects.get(after.image_object_path!)
+      expect(stored, 'the published image').toBeDefined()
+      expect(after.image_checksum).toBe(sha256(stored!))
+      expect(after.image_byte_size).toBe(stored!.length)
+    })
+
+    describe('the pending declaration around an object write', () => {
+      /** Fails the first upload at the chosen moment, as a worker lost there would. */
+      const loseWorker = (storage: InMemoryCommunityStorage, afterWrite: boolean) => {
+        let uploads = 0
+        storage.upload = (objectPath: string, bytes: Buffer) => {
+          uploads += 1
+          if (uploads > 1 || afterWrite) storage.objects.set(objectPath, bytes)
+          return uploads === 1
+            ? Promise.reject(new Error('worker lost'))
+            : Promise.resolve()
+        }
+        return () => uploads
+      }
+
+      it('a worker lost before the write leaves a retry to re-encode and settle', async () => {
+        const { post, storage } = await pendingAuthor()
+        const original = storage.objects.get(post.image_object_path!)!
+        const uploads = loseWorker(storage, false)
+        await expect(
+          processorWith(storage, passingEngine()).process(job(post, 0))
+        ).rejects.toThrow('worker lost')
+        const reserved = await postOf(post.id)
+        expect(reserved.image_pending_checksum).not.toBeNull()
+        expect(reserved.image_checksum).toBe(sha256(original))
+        expect(storage.objects.get(post.image_object_path!)).toEqual(original)
+
+        await processorWith(storage, passingEngine()).process(job(post, 0))
+        const after = await postOf(post.id)
+        expect(after.status).toBe('published')
+        expect(uploads()).toBe(2)
+        expect(after.image_checksum).toBe(
+          sha256(storage.objects.get(post.image_object_path!)!)
+        )
+        expect(after).toMatchObject({
+          image_pending_checksum: null,
+          image_pending_byte_size: null,
+        })
+        expect(after.image_normalized_at).not.toBeNull()
+      })
+
+      it('a worker lost after the write leaves a retry to promote with no second encode', async () => {
+        const { post, storage } = await pendingAuthor()
+        const uploads = loseWorker(storage, true)
+        await expect(
+          processorWith(storage, passingEngine()).process(job(post, 0))
+        ).rejects.toThrow('worker lost')
+        const stored = storage.objects.get(post.image_object_path!)!
+        expect((await postOf(post.id)).image_pending_checksum).toBe(sha256(stored))
+
+        await processorWith(storage, passingEngine()).process(job(post, 0))
+        const after = await postOf(post.id)
+        expect(after.status).toBe('published')
+        expect(uploads()).toBe(1)
+        expect(storage.objects.get(post.image_object_path!)).toEqual(stored)
+        expect(after).toMatchObject({
+          image_checksum: sha256(stored),
+          image_byte_size: stored.length,
+          image_pending_checksum: null,
+        })
+      })
+
+      it('bytes matching neither declaration still fail, with a pending declaration set', async () => {
+        const { post, storage } = await pendingAuthor()
+        loseWorker(storage, true)
+        await expect(
+          processorWith(storage, passingEngine()).process(job(post, 0))
+        ).rejects.toThrow('worker lost')
+        const pending = await postOf(post.id)
+        expect(pending.image_pending_checksum).not.toBeNull()
+
+        const tampered = await sharp({
+          create: { width: 512, height: 640, channels: 3, background: '#ff0000' },
+        })
+          .jpeg()
+          .toBuffer()
+        storage.objects.set(post.image_object_path!, tampered)
+        await processorWith(storage, passingEngine())
+          .process(job(post, 0), { attempt: 1, maxAttempts: 3 })
+          .catch(() => undefined)
+        const after = await postOf(post.id)
+        expect(after.status).not.toBe('published')
+        expect(after.image_checksum).toBe(pending.image_checksum)
+        expect(after.image_normalized_at).toBeNull()
+      })
+
+      it('a later generation does not re-encode what one generation already normalized', async () => {
+        const { seeded, post, storage } = await pendingAuthor()
+        let uploads = 0
+        storage.upload = (objectPath: string, bytes: Buffer) => {
+          uploads += 1
+          storage.objects.set(objectPath, bytes)
+          return Promise.resolve()
+        }
+        const applied = await ban(seeded.caseId, 'temporary')
+        await overturnNow(applied.sanctionId)
+        await processorWith(storage, passingEngine()).process(job(post, 1))
+        expect(uploads).toBe(1)
+        const first = await postOf(post.id)
+        expect(first.image_normalized_at).not.toBeNull()
+
+        const second = await fx.postCase({ author: { id: first.user_id } as never })
+        const again = await ban(second.caseId, 'permanent')
+        await overturnNow(again.sanctionId)
+        expect((await postOf(post.id)).status).toBe('published')
+        expect(uploads).toBe(1)
+      })
+    })
+
     it('R5-2 an old final failure held across recovery leaves the new generation claimable', async () => {
       const { seeded, post, storage } = await pendingAuthor()
       const hold = gated()
