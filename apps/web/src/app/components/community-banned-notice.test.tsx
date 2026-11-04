@@ -321,7 +321,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     expect(document.body.textContent).not.toContain(CHALLENGE.title)
   })
 
-  it('closes the filters and the notifications link with the feed', async () => {
+  it('removes the filters and the notifications link with the feed, and reads no more', async () => {
     signIn()
     const state = { banned: true, reads: 0 }
     serve(state)
@@ -330,13 +330,10 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     await screen.findByTestId('community-banned-notice')
     expect(onBannedChange).toHaveBeenLastCalledWith(true)
     const reads = state.reads
-    const chip = screen.getByTestId('community-filter-all')
-    expect(chip).toHaveAttribute('aria-disabled', 'true')
-    await userEvent.click(chip)
+    expect(screen.queryByTestId('community-filter-all')).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Community notifications' })).toBeNull()
     await settle()
     expect(state.reads).toBe(reads)
-    expect(chip).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.queryByRole('link', { name: 'Community notifications' })).toBeNull()
   })
 
   it('offers no compose control when the very first read is refused', async () => {

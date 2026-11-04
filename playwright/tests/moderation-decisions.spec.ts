@@ -1297,16 +1297,13 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
         page.getByTestId('community-card-grid').getByRole('article')
       ).toHaveCount(0)
 
-      // The filters and the notifications link close with the feed, so a click on a chip reads nothing.
-      const chip = page.getByTestId('community-filter-all')
-      await expect(chip).toHaveAttribute('aria-disabled', 'true')
+      // The filters and the notifications link leave with the feed, and nothing reads it again.
+      await expect(page.getByTestId('community-filter-all')).toHaveCount(0)
       await expect(
         page.getByRole('link', { name: 'Community notifications' })
       ).toHaveCount(0)
       const feedReads = trackRequests(page, isFeedRead)
-      // Forced: Playwright waits out an aria-disabled target, and a member's pointer does not.
-      await chip.click({ force: true })
-      await expectNoFurtherRequest(page, isFeedRead, 'a feed read from a closed filter')
+      await expectNoFurtherRequest(page, isFeedRead, 'a feed read on the closed page')
       expect(feedReads).toEqual([])
       await expect(noticeOf(page)).toBeVisible()
 
