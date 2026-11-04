@@ -30,6 +30,8 @@ import {
 // shape for `expo-web-browser`.
 import {
   allocateCommunityPostResponseSchema,
+  communityBannedErrorSchema,
+  type CommunityBannedError,
   communitySponsoredFeedResponseSchema,
   communitySponsoredPostResponseSchema,
   communitySponsoredSpotlightResponseSchema,
@@ -77,6 +79,7 @@ export type CommunityFailureReason =
   | 'reason_changed'
   | 'self_report'
   | 'disabled'
+  | 'banned'
   | 'cursor_invalid'
   | 'media_unavailable'
   | 'upload_failed'
@@ -94,7 +97,9 @@ export class CommunityRequestError extends Error {
     reason: CommunityFailureReason,
     message: string,
     retryAfterSeconds?: number,
-    readonly httpStatus?: number
+    readonly httpStatus?: number,
+    /** Story 6.11: the ban's term and appeal state, on a `banned` refusal only. */
+    readonly sanction?: CommunityBannedError['sanction']
   ) {
     super(message)
     this.name = 'CommunityRequestError'
@@ -139,6 +144,19 @@ async function isCommunityBanned(response: Response): Promise<boolean> {
     return (body as { code?: unknown } | null)?.code === 'community_banned'
   } catch {
     return false
+  }
+}
+
+/** The ban's terms when the body carries a readable set. A ban without them still closes the screen. */
+async function readBannedSanction(
+  response: Response
+): Promise<CommunityBannedError['sanction'] | undefined> {
+  try {
+    const body = (await response.clone().json()) as { sanction?: unknown } | null
+    const sanction = communityBannedErrorSchema.shape.sanction.safeParse(body?.sanction)
+    return sanction.success ? sanction.data : undefined
+  } catch {
+    return undefined
   }
 }
 
@@ -216,11 +234,16 @@ async function communityError(
   }
   if (error instanceof ResponseError) {
     const message = await readServerMessage(error.response.clone(), fallback)
-    // The code comes first. Mobile has no banned copy yet, so a ban reads as the existing
-    // closed-community state, which offers no retry.
-    const reason = (await isCommunityBanned(error.response))
-      ? 'disabled'
-      : reasonForResponse(error.response.status, message)
+    // The code comes first, ahead of every message rule.
+    if (await isCommunityBanned(error.response))
+      return new CommunityRequestError(
+        'banned',
+        message,
+        undefined,
+        error.response.status,
+        await readBannedSanction(error.response)
+      )
+    const reason = reasonForResponse(error.response.status, message)
     return new CommunityRequestError(
       reason,
       message,
@@ -236,6 +259,20 @@ async function communityError(
 
 export function communityFailureReason(error: unknown): CommunityFailureReason {
   return error instanceof CommunityRequestError ? error.reason : 'unknown'
+}
+
+/** The ban on a `banned` refusal. A body with no readable terms still reads as permanent. */
+export function communitySanctionOf(
+  error: unknown
+): CommunityBannedError['sanction'] | null {
+  if (!(error instanceof CommunityRequestError) || error.reason !== 'banned') return null
+  return (
+    error.sanction ?? {
+      kind: 'permanent',
+      expiresAt: null,
+      appealStatus: 'not_requested',
+    }
+  )
 }
 
 /** Seconds until posting is allowed again, when the failure was a 429. */

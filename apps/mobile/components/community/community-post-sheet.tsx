@@ -84,6 +84,8 @@ export function communityErrorTranslation(
       return { key: 'community.error.selfReport' }
     case 'disabled':
       return { key: 'community.error.disabled' }
+    case 'banned':
+      return { key: 'community.error.banned' }
     case 'media_unavailable':
       return { key: 'community.error.mediaUnavailable' }
     case 'upload_failed':

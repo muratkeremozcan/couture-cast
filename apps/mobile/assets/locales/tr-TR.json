@@ -771,7 +771,8 @@
       "notFound": "Bu kombin artık kullanılamıyor.",
       "disabled": "Topluluk akışı geçici olarak kullanılamıyor.",
       "mediaUnavailable": "Bu kombin geçici olarak kullanılamıyor. Kısa süre sonra tekrar dene.",
-      "generic": "Bir şeyler ters gitti. Tekrar dene."
+      "generic": "Bir şeyler ters gitti. Tekrar dene.",
+      "banned": "Topluluk erişimin askıya alındı."
     },
     "reactions": {
       "label": "Tepkiler",
@@ -888,6 +889,18 @@
       "announceRefreshed": "Şehir vitrini en güncel sıralamayla yenilendi.",
       "targetUnavailable": "Bu kombin artık Şehir Vitrininde değil.",
       "destinationUnavailable": "Şehir Vitrini şu anda kullanılamıyor."
+    },
+    "banned": {
+      "title": "Topluluk erişimin askıya alındı",
+      "temporary": "{{until}} sonrasında geri dönebilirsin. O zamana kadar topluluğu göremez ve topluluğa katılamazsın.",
+      "permanent": "Bu askıya almanın bitiş tarihi yok. Topluluğu göremez ve topluluğa katılamazsın.",
+      "scope": "Gardırobun, günlük ritüelin, uyarıların ve hesap ayarların bundan etkilenmez.",
+      "appeal": {
+        "not_requested": "Bunun bir hata olduğunu düşünüyorsan inceleme istemek için CoutureCast desteğine başvur.",
+        "requested": "İnceleme talebin kaydedildi ve karar bekliyor.",
+        "upheld": "İnceleme talebin değerlendirildi ve bu askıya alma yürürlükte kalıyor.",
+        "overturned": "Bu askıya alma kaldırıldı."
+      }
     }
   },
   "locations": {
