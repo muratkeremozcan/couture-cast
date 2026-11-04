@@ -46,6 +46,19 @@ const ERASURE_REPEAT_DELETE_MS = 15 * 60 * 1000
 
 const MAX_SWEEP_BATCH = 200
 
+const OPEN_ERASURE = {
+  erasure_requested_at: { not: null },
+  objects_purged_at: null,
+} satisfies Prisma.LookbookPostWhereInput
+
+const ERASURE_WORK_FIELDS = {
+  id: true,
+  status: true,
+  image_object_path: true,
+  anonymized_at: true,
+  erasure_requested_at: true,
+} satisfies Prisma.LookbookPostSelect
+
 export interface CommunityStaleReviewSweepResult {
   stalled: number
 }
@@ -271,30 +284,7 @@ export class CommunityMaintenanceService {
   async sweepErasureRequests(
     now: Date = new Date()
   ): Promise<CommunityErasureSweepResult> {
-    const pending = await this.prisma.lookbookPost.findMany({
-      where: {
-        erasure_requested_at: { not: null },
-        objects_purged_at: null,
-        OR: [
-          { anonymized_at: null },
-          { updated_at: { lte: new Date(now.getTime() - ERASURE_REPEAT_DELETE_MS) } },
-          {
-            erasure_requested_at: {
-              lte: new Date(now.getTime() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS),
-            },
-          },
-        ],
-      },
-      orderBy: { erasure_requested_at: 'asc' },
-      take: MAX_SWEEP_BATCH,
-      select: {
-        id: true,
-        status: true,
-        image_object_path: true,
-        anonymized_at: true,
-        erasure_requested_at: true,
-      },
-    })
+    const pending = await this.selectErasureWork(now)
 
     const result: CommunityErasureSweepResult = {
       hidden: 0,
@@ -302,8 +292,6 @@ export class CommunityMaintenanceService {
       objectsPurged: 0,
       overdue: 0,
     }
-
-    const deadlineMs = ERASURE_DEADLINE_HOURS * 60 * 60 * 1000
 
     for (const post of pending) {
       const metadata = await this.eraseMetadata(post.id, now)
@@ -325,12 +313,6 @@ export class CommunityMaintenanceService {
             },
             'Failed to purge community object during erasure; will retry'
           )
-          if (
-            post.erasure_requested_at &&
-            now.getTime() - post.erasure_requested_at.getTime() > deadlineMs
-          ) {
-            result.overdue += 1
-          }
           continue
         }
       }
@@ -358,6 +340,15 @@ export class CommunityMaintenanceService {
       result.objectsPurged += purged.count
     }
 
+    // Over every open row, because a row this pass never selected is overdue too.
+    result.overdue = await this.prisma.lookbookPost.count({
+      where: {
+        ...OPEN_ERASURE,
+        erasure_requested_at: {
+          lt: new Date(now.getTime() - ERASURE_DEADLINE_HOURS * 60 * 60 * 1000),
+        },
+      },
+    })
     if (result.overdue > 0) {
       this.logger.error(
         {
@@ -370,6 +361,51 @@ export class CommunityMaintenanceService {
     }
 
     return result
+  }
+
+  /**
+   * A repeat delete can wait and a new request cannot, so work is taken in that order: rows not yet
+   * anonymized, then rows past the window, then repeats by least recently deleted with what is left.
+   * One oldest-first list would let open rows hold every slot for the whole window.
+   */
+  private async selectErasureWork(now: Date) {
+    const windowStart = new Date(now.getTime() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS)
+    const started = { ...OPEN_ERASURE, anonymized_at: { not: null } }
+    const queues: {
+      where: Prisma.LookbookPostWhereInput
+      orderBy: Prisma.LookbookPostOrderByWithRelationInput
+    }[] = [
+      {
+        where: { ...OPEN_ERASURE, anonymized_at: null },
+        orderBy: { erasure_requested_at: 'asc' },
+      },
+      {
+        where: { ...started, erasure_requested_at: { lte: windowStart } },
+        orderBy: { erasure_requested_at: 'asc' },
+      },
+      {
+        where: {
+          ...started,
+          erasure_requested_at: { gt: windowStart },
+          updated_at: { lte: new Date(now.getTime() - ERASURE_REPEAT_DELETE_MS) },
+        },
+        orderBy: { updated_at: 'asc' },
+      },
+    ]
+    const rows: Prisma.LookbookPostGetPayload<{ select: typeof ERASURE_WORK_FIELDS }>[] =
+      []
+    for (const queue of queues) {
+      const take = MAX_SWEEP_BATCH - rows.length
+      if (take <= 0) break
+      rows.push(
+        ...(await this.prisma.lookbookPost.findMany({
+          ...queue,
+          take,
+          select: ERASURE_WORK_FIELDS,
+        }))
+      )
+    }
+    return rows
   }
 
   private eraseMetadata(id: string, now: Date) {

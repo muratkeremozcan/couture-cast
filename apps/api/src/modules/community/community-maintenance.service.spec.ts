@@ -13,7 +13,10 @@ describe('CommunityMaintenanceService', () => {
   const now = new Date('2026-09-05T12:00:00.000Z')
 
   const createService = () => {
-    const findMany = vi.fn<() => Promise<Record<string, unknown>[]>>()
+    const findMany = vi
+      .fn<() => Promise<Record<string, unknown>[]>>()
+      .mockResolvedValue([])
+    const count = vi.fn().mockResolvedValue(0)
     const update = vi.fn().mockResolvedValue({})
     const updateMany = vi.fn().mockResolvedValue({ count: 1 })
     const deleteMany = vi.fn()
@@ -28,7 +31,7 @@ describe('CommunityMaintenanceService', () => {
     const transaction = {
       $executeRaw: vi.fn().mockResolvedValue(1),
       $queryRaw: vi.fn().mockResolvedValue([]),
-      lookbookPost: { findMany, findFirst, update, updateMany, deleteMany },
+      lookbookPost: { findMany, findFirst, update, updateMany, deleteMany, count },
       communityPostSponsorship: { deleteMany: sponsorshipDeleteMany },
       jobFailure: { create: jobFailureCreate },
     }
@@ -43,6 +46,7 @@ describe('CommunityMaintenanceService', () => {
     return {
       prisma,
       service: new CommunityMaintenanceService(prisma, storage),
+      count,
       storage,
       findMany,
       update,
@@ -155,7 +159,7 @@ describe('CommunityMaintenanceService', () => {
 
     it('claims requests that have not had their objects purged', async () => {
       const { service, findMany } = createService()
-      findMany.mockResolvedValueOnce([])
+      findMany.mockResolvedValue([])
 
       await service.sweepErasureRequests(now)
 
@@ -175,6 +179,7 @@ describe('CommunityMaintenanceService', () => {
       const { service, storage, findMany, update, updateMany } = createService()
       storage.put('community/post-erase/s.jpg', Buffer.from('bytes'))
       findMany.mockResolvedValueOnce([erasureRow()])
+      findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
       updateMany.mockResolvedValueOnce({ count: 1 })
 
       const result = await service.sweepErasureRequests(now)
@@ -194,6 +199,7 @@ describe('CommunityMaintenanceService', () => {
       const { service, findMany, update, updateMany, sponsorshipDeleteMany } =
         createService()
       findMany.mockResolvedValueOnce([erasureRow()])
+      findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
       updateMany.mockResolvedValueOnce({ count: 1 })
 
       await service.sweepErasureRequests(now)
@@ -246,6 +252,7 @@ describe('CommunityMaintenanceService', () => {
           anonymized_at: new Date('2026-09-05T11:30:00.000Z'),
         }),
       ])
+      findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
       updateMany.mockResolvedValueOnce({ count: 1 })
 
       const result = await service.sweepErasureRequests(now)
@@ -256,7 +263,8 @@ describe('CommunityMaintenanceService', () => {
     })
 
     it('leaves objects_purged_at unset when the delete fails, and flags an overdue request', async () => {
-      const { prisma, findMany, update, updateMany } = createService()
+      const { prisma, findMany, update, updateMany, count } = createService()
+      count.mockResolvedValueOnce(1)
       findMany.mockResolvedValueOnce([
         erasureRow({
           status: 'withdrawn',
@@ -266,6 +274,7 @@ describe('CommunityMaintenanceService', () => {
           ),
         }),
       ])
+      findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
       updateMany.mockResolvedValueOnce({ count: 0 })
 
       const failingStorage = new InMemoryCommunityStorage()
@@ -287,6 +296,7 @@ describe('CommunityMaintenanceService', () => {
       findMany.mockResolvedValueOnce([
         erasureRow({ status: 'withdrawn', image_object_path: null }),
       ])
+      findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
       updateMany.mockResolvedValueOnce({ count: 1 })
 
       const result = await service.sweepErasureRequests(now)
