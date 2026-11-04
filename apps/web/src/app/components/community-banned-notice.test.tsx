@@ -489,6 +489,124 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     })
   })
 
+  describe('a realtime rebuild still out when the ban lands', () => {
+    const EVENTS_PAGE = {
+      data: { events: [], nextCursor: 'cursor', hasMore: false, resyncRequired: false },
+    }
+    const DENIED = { statusCode: 403, message: 'Denied' }
+
+    /**
+     * Runs the bootstrap catch-up itself, which the file's clock stubs away with `start`.
+     * Only the socket stays out of it, and a catch-up needs no socket.
+     */
+    function runBootstrapOnStart() {
+      vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
+        this: CommunitySyncState
+      ) {
+        void this.catchUp()
+      })
+    }
+
+    /**
+     * Holds both reads of one feed generation, so the test chooses which answers first.
+     * The events page waits for the direct read, so the next read is always the rebuild.
+     */
+    function serveBothReads({ validationDenied }: { validationDenied: boolean }) {
+      const seen = {
+        direct: false,
+        rebuild: false,
+        rebuildAnswered: false,
+        validations: 0,
+      }
+      let releaseDirect: () => void = () => undefined
+      let releaseRebuild: () => void = () => undefined
+      let directArrived: () => void = () => undefined
+      const directGate = new Promise<void>((resolve) => (releaseDirect = resolve))
+      const rebuildGate = new Promise<void>((resolve) => (releaseRebuild = resolve))
+      const directSeen = new Promise<void>((resolve) => (directArrived = resolve))
+      let eventPages = 0
+      const install = useMswHandlers
+      install(
+        http.get(FEED_PATH, async () => {
+          if (!seen.direct) {
+            seen.direct = true
+            directArrived()
+            await directGate
+            return bannedResponse()
+          }
+          if (!seen.rebuild) {
+            seen.rebuild = true
+            await rebuildGate
+            seen.rebuildAnswered = true
+            return feedBody({ items: [item()], activeChallenge: CHALLENGE })
+          }
+          // The ban is real by now, so any later read is refused.
+          return bannedResponse()
+        }),
+        http.get(SPOTLIGHT_PATH, emptySpotlight),
+        http.get('/api/v1/community/events', async () => {
+          eventPages += 1
+          await directSeen
+          return eventPages > 1 && validationDenied
+            ? HttpResponse.json(DENIED, { status: 403 })
+            : HttpResponse.json(EVENTS_PAGE)
+        }),
+        http.post('/api/v1/community/targets/resolve', async ({ request }) => {
+          seen.validations += 1
+          const { targets } = (await request.json()) as {
+            targets: { key: string; postId: string }[]
+          }
+          return validationDenied
+            ? HttpResponse.json(DENIED, { status: 403 })
+            : HttpResponse.json({
+                data: {
+                  targets: targets.map((target) => ({
+                    key: target.key,
+                    status: 'unavailable',
+                  })),
+                },
+              })
+        })
+      )
+      return {
+        seen,
+        releaseDirect: () => act(() => releaseDirect()),
+        releaseRebuild: () => act(() => releaseRebuild()),
+      }
+    }
+
+    it.each<[string, boolean]>([
+      ['the late page lands', false],
+      ['the late page lands and target validation is then denied', true],
+    ])('keeps the challenge off the page when %s', async (_label, validationDenied) => {
+      signIn()
+      runBootstrapOnStart()
+      const reads = serveBothReads({ validationDenied })
+      const onBannedChange = vi.fn()
+      renderGrid({ onBannedChange })
+      await waitFor(() => expect(reads.seen.rebuild).toBe(true))
+
+      reads.releaseDirect()
+      await screen.findByTestId('community-banned-notice')
+      expect(screen.queryByTestId('weekly-challenge-banner')).not.toBeInTheDocument()
+
+      reads.releaseRebuild()
+      await waitFor(() => expect(reads.seen.rebuildAnswered).toBe(true))
+      // The first round hands the held answer back, and the second sees what its commit started.
+      await settle()
+      await settle()
+
+      expect(notice()).toHaveTextContent(longDate('en-US'))
+      expect(onBannedChange).toHaveBeenLastCalledWith(true)
+      expect(screen.queryByTestId('weekly-challenge-banner')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('challenge-participate-button')).not.toBeInTheDocument()
+      expect(document.body.textContent).not.toContain(CHALLENGE.title)
+      expect(screen.queryByTestId('lookbook-card-post-1')).not.toBeInTheDocument()
+      expect(screen.queryByText(item().caption!)).not.toBeInTheDocument()
+      expect(cardsShown()).toBe(0)
+    })
+  })
+
   describe('a denied socket control', () => {
     function captureSync() {
       const syncs: CommunitySyncState[] = []
