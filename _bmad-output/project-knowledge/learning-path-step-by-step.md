@@ -9584,6 +9584,7 @@ Hard-won lessons from the implementation and review of this story:
     `clearScope` cleared a member's cards and left their sanction, so ban details outlived sign-out on a mounted page.
 15. **Two ways to learn one fact need one cleanup.**
     The feed path cleared the weekly challenge and the socket path did not, so `closeForBan` now serves both.
+    The re-review then found a rebuild already in flight could restore the challenge, so `closeForBan` also bumps the feed generation.
 16. **A file budget is a real constraint late in a story.**
     The last UI round reached 101 changed files, so the pre-existing Sign in and Sign out fix on the notification settings page moved to `fix/notification-settings-auth-links`.
 
@@ -9695,6 +9696,8 @@ Evidence boundaries:
 - **Written before review and merge.**
   The code and tests are committed on `feat/cc-6-11-moderation-decisions`, nothing was pushed when this step was written, and no PR job has run.
   The Codex review of `4cf4b128` found six defects, and they are fixed and logged in the spec as C1 to C6.
+  Its re-review of `1d49278a` found one more, fixed as R2-1 with a test that was red first.
+  The full runs above predate the R2-1 commit.
 - **What ran locally.**
   TEA signed off with three consecutive clean runs of every tier at `5cbf216f`, after the Codex review fixes; the only later commits are the test design and this evidence.
   Passing per run: `apps/api` 7887 with 28 skipped, `packages/api-client` 1580, `packages/config` 29, `packages/db` 266 with 1 skipped, `apps/web` 1825, `apps/mobile` 1905, the Pact consumer 444 with the provider verified, and Playwright 62 with 1 skipped.

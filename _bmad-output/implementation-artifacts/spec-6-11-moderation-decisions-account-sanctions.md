@@ -341,6 +341,7 @@ Residuals RG1 to RG8 are in the test design under Assumptions.
 
 The bmad-build lens fan-out did not run: TEA reviewed every commit as the independent reader, and the coordinator runs the Codex review after this log.
 C1 to C6 are the Codex review of `4cf4b128`, each checked against the code before its fix.
+R2-1 is the Codex re-review of `1d49278a`, which confirmed the other five fixed.
 All rows below were real and fixed.
 
 | Id           | Sev    | Finding                                                                                                                                                | Fix                                                                                                                                                       |
@@ -375,6 +376,7 @@ All rows below were real and fixed.
 | C4           | medium | Try again sent changed ban terms with no confirmation                                                                                                  | Try again leaves once the form differs from the failed attempt, and Apply goes through confirmation                                                       |
 | C5           | medium | A ban learned from the socket left the weekly challenge and its dead button                                                                            | `closeForBan` is the one cleanup for both paths                                                                                                           |
 | C6           | medium | Erasure during lock acquisition answered the legacy 404 with no closed code, so the panel offered retries                                              | `takeTargetLocks` maps it to `case_not_found`                                                                                                             |
+| R2-1         | medium | A delayed realtime rebuild restored the weekly challenge after the ban cleanup                                                                         | `closeForBan` bumps the feed generation, so reads in flight cannot land                                                                                   |
 
 ## Design Notes
 

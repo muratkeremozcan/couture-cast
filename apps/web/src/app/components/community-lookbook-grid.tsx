@@ -2238,6 +2238,10 @@ export function CommunityLookbookGrid({
   /** Every path that learns of a ban leaves the same page: the notice and nothing of the feed. */
   const closeForBan = useCallback(
     (sanction: CommunityBannedError['sanction']) => {
+      // A read still in flight was authorized before the ban, so its answer can never land.
+      feedGenerationRef.current++
+      setIsLoading(false)
+      setIsLoadingMore(false)
       setBannedSanction(sanction)
       setItems([])
       setAuthorStates([])
