@@ -645,6 +645,8 @@ model LookbookPost {
   image_pending_byte_size      Int?
   /// Story 6.11: the stored bytes are normalized, so no later generation re-encodes them.
   image_normalized_at          DateTime?
+  /// Story 6.11: when erasure last tried to delete the object, whatever happened. Schedules the next delete.
+  image_delete_attempted_at    DateTime?
   upload_expires_at            DateTime?
   /// When the author confirmed the alt text stored in `alt_text`. The Zod
   /// contract refuses an unconfirmed publish at the HTTP boundary, but a

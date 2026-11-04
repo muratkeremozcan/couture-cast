@@ -51,13 +51,13 @@ const OPEN_ERASURE = {
   objects_purged_at: null,
 } satisfies Prisma.LookbookPostWhereInput
 
-const ERASURE_WORK_FIELDS = {
-  id: true,
-  status: true,
-  image_object_path: true,
-  anonymized_at: true,
-  erasure_requested_at: true,
-} satisfies Prisma.LookbookPostSelect
+interface ErasureWork {
+  id: string
+  status: string
+  image_object_path: string | null
+  anonymized_at: Date | null
+  erasure_requested_at: Date | null
+}
 
 export interface CommunityStaleReviewSweepResult {
   stalled: number
@@ -313,8 +313,10 @@ export class CommunityMaintenanceService {
             },
             'Failed to purge community object during erasure; will retry'
           )
+          await this.recordDeleteAttempt(post.id, now)
           continue
         }
+        await this.recordDeleteAttempt(post.id, now)
       }
 
       if (
@@ -364,48 +366,38 @@ export class CommunityMaintenanceService {
   }
 
   /**
-   * A repeat delete can wait and a new request cannot, so work is taken in that order: rows not yet
-   * anonymized, then rows past the window, then repeats by least recently deleted with what is left.
-   * One oldest-first list would let open rows hold every slot for the whole window.
+   * One queue, earliest due first, so waiting work ages past whatever arrives later and nothing starves
+   * behind a stream of new requests. A new request is due at its request time. After an attempt the
+   * next delete is due at the pace, and no later than the end of the window for the final one.
    */
-  private async selectErasureWork(now: Date) {
-    const windowStart = new Date(now.getTime() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS)
-    const started = { ...OPEN_ERASURE, anonymized_at: { not: null } }
-    const queues: {
-      where: Prisma.LookbookPostWhereInput
-      orderBy: Prisma.LookbookPostOrderByWithRelationInput
-    }[] = [
-      {
-        where: { ...OPEN_ERASURE, anonymized_at: null },
-        orderBy: { erasure_requested_at: 'asc' },
-      },
-      {
-        where: { ...started, erasure_requested_at: { lte: windowStart } },
-        orderBy: { erasure_requested_at: 'asc' },
-      },
-      {
-        where: {
-          ...started,
-          erasure_requested_at: { gt: windowStart },
-          updated_at: { lte: new Date(now.getTime() - ERASURE_REPEAT_DELETE_MS) },
-        },
-        orderBy: { updated_at: 'asc' },
-      },
-    ]
-    const rows: Prisma.LookbookPostGetPayload<{ select: typeof ERASURE_WORK_FIELDS }>[] =
-      []
-    for (const queue of queues) {
-      const take = MAX_SWEEP_BATCH - rows.length
-      if (take <= 0) break
-      rows.push(
-        ...(await this.prisma.lookbookPost.findMany({
-          ...queue,
-          take,
-          select: ERASURE_WORK_FIELDS,
-        }))
-      )
-    }
-    return rows
+  private selectErasureWork(now: Date) {
+    const pace = Prisma.sql`(${ERASURE_REPEAT_DELETE_MS}::double precision * interval '1 millisecond')`
+    const windowEnd = Prisma.sql`(erasure_requested_at + ${COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS}::double precision * interval '1 millisecond')`
+    return this.prisma.$queryRaw<ErasureWork[]>(Prisma.sql`
+      SELECT id, status::text AS status, image_object_path, anonymized_at, erasure_requested_at
+      FROM (
+        SELECT *, CASE
+          WHEN image_delete_attempted_at IS NULL THEN erasure_requested_at
+          WHEN image_delete_attempted_at >= ${windowEnd} THEN image_delete_attempted_at + ${pace}
+          ELSE LEAST(image_delete_attempted_at + ${pace}, ${windowEnd})
+        END AS due_at
+        FROM "LookbookPost"
+        WHERE erasure_requested_at IS NOT NULL AND objects_purged_at IS NULL
+      ) AS open_erasure
+      WHERE due_at <= ${now.toISOString()}::timestamp
+      ORDER BY due_at, id
+      LIMIT ${MAX_SWEEP_BATCH}`)
+  }
+
+  /** After the delete settles, so a crash before it leaves the row due and a failure paces its retry. */
+  private recordDeleteAttempt(id: string, now: Date) {
+    return communityPrivacyTransaction(this.prisma, async (tx) => {
+      await guardCommunityPost(tx, id)
+      await tx.lookbookPost.updateMany({
+        where: { id },
+        data: { image_delete_attempted_at: now },
+      })
+    })
   }
 
   private eraseMetadata(id: string, now: Date) {
@@ -425,8 +417,6 @@ export class CommunityMaintenanceService {
         where: { id },
         data: {
           status: 'withdrawn',
-          // On the sweep's clock, because it paces the next delete of this object.
-          updated_at: now,
           ...(anonymized
             ? {
                 caption: null,

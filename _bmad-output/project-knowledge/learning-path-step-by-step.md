@@ -9609,6 +9609,7 @@ Hard-won lessons from the implementation and review of this story:
     Removal asks a different question from settlement: losing ownership means stop, and only a row that no longer owns the object may delete it.
     A write outside the transaction needs its own answer: record the intent under the fence first, so a worker lost between the two leaves bytes the next owner can recognize.
     The same write can outlive its owner entirely, so a timer on our side bounds nothing: a pause can follow any check, and only the system taking the write can refuse it. A signed token minted before the reservation gives storage that refusal, and the delete obligation lasts until it has expired.
+    A longer deletion window then turned into a scheduling problem: priority tiers starved whichever tier came last, and a shared timestamp hid failed deletes. One queue ordered by due time, with its own attempt column written after the delete settles, ages all waiting work.
 
 Story/Task mapping:
 

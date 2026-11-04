@@ -30,7 +30,8 @@ describe('CommunityMaintenanceService', () => {
     const findFirst = vi.fn(async () => (await firstRows())[0])
     const transaction = {
       $executeRaw: vi.fn().mockResolvedValue(1),
-      $queryRaw: vi.fn().mockResolvedValue([]),
+      // The erasure queue's select, read from the rows a test hands `findMany`.
+      $queryRaw: vi.fn(() => findMany()),
       lookbookPost: { findMany, findFirst, update, updateMany, deleteMany, count },
       communityPostSponsorship: { deleteMany: sponsorshipDeleteMany },
       jobFailure: { create: jobFailureCreate },
@@ -157,20 +158,16 @@ describe('CommunityMaintenanceService', () => {
       ...overrides,
     })
 
-    it('claims requests that have not had their objects purged', async () => {
+    it('does nothing when no erasure work is due', async () => {
       const { service, findMany } = createService()
       findMany.mockResolvedValue([])
 
-      await service.sweepErasureRequests(now)
-
-      expect(findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            erasure_requested_at: { not: null },
-            objects_purged_at: null,
-          }) as unknown,
-        })
-      )
+      await expect(service.sweepErasureRequests(now)).resolves.toEqual({
+        hidden: 0,
+        anonymized: 0,
+        objectsPurged: 0,
+        overdue: 0,
+      })
     })
 
     it('hides the post before deleting its object', async () => {
@@ -179,7 +176,6 @@ describe('CommunityMaintenanceService', () => {
       const { service, storage, findMany, update, updateMany } = createService()
       storage.put('community/post-erase/s.jpg', Buffer.from('bytes'))
       findMany.mockResolvedValueOnce([erasureRow()])
-      findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
       updateMany.mockResolvedValueOnce({ count: 1 })
 
       const result = await service.sweepErasureRequests(now)
@@ -199,7 +195,6 @@ describe('CommunityMaintenanceService', () => {
       const { service, findMany, update, updateMany, sponsorshipDeleteMany } =
         createService()
       findMany.mockResolvedValueOnce([erasureRow()])
-      findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
       updateMany.mockResolvedValueOnce({ count: 1 })
 
       await service.sweepErasureRequests(now)
@@ -217,7 +212,6 @@ describe('CommunityMaintenanceService', () => {
         where: { id: 'post-erase' },
         data: {
           status: 'withdrawn',
-          updated_at: now,
           caption: null,
           alt_text: null,
           locale: null,
@@ -252,7 +246,6 @@ describe('CommunityMaintenanceService', () => {
           anonymized_at: new Date('2026-09-05T11:30:00.000Z'),
         }),
       ])
-      findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
       updateMany.mockResolvedValueOnce({ count: 1 })
 
       const result = await service.sweepErasureRequests(now)
@@ -274,7 +267,6 @@ describe('CommunityMaintenanceService', () => {
           ),
         }),
       ])
-      findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
       updateMany.mockResolvedValueOnce({ count: 0 })
 
       const failingStorage = new InMemoryCommunityStorage()
@@ -287,7 +279,7 @@ describe('CommunityMaintenanceService', () => {
       expect(result).toEqual({ hidden: 0, anonymized: 0, objectsPurged: 0, overdue: 1 })
       expect(update).toHaveBeenCalledWith({
         where: { id: 'post-erase' },
-        data: { status: 'withdrawn', updated_at: now },
+        data: { status: 'withdrawn' },
       })
     })
 
@@ -296,7 +288,6 @@ describe('CommunityMaintenanceService', () => {
       findMany.mockResolvedValueOnce([
         erasureRow({ status: 'withdrawn', image_object_path: null }),
       ])
-      findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
       updateMany.mockResolvedValueOnce({ count: 1 })
 
       const result = await service.sweepErasureRequests(now)

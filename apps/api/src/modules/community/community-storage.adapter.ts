@@ -43,7 +43,9 @@ function signedUploadExpiry(token: string): Date {
   if (typeof exp !== 'number') throw storageUnavailable()
   const expiresAt = new Date(exp * 1000)
   const latest = Date.now() + COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS + TOKEN_CLOCK_SKEW_MS
-  if (expiresAt.getTime() > latest) throw storageUnavailable()
+  if (expiresAt.getTime() > latest || expiresAt.getTime() <= Date.now()) {
+    throw storageUnavailable()
+  }
   return expiresAt
 }
 
@@ -204,14 +206,16 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
     if (error || !data?.signedUrl) {
       throw storageUnavailable()
     }
-    // `expiresAt` is the client's upload window and publish enforces it. The token lasts longer.
-    signedUploadExpiry(data.token)
+    // `expiresAt` is the client's upload window and publish enforces it. It is normally the shorter
+    // of the two, and a slow mint can leave the token shorter, which the client must then be told.
+    const tokenExpiresAt = signedUploadExpiry(data.token).getTime()
+    const plannedExpiresAt = Date.now() + expiresInSeconds * 1000
 
     return {
       uploadUrl: data.signedUrl,
       uploadToken: data.token,
       // From after the mint, so a slow mint cannot leave a live token behind an old expiry.
-      expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+      expiresAt: new Date(Math.min(plannedExpiresAt, tokenExpiresAt)).toISOString(),
     }
   }
 
