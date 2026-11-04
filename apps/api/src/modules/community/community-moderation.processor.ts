@@ -58,6 +58,7 @@ import {
   type CommunityMimeType,
 } from './community-image-validation.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { createHash } from 'node:crypto'
 
 /**
  * Hard ceilings on the two external calls a screening job makes. Without them a hung
@@ -233,18 +234,7 @@ export class CommunityModerationProcessor {
     let imageBuffer: Buffer
     try {
       const normalized = await withModerationTimeout(
-        this.normalizeUpload(
-          post.id,
-          post.user_id,
-          post.image_object_path,
-          rawBytes,
-          {
-            byteSize: post.image_byte_size,
-            mimeType: post.image_content_type,
-            sha256: post.image_checksum,
-          },
-          generation
-        ),
+        this.normalizeUpload(post, post.image_object_path, rawBytes, generation),
         MODERATION_SCREENING_TIMEOUT_MS,
         'community image verification'
       )
@@ -375,53 +365,154 @@ export class CommunityModerationProcessor {
   }
 
   /**
-   * Verifies the stored declaration against the bytes, re-encodes them, writes
-   * the normalized object back over the original, and persists the checksum,
-   * byte size and MIME that describe what is actually stored.
+   * Verifies the bytes against the row's declarations, re-encodes them once, and writes them back
+   * with the checksum, byte size and MIME that describe what is stored.
    *
-   * Returns null when a newer generation took the post over: that generation owns the object and
-   * its declarations, so this work stops without touching either.
+   * Storage and the row cannot change together, so the row records the coming write first. A worker
+   * lost between the two leaves bytes matching the pending declaration, and whoever screens next
+   * finishes the work without re-encoding. Bytes matching neither declaration still fail.
+   *
+   * Returns null when this work lost the post: whoever owns it now owns the object and its
+   * declarations, so this work stops without touching either.
    */
   private async normalizeUpload(
-    postId: string,
-    userId: string,
+    post: LookbookPost,
     objectPath: string,
     rawBytes: Buffer,
-    declared: {
-      byteSize: number | null
-      mimeType: string | null
-      sha256: string | null
-    },
     generation: number
   ): Promise<Buffer | null> {
-    if (!declared.byteSize || !declared.mimeType || !declared.sha256) {
+    const match = await this.matchStoredBytes(post, rawBytes)
+    const { byteSize, mimeType, sha256 } = match.declaration
+    if (!byteSize || !mimeType || !sha256) {
       throw new CommunityImageValidationError(
         communityImageValidationCodeSchema.enum.IMAGE_DECLARATION_MISSING
       )
     }
 
     const normalized = await verifyAndNormalizeCommunityImage(rawBytes, {
-      byteSize: declared.byteSize,
-      mimeType: declared.mimeType as CommunityMimeType,
-      sha256: declared.sha256,
+      byteSize,
+      mimeType: mimeType as CommunityMimeType,
+      sha256,
     })
 
-    if (normalized.sha256 === declared.sha256) return normalized.bytes
-    // Storage has no conditional write, so this check only narrows the window. Work paused past it
-    // can still overwrite, and the settlement below then keeps the object rather than deleting it.
-    if ((await this.currentGeneration(postId)) !== generation) return null
+    if (match.state === 'normalized') return rawBytes
+    const settlement = { post, objectPath, generation, mimeType: normalized.mimeType }
+    if (match.state === 'pending')
+      return this.settleNormalization({
+        ...settlement,
+        sha256,
+        byteSize,
+        bytes: rawBytes,
+      })
+    if (normalized.sha256 === sha256) return normalized.bytes
+
+    const reserved = await this.withImageOwnership(
+      post,
+      objectPath,
+      generation,
+      async (tx) => {
+        await tx.lookbookPost.update({
+          where: { id: post.id },
+          data: {
+            image_pending_checksum: normalized.sha256,
+            image_pending_byte_size: normalized.byteSize,
+          },
+        })
+      }
+    )
+    if (reserved !== 'owner') return null
 
     await this.storage.upload(objectPath, normalized.bytes, normalized.mimeType)
-    const settled = await interactiveTransaction(this.prisma, async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
-      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
-      const owner = await this.holdsGeneration(tx, postId, generation)
-      const row = await tx.lookbookPost.findUnique({ where: { id: postId } })
+    return this.settleNormalization({
+      ...settlement,
+      sha256: normalized.sha256,
+      byteSize: normalized.byteSize,
+      bytes: normalized.bytes,
+    })
+  }
+
+  /**
+   * Which declaration describes these bytes. The row read before the download can be older than the
+   * bytes, so a miss reads it again; a miss on both reports against the current row, which fails.
+   */
+  private async matchStoredBytes(post: LookbookPost, bytes: Buffer) {
+    const sha256 = createHash('sha256').update(bytes).digest('hex')
+    const read = (row: LookbookPost) => {
+      if (row.image_checksum === sha256)
+        return row.image_normalized_at ? ('normalized' as const) : ('declared' as const)
+      return row.image_pending_checksum === sha256 ? ('pending' as const) : null
+    }
+    const declarationOf = (row: LookbookPost, state: ReturnType<typeof read>) => ({
+      state,
+      declaration: {
+        byteSize: state === 'pending' ? row.image_pending_byte_size : row.image_byte_size,
+        mimeType: row.image_content_type,
+        sha256: state === 'pending' ? row.image_pending_checksum : row.image_checksum,
+      },
+    })
+    const state = read(post)
+    if (state) return declarationOf(post, state)
+    const current =
+      (await this.prisma.lookbookPost.findUnique({ where: { id: post.id } })) ?? post
+    return declarationOf(current, read(current))
+  }
+
+  /** Publishes the stored bytes' declarations, unless this work has lost the post. */
+  private async settleNormalization(params: {
+    post: LookbookPost
+    objectPath: string
+    generation: number
+    sha256: string
+    byteSize: number
+    mimeType: string
+    bytes: Buffer
+  }): Promise<Buffer | null> {
+    const { post, objectPath, generation, sha256, byteSize, mimeType, bytes } = params
+    const settled = await this.withImageOwnership(
+      post,
+      objectPath,
+      generation,
+      async (tx) => {
+        await tx.lookbookPost.update({
+          where: { id: post.id },
+          data: {
+            image_checksum: sha256,
+            image_byte_size: byteSize,
+            image_content_type: mimeType,
+            image_pending_checksum: null,
+            image_pending_byte_size: null,
+            image_normalized_at: new Date(),
+          },
+        })
+      }
+    )
+    if (settled === 'released') {
       // Only here does nothing else own the object: a completed late upload cannot restore erased
       // metadata or retain its object.
+      await this.storage.remove([objectPath])
+      throw new Error('Community normalization ownership expired.')
+    }
+    return settled === 'owner' ? bytes : null
+  }
+
+  /**
+   * Runs `write` if this generation still owns the post's image. `released` means nothing owns the
+   * object any more; `superseded` means a newer generation or a moderator does.
+   */
+  private async withImageOwnership(
+    post: LookbookPost,
+    objectPath: string,
+    generation: number,
+    write: (tx: Prisma.TransactionClient) => Promise<void>
+  ): Promise<'owner' | 'released' | 'superseded'> {
+    return interactiveTransaction(this.prisma, async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${post.user_id}))`
+      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${post.id} FOR UPDATE`
+      const owner = await this.holdsGeneration(tx, post.id, generation)
+      const row = await tx.lookbookPost.findUnique({ where: { id: post.id } })
       if (
         !row ||
-        row.user_id !== userId ||
+        row.user_id !== post.user_id ||
         row.image_object_path !== objectPath ||
         row.erasure_requested_at ||
         row.anonymized_at ||
@@ -435,21 +526,9 @@ export class CommunityModerationProcessor {
         row.moderation_reason?.startsWith(COMMUNITY_BAN_MARKER_PREFIX)
       if (!owner || (row.status !== 'pending_review' && !held))
         return 'superseded' as const
-      await tx.lookbookPost.update({
-        where: { id: postId },
-        data: {
-          image_checksum: normalized.sha256,
-          image_byte_size: normalized.byteSize,
-          image_content_type: normalized.mimeType,
-        },
-      })
-      return 'settled' as const
+      await write(tx)
+      return 'owner' as const
     })
-    if (settled === 'released') {
-      await this.storage.remove([objectPath])
-      throw new Error('Community normalization ownership expired.')
-    }
-    return settled === 'settled' ? normalized.bytes : null
   }
 
   private async publishPost(params: {

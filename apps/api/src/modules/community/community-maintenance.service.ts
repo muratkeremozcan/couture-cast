@@ -366,6 +366,8 @@ export class CommunityMaintenanceService {
                 area_region: null,
                 area_city: null,
                 image_checksum: null,
+                image_pending_checksum: null,
+                image_pending_byte_size: null,
                 anonymized_at: now,
               }
             : {}),

@@ -639,6 +639,12 @@ model LookbookPost {
   image_content_type           String?
   image_checksum               String?
   image_byte_size              Int?
+  /// Story 6.11: what normalization is about to write, recorded before the write. Only the screening
+  /// pipeline reads these; every reader of the object goes by the three declarations above.
+  image_pending_checksum       String?
+  image_pending_byte_size      Int?
+  /// Story 6.11: the stored bytes are normalized, so no later generation re-encodes them.
+  image_normalized_at          DateTime?
   upload_expires_at            DateTime?
   /// When the author confirmed the alt text stored in `alt_text`. The Zod
   /// contract refuses an unconfirmed publish at the HTTP boundary, but a
