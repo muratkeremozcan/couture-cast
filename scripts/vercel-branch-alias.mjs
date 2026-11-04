@@ -42,6 +42,7 @@ export function pickGitBranchAlias(aliases) {
 /**
  * A deployment's git-branch alias URL: from its own `alias` list when it has one, else from Vercel.
  * @param {Record<string, any>} deployment
+ * A failed alias request counts as no alias, so the caller can try the next candidate or its fallback.
  * @param {(deploymentId: string) => Promise<string[]>} fetchAliases
  * @returns {Promise<string | undefined>}
  */
@@ -50,5 +51,9 @@ export async function gitBranchAliasForDeployment(deployment, fetchAliases) {
   if (own) return own
   const id = deployment?.uid ?? deployment?.id
   if (typeof id !== 'string') return undefined
-  return pickGitBranchAlias(await fetchAliases(id))
+  try {
+    return pickGitBranchAlias(await fetchAliases(id))
+  } catch {
+    return undefined
+  }
 }

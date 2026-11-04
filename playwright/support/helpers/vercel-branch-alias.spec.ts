@@ -77,6 +77,14 @@ describe('gitBranchAliasForDeployment', () => {
     expect(fetchAliases).not.toHaveBeenCalled()
   })
 
+  it('treats a failed alias request as no alias so the caller can go on', async () => {
+    const fetchAliases = vi.fn(() => Promise.reject(new Error('HTTP 429')))
+    expect(
+      await gitBranchAliasForDeployment({ uid: 'dpl_failing' }, fetchAliases)
+    ).toBeUndefined()
+    expect(fetchAliases).toHaveBeenCalledTimes(1)
+  })
+
   it('returns undefined for a deployment with no id and no alias', async () => {
     const fetchAliases = vi.fn(() => Promise.resolve([HASHED_ALIAS]))
     expect(await gitBranchAliasForDeployment({}, fetchAliases)).toBeUndefined()

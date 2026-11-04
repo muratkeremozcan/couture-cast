@@ -393,7 +393,12 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
 
     logDeploymentDetails(deployment)
 
-    const aliasUrl = await findGitBranchAliasUrl(deployment, teamId)
+    // An alias belongs to the branch that built the deployment; the unfiltered fallback lists other branches too.
+    const ref = deployment.meta?.githubCommitRef
+    const aliasUrl =
+      ref === branch || ref === branchSlug
+        ? await findGitBranchAliasUrl(deployment, teamId)
+        : undefined
     if (aliasUrl) return aliasUrl
 
     // A canonical URL is locked to its commit, so it only helps when no

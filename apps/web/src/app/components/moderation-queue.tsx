@@ -115,6 +115,8 @@ function useModerationQueue(filters: ModerationQueueFilters) {
     setItems([])
     setCursor(null)
     setRetryMore(false)
+    setStale(false)
+    setFailure(null)
     setRefreshed(false)
     setFocus(null)
     setPhase('loading')
@@ -384,7 +386,7 @@ function CaseRow({
       <h2 id={`case-${item.caseId}`} className="mt-3 text-lg font-semibold">
         <Link
           id={`case-link-${item.caseId}`}
-          aria-labelledby={`case-link-${item.caseId} case-hint-${item.caseId}`}
+          aria-labelledby={`case-link-${item.caseId} case-hint-${item.caseId} case-ref-${item.caseId}`}
           href={`/moderation/cases/${encodeURIComponent(item.caseId)}`}
           className="rounded after:absolute after:inset-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)]"
         >
@@ -393,16 +395,15 @@ function CaseRow({
           })}
         </Link>
       </h2>
-      {/* The hint completes the link name, so two cases from one source never share a name. */}
+      {/* The excerpt and the case id complete the link name, so two cases never share one, even with the same caption. */}
       {item.excerpt ? (
         <p id={`case-hint-${item.caseId}`} className="mt-1 line-clamp-2 text-sm">
           <PlainText value={item.excerpt} />
         </p>
-      ) : (
-        <span id={`case-hint-${item.caseId}`} className="sr-only">
-          {t('moderation.queue.caseRef', { id: item.caseId })}
-        </span>
-      )}
+      ) : null}
+      <span id={`case-ref-${item.caseId}`} className="sr-only">
+        {t('moderation.queue.caseRef', { id: item.caseId })}
+      </span>
       <p className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">
         {t('moderation.queue.reports', { count: item.reportCount })}
         {' · '}

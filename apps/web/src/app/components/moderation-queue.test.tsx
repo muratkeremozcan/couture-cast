@@ -67,9 +67,9 @@ describe('C-WEB-Q-QUEUE', () => {
     expect(within(rows[1]!).getByText(/Spam, Harassment/)).toBeInTheDocument()
     expect(within(rows[1]!).getByText(/Screening finding/)).toBeInTheDocument()
     expect(within(rows[0]!).getByText(/de-DE/)).toBeInTheDocument()
-    // No raw enum value leaks into the page.
+    // No raw enum value leaks into the page. The case id is the one raw token, and only in the link name.
     expect(document.body.textContent).not.toMatch(
-      /\b(on_track|at_risk|hate_speech|inappropriate_content|orphan-post)\b/
+      /\b(on_track|at_risk|hate_speech|inappropriate_content)\b/
     )
   })
 
@@ -603,12 +603,48 @@ describe('CodeRabbit review: empty state, retry and link names', () => {
       summary({ caseId: 'post.b', excerpt: 'Second caption' }),
       summary({ caseId: 'post.c', excerpt: null }),
     ])
-    expect(screen.getByRole('link', { name: 'Post case First caption' })).toHaveAttribute(
-      'href',
-      '/moderation/cases/post.a'
-    )
-    expect(screen.getByRole('link', { name: 'Post case Second caption' })).toBeVisible()
+    expect(
+      screen.getByRole('link', { name: 'Post case First caption Case post.a' })
+    ).toHaveAttribute('href', '/moderation/cases/post.a')
+    expect(
+      screen.getByRole('link', { name: 'Post case Second caption Case post.b' })
+    ).toBeVisible()
     // With no excerpt the case id tells the case apart.
     expect(screen.getByRole('link', { name: 'Post case Case post.c' })).toBeVisible()
+  })
+
+  it('keeps two cases with the same caption apart by their case id', async () => {
+    await openQueue([
+      summary({ caseId: 'post.a', excerpt: 'Same caption' }),
+      summary({ caseId: 'post.b', excerpt: 'Same caption' }),
+    ])
+    const names = screen.getAllByRole('link').map((link) => link.textContent)
+    expect(
+      screen.getByRole('link', { name: 'Post case Same caption Case post.a' })
+    ).toHaveAttribute('href', '/moderation/cases/post.a')
+    expect(
+      screen.getByRole('link', { name: 'Post case Same caption Case post.b' })
+    ).toHaveAttribute('href', '/moderation/cases/post.b')
+    expect(names).toHaveLength(2)
+  })
+
+  it('drops the stale notice when a filter change starts a new query that also fails', async () => {
+    mockApi(
+      queueHandler((query) => {
+        if (query.risk === 'low') return json({ statusCode: 500 }, 500)
+        if (query.cursor) return json({ statusCode: 500 }, 500)
+        return json(page(three, 'c1'))
+      })
+    )
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Showing the last result')
+    await userEvent.selectOptions(screen.getByLabelText('Risk'), 'low')
+    await waitFor(() => expect(screen.getAllByRole('alert')).toHaveLength(1))
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The moderation queue is unavailable. Try again.'
+    )
+    expect(screen.queryByText(/Showing the last result/)).not.toBeInTheDocument()
   })
 })
