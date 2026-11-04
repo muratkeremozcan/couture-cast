@@ -194,3 +194,130 @@ test.describe('Auth and moderation endpoint security contracts', () => {
     })
   }
 })
+
+// Story 6.10: the two read-only moderation routes. The role matrix runs the real guards against
+// the running API: bearer first, role second, the flag after the role.
+test.describe('Moderator queue read routes (Story 6.10)', () => {
+  const QUEUE_PATH = '/api/v1/moderation/cases'
+  const detailPath = (caseId: string) => `${QUEUE_PATH}/${caseId}`
+
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      isProdEnvironment(testInfo),
+      'Synthetic moderator identities are not provisioned in production.'
+    )
+  })
+
+  test('[P0] P-Q-ROLES returns 401 without a bearer token on both routes', async ({
+    apiRequest,
+    validateSchema,
+  }, testInfo) => {
+    for (const path of [QUEUE_PATH, detailPath('post.anything')]) {
+      const { status, body } = await apiRequest({
+        method: 'GET',
+        path,
+        baseUrl: resolveApiBaseUrl(testInfo),
+      })
+      expect(status).toBe(401)
+      await validateSchema(unauthorizedHttpErrorSchema, body, {
+        shape: { statusCode: 401, error: 'Unauthorized' },
+      })
+    }
+  })
+
+  test('[P0] P-Q-ROLES gives each non-moderator role one 403 body for real, unknown and malformed ids', async ({
+    apiRequest,
+    validateSchema,
+  }, testInfo) => {
+    // The teen consent gate runs before the role check, so a teen sees a different message than a guardian.
+    // Each role still sees exactly one body, whatever the id.
+    const expectedMessage = {
+      guardian: 'Insufficient role',
+      teen: 'Guardian consent required',
+    }
+    for (const role of ['guardian', 'teen'] as const) {
+      const headers = authHeaders(buildUniqueId(`${role}-reader`, testInfo), role)
+      const bodies = new Set<string>()
+      for (const path of [
+        QUEUE_PATH,
+        detailPath('post.cmreal0000000000000000000'),
+        detailPath('post.does-not-exist'),
+        detailPath('not-a-case'),
+        detailPath('orphan-comment.x'),
+      ]) {
+        const { status, body } = await apiRequest({
+          method: 'GET',
+          path,
+          baseUrl: resolveApiBaseUrl(testInfo),
+          headers,
+        })
+        expect(status, `${role} ${path}`).toBe(403)
+        await validateSchema(forbiddenHttpErrorSchema, body, {
+          shape: { statusCode: 403, error: 'Forbidden' },
+        })
+        expect(extractErrorMessage(body)).toContain(expectedMessage[role])
+        bodies.add(JSON.stringify(body))
+      }
+      expect(bodies.size, `${role} bodies`).toBe(1)
+    }
+  })
+
+  test('[P0] P-Q-ROLES lets a moderator and an admin read the queue with private, no-store headers', async ({
+    request,
+  }, testInfo) => {
+    const baseUrl = resolveApiBaseUrl(testInfo)
+    for (const role of ['moderator', 'admin'] as const) {
+      const response = await request.get(`${baseUrl}${QUEUE_PATH}?limit=5`, {
+        headers: authHeaders(buildUniqueId(`${role}-reader`, testInfo), role),
+      })
+      expect(response.status(), role).toBe(200)
+      expect(response.headers()['cache-control']).toBe('private, no-store')
+      const body = (await response.json()) as {
+        data: { items: unknown[]; nextCursor: string | null; serverNow: string }
+      }
+      expect(Array.isArray(body.data.items)).toBe(true)
+      expect(Date.parse(body.data.serverNow)).not.toBeNaN()
+      // The page never carries a forbidden key.
+      expect(JSON.stringify(body)).not.toMatch(
+        /"(user_id|userId|email|reporterId|reportId|objectPath|bucket|ip)"/
+      )
+    }
+  })
+
+  test('[P0] P-Q-ROLES answers 404 case_not_found with one body for unknown and malformed ids', async ({
+    request,
+  }, testInfo) => {
+    const baseUrl = resolveApiBaseUrl(testInfo)
+    const headers = authHeaders(buildUniqueId('moderator-reader', testInfo), 'moderator')
+    const bodies = new Set<string>()
+    for (const id of [
+      'post.never-existed-1',
+      'not-a-case',
+      'post.',
+      'orphan-post.never',
+    ]) {
+      const response = await request.get(`${baseUrl}${detailPath(id)}`, { headers })
+      expect(response.status(), id).toBe(404)
+      expect(response.headers()['cache-control']).toBe('private, no-store')
+      bodies.add(JSON.stringify(await response.json()))
+    }
+    expect(bodies.size).toBe(1)
+    expect([...bodies][0]).toContain('case_not_found')
+  })
+
+  test('[P1] P-Q-ROLES refuses a bad filter with a closed code and exposes no write method', async ({
+    request,
+  }, testInfo) => {
+    const baseUrl = resolveApiBaseUrl(testInfo)
+    const headers = authHeaders(buildUniqueId('moderator-reader', testInfo), 'moderator')
+    const bad = await request.get(`${baseUrl}${QUEUE_PATH}?risk=critical&limit=500`, {
+      headers,
+    })
+    expect(bad.status()).toBe(400)
+    expect(await bad.json()).toMatchObject({ statusCode: 400, code: 'invalid_filter' })
+    for (const method of ['post', 'put', 'patch', 'delete'] as const) {
+      const response = await request[method](`${baseUrl}${QUEUE_PATH}`, { headers })
+      expect([404, 405], method).toContain(response.status())
+    }
+  })
+})
