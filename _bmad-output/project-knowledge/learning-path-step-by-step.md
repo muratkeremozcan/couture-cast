@@ -9699,7 +9699,7 @@ Evidence boundaries:
   The code and tests are committed on `feat/cc-6-11-moderation-decisions`, nothing was pushed when this step was written, and no PR job has run.
   The Codex review of `4cf4b128` found six defects, and they are fixed and logged in the spec as C1 to C6.
   Its re-review of `1d49278a` found one more, fixed as R2-1 with a test that was red first.
-  The full runs above predate the R2-1 commit.
+  The full runs above predate R2-1, the Optic change and the CodeRabbit fixes, which CI on the PR covers.
 - **What ran locally.**
   TEA signed off with three consecutive clean runs of every tier at `5cbf216f`, after the Codex review fixes; the only later commits are the test design and this evidence.
   Passing per run: `apps/api` 7887 with 28 skipped, `packages/api-client` 1580, `packages/config` 29, `packages/db` 266 with 1 skipped, `apps/web` 1825, `apps/mobile` 1905, the Pact consumer 444 with the provider verified, and Playwright 62 with 1 skipped.

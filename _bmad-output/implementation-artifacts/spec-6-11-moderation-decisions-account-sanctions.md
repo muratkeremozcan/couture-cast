@@ -2,7 +2,7 @@
 title: 'CC-6.11 Moderation decisions and account sanctions'
 type: 'feature'
 created: '2026-11-04'
-status: 'built'
+status: 'done'
 review: 'none'
 review_source: 'coordinator: TEA per commit, Codex after handoff'
 lenses_ran: []
