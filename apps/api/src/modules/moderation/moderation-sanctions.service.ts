@@ -200,13 +200,16 @@ export class ModerationSanctionsService {
     })
   }
 
-  /** A released row keeps its machine reason, and the marker must not cost it that for good. */
+  /**
+   * A released row keeps its machine reason, and the marker must not cost it that for good. The
+   * current reason replaces any older snapshot, null included, so a stale one never comes back.
+   */
   private async keepPriorReasons(tx: Tx, subjectId: string): Promise<void> {
     const posts = await tx.lookbookPost.findMany({
       where: {
         user_id: subjectId,
         status: 'published',
-        moderation_reason: { not: null },
+        OR: [{ moderation_reason: { not: null } }, { ban_prior_reason: { not: null } }],
       },
       select: { id: true, moderation_reason: true },
     })
@@ -219,7 +222,7 @@ export class ModerationSanctionsService {
       where: {
         user_id: subjectId,
         status: 'published',
-        screening_reason: { not: null },
+        OR: [{ screening_reason: { not: null } }, { ban_prior_reason: { not: null } }],
       },
       select: { id: true, screening_reason: true },
     })

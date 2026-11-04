@@ -34,7 +34,13 @@ export async function returnBanHoldsToScreening(
   if (postIds.length > 0) {
     await tx.lookbookPost.updateMany({
       where: { id: { in: postIds } },
-      data: { status: 'pending_review', moderation_reason: null, updated_at: now },
+      // A new screening decides the reason, so nothing a ban saved may outlive it.
+      data: {
+        status: 'pending_review',
+        moderation_reason: null,
+        ban_prior_reason: null,
+        updated_at: now,
+      },
     })
     for (const postId of postIds)
       await tx.communityModerationOutbox.upsert({
@@ -56,7 +62,12 @@ export async function returnBanHoldsToScreening(
   if (commentIds.length > 0) {
     await tx.communityComment.updateMany({
       where: { id: { in: commentIds } },
-      data: { status: 'pending_screening', screening_reason: null, updated_at: now },
+      data: {
+        status: 'pending_screening',
+        screening_reason: null,
+        ban_prior_reason: null,
+        updated_at: now,
+      },
     })
     for (const commentId of commentIds)
       await tx.communityCommentScreeningOutbox.upsert({

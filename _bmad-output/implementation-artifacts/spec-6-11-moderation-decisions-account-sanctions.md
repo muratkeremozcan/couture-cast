@@ -348,6 +348,7 @@ Residuals RG1 to RG8 are in the test design under Assumptions.
 The bmad-build lens fan-out did not run: TEA reviewed every commit as the independent reader, and the coordinator runs the Codex review after this log.
 C1 to C6 are the Codex review of `4cf4b128`, each checked against the code before its fix.
 R2-1 is the Codex re-review of `1d49278a`, which confirmed the other five fixed.
+R4-1 to R4-3 are the Codex review of `9f8f6615`.
 R3-1 to R3-5 are the Codex review of `6ee348f3`, each checked against the current head first. Overturn recovery shares that path, so it gains the same fixes.
 All rows below were real and fixed.
 
@@ -406,6 +407,9 @@ All rows below were real and fixed.
 | R3-3         | high   | A ban during image normalization deleted the object recovery needs                                                                                     | The metadata update also matches a post flagged with a ban marker, so bytes and declaration stay together; erased and anonymized posts still lose the late object                      |
 | R3-4         | high   | Mobile stayed closed after a successful refresh once a ban ended, because a denial stops the sync for good                                             | An authorized read after a denial restores availability and starts a new sync                                                                                                          |
 | R3-5         | medium | Generated 403 models required every member's fields, so neither real body satisfied them                                                               | The document publishes these unions as `oneOf`, which generates a union type; both bodies compile and Optic passes                                                                     |
+| R4-1         | low    | A later overturn restored a stale machine reason after a newer passing screen                                                                          | Restarting screening clears the saved reason, and a new ban's snapshot replaces an older one, null included                                                                            |
+| R4-2         | low    | The rollback regression accepted a sweep that resolved after a failed subject                                                                          | TEA: the first sweep must reject                                                                                                                                                       |
+| R4-3         | low    | A permanent overturn through the fallback sweep was unverified                                                                                         | TEA: pending post and comment, ineligible at overturn, then the sweep                                                                                                                  |
 
 ## Design Notes
 
