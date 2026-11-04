@@ -5,6 +5,7 @@
 // declare no server action that could reach the tables around the API.
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
 const SRC = join(__dirname, '..', '..')
@@ -24,10 +25,33 @@ const consoleSources = [
   join(SRC, 'lib', 'moderation.ts'),
 ].filter((path) => /\.(ts|tsx)$/.test(path) && !/\.(test|spec)\.(ts|tsx)$/.test(path))
 
-// A call to fetch, with an optional call (`?.`) and any whitespace or block comment before the
-// parenthesis. Indirect references such as `fetch.call` stay out of scope.
-const GAP = String.raw`(?:\s|\/\*[\s\S]*?\*\/)*`
-const FETCH_CALL = new RegExp(String.raw`\bfetch\b${GAP}(?:\?\.${GAP})?\(`)
+/**
+ * Every reference to `fetch` in a source: an identifier named fetch (a call, `fetch.call`, an alias,
+ * `globalThis.fetch` and `window.fetch` all end in one) or an element access with the literal
+ * 'fetch' (`globalThis['fetch']`). A parsed tree ignores comments and strings, so no spelling
+ * of the call slips past the way a pattern would.
+ */
+function fetchReferences(source: string): string[] {
+  const tree = ts.createSourceFile(
+    'scan.tsx',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX
+  )
+  const found: string[] = []
+  const visit = (node: ts.Node) => {
+    const isName = ts.isIdentifier(node) && node.text === 'fetch'
+    const isElement =
+      ts.isElementAccessExpression(node) &&
+      ts.isStringLiteralLike(node.argumentExpression) &&
+      node.argumentExpression.text === 'fetch'
+    if (isName || isElement) found.push(node.getText(tree))
+    ts.forEachChild(node, visit)
+  }
+  visit(tree)
+  return found
+}
 
 describe('U-WEB-Q-NO-DIRECT', () => {
   it.each([
@@ -39,18 +63,36 @@ describe('U-WEB-Q-NO-DIRECT', () => {
     'globalThis.fetch?.(url)',
     'window.fetch?.(url)',
     'fetch /* note */ (url)',
+    'fetch // note\n (url)',
     'fetch/* a */?./* b */(url)',
     'fetch\n  (url)',
+    "globalThis['fetch'](url)",
+    'globalThis["fetch"]?.(url)',
+    'globalThis[`fetch`](url)',
+    'fetch.call(null, url)',
+    'fetch.bind(globalThis)(url)',
+    'const get = fetch; get(url)',
+    'const { fetch: get } = globalThis',
+    'const get = globalThis.fetch',
+    'export const view = () => <a onClick={() => fetch(url)} />',
   ])('the network scan catches %j', (source) => {
-    expect(source).toMatch(FETCH_CALL)
+    expect(fetchReferences(source)).not.toEqual([])
   })
 
-  it.each(['const fetched = 1', 'prefetch(url)', 'fetchCases(url)', 'refetch?.()'])(
-    'the network scan leaves %j alone',
-    (source) => {
-      expect(source).not.toMatch(FETCH_CALL)
-    }
-  )
+  it.each([
+    'const fetched = 1',
+    'prefetch(url)',
+    'fetchCases(url)',
+    'refetch?.()',
+    'const note = "call fetch(url) later"',
+    'const note = `fetch(url)`',
+    '// fetch(url) is not allowed here',
+    '/* globalThis.fetch(url) */ const ok = 1',
+    "globalThis['fetchCases'](url)",
+    'client.fetchCases(url)',
+  ])('the network scan leaves %j alone', (source) => {
+    expect(fetchReferences(source)).toEqual([])
+  })
 
   it('finds the console sources it is meant to scan', () => {
     expect(consoleSources.map((path) => relative(SRC, path))).toEqual(
@@ -94,7 +136,7 @@ describe('U-WEB-Q-NO-DIRECT', () => {
     expect(lib).toMatch(/getModerationCase/)
     // No console source reaches the network on its own.
     for (const path of consoleSources) {
-      expect(readFileSync(path, 'utf8'), relative(SRC, path)).not.toMatch(FETCH_CALL)
+      expect(fetchReferences(readFileSync(path, 'utf8')), relative(SRC, path)).toEqual([])
     }
   })
 })
