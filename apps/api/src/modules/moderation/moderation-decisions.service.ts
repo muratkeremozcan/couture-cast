@@ -41,6 +41,7 @@ import {
   guardCommunityPost,
   guardCommunitySubject,
 } from '../community/community-privacy.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import {
   buildDecisionAuditData,
@@ -170,41 +171,47 @@ export class ModerationDecisionsService {
     const id = parseModerationCaseId(caseId)
     if (!id) return null
     const now = this.clock()
-    const read = await this.prisma.$transaction(async (tx) => {
-      const visible = await readVisible(tx)
-      const loaded = visible ? await this.repository.loadCase(tx, id) : null
-      if (!visible || !loaded) return null
-      const subject = decisionCaseSubject(loaded)
-      const history = summarizeDecisionHistory(
-        await this.repository.decisionHistory(
-          tx,
-          caseId,
-          loaded.reports.map((report) => report.id)
-        ),
-        caseId
-      )
-      const sanctions = subject ? await this.repository.sanctionsOf(tx, subject) : []
-      const active = subject ? await findActiveCommunitySanction(tx, subject, now) : null
-      const newest = sanctions[0]
-      return {
-        visible,
-        loaded,
-        subject,
-        history,
-        sanctions,
-        active,
-        newest,
-        availability: await this.availabilityInput(tx, auth, loaded, {
-          escalated: history.escalated,
-          subjectBan: active?.kind ?? null,
-          writesOpen: false,
-          now,
-        }),
-        appealConflict: newest
-          ? await this.sanctions.appealViewerConflict(tx, auth.userId, newest)
-          : false,
-      }
-    }, CASE_SNAPSHOT_OPTIONS)
+    const read = await interactiveTransaction(
+      this.prisma,
+      async (tx) => {
+        const visible = await readVisible(tx)
+        const loaded = visible ? await this.repository.loadCase(tx, id) : null
+        if (!visible || !loaded) return null
+        const subject = decisionCaseSubject(loaded)
+        const history = summarizeDecisionHistory(
+          await this.repository.decisionHistory(
+            tx,
+            caseId,
+            loaded.reports.map((report) => report.id)
+          ),
+          caseId
+        )
+        const sanctions = subject ? await this.repository.sanctionsOf(tx, subject) : []
+        const active = subject
+          ? await findActiveCommunitySanction(tx, subject, now)
+          : null
+        const newest = sanctions[0]
+        return {
+          visible,
+          loaded,
+          subject,
+          history,
+          sanctions,
+          active,
+          newest,
+          availability: await this.availabilityInput(tx, auth, loaded, {
+            escalated: history.escalated,
+            subjectBan: active?.kind ?? null,
+            writesOpen: false,
+            now,
+          }),
+          appealConflict: newest
+            ? await this.sanctions.appealViewerConflict(tx, auth.userId, newest)
+            : false,
+        }
+      },
+      CASE_SNAPSHOT_OPTIONS
+    )
     if (!read) return null
 
     // Flags are external state, so they resolve after the snapshot closes.
