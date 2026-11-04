@@ -242,6 +242,38 @@ enum CommunityReportReason {
   other
 }
 
+/// Story 6.11: who put a report in the queue. A null `reporter_id` alone cannot
+/// say, because erasure also nulls a member reporter.
+enum CommunityReportOrigin {
+  member
+  screening
+}
+
+/// Story 6.11: the decision vocabulary of `ModerationDecision`. The appeal steps
+/// share the table so they share its attribution, sequence and idempotency.
+enum ModerationDecisionAction {
+  resolve
+  release
+  takedown
+  escalate
+  ban
+  appeal_requested
+  appeal_upheld
+  appeal_overturned
+}
+
+enum CommunitySanctionKind {
+  temporary
+  permanent
+}
+
+enum CommunitySanctionAppealStatus {
+  not_requested
+  requested
+  upheld
+  overturned
+}
+
 model User {
   id                                  String                            @id @default(cuid())
   email                               String                            @unique
@@ -296,6 +328,9 @@ model User {
   community_reports_filed             CommunityPostReport[]             @relation("CommunityReporter")
   community_sponsorships_created      CommunityPostSponsorship[]        @relation("CommunitySponsorshipCreator")
   community_sponsorships_ended        CommunityPostSponsorship[]        @relation("CommunitySponsorshipEnder")
+  moderation_decisions_made           ModerationDecision[]              @relation("ModerationDecisionModerator")
+  moderation_decisions_received       ModerationDecision[]              @relation("ModerationDecisionSubject")
+  community_sanctions                 CommunitySanction[]
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -642,6 +677,7 @@ model LookbookPost {
   challenge                    CommunityChallenge?        @relation(fields: [challenge_id], references: [id], onDelete: SetNull)
   challenge_id                 String?
   moderation_outbox            CommunityModerationOutbox?
+  moderation_decisions         ModerationDecision[]
   /// Erasure clock. The story requires deletion to complete within 72 hours,
   /// and it completes in three observable steps: the request, the row
   /// anonymization, and the durable removal of the storage object. A sweep
@@ -735,6 +771,7 @@ model CommunityPostReport {
   sla_due_at        DateTime
   created_at        DateTime              @default(now())
   resolved_at       DateTime?
+  origin            CommunityReportOrigin @default(member)
 
   @@unique([post_id, reporter_id])
   @@index([post_id])
@@ -992,6 +1029,77 @@ model ModerationEvent {
 
   @@index([post_id])
   @@index([flagged_by_id])
+}
+
+/// Story 6.11: one row per applied moderation decision or appeal step, and the
+/// source of truth for attribution, serialization, idempotency and the first
+/// effective decision time. No code path updates or deletes a row; Story 6.13
+/// enforces that at the database boundary.
+/// RLS: API-only, enabled with zero policies and zero grants.
+///
+/// `case_key` has no foreign key because a case is derived from its reports.
+/// `report_ids` holds every report of the case at decision time, so the history
+/// survives the re-key erasure causes. The three identity columns are SetNull so
+/// neither a moderator's nor a subject's erasure destroys the record, and
+/// `subject_alias` is what is left of the subject afterwards.
+model ModerationDecision {
+  id              String                   @id @default(cuid())
+  case_key        String
+  sequence        Int
+  source          String
+  post            LookbookPost?            @relation(fields: [post_id], references: [id], onDelete: SetNull)
+  post_id         String?
+  comment         CommunityComment?        @relation(fields: [comment_id], references: [id], onDelete: SetNull)
+  comment_id      String?
+  report_ids      String[]
+  action          ModerationDecisionAction
+  reason          String
+  moderator       User?                    @relation("ModerationDecisionModerator", fields: [moderator_id], references: [id], onDelete: SetNull)
+  moderator_id    String?
+  moderator_role  String
+  subject         User?                    @relation("ModerationDecisionSubject", fields: [subject_user_id], references: [id], onDelete: SetNull)
+  subject_user_id String?
+  subject_alias   String?
+  mutation_id     String                   @db.Uuid
+  payload_hash    String
+  /// The stored success response for a replay. Holds no reason and no signed URL.
+  response        Json
+  /// True for resolve, release, takedown and ban. `firstDecisionAt` reads only these.
+  is_terminal     Boolean
+  decided_at      DateTime
+  sanction        CommunitySanction?
+
+  @@unique([case_key, sequence])
+  @@unique([moderator_id, mutation_id])
+  @@index([post_id])
+  @@index([comment_id])
+  @@index([subject_user_id])
+  @@index([report_ids], type: Gin)
+}
+
+/// Story 6.11: a community ban. Active means `lifted_at IS NULL AND (expires_at IS
+/// NULL OR expires_at > now)`, compared by the API per request, so a temporary ban
+/// ends with no worker. It cascades with the member, whose decision rows keep only
+/// `subject_alias`.
+/// RLS: API-only, enabled with zero policies and zero grants.
+///
+/// The migration adds a CHECK tying `kind` to `expires_at` and the partial unique
+/// index `CommunitySanction_one_unlifted_permanent_idx`, neither of which Prisma
+/// can express.
+model CommunitySanction {
+  id            String                        @id @default(cuid())
+  user          User                          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id       String
+  decision      ModerationDecision            @relation(fields: [decision_id], references: [id], onDelete: Restrict)
+  decision_id   String                        @unique
+  case_key      String
+  kind          CommunitySanctionKind
+  expires_at    DateTime?
+  lifted_at     DateTime?
+  appeal_status CommunitySanctionAppealStatus @default(not_requested)
+  created_at    DateTime
+
+  @@index([user_id, lifted_at, expires_at])
 }
 
 /// RLS: immutable audit trail entries scoped by user_id
@@ -1619,6 +1727,7 @@ model CommunityComment {
   receipt              CommunityCommentReceipt?
   screening_outbox     CommunityCommentScreeningOutbox?
   reports              CommunityCommentReport[]
+  moderation_decisions ModerationDecision[]
 
   @@unique([post_id, publication_sequence])
   @@index([post_id, parent_id, publication_sequence])
@@ -1664,6 +1773,7 @@ model CommunityCommentReport {
   routed_at        DateTime                @default(now())
   sla_due_at       DateTime
   resolved_at      DateTime?
+  origin           CommunityReportOrigin   @default(member)
   audit            CommunityCommentAudit[]
 
   @@unique([comment_id, reporter_id])

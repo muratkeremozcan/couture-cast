@@ -63,6 +63,68 @@ export type ModerationAliasState = z.infer<typeof moderationAliasStateSchema>
 export const moderationActorKindSchema = z.enum(['screening', 'reporter', 'operator'])
 export type ModerationActorKind = z.infer<typeof moderationActorKindSchema>
 
+// --- Decision vocabulary (Story 6.11) --------------------------------------
+
+/** The five decisions. `escalate` alone is not terminal: it changes no report and no target. */
+export const moderationDecisionActionSchema = z.enum([
+  'resolve',
+  'release',
+  'takedown',
+  'escalate',
+  'ban',
+])
+export type ModerationDecisionAction = z.infer<typeof moderationDecisionActionSchema>
+
+export const moderationSanctionKindSchema = z.enum(['temporary', 'permanent'])
+export type ModerationSanctionKind = z.infer<typeof moderationSanctionKindSchema>
+
+export const moderationAppealStatusSchema = z.enum([
+  'not_requested',
+  'requested',
+  'upheld',
+  'overturned',
+])
+export type ModerationAppealStatus = z.infer<typeof moderationAppealStatusSchema>
+
+/** A sanction as an operator sees it. The member's own view is `communityBannedErrorSchema`. */
+export const moderationSanctionSchema = z
+  .object({
+    sanctionId: z.string().min(1).max(64),
+    kind: moderationSanctionKindSchema,
+    /** Null on a permanent ban. */
+    expiresAt: z.string().datetime().nullable(),
+    appealStatus: moderationAppealStatusSchema,
+  })
+  .strict()
+export type ModerationSanction = z.infer<typeof moderationSanctionSchema>
+
+/** The author's standing. `sanction` is the newest row, active or not. Null when the author is gone. */
+export const moderationSubjectStandingSchema = z
+  .object({
+    active: z.boolean(),
+    sanction: moderationSanctionSchema.nullable(),
+    /** Bans older than `sanction`. */
+    priorBanCount: z.number().int().min(0),
+  })
+  .strict()
+export type ModerationSubjectStanding = z.infer<typeof moderationSubjectStandingSchema>
+
+/** The fields 6.11 adds to the case detail. `allowedActions` and `banKinds` are computed for the viewer. */
+export const moderationCaseDecisionStateSchema = z
+  .object({
+    revision: z.string().regex(/^[0-9a-f]{16}$/),
+    allowedActions: z.array(moderationDecisionActionSchema),
+    banKinds: z.array(moderationSanctionKindSchema),
+    escalated: z.boolean(),
+    /** The earliest terminal decision of the case. It never moves. */
+    firstDecisionAt: z.string().datetime().nullable(),
+    subjectStanding: moderationSubjectStandingSchema.nullable(),
+  })
+  .strict()
+export type ModerationCaseDecisionState = z.infer<
+  typeof moderationCaseDecisionStateSchema
+>
+
 // --- Risk and SLA: the single definition ----------------------------------
 
 export const MODERATION_RISK_RANKS = Object.freeze({
