@@ -705,6 +705,19 @@ TypeScript is clean in every workspace, ESLint is clean on the changed files, an
 The earlier limits still apply: nothing has run on a deployed preview.
 One new limit: `couture:account-erased` has no dispatcher in `apps/` or `packages/`, so production may never reach the erasure path C3's erasure tests cover.
 
+### Review round 2 on PR 195
+
+R2-1: a realtime feed read still in flight when the ban lands restored the page, and the Participate challenge came back.
+`community-banned-notice.test.tsx` holds that read across the ban cleanup in a new block, "a realtime rebuild still out when the ban lands".
+Both cases went red at `1d49278a` and green with the fix in `10295495`.
+
+A builder run failed once in the block "a change of identity while the notice shows" while the R2-1 test was being edited.
+12 serial runs and 24 runs under four parallel processes passed all 33 cases, so no flake is recorded.
+
+GitGuardian flagged the `Basic` header fixture in `moderation-decisions.controller.spec.ts`.
+The value decoded to `mod:mod`, a made-up pair, and the fixture now reads `Basic abc`, as the queue spec does.
+The old literal stays in commit `d4b420f4`, since no credential needs removing from history.
+
 ---
 
 ## Quality Gate Criteria

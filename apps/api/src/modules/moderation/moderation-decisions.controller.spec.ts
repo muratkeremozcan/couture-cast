@@ -220,7 +220,7 @@ describe.each(ROUTES)('U-D-CTRL-ROLES: $name route', ({ path, body }) => {
 
   it.each([
     ['no header', undefined],
-    ['a Basic scheme', 'Basic bW9kOm1vZA=='],
+    ['a Basic scheme', 'Basic abc'],
     ['an empty bearer', 'Bearer '],
     ['a bare token', 'moderator'],
   ])('refuses %s with 401', async (_name, header) => {
