@@ -1585,6 +1585,315 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
     })
   })
 
+  /** Ends the ban by its expiry or by an overturn, then lets the sweep run. */
+  const END_BY: [
+    string,
+    (held: Awaited<ReturnType<typeof heldByTemporaryBan>>) => Promise<void>,
+  ][] = [
+    ['expiry', () => sweep().then(() => undefined)],
+    [
+      'overturn',
+      async (held) => {
+        const staff = await admin()
+        for (const status of ['requested', 'overturned'] as const) {
+          const appeal = await staff.appeal(held.applied.sanctionId, {
+            status,
+            reason: REASON,
+          })
+          expect(appeal.status, dump(appeal)).toBe(200)
+        }
+      },
+    ],
+  ]
+
+  describe('R3-1: a dispatch still out when the ban ends', () => {
+    it.each(END_BY)(
+      'cannot settle the generation an %s re-armed, which then gets its own job',
+      async (name, end) => {
+        const held = await heldByTemporaryBan()
+        await prisma.communityModerationOutbox.updateMany({
+          where: { post_id: { not: held.post.id } },
+          data: { dispatched_at: NOW },
+        })
+        const enqueued: number[] = []
+        let entered!: () => void
+        let release!: () => void
+        const inEnqueue = new Promise<void>((resolve) => (entered = resolve))
+        const gate = new Promise<void>((resolve) => (release = resolve))
+        const dispatcher = new CommunityModerationOutboxDispatcher(prisma, {
+          enqueue: async (
+            _postId: string,
+            _session: string,
+            _platform?: 'web' | 'mobile',
+            generation = 0
+          ) => {
+            enqueued.push(generation)
+            if (enqueued.length === 1) {
+              entered()
+              await gate
+            }
+          },
+        })
+        // An appeal step applies only while the ban runs, and the sweep only once it has ended.
+        await atInstant(name === 'expiry' ? held.expiresAt : NOW, async () => {
+          const outstanding = dispatcher.dispatchPending()
+          await inEnqueue
+          await end(held)
+          release()
+          await outstanding
+          expect(
+            await prisma.communityModerationOutbox.findUniqueOrThrow({
+              where: { post_id: held.post.id },
+            })
+          ).toMatchObject({ generation: 1, dispatched_at: null })
+
+          await dispatcher.dispatchPending()
+          expect(enqueued).toEqual([0, 1])
+          expect(
+            (
+              await prisma.communityModerationOutbox.findUniqueOrThrow({
+                where: { post_id: held.post.id },
+              })
+            ).dispatched_at
+          ).not.toBeNull()
+        })
+      }
+    )
+  })
+
+  describe('R3-3: a ban that lands during image normalization', () => {
+    const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
+
+    /** Runs screening with the normalized upload held, so `during` lands inside it. */
+    async function normalizeThrough(
+      post: { id: string },
+      storage: InMemoryCommunityStorage,
+      during: () => Promise<void>
+    ) {
+      let entered!: () => void
+      let release!: () => void
+      const inUpload = new Promise<void>((resolve) => (entered = resolve))
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      storage.upload = async (objectPath: string, bytes: Buffer) => {
+        entered()
+        await gate
+        storage.objects.set(objectPath, bytes)
+      }
+      const run = new CommunityModerationProcessor(
+        prisma,
+        storage,
+        moderationTelemetry,
+        passingEngine() as never,
+        undefined,
+        rolloutOpen
+      )
+        .process({ postId: post.id, uploadSessionId: post.id })
+        .catch(() => undefined)
+      await inUpload
+      await during()
+      release()
+      await run
+    }
+
+    it.each(END_BY)(
+      'keeps the object and its declarations true, so screening succeeds after an %s',
+      async (name, end) => {
+        const author = await fx.member('author')
+        const seeded = await fx.postCase({ author })
+        const { post, storage } = await pendingPostWithImage(author.id)
+        const applied = await normalizeThrough(post, storage, async () => {
+          const banned = await ban(seeded.caseId, 'temporary')
+          expect((await postOf(post.id)).status).toBe('flagged')
+          return void banned
+        }).then(async () => {
+          const { id } = await prisma.communitySanction.findFirstOrThrow({
+            where: { user_id: author.id },
+          })
+          return sanctionOf(id)
+        })
+        const marker = banMarker(applied.id)
+
+        // Nothing published, the object survives, and the row describes the bytes in storage.
+        const after = await postOf(post.id)
+        expect(after).toMatchObject({ status: 'flagged', moderation_reason: marker })
+        const stored = storage.objects.get(after.image_object_path!)
+        expect(stored, 'the object recovery needs').toBeDefined()
+        expect(after.image_checksum).toBe(sha256(stored!))
+        expect(after.image_byte_size).toBe(stored!.length)
+
+        const held = {
+          post,
+          comment: { id: '' },
+          applied: { sanctionId: applied.id },
+        } as Awaited<ReturnType<typeof heldByTemporaryBan>>
+        await atInstant(name === 'expiry' ? applied.expires_at! : NOW, async () => {
+          await end(held)
+          expect((await postOf(post.id)).status).toBe('pending_review')
+          await new CommunityModerationProcessor(
+            prisma,
+            storage,
+            moderationTelemetry,
+            passingEngine() as never,
+            undefined,
+            rolloutOpen
+          ).process({ postId: post.id, uploadSessionId: post.id })
+          expect((await postOf(post.id)).status).toBe('published')
+        })
+      }
+    )
+
+    it.each([
+      ['erased', { erasure_requested_at: NOW }],
+      ['anonymized', { anonymized_at: NOW }],
+    ] as const)(
+      'still removes the late object of a post %s during normalization',
+      async (_name, data) => {
+        const author = await fx.member('author')
+        const { post, storage } = await pendingPostWithImage(author.id)
+        await normalizeThrough(post, storage, async () => {
+          await communityPrivacyTransaction(prisma, async (tx) => {
+            await guardCommunityPost(tx, post.id)
+            await tx.lookbookPost.update({ where: { id: post.id }, data })
+          })
+        })
+        expect(storage.objects.has(post.image_object_path!)).toBe(false)
+        expect((await postOf(post.id)).status).not.toBe('published')
+      }
+    )
+
+    it('still removes the late object of a post the author withdrew during normalization', async () => {
+      const author = await fx.member('author')
+      const { post, storage } = await pendingPostWithImage(author.id)
+      await normalizeThrough(post, storage, async () => {
+        const withdrawn = await member(author.id).post(
+          `/api/v1/community/posts/${post.id}/withdraw`
+        )
+        expect(withdrawn.status, dump(withdrawn)).toBe(200)
+      })
+      expect(storage.objects.has(post.image_object_path!)).toBe(false)
+    })
+  })
+
+  describe('an overturn that finds the author ineligible', () => {
+    const overturnBan = async (sanctionId: string) => {
+      const staff = await admin()
+      for (const status of ['requested', 'overturned'] as const) {
+        const appeal = await staff.appeal(sanctionId, { status, reason: REASON })
+        expect(appeal.status, dump(appeal)).toBe(200)
+      }
+    }
+    const restoreConsent = (teenId: string) =>
+      prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${teenId}]::text[], ARRAY[]::text[], true)`
+        await tx.guardianConsent.updateMany({
+          where: { teen_id: teenId },
+          data: { status: 'granted', revoked_at: null },
+        })
+      })
+
+    it('R4-3 leaves a permanent ban to the sweep, which returns the rows and publishes nothing', async () => {
+      const teen = await fx.teen()
+      const seeded = await fx.postCase({ author: teen })
+      const { post } = await pendingPostWithImage(teen.id)
+      const comment = await pendingComment(teen.id)
+      const applied = await ban(seeded.caseId, 'permanent')
+      const marker = banMarker(applied.sanctionId)
+      await fx.lapseConsent(teen.id)
+
+      await overturnBan(applied.sanctionId)
+      await expectHeld({ post, comment }, marker)
+      expect((await sanctionOf(applied.sanctionId)).holds_released_at).toBeNull()
+
+      expect(await sweep()).toEqual({ subjects: 1, posts: 1, comments: 1 })
+      await expectInScreening({ post, comment })
+      expect(
+        await prisma.communityModerationOutbox.findUniqueOrThrow({
+          where: { post_id: post.id },
+        })
+      ).toMatchObject({ generation: 1, dispatched_at: null })
+      expect(
+        await prisma.communityCommentScreeningOutbox.findUniqueOrThrow({
+          where: { comment_id: comment.id },
+        })
+      ).toMatchObject({ generation: 1, dispatched_at: null })
+      expect((await sanctionOf(applied.sanctionId)).holds_released_at).not.toBeNull()
+      expect(
+        await prisma.lookbookPost.count({
+          where: { user_id: teen.id, status: 'published' },
+        })
+      ).toBe(0)
+      expect(
+        await prisma.communityComment.count({
+          where: { user_id: teen.id, status: 'published' },
+        })
+      ).toBe(0)
+
+      expect(await sweep()).toEqual({ subjects: 0, posts: 0, comments: 0 })
+    })
+
+    it('R4-1 a stale machine reason does not outlive a fresh passing screen', async () => {
+      const teen = await fx.teen()
+      const firstCase = await fx.postCase({ author: teen })
+      const { post, storage } = await pendingPostWithImage(teen.id)
+      await communityPrivacyTransaction(prisma, async (tx) => {
+        await guardCommunityPost(tx, post.id)
+        await tx.lookbookPost.update({
+          where: { id: post.id },
+          data: {
+            status: 'published',
+            published_at: NOW,
+            moderation_reason: 'low_confidence',
+          },
+        })
+      })
+
+      // P, overturned while the author is ineligible, so only the sweep reaches the post.
+      const first = await ban(firstCase.caseId, 'permanent')
+      expect(await postOf(post.id)).toMatchObject({
+        moderation_reason: banMarker(first.sanctionId),
+        ban_prior_reason: 'low_confidence',
+      })
+      await fx.lapseConsent(teen.id)
+      await overturnBan(first.sanctionId)
+      await sweep()
+      expect(await postOf(post.id)).toMatchObject({
+        status: 'pending_review',
+        moderation_reason: null,
+        ban_prior_reason: null,
+      })
+
+      // Eligible again, and a fresh screen passes with no finding.
+      await restoreConsent(teen.id)
+      await new CommunityModerationProcessor(
+        prisma,
+        storage,
+        moderationTelemetry,
+        passingEngine() as never,
+        undefined,
+        rolloutOpen
+      ).process({ postId: post.id, uploadSessionId: post.id })
+      expect(await postOf(post.id)).toMatchObject({
+        status: 'published',
+        moderation_reason: null,
+      })
+
+      // Q, overturned with the author eligible. Nothing may bring the old finding back.
+      const secondCase = await fx.postCase({ author: teen })
+      const second = await ban(secondCase.caseId, 'permanent')
+      expect(await postOf(post.id)).toMatchObject({
+        status: 'flagged',
+        moderation_reason: banMarker(second.sanctionId),
+        ban_prior_reason: null,
+      })
+      await overturnBan(second.sanctionId)
+      expect(await postOf(post.id)).toMatchObject({
+        status: 'published',
+        moderation_reason: null,
+        ban_prior_reason: null,
+      })
+    })
+  })
+
   describe('an overturn of a permanent ban', () => {
     const overturn = async (sanctionId: string) => {
       const staff = await admin()

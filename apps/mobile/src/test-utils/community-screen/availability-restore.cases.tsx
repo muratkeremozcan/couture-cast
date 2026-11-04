@@ -14,7 +14,9 @@ import { CommunityScreen } from '@/src/features/community/community-screen'
 import { server } from '@/src/test-utils/msw/server'
 import { press } from '@/src/test-utils/press'
 import { screenFocus } from '@/src/test-utils/focus-effect'
+import { COMMUNITY_BANNED_MESSAGE } from '@couture/api-client/contracts/http'
 import { feedJson, item, serveFeed } from './harness'
+import { refreshEvents } from './mock-state'
 
 const summary = {
   counts: { applause: 0, love: 0, inspiration: 0 },
@@ -71,6 +73,8 @@ function verifiedFeed() {
   )
   return {
     sync: () => syncs[0]!,
+    latest: () => syncs.at(-1)!,
+    started: () => syncs.length,
     /** Holds every later event page past its 2 s client deadline until released. */
     hold: () => {
       let release!: () => void
@@ -150,7 +154,108 @@ async function typeThroughStaleHide(whileHidden?: () => void) {
   }
 }
 
+const DENIED = () =>
+  HttpResponse.json(
+    { statusCode: 403, code: 'community_access_denied', message: 'Denied' },
+    { status: 403 }
+  )
+const BANNED = () =>
+  HttpResponse.json(
+    {
+      statusCode: 403,
+      code: 'community_banned',
+      message: COMMUNITY_BANNED_MESSAGE,
+      sanction: {
+        kind: 'temporary',
+        expiresAt: '2026-11-11T12:00:00.000Z',
+        appealStatus: 'not_requested',
+      },
+    },
+    { status: 403 }
+  )
+
 export function registerCommunityAvailabilityRestoreCases() {
+  it('R3-4 a refresh after a ban ends brings back the cards, the actions and the sync', async () => {
+    const feed = verifiedFeed()
+    await openVerifiedFeed(feed)
+    const look = () => item({ id: 'post-a', reactions: summary })
+
+    // The real sync takes the denial and stops itself. The screen's probe finds the ban.
+    server.use(
+      http.get('*/api/v1/community/events', DENIED),
+      http.get('*/api/v1/community/feed', BANNED)
+    )
+    await act(async () => {
+      await feed.latest().catchUp()
+    })
+    await screen.findByTestId('community-banned-notice')
+    expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+
+    // The ban ends with no change of account or mode.
+    let eventReads = 0
+    server.use(
+      http.get('*/api/v1/community/events', () => {
+        eventReads += 1
+        return HttpResponse.json({
+          data: {
+            events: [],
+            nextCursor: 'after-ban',
+            hasMore: false,
+            resyncRequired: false,
+          },
+        })
+      }),
+      http.get('*/api/v1/community/feed', () => feedJson({ items: [look()] }))
+    )
+    const startedBefore = feed.started()
+    await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
+    act(() => refreshEvents.onRefresh!())
+
+    await screen.findByTestId('community-post-card-post-a')
+    expect(screen.queryByTestId('community-banned-notice')).toBeNull()
+    expect(screen.queryByTestId('community-feed-unavailable')).toBeNull()
+    expect(screen.getByTestId('community-card-comments-post-a')).toBeVisible()
+    expect(screen.getByTestId('community-new-post-button')).toBeVisible()
+
+    await waitFor(() => expect(feed.started()).toBeGreaterThan(startedBefore))
+    await act(async () => {
+      const sync = feed.latest()
+      sync.foreground()
+      await sync.catchUp()
+    })
+    expect(eventReads).toBeGreaterThan(0)
+    expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+  }, 15_000)
+
+  it('R3-4 a refresh after a plain denial ends brings the feed back too', async () => {
+    const feed = verifiedFeed()
+    await openVerifiedFeed(feed)
+    server.use(http.get('*/api/v1/community/events', DENIED))
+    await act(async () => {
+      await feed.latest().catchUp()
+    })
+    await screen.findByTestId('community-feed-unavailable')
+
+    server.use(
+      http.get('*/api/v1/community/events', () =>
+        HttpResponse.json({
+          data: {
+            events: [],
+            nextCursor: 'after-denial',
+            hasMore: false,
+            resyncRequired: false,
+          },
+        })
+      )
+    )
+    const startedBefore = feed.started()
+    await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
+    act(() => refreshEvents.onRefresh!())
+    await screen.findByTestId('community-post-card-post-a')
+    expect(screen.queryByTestId('community-feed-unavailable')).toBeNull()
+    await waitFor(() => expect(feed.started()).toBeGreaterThan(startedBefore))
+  }, 15_000)
+
   it('6.5-R43-MOB-001 a catch-up aborted at its 2 s client deadline keeps the verified feed', async () => {
     const feed = verifiedFeed()
     const card = await openVerifiedFeed(feed)

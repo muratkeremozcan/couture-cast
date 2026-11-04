@@ -2,6 +2,13 @@
 // The oracle tables below are written out by hand from spec D1, D2, D4 and the TEA entries, so a
 // drift in the shipped rule fails here instead of moving both sides at once.
 import { describe, expect, it } from 'vitest'
+import { forbiddenHttpErrorSchema } from '../src/contracts/http/common'
+import { generateHttpOpenApiDocument } from '../src/contracts/http/openapi'
+import type {
+  ApiV1CommunityFeedGet403Response,
+  ApiV1CommunityPostsPostIdGet403Response,
+  GetCommunityComments403Response,
+} from '../src/generated/models'
 import {
   COMMUNITY_BANNED_MESSAGE,
   COMMUNITY_BAN_MARKER_PREFIX,
@@ -639,6 +646,75 @@ const appealResult = {
   replayed: true,
   cacheInvalidation: 'deferred',
 }
+
+/**
+ * R3-5. These assignments are the test: `tsc` over `testing/` fails when a real body stops fitting.
+ * The generator once flattened the union into one interface that neither body satisfied.
+ */
+const bannedRefusal = {
+  statusCode: 403,
+  code: 'community_banned',
+  message: COMMUNITY_BANNED_MESSAGE,
+  sanction: {
+    kind: 'temporary',
+    expiresAt: '2026-11-11T12:00:00.000Z',
+    appealStatus: 'not_requested',
+  },
+} as const
+const ordinaryRefusal = {
+  statusCode: 403,
+  error: 'Forbidden',
+  message: 'Community access is not available.',
+} as const
+export const refusalsFitTheSdk: {
+  commentsBanned: GetCommunityComments403Response
+  commentsOrdinary: GetCommunityComments403Response
+  feedBanned: ApiV1CommunityFeedGet403Response
+  feedOrdinary: ApiV1CommunityFeedGet403Response
+  postBanned: ApiV1CommunityPostsPostIdGet403Response
+  postOrdinary: ApiV1CommunityPostsPostIdGet403Response
+} = {
+  commentsBanned: bannedRefusal,
+  commentsOrdinary: ordinaryRefusal,
+  feedBanned: bannedRefusal,
+  feedOrdinary: ordinaryRefusal,
+  postBanned: bannedRefusal,
+  postOrdinary: ordinaryRefusal,
+}
+
+describe('R3-5: the SDK types and the document agree on a 403', () => {
+  it('the same two bodies parse against the canonical schema', () => {
+    expect(communityBannedErrorSchema.safeParse(bannedRefusal).success).toBe(true)
+    expect(communityBannedErrorSchema.safeParse(ordinaryRefusal).success).toBe(false)
+    expect(forbiddenHttpErrorSchema.safeParse(ordinaryRefusal).success).toBe(true)
+    expect(forbiddenHttpErrorSchema.safeParse(bannedRefusal).success).toBe(false)
+  })
+
+  it('publishes every 403 of two bodies as oneOf, naming the ban on each enforced route', () => {
+    type Schema = { anyOf?: unknown; oneOf?: unknown }
+    type DocumentOperation = {
+      responses?: Record<
+        string,
+        { content?: Record<string, { schema?: Schema }> } | undefined
+      >
+    } | null
+    const operations = Object.values(
+      generateHttpOpenApiDocument().paths as unknown as Record<
+        string,
+        Record<string, DocumentOperation>
+      >
+    ).flatMap((path) => Object.values(path))
+    const schemas = operations.flatMap((operation) => {
+      const schema = operation?.responses?.['403']?.content?.['application/json']?.schema
+      return schema ? [schema] : []
+    })
+    expect(schemas.filter((schema) => schema.anyOf)).toEqual([])
+    const unions = schemas.filter((schema) => schema.oneOf)
+    expect(unions.length).toBeGreaterThan(0)
+    for (const union of unions)
+      expect(JSON.stringify(union.oneOf)).toContain('CommunityBannedError')
+  })
+})
 
 describe('U-D-RESPONSE-STRICT: nothing private leaves the API (D1, D6, D9)', () => {
   it('parses the maximal fixtures and finds no forbidden key at any depth', () => {

@@ -334,7 +334,7 @@ describe('createCommunityWorkerRuntime', () => {
     }
   })
 
-  it('exposes exactly the four sweeps both process groups drive', async () => {
+  it('exposes exactly the five sweeps both process groups drive', async () => {
     const runtime = await createCommunityWorkerRuntime({
       prisma,
       telemetryService,
@@ -368,6 +368,7 @@ describe('createCommunityWorkerRuntime', () => {
     expect(Object.keys(runtime.sweeps).sort()).toEqual([
       'dispatchPending',
       'sweepErasureRequests',
+      'sweepExpiredBanHolds',
       'sweepExpiredUploads',
       'sweepStalePendingReview',
     ])

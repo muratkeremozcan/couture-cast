@@ -771,6 +771,24 @@ A member retracts their own comment on a hidden post with no reveal: `a member r
 A foreign comment, an unknown comment and an unknown post give one 404 there, and a read, a report and an erased comment stay closed.
 `couture:account-erased` had no dispatcher in the web app, so the listeners and their tests went, and the photo draft cleanup moved to the sign-out path.
 
+### Codex round 3
+
+| Finding                                            | Test                                                       | Red at `9f8f6615`                                                          |
+| :------------------------------------------------- | :--------------------------------------------------------- | :------------------------------------------------------------------------- |
+| R3-1 An old dispatch settles a newer generation    | R3-1 in I-B-END-RESTORE, expiry and overturn               | Both red                                                                   |
+| R3-2 Cleanup deletes a re-armed outbox row         | R3-2 in I-C-END-RESTORE, a real blocked delete             | Red                                                                        |
+| R3-3 A ban during normalization removes the object | R3-3 in I-B-END-RESTORE, expiry and overturn               | Both red; erasure, anonymizing and withdrawal still remove the late object |
+| R3-4 Mobile stays closed after a good refresh      | R3-4 in `availability-restore.cases.tsx`                   | See below                                                                  |
+| R3-5 Generated 403 types reject both bodies        | `moderation-decisions-contract.spec.ts`, compiled by `tsc` | Four compile errors, and the `oneOf` test red                              |
+
+Codex round 4: R4-1 is the P, ineligible overturn, sweep, passing screen, Q, overturn lifecycle.
+R4-2 makes the rollback test assert the first sweep rejects.
+R4-3 runs an ineligible permanent overturn through the fallback sweep and checks statuses, markers, outboxes and the hold-release stamp.
+
+At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
+That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
+Those failures were my setup, and the rerun below is the evidence.
+
 ---
 
 ## Quality Gate Criteria

@@ -31,6 +31,7 @@ import {
 } from '../src/modules/community/community-privacy.js'
 import { ModerationDecisionsRepository } from '../src/modules/moderation/moderation-decisions.repository.js'
 import { ModerationQueueRepository } from '../src/modules/moderation/moderation-queue.repository.js'
+import { CommunityCommentsOutbox } from '../src/modules/community/community-comments.outbox.js'
 import { CommunityMaintenanceService } from '../src/modules/community/community-maintenance.service.js'
 import { checksumTables } from './helpers/moderation-queue-context.js'
 import {
@@ -2156,6 +2157,91 @@ describe('I-C-END-RESTORE: the sweep that returns held content when a ban ends (
     })
   })
 
+  describe('R3-2: the comment outbox cleanup', () => {
+    const cleanup = () =>
+      new CommunityCommentsOutbox(
+        prisma,
+        { enqueueComment: () => Promise.resolve() } as never,
+        { captureCommentEvent: vi.fn() } as never,
+        {} as never
+      ).sweepStale()
+
+    it('keeps the row recovery re-armed after the cleanup selected it', async () => {
+      const held = await endedBan()
+      await prisma.communityCommentScreeningOutbox.create({
+        data: { comment_id: held.comment.id, generation: 0, dispatched_at: NOW },
+      })
+      await withHeldConnection(async (lock) => {
+        await holdSubjectGuard(lock, held.author.id)
+        await holdPostGuard(lock, held.comment.post_id)
+        // Recovery, uncommitted: the cleanup still reads a finished comment and selects its row.
+        await lock.query(
+          `UPDATE "CommunityComment" SET status = 'pending_screening', screening_reason = NULL
+           WHERE id = $1`,
+          [held.comment.id]
+        )
+        await lock.query(
+          `UPDATE "CommunityCommentScreeningOutbox"
+           SET generation = generation + 1, dispatched_at = NULL WHERE comment_id = $1`,
+          [held.comment.id]
+        )
+        const run = cleanup()
+        await waitForBlocked(1)
+        await lock.query('COMMIT')
+        await lock.query('BEGIN')
+        await run
+      })
+      expect(
+        await prisma.communityCommentScreeningOutbox.findUnique({
+          where: { comment_id: held.comment.id },
+        })
+      ).toMatchObject({ generation: 1, dispatched_at: null })
+
+      const jobs: [string, number][] = []
+      await new CommunityCommentsOutbox(
+        prisma,
+        {
+          enqueueComment: (id: string, generation: number) => {
+            jobs.push([id, generation])
+            return Promise.resolve()
+          },
+        } as never,
+        { captureCommentEvent: vi.fn() } as never,
+        {} as never
+      ).dispatchPending()
+      // A generation above 0 waits out the outbox's 30 s pause.
+      await prisma.communityCommentScreeningOutbox.updateMany({
+        where: { comment_id: held.comment.id },
+        data: { updated_at: new Date(Date.now() - 31_000) },
+      })
+      await new CommunityCommentsOutbox(
+        prisma,
+        {
+          enqueueComment: (id: string, generation: number) => {
+            jobs.push([id, generation])
+            return Promise.resolve()
+          },
+        } as never,
+        { captureCommentEvent: vi.fn() } as never,
+        {} as never
+      ).dispatchPending()
+      expect(jobs).toContainEqual([held.comment.id, 1])
+    })
+
+    it('still deletes the row of a comment that really finished', async () => {
+      const held = await endedBan()
+      await prisma.communityCommentScreeningOutbox.create({
+        data: { comment_id: held.comment.id, generation: 0, dispatched_at: NOW },
+      })
+      await cleanup()
+      expect(
+        await prisma.communityCommentScreeningOutbox.findUnique({
+          where: { comment_id: held.comment.id },
+        })
+      ).toBeNull()
+    })
+  })
+
   it('rolls one member back whole when a write fails, and still reaches the next member', async () => {
     const stuck = await endedBan()
     const next = await endedBan()
@@ -2171,7 +2257,8 @@ describe('I-C-END-RESTORE: the sweep that returns held content when a ban ends (
       CREATE TRIGGER cc611_refuse_comment BEFORE UPDATE ON "CommunityComment"
       FOR EACH ROW EXECUTE FUNCTION cc611_refuse_comment()`)
     try {
-      await sweep().catch(() => undefined)
+      // The job fails, so the queue retries and an operator sees it, though the next member went through.
+      await expect(sweep()).rejects.toThrow('Ban hold release failed for 1 subject')
       expect(await rowsOf(next)).toEqual(RETURNED)
       expect(await rowsOf(stuck)).toEqual({
         post: { status: 'flagged', moderation_reason: stuck.marker },
