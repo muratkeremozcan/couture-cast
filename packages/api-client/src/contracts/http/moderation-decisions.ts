@@ -55,6 +55,10 @@ export const moderationDecisionReasonSchema = z
       !reason.startsWith(COMMUNITY_BAN_MARKER_PREFIX),
     { message: 'Reason is reserved.' }
   )
+  .openapi({
+    description:
+      'Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.',
+  })
 
 const revisionSchema = z.string().regex(/^[0-9a-f]{16}$/)
 

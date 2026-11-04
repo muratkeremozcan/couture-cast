@@ -2038,7 +2038,7 @@ export interface ApplyModerationDecisionRequestOneOf {
    */
   action: ApplyModerationDecisionRequestOneOfActionEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf
    */
@@ -2079,7 +2079,7 @@ export interface ApplyModerationDecisionRequestOneOf1 {
    */
   action: ApplyModerationDecisionRequestOneOf1ActionEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf1
    */
@@ -2120,7 +2120,7 @@ export interface ApplyModerationDecisionRequestOneOf2 {
    */
   action: ApplyModerationDecisionRequestOneOf2ActionEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf2
    */
@@ -2161,7 +2161,7 @@ export interface ApplyModerationDecisionRequestOneOf3 {
    */
   action: ApplyModerationDecisionRequestOneOf3ActionEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf3
    */
@@ -2202,7 +2202,7 @@ export interface ApplyModerationDecisionRequestOneOf4 {
    */
   action: ApplyModerationDecisionRequestOneOf4ActionEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf4
    */
@@ -9918,7 +9918,7 @@ export interface ModerationAppealInput {
    */
   status: ModerationAppealInputStatusEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationAppealInput
    */
@@ -10820,7 +10820,7 @@ export interface ModerationDecisionInputOneOf {
    */
   action: ModerationDecisionInputOneOfActionEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf
    */
@@ -10861,7 +10861,7 @@ export interface ModerationDecisionInputOneOf1 {
    */
   action: ModerationDecisionInputOneOf1ActionEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf1
    */
@@ -10902,7 +10902,7 @@ export interface ModerationDecisionInputOneOf2 {
    */
   action: ModerationDecisionInputOneOf2ActionEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf2
    */
@@ -10943,7 +10943,7 @@ export interface ModerationDecisionInputOneOf3 {
    */
   action: ModerationDecisionInputOneOf3ActionEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf3
    */
@@ -10984,7 +10984,7 @@ export interface ModerationDecisionInputOneOf4 {
    */
   action: ModerationDecisionInputOneOf4ActionEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf4
    */
@@ -13984,7 +13984,7 @@ export interface RecordModerationAppealRequest {
    */
   status: RecordModerationAppealRequestStatusEnum
   /**
-   *
+   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof RecordModerationAppealRequest
    */

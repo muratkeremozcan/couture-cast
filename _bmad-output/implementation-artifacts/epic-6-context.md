@@ -9,8 +9,8 @@ highlights, and branded export and sharing, backed by safe publication and accou
 Every lane ships behind disabled production read and write controls. Community Beta opens only after
 Stories 6.2 through 6.13 and every signed release-gate item are complete. The one sanctioned
 exception is complimentary full access, which lets owner-selected family testers use premium and
-community features in production without payment. Stories 6.1 through 6.10 are done; the current
-story is 6.11, moderation decisions and account sanctions.
+community features in production without payment. Stories 6.1 through 6.9 are done; the current
+story is 6.10, the read-only moderator queue and case detail.
 
 ## Stories
 

@@ -18506,7 +18506,8 @@
               "reason": {
                 "type": "string",
                 "minLength": 3,
-                "maxLength": 1000
+                "maxLength": 1000,
+                "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18537,7 +18538,8 @@
               "reason": {
                 "type": "string",
                 "minLength": 3,
-                "maxLength": 1000
+                "maxLength": 1000,
+                "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18568,7 +18570,8 @@
               "reason": {
                 "type": "string",
                 "minLength": 3,
-                "maxLength": 1000
+                "maxLength": 1000,
+                "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18599,7 +18602,8 @@
               "reason": {
                 "type": "string",
                 "minLength": 3,
-                "maxLength": 1000
+                "maxLength": 1000,
+                "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18630,7 +18634,8 @@
               "reason": {
                 "type": "string",
                 "minLength": 3,
-                "maxLength": 1000
+                "maxLength": 1000,
+                "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18865,7 +18870,8 @@
           "reason": {
             "type": "string",
             "minLength": 3,
-            "maxLength": 1000
+            "maxLength": 1000,
+            "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
           },
           "mutationId": {
             "type": "string",
@@ -30190,7 +30196,8 @@
                       "reason": {
                         "type": "string",
                         "minLength": 3,
-                        "maxLength": 1000
+                        "maxLength": 1000,
+                        "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -30221,7 +30228,8 @@
                       "reason": {
                         "type": "string",
                         "minLength": 3,
-                        "maxLength": 1000
+                        "maxLength": 1000,
+                        "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -30252,7 +30260,8 @@
                       "reason": {
                         "type": "string",
                         "minLength": 3,
-                        "maxLength": 1000
+                        "maxLength": 1000,
+                        "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -30283,7 +30292,8 @@
                       "reason": {
                         "type": "string",
                         "minLength": 3,
-                        "maxLength": 1000
+                        "maxLength": 1000,
+                        "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -30314,7 +30324,8 @@
                       "reason": {
                         "type": "string",
                         "minLength": 3,
-                        "maxLength": 1000
+                        "maxLength": 1000,
+                        "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -30900,7 +30911,8 @@
                   "reason": {
                     "type": "string",
                     "minLength": 3,
-                    "maxLength": 1000
+                    "maxLength": 1000,
+                    "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
                   },
                   "mutationId": {
                     "type": "string",

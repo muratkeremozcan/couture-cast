@@ -288,6 +288,8 @@ File budget:
 
 - The story passed the 90-file trigger in Design Notes.
   The banned notice stayed in, because the AC and the user-facing verification both name it, and TEA agreed.
+- `epic-6-context.md` stays as it is on main, because the 6.10 harness and console specs needed the room.
+  The coordinator names 6.11 there after merge, which departs from the first task line.
 - At 101 files the pre-existing Sign in and Sign out fix on `notification-settings/page.tsx` moved to the local branch `fix/notification-settings-auth-links` (`84307904`), and the factory email fix left with it.
   It has no dependency on this story.
 
@@ -352,6 +354,7 @@ All rows below were real and fixed.
 | F15 to F17   | medium | A banned member kept author states, the challenge and `canAct`, and non-JSON refusal bodies lost the code                             | Banned state clears them, tolerant code read                                  |
 | F18 to F20   | low    | The form lacked `aria-required`, `aria-invalid` and `noValidate`, and the notice announced through `role=status` on mount             | Attributes added, one live region                                             |
 | F21          | low    | Timer `unref` typing, and prettier merged two lines through ASI                                                                       | Explicit cast and statement separation                                        |
+| F22          | medium | `moderationDecisionReasonSchema` refined with no published description, so the invariants gate failed                                 | `.openapi({ description })`, client regenerated                               |
 | UI-A         | medium | The notice was a black card on the light page in dark mode                                                                            | Light surface classes only                                                    |
 | UI-B         | medium | The case view printed the raw status enum in every locale                                                                             | `moderation.targetStatus`                                                     |
 | UI-C         | medium | Banned page filters stayed live and fired three 403 reads per click                                                                   | Nav leaves the page through `closed`, zero reads                              |
