@@ -9694,12 +9694,13 @@ Evidence boundaries:
 
 - **Written before review and merge.**
   The code and tests are committed on `feat/cc-6-11-moderation-decisions`, nothing was pushed when this step was written, and no PR job has run.
-  The Codex review that follows is not recorded here.
+  The Codex review of `4cf4b128` found six defects, and they are fixed and logged in the spec as C1 to C6.
 - **What ran locally.**
-  TEA signed off at `eacf86df` with three consecutive clean runs of every tier at `3a23e2cc`; the only later commit is the test design.
-  Passing per run: `apps/api` 7879 with 28 skipped, `packages/api-client` 1580, `packages/config` 29, `packages/db` 266 with 1 skipped, `apps/web` 1807, `apps/mobile` 1905, the Pact consumer 444 with the provider verified, and Playwright 62 with 1 skipped.
+  TEA signed off with three consecutive clean runs of every tier at `5cbf216f`, after the Codex review fixes; the only later commits are the test design and this evidence.
+  Passing per run: `apps/api` 7887 with 28 skipped, `packages/api-client` 1580, `packages/config` 29, `packages/db` 266 with 1 skipped, `apps/web` 1825, `apps/mobile` 1905, the Pact consumer 444 with the provider verified, and Playwright 62 with 1 skipped.
   The skipped Playwright test is `P-D-PREVIEW-CLOSED`, which needs flags off, and no moderation test in the API or database tiers skips.
   All 17 seeded defects went red, and two comment forms of S-17 survived at first and are now caught.
+  Each regression test for review findings C1 to C6 and F23 was red before its fix.
   tsc and eslint are clean in all workspaces, and all five `node-test-gate` suites pass.
   Limits are in the test design under Execution results, and nothing has run on a deployed preview.
 - **A real browser walk used doubles for the edges.**
