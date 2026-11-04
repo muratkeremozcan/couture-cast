@@ -34,6 +34,7 @@ import {
   type ShareCardHost,
 } from './share-card-dialog'
 
+import { CommunityBannedNotice } from './community-banned-notice'
 import { CommunityComments } from './community-comments'
 import {
   ResponseError,
@@ -57,6 +58,7 @@ import {
   allocateCommunityLookFromWeb,
   CommunityRequestError,
   communityFailureReason,
+  communitySanctionOf,
   setCommunityReactionFromWeb,
   communityRetryAfterSeconds,
   generateIdempotencyKey,
@@ -123,6 +125,7 @@ import {
   type CommunityReportReason,
   type EmbeddedCommunityChallenge,
   type SupportedLocale,
+  type CommunityBannedError,
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
@@ -185,7 +188,7 @@ const MERLOT = '#7A1F2D'
 function notificationFailureIsRetryable(error: unknown) {
   if (
     error instanceof CommunityRequestError &&
-    ['signed_out', 'age_gate', 'not_found', 'disabled'].includes(error.reason)
+    ['signed_out', 'age_gate', 'banned', 'not_found', 'disabled'].includes(error.reason)
   )
     return false
   const status =
@@ -200,6 +203,7 @@ function notificationFailureIsRetryable(error: unknown) {
 const FAILURE_KEYS: Record<CommunityFailureReason, string> = {
   signed_out: 'community.error.signedOut',
   age_gate: 'community.error.ageGate',
+  banned: 'community.error.banned',
   rate_limited: 'community.error.rateLimited',
   not_found: 'community.error.notFound',
   reason_changed: 'community.error.reasonChanged',
@@ -2172,6 +2176,10 @@ export function CommunityLookbookGrid({
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [feedError, setFeedError] = useState<Message | null>(null)
+  // Story 6.11: the member's own ban replaces the feed with a notice.
+  const [bannedSanction, setBannedSanction] = useState<
+    CommunityBannedError['sanction'] | null
+  >(null)
   // What the one live region holds, in the order it happened. A message replaces the list,
   // except the feed's own completion message, which follows anything announced while that
   // same read was in flight (see announceFeed).
@@ -2455,6 +2463,7 @@ export function CommunityLookbookGrid({
         setActiveChallenge(feed.activeChallenge)
         setNextCursor(feed.nextCursor)
         setFeedError(null)
+        setBannedSanction(null)
         // A refetch that hands back a freshly signed URL clears the failure: not
         // clearing it is what left a recovered card reading "Image unavailable"
         // for the rest of the session.
@@ -2511,6 +2520,13 @@ export function CommunityLookbookGrid({
         )
       } catch (error: unknown) {
         if (controller.signal.aborted || generation !== feedGenerationRef.current) {
+          return
+        }
+        const sanction = communitySanctionOf(error)
+        if (sanction) {
+          setBannedSanction(sanction)
+          setItems([])
+          setFeedError(null)
           return
         }
         const message = messageForError(
@@ -2824,6 +2840,14 @@ export function CommunityLookbookGrid({
           setItems([])
           setOpenedItem(null)
           setNewLooks([])
+          // A denied socket says nothing about why. One read asks, so a member banned while
+          // the page was open sees the notice.
+          void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
+            (error: unknown) => {
+              const sanction = communitySanctionOf(error)
+              if (active && sanction) setBannedSanction(sanction)
+            }
+          )
         }
       },
     })
@@ -3577,16 +3601,24 @@ export function CommunityLookbookGrid({
           />
         )}
 
-        <CommunityFeedStates
-          isLoading={isLoading}
-          errorText={renderMessage(feedError, t, viewerBand)}
-          itemCount={displayedItems.length}
-          gridColumns={gridColumns}
-          canShare={presentation.canAct}
-          onRetry={handleRetry}
-          onShare={openCreateModal}
-          t={t}
-        />
+        {bannedSanction ? (
+          <CommunityBannedNotice
+            sanction={bannedSanction}
+            language={i18n.language}
+            t={t}
+          />
+        ) : (
+          <CommunityFeedStates
+            isLoading={isLoading}
+            errorText={renderMessage(feedError, t, viewerBand)}
+            itemCount={displayedItems.length}
+            gridColumns={gridColumns}
+            canShare={presentation.canAct}
+            onRetry={handleRetry}
+            onShare={openCreateModal}
+            t={t}
+          />
+        )}
 
         <div
           ref={gridRef}

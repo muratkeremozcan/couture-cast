@@ -8417,7 +8417,25 @@ export interface GetModerationCase200ResponseDataSubjectStanding {
    * @memberof GetModerationCase200ResponseDataSubjectStanding
    */
   priorBanCount: number
+  /**
+   *
+   * @type {Array<GetModerationCase200ResponseDataSubjectStandingAllowedAppealStepsEnum>}
+   * @memberof GetModerationCase200ResponseDataSubjectStanding
+   */
+  allowedAppealSteps: Array<GetModerationCase200ResponseDataSubjectStandingAllowedAppealStepsEnum>
 }
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataSubjectStandingAllowedAppealStepsEnum = {
+  requested: 'requested',
+  upheld: 'upheld',
+  overturned: 'overturned',
+} as const
+export type GetModerationCase200ResponseDataSubjectStandingAllowedAppealStepsEnum =
+  (typeof GetModerationCase200ResponseDataSubjectStandingAllowedAppealStepsEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStandingAllowedAppealStepsEnum]
+
 /**
  *
  * @export
@@ -10460,7 +10478,25 @@ export interface ModerationCaseDetailResponseDataSubjectStanding {
    * @memberof ModerationCaseDetailResponseDataSubjectStanding
    */
   priorBanCount: number
+  /**
+   *
+   * @type {Array<ModerationCaseDetailResponseDataSubjectStandingAllowedAppealStepsEnum>}
+   * @memberof ModerationCaseDetailResponseDataSubjectStanding
+   */
+  allowedAppealSteps: Array<ModerationCaseDetailResponseDataSubjectStandingAllowedAppealStepsEnum>
 }
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataSubjectStandingAllowedAppealStepsEnum = {
+  requested: 'requested',
+  upheld: 'upheld',
+  overturned: 'overturned',
+} as const
+export type ModerationCaseDetailResponseDataSubjectStandingAllowedAppealStepsEnum =
+  (typeof ModerationCaseDetailResponseDataSubjectStandingAllowedAppealStepsEnum)[keyof typeof ModerationCaseDetailResponseDataSubjectStandingAllowedAppealStepsEnum]
+
 /**
  *
  * @export

@@ -7,6 +7,7 @@ import { ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common'
 import { PrismaClient, type Prisma } from '@prisma/client'
 import {
   deriveAllowedActions,
+  deriveAllowedAppealSteps,
   moderationActionAvailability,
   moderationDecisionResponseSchema,
   moderationStoredDecisionResultSchema,
@@ -190,6 +191,20 @@ export class ModerationDecisionsService {
             active: active !== null,
             sanction: newest ? toModerationSanction(newest) : null,
             priorBanCount: Math.max(sanctions.length - 1, 0),
+            allowedAppealSteps:
+              decisionsOpen && newest
+                ? deriveAllowedAppealSteps({
+                    role: availability.role,
+                    viewerConflict: await this.sanctions.appealViewerConflict(
+                      this.prisma,
+                      auth.userId,
+                      newest
+                    ),
+                    operatorSanctioned: availability.operatorSanctioned,
+                    sanctionActive: active?.id === newest.id,
+                    appealStatus: newest.appeal_status,
+                  })
+                : [],
           }
         : null,
     }

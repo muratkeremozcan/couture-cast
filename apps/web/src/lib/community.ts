@@ -68,6 +68,8 @@ import {
   type CommunityReportReason,
   type CreateCommunityCommentInput,
   type SupportedLocale,
+  communityBannedErrorSchema,
+  type CommunityBannedError,
 } from '@couture/api-client/contracts/http'
 import { createWebApiClient } from './api-client'
 import {
@@ -97,6 +99,7 @@ export { generateIdempotencyKey }
 export type CommunityFailureReason =
   | 'signed_out'
   | 'age_gate'
+  | 'banned'
   | 'rate_limited'
   | 'not_found'
   | 'reason_changed'
@@ -122,6 +125,8 @@ export class CommunityRequestError extends Error {
   readonly reason: CommunityFailureReason
   /** Seconds until the next post is allowed, from the 429 `Retry-After` header. */
   readonly retryAfterSeconds?: number
+  /** What the member may read about their own ban, when the reason is `banned`. */
+  sanction?: CommunityBannedError['sanction']
 
   constructor(
     reason: CommunityFailureReason,
@@ -169,6 +174,16 @@ async function readServerMessage(response: Response, fallback: string): Promise<
     return typeof message === 'string' && message.trim().length > 0 ? message : fallback
   } catch {
     return fallback
+  }
+}
+
+async function readBannedError(response: Response): Promise<CommunityBannedError | null> {
+  if (response.status !== 403) return null
+  try {
+    const parsed = communityBannedErrorSchema.safeParse(await response.clone().json())
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
   }
 }
 
@@ -251,6 +266,18 @@ async function communityError(
     return error
   }
   if (error instanceof ResponseError) {
+    // The code comes first: a ban must never read as any 403 the message rules know.
+    const banned = await readBannedError(error.response)
+    if (banned) {
+      const refused = new CommunityRequestError(
+        'banned',
+        banned.message,
+        undefined,
+        error.response.status
+      )
+      refused.sanction = banned.sanction
+      return refused
+    }
     const message = await readServerMessage(error.response, fallback)
     return new CommunityRequestError(
       reasonForResponse(error.response.status, message),
@@ -274,6 +301,13 @@ async function communityError(
  */
 export function communityFailureReason(error: unknown): CommunityFailureReason {
   return error instanceof CommunityRequestError ? error.reason : 'unknown'
+}
+
+/** The member's own ban behind a rejection, when that is what it was. */
+export function communitySanctionOf(
+  error: unknown
+): CommunityBannedError['sanction'] | null {
+  return error instanceof CommunityRequestError ? (error.sanction ?? null) : null
 }
 
 /** Seconds until posting is allowed again, when the failure was a 429. */

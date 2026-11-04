@@ -7,11 +7,14 @@ import { z } from 'zod'
 import { communityModerationReasonCategories } from './community'
 import {
   moderationAppealStatusSchema,
+  moderationAppealStepSchema,
   moderationCaseIdSchema,
   moderationCaseStatusSchema,
   moderationDecisionActionSchema,
   moderationSanctionKindSchema,
   moderationSanctionSchema,
+  type ModerationAppealStatus,
+  type ModerationAppealStep,
   type ModerationDecisionAction,
   type ModerationSanctionKind,
 } from './moderation-queue'
@@ -87,10 +90,6 @@ export const moderationDecisionInputSchema = z.discriminatedUnion('action', [
     .strict(),
 ])
 export type ModerationDecisionInput = z.infer<typeof moderationDecisionInputSchema>
-
-/** The steps an operator can record. `not_requested` is only ever the starting state. */
-export const moderationAppealStepSchema = z.enum(['requested', 'upheld', 'overturned'])
-export type ModerationAppealStep = z.infer<typeof moderationAppealStepSchema>
 
 export const moderationAppealInputSchema = z
   .object({
@@ -365,6 +364,22 @@ export function moderationActionAvailability(
   const refusal = moderationViewerRefusal(input, action, banKind)
   if (refusal) return { available: false, code: refusal }
   return STATE_RULES[action](input, banKind)
+}
+
+/** The appeal rule the standing section lists and the appeal route enforces. */
+export function deriveAllowedAppealSteps(input: {
+  role: 'moderator' | 'admin'
+  viewerConflict: boolean
+  operatorSanctioned: boolean
+  /** Not lifted and not past its expiry. */
+  sanctionActive: boolean
+  appealStatus: ModerationAppealStatus
+}): ModerationAppealStep[] {
+  if (input.viewerConflict || input.operatorSanctioned || !input.sanctionActive) return []
+  if (input.appealStatus === 'not_requested') return ['requested']
+  if (input.appealStatus === 'requested' && input.role === 'admin')
+    return ['upheld', 'overturned']
+  return []
 }
 
 /** The list the case detail returns. An empty list means the console renders no form. */

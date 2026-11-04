@@ -108,7 +108,7 @@ function newEntries(
 /** Same read refusals as the feed render the localized disabled state, like mobile. */
 function isDisabledRefusal(error: unknown): boolean {
   const reason = communityFailureReason(error)
-  return reason === 'disabled' || reason === 'age_gate'
+  return reason === 'disabled' || reason === 'age_gate' || reason === 'banned'
 }
 
 export function useCommunitySpotlight<Token = number>({

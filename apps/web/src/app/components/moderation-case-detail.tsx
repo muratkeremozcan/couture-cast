@@ -17,7 +17,9 @@ import {
   type ModerationCaseResult,
   type ModerationFailureReason,
 } from '../../lib/moderation'
+import { ModerationAccountStanding } from './moderation-account-standing'
 import { CaseMedia } from './moderation-case-media'
+import { ModerationDecisionPanel } from './moderation-decision-panel'
 import { FailureNotice, moderationControl } from './moderation-failure-notice'
 import { PlainText } from './moderation-plain-text'
 import { SlaCountdown } from './moderation-sla-countdown'
@@ -109,6 +111,14 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
     if (!loading) void read()
   }
 
+  // One polite region outside the panel, so an outcome is announced once and survives the reload.
+  const [outcome, setOutcome] = useState<string | null>(null)
+  const outcomeRef = useRef<HTMLParagraphElement>(null)
+  const applied = (message: string) => {
+    setOutcome(message)
+    void read().then(() => outcomeRef.current?.focus())
+  }
+
   const back = (
     <Link
       href="/moderation"
@@ -143,6 +153,25 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
     >
       {back}
       <DetailHeader detail={detail} stale={stale} loading={loading} onReload={reload} />
+      <p
+        ref={outcomeRef}
+        role="status"
+        tabIndex={-1}
+        data-testid="moderation-decision-outcome"
+        className={
+          outcome
+            ? 'rounded border border-green-800 p-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)] dark:border-green-500'
+            : 'sr-only'
+        }
+      >
+        {outcome}
+      </p>
+      <ModerationDecisionPanel
+        key={detail.revision}
+        detail={detail}
+        onApplied={applied}
+        onReload={reload}
+      />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <ContentSection detail={detail} />
@@ -160,6 +189,11 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
         <div className="flex flex-col gap-6">
           <FindingsSection detail={detail} />
           <ReportersSection detail={detail} />
+          <ModerationAccountStanding
+            detail={detail}
+            onApplied={applied}
+            onReload={reload}
+          />
           <PriorActionsSection detail={detail} />
         </div>
       </div>
@@ -208,7 +242,15 @@ function DetailHeader({
         {' · '}
         {t('moderation.queue.reports', { count: detail.reportCount })}
         {detail.locale ? ` · ${detail.locale}` : ''}
+        {detail.firstDecisionAt
+          ? ` · ${t('moderation.detail.firstDecision', { when: format(detail.firstDecisionAt) })}`
+          : ''}
       </p>
+      {detail.escalated ? (
+        <p role="note" className="rounded border border-amber-700 p-3 text-sm">
+          {t('moderation.detail.escalated')}
+        </p>
+      ) : null}
       {detail.viewerConflict ? (
         <p role="note" className="rounded border border-amber-700 p-3 text-sm">
           {t('moderation.detail.conflict')}
@@ -435,7 +477,9 @@ function PriorActionsSection({ detail }: { detail: ModerationCaseDetail }) {
               <p className="font-medium">
                 {t(`moderation.actor.${action.actorKind}`)}
                 {' · '}
-                <code>{action.action}</code>
+                {t(`moderation.action.${action.action}`, {
+                  defaultValue: t('moderation.action.unknown'),
+                })}
               </p>
               <p className="text-neutral-700 dark:text-neutral-300">
                 {format(action.occurredAt)}

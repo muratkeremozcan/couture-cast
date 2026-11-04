@@ -316,13 +316,7 @@ export class ModerationSanctionsService {
     const origin = await tx.moderationDecision.findUniqueOrThrow({
       where: { id: head.decision_id },
     })
-    if (
-      computeViewerConflict({
-        viewerId: auth.userId,
-        authorId: head.user_id,
-        reporterIds: await this.originReporters(tx, head.case_key, origin.report_ids),
-      })
-    )
+    if (await this.appealViewerConflict(tx, auth.userId, head))
       throw moderationDecisionError('self_review_refused')
     if (input.status !== 'requested' && auth.role !== 'admin')
       throw moderationDecisionError('admin_required')
@@ -395,6 +389,26 @@ export class ModerationSanctionsService {
       })
     )
     return { replayed: false, stored }
+  }
+
+  /**
+   * One rule for the appeal controls and the appeal route: the sanction's subject and the author
+   * and every reporter of the case it came from, whichever case the viewer has open.
+   */
+  async appealViewerConflict(
+    tx: Tx,
+    viewerId: string,
+    sanction: Pick<CommunitySanction, 'user_id' | 'case_key' | 'decision_id'>
+  ): Promise<boolean> {
+    const origin = await tx.moderationDecision.findUniqueOrThrow({
+      where: { id: sanction.decision_id },
+      select: { report_ids: true },
+    })
+    return computeViewerConflict({
+      viewerId,
+      authorId: sanction.user_id,
+      reporterIds: await this.originReporters(tx, sanction.case_key, origin.report_ids),
+    })
   }
 
   /** The reporters of the originating case, those of the decision and any filed since. */

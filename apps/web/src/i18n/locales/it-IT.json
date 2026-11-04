@@ -608,7 +608,8 @@
       "notFound": "Questo look non è più disponibile.",
       "disabled": "Il feed della community non è disponibile al momento.",
       "mediaUnavailable": "Questo look non è disponibile al momento. Riprova tra poco.",
-      "generic": "Qualcosa è andato storto. Riprova."
+      "generic": "Qualcosa è andato storto. Riprova.",
+      "banned": "Il tuo accesso alla community è sospeso."
     },
     "reactions": {
       "label": "Reazioni",
@@ -703,6 +704,18 @@
       "back": "Torna alla community",
       "bindingConflict": "La registrazione delle notifiche di questo dispositivo è cambiata. Riprova.",
       "pushUnavailable": "Le notifiche push non sono disponibili su questo dispositivo."
+    },
+    "banned": {
+      "title": "Il tuo accesso alla community è sospeso",
+      "temporary": "Potrai tornare dopo il {{until}}. Fino ad allora non puoi vedere la community né parteciparvi.",
+      "permanent": "Questa sospensione non ha una data di fine. Non puoi vedere la community né parteciparvi.",
+      "scope": "Il tuo guardaroba, il rituale quotidiano, gli avvisi e le impostazioni dell'account non sono interessati.",
+      "appeal": {
+        "not_requested": "Se pensi che sia un errore, contatta l'assistenza CoutureCast per chiedere una revisione.",
+        "requested": "La tua richiesta di revisione è stata registrata ed è in attesa di una decisione.",
+        "upheld": "La tua richiesta di revisione è stata valutata e questa sospensione resta in vigore.",
+        "overturned": "Questa sospensione è stata revocata."
+      }
     }
   },
   "locations": {
@@ -884,7 +897,8 @@
     },
     "alias": {
       "erased": "Membro eliminato",
-      "unknown": "Membro senza nome"
+      "unknown": "Membro senza nome",
+      "screening": "Controllo automatico"
     },
     "mediaReason": {
       "target_erased": "Il post è stato eliminato, quindi la sua immagine non esiste più.",
@@ -929,7 +943,8 @@
       "reports": "Segnalazioni: {{count}}",
       "finding": "Rilevamento del controllo",
       "refreshing": "Aggiornamento in corso",
-      "refreshed": "Aggiornato dalla prima pagina. Casi mostrati: {{count}}"
+      "refreshed": "Aggiornato dalla prima pagina. Casi mostrati: {{count}}",
+      "escalated": "Inoltrato"
     },
     "detail": {
       "title": "Caso: {{source}}",
@@ -958,7 +973,135 @@
       "heldNoCodes": "Trattenuto per revisione senza codice registrato.",
       "reporters": "Chi ha segnalato",
       "priorActions": "Azioni precedenti",
-      "noPriorActions": "Nessuna azione precedente."
+      "noPriorActions": "Nessuna azione precedente.",
+      "firstDecision": "Prima decisione: {{when}}",
+      "escalated": "Questo caso è in attesa di un amministratore. Solo un amministratore può chiuderlo."
+    },
+    "action": {
+      "flagged": "Segnalato dal controllo automatico",
+      "screening_passed": "Controllo automatico superato",
+      "held_for_review": "Trattenuto per la revisione",
+      "blocked": "Bloccato dal controllo automatico",
+      "screening_failed": "Il controllo automatico non è stato completato",
+      "released_by_operator": "Ripristinato",
+      "release": "Ripristinato",
+      "taken_down_by_operator": "Rimosso",
+      "takedown": "Rimosso",
+      "report_resolved": "Segnalazione risolta",
+      "resolve": "Segnalazione risolta",
+      "escalated_by_operator": "Inoltrato a un amministratore",
+      "escalate": "Inoltrato a un amministratore",
+      "banned_by_operator": "Autore sospeso",
+      "ban": "Autore sospeso",
+      "appeal_requested": "Ricorso registrato",
+      "appeal_upheld": "Sospensione confermata dopo il ricorso",
+      "appeal_overturned": "Sospensione annullata dopo il ricorso",
+      "unknown": "Altra azione"
+    },
+    "decision": {
+      "title": "Decisione",
+      "actionLabel": "Azione",
+      "action": {
+        "resolve": "Risolvi",
+        "release": "Ripristina",
+        "takedown": "Rimuovi",
+        "escalate": "Inoltra",
+        "ban": "Sospendi l'autore"
+      },
+      "hint": {
+        "resolve": "Chiude tutte le segnalazioni aperte. Il contenuto resta invariato.",
+        "release": "Pubblica il contenuto trattenuto e chiude tutte le segnalazioni aperte.",
+        "takedown": "Rimuove il contenuto dalla community e chiude tutte le segnalazioni aperte.",
+        "escalate": "Chiede a un amministratore di decidere. Le segnalazioni restano aperte e il tempo continua a scorrere.",
+        "ban": "Chiude l'accesso dell'autore alla community, rimuove questo contenuto e chiude tutte le segnalazioni aperte."
+      },
+      "banKind": "Tipo di sospensione",
+      "duration": "Durata",
+      "days_one": "{{count}} giorno",
+      "days_other": "{{count}} giorni",
+      "reason": "Motivo (obbligatorio)",
+      "reasonCount": "{{count}} di {{max}} caratteri, almeno {{min}}",
+      "submit": "Applica la decisione",
+      "submitting": "Applicazione in corso",
+      "confirmYes": "Sì, applica",
+      "cancel": "Annulla",
+      "confirm": {
+        "takedown": "Rimuovere ora questo contenuto? I lettori non lo vedranno più al prossimo caricamento.",
+        "ban_temporary": "Sospendere questo autore per il periodo scelto? Il suo accesso alla community si chiude subito.",
+        "ban_permanent": "Sospendere questo autore in modo permanente? Tutti i suoi contenuti nella community vengono nascosti e le sue reazioni ritirate."
+      },
+      "outcome": {
+        "resolve": "Le segnalazioni sono risolte.",
+        "release": "Il contenuto è pubblicato e le segnalazioni sono risolte.",
+        "takedown": "Il contenuto è rimosso e le segnalazioni sono risolte.",
+        "escalate": "Il caso è inoltrato a un amministratore.",
+        "banTemporary": "L'autore è sospeso fino al {{until}}.",
+        "banPermanent": "L'autore è sospeso in modo permanente.",
+        "deferred": "Alcune pagine pubbliche potrebbero impiegare un momento ad aggiornarsi."
+      },
+      "detail": {
+        "no_open_reports": "Questo caso non ha segnalazioni aperte.",
+        "target_not_held": "Questo contenuto non è trattenuto, quindi non può essere ripristinato.",
+        "target_not_published": "Questo contenuto non è pubblicato, quindi non può essere rimosso.",
+        "already_escalated": "Questo caso è già stato inoltrato.",
+        "target_erased": "Il contenuto o il suo autore è stato cancellato, quindi questa azione non è più applicabile.",
+        "subject_banned": "L'autore è sospeso, quindi questo contenuto non può essere ripristinato.",
+        "already_banned": "L'autore ha già una sospensione che copre questo caso.",
+        "author_ineligible": "L'autore al momento non può partecipare alla community, quindi questo contenuto non può essere ripristinato.",
+        "community_writes_closed": "La pubblicazione nella community è chiusa per questo autore, quindi questo contenuto non può ancora essere ripristinato."
+      },
+      "error": {
+        "invalid_decision": "Non è stato possibile leggere la decisione. Controlla il motivo e riprova.",
+        "case_not_found": "Questo caso non esiste più. Potrebbe aver cambiato chiave dopo una cancellazione.",
+        "sanction_not_found": "Questa sanzione non esiste più.",
+        "moderation_console_disabled": "La console di moderazione è disattivata.",
+        "moderation_decisions_disabled": "Le decisioni di moderazione sono disattivate. I casi restano consultabili.",
+        "self_review_refused": "Hai scritto questo contenuto o inviato una delle segnalazioni, quindi deve decidere un altro moderatore.",
+        "admin_required": "Questa decisione richiede un amministratore. Inoltra il caso per affidarlo.",
+        "operator_sanctioned": "Questo account ha una sospensione attiva nella community, quindi non può applicare decisioni.",
+        "case_conflict": "Questo caso è cambiato da quando l'hai aperto. Ricarica per vedere cosa è cambiato. Il tuo motivo resta qui.",
+        "action_not_applicable": "Questa azione non si applica al caso nel suo stato attuale.",
+        "idempotency_mismatch": "Questa richiesta è già stata usata per un'altra decisione. Ricarica e riprova.",
+        "appeal_transition_invalid": "Questo passaggio del ricorso ora non si applica a questa sanzione.",
+        "audit_unavailable": "Non è stato possibile registrare la decisione, quindi non è cambiato nulla. Riprova.",
+        "signed_out": "Accedi di nuovo per continuare.",
+        "forbidden": "Questo account non può applicare decisioni di moderazione.",
+        "rate_limited": "Troppe richieste. Attendi un momento e riprova.",
+        "offline": "La decisione potrebbe non aver raggiunto il server. Riprova: non verrà applicata due volte.",
+        "unavailable": "Al momento non è stato possibile applicare la decisione. Riprova."
+      }
+    },
+    "standing": {
+      "title": "Stato dell'autore",
+      "state": "Sospensione",
+      "active": "Attiva",
+      "ended": "Terminata",
+      "kindLabel": "Tipo",
+      "kind": {
+        "temporary": "Temporanea",
+        "permanent": "Permanente"
+      },
+      "expires": "Termina",
+      "appealLabel": "Ricorso",
+      "appeal": {
+        "not_requested": "Nessuno registrato",
+        "requested": "In attesa di decisione",
+        "upheld": "Sospensione confermata",
+        "overturned": "Sospensione annullata"
+      },
+      "priorBans": "Sospensioni precedenti",
+      "none": "Nessuna sospensione registrata.",
+      "appealReason": "Nota sul ricorso (obbligatoria)",
+      "step": {
+        "requested": "Registra un ricorso",
+        "upheld": "Conferma la sospensione",
+        "overturned": "Annulla la sospensione"
+      },
+      "outcome": {
+        "requested": "Il ricorso è registrato.",
+        "upheld": "La sospensione resta in vigore.",
+        "overturned": "La sospensione è revocata. I contenuti del membro sono tornati, se è ancora idoneo."
+      }
     }
   }
 }

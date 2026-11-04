@@ -608,7 +608,8 @@
       "notFound": "Dieser Look ist nicht mehr verfügbar.",
       "disabled": "Der Community-Feed ist vorübergehend nicht verfügbar.",
       "mediaUnavailable": "Dieser Look ist vorübergehend nicht verfügbar. Versuche es in Kürze erneut.",
-      "generic": "Etwas ist schiefgelaufen. Versuche es erneut."
+      "generic": "Etwas ist schiefgelaufen. Versuche es erneut.",
+      "banned": "Dein Community-Zugang ist gesperrt."
     },
     "reactions": {
       "label": "Reaktionen",
@@ -703,6 +704,18 @@
       "back": "Zurück zur Community",
       "bindingConflict": "Die Benachrichtigungsregistrierung dieses Geräts hat sich geändert. Versuche es erneut.",
       "pushUnavailable": "Push-Benachrichtigungen sind auf diesem Gerät nicht verfügbar."
+    },
+    "banned": {
+      "title": "Dein Community-Zugang ist gesperrt",
+      "temporary": "Du kannst ab {{until}} zurückkehren. Bis dahin kannst du die Community weder ansehen noch mitmachen.",
+      "permanent": "Diese Sperre hat kein Enddatum. Du kannst die Community weder ansehen noch mitmachen.",
+      "scope": "Dein Kleiderschrank, dein tägliches Ritual, deine Warnungen und Kontoeinstellungen sind nicht betroffen.",
+      "appeal": {
+        "not_requested": "Wenn du das für einen Fehler hältst, bitte den CoutureCast-Support um eine Überprüfung.",
+        "requested": "Deine Bitte um Überprüfung wurde erfasst und wartet auf eine Entscheidung.",
+        "upheld": "Deine Bitte um Überprüfung wurde geprüft, und diese Sperre bleibt bestehen.",
+        "overturned": "Diese Sperre wurde aufgehoben."
+      }
     }
   },
   "locations": {
@@ -884,7 +897,8 @@
     },
     "alias": {
       "erased": "Gelöschtes Mitglied",
-      "unknown": "Unbenanntes Mitglied"
+      "unknown": "Unbenanntes Mitglied",
+      "screening": "Automatisches Screening"
     },
     "mediaReason": {
       "target_erased": "Der Beitrag wurde gelöscht, das Bild ist nicht mehr vorhanden.",
@@ -929,7 +943,8 @@
       "reports": "Meldungen: {{count}}",
       "finding": "Prüfbefund",
       "refreshing": "Wird aktualisiert",
-      "refreshed": "Ab der ersten Seite aktualisiert. Angezeigte Fälle: {{count}}"
+      "refreshed": "Ab der ersten Seite aktualisiert. Angezeigte Fälle: {{count}}",
+      "escalated": "Eskaliert"
     },
     "detail": {
       "title": "Fall: {{source}}",
@@ -958,7 +973,135 @@
       "heldNoCodes": "Zur Prüfung zurückgehalten, ohne gespeicherten Code.",
       "reporters": "Meldende",
       "priorActions": "Frühere Maßnahmen",
-      "noPriorActions": "Keine früheren Maßnahmen."
+      "noPriorActions": "Keine früheren Maßnahmen.",
+      "firstDecision": "Erste Entscheidung {{when}}",
+      "escalated": "Dieser Fall wartet auf einen Admin. Nur ein Admin kann ihn abschließen."
+    },
+    "action": {
+      "flagged": "Vom Screening markiert",
+      "screening_passed": "Screening bestanden",
+      "held_for_review": "Zur Prüfung zurückgehalten",
+      "blocked": "Vom Screening blockiert",
+      "screening_failed": "Screening konnte nicht abgeschlossen werden",
+      "released_by_operator": "Freigegeben",
+      "release": "Freigegeben",
+      "taken_down_by_operator": "Entfernt",
+      "takedown": "Entfernt",
+      "report_resolved": "Meldung erledigt",
+      "resolve": "Meldung erledigt",
+      "escalated_by_operator": "An Admin eskaliert",
+      "escalate": "An Admin eskaliert",
+      "banned_by_operator": "Autor gesperrt",
+      "ban": "Autor gesperrt",
+      "appeal_requested": "Einspruch erfasst",
+      "appeal_upheld": "Sperre im Einspruch bestätigt",
+      "appeal_overturned": "Sperre im Einspruch aufgehoben",
+      "unknown": "Andere Aktion"
+    },
+    "decision": {
+      "title": "Entscheidung",
+      "actionLabel": "Aktion",
+      "action": {
+        "resolve": "Erledigen",
+        "release": "Freigeben",
+        "takedown": "Entfernen",
+        "escalate": "Eskalieren",
+        "ban": "Autor sperren"
+      },
+      "hint": {
+        "resolve": "Alle offenen Meldungen schließen. Der Inhalt bleibt, wie er ist.",
+        "release": "Den zurückgehaltenen Inhalt veröffentlichen und alle offenen Meldungen schließen.",
+        "takedown": "Den Inhalt aus der Community entfernen und alle offenen Meldungen schließen.",
+        "escalate": "Einen Admin um die Entscheidung bitten. Die Meldungen bleiben offen und die Zeit läuft weiter.",
+        "ban": "Den Community-Zugang des Autors schließen, diesen Inhalt entfernen und alle offenen Meldungen schließen."
+      },
+      "banKind": "Art der Sperre",
+      "duration": "Dauer",
+      "days_one": "{{count}} Tag",
+      "days_other": "{{count}} Tage",
+      "reason": "Begründung (erforderlich)",
+      "reasonCount": "{{count}} von {{max}} Zeichen, mindestens {{min}}",
+      "submit": "Entscheidung anwenden",
+      "submitting": "Wird angewendet",
+      "confirmYes": "Ja, anwenden",
+      "cancel": "Abbrechen",
+      "confirm": {
+        "takedown": "Diesen Inhalt jetzt entfernen? Beim nächsten Laden ist er für alle verschwunden.",
+        "ban_temporary": "Diesen Autor für die gewählte Zeit sperren? Der Community-Zugang endet sofort.",
+        "ban_permanent": "Diesen Autor dauerhaft sperren? Alle seine Community-Inhalte werden ausgeblendet und seine Reaktionen zurückgezogen."
+      },
+      "outcome": {
+        "resolve": "Die Meldungen sind erledigt.",
+        "release": "Der Inhalt ist veröffentlicht und die Meldungen sind erledigt.",
+        "takedown": "Der Inhalt ist entfernt und die Meldungen sind erledigt.",
+        "escalate": "Der Fall ist an einen Admin eskaliert.",
+        "banTemporary": "Der Autor ist bis {{until}} gesperrt.",
+        "banPermanent": "Der Autor ist dauerhaft gesperrt.",
+        "deferred": "Einige öffentliche Seiten brauchen vielleicht einen Moment."
+      },
+      "detail": {
+        "no_open_reports": "Dieser Fall hat keine offenen Meldungen.",
+        "target_not_held": "Dieser Inhalt wird nicht zurückgehalten und kann daher nicht freigegeben werden.",
+        "target_not_published": "Dieser Inhalt ist nicht veröffentlicht und kann daher nicht entfernt werden.",
+        "already_escalated": "Dieser Fall ist bereits eskaliert.",
+        "target_erased": "Der Inhalt oder sein Autor wurde gelöscht, daher ist diese Aktion nicht mehr möglich.",
+        "subject_banned": "Der Autor ist gesperrt, daher kann dieser Inhalt nicht freigegeben werden.",
+        "already_banned": "Für den Autor gilt bereits eine Sperre, die das abdeckt.",
+        "author_ineligible": "Der Autor kann derzeit nicht an der Community teilnehmen, daher kann dieser Inhalt nicht freigegeben werden.",
+        "community_writes_closed": "Das Veröffentlichen in der Community ist für diesen Autor geschlossen, daher kann dieser Inhalt noch nicht freigegeben werden."
+      },
+      "error": {
+        "invalid_decision": "Die Entscheidung konnte nicht gelesen werden. Prüfe die Begründung und versuche es erneut.",
+        "case_not_found": "Dieser Fall existiert nicht mehr. Er wurde nach einer Löschung möglicherweise neu zugeordnet.",
+        "sanction_not_found": "Diese Sanktion existiert nicht mehr.",
+        "moderation_console_disabled": "Die Moderationskonsole ist ausgeschaltet.",
+        "moderation_decisions_disabled": "Moderationsentscheidungen sind ausgeschaltet. Fälle bleiben lesbar.",
+        "self_review_refused": "Du hast diesen Inhalt verfasst oder eine der Meldungen eingereicht. Ein anderer Moderator muss entscheiden.",
+        "admin_required": "Diese Entscheidung braucht einen Admin. Eskaliere den Fall, um ihn zu übergeben.",
+        "operator_sanctioned": "Dieses Konto hat eine aktive Community-Sperre und kann keine Entscheidungen anwenden.",
+        "case_conflict": "Dieser Fall hat sich seit dem Öffnen geändert. Lade neu, um die Änderung zu sehen. Deine Begründung bleibt erhalten.",
+        "action_not_applicable": "Diese Aktion passt nicht zum aktuellen Stand des Falls.",
+        "idempotency_mismatch": "Diese Anfrage wurde bereits für eine andere Entscheidung verwendet. Lade neu und versuche es erneut.",
+        "appeal_transition_invalid": "Dieser Einspruchsschritt passt derzeit nicht zu dieser Sanktion.",
+        "audit_unavailable": "Die Entscheidung konnte nicht erfasst werden, daher hat sich nichts geändert. Versuche es erneut.",
+        "signed_out": "Melde dich erneut an, um fortzufahren.",
+        "forbidden": "Dieses Konto kann keine Moderationsentscheidungen anwenden.",
+        "rate_limited": "Zu viele Anfragen. Warte kurz und versuche es dann erneut.",
+        "offline": "Die Entscheidung hat den Server vielleicht nicht erreicht. Versuche es erneut: Sie wird nicht doppelt angewendet.",
+        "unavailable": "Die Entscheidung konnte gerade nicht angewendet werden. Versuche es erneut."
+      }
+    },
+    "standing": {
+      "title": "Status des Autors",
+      "state": "Sperre",
+      "active": "Aktiv",
+      "ended": "Beendet",
+      "kindLabel": "Art",
+      "kind": {
+        "temporary": "Befristet",
+        "permanent": "Dauerhaft"
+      },
+      "expires": "Endet",
+      "appealLabel": "Einspruch",
+      "appeal": {
+        "not_requested": "Keiner erfasst",
+        "requested": "Wartet auf Entscheidung",
+        "upheld": "Sperre bestätigt",
+        "overturned": "Sperre aufgehoben"
+      },
+      "priorBans": "Frühere Sperren",
+      "none": "Keine Sperren erfasst.",
+      "appealReason": "Notiz zum Einspruch (erforderlich)",
+      "step": {
+        "requested": "Einspruch erfassen",
+        "upheld": "Sperre bestätigen",
+        "overturned": "Sperre aufheben"
+      },
+      "outcome": {
+        "requested": "Der Einspruch ist erfasst.",
+        "upheld": "Die Sperre bleibt bestehen.",
+        "overturned": "Die Sperre ist aufgehoben. Die Inhalte des Mitglieds sind zurück, sofern es weiterhin berechtigt ist."
+      }
     }
   }
 }

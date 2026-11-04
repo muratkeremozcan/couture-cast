@@ -608,7 +608,8 @@
       "notFound": "Bu kombin artık kullanılamıyor.",
       "disabled": "Topluluk akışı geçici olarak kullanılamıyor.",
       "mediaUnavailable": "Bu kombin geçici olarak kullanılamıyor. Kısa süre sonra tekrar dene.",
-      "generic": "Bir şeyler ters gitti. Tekrar dene."
+      "generic": "Bir şeyler ters gitti. Tekrar dene.",
+      "banned": "Topluluk erişimin askıya alındı."
     },
     "reactions": {
       "label": "Tepkiler",
@@ -703,6 +704,18 @@
       "back": "Topluluğa dön",
       "bindingConflict": "Bu cihazın bildirim kaydı değişti. Tekrar deneyin.",
       "pushUnavailable": "Bu cihazda anlık bildirimler kullanılamıyor."
+    },
+    "banned": {
+      "title": "Topluluk erişimin askıya alındı",
+      "temporary": "{{until}} sonrasında geri dönebilirsin. O zamana kadar topluluğu göremez ve topluluğa katılamazsın.",
+      "permanent": "Bu askıya almanın bitiş tarihi yok. Topluluğu göremez ve topluluğa katılamazsın.",
+      "scope": "Gardırobun, günlük ritüelin, uyarıların ve hesap ayarların bundan etkilenmez.",
+      "appeal": {
+        "not_requested": "Bunun bir hata olduğunu düşünüyorsan inceleme istemek için CoutureCast desteğine başvur.",
+        "requested": "İnceleme talebin kaydedildi ve karar bekliyor.",
+        "upheld": "İnceleme talebin değerlendirildi ve bu askıya alma yürürlükte kalıyor.",
+        "overturned": "Bu askıya alma kaldırıldı."
+      }
     }
   },
   "locations": {
@@ -884,7 +897,8 @@
     },
     "alias": {
       "erased": "Silinmiş üye",
-      "unknown": "Adsız üye"
+      "unknown": "Adsız üye",
+      "screening": "Otomatik tarama"
     },
     "mediaReason": {
       "target_erased": "Gönderi silindiği için görseli artık yok.",
@@ -929,7 +943,8 @@
       "reports": "Bildirim: {{count}}",
       "finding": "Tarama bulgusu",
       "refreshing": "Yenileniyor",
-      "refreshed": "İlk sayfadan yenilendi. Gösterilen vaka: {{count}}"
+      "refreshed": "İlk sayfadan yenilendi. Gösterilen vaka: {{count}}",
+      "escalated": "İletildi"
     },
     "detail": {
       "title": "{{source}} vakası",
@@ -958,7 +973,135 @@
       "heldNoCodes": "Kayıtlı kod olmadan incelemeye alındı.",
       "reporters": "Bildirenler",
       "priorActions": "Önceki işlemler",
-      "noPriorActions": "Önceki işlem yok."
+      "noPriorActions": "Önceki işlem yok.",
+      "firstDecision": "İlk karar: {{when}}",
+      "escalated": "Bu vaka bir yöneticiyi bekliyor. Yalnızca bir yönetici kapatabilir."
+    },
+    "action": {
+      "flagged": "Tarama tarafından işaretlendi",
+      "screening_passed": "Taramadan geçti",
+      "held_for_review": "İnceleme için bekletildi",
+      "blocked": "Tarama tarafından engellendi",
+      "screening_failed": "Tarama tamamlanamadı",
+      "released_by_operator": "Yayımlandı",
+      "release": "Yayımlandı",
+      "taken_down_by_operator": "Kaldırıldı",
+      "takedown": "Kaldırıldı",
+      "report_resolved": "Bildirim çözüldü",
+      "resolve": "Bildirim çözüldü",
+      "escalated_by_operator": "Yöneticiye iletildi",
+      "escalate": "Yöneticiye iletildi",
+      "banned_by_operator": "Yazar askıya alındı",
+      "ban": "Yazar askıya alındı",
+      "appeal_requested": "İtiraz kaydedildi",
+      "appeal_upheld": "İtiraz sonrası askıya alma sürdürüldü",
+      "appeal_overturned": "İtiraz sonrası askıya alma kaldırıldı",
+      "unknown": "Diğer işlem"
+    },
+    "decision": {
+      "title": "Karar",
+      "actionLabel": "İşlem",
+      "action": {
+        "resolve": "Çöz",
+        "release": "Yayımla",
+        "takedown": "Kaldır",
+        "escalate": "İlet",
+        "ban": "Yazarı askıya al"
+      },
+      "hint": {
+        "resolve": "Tüm açık bildirimleri kapatır. İçerik olduğu gibi kalır.",
+        "release": "Bekletilen içeriği yayımlar ve tüm açık bildirimleri kapatır.",
+        "takedown": "İçeriği topluluktan kaldırır ve tüm açık bildirimleri kapatır.",
+        "escalate": "Karar vermesi için bir yöneticiye iletir. Bildirimler açık kalır ve süre işlemeye devam eder.",
+        "ban": "Yazarın topluluk erişimini kapatır, bu içeriği kaldırır ve tüm açık bildirimleri kapatır."
+      },
+      "banKind": "Askıya alma türü",
+      "duration": "Süre",
+      "days_one": "{{count}} gün",
+      "days_other": "{{count}} gün",
+      "reason": "Gerekçe (zorunlu)",
+      "reasonCount": "{{max}} karakterden {{count}}, en az {{min}}",
+      "submit": "Kararı uygula",
+      "submitting": "Uygulanıyor",
+      "confirmYes": "Evet, uygula",
+      "cancel": "Vazgeç",
+      "confirm": {
+        "takedown": "Bu içerik şimdi kaldırılsın mı? Okuyucular bir sonraki yüklemede göremez.",
+        "ban_temporary": "Bu yazar seçilen süre boyunca askıya alınsın mı? Topluluk erişimi hemen kapanır.",
+        "ban_permanent": "Bu yazar kalıcı olarak askıya alınsın mı? Tüm topluluk içeriği gizlenir ve tepkileri geri alınır."
+      },
+      "outcome": {
+        "resolve": "Bildirimler çözüldü.",
+        "release": "İçerik yayımlandı ve bildirimler çözüldü.",
+        "takedown": "İçerik kaldırıldı ve bildirimler çözüldü.",
+        "escalate": "Vaka bir yöneticiye iletildi.",
+        "banTemporary": "Yazar {{until}} tarihine kadar askıya alındı.",
+        "banPermanent": "Yazar kalıcı olarak askıya alındı.",
+        "deferred": "Bazı herkese açık sayfaların güncellenmesi biraz sürebilir."
+      },
+      "detail": {
+        "no_open_reports": "Bu vakada açık bildirim yok.",
+        "target_not_held": "Bu içerik bekletilmiyor, bu yüzden yayımlanamaz.",
+        "target_not_published": "Bu içerik yayımlanmadı, bu yüzden kaldırılamaz.",
+        "already_escalated": "Bu vaka zaten iletildi.",
+        "target_erased": "İçerik veya yazarı silindi, bu yüzden bu işlem artık uygulanamaz.",
+        "subject_banned": "Yazar askıya alındı, bu yüzden bu içerik yayımlanamaz.",
+        "already_banned": "Yazarın bunu kapsayan bir askıya alınması zaten var.",
+        "author_ineligible": "Yazar şu anda topluluğa katılamıyor, bu yüzden bu içerik yayımlanamaz.",
+        "community_writes_closed": "Bu yazar için topluluk yayını kapalı, bu yüzden bu içerik henüz yayımlanamaz."
+      },
+      "error": {
+        "invalid_decision": "Karar okunamadı. Gerekçeyi kontrol edip yeniden dene.",
+        "case_not_found": "Bu vaka artık yok. Bir silme işleminden sonra anahtarı değişmiş olabilir.",
+        "sanction_not_found": "Bu yaptırım artık yok.",
+        "moderation_console_disabled": "Moderasyon konsolu kapalı.",
+        "moderation_decisions_disabled": "Moderasyon kararları kapalı. Vakalar okunabilir durumda kalır.",
+        "self_review_refused": "Bu içeriği sen yazdın veya bildirimlerinden birini sen yaptın, bu yüzden başka bir moderatör karar vermeli.",
+        "admin_required": "Bu karar için yönetici gerekir. Devretmek için vakayı ilet.",
+        "operator_sanctioned": "Bu hesabın etkin bir topluluk askıya alınması var, bu yüzden karar uygulayamaz.",
+        "case_conflict": "Bu vaka sen açtıktan sonra değişti. Neyin değiştiğini görmek için yeniden yükle. Gerekçen burada kalır.",
+        "action_not_applicable": "Bu işlem vakanın şu anki durumuna uygulanamaz.",
+        "idempotency_mismatch": "Bu istek başka bir karar için zaten kullanıldı. Yeniden yükleyip tekrar dene.",
+        "appeal_transition_invalid": "Bu itiraz adımı şu anda bu yaptırıma uygulanamaz.",
+        "audit_unavailable": "Karar kaydedilemedi, bu yüzden hiçbir şey değişmedi. Yeniden dene.",
+        "signed_out": "Devam etmek için yeniden giriş yap.",
+        "forbidden": "Bu hesap moderasyon kararı uygulayamaz.",
+        "rate_limited": "Çok fazla istek. Biraz bekleyip yeniden dene.",
+        "offline": "Karar sunucuya ulaşmamış olabilir. Yeniden dene: iki kez uygulanmaz.",
+        "unavailable": "Karar şu anda uygulanamadı. Yeniden dene."
+      }
+    },
+    "standing": {
+      "title": "Yazarın durumu",
+      "state": "Askıya alma",
+      "active": "Etkin",
+      "ended": "Sona erdi",
+      "kindLabel": "Tür",
+      "kind": {
+        "temporary": "Geçici",
+        "permanent": "Kalıcı"
+      },
+      "expires": "Bitiş",
+      "appealLabel": "İtiraz",
+      "appeal": {
+        "not_requested": "Kayıt yok",
+        "requested": "Karar bekliyor",
+        "upheld": "Askıya alma sürdürüldü",
+        "overturned": "Askıya alma kaldırıldı"
+      },
+      "priorBans": "Önceki askıya almalar",
+      "none": "Kayıtlı askıya alma yok.",
+      "appealReason": "İtiraz notu (zorunlu)",
+      "step": {
+        "requested": "İtirazı kaydet",
+        "upheld": "Askıya almayı sürdür",
+        "overturned": "Askıya almayı kaldır"
+      },
+      "outcome": {
+        "requested": "İtiraz kaydedildi.",
+        "upheld": "Askıya alma yürürlükte kalıyor.",
+        "overturned": "Askıya alma kaldırıldı. Üye hâlâ uygunsa içeriği geri geldi."
+      }
     }
   }
 }

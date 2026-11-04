@@ -57,6 +57,7 @@ import {
   type CommunityExperimentVariant,
   type CommunitySponsoredFeed as CommunityFeed,
   type CommunitySponsoredFeedItem as CommunityFeedItem,
+  communityBannedErrorSchema,
   type CommunityFeedMode,
   type CommunityReportReason,
   type CreateCommunityCommentInput,
@@ -128,6 +129,15 @@ async function readServerMessage(response: Response, fallback: string): Promise<
     return typeof message === 'string' && message.trim().length > 0 ? message : fallback
   } catch {
     return fallback
+  }
+}
+
+async function isCommunityBanned(response: Response): Promise<boolean> {
+  if (response.status !== 403) return false
+  try {
+    return communityBannedErrorSchema.safeParse(await response.clone().json()).success
+  } catch {
+    return false
   }
 }
 
@@ -204,9 +214,14 @@ async function communityError(
     return error
   }
   if (error instanceof ResponseError) {
-    const message = await readServerMessage(error.response, fallback)
+    const message = await readServerMessage(error.response.clone(), fallback)
+    // The code comes first. Mobile has no banned copy yet, so a ban reads as the existing
+    // closed-community state, which offers no retry.
+    const reason = (await isCommunityBanned(error.response))
+      ? 'disabled'
+      : reasonForResponse(error.response.status, message)
     return new CommunityRequestError(
-      reasonForResponse(error.response.status, message),
+      reason,
       message,
       readRetryAfterSeconds(error.response),
       error.response.status

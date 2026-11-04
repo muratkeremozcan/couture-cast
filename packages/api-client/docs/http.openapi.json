@@ -18408,12 +18408,24 @@
                   "priorBanCount": {
                     "type": "integer",
                     "minimum": 0
+                  },
+                  "allowedAppealSteps": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "requested",
+                        "upheld",
+                        "overturned"
+                      ]
+                    }
                   }
                 },
                 "required": [
                   "active",
                   "sanction",
-                  "priorBanCount"
+                  "priorBanCount",
+                  "allowedAppealSteps"
                 ],
                 "additionalProperties": false
               }
@@ -29996,12 +30008,24 @@
                             "priorBanCount": {
                               "type": "integer",
                               "minimum": 0
+                            },
+                            "allowedAppealSteps": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "requested",
+                                  "upheld",
+                                  "overturned"
+                                ]
+                              }
                             }
                           },
                           "required": [
                             "active",
                             "sanction",
-                            "priorBanCount"
+                            "priorBanCount",
+                            "allowedAppealSteps"
                           ],
                           "additionalProperties": false
                         }

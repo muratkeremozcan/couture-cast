@@ -94,6 +94,10 @@ export const moderationAppealStatusSchema = z.enum([
 ])
 export type ModerationAppealStatus = z.infer<typeof moderationAppealStatusSchema>
 
+/** The steps an operator can record. `not_requested` is only ever the starting state. */
+export const moderationAppealStepSchema = z.enum(['requested', 'upheld', 'overturned'])
+export type ModerationAppealStep = z.infer<typeof moderationAppealStepSchema>
+
 /** A sanction as an operator sees it. The member's own view is `communityBannedErrorSchema`. */
 export const moderationSanctionSchema = z
   .object({
@@ -113,6 +117,8 @@ export const moderationSubjectStandingSchema = z
     sanction: moderationSanctionSchema.nullable(),
     /** Bans older than `sanction`. */
     priorBanCount: z.number().int().min(0),
+    /** The steps this viewer may record on `sanction` now. */
+    allowedAppealSteps: z.array(moderationAppealStepSchema),
   })
   .strict()
 export type ModerationSubjectStanding = z.infer<typeof moderationSubjectStandingSchema>
