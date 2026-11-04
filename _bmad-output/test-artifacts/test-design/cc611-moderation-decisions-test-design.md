@@ -398,21 +398,21 @@ Interleavings are forced with a held advisory or row lock, and `pg_locks` confir
 
 ### End to end (`playwright/tests/moderation-decisions.spec.ts`, `playwright/tests/api/auth-moderation-security.spec.ts`)
 
-| ID                  | Level | Pri | AC     | Red | Scenario                                                                                                                                                                                                                |
-| ------------------- | ----- | --- | ------ | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P-D-ROLES           | E2E   | P0  | S2     | R   | API role matrix on both routes through `apiRequest`: no token 401; guardian and teen 403 with one body for real and unknown ids; a forged `moderatorId` 400 and nothing written                                         |
-| P-D-JOURNEY         | E2E   | P0  | E1, S1 | R   | Moderator opens a case in the console, resolves, reads the outcome, sees `firstDecisionAt` and the prior action. Same for release and takedown from seeded cases                                                        |
-| P-D-CONFLICT        | E2E   | P0  | E2, S3 | R   | Two browser contexts on one case: the second submit shows the conflict state with the reason kept; reload and resubmit gives `action_not_applicable` or applies per the new state                                       |
-| P-D-BAN-JOURNEY     | E2E   | P0  | E3, S7 | R   | Moderator bans for 7 days. In the member's open community page the socket closes, the banned notice shows localized copy, comment and reaction fail, and wardrobe still loads. A second member no longer sees the post  |
-| P-D-AXE             | E2E   | P0  | S9     | R   | axe with `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22a`, `wcag22aa` on panel idle, confirm, conflict, applied, standing and banned notice, in light and dark, at 375 and 1280                                    |
-| P-D-TAKEDOWN-PUBLIC | E2E   | P1  | E2, S6 | R   | A second member's feed, spotlight and teaser lose the post on the next read after a takedown, using `recurse` with a bounded window                                                                                     |
-| P-D-KEYBOARD        | E2E   | P1  | S9     | R   | Whole decision by keyboard with real Tab presses: action, reason, confirm, outcome, with focus visible at each step                                                                                                     |
-| P-D-THEMES-WIDTHS   | E2E   | P1  | S9     | R   | Panel and notice at 375 and 1280, light and dark: no horizontal overflow, targets at 44 px; screenshots saved under `story-6-11/`                                                                                       |
-| P-D-OFFLINE-RETRY   | E2E   | P1  | E2, S4 | R   | Commit, drop the response by routing, retry from the offline state: `replayed:true`, one decision row, one announcement                                                                                                 |
-| P-D-APPEAL          | E2E   | P1  | E3, S7 | R   | Moderator records `requested`; admin overturns; the member's community page returns on reload                                                                                                                           |
-| P-D-PREVIEW-CLOSED  | E2E   | P1  | S2     | R   | Live on a preview with no database: flags closed, moderator gets 503 `moderation_decisions_disabled` with `private, no-store`; guardian, teen and anonymous stay 403 and 401; the detail stays read-only in the browser |
-| P-D-LOCALE          | E2E   | P2  | S8     | R   | `es-419` and the locale with the longest strings render the panel and notice with no overflow and no raw enum                                                                                                           |
-| P-D-DISABLED        | E2E   | P2  | S8     | R   | A routed 503 renders the read-only console (RG5)                                                                                                                                                                        |
+| ID                  | Level | Pri | AC     | Red | Scenario                                                                                                                                                                                                                                                            |
+| ------------------- | ----- | --- | ------ | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P-D-ROLES           | E2E   | P0  | S2     | R   | API role matrix on both routes through `apiRequest`: no token 401; guardian and teen 403 with one body for real and unknown ids; a forged `moderatorId` 400 and nothing written                                                                                     |
+| P-D-JOURNEY         | E2E   | P0  | E1, S1 | R   | Moderator opens a case in the console, resolves, reads the outcome, sees `firstDecisionAt` and the prior action. Same for release and takedown from seeded cases                                                                                                    |
+| P-D-CONFLICT        | E2E   | P0  | E2, S3 | R   | Two browser contexts on one case: the second submit shows the conflict state with the reason kept; reload and resubmit gives `action_not_applicable` or applies per the new state                                                                                   |
+| P-D-BAN-JOURNEY     | E2E   | P0  | E3, S7 | R   | Moderator bans for 7 days. In the member's open community page the socket closes, the banned notice shows localized copy, comment and reaction fail, and wardrobe still loads. A second member no longer sees the post                                              |
+| P-D-AXE             | E2E   | P0  | S9     | R   | axe with `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22a`, `wcag22aa` on panel idle, confirm, conflict, applied, standing and banned notice, in light and dark, at 375 and 1280                                                                                |
+| P-D-TAKEDOWN-PUBLIC | E2E   | P1  | E2, S6 | R   | A second member's feed, spotlight and teaser lose the post on one read after a takedown, with no polling; only a `deferred` answer may wait for the worker                                                                                                          |
+| P-D-KEYBOARD        | E2E   | P1  | S9     | R   | Whole decision by keyboard with real Tab presses: action, reason, confirm, outcome, with focus visible at each step                                                                                                                                                 |
+| P-D-THEMES-WIDTHS   | E2E   | P1  | S9     | R   | Panel and notice at 375 and 1280, light and dark: no horizontal overflow, targets at 44 px; screenshots saved under `story-6-11/`                                                                                                                                   |
+| P-D-OFFLINE-RETRY   | E2E   | P1  | E2, S4 | R   | Commit, drop the response by routing, retry from the offline state: `replayed:true`, one decision row, one announcement                                                                                                                                             |
+| P-D-APPEAL          | E2E   | P1  | E3, S7 | R   | Moderator records `requested`; admin overturns; the member's community page returns on reload                                                                                                                                                                       |
+| P-D-PREVIEW-CLOSED  | E2E   | P1  | S2     | R   | Live on a preview with no database: flags closed, moderator gets 503 `moderation_console_disabled` (the controller reads the console flag first) with `private, no-store`; guardian, teen and anonymous stay 403 and 401; the detail stays read-only in the browser |
+| P-D-LOCALE          | E2E   | P2  | S8     | R   | `es-419` and the locale with the longest strings render the panel and notice with no overflow and no raw enum                                                                                                                                                       |
+| P-D-DISABLED        | E2E   | P2  | S8     | R   | A routed 503 renders the read-only console (RG5)                                                                                                                                                                                                                    |
 
 ### Manual and process
 
@@ -590,6 +590,37 @@ No stash, checkout of paths or reset in the shared checkout.
 | S-12 | Restore the queue's plain `blocked` finding predicate                 | I-S-FINDING-PARITY                     |
 | S-13 | Let the panel offer `permanent` to a moderator                        | I-D-ALLOWED-PARITY, C-WEB-D-PANEL      |
 | S-14 | Remove the `setReaction` sanction check                               | U-B-ROUTE-MATRIX, I-B-ROUTES           |
+
+---
+
+### Seeded-defect results
+
+Run in a throwaway `git worktree` at commit `5da755c1` with `node_modules` symlinked, then removed.
+Every defect turned the named tests red for the stated reason, except the two S-17 comment forms, which exposed a real test gap.
+
+| ID   | Defect injected                                                                      | Red tests (failed count)                                                       |
+| ---- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| S-1  | Optional `moderatorId` in the body, used as the moderator                            | U-D-CONTRACT-STRICT (1), U-D-CTRL-IDENTITY (1)                                 |
+| S-2  | `RolesGuard` only on `decide`, leaving the appeal route open                         | U-D-CTRL-ROLES (4), I-D-HTTP (2). P-D-ROLES not run for this proof             |
+| S-3  | The decision reuses the case read taken before the locks                             | I-C-REPORT-RACE (4)                                                            |
+| S-4  | Replay check moved after the refusal checks                                          | I-C-RETRY-MOVED (6)                                                            |
+| S-5  | `resolved_at` stamped on every report of the case                                    | I-C-FIRST-DECISION (1), I-C-RESOLVED-AT (1)                                    |
+| S-6  | `AuditLog` written after commit                                                      | I-D-ATOMIC (1)                                                                 |
+| S-7  | D14 projection removed                                                               | U-B-D14 (3)                                                                    |
+| S-8  | Sanction check moved into the shared comment `eligibility` closure                   | I-B-RETRACT (3)                                                                |
+| S-9  | The ban also writes `compliance.accountStatus`                                       | I-B-NONCOMMUNITY (1), I-B-TEEN (1)                                             |
+| S-10 | Eligibility gate removed from the overturn restore                                   | I-A-OVERTURN-CONSENT (2)                                                       |
+| S-11 | Unbounded spotlight bump inside the transaction                                      | U-D-SVC-POSTCOMMIT (6), I-K-REDIS-DOWN (2)                                     |
+| S-12 | Plain `blocked` finding predicate, in SQL and in TypeScript separately               | I-S-FINDING-PARITY (2 each)                                                    |
+| S-13 | `banKinds` computed as admin; panel hardcodes both kinds                             | I-D-ALLOWED-PARITY (1), U-D-ALLOWED-RULES (9); C-WEB-D-PANEL (1)               |
+| S-14 | Sanction check removed from `setReaction`                                            | U-B-ROUTE-MATRIX (1), I-B-ROUTES (8), I-B-FLAG-OFF (4)                         |
+| S-15 | Check removed from `assertPublicPostReadable`, allocate and publish, each separately | U-B-ROUTE-MATRIX (3, 1), I-B-ROUTES (6, 2, 2), I-B-FLAG-OFF (3, 1, 1)          |
+| S-16 | A banned actor link makes the group ineligible again                                 | I-B-SEND-GUARD (1)                                                             |
+| S-17 | Restore matches any `community_ban:` prefix                                          | I-B-UPGRADE (1) for posts. Comments survived and gained a test in I-A-OVERTURN |
+
+S-2 is the closest form the code allows, because the guard sits on the class.
+S-9 keeps the sanction row and adds the rejected store, because removing the row would fail every ban test for an unrelated reason.
+The concurrency author also ran 19 mutations of its own, all red. Its attempt-limit mutation for I-C-DEADLOCK was never run, and that row cannot force `40P01`.
 
 ---
 

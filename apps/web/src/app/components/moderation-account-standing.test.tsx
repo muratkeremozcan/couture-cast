@@ -4,7 +4,7 @@
 // `firstDecisionAt` and the escalated marker on the detail and the queue row.
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type {
   ModerationAppealInput,
@@ -27,7 +27,21 @@ import {
 import { ModerationCaseDetailView } from './moderation-case-detail'
 import { ModerationQueueView } from './moderation-queue'
 
-beforeEach(() => signIn())
+const CANARY_URL = '/test-only/request-canary'
+// The opt-in test latency can give a canary a shorter wait than an earlier request, so it also waits the longest one.
+const longestTestLatencyMs = () =>
+  typeof process === 'undefined' ? 0 : Number(process.env.MSW_TEST_DELAY_MS ?? 0)
+const canaryHandler = http.post(`*${CANARY_URL}`, async ({ request }) => {
+  await request.text()
+  await delay(longestTestLatencyMs())
+  return HttpResponse.json({})
+})
+
+// Registered ahead of each test's own handlers, so MSW tries all of those first for a canary.
+beforeEach(() => {
+  signIn()
+  mockApi(canaryHandler)
+})
 afterEach(() => window.sessionStorage.clear())
 
 const EXPIRES_AT = '2026-11-10T12:00:00.000Z'
@@ -74,10 +88,18 @@ const section = () => screen.getByRole('region', { name: 'Author standing' })
 const noteBox = () => screen.getByRole('textbox', { name: 'Appeal note (required)' })
 const typeNote = (value: string = NOTE) =>
   fireEvent.change(noteBox(), { target: { value } })
-const settle = () =>
-  act(async () => {
-    await new Promise((resolve) => window.setTimeout(resolve, 0))
-  })
+/**
+ * Waits until every request sent so far has reached its handler, so a stray one has been counted.
+ * A canary is the slowest route through MSW: it carries a body, and every other handler goes first.
+ * The second round sees whatever the commits of the first round sent.
+ * A request sent later than this is out of reach, and this client has no timer that would send one.
+ */
+const settle = async () => {
+  for (let round = 0; round < 2; round += 1)
+    await act(async () => {
+      await fetch(CANARY_URL, { method: 'POST', body: 'canary' })
+    })
+}
 
 /** The value beside a term in the standing list. */
 function valueOf(term: string) {

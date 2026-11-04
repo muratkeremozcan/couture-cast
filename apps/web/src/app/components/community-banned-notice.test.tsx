@@ -4,7 +4,7 @@
 // The grid runs through the real web transport and MSW.
 import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   COMMUNITY_BANNED_MESSAGE,
@@ -13,7 +13,11 @@ import {
   type CommunityBannedError,
   type ModerationAppealStatus,
 } from '@couture/api-client/contracts/http'
-import { CommunitySyncState } from '@couture/api-client'
+import {
+  COMMUNITY_UNAVAILABLE_MAX_RETRY_SECONDS,
+  CommunitySyncState,
+  SPOTLIGHT_TEASER_REREAD_MS,
+} from '@couture/api-client'
 import { getI18n } from '../../i18n'
 import deDE from '../../i18n/locales/de-DE.json'
 import enUS from '../../i18n/locales/en-US.json'
@@ -80,6 +84,70 @@ function renderNotice(sanction: CommunityBannedError['sanction'], language = 'en
   const t = (key: string, options?: Record<string, unknown>) =>
     translate(key, options ?? {})
   return render(<CommunityBannedNotice sanction={sanction} language={language} t={t} />)
+}
+
+const CANARY_URL = '/test-only/request-canary'
+// The opt-in test latency can give a canary a shorter wait than an earlier request, so it also waits the longest one.
+const longestTestLatencyMs = () =>
+  typeof process === 'undefined' ? 0 : Number(process.env.MSW_TEST_DELAY_MS ?? 0)
+
+// Registered ahead of each test's own handlers, so MSW tries all of those first for a canary.
+beforeEach(() => {
+  const install = useMswHandlers
+  install(
+    http.post(`*${CANARY_URL}`, async ({ request }) => {
+      await request.text()
+      // Nothing is delayed on a fake clock, so nothing needs outlasting there.
+      if (!vi.isFakeTimers()) await delay(longestTestLatencyMs())
+      return HttpResponse.json({})
+    })
+  )
+})
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+/**
+ * Waits until every request sent so far has reached its handler, so a stray one has been counted.
+ * A canary is the slowest route through MSW: it carries a body, and every other handler goes first.
+ * The second round sees whatever the commits of the first round sent.
+ */
+const settle = async () => {
+  for (let round = 0; round < 2; round += 1)
+    await act(async () => {
+      await fetch(CANARY_URL, { method: 'POST', body: 'canary' })
+    })
+}
+
+// The longest pause any feed read takes before its one retry, plus a margin.
+const FEED_RETRY_WINDOW_MS = COMMUNITY_UNAVAILABLE_MAX_RETRY_SECONDS * 1000 + 1000
+// The teaser's only timed read comes this long after an attempt, past both the 5 s pause and the 60 s floor.
+const TEASER_RETRY_WINDOW_MS = SPOTLIGHT_TEASER_REREAD_MS + 1000
+
+/**
+ * Puts the timers on a fake clock, which a test must do before the first read.
+ * A retry armed on the real clock would never notice the jump in `passRetryWindow`.
+ * The clock also follows real time, so MSW and the waits of Testing Library keep moving.
+ */
+function startRetryClock({ withDate = false } = {}) {
+  vi.useFakeTimers({
+    shouldAdvanceTime: true,
+    toFake: [
+      'setTimeout',
+      'clearTimeout',
+      'setInterval',
+      'clearInterval',
+      ...(withDate ? (['Date'] as const) : []),
+    ],
+  })
+}
+
+/** Jumps past a retry window, then waits for whatever fired inside it to reach its handler. */
+async function passRetryWindow(windowMs: number) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(windowMs)
+  })
+  await settle()
 }
 
 const notice = () => screen.getByTestId('community-banned-notice')
@@ -174,11 +242,13 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
   }
 
   it('replaces the first read with the notice, one read and no retry', async () => {
+    startRetryClock()
     signIn()
     const state = { banned: true, reads: 0 }
     serve(state)
     renderGrid()
     expect(await screen.findByTestId('community-banned-notice')).toBeInTheDocument()
+    await passRetryWindow(FEED_RETRY_WINDOW_MS)
     expect(state.reads).toBe(1)
     expect(cardsShown()).toBe(0)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -263,6 +333,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     const chip = screen.getByTestId('community-filter-all')
     expect(chip).toHaveAttribute('aria-disabled', 'true')
     await userEvent.click(chip)
+    await settle()
     expect(state.reads).toBe(reads)
     expect(chip).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByRole('link', { name: 'Community notifications' })).toBeNull()
@@ -323,6 +394,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     }
 
     it('reaches the banned state on its next read', async () => {
+      startRetryClock()
       signIn()
       const sync = captureSync()
       const state = { banned: false, reads: 0, denied: false }
@@ -337,6 +409,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       })
       expect(await screen.findByTestId('community-banned-notice')).toBeInTheDocument()
       expect(screen.queryByText(item().caption!)).not.toBeInTheDocument()
+      await passRetryWindow(FEED_RETRY_WINDOW_MS)
       expect(state.reads).toBe(readsBefore + 1)
     })
 
@@ -353,9 +426,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
         await sync().catchUp()
       })
       await waitFor(() => expect(state.reads).toBe(readsBefore + 1))
-      await act(async () => {
-        await new Promise((resolve) => window.setTimeout(resolve, 0))
-      })
+      await settle()
       expect(queryNotice()).not.toBeInTheDocument()
       expect(screen.queryByText(item().caption!)).not.toBeInTheDocument()
     })
@@ -372,6 +443,8 @@ describe('TEA-22: the home teaser', () => {
   })
 
   it('reads once, shows no module and never retries a banned member', async () => {
+    // The Date too, since the 60 s read floor would otherwise swallow a late re-read.
+    startRetryClock({ withDate: true })
     signIn()
     stubVisibility()
     const reads: (string | null)[] = []
@@ -383,9 +456,7 @@ describe('TEA-22: the home teaser', () => {
     )
     const { result } = renderHook(() => useHomeSpotlightTeaser({ stacked: true }))
     await waitFor(() => expect(reads).toEqual(['home_teaser']))
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 0))
-    })
+    await passRetryWindow(TEASER_RETRY_WINDOW_MS)
     expect(result.current.value).toBeNull()
     expect(reads).toHaveLength(1)
   })

@@ -5,7 +5,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
-import { HttpResponse, type JsonBodyType } from 'msw'
+import { delay, http, HttpResponse, type JsonBodyType } from 'msw'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -28,6 +28,16 @@ import {
 } from '../../test-utils/moderation-console'
 import { ModerationCaseDetailView } from './moderation-case-detail'
 
+const CANARY_URL = '/test-only/request-canary'
+// The opt-in test latency can give a canary a shorter wait than an earlier request, so it also waits the longest one.
+const longestTestLatencyMs = () =>
+  typeof process === 'undefined' ? 0 : Number(process.env.MSW_TEST_DELAY_MS ?? 0)
+const canaryHandler = http.post(`*${CANARY_URL}`, async ({ request }) => {
+  await request.text()
+  await delay(longestTestLatencyMs())
+  return HttpResponse.json({})
+})
+
 const REASON = 'Harassing caption'
 const ALL_ACTIONS: ModerationDecisionAction[] = [
   'resolve',
@@ -44,7 +54,11 @@ const ACTION_NAME: Record<ModerationDecisionAction, RegExp> = {
   ban: /^Ban the author/,
 }
 
-beforeEach(() => signIn())
+// Registered ahead of each test's own handlers, so MSW tries all of those first for a canary.
+beforeEach(() => {
+  signIn()
+  mockApi(canaryHandler)
+})
 afterEach(() => {
   vi.restoreAllMocks()
   window.sessionStorage.clear()
@@ -99,11 +113,18 @@ const closed = (statusCode: number, code: string, extra: object = {}) =>
 const offline = () => HttpResponse.error()
 const conflict = closed(409, 'case_conflict', { currentRevision: MOVED_REVISION })
 
-/** Lets every queued response and React commit finish, so a stray read would have been counted. */
-const settle = () =>
-  act(async () => {
-    await new Promise((resolve) => window.setTimeout(resolve, 0))
-  })
+/**
+ * Waits until every request sent so far has reached its handler, so a stray one has been counted.
+ * A canary is the slowest route through MSW: it carries a body, and every other handler goes first.
+ * The second round sees whatever the commits of the first round sent.
+ * A request sent later than this is out of reach, and this client has no timer that would send one.
+ */
+const settle = async () => {
+  for (let round = 0; round < 2; round += 1)
+    await act(async () => {
+      await fetch(CANARY_URL, { method: 'POST', body: 'canary' })
+    })
+}
 
 async function submitResolve() {
   typeReason()
