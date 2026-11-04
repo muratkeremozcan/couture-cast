@@ -57,7 +57,6 @@ import {
   type CommunityExperimentVariant,
   type CommunitySponsoredFeed as CommunityFeed,
   type CommunitySponsoredFeedItem as CommunityFeedItem,
-  communityBannedErrorSchema,
   type CommunityFeedMode,
   type CommunityReportReason,
   type CreateCommunityCommentInput,
@@ -132,10 +131,12 @@ async function readServerMessage(response: Response, fallback: string): Promise<
   }
 }
 
+/** By the code alone, so a key a newer server added cannot send a ban to the message rules. */
 async function isCommunityBanned(response: Response): Promise<boolean> {
   if (response.status !== 403) return false
   try {
-    return communityBannedErrorSchema.safeParse(await response.clone().json()).success
+    const body: unknown = await response.clone().json()
+    return (body as { code?: unknown } | null)?.code === 'community_banned'
   } catch {
     return false
   }
@@ -757,8 +758,11 @@ export async function setCommunityReactionFromMobile(
       conflict: false,
     }
   } catch (error: unknown) {
-    if (error instanceof ResponseError && error.response.status === 403)
+    if (error instanceof ResponseError && error.response.status === 403) {
+      if (await isCommunityBanned(error.response))
+        throw await communityError(error, 'Community access is suspended.')
       throw new CommunityRequestError('age_gate', 'Reaction eligibility required.')
+    }
     if (error instanceof ResponseError && error.response.status === 409) {
       const conflict = communityReactionConflictResponseSchema.safeParse(
         await error.response.clone().json()

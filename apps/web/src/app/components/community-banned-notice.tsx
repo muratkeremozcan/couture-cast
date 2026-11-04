@@ -23,7 +23,6 @@ export function CommunityBannedNotice({
     : null
   return (
     <section
-      role="status"
       aria-labelledby="community-banned-title"
       data-testid="community-banned-notice"
       className="flex flex-col gap-3 rounded-lg border border-neutral-400 bg-white p-6 text-neutral-900 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100"

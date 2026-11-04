@@ -129,7 +129,8 @@ export class ModerationAfterCommit {
         step().then(() => true),
         new Promise<boolean>((resolve) => {
           timer = setTimeout(() => resolve(false), MODERATION_AFTER_COMMIT_BOUND_MS)
-          timer.unref?.()
+          const handle = timer as unknown as { unref?: () => void }
+          handle.unref?.()
         }),
       ])
     } catch {

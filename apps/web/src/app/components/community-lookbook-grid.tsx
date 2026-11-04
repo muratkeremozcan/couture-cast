@@ -1996,6 +1996,9 @@ function SpotlightFocusNotice({
   )
 }
 
+/** A ban hides the feed, its author states and every action, like lost access does. */
+const feedVisible = (available: boolean, banned: unknown) => available && !banned
+
 function communityPresentation(
   available: boolean,
   hasSession: boolean,
@@ -2526,7 +2529,13 @@ export function CommunityLookbookGrid({
         if (sanction) {
           setBannedSanction(sanction)
           setItems([])
+          setAuthorStates([])
+          setActiveChallenge(null)
+          setNextCursor(null)
           setFeedError(null)
+          // The notice mounts with its words, which a screen reader may not hear, so the page's
+          // live region says it.
+          setAnnouncement({ key: 'community.error.banned' })
           return
         }
         const message = messageForError(
@@ -2845,7 +2854,9 @@ export function CommunityLookbookGrid({
           void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
             (error: unknown) => {
               const sanction = communitySanctionOf(error)
-              if (active && sanction) setBannedSanction(sanction)
+              if (!active || !sanction) return
+              setBannedSanction(sanction)
+              setAnnouncement({ key: 'community.error.banned' })
             }
           )
         }
@@ -3500,7 +3511,7 @@ export function CommunityLookbookGrid({
   ])
 
   const presentation = communityPresentation(
-    communityAvailable,
+    feedVisible(communityAvailable, bannedSanction),
     hasSession,
     displayedItems,
     authorStates,

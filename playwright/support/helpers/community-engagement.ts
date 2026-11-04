@@ -481,7 +481,7 @@ export async function observeCommunitySocket(page: Page) {
   }
 }
 
-/** Controlled operator entry point. Production has no HTTP moderation operator route. */
+/** Controlled operator entry point for a test that needs a takedown with no console or decision row. */
 export async function takeDownCommunityLook(postId: string, operatorId: string) {
   const db = communityTestDatabase()
   // The normal local Playwright route builds API dist before executing browser tests.

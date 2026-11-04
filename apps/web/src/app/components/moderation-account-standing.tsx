@@ -2,7 +2,7 @@
 
 // Story 6.11 web owner: the author's standing and appeal steps in the case view.
 // The steps come from the API. An appeal is recorded by an operator: members have no appeal form yet.
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   MODERATION_REASON_MAX_LENGTH,
   MODERATION_REASON_MIN_LENGTH,
@@ -39,6 +39,10 @@ export function ModerationAccountStanding({
   const [lastStep, setLastStep] = useState<ModerationAppealStep | null>(null)
   const inFlight = useRef(false)
   const keeper = useMemo(() => createMutationIdKeeper(), [])
+  // A new reading answers the old failure. The typed note stays.
+  useEffect(() => {
+    setFailure(null)
+  }, [detail.revision, standing?.sanction?.appealStatus])
   if (!standing) return null
   const { sanction } = standing
 
@@ -63,7 +67,9 @@ export function ModerationAccountStanding({
       setReason('')
       onApplied(t(`moderation.standing.outcome.${step}`))
     } catch (error) {
-      setFailure(moderationDecisionFailure(error))
+      const next = moderationDecisionFailure(error)
+      if (next.failure === 'idempotency_mismatch') keeper.clear()
+      setFailure(next)
     } finally {
       inFlight.current = false
       setSubmitting(false)
@@ -115,6 +121,8 @@ export function ModerationAccountStanding({
             {t('moderation.standing.appealReason')}
             <textarea
               className="min-h-[72px] rounded border border-neutral-500 bg-white p-2 text-sm font-normal text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)] dark:bg-neutral-900 dark:text-neutral-100"
+              aria-required="true"
+              aria-invalid={trimmed.length > MODERATION_REASON_MAX_LENGTH}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
             />
@@ -125,7 +133,10 @@ export function ModerationAccountStanding({
               onRetry={() => {
                 if (lastStep) void send(lastStep)
               }}
-              onReload={onReload}
+              onReload={() => {
+                setFailure(null)
+                onReload()
+              }}
             />
           ) : null}
           <div className="flex flex-wrap gap-3">

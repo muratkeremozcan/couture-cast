@@ -3,7 +3,7 @@
 // Story 6.11 web owner: the decision form of the case view.
 // It renders only what the API allows this viewer now and decides nothing about roles.
 // A typed reason survives every recoverable failure. There is no browser dialog: a takedown and a ban confirm in place.
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   MODERATION_BAN_DURATION_DAYS,
   MODERATION_REASON_MAX_LENGTH,
@@ -11,6 +11,7 @@ import {
   type ModerationDecisionAction,
   type ModerationDecisionDetail,
   type ModerationDecisionInput,
+  type ModerationDecisionResult,
   type ModerationSanctionKind,
 } from '@couture/api-client/contracts/http'
 import {
@@ -71,6 +72,89 @@ export function DecisionFailureNotice({
   )
 }
 
+type Translate = ReturnType<typeof useModerationTranslation>['t']
+
+function decisionOutcomeMessage(
+  result: ModerationDecisionResult,
+  t: Translate,
+  language: string
+): string {
+  const until = result.sanction?.expiresAt
+    ? new Intl.DateTimeFormat(language || 'en-US', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+      }).format(new Date(result.sanction.expiresAt))
+    : null
+  const outcome =
+    result.action === 'ban'
+      ? until
+        ? t('moderation.decision.outcome.banTemporary', { until })
+        : t('moderation.decision.outcome.banPermanent')
+      : t(`moderation.decision.outcome.${result.action}`)
+  return result.cacheInvalidation === 'deferred'
+    ? `${outcome} ${t('moderation.decision.outcome.deferred')}`
+    : outcome
+}
+
+const isValidReason = (trimmed: string) =>
+  trimmed.length >= MODERATION_REASON_MIN_LENGTH &&
+  trimmed.length <= MODERATION_REASON_MAX_LENGTH
+
+function BanTermsFields({
+  banKinds,
+  banKind,
+  durationDays,
+  onKind,
+  onDuration,
+}: {
+  banKinds: readonly ModerationSanctionKind[]
+  banKind: ModerationSanctionKind
+  durationDays: Duration
+  onKind: (kind: ModerationSanctionKind) => void
+  onDuration: (days: Duration) => void
+}) {
+  const { t } = useModerationTranslation()
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        {t('moderation.decision.banKind')}
+        <select
+          className={field}
+          value={banKind}
+          onChange={(event) => onKind(event.target.value as ModerationSanctionKind)}
+        >
+          {banKinds.map((kind) => (
+            <option key={kind} value={kind}>
+              {t(`moderation.standing.kind.${kind}`)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {banKind === 'temporary' ? (
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          {t('moderation.decision.duration')}
+          <select
+            className={field}
+            value={durationDays}
+            onChange={(event) => onDuration(Number(event.target.value) as Duration)}
+          >
+            {MODERATION_BAN_DURATION_DAYS.map((days) => (
+              <option key={days} value={days}>
+                {t('moderation.decision.days', { count: days })}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+    </div>
+  )
+}
+
+/** The chosen value while the API still offers it, else its first offer. */
+function stillOffered<T>(chosen: T | null, offered: readonly T[], fallback: T | null) {
+  return chosen !== null && offered.includes(chosen) ? chosen : (offered[0] ?? fallback)
+}
+
 export function ModerationDecisionPanel({
   detail,
   onApplied,
@@ -82,13 +166,16 @@ export function ModerationDecisionPanel({
 }) {
   const { t, i18n } = useModerationTranslation()
   const allowed = detail.allowedActions
-  const [action, setAction] = useState<ModerationDecisionAction | null>(
+  const [chosen, setChosen] = useState<ModerationDecisionAction | null>(
     allowed[0] ?? null
   )
+  // A reload can narrow the list. The panel then never sends an action the API stopped offering.
+  const action = stillOffered(chosen, allowed, null)
   const [reason, setReason] = useState('')
-  const [banKind, setBanKind] = useState<ModerationSanctionKind>(
+  const [chosenKind, setChosenKind] = useState<ModerationSanctionKind>(
     detail.banKinds[0] ?? 'temporary'
   )
+  const banKind = stillOffered(chosenKind, detail.banKinds, chosenKind) ?? chosenKind
   const [durationDays, setDurationDays] = useState<Duration>(7)
   const [confirming, setConfirming] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -96,13 +183,29 @@ export function ModerationDecisionPanel({
   const inFlight = useRef(false)
   const submitRef = useRef<HTMLButtonElement>(null)
   const keeper = useMemo(() => createMutationIdKeeper(), [])
+  // The control that held focus is gone after a confirmation closes, so focus returns on the
+  // next commit, when the submit button exists again.
+  const focusSubmit = useRef(false)
+  useEffect(() => {
+    if (confirming || !focusSubmit.current) return
+    focusSubmit.current = false
+    submitRef.current?.focus()
+  }, [confirming])
+  // A new reading answers the old failure. The typed reason stays.
+  useEffect(() => {
+    setFailure(null)
+    setConfirming(false)
+    // The Reload inside the failure notice goes away with it.
+    if (focusSubmit.current) {
+      focusSubmit.current = false
+      submitRef.current?.focus()
+    }
+  }, [detail.revision])
 
   if (!action || allowed.length === 0) return null
 
   const trimmed = reason.trim()
-  const reasonValid =
-    trimmed.length >= MODERATION_REASON_MIN_LENGTH &&
-    trimmed.length <= MODERATION_REASON_MAX_LENGTH
+  const reasonValid = isValidReason(trimmed)
 
   const send = async () => {
     if (inFlight.current || !reasonValid) return
@@ -124,25 +227,13 @@ export function ModerationDecisionPanel({
       keeper.clear()
       setReason('')
       setConfirming(false)
-      const until = result.sanction?.expiresAt
-        ? new Intl.DateTimeFormat(i18n.language || 'en-US', {
-            dateStyle: 'long',
-            timeStyle: 'short',
-          }).format(new Date(result.sanction.expiresAt))
-        : null
-      const outcome =
-        result.action === 'ban'
-          ? until
-            ? t('moderation.decision.outcome.banTemporary', { until })
-            : t('moderation.decision.outcome.banPermanent')
-          : t(`moderation.decision.outcome.${result.action}`)
-      onApplied(
-        result.cacheInvalidation === 'deferred'
-          ? `${outcome} ${t('moderation.decision.outcome.deferred')}`
-          : outcome
-      )
+      onApplied(decisionOutcomeMessage(result, t, i18n.language))
     } catch (error) {
-      setFailure(moderationDecisionFailure(error))
+      const next = moderationDecisionFailure(error)
+      // That id belongs to a different request, so retrying with it can only fail again.
+      if (next.failure === 'idempotency_mismatch') keeper.clear()
+      setFailure(next)
+      focusSubmit.current = confirming
       setConfirming(false)
     } finally {
       inFlight.current = false
@@ -160,8 +251,8 @@ export function ModerationDecisionPanel({
   }
 
   const cancelConfirm = () => {
+    focusSubmit.current = true
     setConfirming(false)
-    submitRef.current?.focus()
   }
 
   const counterId = 'moderation-decision-count'
@@ -171,6 +262,7 @@ export function ModerationDecisionPanel({
         {t('moderation.decision.title')}
       </h2>
       <form
+        noValidate
         className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault()
@@ -186,10 +278,10 @@ export function ModerationDecisionPanel({
               <input
                 type="radio"
                 name="moderation-decision-action"
-                className="h-5 w-5"
+                className="h-5 min-h-0 w-5 min-w-0 shrink-0"
                 checked={action === option}
                 onChange={() => {
-                  setAction(option)
+                  setChosen(option)
                   setConfirming(false)
                   setFailure(null)
                 }}
@@ -207,49 +299,21 @@ export function ModerationDecisionPanel({
         </fieldset>
 
         {action === 'ban' ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm font-medium">
-              {t('moderation.decision.banKind')}
-              <select
-                className={field}
-                value={banKind}
-                onChange={(event) =>
-                  setBanKind(event.target.value as ModerationSanctionKind)
-                }
-              >
-                {detail.banKinds.map((kind) => (
-                  <option key={kind} value={kind}>
-                    {t(`moderation.standing.kind.${kind}`)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {banKind === 'temporary' ? (
-              <label className="flex flex-col gap-1 text-sm font-medium">
-                {t('moderation.decision.duration')}
-                <select
-                  className={field}
-                  value={durationDays}
-                  onChange={(event) =>
-                    setDurationDays(Number(event.target.value) as Duration)
-                  }
-                >
-                  {MODERATION_BAN_DURATION_DAYS.map((days) => (
-                    <option key={days} value={days}>
-                      {t('moderation.decision.days', { count: days })}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-          </div>
+          <BanTermsFields
+            banKinds={detail.banKinds}
+            banKind={banKind}
+            durationDays={durationDays}
+            onKind={setChosenKind}
+            onDuration={setDurationDays}
+          />
         ) : null}
 
         <label className="flex flex-col gap-1 text-sm font-medium">
           {t('moderation.decision.reason')}
           <textarea
             className={`${field} min-h-[96px] font-normal`}
-            required
+            aria-required="true"
+            aria-invalid={trimmed.length > MODERATION_REASON_MAX_LENGTH}
             value={reason}
             aria-describedby={counterId}
             onChange={(event) => setReason(event.target.value)}
@@ -267,7 +331,10 @@ export function ModerationDecisionPanel({
           <DecisionFailureNotice
             state={failure}
             onRetry={() => void send()}
-            onReload={onReload}
+            onReload={() => {
+              focusSubmit.current = true
+              onReload()
+            }}
           />
         ) : null}
 

@@ -68,6 +68,7 @@ import {
   type CommunityReportReason,
   type CreateCommunityCommentInput,
   type SupportedLocale,
+  COMMUNITY_BANNED_MESSAGE,
   communityBannedErrorSchema,
   type CommunityBannedError,
 } from '@couture/api-client/contracts/http'
@@ -177,13 +178,32 @@ async function readServerMessage(response: Response, fallback: string): Promise<
   }
 }
 
-async function readBannedError(response: Response): Promise<CommunityBannedError | null> {
+/**
+ * Reads the ban by its code and tolerates a key a newer server added, because a ban must never
+ * fall through to the message rules. The sanction is present only when its own fields parse.
+ */
+async function readBannedError(
+  response: Response
+): Promise<{ message: string; sanction?: CommunityBannedError['sanction'] } | null> {
   if (response.status !== 403) return null
+  let body: Record<string, unknown>
   try {
-    const parsed = communityBannedErrorSchema.safeParse(await response.clone().json())
-    return parsed.success ? parsed.data : null
+    const parsed: unknown = await response.clone().json()
+    if (typeof parsed !== 'object' || parsed === null) return null
+    body = parsed as Record<string, unknown>
   } catch {
     return null
+  }
+  if (body.code !== 'community_banned') return null
+  const raw = (body.sanction ?? {}) as Record<string, unknown>
+  const sanction = communityBannedErrorSchema.shape.sanction.safeParse({
+    kind: raw.kind,
+    expiresAt: raw.expiresAt,
+    appealStatus: raw.appealStatus,
+  })
+  return {
+    message: typeof body.message === 'string' ? body.message : COMMUNITY_BANNED_MESSAGE,
+    ...(sanction.success ? { sanction: sanction.data } : {}),
   }
 }
 
@@ -762,8 +782,11 @@ export async function setCommunityReactionFromWeb(
       conflict: false,
     }
   } catch (error: unknown) {
-    if (error instanceof ResponseError && error.response.status === 403)
+    if (error instanceof ResponseError && error.response.status === 403) {
+      const banned = await communityError(error, 'Reaction eligibility required.')
+      if (banned.reason === 'banned') throw banned
       throw new CommunityRequestError('age_gate', 'Reaction eligibility required.')
+    }
     if (error instanceof ResponseError && error.response.status === 409) {
       const conflict = communityReactionConflictResponseSchema.safeParse(
         await error.response.clone().json()

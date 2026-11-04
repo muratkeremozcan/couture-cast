@@ -62,6 +62,9 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
   const sequence = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
   hasDetail.current = detail !== null
+  // One polite region outside the panel, so an outcome is announced once and survives the reload.
+  const [outcome, setOutcome] = useState<string | null>(null)
+  const outcomeRef = useRef<HTMLParagraphElement>(null)
 
   const read = useCallback(async () => {
     // A newer read, or a new case id, makes every older answer stale. It is dropped, never applied.
@@ -100,6 +103,7 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
       setDetail(null)
       setFailure(null)
       setStale(false)
+      setOutcome(null)
       void read()
     }
     return () => {
@@ -111,9 +115,6 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
     if (!loading) void read()
   }
 
-  // One polite region outside the panel, so an outcome is announced once and survives the reload.
-  const [outcome, setOutcome] = useState<string | null>(null)
-  const outcomeRef = useRef<HTMLParagraphElement>(null)
   const applied = (message: string) => {
     setOutcome(message)
     void read().then(() => outcomeRef.current?.focus())
@@ -152,7 +153,13 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
       aria-labelledby="case-heading"
     >
       {back}
-      <DetailHeader detail={detail} stale={stale} loading={loading} onReload={reload} />
+      <DetailHeader
+        detail={detail}
+        stale={stale}
+        loading={loading}
+        onReload={reload}
+        announceSla={outcome === null}
+      />
       <p
         ref={outcomeRef}
         role="status"
@@ -166,12 +173,7 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
       >
         {outcome}
       </p>
-      <ModerationDecisionPanel
-        key={detail.revision}
-        detail={detail}
-        onApplied={applied}
-        onReload={reload}
-      />
+      <ModerationDecisionPanel detail={detail} onApplied={applied} onReload={reload} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <ContentSection detail={detail} />
@@ -206,11 +208,14 @@ function DetailHeader({
   stale,
   loading,
   onReload,
+  announceSla,
 }: {
   detail: ModerationCaseResult
   stale: boolean
   loading: boolean
   onReload: () => void
+  /** A decision's own outcome is the one announcement, so the SLA change it causes stays silent. */
+  announceSla: boolean
 }) {
   const { t } = useModerationTranslation()
   const format = useDateFormat()
@@ -227,15 +232,21 @@ function DetailHeader({
         >
           {t('moderation.riskLabel', { risk: t(`moderation.risk.${detail.risk}`) })}
         </span>
-        <span className="text-sm font-medium">
+        <span
+          className="text-sm font-medium"
+          data-sla-state={detail.status === 'resolved' ? 'resolved' : undefined}
+        >
           {t(`moderation.status.${detail.status}`)}
         </span>
-        <SlaCountdown
-          dueAt={detail.slaDueAt}
-          clockOffsetMs={detail.clockOffsetMs}
-          resolved={detail.status === 'resolved'}
-          announce
-        />
+        {/* A resolved case says so once, in the status beside this. */}
+        {detail.status === 'open' ? (
+          <SlaCountdown
+            dueAt={detail.slaDueAt}
+            clockOffsetMs={detail.clockOffsetMs}
+            resolved={false}
+            announce={announceSla}
+          />
+        ) : null}
       </div>
       <p className="text-sm text-neutral-700 dark:text-neutral-300">
         {t('moderation.detail.accepted', { when: format(detail.acceptedAt) })}
@@ -388,7 +399,10 @@ function FindingsSection({ detail }: { detail: ModerationCaseDetail }) {
       <h2 id="findings-heading" className="mb-3 text-lg font-semibold">
         {t('moderation.detail.findings')}
       </h2>
-      {!findings ? <p className="text-sm">{t('moderation.detail.noFindings')}</p> : null}
+      {/* An operator's note is not a machine verdict, so it never stands alone under this heading. */}
+      {!findings || (findings.operatorNote && findings.codes.length === 0) ? (
+        <p className="mb-3 text-sm">{t('moderation.detail.noFindings')}</p>
+      ) : null}
       {empty ? <p className="text-sm">{t('moderation.detail.heldNoCodes')}</p> : null}
       {findings && !empty ? (
         <dl className="grid grid-cols-1 gap-3 text-sm">
