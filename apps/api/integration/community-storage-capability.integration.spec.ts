@@ -339,7 +339,8 @@ describe.runIf(process.env.COMMUNITY_REAL_STORAGE_TEST === 'true')(
         expect(done.image_object_path).toBeNull()
         expect(done.objects_purged_at).not.toBeNull()
 
-        const expiry = storage.capability!.expiresAt.getTime()
+        // Source that mints no token has nothing to wait for, and fails below on the late write.
+        const expiry = storage.capability?.expiresAt.getTime() ?? 0
         await sleep(Math.max(0, expiry - Date.now()) + 1100)
         hold.open()
         expect(await settled, 'storage must refuse the late upload').toBeInstanceOf(
