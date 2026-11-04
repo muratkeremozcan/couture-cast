@@ -7193,6 +7193,542 @@ export type GetCommunitySpotlight503ResponseCodeEnum =
 /**
  *
  * @export
+ * @interface GetModerationCase200Response
+ */
+export interface GetModerationCase200Response {
+  /**
+   *
+   * @type {GetModerationCase200ResponseData}
+   * @memberof GetModerationCase200Response
+   */
+  data: GetModerationCase200ResponseData
+}
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseData
+ */
+export interface GetModerationCase200ResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseData
+   */
+  caseId: string
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSourceEnum}
+   * @memberof GetModerationCase200ResponseData
+   */
+  source: GetModerationCase200ResponseDataSourceEnum
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataStatusEnum}
+   * @memberof GetModerationCase200ResponseData
+   */
+  status: GetModerationCase200ResponseDataStatusEnum
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataRiskEnum}
+   * @memberof GetModerationCase200ResponseData
+   */
+  risk: GetModerationCase200ResponseDataRiskEnum
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSlaStateEnum}
+   * @memberof GetModerationCase200ResponseData
+   */
+  slaState: GetModerationCase200ResponseDataSlaStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseData
+   */
+  slaDueAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseData
+   */
+  acceptedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseData
+   */
+  serverNow: string
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationCase200ResponseData
+   */
+  reportCount: number
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseData
+   */
+  locale: string | null
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSubject}
+   * @memberof GetModerationCase200ResponseData
+   */
+  subject: GetModerationCase200ResponseDataSubject
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSnapshot}
+   * @memberof GetModerationCase200ResponseData
+   */
+  snapshot: GetModerationCase200ResponseDataSnapshot
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataTarget}
+   * @memberof GetModerationCase200ResponseData
+   */
+  target: GetModerationCase200ResponseDataTarget
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataFindings}
+   * @memberof GetModerationCase200ResponseData
+   */
+  findings: GetModerationCase200ResponseDataFindings | null
+  /**
+   *
+   * @type {Array<GetModerationCase200ResponseDataReportersInner>}
+   * @memberof GetModerationCase200ResponseData
+   */
+  reporters: Array<GetModerationCase200ResponseDataReportersInner>
+  /**
+   *
+   * @type {Array<GetModerationCase200ResponseDataPriorActionsInner>}
+   * @memberof GetModerationCase200ResponseData
+   */
+  priorActions: Array<GetModerationCase200ResponseDataPriorActionsInner>
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataMedia}
+   * @memberof GetModerationCase200ResponseData
+   */
+  media: GetModerationCase200ResponseDataMedia
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetModerationCase200ResponseData
+   */
+  viewerConflict: boolean
+}
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataSourceEnum = {
+  post: 'post',
+  comment: 'comment',
+} as const
+export type GetModerationCase200ResponseDataSourceEnum =
+  (typeof GetModerationCase200ResponseDataSourceEnum)[keyof typeof GetModerationCase200ResponseDataSourceEnum]
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataStatusEnum = {
+  open: 'open',
+  resolved: 'resolved',
+} as const
+export type GetModerationCase200ResponseDataStatusEnum =
+  (typeof GetModerationCase200ResponseDataStatusEnum)[keyof typeof GetModerationCase200ResponseDataStatusEnum]
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataRiskEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type GetModerationCase200ResponseDataRiskEnum =
+  (typeof GetModerationCase200ResponseDataRiskEnum)[keyof typeof GetModerationCase200ResponseDataRiskEnum]
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataSlaStateEnum = {
+  on_track: 'on_track',
+  at_risk: 'at_risk',
+  breached: 'breached',
+  resolved: 'resolved',
+} as const
+export type GetModerationCase200ResponseDataSlaStateEnum =
+  (typeof GetModerationCase200ResponseDataSlaStateEnum)[keyof typeof GetModerationCase200ResponseDataSlaStateEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataFindings
+ */
+export interface GetModerationCase200ResponseDataFindings {
+  /**
+   *
+   * @type {Array<string>}
+   * @memberof GetModerationCase200ResponseDataFindings
+   */
+  codes: Array<string>
+  /**
+   *
+   * @type {Array<string>}
+   * @memberof GetModerationCase200ResponseDataFindings
+   */
+  categories: Array<string>
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataFindings
+   */
+  engineVersion: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataFindings
+   */
+  operatorNote: string | null
+}
+/**
+ * @type GetModerationCase200ResponseDataMedia
+ *
+ * @export
+ */
+export type GetModerationCase200ResponseDataMedia =
+  | GetModerationCase200ResponseDataMediaOneOf
+  | GetModerationCase200ResponseDataMediaOneOf1
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataMediaOneOf
+ */
+export interface GetModerationCase200ResponseDataMediaOneOf {
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataMediaOneOfStateEnum}
+   * @memberof GetModerationCase200ResponseDataMediaOneOf
+   */
+  state: GetModerationCase200ResponseDataMediaOneOfStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataMediaOneOf
+   */
+  url: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataMediaOneOf
+   */
+  expiresAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataMediaOneOf
+   */
+  altText: string | null
+}
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataMediaOneOfStateEnum = {
+  available: 'available',
+} as const
+export type GetModerationCase200ResponseDataMediaOneOfStateEnum =
+  (typeof GetModerationCase200ResponseDataMediaOneOfStateEnum)[keyof typeof GetModerationCase200ResponseDataMediaOneOfStateEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataMediaOneOf1
+ */
+export interface GetModerationCase200ResponseDataMediaOneOf1 {
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataMediaOneOf1StateEnum}
+   * @memberof GetModerationCase200ResponseDataMediaOneOf1
+   */
+  state: GetModerationCase200ResponseDataMediaOneOf1StateEnum
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataMediaOneOf1ReasonEnum}
+   * @memberof GetModerationCase200ResponseDataMediaOneOf1
+   */
+  reason: GetModerationCase200ResponseDataMediaOneOf1ReasonEnum
+}
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataMediaOneOf1StateEnum = {
+  unavailable: 'unavailable',
+} as const
+export type GetModerationCase200ResponseDataMediaOneOf1StateEnum =
+  (typeof GetModerationCase200ResponseDataMediaOneOf1StateEnum)[keyof typeof GetModerationCase200ResponseDataMediaOneOf1StateEnum]
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataMediaOneOf1ReasonEnum = {
+  target_erased: 'target_erased',
+  anonymized: 'anonymized',
+  purged: 'purged',
+  no_image: 'no_image',
+  signing_failed: 'signing_failed',
+} as const
+export type GetModerationCase200ResponseDataMediaOneOf1ReasonEnum =
+  (typeof GetModerationCase200ResponseDataMediaOneOf1ReasonEnum)[keyof typeof GetModerationCase200ResponseDataMediaOneOf1ReasonEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataPriorActionsInner
+ */
+export interface GetModerationCase200ResponseDataPriorActionsInner {
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataPriorActionsInnerActorKindEnum}
+   * @memberof GetModerationCase200ResponseDataPriorActionsInner
+   */
+  actorKind: GetModerationCase200ResponseDataPriorActionsInnerActorKindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataPriorActionsInner
+   */
+  action: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataPriorActionsInner
+   */
+  reason: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataPriorActionsInner
+   */
+  occurredAt: string
+}
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataPriorActionsInnerActorKindEnum = {
+  screening: 'screening',
+  reporter: 'reporter',
+  operator: 'operator',
+} as const
+export type GetModerationCase200ResponseDataPriorActionsInnerActorKindEnum =
+  (typeof GetModerationCase200ResponseDataPriorActionsInnerActorKindEnum)[keyof typeof GetModerationCase200ResponseDataPriorActionsInnerActorKindEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataReportersInner
+ */
+export interface GetModerationCase200ResponseDataReportersInner {
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataReportersInnerIdentity}
+   * @memberof GetModerationCase200ResponseDataReportersInner
+   */
+  identity: GetModerationCase200ResponseDataReportersInnerIdentity
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataReportersInnerReasonEnum}
+   * @memberof GetModerationCase200ResponseDataReportersInner
+   */
+  reason: GetModerationCase200ResponseDataReportersInnerReasonEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataReportersInner
+   */
+  details: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataReportersInner
+   */
+  reportedAt: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetModerationCase200ResponseDataReportersInner
+   */
+  resolved: boolean
+}
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataReportersInnerReasonEnum = {
+  spam: 'spam',
+  harassment: 'harassment',
+  inappropriate_content: 'inappropriate_content',
+  hate_speech: 'hate_speech',
+  violence: 'violence',
+  other: 'other',
+} as const
+export type GetModerationCase200ResponseDataReportersInnerReasonEnum =
+  (typeof GetModerationCase200ResponseDataReportersInnerReasonEnum)[keyof typeof GetModerationCase200ResponseDataReportersInnerReasonEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataReportersInnerIdentity
+ */
+export interface GetModerationCase200ResponseDataReportersInnerIdentity {
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataReportersInnerIdentityStateEnum}
+   * @memberof GetModerationCase200ResponseDataReportersInnerIdentity
+   */
+  state: GetModerationCase200ResponseDataReportersInnerIdentityStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataReportersInnerIdentity
+   */
+  alias: string | null
+}
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataReportersInnerIdentityStateEnum = {
+  alias: 'alias',
+  erased: 'erased',
+  unknown: 'unknown',
+} as const
+export type GetModerationCase200ResponseDataReportersInnerIdentityStateEnum =
+  (typeof GetModerationCase200ResponseDataReportersInnerIdentityStateEnum)[keyof typeof GetModerationCase200ResponseDataReportersInnerIdentityStateEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataSnapshot
+ */
+export interface GetModerationCase200ResponseDataSnapshot {
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetModerationCase200ResponseDataSnapshot
+   */
+  available: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataSnapshot
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataSnapshot
+   */
+  altText: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataSnapshot
+   */
+  body: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataSnapshot
+   */
+  climateBand: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataSnapshot
+   */
+  capturedAt: string | null
+}
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataSubject
+ */
+export interface GetModerationCase200ResponseDataSubject {
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSubjectStateEnum}
+   * @memberof GetModerationCase200ResponseDataSubject
+   */
+  state: GetModerationCase200ResponseDataSubjectStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataSubject
+   */
+  alias: string | null
+}
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataSubjectStateEnum = {
+  alias: 'alias',
+  erased: 'erased',
+  unknown: 'unknown',
+} as const
+export type GetModerationCase200ResponseDataSubjectStateEnum =
+  (typeof GetModerationCase200ResponseDataSubjectStateEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStateEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataTarget
+ */
+export interface GetModerationCase200ResponseDataTarget {
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataTargetStateEnum}
+   * @memberof GetModerationCase200ResponseDataTarget
+   */
+  state: GetModerationCase200ResponseDataTargetStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataTarget
+   */
+  status: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataTarget
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataTarget
+   */
+  parentBody: string | null
+}
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataTargetStateEnum = {
+  live: 'live',
+  erased: 'erased',
+} as const
+export type GetModerationCase200ResponseDataTargetStateEnum =
+  (typeof GetModerationCase200ResponseDataTargetStateEnum)[keyof typeof GetModerationCase200ResponseDataTargetStateEnum]
+
+/**
+ *
+ * @export
  * @interface GetPushRegistrationsResponse
  */
 export interface GetPushRegistrationsResponse {
@@ -7895,6 +8431,220 @@ export type LinkedTeenStatusEnum =
 /**
  *
  * @export
+ * @interface ListModerationCases200Response
+ */
+export interface ListModerationCases200Response {
+  /**
+   *
+   * @type {ListModerationCases200ResponseData}
+   * @memberof ListModerationCases200Response
+   */
+  data: ListModerationCases200ResponseData
+}
+/**
+ *
+ * @export
+ * @interface ListModerationCases200ResponseData
+ */
+export interface ListModerationCases200ResponseData {
+  /**
+   *
+   * @type {Array<ListModerationCases200ResponseDataItemsInner>}
+   * @memberof ListModerationCases200ResponseData
+   */
+  items: Array<ListModerationCases200ResponseDataItemsInner>
+  /**
+   *
+   * @type {string}
+   * @memberof ListModerationCases200ResponseData
+   */
+  nextCursor: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ListModerationCases200ResponseData
+   */
+  serverNow: string
+}
+/**
+ *
+ * @export
+ * @interface ListModerationCases200ResponseDataItemsInner
+ */
+export interface ListModerationCases200ResponseDataItemsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  caseId: string
+  /**
+   *
+   * @type {ListModerationCases200ResponseDataItemsInnerSourceEnum}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  source: ListModerationCases200ResponseDataItemsInnerSourceEnum
+  /**
+   *
+   * @type {ListModerationCases200ResponseDataItemsInnerStatusEnum}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  status: ListModerationCases200ResponseDataItemsInnerStatusEnum
+  /**
+   *
+   * @type {ListModerationCases200ResponseDataItemsInnerRiskEnum}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  risk: ListModerationCases200ResponseDataItemsInnerRiskEnum
+  /**
+   *
+   * @type {ListModerationCases200ResponseDataItemsInnerSlaStateEnum}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  slaState: ListModerationCases200ResponseDataItemsInnerSlaStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  slaDueAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  acceptedAt: string
+  /**
+   *
+   * @type {number}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  reportCount: number
+  /**
+   *
+   * @type {Array<ListModerationCases200ResponseDataItemsInnerReasonsEnum>}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  reasons: Array<ListModerationCases200ResponseDataItemsInnerReasonsEnum>
+  /**
+   *
+   * @type {string}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  locale: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  hasFinding: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  excerpt: string | null
+}
+
+/**
+ * @export
+ */
+export const ListModerationCases200ResponseDataItemsInnerSourceEnum = {
+  post: 'post',
+  comment: 'comment',
+} as const
+export type ListModerationCases200ResponseDataItemsInnerSourceEnum =
+  (typeof ListModerationCases200ResponseDataItemsInnerSourceEnum)[keyof typeof ListModerationCases200ResponseDataItemsInnerSourceEnum]
+
+/**
+ * @export
+ */
+export const ListModerationCases200ResponseDataItemsInnerStatusEnum = {
+  open: 'open',
+  resolved: 'resolved',
+} as const
+export type ListModerationCases200ResponseDataItemsInnerStatusEnum =
+  (typeof ListModerationCases200ResponseDataItemsInnerStatusEnum)[keyof typeof ListModerationCases200ResponseDataItemsInnerStatusEnum]
+
+/**
+ * @export
+ */
+export const ListModerationCases200ResponseDataItemsInnerRiskEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type ListModerationCases200ResponseDataItemsInnerRiskEnum =
+  (typeof ListModerationCases200ResponseDataItemsInnerRiskEnum)[keyof typeof ListModerationCases200ResponseDataItemsInnerRiskEnum]
+
+/**
+ * @export
+ */
+export const ListModerationCases200ResponseDataItemsInnerSlaStateEnum = {
+  on_track: 'on_track',
+  at_risk: 'at_risk',
+  breached: 'breached',
+  resolved: 'resolved',
+} as const
+export type ListModerationCases200ResponseDataItemsInnerSlaStateEnum =
+  (typeof ListModerationCases200ResponseDataItemsInnerSlaStateEnum)[keyof typeof ListModerationCases200ResponseDataItemsInnerSlaStateEnum]
+
+/**
+ * @export
+ */
+export const ListModerationCases200ResponseDataItemsInnerReasonsEnum = {
+  spam: 'spam',
+  harassment: 'harassment',
+  inappropriate_content: 'inappropriate_content',
+  hate_speech: 'hate_speech',
+  violence: 'violence',
+  other: 'other',
+} as const
+export type ListModerationCases200ResponseDataItemsInnerReasonsEnum =
+  (typeof ListModerationCases200ResponseDataItemsInnerReasonsEnum)[keyof typeof ListModerationCases200ResponseDataItemsInnerReasonsEnum]
+
+/**
+ *
+ * @export
+ * @interface ListModerationCases400Response
+ */
+export interface ListModerationCases400Response {
+  /**
+   *
+   * @type {number}
+   * @memberof ListModerationCases400Response
+   */
+  statusCode: number
+  /**
+   *
+   * @type {ListModerationCases400ResponseCodeEnum}
+   * @memberof ListModerationCases400Response
+   */
+  code: ListModerationCases400ResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ListModerationCases400Response
+   */
+  message: string
+}
+
+/**
+ * @export
+ */
+export const ListModerationCases400ResponseCodeEnum = {
+  invalid_filter: 'invalid_filter',
+  invalid_cursor: 'invalid_cursor',
+  case_not_found: 'case_not_found',
+  moderation_console_disabled: 'moderation_console_disabled',
+  audit_unavailable: 'audit_unavailable',
+} as const
+export type ListModerationCases400ResponseCodeEnum =
+  (typeof ListModerationCases400ResponseCodeEnum)[keyof typeof ListModerationCases400ResponseCodeEnum]
+
+/**
+ *
+ * @export
  * @interface ListSavedLocationsResponse
  */
 export interface ListSavedLocationsResponse {
@@ -8343,6 +9093,642 @@ export interface ModerationActionInput {
    */
   timestamp?: string
 }
+/**
+ *
+ * @export
+ * @interface ModerationCaseDetailResponse
+ */
+export interface ModerationCaseDetailResponse {
+  /**
+   *
+   * @type {ModerationCaseDetailResponseData}
+   * @memberof ModerationCaseDetailResponse
+   */
+  data: ModerationCaseDetailResponseData
+}
+/**
+ *
+ * @export
+ * @interface ModerationCaseDetailResponseData
+ */
+export interface ModerationCaseDetailResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  caseId: string
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataSourceEnum}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  source: ModerationCaseDetailResponseDataSourceEnum
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataStatusEnum}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  status: ModerationCaseDetailResponseDataStatusEnum
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataRiskEnum}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  risk: ModerationCaseDetailResponseDataRiskEnum
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataSlaStateEnum}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  slaState: ModerationCaseDetailResponseDataSlaStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  slaDueAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  acceptedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  serverNow: string
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  reportCount: number
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  locale: string | null
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataReportersInnerIdentity}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  subject: GetModerationCase200ResponseDataReportersInnerIdentity
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataSnapshot}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  snapshot: ModerationCaseDetailResponseDataSnapshot
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataTarget}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  target: ModerationCaseDetailResponseDataTarget
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataFindings}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  findings: ModerationCaseDetailResponseDataFindings | null
+  /**
+   *
+   * @type {Array<GetModerationCase200ResponseDataReportersInner>}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  reporters: Array<GetModerationCase200ResponseDataReportersInner>
+  /**
+   *
+   * @type {Array<ModerationCaseDetailResponseDataPriorActionsInner>}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  priorActions: Array<ModerationCaseDetailResponseDataPriorActionsInner>
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataMedia}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  media: ModerationCaseDetailResponseDataMedia
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  viewerConflict: boolean
+}
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataSourceEnum = {
+  post: 'post',
+  comment: 'comment',
+} as const
+export type ModerationCaseDetailResponseDataSourceEnum =
+  (typeof ModerationCaseDetailResponseDataSourceEnum)[keyof typeof ModerationCaseDetailResponseDataSourceEnum]
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataStatusEnum = {
+  open: 'open',
+  resolved: 'resolved',
+} as const
+export type ModerationCaseDetailResponseDataStatusEnum =
+  (typeof ModerationCaseDetailResponseDataStatusEnum)[keyof typeof ModerationCaseDetailResponseDataStatusEnum]
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataRiskEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type ModerationCaseDetailResponseDataRiskEnum =
+  (typeof ModerationCaseDetailResponseDataRiskEnum)[keyof typeof ModerationCaseDetailResponseDataRiskEnum]
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataSlaStateEnum = {
+  on_track: 'on_track',
+  at_risk: 'at_risk',
+  breached: 'breached',
+  resolved: 'resolved',
+} as const
+export type ModerationCaseDetailResponseDataSlaStateEnum =
+  (typeof ModerationCaseDetailResponseDataSlaStateEnum)[keyof typeof ModerationCaseDetailResponseDataSlaStateEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationCaseDetailResponseDataFindings
+ */
+export interface ModerationCaseDetailResponseDataFindings {
+  /**
+   *
+   * @type {Array<string>}
+   * @memberof ModerationCaseDetailResponseDataFindings
+   */
+  codes: Array<string>
+  /**
+   *
+   * @type {Array<string>}
+   * @memberof ModerationCaseDetailResponseDataFindings
+   */
+  categories: Array<string>
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataFindings
+   */
+  engineVersion: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataFindings
+   */
+  operatorNote: string | null
+}
+/**
+ * @type ModerationCaseDetailResponseDataMedia
+ *
+ * @export
+ */
+export type ModerationCaseDetailResponseDataMedia =
+  | ModerationCaseDetailResponseDataMediaOneOf
+  | ModerationCaseDetailResponseDataMediaOneOf1
+/**
+ *
+ * @export
+ * @interface ModerationCaseDetailResponseDataMediaOneOf
+ */
+export interface ModerationCaseDetailResponseDataMediaOneOf {
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataMediaOneOfStateEnum}
+   * @memberof ModerationCaseDetailResponseDataMediaOneOf
+   */
+  state: ModerationCaseDetailResponseDataMediaOneOfStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataMediaOneOf
+   */
+  url: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataMediaOneOf
+   */
+  expiresAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataMediaOneOf
+   */
+  altText: string | null
+}
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataMediaOneOfStateEnum = {
+  available: 'available',
+} as const
+export type ModerationCaseDetailResponseDataMediaOneOfStateEnum =
+  (typeof ModerationCaseDetailResponseDataMediaOneOfStateEnum)[keyof typeof ModerationCaseDetailResponseDataMediaOneOfStateEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationCaseDetailResponseDataMediaOneOf1
+ */
+export interface ModerationCaseDetailResponseDataMediaOneOf1 {
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataMediaOneOf1StateEnum}
+   * @memberof ModerationCaseDetailResponseDataMediaOneOf1
+   */
+  state: ModerationCaseDetailResponseDataMediaOneOf1StateEnum
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataMediaOneOf1ReasonEnum}
+   * @memberof ModerationCaseDetailResponseDataMediaOneOf1
+   */
+  reason: ModerationCaseDetailResponseDataMediaOneOf1ReasonEnum
+}
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataMediaOneOf1StateEnum = {
+  unavailable: 'unavailable',
+} as const
+export type ModerationCaseDetailResponseDataMediaOneOf1StateEnum =
+  (typeof ModerationCaseDetailResponseDataMediaOneOf1StateEnum)[keyof typeof ModerationCaseDetailResponseDataMediaOneOf1StateEnum]
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataMediaOneOf1ReasonEnum = {
+  target_erased: 'target_erased',
+  anonymized: 'anonymized',
+  purged: 'purged',
+  no_image: 'no_image',
+  signing_failed: 'signing_failed',
+} as const
+export type ModerationCaseDetailResponseDataMediaOneOf1ReasonEnum =
+  (typeof ModerationCaseDetailResponseDataMediaOneOf1ReasonEnum)[keyof typeof ModerationCaseDetailResponseDataMediaOneOf1ReasonEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationCaseDetailResponseDataPriorActionsInner
+ */
+export interface ModerationCaseDetailResponseDataPriorActionsInner {
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataPriorActionsInnerActorKindEnum}
+   * @memberof ModerationCaseDetailResponseDataPriorActionsInner
+   */
+  actorKind: ModerationCaseDetailResponseDataPriorActionsInnerActorKindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataPriorActionsInner
+   */
+  action: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataPriorActionsInner
+   */
+  reason: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataPriorActionsInner
+   */
+  occurredAt: string
+}
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataPriorActionsInnerActorKindEnum = {
+  screening: 'screening',
+  reporter: 'reporter',
+  operator: 'operator',
+} as const
+export type ModerationCaseDetailResponseDataPriorActionsInnerActorKindEnum =
+  (typeof ModerationCaseDetailResponseDataPriorActionsInnerActorKindEnum)[keyof typeof ModerationCaseDetailResponseDataPriorActionsInnerActorKindEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationCaseDetailResponseDataSnapshot
+ */
+export interface ModerationCaseDetailResponseDataSnapshot {
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationCaseDetailResponseDataSnapshot
+   */
+  available: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataSnapshot
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataSnapshot
+   */
+  altText: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataSnapshot
+   */
+  body: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataSnapshot
+   */
+  climateBand: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataSnapshot
+   */
+  capturedAt: string | null
+}
+/**
+ *
+ * @export
+ * @interface ModerationCaseDetailResponseDataTarget
+ */
+export interface ModerationCaseDetailResponseDataTarget {
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataTargetStateEnum}
+   * @memberof ModerationCaseDetailResponseDataTarget
+   */
+  state: ModerationCaseDetailResponseDataTargetStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataTarget
+   */
+  status: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataTarget
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataTarget
+   */
+  parentBody: string | null
+}
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataTargetStateEnum = {
+  live: 'live',
+  erased: 'erased',
+} as const
+export type ModerationCaseDetailResponseDataTargetStateEnum =
+  (typeof ModerationCaseDetailResponseDataTargetStateEnum)[keyof typeof ModerationCaseDetailResponseDataTargetStateEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationCasesResponse
+ */
+export interface ModerationCasesResponse {
+  /**
+   *
+   * @type {ModerationCasesResponseData}
+   * @memberof ModerationCasesResponse
+   */
+  data: ModerationCasesResponseData
+}
+/**
+ *
+ * @export
+ * @interface ModerationCasesResponseData
+ */
+export interface ModerationCasesResponseData {
+  /**
+   *
+   * @type {Array<ModerationCasesResponseDataItemsInner>}
+   * @memberof ModerationCasesResponseData
+   */
+  items: Array<ModerationCasesResponseDataItemsInner>
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCasesResponseData
+   */
+  nextCursor: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCasesResponseData
+   */
+  serverNow: string
+}
+/**
+ *
+ * @export
+ * @interface ModerationCasesResponseDataItemsInner
+ */
+export interface ModerationCasesResponseDataItemsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  caseId: string
+  /**
+   *
+   * @type {ModerationCasesResponseDataItemsInnerSourceEnum}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  source: ModerationCasesResponseDataItemsInnerSourceEnum
+  /**
+   *
+   * @type {ModerationCasesResponseDataItemsInnerStatusEnum}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  status: ModerationCasesResponseDataItemsInnerStatusEnum
+  /**
+   *
+   * @type {ModerationCasesResponseDataItemsInnerRiskEnum}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  risk: ModerationCasesResponseDataItemsInnerRiskEnum
+  /**
+   *
+   * @type {ModerationCasesResponseDataItemsInnerSlaStateEnum}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  slaState: ModerationCasesResponseDataItemsInnerSlaStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  slaDueAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  acceptedAt: string
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  reportCount: number
+  /**
+   *
+   * @type {Array<ModerationCasesResponseDataItemsInnerReasonsEnum>}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  reasons: Array<ModerationCasesResponseDataItemsInnerReasonsEnum>
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  locale: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  hasFinding: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  excerpt: string | null
+}
+
+/**
+ * @export
+ */
+export const ModerationCasesResponseDataItemsInnerSourceEnum = {
+  post: 'post',
+  comment: 'comment',
+} as const
+export type ModerationCasesResponseDataItemsInnerSourceEnum =
+  (typeof ModerationCasesResponseDataItemsInnerSourceEnum)[keyof typeof ModerationCasesResponseDataItemsInnerSourceEnum]
+
+/**
+ * @export
+ */
+export const ModerationCasesResponseDataItemsInnerStatusEnum = {
+  open: 'open',
+  resolved: 'resolved',
+} as const
+export type ModerationCasesResponseDataItemsInnerStatusEnum =
+  (typeof ModerationCasesResponseDataItemsInnerStatusEnum)[keyof typeof ModerationCasesResponseDataItemsInnerStatusEnum]
+
+/**
+ * @export
+ */
+export const ModerationCasesResponseDataItemsInnerRiskEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type ModerationCasesResponseDataItemsInnerRiskEnum =
+  (typeof ModerationCasesResponseDataItemsInnerRiskEnum)[keyof typeof ModerationCasesResponseDataItemsInnerRiskEnum]
+
+/**
+ * @export
+ */
+export const ModerationCasesResponseDataItemsInnerSlaStateEnum = {
+  on_track: 'on_track',
+  at_risk: 'at_risk',
+  breached: 'breached',
+  resolved: 'resolved',
+} as const
+export type ModerationCasesResponseDataItemsInnerSlaStateEnum =
+  (typeof ModerationCasesResponseDataItemsInnerSlaStateEnum)[keyof typeof ModerationCasesResponseDataItemsInnerSlaStateEnum]
+
+/**
+ * @export
+ */
+export const ModerationCasesResponseDataItemsInnerReasonsEnum = {
+  spam: 'spam',
+  harassment: 'harassment',
+  inappropriate_content: 'inappropriate_content',
+  hate_speech: 'hate_speech',
+  violence: 'violence',
+  other: 'other',
+} as const
+export type ModerationCasesResponseDataItemsInnerReasonsEnum =
+  (typeof ModerationCasesResponseDataItemsInnerReasonsEnum)[keyof typeof ModerationCasesResponseDataItemsInnerReasonsEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationQueueError
+ */
+export interface ModerationQueueError {
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationQueueError
+   */
+  statusCode: number
+  /**
+   *
+   * @type {ModerationQueueErrorCodeEnum}
+   * @memberof ModerationQueueError
+   */
+  code: ModerationQueueErrorCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationQueueError
+   */
+  message: string
+}
+
+/**
+ * @export
+ */
+export const ModerationQueueErrorCodeEnum = {
+  invalid_filter: 'invalid_filter',
+  invalid_cursor: 'invalid_cursor',
+  case_not_found: 'case_not_found',
+  moderation_console_disabled: 'moderation_console_disabled',
+  audit_unavailable: 'audit_unavailable',
+} as const
+export type ModerationQueueErrorCodeEnum =
+  (typeof ModerationQueueErrorCodeEnum)[keyof typeof ModerationQueueErrorCodeEnum]
+
 /**
  *
  * @export

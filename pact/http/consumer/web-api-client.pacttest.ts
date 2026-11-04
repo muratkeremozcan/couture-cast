@@ -5,6 +5,14 @@ import {
   verifyShareCardInteraction,
 } from './interactions/share-cards'
 import {
+  moderationRefusals,
+  verifyModerationCaseInteraction,
+  verifyModerationQueueEmptyInteraction,
+  verifyModerationQueueOrphanInteraction,
+  verifyModerationQueueInteraction,
+  verifyModerationRefusal,
+} from './interactions/moderation'
+import {
   communityEngagementInteractions,
   verifyCommunityEngagement,
   commentOperations,
@@ -968,4 +976,20 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
       )
     }
   )
+  // Story 6.10: the moderator console's two read-only routes.
+  it('reads the first page of the moderator queue', async () => {
+    await verifyModerationQueueInteraction(pact)
+  })
+  it('reads a moderator queue with an erased comment case', async () => {
+    await verifyModerationQueueOrphanInteraction(pact)
+  })
+  it('reads an empty moderator queue', async () => {
+    await verifyModerationQueueEmptyInteraction(pact)
+  })
+  it('opens a moderation case with and without its image', async () => {
+    await verifyModerationCaseInteraction(pact)
+  })
+  it.each(moderationRefusals)('refuses $name', async (refusal) => {
+    await verifyModerationRefusal(pact, refusal)
+  })
 })

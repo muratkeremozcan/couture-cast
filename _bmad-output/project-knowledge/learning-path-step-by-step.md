@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-10-31.
-Added Steps 40 to 49:
+Updated: 2026-11-03.
+Added Steps 40 to 50:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -13,6 +13,7 @@ Added Steps 40 to 49:
 - Step 47: Story 6.7b, sponsored community highlights, `1d7b9848` (PR #161).
 - Step 48: Story 6.8, safe branded share-card export, `67806196` (PR #162), with native-lane fixes `3112efbd` (PR #165) and `185e827c` (PR #166).
 - Step 49: Story 6.9, native platform sharing, `6d92598f` (PR #167), merged on 2026-10-31.
+- Step 50: Story 6.10, moderator queue and case detail, in PR review on `feat/cc-6-10-moderator-queue`, not yet merged.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -20,6 +21,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Step 50 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 Step 49 departs from instruction 2 the same way Steps 38 and 39 did, and its `Evidence boundaries` section says what passed, what timed out, and what only a physical device can prove.
 Moved Step 49 to completed after PR #167 merged as `6d92598f`.
 Moved Step 39 to completed, since PR #151 closed Story 6.2.
@@ -100,11 +102,14 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
+- In PR review: Step 50, Story 6.10, Moderator queue and case detail, status `done` in sprint tracking and not yet merged, on `feat/cc-6-10-moderator-queue`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-6-10-moderator-queue-case-detail.md`.
+  Production stays dark because `moderation_console_enabled` defaults to false.
 - Latest completed step: Step 49, Story 6.9, Native platform sharing, status `done`, merged as `6d92598f` (PR #167) on 2026-10-31.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`.
   Step 49 was written from the PR head `37a00d33` before merge, and its `Evidence boundaries` section says so.
   Production stays dark because `share_card_native_share_enabled` defaults to false.
-- Next in `backlog` under epic 6, which is `in-progress`: Stories 6.10 to 6.13 (moderator queue, moderation decisions and sanctions, SLA monitoring, immutable moderation history), 6.14 (complimentary full access) and 6.15 (Expo SDK 58 live font-scale layout).
+- Next in `backlog` under epic 6, which is `in-progress`: Stories 6.11 to 6.13 (moderation decisions and sanctions, SLA monitoring, immutable moderation history), 6.14 (complimentary full access) and 6.15 (Expo SDK 58 live font-scale layout).
 - Step 48, Story 6.8, Safe branded share-card export, status `done`, merged as `67806196` (PR #162) with native-lane fixes in `3112efbd` (PR #165) and `185e827c` (PR #166).
   Its plan is `_bmad-output/implementation-artifacts/spec-6-8-safe-branded-share-card-export.md`.
 - Step 47, Story 6.7b, Sponsored community highlights, status `done`, merged as `1d7b9848` (PR #161).
@@ -9216,4 +9221,250 @@ flowchart TD
   Settle --> Epoch{"identity epoch unchanged?"}
   Epoch -- "yes" --> Event["share_card_shared\nbefore_send allowlist\n$ip null, no person profile"]
   Epoch -- "no" --> Drop["no event"]
+```
+
+## Step 50: Moderator queue and case detail
+
+User/business impact:
+
+Members can report posts and comments, and every accepted report lands in `CommunityPostReport` or `CommunityCommentReport` with a snapshot and a 24-hour due time.
+Until this step no moderator could read them, and an operator needed a script against the production database to learn what was reported.
+This step adds two read-only, moderator-only API routes and a Next.js console at `/moderation`.
+The queue lists cases ordered by risk, then earliest due time, with filters for source, locale, risk, status and SLA state.
+A case view shows what the reporter saw next to the live state, machine findings, reporters, prior actions, a short-lived image and the time left.
+Nothing in this step decides a case.
+Decisions and sanctions are Story 6.11, SLA monitoring is Story 6.12, and the immutable history is Story 6.13.
+The routes sit behind `moderation_console_enabled`, which defaults to false and is true only in the dev seed.
+
+Key takeaways:
+
+1. **A case is one reported target, not one report.**
+   Open reports on one post or one comment form one case with a report count and the union of their reasons.
+   A report whose target was erased (`post_id` or `comment_id` is null) is its own `orphan-post.<reportId>` or `orphan-comment.<reportId>` case, because the snapshot is all that survives.
+   Case ids are stable until erasure re-keys them, and the old id then answers 404 `case_not_found`.
+   Story 6.11 decides a whole case at once, so this is the unit it needs.
+2. **One definition of risk and SLA state, shared by SQL and TypeScript.**
+   `deriveCaseRisk` takes the strongest open report reason (`hate_speech` and `violence` high, `harassment` and `inappropriate_content` medium, `spam` and `other` low), adds one level for a machine finding and one for three or more distinct open reporters, and caps at high.
+   The repository builds its SQL rank from the same exported constants, and an integration test runs every combination through both paths.
+   `deriveSlaState` and `SLA_AT_RISK_WINDOW_MS` (six hours, a quarter of the SLA) live in `@couture/api-client` so Story 6.12 reuses them.
+   An unparseable time throws, because a silent `on_track` would hide a breached case.
+3. **Derive on read and bind one clock.**
+   Risk and SLA change with time and with new reports, so nothing is stored.
+   The service reads an injectable clock once per request and binds that instant as a SQL parameter, so the `sla` filter and the item state cannot disagree at the boundary.
+4. **Page with a signed keyset that survives ties.**
+   Order is risk rank descending, due time ascending, case key ascending.
+   The predicate is an OR chain with `COLLATE "C"` on the case key, because the directions are mixed and a row comparison would skip or repeat rows.
+   The cursor carries the exact Postgres microsecond text of the due time, is HMAC-signed, versioned and bound to the filters, and a mismatch is a 400 `invalid_cursor`.
+   A stateless keyset cannot promise a changed case is never repeated, so unchanged cases appear exactly once, a changed case may appear once more, and the web client dedupes by `caseId`.
+5. **Check the role, then the flag, then the input.**
+   `RequestAuthGuard` and `RolesGuard` with `@Roles('moderator', 'admin')` come first, and the role comes from Supabase `app_metadata`, so a member cannot assign it.
+   A guardian or teen gets the same 403 for a real and an unknown case id, so the routes are no oracle and the flag state stays hidden.
+   A flag read that throws closes the console with 503 `moderation_console_disabled` instead of a 500.
+   The flag is separate from `community_read_enabled`, because an incident can close the feed while reports still need review.
+6. **Audit the read, and audit before you sign.**
+   Every successful detail read writes one `moderation_case_viewed` row to the immutable `AuditLog` with the moderator, role, case id and source.
+   The order is load, audit insert, sign media, respond, so a failed audit returns 503 `audit_unavailable` with no case data and no signed URL.
+   The detail loads once per navigation on the web, because each read writes a row.
+7. **Stored data never causes a 500.**
+   The service projects `content_snapshot` through an allowlist and clamps every stored string to its contract bound before the strict output parse.
+   A long operator reason, an oversized locale or a snapshot with no known key would otherwise fail after the audit row exists and make a case unreadable.
+   Orphaned and anonymized targets stay readable from the snapshot.
+8. **Treat every user-authored string as hostile.**
+   Reporter details, captions, alt text, comment bodies, operator notes and aliases render through one `PlainText` component as a single text node inside `bdi`, never as markdown, HTML or a link.
+   Reporters appear as their `CommunityAlias`, `erased` when the reporter row is gone, or `unknown` when no alias row exists, and a read never creates an alias.
+9. **Sign media on read and keep it out of caches.**
+   The detail signs the image for 120 seconds through the existing storage adapter, and one `CaseMedia` component renders it in a plain `img` with `referrerPolicy="no-referrer"`, never the Next image optimizer.
+   Unavailable media carries a closed reason (`target_erased`, `anonymized`, `purged`, `no_image`, `signing_failed`), and an expired URL shows a Reload control.
+   A middleware sets `Cache-Control: private, no-store` and `Vary: Authorization` before the guards, so 401 and 403 carry them too.
+10. **Prove direct clients stay out.**
+    `MODERATION_QUEUE_READ_TABLES` lives in an import-free file, and the RLS suite iterates it to prove `anon` and `authenticated` are denied on every table the routes read.
+    The web console calls only the API.
+11. **Prove intake visibility without a cache.**
+    The queue reads the report tables directly at READ COMMITTED, and an integration test files a report through the real report route, reads the queue as a moderator and asserts the case is present with an acceptance time under five minutes old.
+
+Hard-won lessons from the implementation and review of this story:
+
+1. **A bare `useTranslation` crashes the first server render.**
+   The first real browser load of `/moderation` showed "Cannot read properties of undefined (reading 'length')" and the server log said `You will need to pass in an i18next instance`.
+   The web app initializes i18n in `getI18n()`, and the bridge only activates the locale after hydration.
+   `useModerationTranslation` in `apps/web/src/lib/moderation.ts` binds `useTranslation` to that instance, as the community grid does.
+2. **A label that wraps its select gives the select a wrong name.**
+   With `<label>Source<select>…</select></label>` the label text includes every option, so assistive technology and `getByLabel` read "SourceAnyPostComment".
+   The filter bar now uses a `<label htmlFor>` beside the select.
+3. **Five stacked filters pushed the first case off a phone screen.**
+   The filter grid is two columns on a phone, three from `sm` and five from `lg`.
+4. **The first contract accepted `limit=1e1`, `0x10` and padded digits.**
+   `z.coerce.number()` calls `Number()`, so the query schema now requires plain decimal digits before it converts.
+   TEA's red tests caught this together with the silent `on_track` for an unparseable time.
+5. **Cache headers set in a handler miss the guards.**
+   A 401 or 403 from the guards never reached the handler, so `ModerationQueueCacheHeadersMiddleware` sets them before the guards run.
+6. **A strict output schema turns legitimate data into a 500.**
+   `ModerationEvent.reason` and `CommunityCommentAudit.reason` are unbounded text and the contract capped them at 2000, so one long reason made a case unreadable after its audit row was written.
+   Every stored string is clamped before the parse, and an empty snapshot object reads as unavailable.
+7. **A flag read that throws must close the console.**
+   An unhandled `getFeatureFlag` rejection answered 500, which leaks that the route exists to a moderator and breaks the disabled state.
+8. **Two peers sharing one git index can commit each other's files.**
+   The API source was staged while the test commit ran, so the test commit carried it under a test message.
+   Commits now name their paths (`git commit -- <paths>`), and a message-only reword with `git commit-tree` and `git update-ref` fixed the history with no change to the working tree.
+9. **A failed lint-staged run can take uncommitted edits with it.**
+   A commit that failed on a conflicting index left the locale and tracking edits out of the working tree, and they survived only in lint-staged's automatic backup stash.
+   They were restored file by file from that backup, and the stash stays in the shared checkout for the owner to drop.
+10. **The generated SDK renumbers inline model names.**
+    Adding two paths changed 3,000 lines of `models/index.ts` and `http.openapi.json` although the OpenAPI document only gained two paths and three schemas.
+    No workspace imports a removed name, and tsc is clean in `apps/web`, `apps/mobile`, `apps/api` and `packages/api-client`.
+
+11. **A banner that keeps the last result is wrong for a lost permission.**
+    The independent review found that a failed Reload kept reporter details and the signed image on screen after a 403, a closed console, a 401 or a re-keyed case.
+    `ec279615` splits failures into terminal ones, which clear the data, and retryable ones, which keep it under a stale banner, and tests each reason on both views.
+12. **A timer is not a state clock.**
+    The countdown re-rendered every 60 seconds, so a breach or at-risk flip and its announcement could lag a minute, and a throttled background tab stayed stale.
+    It now fires at the minute boundary of the shown time and at each state boundary, and resyncs on `visibilitychange` and `focus`.
+13. **Two code paths that derive one value need one rule.**
+    The queue took `min(locale)` over a case's reports while the detail took the first report's locale, so a filter could match a case that showed another locale.
+    Both now take the earliest report's snapshot locale, then the live locale, and reject values the contract cannot carry with the same pattern in SQL and TypeScript.
+14. **Disable with `aria-disabled`, not `disabled`, when the control holds focus.**
+    A `disabled` Load more or Reload drops keyboard focus mid-task; `aria-disabled` plus a guard keeps it, and the first new case takes focus when Load more goes away.
+
+15. **A control that changes with state must stay one element.**
+    The case Reload button sat in two different branches (`stale ? alert+button : button`), so React remounted it and keyboard focus fell to the body when a reload failed.
+    One button now keeps its place and only its label and the banner beside it change.
+    The same round made a failed first load's Try again show `Trying again`, and sent focus to Refresh when Load more ended the list with nothing new.
+
+Story/Task mapping:
+
+- Story 6.10
+- Task 1 (flag `moderation_console_enabled`, default false, seeded true)
+- Task 2 (contract, `deriveCaseRisk`, `deriveSlaState`, OpenAPI paths, regenerated SDK)
+- Task 3 (cursor, repository, service, controller, cache-header middleware and module wiring)
+- Task 4 (web client, queue, filters, case view, media, countdown, plain text)
+- Task 5 (`moderation` namespace in ten catalogs)
+- Task 6 (tests for every test-design ID)
+- Task 7 (Pact, Playwright, RLS iteration of `MODERATION_QUEUE_READ_TABLES`)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/spec-6-10-moderator-queue-case-detail.md`, with decisions D1 to D13 and the Spec Change Log TEA-01 to TEA-18
+- `_bmad-output/test-artifacts/test-design/cc610-moderator-queue-test-design.md`
+- `_bmad-output/test-artifacts/story-6-10/` (screenshots of the real console in light and dark at desktop and phone widths)
+- Commits on `feat/cc-6-10-moderator-queue`, not yet pushed or merged when this step was written
+
+Cross-links:
+
+- Step 38 provides the post, report and snapshot tables the queue reads, and the report intake the five-minute proof drives.
+- Step 42 provides the comment reports and their audit rows.
+- Step 43 provides the signed-cursor pattern and the stream ordering discipline the keyset follows.
+- Step 14 and Step 15 provide the shared Zod contract authoring and the regenerated SDK this step extends.
+- Step 18 provides the `AuditLog` baseline the case-view row writes to.
+- Step 22 provides catalog parity across ten locales.
+
+Sequence to follow:
+
+1. `packages/api-client/src/contracts/http/moderation-queue.ts` for the schemas, `deriveCaseRisk`, `deriveSlaState` and the closed error codes.
+2. `apps/api/src/modules/moderation/moderation-queue-cursor.ts` for the signed, filter-bound keyset cursor.
+3. `apps/api/src/modules/moderation/moderation-queue.repository.ts` for the one SQL path that groups, scores, filters and pages, and for the case loaders.
+4. `apps/api/src/modules/moderation/moderation-queue.service.ts` for the clock, the clamps, the snapshot projection, the audit-before-sign order and the media reasons.
+5. `apps/api/src/modules/moderation/moderation-queue.controller.ts`, `moderation-queue-cache-headers.middleware.ts` and `moderation.module.ts` for the guards, the flag check and the headers.
+6. `apps/web/src/lib/moderation.ts` for the transport, the server-clock offset and `useModerationTranslation`.
+7. `apps/web/src/app/components/moderation-queue.tsx`, `moderation-filters.tsx` and `moderation-case-detail.tsx` for the console, with `moderation-plain-text.tsx`, `moderation-case-media.tsx`, `moderation-sla-countdown.tsx` and `moderation-failure-notice.tsx` for the single-owner pieces.
+8. `packages/db/test/rls/moderation-queue.spec.ts` with `apps/api/src/modules/moderation/moderation-queue-tables.ts` for how direct database clients stay out.
+
+Task owner map:
+
+- Story 6.10 Task 1 step 1 owner: declare the flag in `packages/config/src/flags.ts`, seeded true in `packages/db/prisma/seeds/feature-flags.ts`.
+- Story 6.10 Task 2 step 1 owner: define the contract and the shared risk and SLA derivations in `packages/api-client/src/contracts/http/moderation-queue.ts`.
+- Story 6.10 Task 3 step 1 owner: sign and verify the keyset cursor in `apps/api/src/modules/moderation/moderation-queue-cursor.ts`.
+- Story 6.10 Task 3 step 2 owner: group, score and page the cases in `apps/api/src/modules/moderation/moderation-queue.repository.ts`.
+- Story 6.10 Task 3 step 3 owner: map, clamp, audit and sign in `apps/api/src/modules/moderation/moderation-queue.service.ts`.
+- Story 6.10 Task 3 step 4 owner: guard and route in `apps/api/src/modules/moderation/moderation-queue.controller.ts`.
+- Story 6.10 Task 3 step 5 owner: mark every response private in `apps/api/src/modules/moderation/moderation-queue-cache-headers.middleware.ts`.
+- Story 6.10 Task 3 step 6 owner: list the tables the RLS suite must deny in `apps/api/src/modules/moderation/moderation-queue-tables.ts`.
+- Story 6.10 Task 4 step 1 owner: read the API and classify failures in `apps/web/src/lib/moderation.ts`.
+- Story 6.10 Task 4 step 2 owner: page and filter the queue in `apps/web/src/app/components/moderation-queue.tsx`.
+- Story 6.10 Task 4 step 3 owner: render one case in `apps/web/src/app/components/moderation-case-detail.tsx`.
+- Story 6.10 Task 4 step 4 owner: render user text inertly in `apps/web/src/app/components/moderation-plain-text.tsx`.
+- Story 6.10 Task 4 step 5 owner: own the case image in `apps/web/src/app/components/moderation-case-media.tsx`.
+- Story 6.10 Task 4 step 6 owner: turn a failed read into one closed sentence in `apps/web/src/app/components/moderation-failure-notice.tsx`.
+
+Tests that cover this step:
+
+API unit tests:
+
+- [`apps/api/src/modules/moderation/moderation-queue-cursor.spec.ts`](../../apps/api/src/modules/moderation/moderation-queue-cursor.spec.ts): proves the cursor is signed, versioned and bound to the filters, and that tampering, a wrong scope or a wrong shape is `invalid_cursor`.
+- [`apps/api/src/modules/moderation/moderation-queue.service.spec.ts`](../../apps/api/src/modules/moderation/moderation-queue.service.spec.ts): proves the audit failure returns no data and no signed URL, one clock read per request, the snapshot allowlist, closed log fields, identity states, media reasons, findings versus operator notes, prior actions and the conflict flag.
+- [`apps/api/src/modules/moderation/moderation-queue.controller.spec.ts`](../../apps/api/src/modules/moderation/moderation-queue.controller.spec.ts) and [`apps/api/src/modules/moderation/moderation-queue.roles.spec.ts`](../../apps/api/src/modules/moderation/moderation-queue.roles.spec.ts): prove the guards and role declaration, the flag order, validation, that the routes are read-only, and that the role comes from `app_metadata` only with test-token bypasses closed outside test builds.
+- [`apps/api/src/modules/feature-flags/feature-flags.service.spec.ts`](../../apps/api/src/modules/feature-flags/feature-flags.service.spec.ts): the synced flag count moves to ten with the new flag.
+
+API integration tests, against real PostgreSQL with the real guards:
+
+- [`apps/api/integration/moderation-queue.integration.spec.ts`](../../apps/api/integration/moderation-queue.integration.spec.ts): proves order, grouping, orphans, filters, the detail, the read-only guarantee, one audit row per view and the HTTP answers.
+- [`apps/api/integration/moderation-queue-paging.integration.spec.ts`](../../apps/api/integration/moderation-queue-paging.integration.spec.ts): proves keyset ties, change between pages, resolution, the erasure re-key and SQL safety.
+- [`apps/api/integration/moderation-queue-parity.integration.spec.ts`](../../apps/api/integration/moderation-queue-parity.integration.spec.ts): proves the SQL rank, the detail risk and `deriveCaseRisk` agree on every combination.
+- [`apps/api/integration/moderation-queue-locale.integration.spec.ts`](../../apps/api/integration/moderation-queue-locale.integration.spec.ts): proves the list, the detail and the `locale` filter agree on the locale of a multi-report case, and that an unusable locale reads as none.
+- [`apps/api/integration/moderation-queue-detail.integration.spec.ts`](../../apps/api/integration/moderation-queue-detail.integration.spec.ts): proves oversized, hostile and odd stored values never turn a read into a 500.
+- [`apps/api/integration/moderation-queue-intake.integration.spec.ts`](../../apps/api/integration/moderation-queue-intake.integration.spec.ts): proves a report filed through the real report routes is in the queue within five minutes, and concurrent reads stay consistent.
+- [`apps/api/integration/moderation-queue-plan.integration.spec.ts`](../../apps/api/integration/moderation-queue-plan.integration.spec.ts): proves the open set is read through the `(resolved_at, sla_due_at)` indexes.
+- [`apps/api/integration/moderation-queue-module.integration.spec.ts`](../../apps/api/integration/moderation-queue-module.integration.spec.ts): compiles the real `ModerationModule` graph and checks the response headers as shipped.
+- [`apps/api/integration/helpers/moderation-queue-seed.ts`](../../apps/api/integration/helpers/moderation-queue-seed.ts) and [`apps/api/integration/helpers/moderation-queue-context.ts`](../../apps/api/integration/helpers/moderation-queue-context.ts): the shared seed and the disposable-database context.
+
+Contract and database tests:
+
+- [`packages/api-client/testing/moderation-queue-contract.spec.ts`](../../packages/api-client/testing/moderation-queue-contract.spec.ts): proves the strict schemas, digits-only `limit`, the hand-written risk and SLA oracle tables and the `RangeError` on bad times.
+- [`packages/db/test/rls/moderation-queue.spec.ts`](../../packages/db/test/rls/moderation-queue.spec.ts): proves `anon` and `authenticated` are denied on every table in `MODERATION_QUEUE_READ_TABLES` and cannot forge or read the case-view audit rows.
+- [`packages/db/test/moderation-console-flag-seed.spec.ts`](../../packages/db/test/moderation-console-flag-seed.spec.ts) and [`packages/config/src/flags.spec.ts`](../../packages/config/src/flags.spec.ts): prove the seed turns the console on and the registry default stays false.
+- [`pact/http/consumer/interactions/moderation.ts`](../../pact/http/consumer/interactions/moderation.ts) with [`pact/http/provider/doubles/moderation.ts`](../../pact/http/provider/doubles/moderation.ts): record and verify the queue, the detail and each refusal with byte-stable matchers.
+
+Web tests:
+
+- [`apps/web/src/lib/moderation.test.ts`](../../apps/web/src/lib/moderation.test.ts): proves the transport, the server-clock offset and the closed failure states.
+- [`apps/web/src/app/components/moderation-queue.test.tsx`](../../apps/web/src/app/components/moderation-queue.test.tsx) and [`apps/web/src/app/components/moderation-case-detail.test.tsx`](../../apps/web/src/app/components/moderation-case-detail.test.tsx): prove the states, forbidden with no data, dedupe by `caseId`, filters, one read per navigation, the conflict notice and that no action control renders.
+- [`apps/web/src/app/components/moderation-plain-text.test.tsx`](../../apps/web/src/app/components/moderation-plain-text.test.tsx), [`apps/web/src/app/components/moderation-case-media.test.tsx`](../../apps/web/src/app/components/moderation-case-media.test.tsx) and [`apps/web/src/app/components/moderation-sla-countdown.test.tsx`](../../apps/web/src/app/components/moderation-sla-countdown.test.tsx): prove inert text with visible bidi markers, a plain `img` with no referrer and an expiry state, and a once-a-minute countdown that announces only state changes.
+- [`apps/web/src/app/components/moderation-a11y.test.tsx`](../../apps/web/src/app/components/moderation-a11y.test.tsx): proves axe, heading and focus order, 44-pixel targets and distinct control names.
+- [`apps/web/src/app/moderation/moderation-no-direct-access.test.ts`](../../apps/web/src/app/moderation/moderation-no-direct-access.test.ts) and [`apps/web/src/app/moderation/cases/[caseId]/page.test.tsx`](../../apps/web/src/app/moderation/cases/%5BcaseId%5D/page.test.tsx): prove the console imports no database, table or storage client, and that a malformed case id becomes not-found.
+- [`apps/web/src/i18n/moderation-locales.spec.ts`](../../apps/web/src/i18n/moderation-locales.spec.ts): proves ten-locale parity with the expected keys derived from the contract enums.
+
+Playwright tests:
+
+- [`playwright/tests/moderation-console.spec.ts`](../../playwright/tests/moderation-console.spec.ts): drives the real console for order, filters, intake, one audit row per view, keyboard use, hostile text, signed media, axe in light and dark, and 320, 768 and 1280 pixel widths.
+- [`playwright/tests/api/auth-moderation-security.spec.ts`](../../playwright/tests/api/auth-moderation-security.spec.ts): the read role matrix of the new routes beside the existing write route.
+
+Evidence boundaries:
+
+- **Written before review and merge.**
+  The code and tests are committed on `feat/cc-6-10-moderator-queue` and nothing was pushed when this step was written.
+  No PR job has run, and the Codex review that follows is not recorded here.
+- **What ran locally.**
+  TEA's final run at `e884d62a`, three consecutive times where noted: API unit tests 87 (6 files), API integration `moderation-queue*` 92 (8 files) against stock PostgreSQL 17 with the real guards, the contract spec 88, the config flag spec 26, the database specs 8, web `vitest run moderation` 225 (11 files), the web Pact 230 with the provider verification passing, Playwright 27 three times, and tsc with 0 errors in `apps/api`, `apps/web`, `packages/db`, `packages/api-client` and `pact`.
+  A production `next build` of `apps/web` passed at the first commit of the console.
+  TEA's seeded-defect proofs S-1 to S-10 all went red, and so did S-11 to S-17 on the review fixes, except S-13, an equivalent mutant: the terminal notice replaces the whole console, so a retained row could never render.
+  Review round 2 added four web tests and one API unit test after those counts, and TEA re-ran its Playwright console spec (14) and the flag spec (27) at `ec9afad2`.
+  This step did not re-run any of it.
+- **A real browser walk used doubles for the edges.**
+  The built API ran against an isolated migrated database seeded with the shared test seed, a mock storage origin served the image, and sign-in used the `NEXT_PUBLIC_E2E_AUTH` fixture token.
+  No real Supabase Auth session or real storage object was involved, and a moderator account in a hosted environment was not tried.
+- **Production stays dark.**
+  `moderation_console_enabled` defaults to false and is true only in the dev seed.
+- **Known limits by design.**
+  Screener-flagged posts and held comments with no member report are not queue items until Story 6.11 decides a `screening` source.
+  The default `git diff` of the regenerated SDK shows deletions that are alignment noise; a `--patience` diff and a semantic comparison show only additions.
+  Screenshots under `_bmad-output/test-artifacts/story-6-10/` are git-ignored local evidence.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Rep["CommunityPostReport and\nCommunityCommentReport\nsnapshot + 24 h due time"] --> SQL["one SQL path\ngroup by case key, score,\nfilter, keyset page"]
+  Clock["one clock read\nbound as a parameter"] --> SQL
+  SQL --> Q["GET /moderation/cases\nrisk, due, case key order\nsigned filter-bound cursor"]
+  Q --> Role{"moderator or admin?"}
+  Role -- "no" --> F403["403 same body\nfor every case id"]
+  Role -- "yes" --> Flag{"moderation_console_enabled?"}
+  Flag -- "off or read error" --> F503["503 moderation_console_disabled"]
+  Flag -- "on" --> Page["page of cases + serverNow"]
+  Page --> Open["GET /moderation/cases/:id"]
+  Open --> Load["load snapshot, live target,\nfindings, reporters, prior actions"]
+  Load --> Audit["AuditLog row\nmoderation_case_viewed"]
+  Audit -- "fails" --> A503["503 audit_unavailable\nno data, no URL"]
+  Audit -- "ok" --> Sign["sign image 120 s"]
+  Sign --> Clamp["clamp stored values,\nstrict output parse"]
+  Clamp --> UI["console: PlainText, CaseMedia,\ncountdown, one read per navigation"]
 ```

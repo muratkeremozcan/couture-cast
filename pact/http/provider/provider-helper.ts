@@ -1,4 +1,13 @@
 // Story 4.4 Task 7 step 1 owner: wire real provider verification for onboarding and silhouette in pact/http/provider/provider-helper.ts
+import { ModerationQueueCacheHeadersMiddleware } from '../../../apps/api/src/modules/moderation/moderation-queue-cache-headers.middleware'
+import { ModerationQueueController } from '../../../apps/api/src/modules/moderation/moderation-queue.controller'
+import { ModerationQueueService } from '../../../apps/api/src/modules/moderation/moderation-queue.service'
+import { FeatureFlagsService } from '../../../apps/api/src/modules/feature-flags/feature-flags.service'
+import {
+  moderationFlagsDouble,
+  moderationQueueServiceDouble,
+  resetModerationState,
+} from './doubles/moderation'
 import { ShareCardsController } from '../../../apps/api/src/modules/share-cards/share-cards.controller'
 import { ShareCardsService } from '../../../apps/api/src/modules/share-cards/share-cards.service'
 import { resetShareCardOutcome, shareCardServiceDouble } from './doubles/share-cards'
@@ -168,6 +177,7 @@ export function resetProviderState() {
   resetProviderEngagementState()
   resetProviderLocationState()
   resetShareCardOutcome()
+  resetModerationState()
 }
 
 export function parsePactEvent(event: PactEvent | string) {
@@ -265,6 +275,7 @@ export async function startLocalPactProvider({
   const locationSeams = createLocationDoubles()
   const moduleFixture = await Test.createTestingModule({
     controllers: [
+      ModerationQueueController,
       ShareCardsController,
       CommunitySyncController,
       PushRegistrationController,
@@ -292,6 +303,8 @@ export async function startLocalPactProvider({
     ],
     providers: [
       { provide: ShareCardsService, useValue: shareCardServiceDouble },
+      { provide: ModerationQueueService, useValue: moderationQueueServiceDouble },
+      { provide: FeatureFlagsService, useValue: moderationFlagsDouble },
       { provide: CommunityPreferencesService, useValue: engagement.preferences },
       { provide: CommunitySyncService, useValue: engagement.sync },
       { provide: CommunityTargetsService, useValue: engagement.targets },
@@ -477,6 +490,16 @@ export async function startLocalPactProvider({
   localApp.use('/api/v1/commerce', (req: Request, res: Response, next: NextFunction) => {
     commerceCacheHeaders.use(req, res, next)
   })
+
+  // ModerationModule applies this through `configure`, which a bare testing module never
+  // calls. Without it the 401, 403 and 503 the contract records would miss the headers.
+  const moderationCacheHeaders = new ModerationQueueCacheHeadersMiddleware()
+  localApp.use(
+    '/api/v1/moderation/cases',
+    (req: Request, res: Response, next: NextFunction) => {
+      moderationCacheHeaders.use(req, res, next)
+    }
+  )
 
   await localApp.init()
   await localApp.listen(0, '127.0.0.1')

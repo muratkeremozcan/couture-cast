@@ -35,6 +35,11 @@ export function createIdentityDoubles() {
       if (token === 'pact-admin-token') {
         return Promise.resolve({ userId: 'admin-1', role: 'admin' as const })
       }
+      // Story 6.10 moderator queue: `RolesGuard` with `@Roles('moderator', 'admin')` runs for
+      // real, so the moderation interactions need a moderator actor.
+      if (token === 'pact-moderator-token') {
+        return Promise.resolve({ userId: 'moderator-1', role: 'moderator' as const })
+      }
       return Promise.reject(new Error('Unknown Pact access token'))
     },
   } as unknown as AccessTokenIdentityService

@@ -1,8 +1,9 @@
 // Learning path Step 12: Cross-surface E2E confidence.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-12-cross-surface-e2e-confidence
-import type { TestInfo } from '@playwright/test'
+import type { APIRequestContext, APIResponse, TestInfo } from '@playwright/test'
 import {
   forbiddenHttpErrorSchema,
+  moderationQueueErrorSchema,
   trackedResponseSchema,
   unauthorizedHttpErrorSchema,
 } from '@couture/api-client/contracts/http'
@@ -11,6 +12,7 @@ import {
   authHeaders,
   buildUniqueId,
   extractErrorMessage,
+  isNonLocalEnvironment,
   isProdEnvironment,
   resolveApiBaseUrl,
 } from '../../support/helpers/api-test'
@@ -193,4 +195,186 @@ test.describe('Auth and moderation endpoint security contracts', () => {
       })
     })
   }
+})
+
+// Story 6.10: the two read-only moderation routes. The role matrix runs the real guards against
+// the running API: bearer first, role second, the flag after the role.
+test.describe('Moderator queue read routes (Story 6.10)', () => {
+  const QUEUE_PATH = '/api/v1/moderation/cases'
+  const detailPath = (caseId: string) => `${QUEUE_PATH}/${caseId}`
+
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      isProdEnvironment(testInfo),
+      'Synthetic moderator identities are not provisioned in production.'
+    )
+  })
+
+  test('[P0] P-Q-ROLES returns 401 without a bearer token on both routes', async ({
+    apiRequest,
+    validateSchema,
+  }, testInfo) => {
+    for (const path of [QUEUE_PATH, detailPath('post.anything')]) {
+      const { status, body } = await apiRequest({
+        method: 'GET',
+        path,
+        baseUrl: resolveApiBaseUrl(testInfo),
+      })
+      expect(status).toBe(401)
+      await validateSchema(unauthorizedHttpErrorSchema, body, {
+        shape: { statusCode: 401, error: 'Unauthorized' },
+      })
+    }
+  })
+
+  test('[P0] P-Q-ROLES gives each non-moderator role one 403 body for real, unknown and malformed ids', async ({
+    apiRequest,
+    validateSchema,
+  }, testInfo) => {
+    // The teen consent gate runs before the role check, so a teen sees a different message than a guardian.
+    // Each role still sees exactly one body, whatever the id.
+    const expectedMessage = {
+      guardian: 'Insufficient role',
+      teen: 'Guardian consent required',
+    }
+    for (const role of ['guardian', 'teen'] as const) {
+      const headers = authHeaders(buildUniqueId(`${role}-reader`, testInfo), role)
+      const bodies = new Set<string>()
+      for (const path of [
+        QUEUE_PATH,
+        detailPath('post.cmreal0000000000000000000'),
+        detailPath('post.does-not-exist'),
+        detailPath('not-a-case'),
+        detailPath('orphan-comment.x'),
+      ]) {
+        const { status, body } = await apiRequest({
+          method: 'GET',
+          path,
+          baseUrl: resolveApiBaseUrl(testInfo),
+          headers,
+        })
+        expect(status, `${role} ${path}`).toBe(403)
+        await validateSchema(forbiddenHttpErrorSchema, body, {
+          shape: { statusCode: 403, error: 'Forbidden' },
+        })
+        expect(extractErrorMessage(body)).toContain(expectedMessage[role])
+        bodies.add(JSON.stringify(body))
+      }
+      expect(bodies.size, `${role} bodies`).toBe(1)
+    }
+  })
+
+  // The flag is environment configuration: a local stack seeds it on and a preview may have it off.
+  // A moderator passes the role check either way, so the queue answers 200 when the console is on and
+  // 503 `moderation_console_disabled` when it is off. Each test asserts the state it finds, and a local
+  // stack must be on, so neither state hides a defect.
+  async function consoleIsOn(request: APIRequestContext, testInfo: TestInfo) {
+    const probe = await request.get(
+      `${resolveApiBaseUrl(testInfo)}${QUEUE_PATH}?limit=1`,
+      { headers: authHeaders(buildUniqueId('moderator-probe', testInfo), 'moderator') }
+    )
+    if (probe.status() === 200) return true
+    await expectClosedConsole(probe)
+    expect(isNonLocalEnvironment(testInfo), 'a local stack seeds the console on').toBe(
+      true
+    )
+    return false
+  }
+
+  /** The closed console is a typed 503 that is never cached and carries no queue data. */
+  async function expectClosedConsole(response: APIResponse) {
+    expect(response.status(), await response.text()).toBe(503)
+    expect(response.headers()['cache-control']).toBe('private, no-store')
+    const body = moderationQueueErrorSchema.parse(await response.json())
+    expect(body.code).toBe('moderation_console_disabled')
+    expect(JSON.stringify(body)).not.toContain('items')
+    return JSON.stringify(body)
+  }
+
+  test('[P0] P-Q-ROLES lets a moderator and an admin read the queue with private, no-store headers', async ({
+    request,
+  }, testInfo) => {
+    const on = await consoleIsOn(request, testInfo)
+    const baseUrl = resolveApiBaseUrl(testInfo)
+    for (const role of ['moderator', 'admin'] as const) {
+      const response = await request.get(`${baseUrl}${QUEUE_PATH}?limit=5`, {
+        headers: authHeaders(buildUniqueId(`${role}-reader`, testInfo), role),
+      })
+      if (!on) {
+        await expectClosedConsole(response)
+        continue
+      }
+      expect(response.status(), role).toBe(200)
+      expect(response.headers()['cache-control']).toBe('private, no-store')
+      const body = (await response.json()) as {
+        data: { items: unknown[]; nextCursor: string | null; serverNow: string }
+      }
+      expect(Array.isArray(body.data.items)).toBe(true)
+      expect(Date.parse(body.data.serverNow)).not.toBeNaN()
+      // The page never carries a forbidden key.
+      expect(JSON.stringify(body)).not.toMatch(
+        /"(user_id|userId|email|reporterId|reportId|objectPath|bucket|ip)"/
+      )
+    }
+  })
+
+  test('[P0] P-Q-ROLES answers 404 case_not_found with one body for unknown and malformed ids', async ({
+    request,
+  }, testInfo) => {
+    const on = await consoleIsOn(request, testInfo)
+    const baseUrl = resolveApiBaseUrl(testInfo)
+    const headers = authHeaders(buildUniqueId('moderator-reader', testInfo), 'moderator')
+    const bodies = new Set<string>()
+    for (const id of [
+      'post.never-existed-1',
+      'not-a-case',
+      'post.',
+      'orphan-post.never',
+    ]) {
+      const response = await request.get(`${baseUrl}${detailPath(id)}`, { headers })
+      if (!on) {
+        // The flag is read before the id, so a closed console cannot reveal which ids exist.
+        bodies.add(await expectClosedConsole(response))
+        continue
+      }
+      expect(response.status(), id).toBe(404)
+      expect(response.headers()['cache-control']).toBe('private, no-store')
+      bodies.add(JSON.stringify(await response.json()))
+    }
+    expect(bodies.size).toBe(1)
+    expect([...bodies][0]).toContain(
+      on ? 'case_not_found' : 'moderation_console_disabled'
+    )
+  })
+
+  test('[P1] P-Q-ROLES refuses a bad filter with a closed code and exposes no write method', async ({
+    request,
+  }, testInfo) => {
+    const on = await consoleIsOn(request, testInfo)
+    const baseUrl = resolveApiBaseUrl(testInfo)
+    const headers = authHeaders(buildUniqueId('moderator-reader', testInfo), 'moderator')
+    // One invalid value per request, each beside a valid limit, so a 400 names the value that caused it.
+    // The control proves that limit alone is valid.
+    if (on) {
+      const control = await request.get(`${baseUrl}${QUEUE_PATH}?limit=10`, { headers })
+      expect(control.status(), 'a valid limit alone is accepted').toBe(200)
+    }
+    for (const query of ['risk=critical&limit=10', 'limit=500']) {
+      const bad = await request.get(`${baseUrl}${QUEUE_PATH}?${query}`, { headers })
+      if (on) {
+        expect(bad.status(), query).toBe(400)
+        expect(await bad.json(), query).toMatchObject({
+          statusCode: 400,
+          code: 'invalid_filter',
+        })
+      } else {
+        // The flag is read before the query, so a closed console answers the same for any input.
+        await expectClosedConsole(bad)
+      }
+    }
+    for (const method of ['post', 'put', 'patch', 'delete'] as const) {
+      const response = await request[method](`${baseUrl}${QUEUE_PATH}`, { headers })
+      expect([404, 405], method).toContain(response.status())
+    }
+  })
 })

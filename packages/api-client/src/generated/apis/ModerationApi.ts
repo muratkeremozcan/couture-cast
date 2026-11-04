@@ -12,10 +12,29 @@
  */
 
 import * as runtime from '../runtime'
-import type { ModerationActionInput, TrackedResponse } from '../models/index'
+import type {
+  GetModerationCase200Response,
+  ListModerationCases200Response,
+  ModerationActionInput,
+  TrackedResponse,
+} from '../models/index'
 
 export interface ApiV1ModerationActionsPostRequest {
   moderationActionInput: ModerationActionInput
+}
+
+export interface GetModerationCaseRequest {
+  caseId: string
+}
+
+export interface ListModerationCasesRequest {
+  source?: ListModerationCasesSourceEnum
+  locale?: string
+  risk?: ListModerationCasesRiskEnum
+  status?: ListModerationCasesStatusEnum
+  sla?: ListModerationCasesSlaEnum
+  limit?: number
+  cursor?: string
 }
 
 /**
@@ -81,4 +100,193 @@ export class ModerationApi extends runtime.BaseAPI {
     )
     return await response.value()
   }
+
+  /**
+   * Creates request options for getModerationCase without sending the request
+   */
+  async getModerationCaseRequestOpts(
+    requestParameters: GetModerationCaseRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['caseId'] == null) {
+      throw new runtime.RequiredError(
+        'caseId',
+        'Required parameter "caseId" was null or undefined when calling getModerationCase().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/moderation/cases/{caseId}`
+    urlPath = urlPath.replace(
+      `{${'caseId'}}`,
+      encodeURIComponent(String(requestParameters['caseId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Moderator and admin only. Read-only except for one audit row per successful read.
+   * One moderation case with its full context (private, no-store)
+   */
+  async getModerationCaseRaw(
+    requestParameters: GetModerationCaseRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<GetModerationCase200Response>> {
+    const requestOptions = await this.getModerationCaseRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Moderator and admin only. Read-only except for one audit row per successful read.
+   * One moderation case with its full context (private, no-store)
+   */
+  async getModerationCase(
+    requestParameters: GetModerationCaseRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<GetModerationCase200Response> {
+    const response = await this.getModerationCaseRaw(requestParameters, initOverrides)
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for listModerationCases without sending the request
+   */
+  async listModerationCasesRequestOpts(
+    requestParameters: ListModerationCasesRequest
+  ): Promise<runtime.RequestOpts> {
+    const queryParameters: any = {}
+
+    if (requestParameters['source'] != null) {
+      queryParameters['source'] = requestParameters['source']
+    }
+
+    if (requestParameters['locale'] != null) {
+      queryParameters['locale'] = requestParameters['locale']
+    }
+
+    if (requestParameters['risk'] != null) {
+      queryParameters['risk'] = requestParameters['risk']
+    }
+
+    if (requestParameters['status'] != null) {
+      queryParameters['status'] = requestParameters['status']
+    }
+
+    if (requestParameters['sla'] != null) {
+      queryParameters['sla'] = requestParameters['sla']
+    }
+
+    if (requestParameters['limit'] != null) {
+      queryParameters['limit'] = requestParameters['limit']
+    }
+
+    if (requestParameters['cursor'] != null) {
+      queryParameters['cursor'] = requestParameters['cursor']
+    }
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/moderation/cases`
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Moderator and admin only. Read-only. Ordered by risk, earliest open due time and case key, with a signed keyset cursor bound to the filters.
+   * The moderator case queue (private, no-store)
+   */
+  async listModerationCasesRaw(
+    requestParameters: ListModerationCasesRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<ListModerationCases200Response>> {
+    const requestOptions = await this.listModerationCasesRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Moderator and admin only. Read-only. Ordered by risk, earliest open due time and case key, with a signed keyset cursor bound to the filters.
+   * The moderator case queue (private, no-store)
+   */
+  async listModerationCases(
+    requestParameters: ListModerationCasesRequest = {},
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<ListModerationCases200Response> {
+    const response = await this.listModerationCasesRaw(requestParameters, initOverrides)
+    return await response.value()
+  }
 }
+
+/**
+ * @export
+ */
+export const ListModerationCasesSourceEnum = {
+  post: 'post',
+  comment: 'comment',
+} as const
+export type ListModerationCasesSourceEnum =
+  (typeof ListModerationCasesSourceEnum)[keyof typeof ListModerationCasesSourceEnum]
+/**
+ * @export
+ */
+export const ListModerationCasesRiskEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type ListModerationCasesRiskEnum =
+  (typeof ListModerationCasesRiskEnum)[keyof typeof ListModerationCasesRiskEnum]
+/**
+ * @export
+ */
+export const ListModerationCasesStatusEnum = {
+  open: 'open',
+  resolved: 'resolved',
+} as const
+export type ListModerationCasesStatusEnum =
+  (typeof ListModerationCasesStatusEnum)[keyof typeof ListModerationCasesStatusEnum]
+/**
+ * @export
+ */
+export const ListModerationCasesSlaEnum = {
+  on_track: 'on_track',
+  at_risk: 'at_risk',
+  breached: 'breached',
+  resolved: 'resolved',
+} as const
+export type ListModerationCasesSlaEnum =
+  (typeof ListModerationCasesSlaEnum)[keyof typeof ListModerationCasesSlaEnum]

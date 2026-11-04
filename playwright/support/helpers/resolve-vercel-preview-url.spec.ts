@@ -4,11 +4,16 @@ import { waitForDeploymentWithSha } from '../../../scripts/resolve-vercel-previe
 const expectedSha = 'bd339289e00c95ba24f320fd095b4d81a753bf98'
 const stale = {
   url: 'couture-cast-stale.vercel.app',
-  meta: { githubCommitSha: '058b82912e07' },
+  meta: { githubCommitSha: '058b82912e07', githubCommitRef: 'feature/a' },
 }
 const fresh = {
   url: 'couture-cast-fresh.vercel.app',
-  meta: { githubCommitSha: expectedSha },
+  meta: { githubCommitSha: expectedSha, githubCommitRef: 'feature/a' },
+}
+// The same commit built for another branch: the unfiltered listing can contain it.
+const otherBranch = {
+  url: 'couture-cast-other.vercel.app',
+  meta: { githubCommitSha: expectedSha, githubCommitRef: 'feature-a' },
 }
 
 describe('waitForDeploymentWithSha', () => {
@@ -27,7 +32,8 @@ describe('waitForDeploymentWithSha', () => {
     let calls = 0
     const url = await waitForDeploymentWithSha(
       () => Promise.resolve(listings[Math.min(calls++, listings.length - 1)] ?? []),
-      expectedSha.slice(0, 7)
+      expectedSha.slice(0, 7),
+      'feature/a'
     )
 
     expect(url).toBe('https://couture-cast-fresh.vercel.app')
@@ -38,9 +44,28 @@ describe('waitForDeploymentWithSha', () => {
     process.env.RESOLVE_SHA_TIMEOUT_SECONDS = '0.05'
     const url = await waitForDeploymentWithSha(
       () => Promise.resolve([stale]),
-      expectedSha
+      expectedSha,
+      'feature/a'
     )
 
     expect(url).toBeUndefined()
+  })
+
+  it('never returns a deployment of another branch built from the same commit', async () => {
+    process.env.RESOLVE_SHA_TIMEOUT_SECONDS = '0.05'
+    expect(
+      await waitForDeploymentWithSha(
+        () => Promise.resolve([otherBranch]),
+        expectedSha,
+        'feature/a'
+      )
+    ).toBeUndefined()
+    expect(
+      await waitForDeploymentWithSha(
+        () => Promise.resolve([otherBranch, fresh]),
+        expectedSha,
+        'feature/a'
+      )
+    ).toBe('https://couture-cast-fresh.vercel.app')
   })
 })

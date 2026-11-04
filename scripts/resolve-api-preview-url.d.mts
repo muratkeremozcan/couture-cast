@@ -5,7 +5,12 @@
 
 /** List deployments, polling while `expectedSha` has none yet and `poll` is set. */
 export function listDeploymentsAwaitingSha(
-  listDeployments: () => Promise<{ url?: string; meta?: { githubCommitSha?: string } }[]>,
+  listDeployments: () => Promise<
+    { url?: string; meta?: { githubCommitSha?: string; githubCommitRef?: string } }[]
+  >,
   expectedSha: string | undefined,
-  poll: boolean
-): Promise<{ url?: string; meta?: { githubCommitSha?: string } }[]>
+  poll: boolean,
+  branch?: string
+): Promise<
+  { url?: string; meta?: { githubCommitSha?: string; githubCommitRef?: string } }[]
+>

@@ -15,6 +15,7 @@ import { registerGuardianContracts } from './guardian'
 import { registerHealthContracts } from './health'
 import { registerLocationsContracts } from './locations'
 import { registerModerationContracts } from './moderation'
+import { registerModerationQueueContracts } from './moderation-queue'
 import { registerUserContracts } from './user'
 import { registerWeatherContracts } from './weather'
 import { registerRitualContracts } from './ritual'
@@ -121,6 +122,7 @@ export function createHttpOpenApiRegistry() {
   registerPlannerContracts(registry, commonSchemas)
   registerCommunityContracts(registry, commonSchemas)
   registerCommunitySyncContracts(registry, commonSchemas)
+  registerModerationQueueContracts(registry)
   registerShareCardsContracts(registry)
 
   return registry

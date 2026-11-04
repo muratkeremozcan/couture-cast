@@ -47,6 +47,7 @@ export class FeatureFlagsService {
   private readonly logger = createBaseLogger().child({ feature: 'feature-flags' })
 
   constructor(
+    @Inject(FeatureFlagsRepository)
     private readonly repository: FeatureFlagsRepository,
     @InjectRemoteFeatureFlagProvider()
     private readonly remoteProvider: RemoteFeatureFlagProvider,

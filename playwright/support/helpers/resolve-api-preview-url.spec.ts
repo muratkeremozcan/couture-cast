@@ -50,4 +50,28 @@ describe('listDeploymentsAwaitingSha', () => {
     expect(deployments).toEqual([stale])
     expect(calls).toBe(1)
   })
+
+  it('ignores a deployment of another branch at the expected commit', async () => {
+    const otherBranch = {
+      url: 'couture-cast-other.vercel.app',
+      meta: { githubCommitSha: expectedSha, githubCommitRef: 'feature-a' },
+    }
+    const built = {
+      url: 'couture-cast-built.vercel.app',
+      meta: { githubCommitSha: expectedSha, githubCommitRef: 'feature/a' },
+    }
+    let calls = 0
+    const deployments = await listDeploymentsAwaitingSha(
+      () => {
+        calls += 1
+        return Promise.resolve(calls < 3 ? [otherBranch, stale] : [otherBranch, built])
+      },
+      expectedSha,
+      true,
+      'feature/a'
+    )
+
+    expect(deployments).toEqual([otherBranch, built])
+    expect(calls).toBe(3)
+  })
 })

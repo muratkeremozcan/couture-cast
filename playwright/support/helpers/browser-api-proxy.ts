@@ -69,6 +69,10 @@ function buildApiProxyHeaders(
   const headers = { ...route.request().headers() }
   delete headers.host
   delete headers['content-length']
+  // The browser's cookie header belongs to the web origin. On a protected preview it holds the web
+  // deployment's bypass cookie, which the API rejects, and it would hide the API's own cookie that
+  // `route.fetch` takes from the context's jar. Dropping it lets the jar answer for the API origin.
+  delete headers.cookie
 
   const auth = state.authOverrides.get(apiProxyKeyFromRoute(route))
   if (!auth) {

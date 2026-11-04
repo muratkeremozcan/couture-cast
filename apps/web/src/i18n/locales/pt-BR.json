@@ -815,5 +815,150 @@
       "warm_dry": "Quente e seco",
       "warm_wet": "Quente e úmido"
     }
+  },
+  "moderation": {
+    "title": "Fila de moderação",
+    "subtitle": "Publicações e comentários denunciados, primeiro os de maior risco e os mais antigos.",
+    "backToQueue": "Voltar à fila",
+    "riskLabel": "Risco: {{risk}}",
+    "filters": {
+      "label": "Filtrar casos",
+      "source": "Origem",
+      "locale": "Idioma",
+      "risk": "Risco",
+      "status": "Status",
+      "sla": "Prazo",
+      "any": "Qualquer",
+      "localeUnknown": "Sem idioma"
+    },
+    "source": {
+      "post": "Publicação",
+      "comment": "Comentário"
+    },
+    "risk": {
+      "low": "Baixo",
+      "medium": "Médio",
+      "high": "Alto"
+    },
+    "status": {
+      "open": "Aberto",
+      "resolved": "Resolvido"
+    },
+    "slaState": {
+      "on_track": "No prazo",
+      "at_risk": "Em risco",
+      "breached": "Vencido",
+      "resolved": "Resolvido"
+    },
+    "sla": {
+      "left": "Faltam {{time}}",
+      "over": "Atrasado há {{time}}",
+      "resolved": "Resolvido"
+    },
+    "duration": {
+      "dh": "{{days}} d {{hours}} h",
+      "hm": "{{hours}} h {{minutes}} min",
+      "m": "{{minutes}} min"
+    },
+    "reason": {
+      "spam": "Spam",
+      "harassment": "Assédio",
+      "inappropriate_content": "Conteúdo inadequado",
+      "hate_speech": "Discurso de ódio",
+      "violence": "Violência",
+      "other": "Outro"
+    },
+    "category": {
+      "language": "Linguagem",
+      "textUnreadable": "Texto ilegível",
+      "photo": "Foto",
+      "photoUnconfirmed": "Foto não confirmada",
+      "incomplete": "Análise incompleta",
+      "upload": "Problema de envio",
+      "unknown": "Outro achado"
+    },
+    "actor": {
+      "screening": "Análise automática",
+      "reporter": "Quem denunciou",
+      "operator": "Operador"
+    },
+    "alias": {
+      "erased": "Membro excluído",
+      "unknown": "Membro sem nome"
+    },
+    "mediaReason": {
+      "target_erased": "A publicação foi excluída, então a imagem não existe mais.",
+      "anonymized": "A publicação foi anonimizada, então a imagem não existe mais.",
+      "purged": "A imagem foi removida.",
+      "no_image": "Este caso não tem imagem.",
+      "signing_failed": "Não foi possível carregar a imagem."
+    },
+    "media": {
+      "expired": "O link da imagem expirou.",
+      "failed": "Não foi possível carregar a imagem.",
+      "reload": "Recarregar imagem",
+      "noAlt": "Nenhuma descrição informada"
+    },
+    "state": {
+      "loading": "Carregando",
+      "retry": "Tentar de novo",
+      "stale": "Não foi possível atualizar. Mostrando o último resultado.",
+      "forbidden": "Esta conta não pode abrir o console de moderação.",
+      "disabled": "O console de moderação está desativado.",
+      "not_found": "Este caso não existe mais. O identificador pode ter mudado após uma exclusão.",
+      "signed_out": "Entre de novo para continuar.",
+      "invalid_cursor": "O link da página não é mais válido. Atualize a fila.",
+      "invalid_filter": "Esse filtro não é válido.",
+      "audit_unavailable": "Não foi possível registrar a visualização, então o caso não foi aberto. Tente de novo.",
+      "unavailable": "A fila de moderação está indisponível. Tente de novo.",
+      "rate_limited": "Muitas solicitações. Aguarde um momento e tente de novo.",
+      "signInLink": "Entrar",
+      "caseUnavailable": "Não foi possível abrir este caso. Tente de novo.",
+      "retrying": "Tentando de novo"
+    },
+    "queue": {
+      "count": "Casos exibidos: {{count}}",
+      "empty": "Nenhum caso aberto.",
+      "filteredEmpty": "Nenhum caso corresponde a estes filtros.",
+      "listLabel": "Casos",
+      "refresh": "Atualizar",
+      "loadMore": "Carregar mais",
+      "loadingMore": "Carregando mais",
+      "caseTitle": "Caso de {{source}}",
+      "caseRef": "Caso {{id}}",
+      "reports": "Denúncias: {{count}}",
+      "finding": "Achado da análise",
+      "refreshing": "Atualizando",
+      "refreshed": "Atualizado desde a primeira página. Casos exibidos: {{count}}"
+    },
+    "detail": {
+      "title": "Caso de {{source}}",
+      "accepted": "Denunciado {{when}}",
+      "conflict": "Você escreveu este conteúdo ou registrou uma denúncia sobre ele. A decisão cabe a outro moderador.",
+      "reload": "Recarregar caso",
+      "media": "Imagem",
+      "altText": "Texto alternativo",
+      "content": "Conteúdo denunciado",
+      "subject": "Autor",
+      "reportedVersion": "O que quem denunciou viu",
+      "snapshotUnavailable": "O conteúdo desta denúncia não está disponível.",
+      "snapshotEmpty": "A denúncia não tem texto.",
+      "capturedAt": "Capturado {{when}}",
+      "currentState": "Agora",
+      "targetErased": "O conteúdo foi excluído.",
+      "targetStatus": "Status",
+      "publishedAt": "Publicado {{when}}",
+      "parentComment": "Comentário principal",
+      "findings": "Achados automáticos",
+      "noFindings": "Nenhum achado automático.",
+      "categories": "Categorias",
+      "codes": "Códigos",
+      "engine": "Versão do mecanismo",
+      "operatorNote": "Nota do operador",
+      "heldNoCodes": "Retido para revisão sem código registrado.",
+      "reporters": "Quem denunciou",
+      "priorActions": "Ações anteriores",
+      "noPriorActions": "Nenhuma ação anterior."
+    }
   }
 }
