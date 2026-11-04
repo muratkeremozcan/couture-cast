@@ -287,6 +287,9 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.migrations.outcome == 'success' }}
         id: tests
         continue-on-error: true
+        env:
+          # The Prisma and build steps above already did what each workspace's pre-hook repeats.
+          COVERAGE_SHARED_DEPS_BUILT: 'true'
         run: npm run test:coverage
 
       - name: Coverage report and PR comment

@@ -25,10 +25,12 @@ const later = (at: Date, ms: number) => new Date(at.getTime() + ms)
 
 const database = isolatedCommunityDatabase()
 let prisma: PrismaClient
+let authorId: string
 
 beforeAll(async () => {
   await database.migrate()
   prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
+  authorId = (await persistUser(prisma, createUser())).id
 }, 60_000)
 
 afterAll(async () => {
@@ -42,11 +44,10 @@ afterEach(async () => {
 
 describe('erasure sweep fairness across a 70 hour window', () => {
   async function requested(storage: InMemoryCommunityStorage, at: Date) {
-    const user = await persistUser(prisma, createUser())
     const post = await prisma.lookbookPost.create({
       data: {
         ...buildLookbookPostCreateInput(
-          createLookbookPost({ userId: user.id, status: 'published' })
+          createLookbookPost({ userId: authorId, status: 'published' })
         ),
         erasure_requested_at: at,
       },
