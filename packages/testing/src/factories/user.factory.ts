@@ -98,7 +98,9 @@ function buildComfortPreferences(role: UserFixtureRole): UserComfortPreferences 
 function buildDefaultUserFixture(role: UserFixtureRole, age: number): UserFixture {
   return {
     id: faker.string.uuid(),
-    email: faker.internet.email().toLowerCase(),
+    // `User.email` is unique and faker's name pool is small: suites that create many users on one
+    // database hit P2002 about once in 80 runs without the random prefix.
+    email: `${faker.string.alphanumeric(12)}.${faker.internet.email()}`.toLowerCase(),
     role,
     age,
     displayName: faker.person.fullName(),

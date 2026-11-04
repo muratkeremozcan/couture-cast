@@ -245,12 +245,25 @@ describe('6.1 community locale parity', () => {
    * Story 6.7b: `card.shopOpensInBrowser` is web's "opens in a new tab" hint for
    * the sponsored CTA. Mobile opens the partner in an in-app browser and reuses
    * `commerce.shopThisLook.opensInBrowser`, which already says exactly that.
+   *
+   * Story 6.11: `banned.*` and `error.banned` are the web banned notice. Spec D15 has mobile treat
+   * `community_banned` as its existing denied state, and mobile banned copy is a
+   * named follow-up.
    */
   const WEB_ONLY_KEYS = [
+    'banned.appeal.not_requested',
+    'banned.appeal.overturned',
+    'banned.appeal.requested',
+    'banned.appeal.upheld',
+    'banned.permanent',
+    'banned.scope',
+    'banned.temporary',
+    'banned.title',
     'card.detailClose',
     'card.open',
     'card.openLabel',
     'card.shopOpensInBrowser',
+    'error.banned',
   ]
 
   it('6.2-I18N-MOB-11 explains every moderation reason category in every locale', () => {
