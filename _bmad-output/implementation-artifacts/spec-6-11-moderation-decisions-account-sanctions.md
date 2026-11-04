@@ -2,7 +2,10 @@
 title: 'CC-6.11 Moderation decisions and account sanctions'
 type: 'feature'
 created: '2026-11-04'
-status: 'ready-for-dev'
+status: 'built'
+review: 'none'
+review_source: 'coordinator: TEA per commit, Codex after handoff'
+lenses_ran: []
 baseline_commit: '6337dc8cbe5fdae4fe9a8f35f05798031293da36'
 baseline_revision: '6337dc8cbe5fdae4fe9a8f35f05798031293da36'
 route: 'dispatch'
@@ -267,6 +270,38 @@ Verified against `main` at `6337dc8c`.
 
 ## Implementation Notes
 
+Decisions taken during the build under the owner's delegated approval:
+
+- The clock token `MODERATION_QUEUE_CLOCK` and the revision, hash and audit functions live in `moderation-decision-rules.ts`, so the decision and queue services share them with no import cycle.
+- `ModerationAfterCommit` runs the bounded spotlight and stream steps for both routes, and every 200, replay included, runs it (TEA-13).
+- The standing section reads `allowedAppealSteps` from `deriveAllowedAppealSteps`, the appeal counterpart of `deriveAllowedActions`, so the console and the route share one rule.
+- `writeModerationRecord` in `community-moderation.actions.ts` turns a failed record insert into 503 `audit_unavailable`.
+  Unique violations and retryable lock errors pass through to their own handlers.
+- The D11 backfill also skips canary, erasure-requested and anonymized posts, because a report row on them would open a case nobody can act on.
+- TEA-08 wins over the U-A wording in the test design, as the spec's change log says.
+- The target status now has localized labels under `moderation.targetStatus`, and an operator note has its own section in the case view.
+- A banned member's filter chips are `aria-disabled` on both navs, and the grid lifts the state through `onBannedChange`.
+  A member whose ban ends while the page stays open sees the feed on the next reload or session change.
+- The banned notice uses the light lookbook surface it sits on, because that surface has no dark variant.
+
+File budget:
+
+- The story passed the 90-file trigger in Design Notes.
+  The banned notice stayed in, because the AC and the user-facing verification both name it, and TEA agreed.
+- At 101 files the pre-existing Sign in and Sign out fix on `notification-settings/page.tsx` moved to the local branch `fix/notification-settings-auth-links` (`84307904`), and the factory email fix left with it.
+  It has no dependency on this story.
+
+Manual walk:
+
+- Local stack: built API on `cc611_walk`, `next dev` with `WEB_NEXT_DIST_DIR=.next-walk`, a mock storage origin, and the `NEXT_PUBLIC_E2E_AUTH` fixture token.
+- `E2E_CALLER_OWNED_ENV_KEYS` must name `DATABASE_URL`, because `TEST_ENV=local` otherwise lets `.env.local` override it.
+  `COMMUNITY_FLAG_FIXTURE_MODE=true` is needed for community reads.
+- Each decision, a temporary ban and a permanent ban were applied in Chromium, and the rows were read back.
+  The notice was checked for both ban kinds in light and dark at 1280 and 375 pixels.
+  Screenshots are under `_bmad-output/test-artifacts/story-6-11/` and stay out of git.
+
+Matrix test audit (row, then the test that covers it): resolve grouped `I-D-RESOLVE-GROUP`; resolve orphan `I-D-RESOLVE-ORPHAN`; release screener flag `I-D-RELEASE-POST`; release held comment `I-D-RELEASE-COMMENT`; writes closed `I-D-RELEASE-REFUSALS`; takedowns `I-D-TAKEDOWN-POST`, `I-D-TAKEDOWN-COMMENT`, `I-D-TAKEDOWN-TWICE`; concurrent conflict `I-C-CONFLICT`; new report `I-C-REPORT-RACE`; network retry `I-C-RETRY`; retry after a move `I-C-RETRY-MOVED`, `I-C-REKEY`; key reuse `I-C-KEY-REUSE`; other moderator `I-C-KEY-SCOPE`; first decision `I-C-FIRST-DECISION`; escalate first `I-C-FIRST-ESCALATE`; escalated moderator `I-D-ESCALATE`; forged identity `U-D-CTRL-IDENTITY`; missing reason `U-D-REASON`; wrong role `U-D-CTRL-NO-ORACLE`, `P-D-ROLES`; self review `I-D-SELF-REVIEW`; flags off `U-D-CTRL-ORDER`, `P-D-DISABLED`; audit fails `I-D-ATOMIC`; temporary ban `I-B-CONTENT-TEMP`; expiry `I-B-EXPIRY`; upgrade `I-B-UPGRADE`; moderator permanent `U-D-ALLOWED-RULES`, `I-B-SECOND`; second ban `I-B-SECOND`; author erased `I-B-ERASED`; pending content `I-B-PENDING`; live socket `I-B-REALTIME`; retraction `I-B-RETRACT`; banned teen `I-B-TEEN`; alerts `I-B-NONCOMMUNITY`; overturned `I-A-OVERTURN`; bad step `I-A-BAD-STEP`; Redis down `I-K-REDIS-DOWN`; author view `U-B-D14`; screening intake `I-S-INTAKE`; hostile reason `I-D-HOSTILE`.
+
 ## Spec Change Log
 
 Added by TEA on 2026-11-04 after reading the spec against the code at `6337dc8c`.
@@ -299,6 +334,30 @@ Entries marked (intent) tighten or extend frozen intent and were sent to the bui
 Residuals RG1 to RG8 are in the test design under Assumptions.
 
 ## Review Triage Log
+
+The bmad-build lens fan-out did not run: TEA reviewed every commit as the independent reader, and the coordinator runs the Codex review after this log.
+All rows below were real and fixed.
+
+| Id         | Sev    | Finding                                                                                                                               | Fix                                                                           |
+| ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| F1         | high   | The foreign-key handler read `meta.field_name`, and Prisma reports `meta.constraint`, so a moderator with no `User` row got a 500     | `writeModerationRecord`                                                       |
+| F2         | high   | Non-audit record inserts answered 500 with the audit promise broken                                                                   | Same wrapper covers every record insert                                       |
+| F3         | high   | The appeal route computed its own viewer conflict                                                                                     | `appealViewerConflict` is shared                                              |
+| F4 to F6   | high   | The ban check sat behind allocate and publish replays and missed some reads                                                           | Check moved ahead of every replay and into `assertPublicPostReadable`         |
+| F7         | high   | A banned actor's engagement dropped other members' notifications                                                                      | The banned actor drops alone in the send guard                                |
+| F8         | high   | `key={detail.revision}` remounted the panel and lost the reason and focus                                                             | Key removed                                                                   |
+| F9, F10    | medium | The panel kept a chosen action or ban kind that a reload no longer offered                                                            | Effective action and kind through `stillOffered`                              |
+| F11 to F13 | medium | Focus fell to the body after a conflict reload, outcome text survived a case change, and the SLA announcement talked over the outcome | `focusSubmit` ref, outcome reset per case, `announceSla`                      |
+| F14        | medium | The mutation key survived an idempotency mismatch                                                                                     | Keeper cleared on mismatch                                                    |
+| F15 to F17 | medium | A banned member kept author states, the challenge and `canAct`, and non-JSON refusal bodies lost the code                             | Banned state clears them, tolerant code read                                  |
+| F18 to F20 | low    | The form lacked `aria-required`, `aria-invalid` and `noValidate`, and the notice announced through `role=status` on mount             | Attributes added, one live region                                             |
+| F21        | low    | Timer `unref` typing, and prettier merged two lines through ASI                                                                       | Explicit cast and statement separation                                        |
+| UI-A       | medium | The notice was a black card on the light page in dark mode                                                                            | Light surface classes only                                                    |
+| UI-B       | medium | The case view printed the raw status enum in every locale                                                                             | `moderation.targetStatus`                                                     |
+| UI-C       | medium | Banned page filters stayed live and fired three 403 reads per click                                                                   | `aria-disabled` chips, lifted state, zero reads                               |
+| UI-D       | low    | The notifications link stayed on the banned page, and settings showed Sign in with Sign out                                           | Link hidden; the settings fix moved to `fix/notification-settings-auth-links` |
+| UI-E       | low    | Operator words sat under the Machine findings heading                                                                                 | Own section                                                                   |
+| UI-F       | low    | 44-pixel global rule stretched radios, three Resolved labels stacked, and Reload stretched across the failure notice                  | `min-h-0 min-w-0`, header reduced, `self-start`                               |
 
 ## Design Notes
 
