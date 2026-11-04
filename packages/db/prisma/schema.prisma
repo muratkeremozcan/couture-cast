@@ -657,6 +657,8 @@ model LookbookPost {
   submitted_at                 DateTime?
   published_at                 DateTime?
   moderation_reason            String?
+  /// Story 6.11: the machine reason a ban's marker replaced, restored when an appeal lifts the ban.
+  ban_prior_reason             String?
   moderation_engine_version    String?
   idempotency_key              String?
   location_key                 String?
@@ -698,19 +700,6 @@ model LookbookPost {
   reaction_receipts            CommunityReactionReceipt[]
   reaction_outbox              CommunityReactionOutbox[]
   sponsorships                 CommunityPostSponsorship[]
-
-  @@unique([user_id, idempotency_key])
-  @@index([user_id])
-  @@index([challenge_id])
-  /// Feed ordering is `published_at, id` DESC, matching the public cursor. The
-  /// sort direction is declared here as well as in the migration: without it
-  /// Prisma models an ascending index, the SQL creates a descending one, and
-  /// `prisma migrate diff` reports permanent drift on both.
-  @@index([climate_band, status, published_at(sort: Desc), id(sort: Desc)])
-  @@index([status, published_at(sort: Desc), id(sort: Desc)])
-  @@index([upload_expires_at])
-  @@index([user_id, submitted_at(sort: Desc)])
-  @@index([erasure_requested_at, objects_purged_at])
   /// Three indexes on this table are deliberately NOT declared here, all
   /// partial on the public visibility predicate (status = 'published' AND
   /// published_at IS NOT NULL AND erasure_requested_at IS NULL AND
@@ -731,6 +720,19 @@ model LookbookPost {
   /// DSL cannot say `WHERE`; see the AffiliateOffer comment for why an
   /// undeclared partial index is the honest description. The spotlight
   /// integration suite guards the objects themselves.
+
+  @@unique([user_id, idempotency_key])
+  @@index([user_id])
+  @@index([challenge_id])
+  /// Feed ordering is `published_at, id` DESC, matching the public cursor. The
+  /// sort direction is declared here as well as in the migration: without it
+  /// Prisma models an ascending index, the SQL creates a descending one, and
+  /// `prisma migrate diff` reports permanent drift on both.
+  @@index([climate_band, status, published_at(sort: Desc), id(sort: Desc)])
+  @@index([status, published_at(sort: Desc), id(sort: Desc)])
+  @@index([upload_expires_at])
+  @@index([user_id, submitted_at(sort: Desc)])
+  @@index([erasure_requested_at, objects_purged_at])
 }
 
 /// Story 6.1: the persisted pseudonym a community post is attributed to.
@@ -785,6 +787,8 @@ model CommunityModerationOutbox {
   id            String       @id @default(cuid())
   post          LookbookPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
   post_id       String       @unique
+  /// Story 6.11: moves when a row is re-armed, so its job id is new and a retained job cannot swallow it.
+  generation    Int          @default(0)
   attempts      Int          @default(0)
   last_error    String?
   dispatched_at DateTime?
@@ -1087,17 +1091,19 @@ model ModerationDecision {
 /// index `CommunitySanction_one_unlifted_permanent_idx`, neither of which Prisma
 /// can express.
 model CommunitySanction {
-  id            String                        @id @default(cuid())
-  user          User                          @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  user_id       String
-  decision      ModerationDecision            @relation(fields: [decision_id], references: [id], onDelete: Restrict)
-  decision_id   String                        @unique
-  case_key      String
-  kind          CommunitySanctionKind
-  expires_at    DateTime?
-  lifted_at     DateTime?
-  appeal_status CommunitySanctionAppealStatus @default(not_requested)
-  created_at    DateTime
+  id                String                        @id @default(cuid())
+  user              User                          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id           String
+  decision          ModerationDecision            @relation(fields: [decision_id], references: [id], onDelete: Restrict)
+  decision_id       String                        @unique
+  case_key          String
+  kind              CommunitySanctionKind
+  expires_at        DateTime?
+  lifted_at         DateTime?
+  appeal_status     CommunitySanctionAppealStatus @default(not_requested)
+  created_at        DateTime
+  /// Story 6.11: when the rows this ban held were handled. Null means the sweep still owes them.
+  holds_released_at DateTime?
 
   @@index([user_id, lifted_at, expires_at])
 }
@@ -1285,8 +1291,8 @@ model CommercePartner {
 /// and it cannot drop what it cannot see. `packages/db/test/palette-advisor-schema.spec.ts`
 /// (5.4-DB-041) is what guards the object itself.
 model AffiliateOffer {
-  id                 String               @id @default(cuid())
-  partner            CommercePartner      @relation(fields: [partner_id], references: [id], onDelete: Restrict)
+  id                 String                     @id @default(cuid())
+  partner            CommercePartner            @relation(fields: [partner_id], references: [id], onDelete: Restrict)
   partner_id         String
   garment_category   GarmentCategory?
   comfort_range      GarmentComfortRange?
@@ -1300,14 +1306,14 @@ model AffiliateOffer {
   /// Contains the literal {clickToken} placeholder. A template without it is
   /// rejected at click time as operator misconfiguration.
   deep_link_template String
-  priority           Int                  @default(0)
-  status             AffiliateOfferStatus @default(inactive)
+  priority           Int                        @default(0)
+  status             AffiliateOfferStatus       @default(inactive)
   /// Inclusive lower bound of the publication window.
   effective_from     DateTime
   /// Exclusive upper bound; NULL means open-ended.
   effective_to       DateTime?
-  created_at         DateTime             @default(now())
-  updated_at         DateTime             @updatedAt
+  created_at         DateTime                   @default(now())
+  updated_at         DateTime                   @updatedAt
   clicks             AffiliateClick[]
   sponsorships       CommunityPostSponsorship[]
 
@@ -1647,13 +1653,13 @@ model CommunityReaction {
   user       User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   post       LookbookPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
   updated_at DateTime     @default(now()) @updatedAt
-
-  @@id([user_id, post_id])
-  @@index([post_id, selection])
   /// Also undeclared because it is PARTIAL: CommunityReaction_spotlight_post_idx
   /// ON (post_id) INCLUDE (user_id) WHERE selection IS NOT NULL, from
   /// 20261022140000_community_spotlight_window_indexes, for index-only
   /// non-author reaction counts. The spotlight integration suite guards it.
+
+  @@id([user_id, post_id])
+  @@index([post_id, selection])
 }
 
 /// Payload-bound accepted requests. Retention is 30 days.
@@ -1723,6 +1729,8 @@ model CommunityComment {
   updated_at           DateTime                         @updatedAt
   platform             String
   screening_reason     String?
+  /// Story 6.11: the machine reason a ban's marker replaced, restored when an appeal lifts the ban.
+  ban_prior_reason     String?
   screening_version    String?
   receipt              CommunityCommentReceipt?
   screening_outbox     CommunityCommentScreeningOutbox?
@@ -1950,18 +1958,18 @@ model CommunityNotificationIntent {
 }
 
 model CommunityNotificationGroup {
-  id              String                        @id @default(uuid()) @db.Uuid
-  recipient_id    String?
-  post_id         String?
-  status          String                        @default("pending")
-  eligible_at     DateTime
-  policy_revision Int @default(0)
-  next_attempt_at DateTime
-  expires_at      DateTime
-  snapshot_at     DateTime?
-  created_at      DateTime                      @default(now())
-  intents         CommunityNotificationIntent[]
-  deliveries      CommunityTokenDelivery[]
+  id                  String                        @id @default(uuid()) @db.Uuid
+  recipient_id        String?
+  post_id             String?
+  status              String                        @default("pending")
+  eligible_at         DateTime
+  policy_revision     Int                           @default(0)
+  next_attempt_at     DateTime
+  expires_at          DateTime
+  snapshot_at         DateTime?
+  created_at          DateTime                      @default(now())
+  intents             CommunityNotificationIntent[]
+  deliveries          CommunityTokenDelivery[]
   eligibility_changes CommunityEligibilityChange[]
 
   @@index([status, next_attempt_at, eligible_at])
@@ -2041,14 +2049,15 @@ model CommunityEngagementTelemetry {
 
 /// Server-only policy-derived deadline history. Identified solely through its guarded group.
 model CommunityEligibilityChange {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  group_id String @db.Uuid
-  group CommunityNotificationGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
-  recorded_at DateTime @default(now())
-  policy_revision Int
+  id                   String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id             String                     @db.Uuid
+  group                CommunityNotificationGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  recorded_at          DateTime                   @default(now())
+  policy_revision      Int
   previous_eligible_at DateTime
-  eligible_at DateTime
-  reason String
+  eligible_at          DateTime
+  reason               String
+
   @@index([group_id, recorded_at])
 }
 

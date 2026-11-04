@@ -55,7 +55,12 @@ export class CommunityModerationOutboxDispatcher {
     let failed = 0
 
     for (const row of pending) {
-      const ok = await this.dispatchOne(row.id, row.post_id, row.post.image_object_path)
+      const ok = await this.dispatchOne(
+        row.id,
+        row.post_id,
+        row.post.image_object_path,
+        row.generation
+      )
       if (ok) {
         dispatched += 1
       } else {
@@ -69,7 +74,8 @@ export class CommunityModerationOutboxDispatcher {
   private async dispatchOne(
     outboxId: string,
     postId: string,
-    imageObjectPath: string | null
+    imageObjectPath: string | null,
+    generation: number
   ): Promise<boolean> {
     // The upload session is the random middle segment of the object path, so it
     // survives a restart without a column of its own and keeps the job id stable
@@ -81,7 +87,9 @@ export class CommunityModerationOutboxDispatcher {
         : null) ?? postId
 
     try {
-      await this.queue.enqueue(postId, uploadSessionId)
+      if (generation > 0)
+        await this.queue.enqueue(postId, uploadSessionId, undefined, generation)
+      else await this.queue.enqueue(postId, uploadSessionId)
       await this.prisma.communityModerationOutbox.update({
         where: { id: outboxId },
         data: {

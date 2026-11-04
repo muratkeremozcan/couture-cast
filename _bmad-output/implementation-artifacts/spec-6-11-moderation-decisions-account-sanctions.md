@@ -84,7 +84,7 @@ Decisions (coordinator delegated planning, owner unavailable, 2026-11-04):
   | New engagement   | Post allocation and publication, comment, reaction, report and share-card export are refused with 403 `community_banned`. Push sends stop through the existing send guard                                                              | Same                                                                                                                |
   | Community reads  | Feed, comments, spotlight and home teaser are refused with the same 403                                                                                                                                                                | Same                                                                                                                |
   | Existing content | The case target is taken down. Other published content stays. Unpublished `pending_review` posts and `pending_screening` comments are held with a ban marker                                                                           | Every `published` or pending post and comment is hidden with a ban marker, and the member's reactions are withdrawn |
-  | End              | Ends by itself at `expires_at`, checked per request with no worker. Content the ban held stays held                                                                                                                                    | Ends only by an overturned appeal                                                                                   |
+  | End              | Ends by itself at `expires_at`, checked per request. A sweep returns content held only by this ban to screening (owner ruling, Build-03); it never publishes directly                                                                  | Ends only by an overturned appeal                                                                                   |
   | Appeal status    | Starts `not_requested`. A step is refused once the ban expired                                                                                                                                                                         | Starts `not_requested`                                                                                              |
   - Rejected: a whole-account lock. It would cut a paying member off paid features and privacy rights, and Supabase offers no revoke-by-user-id for another member's sessions. `UserSessionService.invalidateUserSessions`, today an empty boundary, is still called after commit, so a future session store is covered.
   - Rejected: `community_forget_subject(member, false)` on a ban. It deletes `PushToken` rows, which silently ends weather alerts for a member who only lost community access.
@@ -124,9 +124,9 @@ Decisions (coordinator delegated planning, owner unavailable, 2026-11-04):
   - A `mutationId` is minted per intent and reused on every retry of the same payload.
   - States: idle, submitting, applied (polite announcement of the localized outcome, then one detail reload), conflict (keeps the typed reason, offers reload), not applicable, forbidden, admin required, self-review, disabled, audit unavailable, offline retry, cache deferred.
   - The detail shows `firstDecisionAt`, the escalated marker and an account standing section (sanction, expiry, appeal status, prior ban count, appeal controls). The queue row shows the escalated marker.
-  - The web community page renders a localized banned notice from the 403 body. Mobile treats `community_banned` as its existing denied state and adds no strings: the 20 mobile catalog files would break the file budget, and CC-6.11's AC asks for localized operator outcomes. Mobile banned copy is a named follow-up.
+  - The web community page and the mobile community screen render a localized banned notice from the 403 body (owner ruling, Build-04).
   - Light and dark, desktop and mobile widths, WCAG 2.2 AA, 44-pixel targets, visible focus.
-- D16 One PR under 100 changed files, generated files included. The budget table in Design Notes is the plan.
+- D16 The owner lifted the file limit for this PR on 2026-11-04 (Build-05).
 
 ## Boundaries & Constraints
 
@@ -284,12 +284,15 @@ Decisions taken during the build under the owner's delegated approval:
   A member whose ban ends while the page stays open sees the feed on the next reload or session change.
 - The banned notice uses the light lookbook surface it sits on, because that surface has no dark variant.
 
-File budget:
+Left on purpose, with the reason:
 
-- The story passed the 90-file trigger in Design Notes.
-  The banned notice stayed in, because the AC and the user-facing verification both name it, and TEA agreed.
-- At 101 files the pre-existing Sign in and Sign out fix on `notification-settings/page.tsx` moved to the local branch `fix/notification-settings-auth-links` (`84307904`), and the factory email fix left with it.
-  It has no dependency on this story.
+- Member self-service appeals: the spec's Never list rules them out.
+- SLA timers and escalation delivery: CC-6.12.
+- Database append-only enforcement and evidence retention, RG4 included: CC-6.13.
+- RG1, a signed URL issued before a decision lives up to 900 seconds: D12 records it as a known bound, and a signed URL cannot be revoked.
+- RG3, comment delete keeps the visible-post rule every member has: existing behavior outside this story.
+- A permanent ban's never-public rows stay held after an overturn: the owner ruling keeps permanent bans as they are, and an upgraded temporary ban's rows follow that rule because they carry the permanent marker.
+- `couture:account-erased` has listeners and no dispatcher in apps or packages: the web erasure flow predates this story and no 6.11 path raises it.
 
 Manual walk:
 
@@ -331,6 +334,10 @@ Entries marked (intent) tighten or extend frozen intent and were sent to the bui
 - TEA-21 (D12, fixed from code). A release runs the same after-commit step for the post's areas. `resolve` and `escalate` skip the bump and report `completed`.
 - TEA-22 (D15, fixed from code). Both clients read `code` ahead of every message rule, and the `community_banned` message stays distinct from the rollout copy.
 
+- Build-03 (D8, D10, owner ruling on CR-2). When a temporary ban ends, content held only by its marker returns to screening: posts to `pending_review`, comments to `pending_screening`, marker cleared. It never publishes directly. Content a moderator took down stays down, an erased or withdrawn item stays as it is, a newer active ban keeps it held, and permanent bans keep their behavior. The mechanism is `CommunityMaintenanceService.sweepExpiredBanHolds` on the shared `maintenance` queue every five minutes, because the worker runtime is the only place a schedule fires and a ban ending has no request to hang off. `CommunitySanction.holds_released_at` makes it retry-safe. Each subject runs in its own transaction under the exclusive `community_sanction` lock and `guardCommunitySubject`, and re-reads inside, so several instances and a new ban cannot interleave. `CommunityModerationOutbox.generation` gives a re-armed post a new job id, because a retained BullMQ job under the old id would swallow it. Overturning a temporary ban does the same in its own transaction; when the access check refuses, the ban stays unstamped for the sweep.
+- Build-04 (D15, owner ruling). Mobile classifies `community_banned` as reason `banned`, carries the sanction, and shows `community-banned-notice.tsx` with the web copy in its ten catalogs. A ban closes the screen on any path: feed, spotlight page or a socket denial probe.
+- Build-05 (D16, owner ruling). The file limit is lifted, and the 90-file split rule and the budget table in Design Notes no longer apply.
+- Build-06 (D8, RG6, CR-3). `ban_prior_reason` on `LookbookPost` and `CommunityComment` keeps the machine reason a permanent ban's marker replaces, and an overturn restores it, so the post keeps its risk step.
 - Build-02 (D11, Optic on PR 195). A screening report reads as identity state `unknown` with `origin: screening` on the reporter, where D11 said identity state `screening`. Adding that enum value is a breaking response change under `api-versioning.md`, and the one exemption the repo has is for deliberately open sets, which this closed set is not. The console shows the same Automated screening label from `origin`.
 - Build-01 (TEA-01, D2, review C2). The transaction order gains one step: case lock, replay check, case read, sanction eligibility locks, privacy guard, member lock, post row lock, then the re-read and revision check.
 
@@ -362,7 +369,8 @@ All rows below were real and fixed.
 | UI-A         | medium | The notice was a black card on the light page in dark mode                                                                                             | Light surface classes only                                                                                                                                                             |
 | UI-B         | medium | The case view printed the raw status enum in every locale                                                                                              | `moderation.targetStatus`                                                                                                                                                              |
 | UI-C         | medium | Banned page filters stayed live and fired three 403 reads per click                                                                                    | Nav leaves the page through `closed`, zero reads                                                                                                                                       |
-| UI-D         | low    | The notifications link stayed on the banned page, and settings showed Sign in with Sign out                                                            | Link hidden; the settings fix moved to `fix/notification-settings-auth-links`                                                                                                          |
+| UI-D         | low    | The notifications link stayed on the banned page, and settings showed Sign in with Sign out                                                            | Link hidden, and settings offers the one that applies                                                                                                                                  |
+| UI-H         | low    | Chip nav pills overran their padding at 375, and a dark 1 px line ran down x=0 at odd widths                                                           | `shrink-0`, and the full-bleed wrapper uses margins, because a -50% transform lands on a half pixel                                                                                    |
 | UI-E         | low    | Operator words sat under the Machine findings heading                                                                                                  | Own section                                                                                                                                                                            |
 | UI-F         | low    | 44-pixel global rule stretched radios, three Resolved labels stacked, and Reload stretched across the failure notice                                   | `min-h-0 min-w-0`, header reduced, `self-start`                                                                                                                                        |
 | UI-G1, UI-G2 | medium | Closed chips kept a selected look, with their heading stranded from the notice                                                                         | Same `closed` nav                                                                                                                                                                      |
@@ -378,8 +386,8 @@ All rows below were real and fixed.
 | R2-1         | medium | A delayed realtime rebuild restored the weekly challenge after the ban cleanup                                                                         | `closeForBan` bumps the feed generation, so reads in flight cannot land                                                                                                                |
 | CI-1         | high   | Optic refused the new `screening` value of the alias state as a breaking response enum change                                                          | The enum returns to its main values, and reporters gain `origin`, with no exemption                                                                                                    |
 | CR-1         | low    | Decision history replayed rows by time, so clock skew could leave a resolved case escalated                                                            | `inDecisionOrder` lets the sequence decide inside one case key                                                                                                                         |
-| CR-2         | none   | Content a temporary ban held stays held after it expires                                                                                               | Kept: D8 says so in its End row. Reply on the thread, and raised with the coordinator as a product question                                                                            |
-| CR-3         | low    | Overturning a permanent ban clears `moderation_reason` on a post it hid                                                                                | Kept: the post's `ModerationEvent` rows hold the original reason, and an operator can read them under Prior actions                                                                    |
+| CR-2         | high   | Content a temporary ban held was stranded after the ban ended                                                                                          | Owner ruling, Build-03: a sweep returns it to screening                                                                                                                                |
+| CR-3         | low    | Overturning a permanent ban cleared `moderation_reason` on a post it hid                                                                               | Build-06: `ban_prior_reason` keeps it and the overturn restores it                                                                                                                     |
 | CR-4         | high   | An upgrade left content under the replaced temporary marker, which no appeal could reach                                                               | `createSanction` moves those rows to the new marker                                                                                                                                    |
 | CR-5         | high   | A ban left the detail, report and compose dialogs open and interactive                                                                                 | `closeForBan` closes them                                                                                                                                                              |
 | CR-6         | medium | A ban on a later spotlight page only offered a retry                                                                                                   | The hook hands the sanction to `closeForBan`                                                                                                                                           |
@@ -401,7 +409,7 @@ All rows below were real and fixed.
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | 6.12  | `escalate` decision rows and `escalated`; `firstDecisionAt`; `resolved_at` stamped only once; screening reports now carry a real `sla_due_at`                                             | The worker reads them. Alert delivery on escalation is its own outbox, added there |
 | 6.13  | `ModerationDecision` written by insert only; `AuditLog` events with no subject identity; `moderator_id`, `subject_user_id`, `subject_alias` and `reason` as the fields erasure must treat | An append-only trigger on the table, retention, anonymization and evidence export  |
-| Later | `community_banned` body with kind, expiry and appeal status; `appeal_status` state machine                                                                                                | Mobile banned copy and member self-service appeal intake                           |
+| Later | `appeal_status` state machine                                                                                                                                                             | Member self-service appeal, which this story rules out                             |
 
 **Why a decision row is the record.**
 Comment audit rows have no actor column and post events cannot express escalation or a ban.
@@ -420,7 +428,7 @@ revision = sha256(`${newestSequence}|${sortedOpenReportIds.join(',')}|${targetSt
 case with no decision, reports r1 r2, post published: sha256("0|r1,r2|published")
 ```
 
-**File budget (target under 100, plan about 83).**
+**File budget at planning (superseded by Build-05, kept as the record of the plan).**
 
 | Area                                                                                                              | Files |
 | ----------------------------------------------------------------------------------------------------------------- | ----- |
@@ -441,8 +449,6 @@ case with no decision, reports r1 r2, post published: sha256("0|r1,r2|published"
 | Playwright: spec, role matrix, helper                                                                             | 3     |
 | Headroom for review fixes                                                                                         | 3     |
 
-Mobile catalogs are excluded by D15, because 20 more files would leave no headroom.
-If review fixes push the count past 90, move the web banned notice and its strings to a stacked follow-up PR and keep the 403 classified as denied.
 Do not trim tests.
 
 ## Test Design (TEA)

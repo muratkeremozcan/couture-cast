@@ -9484,7 +9484,7 @@ Since Step 50 a moderator could read every case and change none of them.
 Comment cases had no operator action, posts the screener flagged never reached the queue, and repeat abuse had no consequence.
 This step adds one moderator-only write route that applies a decision to a whole case in one transaction: resolve, release, takedown, escalate or ban.
 A second route records appeal steps on a ban.
-The console gains a decision panel and an account standing section, and a banned member sees a localized notice on the web community page.
+The console gains a decision panel and an account standing section, and a banned member sees a localized notice on the web community page and the mobile community screen.
 A ban closes community access only, so the member keeps wardrobe, daily ritual, weather alerts, billing and privacy rights.
 Both routes sit behind `moderation_decisions_enabled` and `moderation_console_enabled`, and both default to false in production.
 Ban enforcement has no flag, so turning the console off never lifts a ban.
@@ -9522,6 +9522,8 @@ Key takeaways:
    An overturned appeal always lifts the ban, and restoration runs only when `assertCommunityDatabaseAccess` passes under the subject guard, so a lifted ban cannot republish a teen's content after consent lapsed.
    A taken-down case target keeps its operator reason, stays down, and can be released from its case.
    Upgrading a temporary ban moves what it held to the permanent ban's marker, so overturning the permanent ban reaches it.
+   When a temporary ban ends, `sweepExpiredBanHolds` returns what only it held to screening on the `maintenance` queue, because a ban ending has no request to hang off; `holds_released_at` makes the sweep retry-safe and a new outbox `generation` gives a re-armed post a job id no retained job can swallow.
+   `ban_prior_reason` keeps a machine reason through a permanent ban, and an overturn restores it.
 8. **Screening intake is a report row.**
    `flagPost` writes a `CommunityPostReport` with a null reporter and `origin: screening`, as comment intake already did, so the queue, keyset, SLA, risk and erasure re-key apply unchanged.
    The case detail marks such a reporter with `origin: screening`, because adding a value to the alias state enum is a breaking response change that Optic refuses.
@@ -9587,8 +9589,11 @@ Hard-won lessons from the implementation and review of this story:
 15. **Two ways to learn one fact need one cleanup.**
     The feed path cleared the weekly challenge and the socket path did not, so `closeForBan` now serves both.
     The re-review then found a rebuild already in flight could restore the challenge, so `closeForBan` also bumps the feed generation.
-16. **A file budget is a real constraint late in a story.**
-    The last UI round reached 101 changed files, so the pre-existing Sign in and Sign out fix on the notification settings page moved to `fix/notification-settings-auth-links`.
+16. **A half-pixel transform paints a line.**
+    A full-bleed wrapper centered with `left-1/2 -translate-x-1/2` lands on -187.5 pixels at 375, and column 0 blends the dark page into white.
+    Margins bleed to the same place, and layout snaps them to a pixel.
+17. **Deferring for a budget hid real gaps.**
+    Held content with no way back, undocumented 403 bodies and a mobile screen with no explanation all sat as follow-ups under a file limit until the owner lifted it.
 
 Story/Task mapping:
 
@@ -9604,7 +9609,7 @@ Story/Task mapping:
 - Task 9 (decision and sanction services, repository, controller, module, cache headers)
 - Task 10 (detail additions, identity and actor kinds, orphan prior actions, finding predicates)
 - Task 11 (decision panel, account standing, case view, queue marker)
-- Task 12 (banned notice, closed filters, mobile denied state)
+- Task 12 (banned notice on web and mobile, closed filters)
 - Task 13 (ten web catalogs and parity)
 - Task 14 (Pact, Playwright, tests per the test design)
 
@@ -9639,7 +9644,7 @@ Task owner map:
 
 - Story 6.11 Task 2 step 1 owner: add the models and enums in `packages/db/prisma/schema.prisma`, with constraints, grants and the backfill in `packages/db/prisma/migrations/20261104120000_moderation_decisions/migration.sql`.
 - Story 6.11 Task 3 step 1 owner: declare the flag in `packages/config/src/flags.ts`, seeded true in `packages/db/prisma/seeds/feature-flags.ts`.
-- Story 6.11 Task 4 step 1 owner: define the decision contract in `packages/api-client/src/contracts/http/moderation-decisions.ts`.
+- Story 6.11 Task 4 step 1 owner: define the decision contract in `packages/api-client/src/contracts/http/moderation-decisions.ts`, and the ban refusal every enforced 403 names in `community-banned.ts`.
 - Story 6.11 Task 5 step 1 owner: apply post and comment effects in `apps/api/src/modules/community/community-moderation.actions.ts`.
 - Story 6.11 Task 6 step 1 owner: refuse a banned member in `apps/api/src/modules/community/community-access.service.ts`.
 - Story 6.11 Task 7 step 1 owner: write screening reports in `apps/api/src/modules/community/community-moderation.processor.ts` and `community-comments.processor.ts`.
@@ -9649,12 +9654,13 @@ Task owner map:
 - Story 6.11 Task 9 step 3 owner: serialize and apply a decision in `apps/api/src/modules/moderation/moderation-decisions.service.ts`.
 - Story 6.11 Task 9 step 4 owner: apply ban effects and appeal steps in `apps/api/src/modules/moderation/moderation-sanctions.service.ts`.
 - Story 6.11 Task 9 step 5 owner: guard and route in `apps/api/src/modules/moderation/moderation-decisions.controller.ts`.
+- Story 6.11 Task 9 step 6 owner: return ended bans' holds to screening in `apps/api/src/modules/community/community-ban-holds.ts` and `community-maintenance.service.ts`.
 - Story 6.11 Task 10 step 1 owner: extend the case detail in `apps/api/src/modules/moderation/moderation-queue.service.ts` and `moderation-queue.repository.ts`.
 - Story 6.11 Task 11 step 1 owner: read and write decisions from the web in `apps/web/src/lib/moderation.ts`.
 - Story 6.11 Task 11 step 2 owner: collect and submit a decision in `apps/web/src/app/components/moderation-decision-panel.tsx`.
 - Story 6.11 Task 11 step 3 owner: show sanctions and appeal controls in `apps/web/src/app/components/moderation-account-standing.tsx`.
 - Story 6.11 Task 12 step 1 owner: read the refusal by code in `apps/web/src/lib/community.ts` and `apps/mobile/src/lib/community.ts`.
-- Story 6.11 Task 12 step 2 owner: tell the member in `apps/web/src/app/components/community-banned-notice.tsx`.
+- Story 6.11 Task 12 step 2 owner: tell the member in `apps/web/src/app/components/community-banned-notice.tsx` and `apps/mobile/src/features/community/community-banned-notice.tsx`.
 - Story 6.11 Task 12 step 3 owner: close the surface in `apps/web/src/app/components/community-lookbook-grid.tsx` and `lookbook-prism-layout.tsx`.
 
 Tests that cover this step:
@@ -9715,12 +9721,10 @@ Evidence boundaries:
 - **Production stays dark.**
   `moderation_decisions_enabled` and `moderation_console_enabled` default to false and are true only in the dev seed.
 - **Known limits by design.**
-  Mobile shows its existing denied state with no banned copy, as a named follow-up.
-  The OpenAPI document does not name `community_banned` on community 403 responses, as a named follow-up, and both clients read it by code.
   A signed image URL issued before a decision lives up to 900 seconds.
   Appeal intake is operator-recorded, and the notice sends the member to support.
+  A permanent ban's never-public rows stay held after an overturn, by owner ruling.
   With the filters gone, a member whose ban ends while the page stays open sees the feed on the next reload or session change.
-  The branch has 99 changed files, and `fix/notification-settings-auth-links` holds the settings page fix outside it.
   Screenshots under `_bmad-output/test-artifacts/story-6-11/` are git-ignored local evidence.
 
 Architecture diagram:

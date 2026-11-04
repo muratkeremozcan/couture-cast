@@ -55,6 +55,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -206,6 +207,10 @@ function spotlightDetailForVisit(
   currentVisit: boolean
 ) {
   return available && currentVisit ? item : null
+}
+
+function UnlessBanned({ banned, children }: { banned: boolean; children: ReactNode }) {
+  return banned ? null : <>{children}</>
 }
 
 export function CommunityScreen() {
@@ -2058,26 +2063,29 @@ export function CommunityScreen() {
         style={[styles.container, { backgroundColor: palette.background }]}
         testID="community-screen"
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            ref={newPostButtonRef}
-            testID="community-new-post-button"
-            style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
-            onPress={() => openPostSheet(false)}
-            accessibilityRole="button"
-            accessibilityLabel={t('community.newPost')}
-          >
-            <Text style={[styles.primaryButtonText, { color: ON_ACCENT }]}>
-              {t('community.newPost')}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Story 6.11: a banned member has nothing to post to or filter. */}
+        <UnlessBanned banned={bannedSanction !== null}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              ref={newPostButtonRef}
+              testID="community-new-post-button"
+              style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
+              onPress={() => openPostSheet(false)}
+              accessibilityRole="button"
+              accessibilityLabel={t('community.newPost')}
+            >
+              <Text style={[styles.primaryButtonText, { color: ON_ACCENT }]}>
+                {t('community.newPost')}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        <CommunityFilterChips
-          selectedMode={servedMode}
-          onSelectMode={handleSelectMode}
-          viewerBand={viewerBand}
-        />
+          <CommunityFilterChips
+            selectedMode={servedMode}
+            onSelectMode={handleSelectMode}
+            viewerBand={viewerBand}
+          />
+        </UnlessBanned>
 
         {newLooks.length > 0 && communityAvailable && (
           <TouchableOpacity

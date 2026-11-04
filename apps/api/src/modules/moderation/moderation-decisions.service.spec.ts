@@ -268,6 +268,7 @@ function build(seed: Seed = {}) {
       }),
     },
     lookbookPost: {
+      findMany: vi.fn(() => Promise.resolve([])),
       findUnique: vi.fn(() => Promise.resolve(state.post)),
       findUniqueOrThrow: vi.fn(() => Promise.resolve(state.post)),
       update: vi.fn(({ data }: { data: Row }) =>
@@ -284,6 +285,7 @@ function build(seed: Seed = {}) {
       }),
     },
     communityComment: {
+      findMany: vi.fn(() => Promise.resolve([])),
       findUnique: vi.fn(() => Promise.resolve(state.comment)),
       findFirst: vi.fn(() => Promise.resolve(state.comment)),
       update: vi.fn(({ data }: { data: Row }) => {

@@ -1,7 +1,12 @@
 // Story 6.1 maintenance owner: own the expiry and retention sweeps in `apps/api/src/modules/community/community-maintenance.service.ts` and their schedule in `community-maintenance.scheduler.ts`
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
-import { communityPrivacyTransaction, guardCommunityPost } from './community-privacy.js'
+import { returnBanHoldsToScreening } from './community-ban-holds.js'
+import {
+  communityPrivacyTransaction,
+  guardCommunityPost,
+  guardCommunitySubject,
+} from './community-privacy.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import {
   SupabaseCommunityStorageAdapter,
@@ -39,6 +44,12 @@ export interface CommunityUploadExpirySweepResult {
   draftsDeleted: number
 }
 
+export interface CommunityBanExpirySweepResult {
+  subjects: number
+  posts: number
+  comments: number
+}
+
 export interface CommunityErasureSweepResult {
   hidden: number
   anonymized: number
@@ -59,6 +70,92 @@ export class CommunityMaintenanceService {
     @Inject(SupabaseCommunityStorageAdapter)
     private readonly storage: CommunityStorage
   ) {}
+
+  /**
+   * Returns what ended temporary bans held to screening (Story 6.11, CR-2). A ban ends by the clock
+   * with no request to hang off, so only a sweep can reach it. A member with an active ban stays out
+   * until that ban ends, when every older marker releases with it. One transaction per subject, so
+   * one bad subject cannot block the rest, and a failure still fails the job so an operator sees it.
+   */
+  async sweepExpiredBanHolds(
+    now: Date = new Date()
+  ): Promise<CommunityBanExpirySweepResult> {
+    const subjects = await this.prisma.$queryRaw<{ user_id: string }[]>`
+      SELECT s.user_id
+      FROM "CommunitySanction" s
+      WHERE s.kind = 'temporary'
+        AND s.holds_released_at IS NULL
+        AND (s.expires_at <= ${now} OR s.lifted_at IS NOT NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM "CommunitySanction" a
+          WHERE a.user_id = s.user_id
+            AND a.lifted_at IS NULL
+            AND (a.expires_at IS NULL OR a.expires_at > ${now})
+        )
+      GROUP BY s.user_id
+      ORDER BY MIN(s.expires_at)
+      LIMIT ${MAX_SWEEP_BATCH}
+    `
+    const result: CommunityBanExpirySweepResult = { subjects: 0, posts: 0, comments: 0 }
+    let failed = 0
+    for (const { user_id: subjectId } of subjects) {
+      try {
+        const moved = await communityPrivacyTransaction(this.prisma, (tx) =>
+          this.releaseSubjectBanHolds(tx, subjectId, now)
+        )
+        if (moved.posts + moved.comments > 0) result.subjects += 1
+        result.posts += moved.posts
+        result.comments += moved.comments
+      } catch (error) {
+        failed += 1
+        this.logger.error(
+          {
+            event: 'community_ban_expiry_release_failed',
+            error: error instanceof Error ? error.name : 'unknown',
+          },
+          'Ban hold release failed for one subject'
+        )
+      }
+    }
+    if (failed > 0) throw new Error(`Ban hold release failed for ${failed} subject(s)`)
+    return result
+  }
+
+  private async releaseSubjectBanHolds(
+    tx: Prisma.TransactionClient,
+    subjectId: string,
+    now: Date
+  ): Promise<{ posts: number; comments: number }> {
+    // The same lock a new ban takes, so a ban and this release cannot interleave.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_sanction:' || ${subjectId}))`
+    await guardCommunitySubject(tx, subjectId)
+    const active = await tx.communitySanction.findFirst({
+      where: {
+        user_id: subjectId,
+        lifted_at: null,
+        OR: [{ expires_at: null }, { expires_at: { gt: now } }],
+      },
+      select: { id: true },
+    })
+    if (active) return { posts: 0, comments: 0 }
+    const ended = await tx.communitySanction.findMany({
+      where: {
+        user_id: subjectId,
+        kind: 'temporary',
+        holds_released_at: null,
+        OR: [{ expires_at: { lte: now } }, { lifted_at: { not: null } }],
+      },
+      select: { id: true },
+    })
+    const ids = ended.map((sanction) => sanction.id)
+    if (ids.length === 0) return { posts: 0, comments: 0 }
+    const moved = await returnBanHoldsToScreening(tx, subjectId, ids, now)
+    await tx.communitySanction.updateMany({
+      where: { id: { in: ids } },
+      data: { holds_released_at: now },
+    })
+    return moved
+  }
 
   /**
    * Moves posts stuck in `pending_review` past the stall deadline to

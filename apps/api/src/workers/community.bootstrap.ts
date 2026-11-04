@@ -165,6 +165,12 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
       SWEEP_INTERVAL_MS,
       community.sweeps.sweepErasureRequests
     )
+    schedule(
+      state.timers,
+      'ban-expiry',
+      SWEEP_INTERVAL_MS,
+      community.sweeps.sweepExpiredBanHolds
+    )
 
     logger.info(
       {

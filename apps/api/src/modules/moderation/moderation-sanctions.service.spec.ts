@@ -187,6 +187,8 @@ function buildAppeal(
       findMany: vi.fn(() => Promise.resolve(seed.commentReports ?? [])),
     },
     lookbookPost: {
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
       findUnique: vi.fn(() => Promise.resolve({ id: 'p1', user_id: SUBJECT })),
       updateMany: vi.fn(({ where }: { where: Row }) => {
         state.restoredPosts = where.moderation_reason ? 2 : 0
@@ -194,6 +196,8 @@ function buildAppeal(
       }),
     },
     communityComment: {
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
       updateMany: vi.fn(({ where }: { where: Row }) => {
         state.restoredComments = where.screening_reason ? 1 : 0
         return Promise.resolve({ count: state.restoredComments })

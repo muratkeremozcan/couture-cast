@@ -18,6 +18,7 @@ import {
   assertCommunityDatabaseAccess,
   findActiveCommunitySanction,
 } from '../community/community-access.service.js'
+import { returnBanHoldsToScreening } from '../community/community-ban-holds.js'
 import {
   ModerationRecordWriteError,
   writeModerationRecord,
@@ -176,6 +177,7 @@ export class ModerationSanctionsService {
     const { subjectId, kind } = params
     const marker = communityBanMarker(params.sanctionId)
     const permanent = kind === 'permanent'
+    if (permanent) await this.keepPriorReasons(tx, subjectId)
     await tx.lookbookPost.updateMany({
       where: {
         user_id: subjectId,
@@ -196,6 +198,36 @@ export class ModerationSanctionsService {
       where: { user_id: subjectId, selection: { not: null } },
       data: { selection: null, revision: { increment: 1 } },
     })
+  }
+
+  /** A released row keeps its machine reason, and the marker must not cost it that for good. */
+  private async keepPriorReasons(tx: Tx, subjectId: string): Promise<void> {
+    const posts = await tx.lookbookPost.findMany({
+      where: {
+        user_id: subjectId,
+        status: 'published',
+        moderation_reason: { not: null },
+      },
+      select: { id: true, moderation_reason: true },
+    })
+    for (const post of posts)
+      await tx.lookbookPost.update({
+        where: { id: post.id },
+        data: { ban_prior_reason: post.moderation_reason },
+      })
+    const comments = await tx.communityComment.findMany({
+      where: {
+        user_id: subjectId,
+        status: 'published',
+        screening_reason: { not: null },
+      },
+      select: { id: true, screening_reason: true },
+    })
+    for (const comment of comments)
+      await tx.communityComment.update({
+        where: { id: comment.id },
+        data: { ban_prior_reason: comment.screening_reason },
+      })
   }
 
   /** Writes the sanction row. An upgrade lifts the temporary ban it replaces. The decision row must exist. */
@@ -222,7 +254,7 @@ export class ModerationSanctionsService {
     })
     await tx.communitySanction.updateMany({
       where: { id: { in: replaced.map((row) => row.id) } },
-      data: { lifted_at: at },
+      data: { lifted_at: at, holds_released_at: at },
     })
     // What the replaced ban held now belongs to this one, so overturning this one can restore it.
     const held = replaced.map((row) => communityBanMarker(row.id))
@@ -363,7 +395,7 @@ export class ModerationSanctionsService {
     })
     const restoredCount =
       input.status === 'overturned'
-        ? await this.restoreContent(tx, sanction.user_id, sanctionId)
+        ? await this.restoreContent(tx, sanction.user_id, sanction, at)
         : 0
 
     const decisionId = randomUUID()
@@ -486,35 +518,65 @@ export class ModerationSanctionsService {
   private async restoreContent(
     tx: Tx,
     subjectId: string,
-    sanctionId: string
+    sanction: CommunitySanction,
+    at: Date
   ): Promise<number> {
     try {
       await assertCommunityDatabaseAccess(tx, subjectId)
     } catch (error) {
+      // Unstamped, so the expiry sweep owes it: that path re-checks through screening and publishes nothing.
       if (error instanceof ForbiddenException) return 0
       throw error
     }
-    const marker = communityBanMarker(sanctionId)
+    const marker = communityBanMarker(sanction.id)
+    const postWhere = {
+      user_id: subjectId,
+      status: 'flagged',
+      moderation_reason: marker,
+      published_at: { not: null },
+      erasure_requested_at: null,
+      anonymized_at: null,
+    } satisfies Prisma.LookbookPostWhereInput
+    const priorPosts = await tx.lookbookPost.findMany({
+      where: { ...postWhere, ban_prior_reason: { not: null } },
+      select: { id: true, ban_prior_reason: true },
+    })
     const posts = await tx.lookbookPost.updateMany({
-      where: {
-        user_id: subjectId,
-        status: 'flagged',
-        moderation_reason: marker,
-        published_at: { not: null },
-        erasure_requested_at: null,
-        anonymized_at: null,
-      },
+      where: postWhere,
       data: { status: 'published', moderation_reason: null },
     })
+    for (const post of priorPosts)
+      await tx.lookbookPost.update({
+        where: { id: post.id },
+        data: { moderation_reason: post.ban_prior_reason, ban_prior_reason: null },
+      })
+    const commentWhere = {
+      user_id: subjectId,
+      status: 'blocked',
+      screening_reason: marker,
+      publication_sequence: { not: null },
+    } satisfies Prisma.CommunityCommentWhereInput
+    const priorComments = await tx.communityComment.findMany({
+      where: { ...commentWhere, ban_prior_reason: { not: null } },
+      select: { id: true, ban_prior_reason: true },
+    })
     const comments = await tx.communityComment.updateMany({
-      where: {
-        user_id: subjectId,
-        status: 'blocked',
-        screening_reason: marker,
-        publication_sequence: { not: null },
-      },
+      where: commentWhere,
       data: { status: 'published', screening_reason: null },
     })
+    for (const comment of priorComments)
+      await tx.communityComment.update({
+        where: { id: comment.id },
+        data: { screening_reason: comment.ban_prior_reason, ban_prior_reason: null },
+      })
+    // What was never public goes back through screening. Permanent bans keep their rule (D8, CR-2).
+    if (sanction.kind === 'temporary') {
+      await returnBanHoldsToScreening(tx, subjectId, [sanction.id], at)
+      await tx.communitySanction.update({
+        where: { id: sanction.id },
+        data: { holds_released_at: at },
+      })
+    }
     return posts.count + comments.count
   }
 }

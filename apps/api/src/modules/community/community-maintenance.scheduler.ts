@@ -16,6 +16,7 @@ export const COMMUNITY_MODERATION_DISPATCH_JOB_NAME = 'community-moderation-disp
 export const COMMUNITY_STALE_REVIEW_JOB_NAME = 'community-stale-review-sweep'
 export const COMMUNITY_UPLOAD_EXPIRY_JOB_NAME = 'community-upload-expiry-sweep'
 export const COMMUNITY_ERASURE_JOB_NAME = 'community-erasure-sweep'
+export const COMMUNITY_BAN_EXPIRY_JOB_NAME = 'community-ban-expiry-sweep'
 
 /**
  * Every minute. This is the latency between a post being submitted and its
@@ -43,11 +44,18 @@ export const COMMUNITY_UPLOAD_EXPIRY_CRON_PATTERN = '15 * * * *'
  */
 export const COMMUNITY_ERASURE_CRON_PATTERN = '*/15 * * * *'
 
+/**
+ * Every five minutes. A temporary ban ends by the clock with no request to hang off, and a
+ * stranded member's content waits on this sweep to return to screening.
+ */
+export const COMMUNITY_BAN_EXPIRY_CRON_PATTERN = '*/5 * * * *'
+
 export const COMMUNITY_MAINTENANCE_JOB_NAMES = [
   COMMUNITY_MODERATION_DISPATCH_JOB_NAME,
   COMMUNITY_STALE_REVIEW_JOB_NAME,
   COMMUNITY_UPLOAD_EXPIRY_JOB_NAME,
   COMMUNITY_ERASURE_JOB_NAME,
+  COMMUNITY_BAN_EXPIRY_JOB_NAME,
 ] as const
 
 export type CommunityMaintenanceJobName = (typeof COMMUNITY_MAINTENANCE_JOB_NAMES)[number]
@@ -87,6 +95,11 @@ export async function registerCommunityMaintenanceSchedulers(
       COMMUNITY_ERASURE_JOB_NAME,
       { pattern: COMMUNITY_ERASURE_CRON_PATTERN },
       { name: COMMUNITY_ERASURE_JOB_NAME, data: {} }
+    ),
+    queue.upsertJobScheduler(
+      COMMUNITY_BAN_EXPIRY_JOB_NAME,
+      { pattern: COMMUNITY_BAN_EXPIRY_CRON_PATTERN },
+      { name: COMMUNITY_BAN_EXPIRY_JOB_NAME, data: {} }
     ),
   ])
 }

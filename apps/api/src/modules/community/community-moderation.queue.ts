@@ -33,7 +33,8 @@ export interface CommunityModerationPublisher {
   enqueue(
     postId: string,
     uploadSessionId: string,
-    platform?: 'web' | 'mobile'
+    platform?: 'web' | 'mobile',
+    generation?: number
   ): Promise<void>
 }
 
@@ -50,7 +51,8 @@ export interface CommunityModerationPublisher {
  *
  * That is the correct behaviour — it is what makes a duplicate dispatch safe —
  * but an operator who needs a genuine re-screen has to do one of two things:
- * remove the retained job from the queue first (`queue.getJob(id)` then
+ * bump the outbox `generation`, which changes the job id (how a ban's held post
+ * returns to screening), remove the retained job from the queue first (`queue.getJob(id)` then
  * `job.remove()`), or give the post a new upload session, which changes the
  * object path and therefore the job id. Re-arming the outbox row alone is not
  * enough and looks like it worked. Either way the post must still be in
@@ -63,9 +65,11 @@ export interface CommunityModerationPublisher {
  */
 export function buildCommunityModerationJobId(
   postId: string,
-  uploadSessionId: string
+  uploadSessionId: string,
+  generation = 0
 ): string {
-  return `${postId}__${uploadSessionId}`
+  const base = `${postId}__${uploadSessionId}`
+  return generation > 0 ? `${base}__g${generation}` : base
 }
 
 /**
@@ -102,7 +106,8 @@ export class CommunityModerationQueue
   async enqueue(
     postId: string,
     uploadSessionId: string,
-    platform?: 'web' | 'mobile'
+    platform?: 'web' | 'mobile',
+    generation = 0
   ): Promise<void> {
     const data = communityModerationJobSchema.parse({
       postId,
@@ -110,7 +115,7 @@ export class CommunityModerationQueue
       platform,
     })
     await this.getQueue().add(COMMUNITY_MODERATION_JOB, data, {
-      jobId: buildCommunityModerationJobId(postId, uploadSessionId),
+      jobId: buildCommunityModerationJobId(postId, uploadSessionId, generation),
       removeOnComplete: { age: JOB_RETENTION_SECONDS },
       removeOnFail: { age: JOB_RETENTION_SECONDS },
     })
