@@ -3,7 +3,15 @@
 // Story 6.11 test owner: C-WEB-D-BANNED-NOTICE, the D14 author state, and the TEA-22 banned state in the grid and the teaser.
 // Fix round 1: the sanction leaves with the session that owned it, and a live ban takes the weekly challenge with it.
 // The grid runs through the real web transport and MSW.
-import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { delay, http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,6 +48,7 @@ import {
 } from '../../test-utils/community-lookbook-grid'
 import { CommunityBannedNotice } from './community-banned-notice'
 import { CommunityLookbookGrid } from './community-lookbook-grid'
+import { useCommunitySpotlight } from './community-spotlight'
 import { useHomeSpotlightTeaser } from './home-spotlight-teaser'
 
 vi.mock('posthog-js', () => ({
@@ -352,6 +361,19 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     expect(screen.queryByTestId('weekly-challenge-banner')).not.toBeInTheDocument()
     expect(screen.queryByTestId('challenge-participate-button')).not.toBeInTheDocument()
     expect(document.body.textContent).not.toContain(CHALLENGE.title)
+  })
+
+  it('closes an open dialog when the ban lands behind it', async () => {
+    signIn()
+    const state = { banned: false, reads: 0 }
+    serve(state)
+    renderGrid()
+    await userEvent.click(await screen.findByTestId('create-post-button'))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    state.banned = true
+    fireEvent.click(screen.getByTestId('community-filter-all'))
+    await screen.findByTestId('community-banned-notice')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('removes the filters and the notifications link with the feed, and reads no more', async () => {
@@ -757,6 +779,70 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       expect(queryNotice()).not.toBeInTheDocument()
       expect(screen.queryByText(item().caption!)).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('TEA-22: the spotlight', () => {
+  const spotlightPage = (nextCursor: string | null) => ({
+    data: { level: 'none', label: null, items: [], nextCursor },
+  })
+
+  function renderSpotlight(onBanned: (sanction: unknown) => void) {
+    const announce = vi.fn()
+    const view = renderHook(() =>
+      useCommunitySpotlight({
+        scope: 'member-1',
+        onBanned,
+        beginRead: () => 0,
+        reconcile: (items) => [...items],
+        announce,
+      })
+    )
+    return { ...view, announce }
+  }
+
+  it('closes the surface when a later page is refused for a ban', async () => {
+    signIn()
+    let reads = 0
+    useMswHandlers(
+      http.get(SPOTLIGHT_PATH, () => {
+        reads += 1
+        return reads === 1 ? HttpResponse.json(spotlightPage('next')) : bannedResponse()
+      })
+    )
+    const onBanned = vi.fn()
+    const { result, announce } = renderSpotlight(onBanned)
+    await waitFor(() => expect(result.current.state.status).toBe('ready'))
+    expect(onBanned).not.toHaveBeenCalled()
+
+    await act(() => result.current.loadMore())
+    expect(onBanned).toHaveBeenCalledTimes(1)
+    expect(onBanned).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: expect.any(String) as string })
+    )
+    expect(result.current.state.status).toBe('disabled')
+    expect(result.current.state.moreFailed).toBe(false)
+    expect(announce).not.toHaveBeenCalledWith({ key: 'community.spotlight.error' })
+    expect(reads).toBe(2)
+  })
+
+  it('says nothing about a ban when a later page fails for another reason', async () => {
+    signIn()
+    let reads = 0
+    useMswHandlers(
+      http.get(SPOTLIGHT_PATH, () => {
+        reads += 1
+        return reads === 1
+          ? HttpResponse.json(spotlightPage('next'))
+          : HttpResponse.error()
+      })
+    )
+    const onBanned = vi.fn()
+    const { result } = renderSpotlight(onBanned)
+    await waitFor(() => expect(result.current.state.status).toBe('ready'))
+    await act(() => result.current.loadMore())
+    expect(onBanned).not.toHaveBeenCalled()
+    expect(result.current.state.moreFailed).toBe(true)
   })
 })
 

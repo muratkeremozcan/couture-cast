@@ -202,6 +202,13 @@ describe('U-D-REASON: the required reason (D1, TEA-03)', () => {
     expect(moderationDecisionReasonSchema.safeParse(reason).success).toBe(false)
   })
 
+  it.each(['operator_takedown', '  operator_takedown  '])(
+    'refuses %j, which would read as the takedown marker',
+    (reason) => {
+      expect(moderationDecisionReasonSchema.safeParse(reason).success).toBe(false)
+    }
+  )
+
   it.each([
     'Spam',
     'unsafe class of content',
@@ -684,6 +691,18 @@ describe('U-D-RESPONSE-STRICT: nothing private leaves the API (D1, D6, D9)', () 
       ).toBe(false)
     }
   )
+
+  it.each([
+    ['temporary', null],
+    ['permanent', '2026-11-11T12:00:00.000Z'],
+  ])('refuses a %s ban with expiry %s in the member refusal', (kind, expiresAt) => {
+    expect(
+      communityBannedErrorSchema.safeParse({
+        ...bannedBody,
+        sanction: { ...bannedBody.sanction, kind, expiresAt },
+      }).success
+    ).toBe(false)
+  })
 
   it('names no sanction id in the member body', () => {
     expect(

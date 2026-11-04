@@ -434,16 +434,21 @@ test.describe('P-D-ROLES moderation decision write routes (Story 6.11)', () => {
   }
 
   /**
-   * Whether both flags are open for a moderator. A valid body on an unknown case answers 404 when open.
+   * Whether both flags are open for this identity, since a flag can target one person and not another.
+   * A valid body on an unknown case answers 404 when open.
    * A closed route answers 503 with one of the two closed codes, and a local stack must be open.
    */
-  async function routeIsOpen(request: APIRequestContext, testInfo: TestInfo) {
+  async function routeIsOpen(
+    request: APIRequestContext,
+    testInfo: TestInfo,
+    headers: Record<string, string>
+  ) {
     const response = await postDecisionRoute(
       request,
       testInfo,
       decisionPath('post.never-existed-probe'),
       decisionBody(),
-      authHeaders(buildUniqueId('moderator-probe', testInfo), 'moderator')
+      headers
     )
     const body = moderationDecisionErrorSchema.parse(await response.json())
     if (response.status() === 404) {
@@ -549,10 +554,10 @@ test.describe('P-D-ROLES moderation decision write routes (Story 6.11)', () => {
   test('[P0] P-D-ROLES refuses a forged moderatorId and an unknown key on both routes', async ({
     request,
   }, testInfo) => {
-    const open = await routeIsOpen(request, testInfo)
     const moderatorId = buildUniqueId('moderator-writer', testInfo)
     const forgedId = buildUniqueId('forged-moderator', testInfo)
     const headers = authHeaders(moderatorId, 'moderator')
+    const open = await routeIsOpen(request, testInfo, headers)
     for (const { path, body } of routes('post.anything', 'anything')) {
       for (const extra of [
         { moderatorId: forgedId },
@@ -596,10 +601,13 @@ test.describe('P-D-ROLES moderation decision write routes (Story 6.11)', () => {
       const reporter = await seedMember(prisma, runId, 'reporter')
       const moderator = await seedMember(prisma, runId, 'moderator', { alias: false })
       const now = new Date()
+      // Flagged, so this row stays off the public feed: seven spotlight and five lookbook rows fill its first page.
       const post = await seedPost(prisma, {
         runId,
         label: 'roles',
         authorId: author.id,
+        status: 'flagged',
+        moderationReason: 'unsafe_class',
         now,
       })
       await seedPostReport(prisma, {
@@ -665,7 +673,7 @@ test.describe('P-D-ROLES moderation decision write routes (Story 6.11)', () => {
         decisions: 0,
         audit: 0,
         open: 1,
-        status: 'published',
+        status: 'flagged',
         appeal: 'not_requested',
       })
 
@@ -732,10 +740,10 @@ test.describe('P-D-ROLES moderation decision write routes (Story 6.11)', () => {
   test('[P1] P-D-ROLES lets a moderator and an admin past the guards, and exposes no other write method', async ({
     request,
   }, testInfo) => {
-    const open = await routeIsOpen(request, testInfo)
     const baseUrl = resolveApiBaseUrl(testInfo)
     for (const role of ['moderator', 'admin'] as const) {
       const headers = authHeaders(buildUniqueId(`${role}-writer`, testInfo), role)
+      const open = await routeIsOpen(request, testInfo, headers)
       for (const { path, body } of routes('post.never-existed', 'never-existed')) {
         const response = await postDecisionRoute(request, testInfo, path, body(), headers)
         // A role the guards let through reaches the service, which knows no such id.

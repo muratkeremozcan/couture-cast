@@ -86,6 +86,14 @@ const test = base.extend<Fixtures>({
 })
 
 test.afterAll(async () => {
+  // A look left published here takes a slot on the first feed page, which seeded rows already fill.
+  if (seededQueue) {
+    const { runId } = await seededQueue
+    await databaseClient().lookbookPost.updateMany({
+      where: { id: { startsWith: `${runId}-` }, status: 'published' },
+      data: { status: 'withdrawn' },
+    })
+  }
   await prismaClient?.$disconnect()
 })
 

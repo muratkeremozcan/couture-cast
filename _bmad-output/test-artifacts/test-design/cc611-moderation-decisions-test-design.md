@@ -718,6 +718,15 @@ GitGuardian flagged the `Basic` header fixture in `moderation-decisions.controll
 The value decoded to `mod:mod`, a made-up pair, and the fixture now reads `Basic abc`, as the queue spec does.
 The old literal stays in commit `d4b420f4`, since no credential needs removing from history.
 
+Burn-in failed 6.1-API-01 on `10295495`, missing `lookbook-1`, then 1 and 2, then 1 to 3, across three repeats.
+Seven spotlight rows and five lookbook rows fill the feed's first page of 12 exactly, and P-D-ROLES left one published look per repeat.
+P-D-ROLES now seeds a flagged look, and `moderation-decisions.spec.ts` and `moderation-console.spec.ts` withdraw theirs at teardown.
+On a fresh seeded database, P-D-ROLES and 6.1-API-01 at `--repeat-each=3` passed 87 of 87 and left 12 published rows.
+My sign-off ran only the moderation browser specs, which is why the three runs missed this.
+
+Later fixes pinned in existing files: the `origin` field and the alias state enum, sanction kind against expiry, the takedown marker as a reason, decision order by sequence, the engine row without codes, a confirmation closed by changed terms, the appeal retry after an edited note, an open dialog closed by a ban, and a ban on a later spotlight page.
+The home teaser hidden when the grid is refused has no regression test yet: `lookbook-prism-layout.test.tsx` is outside the 99 paths.
+
 ---
 
 ## Quality Gate Criteria

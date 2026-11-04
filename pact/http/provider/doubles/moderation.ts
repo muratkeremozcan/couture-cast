@@ -459,21 +459,29 @@ export const moderationSanctionsServiceDouble = {
   },
 }
 
-/** One active ban, so the refusal below is the one the shipped read gate builds. */
+/** The member the provider's auth double signs in. */
+const BANNED_MEMBER = 'guardian-1'
+
+/** One active ban on that member alone, so the refusal below is the one the shipped read gate builds. */
 const bannedMemberTx = {
   communitySanction: {
-    findFirst: () =>
-      Promise.resolve({
-        kind: 'temporary',
-        expires_at: new Date(BAN_EXPIRES_AT),
-        appeal_status: 'not_requested',
-      }),
+    findFirst: ({ where }: { where: { user_id: string } }) =>
+      Promise.resolve(
+        where.user_id === BANNED_MEMBER
+          ? {
+              kind: 'temporary',
+              expires_at: new Date(BAN_EXPIRES_AT),
+              appeal_status: 'not_requested',
+            }
+          : null
+      ),
   },
 } as unknown as Pick<Prisma.TransactionClient, 'communitySanction'>
 
 /**
  * The feed of a banned member. `CommunityService.getFeed` runs the read gate first, so the double
  * answers with the gate's own refusal and every other scenario reads the wrapped service.
+ * The gate reads the id the controller forwards, so a controller that drops it gets no refusal.
  */
 export function withCommunityBan<S extends { getFeed: (params: never) => unknown }>(
   service: S
@@ -481,8 +489,10 @@ export function withCommunityBan<S extends { getFeed: (params: never) => unknown
   return {
     ...service,
     getFeed: async (params: never) => {
-      if (scenario === 'banned_feed')
-        await assertCommunityMemberNotSanctioned(bannedMemberTx, 'guardian-1')
+      if (scenario === 'banned_feed') {
+        const { userId } = params as { userId: string }
+        await assertCommunityMemberNotSanctioned(bannedMemberTx, userId)
+      }
       return service.getFeed(params)
     },
   }

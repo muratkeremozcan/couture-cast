@@ -276,6 +276,22 @@ describe('U-Q-SVC-IDENTITY', () => {
     )
   })
 
+  it('keeps a member report with no alias row a member report', async () => {
+    const loaded = postCase()
+    loaded.reports = [
+      {
+        ...loaded.reports[0]!,
+        id: 'r1',
+        reporterId: 'reporter-no-alias',
+        origin: 'member',
+      },
+    ]
+    const { data } = await build(loaded).service.getCase(AUTH, 'post.p1')
+    expect(data.reporters.map(({ identity, origin }) => ({ identity, origin }))).toEqual([
+      { identity: { state: 'unknown', alias: null }, origin: 'member' },
+    ])
+  })
+
   it('reads a screening report as screening and keeps an erased reporter erased (D11)', async () => {
     const loaded = postCase()
     loaded.reports = [

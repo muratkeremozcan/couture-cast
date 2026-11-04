@@ -294,6 +294,22 @@ describe('C-WEB-D-STANDING: appeal controls per role', () => {
     expect(bodies[1]?.mutationId).toBe(bodies[0]?.mutationId)
   })
 
+  it('drops the retry when the note changes, since the edited note is a new request', async () => {
+    const { bodies } = await openCase(
+      { subjectStanding: standing({ allowedAppealSteps: ['requested'] }) },
+      () => HttpResponse.error()
+    )
+    typeNote()
+    await userEvent.click(
+      within(section()).getByRole('button', { name: 'Record an appeal' })
+    )
+    const alert = await within(section()).findByRole('alert')
+    expect(within(alert).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    typeNote(`${NOTE} and more`)
+    expect(within(section()).queryByRole('button', { name: 'Try again' })).toBeNull()
+    expect(bodies).toHaveLength(1)
+  })
+
   it('sends once for a double click while the request is out', async () => {
     let release: () => void = () => undefined
     const gate = new Promise<void>((resolve) => (release = resolve))

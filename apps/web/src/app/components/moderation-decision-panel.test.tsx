@@ -948,6 +948,22 @@ describe('C-WEB-D-CONFIRM: a retry once the confirmed terms have changed', () =>
     },
   ]
 
+  it.each(CHANGES)(
+    'closes an open confirmation after changing $label, before anything is sent',
+    async ({ overrides, change, ask }) => {
+      const { bodies } = await openCase(undefined, overrides)
+      typeReason()
+      await userEvent.click(submitButton())
+      expect(confirmation()).not.toBeNull()
+      await change()
+      expect(confirmation()).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Yes, apply it' })).toBeNull()
+      expect(bodies).toHaveLength(0)
+      await userEvent.click(submitButton())
+      expect(confirmation()).toHaveAccessibleName(ask)
+    }
+  )
+
   const confirmFirstAttempt = async () => {
     typeReason()
     await userEvent.click(submitButton())

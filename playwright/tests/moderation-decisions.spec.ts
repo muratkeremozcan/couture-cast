@@ -200,7 +200,13 @@ const test = base.extend<Fixtures>({
     await use(databaseClient())
   },
   fx: async ({ prisma }, use) => {
-    await use(decisionSeed(prisma))
+    const seed = decisionSeed(prisma)
+    await use(seed)
+    // A look left published here takes a slot on the first feed page, which seeded rows already fill.
+    await prisma.lookbookPost.updateMany({
+      where: { id: { startsWith: `${seed.runId}-` }, status: 'published' },
+      data: { status: 'withdrawn' },
+    })
   },
   moderator: async ({ fx }, use) => {
     await use(await fx.operator())

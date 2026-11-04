@@ -19,6 +19,9 @@ import { CommunityModerationActionsService } from '../community/community-modera
 import {
   computeDecisionPayloadHash,
   computeModerationCaseRevision,
+  inDecisionOrder,
+  summarizeDecisionHistory,
+  type DecisionHistoryRow,
   type DecisionPayload,
 } from './moderation-decision-rules.js'
 import { ModerationDecisionsRepository } from './moderation-decisions.repository.js'
@@ -550,6 +553,53 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
+})
+
+describe('U-D-ORDER: two API instances can disagree about the time', () => {
+  const at = (minute: number) => new Date(Date.UTC(2026, 10, 4, 12, minute))
+  const row = (caseKey: string, sequence: number, minute: number) => ({
+    caseKey,
+    sequence,
+    decidedAt: at(minute),
+  })
+  const order = (rows: ReturnType<typeof row>[]) =>
+    inDecisionOrder(rows).map((entry) => `${entry.caseKey}#${entry.sequence}`)
+
+  it('lets the sequence decide inside a case, whatever the clocks say', () => {
+    expect(order([row('a', 2, 1), row('a', 1, 5), row('a', 3, 3)])).toEqual([
+      'a#1',
+      'a#2',
+      'a#3',
+    ])
+  })
+
+  it('places different cases by time, keeping each case in sequence', () => {
+    expect(
+      order([row('a', 2, 1), row('b', 1, 2), row('a', 1, 3), row('b', 2, 4)])
+    ).toEqual(['a#1', 'b#1', 'a#2', 'b#2'])
+  })
+
+  it('leaves its input alone', () => {
+    const rows = [row('a', 2, 1), row('a', 1, 5)]
+    inDecisionOrder(rows)
+    expect(rows.map((entry) => entry.sequence)).toEqual([2, 1])
+  })
+
+  it('reads the state the last sequence left, and the earliest time as the first decision', () => {
+    const decision = (
+      action: string,
+      isTerminal: boolean,
+      sequence: number,
+      minute: number
+    ): DecisionHistoryRow => ({ ...row('a', sequence, minute), action, isTerminal })
+    // The later resolve carries the earlier clock, so time alone would leave the case escalated.
+    expect(
+      summarizeDecisionHistory(
+        [decision('resolve', true, 2, 1), decision('escalate', false, 1, 5)],
+        'a'
+      )
+    ).toEqual({ sequence: 2, escalated: false, firstDecisionAt: at(1) })
+  })
 })
 
 describe('U-D-REVISION', () => {

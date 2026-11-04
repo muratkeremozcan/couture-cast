@@ -147,6 +147,37 @@ describe('C-WEB-Q-DETAIL', () => {
     expect(within(reporters).getAllByText(/Resolved/)).toHaveLength(1)
   })
 
+  it('names a screening report by its origin and leaves an unknown member an unnamed member', async () => {
+    const reporter = {
+      identity: { state: 'unknown' as const, alias: null },
+      reason: 'spam' as const,
+      details: null,
+      reportedAt: '2026-11-03T10:00:00.000Z',
+      resolved: false,
+    }
+    await openCase({
+      reporters: [
+        { ...reporter, origin: 'screening' as const },
+        { ...reporter, origin: 'member' as const },
+      ],
+      reportCount: 2,
+    })
+    const reporters = screen.getByRole('region', { name: 'Reporters' })
+    const [screening, member] = within(reporters).getAllByRole('listitem')
+    expect(screening).toHaveTextContent('Automated screening')
+    expect(screening).not.toHaveTextContent('Unnamed member')
+    expect(member).toHaveTextContent('Unnamed member')
+    expect(member).not.toHaveTextContent('Automated screening')
+  })
+
+  it('shows the engine version of a held item that has no codes or categories', async () => {
+    await openCase({
+      findings: { codes: [], categories: [], engineVersion: '2.1.0', operatorNote: null },
+    })
+    const findings = screen.getByRole('region', { name: 'Machine findings' })
+    expect(within(findings).getByText('2.1.0')).toBeInTheDocument()
+  })
+
   it('shows prior actions with the actor, the action and the time, or says there are none', async () => {
     const none = await openCase({ priorActions: [] })
     expect(screen.getByText('No prior actions.')).toBeInTheDocument()
