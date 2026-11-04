@@ -183,7 +183,9 @@ export class CommunityMaintenanceService {
     let transitioned = 0
     for (const post of stalled) {
       const updated = await this.prisma.lookbookPost.updateMany({
-        where: { id: post.id, status: 'pending_review' },
+        // On the selected clock too: recovery can return this post to `pending_review` after the
+        // select above, and its fresh clock is what says that work has not stalled.
+        where: { id: post.id, status: 'pending_review', updated_at: post.updated_at },
         data: {
           status: 'review_failed',
           moderation_reason: MODERATION_STALLED_REASON,

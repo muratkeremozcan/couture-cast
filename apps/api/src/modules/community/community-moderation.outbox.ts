@@ -87,9 +87,7 @@ export class CommunityModerationOutboxDispatcher {
         : null) ?? postId
 
     try {
-      if (generation > 0)
-        await this.queue.enqueue(postId, uploadSessionId, undefined, generation)
-      else await this.queue.enqueue(postId, uploadSessionId)
+      await this.queue.enqueue(postId, uploadSessionId, undefined, generation)
       // Only the generation this call enqueued. Recovery may have re-armed the row meanwhile, and
       // that newer generation still needs its own job.
       await this.prisma.communityModerationOutbox.updateMany({
@@ -108,9 +106,10 @@ export class CommunityModerationOutboxDispatcher {
         'Community moderation enqueue failed; outbox row stays claimable for retry'
       )
 
+      // Also only this generation: a failure from old work says nothing about the re-armed row.
       await this.prisma.communityModerationOutbox
-        .update({
-          where: { id: outboxId },
+        .updateMany({
+          where: { id: outboxId, generation },
           data: { attempts: { increment: 1 }, last_error: message.slice(0, 500) },
         })
         .catch(() => {

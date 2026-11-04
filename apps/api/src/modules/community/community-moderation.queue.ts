@@ -24,10 +24,17 @@ export const communityModerationJobSchema = z
     postId: z.string().trim().min(1).max(128),
     uploadSessionId: z.string().trim().min(1).max(128),
     platform: z.enum(['web', 'mobile']).optional(),
+    // Optional only for jobs queued before this field existed. Those ran before any row could be
+    // re-armed, so `communityModerationJobGeneration` reads them as generation 0.
+    generation: z.number().int().nonnegative().optional(),
   })
   .strict()
 
 export type CommunityModerationJob = z.infer<typeof communityModerationJobSchema>
+
+/** The outbox generation this job works for. Only that generation may settle the post. */
+export const communityModerationJobGeneration = (job: CommunityModerationJob): number =>
+  job.generation ?? 0
 
 export interface CommunityModerationPublisher {
   enqueue(
@@ -113,6 +120,7 @@ export class CommunityModerationQueue
       postId,
       uploadSessionId,
       platform,
+      generation,
     })
     await this.getQueue().add(COMMUNITY_MODERATION_JOB, data, {
       jobId: buildCommunityModerationJobId(postId, uploadSessionId, generation),

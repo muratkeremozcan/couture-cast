@@ -19410,6 +19410,33 @@
         ],
         "additionalProperties": false
       },
+      "CommunityRolloutDeniedError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              403
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "denied"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      },
       "CommunityBannedError": {
         "type": "object",
         "properties": {
@@ -24972,6 +24999,9 @@
                       "$ref": "#/components/schemas/ForbiddenHttpError"
                     },
                     {
+                      "$ref": "#/components/schemas/CommunityRolloutDeniedError"
+                    },
+                    {
                       "$ref": "#/components/schemas/CommunityBannedError"
                     }
                   ]
@@ -25093,6 +25123,9 @@
                   "oneOf": [
                     {
                       "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityRolloutDeniedError"
                     },
                     {
                       "$ref": "#/components/schemas/CommunityBannedError"
@@ -25268,6 +25301,9 @@
                       "$ref": "#/components/schemas/ForbiddenHttpError"
                     },
                     {
+                      "$ref": "#/components/schemas/CommunityRolloutDeniedError"
+                    },
+                    {
                       "$ref": "#/components/schemas/CommunityBannedError"
                     }
                   ]
@@ -25402,6 +25438,9 @@
                   "oneOf": [
                     {
                       "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityRolloutDeniedError"
                     },
                     {
                       "$ref": "#/components/schemas/CommunityBannedError"
@@ -25651,6 +25690,9 @@
                   "oneOf": [
                     {
                       "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityRolloutDeniedError"
                     },
                     {
                       "$ref": "#/components/schemas/CommunityBannedError"

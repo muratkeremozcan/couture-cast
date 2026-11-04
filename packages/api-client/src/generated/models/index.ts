@@ -1655,6 +1655,14 @@ export type ApiV1CommunityPostsPostIdGet403ResponseOneOfStatusCodeEnum =
   (typeof ApiV1CommunityPostsPostIdGet403ResponseOneOfStatusCodeEnum)[keyof typeof ApiV1CommunityPostsPostIdGet403ResponseOneOfStatusCodeEnum]
 
 /**
+ * @type ApiV1CommunityPostsPostIdReactionPut403Response
+ *
+ * @export
+ */
+export type ApiV1CommunityPostsPostIdReactionPut403Response =
+  | CommunityBannedError
+  | ForbiddenHttpError
+/**
  *
  * @export
  * @interface ApiV1CommunityPostsPostIdReactionPut409Response
@@ -4955,6 +4963,50 @@ export type CommunityReportReason =
 /**
  *
  * @export
+ * @interface CommunityRolloutDeniedError
+ */
+export interface CommunityRolloutDeniedError {
+  /**
+   *
+   * @type {CommunityRolloutDeniedErrorStatusCodeEnum}
+   * @memberof CommunityRolloutDeniedError
+   */
+  statusCode: CommunityRolloutDeniedErrorStatusCodeEnum
+  /**
+   *
+   * @type {CommunityRolloutDeniedErrorCodeEnum}
+   * @memberof CommunityRolloutDeniedError
+   */
+  code: CommunityRolloutDeniedErrorCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityRolloutDeniedError
+   */
+  message: string
+}
+
+/**
+ * @export
+ */
+export const CommunityRolloutDeniedErrorStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type CommunityRolloutDeniedErrorStatusCodeEnum =
+  (typeof CommunityRolloutDeniedErrorStatusCodeEnum)[keyof typeof CommunityRolloutDeniedErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const CommunityRolloutDeniedErrorCodeEnum = {
+  denied: 'denied',
+} as const
+export type CommunityRolloutDeniedErrorCodeEnum =
+  (typeof CommunityRolloutDeniedErrorCodeEnum)[keyof typeof CommunityRolloutDeniedErrorCodeEnum]
+
+/**
+ *
+ * @export
  * @interface CommunitySponsoredFeedResponse
  */
 export interface CommunitySponsoredFeedResponse {
@@ -7286,7 +7338,10 @@ export interface GetAlertPreferencesResponseDataPreferences {
  *
  * @export
  */
-export type GetCommunityComments403Response = CommunityBannedError | ForbiddenHttpError
+export type GetCommunityComments403Response =
+  | CommunityBannedError
+  | CommunityRolloutDeniedError
+  | ForbiddenHttpError
 /**
  *
  * @export

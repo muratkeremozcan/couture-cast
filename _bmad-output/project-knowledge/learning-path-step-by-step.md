@@ -9602,6 +9602,12 @@ Hard-won lessons from the implementation and review of this story:
 19. **Deferring for a budget hid real gaps.**
     Held content with no way back, undocumented 403 bodies and a mobile screen with no explanation all sat as follow-ups under a file limit until the owner lifted it.
 
+20. **When a row can return to an earlier state, status stops being evidence of ownership.**
+    A ban held a pending post, an overturn returned it to pending, and old screening work saw `pending_review` and took it for its own.
+    Codex found this five times in five different writers, because only the BullMQ job id carried the generation.
+    The fix is one rule: the job payload names its generation, and every settlement proves that generation under the outbox row lock, failures, acknowledgements and storage removal included.
+    Removal asks a different question from settlement: losing ownership means stop, and only a row that no longer owns the object may delete it.
+
 Story/Task mapping:
 
 - Story 6.11
@@ -9712,7 +9718,7 @@ Evidence boundaries:
   The code and tests are committed on `feat/cc-6-11-moderation-decisions`, nothing was pushed when this step was written, and no PR job has run.
   The Codex review of `4cf4b128` found six defects, and they are fixed and logged in the spec as C1 to C6.
   Its re-review of `1d49278a` found one more, fixed as R2-1 with a test that was red first.
-  The full runs above predate R2-1, the Optic change and the CodeRabbit fixes, which CI on the PR covers.
+  The full runs above predate R2-1, the Optic change, the CodeRabbit fixes and the screening ownership work of Codex round 5, which CI on the PR covers.
 - **What ran locally.**
   TEA signed off with three consecutive clean runs of every tier at `5cbf216f`, after the Codex review fixes; the only later commits are the test design and this evidence.
   Passing per run: `apps/api` 7887 with 28 skipped, `packages/api-client` 1580, `packages/config` 29, `packages/db` 266 with 1 skipped, `apps/web` 1825, `apps/mobile` 1905, the Pact consumer 444 with the provider verified, and Playwright 62 with 1 skipped.

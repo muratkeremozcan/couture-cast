@@ -16,7 +16,12 @@ import {
   communityImageValidationCodeSchema,
   SLA_DURATION_MS,
 } from '@couture/api-client/contracts/http'
-import { PrismaClient, type ClimateBand, type LookbookPost } from '@prisma/client'
+import {
+  PrismaClient,
+  type ClimateBand,
+  type LookbookPost,
+  type Prisma,
+} from '@prisma/client'
 import {
   TelemetryService,
   type TelemetryPropertiesMap,
@@ -37,7 +42,10 @@ import {
   type CommunityModerationMeter,
   type ModerationOutcome,
 } from './community-moderation.telemetry.js'
-import { type CommunityModerationJob } from './community-moderation.queue.js'
+import {
+  communityModerationJobGeneration,
+  type CommunityModerationJob,
+} from './community-moderation.queue.js'
 import {
   communitySubjectToken,
   isCommunityCanaryUser,
@@ -176,6 +184,7 @@ export class CommunityModerationProcessor {
     attempt: number
   ): Promise<void> {
     const { postId, platform } = jobData
+    const generation = communityModerationJobGeneration(jobData)
     const startedAt = Date.now()
 
     const post = await this.prisma.lookbookPost.findUnique({
@@ -191,6 +200,16 @@ export class CommunityModerationProcessor {
       this.logger.debug(
         { postId: post.id, status: post.status },
         'LookbookPost is not in pending_review status; skipping moderation'
+      )
+      return
+    }
+
+    // Recovery can return this post to `pending_review` under a newer generation, and then the
+    // status alone makes old work look current. Old work stops here and changes nothing.
+    if ((await this.currentGeneration(post.id)) !== generation) {
+      this.logger.debug(
+        { postId: post.id, generation },
+        'Moderation job lost its generation; skipping'
       )
       return
     }
@@ -214,18 +233,26 @@ export class CommunityModerationProcessor {
     let imageBuffer: Buffer
     try {
       const normalized = await withModerationTimeout(
-        this.normalizeUpload(post.id, post.user_id, post.image_object_path, rawBytes, {
-          byteSize: post.image_byte_size,
-          mimeType: post.image_content_type,
-          sha256: post.image_checksum,
-        }),
+        this.normalizeUpload(
+          post.id,
+          post.user_id,
+          post.image_object_path,
+          rawBytes,
+          {
+            byteSize: post.image_byte_size,
+            mimeType: post.image_content_type,
+            sha256: post.image_checksum,
+          },
+          generation
+        ),
         MODERATION_SCREENING_TIMEOUT_MS,
         'community image verification'
       )
+      if (!normalized) return
       imageBuffer = normalized
     } catch (error) {
       if (error instanceof CommunityImageValidationError) {
-        await this.markFailed(post.id, error.code, context)
+        await this.markFailed(post.id, error.code, { ...context, generation })
         this.meter.recordScreening(
           'review',
           'review_failed',
@@ -261,9 +288,17 @@ export class CommunityModerationProcessor {
         engineVersion,
         platform,
         post,
+        generation,
       })
     } else {
-      await this.flagPost(post.id, post.user_id, screeningResult, engineVersion, post)
+      await this.flagPost(
+        post.id,
+        post.user_id,
+        screeningResult,
+        engineVersion,
+        post,
+        generation
+      )
     }
 
     // Disposition, duration and attempt only. No post id, no author, no object
@@ -315,10 +350,37 @@ export class CommunityModerationProcessor {
     }
   }
 
+  /** A post without an outbox row is at generation 0. */
+  private async currentGeneration(postId: string): Promise<number> {
+    const row = await this.prisma.communityModerationOutbox.findUnique({
+      where: { post_id: postId },
+      select: { generation: true },
+    })
+    return row?.generation ?? 0
+  }
+
+  /**
+   * True while `generation` is current. This takes the outbox row lock, which recovery needs to
+   * re-arm the post, so the answer holds until the settling transaction ends.
+   */
+  private async holdsGeneration(
+    tx: Prisma.TransactionClient,
+    postId: string,
+    generation: number
+  ): Promise<boolean> {
+    const [row] = await tx.$queryRaw<
+      { generation: number }[]
+    >`SELECT generation FROM "CommunityModerationOutbox" WHERE post_id = ${postId} FOR UPDATE`
+    return (row?.generation ?? 0) === generation
+  }
+
   /**
    * Verifies the stored declaration against the bytes, re-encodes them, writes
    * the normalized object back over the original, and persists the checksum,
    * byte size and MIME that describe what is actually stored.
+   *
+   * Returns null when a newer generation took the post over: that generation owns the object and
+   * its declarations, so this work stops without touching either.
    */
   private async normalizeUpload(
     postId: string,
@@ -329,8 +391,9 @@ export class CommunityModerationProcessor {
       byteSize: number | null
       mimeType: string | null
       sha256: string | null
-    }
-  ): Promise<Buffer> {
+    },
+    generation: number
+  ): Promise<Buffer | null> {
     if (!declared.byteSize || !declared.mimeType || !declared.sha256) {
       throw new CommunityImageValidationError(
         communityImageValidationCodeSchema.enum.IMAGE_DECLARATION_MISSING
@@ -343,43 +406,50 @@ export class CommunityModerationProcessor {
       sha256: declared.sha256,
     })
 
-    if (normalized.sha256 !== declared.sha256) {
-      await this.storage.upload(objectPath, normalized.bytes, normalized.mimeType)
-      const updated = await interactiveTransaction(this.prisma, async (tx) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
-        await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
-        return tx.lookbookPost.updateMany({
-          where: {
-            id: postId,
-            user_id: userId,
-            // A ban can hold the post mid-upload. It may return to screening, so its object and
-            // declaration must keep describing the same bytes.
-            OR: [
-              { status: 'pending_review' },
-              {
-                status: 'flagged',
-                moderation_reason: { startsWith: COMMUNITY_BAN_MARKER_PREFIX },
-              },
-            ],
-            image_object_path: objectPath,
-            erasure_requested_at: null,
-            anonymized_at: null,
-          },
-          data: {
-            image_checksum: normalized.sha256,
-            image_byte_size: normalized.byteSize,
-            image_content_type: normalized.mimeType,
-          },
-        })
-      })
-      if (!updated.count) {
-        // A completed late upload cannot restore erased metadata or retain its object.
-        await this.storage.remove([objectPath])
-        throw new Error('Community normalization ownership expired.')
-      }
-    }
+    if (normalized.sha256 === declared.sha256) return normalized.bytes
+    // Storage has no conditional write, so this check only narrows the window. Work paused past it
+    // can still overwrite, and the settlement below then keeps the object rather than deleting it.
+    if ((await this.currentGeneration(postId)) !== generation) return null
 
-    return normalized.bytes
+    await this.storage.upload(objectPath, normalized.bytes, normalized.mimeType)
+    const settled = await interactiveTransaction(this.prisma, async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
+      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
+      const owner = await this.holdsGeneration(tx, postId, generation)
+      const row = await tx.lookbookPost.findUnique({ where: { id: postId } })
+      // Only here does nothing else own the object: a completed late upload cannot restore erased
+      // metadata or retain its object.
+      if (
+        !row ||
+        row.user_id !== userId ||
+        row.image_object_path !== objectPath ||
+        row.erasure_requested_at ||
+        row.anonymized_at ||
+        row.status === 'withdrawn'
+      )
+        return 'released' as const
+      // A ban can hold the post mid-upload. It may return to screening, so its object and
+      // declaration must keep describing the same bytes.
+      const held =
+        row.status === 'flagged' &&
+        row.moderation_reason?.startsWith(COMMUNITY_BAN_MARKER_PREFIX)
+      if (!owner || (row.status !== 'pending_review' && !held))
+        return 'superseded' as const
+      await tx.lookbookPost.update({
+        where: { id: postId },
+        data: {
+          image_checksum: normalized.sha256,
+          image_byte_size: normalized.byteSize,
+          image_content_type: normalized.mimeType,
+        },
+      })
+      return 'settled' as const
+    })
+    if (settled === 'released') {
+      await this.storage.remove([objectPath])
+      throw new Error('Community normalization ownership expired.')
+    }
+    return settled === 'settled' ? normalized.bytes : null
   }
 
   private async publishPost(params: {
@@ -390,9 +460,18 @@ export class CommunityModerationProcessor {
     engineVersion: string
     platform: 'web' | 'mobile' | undefined
     post: LookbookPost
+    generation: number
   }): Promise<void> {
-    const { postId, userId, climateBand, challengeId, engineVersion, platform, post } =
-      params
+    const {
+      postId,
+      userId,
+      climateBand,
+      challengeId,
+      engineVersion,
+      platform,
+      post,
+      generation,
+    } = params
     const canary = isCommunityCanaryUser(userId)
     if (!canary && !(await this.flags?.getFeatureFlag('community_write_enabled', userId)))
       throw new ServiceUnavailableException('Community publication is unavailable.')
@@ -400,6 +479,7 @@ export class CommunityModerationProcessor {
     const updated = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
+      if (!(await this.holdsGeneration(tx, postId, generation))) return false
       if (!canary) {
         try {
           await assertCommunityDatabaseAccess(tx, userId)
@@ -454,7 +534,7 @@ export class CommunityModerationProcessor {
         })
 
         await tx.communityModerationOutbox.updateMany({
-          where: { post_id: postId },
+          where: { post_id: postId, generation },
           data: { dispatched_at: publishedAt },
         })
       }
@@ -507,14 +587,16 @@ export class CommunityModerationProcessor {
     userId: string,
     screeningResult: CommunityModerationResult,
     engineVersion: string,
-    post: LookbookPost
+    post: LookbookPost,
+    generation: number
   ): Promise<void> {
     const reason = screeningResult.reasons.join(', ') || FLAGGED_BY_SCREENING_REASON
     const flaggedAt = new Date()
 
-    await interactiveTransaction(this.prisma, async (tx) => {
+    const settled = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
+      if (!(await this.holdsGeneration(tx, postId, generation))) return false
       const updateResult = await tx.lookbookPost.updateMany({
         where: {
           id: postId,
@@ -531,7 +613,7 @@ export class CommunityModerationProcessor {
       })
 
       if (updateResult.count !== 1) {
-        return
+        return false
       }
 
       await tx.moderationEvent.create({
@@ -572,10 +654,12 @@ export class CommunityModerationProcessor {
       // re-enqueued every flagged post forever, because `dispatched_at IS NULL`
       // is the dispatcher's only claim predicate.
       await tx.communityModerationOutbox.updateMany({
-        where: { post_id: postId },
+        where: { post_id: postId, generation },
         data: { dispatched_at: flaggedAt },
       })
+      return true
     })
+    if (!settled) return
 
     this.logger.warn(
       {
@@ -606,19 +690,22 @@ export class CommunityModerationProcessor {
   /**
    * If retry attempts are exhausted, transitions status to review_failed with
    * reason. The outbox row is stamped here too, for the same reason it is
-   * stamped on the flagged branch.
+   * stamped on the flagged branch. Old work's failure changes nothing: it says nothing about the
+   * generation that replaced it.
    */
   async markFailed(
     postId: string,
     reason: string,
-    context?: CommunityModerationAttemptContext
+    context: Partial<CommunityModerationAttemptContext> & { generation: number }
   ): Promise<void> {
+    const { generation } = context
     const failedAt = new Date()
     const source = await this.prisma.lookbookPost.findUnique({ where: { id: postId } })
     if (!source) return
-    await interactiveTransaction(this.prisma, async (tx) => {
+    const settled = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${source.user_id}))`
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
+      if (!(await this.holdsGeneration(tx, postId, generation))) return false
       const updateResult = await tx.lookbookPost.updateMany({
         where: {
           id: postId,
@@ -634,22 +721,24 @@ export class CommunityModerationProcessor {
       })
 
       if (updateResult.count !== 1) {
-        return
+        return false
       }
 
       await tx.communityModerationOutbox.updateMany({
-        where: { post_id: postId },
+        where: { post_id: postId, generation },
         data: { dispatched_at: failedAt },
       })
+      return true
     })
+    if (!settled) return
 
     this.logger.error(
       {
         event: 'community_moderation_review_failed',
         postId,
         reason,
-        attempt: context?.attempt ?? null,
-        maxAttempts: context?.maxAttempts ?? null,
+        attempt: context.attempt ?? null,
+        maxAttempts: context.maxAttempts ?? null,
       },
       'Post moderation retry attempts exhausted; status transitioned to review_failed'
     )
