@@ -17,6 +17,10 @@ import {
   SupabaseCommunityStorageAdapter,
 } from './community-storage.adapter'
 
+const tokenExpiringIn = (ms: number): string =>
+  `h.${Buffer.from(JSON.stringify({ exp: Math.floor((Date.now() + ms) / 1000) })).toString('base64url')}.s`
+const validToken = tokenExpiringIn(COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS)
+
 const capability = {
   objectPath: 'community/p/s.jpg',
   token: 'signed-token',
@@ -202,7 +206,7 @@ describe('SupabaseCommunityStorageAdapter', () => {
   describe('createUploadSession', () => {
     it('returns the signed upload URL, token, and expiry', async () => {
       bucketApi.createSignedUploadUrl.mockResolvedValueOnce({
-        data: { signedUrl: 'https://upload.test/put', token: 'tok-1' },
+        data: { signedUrl: 'https://upload.test/put', token: validToken },
         error: null,
       })
 
@@ -210,7 +214,7 @@ describe('SupabaseCommunityStorageAdapter', () => {
       const session = await adapter.createUploadSession('community/p/s.jpg', 900)
 
       expect(session.uploadUrl).toBe('https://upload.test/put')
-      expect(session.uploadToken).toBe('tok-1')
+      expect(session.uploadToken).toBe(validToken)
       expect(new Date(session.expiresAt).getTime()).toBeGreaterThan(Date.now())
     })
 
@@ -252,7 +256,7 @@ describe('SupabaseCommunityStorageAdapter', () => {
   describe('upload', () => {
     it('mints an overwriting token for the path, with the lifetime storage enforces', async () => {
       bucketApi.createSignedUploadUrl.mockResolvedValueOnce({
-        data: { token: 'minted', signedUrl: 'https://x/y', path: 'community/p/s.jpg' },
+        data: { token: validToken, signedUrl: 'https://x/y', path: 'community/p/s.jpg' },
         error: null,
       })
 
@@ -262,10 +266,28 @@ describe('SupabaseCommunityStorageAdapter', () => {
       expect(bucketApi.createSignedUploadUrl).toHaveBeenCalledWith('community/p/s.jpg', {
         upsert: true,
       })
-      expect(minted.token).toBe('minted')
+      expect(minted.token).toBe(validToken)
       expect(minted.expiresAt.getTime()).toBeLessThanOrEqual(
         Date.now() + COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS
       )
+    })
+
+    it.each([
+      [
+        'longer than the erasure window allows',
+        () => tokenExpiringIn(3 * 60 * 60 * 1000),
+      ],
+      ['unreadable', () => 'not-a-jwt'],
+    ])('fails closed on a token %s', async (_name, token) => {
+      bucketApi.createSignedUploadUrl.mockResolvedValueOnce({
+        data: { token: token(), signedUrl: 'https://x/y', path: 'community/p/s.jpg' },
+        error: null,
+      })
+
+      const adapter = new SupabaseCommunityStorageAdapter()
+      await expect(
+        adapter.createOverwriteCapability('community/p/s.jpg')
+      ).rejects.toThrow('STORAGE_PERMISSION_DENIED')
     })
 
     it('raises STORAGE_PERMISSION_DENIED when no token can be minted', async () => {

@@ -23,6 +23,30 @@ export const COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS = 2 * 60 * 60 * 1000
  */
 export const COMMUNITY_SIGNED_UPLOAD_REQUEST_TIMEOUT_MS = 5 * 60 * 1000
 
+/** Allowance for the storage server's clock when reading a token's expiry. */
+const TOKEN_CLOCK_SKEW_MS = 60 * 1000
+
+/**
+ * The expiry in the token itself. Erasure's delete window is sized for this lifetime, so a deployment
+ * that signs longer tokens, or a token this cannot read, fails closed.
+ */
+function signedUploadExpiry(token: string): Date {
+  const payload = token.split('.')[1]
+  let exp: unknown
+  try {
+    exp = (
+      JSON.parse(Buffer.from(payload ?? '', 'base64url').toString()) as { exp?: unknown }
+    ).exp
+  } catch {
+    throw storageUnavailable()
+  }
+  if (typeof exp !== 'number') throw storageUnavailable()
+  const expiresAt = new Date(exp * 1000)
+  const latest = Date.now() + COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS + TOKEN_CLOCK_SKEW_MS
+  if (expiresAt.getTime() > latest) throw storageUnavailable()
+  return expiresAt
+}
+
 const fetchWithUploadTimeout = (
   input: Parameters<typeof fetch>[0],
   init?: RequestInit
@@ -181,6 +205,8 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
     if (error || !data?.signedUrl) {
       throw storageUnavailable()
     }
+    // `expiresAt` is the client's upload window and publish enforces it. The token lasts longer.
+    signedUploadExpiry(data.token)
 
     return {
       uploadUrl: data.signedUrl,
@@ -268,14 +294,13 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
   async createOverwriteCapability(
     objectPath: string
   ): Promise<CommunityOverwriteCapability> {
-    const expiresAt = new Date(Date.now() + COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS)
     const { data, error } = await this.storage().createSignedUploadUrl(objectPath, {
       upsert: true,
     })
     if (error || !data?.token) {
       throw storageUnavailable()
     }
-    return { objectPath, token: data.token, expiresAt }
+    return { objectPath, token: data.token, expiresAt: signedUploadExpiry(data.token) }
   }
 
   async upload(

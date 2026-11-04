@@ -333,7 +333,9 @@ describe('CommunityMaintenanceService', () => {
         where: {
           id: { in: ['post-abandoned'] },
           status: 'draft',
-          upload_expires_at: { lt: now },
+          upload_expires_at: {
+            lt: new Date(now.getTime() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS),
+          },
           erasure_requested_at: { not: null },
         },
       })

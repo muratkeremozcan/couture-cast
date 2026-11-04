@@ -558,7 +558,10 @@ describe('6.1 community lifecycle sweeps', () => {
         status: 'draft',
         publishedAt: null,
         submittedAt: null,
-        uploadExpiresAt: new Date(Date.now() - 60 * 1000),
+        // Past the client's window and the late-write window after it.
+        uploadExpiresAt: new Date(
+          Date.now() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS - 60 * 1000
+        ),
       })
       // A draft whose reservation has not lapsed yet is left alone; the sweep
       // must be bounded by the expiry column, not by the status alone.

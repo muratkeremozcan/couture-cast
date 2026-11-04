@@ -426,10 +426,13 @@ export class CommunityMaintenanceService {
   async sweepExpiredUploads(
     now: Date = new Date()
   ): Promise<CommunityUploadExpirySweepResult> {
+    // The token handed to the client outlives this expiry, and a write landing after the row is gone
+    // would leave an object nothing names. A replay moves the expiry, so this covers its token too.
+    const deadline = new Date(now.getTime() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS)
     const abandoned = await this.prisma.lookbookPost.findMany({
       where: {
         status: 'draft',
-        upload_expires_at: { lt: now },
+        upload_expires_at: { lt: deadline },
       },
       orderBy: { upload_expires_at: 'asc' },
       take: MAX_SWEEP_BATCH,
@@ -452,7 +455,7 @@ export class CommunityMaintenanceService {
         where: {
           id: { in: candidateIds },
           status: 'draft',
-          upload_expires_at: { lt: now },
+          upload_expires_at: { lt: deadline },
         },
         select: { id: true, image_object_path: true },
       })
@@ -501,7 +504,7 @@ export class CommunityMaintenanceService {
         where: {
           id: { in: ids },
           status: 'draft',
-          upload_expires_at: { lt: now },
+          upload_expires_at: { lt: deadline },
           erasure_requested_at: { not: null },
         },
       })

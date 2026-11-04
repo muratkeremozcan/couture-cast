@@ -680,6 +680,15 @@ export class CommunityRepository {
     })
   }
 
+  /** False when the draft has gone or the expiry sweep has claimed it. */
+  async renewDraftUpload(postId: string, expiresAt: Date): Promise<boolean> {
+    const { count } = await this.prisma.lookbookPost.updateMany({
+      where: { id: postId, status: 'draft', erasure_requested_at: null },
+      data: { upload_expires_at: expiresAt },
+    })
+    return count === 1
+  }
+
   async createModerationOutbox(postId: string): Promise<CommunityModerationOutbox> {
     return this.prisma.communityModerationOutbox.upsert({
       where: { post_id: postId },

@@ -1079,7 +1079,8 @@ export class CommunityService {
       existingPost.image_byte_size !== input.byteSize ||
       existingPost.image_content_type !== input.contentType ||
       !objectPath ||
-      !parsed
+      !parsed ||
+      existingPost.erasure_requested_at
     ) {
       throw new ConflictException(COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE)
     }
@@ -1088,6 +1089,17 @@ export class CommunityService {
       objectPath,
       UPLOAD_URL_EXPIRES_IN_SECONDS
     )
+    // A new token restarts the time the draft's row has to outlive. Losing to the expiry sweep means
+    // this token must never reach the client.
+    if (
+      existingPost.status === 'draft' &&
+      !(await this.repository.renewDraftUpload(
+        existingPost.id,
+        new Date(uploadSession.expiresAt)
+      ))
+    ) {
+      throw new ConflictException(COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE)
+    }
 
     return {
       postId: existingPost.id,
