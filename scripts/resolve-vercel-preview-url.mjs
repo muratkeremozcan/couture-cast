@@ -10,6 +10,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync, execSync } from 'node:child_process'
+import {
+  deterministicBranchAliasUrl,
+  gitBranchAliasForDeployment,
+} from './vercel-branch-alias.mjs'
 
 /**
  * Load env files for local Preview runs; CI passes env vars directly. Called from
@@ -326,29 +330,22 @@ function toAbsoluteUrl(hostOrUrl) {
 }
 
 /**
- * Git-branch alias URL for a deployment, when it exposes one.
+ * Git-branch alias URL for a deployment. The deployment list leaves `alias` out, so the
+ * aliases are read from Vercel, which also yields the hashed alias of a long branch name.
  * @param {Record<string, any>} deployment
- * @returns {string | undefined}
+ * @param {string | undefined} teamId
+ * @returns {Promise<string | undefined>}
  */
-function findGitBranchAliasUrl(deployment) {
-  // Check if deployment has alias URLs (git-branch aliases)
-  if (
-    deployment.alias &&
-    Array.isArray(deployment.alias) &&
-    deployment.alias.length > 0
-  ) {
-    // Look for git-branch alias (contains "-git-")
-    const gitBranchAlias = deployment.alias.find(
-      (alias) => alias && alias.includes('-git-')
+async function findGitBranchAliasUrl(deployment, teamId) {
+  const url = await gitBranchAliasForDeployment(deployment, async (deploymentId) => {
+    const data = await fetchVercelApi(
+      `/v2/deployments/${deploymentId}/aliases`,
+      teamId ? { teamId } : {}
     )
-    if (gitBranchAlias) {
-      const url = toAbsoluteUrl(gitBranchAlias)
-      logDebug(`✓ Using git-branch alias URL (auto-updates): ${url}`)
-      return url
-    }
-  }
-
-  return undefined
+    return (data?.aliases ?? []).map((entry) => entry?.alias)
+  })
+  if (url) logDebug(`✓ Using git-branch alias URL (auto-updates): ${url}`)
+  return url
 }
 
 async function findUrlFromVercel(projectSlug, teamSlug, branch) {
@@ -396,7 +393,7 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
 
     logDeploymentDetails(deployment)
 
-    const aliasUrl = findGitBranchAliasUrl(deployment)
+    const aliasUrl = await findGitBranchAliasUrl(deployment, teamId)
     if (aliasUrl) return aliasUrl
 
     // A canonical URL is locked to its commit, so it only helps when no
@@ -496,35 +493,27 @@ function getManualPreviewUrl() {
 
 /**
  * Deterministic hostname attempt first (matches Vercel pattern).
- * These git-branch URLs are aliases that Vercel updates to point to the latest deployment.
- * Returns undefined when the project/team slugs are absent or nothing is reachable.
+ * The git-branch alias is a URL Vercel updates to point to the latest deployment.
+ * A name too long for a DNS label gets a hashed alias that cannot be derived, so it is read from
+ * the Vercel API instead; a shortened guess could name another branch's alias.
+ * Returns undefined when the alias is not derivable or not reachable.
  * @param {string | undefined} projectSlug
  * @param {string | undefined} teamSlug
  * @param {string} branchSlug
  * @returns {Promise<string | undefined>}
  */
 async function findReachableGitBranchAliasUrl(projectSlug, teamSlug, branchSlug) {
-  if (!projectSlug || !teamSlug) return undefined
-
-  // Try progressively shorter slugs (Vercel truncates long branch names)
-  // Example: "chore/test-preview-prod-deploys" -> "chore-test-preview-prod-deploys" -> "chore-tes" (9 chars)
-  const slugLengths = [branchSlug.length, 15, 12, 10, 9, 8, 7]
-  for (const len of slugLengths) {
-    const trySlug = branchSlug.slice(0, len)
-    if (trySlug.length < 3) break // Too short to be meaningful
-
-    const tryUrl = `https://${projectSlug}-git-${trySlug}-${teamSlug}.vercel.app`
-    logDebug(`Trying git-branch alias (${trySlug.length} chars): ${tryUrl}`)
-
-    if (await isReachable(tryUrl)) {
-      logDebug(
-        '✓ Found reachable git-branch alias URL (auto-updates to latest deployment)'
-      )
-      return tryUrl
-    }
+  const url = deterministicBranchAliasUrl(projectSlug, branchSlug, teamSlug)
+  if (!url) {
+    logDebug('Branch alias is too long to derive; falling back to the Vercel API')
+    return undefined
   }
-
-  logDebug('No git-branch alias URLs reachable, falling back to Vercel API')
+  logDebug(`Trying git-branch alias: ${url}`)
+  if (await isReachable(url)) {
+    logDebug('✓ Found reachable git-branch alias URL (auto-updates to latest deployment)')
+    return url
+  }
+  logDebug('Git-branch alias not reachable, falling back to Vercel API')
   return undefined
 }
 

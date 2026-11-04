@@ -18,6 +18,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
+import {
+  deterministicBranchAliasUrl,
+  gitBranchAliasForDeployment,
+} from './vercel-branch-alias.mjs'
 
 /**
  * Load env files for local Preview runs; CI passes env vars directly. Called from
@@ -117,18 +121,12 @@ function getCanonicalDeploymentUrl(deployment) {
     : `https://${deployment.url}`
 }
 
-function getGitBranchAliasUrl(deployment) {
-  if (!Array.isArray(deployment?.alias)) return undefined
-
-  const gitBranchAlias = deployment.alias.find(
-    (alias) => typeof alias === 'string' && alias.includes('-git-')
-  )
-
-  if (!gitBranchAlias) return undefined
-
-  return gitBranchAlias.startsWith('https://')
-    ? gitBranchAlias
-    : `https://${gitBranchAlias}`
+/** Alias hostnames of one deployment; the deployment list leaves them out. */
+async function fetchDeploymentAliases(deploymentId, teamId) {
+  const url = new URL(`https://api.vercel.com/v2/deployments/${deploymentId}/aliases`)
+  if (teamId) url.searchParams.set('teamId', teamId)
+  const result = await fetchJson(url.toString())
+  return (result?.aliases ?? []).map((entry) => entry?.alias)
 }
 
 /**
@@ -229,7 +227,9 @@ async function findDeploymentUrl(projectId, teamId, branch) {
   })
 
   for (const deployment of branchCandidates) {
-    const aliasUrl = getGitBranchAliasUrl(deployment)
+    const aliasUrl = await gitBranchAliasForDeployment(deployment, (id) =>
+      fetchDeploymentAliases(id, teamId)
+    )
     if (!aliasUrl) continue
 
     logDebug(`Using git-branch alias URL while waiting for expected SHA: ${aliasUrl}`)
@@ -237,11 +237,6 @@ async function findDeploymentUrl(projectId, teamId, branch) {
   }
 
   return undefined
-}
-
-function deterministicUrl(projectSlug, branchSlug, teamSlug) {
-  if (!projectSlug || !branchSlug || !teamSlug) return undefined
-  return `https://${projectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
 }
 
 async function main() {
@@ -287,14 +282,17 @@ async function main() {
   // Deterministic aliases are a useful fallback, but they are weaker than the
   // explicit deployment lookup above because they do not prove the commit SHA.
   logDebug('No deployment found via API, trying deterministic URL')
-  const fallback = deterministicUrl(projectSlug, branchSlug, teamSlug)
+  const fallback = deterministicBranchAliasUrl(projectSlug, branchSlug, teamSlug)
   if (fallback) {
     logDebug(`Using fallback deterministic URL: ${fallback}`)
     process.stdout.write(fallback)
     return
   }
 
-  fail(`Could not resolve preview URL for ${projectSlug}`)
+  fail(
+    `Could not resolve preview URL for ${projectSlug}: no deployment exists for branch "${branch}" yet, ` +
+      'and its branch alias is too long to derive (Vercel shortens it and adds a hash).'
+  )
 }
 
 // Run only as a script, so tests can import the helpers without resolving anything.
