@@ -46,6 +46,32 @@ const ERASURE_REPEAT_DELETE_MS = 15 * 60 * 1000
 
 const MAX_SWEEP_BATCH = 200
 
+/**
+ * The sweep's clock at a later moment, to the whole minute. Deletes run one at a time, so a slow one
+ * must not backdate the attempts after it to when the sweep began. Whole minutes keep a batch's first
+ * minute on the sweep's own time: a row stamped seconds later would miss the 15-minute cron's next
+ * pass by those seconds and wait a whole extra cycle. So a retry can run up to a minute early.
+ */
+function sweepClock(now: Date): () => Date {
+  const startedAt = Date.now()
+  return () => {
+    const elapsed = Date.now() - startedAt
+    return new Date(now.getTime() + elapsed - (elapsed % 60_000))
+  }
+}
+
+/** The delete pace, shared with the erasure queue: an abandoned draft's retry waits for it too. */
+const deleteIsDue = (now: Date): Prisma.LookbookPostWhereInput => ({
+  OR: [
+    { image_delete_attempted_at: null },
+    {
+      image_delete_attempted_at: {
+        lte: new Date(now.getTime() - ERASURE_REPEAT_DELETE_MS),
+      },
+    },
+  ],
+})
+
 const OPEN_ERASURE = {
   erasure_requested_at: { not: null },
   objects_purged_at: null,
@@ -284,6 +310,7 @@ export class CommunityMaintenanceService {
   async sweepErasureRequests(
     now: Date = new Date()
   ): Promise<CommunityErasureSweepResult> {
+    const settledAt = sweepClock(now)
     const pending = await this.selectErasureWork(now)
 
     const result: CommunityErasureSweepResult = {
@@ -313,10 +340,10 @@ export class CommunityMaintenanceService {
             },
             'Failed to purge community object during erasure; will retry'
           )
-          await this.recordDeleteAttempt(post.id, now)
+          await this.recordDeleteAttempts([post.id], settledAt())
           continue
         }
-        await this.recordDeleteAttempt(post.id, now)
+        await this.recordDeleteAttempts([post.id], settledAt())
       }
 
       if (
@@ -389,13 +416,25 @@ export class CommunityMaintenanceService {
       LIMIT ${MAX_SWEEP_BATCH}`)
   }
 
-  /** After the delete settles, so a crash before it leaves the row due and a failure paces its retry. */
-  private recordDeleteAttempt(id: string, now: Date) {
+  /**
+   * After the delete settles, so a crash before it leaves the row due and a failure paces its retry.
+   * Forward only: a slower sweep finishing last must not make a newer attempt look old.
+   */
+  private recordDeleteAttempts(ids: string[], at: Date) {
+    if (ids.length === 0) return
     return communityPrivacyTransaction(this.prisma, async (tx) => {
-      await guardCommunityPost(tx, id)
+      await tx.$executeRaw(
+        Prisma.sql`SELECT community_privacy_guards(ARRAY[]::text[],ARRAY[${Prisma.join(ids)}]::text[],true)`
+      )
       await tx.lookbookPost.updateMany({
-        where: { id },
-        data: { image_delete_attempted_at: now },
+        where: {
+          id: { in: ids },
+          OR: [
+            { image_delete_attempted_at: null },
+            { image_delete_attempted_at: { lt: at } },
+          ],
+        },
+        data: { image_delete_attempted_at: at },
       })
     })
   }
@@ -453,10 +492,12 @@ export class CommunityMaintenanceService {
     // The token handed to the client outlives this expiry, and a write landing after the row is gone
     // would leave an object nothing names. A replay moves the expiry, so this covers its token too.
     const deadline = new Date(now.getTime() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS)
+    const settledAt = sweepClock(now)
     const abandoned = await this.prisma.lookbookPost.findMany({
       where: {
         status: 'draft',
         upload_expires_at: { lt: deadline },
+        ...deleteIsDue(now),
       },
       orderBy: { upload_expires_at: 'asc' },
       take: MAX_SWEEP_BATCH,
@@ -480,6 +521,7 @@ export class CommunityMaintenanceService {
           id: { in: candidateIds },
           status: 'draft',
           upload_expires_at: { lt: deadline },
+          ...deleteIsDue(now),
         },
         select: { id: true, image_object_path: true },
       })
@@ -496,11 +538,15 @@ export class CommunityMaintenanceService {
       .map((post) => post.image_object_path)
       .filter((path): path is string => Boolean(path))
 
+    const attempted = claimed
+      .filter((post) => Boolean(post.image_object_path))
+      .map((post) => post.id)
     let objectsDeleted = 0
     if (objectPaths.length > 0) {
       try {
         await this.storage.remove(objectPaths)
         objectsDeleted = objectPaths.length
+        await this.recordDeleteAttempts(attempted, settledAt())
       } catch (error: unknown) {
         // The rows stay so the next sweep retries the delete. Dropping them here
         // would orphan the objects permanently.
@@ -512,6 +558,7 @@ export class CommunityMaintenanceService {
           },
           'Failed to delete abandoned community upload objects; rows retained for retry'
         )
+        await this.recordDeleteAttempts(attempted, settledAt())
         return { objectsDeleted: 0, draftsDeleted: 0 }
       }
     }
