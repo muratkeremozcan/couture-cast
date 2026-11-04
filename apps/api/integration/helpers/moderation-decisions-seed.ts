@@ -13,7 +13,7 @@ import {
   type CommunityReportReason,
 } from '@prisma/client'
 import request from 'supertest'
-import { afterEach, vi } from 'vitest'
+import { afterEach, beforeAll, vi } from 'vitest'
 import {
   moderationCaseDetailResponseSchema,
   type ModerationBanTerms,
@@ -116,6 +116,11 @@ export function moderationDecisionsTestContext() {
       return Promise.resolve()
     }),
   }
+
+  // Production runs with the privacy triggers on, so a decision must pass them here too.
+  beforeAll(async () => {
+    await prisma.$executeRaw`UPDATE "CommunityRuntimeCapability" SET privacy_version = 1 WHERE id = 1`
+  })
 
   afterEach(() => {
     failingFlags.clear()
@@ -341,6 +346,16 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
     return { id: user.id, alias, guardianId: guardian.id }
   }
 
+  /** The consent lapse a guardian revocation leaves. The privacy trigger needs the member guard. */
+  const lapseConsent = (teenId: string) =>
+    prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${teenId}]::text[], ARRAY[]::text[], true)`
+      await tx.guardianConsent.updateMany({
+        where: { teen_id: teenId },
+        data: { status: 'revoked', revoked_at: now() },
+      })
+    })
+
   async function post(params: {
     authorId: string
     status?: CommunityPostStatus
@@ -376,15 +391,15 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
       { now: now() }
     )
     const created = await prisma.lookbookPost.create({
-      data: buildLookbookPostCreateInput(fixture),
+      data: {
+        ...buildLookbookPostCreateInput(fixture),
+        erasure_requested_at: params.erasureRequestedAt ?? null,
+      },
     })
-    if (params.erasureRequestedAt || params.area)
+    if (params.area)
       return prisma.lookbookPost.update({
         where: { id: created.id },
         data: {
-          ...(params.erasureRequestedAt
-            ? { erasure_requested_at: params.erasureRequestedAt }
-            : {}),
           ...(params.area
             ? {
                 area_country: params.area.country,
@@ -642,6 +657,7 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
     member,
     operator,
     teen,
+    lapseConsent,
     post,
     comment,
     postReport,

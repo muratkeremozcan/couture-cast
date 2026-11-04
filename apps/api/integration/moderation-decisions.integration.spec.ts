@@ -370,10 +370,7 @@ describe('I-D-RELEASE-REFUSALS: each refusal comes from a real state and writes 
   it('author_ineligible when a teen author has no consent left', async () => {
     const author = await fx.teen()
     const seeded = await fx.postCase({ status: 'flagged', author })
-    await prisma.guardianConsent.updateMany({
-      where: { teen_id: author.id },
-      data: { status: 'revoked', revoked_at: NOW },
-    })
+    await fx.lapseConsent(author.id)
     await refused(seeded.caseId, 'release', 'author_ineligible')
   })
 
