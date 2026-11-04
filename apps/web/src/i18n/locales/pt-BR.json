@@ -897,8 +897,7 @@
     },
     "alias": {
       "erased": "Membro excluído",
-      "unknown": "Membro sem nome",
-      "screening": "Triagem automática"
+      "unknown": "Membro sem nome"
     },
     "mediaReason": {
       "target_erased": "A publicação foi excluída, então a imagem não existe mais.",
@@ -975,7 +974,8 @@
       "priorActions": "Ações anteriores",
       "noPriorActions": "Nenhuma ação anterior.",
       "firstDecision": "Primeira decisão: {{when}}",
-      "escalated": "Este caso aguarda um administrador. Só um administrador pode encerrá-lo."
+      "escalated": "Este caso aguarda um administrador. Só um administrador pode encerrá-lo.",
+      "reporterScreening": "Triagem automática"
     },
     "action": {
       "flagged": "Sinalizado pela triagem",

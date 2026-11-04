@@ -56,17 +56,13 @@ export type ModerationMediaUnavailableReason = z.infer<
   typeof moderationMediaUnavailableReasonSchema
 >
 
-/**
- * `unknown` means the reporter has no alias row yet, and a read never creates one.
- * `screening` means the screener filed the report, so no member stands behind it.
- */
-export const moderationAliasStateSchema = z.enum([
-  'alias',
-  'erased',
-  'unknown',
-  'screening',
-])
+/** `unknown` means the reporter has no alias row yet, and a read never creates one. */
+export const moderationAliasStateSchema = z.enum(['alias', 'erased', 'unknown'])
 export type ModerationAliasState = z.infer<typeof moderationAliasStateSchema>
+
+/** `screening` means the screener filed the report, so no member stands behind it. */
+export const moderationReportOriginSchema = z.enum(['member', 'screening'])
+export type ModerationReportOrigin = z.infer<typeof moderationReportOriginSchema>
 
 export const moderationActorKindSchema = z.enum(['screening', 'reporter', 'operator'])
 export type ModerationActorKind = z.infer<typeof moderationActorKindSchema>
@@ -329,6 +325,7 @@ export const moderationIdentitySchema = z
 export const moderationReporterSchema = z
   .object({
     identity: moderationIdentitySchema,
+    origin: moderationReportOriginSchema,
     reason: communityReportReasonSchema,
     /** Reporter free text from post reports, at most 500 characters. Plain text only. */
     details: z.string().max(500).nullable(),

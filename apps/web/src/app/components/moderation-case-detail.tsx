@@ -463,7 +463,11 @@ function ReportersSection({ detail }: { detail: ModerationCaseDetail }) {
         {detail.reporters.map((reporter, index) => (
           <li key={index} className="text-sm">
             <p className="font-medium">
-              <Identity identity={reporter.identity} />
+              {reporter.origin === 'screening' ? (
+                t('moderation.detail.reporterScreening')
+              ) : (
+                <Identity identity={reporter.identity} />
+              )}
               {' · '}
               {t(`moderation.reason.${reporter.reason}`)}
             </p>

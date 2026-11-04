@@ -897,8 +897,7 @@
     },
     "alias": {
       "erased": "Silinmiş üye",
-      "unknown": "Adsız üye",
-      "screening": "Otomatik tarama"
+      "unknown": "Adsız üye"
     },
     "mediaReason": {
       "target_erased": "Gönderi silindiği için görseli artık yok.",
@@ -975,7 +974,8 @@
       "priorActions": "Önceki işlemler",
       "noPriorActions": "Önceki işlem yok.",
       "firstDecision": "İlk karar: {{when}}",
-      "escalated": "Bu vaka bir yöneticiyi bekliyor. Yalnızca bir yönetici kapatabilir."
+      "escalated": "Bu vaka bir yöneticiyi bekliyor. Yalnızca bir yönetici kapatabilir.",
+      "reporterScreening": "Otomatik tarama"
     },
     "action": {
       "flagged": "Tarama tarafından işaretlendi",

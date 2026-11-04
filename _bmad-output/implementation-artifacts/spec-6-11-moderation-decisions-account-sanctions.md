@@ -333,6 +333,7 @@ Entries marked (intent) tighten or extend frozen intent and were sent to the bui
 - TEA-21 (D12, fixed from code). A release runs the same after-commit step for the post's areas. `resolve` and `escalate` skip the bump and report `completed`.
 - TEA-22 (D15, fixed from code). Both clients read `code` ahead of every message rule, and the `community_banned` message stays distinct from the rollout copy.
 
+- Build-02 (D11, Optic on PR 195). A screening report reads as identity state `unknown` with `origin: screening` on the reporter, where D11 said identity state `screening`. Adding that enum value is a breaking response change under `api-versioning.md`, and the one exemption the repo has is for deliberately open sets, which this closed set is not. The console shows the same Automated screening label from `origin`.
 - Build-01 (TEA-01, D2, review C2). The transaction order gains one step: case lock, replay check, case read, sanction eligibility locks, privacy guard, member lock, post row lock, then the re-read and revision check.
 
 Residuals RG1 to RG8 are in the test design under Assumptions.
@@ -377,6 +378,7 @@ All rows below were real and fixed.
 | C5           | medium | A ban learned from the socket left the weekly challenge and its dead button                                                                            | `closeForBan` is the one cleanup for both paths                                                                                                           |
 | C6           | medium | Erasure during lock acquisition answered the legacy 404 with no closed code, so the panel offered retries                                              | `takeTargetLocks` maps it to `case_not_found`                                                                                                             |
 | R2-1         | medium | A delayed realtime rebuild restored the weekly challenge after the ban cleanup                                                                         | `closeForBan` bumps the feed generation, so reads in flight cannot land                                                                                   |
+| CI-1         | high   | Optic refused the new `screening` value of the alias state as a breaking response enum change                                                          | The enum returns to its main values, and reporters gain `origin`, with no exemption                                                                       |
 
 ## Design Notes
 

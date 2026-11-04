@@ -200,6 +200,7 @@ const withoutImage = {
   target: like({ state: 'erased', status: null, publishedAt: null, parentBody: null }),
   reporters: eachLike({
     identity: { state: regex('erased', 'erased'), alias: null },
+    origin: 'member',
     reason: regex(
       'spam|harassment|inappropriate_content|hate_speech|violence|other',
       'harassment'
@@ -478,6 +479,7 @@ export async function verifyModerationCaseInteraction(pact: PactV4) {
                 state: regex('alias|erased|unknown', 'unknown'),
                 alias: nullValue(),
               },
+              origin: 'member',
               reason: regex(
                 'spam|harassment|inappropriate_content|hate_speech|violence|other',
                 'other'

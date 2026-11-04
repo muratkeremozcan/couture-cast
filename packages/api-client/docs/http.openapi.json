@@ -17990,8 +17990,7 @@
                     "enum": [
                       "alias",
                       "erased",
-                      "unknown",
-                      "screening"
+                      "unknown"
                     ]
                   },
                   "alias": {
@@ -18156,8 +18155,7 @@
                           "enum": [
                             "alias",
                             "erased",
-                            "unknown",
-                            "screening"
+                            "unknown"
                           ]
                         },
                         "alias": {
@@ -18174,6 +18172,13 @@
                         "alias"
                       ],
                       "additionalProperties": false
+                    },
+                    "origin": {
+                      "type": "string",
+                      "enum": [
+                        "member",
+                        "screening"
+                      ]
                     },
                     "reason": {
                       "type": "string",
@@ -18203,6 +18208,7 @@
                   },
                   "required": [
                     "identity",
+                    "origin",
                     "reason",
                     "details",
                     "reportedAt",
@@ -29596,8 +29602,7 @@
                               "enum": [
                                 "alias",
                                 "erased",
-                                "unknown",
-                                "screening"
+                                "unknown"
                               ]
                             },
                             "alias": {
@@ -29762,8 +29767,7 @@
                                     "enum": [
                                       "alias",
                                       "erased",
-                                      "unknown",
-                                      "screening"
+                                      "unknown"
                                     ]
                                   },
                                   "alias": {
@@ -29780,6 +29784,13 @@
                                   "alias"
                                 ],
                                 "additionalProperties": false
+                              },
+                              "origin": {
+                                "type": "string",
+                                "enum": [
+                                  "member",
+                                  "screening"
+                                ]
                               },
                               "reason": {
                                 "type": "string",
@@ -29809,6 +29820,7 @@
                             },
                             "required": [
                               "identity",
+                              "origin",
                               "reason",
                               "details",
                               "reportedAt",

@@ -180,6 +180,7 @@ const baseDetail = {
   reporters: [
     {
       identity: { state: 'alias', alias: 'brave-owl-9876' },
+      origin: 'member',
       reason: 'harassment',
       details: 'Reporter note',
       reportedAt: iso(-2),
@@ -276,6 +277,7 @@ export const moderationQueueServiceDouble = {
             reporters: [
               {
                 identity: { state: 'unknown', alias: null },
+                origin: 'member',
                 reason: 'other',
                 details: null,
                 reportedAt: iso(-2),
@@ -332,6 +334,7 @@ export const moderationQueueServiceDouble = {
                 {
                   ...baseDetail.reporters[0],
                   identity: { state: 'erased', alias: null },
+                  origin: 'member',
                 },
               ],
               ...decisionState({ ...openCase, target: { state: 'erased' } }),

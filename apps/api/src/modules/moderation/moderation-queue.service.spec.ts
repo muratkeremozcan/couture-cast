@@ -283,9 +283,9 @@ describe('U-Q-SVC-IDENTITY', () => {
       { ...loaded.reports[0]!, id: 'r2', reporterId: null, origin: 'member' },
     ]
     const { data } = await build(loaded).service.getCase(AUTH, 'post.p1')
-    expect(data.reporters.map((entry) => entry.identity)).toEqual([
-      { state: 'screening', alias: null },
-      { state: 'erased', alias: null },
+    expect(data.reporters.map(({ identity, origin }) => ({ identity, origin }))).toEqual([
+      { identity: { state: 'unknown', alias: null }, origin: 'screening' },
+      { identity: { state: 'erased', alias: null }, origin: 'member' },
     ])
   })
 

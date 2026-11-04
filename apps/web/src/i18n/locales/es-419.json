@@ -897,8 +897,7 @@
     },
     "alias": {
       "erased": "Miembro eliminado",
-      "unknown": "Miembro sin nombre",
-      "screening": "Revisión automática"
+      "unknown": "Miembro sin nombre"
     },
     "mediaReason": {
       "target_erased": "La publicación fue eliminada, por lo que su imagen ya no existe.",
@@ -975,7 +974,8 @@
       "priorActions": "Acciones previas",
       "noPriorActions": "Sin acciones previas.",
       "firstDecision": "Primera decisión: {{when}}",
-      "escalated": "Este caso está a la espera de un administrador. Solo un administrador puede cerrarlo."
+      "escalated": "Este caso está a la espera de un administrador. Solo un administrador puede cerrarlo.",
+      "reporterScreening": "Revisión automática"
     },
     "action": {
       "flagged": "Marcado por la revisión automática",

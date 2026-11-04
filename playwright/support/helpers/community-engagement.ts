@@ -69,7 +69,9 @@ async function monitorPage(
   // An erased author's open thread can still be reading the comments of a look the
   // erasure removed; that read answers 404 and the thread then closes.
   const erasedComments = /\/api\/v1\/community\/posts\/[^/?]+\/comments(?:\?|$)/
-  const excluded = expectsErasure ? [events, erasedComments] : [events]
+  // A denied socket asks the feed once why, and an erased author's answer is 403.
+  const deniedProbe = /\/api\/v1\/community\/feed\?(?:.*&)?limit=1(?:&|$)/
+  const excluded = expectsErasure ? [events, erasedComments, deniedProbe] : [events]
   const failures: string[] = []
   // playwright-utils deviation: the monitor supports URL exclusions, not status/body-scoped expected errors.
   // Its excluded cursor responses remain status-checked; the scenario validates the canonical body through the same actual HTTP cursor.
@@ -81,7 +83,7 @@ async function monitorPage(
       try {
         if (expectsErasure) {
           expect(expectedErasedAuthors.has(page)).toBe(true)
-          expect(response.status()).toBe(events.test(url) ? 403 : 404)
+          expect(response.status()).toBe(erasedComments.test(url) ? 404 : 403)
         } else expect(response.status()).toBe(409)
       } catch (error) {
         failures.push(error instanceof Error ? error.message : String(error))

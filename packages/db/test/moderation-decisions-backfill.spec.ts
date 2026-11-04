@@ -6,6 +6,8 @@ import { readdir, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { getDefaultFeatureFlagValue } from '../../config/src/flags.ts'
+import { SEEDED_FEATURE_FLAGS } from '../prisma/seeds/feature-flags.js'
 
 const MIGRATION = '20261104120000_moderation_decisions'
 const directory = resolve(__dirname, '../prisma/migrations')
@@ -465,5 +467,20 @@ describe.runIf(reachable || automated)('moderation decisions database', () => {
             expect(rows[0]?.granted, `${role} ${privilege} ${table}`).toBe(false)
           }
     })
+  })
+})
+
+describe('U-D-FLAG: moderation_decisions_enabled', () => {
+  it('is seeded true for local and test environments', () => {
+    expect(
+      SEEDED_FEATURE_FLAGS.find((flag) => flag.key === 'moderation_decisions_enabled')
+    ).toEqual({
+      key: 'moderation_decisions_enabled',
+      value: true,
+    })
+  })
+
+  it('stays false in the registry, which is what production resolves', () => {
+    expect(getDefaultFeatureFlagValue('moderation_decisions_enabled')).toBe(false)
   })
 })

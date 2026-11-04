@@ -89,6 +89,7 @@ export function detail(
       reporters: [
         {
           identity: { state: 'alias', alias: 'brave-owl-9876' },
+          origin: 'member',
           reason: 'harassment',
           details: 'Reporter typed this',
           reportedAt: hours(-2),

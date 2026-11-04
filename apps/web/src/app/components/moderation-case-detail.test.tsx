@@ -124,6 +124,7 @@ describe('C-WEB-Q-DETAIL', () => {
       reporters: [
         {
           identity: { state: 'unknown', alias: null },
+          origin: 'member',
           reason: 'spam',
           details: null,
           reportedAt: '2026-11-03T10:00:00.000Z',
@@ -131,6 +132,7 @@ describe('C-WEB-Q-DETAIL', () => {
         },
         {
           identity: { state: 'erased', alias: null },
+          origin: 'member',
           reason: 'violence',
           details: null,
           reportedAt: '2026-11-03T10:30:00.000Z',
@@ -453,6 +455,7 @@ describe('C-WEB-Q-HOSTILE-TEXT: every user-authored string is inert', () => {
       reporters: [
         {
           identity: { state: 'alias', alias: hostile('reporter').slice(0, 64) },
+          origin: 'member',
           reason: 'other',
           details: hostile('details').slice(0, 500),
           reportedAt: '2026-11-03T10:00:00.000Z',

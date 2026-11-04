@@ -9523,6 +9523,7 @@ Key takeaways:
    A taken-down case target keeps its operator reason, stays down, and can be released from its case.
 8. **Screening intake is a report row.**
    `flagPost` writes a `CommunityPostReport` with a null reporter and `origin: screening`, as comment intake already did, so the queue, keyset, SLA, risk and erasure re-key apply unchanged.
+   The case detail marks such a reporter with `origin: screening`, because adding a value to the alias state enum is a breaking response change that Optic refuses.
    The migration backfills flagged posts whose newest status-changing event is `flagged`, and it skips canary, erasure-requested and anonymized posts.
 9. **An operator hold is not a machine finding.**
    Both finding predicates exclude operator takedown and ban values through `isOperatorHoldReason`, and a comment takedown writes the closed value `operator_takedown` while the operator's words stay on the decision row.

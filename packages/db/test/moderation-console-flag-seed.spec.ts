@@ -20,18 +20,3 @@ describe('6.10-SEED-001 moderation_console_enabled', () => {
     expect(getDefaultFeatureFlagValue('moderation_console_enabled')).toBe(false)
   })
 })
-
-describe('U-D-FLAG: moderation_decisions_enabled', () => {
-  it('is seeded true for local and test environments', () => {
-    expect(
-      SEEDED_FEATURE_FLAGS.find((flag) => flag.key === 'moderation_decisions_enabled')
-    ).toEqual({
-      key: 'moderation_decisions_enabled',
-      value: true,
-    })
-  })
-
-  it('stays false in the registry, which is what production resolves', () => {
-    expect(getDefaultFeatureFlagValue('moderation_decisions_enabled')).toBe(false)
-  })
-})

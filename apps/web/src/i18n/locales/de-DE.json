@@ -897,8 +897,7 @@
     },
     "alias": {
       "erased": "Gelöschtes Mitglied",
-      "unknown": "Unbenanntes Mitglied",
-      "screening": "Automatisches Screening"
+      "unknown": "Unbenanntes Mitglied"
     },
     "mediaReason": {
       "target_erased": "Der Beitrag wurde gelöscht, das Bild ist nicht mehr vorhanden.",
@@ -975,7 +974,8 @@
       "priorActions": "Frühere Maßnahmen",
       "noPriorActions": "Keine früheren Maßnahmen.",
       "firstDecision": "Erste Entscheidung {{when}}",
-      "escalated": "Dieser Fall wartet auf einen Admin. Nur ein Admin kann ihn abschließen."
+      "escalated": "Dieser Fall wartet auf einen Admin. Nur ein Admin kann ihn abschließen.",
+      "reporterScreening": "Automatisches Screening"
     },
     "action": {
       "flagged": "Vom Screening markiert",

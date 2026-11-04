@@ -249,6 +249,7 @@ const stubbedDetail = (caseId: string, media: unknown) =>
       reporters: [
         {
           identity: { state: 'alias', alias: 'stub-reporter' },
+          origin: 'member',
           reason: 'spam',
           details: null,
           reportedAt: new Date(Date.now() - 3_600_000).toISOString(),

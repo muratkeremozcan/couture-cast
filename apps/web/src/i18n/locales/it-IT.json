@@ -897,8 +897,7 @@
     },
     "alias": {
       "erased": "Membro eliminato",
-      "unknown": "Membro senza nome",
-      "screening": "Controllo automatico"
+      "unknown": "Membro senza nome"
     },
     "mediaReason": {
       "target_erased": "Il post è stato eliminato, quindi la sua immagine non esiste più.",
@@ -975,7 +974,8 @@
       "priorActions": "Azioni precedenti",
       "noPriorActions": "Nessuna azione precedente.",
       "firstDecision": "Prima decisione: {{when}}",
-      "escalated": "Questo caso è in attesa di un amministratore. Solo un amministratore può chiuderlo."
+      "escalated": "Questo caso è in attesa di un amministratore. Solo un amministratore può chiuderlo.",
+      "reporterScreening": "Controllo automatico"
     },
     "action": {
       "flagged": "Segnalato dal controllo automatico",

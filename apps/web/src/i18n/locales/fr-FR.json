@@ -897,8 +897,7 @@
     },
     "alias": {
       "erased": "Membre supprimé",
-      "unknown": "Membre sans nom",
-      "screening": "Filtrage automatique"
+      "unknown": "Membre sans nom"
     },
     "mediaReason": {
       "target_erased": "La publication a été supprimée, son image n’existe plus.",
@@ -975,7 +974,8 @@
       "priorActions": "Actions précédentes",
       "noPriorActions": "Aucune action précédente.",
       "firstDecision": "Première décision : {{when}}",
-      "escalated": "Ce cas attend un administrateur. Seul un administrateur peut le clore."
+      "escalated": "Ce cas attend un administrateur. Seul un administrateur peut le clore.",
+      "reporterScreening": "Filtrage automatique"
     },
     "action": {
       "flagged": "Signalé par le filtrage",

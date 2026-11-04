@@ -278,10 +278,12 @@ export class ModerationQueueService {
       target: this.target(loaded),
       findings,
       reporters: relevant.map((report) => ({
+        // No member stands behind a screening report, so the alias states do not apply to it.
         identity:
           report.origin === 'screening'
-            ? { state: 'screening' as const, alias: null }
+            ? { state: 'unknown' as const, alias: null }
             : this.identity(report.reporterId, loaded),
+        origin: report.origin,
         reason: report.reason as CommunityReportReason,
         details: clamp(report.details, 500),
         reportedAt: report.acceptedAt.toISOString(),

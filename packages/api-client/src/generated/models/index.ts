@@ -8248,6 +8248,12 @@ export interface GetModerationCase200ResponseDataReportersInner {
   identity: GetModerationCase200ResponseDataReportersInnerIdentity
   /**
    *
+   * @type {GetModerationCase200ResponseDataReportersInnerOriginEnum}
+   * @memberof GetModerationCase200ResponseDataReportersInner
+   */
+  origin: GetModerationCase200ResponseDataReportersInnerOriginEnum
+  /**
+   *
    * @type {GetModerationCase200ResponseDataReportersInnerReasonEnum}
    * @memberof GetModerationCase200ResponseDataReportersInner
    */
@@ -8271,6 +8277,16 @@ export interface GetModerationCase200ResponseDataReportersInner {
    */
   resolved: boolean
 }
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataReportersInnerOriginEnum = {
+  member: 'member',
+  screening: 'screening',
+} as const
+export type GetModerationCase200ResponseDataReportersInnerOriginEnum =
+  (typeof GetModerationCase200ResponseDataReportersInnerOriginEnum)[keyof typeof GetModerationCase200ResponseDataReportersInnerOriginEnum]
 
 /**
  * @export
@@ -8313,7 +8329,6 @@ export const GetModerationCase200ResponseDataReportersInnerIdentityStateEnum = {
   alias: 'alias',
   erased: 'erased',
   unknown: 'unknown',
-  screening: 'screening',
 } as const
 export type GetModerationCase200ResponseDataReportersInnerIdentityStateEnum =
   (typeof GetModerationCase200ResponseDataReportersInnerIdentityStateEnum)[keyof typeof GetModerationCase200ResponseDataReportersInnerIdentityStateEnum]
@@ -8388,7 +8403,6 @@ export const GetModerationCase200ResponseDataSubjectStateEnum = {
   alias: 'alias',
   erased: 'erased',
   unknown: 'unknown',
-  screening: 'screening',
 } as const
 export type GetModerationCase200ResponseDataSubjectStateEnum =
   (typeof GetModerationCase200ResponseDataSubjectStateEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStateEnum]

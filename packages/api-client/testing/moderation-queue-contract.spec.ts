@@ -223,6 +223,7 @@ const detail = {
   reporters: [
     {
       identity: { state: 'erased', alias: null },
+      origin: 'member',
       reason: 'spam',
       details: 'note',
       reportedAt: iso,

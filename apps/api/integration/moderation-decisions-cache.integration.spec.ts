@@ -1021,9 +1021,9 @@ describe('I-S-INTAKE: a screener flag reaches the queue through the real process
 
     const detail = await staff.detail(caseId)
     expect(detail.reportCount).toBe(1)
-    expect(detail.reporters.map((reporter) => reporter.identity)).toEqual([
-      { state: 'screening', alias: null },
-    ])
+    expect(
+      detail.reporters.map(({ identity, origin }) => ({ identity, origin }))
+    ).toEqual([{ identity: { state: 'unknown', alias: null }, origin: 'screening' }])
     expect(detail.subject).toEqual({ state: 'alias', alias: author.alias })
     expect(detail.priorActions).toEqual(
       expect.arrayContaining([
@@ -1135,9 +1135,9 @@ describe('I-S-LOOP: the first path out of a held item with no script (E1, S1)', 
     const { staff, items } = await queueItems()
     expect(items.get(caseId)).toMatchObject({ reportCount: 1, hasFinding: true })
     const detail = await staff.detail(caseId)
-    expect(detail.reporters.map((reporter) => reporter.identity)).toEqual([
-      { state: 'screening', alias: null },
-    ])
+    expect(
+      detail.reporters.map(({ identity, origin }) => ({ identity, origin }))
+    ).toEqual([{ identity: { state: 'unknown', alias: null }, origin: 'screening' }])
     expect(detail.allowedActions).toContain('release')
 
     const result = applied(
@@ -1168,6 +1168,10 @@ describe('I-S-IDENTITY: who a null reporter is (S1, D11, TEA-16)', () => {
       const detail = await staff.detail(caseId)
       expect(detail.reporters.map((reporter) => reporter.identity.state).sort()).toEqual([
         'erased',
+        'unknown',
+      ])
+      expect(detail.reporters.map((reporter) => reporter.origin).sort()).toEqual([
+        'member',
         'screening',
       ])
       for (const reporter of detail.reporters) expect(reporter.identity.alias).toBeNull()

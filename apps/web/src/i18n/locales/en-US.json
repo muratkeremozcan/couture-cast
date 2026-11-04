@@ -897,8 +897,7 @@
     },
     "alias": {
       "erased": "Erased member",
-      "unknown": "Unnamed member",
-      "screening": "Automated screening"
+      "unknown": "Unnamed member"
     },
     "mediaReason": {
       "target_erased": "The post was erased, so its image is gone.",
@@ -975,7 +974,8 @@
       "priorActions": "Prior actions",
       "noPriorActions": "No prior actions.",
       "firstDecision": "First decision {{when}}",
-      "escalated": "This case is waiting for an admin. Only an admin can close it."
+      "escalated": "This case is waiting for an admin. Only an admin can close it.",
+      "reporterScreening": "Automated screening"
     },
     "action": {
       "flagged": "Flagged by screening",
