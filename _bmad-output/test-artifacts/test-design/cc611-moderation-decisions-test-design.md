@@ -740,6 +740,29 @@ The seam came from `left-1/2 -translate-x-1/2` in `apps/web/src/app/page.tsx`, a
 Column 0 read 132 where its neighbours read 255, the half blend of the white lookbook and the dark page.
 
 P-D-PREVIEW-CLOSED passed on the deployed preview in run 41854295529, so the local-only limit above no longer applies to it.
+S-2 now also ran against P-D-ROLES: with the guard on the decide route only, 3 of the 6 role tests went red on the appeal route.
+The I-C-DEADLOCK attempt limit mutation went red in `community-privacy.spec.ts`, as that row states.
+
+### CR-2: content a ban held returns to screening
+
+I-B-END-RESTORE and I-C-END-RESTORE pin the owner ruling on D8, with the sweep at `CommunityMaintenanceService.sweepExpiredBanHolds`.
+All 18 went red on the missing method and passed with `6ee348f3`.
+Every seeded defect went red for its own reason:
+
+| Defect                              | Red test                                                  |
+| :---------------------------------- | :-------------------------------------------------------- |
+| No active ban check inside the lock | waits on the member eligibility lock                      |
+| No eligibility lock                 | waits on the member eligibility lock                      |
+| No subject guard                    | leaves content that erasure took                          |
+| No marker filter on posts           | touches only rows held by that marker, and two others     |
+| No marker filter on comments        | touches only rows held by that marker                     |
+| No erasure filter                   | leaves a withdrawn post, leaves content that erasure took |
+| Stale `updated_at`                  | gives a returned post a fresh stall clock                 |
+| Post outbox not re-armed            | takes the returned content through real screening         |
+| Comment outbox not re-armed         | takes the returned content through real screening         |
+| Job id ignores the generation       | both queue tests                                          |
+
+A re-armed comment waits out the outbox's 30-second pause before it dispatches, which the test states.
 
 ---
 

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  COMMUNITY_BAN_EXPIRY_JOB_NAME,
+  registerCommunityMaintenanceSchedulers,
+} from '../modules/community/community-maintenance.scheduler.js'
+import {
   createMaintenanceProcessor,
   JOB_FAILURE_RETENTION_DAYS,
   type MaintenanceProcessorDeps,
@@ -34,6 +38,11 @@ function build() {
     telemetry: { pruneOldTelemetryEvents: vi.fn().mockResolvedValue(undefined) },
     wardrobeRetention: {
       purgeExpiredAndDeletedGarments: vi.fn().mockResolvedValue(undefined),
+    },
+    community: {
+      sweepExpiredBanHolds: vi
+        .fn()
+        .mockResolvedValue({ subjects: 1, posts: 1, comments: 0 }),
     },
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   } as unknown as MaintenanceProcessorDeps & {
@@ -95,6 +104,19 @@ describe('createMaintenanceProcessor: routing', () => {
     await harness.process({ name: TELEMETRY_EVENT_PRUNE_JOB_NAME })
 
     expect(harness.deps.telemetry.pruneOldTelemetryEvents).toHaveBeenCalledOnce()
+  })
+
+  it('runs the sweep that returns content when a ban ends, on every worker schedule', async () => {
+    await harness.process({ name: COMMUNITY_BAN_EXPIRY_JOB_NAME })
+    expect(harness.deps.community.sweepExpiredBanHolds).toHaveBeenCalledOnce()
+
+    const upsertJobScheduler = vi.fn().mockResolvedValue(undefined)
+    await registerCommunityMaintenanceSchedulers({ upsertJobScheduler })
+    expect(upsertJobScheduler).toHaveBeenCalledWith(
+      COMMUNITY_BAN_EXPIRY_JOB_NAME,
+      { pattern: '*/5 * * * *' },
+      { name: COMMUNITY_BAN_EXPIRY_JOB_NAME, data: {} }
+    )
   })
 
   it('routes one job name to one sweep and leaves the rest alone', async () => {

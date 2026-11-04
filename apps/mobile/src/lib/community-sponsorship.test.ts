@@ -12,6 +12,7 @@ import {
   COMMUNITY_FEED_DISABLED_MESSAGE,
   COMMUNITY_SELF_REPORT_MESSAGE,
   COMMUNITY_SPONSORSHIP_HEADER,
+  moderationAppealStatusSchema,
   type CommunityBannedError,
   type CommunitySponsoredFeedItem,
   type CommunitySponsorship,
@@ -22,6 +23,7 @@ import { setMobileAccessTokenResolver } from './mobile-auth'
 import {
   communityCommentsRootsFromMobile,
   communityFailureReason,
+  communitySanctionOf,
   getCommunityFeedFromMobile,
   getCommunityPostFromMobile,
   getCommunitySpotlightFromMobile,
@@ -175,7 +177,7 @@ describe('mobile community reads opt into sponsorship (Story 6.7b)', () => {
   })
 })
 
-describe('U-MOB-D-DENIED: community_banned is the existing denied state', () => {
+describe('U-MOB-D-DENIED: community_banned reads as banned, with its terms', () => {
   let restoreToken: (() => void) | undefined
 
   beforeAll(() => {
@@ -230,14 +232,15 @@ describe('U-MOB-D-DENIED: community_banned is the existing denied state', () => 
     ],
     ['a card open', () => recordCommunityCardOpenedFromMobile('post-a', 'auto')],
     ['comment roots', () => communityCommentsRootsFromMobile('post-a')],
-  ])('%s reads as disabled, with one request and no retry', async (_route, run) => {
+  ])('%s reads as banned, with one request and no retry', async (_route, run) => {
     const calls = refuseEverything()
     const failure = await failureOf(run)
-    expect(communityFailureReason(failure)).toBe('disabled')
+    expect(communityFailureReason(failure)).toBe('banned')
+    expect(communitySanctionOf(failure)).toEqual(banned().sanction)
     expect(calls).toHaveLength(1)
   })
 
-  it('a reaction reads as the same denied state, ahead of the eligibility rule', async () => {
+  it('a reaction reads as banned, ahead of the eligibility rule', async () => {
     refuseEverything()
     const failure = await failureOf(() =>
       setCommunityReactionFromMobile('post-a', {
@@ -246,7 +249,7 @@ describe('U-MOB-D-DENIED: community_banned is the existing denied state', () => 
         baseRevision: 0,
       })
     )
-    expect(communityFailureReason(failure)).toBe('disabled')
+    expect(communityFailureReason(failure)).toBe('banned')
   })
 
   it.each([
@@ -256,14 +259,24 @@ describe('U-MOB-D-DENIED: community_banned is the existing denied state', () => 
   ])('reads the code ahead of the %s message rule', async (_rule, message) => {
     refuseEverything(banned(message))
     const failure = await failureOf(() => getCommunityFeedFromMobile({ mode: 'auto' }))
-    expect(communityFailureReason(failure)).toBe('disabled')
+    expect(communityFailureReason(failure)).toBe('banned')
   })
 
-  it('reads the code, so a body a newer server extended still reads as denied', async () => {
+  it('still closes the community when a newer server sends terms it cannot read', async () => {
     const body = banned(COMMUNITY_SELF_REPORT_MESSAGE)
     refuseEverything({ ...body, sanction: { ...body.sanction, addedLater: 'x' } })
     const failure = await failureOf(() => getCommunityFeedFromMobile({ mode: 'auto' }))
-    expect(communityFailureReason(failure)).toBe('disabled')
+    expect(communityFailureReason(failure)).toBe('banned')
+    expect(communitySanctionOf(failure)).toEqual({
+      kind: 'permanent',
+      expiresAt: null,
+      appealStatus: 'not_requested',
+    })
+  })
+
+  it('names no sanction on any other failure', () => {
+    expect(communitySanctionOf(new Error('offline'))).toBeNull()
+    expect(communitySanctionOf(undefined)).toBeNull()
   })
 
   it('leaves another 403 to its own rule', async () => {
@@ -276,8 +289,11 @@ describe('U-MOB-D-DENIED: community_banned is the existing denied state', () => 
     expect(communityFailureReason(failure)).toBe('age_gate')
   })
 
-  it('adds no banned string to the mobile catalogs', () => {
-    expect(enUS.community).toBeDefined()
-    expect(enUS.community).not.toHaveProperty('banned')
+  it('has the notice copy in the catalog, for the term and each appeal state', () => {
+    expect(Object.keys(enUS.community.banned.appeal).sort()).toEqual(
+      [...moderationAppealStatusSchema.options].sort()
+    )
+    expect(enUS.community.banned.temporary).toContain('{{until}}')
+    expect(enUS.community.error.banned).toBeTruthy()
   })
 })

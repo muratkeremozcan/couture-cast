@@ -1,13 +1,22 @@
 // Story 6.11 test owner: serialization, idempotency and the first decision time against a real, migrated Postgres.
 // I-C-CONFLICT, I-C-REPORT-RACE, I-C-WITHDRAW-RACE, I-C-REPLAY-RACE, I-C-RETRY, I-C-RETRY-MOVED, I-C-KEY-REUSE,
 // I-C-KEY-SCOPE, I-C-FIRST-DECISION, I-C-FIRST-ESCALATE, I-C-RESOLVED-AT, I-C-REKEY, I-C-BAN-RACE, I-C-DB-BACKSTOP,
-// I-C-DEADLOCK, I-C-SPLIT-READ, I-C-RECIPROCAL-BAN, I-C-ERASE-IN-FLIGHT.
+// I-C-DEADLOCK, I-C-SPLIT-READ, I-C-RECIPROCAL-BAN, I-C-ERASE-IN-FLIGHT, I-C-END-RESTORE.
 // Interleavings are forced with a lock held from a second connection.
 // pg_stat_activity confirms each waiter before the lock is released, so no test sleeps.
 import { randomUUID } from 'node:crypto'
 import { type Prisma } from '@prisma/client'
 import { Client } from 'pg'
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import {
   moderationCasesResponseSchema,
   moderationDecisionErrorCodeSchema,
@@ -22,6 +31,7 @@ import {
 } from '../src/modules/community/community-privacy.js'
 import { ModerationDecisionsRepository } from '../src/modules/moderation/moderation-decisions.repository.js'
 import { ModerationQueueRepository } from '../src/modules/moderation/moderation-queue.repository.js'
+import { CommunityMaintenanceService } from '../src/modules/community/community-maintenance.service.js'
 import { checksumTables } from './helpers/moderation-queue-context.js'
 import {
   banMarker,
@@ -1995,6 +2005,187 @@ describe('I-C-RECIPROCAL-BAN: two operators ban each other at once (D2, D5)', ()
       where: { id: unrelated.id },
     })
     expect(sanctionAfter.appeal_status).toBe('not_requested')
+  })
+})
+
+describe('I-C-END-RESTORE: the sweep that returns held content when a ban ends (D8, CR-2)', () => {
+  const sweep = (now = after(1)) =>
+    new CommunityMaintenanceService(prisma, {} as never).sweepExpiredBanHolds(now)
+  const holdEligibility = (held: HeldConnection, memberId: string) =>
+    held.query('SELECT pg_advisory_xact_lock(hashtext($1::text))', [
+      `community_sanction:${memberId}`,
+    ])
+
+  // Every test shares the database, so bans from earlier tests must not count here.
+  beforeEach(async () => {
+    const farFuture = new Date(NOW.getTime() + 3650 * 24 * 60 * MINUTE_MS)
+    while ((await sweep(farFuture)).subjects > 0);
+  })
+
+  /** A ban already past its expiry, with one post and one comment still under its marker. */
+  async function endedBan() {
+    const author = await fx.member('author')
+    const owner = await fx.member('owner')
+    const parent = await fx.post({ authorId: owner.id })
+    const sanction = await fx.sanction(author, {
+      kind: 'temporary',
+      createdAt: new Date(NOW.getTime() - 8 * 24 * 60 * MINUTE_MS),
+      expiresAt: NOW,
+    })
+    const marker = `community_ban:${sanction.id}`
+    const post = await fx.post({
+      authorId: author.id,
+      status: 'flagged',
+      moderationReason: marker,
+      publishedAt: null,
+    })
+    const comment = await fx.comment({
+      postId: parent.id,
+      authorId: author.id,
+      status: 'held_for_review',
+      screeningReason: marker,
+    })
+    return { author, sanction, marker, post, comment }
+  }
+
+  const rowsOf = async (held: { post: { id: string }; comment: { id: string } }) => ({
+    post: await prisma.lookbookPost.findUniqueOrThrow({
+      where: { id: held.post.id },
+      select: { status: true, moderation_reason: true },
+    }),
+    comment: await prisma.communityComment.findUniqueOrThrow({
+      where: { id: held.comment.id },
+      select: { status: true, screening_reason: true },
+    }),
+  })
+
+  const RETURNED = {
+    post: { status: 'pending_review', moderation_reason: null },
+    comment: { status: 'pending_screening', screening_reason: null },
+  }
+
+  it('counts the content once when two instances sweep at the same moment', async () => {
+    const held = await endedBan()
+    clock.at(after(1))
+    const runs = await withHeldConnection(async (lock) => {
+      await holdEligibility(lock, held.author.id)
+      const both = Promise.all([sweep(), sweep()])
+      await waitForBlocked(1)
+      await lock.query('COMMIT')
+      await lock.query('BEGIN')
+      return both
+    })
+    expect(runs.map((run) => run.posts).sort()).toEqual([0, 1])
+    expect(runs.map((run) => run.comments).sort()).toEqual([0, 1])
+    expect(await rowsOf(held)).toEqual(RETURNED)
+  })
+
+  it('waits on the member eligibility lock and keeps the content held when a ban commits first', async () => {
+    const held = await endedBan()
+    clock.at(after(1))
+    const newer = await withHeldConnection(async (lock) => {
+      await holdEligibility(lock, held.author.id)
+      const run = sweep()
+      await waitForBlocked(1)
+      const sanction = await fx.sanction(held.author, {
+        kind: 'temporary',
+        createdAt: after(1),
+        expiresAt: after(60 * 24 * 7),
+      })
+      await lock.query('COMMIT')
+      await lock.query('BEGIN')
+      expect(await run).toMatchObject({ posts: 0, comments: 0 })
+      return sanction
+    })
+    expect(newer.lifted_at).toBeNull()
+    expect(await rowsOf(held)).toEqual({
+      post: { status: 'flagged', moderation_reason: held.marker },
+      comment: { status: 'held_for_review', screening_reason: held.marker },
+    })
+  })
+
+  it('lets a ban that arrives during the sweep hold the returned content again', async () => {
+    const held = await endedBan()
+    clock.at(after(1))
+    const seeded = await fx.postCase({ author: held.author })
+    const staff = await moderator()
+    const { revision } = await staff.detail(seeded.caseId)
+    const decision = await withHeldConnection(async (lock) => {
+      await holdPostRows(lock, [held.post.id])
+      const run = sweep()
+      await waitForBlocked(1)
+      const banned = staff.decide(seeded.caseId, {
+        action: 'ban',
+        ban: SEVEN_DAY_BAN,
+        reason: REASON,
+        expectedRevision: revision,
+      })
+      await waitForBlocked(2)
+      await lock.query('COMMIT')
+      await lock.query('BEGIN')
+      await run
+      return banned
+    })
+    const body = applied(decision)
+    const marker = `community_ban:${body.sanction!.sanctionId}`
+    expect(await rowsOf(held)).toEqual({
+      post: { status: 'flagged', moderation_reason: marker },
+      comment: { status: 'held_for_review', screening_reason: marker },
+    })
+  })
+
+  it('leaves content that erasure took while the sweep waited', async () => {
+    const held = await endedBan()
+    clock.at(after(1))
+    await withHeldConnection(async (lock) => {
+      await holdSubjectGuard(lock, held.author.id)
+      await holdPostGuard(lock, held.post.id)
+      const run = sweep()
+      await waitForBlocked(1)
+      await lock.query(
+        'UPDATE "LookbookPost" SET erasure_requested_at = $1 WHERE id = $2',
+        [after(1), held.post.id]
+      )
+      await lock.query('COMMIT')
+      await lock.query('BEGIN')
+      await run
+    })
+    expect((await rowsOf(held)).post).toEqual({
+      status: 'flagged',
+      moderation_reason: held.marker,
+    })
+  })
+
+  it('rolls one member back whole when a write fails, and still reaches the next member', async () => {
+    const stuck = await endedBan()
+    const next = await endedBan()
+    clock.at(after(1))
+    // A rejecting constraint on only this comment makes the second write of the member fail.
+    await prisma.$executeRawUnsafe(`
+      CREATE OR REPLACE FUNCTION cc611_refuse_comment() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.id = '${stuck.comment.id}' THEN RAISE EXCEPTION 'injected'; END IF;
+        RETURN NEW;
+      END $$ LANGUAGE plpgsql`)
+    await prisma.$executeRawUnsafe(`
+      CREATE TRIGGER cc611_refuse_comment BEFORE UPDATE ON "CommunityComment"
+      FOR EACH ROW EXECUTE FUNCTION cc611_refuse_comment()`)
+    try {
+      await sweep().catch(() => undefined)
+      expect(await rowsOf(next)).toEqual(RETURNED)
+      expect(await rowsOf(stuck)).toEqual({
+        post: { status: 'flagged', moderation_reason: stuck.marker },
+        comment: { status: 'held_for_review', screening_reason: stuck.marker },
+      })
+    } finally {
+      await prisma.$executeRawUnsafe(
+        'DROP TRIGGER cc611_refuse_comment ON "CommunityComment"'
+      )
+      await prisma.$executeRawUnsafe('DROP FUNCTION cc611_refuse_comment()')
+    }
+    // The next pass picks the member up.
+    await sweep()
+    expect(await rowsOf(stuck)).toEqual(RETURNED)
   })
 })
 

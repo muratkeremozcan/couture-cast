@@ -1,7 +1,7 @@
 // Story 6.11 test owner: community bans and appeals against a real, migrated Postgres.
 // I-B-ROUTES, -BODY, -CONTENT-TEMP, -CONTENT-PERM, -PENDING, -EXPIRY, -UPGRADE, -SECOND, -ERASED,
 // -REALTIME, -SEND-GUARD, -RETRACT, -NONCOMMUNITY, -TEEN, -FLAG-OFF, -REPLIES, -SHARE-CARD,
-// -ERASURE-CASCADE, -RACE-ENGAGE, -SCALE.
+// -ERASURE-CASCADE, -RACE-ENGAGE, -SCALE, -END-RESTORE.
 // I-A-HAPPY, -OVERTURN, -OVERTURN-MARKER, -OVERTURN-CONSENT, -BAD-STEP, -SELF, -IDEMPOTENT, -RACE, -FIRST-UNMOVED.
 //
 // Two apps run on the one disposable database.
@@ -71,6 +71,7 @@ import { CommunityController } from '../src/modules/community/community.controll
 import { FixtureCommunityModerationEngine } from '../src/modules/community/community-moderation.engine.js'
 import { CommunityModerationOutboxDispatcher } from '../src/modules/community/community-moderation.outbox.js'
 import { CommunityModerationProcessor } from '../src/modules/community/community-moderation.processor.js'
+import { CommunityMaintenanceService } from '../src/modules/community/community-maintenance.service.js'
 import { CommunityNotificationsWorker } from '../src/modules/community/community-notifications.worker.js'
 import { CommunityPreferencesService } from '../src/modules/community/community-preferences.service.js'
 import {
@@ -1194,6 +1195,475 @@ describe('I-B-EXPIRY: a temporary ban ends by itself at expires_at', () => {
       })
       expect(appeal.status, dump(appeal)).toBe(409)
       expect(codeOf(appeal)).toBe('appeal_transition_invalid')
+    })
+  })
+})
+
+describe('I-B-END-RESTORE: content held only by a ban returns to screening when the ban ends (D8, CR-2)', () => {
+  const sweep = () =>
+    new CommunityMaintenanceService(
+      prisma,
+      new InMemoryCommunityStorage() as never
+    ).sweepExpiredBanHolds(new Date())
+  const LATER_MS = 60_000
+
+  // Every test shares the database, so bans from earlier tests must not count here.
+  beforeEach(async () => {
+    await atInstant(new Date(NOW.getTime() + 3650 * DAY_MS), async () => {
+      while ((await sweep()).subjects > 0);
+    })
+  })
+
+  /** A temporary ban with one pending post and one pending comment held under its marker. */
+  async function heldByTemporaryBan() {
+    const author = await fx.member('author')
+    const seeded = await fx.postCase({ author })
+    const { post, storage } = await pendingPostWithImage(author.id)
+    const comment = await pendingComment(author.id)
+    const applied = await ban(seeded.caseId, 'temporary')
+    const { expires_at: expiresAt } = await sanctionOf(applied.sanctionId)
+    return {
+      author,
+      seeded,
+      post,
+      storage,
+      comment,
+      applied,
+      expiresAt: expiresAt!,
+      marker: banMarker(applied.sanctionId),
+    }
+  }
+
+  const expectHeld = async (
+    held: { post: { id: string }; comment: { id: string } },
+    marker: string
+  ) => {
+    expect(await postOf(held.post.id)).toMatchObject({
+      status: 'flagged',
+      moderation_reason: marker,
+    })
+    expect(await commentOf(held.comment.id)).toMatchObject({
+      status: 'held_for_review',
+      screening_reason: marker,
+    })
+  }
+
+  const expectInScreening = async (held: {
+    post: { id: string }
+    comment: { id: string }
+  }) => {
+    expect(await postOf(held.post.id)).toMatchObject({
+      status: 'pending_review',
+      moderation_reason: null,
+      published_at: null,
+    })
+    expect(await commentOf(held.comment.id)).toMatchObject({
+      status: 'pending_screening',
+      screening_reason: null,
+      body: 'Keep this body.',
+      publication_sequence: null,
+    })
+  }
+
+  it('holds until the expiry and returns the content at the boundary, publishing nothing', async () => {
+    const held = await heldByTemporaryBan()
+
+    await atInstant(new Date(held.expiresAt.getTime() - 1), async () => {
+      expect(await sweep()).toEqual({ subjects: 0, posts: 0, comments: 0 })
+      await expectHeld(held, held.marker)
+    })
+
+    await atInstant(held.expiresAt, async () => {
+      expect(await sweep()).toEqual({ subjects: 1, posts: 1, comments: 1 })
+      await expectInScreening(held)
+    })
+  })
+
+  it('changes nothing on a second run, so a retry after a crash is safe', async () => {
+    const held = await heldByTemporaryBan()
+    await atInstant(held.expiresAt, async () => {
+      await sweep()
+      const before = await checksumTables(prisma)
+      expect(await sweep()).toEqual({ subjects: 0, posts: 0, comments: 0 })
+      expect(await checksumTables(prisma)).toEqual(before)
+    })
+  })
+
+  it('gives a returned post a fresh stall clock, so the stale review sweep does not fail it', async () => {
+    const held = await heldByTemporaryBan()
+    await atInstant(held.expiresAt, async () => {
+      await sweep()
+      const { updated_at: updatedAt } = await postOf(held.post.id)
+      expect(updatedAt.getTime()).toBeGreaterThanOrEqual(held.expiresAt.getTime())
+      await new CommunityMaintenanceService(
+        prisma,
+        held.storage as never
+      ).sweepStalePendingReview(held.expiresAt)
+      expect((await postOf(held.post.id)).status).toBe('pending_review')
+    })
+  })
+
+  it('takes the returned content through real screening to publication', async () => {
+    const held = await heldByTemporaryBan()
+    // The jobs of the first attempt were spent while the ban held the rows.
+    await prisma.communityModerationOutbox.updateMany({
+      where: { post_id: held.post.id },
+      data: { dispatched_at: held.expiresAt },
+    })
+    await prisma.communityCommentScreeningOutbox.updateMany({
+      where: { comment_id: held.comment.id },
+      data: { dispatched_at: held.expiresAt },
+    })
+
+    await atInstant(held.expiresAt, async () => {
+      await sweep()
+
+      const postJobs: string[] = []
+      await new CommunityModerationOutboxDispatcher(prisma, {
+        enqueue: (postId: string) => {
+          postJobs.push(postId)
+          return Promise.resolve()
+        },
+      }).dispatchPending()
+      expect(postJobs).toContain(held.post.id)
+
+      await new CommunityModerationProcessor(
+        prisma,
+        held.storage,
+        moderationTelemetry,
+        passingEngine() as never,
+        undefined,
+        rolloutOpen
+      ).process({ postId: held.post.id, uploadSessionId: held.post.id })
+      expect((await postOf(held.post.id)).status).toBe('published')
+
+      // A re-armed comment row waits out the outbox's 30 s pause, then dispatches.
+      await prisma.communityCommentScreeningOutbox.updateMany({
+        where: { comment_id: held.comment.id },
+        data: { updated_at: new Date(held.expiresAt.getTime() - 31_000) },
+      })
+      await atInstant(held.expiresAt, async () => {
+        const commentJobs: string[] = []
+        const processor = new CommunityCommentsProcessor(
+          prisma,
+          passingEngine() as never,
+          rolloutOpen
+        )
+        await new CommunityCommentsOutbox(
+          prisma,
+          {
+            enqueueComment: (id: string) => {
+              commentJobs.push(id)
+              return Promise.resolve()
+            },
+          } as never,
+          { captureCommentEvent: vi.fn() } as never,
+          processor
+        ).dispatchPending()
+        expect(commentJobs).toContain(held.comment.id)
+        await processor.process(held.comment.id)
+        expect((await commentOf(held.comment.id)).status).toBe('published')
+      })
+    })
+  })
+
+  it('touches only rows held by that marker', async () => {
+    const held = await heldByTemporaryBan()
+    const owner = await fx.member('owner')
+    const parent = await fx.post({ authorId: owner.id })
+    // A screening verdict on the same member, on a post and on a comment.
+    const machinePost = await fx.post({
+      authorId: held.author.id,
+      status: 'flagged',
+      moderationReason: 'unsafe_class',
+    })
+    const machineComment = await fx.comment({
+      postId: parent.id,
+      authorId: held.author.id,
+      status: 'held_for_review',
+      screeningReason: 'language',
+    })
+    // A moderator took this one down.
+    const takenDownComment = await fx.comment({
+      postId: parent.id,
+      authorId: held.author.id,
+      status: 'blocked',
+      screeningReason: 'operator_takedown',
+    })
+    // Another member's ban that is still running.
+    const other = await heldByTemporaryBanUntil(
+      new Date(held.expiresAt.getTime() + 86_400_000)
+    )
+
+    const untouched = async () => ({
+      target: await postOf(held.seeded.postId),
+      machinePost: await postOf(machinePost.id),
+      machineComment: await commentOf(machineComment.id),
+      takenDownComment: await commentOf(takenDownComment.id),
+      otherPost: await postOf(other.post.id),
+      otherComment: await commentOf(other.comment.id),
+    })
+    const before = await untouched()
+    await atInstant(held.expiresAt, async () => {
+      expect(await sweep()).toEqual({ subjects: 1, posts: 1, comments: 1 })
+      expect(await untouched()).toEqual(before)
+      await expectInScreening(held)
+    })
+    // The case target carries the moderator's reason, so it stays down.
+    expect(before.target).toMatchObject({ status: 'flagged', moderation_reason: REASON })
+  })
+
+  /** A second member, banned by direct seed so its expiry can be chosen. */
+  async function heldByTemporaryBanUntil(expiresAt: Date) {
+    const author = await fx.member('author')
+    const { post } = await pendingPostWithImage(author.id)
+    const comment = await pendingComment(author.id)
+    const sanction = await fx.sanction(author, { kind: 'temporary', expiresAt })
+    const marker = banMarker(sanction.id)
+    await prisma.lookbookPost.update({
+      where: { id: post.id },
+      data: { status: 'flagged', moderation_reason: marker },
+    })
+    await prisma.communityComment.update({
+      where: { id: comment.id },
+      data: { status: 'held_for_review', screening_reason: marker },
+    })
+    return { author, post, comment, sanction, marker }
+  }
+
+  it('leaves a withdrawn post, a deleted comment and an erased post as they are', async () => {
+    const held = await heldByTemporaryBan()
+    const client = member(held.author.id)
+    const withdrawn = await client.post(
+      `/api/v1/community/posts/${held.post.id}/withdraw`
+    )
+    expect(withdrawn.status, dump(withdrawn)).toBe(200)
+    const deleted = await client.delete(
+      `/api/v1/community/posts/${held.comment.post_id}/comments/${held.comment.id}`
+    )
+    expect(deleted.status, dump(deleted)).toBe(200)
+    const erased = await fx.post({
+      authorId: held.author.id,
+      status: 'flagged',
+      moderationReason: held.marker,
+      erasureRequestedAt: NOW,
+    })
+    const anonymized = await fx.post({
+      authorId: held.author.id,
+      status: 'flagged',
+      moderationReason: held.marker,
+      anonymizedAt: NOW,
+    })
+    const rows = async () => ({
+      withdrawn: await postOf(held.post.id),
+      deleted: await commentOf(held.comment.id),
+      erased: await postOf(erased.id),
+      anonymized: await postOf(anonymized.id),
+    })
+    const before = await rows()
+    expect(before.withdrawn.status).toBe('withdrawn')
+    expect(before.deleted.status).toBe('author_deleted')
+    await atInstant(held.expiresAt, async () => {
+      await sweep()
+      expect(await rows()).toEqual(before)
+    })
+  })
+
+  it('leaves a permanent ban as it is, also past any expiry', async () => {
+    const author = await fx.member('author')
+    const seeded = await fx.postCase({ author })
+    const { post } = await pendingPostWithImage(author.id)
+    const comment = await pendingComment(author.id)
+    const applied = await ban(seeded.caseId, 'permanent')
+    const marker = banMarker(applied.sanctionId)
+    await atInstant(new Date(NOW.getTime() + 365 * DAY_MS), async () => {
+      expect(await sweep()).toEqual({ subjects: 0, posts: 0, comments: 0 })
+      await expectHeld({ post, comment }, marker)
+    })
+  })
+
+  it('leaves what an upgrade to permanent moved to the new marker', async () => {
+    const held = await heldByTemporaryBan()
+    const staff = await admin()
+    const response = await staff.decide(
+      (await fx.postCase({ author: held.author })).caseId,
+      {
+        action: 'ban',
+        reason: REASON,
+        ban: banTerms('permanent'),
+      }
+    )
+    expect(response.status, dump(response)).toBe(200)
+    const upgraded = banMarker(decisionData(response).sanction!.sanctionId)
+    await atInstant(held.expiresAt, async () => {
+      expect(await sweep()).toEqual({ subjects: 0, posts: 0, comments: 0 })
+      await expectHeld(held, upgraded)
+    })
+  })
+
+  describe('a re-ban before the restore runs', () => {
+    /** The first ban has ended, nothing has swept, and a second ban now runs. */
+    async function rebanned() {
+      const held = await heldByTemporaryBan()
+      const rebanAt = new Date(held.expiresAt.getTime() + LATER_MS)
+      const second = await atInstant(rebanAt, async () => {
+        const seeded = await fx.postCase({ author: held.author })
+        return ban(seeded.caseId, 'temporary')
+      })
+      const { expires_at: secondEnd } = await sanctionOf(second.sanctionId)
+      return { held, rebanAt, secondEnd: secondEnd!, second }
+    }
+
+    it('keeps the content held while the newer ban runs', async () => {
+      const { held, rebanAt } = await rebanned()
+      await atInstant(new Date(rebanAt.getTime() + LATER_MS), async () => {
+        expect(await sweep()).toEqual({ subjects: 0, posts: 0, comments: 0 })
+        await expectHeld(held, held.marker)
+      })
+    })
+
+    it('returns content under both markers once the newer ban ends', async () => {
+      const { held, secondEnd, second } = await rebanned()
+      const pendingUnderSecond = await fx.post({
+        authorId: held.author.id,
+        status: 'flagged',
+        moderationReason: banMarker(second.sanctionId),
+      })
+      await atInstant(secondEnd, async () => {
+        expect(await sweep()).toEqual({ subjects: 1, posts: 2, comments: 1 })
+        await expectInScreening(held)
+        expect(await postOf(pendingUnderSecond.id)).toMatchObject({
+          status: 'pending_review',
+          moderation_reason: null,
+        })
+      })
+    })
+  })
+
+  describe('a temporary ban ended by an overturn', () => {
+    async function overturned() {
+      const held = await heldByTemporaryBan()
+      const staff = await admin()
+      for (const status of ['requested', 'overturned'] as const) {
+        const appeal = await staff.appeal(held.applied.sanctionId, {
+          status,
+          reason: REASON,
+        })
+        expect(appeal.status, dump(appeal)).toBe(200)
+      }
+      return held
+    }
+
+    it('returns held content that was never public to screening with no expiry to wait for', async () => {
+      const held = await overturned()
+      await sweep()
+      await expectInScreening(held)
+    })
+
+    it('still restores what the ban took from public view, with no second screening', async () => {
+      const held = await heldByTemporaryBan()
+      const published = await fx.post({
+        authorId: held.author.id,
+        status: 'flagged',
+        moderationReason: held.marker,
+        publishedAt: NOW,
+      })
+      const staff = await admin()
+      for (const status of ['requested', 'overturned'] as const) {
+        const appeal = await staff.appeal(held.applied.sanctionId, {
+          status,
+          reason: REASON,
+        })
+        expect(appeal.status, dump(appeal)).toBe(200)
+      }
+      await sweep()
+      expect(await postOf(published.id)).toMatchObject({
+        status: 'published',
+        moderation_reason: null,
+      })
+    })
+  })
+
+  describe('a machine reason under the marker (RG6)', () => {
+    const overturn = async (sanctionId: string) => {
+      const staff = await admin()
+      for (const status of ['requested', 'overturned'] as const) {
+        const appeal = await staff.appeal(sanctionId, { status, reason: REASON })
+        expect(appeal.status, dump(appeal)).toBe(200)
+      }
+    }
+
+    it('comes back on an overturn, on a post and on a comment', async () => {
+      const author = await fx.member('author')
+      const owner = await fx.member('owner')
+      const parent = await fx.post({ authorId: owner.id })
+      const seeded = await fx.postCase({ author })
+      const post = await fx.post({
+        authorId: author.id,
+        moderationReason: 'low_confidence',
+      })
+      const comment = await fx.comment({
+        postId: parent.id,
+        authorId: author.id,
+        screeningReason: 'language',
+      })
+      const applied = await ban(seeded.caseId, 'permanent')
+      const marker = banMarker(applied.sanctionId)
+      expect(await postOf(post.id)).toMatchObject({
+        moderation_reason: marker,
+        ban_prior_reason: 'low_confidence',
+      })
+      expect(await commentOf(comment.id)).toMatchObject({
+        screening_reason: marker,
+        ban_prior_reason: 'language',
+      })
+      await overturn(applied.sanctionId)
+      expect(await postOf(post.id)).toMatchObject({
+        status: 'published',
+        moderation_reason: 'low_confidence',
+        ban_prior_reason: null,
+      })
+      expect(await commentOf(comment.id)).toMatchObject({
+        status: 'published',
+        screening_reason: 'language',
+        ban_prior_reason: null,
+      })
+    })
+
+    it('leaves a post with no machine reason with none after an overturn', async () => {
+      const author = await fx.member('author')
+      const seeded = await fx.postCase({ author })
+      const post = await fx.post({ authorId: author.id })
+      const applied = await ban(seeded.caseId, 'permanent')
+      await overturn(applied.sanctionId)
+      expect(await postOf(post.id)).toMatchObject({
+        status: 'published',
+        moderation_reason: null,
+        ban_prior_reason: null,
+      })
+    })
+
+    it('holds nothing back when content returns to screening, which reads it afresh', async () => {
+      const held = await heldByTemporaryBan()
+      await atInstant(held.expiresAt, async () => {
+        await sweep()
+        expect((await postOf(held.post.id)).ban_prior_reason).toBeNull()
+        expect((await commentOf(held.comment.id)).ban_prior_reason).toBeNull()
+      })
+    })
+  })
+
+  it('reaches every subject across runs, whatever the batch size', async () => {
+    const end = new Date(NOW.getTime() + DAY_MS)
+    const members: Awaited<ReturnType<typeof heldByTemporaryBanUntil>>[] = []
+    for (let index = 0; index < 30; index++)
+      members.push(await heldByTemporaryBanUntil(end))
+    await atInstant(end, async () => {
+      for (let run = 0; run < 30; run++) {
+        const { subjects } = await sweep()
+        if (subjects === 0) break
+      }
+      for (const held of members) await expectInScreening(held)
     })
   })
 })
@@ -2582,7 +3052,7 @@ describe('I-A-OVERTURN: an admin overturns a ban (D10)', () => {
     expect((await postOf(seeded.postId)).status).toBe('published')
   })
 
-  it('a temporary ban overturned restores nothing but ends now', async () => {
+  it('a temporary ban overturned publishes nothing, returns held content to screening and ends now', async () => {
     const author = await fx.member('author')
     const seeded = await fx.postCase({ author })
     const held = await fx.post({ authorId: author.id, status: 'pending_review' })
@@ -2596,7 +3066,11 @@ describe('I-A-OVERTURN: an admin overturns a ban (D10)', () => {
     })
     expect(overturned.status, dump(overturned)).toBe(200)
     expect(appealData(overturned)).toMatchObject({ active: false, restoredCount: 0 })
-    expect((await postOf(held.id)).status).toBe('flagged')
+    expect(await postOf(held.id)).toMatchObject({
+      status: 'pending_review',
+      moderation_reason: null,
+      published_at: null,
+    })
     const next = await member(author.id).get(`/api/v1/community/posts/${other.id}`)
     expect(next.status, dump(next)).toBe(200)
   })
