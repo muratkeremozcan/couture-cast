@@ -197,11 +197,14 @@ export class ModerationQueueService {
     const id = parseModerationCaseId(caseId)
     if (!id) throw caseNotFound()
     const now = this.clock()
-    const loaded = await this.repository.loadCase(id)
-    if (!loaded) throw caseNotFound()
+    // One snapshot, so the revision covers exactly the reports this response displays.
+    const read = await this.decisions.describeCase(auth, caseId, (tx) =>
+      this.repository.loadCase(id, tx)
+    )
+    if (!read) throw caseNotFound()
+    const { visible: loaded, state: decisionState } = read
 
     const detail = this.buildDetail(auth, caseId, loaded, now)
-    const decisionState = await this.decisions.describeCase(auth, caseId)
 
     // The audit row comes before any signed URL: a failed audit returns no case data and no media.
     try {

@@ -1392,8 +1392,8 @@ describe('TEA-11: the detail read of a decision state', () => {
     flags.getFeatureFlag.mockImplementation(() =>
       Promise.reject(new Error('posthog down'))
     )
-    const state = await service.describeCase(MOD, 'post.p1')
-    expect(state).toMatchObject({
+    const read = await service.describeCase(MOD, 'post.p1', () => Promise.resolve(true))
+    expect(read?.state).toMatchObject({
       revision: revision(),
       allowedActions: [],
       banKinds: [],
@@ -1402,9 +1402,9 @@ describe('TEA-11: the detail read of a decision state', () => {
 
   it('offers the actions the decision path would allow when the flags are on', async () => {
     const { service } = build()
-    const state = await service.describeCase(MOD, 'post.p1')
-    expect(state.allowedActions).toEqual(['resolve', 'takedown', 'escalate', 'ban'])
-    expect(state.banKinds).toEqual(['temporary'])
+    const read = await service.describeCase(MOD, 'post.p1', () => Promise.resolve(true))
+    expect(read?.state.allowedActions).toEqual(['resolve', 'takedown', 'escalate', 'ban'])
+    expect(read?.state.banKinds).toEqual(['temporary'])
   })
 })
 

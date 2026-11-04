@@ -311,6 +311,7 @@ export class ModerationSanctionsService {
     if (existing) return this.replay(existing, payloadHash)
     if (!head) throw moderationDecisionError('sanction_not_found')
 
+    await this.repository.lockSanctionEligibility(tx, auth.userId, null)
     const at = this.clock()
     if (await findActiveCommunitySanction(tx, auth.userId, at))
       throw moderationDecisionError('operator_sanctioned')

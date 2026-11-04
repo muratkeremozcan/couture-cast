@@ -71,14 +71,24 @@ function build(loaded: LoadedCase | null = postCase()) {
     escalatedCaseKeys: vi.fn().mockResolvedValue(new Set<string>()),
   }
   const decisions = {
-    describeCase: vi.fn().mockResolvedValue({
-      revision: '0123456789abcdef',
-      allowedActions: [],
-      banKinds: [],
-      escalated: false,
-      firstDecisionAt: null,
-      subjectStanding: null,
-    }),
+    describeCase: vi.fn(
+      async (_auth: unknown, _caseId: unknown, readVisible: (tx: unknown) => unknown) => {
+        const visible = await readVisible({})
+        return visible
+          ? {
+              visible,
+              state: {
+                revision: '0123456789abcdef',
+                allowedActions: [],
+                banKinds: [],
+                escalated: false,
+                firstDecisionAt: null,
+                subjectStanding: null,
+              },
+            }
+          : null
+      }
+    ),
   }
   const storage = { signReadUrl: vi.fn().mockResolvedValue(SIGNED) }
   const clock = vi.fn(() => new Date(NOW))

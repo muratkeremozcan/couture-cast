@@ -9497,13 +9497,15 @@ Key takeaways:
    No code path updates or deletes it, and a case stays derived from reports as Step 50 designed.
    `firstDecisionAt` is the smallest `decided_at` of a terminal row matching the case key or overlapping its report ids, so a retry, a later decision or a re-key cannot move it, and an escalation cannot make a late resolution look punctual.
 2. **Lock first, then read, then compare.**
-   The transaction order is case advisory lock, replay check, case read, privacy guard, member lock, post row lock, then a re-read and the revision check.
+   The transaction order is case advisory lock, replay check, case read, sanction eligibility locks, privacy guard, member lock, post row lock, then a re-read and the revision check.
    Report intake holds only the post row lock, so a revision read before that lock could miss a report and stamp it unseen.
    The revision is 16 hex characters of a SHA-256 over the newest sequence, the sorted open report ids and the target status, so a new report, a withdrawal or another decision all move it.
    A mismatch answers 409 `case_conflict` with `currentRevision`, and nothing is written.
+   The GET reads the displayed evidence and the revision in one RepeatableRead snapshot, so a revision can only approve what the moderator saw.
 3. **A refusal order is part of the contract.**
    After input validation the order is replay or mismatch, not found, `operator_sanctioned`, `self_review_refused`, `admin_required`, `case_conflict`, `action_not_applicable`.
    The author of a target and anyone who reported it are refused for every action, admins included.
+   Every decision and appeal holds its operator's `community_sanction` advisory lock shared, and a ban holds its subject's exclusive, so two operators banning each other queue and the second answers `operator_sanctioned`.
    One function, `deriveAllowedActions`, computes what the console offers and what the route enforces, so the panel cannot offer a button the API refuses for a reason it already knew.
 4. **Idempotency survives a reload.**
    `(moderator_id, mutation_id)` is unique and `payload_hash` covers route, case or sanction id, action, trimmed reason and ban.
@@ -9533,6 +9535,7 @@ Key takeaways:
     A failed insert rolls everything back with 503 `audit_unavailable`.
 12. **The panel keeps a moderator's work.**
     One `mutationId` is minted per intent and reused on every retry of the same payload, a conflict keeps the typed reason, and focus returns to the submit button after a reload.
+    Try again leaves once the form differs from the failed attempt, because changed terms are a new intent that needs its own confirmation.
     Every outcome goes through one polite live region and is announced once in all ten web locales.
 
 Hard-won lessons from the implementation and review of this story:
@@ -9571,7 +9574,17 @@ Hard-won lessons from the implementation and review of this story:
 11. **lint-staged does not run tsc.**
     A regex wrap committed `() => await tx`, and only the next tsc run caught it.
     tsc now runs per workspace before each commit.
-12. **A file budget is a real constraint late in a story.**
+12. **Two reads of one thing can disagree inside a single response.**
+    The Codex review found the GET built its evidence and its revision from separate reads, so a report committing between them could be stamped unseen.
+    The earlier race test filed its report after a complete GET, so it passed.
+13. **Per-row locks miss a cycle across rows.**
+    Two operators banning each other touched disjoint subjects, so every existing lock passed and both actor checks read no sanction.
+    Taking the eligibility locks in id order makes the pair queue with no deadlock.
+14. **Session state includes the refusal.**
+    `clearScope` cleared a member's cards and left their sanction, so ban details outlived sign-out on a mounted page.
+15. **Two ways to learn one fact need one cleanup.**
+    The feed path cleared the weekly challenge and the socket path did not, so `closeForBan` now serves both.
+16. **A file budget is a real constraint late in a story.**
     The last UI round reached 101 changed files, so the pre-existing Sign in and Sign out fix on the notification settings page moved to `fix/notification-settings-auth-links`.
 
 Story/Task mapping:

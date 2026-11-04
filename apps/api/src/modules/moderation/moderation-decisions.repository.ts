@@ -68,6 +68,26 @@ export class ModerationDecisionsRepository {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('moderation_case:' || ${caseKey}))`
   }
 
+  /**
+   * Serializes an operator's eligibility with a ban on that operator: every decision and appeal
+   * holds its own operator's lock shared, and a ban holds its subject's lock exclusive.
+   * Taking them in id order means two operators banning each other queue instead of deadlocking,
+   * and the second one re-reads the first one's sanction.
+   */
+  async lockSanctionEligibility(
+    tx: Tx,
+    operatorId: string,
+    banSubjectId: string | null
+  ): Promise<void> {
+    const ids = [...new Set([operatorId, ...(banSubjectId ? [banSubjectId] : [])])].sort()
+    for (const id of ids) {
+      if (id === banSubjectId)
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_sanction:' || ${id}))`
+      else
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtext('community_sanction:' || ${id}))`
+    }
+  }
+
   findByMutation(
     tx: Tx,
     moderatorId: string,

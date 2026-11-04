@@ -1,9 +1,15 @@
 // Story 6.11 owner: applying one moderation decision to a whole case in `apps/api/src/modules/moderation/moderation-decisions.service.ts`.
 // One decision is one transaction: target change, report stamps, sanction, decision row and audit row commit together.
-// The order inside it is the serialization proof: case lock, replay, case read, privacy guard, member lock, post row lock, then the revision read.
+// The order inside it is the serialization proof: case lock, replay, case read, sanction eligibility locks, privacy guard, member lock, post row lock, then the revision read.
 // Report intake takes only the post row lock, so a revision read any earlier could stamp a report nobody reviewed.
 import { randomUUID } from 'node:crypto'
-import { ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common'
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common'
 import { PrismaClient, type Prisma } from '@prisma/client'
 import {
   deriveAllowedActions,
@@ -91,6 +97,13 @@ function afterCommitPlan(outcome: DecisionOutcome): AfterCommitPlan {
   }
 }
 
+/** Read-only, so no write can fail it, and short enough that one read never holds a connection long. */
+const CASE_SNAPSHOT_OPTIONS = {
+  isolationLevel: 'RepeatableRead',
+  timeout: 7000,
+  maxWait: 1000,
+} as const
+
 @Injectable()
 export class ModerationDecisionsService {
   private readonly logger = new Logger(ModerationDecisionsService.name)
@@ -143,74 +156,98 @@ export class ModerationDecisionsService {
     })
   }
 
-  /** The decision fields of a case detail, computed by the rule the decision path enforces. */
-  async describeCase(
+  /**
+   * The decision fields of a case detail, computed by the rule the decision path enforces.
+   * `readVisible` loads what the caller displays. It runs in this method's snapshot, so the revision
+   * cannot cover a report that committed after the displayed evidence was read.
+   * Answers null when the case does not exist.
+   */
+  async describeCase<Visible>(
     auth: RequestAuthContext,
-    caseId: string
-  ): Promise<ModerationCaseDecisionState> {
+    caseId: string,
+    readVisible: (tx: Tx) => Promise<Visible | null>
+  ): Promise<{ visible: Visible; state: ModerationCaseDecisionState } | null> {
     const id = parseModerationCaseId(caseId)
-    const loaded = id ? await this.repository.loadCase(this.prisma, id) : null
-    if (!loaded) throw moderationDecisionError('case_not_found')
+    if (!id) return null
     const now = this.clock()
-    const subject = decisionCaseSubject(loaded)
-    const history = summarizeDecisionHistory(
-      await this.repository.decisionHistory(
-        this.prisma,
-        caseId,
-        loaded.reports.map((report) => report.id)
-      ),
-      caseId
-    )
-    const sanctions = subject
-      ? await this.repository.sanctionsOf(this.prisma, subject)
-      : []
-    const active = subject
-      ? await findActiveCommunitySanction(this.prisma, subject, now)
-      : null
+    const read = await this.prisma.$transaction(async (tx) => {
+      const visible = await readVisible(tx)
+      const loaded = visible ? await this.repository.loadCase(tx, id) : null
+      if (!visible || !loaded) return null
+      const subject = decisionCaseSubject(loaded)
+      const history = summarizeDecisionHistory(
+        await this.repository.decisionHistory(
+          tx,
+          caseId,
+          loaded.reports.map((report) => report.id)
+        ),
+        caseId
+      )
+      const sanctions = subject ? await this.repository.sanctionsOf(tx, subject) : []
+      const active = subject ? await findActiveCommunitySanction(tx, subject, now) : null
+      const newest = sanctions[0]
+      return {
+        visible,
+        loaded,
+        subject,
+        history,
+        sanctions,
+        active,
+        newest,
+        availability: await this.availabilityInput(tx, auth, loaded, {
+          escalated: history.escalated,
+          subjectBan: active?.kind ?? null,
+          writesOpen: false,
+          now,
+        }),
+        appealConflict: newest
+          ? await this.sanctions.appealViewerConflict(tx, auth.userId, newest)
+          : false,
+      }
+    }, CASE_SNAPSHOT_OPTIONS)
+    if (!read) return null
+
+    // Flags are external state, so they resolve after the snapshot closes.
+    const { loaded, subject, history, sanctions, active, newest } = read
     const decisionsOpen = await this.decisionsFlagOpen(auth.userId)
-    const availability = await this.availabilityInput(this.prisma, auth, loaded, {
-      escalated: history.escalated,
-      subjectBan: active?.kind ?? null,
+    const availability = {
+      ...read.availability,
       writesOpen: decisionsOpen ? await this.writesOpenFor(subject) : false,
-      now,
-    })
-    const newest = sanctions[0]
+    }
     return {
-      revision: computeModerationCaseRevision({
-        sequence: history.sequence,
-        openReportIds: decisionCaseOpenReportIds(loaded),
-        targetStatus: decisionCaseTargetStatus(loaded),
-      }),
-      ...(decisionsOpen
-        ? deriveAllowedActions(availability)
-        : { allowedActions: [], banKinds: [] }),
-      escalated: history.escalated,
-      firstDecisionAt: history.firstDecisionAt?.toISOString() ?? null,
-      subjectStanding: subject
-        ? {
-            active: active !== null,
-            sanction: newest ? toModerationSanction(newest) : null,
-            priorBanCount: Math.max(sanctions.length - 1, 0),
-            allowedAppealSteps:
-              decisionsOpen && newest
-                ? deriveAllowedAppealSteps({
-                    role: availability.role,
-                    viewerConflict: await this.sanctions.appealViewerConflict(
-                      this.prisma,
-                      auth.userId,
-                      newest
-                    ),
-                    operatorSanctioned: availability.operatorSanctioned,
-                    sanctionActive: active?.id === newest.id,
-                    appealStatus: newest.appeal_status,
-                  })
-                : [],
-          }
-        : null,
+      visible: read.visible,
+      state: {
+        revision: computeModerationCaseRevision({
+          sequence: history.sequence,
+          openReportIds: decisionCaseOpenReportIds(loaded),
+          targetStatus: decisionCaseTargetStatus(loaded),
+        }),
+        ...(decisionsOpen
+          ? deriveAllowedActions(availability)
+          : { allowedActions: [], banKinds: [] }),
+        escalated: history.escalated,
+        firstDecisionAt: history.firstDecisionAt?.toISOString() ?? null,
+        subjectStanding: subject
+          ? {
+              active: active !== null,
+              sanction: newest ? toModerationSanction(newest) : null,
+              priorBanCount: Math.max(sanctions.length - 1, 0),
+              allowedAppealSteps:
+                decisionsOpen && newest
+                  ? deriveAllowedAppealSteps({
+                      role: availability.role,
+                      viewerConflict: read.appealConflict,
+                      operatorSanctioned: availability.operatorSanctioned,
+                      sanctionActive: active?.id === newest.id,
+                      appealStatus: newest.appeal_status,
+                    })
+                  : [],
+            }
+          : null,
+      },
     }
   }
 
-  /** A failure on the GET leaves the read working with no action offered. The POST answers 503. */
   private async decisionsFlagOpen(userId: string): Promise<boolean> {
     try {
       return await this.flags.getFeatureFlag('moderation_decisions_enabled', userId)
@@ -365,6 +402,11 @@ export class ModerationDecisionsService {
     const before = await this.repository.loadCase(tx, id)
     if (!before) throw moderationDecisionError('case_not_found')
 
+    await this.repository.lockSanctionEligibility(
+      tx,
+      auth.userId,
+      input.action === 'ban' ? decisionCaseSubject(before) : null
+    )
     await this.takeTargetLocks(tx, before, input.action)
 
     // Everything below reads the case as the locks now hold it.
@@ -572,7 +614,15 @@ export class ModerationDecisionsService {
       if (subject)
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${subject}))`
     }
-    if (postId) await this.operator.lockPost(tx, postId)
+    if (!postId) return
+    try {
+      await this.operator.lockPost(tx, postId)
+    } catch (error) {
+      // Erasure removed the post after the first read, and its case key is gone with it.
+      if (error instanceof NotFoundException)
+        throw moderationDecisionError('case_not_found')
+      throw error
+    }
   }
 
   /** Applies the action and returns the target's status afterwards. */

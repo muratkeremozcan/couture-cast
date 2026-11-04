@@ -39,13 +39,27 @@ export interface DecisionFailureState {
 }
 
 /** The sentence and the recovery of one failure. Shared with the appeal form. */
+function decisionPayload(
+  action: ModerationDecisionAction,
+  reason: string,
+  banKind: ModerationSanctionKind,
+  durationDays: Duration
+) {
+  const ban =
+    banKind === 'temporary'
+      ? { kind: 'temporary' as const, durationDays }
+      : { kind: 'permanent' as const }
+  return { action, reason, ...(action === 'ban' ? { ban } : {}) }
+}
+
 export function DecisionFailureNotice({
   state,
   onRetry,
   onReload,
 }: {
   state: DecisionFailureState
-  onRetry: () => void
+  /** Absent once the form no longer matches the failed attempt, because a retry sends that attempt. */
+  onRetry?: () => void
   onReload: () => void
 }) {
   const { t } = useModerationTranslation()
@@ -60,13 +74,15 @@ export function DecisionFailureNotice({
     >
       <p>{message}</p>
       {retryable ? (
-        <button
-          type="button"
-          className={`${moderationControl} self-start`}
-          onClick={onRetry}
-        >
-          {t('moderation.state.retry')}
-        </button>
+        onRetry ? (
+          <button
+            type="button"
+            className={`${moderationControl} self-start`}
+            onClick={onRetry}
+          >
+            {t('moderation.state.retry')}
+          </button>
+        ) : null
       ) : (
         <button
           type="button"
@@ -188,6 +204,7 @@ export function ModerationDecisionPanel({
   const [confirming, setConfirming] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [failure, setFailure] = useState<DecisionFailureState | null>(null)
+  const failedPayload = useRef<string | null>(null)
   const inFlight = useRef(false)
   const submitRef = useRef<HTMLButtonElement>(null)
   const keeper = useMemo(() => createMutationIdKeeper(), [])
@@ -215,16 +232,14 @@ export function ModerationDecisionPanel({
   const trimmed = reason.trim()
   const reasonValid = isValidReason(trimmed)
 
+  const payload = decisionPayload(action, trimmed, banKind, durationDays)
+  const payloadKey = JSON.stringify(payload)
+
   const send = async () => {
     if (inFlight.current || !reasonValid) return
     inFlight.current = true
     setSubmitting(true)
     setFailure(null)
-    const ban =
-      banKind === 'temporary'
-        ? { kind: 'temporary' as const, durationDays }
-        : { kind: 'permanent' as const }
-    const payload = { action, reason: trimmed, ...(action === 'ban' ? { ban } : {}) }
     const input = {
       ...payload,
       mutationId: keeper.idFor(payload),
@@ -238,6 +253,7 @@ export function ModerationDecisionPanel({
       onApplied(decisionOutcomeMessage(result, t, i18n.language))
     } catch (error) {
       const next = moderationDecisionFailure(error)
+      failedPayload.current = payloadKey
       // That id belongs to a different request, so retrying with it can only fail again.
       if (next.failure === 'idempotency_mismatch') keeper.clear()
       setFailure(next)
@@ -338,7 +354,8 @@ export function ModerationDecisionPanel({
         {failure ? (
           <DecisionFailureNotice
             state={failure}
-            onRetry={() => void send()}
+            // Changed terms are a new intent, so they go back through Apply and its confirmation.
+            onRetry={failedPayload.current === payloadKey ? () => void send() : undefined}
             onReload={() => {
               focusSubmit.current = true
               onReload()

@@ -2235,6 +2235,20 @@ export function CommunityLookbookGrid({
     announcedDuringReadRef.current = feedGenerationRef.current
     setAnnouncements(message ? [message] : [])
   }, [])
+  /** Every path that learns of a ban leaves the same page: the notice and nothing of the feed. */
+  const closeForBan = useCallback(
+    (sanction: CommunityBannedError['sanction']) => {
+      setBannedSanction(sanction)
+      setItems([])
+      setAuthorStates([])
+      setActiveChallenge(null)
+      setNextCursor(null)
+      setFeedError(null)
+      // The notice mounts with its words, which a screen reader may not hear, so the live region says it.
+      setAnnouncement({ key: 'community.error.banned' })
+    },
+    [setAnnouncement]
+  )
   /**
    * The feed's own messages. The loading message always starts a fresh list; the completion
    * message joins the list when something else was announced during the same read, a
@@ -2568,15 +2582,7 @@ export function CommunityLookbookGrid({
         }
         const sanction = communitySanctionOf(error)
         if (sanction) {
-          setBannedSanction(sanction)
-          setItems([])
-          setAuthorStates([])
-          setActiveChallenge(null)
-          setNextCursor(null)
-          setFeedError(null)
-          // The notice mounts with its words, which a screen reader may not hear, so the page's
-          // live region says it.
-          setAnnouncement({ key: 'community.error.banned' })
+          closeForBan(sanction)
           return
         }
         const message = messageForError(
@@ -2596,6 +2602,7 @@ export function CommunityLookbookGrid({
     [
       announceFeed,
       applyLiveSponsorship,
+      closeForBan,
       liveSponsorships,
       reactionState,
       revalidateHighlighted,
@@ -2617,6 +2624,8 @@ export function CommunityLookbookGrid({
       // A teaser intent and its notice belong to the member who tapped it.
       setPendingFocus(null)
       setSpotlightNotice(null)
+      // A sanction names one member's ban, its expiry and appeal, so it leaves with that member.
+      setBannedSanction(null)
       setItems([])
       itemsRef.current = []
       setAuthorStates([])
@@ -2897,8 +2906,7 @@ export function CommunityLookbookGrid({
               (error: unknown) => {
                 const sanction = communitySanctionOf(error)
                 if (!active || !sanction) return
-                setBannedSanction(sanction)
-                setAnnouncement({ key: 'community.error.banned' })
+                closeForBan(sanction)
               }
             )
         }
@@ -2929,6 +2937,7 @@ export function CommunityLookbookGrid({
     }
   }, [
     applyLiveSponsorship,
+    closeForBan,
     liveSponsorships,
     comments,
     currentMode,
