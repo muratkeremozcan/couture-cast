@@ -244,6 +244,7 @@ export const createService = (
   const findAuthorPostStates = vi.fn().mockResolvedValue(authorPosts)
   const findActiveChallenge = vi.fn().mockResolvedValue(challenge)
   const findPostByIdempotencyKey = vi.fn().mockResolvedValue(null)
+  const renewDraftUpload = vi.fn().mockResolvedValue(true)
   const createPostDraft = vi
     .fn()
     .mockImplementation((data) =>
@@ -350,6 +351,7 @@ export const createService = (
     findAuthorPostStates,
     findActiveChallenge,
     findPostByIdempotencyKey,
+    renewDraftUpload,
     createPostDraft,
     findPostById,
     updatePost,
@@ -427,6 +429,7 @@ export const createService = (
     findAuthorPostStates,
     findActiveChallenge,
     findPostByIdempotencyKey,
+    renewDraftUpload,
     createPostDraft,
     findPostById,
     updatePost,

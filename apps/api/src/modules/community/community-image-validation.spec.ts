@@ -1,10 +1,11 @@
 // Learning path Step 38: Community feed by climate band.
 import { createHash } from 'node:crypto'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import sharp from 'sharp'
 import {
   CommunityImageValidationError,
   verifyAndNormalizeCommunityImage,
+  verifyCommunityImage,
 } from './community-image-validation'
 
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
@@ -142,4 +143,62 @@ describe('verifyAndNormalizeCommunityImage', () => {
       })
     ).rejects.toBeInstanceOf(CommunityImageValidationError)
   })
+})
+
+describe('verifyCommunityImage', () => {
+  let complete: Buffer
+
+  const declarationOf = (bytes: Buffer) => ({
+    byteSize: bytes.length,
+    mimeType: 'image/jpeg' as const,
+    sha256: sha256(bytes),
+  })
+  const encoders = ['toFormat', 'jpeg', 'png', 'webp'] as const
+  const encodes = () => {
+    const prototype = sharp.prototype as Record<(typeof encoders)[number], () => unknown>
+    return encoders.map((encoder) => vi.spyOn(prototype, encoder))
+  }
+  const expectNoEncode = (spies: ReturnType<typeof encodes>) => {
+    for (const spy of spies) expect(spy).not.toHaveBeenCalled()
+  }
+
+  beforeAll(async () => {
+    const pixels = Buffer.from(
+      Array.from({ length: 512 * 640 * 3 }, (_, index) => (index * 2654435761) % 251)
+    )
+    complete = await sharp(pixels, { raw: { width: 512, height: 640, channels: 3 } })
+      .jpeg({ quality: 90 })
+      .toBuffer()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('accepts a complete image and encodes nothing', async () => {
+    const spy = encodes()
+    await expect(
+      verifyCommunityImage(complete, declarationOf(complete))
+    ).resolves.toEqual({ mimeType: 'image/jpeg' })
+    expectNoEncode(spy)
+  })
+
+  it.each([
+    ['a quarter', 0.25],
+    ['half', 0.5],
+    ['nearly all', 0.98],
+  ])(
+    'refuses a matching declaration when only %s of the bytes arrived, though the header reads',
+    async (_label, fraction) => {
+      const truncated = complete.subarray(0, Math.floor(complete.length * fraction))
+      const metadata = await sharp(truncated).metadata()
+      expect(metadata.width, 'the fixture must keep a readable header').toBe(512)
+
+      const spy = encodes()
+      await expect(
+        verifyCommunityImage(truncated, declarationOf(truncated))
+      ).rejects.toMatchObject({ code: 'IMAGE_DECODE_FAILED' })
+      expectNoEncode(spy)
+    }
+  )
 })

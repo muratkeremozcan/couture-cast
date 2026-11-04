@@ -847,6 +847,36 @@ Seeded defects at `0eca2d75`, each run against the R7 tests in a throwaway workt
 | Late-write window of zero             | 4, among them the window and the full reserve-to-sweep run |
 | Validation encodes again              | 1: encodes once, and not on a retry                        |
 
+### Codex round 8
+
+R8-1 lives in `community-storage-capability.integration.spec.ts`, run by `npm run test:community-storage -w apps/api` in the real-session job, the one with local Supabase.
+It uses the real adapter, real local Storage v1.32.0 and a real migrated Postgres.
+Local Storage mints a fixed 2 hour token and ignores a requested expiry.
+So expiry cases re-sign a token storage really minted, changing only its times, and a control with a future expiry must pass.
+Sweeps take an injected clock, so 6 hours and 73 hours pass without a real wait.
+
+| Probe on local Storage                 | Result                                                          |
+| :------------------------------------- | :-------------------------------------------------------------- |
+| Expired token, through Kong and direct | 400 InvalidJWT, nothing written                                 |
+| Token for another path                 | 400 InvalidSignature, nothing written                           |
+| Upsert token used twice                | Overwrites                                                      |
+| Same token after a delete              | Recreates the object, which is why the final delete waits       |
+| 8 s body on a 3 s token, through Kong  | Refused: Kong buffers, and Storage checks on arrival            |
+| Same slow body, direct to port 5000    | 200, written after expiry: Storage checks once at request start |
+| 70 s gap inside the body, through Kong | Connection closed, nothing written                              |
+| 20 s gaps, direct to port 5000         | 200 after 40 s, written after expiry                            |
+
+The 6 hour window therefore rests on the gateway for a stalled request: 2 hours of token lifetime and 4 hours of margin.
+Not exercised: hosted Supabase, its gateway, and a real 2 hour wait.
+The adapter failing closed on a token above 2 hours is unit tested, because local Storage cannot mint one.
+
+R8-2 has a noisy 512 by 640 JPEG cut to a quarter, half and 98 percent, each with a readable header and a matching declaration.
+Each returns IMAGE_DECODE_FAILED with no call to `toFormat`, `jpeg`, `png` or `webp`.
+
+The late client upload runs in the same suite: past the old 15 minute sweep point the row stays, the client's real token writes, erasure removes the object, and a second write inside the window goes at the final delete.
+With no erasure the draft and its object go once the token is dead, and a replay renewal keeps the row for the token it mints.
+Publish refusal past the 15 minute expiry stays pinned by the two boundary tests in `community.service.publishing.spec.ts`.
+
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
 Those failures were my setup, and the rerun below is the evidence.

@@ -2234,6 +2234,38 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         ).toMatchObject({ hidden: 0, anonymized: 0, objectsPurged: 0, overdue: 0 })
       })
 
+      it('R8-1 mints a fresh token before each reservation and writes through it', async () => {
+        const { post, storage } = await pendingAuthor()
+        const atMint: (string | null)[] = []
+        const minted: { token: string }[] = []
+        storage.createOverwriteCapability = async (objectPath: string) => {
+          atMint.push((await postOf(post.id)).image_pending_checksum)
+          const capability = {
+            objectPath,
+            token: `token-${minted.length}`,
+            expiresAt: LATER(NOW, 60_000),
+          }
+          minted.push(capability)
+          return capability
+        }
+        const used: { token: string }[] = []
+        storage.upload = (_path, _bytes, _mime, capability) => {
+          used.push(capability)
+          return used.length === 1
+            ? Promise.reject(new Error('worker lost'))
+            : Promise.resolve()
+        }
+        await expect(
+          processorWith(storage, passingEngine()).process(job(post, 0))
+        ).rejects.toThrow('worker lost')
+        expect(atMint[0], 'minted after the reservation').toBeNull()
+        expect(used[0]).toBe(minted[0])
+
+        await processorWith(storage, passingEngine()).process(job(post, 0))
+        expect(minted, 'the second attempt mints its own').toHaveLength(2)
+        expect(used[1]).toBe(minted[1])
+      })
+
       it('holds the obligation open until the window passes, inside the 72 hour deadline', async () => {
         const { post, storage } = await pendingAuthor()
         await requestErasure(post)
