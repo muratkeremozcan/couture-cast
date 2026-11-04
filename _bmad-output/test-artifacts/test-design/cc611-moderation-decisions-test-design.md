@@ -20,7 +20,7 @@ lastSaved: '2026-11-04'
 
 **Date:** 2026-11-04
 **Author:** Murat (TEA), non-interactive run, owner unavailable, decisions recorded in the spec
-**Status:** Task 1 plan, built and executed. Signed off at `3a23e2cc`, results under Execution results. Reconciled to the spec and its Spec Change Log entries TEA-01 to TEA-22.
+**Status:** Task 1 plan, built and executed. Fix round 1 confirmed at `5cbf216f`, results under Execution results and Fix round 1. Reconciled to the spec and its Spec Change Log entries TEA-01 to TEA-22.
 
 **Precedence:** the spec at `_bmad-output/implementation-artifacts/spec-6-11-moderation-decisions-account-sanctions.md` wins wherever this document and the spec disagree.
 The frozen block is byte-identical to the builder's draft.
@@ -667,6 +667,43 @@ Outside this PR, for the coordinator:
 - `epic-6-context.md` needs its story update after merge.
 - `chip-navigation.tsx` pills overrun at 375 px, and a 1 px dark line shows at x=0 (unverified).
 - The `faker` email collision in `packages/testing` can still hit other suites that create many users.
+
+---
+
+### Fix round 1: independent review of `4cf4b128`
+
+Codex found six defects that the plan's tests missed, and each now has a regression test that was red before its fix.
+All six reproduced, including C2 on a real database, which the review had only traced.
+
+| Finding | Red at `4cf4b128`                                                                    | Regression tests                                                                  |
+| ------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| C1      | A resolve stamped a report the GET never displayed, on post and comment cases        | I-C-SPLIT-READ (2)                                                                |
+| C2      | `[200, 200]` on reciprocal bans, on the first unforced round; an appeal did not wait | I-C-RECIPROCAL-BAN (3)                                                            |
+| C3      | The sanction and its announcement stayed after sign-out, erasure and account switch  | "a change of identity while the notice shows" (4), "a probe still out" (3)        |
+| C4      | A retry sent changed terms with a new id and no confirmation                         | C-WEB-D-CONFIRM "a retry once the confirmed terms have changed" (8 plus 2 guards) |
+| C5      | The weekly challenge stayed beside a ban learned from the socket                     | "takes the weekly challenge and its Participate button with it"                   |
+| C6      | Erasure during locking answered the legacy 404 with no closed code                   | I-C-ERASE-IN-FLIGHT (3)                                                           |
+
+The first fix for C3 left the ban announcement in the live region, and a late socket probe could restore the notice; both were fixed in `82ea15b6`, with the probe red at `6687e258`.
+The sign-out probe case passed before that fix, so it is a guard, shown able to fail by removing the `!active` check.
+The full-tier rerun then caught F23: the C1 fix called `$transaction` directly, which `prisma-client.guard.spec.ts` refuses.
+
+Three consecutive full runs at `5cbf216f`, with no failure, retry or flake:
+
+| Suite                                                                 | Result on each of three runs              |
+| --------------------------------------------------------------------- | ----------------------------------------- |
+| `apps/api` whole tier, units and integration                          | 7887 passed, 28 skipped, 362 of 365 files |
+| `packages/api-client`                                                 | 1580 passed                               |
+| `packages/config`                                                     | 29 passed                                 |
+| `packages/db`, RLS, constraints and backfill                          | 266 passed, 1 skipped                     |
+| `apps/web`                                                            | 1825 passed                               |
+| `apps/mobile`                                                         | 1905 passed                               |
+| Pact consumer and provider                                            | 444 passed and verification passed        |
+| Playwright: `moderation-decisions`, `moderation-console`, role matrix | 62 passed, 1 skipped                      |
+
+TypeScript is clean in every workspace, ESLint is clean on the changed files, and all five `node-test-gate` suites pass.
+The earlier limits still apply: nothing has run on a deployed preview.
+One new limit: `couture:account-erased` has no dispatcher in `apps/` or `packages/`, so production may never reach the erasure path C3's erasure tests cover.
 
 ---
 
