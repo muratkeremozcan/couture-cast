@@ -9,7 +9,7 @@ import type {
 } from '@prisma/client'
 import type { ModerationCaseTargetState } from '@couture/api-client/contracts/http'
 import type { ParsedCaseId } from './moderation-queue.repository.js'
-import type { DecisionHistoryRow } from './moderation-decision-rules.js'
+import { inDecisionOrder, type DecisionHistoryRow } from './moderation-decision-rules.js'
 
 type Tx = Prisma.TransactionClient
 
@@ -240,11 +240,19 @@ export async function escalatedCaseKeys(
         in: ['resolve', 'release', 'takedown', 'ban', 'escalate'],
       },
     },
-    orderBy: [{ decided_at: 'asc' }, { sequence: 'asc' }],
-    select: { case_key: true, action: true, report_ids: true },
+    select: {
+      case_key: true,
+      action: true,
+      report_ids: true,
+      sequence: true,
+      decided_at: true,
+    },
   })
   const escalated = new Set<string>()
-  for (const row of rows) {
+  const ordered = inDecisionOrder(
+    rows.map((row) => ({ ...row, caseKey: row.case_key, decidedAt: row.decided_at }))
+  )
+  for (const row of ordered) {
     const keys = new Set<string>()
     if (caseKeys.includes(row.case_key)) keys.add(row.case_key)
     for (const report of row.report_ids) {

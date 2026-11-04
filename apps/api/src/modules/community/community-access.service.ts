@@ -139,11 +139,15 @@ export async function assertCommunityMemberNotSanctioned(
     statusCode: 403,
     code: 'community_banned',
     message: COMMUNITY_BANNED_MESSAGE,
-    sanction: {
-      kind: sanction.kind,
-      expiresAt: sanction.expires_at?.toISOString() ?? null,
-      appealStatus: sanction.appeal_status,
-    },
+    // A CHECK on the row ties a temporary ban to an expiry.
+    sanction:
+      sanction.kind === 'temporary'
+        ? {
+            kind: 'temporary',
+            expiresAt: (sanction.expires_at as Date).toISOString(),
+            appealStatus: sanction.appeal_status,
+          }
+        : { kind: 'permanent', expiresAt: null, appealStatus: sanction.appeal_status },
   }
   throw new ForbiddenException(body)
 }

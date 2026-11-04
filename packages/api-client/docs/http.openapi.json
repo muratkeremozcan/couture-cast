@@ -18369,47 +18369,82 @@
                     "type": "boolean"
                   },
                   "sanction": {
-                    "type": [
-                      "object",
-                      "null"
-                    ],
-                    "properties": {
-                      "sanctionId": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      },
-                      "kind": {
-                        "type": "string",
-                        "enum": [
-                          "temporary",
-                          "permanent"
-                        ]
-                      },
-                      "expiresAt": {
-                        "type": [
-                          "string",
-                          "null"
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "sanctionId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "temporary"
+                            ]
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "appealStatus": {
+                            "type": "string",
+                            "enum": [
+                              "not_requested",
+                              "requested",
+                              "upheld",
+                              "overturned"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "sanctionId",
+                          "kind",
+                          "expiresAt",
+                          "appealStatus"
                         ],
-                        "format": "date-time"
+                        "additionalProperties": false
                       },
-                      "appealStatus": {
-                        "type": "string",
-                        "enum": [
-                          "not_requested",
-                          "requested",
-                          "upheld",
-                          "overturned"
-                        ]
+                      {
+                        "type": "object",
+                        "properties": {
+                          "sanctionId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "permanent"
+                            ]
+                          },
+                          "expiresAt": {
+                            "type": "null"
+                          },
+                          "appealStatus": {
+                            "type": "string",
+                            "enum": [
+                              "not_requested",
+                              "requested",
+                              "upheld",
+                              "overturned"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "sanctionId",
+                          "kind",
+                          "expiresAt",
+                          "appealStatus"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
                       }
-                    },
-                    "required": [
-                      "sanctionId",
-                      "kind",
-                      "expiresAt",
-                      "appealStatus"
-                    ],
-                    "additionalProperties": false
+                    ]
                   },
                   "priorBanCount": {
                     "type": "integer",
@@ -18513,7 +18548,7 @@
                 "type": "string",
                 "minLength": 3,
                 "maxLength": 1000,
-                "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18545,7 +18580,7 @@
                 "type": "string",
                 "minLength": 3,
                 "maxLength": 1000,
-                "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18577,7 +18612,7 @@
                 "type": "string",
                 "minLength": 3,
                 "maxLength": 1000,
-                "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18609,7 +18644,7 @@
                 "type": "string",
                 "minLength": 3,
                 "maxLength": 1000,
-                "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18641,7 +18676,7 @@
                 "type": "string",
                 "minLength": 3,
                 "maxLength": 1000,
-                "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18787,47 +18822,82 @@
                 "maxLength": 64
               },
               "sanction": {
-                "type": [
-                  "object",
-                  "null"
-                ],
-                "properties": {
-                  "sanctionId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
-                  },
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "temporary",
-                      "permanent"
-                    ]
-                  },
-                  "expiresAt": {
-                    "type": [
-                      "string",
-                      "null"
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "sanctionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "temporary"
+                        ]
+                      },
+                      "expiresAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "appealStatus": {
+                        "type": "string",
+                        "enum": [
+                          "not_requested",
+                          "requested",
+                          "upheld",
+                          "overturned"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "sanctionId",
+                      "kind",
+                      "expiresAt",
+                      "appealStatus"
                     ],
-                    "format": "date-time"
+                    "additionalProperties": false
                   },
-                  "appealStatus": {
-                    "type": "string",
-                    "enum": [
-                      "not_requested",
-                      "requested",
-                      "upheld",
-                      "overturned"
-                    ]
+                  {
+                    "type": "object",
+                    "properties": {
+                      "sanctionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "permanent"
+                        ]
+                      },
+                      "expiresAt": {
+                        "type": "null"
+                      },
+                      "appealStatus": {
+                        "type": "string",
+                        "enum": [
+                          "not_requested",
+                          "requested",
+                          "upheld",
+                          "overturned"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "sanctionId",
+                      "kind",
+                      "expiresAt",
+                      "appealStatus"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
                   }
-                },
-                "required": [
-                  "sanctionId",
-                  "kind",
-                  "expiresAt",
-                  "appealStatus"
-                ],
-                "additionalProperties": false
+                ]
               },
               "replayed": {
                 "type": "boolean"
@@ -18877,7 +18947,7 @@
             "type": "string",
             "minLength": 3,
             "maxLength": 1000,
-            "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+            "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
           },
           "mutationId": {
             "type": "string",
@@ -18907,44 +18977,79 @@
                 "format": "date-time"
               },
               "sanction": {
-                "type": "object",
-                "properties": {
-                  "sanctionId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
-                  },
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "temporary",
-                      "permanent"
-                    ]
-                  },
-                  "expiresAt": {
-                    "type": [
-                      "string",
-                      "null"
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "sanctionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "temporary"
+                        ]
+                      },
+                      "expiresAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "appealStatus": {
+                        "type": "string",
+                        "enum": [
+                          "not_requested",
+                          "requested",
+                          "upheld",
+                          "overturned"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "sanctionId",
+                      "kind",
+                      "expiresAt",
+                      "appealStatus"
                     ],
-                    "format": "date-time"
+                    "additionalProperties": false
                   },
-                  "appealStatus": {
-                    "type": "string",
-                    "enum": [
-                      "not_requested",
-                      "requested",
-                      "upheld",
-                      "overturned"
-                    ]
+                  {
+                    "type": "object",
+                    "properties": {
+                      "sanctionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "permanent"
+                        ]
+                      },
+                      "expiresAt": {
+                        "type": "null"
+                      },
+                      "appealStatus": {
+                        "type": "string",
+                        "enum": [
+                          "not_requested",
+                          "requested",
+                          "upheld",
+                          "overturned"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "sanctionId",
+                      "kind",
+                      "expiresAt",
+                      "appealStatus"
+                    ],
+                    "additionalProperties": false
                   }
-                },
-                "required": [
-                  "sanctionId",
-                  "kind",
-                  "expiresAt",
-                  "appealStatus"
-                ],
-                "additionalProperties": false
+                ]
               },
               "active": {
                 "type": "boolean"
@@ -19055,38 +19160,67 @@
             "minLength": 1
           },
           "sanction": {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "temporary",
-                  "permanent"
-                ]
-              },
-              "expiresAt": {
-                "type": [
-                  "string",
-                  "null"
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "temporary"
+                    ]
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "appealStatus": {
+                    "type": "string",
+                    "enum": [
+                      "not_requested",
+                      "requested",
+                      "upheld",
+                      "overturned"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "expiresAt",
+                  "appealStatus"
                 ],
-                "format": "date-time"
+                "additionalProperties": false
               },
-              "appealStatus": {
-                "type": "string",
-                "enum": [
-                  "not_requested",
-                  "requested",
-                  "upheld",
-                  "overturned"
-                ]
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "permanent"
+                    ]
+                  },
+                  "expiresAt": {
+                    "type": "null"
+                  },
+                  "appealStatus": {
+                    "type": "string",
+                    "enum": [
+                      "not_requested",
+                      "requested",
+                      "upheld",
+                      "overturned"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "expiresAt",
+                  "appealStatus"
+                ],
+                "additionalProperties": false
               }
-            },
-            "required": [
-              "kind",
-              "expiresAt",
-              "appealStatus"
-            ],
-            "additionalProperties": false
+            ]
           }
         },
         "required": [
@@ -29981,47 +30115,82 @@
                               "type": "boolean"
                             },
                             "sanction": {
-                              "type": [
-                                "object",
-                                "null"
-                              ],
-                              "properties": {
-                                "sanctionId": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 64
-                                },
-                                "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "temporary",
-                                    "permanent"
-                                  ]
-                                },
-                                "expiresAt": {
-                                  "type": [
-                                    "string",
-                                    "null"
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "sanctionId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 64
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "temporary"
+                                      ]
+                                    },
+                                    "expiresAt": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "appealStatus": {
+                                      "type": "string",
+                                      "enum": [
+                                        "not_requested",
+                                        "requested",
+                                        "upheld",
+                                        "overturned"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "sanctionId",
+                                    "kind",
+                                    "expiresAt",
+                                    "appealStatus"
                                   ],
-                                  "format": "date-time"
+                                  "additionalProperties": false
                                 },
-                                "appealStatus": {
-                                  "type": "string",
-                                  "enum": [
-                                    "not_requested",
-                                    "requested",
-                                    "upheld",
-                                    "overturned"
-                                  ]
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "sanctionId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 64
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "permanent"
+                                      ]
+                                    },
+                                    "expiresAt": {
+                                      "type": "null"
+                                    },
+                                    "appealStatus": {
+                                      "type": "string",
+                                      "enum": [
+                                        "not_requested",
+                                        "requested",
+                                        "upheld",
+                                        "overturned"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "sanctionId",
+                                    "kind",
+                                    "expiresAt",
+                                    "appealStatus"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
                                 }
-                              },
-                              "required": [
-                                "sanctionId",
-                                "kind",
-                                "expiresAt",
-                                "appealStatus"
-                              ],
-                              "additionalProperties": false
+                              ]
                             },
                             "priorBanCount": {
                               "type": "integer",
@@ -30209,7 +30378,7 @@
                         "type": "string",
                         "minLength": 3,
                         "maxLength": 1000,
-                        "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -30241,7 +30410,7 @@
                         "type": "string",
                         "minLength": 3,
                         "maxLength": 1000,
-                        "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -30273,7 +30442,7 @@
                         "type": "string",
                         "minLength": 3,
                         "maxLength": 1000,
-                        "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -30305,7 +30474,7 @@
                         "type": "string",
                         "minLength": 3,
                         "maxLength": 1000,
-                        "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -30337,7 +30506,7 @@
                         "type": "string",
                         "minLength": 3,
                         "maxLength": 1000,
-                        "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -30491,47 +30660,82 @@
                           "maxLength": 64
                         },
                         "sanction": {
-                          "type": [
-                            "object",
-                            "null"
-                          ],
-                          "properties": {
-                            "sanctionId": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 64
-                            },
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "temporary",
-                                "permanent"
-                              ]
-                            },
-                            "expiresAt": {
-                              "type": [
-                                "string",
-                                "null"
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "sanctionId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "temporary"
+                                  ]
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "appealStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_requested",
+                                    "requested",
+                                    "upheld",
+                                    "overturned"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "sanctionId",
+                                "kind",
+                                "expiresAt",
+                                "appealStatus"
                               ],
-                              "format": "date-time"
+                              "additionalProperties": false
                             },
-                            "appealStatus": {
-                              "type": "string",
-                              "enum": [
-                                "not_requested",
-                                "requested",
-                                "upheld",
-                                "overturned"
-                              ]
+                            {
+                              "type": "object",
+                              "properties": {
+                                "sanctionId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "permanent"
+                                  ]
+                                },
+                                "expiresAt": {
+                                  "type": "null"
+                                },
+                                "appealStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_requested",
+                                    "requested",
+                                    "upheld",
+                                    "overturned"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "sanctionId",
+                                "kind",
+                                "expiresAt",
+                                "appealStatus"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
                             }
-                          },
-                          "required": [
-                            "sanctionId",
-                            "kind",
-                            "expiresAt",
-                            "appealStatus"
-                          ],
-                          "additionalProperties": false
+                          ]
                         },
                         "replayed": {
                           "type": "boolean"
@@ -30924,7 +31128,7 @@
                     "type": "string",
                     "minLength": 3,
                     "maxLength": 1000,
-                    "description": "Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused."
+                    "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
                   },
                   "mutationId": {
                     "type": "string",
@@ -30962,44 +31166,79 @@
                           "format": "date-time"
                         },
                         "sanction": {
-                          "type": "object",
-                          "properties": {
-                            "sanctionId": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 64
-                            },
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "temporary",
-                                "permanent"
-                              ]
-                            },
-                            "expiresAt": {
-                              "type": [
-                                "string",
-                                "null"
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "sanctionId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "temporary"
+                                  ]
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "appealStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_requested",
+                                    "requested",
+                                    "upheld",
+                                    "overturned"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "sanctionId",
+                                "kind",
+                                "expiresAt",
+                                "appealStatus"
                               ],
-                              "format": "date-time"
+                              "additionalProperties": false
                             },
-                            "appealStatus": {
-                              "type": "string",
-                              "enum": [
-                                "not_requested",
-                                "requested",
-                                "upheld",
-                                "overturned"
-                              ]
+                            {
+                              "type": "object",
+                              "properties": {
+                                "sanctionId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "permanent"
+                                  ]
+                                },
+                                "expiresAt": {
+                                  "type": "null"
+                                },
+                                "appealStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_requested",
+                                    "requested",
+                                    "upheld",
+                                    "overturned"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "sanctionId",
+                                "kind",
+                                "expiresAt",
+                                "appealStatus"
+                              ],
+                              "additionalProperties": false
                             }
-                          },
-                          "required": [
-                            "sanctionId",
-                            "kind",
-                            "expiresAt",
-                            "appealStatus"
-                          ],
-                          "additionalProperties": false
+                          ]
                         },
                         "active": {
                           "type": "boolean"

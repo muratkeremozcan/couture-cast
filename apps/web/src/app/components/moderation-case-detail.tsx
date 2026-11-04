@@ -417,14 +417,6 @@ function FindingsSection({ detail }: { detail: ModerationCaseDetail }) {
                 </dd>
               </div>
             ) : null}
-            {findings.engineVersion ? (
-              <div>
-                <dt className="font-medium">{t('moderation.detail.engine')}</dt>
-                <dd>
-                  <code>{findings.engineVersion}</code>
-                </dd>
-              </div>
-            ) : null}
           </dl>
         ) : (
           <p className="text-sm">
@@ -435,6 +427,14 @@ function FindingsSection({ detail }: { detail: ModerationCaseDetail }) {
             )}
           </p>
         )}
+        {findings?.engineVersion ? (
+          <dl className="mt-3 text-sm">
+            <dt className="font-medium">{t('moderation.detail.engine')}</dt>
+            <dd>
+              <code>{findings.engineVersion}</code>
+            </dd>
+          </dl>
+        ) : null}
       </section>
       {/* An operator's words are no machine verdict, so they sit under their own heading. */}
       {note ? (

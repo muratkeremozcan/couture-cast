@@ -95,15 +95,24 @@ export const moderationAppealStepSchema = z.enum(['requested', 'upheld', 'overtu
 export type ModerationAppealStep = z.infer<typeof moderationAppealStepSchema>
 
 /** A sanction as an operator sees it. The member's own view is `communityBannedErrorSchema`. */
-export const moderationSanctionSchema = z
-  .object({
-    sanctionId: z.string().min(1).max(64),
-    kind: moderationSanctionKindSchema,
-    /** Null on a permanent ban. */
-    expiresAt: z.string().datetime().nullable(),
-    appealStatus: moderationAppealStatusSchema,
-  })
-  .strict()
+export const moderationSanctionSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      sanctionId: z.string().min(1).max(64),
+      kind: z.literal('temporary'),
+      expiresAt: z.string().datetime(),
+      appealStatus: moderationAppealStatusSchema,
+    })
+    .strict(),
+  z
+    .object({
+      sanctionId: z.string().min(1).max(64),
+      kind: z.literal('permanent'),
+      expiresAt: z.null(),
+      appealStatus: moderationAppealStatusSchema,
+    })
+    .strict(),
+])
 export type ModerationSanction = z.infer<typeof moderationSanctionSchema>
 
 /** The author's standing. `sanction` is the newest row, active or not. Null when the author is gone. */

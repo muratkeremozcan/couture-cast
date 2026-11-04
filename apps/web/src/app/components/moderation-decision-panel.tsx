@@ -307,6 +307,7 @@ export function ModerationDecisionPanel({
                 onChange={() => {
                   setChosen(option)
                   setConfirming(false)
+                  setConfirming(false)
                   setFailure(null)
                 }}
               />
@@ -327,8 +328,15 @@ export function ModerationDecisionPanel({
             banKinds={detail.banKinds}
             banKind={banKind}
             durationDays={durationDays}
-            onKind={setChosenKind}
-            onDuration={setDurationDays}
+            // Yes sends what is on screen, so changed terms need a fresh confirmation.
+            onKind={(kind) => {
+              setChosenKind(kind)
+              setConfirming(false)
+            }}
+            onDuration={(days) => {
+              setDurationDays(days)
+              setConfirming(false)
+            }}
           />
         ) : null}
 
@@ -340,7 +348,10 @@ export function ModerationDecisionPanel({
             aria-invalid={trimmed.length > MODERATION_REASON_MAX_LENGTH}
             value={reason}
             aria-describedby={counterId}
-            onChange={(event) => setReason(event.target.value)}
+            onChange={(event) => {
+              setReason(event.target.value)
+              setConfirming(false)
+            }}
           />
         </label>
         <p id={counterId} className="text-sm text-neutral-700 dark:text-neutral-300">

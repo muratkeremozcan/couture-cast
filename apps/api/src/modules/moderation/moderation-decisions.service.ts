@@ -22,8 +22,10 @@ import {
   type ModerationCaseDecisionState,
   type ModerationDecisionAction,
   type ModerationDecisionInput,
+  type ModerationSanction,
   type ModerationSanctionKind,
   type ModerationStoredDecisionResult,
+  type ModerationBanTerms,
 } from '@couture/api-client/contracts/http'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import {
@@ -96,6 +98,21 @@ function afterCommitPlan(outcome: DecisionOutcome): AfterCommitPlan {
     assist: true,
     sessionsOf: action === 'ban' ? outcome.subjectId : null,
   }
+}
+
+function newSanctionResult(
+  sanctionId: string,
+  ban: ModerationBanTerms,
+  at: Date
+): ModerationSanction {
+  return ban.kind === 'temporary'
+    ? {
+        sanctionId,
+        kind: 'temporary',
+        expiresAt: (moderationSanctionExpiry(ban, at) as Date).toISOString(),
+        appealStatus: 'not_requested',
+      }
+    : { sanctionId, kind: 'permanent', expiresAt: null, appealStatus: 'not_requested' }
 }
 
 /** Read-only, so no write can fail it, and short enough that one read never holds a connection long. */
@@ -529,12 +546,7 @@ export class ModerationDecisionsService {
       targetStatus: newStatus,
       sanction:
         input.action === 'ban' && sanctionId
-          ? {
-              sanctionId,
-              kind: input.ban.kind,
-              expiresAt: moderationSanctionExpiry(input.ban, at)?.toISOString() ?? null,
-              appealStatus: 'not_requested',
-            }
+          ? newSanctionResult(sanctionId, input.ban, at)
           : null,
     } satisfies ModerationStoredDecisionResult)
   }

@@ -9521,6 +9521,7 @@ Key takeaways:
    Held rows carry `community_ban:<sanctionId>` in `moderation_reason` or `screening_reason`, the marker never leaves the API, and the author-state projection passes only recognized moderation categories.
    An overturned appeal always lifts the ban, and restoration runs only when `assertCommunityDatabaseAccess` passes under the subject guard, so a lifted ban cannot republish a teen's content after consent lapsed.
    A taken-down case target keeps its operator reason, stays down, and can be released from its case.
+   Upgrading a temporary ban moves what it held to the permanent ban's marker, so overturning the permanent ban reaches it.
 8. **Screening intake is a report row.**
    `flagPost` writes a `CommunityPostReport` with a null reporter and `origin: screening`, as comment intake already did, so the queue, keyset, SLA, risk and erasure re-key apply unchanged.
    The case detail marks such a reporter with `origin: screening`, because adding a value to the alias state enum is a breaking response change that Optic refuses.
@@ -9715,6 +9716,7 @@ Evidence boundaries:
   `moderation_decisions_enabled` and `moderation_console_enabled` default to false and are true only in the dev seed.
 - **Known limits by design.**
   Mobile shows its existing denied state with no banned copy, as a named follow-up.
+  The OpenAPI document does not name `community_banned` on community 403 responses, as a named follow-up, and both clients read it by code.
   A signed image URL issued before a decision lives up to 900 seconds.
   Appeal intake is operator-recorded, and the notice sends the member to support.
   With the filters gone, a member whose ban ends while the page stays open sees the feed on the next reload or session change.

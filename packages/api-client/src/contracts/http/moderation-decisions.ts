@@ -52,12 +52,12 @@ export const moderationDecisionReasonSchema = z
   .refine(
     (reason) =>
       communityModerationReasonCategories(reason) === null &&
-      !reason.startsWith(COMMUNITY_BAN_MARKER_PREFIX),
+      !isOperatorHoldReason(reason),
     { message: 'Reason is reserved.' }
   )
   .openapi({
     description:
-      'Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.',
+      'Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.',
   })
 
 const revisionSchema = z.string().regex(/^[0-9a-f]{16}$/)
@@ -225,13 +225,22 @@ export const communityBannedErrorSchema = z
     statusCode: z.literal(403),
     code: z.literal('community_banned'),
     message: z.string().min(1),
-    sanction: z
-      .object({
-        kind: moderationSanctionKindSchema,
-        expiresAt: z.string().datetime().nullable(),
-        appealStatus: moderationAppealStatusSchema,
-      })
-      .strict(),
+    sanction: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('temporary'),
+          expiresAt: z.string().datetime(),
+          appealStatus: moderationAppealStatusSchema,
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('permanent'),
+          expiresAt: z.null(),
+          appealStatus: moderationAppealStatusSchema,
+        })
+        .strict(),
+    ]),
   })
   .strict()
 export type CommunityBannedError = z.infer<typeof communityBannedErrorSchema>

@@ -38,6 +38,7 @@ export function ModerationAccountStanding({
   const [failure, setFailure] = useState<DecisionFailureState | null>(null)
   const [lastStep, setLastStep] = useState<ModerationAppealStep | null>(null)
   const inFlight = useRef(false)
+  const failedReason = useRef<string | null>(null)
   const keeper = useMemo(() => createMutationIdKeeper(), [])
   // A new reading answers the old failure. The typed note stays.
   useEffect(() => {
@@ -68,6 +69,7 @@ export function ModerationAccountStanding({
       onApplied(t(`moderation.standing.outcome.${step}`))
     } catch (error) {
       const next = moderationDecisionFailure(error)
+      failedReason.current = trimmed
       if (next.failure === 'idempotency_mismatch') keeper.clear()
       setFailure(next)
     } finally {
@@ -130,9 +132,12 @@ export function ModerationAccountStanding({
           {failure ? (
             <DecisionFailureNotice
               state={failure}
-              onRetry={() => {
-                if (lastStep) void send(lastStep)
-              }}
+              // An edited note is a new request, which goes through the step buttons.
+              onRetry={
+                failedReason.current === trimmed && lastStep
+                  ? () => void send(lastStep)
+                  : undefined
+              }
               onReload={() => {
                 setFailure(null)
                 onReload()

@@ -106,6 +106,24 @@ export interface DecisionHistoryRow {
 }
 
 /**
+ * Decisions in the order they applied. Inside one case key the sequence decides, because it comes
+ * from the case lock and two API instances can disagree about the time. Rows of different keys
+ * have no sequence in common, so time places them.
+ */
+export function inDecisionOrder<
+  Row extends { caseKey: string; sequence: number; decidedAt: Date },
+>(rows: readonly Row[]): Row[] {
+  const ordered = [...rows].sort(
+    (a, b) => a.decidedAt.getTime() - b.decidedAt.getTime() || a.sequence - b.sequence
+  )
+  const byKey = new Map<string, Row[]>()
+  for (const row of ordered)
+    byKey.set(row.caseKey, [...(byKey.get(row.caseKey) ?? []), row])
+  for (const group of byKey.values()) group.sort((a, b) => a.sequence - b.sequence)
+  return ordered.map((row) => byKey.get(row.caseKey)!.shift()!)
+}
+
+/**
  * What the record says about a case. `firstDecisionAt` is a minimum over rows nothing updates, so
  * nothing can move it. The rows are read by case key or report overlap, so they survive a re-key.
  */
@@ -113,18 +131,16 @@ export function summarizeDecisionHistory(
   rows: readonly DecisionHistoryRow[],
   caseKey: string
 ): { sequence: number; escalated: boolean; firstDecisionAt: Date | null } {
-  const ordered = [...rows].sort(
-    (a, b) => a.decidedAt.getTime() - b.decidedAt.getTime() || a.sequence - b.sequence
-  )
   let sequence = 0
   let escalated = false
   let firstDecisionAt: Date | null = null
-  for (const row of ordered) {
+  for (const row of inDecisionOrder(rows)) {
     if (row.caseKey === caseKey) sequence = Math.max(sequence, row.sequence)
     if (row.action === 'escalate') escalated = true
     if (row.isTerminal) {
       escalated = false
-      firstDecisionAt ??= row.decidedAt
+      if (!firstDecisionAt || row.decidedAt < firstDecisionAt)
+        firstDecisionAt = row.decidedAt
     }
   }
   return { sequence, escalated, firstDecisionAt }

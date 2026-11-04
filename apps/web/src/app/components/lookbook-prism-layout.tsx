@@ -602,7 +602,7 @@ export function LookbookPrismLayout() {
           {/* Story 6.7: only while stacked; the value itself lives above. */}
           <HomeSpotlightTeaserSlot
             stacked={isStacked}
-            teaser={teaser}
+            teaser={communityBanned ? { ...teaser, value: null } : teaser}
             t={(key, options) => i18n.t(key, options)}
             onLeaveWhileFocused={() => {
               requestAnimationFrame(() => heroCanvasRef.current?.focus())

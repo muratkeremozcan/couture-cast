@@ -49,12 +49,21 @@ type Tx = Prisma.TransactionClient
 export const MODERATION_AFTER_COMMIT_BOUND_MS = 1000
 const DAY_MS = 86_400_000
 
-export const toModerationSanction = (row: CommunitySanction): ModerationSanction => ({
-  sanctionId: row.id,
-  kind: row.kind,
-  expiresAt: row.expires_at?.toISOString() ?? null,
-  appealStatus: row.appeal_status,
-})
+/** The row's own CHECK ties a temporary ban to an expiry, and the contract says the same. */
+export const toModerationSanction = (row: CommunitySanction): ModerationSanction =>
+  row.kind === 'temporary'
+    ? {
+        sanctionId: row.id,
+        kind: 'temporary',
+        expiresAt: (row.expires_at as Date).toISOString(),
+        appealStatus: row.appeal_status,
+      }
+    : {
+        sanctionId: row.id,
+        kind: 'permanent',
+        expiresAt: null,
+        appealStatus: row.appeal_status,
+      }
 
 /** When a ban ends. A permanent ban has no expiry. */
 export const moderationSanctionExpiry = (
@@ -202,14 +211,29 @@ export class ModerationSanctionsService {
     }
   ): Promise<CommunitySanction> {
     const { terms, at } = params
-    await tx.communitySanction.updateMany({
+    const replaced = await tx.communitySanction.findMany({
       where: {
         user_id: params.subjectId,
         lifted_at: null,
         kind: 'temporary',
         expires_at: { gt: at },
       },
+      select: { id: true },
+    })
+    await tx.communitySanction.updateMany({
+      where: { id: { in: replaced.map((row) => row.id) } },
       data: { lifted_at: at },
+    })
+    // What the replaced ban held now belongs to this one, so overturning this one can restore it.
+    const held = replaced.map((row) => communityBanMarker(row.id))
+    const marker = communityBanMarker(params.sanctionId)
+    await tx.lookbookPost.updateMany({
+      where: { user_id: params.subjectId, moderation_reason: { in: held } },
+      data: { moderation_reason: marker },
+    })
+    await tx.communityComment.updateMany({
+      where: { user_id: params.subjectId, screening_reason: { in: held } },
+      data: { screening_reason: marker },
     })
     return writeModerationRecord(() =>
       tx.communitySanction.create({

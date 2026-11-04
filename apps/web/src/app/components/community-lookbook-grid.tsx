@@ -2242,12 +2242,22 @@ export function CommunityLookbookGrid({
       feedGenerationRef.current++
       setIsLoading(false)
       setIsLoadingMore(false)
+      actionControllerRef.current?.abort()
       setBannedSanction(sanction)
       setItems([])
       setAuthorStates([])
       setActiveChallenge(null)
       setNextCursor(null)
       setFeedError(null)
+      setOpenedItem(null)
+      setDeepLinkedItem(null)
+      setCommentTarget(undefined)
+      setReportingPostId(null)
+      setIsCreateModalOpen(false)
+      setIsSubmittingReport(false)
+      setIsPreparingPhoto(false)
+      setIsPublishing(false)
+      setNewLooks([])
       // The notice mounts with its words, which a screen reader may not hear, so the live region says it.
       setAnnouncement({ key: 'community.error.banned' })
     },
@@ -2324,6 +2334,7 @@ export function CommunityLookbookGrid({
   // or superseded read leaves nothing behind.
   const spotlight = useCommunitySpotlight<{ ticket: number; stamp: LiveReadStamp }>({
     scope: sessionScope,
+    onBanned: closeForBan,
     beginRead: () => ({
       ticket: reactionState.beginRead(),
       stamp: liveSponsorships.begin(),

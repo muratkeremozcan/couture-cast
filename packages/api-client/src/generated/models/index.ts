@@ -1885,58 +1885,118 @@ export type ApplyModerationDecision200ResponseDataCacheInvalidationEnum =
   (typeof ApplyModerationDecision200ResponseDataCacheInvalidationEnum)[keyof typeof ApplyModerationDecision200ResponseDataCacheInvalidationEnum]
 
 /**
+ * @type ApplyModerationDecision200ResponseDataSanction
  *
  * @export
- * @interface ApplyModerationDecision200ResponseDataSanction
  */
-export interface ApplyModerationDecision200ResponseDataSanction {
+export type ApplyModerationDecision200ResponseDataSanction =
+  | ApplyModerationDecision200ResponseDataSanctionOneOf
+  | ApplyModerationDecision200ResponseDataSanctionOneOf1
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecision200ResponseDataSanctionOneOf
+ */
+export interface ApplyModerationDecision200ResponseDataSanctionOneOf {
   /**
    *
    * @type {string}
-   * @memberof ApplyModerationDecision200ResponseDataSanction
+   * @memberof ApplyModerationDecision200ResponseDataSanctionOneOf
    */
   sanctionId: string
   /**
    *
-   * @type {ApplyModerationDecision200ResponseDataSanctionKindEnum}
-   * @memberof ApplyModerationDecision200ResponseDataSanction
+   * @type {ApplyModerationDecision200ResponseDataSanctionOneOfKindEnum}
+   * @memberof ApplyModerationDecision200ResponseDataSanctionOneOf
    */
-  kind: ApplyModerationDecision200ResponseDataSanctionKindEnum
+  kind: ApplyModerationDecision200ResponseDataSanctionOneOfKindEnum
   /**
    *
    * @type {string}
-   * @memberof ApplyModerationDecision200ResponseDataSanction
+   * @memberof ApplyModerationDecision200ResponseDataSanctionOneOf
    */
-  expiresAt: string | null
+  expiresAt: string
   /**
    *
-   * @type {ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum}
-   * @memberof ApplyModerationDecision200ResponseDataSanction
+   * @type {ApplyModerationDecision200ResponseDataSanctionOneOfAppealStatusEnum}
+   * @memberof ApplyModerationDecision200ResponseDataSanctionOneOf
    */
-  appealStatus: ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum
+  appealStatus: ApplyModerationDecision200ResponseDataSanctionOneOfAppealStatusEnum
 }
 
 /**
  * @export
  */
-export const ApplyModerationDecision200ResponseDataSanctionKindEnum = {
+export const ApplyModerationDecision200ResponseDataSanctionOneOfKindEnum = {
   temporary: 'temporary',
-  permanent: 'permanent',
 } as const
-export type ApplyModerationDecision200ResponseDataSanctionKindEnum =
-  (typeof ApplyModerationDecision200ResponseDataSanctionKindEnum)[keyof typeof ApplyModerationDecision200ResponseDataSanctionKindEnum]
+export type ApplyModerationDecision200ResponseDataSanctionOneOfKindEnum =
+  (typeof ApplyModerationDecision200ResponseDataSanctionOneOfKindEnum)[keyof typeof ApplyModerationDecision200ResponseDataSanctionOneOfKindEnum]
 
 /**
  * @export
  */
-export const ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum = {
+export const ApplyModerationDecision200ResponseDataSanctionOneOfAppealStatusEnum = {
   not_requested: 'not_requested',
   requested: 'requested',
   upheld: 'upheld',
   overturned: 'overturned',
 } as const
-export type ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum =
-  (typeof ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum)[keyof typeof ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum]
+export type ApplyModerationDecision200ResponseDataSanctionOneOfAppealStatusEnum =
+  (typeof ApplyModerationDecision200ResponseDataSanctionOneOfAppealStatusEnum)[keyof typeof ApplyModerationDecision200ResponseDataSanctionOneOfAppealStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecision200ResponseDataSanctionOneOf1
+ */
+export interface ApplyModerationDecision200ResponseDataSanctionOneOf1 {
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecision200ResponseDataSanctionOneOf1
+   */
+  sanctionId: string
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseDataSanctionOneOf1KindEnum}
+   * @memberof ApplyModerationDecision200ResponseDataSanctionOneOf1
+   */
+  kind: ApplyModerationDecision200ResponseDataSanctionOneOf1KindEnum
+  /**
+   *
+   * @type {null}
+   * @memberof ApplyModerationDecision200ResponseDataSanctionOneOf1
+   */
+  expiresAt: null
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseDataSanctionOneOf1AppealStatusEnum}
+   * @memberof ApplyModerationDecision200ResponseDataSanctionOneOf1
+   */
+  appealStatus: ApplyModerationDecision200ResponseDataSanctionOneOf1AppealStatusEnum
+}
+
+/**
+ * @export
+ */
+export const ApplyModerationDecision200ResponseDataSanctionOneOf1KindEnum = {
+  permanent: 'permanent',
+} as const
+export type ApplyModerationDecision200ResponseDataSanctionOneOf1KindEnum =
+  (typeof ApplyModerationDecision200ResponseDataSanctionOneOf1KindEnum)[keyof typeof ApplyModerationDecision200ResponseDataSanctionOneOf1KindEnum]
+
+/**
+ * @export
+ */
+export const ApplyModerationDecision200ResponseDataSanctionOneOf1AppealStatusEnum = {
+  not_requested: 'not_requested',
+  requested: 'requested',
+  upheld: 'upheld',
+  overturned: 'overturned',
+} as const
+export type ApplyModerationDecision200ResponseDataSanctionOneOf1AppealStatusEnum =
+  (typeof ApplyModerationDecision200ResponseDataSanctionOneOf1AppealStatusEnum)[keyof typeof ApplyModerationDecision200ResponseDataSanctionOneOf1AppealStatusEnum]
 
 /**
  *
@@ -2038,7 +2098,7 @@ export interface ApplyModerationDecisionRequestOneOf {
    */
   action: ApplyModerationDecisionRequestOneOfActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf
    */
@@ -2079,7 +2139,7 @@ export interface ApplyModerationDecisionRequestOneOf1 {
    */
   action: ApplyModerationDecisionRequestOneOf1ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf1
    */
@@ -2120,7 +2180,7 @@ export interface ApplyModerationDecisionRequestOneOf2 {
    */
   action: ApplyModerationDecisionRequestOneOf2ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf2
    */
@@ -2161,7 +2221,7 @@ export interface ApplyModerationDecisionRequestOneOf3 {
    */
   action: ApplyModerationDecisionRequestOneOf3ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf3
    */
@@ -2202,7 +2262,7 @@ export interface ApplyModerationDecisionRequestOneOf4 {
    */
   action: ApplyModerationDecisionRequestOneOf4ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf4
    */
@@ -3140,52 +3200,106 @@ export type CommunityBannedErrorCodeEnum =
   (typeof CommunityBannedErrorCodeEnum)[keyof typeof CommunityBannedErrorCodeEnum]
 
 /**
+ * @type CommunityBannedErrorSanction
  *
  * @export
- * @interface CommunityBannedErrorSanction
  */
-export interface CommunityBannedErrorSanction {
+export type CommunityBannedErrorSanction =
+  | CommunityBannedErrorSanctionOneOf
+  | CommunityBannedErrorSanctionOneOf1
+/**
+ *
+ * @export
+ * @interface CommunityBannedErrorSanctionOneOf
+ */
+export interface CommunityBannedErrorSanctionOneOf {
   /**
    *
-   * @type {CommunityBannedErrorSanctionKindEnum}
-   * @memberof CommunityBannedErrorSanction
+   * @type {CommunityBannedErrorSanctionOneOfKindEnum}
+   * @memberof CommunityBannedErrorSanctionOneOf
    */
-  kind: CommunityBannedErrorSanctionKindEnum
+  kind: CommunityBannedErrorSanctionOneOfKindEnum
   /**
    *
    * @type {string}
-   * @memberof CommunityBannedErrorSanction
+   * @memberof CommunityBannedErrorSanctionOneOf
    */
-  expiresAt: string | null
+  expiresAt: string
   /**
    *
-   * @type {CommunityBannedErrorSanctionAppealStatusEnum}
-   * @memberof CommunityBannedErrorSanction
+   * @type {CommunityBannedErrorSanctionOneOfAppealStatusEnum}
+   * @memberof CommunityBannedErrorSanctionOneOf
    */
-  appealStatus: CommunityBannedErrorSanctionAppealStatusEnum
+  appealStatus: CommunityBannedErrorSanctionOneOfAppealStatusEnum
 }
 
 /**
  * @export
  */
-export const CommunityBannedErrorSanctionKindEnum = {
+export const CommunityBannedErrorSanctionOneOfKindEnum = {
   temporary: 'temporary',
-  permanent: 'permanent',
 } as const
-export type CommunityBannedErrorSanctionKindEnum =
-  (typeof CommunityBannedErrorSanctionKindEnum)[keyof typeof CommunityBannedErrorSanctionKindEnum]
+export type CommunityBannedErrorSanctionOneOfKindEnum =
+  (typeof CommunityBannedErrorSanctionOneOfKindEnum)[keyof typeof CommunityBannedErrorSanctionOneOfKindEnum]
 
 /**
  * @export
  */
-export const CommunityBannedErrorSanctionAppealStatusEnum = {
+export const CommunityBannedErrorSanctionOneOfAppealStatusEnum = {
   not_requested: 'not_requested',
   requested: 'requested',
   upheld: 'upheld',
   overturned: 'overturned',
 } as const
-export type CommunityBannedErrorSanctionAppealStatusEnum =
-  (typeof CommunityBannedErrorSanctionAppealStatusEnum)[keyof typeof CommunityBannedErrorSanctionAppealStatusEnum]
+export type CommunityBannedErrorSanctionOneOfAppealStatusEnum =
+  (typeof CommunityBannedErrorSanctionOneOfAppealStatusEnum)[keyof typeof CommunityBannedErrorSanctionOneOfAppealStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityBannedErrorSanctionOneOf1
+ */
+export interface CommunityBannedErrorSanctionOneOf1 {
+  /**
+   *
+   * @type {CommunityBannedErrorSanctionOneOf1KindEnum}
+   * @memberof CommunityBannedErrorSanctionOneOf1
+   */
+  kind: CommunityBannedErrorSanctionOneOf1KindEnum
+  /**
+   *
+   * @type {null}
+   * @memberof CommunityBannedErrorSanctionOneOf1
+   */
+  expiresAt: null
+  /**
+   *
+   * @type {CommunityBannedErrorSanctionOneOf1AppealStatusEnum}
+   * @memberof CommunityBannedErrorSanctionOneOf1
+   */
+  appealStatus: CommunityBannedErrorSanctionOneOf1AppealStatusEnum
+}
+
+/**
+ * @export
+ */
+export const CommunityBannedErrorSanctionOneOf1KindEnum = {
+  permanent: 'permanent',
+} as const
+export type CommunityBannedErrorSanctionOneOf1KindEnum =
+  (typeof CommunityBannedErrorSanctionOneOf1KindEnum)[keyof typeof CommunityBannedErrorSanctionOneOf1KindEnum]
+
+/**
+ * @export
+ */
+export const CommunityBannedErrorSanctionOneOf1AppealStatusEnum = {
+  not_requested: 'not_requested',
+  requested: 'requested',
+  upheld: 'upheld',
+  overturned: 'overturned',
+} as const
+export type CommunityBannedErrorSanctionOneOf1AppealStatusEnum =
+  (typeof CommunityBannedErrorSanctionOneOf1AppealStatusEnum)[keyof typeof CommunityBannedErrorSanctionOneOf1AppealStatusEnum]
 
 /**
  *
@@ -8451,58 +8565,120 @@ export type GetModerationCase200ResponseDataSubjectStandingAllowedAppealStepsEnu
   (typeof GetModerationCase200ResponseDataSubjectStandingAllowedAppealStepsEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStandingAllowedAppealStepsEnum]
 
 /**
+ * @type GetModerationCase200ResponseDataSubjectStandingSanction
  *
  * @export
- * @interface GetModerationCase200ResponseDataSubjectStandingSanction
  */
-export interface GetModerationCase200ResponseDataSubjectStandingSanction {
+export type GetModerationCase200ResponseDataSubjectStandingSanction =
+  | GetModerationCase200ResponseDataSubjectStandingSanctionOneOf
+  | GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataSubjectStandingSanctionOneOf
+ */
+export interface GetModerationCase200ResponseDataSubjectStandingSanctionOneOf {
   /**
    *
    * @type {string}
-   * @memberof GetModerationCase200ResponseDataSubjectStandingSanction
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf
    */
   sanctionId: string
   /**
    *
-   * @type {GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum}
-   * @memberof GetModerationCase200ResponseDataSubjectStandingSanction
+   * @type {GetModerationCase200ResponseDataSubjectStandingSanctionOneOfKindEnum}
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf
    */
-  kind: GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum
+  kind: GetModerationCase200ResponseDataSubjectStandingSanctionOneOfKindEnum
   /**
    *
    * @type {string}
-   * @memberof GetModerationCase200ResponseDataSubjectStandingSanction
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf
    */
-  expiresAt: string | null
+  expiresAt: string
   /**
    *
-   * @type {GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum}
-   * @memberof GetModerationCase200ResponseDataSubjectStandingSanction
+   * @type {GetModerationCase200ResponseDataSubjectStandingSanctionOneOfAppealStatusEnum}
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf
    */
-  appealStatus: GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum
+  appealStatus: GetModerationCase200ResponseDataSubjectStandingSanctionOneOfAppealStatusEnum
 }
 
 /**
  * @export
  */
-export const GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum = {
+export const GetModerationCase200ResponseDataSubjectStandingSanctionOneOfKindEnum = {
   temporary: 'temporary',
-  permanent: 'permanent',
 } as const
-export type GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum =
-  (typeof GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum]
+export type GetModerationCase200ResponseDataSubjectStandingSanctionOneOfKindEnum =
+  (typeof GetModerationCase200ResponseDataSubjectStandingSanctionOneOfKindEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStandingSanctionOneOfKindEnum]
 
 /**
  * @export
  */
-export const GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum = {
-  not_requested: 'not_requested',
-  requested: 'requested',
-  upheld: 'upheld',
-  overturned: 'overturned',
+export const GetModerationCase200ResponseDataSubjectStandingSanctionOneOfAppealStatusEnum =
+  {
+    not_requested: 'not_requested',
+    requested: 'requested',
+    upheld: 'upheld',
+    overturned: 'overturned',
+  } as const
+export type GetModerationCase200ResponseDataSubjectStandingSanctionOneOfAppealStatusEnum =
+  (typeof GetModerationCase200ResponseDataSubjectStandingSanctionOneOfAppealStatusEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStandingSanctionOneOfAppealStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1
+ */
+export interface GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1 {
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1
+   */
+  sanctionId: string
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1KindEnum}
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1
+   */
+  kind: GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1KindEnum
+  /**
+   *
+   * @type {null}
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1
+   */
+  expiresAt: null
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1AppealStatusEnum}
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1
+   */
+  appealStatus: GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1AppealStatusEnum
+}
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1KindEnum = {
+  permanent: 'permanent',
 } as const
-export type GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum =
-  (typeof GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum]
+export type GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1KindEnum =
+  (typeof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1KindEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1KindEnum]
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1AppealStatusEnum =
+  {
+    not_requested: 'not_requested',
+    requested: 'requested',
+    upheld: 'upheld',
+    overturned: 'overturned',
+  } as const
+export type GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1AppealStatusEnum =
+  (typeof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1AppealStatusEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStandingSanctionOneOf1AppealStatusEnum]
 
 /**
  *
@@ -9932,7 +10108,7 @@ export interface ModerationAppealInput {
    */
   status: ModerationAppealInputStatusEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationAppealInput
    */
@@ -9964,71 +10140,11 @@ export type ModerationAppealInputStatusEnum =
 export interface ModerationAppealResponse {
   /**
    *
-   * @type {ModerationAppealResponseData}
+   * @type {RecordModerationAppeal200ResponseData}
    * @memberof ModerationAppealResponse
    */
-  data: ModerationAppealResponseData
+  data: RecordModerationAppeal200ResponseData
 }
-/**
- *
- * @export
- * @interface ModerationAppealResponseData
- */
-export interface ModerationAppealResponseData {
-  /**
-   *
-   * @type {string}
-   * @memberof ModerationAppealResponseData
-   */
-  decisionId: string
-  /**
-   *
-   * @type {string}
-   * @memberof ModerationAppealResponseData
-   */
-  decidedAt: string
-  /**
-   *
-   * @type {ApplyModerationDecision200ResponseDataSanction}
-   * @memberof ModerationAppealResponseData
-   */
-  sanction: ApplyModerationDecision200ResponseDataSanction
-  /**
-   *
-   * @type {boolean}
-   * @memberof ModerationAppealResponseData
-   */
-  active: boolean
-  /**
-   *
-   * @type {number}
-   * @memberof ModerationAppealResponseData
-   */
-  restoredCount: number
-  /**
-   *
-   * @type {boolean}
-   * @memberof ModerationAppealResponseData
-   */
-  replayed: boolean
-  /**
-   *
-   * @type {ModerationAppealResponseDataCacheInvalidationEnum}
-   * @memberof ModerationAppealResponseData
-   */
-  cacheInvalidation: ModerationAppealResponseDataCacheInvalidationEnum
-}
-
-/**
- * @export
- */
-export const ModerationAppealResponseDataCacheInvalidationEnum = {
-  completed: 'completed',
-  deferred: 'deferred',
-} as const
-export type ModerationAppealResponseDataCacheInvalidationEnum =
-  (typeof ModerationAppealResponseDataCacheInvalidationEnum)[keyof typeof ModerationAppealResponseDataCacheInvalidationEnum]
-
 /**
  *
  * @export
@@ -10834,7 +10950,7 @@ export interface ModerationDecisionInputOneOf {
    */
   action: ModerationDecisionInputOneOfActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf
    */
@@ -10875,7 +10991,7 @@ export interface ModerationDecisionInputOneOf1 {
    */
   action: ModerationDecisionInputOneOf1ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf1
    */
@@ -10916,7 +11032,7 @@ export interface ModerationDecisionInputOneOf2 {
    */
   action: ModerationDecisionInputOneOf2ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf2
    */
@@ -10957,7 +11073,7 @@ export interface ModerationDecisionInputOneOf3 {
    */
   action: ModerationDecisionInputOneOf3ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf3
    */
@@ -10998,7 +11114,7 @@ export interface ModerationDecisionInputOneOf4 {
    */
   action: ModerationDecisionInputOneOf4ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf4
    */
@@ -13869,10 +13985,10 @@ export interface RecordModerationAppeal200ResponseData {
   decidedAt: string
   /**
    *
-   * @type {GetModerationCase200ResponseDataSubjectStandingSanction}
+   * @type {RecordModerationAppeal200ResponseDataSanction}
    * @memberof RecordModerationAppeal200ResponseData
    */
-  sanction: GetModerationCase200ResponseDataSubjectStandingSanction
+  sanction: RecordModerationAppeal200ResponseDataSanction
   /**
    *
    * @type {boolean}
@@ -13909,6 +14025,14 @@ export const RecordModerationAppeal200ResponseDataCacheInvalidationEnum = {
 export type RecordModerationAppeal200ResponseDataCacheInvalidationEnum =
   (typeof RecordModerationAppeal200ResponseDataCacheInvalidationEnum)[keyof typeof RecordModerationAppeal200ResponseDataCacheInvalidationEnum]
 
+/**
+ * @type RecordModerationAppeal200ResponseDataSanction
+ *
+ * @export
+ */
+export type RecordModerationAppeal200ResponseDataSanction =
+  | ApplyModerationDecision200ResponseDataSanctionOneOf
+  | ApplyModerationDecision200ResponseDataSanctionOneOf1
 /**
  *
  * @export
@@ -13998,7 +14122,7 @@ export interface RecordModerationAppealRequest {
    */
   status: RecordModerationAppealRequestStatusEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof RecordModerationAppealRequest
    */

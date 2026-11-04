@@ -1199,7 +1199,7 @@ describe('I-B-EXPIRY: a temporary ban ends by itself at expires_at', () => {
 })
 
 describe('I-B-UPGRADE: an admin upgrades an active temporary ban', () => {
-  it('lifts the old row, hides everything, bumps the epoch, and overturn restores only its own marker', async () => {
+  it('lifts the old row, moves what it held to the new marker, bumps the epoch, and overturn restores it', async () => {
     const author = await fx.member('author')
     const first = await fx.postCase({ author })
     const heldByTemporary = await fx.post({
@@ -1208,7 +1208,7 @@ describe('I-B-UPGRADE: an admin upgrades an active temporary ban', () => {
     })
     const temporary = await ban(first.caseId, 'temporary', await moderator())
     const temporaryMarker = banMarker(temporary.sanctionId)
-    // A row that carries the old marker and has been public, so only the marker match keeps it out.
+    // Held by the replaced ban and has been public, so overturning its replacement brings it back.
     const olderMarked = await fx.post({
       authorId: author.id,
       status: 'flagged',
@@ -1246,7 +1246,11 @@ describe('I-B-UPGRADE: an admin upgrades an active temporary ban', () => {
     })
     expect(await postOf(heldByTemporary.id)).toMatchObject({
       status: 'flagged',
-      moderation_reason: temporaryMarker,
+      moderation_reason: permanentMarker,
+    })
+    expect(await postOf(olderMarked.id)).toMatchObject({
+      status: 'flagged',
+      moderation_reason: permanentMarker,
     })
     const standing = (await staff.detail(second.caseId)).subjectStanding
     expect(standing).toMatchObject({ active: true, priorBanCount: 1 })
@@ -1262,18 +1266,19 @@ describe('I-B-UPGRADE: an admin upgrades an active temporary ban', () => {
       reason: REASON,
     })
     expect(overturned.status, dump(overturned)).toBe(200)
-    expect(appealData(overturned).restoredCount).toBe(1)
+    expect(appealData(overturned).restoredCount).toBe(2)
     expect(await postOf(published.id)).toMatchObject({
       status: 'published',
       moderation_reason: null,
     })
     expect(await postOf(olderMarked.id)).toMatchObject({
-      status: 'flagged',
-      moderation_reason: temporaryMarker,
+      status: 'published',
+      moderation_reason: null,
     })
+    // Never public, so it stays held like any other pending item a ban held.
     expect(await postOf(heldByTemporary.id)).toMatchObject({
       status: 'flagged',
-      moderation_reason: temporaryMarker,
+      moderation_reason: permanentMarker,
     })
   })
 })
