@@ -73,7 +73,10 @@ import { CommunityController } from '../src/modules/community/community.controll
 import { FixtureCommunityModerationEngine } from '../src/modules/community/community-moderation.engine.js'
 import { CommunityModerationOutboxDispatcher } from '../src/modules/community/community-moderation.outbox.js'
 import { CommunityModerationProcessor } from '../src/modules/community/community-moderation.processor.js'
-import { CommunityMaintenanceService } from '../src/modules/community/community-maintenance.service.js'
+import {
+  COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS,
+  CommunityMaintenanceService,
+} from '../src/modules/community/community-maintenance.service.js'
 import { verifyAndNormalizeCommunityImage } from '../src/modules/community/community-image-validation.js'
 import { CommunityNotificationsWorker } from '../src/modules/community/community-notifications.worker.js'
 import { CommunityPreferencesService } from '../src/modules/community/community-preferences.service.js'
@@ -2081,6 +2084,236 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         expect(after.image_checksum).toBe(
           sha256(storage.objects.get(post.image_object_path!)!)
         )
+      })
+    })
+
+    describe('R7-3: validation without a discarded encode', () => {
+      const encodes = () =>
+        vi.spyOn(sharp.prototype as { toFormat: () => unknown }, 'toFormat')
+      afterEach(() => {
+        vi.restoreAllMocks()
+      })
+
+      it('encodes once to normalize, and not at all on a pending or normalized retry', async () => {
+        const { post, storage } = await pendingAuthor()
+        let uploads = 0
+        storage.upload = (objectPath: string, bytes: Buffer) => {
+          uploads += 1
+          storage.objects.set(objectPath, bytes)
+          return uploads === 1
+            ? Promise.reject(new Error('worker lost'))
+            : Promise.resolve()
+        }
+        const spy = encodes()
+        await expect(
+          processorWith(storage, passingEngine()).process(job(post, 0))
+        ).rejects.toThrow('worker lost')
+        expect(spy).toHaveBeenCalledTimes(1)
+
+        // Bytes match the pending declaration, which promotes with no encode.
+        spy.mockClear()
+        const hold = gated()
+        const paused = processorWith(storage, {
+          screenText: () => Promise.reject(new Error('unused')),
+          moderatePost: async () => {
+            hold.entered()
+            await hold.gate
+            throw new Error('dependency unavailable')
+          },
+        }).process(job(post, 0))
+        await hold.inside
+        expect(spy).not.toHaveBeenCalled()
+        expect((await postOf(post.id)).image_normalized_at).not.toBeNull()
+        hold.release()
+        await expect(paused).rejects.toThrow('dependency unavailable')
+
+        // Bytes match a normalized declaration, which screens as they are.
+        spy.mockClear()
+        await processorWith(storage, passingEngine()).process(job(post, 0))
+        expect(spy).not.toHaveBeenCalled()
+        expect((await postOf(post.id)).status).toBe('published')
+        expect(uploads).toBe(1)
+      })
+
+      it.each([
+        [
+          'a type the row does not declare',
+          () =>
+            sharp({
+              create: { width: 512, height: 640, channels: 3, background: '#112233' },
+            })
+              .png()
+              .toBuffer(),
+        ],
+        [
+          'dimensions out of range',
+          () =>
+            sharp({
+              create: { width: 8, height: 8, channels: 3, background: '#112233' },
+            })
+              .jpeg()
+              .toBuffer(),
+        ],
+      ])('still refuses %s, even when its hash matches pending', async (_name, make) => {
+        const { post, storage } = await pendingAuthor()
+        const bytes = await make()
+        storage.objects.set(post.image_object_path!, bytes)
+        await communityPrivacyTransaction(prisma, async (tx) => {
+          await guardCommunityPost(tx, post.id)
+          await tx.lookbookPost.update({
+            where: { id: post.id },
+            data: {
+              image_pending_checksum: sha256(bytes),
+              image_pending_byte_size: bytes.length,
+            },
+          })
+        })
+        await processorWith(storage, passingEngine()).process(job(post, 0), {
+          attempt: 1,
+          maxAttempts: 3,
+        })
+        const after = await postOf(post.id)
+        expect(after.status).toBe('review_failed')
+        expect(after.moderation_reason).toMatch(/IMAGE/)
+        expect(after.image_normalized_at).toBeNull()
+      })
+    })
+
+    describe('R7-1: a lost worker cannot leave an image behind after erasure', () => {
+      const LATER = (at: Date, ms: number) => new Date(at.getTime() + ms)
+      const eraser = (storage: InMemoryCommunityStorage) =>
+        new CommunityMaintenanceService(prisma, storage as never)
+      const requestErasure = (post: { id: string }, at: Date = NOW) =>
+        communityPrivacyTransaction(prisma, async (tx) => {
+          await guardCommunityPost(tx, post.id)
+          await tx.lookbookPost.update({
+            where: { id: post.id },
+            data: { erasure_requested_at: at },
+          })
+        })
+
+      it('reserve, complete erasure, late write, lost worker, retry and sweep', async () => {
+        const { post, storage } = await pendingAuthor()
+        const path = post.image_object_path!
+        const hold = gated()
+        storage.upload = async (objectPath: string, bytes: Buffer) => {
+          hold.entered()
+          await hold.gate
+          // The bytes commit and the worker never hears back.
+          storage.objects.set(objectPath, bytes)
+          throw new Error('worker lost')
+        }
+        const lost = processorWith(storage, passingEngine()).process(job(post, 0))
+        await hold.inside
+
+        await requestErasure(post)
+        await eraser(storage).sweepErasureRequests(NOW)
+        expect(storage.objects.has(path)).toBe(false)
+        expect(await postOf(post.id)).toMatchObject({
+          status: 'withdrawn',
+          image_checksum: null,
+          image_pending_checksum: null,
+          image_pending_byte_size: null,
+        })
+
+        hold.release()
+        await expect(lost).rejects.toThrow('worker lost')
+        expect(storage.objects.has(path), 'the late write recreated it').toBe(true)
+
+        await processorWith(storage, passingEngine()).process(job(post, 0))
+        expect(storage.objects.has(path), 'a retry has no ownership').toBe(true)
+
+        const past = LATER(NOW, COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS + 1)
+        await eraser(storage).sweepErasureRequests(past)
+        expect(storage.objects.has(path)).toBe(false)
+        const done = await postOf(post.id)
+        expect(done.image_object_path).toBeNull()
+        expect(done.objects_purged_at).not.toBeNull()
+        expect(
+          await eraser(storage).sweepErasureRequests(LATER(past, 60_000))
+        ).toMatchObject({ hidden: 0, anonymized: 0, objectsPurged: 0, overdue: 0 })
+      })
+
+      it('holds the obligation open until the window passes, inside the 72 hour deadline', async () => {
+        const { post, storage } = await pendingAuthor()
+        await requestErasure(post)
+        await eraser(storage).sweepErasureRequests(NOW)
+        const open = await postOf(post.id)
+        expect(open.image_object_path).toBe(post.image_object_path)
+        expect(open.objects_purged_at).toBeNull()
+
+        const inside = LATER(NOW, COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS - 1)
+        await eraser(storage).sweepErasureRequests(inside)
+        expect((await postOf(post.id)).objects_purged_at).toBeNull()
+
+        expect(COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS).toBeLessThan(72 * 3_600_000)
+        const past = LATER(NOW, COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS + 1)
+        await eraser(storage).sweepErasureRequests(past)
+        expect((await postOf(post.id)).objects_purged_at).not.toBeNull()
+      })
+
+      it('retries a failed final delete and reports it overdue past the deadline', async () => {
+        const { post, storage } = await pendingAuthor()
+        await requestErasure(post)
+        await eraser(storage).sweepErasureRequests(NOW)
+        storage.objects.set(post.image_object_path!, Buffer.from('recreated'))
+        let down = true
+        storage.remove = (paths: string[]) => {
+          if (down) return Promise.reject(new Error('storage down'))
+          for (const path of paths) storage.objects.delete(path)
+          return Promise.resolve()
+        }
+        const late = LATER(NOW, 73 * 3_600_000)
+        expect(await eraser(storage).sweepErasureRequests(late)).toMatchObject({
+          overdue: 1,
+        })
+        expect((await postOf(post.id)).objects_purged_at).toBeNull()
+
+        down = false
+        await eraser(storage).sweepErasureRequests(LATER(late, 60_000))
+        expect(storage.objects.has(post.image_object_path!)).toBe(false)
+        expect((await postOf(post.id)).objects_purged_at).not.toBeNull()
+      })
+
+      it('never shows the kept path to a member or a moderator', async () => {
+        const author = await fx.member('author')
+        const seeded = await fx.postCase({ author })
+        const before = await postOf(seeded.postId)
+        const path = before.image_object_path!
+        expect(path).toBeTruthy()
+        await requestErasure({ id: seeded.postId })
+        await eraser(new InMemoryCommunityStorage()).sweepErasureRequests(NOW)
+        expect((await postOf(seeded.postId)).image_object_path).toBe(path)
+
+        // The last segment, because a signed URL carries the path percent-encoded.
+        const segment = path.split('/').pop()!
+        const expectNoPath = (response: { body: unknown }) =>
+          expect(JSON.stringify(response.body)).not.toContain(segment)
+
+        const staff = await admin()
+        const queue = await staff.get('/api/v1/moderation/cases?limit=50')
+        expect(queue.status, dump(queue)).toBe(200)
+        expectNoPath(queue)
+        const detail = await staff.get(`/api/v1/moderation/cases/${seeded.caseId}`)
+        expectNoPath(detail)
+        if (detail.status === 200)
+          expect(
+            (detail.body as { data: { media: { state: string } } }).data.media.state
+          ).toBe('unavailable')
+
+        const reader = member((await fx.member('reader')).id)
+        const read = await reader.get(`/api/v1/community/posts/${seeded.postId}`)
+        expect(read.status, dump(read)).toBe(404)
+        const feed = await reader.get('/api/v1/community/feed?mode=all&limit=30')
+        expect(feed.status, dump(feed)).toBe(200)
+        expectNoPath(feed)
+
+        // The author's own view lists a withdrawn post among its author states.
+        const own = member(author.id)
+        const ownFeed = await own.get('/api/v1/community/feed?mode=all&limit=30')
+        expect(ownFeed.status, dump(ownFeed)).toBe(200)
+        expectNoPath(ownFeed)
+        expectNoPath(await own.get(`/api/v1/community/posts/${seeded.postId}`))
       })
     })
 

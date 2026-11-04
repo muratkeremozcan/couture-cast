@@ -829,6 +829,16 @@ Every seeded defect now goes red on top of R6-3, which is red without its source
 
 Both defects that survived the first image tests die here.
 
+### Codex round 7
+
+R7-1 in I-B-END-RESTORE runs reserve, complete erasure, late write, lost worker, retry and sweep.
+It went red at `8f9b3945`: the late write survived with the path already null.
+It also pins the obligation staying open until the 6-hour window ends, a failed final delete counted overdue past 72 hours, and the kept path absent from the queue, the case detail, the feed, the post read and the author's own states.
+R7-3 counts encoder calls on `sharp.prototype.toFormat`: one to normalize, none on a pending or normalized retry.
+A type or size out of range still fails with a hash matching pending.
+Logs and share cards have no test for the kept path: the erasure log records only the post id, and a share card needs a published post.
+R7-2 is a rollout precondition builder records, with no test here.
+
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
 Those failures were my setup, and the rerun below is the evidence.
