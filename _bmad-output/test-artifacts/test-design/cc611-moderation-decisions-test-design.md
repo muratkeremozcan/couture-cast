@@ -839,6 +839,14 @@ A type or size out of range still fails with a hash matching pending.
 Logs and share cards have no test for the kept path: the erasure log records only the post id, and a share card needs a published post.
 R7-2 is a rollout precondition builder records, with no test here.
 
+Seeded defects at `0eca2d75`, each run against the R7 tests in a throwaway worktree:
+
+| Seeded defect                         | Red tests                                                  |
+| :------------------------------------ | :--------------------------------------------------------- |
+| Author state read signs the kept path | 1: never shows the kept path                               |
+| Late-write window of zero             | 4, among them the window and the full reserve-to-sweep run |
+| Validation encodes again              | 1: encodes once, and not on a retry                        |
+
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
 Those failures were my setup, and the rerun below is the evidence.
