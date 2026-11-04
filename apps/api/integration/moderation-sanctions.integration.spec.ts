@@ -74,6 +74,7 @@ import { FixtureCommunityModerationEngine } from '../src/modules/community/commu
 import { CommunityModerationOutboxDispatcher } from '../src/modules/community/community-moderation.outbox.js'
 import { CommunityModerationProcessor } from '../src/modules/community/community-moderation.processor.js'
 import { CommunityMaintenanceService } from '../src/modules/community/community-maintenance.service.js'
+import { verifyAndNormalizeCommunityImage } from '../src/modules/community/community-image-validation.js'
 import { CommunityNotificationsWorker } from '../src/modules/community/community-notifications.worker.js'
 import { CommunityPreferencesService } from '../src/modules/community/community-preferences.service.js'
 import {
@@ -1689,11 +1690,14 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         rolloutOpen
       )
         .process({ postId: post.id, uploadSessionId: post.id })
-        .catch(() => undefined)
+        .then(
+          () => null,
+          (error: unknown) => (error as Error).message
+        )
       await inUpload
       await during()
       release()
-      await run
+      return run
     }
 
     it.each(END_BY)(
@@ -1702,16 +1706,15 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         const author = await fx.member('author')
         const seeded = await fx.postCase({ author })
         const { post, storage } = await pendingPostWithImage(author.id)
-        const applied = await normalizeThrough(post, storage, async () => {
-          const banned = await ban(seeded.caseId, 'temporary')
+        const failure = await normalizeThrough(post, storage, async () => {
+          await ban(seeded.caseId, 'temporary')
           expect((await postOf(post.id)).status).toBe('flagged')
-          return void banned
-        }).then(async () => {
-          const { id } = await prisma.communitySanction.findFirstOrThrow({
-            where: { user_id: author.id },
-          })
-          return sanctionOf(id)
         })
+        expect(failure).toBeNull()
+        const { id: sanctionId } = await prisma.communitySanction.findFirstOrThrow({
+          where: { user_id: author.id },
+        })
+        const applied = await sanctionOf(sanctionId)
         const marker = banMarker(applied.id)
 
         // Nothing published, the object survives, and the row describes the bytes in storage.
@@ -1751,12 +1754,13 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
       async (_name, data) => {
         const author = await fx.member('author')
         const { post, storage } = await pendingPostWithImage(author.id)
-        await normalizeThrough(post, storage, async () => {
+        const failure = await normalizeThrough(post, storage, async () => {
           await communityPrivacyTransaction(prisma, async (tx) => {
             await guardCommunityPost(tx, post.id)
             await tx.lookbookPost.update({ where: { id: post.id }, data })
           })
         })
+        expect(failure).toContain('ownership expired')
         expect(storage.objects.has(post.image_object_path!)).toBe(false)
         expect((await postOf(post.id)).status).not.toBe('published')
       }
@@ -1765,12 +1769,13 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
     it('still removes the late object of a post the author withdrew during normalization', async () => {
       const author = await fx.member('author')
       const { post, storage } = await pendingPostWithImage(author.id)
-      await normalizeThrough(post, storage, async () => {
+      const failure = await normalizeThrough(post, storage, async () => {
         const withdrawn = await member(author.id).post(
           `/api/v1/community/posts/${post.id}/withdraw`
         )
         expect(withdrawn.status, dump(withdrawn)).toBe(200)
       })
+      expect(failure).toContain('ownership expired')
       expect(storage.objects.has(post.image_object_path!)).toBe(false)
     })
   })
@@ -1838,9 +1843,7 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         }
         storage.objects.set(objectPath, bytes)
       }
-      const old = processorWith(storage, passingEngine())
-        .process(job(post, 0))
-        .catch(() => undefined)
+      const old = processorWith(storage, passingEngine()).process(job(post, 0))
       await hold.inside
 
       await banAndRecover(seeded, post)
@@ -1859,6 +1862,38 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
       expect(after.image_byte_size).toBe(stored!.length)
     })
 
+    it('R6-1 an upload that finishes after recovery, before the current worker starts, still screens', async () => {
+      const { seeded, post, storage } = await pendingAuthor()
+      const hold = gated()
+      let uploads = 0
+      storage.upload = async (objectPath: string, bytes: Buffer) => {
+        uploads += 1
+        // The old worker is past its check and has not written anything yet.
+        if (uploads === 1) {
+          hold.entered()
+          await hold.gate
+        }
+        storage.objects.set(objectPath, bytes)
+      }
+      const original = storage.objects.get(post.image_object_path!)!
+      const old = processorWith(storage, passingEngine()).process(job(post, 0))
+      await hold.inside
+
+      await banAndRecover(seeded, post)
+      hold.release()
+      await old
+      const overwritten = storage.objects.get(post.image_object_path!)!
+      expect(overwritten.equals(original), 'the late upload wrote').toBe(false)
+
+      await processorWith(storage, passingEngine()).process(job(post, 1))
+      const after = await postOf(post.id)
+      expect(after.status).toBe('published')
+      const stored = storage.objects.get(after.image_object_path!)!
+      expect(after.image_checksum).toBe(sha256(stored))
+      expect(after.image_byte_size).toBe(stored.length)
+      expect(after.image_pending_checksum).toBeNull()
+    })
+
     it('R5-1 an upload that landed before recovery leaves the new generation able to screen', async () => {
       const { seeded, post, storage } = await pendingAuthor()
       const hold = gated()
@@ -1872,9 +1907,7 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
           await hold.gate
         }
       }
-      const old = processorWith(storage, passingEngine())
-        .process(job(post, 0))
-        .catch(() => undefined)
+      const old = processorWith(storage, passingEngine()).process(job(post, 0))
       await hold.inside
 
       await banAndRecover(seeded, post)
@@ -1953,32 +1986,68 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         })
       })
 
-      it('bytes matching neither declaration still fail, with a pending declaration set', async () => {
+      it('bytes matching neither declaration fail against the current declaration, not the pending one', async () => {
         const { post, storage } = await pendingAuthor()
-        loseWorker(storage, true)
+        const original = storage.objects.get(post.image_object_path!)!
+        loseWorker(storage, false)
         await expect(
           processorWith(storage, passingEngine()).process(job(post, 0))
         ).rejects.toThrow('worker lost')
         const pending = await postOf(post.id)
         expect(pending.image_pending_checksum).not.toBeNull()
+        expect(pending.image_pending_byte_size).not.toBe(original.length)
 
-        const tampered = await sharp({
-          create: { width: 512, height: 640, channels: 3, background: '#ff0000' },
-        })
-          .jpeg()
-          .toBuffer()
+        // The declared size and a different hash, so only the checksum can refuse these bytes.
+        const tampered = Buffer.from(original)
+        tampered[tampered.length - 10] = tampered[tampered.length - 10]! ^ 0xff
         storage.objects.set(post.image_object_path!, tampered)
-        await processorWith(storage, passingEngine())
-          .process(job(post, 0), { attempt: 1, maxAttempts: 3 })
-          .catch(() => undefined)
+        await processorWith(storage, passingEngine()).process(job(post, 0), {
+          attempt: 1,
+          maxAttempts: 3,
+        })
         const after = await postOf(post.id)
-        expect(after.status).not.toBe('published')
-        expect(after.image_checksum).toBe(pending.image_checksum)
-        expect(after.image_normalized_at).toBeNull()
+        expect(after).toMatchObject({
+          status: 'review_failed',
+          moderation_reason: 'IMAGE_CHECKSUM_MISMATCH',
+          image_checksum: pending.image_checksum,
+          image_normalized_at: null,
+        })
       })
 
       it('a later generation does not re-encode what an earlier one normalized', async () => {
         const { seeded, post, storage } = await pendingAuthor()
+        // A noisy JPEG, whose second encode gives different bytes, so the branch is really needed.
+        const noisy = await sharp({
+          create: {
+            width: 512,
+            height: 640,
+            channels: 3,
+            background: '#112233',
+            noise: { type: 'gaussian', mean: 128, sigma: 60 },
+          },
+        })
+          .jpeg({ quality: 100 })
+          .toBuffer()
+        const once = await verifyAndNormalizeCommunityImage(noisy, {
+          byteSize: noisy.length,
+          mimeType: 'image/jpeg',
+          sha256: sha256(noisy),
+        })
+        const twice = await verifyAndNormalizeCommunityImage(once.bytes, {
+          byteSize: once.byteSize,
+          mimeType: 'image/jpeg',
+          sha256: once.sha256,
+        })
+        expect(twice.sha256, 'this fixture must not be idempotent').not.toBe(once.sha256)
+        storage.objects.set(post.image_object_path!, noisy)
+        await communityPrivacyTransaction(prisma, async (tx) => {
+          await guardCommunityPost(tx, post.id)
+          await tx.lookbookPost.update({
+            where: { id: post.id },
+            data: { image_checksum: sha256(noisy), image_byte_size: noisy.length },
+          })
+        })
+
         let uploads = 0
         storage.upload = (objectPath: string, bytes: Buffer) => {
           uploads += 1
@@ -1994,9 +2063,7 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
             throw new Error('dependency unavailable')
           },
           screenText: () => Promise.reject(new Error('unused')),
-        })
-          .process(job(post, 0))
-          .catch(() => undefined)
+        }).process(job(post, 0))
         await hold.inside
         const normalized = await postOf(post.id)
         expect(normalized.image_normalized_at).not.toBeNull()
@@ -2004,7 +2071,7 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
 
         await banAndRecover(seeded, post)
         hold.release()
-        await old
+        await expect(old).rejects.toThrow('dependency unavailable')
 
         await processorWith(storage, passingEngine()).process(job(post, 1))
         const after = await postOf(post.id)
@@ -2054,37 +2121,28 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
     it.each([
       ['pass', passingEngine],
       [
-        'block',
-        () => ({
-          moderatePost: () =>
-            Promise.resolve({
-              disposition: 'block',
-              passed: false,
-              reasons: ['unsafe_class'],
-              engineVersion: 'old',
-            }),
-          screenText: () => Promise.reject(new Error('unused')),
-        }),
+        'flag',
+        () =>
+          new FixtureCommunityModerationEngine({
+            textOutcome: { passed: true, reasons: [] },
+            imageOutcome: { passed: false, reasons: ['unsafe_class'] },
+          }),
       ],
     ] as const)(
-      'an old %s verdict that lands after recovery changes nothing',
+      'an old %s verdict that lands after recovery changes nothing, and the new generation completes',
       async (_name, verdict) => {
         const { seeded, post, storage } = await pendingAuthor()
         const hold = gated()
-        const engine = verdict() as {
-          moderatePost: (input: never) => Promise<unknown>
-          screenText: (input: never) => Promise<unknown>
-        }
+        const engine = verdict()
         const old = processorWith(storage, {
-          ...engine,
-          moderatePost: async (input: never) => {
+          screenText: (input: Parameters<typeof engine.screenText>[0]) =>
+            engine.screenText(input),
+          moderatePost: async (input: Parameters<typeof engine.moderatePost>[0]) => {
             hold.entered()
             await hold.gate
             return engine.moderatePost(input)
           },
-        })
-          .process(job(post, 0))
-          .catch(() => undefined)
+        }).process(job(post, 0))
         await hold.inside
         await banAndRecover(seeded, post)
         const events = () => prisma.moderationEvent.count({ where: { post_id: post.id } })
@@ -2099,6 +2157,9 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         })
         expect(await outboxOf(post)).toMatchObject({ generation: 1, dispatched_at: null })
         expect(await events()).toBe(before)
+
+        await processorWith(storage, passingEngine()).process(job(post, 1))
+        expect((await postOf(post.id)).status).toBe('published')
       }
     )
 
@@ -2159,9 +2220,7 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
                 engineVersion: 'old',
               }
             },
-          })
-            .process(comment.id, 0)
-            .catch(() => undefined)
+          }).process(comment.id, 0)
           await hold.inside
           await recoverComment(seeded, comment)
           hold.release()
@@ -2307,6 +2366,56 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
         ban_prior_reason: null,
       })
     })
+  })
+
+  it('R6-3 a second ban on a case the fallback sweep returned to screening stores the status it left', async () => {
+    const teen = await fx.teen()
+    const reported = await fx.postCase({ author: teen })
+    const other = await fx.postCase({ author: teen })
+    const first = await ban(other.caseId, 'permanent')
+    expect((await postOf(reported.postId)).moderation_reason).toBe(
+      banMarker(first.sanctionId)
+    )
+    await fx.lapseConsent(teen.id)
+    const staff = await admin()
+    for (const status of ['requested', 'overturned'] as const) {
+      const appeal = await staff.appeal(first.sanctionId, { status, reason: REASON })
+      expect(appeal.status, dump(appeal)).toBe(200)
+    }
+    await sweep()
+    expect((await postOf(reported.postId)).status).toBe('pending_review')
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${teen.id}]::text[], ARRAY[]::text[], true)`
+      await tx.guardianConsent.updateMany({
+        where: { teen_id: teen.id },
+        data: { status: 'granted', revoked_at: null },
+      })
+    })
+
+    const mutationId = randomUUID()
+    const before = await staff.detail(reported.caseId)
+    const request = {
+      action: 'ban' as const,
+      reason: REASON,
+      ban: banTerms('temporary'),
+      mutationId,
+      expectedRevision: before.revision,
+    }
+    const second = await staff.decide(reported.caseId, request)
+    expect(second.status, dump(second)).toBe(200)
+    const body = decisionData(second)
+    expect((await postOf(reported.postId)).status).toBe('flagged')
+    expect(body.targetStatus).toBe('flagged')
+
+    const after = await staff.detail(reported.caseId)
+    expect(after.revision).toBe(body.revision)
+
+    const replay = await staff.decide(reported.caseId, request)
+    expect(replay.status, dump(replay)).toBe(200)
+    const replayed = decisionData(replay)
+    expect(replayed.replayed).toBe(true)
+    expect(replayed.targetStatus).toBe('flagged')
+    expect(replayed.revision).toBe(body.revision)
   })
 
   describe('an overturn of a permanent ban', () => {

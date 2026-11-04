@@ -810,12 +810,24 @@ A crash in the same window would fail a retry the same way, which predates this 
 Builder fixed it with a pending declaration recorded before the write, in `02c8c35e`, and `R5-1 an upload that landed before recovery` went red at `32a03b73` and passes on it.
 `the pending declaration around an object write` pins a worker lost before the write, a worker lost after it, bytes matching neither declaration, and no second encode by a later generation.
 
-Removing the pending reservation turned 4 of these tests red.
-Two seeded defects survived, and neither is a gap in behaviour:
+### Codex round 6
 
-- Trusting the pending column with no hash match survives because `verifyAndNormalizeCommunityImage` still rejects the bytes against that checksum, so tampered bytes never publish.
-- Skipping the `image_normalized_at` branch survives because re-encoding this fixture's normalized JPEG gives identical bytes, so no second upload happens either way.
-  The branch matters only for an encoder that is not idempotent on its own output, which no test here can produce with real Sharp.
+R6-1 adds Codex's exact schedule: the old worker is past its check and paused before writing, recovery runs, the old upload finishes, and only then does the current worker start.
+R6-2: the old block verdict test threw a TypeError on a mis-shaped engine result, and a `.catch(() => undefined)` on the call under test hid it, so it never reached the fence.
+It now uses a real fixture engine with a flagged verdict, requires the old process to resolve, and requires the new generation to complete.
+That catch pattern is gone from every call under test in the moderation suites, and the callers state whether old work resolves or rejects.
+R6-3 runs an existing report through the fallback sweep to a second ban before screening finishes, and the response, replay and detail revision must agree.
+
+Every seeded defect now goes red on top of R6-3, which is red without its source fix:
+
+| Defect                                    | Further tests red                                                             |
+| :---------------------------------------- | :---------------------------------------------------------------------------- |
+| `flagPost` ownership check removed        | 1, the old flag verdict                                                       |
+| Pending column trusted with no hash match | 1, which now requires `IMAGE_CHECKSUM_MISMATCH` on bytes of the declared size |
+| `image_normalized_at` branch skipped      | 1, on a noisy JPEG the test proves is not idempotent                          |
+| No reservation before the write           | 5                                                                             |
+
+Both defects that survived the first image tests die here.
 
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
