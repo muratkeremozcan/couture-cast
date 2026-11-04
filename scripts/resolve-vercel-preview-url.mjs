@@ -11,6 +11,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync, execSync } from 'node:child_process'
 import {
+  deploymentBuiltFromBranch,
   deterministicBranchAliasUrl,
   gitBranchAliasForDeployment,
 } from './vercel-branch-alias.mjs'
@@ -393,12 +394,16 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
 
     logDeploymentDetails(deployment)
 
-    // An alias belongs to the branch that built the deployment; the unfiltered fallback lists other branches too.
-    const ref = deployment.meta?.githubCommitRef
-    const aliasUrl =
-      ref === branch || ref === branchSlug
-        ? await findGitBranchAliasUrl(deployment, teamId)
-        : undefined
+    // The unfiltered fallback lists other branches too. An alias or a canonical URL of another branch's
+    // build would test the wrong code, so only a deployment built from exactly this branch counts.
+    if (!deploymentBuiltFromBranch(deployment, branch)) {
+      logDebug(
+        `Skipping a deployment built from another branch (${deployment.meta?.githubCommitRef})`
+      )
+      continue
+    }
+
+    const aliasUrl = await findGitBranchAliasUrl(deployment, teamId)
     if (aliasUrl) return aliasUrl
 
     // A canonical URL is locked to its commit, so it only helps when no

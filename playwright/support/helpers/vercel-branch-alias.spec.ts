@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   DNS_LABEL_MAX,
+  deploymentBuiltFromBranch,
   deterministicBranchAliasUrl,
   gitBranchAliasForDeployment,
   pickGitBranchAlias,
@@ -89,5 +90,19 @@ describe('gitBranchAliasForDeployment', () => {
     const fetchAliases = vi.fn(() => Promise.resolve([HASHED_ALIAS]))
     expect(await gitBranchAliasForDeployment({}, fetchAliases)).toBeUndefined()
     expect(fetchAliases).not.toHaveBeenCalled()
+  })
+})
+
+describe('deploymentBuiltFromBranch', () => {
+  it('matches only the exact raw git ref', () => {
+    const built = (githubCommitRef?: string) => ({ meta: { githubCommitRef } })
+    expect(deploymentBuiltFromBranch(built('feature/a'), 'feature/a')).toBe(true)
+    // A slug match would accept another branch.
+    expect(deploymentBuiltFromBranch(built('feature-a'), 'feature/a')).toBe(false)
+    expect(deploymentBuiltFromBranch(built('feature/a'), 'feature-a')).toBe(false)
+    expect(deploymentBuiltFromBranch(built('main'), 'feature/a')).toBe(false)
+    expect(deploymentBuiltFromBranch(built(undefined), 'feature/a')).toBe(false)
+    expect(deploymentBuiltFromBranch({}, 'feature/a')).toBe(false)
+    expect(deploymentBuiltFromBranch(built('feature/a'), undefined)).toBe(false)
   })
 })

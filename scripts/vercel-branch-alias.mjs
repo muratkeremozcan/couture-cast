@@ -40,6 +40,17 @@ export function pickGitBranchAlias(aliases) {
 }
 
 /**
+ * Whether Vercel built the deployment from exactly this branch. `meta.githubCommitRef` is the raw
+ * git ref (`feature/a`), so a slug match would also accept another branch (`feature-a`).
+ * @param {Record<string, any>} deployment
+ * @param {string | undefined} branch
+ * @returns {boolean}
+ */
+export function deploymentBuiltFromBranch(deployment, branch) {
+  return Boolean(branch) && deployment?.meta?.githubCommitRef === branch
+}
+
+/**
  * A deployment's git-branch alias URL: from its own `alias` list when it has one, else from Vercel.
  * @param {Record<string, any>} deployment
  * A failed alias request counts as no alias, so the caller can try the next candidate or its fallback.

@@ -8,6 +8,11 @@ export function deterministicBranchAliasUrl(
 ): string | undefined
 /** The git-branch alias URL among a deployment's alias hostnames. */
 export function pickGitBranchAlias(aliases: unknown): string | undefined
+/** Whether Vercel built the deployment from exactly this branch (the raw git ref). */
+export function deploymentBuiltFromBranch(
+  deployment: { meta?: { githubCommitRef?: string } },
+  branch: string | undefined
+): boolean
 /** A deployment's git-branch alias URL: from its own `alias` list, else from Vercel. */
 export function gitBranchAliasForDeployment(
   deployment: { uid?: string; id?: string; alias?: string[] },
