@@ -6,29 +6,33 @@
 // P-D-ROLES lives in playwright/tests/api/auth-moderation-security.spec.ts.
 // Two kinds of test share this file.
 // Live tests need no database: they sign up a throwaway moderator through the product API, so they run on a
-// local stack and on a Vercel preview alike, and assert the closed contract when a flag is off there.
+// local stack and on a Vercel preview alike. Each environment's flag state is pinned, see `closedWriteCode`.
 // Seeded tests need direct database access and run on a local stack only.
 // Every seeded row carries a run id and nothing is deleted: AuditLog is immutable and its user_id is a
 // RESTRICT key.
-// The flags stay at the seeded value (RG5), so the disabled state is a routed 503 plus the real flag in the
-// API integration suite.
+// The flags stay at the seeded value (RG5), so a disabled state on a local stack is a routed answer plus the
+// real flag in the API integration suite.
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { PrismaClient } from '@prisma/client'
-import type {
-  APIRequestContext,
-  BrowserContextOptions,
-  Locator,
-  Page,
-  TestInfo,
-  WebSocket,
+import {
+  errors,
+  type APIRequestContext,
+  type BrowserContextOptions,
+  type Locator,
+  type Page,
+  type Request,
+  type TestInfo,
+  type WebSocket,
 } from '@playwright/test'
 import {
   communityBannedErrorSchema,
   communityFeedResponseSchema,
   communitySpotlightResponseSchema,
+  MODERATION_QUEUE_MAX_LIMIT,
   moderationCaseDetailResponseSchema,
+  moderationCasesResponseSchema,
   moderationDecisionErrorSchema,
   moderationDecisionResponseSchema,
   type ModerationDecisionAction,
@@ -189,6 +193,7 @@ type Fixtures = {
   openAs: OpenAs
 }
 
+// These fixtures seed this story's rows and no other spec uses them, so they stay beside the tests.
 const test = base.extend<Fixtures>({
   prisma: async ({}, use, testInfo) => {
     test.skip(isNonLocalEnvironment(testInfo), NO_DATABASE)
@@ -390,6 +395,35 @@ async function spotlightIds(
   return { level: data.level, ids: data.items.map((item) => item.id) }
 }
 
+/** Every case id one queue status holds, as a moderator reads it through the API, walked to the last page. */
+async function queueCaseIds(
+  apiRequest: ApiRequest,
+  testInfo: TestInfo,
+  moderatorId: string,
+  status: 'open' | 'resolved'
+) {
+  const ids: string[] = []
+  let cursor: string | null = null
+  do {
+    const result: { status: number; body: unknown } = await apiRequest<unknown>({
+      method: 'GET',
+      path: '/api/v1/moderation/cases',
+      baseUrl: resolveApiBaseUrl(testInfo),
+      headers: authHeaders(moderatorId, 'moderator'),
+      params: {
+        status,
+        limit: MODERATION_QUEUE_MAX_LIMIT,
+        ...(cursor ? { cursor } : {}),
+      },
+    })
+    expect(result.status, JSON.stringify(result.body)).toBe(200)
+    const { data } = moderationCasesResponseSchema.parse(result.body)
+    ids.push(...data.items.map((item) => item.caseId))
+    cursor = data.nextCursor
+  } while (cursor)
+  return ids
+}
+
 /** Opens the community section on the `all` filter, where a newly published look leads. */
 async function openCommunity(page: Page, postId: string) {
   await page.goto(COMMUNITY_URL)
@@ -467,13 +501,19 @@ async function expectTargetsAt44(scope: Locator, label: string) {
   }
 }
 
-/** Counts every non-empty text the one polite region takes, so a repeated announcement shows. */
+/**
+ * Lists every text the one polite region takes, compared with its previous raw text.
+ * Clearing the region and setting the same words again is two announcements, so it shows as two.
+ */
 async function watchAnnouncements(page: Page) {
   await outcomeOf(page).evaluate((node) => {
     const seen: string[] = []
+    let previous = node.textContent?.trim() ?? ''
     new MutationObserver(() => {
       const text = node.textContent?.trim() ?? ''
-      if (text && seen[seen.length - 1] !== text) seen.push(text)
+      if (text === previous) return
+      previous = text
+      if (text) seen.push(text)
     }).observe(node, { subtree: true, childList: true, characterData: true })
     Object.defineProperty(window, '__cc611Announcements', { value: seen })
   })
@@ -493,46 +533,69 @@ async function decisionRows(prisma: PrismaClient, caseId: string) {
 
 /** The socket revalidates every 4 to 6 seconds (D8), so this covers two rounds and the read after them. */
 const REALTIME_WINDOW_MS = 20_000
+/** How long a test that says nothing more is sent keeps listening for a late request. */
+const QUIET_WINDOW_MS = 2_000
+
+const pathOf = (request: Request) => new URL(request.url()).pathname
+const isDecisionPost = (request: Request) =>
+  request.method() === 'POST' && pathOf(request).endsWith('/decisions')
+const isCaseRead = (request: Request) =>
+  request.method() === 'GET' &&
+  /^\/api\/v1\/moderation\/cases\/[^/]+$/.test(pathOf(request))
+const isFeedRead = (request: Request) =>
+  request.method() === 'GET' && pathOf(request) === '/api/v1/community/feed'
+
+/** Keeps the URL of every matching request from now on, in flight or answered. */
+function trackRequests(page: Page, matches: (request: Request) => boolean) {
+  const seen: string[] = []
+  // playwright-utils deviation: interceptNetworkCall settles on the first match, and this counts them all.
+  page.on('request', (request) => {
+    if (matches(request)) seen.push(request.url())
+  })
+  return seen
+}
+
+/** Fails the moment a matching request starts inside the window, and passes when the window ends quiet. */
+async function expectNoFurtherRequest(
+  page: Page,
+  matches: (request: Request) => boolean,
+  label: string
+) {
+  // playwright-utils deviation: interceptNetworkCall has no way to assert that a request never comes.
+  const late = await page
+    .waitForRequest(matches, { timeout: QUIET_WINDOW_MS })
+    .catch((error: unknown) => {
+      if (error instanceof errors.TimeoutError) return null
+      throw error
+    })
+  expect(late?.url() ?? null, label).toBeNull()
+}
+
+/** Nothing left the page, nothing is about to, and nothing was written. */
+async function expectNoDecisionSent(
+  page: Page,
+  posts: string[],
+  prisma: PrismaClient,
+  caseId: string
+) {
+  await expectNoFurtherRequest(page, isDecisionPost, 'a decision POST')
+  expect(posts).toEqual([])
+  expect(await decisionRows(prisma, caseId)).toHaveLength(0)
+}
 
 // ---------------------------------------------------------------------------------------------------
 // Live tests: no database, safe on a preview.
 // ---------------------------------------------------------------------------------------------------
 
 /**
- * Asks the API whether both flags are open for a moderator. A valid body on an unknown case answers 404
- * when they are, and 503 with a closed code when one is off. Anything else is a defect and fails here.
+ * The code a moderator's write answers in this environment, or null when the route is open.
+ * A local stack seeds both flags on. A deployed preview runs no seed, so both stay at their default off,
+ * and the route reads the console flag first. Turning a flag on for previews changes this line on purpose.
  */
-// playwright-utils deviation: apiRequest returns only status and body, and these two tests read Cache-Control.
-async function decisionsAreOpen(
-  request: APIRequestContext,
-  testInfo: TestInfo,
-  moderatorId: string
-) {
-  const response = await request.post(
-    `${resolveApiBaseUrl(testInfo)}/api/v1/moderation/cases/post.never-existed-probe/decisions`,
-    {
-      headers: authHeaders(moderatorId, 'moderator'),
-      data: {
-        action: 'resolve',
-        reason: 'Flag probe.',
-        mutationId: randomUUID(),
-        expectedRevision: '0000000000000000',
-      },
-    }
-  )
-  expect(response.headers()['cache-control']).toBe('private, no-store')
-  const { code } = moderationDecisionErrorSchema.parse(await response.json())
-  if (response.status() === 404) {
-    expect(code).toBe('case_not_found')
-    return { open: true, code }
-  }
-  expect(response.status()).toBe(503)
-  expect(['moderation_decisions_disabled', 'moderation_console_disabled']).toContain(code)
-  expect(isNonLocalEnvironment(testInfo), 'a local stack seeds both flags on').toBe(true)
-  return { open: false, code }
-}
+const closedWriteCode = (testInfo: TestInfo) =>
+  isNonLocalEnvironment(testInfo) ? 'moderation_console_disabled' : null
 
-/** A schema-valid case the disabled test serves itself, so it needs no stored case. */
+/** A schema-valid case the stubbed tests serve themselves, so they need no stored case. */
 const stubbedDetail = (
   caseId: string,
   allowedActions: ModerationDecisionAction[]
@@ -586,6 +649,32 @@ const stubbedDetail = (
     },
   })
 
+/** One page of the queue holding the stubbed case, so the walk to it needs no stored case. */
+const stubbedQueue = (caseId: string): unknown =>
+  moderationCasesResponseSchema.parse({
+    data: {
+      items: [
+        {
+          caseId,
+          source: 'post',
+          status: 'open',
+          risk: 'medium',
+          slaState: 'on_track',
+          slaDueAt: new Date(Date.now() + 20 * 3_600_000).toISOString(),
+          acceptedAt: new Date(Date.now() - 3_600_000).toISOString(),
+          escalated: false,
+          reportCount: 1,
+          reasons: ['spam'],
+          locale: 'en-US',
+          hasFinding: false,
+          excerpt: 'Stubbed caption',
+        },
+      ],
+      nextCursor: null,
+      serverNow: new Date().toISOString(),
+    },
+  })
+
 test.describe('Moderation decisions, live (Story 6.11)', () => {
   // A live moderator is made the way a product user is made, so a preview can have one.
   const liveModerator = (request: APIRequestContext, testInfo: TestInfo) =>
@@ -595,11 +684,12 @@ test.describe('Moderation decisions, live (Story 6.11)', () => {
       buildUniqueId('moderator', testInfo)
     )
 
-  test('[P1] P-D-PREVIEW-CLOSED the write routes answer per the flags, and no other role learns which', async ({
+  test('[P1] P-D-PREVIEW-CLOSED the write routes answer per this environment, and no other role learns which', async ({
     request,
+    apiRequest,
   }, testInfo) => {
     const moderatorId = await liveModerator(request, testInfo)
-    const { open, code } = await decisionsAreOpen(request, testInfo, moderatorId)
+    const closed = closedWriteCode(testInfo)
     const baseUrl = resolveApiBaseUrl(testInfo)
     const body = {
       action: 'resolve',
@@ -625,63 +715,87 @@ test.describe('Moderation decisions, live (Story 6.11)', () => {
       },
     ]
     for (const { path: route, data, missing } of routes) {
-      const url = `${baseUrl}${route}`
       for (const role of ['moderator', 'admin'] as const) {
-        const answer = await request.post(url, {
+        // playwright-utils deviation: apiRequest returns only status and body, and this reads Cache-Control.
+        const answer = await request.post(`${baseUrl}${route}`, {
           headers: authHeaders(moderatorId, role),
           data,
         })
         expect(answer.headers()['cache-control'], route).toBe('private, no-store')
         const parsed = moderationDecisionErrorSchema.parse(await answer.json())
-        if (open) {
-          expect(answer.status(), route).toBe(404)
-          expect(parsed.code).toBe(missing)
-        } else {
-          expect(answer.status(), route).toBe(503)
-          // The flag is read before the id, so a closed route cannot reveal which ids exist.
-          expect(parsed.code).toBe(code)
-        }
+        // The flag is read before the id, so a closed route cannot reveal which ids exist.
+        expect(answer.status(), route).toBe(closed ? 503 : 404)
+        expect(parsed.code, route).toBe(closed ?? missing)
       }
 
-      const anonymous = await request.post(url, { data })
-      expect(anonymous.status(), `anonymous ${route}`).toBe(401)
-      const guardian = await request.post(url, {
-        headers: authHeaders(buildUniqueId('guardian', testInfo), 'guardian'),
-        data,
-      })
-      expect(guardian.status(), `guardian ${route}`).toBe(403)
-      expect(await guardian.text()).toContain('Insufficient role')
-      const teen = await request.post(url, {
-        headers: authHeaders(buildUniqueId('teen', testInfo), 'teen'),
-        data,
-      })
-      expect(teen.status(), `teen ${route}`).toBe(403)
-      expect(await teen.text()).not.toContain('moderation_')
+      const post = (headers?: Record<string, string>) =>
+        apiRequest<unknown>({
+          method: 'POST',
+          path: route,
+          baseUrl,
+          ...(headers ? { headers } : {}),
+          body: data,
+          retryConfig: { maxRetries: 0 },
+        })
+      const anonymous = await post()
+      expect(anonymous.status, `anonymous ${route}`).toBe(401)
+      const guardian = await post(
+        authHeaders(buildUniqueId('guardian', testInfo), 'guardian')
+      )
+      expect(guardian.status, `guardian ${route}`).toBe(403)
+      expect(JSON.stringify(guardian.body)).toContain('Insufficient role')
+      const teen = await post(authHeaders(buildUniqueId('teen', testInfo), 'teen'))
+      expect(teen.status, `teen ${route}`).toBe(403)
+      expect(JSON.stringify(teen.body)).not.toContain('moderation_')
     }
   })
 
   test(
-    '[P1] P-D-PREVIEW-CLOSED an environment with a flag off keeps the console read-only in the browser',
+    '[P1] P-D-PREVIEW-CLOSED the real console in the browser matches this environment',
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ page, request }, testInfo) => {
       const moderatorId = await liveModerator(request, testInfo)
-      const { open, code } = await decisionsAreOpen(request, testInfo, moderatorId)
-      test.skip(open, 'Both flags are on here, so there is no closed state to observe.')
       await signInAs(page, moderatorId)
       await page.goto(QUEUE_URL)
-      if (code === 'moderation_console_disabled') {
+      if (closedWriteCode(testInfo)) {
         await expect(alertOf(page)).toContainText('The moderation console is turned off.')
         await expect(page.locator('a[href^="/moderation/cases/"]')).toHaveCount(0)
-        return
+      } else {
+        // The list is left out at zero items, so an empty queue is the other healthy answer.
+        await expect(
+          page.getByRole('list', { name: 'Cases' }).or(page.getByText('No open cases.'))
+        ).toBeVisible()
+        await expect(alertOf(page)).toHaveCount(0)
       }
-      // The console is open with decisions off: a case reads as before, and no form is on it.
-      await expect(
-        page.getByRole('list', { name: 'Cases' }).or(page.getByText('No open cases.'))
-      ).toBeVisible()
-      const link = page.locator('ol[aria-label="Cases"] a').first()
-      if ((await link.count()) === 0) return
-      await link.click()
+    }
+  )
+
+  test(
+    '[P1] P-D-PREVIEW-CLOSED with decisions off a case from the queue reads as before and carries no form',
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    async ({ page, request, interceptNetworkCall }, testInfo) => {
+      const moderatorId = await liveModerator(request, testInfo)
+      // Sign in first: a later route wins, so the stubs below sit above the preview API proxy.
+      await signInAs(page, moderatorId)
+      const caseId = 'post.stubclosed'
+      const headers = { 'cache-control': 'private, no-store' }
+      void interceptNetworkCall({
+        method: 'GET',
+        url: '**/api/v1/moderation/cases?*',
+        fulfillResponse: { status: 200, headers, body: stubbedQueue(caseId) },
+      })
+      // With the flag off the detail answers an empty list. P-D-DISABLED shows this stub with a form.
+      void interceptNetworkCall({
+        method: 'GET',
+        url: `**/api/v1/moderation/cases/${caseId}`,
+        fulfillResponse: { status: 200, headers, body: stubbedDetail(caseId, []) },
+      })
+      await page.goto(QUEUE_URL)
+      await page.locator(`a[href="${caseUrl(caseId)}"]`).click()
       await expect(page.getByRole('region', { name: 'Reporters' })).toBeVisible()
+      await expect(page.getByRole('region', { name: 'Content' })).toContainText(
+        'Stubbed caption'
+      )
       await expect(panelOf(page)).toHaveCount(0)
       await expect(page.getByRole('radio')).toHaveCount(0)
     }
@@ -762,10 +876,11 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
   test.describe('P-D-JOURNEY', () => {
     test('[P0] P-D-JOURNEY a moderator opens a case from the queue, resolves it and reads the outcome', async ({
       page,
+      apiRequest,
       prisma,
       fx,
       moderator,
-    }) => {
+    }, testInfo) => {
       const seeded = await fx.postCase({ reports: 2 })
       await signInAs(page, moderator.id)
       await page.goto(QUEUE_URL)
@@ -776,11 +891,10 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       for (let attempt = 0; attempt < 400 && (await link.count()) === 0; attempt++) {
         const more = page.getByRole('button', { name: 'Load more' })
         if (!(await more.isVisible())) break
-        const before = await page.locator('ol[aria-label="Cases"] > li').count()
+        const rows = page.locator('ol[aria-label="Cases"] > li')
+        const before = await rows.count()
         await more.click()
-        await expect
-          .poll(() => page.locator('ol[aria-label="Cases"] > li').count())
-          .toBeGreaterThan(before)
+        await expect(rows.nth(before)).toBeVisible()
       }
       await link.click()
       await expect(
@@ -805,14 +919,7 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       )
       await expect(submitButton(page)).toHaveAttribute('aria-disabled', 'false')
 
-      const reads: string[] = []
-      page.on('request', (request) => {
-        if (
-          request.method() === 'GET' &&
-          request.url().includes('/api/v1/moderation/cases/post.')
-        )
-          reads.push(request.url())
-      })
+      const reads = trackRequests(page, isCaseRead)
       // playwright-utils deviation: a passive watch on one real response, with no route in its way.
       const answered = page.waitForResponse((response) =>
         response.url().endsWith('/decisions')
@@ -822,6 +929,7 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
         await (await answered).json()
       ).data
       expect(applied.replayed).toBe(false)
+      // A resolve has no step after commit, so nothing can miss the bound.
       expect(applied.cacheInvalidation).toBe('completed')
 
       await expect(outcomeOf(page)).toHaveText('The reports are resolved.')
@@ -831,6 +939,7 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       await expect(prior).toContainText('Report resolved')
       await expect(prior).toContainText(reason)
       expect(reads, 'one reload after the outcome').toHaveLength(1)
+      await expectNoFurtherRequest(page, isCaseRead, 'a second read of the case')
 
       // Only what a resolved case still allows stays on the panel, and the reason is cleared.
       await expect(actionRadio(page, 'resolve')).toHaveCount(0)
@@ -866,11 +975,18 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
         role: 'moderator',
       })
 
-      // The case left the open queue.
+      // The case left the open queue. The list is left out at zero items, so an empty queue also answers.
       await page.getByRole('link', { name: 'Back to queue' }).click()
       await expect(page).toHaveURL(/\/moderation$/)
-      await expect(list).toBeVisible()
+      await expect(list.or(page.getByText('No open cases.'))).toBeVisible()
       await expect(link).toHaveCount(0)
+      // The page shows only the first page of a long queue, so the API proves the rest, and where the case went.
+      expect(
+        await queueCaseIds(apiRequest, testInfo, moderator.id, 'open')
+      ).not.toContain(seeded.caseId)
+      expect(
+        await queueCaseIds(apiRequest, testInfo, moderator.id, 'resolved')
+      ).toContain(seeded.caseId)
     })
 
     test('[P0] P-D-JOURNEY a release publishes a flagged post and a reader sees it', async ({
@@ -927,18 +1043,20 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       await openCase(page, seeded.caseId)
       const reason = 'The caption targets another member.'
       await fillDecision(page, 'takedown', reason)
+      const posts = trackRequests(page, isDecisionPost)
       await submitButton(page).click()
       // The step sends nothing until the moderator says yes.
       await expect(
         panelOf(page).getByRole('group', { name: /Take this content down/ })
       ).toBeVisible()
       await expect(confirmButton(page)).toBeFocused()
-      expect(await decisionRows(prisma, seeded.caseId)).toHaveLength(0)
+      await expectNoDecisionSent(page, posts, prisma, seeded.caseId)
 
       await confirmButton(page).click()
       await expect(outcomeOf(page)).toHaveText(
         'The content is down and the reports are resolved.'
       )
+      expect(posts, 'the yes sends the one decision').toHaveLength(1)
       await expect(page.getByText(/First decision/)).toBeVisible()
       const prior = page.getByRole('region', { name: 'Prior actions' })
       await expect(prior).toContainText('Taken down')
@@ -996,14 +1114,16 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
         expect(await decisionRows(prisma, seeded.caseId)).toHaveLength(1)
 
         // A conflict fetches nothing until the moderator asks, and then fetches once.
-        let reads = 0
-        other.on('request', (request) => {
-          if (request.method() === 'GET' && request.url().includes('/moderation/cases/'))
-            reads += 1
-        })
+        const reads = trackRequests(other, isCaseRead)
+        await expectNoFurtherRequest(
+          other,
+          isCaseRead,
+          'a read before the moderator asks'
+        )
         await alert.getByRole('button', { name: 'Reload case' }).click()
         await expect(other.getByText(/First decision/)).toBeVisible()
-        expect(reads).toBe(1)
+        expect(reads).toHaveLength(1)
+        await expectNoFurtherRequest(other, isCaseRead, 'a second read of the case')
         await expect(alert).toHaveCount(0)
         await expect(reasonBox(other), 'the reason survives the reload').toHaveValue(
           reason
@@ -1111,9 +1231,11 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
         socket.on('close', () => closed.push(socket.url()))
       })
       await openCommunity(page, seeded.postId)
-      await expect
-        .poll(() => ready.length, { timeout: REALTIME_WINDOW_MS })
-        .toBeGreaterThan(0)
+      await recurse(
+        () => Promise.resolve(ready.length),
+        (count) => count > 0,
+        { timeout: REALTIME_WINDOW_MS, interval: 100 }
+      )
       const openSockets = () => sockets.length - closed.length
       expect(openSockets()).toBeGreaterThan(0)
       await expect(noticeOf(page)).toHaveCount(0)
@@ -1161,7 +1283,12 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       await expect(noticeOf(page).getByRole('button')).toHaveCount(0)
       await expect(noticeOf(page)).not.toContainText(reason)
       await expect(cardOf(page, seeded.postId)).toHaveCount(0)
-      await expect.poll(openSockets, { timeout: REALTIME_WINDOW_MS }).toBe(0)
+      await recurse(
+        // Wrapped: recurse treats a falsy result as no result, and zero is the answer here.
+        () => Promise.resolve({ open: openSockets() }),
+        ({ open }) => open === 0,
+        { timeout: REALTIME_WINDOW_MS, interval: 100 }
+      )
 
       // A fresh read lands on the same notice.
       await page.reload()
@@ -1169,6 +1296,19 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       await expect(
         page.getByTestId('community-card-grid').getByRole('article')
       ).toHaveCount(0)
+
+      // The filters and the notifications link close with the feed, so a click on a chip reads nothing.
+      const chip = page.getByTestId('community-filter-all')
+      await expect(chip).toHaveAttribute('aria-disabled', 'true')
+      await expect(
+        page.getByRole('link', { name: 'Community notifications' })
+      ).toHaveCount(0)
+      const feedReads = trackRequests(page, isFeedRead)
+      // Forced: Playwright waits out an aria-disabled target, and a member's pointer does not.
+      await chip.click({ force: true })
+      await expectNoFurtherRequest(page, isFeedRead, 'a feed read from a closed filter')
+      expect(feedReads).toEqual([])
+      await expect(noticeOf(page)).toBeVisible()
 
       // Comment and reaction fail with the member's own view of the ban.
       const headers = memberHeaders(seeded.author.id)
@@ -1228,11 +1368,8 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       await expect(noticeOf(page)).toHaveCount(0)
 
       // A second member no longer sees the post on the next read, and the author's other look stays.
-      const ids = await recurse(
-        () => feedIds(apiRequest, testInfo, viewer.id),
-        (read) => !read.includes(seeded.postId),
-        { timeout: 10_000, interval: 250 }
-      )
+      const ids = await feedIds(apiRequest, testInfo, viewer.id)
+      expect(ids).not.toContain(seeded.postId)
       expect(ids).toContain(otherLook.id)
       const second = await openAs(viewer.id, 'guardian')
       await openCommunity(second, otherLook.id)
@@ -1293,21 +1430,28 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
     )
     expect(response.status, JSON.stringify(response.body)).toBe(200)
     const applied = moderationDecisionResponseSchema.parse(response.body).data
-    expect(applied.cacheInvalidation).toBe('completed')
+    // The spotlight bump has a 1000 ms bound. Past it the answer is `deferred` and the decision stands.
+    expect(['completed', 'deferred']).toContain(applied.cacheInvalidation)
 
-    // The next read: the window only covers the read itself, since no worker has to run first.
-    const after = await recurse(
-      async () => ({
-        feed: await feedIds(apiRequest, testInfo, viewer.id, WHOLE_FEED),
-        spotlight: await spotlightIds(apiRequest, testInfo, viewer.id),
-        teaser: await spotlightIds(apiRequest, testInfo, viewer.id, 'home_teaser'),
-      }),
-      (read) =>
-        !read.feed.includes(top) &&
-        !read.spotlight.ids.includes(top) &&
-        !read.teaser.ids.includes(top),
-      { timeout: 15_000, interval: 250 }
-    )
+    // The feed reads the post's status, so its next read holds on either answer.
+    expect(await feedIds(apiRequest, testInfo, viewer.id, WHOLE_FEED)).not.toContain(top)
+
+    const readSpotlight = async () => ({
+      spotlight: await spotlightIds(apiRequest, testInfo, viewer.id),
+      teaser: await spotlightIds(apiRequest, testInfo, viewer.id, 'home_teaser'),
+    })
+    // A completed bump owes the very next read, with no polling, so a worker catching up cannot pass for it.
+    // Only a deferred bump leaves the cache to the worker, so only that answer may wait for it.
+    const after =
+      applied.cacheInvalidation === 'completed'
+        ? await readSpotlight()
+        : await recurse(
+            readSpotlight,
+            (read) => !read.spotlight.ids.includes(top) && !read.teaser.ids.includes(top),
+            { timeout: 15_000, interval: 250 }
+          )
+    expect(after.spotlight.ids).not.toContain(top)
+    expect(after.teaser.ids).not.toContain(top)
     expect(after.spotlight.level, 'the rest of the cohort still holds').toBe('city')
     expect(after.spotlight.ids[0]).toBe(plan.expectedOrder[1])
     expect(after.teaser.ids[0]).toBe(plan.expectedOrder[1])
@@ -1378,11 +1522,12 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
     await signInAs(page, moderator.id)
     await openCase(page, seeded.caseId)
     await tabThroughPanel(page, 'Decided with a keyboard alone.')
+    const posts = trackRequests(page, isDecisionPost)
 
     // Confirm: focus moves to Yes, and Enter applies.
     await page.keyboard.press('Enter')
     await expectVisibleFocus(confirmButton(page), 'confirm')
-    expect(await decisionRows(prisma, seeded.caseId)).toHaveLength(0)
+    await expectNoDecisionSent(page, posts, prisma, seeded.caseId)
     await page.keyboard.press('Enter')
 
     // Outcome: focus lands on the outcome with a ring, past the reload.
@@ -1390,6 +1535,7 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       'The content is down and the reports are resolved.'
     )
     await expectVisibleFocus(outcomeOf(page), 'outcome')
+    expect(posts, 'the yes sends the one decision').toHaveLength(1)
     expect(await decisionRows(prisma, seeded.caseId)).toHaveLength(1)
 
     // The next Tab goes on from the outcome, so focus was never lost to the document.
@@ -1408,6 +1554,7 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
     await openCase(page, seeded.caseId)
     const reason = 'Reconsidered with a keyboard alone.'
     await tabThroughPanel(page, reason)
+    const posts = trackRequests(page, isDecisionPost)
 
     await page.keyboard.press('Enter')
     await expectVisibleFocus(confirmButton(page), 'confirm')
@@ -1416,7 +1563,7 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
     await expectVisibleFocus(cancel, 'cancel')
     await page.keyboard.press('Enter')
     await expect(cancel).toHaveCount(0)
-    expect(await decisionRows(prisma, seeded.caseId)).toHaveLength(0)
+    await expectNoDecisionSent(page, posts, prisma, seeded.caseId)
     await expect(reasonBox(page)).toHaveValue(reason)
     await expectVisibleFocus(submitButton(page), 'submit after cancel')
   })

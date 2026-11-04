@@ -5,8 +5,9 @@
 // across the three determinism runs. Every refusal names its own provider state.
 // Story 6.11 test owner: C-D-PACT, the decision and appeal writes, the fields they add to the case
 // detail, and the one refusal a banned member reads on the feed.
-// A closed value the state fixes (code, detail, replayed) is recorded exact so a provider that
-// answers another one fails verification. Volatile values (ids, revision, times) use matchers.
+// A closed value the state fixes (code, detail, replayed, targetStatus, active) is recorded exact,
+// so a provider that answers another one fails verification.
+// Volatile values (ids, revision, times) use matchers.
 import type { PactV4, V3MockServer } from '@pact-foundation/pact'
 import { createProviderState, setJsonContent } from '@seontechnologies/pactjs-utils'
 import { expect, vi } from 'vitest'
@@ -97,7 +98,7 @@ const sanctionBody = {
 
 /** An author with no ban on record, so the viewer's actions include one and no appeal step exists. */
 const standingClean = {
-  active: like(false),
+  active: false,
   sanction: nullValue(),
   priorBanCount: like(0),
   allowedAppealSteps: [],
@@ -175,7 +176,7 @@ const withImage = {
   // record the appeal request.
   banKinds: [],
   subjectStanding: {
-    active: like(true),
+    active: true,
     sanction: sanctionBody,
     priorBanCount: like(1),
     allowedAppealSteps: eachLike(regex(APPEAL_STEPS, 'requested')),
@@ -756,7 +757,7 @@ export async function verifyModerationDecisionAppliedInteraction(pact: PactV4) {
             revision: revision(NEXT_REVISION),
             caseStatus: 'resolved',
             escalated: false,
-            targetStatus: like('flagged'),
+            targetStatus: 'flagged',
             sanction: nullValue(),
             replayed: false,
             cacheInvalidation: regex(CACHE_OUTCOMES, 'completed'),
@@ -813,7 +814,7 @@ export async function verifyModerationDecisionReplayedInteraction(pact: PactV4) 
             revision: revision(NEXT_REVISION),
             caseStatus: 'resolved',
             escalated: false,
-            targetStatus: like('flagged'),
+            targetStatus: 'flagged',
             sanction: sanctionBody,
             replayed: true,
             cacheInvalidation: regex(CACHE_OUTCOMES, 'completed'),
@@ -971,8 +972,8 @@ export async function verifyModerationAppealInteraction(pact: PactV4) {
             decisionId: string('pact-decision-2'),
             decidedAt: iso(SERVER_NOW),
             sanction: { ...sanctionBody, appealStatus: 'requested' },
-            active: like(true),
-            restoredCount: like(0),
+            active: true,
+            restoredCount: 0,
             replayed: false,
             cacheInvalidation: regex(CACHE_OUTCOMES, 'completed'),
           },
