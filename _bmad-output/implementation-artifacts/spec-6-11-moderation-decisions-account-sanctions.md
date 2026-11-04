@@ -280,7 +280,7 @@ Decisions taken during the build under the owner's delegated approval:
 - The D11 backfill also skips canary, erasure-requested and anonymized posts, because a report row on them would open a case nobody can act on.
 - TEA-08 wins over the U-A wording in the test design, as the spec's change log says.
 - The target status now has localized labels under `moderation.targetStatus`, and an operator note has its own section in the case view.
-- A banned member's filter chips are `aria-disabled` on both navs, and the grid lifts the state through `onBannedChange`.
+- A banned member's page drops the filter nav, its heading, the notifications link and the spotlight, and the grid lifts the state to the layout through `onBannedChange`.
   A member whose ban ends while the page stays open sees the feed on the next reload or session change.
 - The banned notice uses the light lookbook surface it sits on, because that surface has no dark variant.
 
@@ -338,26 +338,30 @@ Residuals RG1 to RG8 are in the test design under Assumptions.
 The bmad-build lens fan-out did not run: TEA reviewed every commit as the independent reader, and the coordinator runs the Codex review after this log.
 All rows below were real and fixed.
 
-| Id         | Sev    | Finding                                                                                                                               | Fix                                                                           |
-| ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| F1         | high   | The foreign-key handler read `meta.field_name`, and Prisma reports `meta.constraint`, so a moderator with no `User` row got a 500     | `writeModerationRecord`                                                       |
-| F2         | high   | Non-audit record inserts answered 500 with the audit promise broken                                                                   | Same wrapper covers every record insert                                       |
-| F3         | high   | The appeal route computed its own viewer conflict                                                                                     | `appealViewerConflict` is shared                                              |
-| F4 to F6   | high   | The ban check sat behind allocate and publish replays and missed some reads                                                           | Check moved ahead of every replay and into `assertPublicPostReadable`         |
-| F7         | high   | A banned actor's engagement dropped other members' notifications                                                                      | The banned actor drops alone in the send guard                                |
-| F8         | high   | `key={detail.revision}` remounted the panel and lost the reason and focus                                                             | Key removed                                                                   |
-| F9, F10    | medium | The panel kept a chosen action or ban kind that a reload no longer offered                                                            | Effective action and kind through `stillOffered`                              |
-| F11 to F13 | medium | Focus fell to the body after a conflict reload, outcome text survived a case change, and the SLA announcement talked over the outcome | `focusSubmit` ref, outcome reset per case, `announceSla`                      |
-| F14        | medium | The mutation key survived an idempotency mismatch                                                                                     | Keeper cleared on mismatch                                                    |
-| F15 to F17 | medium | A banned member kept author states, the challenge and `canAct`, and non-JSON refusal bodies lost the code                             | Banned state clears them, tolerant code read                                  |
-| F18 to F20 | low    | The form lacked `aria-required`, `aria-invalid` and `noValidate`, and the notice announced through `role=status` on mount             | Attributes added, one live region                                             |
-| F21        | low    | Timer `unref` typing, and prettier merged two lines through ASI                                                                       | Explicit cast and statement separation                                        |
-| UI-A       | medium | The notice was a black card on the light page in dark mode                                                                            | Light surface classes only                                                    |
-| UI-B       | medium | The case view printed the raw status enum in every locale                                                                             | `moderation.targetStatus`                                                     |
-| UI-C       | medium | Banned page filters stayed live and fired three 403 reads per click                                                                   | `aria-disabled` chips, lifted state, zero reads                               |
-| UI-D       | low    | The notifications link stayed on the banned page, and settings showed Sign in with Sign out                                           | Link hidden; the settings fix moved to `fix/notification-settings-auth-links` |
-| UI-E       | low    | Operator words sat under the Machine findings heading                                                                                 | Own section                                                                   |
-| UI-F       | low    | 44-pixel global rule stretched radios, three Resolved labels stacked, and Reload stretched across the failure notice                  | `min-h-0 min-w-0`, header reduced, `self-start`                               |
+| Id           | Sev    | Finding                                                                                                                               | Fix                                                                           |
+| ------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| F1           | high   | The foreign-key handler read `meta.field_name`, and Prisma reports `meta.constraint`, so a moderator with no `User` row got a 500     | `writeModerationRecord`                                                       |
+| F2           | high   | Non-audit record inserts answered 500 with the audit promise broken                                                                   | Same wrapper covers every record insert                                       |
+| F3           | high   | The appeal route computed its own viewer conflict                                                                                     | `appealViewerConflict` is shared                                              |
+| F4 to F6     | high   | The ban check sat behind allocate and publish replays and missed some reads                                                           | Check moved ahead of every replay and into `assertPublicPostReadable`         |
+| F7           | high   | A banned actor's engagement dropped other members' notifications                                                                      | The banned actor drops alone in the send guard                                |
+| F8           | high   | `key={detail.revision}` remounted the panel and lost the reason and focus                                                             | Key removed                                                                   |
+| F9, F10      | medium | The panel kept a chosen action or ban kind that a reload no longer offered                                                            | Effective action and kind through `stillOffered`                              |
+| F11 to F13   | medium | Focus fell to the body after a conflict reload, outcome text survived a case change, and the SLA announcement talked over the outcome | `focusSubmit` ref, outcome reset per case, `announceSla`                      |
+| F14          | medium | The mutation key survived an idempotency mismatch                                                                                     | Keeper cleared on mismatch                                                    |
+| F15 to F17   | medium | A banned member kept author states, the challenge and `canAct`, and non-JSON refusal bodies lost the code                             | Banned state clears them, tolerant code read                                  |
+| F18 to F20   | low    | The form lacked `aria-required`, `aria-invalid` and `noValidate`, and the notice announced through `role=status` on mount             | Attributes added, one live region                                             |
+| F21          | low    | Timer `unref` typing, and prettier merged two lines through ASI                                                                       | Explicit cast and statement separation                                        |
+| UI-A         | medium | The notice was a black card on the light page in dark mode                                                                            | Light surface classes only                                                    |
+| UI-B         | medium | The case view printed the raw status enum in every locale                                                                             | `moderation.targetStatus`                                                     |
+| UI-C         | medium | Banned page filters stayed live and fired three 403 reads per click                                                                   | Nav leaves the page through `closed`, zero reads                              |
+| UI-D         | low    | The notifications link stayed on the banned page, and settings showed Sign in with Sign out                                           | Link hidden; the settings fix moved to `fix/notification-settings-auth-links` |
+| UI-E         | low    | Operator words sat under the Machine findings heading                                                                                 | Own section                                                                   |
+| UI-F         | low    | 44-pixel global rule stretched radios, three Resolved labels stacked, and Reload stretched across the failure notice                  | `min-h-0 min-w-0`, header reduced, `self-start`                               |
+| UI-G1, UI-G2 | medium | Closed chips kept a selected look, with their heading stranded from the notice                                                        | Same `closed` nav                                                             |
+| UI-G3        | low    | The chip row clipped mid-word, on main too                                                                                            | Wrap from 768 pixels, a right edge fade below                                 |
+| UI-G4        | low    | The section label sat against the divider once the link left                                                                          | `pt-6` when banned                                                            |
+| UI-G5        | medium | The spotlight said it was unavailable beside the notice                                                                               | Its `available` follows `feedVisible`                                         |
 
 ## Design Notes
 

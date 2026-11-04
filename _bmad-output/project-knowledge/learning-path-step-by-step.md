@@ -9558,7 +9558,8 @@ Hard-won lessons from the implementation and review of this story:
    TEA's locale screenshots caught it, and `moderation.targetStatus` now maps every post and comment status with an unknown fallback.
 7. **A notice is not a closed surface.**
    The banned page kept live climate chips, and one click fired a feed read, an events read and a probe, all 403.
-   The chips now go `aria-disabled` through a `disabled` prop, the grid lifts `onBannedChange` to the layout's second nav, the notifications link goes, and a click makes zero reads in the browser.
+   Disabled chips then kept a selected look and stranded a heading far from the notice, and the spotlight said it was temporarily unavailable beside the notice.
+   The grid now lifts `onBannedChange` to the layout, and the filter nav, its heading, the notifications link and the spotlight all leave the page.
 8. **A dark card needs a dark page.**
    The notice followed `prefers-color-scheme` while the lookbook surface around it stays light, so dark mode showed a black card on a white page.
    The notice now uses the surface it sits on.
@@ -9694,7 +9695,7 @@ Evidence boundaries:
   Mobile shows its existing denied state with no banned copy, as a named follow-up.
   A signed image URL issued before a decision lives up to 900 seconds.
   Appeal intake is operator-recorded, and the notice sends the member to support.
-  With the filters closed, a member whose ban ends while the page stays open sees the feed on the next reload or session change.
+  With the filters gone, a member whose ban ends while the page stays open sees the feed on the next reload or session change.
   The branch has 99 changed files, and `fix/notification-settings-auth-links` holds the settings page fix outside it.
   Screenshots under `_bmad-output/test-artifacts/story-6-11/` are git-ignored local evidence.
 
