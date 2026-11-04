@@ -97,11 +97,14 @@ export interface LoadedCase {
   }[]
 }
 
-const REASON_RANK_SQL = Prisma.raw(
-  `CASE reason ${Object.entries(MODERATION_REASON_RISK_RANK)
-    .map(([reason, rank]) => `WHEN '${reason}' THEN ${rank}`)
-    .join(' ')} ELSE 0 END`
-)
+// The SQL fragments build at call time, so importing this module never touches the Prisma namespace.
+// A spec that mocks `@prisma/client` with only the client class can still load the whole app.
+const reasonRankSql = () =>
+  Prisma.raw(
+    `CASE reason ${Object.entries(MODERATION_REASON_RISK_RANK)
+      .map(([reason, rank]) => `WHEN '${reason}' THEN ${rank}`)
+      .join(' ')} ELSE 0 END`
+  )
 const KNOWN_FINDING_CODES = Object.keys(COMMUNITY_MODERATION_REASON_CATEGORY)
 const MAX_RISK_RANK = MODERATION_RISK_BY_RANK.length - 1
 /** A locale the contract can carry: ASCII letters, digits and hyphens, 1 to 35 characters. */
@@ -111,7 +114,7 @@ const validLocale = (column: string) =>
 const DUE_KEY_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
 
 /** True when a post's `moderation_reason` holds at least one code and every code is a known screening code. */
-const POST_FINDING_SQL = Prisma.sql`COALESCE(
+const postFindingSql = () => Prisma.sql`COALESCE(
   p.moderation_reason IS NOT NULL
   AND EXISTS (
     SELECT 1 FROM unnest(string_to_array(p.moderation_reason, ',')) AS c(code)
@@ -149,7 +152,7 @@ export class ModerationQueueRepository {
           r.sla_due_at, r.resolved_at,
           COALESCE(${validLocale("(r.content_snapshot->>'locale')")}, ${validLocale('p.locale')}) AS locale,
           NULLIF(r.content_snapshot->>'caption', '') AS excerpt,
-          ${POST_FINDING_SQL} AS finding
+          ${postFindingSql()} AS finding
         FROM "CommunityPostReport" r
         LEFT JOIN "LookbookPost" p ON p.id = r.post_id
         ${reportFilter}`)
@@ -213,7 +216,7 @@ export class ModerationQueueRepository {
         SELECT source, case_key,
           count(*)::int AS report_count,
           array_agg(DISTINCT reason ORDER BY reason) AS reasons,
-          max(${REASON_RANK_SQL}) AS base_rank,
+          max(${reasonRankSql()}) AS base_rank,
           bool_or(finding) AS finding,
           (count(DISTINCT reporter_id) + count(*) FILTER (WHERE reporter_id IS NULL))::int AS reporters,
           count(*) FILTER (WHERE resolved_at IS NULL)::int AS open_count,
