@@ -569,14 +569,12 @@ export class ModerationSanctionsService {
         where: { id: comment.id },
         data: { screening_reason: comment.ban_prior_reason, ban_prior_reason: null },
       })
-    // What was never public goes back through screening. Permanent bans keep their rule (D8, CR-2).
-    if (sanction.kind === 'temporary') {
-      await returnBanHoldsToScreening(tx, subjectId, [sanction.id], at)
-      await tx.communitySanction.update({
-        where: { id: sanction.id },
-        data: { holds_released_at: at },
-      })
-    }
+    // An overturn means the ban was wrong, so what was never public goes back through screening.
+    await returnBanHoldsToScreening(tx, subjectId, [sanction.id], at)
+    await tx.communitySanction.update({
+      where: { id: sanction.id },
+      data: { holds_released_at: at },
+    })
     return posts.count + comments.count
   }
 }

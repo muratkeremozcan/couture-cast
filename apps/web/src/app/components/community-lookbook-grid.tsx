@@ -2681,20 +2681,14 @@ export function CommunityLookbookGrid({
         if (identity) void loadFeed(modeRef.current)
       }
     }
-    const erase = () => {
-      comments.reset()
-      clearScope()
-    }
     syncSession()
     const timer = setInterval(syncSession, 1000)
     window.addEventListener('storage', syncSession)
     window.addEventListener('couture:session', syncSession)
-    window.addEventListener('couture:account-erased', erase)
     return () => {
       clearInterval(timer)
       window.removeEventListener('storage', syncSession)
       window.removeEventListener('couture:session', syncSession)
-      window.removeEventListener('couture:account-erased', erase)
     }
   }, [comments, reactionState, loadFeed, resetSpotlight, liveSponsorships])
 
@@ -2920,7 +2914,7 @@ export function CommunityLookbookGrid({
           // A denied socket says nothing about why. One read asks, so a member banned while
           // the page was open sees the notice. A member already told needs no second answer.
           if (!bannedRef.current) {
-            // Erasure keeps the identity and retires the scope, so the answer checks the scope too.
+            // The answer belongs to the session scope it was asked in.
             const scope = feedScopeRef.current
             void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
               (error: unknown) => {

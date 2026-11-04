@@ -72,8 +72,9 @@ export class CommunityMaintenanceService {
   ) {}
 
   /**
-   * Returns what ended temporary bans held to screening (Story 6.11, CR-2). A ban ends by the clock
-   * with no request to hang off, so only a sweep can reach it. A member with an active ban stays out
+   * Returns what ended bans held to screening (Story 6.11, CR-2): a temporary ban that expired, or
+   * an overturn whose access check refused at the time. A ban ends by the clock with no request to
+   * hang off, so only a sweep can reach it. A member with an active ban stays out
    * until that ban ends, when every older marker releases with it. One transaction per subject, so
    * one bad subject cannot block the rest, and a failure still fails the job so an operator sees it.
    */
@@ -83,8 +84,7 @@ export class CommunityMaintenanceService {
     const subjects = await this.prisma.$queryRaw<{ user_id: string }[]>`
       SELECT s.user_id
       FROM "CommunitySanction" s
-      WHERE s.kind = 'temporary'
-        AND s.holds_released_at IS NULL
+      WHERE s.holds_released_at IS NULL
         AND (s.expires_at <= ${now} OR s.lifted_at IS NOT NULL)
         AND NOT EXISTS (
           SELECT 1 FROM "CommunitySanction" a
@@ -141,7 +141,6 @@ export class CommunityMaintenanceService {
     const ended = await tx.communitySanction.findMany({
       where: {
         user_id: subjectId,
-        kind: 'temporary',
         holds_released_at: null,
         OR: [{ expires_at: { lte: now } }, { lifted_at: { not: null } }],
       },

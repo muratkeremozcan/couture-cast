@@ -290,9 +290,6 @@ Left on purpose, with the reason:
 - SLA timers and escalation delivery: CC-6.12.
 - Database append-only enforcement and evidence retention, RG4 included: CC-6.13.
 - RG1, a signed URL issued before a decision lives up to 900 seconds: D12 records it as a known bound, and a signed URL cannot be revoked.
-- RG3, comment delete keeps the visible-post rule every member has: existing behavior outside this story.
-- A permanent ban's never-public rows stay held after an overturn: the owner ruling keeps permanent bans as they are, and an upgraded temporary ban's rows follow that rule because they carry the permanent marker.
-- `couture:account-erased` has listeners and no dispatcher in apps or packages: the web erasure flow predates this story and no 6.11 path raises it.
 
 Manual walk:
 
@@ -338,6 +335,9 @@ Entries marked (intent) tighten or extend frozen intent and were sent to the bui
 - Build-04 (D15, owner ruling). Mobile classifies `community_banned` as reason `banned`, carries the sanction, and shows `community-banned-notice.tsx` with the web copy in its ten catalogs. A ban closes the screen on any path: feed, spotlight page or a socket denial probe.
 - Build-05 (D16, owner ruling). The file limit is lifted, and the 90-file split rule and the budget table in Design Notes no longer apply.
 - Build-06 (D8, RG6, CR-3). `ban_prior_reason` on `LookbookPost` and `CommunityComment` keeps the machine reason a permanent ban's marker replaces, and an overturn restores it, so the post keeps its risk step.
+- Build-07 (D10, coordinator ruling). An overturn of any ban returns rows held only by its marker to screening, an upgraded temporary ban's rows included, and they never publish directly. Restoring what had been public stays per TEA-02. "Permanent bans keep today's behavior" in Build-03 means they do not expire.
+- Build-08 (coordinator ruling). `couture:account-erased` had listeners and no dispatcher, and no in-app web flow erases an account, so the grid and teaser listeners are gone.
+- Build-09 (TEA-18, RG3, coordinator ruling). A member can delete their own comment on a hidden post. It reveals nothing, and an unknown or foreign comment still answers the post's 404. The clients have no surface for a hidden post's thread, so this is the API right.
 - Build-02 (D11, Optic on PR 195). A screening report reads as identity state `unknown` with `origin: screening` on the reporter, where D11 said identity state `screening`. Adding that enum value is a breaking response change under `api-versioning.md`, and the one exemption the repo has is for deliberately open sets, which this closed set is not. The console shows the same Automated screening label from `origin`.
 - Build-01 (TEA-01, D2, review C2). The transaction order gains one step: case lock, replay check, case read, sanction eligibility locks, privacy guard, member lock, post row lock, then the re-read and revision check.
 

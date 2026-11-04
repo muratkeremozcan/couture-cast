@@ -5,7 +5,7 @@ ALTER TABLE "CommunitySanction" ADD COLUMN "holds_released_at" TIMESTAMP(3);
 
 CREATE INDEX "CommunitySanction_pending_hold_release_idx"
   ON "CommunitySanction" ("expires_at")
-  WHERE "kind" = 'temporary' AND "holds_released_at" IS NULL;
+  WHERE "holds_released_at" IS NULL;
 
 -- A retained BullMQ job under the same id swallows a re-enqueue, so a re-armed post gets a new id.
 ALTER TABLE "CommunityModerationOutbox" ADD COLUMN "generation" INTEGER NOT NULL DEFAULT 0;

@@ -9517,12 +9517,14 @@ Key takeaways:
    Active means not lifted and either no expiry or an expiry after a `new Date()` bound as a query parameter, so a temporary ban ends with no worker.
 6. **Retraction stays open during a ban.**
    Withdrawing one's own post and deleting one's own comment skip the check, because retraction is the author's right.
+   It also survives a takedown: a member can delete their own comment on a hidden post, and an unknown or foreign comment still answers the post's 404.
 7. **A ban holds content with a marker a lift can find.**
    Held rows carry `community_ban:<sanctionId>` in `moderation_reason` or `screening_reason`, the marker never leaves the API, and the author-state projection passes only recognized moderation categories.
    An overturned appeal always lifts the ban, and restoration runs only when `assertCommunityDatabaseAccess` passes under the subject guard, so a lifted ban cannot republish a teen's content after consent lapsed.
    A taken-down case target keeps its operator reason, stays down, and can be released from its case.
    Upgrading a temporary ban moves what it held to the permanent ban's marker, so overturning the permanent ban reaches it.
    When a temporary ban ends, `sweepExpiredBanHolds` returns what only it held to screening on the `maintenance` queue, because a ban ending has no request to hang off; `holds_released_at` makes the sweep retry-safe and a new outbox `generation` gives a re-armed post a job id no retained job can swallow.
+   An overturn of any ban returns its never-public rows to screening the same way.
    `ban_prior_reason` keeps a machine reason through a permanent ban, and an overturn restores it.
 8. **Screening intake is a report row.**
    `flagPost` writes a `CommunityPostReport` with a null reporter and `origin: screening`, as comment intake already did, so the queue, keyset, SLA, risk and erasure re-key apply unchanged.
@@ -9723,7 +9725,6 @@ Evidence boundaries:
 - **Known limits by design.**
   A signed image URL issued before a decision lives up to 900 seconds.
   Appeal intake is operator-recorded, and the notice sends the member to support.
-  A permanent ban's never-public rows stay held after an overturn, by owner ruling.
   With the filters gone, a member whose ban ends while the page stays open sees the feed on the next reload or session change.
   Screenshots under `_bmad-output/test-artifacts/story-6-11/` are git-ignored local evidence.
 
