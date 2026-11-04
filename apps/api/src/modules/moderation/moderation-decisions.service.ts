@@ -676,6 +676,9 @@ export class ModerationDecisionsService {
         kind: input.ban.kind,
       })
       await this.recordTargetAction(tx, loaded, effect, 'banned_by_operator')
+      // The hold can move the target too, a pending case's included, and the stored response and
+      // its revision have to describe the row a later read will see.
+      next = await this.readTargetStatus(tx, loaded)
     }
 
     const reportIds = decisionCaseOpenReportIds(loaded)
@@ -683,6 +686,25 @@ export class ModerationDecisionsService {
       await this.operator.resolveOpenPostReports(tx, reportIds, effect)
     else await this.operator.resolveOpenCommentReports(tx, reportIds, effect)
     return next
+  }
+
+  private async readTargetStatus(
+    tx: Tx,
+    { post, comment }: DecisionCase
+  ): Promise<string | null> {
+    if (post) {
+      const row = await tx.lookbookPost.findUnique({
+        where: { id: post.id },
+        select: { status: true },
+      })
+      return row?.status ?? null
+    }
+    if (!comment) return null
+    const row = await tx.communityComment.findUnique({
+      where: { id: comment.id },
+      select: { status: true },
+    })
+    return row?.status ?? null
   }
 
   private async releaseTarget(
