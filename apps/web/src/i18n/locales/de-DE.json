@@ -1102,6 +1102,23 @@
         "upheld": "Die Sperre bleibt bestehen.",
         "overturned": "Die Sperre ist aufgehoben. Die Inhalte des Mitglieds sind zurück, sofern es weiterhin berechtigt ist."
       }
+    },
+    "targetStatus": {
+      "draft": "Entwurf",
+      "uploading": "Wird hochgeladen",
+      "pending_review": "Wartet auf Screening",
+      "pending_screening": "Wartet auf Screening",
+      "published": "Veröffentlicht",
+      "flagged": "Ausgeblendet, zur Moderation zurückgehalten",
+      "review_failed": "Screening fehlgeschlagen",
+      "screening_failed": "Screening fehlgeschlagen",
+      "withdrawn": "Vom Autor zurückgezogen",
+      "consent_suspended": "Ausgesetzt, Einwilligung erloschen",
+      "held_for_review": "Zur Prüfung zurückgehalten",
+      "blocked": "Blockiert",
+      "author_deleted": "Vom Autor gelöscht",
+      "erased": "Gelöscht",
+      "unknown": "Anderer Status"
     }
   }
 }

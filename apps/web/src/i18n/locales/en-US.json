@@ -1102,6 +1102,23 @@
         "upheld": "The ban stays in place.",
         "overturned": "The ban is lifted. The member's content returned where they are still eligible."
       }
+    },
+    "targetStatus": {
+      "draft": "Draft",
+      "uploading": "Uploading",
+      "pending_review": "Waiting for screening",
+      "pending_screening": "Waiting for screening",
+      "published": "Published",
+      "flagged": "Hidden, held for moderation",
+      "review_failed": "Screening failed",
+      "screening_failed": "Screening failed",
+      "withdrawn": "Withdrawn by the author",
+      "consent_suspended": "Suspended, consent lapsed",
+      "held_for_review": "Held for review",
+      "blocked": "Blocked",
+      "author_deleted": "Deleted by the author",
+      "erased": "Erased",
+      "unknown": "Other status"
     }
   }
 }

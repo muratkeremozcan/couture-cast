@@ -1102,6 +1102,23 @@
         "upheld": "La suspension est maintenue.",
         "overturned": "La suspension est levée. Le contenu du membre est rétabli s'il reste éligible."
       }
+    },
+    "targetStatus": {
+      "draft": "Brouillon",
+      "uploading": "Envoi en cours",
+      "pending_review": "En attente de filtrage",
+      "pending_screening": "En attente de filtrage",
+      "published": "Publié",
+      "flagged": "Masqué, retenu pour modération",
+      "review_failed": "Échec du filtrage",
+      "screening_failed": "Échec du filtrage",
+      "withdrawn": "Retiré par l'auteur",
+      "consent_suspended": "Suspendu, consentement expiré",
+      "held_for_review": "Retenu pour examen",
+      "blocked": "Bloqué",
+      "author_deleted": "Supprimé par l'auteur",
+      "erased": "Effacé",
+      "unknown": "Autre statut"
     }
   }
 }

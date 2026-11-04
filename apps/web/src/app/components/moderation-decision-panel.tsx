@@ -60,11 +60,19 @@ export function DecisionFailureNotice({
     >
       <p>{message}</p>
       {retryable ? (
-        <button type="button" className={moderationControl} onClick={onRetry}>
+        <button
+          type="button"
+          className={`${moderationControl} self-start`}
+          onClick={onRetry}
+        >
           {t('moderation.state.retry')}
         </button>
       ) : (
-        <button type="button" className={moderationControl} onClick={onReload}>
+        <button
+          type="button"
+          className={`${moderationControl} self-start`}
+          onClick={onReload}
+        >
           {t('moderation.detail.reload')}
         </button>
       )}

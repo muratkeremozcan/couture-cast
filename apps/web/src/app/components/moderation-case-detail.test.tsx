@@ -50,7 +50,7 @@ describe('C-WEB-Q-DETAIL', () => {
       within(content).getByText('Alt the reporter saw', { selector: 'bdi' })
     ).toBeInTheDocument()
     expect(within(content).getByText('Current state')).toBeInTheDocument()
-    expect(within(content).getByText('published')).toBeInTheDocument()
+    expect(within(content).getByText('Status: Published')).toBeInTheDocument()
 
     const reporters = screen.getByRole('region', { name: 'Reporters' })
     expect(within(reporters).getByText('brave-owl-9876')).toBeInTheDocument()

@@ -1102,6 +1102,23 @@
         "upheld": "Askıya alma yürürlükte kalıyor.",
         "overturned": "Askıya alma kaldırıldı. Üye hâlâ uygunsa içeriği geri geldi."
       }
+    },
+    "targetStatus": {
+      "draft": "Taslak",
+      "uploading": "Yükleniyor",
+      "pending_review": "Tarama bekliyor",
+      "pending_screening": "Tarama bekliyor",
+      "published": "Yayımlandı",
+      "flagged": "Gizli, moderasyon için bekletiliyor",
+      "review_failed": "Tarama başarısız",
+      "screening_failed": "Tarama başarısız",
+      "withdrawn": "Yazar tarafından geri çekildi",
+      "consent_suspended": "Askıda, izin sona erdi",
+      "held_for_review": "İnceleme için bekletildi",
+      "blocked": "Engellendi",
+      "author_deleted": "Yazar tarafından silindi",
+      "erased": "Silindi",
+      "unknown": "Diğer durum"
     }
   }
 }

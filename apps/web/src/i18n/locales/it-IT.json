@@ -1102,6 +1102,23 @@
         "upheld": "La sospensione resta in vigore.",
         "overturned": "La sospensione è revocata. I contenuti del membro sono tornati, se è ancora idoneo."
       }
+    },
+    "targetStatus": {
+      "draft": "Bozza",
+      "uploading": "Caricamento",
+      "pending_review": "In attesa del controllo",
+      "pending_screening": "In attesa del controllo",
+      "published": "Pubblicato",
+      "flagged": "Nascosto, trattenuto per la moderazione",
+      "review_failed": "Controllo non riuscito",
+      "screening_failed": "Controllo non riuscito",
+      "withdrawn": "Ritirato dall'autore",
+      "consent_suspended": "Sospeso, consenso scaduto",
+      "held_for_review": "Trattenuto per la revisione",
+      "blocked": "Bloccato",
+      "author_deleted": "Eliminato dall'autore",
+      "erased": "Cancellato",
+      "unknown": "Altro stato"
     }
   }
 }

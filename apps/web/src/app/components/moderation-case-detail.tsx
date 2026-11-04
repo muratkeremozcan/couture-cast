@@ -351,7 +351,10 @@ function ContentSection({ detail }: { detail: ModerationCaseDetail }) {
             ) : (
               <>
                 <span>
-                  {t('moderation.detail.targetStatus')}: <code>{target.status}</code>
+                  {t('moderation.detail.targetStatus')}:{' '}
+                  {t(`moderation.targetStatus.${target.status ?? 'unknown'}`, {
+                    defaultValue: t('moderation.targetStatus.unknown'),
+                  })}
                 </span>
                 {target.publishedAt ? (
                   <span>
