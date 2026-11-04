@@ -810,6 +810,13 @@ A crash in the same window would fail a retry the same way, which predates this 
 Builder fixed it with a pending declaration recorded before the write, in `02c8c35e`, and `R5-1 an upload that landed before recovery` went red at `32a03b73` and passes on it.
 `the pending declaration around an object write` pins a worker lost before the write, a worker lost after it, bytes matching neither declaration, and no second encode by a later generation.
 
+Removing the pending reservation turned 4 of these tests red.
+Two seeded defects survived, and neither is a gap in behaviour:
+
+- Trusting the pending column with no hash match survives because `verifyAndNormalizeCommunityImage` still rejects the bytes against that checksum, so tampered bytes never publish.
+- Skipping the `image_normalized_at` branch survives because re-encoding this fixture's normalized JPEG gives identical bytes, so no second upload happens either way.
+  The branch matters only for an encoder that is not idempotent on its own output, which no test here can produce with real Sharp.
+
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
 Those failures were my setup, and the rerun below is the evidence.
