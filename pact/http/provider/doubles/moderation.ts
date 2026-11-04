@@ -21,6 +21,8 @@ export type ModerationScenario =
   | 'stale_cursor'
   | 'detail_with_image'
   | 'detail_without_image'
+  | 'detail_comment_resolved'
+  | 'detail_signing_failed'
   | 'unknown_case'
   | 'audit_unavailable'
 
@@ -176,6 +178,71 @@ export const moderationQueueServiceDouble = {
         code: 'audit_unavailable',
         message: 'The case view could not be recorded.',
       })
+    if (scenario === 'detail_comment_resolved')
+      return Promise.resolve(
+        moderationCaseDetailResponseSchema.parse({
+          data: {
+            ...baseDetail,
+            caseId,
+            source: 'comment',
+            status: 'resolved',
+            slaState: 'resolved',
+            locale: null,
+            subject: { state: 'unknown', alias: null },
+            snapshot: {
+              available: true,
+              caption: null,
+              altText: null,
+              body: 'A reported comment',
+              climateBand: null,
+              capturedAt: iso(-2),
+            },
+            target: {
+              state: 'live',
+              status: 'published',
+              publishedAt: iso(-5),
+              parentBody: 'The parent comment',
+            },
+            findings: null,
+            reporters: [
+              {
+                identity: { state: 'unknown', alias: null },
+                reason: 'other',
+                details: null,
+                reportedAt: iso(-2),
+                resolved: true,
+              },
+            ],
+            priorActions: [],
+            media: { state: 'unavailable', reason: 'no_image' },
+            viewerConflict: true,
+          },
+        })
+      )
+    if (scenario === 'detail_signing_failed')
+      return Promise.resolve(
+        moderationCaseDetailResponseSchema.parse({
+          data: {
+            ...baseDetail,
+            caseId,
+            snapshot: {
+              available: false,
+              caption: null,
+              altText: null,
+              body: null,
+              climateBand: null,
+              capturedAt: null,
+            },
+            findings: {
+              codes: [],
+              categories: [],
+              engineVersion: null,
+              operatorNote: 'Taken down by an operator',
+            },
+            media: { state: 'unavailable', reason: 'signing_failed' },
+          },
+        })
+      )
     const withoutImage = scenario === 'detail_without_image'
     return Promise.resolve(
       moderationCaseDetailResponseSchema.parse({

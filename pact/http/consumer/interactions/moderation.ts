@@ -174,7 +174,9 @@ async function withWebSession<T>(
   }
 }
 
-const consoleOn = 'The moderation console is on'
+// A non-moderator is refused before the flag is read, so the 403 interactions run with the console off.
+const consoleOff = 'The moderation console is turned off'
+const COMMENT_CASE_PATH = '/api/v1/moderation/cases/comment.pactcomment1'
 const state = (name: string) => createProviderState({ name, params: {} })
 
 export async function verifyModerationQueueInteraction(pact: PactV4) {
@@ -334,6 +336,142 @@ export async function verifyModerationCaseInteraction(pact: PactV4) {
       expect(data.target.state).toBe('erased')
       expect(data.reporters[0]?.identity).toEqual({ state: 'erased', alias: null })
     })
+
+  await pact
+    .addInteraction()
+    .given(...state('A moderator opens a resolved comment case with no findings'))
+    .uponReceiving(
+      'a moderator opening a resolved comment case with no findings and no image'
+    )
+    .withRequest(
+      'GET',
+      COMMENT_CASE_PATH,
+      setJsonContent({ headers: pactModeratorHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            caseId: string('comment.pactcomment1'),
+            source: regex('post|comment', 'comment'),
+            status: regex('open|resolved', 'resolved'),
+            risk: regex('low|medium|high', 'low'),
+            slaState: regex('on_track|at_risk|breached|resolved', 'resolved'),
+            slaDueAt: iso('2026-11-03T15:00:00.000Z'),
+            acceptedAt: iso('2026-11-03T10:00:00.000Z'),
+            serverNow: iso(SERVER_NOW),
+            reportCount: like(1),
+            locale: nullValue(),
+            subject: {
+              state: regex('alias|erased|unknown', 'unknown'),
+              alias: nullValue(),
+            },
+            snapshot: {
+              available: like(true),
+              caption: nullValue(),
+              altText: nullValue(),
+              body: like('A reported comment'),
+              climateBand: nullValue(),
+              capturedAt: iso('2026-11-03T10:00:00.000Z'),
+            },
+            target: {
+              state: regex('live|erased', 'live'),
+              status: like('published'),
+              publishedAt: iso('2026-11-03T07:00:00.000Z'),
+              parentBody: like('The parent comment'),
+            },
+            findings: nullValue(),
+            reporters: eachLike({
+              identity: {
+                state: regex('alias|erased|unknown', 'unknown'),
+                alias: nullValue(),
+              },
+              reason: regex(
+                'spam|harassment|inappropriate_content|hate_speech|violence|other',
+                'other'
+              ),
+              details: nullValue(),
+              reportedAt: iso('2026-11-03T10:00:00.000Z'),
+              resolved: like(true),
+            }),
+            priorActions: [],
+            media: {
+              state: regex('unavailable', 'unavailable'),
+              reason: regex(
+                'target_erased|anonymized|purged|no_image|signing_failed',
+                'no_image'
+              ),
+            },
+            viewerConflict: like(true),
+          },
+        },
+      })
+    )
+    .executeTest(async (server: V3MockServer) => {
+      const data = await withWebSession(server, pactModeratorAuth.accessToken, () =>
+        getModerationCaseFromWeb('comment.pactcomment1')
+      )
+      expect(data.source).toBe('comment')
+      expect(data.status).toBe('resolved')
+      expect(data.findings).toBeNull()
+      expect(data.locale).toBeNull()
+      expect(data.subject).toEqual({ state: 'unknown', alias: null })
+      expect(data.reporters[0]?.identity).toEqual({ state: 'unknown', alias: null })
+      expect(data.media).toEqual({ state: 'unavailable', reason: 'no_image' })
+      expect(data.target.parentBody).toBe('The parent comment')
+      expect(data.viewerConflict).toBe(true)
+    })
+
+  await pact
+    .addInteraction()
+    .given(...state('A moderator opens a case whose image cannot be signed'))
+    .uponReceiving('a moderator opening a case whose image cannot be signed')
+    .withRequest('GET', CASE_PATH, setJsonContent({ headers: pactModeratorHeaders }))
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            ...detailBody,
+            snapshot: {
+              available: like(false),
+              caption: nullValue(),
+              altText: nullValue(),
+              body: nullValue(),
+              climateBand: nullValue(),
+              capturedAt: nullValue(),
+            },
+            findings: {
+              codes: [],
+              categories: [],
+              engineVersion: nullValue(),
+              operatorNote: like('Taken down by an operator'),
+            },
+            media: {
+              state: regex('unavailable', 'unavailable'),
+              reason: regex(
+                'target_erased|anonymized|purged|no_image|signing_failed',
+                'signing_failed'
+              ),
+            },
+          },
+        },
+      })
+    )
+    .executeTest(async (server: V3MockServer) => {
+      const data = await withWebSession(server, pactModeratorAuth.accessToken, () =>
+        getModerationCaseFromWeb('post.pactpost1')
+      )
+      expect(data.media).toEqual({ state: 'unavailable', reason: 'signing_failed' })
+      expect(data.snapshot.available).toBe(false)
+      expect(data.findings).toEqual({
+        codes: [],
+        categories: [],
+        engineVersion: null,
+        operatorNote: 'Taken down by an operator',
+      })
+    })
 }
 
 type Refusal = {
@@ -352,8 +490,8 @@ type Refusal = {
 
 export const moderationRefusals: Refusal[] = [
   {
-    name: 'a guardian reading the queue',
-    given: consoleOn,
+    name: 'a guardian reading the queue while the console is off',
+    given: consoleOff,
     path: QUEUE_PATH,
     headers: pactEventHeaders,
     token: pactEventAuth.accessToken,
@@ -368,8 +506,8 @@ export const moderationRefusals: Refusal[] = [
     call: () => listModerationCasesFromWeb({ filters: { status: 'open' } }),
   },
   {
-    name: 'a guardian opening a case',
-    given: consoleOn,
+    name: 'a guardian opening a case while the console is off',
+    given: consoleOff,
     path: CASE_PATH,
     headers: pactEventHeaders,
     token: pactEventAuth.accessToken,
@@ -384,7 +522,7 @@ export const moderationRefusals: Refusal[] = [
   },
   {
     name: 'a moderator reading the queue while the console is off',
-    given: 'The moderation console is turned off',
+    given: consoleOff,
     path: QUEUE_PATH,
     headers: pactModeratorHeaders,
     token: pactModeratorAuth.accessToken,

@@ -159,6 +159,14 @@ export const stateHandlers: StateHandlers = {
     'detail_without_image',
     'Configured a case whose target and image are gone'
   ),
+  'A moderator opens a resolved comment case with no findings': moderationState(
+    'detail_comment_resolved',
+    'Configured a resolved comment case with no findings and no image'
+  ),
+  'A moderator opens a case whose image cannot be signed': moderationState(
+    'detail_signing_failed',
+    'Configured a case whose image signing failed and whose snapshot is gone'
+  ),
   'A moderator opens a case that does not exist': moderationState(
     'unknown_case',
     'Configured an unknown case id'

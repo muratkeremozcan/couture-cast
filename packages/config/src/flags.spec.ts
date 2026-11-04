@@ -55,9 +55,9 @@ describe('feature flag registry', () => {
     // console flag is its own control. A degraded PostHog with no cache row must never open it.
     expect(getDefaultFeatureFlagValue('moderation_console_enabled')).toBe(false)
     expect(FEATURE_FLAG_KEYS).toContain('moderation_console_enabled')
-    expect(FEATURE_FLAG_KEYS.filter((key) => key.startsWith('moderation_'))).toEqual([
-      'moderation_console_enabled',
-    ])
+    // Separate keys are the whole point of D4: one flag can close while the other stays open.
+    expect(FEATURE_FLAG_KEYS).toContain('community_read_enabled')
+    expect('moderation_console_enabled').not.toBe('community_read_enabled')
   })
 
   it('6.10-CFG-002: resolves the console flag to false when PostHog and the cache both fail', async () => {

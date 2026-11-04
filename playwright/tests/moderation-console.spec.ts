@@ -8,6 +8,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { PrismaClient } from '@prisma/client'
 import type { Locator, Page, Route } from '@playwright/test'
+import {
+  moderationCaseDetailResponseSchema,
+  moderationMediaUnavailableReasonSchema,
+} from '@couture/api-client/contracts/http'
 import { test as base, expect } from '../support/fixtures/merged-fixtures'
 import { checkA11y } from '../support/helpers/accessibility'
 import { authHeaders, resolveApiBaseUrl } from '../support/helpers/api-test'
@@ -79,7 +83,8 @@ async function loadCases(page: Page, caseIds: string[]) {
   const linkFor = (caseId: string) => page.locator(`a[href="${caseUrl(caseId)}"]`)
   const list = page.getByRole('list', { name: 'Cases' })
   await expect(list).toBeVisible()
-  for (let attempt = 0; attempt < 40; attempt++) {
+  // A long-lived local database can hold thousands of older open cases, so walk until the queue ends.
+  for (let attempt = 0; attempt < 400; attempt++) {
     const present = await Promise.all(
       caseIds.map(async (caseId) => (await linkFor(caseId).count()) > 0)
     )
@@ -466,17 +471,18 @@ test.describe('Moderator console (Story 6.10)', () => {
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ page, queue }) => {
       // The flag path is proven against the real API in the integration and Pact suites.
-      // A flag flip here would race every other worker, so the browser asserts the rendering of the real 503 body.
+      // A flag flip here would race every other worker, so the browser renders the controller's exact 503 body.
       await signInAs(page, queue.moderator.id)
       await page.route('**/api/v1/moderation/cases**', async (route) => {
         await route.fulfill({
           status: 503,
           contentType: 'application/json',
           headers: { 'cache-control': 'private, no-store' },
+          // The exact body the controller throws, which the contract requires to carry a message.
           json: {
             statusCode: 503,
-            error: 'Service Unavailable',
             code: 'moderation_console_disabled',
+            message: 'The moderation console is not available.',
           },
         })
       })
@@ -485,6 +491,34 @@ test.describe('Moderator console (Story 6.10)', () => {
       await expect(page.getByRole('list', { name: 'Cases' })).toHaveCount(0)
     }
   )
+
+  test('[P0] P-Q-MEDIA-REAL the unstubbed API answers a closed media block for a post with an image', async ({
+    request,
+    queue,
+  }, testInfo) => {
+    // The stubbed test above proves the browser handles a signed URL.
+    // This one holds the real API to the contract: no storage locally means a closed reason, never a raw path.
+    const response = await request.get(
+      `${resolveApiBaseUrl(testInfo)}/api/v1/moderation/cases/${queue.expectations.A!.caseId}`,
+      { headers: authHeaders(queue.moderator.id, 'moderator') }
+    )
+    expect(response.status()).toBe(200)
+    const body = moderationCaseDetailResponseSchema.parse(await response.json())
+    const { media } = body.data
+    if (media.state === 'available') {
+      expect(media.url).toMatch(/^https?:\/\//)
+      expect(Date.parse(media.expiresAt)).toBeGreaterThan(Date.now())
+    } else {
+      expect(moderationMediaUnavailableReasonSchema.options).toContain(media.reason)
+      // A post that has an image can only fail to sign, never claim to have none.
+      expect(media.reason).toBe('signing_failed')
+    }
+    // The object path appears only inside a signed URL, so check everything except media.
+    const rest = { ...body.data, media: null }
+    expect(JSON.stringify(rest)).not.toContain(
+      queue.posts.A.image_object_path ?? 'no-path'
+    )
+  })
 
   test('[P1] P-Q-AXE the queue and the case pass axe in light and dark', async ({
     page,
