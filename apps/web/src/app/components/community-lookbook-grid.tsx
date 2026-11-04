@@ -434,6 +434,8 @@ export interface LookbookFilterNavProps {
   onTabChange: (tab: FilterCategory) => void
   /** The band `auto` resolved to, so that chip can name it instead of saying "your climate". */
   viewerBand?: ClimateBand | null
+  /** Story 6.11: a banned member has no feed to filter. The chips keep their place and do nothing. */
+  disabled?: boolean
 }
 
 export function LookbookFilterNav({
@@ -441,10 +443,12 @@ export function LookbookFilterNav({
   isMobilePreview = false,
   onTabChange,
   viewerBand = null,
+  disabled = false,
 }: LookbookFilterNavProps) {
   const { t } = useCommunityTranslation()
 
   const handleTabClick = (tab: FilterCategory) => {
+    if (disabled) return
     onTabChange(tab)
     try {
       if (typeof window !== 'undefined' && typeof posthog.capture === 'function') {
@@ -492,7 +496,8 @@ export function LookbookFilterNav({
                 handleTabClick(mode)
               }}
               aria-pressed={isActive}
-              className={`min-h-[44px] shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-xs uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${tabletStyles} ${activeStyles}`}
+              aria-disabled={disabled || undefined}
+              className={`${disabled ? 'cursor-not-allowed opacity-50 ' : ''}min-h-[44px] shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-xs uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${tabletStyles} ${activeStyles}`}
             >
               {modeLabel(mode, viewerBand, t, isActive)}
             </button>
@@ -1943,6 +1948,8 @@ export interface CommunityLookbookGridProps {
    * `auto` chip pressed over a feed carrying every region.
    */
   onServedModeChange?: (mode: CommunityFeedMode) => void
+  /** Story 6.11: the same lift for the ban, so the page's other filter nav closes with the feed. */
+  onBannedChange?: (banned: boolean) => void
   /**
    * Story 6.7: a Home teaser activation. A new token asks this section to focus
    * that spotlight entry, or to focus one notice saying why it cannot.
@@ -2022,6 +2029,24 @@ function communityPresentation(
   }
 }
 
+/** Story 6.11: a banned member has no community notifications to manage. */
+function CommunitySettingsLink({
+  banned,
+  href,
+  label,
+}: {
+  banned: boolean
+  href: string
+  label: string
+}) {
+  if (banned) return null
+  return (
+    <Link href={href} className="min-h-12 self-start py-3 underline">
+      {label}
+    </Link>
+  )
+}
+
 export function CommunityLookbookGrid({
   activeTab = 'auto',
   onTabChange,
@@ -2031,6 +2056,7 @@ export function CommunityLookbookGrid({
   showFilterNav = false,
   onViewerBandChange,
   onServedModeChange,
+  onBannedChange,
   spotlightFocusIntent,
 }: CommunityLookbookGridProps) {
   const { t, i18n } = useCommunityTranslation()
@@ -2187,6 +2213,12 @@ export function CommunityLookbookGrid({
   // except the feed's own completion message, which follows anything announced while that
   // same read was in flight (see announceFeed).
   const [announcements, setAnnouncements] = useState<Message[]>([])
+  const bannedRef = useRef(false)
+  const banned = Boolean(bannedSanction)
+  useEffect(() => {
+    bannedRef.current = banned
+    onBannedChange?.(banned)
+  }, [banned, onBannedChange])
   /** Monotonic request id, so a late response for an abandoned filter is dropped. */
   const feedGenerationRef = useRef(0)
   const announcedDuringReadRef = useRef<number | null>(null)
@@ -2850,15 +2882,16 @@ export function CommunityLookbookGrid({
           setOpenedItem(null)
           setNewLooks([])
           // A denied socket says nothing about why. One read asks, so a member banned while
-          // the page was open sees the notice.
-          void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
-            (error: unknown) => {
-              const sanction = communitySanctionOf(error)
-              if (!active || !sanction) return
-              setBannedSanction(sanction)
-              setAnnouncement({ key: 'community.error.banned' })
-            }
-          )
+          // the page was open sees the notice. A member already told needs no second answer.
+          if (!bannedRef.current)
+            void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
+              (error: unknown) => {
+                const sanction = communitySanctionOf(error)
+                if (!active || !sanction) return
+                setBannedSanction(sanction)
+                setAnnouncement({ key: 'community.error.banned' })
+              }
+            )
         }
       },
     })
@@ -3584,15 +3617,15 @@ export function CommunityLookbookGrid({
             isMobilePreview={isMobilePreview}
             onTabChange={handleModeChange}
             viewerBand={viewerBand}
+            disabled={banned}
           />
         )}
 
-        <Link
+        <CommunitySettingsLink
+          banned={banned}
           href={presentation.settingsHref}
-          className="min-h-12 self-start py-3 underline"
-        >
-          {t(presentation.settingsLabel)}
-        </Link>
+          label={t(presentation.settingsLabel)}
+        />
         <CommunityHeader canShare={presentation.canAct} onShare={openCreateModal} t={t} />
 
         <CommunityNotices

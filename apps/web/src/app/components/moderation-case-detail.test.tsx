@@ -111,8 +111,11 @@ describe('C-WEB-Q-DETAIL', () => {
         operatorNote: 'Removed for doxxing',
       },
     })
-    expect(screen.getByText('Operator note')).toBeInTheDocument()
-    expect(screen.getByText('Removed for doxxing')).toBeInTheDocument()
+    const findings = screen.getByRole('region', { name: 'Machine findings' })
+    expect(within(findings).getByText('No machine findings.')).toBeInTheDocument()
+    expect(within(findings).queryByText('Removed for doxxing')).toBeNull()
+    const note = screen.getByRole('region', { name: 'Operator note' })
+    expect(within(note).getByText('Removed for doxxing')).toBeInTheDocument()
   })
 
   it('names erased and unknown members without an id and marks resolved reports', async () => {

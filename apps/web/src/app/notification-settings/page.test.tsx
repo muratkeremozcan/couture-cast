@@ -68,6 +68,23 @@ describe('R11 verified settings journeys', () => {
     expect(screen.queryByLabelText(label('timezone'))).toBeNull()
     expect(requests).toEqual(['Bearer verified-member-a', 'Bearer verified-member-b'])
   })
+  it('offers Sign out to a member and Sign in to a visitor, never both', async () => {
+    useMswHandlers(
+      http.get('*/api/v1/community/notification-preferences', () =>
+        HttpResponse.json({ data: settings() })
+      )
+    )
+    render(<NotificationSettingsPage />)
+    expect(screen.getByRole('link', { name: label('signin') })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: label('signout') })).toBeNull()
+    identify('member-a')
+    expect(screen.getByRole('button', { name: label('signout') })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: label('signin') })).toBeNull()
+    await screen.findByDisplayValue('Europe/London')
+    identify(null)
+    expect(screen.getByRole('link', { name: label('signin') })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: label('signout') })).toBeNull()
+  })
   it('rebases a conflict without discarding edits and sends only changed fields', async () => {
     let reads = 0
     const writes: unknown[] = []

@@ -32,6 +32,7 @@ import {
   signIn,
 } from '../../test-utils/community-lookbook-grid'
 import { CommunityBannedNotice } from './community-banned-notice'
+import { CommunityLookbookGrid } from './community-lookbook-grid'
 import { useHomeSpotlightTeaser } from './home-spotlight-teaser'
 
 vi.mock('posthog-js', () => ({
@@ -250,6 +251,23 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     expect(document.body.textContent).not.toContain(CHALLENGE.title)
   })
 
+  it('closes the filters and the notifications link with the feed', async () => {
+    signIn()
+    const state = { banned: true, reads: 0 }
+    serve(state)
+    const onBannedChange = vi.fn()
+    renderGrid({ onBannedChange })
+    await screen.findByTestId('community-banned-notice')
+    expect(onBannedChange).toHaveBeenLastCalledWith(true)
+    const reads = state.reads
+    const chip = screen.getByTestId('community-filter-all')
+    expect(chip).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(chip)
+    expect(state.reads).toBe(reads)
+    expect(chip).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('link', { name: 'Community notifications' })).toBeNull()
+  })
+
   it('offers no compose control when the very first read is refused', async () => {
     signIn()
     serve({ banned: true, reads: 0 })
@@ -262,10 +280,10 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     signIn()
     const state = { banned: true, reads: 0 }
     serve(state)
-    renderGrid()
+    const { rerender } = renderGrid()
     await screen.findByTestId('community-banned-notice')
     state.banned = false
-    await userEvent.click(screen.getByTestId('community-filter-all'))
+    rerender(<CommunityLookbookGrid showFilterNav activeTab="all" />)
     await screen.findByText(item().caption!)
     expect(queryNotice()).not.toBeInTheDocument()
   })

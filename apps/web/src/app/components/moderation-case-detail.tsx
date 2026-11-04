@@ -392,56 +392,62 @@ const categoryKey = (category: string) =>
 function FindingsSection({ detail }: { detail: ModerationCaseDetail }) {
   const { t } = useModerationTranslation()
   const { findings } = detail
-  const empty =
-    findings !== null &&
-    findings.categories.length === 0 &&
-    findings.codes.length === 0 &&
-    !findings.operatorNote
+  const machine =
+    findings !== null && (findings.categories.length > 0 || findings.codes.length > 0)
+  const note = findings?.operatorNote ?? null
   return (
-    <section aria-labelledby="findings-heading" className={card}>
-      <h2 id="findings-heading" className="mb-3 text-lg font-semibold">
-        {t('moderation.detail.findings')}
-      </h2>
-      {/* An operator's note is not a machine verdict, so it never stands alone under this heading. */}
-      {!findings || (findings.operatorNote && findings.codes.length === 0) ? (
-        <p className="mb-3 text-sm">{t('moderation.detail.noFindings')}</p>
+    <>
+      <section aria-labelledby="findings-heading" className={card}>
+        <h2 id="findings-heading" className="mb-3 text-lg font-semibold">
+          {t('moderation.detail.findings')}
+        </h2>
+        {machine ? (
+          <dl className="grid grid-cols-1 gap-3 text-sm">
+            {findings.categories.length > 0 ? (
+              <div>
+                <dt className="font-medium">{t('moderation.detail.categories')}</dt>
+                <dd>{findings.categories.map((c) => t(categoryKey(c))).join(', ')}</dd>
+              </div>
+            ) : null}
+            {findings.codes.length > 0 ? (
+              <div>
+                <dt className="font-medium">{t('moderation.detail.codes')}</dt>
+                <dd>
+                  <code>{findings.codes.join(', ')}</code>
+                </dd>
+              </div>
+            ) : null}
+            {findings.engineVersion ? (
+              <div>
+                <dt className="font-medium">{t('moderation.detail.engine')}</dt>
+                <dd>
+                  <code>{findings.engineVersion}</code>
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : (
+          <p className="text-sm">
+            {t(
+              findings && !note
+                ? 'moderation.detail.heldNoCodes'
+                : 'moderation.detail.noFindings'
+            )}
+          </p>
+        )}
+      </section>
+      {/* An operator's words are no machine verdict, so they sit under their own heading. */}
+      {note ? (
+        <section aria-labelledby="operator-note-heading" className={card}>
+          <h2 id="operator-note-heading" className="mb-3 text-lg font-semibold">
+            {t('moderation.detail.operatorNote')}
+          </h2>
+          <div className="text-sm">
+            <PlainText value={note} />
+          </div>
+        </section>
       ) : null}
-      {empty ? <p className="text-sm">{t('moderation.detail.heldNoCodes')}</p> : null}
-      {findings && !empty ? (
-        <dl className="grid grid-cols-1 gap-3 text-sm">
-          {findings.categories.length > 0 ? (
-            <div>
-              <dt className="font-medium">{t('moderation.detail.categories')}</dt>
-              <dd>{findings.categories.map((c) => t(categoryKey(c))).join(', ')}</dd>
-            </div>
-          ) : null}
-          {findings.codes.length > 0 ? (
-            <div>
-              <dt className="font-medium">{t('moderation.detail.codes')}</dt>
-              <dd>
-                <code>{findings.codes.join(', ')}</code>
-              </dd>
-            </div>
-          ) : null}
-          {findings.engineVersion ? (
-            <div>
-              <dt className="font-medium">{t('moderation.detail.engine')}</dt>
-              <dd>
-                <code>{findings.engineVersion}</code>
-              </dd>
-            </div>
-          ) : null}
-          {findings.operatorNote ? (
-            <div>
-              <dt className="font-medium">{t('moderation.detail.operatorNote')}</dt>
-              <dd>
-                <PlainText value={findings.operatorNote} />
-              </dd>
-            </div>
-          ) : null}
-        </dl>
-      ) : null}
-    </section>
+    </>
   )
 }
 
