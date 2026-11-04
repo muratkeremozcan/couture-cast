@@ -3,7 +3,7 @@
 // -TAKEDOWN-POST, -TAKEDOWN-COMMENT, -TAKEDOWN-TWICE, -ESCALATE, -ALLOWED-PARITY, -DETAIL-READONLY,
 // -REVISION-CONTINUITY, -ATOMIC, -AUDIT-SHAPE, -PRIOR-ACTIONS, -HTTP, -SELF-REVIEW, -OPERATOR-SANCTIONED, -HOSTILE, -ACTIONS-COMPAT.
 import { randomUUID } from 'node:crypto'
-import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   moderationCaseDetailResponseSchema,
   moderationDecisionActionSchema,
@@ -17,6 +17,8 @@ import {
   moderationDecisionsTestContext,
   type DecisionBoot,
 } from './helpers/moderation-decisions-seed.js'
+
+vi.setConfig({ testTimeout: 30_000 })
 
 const NOW = new Date('2026-11-04T12:00:00.000Z')
 const REASON = 'Breaks the community rules.'

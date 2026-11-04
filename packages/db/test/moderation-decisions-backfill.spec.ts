@@ -87,9 +87,15 @@ const canReach = async () => {
 }
 
 const reachable = await canReach()
+// A laptop with no database skips this suite, and CI with no database is a failed run.
+const automated = process.env.CI === 'true' || process.env.CI === '1'
 
-describe.runIf(reachable)('moderation decisions database', () => {
+describe.runIf(reachable || automated)('moderation decisions database', () => {
   beforeAll(async () => {
+    if (!reachable)
+      throw new Error(
+        `CI is set and ${target.hostname}:${target.port} is unreachable, so the decision table guarantees would go unproven.`
+      )
     await admin.connect()
     await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
     await db.connect()
@@ -188,6 +194,7 @@ describe.runIf(reachable)('moderation decisions database', () => {
   }, 120_000)
 
   afterAll(async () => {
+    if (!reachable) return
     await db.end().catch(() => undefined)
     await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`)
     await admin.end()

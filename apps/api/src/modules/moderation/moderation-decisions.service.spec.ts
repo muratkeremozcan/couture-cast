@@ -756,7 +756,8 @@ describe('U-D-SVC-PRECEDENCE: the TEA-08 refusal order', () => {
       service.decide(row.auth, row.caseId ?? 'post.p1', row.request())
     )
     expect(body.code).toBe(row.code)
-    if (row.detail) expect(body.detail).toBe(row.detail)
+    // A row with no detail expects `undefined`, so a stray detail fails too.
+    expect(body.detail).toBe(row.detail)
     expect(state.decisions).toHaveLength(before)
     expect(state.audits).toEqual([])
     expect(state.events).toEqual([])

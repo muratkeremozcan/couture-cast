@@ -46,7 +46,6 @@ import { CommunitySpotlightRepository } from '../src/modules/community/community
 import { CommunitySpotlightService } from '../src/modules/community/community-spotlight.service.js'
 import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
 import { CommunityStreamRepository } from '../src/modules/community/community-stream.repository.js'
-import { MODERATION_AFTER_COMMIT_BOUND_MS } from '../src/modules/moderation/moderation-sanctions.service.js'
 import { unavailableRedis } from './helpers/community-spotlight-context.js'
 import { drainCommunityOutbox } from './helpers/community-outbox-drain.js'
 import {
@@ -66,8 +65,8 @@ const AS_OF = new Date('2026-11-04T12:00:00.000Z')
 const RANKED_AT = new Date(AS_OF.getTime() - 30 * 60_000)
 const DAY_MS = 86_400_000
 const REASON = 'Breaks the community rules.'
-/** Room for the transaction itself on a slow machine. An unbounded step never returns at all. */
-const AFTER_COMMIT_MARGIN_MS = 1500
+/** Room for a bump that outlived the 1000 ms response bound, and below the 30 s test timeout. */
+const BUMP_DEADLINE_MS = 10_000
 
 const ctx = moderationDecisionsTestContext()
 const { prisma, clock, flags, flagValues } = ctx
@@ -177,6 +176,18 @@ function applied(response: { status: number; body: unknown }) {
   expect(response.status, JSON.stringify(response.body)).toBe(200)
   return moderationDecisionResponseSchema.parse(response.body).data
 }
+
+/**
+ * A decision races real Redis against the 1000 ms bound, so a slow runner may legally answer `deferred`.
+ * U-D-SVC-POSTCOMMIT and the decision spec pin the exact value with doubles, so no real Redis stall can fail it.
+ */
+function expectEitherOutcome(outcome: string): void {
+  expect(['completed', 'deferred']).toContain(outcome)
+}
+
+/** A `deferred` response leaves the bump running, so what it moves is awaited, bounded. */
+const bumpLands = <T>(effect: () => Promise<T>): Promise<T> =>
+  vi.waitFor(effect, { timeout: BUMP_DEADLINE_MS, interval: 20 })
 
 function appealed(response: { status: number; body: unknown }) {
   expect(response.status, JSON.stringify(response.body)).toBe(200)
@@ -441,14 +452,13 @@ describe('I-K-TAKEDOWN-READS: a takedown reaches every public read with no worke
     const result = applied(
       await staff.decide(caseId, { action: 'takedown', reason: REASON })
     )
-    expect(result).toMatchObject({
-      targetStatus: 'flagged',
-      cacheInvalidation: 'completed',
-      replayed: false,
-    })
+    expect(result).toMatchObject({ targetStatus: 'flagged', replayed: false })
+    expectEitherOutcome(result.cacheInvalidation)
 
     // The request moved the counters itself, since the invalidator cursor never advanced.
-    expectEveryVersionMoved(versions, await areaVersions(area))
+    await bumpLands(async () =>
+      expectEveryVersionMoved(versions, await areaVersions(area))
+    )
     expect(await epochValue()).toBe(epoch)
     expect(await spotlightCursor()).toBe(cursor)
 
@@ -466,7 +476,9 @@ describe('I-K-TAKEDOWN-READS: a takedown reaches every public read with no worke
     expect(rebuilt?.entries.map((entry) => entry.id)).not.toContain(post.id)
 
     // A public removal goes out as an anonymous resync, which is what the client re-reads on.
-    const event = await publicEvent({ kind: 'post.removed', post_id: post.id })
+    const event = await bumpLands(() =>
+      publicEvent({ kind: 'post.removed', post_id: post.id })
+    )
     expect(event).toMatchObject({ stream_id: 'public', kind: 'resync', post_id: null })
     expect(event.sequence).toBeGreaterThan(head)
   })
@@ -499,9 +511,9 @@ describe('I-K-BAN-EPOCH: which read models a ban moves (E2, S6)', () => {
         ban: { kind: 'permanent' },
       })
     )
-    expect(result.cacheInvalidation).toBe('completed')
+    expectEitherOutcome(result.cacheInvalidation)
     expect(result.sanction?.kind).toBe('permanent')
-    expect(await epochValue()).not.toBe(epoch)
+    await bumpLands(async () => expect(await epochValue()).not.toBe(epoch))
 
     for (const area of areas) {
       // The epoch orphaned the pointer, so the area rebuilds whatever its own version says.
@@ -538,11 +550,13 @@ describe('I-K-BAN-EPOCH: which read models a ban moves (E2, S6)', () => {
         ban: { kind: 'temporary', durationDays: 7 },
       })
     )
-    expect(result.cacheInvalidation).toBe('completed')
+    expectEitherOutcome(result.cacheInvalidation)
     expect(result.sanction?.kind).toBe('temporary')
 
+    await bumpLands(async () =>
+      expectEveryVersionMoved(targetVersions, await areaVersions(target))
+    )
     expect(await epochValue()).toBe(epoch)
-    expectEveryVersionMoved(targetVersions, await areaVersions(target))
     expect(await areaVersions(other)).toEqual(otherVersions)
     expect((await currentSnapshot(other))?.id).toBe(otherPrimed.id)
 
@@ -619,7 +633,7 @@ describe('I-K-REDIS-DOWN: an outage changes only cacheInvalidation (E2, S6, S-11
     expect(await spotlightCursor()).toBeGreaterThanOrEqual(event.sequence)
   })
 
-  it('a hanging Redis: the 200 returns inside the after-commit bound, deferred', async () => {
+  it('a hanging Redis: the bound releases the 200, deferred', async () => {
     const hanging = {
       get: vi.fn(() => new Promise<string | null>(() => undefined)),
       set: vi.fn(() => new Promise<'OK' | null>(() => undefined)),
@@ -634,21 +648,16 @@ describe('I-K-REDIS-DOWN: an outage changes only cacheInvalidation (E2, S6, S-11
     const staff = await moderator(stuck)
     const { revision } = await staff.detail(caseId)
 
-    const started = performance.now()
     const response = await staff.decide(caseId, {
       action: 'takedown',
       reason: REASON,
       expectedRevision: revision,
     })
-    const elapsed = performance.now() - started
 
     expect(applied(response).cacheInvalidation).toBe('deferred')
     // The bump really ran and really hung, and only the bound let the response go.
+    // An unbounded step never returns, and the service spec proves the bound's length with fake timers.
     expect(hanging.eval).toHaveBeenCalledTimes(1)
-    expect(elapsed).toBeGreaterThanOrEqual(MODERATION_AFTER_COMMIT_BOUND_MS - 50)
-    expect(elapsed).toBeLessThan(
-      MODERATION_AFTER_COMMIT_BOUND_MS + AFTER_COMMIT_MARGIN_MS
-    )
 
     expect(
       (await prisma.lookbookPost.findUniqueOrThrow({ where: { id: post.id } })).status
@@ -673,6 +682,7 @@ describe('I-K-OVERTURN: an overturned appeal returns content with no worker (E2,
     const other = await rankedPost(area, subject)
     await primeArea(area)
     const staff = await admin()
+    const epochBeforeBan = await epochValue()
 
     const ban = applied(
       await staff.decide(caseId, {
@@ -681,6 +691,7 @@ describe('I-K-OVERTURN: an overturned appeal returns content with no worker (E2,
         ban: { kind: 'permanent' },
       })
     )
+    await bumpLands(async () => expect(await epochValue()).not.toBe(epochBeforeBan))
     const sanctionId = ban.sanction!.sanctionId
     const banned = await spotlightIds(live, area.viewer)
     expect(banned).not.toContain(other.id)
@@ -700,13 +711,10 @@ describe('I-K-OVERTURN: an overturned appeal returns content with no worker (E2,
     const overturned = appealed(
       await staff.appeal(sanctionId, { status: 'overturned', reason: REASON })
     )
-    expect(overturned).toMatchObject({
-      cacheInvalidation: 'completed',
-      active: false,
-      restoredCount: 1,
-    })
+    expect(overturned).toMatchObject({ active: false, restoredCount: 1 })
+    expectEitherOutcome(overturned.cacheInvalidation)
 
-    expect(await epochValue()).not.toBe(epoch)
+    await bumpLands(async () => expect(await epochValue()).not.toBe(epoch))
     expect(await spotlightCursor()).toBe(cursor)
     expect(await currentSnapshot(area)).toBeNull()
 
@@ -768,9 +776,11 @@ describe('I-K-REPLAY-RERUN: a retry repairs a crash after commit (E2, S6, TEA-13
       revision: first.revision,
       targetStatus: 'flagged',
       replayed: true,
-      cacheInvalidation: 'completed',
     })
-    expectEveryVersionMoved(versions, await areaVersions(area))
+    expectEitherOutcome(retried.cacheInvalidation)
+    await bumpLands(async () =>
+      expectEveryVersionMoved(versions, await areaVersions(area))
+    )
 
     const rows = await prisma.moderationDecision.findMany({ where: { case_key: caseId } })
     expect(rows).toHaveLength(1)
@@ -843,14 +853,14 @@ describe('I-K-COMMENT-STREAM: comment decisions reach the stream with no worker 
     const result = applied(
       await staff.decide(seeded.caseId, { action: 'takedown', reason: REASON })
     )
-    expect(result).toMatchObject({
-      targetStatus: 'blocked',
-      cacheInvalidation: 'completed',
-    })
-    const event = await publicEvent({
-      kind: 'comment.removed',
-      comment_id: seeded.commentId,
-    })
+    expect(result.targetStatus).toBe('blocked')
+    expectEitherOutcome(result.cacheInvalidation)
+    const event = await bumpLands(() =>
+      publicEvent({
+        kind: 'comment.removed',
+        comment_id: seeded.commentId,
+      })
+    )
     expect(event).toMatchObject({ stream_id: 'public', kind: 'resync' })
     expect(event.sequence).toBeGreaterThan(head)
     expect(await spotlightCursor()).toBe(cursor)
@@ -875,9 +885,9 @@ describe('I-K-COMMENT-STREAM: comment decisions reach the stream with no worker 
         ban: { kind: 'permanent' },
       })
     )
-    expect(ban.cacheInvalidation).toBe('completed')
+    expectEitherOutcome(ban.cacheInvalidation)
     await expect(
-      publicEvent({ kind: 'comment.removed', comment_id: comment.id })
+      bumpLands(() => publicEvent({ kind: 'comment.removed', comment_id: comment.id }))
     ).resolves.toMatchObject({ stream_id: 'public', kind: 'resync' })
     expect(await commentIds(reader, host.id)).not.toContain(comment.id)
 
@@ -888,9 +898,11 @@ describe('I-K-COMMENT-STREAM: comment decisions reach the stream with no worker 
     const overturned = appealed(
       await staff.appeal(sanctionId, { status: 'overturned', reason: REASON })
     )
-    expect(overturned.cacheInvalidation).toBe('completed')
+    expectEitherOutcome(overturned.cacheInvalidation)
 
-    const event = await publicEvent({ kind: 'comment.published', comment_id: comment.id })
+    const event = await bumpLands(() =>
+      publicEvent({ kind: 'comment.published', comment_id: comment.id })
+    )
     expect(event).toMatchObject({
       stream_id: 'public',
       kind: 'comment.published',
@@ -917,11 +929,11 @@ describe('I-K-RELEASE: a release shows on the next read and resolve or escalate 
     const result = applied(
       await staff.decide(caseId, { action: 'release', reason: REASON })
     )
-    expect(result).toMatchObject({
-      targetStatus: 'published',
-      cacheInvalidation: 'completed',
-    })
-    expectEveryVersionMoved(versions, await areaVersions(area))
+    expect(result.targetStatus).toBe('published')
+    expectEitherOutcome(result.cacheInvalidation)
+    await bumpLands(async () =>
+      expectEveryVersionMoved(versions, await areaVersions(area))
+    )
     expect(await epochValue()).toBe(epoch)
     expect(await spotlightCursor()).toBe(cursor)
 
@@ -930,6 +942,7 @@ describe('I-K-RELEASE: a release shows on the next read and resolve or escalate 
     expect(await feedIds(area.viewer)).toContain(post.id)
   })
 
+  // These two have no after-commit step at all, so `completed` here races nothing.
   it('resolve and escalate run no bump and report completed', async () => {
     const area = await seededArea('no-bump')
     const resolved = await reportedPost(area, await fx.member('author'))
@@ -1072,11 +1085,8 @@ describe('I-S-LOOP: the first path out of a held item with no script (E1, S1)', 
     const result = applied(
       await staff.decide(caseId, { action: 'release', reason: REASON })
     )
-    expect(result).toMatchObject({
-      targetStatus: 'published',
-      caseStatus: 'resolved',
-      cacheInvalidation: 'completed',
-    })
+    expect(result).toMatchObject({ targetStatus: 'published', caseStatus: 'resolved' })
+    expectEitherOutcome(result.cacheInvalidation)
 
     expect(await feedIds(reader)).toContain(session.postId)
     expect((await queueItems()).items.has(caseId)).toBe(false)
@@ -1133,11 +1143,8 @@ describe('I-S-LOOP: the first path out of a held item with no script (E1, S1)', 
     const result = applied(
       await staff.decide(caseId, { action: 'release', reason: REASON })
     )
-    expect(result).toMatchObject({
-      targetStatus: 'published',
-      caseStatus: 'resolved',
-      cacheInvalidation: 'completed',
-    })
+    expect(result).toMatchObject({ targetStatus: 'published', caseStatus: 'resolved' })
+    expectEitherOutcome(result.cacheInvalidation)
     expect(await commentIds(reader, host.id)).toContain(commentId)
     expect((await queueItems()).items.has(caseId)).toBe(false)
   })

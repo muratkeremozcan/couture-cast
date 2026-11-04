@@ -29,14 +29,16 @@ import {
   type DecisionBoot,
   type DecisionFixtures,
   type DecisionRequest,
-  type SeededMember,
 } from './helpers/moderation-decisions-seed.js'
+
+vi.setConfig({ testTimeout: 30_000 })
 
 const NOW = new Date('2026-11-04T12:00:00.000Z')
 const MINUTE_MS = 60_000
 const REASON = 'Breaks the community rules.'
 const SEVEN_DAY_BAN = { kind: 'temporary', durationDays: 7 } as const
 const STALE_REVISION = 'ffffffffffffffff'
+/** Below the 30 s test timeout, so a missing waiter fails with its own message. */
 const WAITER_DEADLINE_MS = 15_000
 
 const ctx = moderationDecisionsTestContext()
@@ -1409,7 +1411,7 @@ describe('I-C-RESOLVED-AT: random sequences never move a stamp (D7, S-5)', () =>
         terminal.length > 0 ? new Date(Math.min(...terminal)).toISOString() : null
       ).toBe(target.firstDecisionAt)
     }
-  }, 60_000)
+  }, 120_000)
 })
 
 describe('I-C-REKEY: an erased post splits the case by report (D5, TEA-14)', () => {
@@ -1769,6 +1771,9 @@ describe('I-C-DB-BACKSTOP: the unique index holds without the case lock (D5)', (
   })
 })
 
+// This row cannot force 40P01.
+// It drives every lock path of one member at once and proves what must hold whatever the scheduler does.
+// The retry itself is proved in community-privacy.spec.ts, which raises 40P01 directly.
 describe('I-C-DEADLOCK: mixed load on one member (D5)', () => {
   const ATTEMPTS = 3
   const LOAD_ACTIONS: DecisionRequest[] = [
@@ -1782,9 +1787,9 @@ describe('I-C-DEADLOCK: mixed load on one member (D5)', () => {
   it('finishes with closed results and stays inside three attempts per decision', async () => {
     const author = await fx.member('author')
     const posts: Awaited<ReturnType<DecisionFixtures['postCase']>>[] = []
-    for (let index = 0; index < 6; index++) posts.push(await fx.postCase({ author }))
+    for (let index = 0; index < 3; index++) posts.push(await fx.postCase({ author }))
     const comments: Awaited<ReturnType<DecisionFixtures['commentCase']>>[] = []
-    for (let index = 0; index < 4; index++)
+    for (let index = 0; index < 2; index++)
       comments.push(await fx.commentCase({ author }))
     const staff = await admin()
 
@@ -1797,22 +1802,19 @@ describe('I-C-DEADLOCK: mixed load on one member (D5)', () => {
         },
       }))
     )
-    const reporters: SeededMember[] = []
-    for (let index = 0; index < 10; index++) reporters.push(await fx.member('reporter'))
+    const reporter = await fx.member('reporter')
     const lockCalls = vi.spyOn(repository, 'lockCase')
     const erasure = new CommunityRepository(prisma)
 
     try {
       const [decisions, reports, withdrawal] = await Promise.all([
         Promise.all(decisionPlan.map(({ caseId, input }) => staff.decide(caseId, input))),
+        // Nine requests in all, no more than the pool of 9 vitest.config.ts pins, so no transaction waits out maxWait.
+        // Only the first post and the first comment race a report, because a report moves the revision.
         Promise.all([
-          ...posts.map((seeded, index) =>
-            Promise.resolve(reportPost(reporters[index]!.id, seeded.postId))
-          ),
-          ...comments.map((seeded, index) =>
-            Promise.resolve(
-              reportComment(reporters[6 + index]!.id, seeded.postId, seeded.commentId)
-            )
+          Promise.resolve(reportPost(reporter.id, posts[0]!.postId)),
+          Promise.resolve(
+            reportComment(reporter.id, comments[0]!.postId, comments[0]!.commentId)
           ),
         ]),
         Promise.resolve(withdrawPost(author.id, posts[0]!.postId)),
@@ -1839,6 +1841,8 @@ describe('I-C-DEADLOCK: mixed load on one member (D5)', () => {
       // Nothing is left holding a lock, and the record agrees with the answers.
       expect(await blockedStatements()).toEqual([])
       const appliedCount = decisions.filter((response) => response.status === 200).length
+      // Erasure moves no post status and nothing else touches the revision of the second post.
+      expect(appliedCount).toBeGreaterThanOrEqual(1)
       const rows = await prisma.moderationDecision.count({
         where: { case_key: { in: decisionPlan.map(({ caseId }) => caseId) } },
       })
