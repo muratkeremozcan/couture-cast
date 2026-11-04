@@ -126,6 +126,69 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
     await expect(liveRegion).toHaveText('Showing Community recommendations')
   })
 
+  test('3.6-E2E-005: each chip keeps its label inside its padding at 375 px', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await page.goto('/')
+    await expect(page.getByTestId('chip-navigation-bar')).toBeVisible()
+
+    for (const chip of ['personal', 'community', 'sponsored']) {
+      const inset = await page.getByTestId(`chip-${chip}`).evaluate((button) => {
+        const range = document.createRange()
+        range.selectNodeContents(button)
+        const label = range.getBoundingClientRect()
+        const pill = button.getBoundingClientRect()
+        return { left: label.left - pill.left, right: pill.right - label.right }
+      })
+      expect(inset.left, `${chip} left padding`).toBeGreaterThanOrEqual(16)
+      expect(inset.right, `${chip} right padding`).toBeGreaterThanOrEqual(16)
+    }
+
+    // A row wider than the screen scrolls to its end, so no chip is left out of reach.
+    const last = await page
+      .getByRole('group', { name: 'Category filters' })
+      .evaluate((row) => {
+        row.scrollLeft = row.scrollWidth
+        const edge = row.getBoundingClientRect().right
+        return { edge, chip: row.lastElementChild!.getBoundingClientRect().right }
+      })
+    expect(last.chip).toBeLessThanOrEqual(last.edge)
+  })
+
+  // The full-bleed lookbook centers itself with a half-width transform, so an odd width lands on half a pixel.
+  for (const width of [375, 393]) {
+    test(`3.6-E2E-006: the lookbook meets the left edge with no seam at ${width} px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 812 })
+      await page.goto('/')
+      const lookbook = page.getByTestId('lookbook-prism-container')
+      await expect(lookbook).toBeVisible()
+      const box = await lookbook.boundingBox()
+      const screenshot = await page.screenshot({
+        clip: { x: 0, y: box!.y + 10, width: 2, height: 200 },
+      })
+      const columns = await page.evaluate(async (png) => {
+        const image = new Image()
+        image.src = `data:image/png;base64,${png}`
+        await image.decode()
+        const canvas = document.createElement('canvas')
+        canvas.width = image.width
+        canvas.height = image.height
+        const context = canvas.getContext('2d')!
+        context.drawImage(image, 0, 0)
+        const { data } = context.getImageData(0, 0, image.width, image.height)
+        let widest = 0
+        for (let index = 0; index < data.length; index += 8)
+          widest = Math.max(widest, Math.abs(data[index]! - data[index + 4]!))
+        return widest
+      }, screenshot.toString('base64'))
+      // Two neighbouring columns of the same flat background differ by rounding noise at most.
+      expect(columns).toBeLessThanOrEqual(8)
+    })
+  }
+
   test('3.6-E2E-003: keyboard arrow navigation across chips and focus ring styling', async ({
     page,
   }) => {

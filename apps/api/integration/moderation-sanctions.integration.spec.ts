@@ -1525,6 +1525,23 @@ describe('I-B-REALTIME: the real socket server with the real access path', () =>
     })
   })
 
+  it('denies a live socket on a permanent ban', async () => {
+    const author = await fx.member('author')
+    const seeded = await fx.postCase({ author })
+    const socket = socketFor(fixtureToken(author.id))
+    await connect(socket)
+    const control = new Promise<unknown>((resolve) =>
+      socket.once('community:availability', resolve)
+    )
+    const disconnected = new Promise<void>((resolve) =>
+      socket.once('disconnect', () => resolve())
+    )
+
+    await ban(seeded.caseId, 'permanent')
+    expect(await control).toEqual({ version: 1, status: 'denied' })
+    await disconnected
+  })
+
   it('refuses a handshake during a permanent ban', async () => {
     const author = await fx.member('author')
     await ban((await fx.postCase({ author })).caseId, 'permanent')

@@ -317,14 +317,8 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
   const label = () => `${++counter}`
   let sequence = 0
 
-  /**
-   * The factory's faker email comes from a small name pool, and `User.email` is unique. These
-   * suites create many users per database, which collided about once in 80 runs.
-   */
-  const uniqueEmail = () => `${randomUUID()}@example.test`
-
   async function seedOwnMember(alias: string | null): Promise<SeededMember> {
-    const user = await persistUser(prisma, createUser({ email: uniqueEmail() }))
+    const user = await persistUser(prisma, createUser())
     const name = alias ?? `${runId}-operator${label()}`
     if (alias) await prisma.communityAlias.create({ data: { user_id: user.id, alias } })
     return { id: user.id, alias: name }
@@ -341,11 +335,10 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
     const user = await persistUser(
       prisma,
       createTeenUser({
-        email: uniqueEmail(),
         profilePreferences: { compliance: { accountStatus: 'active' } },
       })
     )
-    const guardian = await persistUser(prisma, createUser({ email: uniqueEmail() }))
+    const guardian = await persistUser(prisma, createUser())
     const alias = `${runId}-teen${label()}`
     await prisma.communityAlias.create({ data: { user_id: user.id, alias } })
     await prisma.guardianConsent.create({

@@ -7,7 +7,10 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
-import { COMMUNITY_FEED_DISABLED_MESSAGE } from '@couture/api-client/contracts/http'
+import {
+  COMMUNITY_BANNED_MESSAGE,
+  COMMUNITY_FEED_DISABLED_MESSAGE,
+} from '@couture/api-client/contracts/http'
 import { CommunitySyncState, SPOTLIGHT_TEASER_READ_FLOOR_MS } from '@couture/api-client'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
@@ -177,6 +180,37 @@ describe('6.7 web Home spotlight teaser', () => {
       if (testId !== null) expect(testId).toMatch(/^home-spotlight-teaser-/)
       if (node.id) expect(node.id).toMatch(/^home-spotlight-teaser-/)
     }
+  })
+
+  it('TEA-22 takes a teaser already on screen away when the feed refuses the member for a ban', async () => {
+    signIn()
+    const { answer } = useServedSpotlight()
+    render(<LookbookPrismLayout />)
+    await answer(0, cityPage())
+    await screen.findByTestId('home-spotlight-teaser-link')
+    await heroFeedSettled()
+
+    useMswHandlers(
+      http.get('/api/v1/community/feed', () =>
+        HttpResponse.json(
+          {
+            statusCode: 403,
+            code: 'community_banned',
+            message: COMMUNITY_BANNED_MESSAGE,
+            sanction: {
+              kind: 'permanent',
+              expiresAt: null,
+              appealStatus: 'not_requested',
+            },
+          },
+          { status: 403 }
+        )
+      )
+    )
+    fireEvent.click(screen.getAllByTestId('community-filter-all')[0]!)
+    await screen.findByTestId('community-banned-notice')
+    await waitFor(() => expect(teaserNodes()).toHaveLength(0))
+    expect(screen.queryByTestId('home-spotlight-teaser-link')).not.toBeInTheDocument()
   })
 
   it('6.7-WEB-002 the author rule names the viewer You', async () => {

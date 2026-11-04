@@ -663,10 +663,7 @@ Defects these tests found and the builder fixed: F1 to F7 and F21 to F22 in the 
 
 Outside this PR, for the coordinator:
 
-- `fix/notification-settings-auth-links` holds the auth link fix.
-- `epic-6-context.md` needs its story update after merge.
-- `chip-navigation.tsx` pills overrun at 375 px, and a 1 px dark line shows at x=0 (unverified).
-- The `faker` email collision in `packages/testing` can still hit other suites that create many users.
+- None remain: the owner ruling below moved the auth link fix, the `epic-6-context.md` update, the chip pills, the x=0 line and the factory emails into this PR.
 
 ---
 
@@ -725,7 +722,24 @@ On a fresh seeded database, P-D-ROLES and 6.1-API-01 at `--repeat-each=3` passed
 My sign-off ran only the moderation browser specs, which is why the three runs missed this.
 
 Later fixes pinned in existing files: the `origin` field and the alias state enum, sanction kind against expiry, the takedown marker as a reason, decision order by sequence, the engine row without codes, a confirmation closed by changed terms, the appeal retry after an edited note, an open dialog closed by a ban, and a ban on a later spotlight page.
-The home teaser hidden when the grid is refused has no regression test yet: `lookbook-prism-layout.test.tsx` is outside the 99 paths.
+
+### No deferrals: owner ruling of 2026-11-04
+
+The file limit no longer applies to PR 195, so the items below moved into it.
+
+| Item                                         | Test                                                               | Proof                                                                   |
+| :------------------------------------------- | :----------------------------------------------------------------- | :---------------------------------------------------------------------- |
+| Teaser on screen when the feed refuses a ban | `home-spotlight-teaser.test.tsx`, TEA-22                           | Red with the layout passing the teaser through                          |
+| 6.1-API-01 assumed a first page              | `community-feed.api.spec.ts` walks the feed                        | Status below                                                            |
+| Permanent ban on a live socket               | I-B-REALTIME, `moderation-sanctions.integration.spec.ts`           | Red with the sanction read ignoring permanent bans                      |
+| Factory emails collide                       | `packages/testing/test/user.factory.spec.ts`, 5000 distinct emails | Red on the faker email                                                  |
+| Chip labels overrun their pills at 375       | 3.6-E2E-005                                                        | Red at 1.33 px right padding, green with `shrink-0`                     |
+| Column 0 seam at odd widths                  | 3.6-E2E-006 at 375 and 393                                         | Red at a difference of 124 between columns, green with the margin bleed |
+
+The seam came from `left-1/2 -translate-x-1/2` in `apps/web/src/app/page.tsx`, a transform of -187.5 px at 375.
+Column 0 read 132 where its neighbours read 255, the half blend of the white lookbook and the dark page.
+
+P-D-PREVIEW-CLOSED passed on the deployed preview in run 41854295529, so the local-only limit above no longer applies to it.
 
 ---
 

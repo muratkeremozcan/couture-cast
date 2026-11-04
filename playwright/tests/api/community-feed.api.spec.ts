@@ -119,8 +119,21 @@ test.describe('6.1 community feed HTTP contract', () => {
      * The floor comes first so an unseeded database fails naming `npm run db:seed`
      * rather than passing vacuously.
      */
-    assertSeededFeed(body.data.items as unknown as CommunityFeedItemShape[])
-    expect(body.data.items.length).toBeGreaterThan(0)
+    // Other specs publish newer looks, so the seeded rows sit anywhere in the feed. Walk all of it.
+    const items = [...body.data.items]
+    let cursor = body.data.nextCursor as string | null
+    while (cursor) {
+      const next = await request.get(
+        `${communityApi.apiBaseUrl}${FEED_PATH}?mode=all&limit=12&cursor=${encodeURIComponent(cursor)}`,
+        { headers: communityApi.headers }
+      )
+      expect(next.status()).toBe(200)
+      const page = (await next.json()) as typeof body
+      items.push(...page.data.items)
+      cursor = page.data.nextCursor as string | null
+    }
+    assertSeededFeed(items as unknown as CommunityFeedItemShape[])
+    expect(items.length).toBeGreaterThan(0)
 
     /*
      * Every item, not just the first: a projection that leaked on one row and not
@@ -128,7 +141,7 @@ test.describe('6.1 community feed HTTP contract', () => {
      * the two the story forbids by name, and an exact key set catches them and
      * anything else that has not been allowlisted.
      */
-    for (const item of body.data.items) {
+    for (const item of items) {
       expect(Object.keys(item).sort()).toEqual(FEED_ITEM_KEYS)
       expect(Object.keys(item.author as Record<string, unknown>).sort()).toEqual([
         'displayName',

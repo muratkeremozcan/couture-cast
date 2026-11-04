@@ -98,7 +98,8 @@ function buildComfortPreferences(role: UserFixtureRole): UserComfortPreferences 
 function buildDefaultUserFixture(role: UserFixtureRole, age: number): UserFixture {
   return {
     id: faker.string.uuid(),
-    email: faker.internet.email().toLowerCase(),
+    // `User.email` is unique and faker's names come from a small pool, so large suites collide.
+    email: `${faker.string.uuid()}@example.test`,
     role,
     age,
     displayName: faker.person.fullName(),
