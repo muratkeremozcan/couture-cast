@@ -2,6 +2,7 @@
 // The controller, OpenAPI document, generated SDK and web console all derive from these schemas.
 // `moderationActionAvailability` is the single rule for what a viewer may do to a case: the detail
 // route lists it through `deriveAllowedActions` and the decision route enforces it.
+import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { communityModerationReasonCategories } from './community'
 import {
@@ -381,4 +382,87 @@ export function deriveAllowedActions(input: ModerationAvailabilityInput): {
     allowedActions: banKinds.length > 0 ? [...allowedActions, 'ban'] : allowedActions,
     banKinds,
   }
+}
+
+// --- OpenAPI ----------------------------------------------------------------
+
+export function registerModerationDecisionContracts(registry: OpenAPIRegistry) {
+  registry.register('ModerationDecisionInput', moderationDecisionInputSchema)
+  registry.register('ModerationDecisionResponse', moderationDecisionResponseSchema)
+  registry.register('ModerationAppealInput', moderationAppealInputSchema)
+  registry.register('ModerationAppealResponse', moderationAppealResponseSchema)
+  registry.register('ModerationDecisionError', moderationDecisionErrorSchema)
+  registry.register('CommunityBannedError', communityBannedErrorSchema)
+  const error = (description: string) => ({
+    description,
+    content: { 'application/json': { schema: moderationDecisionErrorSchema } },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/moderation/cases/{caseId}/decisions',
+    operationId: 'applyModerationDecision',
+    tags: ['moderation'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Apply one decision to a whole case (private, no-store)',
+    description:
+      'Moderator and admin only. The moderator is the session. One transaction per decision, idempotent per moderator and mutationId.',
+    request: {
+      params: z.object({ caseId: moderationCaseIdSchema }),
+      body: {
+        required: true,
+        content: { 'application/json': { schema: moderationDecisionInputSchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: 'The decision applied, or the stored response of a retry',
+        content: { 'application/json': { schema: moderationDecisionResponseSchema } },
+      },
+      400: error('invalid_decision'),
+      401: { description: 'Authentication required' },
+      403: error(
+        'Insufficient role, self_review_refused, admin_required or operator_sanctioned'
+      ),
+      404: error('case_not_found'),
+      409: error('case_conflict, action_not_applicable or idempotency_mismatch'),
+      503: error(
+        'moderation_console_disabled, moderation_decisions_disabled or audit_unavailable'
+      ),
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/moderation/sanctions/{sanctionId}/appeal',
+    operationId: 'recordModerationAppeal',
+    tags: ['moderation'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Record one appeal step on a sanction (private, no-store)',
+    description:
+      'Moderator and admin may record requested. Only an admin may record upheld or overturned.',
+    request: {
+      params: z.object({ sanctionId: z.string().min(1).max(64) }),
+      body: {
+        required: true,
+        content: { 'application/json': { schema: moderationAppealInputSchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: 'The step recorded, or the stored response of a retry',
+        content: { 'application/json': { schema: moderationAppealResponseSchema } },
+      },
+      400: error('invalid_decision'),
+      401: { description: 'Authentication required' },
+      403: error(
+        'Insufficient role, self_review_refused, admin_required or operator_sanctioned'
+      ),
+      404: error('sanction_not_found'),
+      409: error('appeal_transition_invalid or idempotency_mismatch'),
+      503: error(
+        'moderation_console_disabled, moderation_decisions_disabled or audit_unavailable'
+      ),
+    },
+  })
 }

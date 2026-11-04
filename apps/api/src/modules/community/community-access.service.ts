@@ -6,7 +6,11 @@ import {
 // Story 6.5 owner: fresh primary eligibility, including serialization-time flag expiry.
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common'
 import { PrismaClient, type Prisma } from '@prisma/client'
-import { COMMUNITY_AGE_GATE_DENIED_MESSAGE } from '@couture/api-client/contracts/http'
+import {
+  COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+  COMMUNITY_BANNED_MESSAGE,
+  type CommunityBannedError,
+} from '@couture/api-client/contracts/http'
 import { calculateAge } from '@couture/utils'
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import { assertWardrobeParticipationAllowed } from '../guardian/guardian-participation.js'
@@ -101,11 +105,55 @@ export async function assertCommunitySubjectPresent(
   )
 }
 
+/**
+ * The member's active community ban, read from the primary with no cache.
+ * `new Date()` is a bound parameter, so a temporary ban ends at `expires_at` with no worker and
+ * no write. Active means not lifted and not past its expiry.
+ */
+export function findActiveCommunitySanction(
+  tx: Pick<Prisma.TransactionClient, 'communitySanction'>,
+  member: string,
+  now: Date = new Date()
+) {
+  return tx.communitySanction.findFirst({
+    where: {
+      user_id: member,
+      lifted_at: null,
+      OR: [{ expires_at: null }, { expires_at: { gt: now } }],
+    },
+    orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+  })
+}
+
+/**
+ * Story 6.11 D9: the single refusal of a banned member. It names the kind, expiry and appeal
+ * status and nothing about the reason, the moderator or the case.
+ */
+export async function assertCommunityMemberNotSanctioned(
+  tx: Pick<Prisma.TransactionClient, 'communitySanction'>,
+  member: string
+): Promise<void> {
+  const sanction = await findActiveCommunitySanction(tx, member)
+  if (!sanction) return
+  const body: CommunityBannedError = {
+    statusCode: 403,
+    code: 'community_banned',
+    message: COMMUNITY_BANNED_MESSAGE,
+    sanction: {
+      kind: sanction.kind,
+      expiresAt: sanction.expires_at?.toISOString() ?? null,
+      appealStatus: sanction.appeal_status,
+    },
+  }
+  throw new ForbiddenException(body)
+}
+
 export async function assertCommunityDatabaseReadAccess(
   tx: Prisma.TransactionClient,
   member: string,
   allowConsentPending = false
 ): Promise<void> {
+  await assertCommunityMemberNotSanctioned(tx, member)
   const profile = await tx.userProfile.findUnique({ where: { user_id: member } })
   if (!profile?.birthdate || calculateAge(profile.birthdate) < 13)
     throw new ForbiddenException(COMMUNITY_AGE_GATE_DENIED_MESSAGE)

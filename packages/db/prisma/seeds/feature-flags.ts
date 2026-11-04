@@ -63,6 +63,8 @@ const canonicalFlagOverrides: Record<FeatureFlagKey, FeatureFlagStoredValue> = {
   // Story 6.10: the registry default is false; this seed turns the moderator
   // console reads on in seeded and local environments. Production never runs it.
   moderation_console_enabled: true,
+  // Story 6.11: same reasoning for moderation decisions. Production never runs it.
+  moderation_decisions_enabled: true,
 }
 
 const supplementalFeatureFlags: SeededFeatureFlag[] = [

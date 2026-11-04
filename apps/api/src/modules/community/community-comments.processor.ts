@@ -205,6 +205,7 @@ export class CommunityCommentsProcessor {
       data: {
         comment_id: commentId,
         reason: 'inappropriate_content',
+        origin: 'screening',
         accepted_at: now,
         routed_at: now,
         sla_due_at: new Date(now.getTime() + 86_400_000),

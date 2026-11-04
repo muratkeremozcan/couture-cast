@@ -149,6 +149,14 @@ const FEATURE_FLAG_DEFINITIONS = {
     kind: 'boolean',
     defaultValue: false,
   },
+  // Story 6.11: the kill switch for moderation decisions and appeal steps. It can
+  // close writes while the console stays readable, and writes also need the
+  // console flag. It is evaluated after the role check, and a read failure closes
+  // the route. It never lifts a ban: enforcement has no flag.
+  moderation_decisions_enabled: {
+    kind: 'boolean',
+    defaultValue: false,
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<FeatureFlagStoredValue>>
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAG_DEFINITIONS

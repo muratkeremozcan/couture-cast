@@ -54,6 +54,7 @@ import {
   type SupportedLocale,
   type UpdateCommunityChallengeInput,
   type WithdrawCommunityPostResponse,
+  communityModerationReasonCategories,
 } from '@couture/api-client/contracts/http'
 import { randomUUID } from 'node:crypto'
 import {
@@ -754,7 +755,12 @@ export class CommunityService {
         publishedAt: post.published_at?.toISOString() ?? null,
         status: post.status,
         challengeId: post.challenge_id ?? null,
-        moderationReason: post.moderation_reason ?? null,
+        // Only a screening code the client can localize. An operator's words or a ban marker
+        // stay private, and the author sees the generic removed state.
+        moderationReason:
+          communityModerationReasonCategories(post.moderation_reason) === null
+            ? null
+            : post.moderation_reason,
       }
     })
   }
@@ -917,6 +923,8 @@ export class CommunityService {
     platform: CommunityPlatform
     input: OpenCommunityFeedPostInput
   }): Promise<OpenCommunityPostResponse> {
+    // Ahead of the read, because the 404 below would tell a banned member which posts are live.
+    await this.repository.assertNotSanctioned(params.userId)
     const post = await this.assertPublicPostReadable(params.userId, params.postId)
 
     await this.capture(params.userId, 'community_card_opened', {

@@ -56,8 +56,16 @@ export type ModerationMediaUnavailableReason = z.infer<
   typeof moderationMediaUnavailableReasonSchema
 >
 
-/** `unknown` means the reporter has no alias row yet. A read never creates one. */
-export const moderationAliasStateSchema = z.enum(['alias', 'erased', 'unknown'])
+/**
+ * `unknown` means the reporter has no alias row yet, and a read never creates one.
+ * `screening` means the screener filed the report, so no member stands behind it.
+ */
+export const moderationAliasStateSchema = z.enum([
+  'alias',
+  'erased',
+  'unknown',
+  'screening',
+])
 export type ModerationAliasState = z.infer<typeof moderationAliasStateSchema>
 
 export const moderationActorKindSchema = z.enum(['screening', 'reporter', 'operator'])
@@ -255,6 +263,8 @@ export const moderationCaseSummarySchema = z
     slaDueAt: isoSchema,
     /** The earliest accepted time among the case's open reports. */
     acceptedAt: isoSchema,
+    /** An escalation is waiting for an admin. It changes no SLA value or ordering. */
+    escalated: z.boolean(),
     reportCount: z.number().int().min(1),
     reasons: z.array(communityReportReasonSchema).min(1),
     locale: z.string().min(1).max(35).nullable(),
@@ -380,6 +390,7 @@ export const moderationCaseDetailSchema = z
     media: moderationMediaSchema,
     /** The moderator wrote the target or filed one of its reports. 6.11 refuses self-review. */
     viewerConflict: z.boolean(),
+    ...moderationCaseDecisionStateSchema.shape,
   })
   .strict()
 export type ModerationCaseDetail = z.infer<typeof moderationCaseDetailSchema>

@@ -11,7 +11,10 @@ import {
   ForbiddenException,
   ServiceUnavailableException,
 } from '@nestjs/common'
-import { communityImageValidationCodeSchema } from '@couture/api-client/contracts/http'
+import {
+  communityImageValidationCodeSchema,
+  SLA_DURATION_MS,
+} from '@couture/api-client/contracts/http'
 import { PrismaClient, type ClimateBand, type LookbookPost } from '@prisma/client'
 import {
   TelemetryService,
@@ -532,6 +535,28 @@ export class CommunityModerationProcessor {
           created_at: flaggedAt,
         },
       })
+
+      // Story 6.11 D11: the flagged post enters the moderator queue the way a held comment does,
+      // as a null-reporter report with a real due time. The canary is not a member and never
+      // reaches a human reviewer. An existing alias is copied and a read never creates one.
+      if (!isCommunityCanaryUser(userId)) {
+        const alias = await tx.communityAlias.findUnique({
+          where: { user_id: userId },
+          select: { alias: true },
+        })
+        await tx.communityPostReport.create({
+          data: {
+            post_id: postId,
+            reason: 'inappropriate_content',
+            origin: 'screening',
+            content_snapshot: buildCommunityContentSnapshot(post, flaggedAt),
+            subject_alias: alias?.alias ?? null,
+            image_object_path: post.image_object_path,
+            sla_due_at: new Date(flaggedAt.getTime() + SLA_DURATION_MS),
+            created_at: flaggedAt,
+          },
+        })
+      }
 
       // The outbox row is stamped on EVERY terminal branch, not only the
       // published one. Leaving it unstamped here meant the outbox dispatcher

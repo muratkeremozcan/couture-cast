@@ -121,6 +121,7 @@ import { CommunitySpotlightRepository } from './community-spotlight.repository.j
     CommunityModerationQueue,
     CommunityModerationOutboxDispatcher,
     CommunityModerationActionsService,
+    CommunitySpotlightService,
   ],
 })
 export class CommunityModule implements NestModule {

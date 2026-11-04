@@ -16,6 +16,8 @@ import {
   moderationCasesResponseSchema,
   MODERATION_RISK_BY_RANK,
   type CommunityReportReason,
+  isOperatorHoldReason,
+  type ModerationCaseDecisionState,
   type ModerationCaseDetail,
   type ModerationCaseSource,
   type ModerationCaseStatus,
@@ -29,16 +31,23 @@ import {
   encodeModerationQueueCursor,
 } from './moderation-queue-cursor.js'
 import {
+  MODERATION_QUEUE_CLOCK,
+  type ModerationQueueClock,
+} from './moderation-decision-rules.js'
+import { ModerationDecisionsService } from './moderation-decisions.service.js'
+import {
   ModerationQueueRepository,
   parseModerationCaseId,
   type LoadedCase,
   type ReportRecord,
 } from './moderation-queue.repository.js'
 
-/** The one clock of a request. Tests inject a fixed instant. */
-export const MODERATION_QUEUE_CLOCK = Symbol('MODERATION_QUEUE_CLOCK')
-export type ModerationQueueClock = () => Date
-export const systemModerationQueueClock: ModerationQueueClock = () => new Date()
+// The clock lives with the decision rules so the decision services can share it without an import cycle.
+export {
+  MODERATION_QUEUE_CLOCK,
+  systemModerationQueueClock,
+  type ModerationQueueClock,
+} from './moderation-decision-rules.js'
 
 /** A moderator opens one case, so the signed image outlives the page by two minutes. */
 export const MODERATION_MEDIA_TTL_SECONDS = 120
@@ -128,7 +137,9 @@ export class ModerationQueueService {
     private readonly repository: ModerationQueueRepository,
     @Inject(SupabaseCommunityStorageAdapter)
     private readonly storage: Pick<SupabaseCommunityStorageAdapter, 'signReadUrl'>,
-    @Inject(MODERATION_QUEUE_CLOCK) private readonly clock: ModerationQueueClock
+    @Inject(MODERATION_QUEUE_CLOCK) private readonly clock: ModerationQueueClock,
+    @Inject(ModerationDecisionsService)
+    private readonly decisions: Pick<ModerationDecisionsService, 'describeCase'>
   ) {}
 
   async listCases(auth: RequestAuthContext, query: ModerationCasesQuery) {
@@ -145,6 +156,9 @@ export class ModerationQueueService {
           )
         : null
 
+    const escalated = await this.repository.escalatedCaseKeys(
+      page.map((row) => row.caseKey)
+    )
     const items = page.map((row) => {
       const status: ModerationCaseStatus = row.openCount > 0 ? 'open' : 'resolved'
       return {
@@ -155,6 +169,7 @@ export class ModerationQueueService {
         slaState: deriveSlaState({ status, dueAt: row.dueAt, now }),
         slaDueAt: row.dueAt.toISOString(),
         acceptedAt: row.acceptedAt.toISOString(),
+        escalated: escalated.has(row.caseKey),
         reportCount: row.reportCount,
         reasons: row.reasons as CommunityReportReason[],
         locale: clampLocale(row.locale),
@@ -186,6 +201,7 @@ export class ModerationQueueService {
     if (!loaded) throw caseNotFound()
 
     const detail = this.buildDetail(auth, caseId, loaded, now)
+    const decisionState = await this.decisions.describeCase(auth, caseId)
 
     // The audit row comes before any signed URL: a failed audit returns no case data and no media.
     try {
@@ -204,7 +220,9 @@ export class ModerationQueueService {
     }
 
     const media = await this.resolveMedia(loaded, detail.snapshot.altText, now)
-    return moderationCaseDetailResponseSchema.parse({ data: { ...detail, media } })
+    return moderationCaseDetailResponseSchema.parse({
+      data: { ...detail, ...decisionState, media },
+    })
   }
 
   private buildDetail(
@@ -212,7 +230,7 @@ export class ModerationQueueService {
     caseId: string,
     loaded: LoadedCase,
     now: Date
-  ): Omit<ModerationCaseDetail, 'media'> {
+  ): Omit<ModerationCaseDetail, 'media' | keyof ModerationCaseDecisionState> {
     const open = loaded.reports.filter((report) => report.resolvedAt === null)
     const status: ModerationCaseStatus = open.length > 0 ? 'open' : 'resolved'
     const relevant = open.length > 0 ? open : loaded.reports
@@ -257,7 +275,10 @@ export class ModerationQueueService {
       target: this.target(loaded),
       findings,
       reporters: relevant.map((report) => ({
-        identity: this.identity(report.reporterId, loaded),
+        identity:
+          report.origin === 'screening'
+            ? { state: 'screening' as const, alias: null }
+            : this.identity(report.reporterId, loaded),
         reason: report.reason as CommunityReportReason,
         details: clamp(report.details, 500),
         reportedAt: report.acceptedAt.toISOString(),
@@ -332,7 +353,11 @@ export class ModerationQueueService {
       return communityModerationReasonCategories(loaded.post.moderationReason) !== null
     }
     if (loaded.comment) {
-      return ['held_for_review', 'blocked'].includes(loaded.comment.status)
+      // A ban or an operator takedown is a human hold, so it adds no machine risk step.
+      return (
+        ['held_for_review', 'blocked'].includes(loaded.comment.status) &&
+        !isOperatorHoldReason(loaded.comment.screeningReason)
+      )
     }
     return false
   }
@@ -353,6 +378,7 @@ export class ModerationQueueService {
         operatorNote: null,
       }
     }
+    if (isOperatorHoldReason(reason)) return null
     if (
       loaded.comment &&
       ['held_for_review', 'blocked'].includes(loaded.comment.status)

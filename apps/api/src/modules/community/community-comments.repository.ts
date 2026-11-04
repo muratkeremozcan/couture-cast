@@ -1,4 +1,5 @@
 import {
+  assertCommunityMemberNotSanctioned,
   assertCommunityReadEligibility,
   assertCommunitySubjectPresent,
 } from './community-access.service.js'
@@ -332,6 +333,9 @@ export class CommunityCommentsRepository {
       .update(JSON.stringify([postId, input.parentId, input.body, input.locale]))
       .digest('hex')
     return this.withThread(userId, postId, params.eligible, async (tx, post) => {
+      // Here and in `report`, never in the shared eligibility closure: delete uses that closure,
+      // and retracting one's own comment stays open during a ban.
+      await assertCommunityMemberNotSanctioned(tx, userId)
       const receipt = await tx.communityCommentReceipt.findUnique({
         where: {
           user_id_mutation_id: { user_id: userId, mutation_id: input.mutationId },
@@ -467,6 +471,7 @@ export class CommunityCommentsRepository {
       async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${params.userId}))`
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_report:' || ${params.userId}))`
+        await assertCommunityMemberNotSanctioned(tx, params.userId)
         await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${params.postId} FOR UPDATE`
         const post = await tx.lookbookPost.findFirst({
           where: { id: params.postId, ...PUBLICLY_VISIBLE_POST_WHERE },

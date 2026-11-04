@@ -4,6 +4,7 @@
 import type { CommunityAuthorizationBudget } from './community-availability.js'
 import {
   assertCommunityDatabaseAccess,
+  assertCommunityMemberNotSanctioned,
   assertCommunityReadEligibility,
   assertCommunitySubjectPresent,
 } from './community-access.service.js'
@@ -213,6 +214,10 @@ export class CommunityRepository {
   assertSubjectAvailable(member: string, budget: CommunityAuthorizationBudget) {
     return assertCommunitySubjectPresent(this.prisma, member, budget)
   }
+  /** For a route with no transaction of its own. */
+  assertNotSanctioned(member: string) {
+    return assertCommunityMemberNotSanctioned(this.prisma, member)
+  }
 
   /** One statement supplies every aggregate and viewer revision from one MVCC snapshot. */
   async reactionSummaries(
@@ -256,6 +261,7 @@ export class CommunityRepository {
     return interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       await assertCommunitySubjectAvailable(tx, userId)
+      await assertCommunityMemberNotSanctioned(tx, userId)
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
       await params.assertEligible(tx, false)
       const post = await tx.lookbookPost.findUnique({ where: { id: postId } })
@@ -724,6 +730,7 @@ export class CommunityRepository {
     try {
       return await interactiveTransaction(this.prisma, async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_report:' || ${reporterId}))`
+        await assertCommunityMemberNotSanctioned(tx, reporterId)
 
         const locked = await tx.$queryRaw<
           {

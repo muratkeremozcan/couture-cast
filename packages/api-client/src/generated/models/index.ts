@@ -1761,6 +1761,556 @@ export interface ApiV1HealthQueuesGet200ResponseMetrics {
 /**
  *
  * @export
+ * @interface ApplyModerationDecision200Response
+ */
+export interface ApplyModerationDecision200Response {
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseData}
+   * @memberof ApplyModerationDecision200Response
+   */
+  data: ApplyModerationDecision200ResponseData
+}
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecision200ResponseData
+ */
+export interface ApplyModerationDecision200ResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  decisionId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  caseId: string
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseDataActionEnum}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  action: ApplyModerationDecision200ResponseDataActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  decidedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  firstDecisionAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  revision: string
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseDataCaseStatusEnum}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  caseStatus: ApplyModerationDecision200ResponseDataCaseStatusEnum
+  /**
+   *
+   * @type {boolean}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  escalated: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  targetStatus: string | null
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseDataSanction}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  sanction: ApplyModerationDecision200ResponseDataSanction | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  replayed: boolean
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseDataCacheInvalidationEnum}
+   * @memberof ApplyModerationDecision200ResponseData
+   */
+  cacheInvalidation: ApplyModerationDecision200ResponseDataCacheInvalidationEnum
+}
+
+/**
+ * @export
+ */
+export const ApplyModerationDecision200ResponseDataActionEnum = {
+  resolve: 'resolve',
+  release: 'release',
+  takedown: 'takedown',
+  escalate: 'escalate',
+  ban: 'ban',
+} as const
+export type ApplyModerationDecision200ResponseDataActionEnum =
+  (typeof ApplyModerationDecision200ResponseDataActionEnum)[keyof typeof ApplyModerationDecision200ResponseDataActionEnum]
+
+/**
+ * @export
+ */
+export const ApplyModerationDecision200ResponseDataCaseStatusEnum = {
+  open: 'open',
+  resolved: 'resolved',
+} as const
+export type ApplyModerationDecision200ResponseDataCaseStatusEnum =
+  (typeof ApplyModerationDecision200ResponseDataCaseStatusEnum)[keyof typeof ApplyModerationDecision200ResponseDataCaseStatusEnum]
+
+/**
+ * @export
+ */
+export const ApplyModerationDecision200ResponseDataCacheInvalidationEnum = {
+  completed: 'completed',
+  deferred: 'deferred',
+} as const
+export type ApplyModerationDecision200ResponseDataCacheInvalidationEnum =
+  (typeof ApplyModerationDecision200ResponseDataCacheInvalidationEnum)[keyof typeof ApplyModerationDecision200ResponseDataCacheInvalidationEnum]
+
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecision200ResponseDataSanction
+ */
+export interface ApplyModerationDecision200ResponseDataSanction {
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecision200ResponseDataSanction
+   */
+  sanctionId: string
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseDataSanctionKindEnum}
+   * @memberof ApplyModerationDecision200ResponseDataSanction
+   */
+  kind: ApplyModerationDecision200ResponseDataSanctionKindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecision200ResponseDataSanction
+   */
+  expiresAt: string | null
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum}
+   * @memberof ApplyModerationDecision200ResponseDataSanction
+   */
+  appealStatus: ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum
+}
+
+/**
+ * @export
+ */
+export const ApplyModerationDecision200ResponseDataSanctionKindEnum = {
+  temporary: 'temporary',
+  permanent: 'permanent',
+} as const
+export type ApplyModerationDecision200ResponseDataSanctionKindEnum =
+  (typeof ApplyModerationDecision200ResponseDataSanctionKindEnum)[keyof typeof ApplyModerationDecision200ResponseDataSanctionKindEnum]
+
+/**
+ * @export
+ */
+export const ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum = {
+  not_requested: 'not_requested',
+  requested: 'requested',
+  upheld: 'upheld',
+  overturned: 'overturned',
+} as const
+export type ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum =
+  (typeof ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum)[keyof typeof ApplyModerationDecision200ResponseDataSanctionAppealStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecision400Response
+ */
+export interface ApplyModerationDecision400Response {
+  /**
+   *
+   * @type {number}
+   * @memberof ApplyModerationDecision400Response
+   */
+  statusCode: number
+  /**
+   *
+   * @type {ApplyModerationDecision400ResponseCodeEnum}
+   * @memberof ApplyModerationDecision400Response
+   */
+  code: ApplyModerationDecision400ResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecision400Response
+   */
+  message: string
+  /**
+   *
+   * @type {ApplyModerationDecision400ResponseDetailEnum}
+   * @memberof ApplyModerationDecision400Response
+   */
+  detail?: ApplyModerationDecision400ResponseDetailEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecision400Response
+   */
+  currentRevision?: string
+}
+
+/**
+ * @export
+ */
+export const ApplyModerationDecision400ResponseCodeEnum = {
+  invalid_decision: 'invalid_decision',
+  case_not_found: 'case_not_found',
+  sanction_not_found: 'sanction_not_found',
+  moderation_console_disabled: 'moderation_console_disabled',
+  moderation_decisions_disabled: 'moderation_decisions_disabled',
+  self_review_refused: 'self_review_refused',
+  admin_required: 'admin_required',
+  operator_sanctioned: 'operator_sanctioned',
+  case_conflict: 'case_conflict',
+  action_not_applicable: 'action_not_applicable',
+  idempotency_mismatch: 'idempotency_mismatch',
+  appeal_transition_invalid: 'appeal_transition_invalid',
+  audit_unavailable: 'audit_unavailable',
+} as const
+export type ApplyModerationDecision400ResponseCodeEnum =
+  (typeof ApplyModerationDecision400ResponseCodeEnum)[keyof typeof ApplyModerationDecision400ResponseCodeEnum]
+
+/**
+ * @export
+ */
+export const ApplyModerationDecision400ResponseDetailEnum = {
+  no_open_reports: 'no_open_reports',
+  target_not_held: 'target_not_held',
+  target_not_published: 'target_not_published',
+  already_escalated: 'already_escalated',
+  target_erased: 'target_erased',
+  subject_banned: 'subject_banned',
+  already_banned: 'already_banned',
+  author_ineligible: 'author_ineligible',
+  community_writes_closed: 'community_writes_closed',
+} as const
+export type ApplyModerationDecision400ResponseDetailEnum =
+  (typeof ApplyModerationDecision400ResponseDetailEnum)[keyof typeof ApplyModerationDecision400ResponseDetailEnum]
+
+/**
+ * @type ApplyModerationDecisionRequest
+ *
+ * @export
+ */
+export type ApplyModerationDecisionRequest =
+  | ApplyModerationDecisionRequestOneOf
+  | ApplyModerationDecisionRequestOneOf1
+  | ApplyModerationDecisionRequestOneOf2
+  | ApplyModerationDecisionRequestOneOf3
+  | ApplyModerationDecisionRequestOneOf4
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecisionRequestOneOf
+ */
+export interface ApplyModerationDecisionRequestOneOf {
+  /**
+   *
+   * @type {ApplyModerationDecisionRequestOneOfActionEnum}
+   * @memberof ApplyModerationDecisionRequestOneOf
+   */
+  action: ApplyModerationDecisionRequestOneOfActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf
+   */
+  mutationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf
+   */
+  expectedRevision: string
+}
+
+/**
+ * @export
+ */
+export const ApplyModerationDecisionRequestOneOfActionEnum = {
+  resolve: 'resolve',
+} as const
+export type ApplyModerationDecisionRequestOneOfActionEnum =
+  (typeof ApplyModerationDecisionRequestOneOfActionEnum)[keyof typeof ApplyModerationDecisionRequestOneOfActionEnum]
+
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecisionRequestOneOf1
+ */
+export interface ApplyModerationDecisionRequestOneOf1 {
+  /**
+   *
+   * @type {ApplyModerationDecisionRequestOneOf1ActionEnum}
+   * @memberof ApplyModerationDecisionRequestOneOf1
+   */
+  action: ApplyModerationDecisionRequestOneOf1ActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf1
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf1
+   */
+  mutationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf1
+   */
+  expectedRevision: string
+}
+
+/**
+ * @export
+ */
+export const ApplyModerationDecisionRequestOneOf1ActionEnum = {
+  release: 'release',
+} as const
+export type ApplyModerationDecisionRequestOneOf1ActionEnum =
+  (typeof ApplyModerationDecisionRequestOneOf1ActionEnum)[keyof typeof ApplyModerationDecisionRequestOneOf1ActionEnum]
+
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecisionRequestOneOf2
+ */
+export interface ApplyModerationDecisionRequestOneOf2 {
+  /**
+   *
+   * @type {ApplyModerationDecisionRequestOneOf2ActionEnum}
+   * @memberof ApplyModerationDecisionRequestOneOf2
+   */
+  action: ApplyModerationDecisionRequestOneOf2ActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf2
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf2
+   */
+  mutationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf2
+   */
+  expectedRevision: string
+}
+
+/**
+ * @export
+ */
+export const ApplyModerationDecisionRequestOneOf2ActionEnum = {
+  takedown: 'takedown',
+} as const
+export type ApplyModerationDecisionRequestOneOf2ActionEnum =
+  (typeof ApplyModerationDecisionRequestOneOf2ActionEnum)[keyof typeof ApplyModerationDecisionRequestOneOf2ActionEnum]
+
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecisionRequestOneOf3
+ */
+export interface ApplyModerationDecisionRequestOneOf3 {
+  /**
+   *
+   * @type {ApplyModerationDecisionRequestOneOf3ActionEnum}
+   * @memberof ApplyModerationDecisionRequestOneOf3
+   */
+  action: ApplyModerationDecisionRequestOneOf3ActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf3
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf3
+   */
+  mutationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf3
+   */
+  expectedRevision: string
+}
+
+/**
+ * @export
+ */
+export const ApplyModerationDecisionRequestOneOf3ActionEnum = {
+  escalate: 'escalate',
+} as const
+export type ApplyModerationDecisionRequestOneOf3ActionEnum =
+  (typeof ApplyModerationDecisionRequestOneOf3ActionEnum)[keyof typeof ApplyModerationDecisionRequestOneOf3ActionEnum]
+
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecisionRequestOneOf4
+ */
+export interface ApplyModerationDecisionRequestOneOf4 {
+  /**
+   *
+   * @type {ApplyModerationDecisionRequestOneOf4ActionEnum}
+   * @memberof ApplyModerationDecisionRequestOneOf4
+   */
+  action: ApplyModerationDecisionRequestOneOf4ActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf4
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf4
+   */
+  mutationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApplyModerationDecisionRequestOneOf4
+   */
+  expectedRevision: string
+  /**
+   *
+   * @type {ApplyModerationDecisionRequestOneOf4Ban}
+   * @memberof ApplyModerationDecisionRequestOneOf4
+   */
+  ban: ApplyModerationDecisionRequestOneOf4Ban
+}
+
+/**
+ * @export
+ */
+export const ApplyModerationDecisionRequestOneOf4ActionEnum = {
+  ban: 'ban',
+} as const
+export type ApplyModerationDecisionRequestOneOf4ActionEnum =
+  (typeof ApplyModerationDecisionRequestOneOf4ActionEnum)[keyof typeof ApplyModerationDecisionRequestOneOf4ActionEnum]
+
+/**
+ * @type ApplyModerationDecisionRequestOneOf4Ban
+ *
+ * @export
+ */
+export type ApplyModerationDecisionRequestOneOf4Ban =
+  | ApplyModerationDecisionRequestOneOf4BanOneOf
+  | ApplyModerationDecisionRequestOneOf4BanOneOf1
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecisionRequestOneOf4BanOneOf
+ */
+export interface ApplyModerationDecisionRequestOneOf4BanOneOf {
+  /**
+   *
+   * @type {ApplyModerationDecisionRequestOneOf4BanOneOfKindEnum}
+   * @memberof ApplyModerationDecisionRequestOneOf4BanOneOf
+   */
+  kind: ApplyModerationDecisionRequestOneOf4BanOneOfKindEnum
+  /**
+   *
+   * @type {ApplyModerationDecisionRequestOneOf4BanOneOfDurationDaysEnum}
+   * @memberof ApplyModerationDecisionRequestOneOf4BanOneOf
+   */
+  durationDays: ApplyModerationDecisionRequestOneOf4BanOneOfDurationDaysEnum
+}
+
+/**
+ * @export
+ */
+export const ApplyModerationDecisionRequestOneOf4BanOneOfKindEnum = {
+  temporary: 'temporary',
+} as const
+export type ApplyModerationDecisionRequestOneOf4BanOneOfKindEnum =
+  (typeof ApplyModerationDecisionRequestOneOf4BanOneOfKindEnum)[keyof typeof ApplyModerationDecisionRequestOneOf4BanOneOfKindEnum]
+
+/**
+ * @export
+ */
+export const ApplyModerationDecisionRequestOneOf4BanOneOfDurationDaysEnum = {
+  NUMBER_1: 1,
+  NUMBER_7: 7,
+  NUMBER_30: 30,
+  NUMBER_90: 90,
+} as const
+export type ApplyModerationDecisionRequestOneOf4BanOneOfDurationDaysEnum =
+  (typeof ApplyModerationDecisionRequestOneOf4BanOneOfDurationDaysEnum)[keyof typeof ApplyModerationDecisionRequestOneOf4BanOneOfDurationDaysEnum]
+
+/**
+ *
+ * @export
+ * @interface ApplyModerationDecisionRequestOneOf4BanOneOf1
+ */
+export interface ApplyModerationDecisionRequestOneOf4BanOneOf1 {
+  /**
+   *
+   * @type {ApplyModerationDecisionRequestOneOf4BanOneOf1KindEnum}
+   * @memberof ApplyModerationDecisionRequestOneOf4BanOneOf1
+   */
+  kind: ApplyModerationDecisionRequestOneOf4BanOneOf1KindEnum
+}
+
+/**
+ * @export
+ */
+export const ApplyModerationDecisionRequestOneOf4BanOneOf1KindEnum = {
+  permanent: 'permanent',
+} as const
+export type ApplyModerationDecisionRequestOneOf4BanOneOf1KindEnum =
+  (typeof ApplyModerationDecisionRequestOneOf4BanOneOf1KindEnum)[keyof typeof ApplyModerationDecisionRequestOneOf4BanOneOf1KindEnum]
+
+/**
+ *
+ * @export
  * @interface BadRequestHttpError
  */
 export interface BadRequestHttpError {
@@ -2538,6 +3088,104 @@ export const CommunityBandUnresolvedReason = {
 } as const
 export type CommunityBandUnresolvedReason =
   (typeof CommunityBandUnresolvedReason)[keyof typeof CommunityBandUnresolvedReason]
+
+/**
+ *
+ * @export
+ * @interface CommunityBannedError
+ */
+export interface CommunityBannedError {
+  /**
+   *
+   * @type {CommunityBannedErrorStatusCodeEnum}
+   * @memberof CommunityBannedError
+   */
+  statusCode: CommunityBannedErrorStatusCodeEnum
+  /**
+   *
+   * @type {CommunityBannedErrorCodeEnum}
+   * @memberof CommunityBannedError
+   */
+  code: CommunityBannedErrorCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityBannedError
+   */
+  message: string
+  /**
+   *
+   * @type {CommunityBannedErrorSanction}
+   * @memberof CommunityBannedError
+   */
+  sanction: CommunityBannedErrorSanction
+}
+
+/**
+ * @export
+ */
+export const CommunityBannedErrorStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type CommunityBannedErrorStatusCodeEnum =
+  (typeof CommunityBannedErrorStatusCodeEnum)[keyof typeof CommunityBannedErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const CommunityBannedErrorCodeEnum = {
+  community_banned: 'community_banned',
+} as const
+export type CommunityBannedErrorCodeEnum =
+  (typeof CommunityBannedErrorCodeEnum)[keyof typeof CommunityBannedErrorCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityBannedErrorSanction
+ */
+export interface CommunityBannedErrorSanction {
+  /**
+   *
+   * @type {CommunityBannedErrorSanctionKindEnum}
+   * @memberof CommunityBannedErrorSanction
+   */
+  kind: CommunityBannedErrorSanctionKindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityBannedErrorSanction
+   */
+  expiresAt: string | null
+  /**
+   *
+   * @type {CommunityBannedErrorSanctionAppealStatusEnum}
+   * @memberof CommunityBannedErrorSanction
+   */
+  appealStatus: CommunityBannedErrorSanctionAppealStatusEnum
+}
+
+/**
+ * @export
+ */
+export const CommunityBannedErrorSanctionKindEnum = {
+  temporary: 'temporary',
+  permanent: 'permanent',
+} as const
+export type CommunityBannedErrorSanctionKindEnum =
+  (typeof CommunityBannedErrorSanctionKindEnum)[keyof typeof CommunityBannedErrorSanctionKindEnum]
+
+/**
+ * @export
+ */
+export const CommunityBannedErrorSanctionAppealStatusEnum = {
+  not_requested: 'not_requested',
+  requested: 'requested',
+  upheld: 'upheld',
+  overturned: 'overturned',
+} as const
+export type CommunityBannedErrorSanctionAppealStatusEnum =
+  (typeof CommunityBannedErrorSanctionAppealStatusEnum)[keyof typeof CommunityBannedErrorSanctionAppealStatusEnum]
 
 /**
  *
@@ -7317,6 +7965,42 @@ export interface GetModerationCase200ResponseData {
    * @memberof GetModerationCase200ResponseData
    */
   viewerConflict: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseData
+   */
+  revision: string
+  /**
+   *
+   * @type {Array<GetModerationCase200ResponseDataAllowedActionsEnum>}
+   * @memberof GetModerationCase200ResponseData
+   */
+  allowedActions: Array<GetModerationCase200ResponseDataAllowedActionsEnum>
+  /**
+   *
+   * @type {Array<GetModerationCase200ResponseDataBanKindsEnum>}
+   * @memberof GetModerationCase200ResponseData
+   */
+  banKinds: Array<GetModerationCase200ResponseDataBanKindsEnum>
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetModerationCase200ResponseData
+   */
+  escalated: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseData
+   */
+  firstDecisionAt: string | null
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSubjectStanding}
+   * @memberof GetModerationCase200ResponseData
+   */
+  subjectStanding: GetModerationCase200ResponseDataSubjectStanding | null
 }
 
 /**
@@ -7361,6 +8045,29 @@ export const GetModerationCase200ResponseDataSlaStateEnum = {
 } as const
 export type GetModerationCase200ResponseDataSlaStateEnum =
   (typeof GetModerationCase200ResponseDataSlaStateEnum)[keyof typeof GetModerationCase200ResponseDataSlaStateEnum]
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataAllowedActionsEnum = {
+  resolve: 'resolve',
+  release: 'release',
+  takedown: 'takedown',
+  escalate: 'escalate',
+  ban: 'ban',
+} as const
+export type GetModerationCase200ResponseDataAllowedActionsEnum =
+  (typeof GetModerationCase200ResponseDataAllowedActionsEnum)[keyof typeof GetModerationCase200ResponseDataAllowedActionsEnum]
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataBanKindsEnum = {
+  temporary: 'temporary',
+  permanent: 'permanent',
+} as const
+export type GetModerationCase200ResponseDataBanKindsEnum =
+  (typeof GetModerationCase200ResponseDataBanKindsEnum)[keyof typeof GetModerationCase200ResponseDataBanKindsEnum]
 
 /**
  *
@@ -7606,6 +8313,7 @@ export const GetModerationCase200ResponseDataReportersInnerIdentityStateEnum = {
   alias: 'alias',
   erased: 'erased',
   unknown: 'unknown',
+  screening: 'screening',
 } as const
 export type GetModerationCase200ResponseDataReportersInnerIdentityStateEnum =
   (typeof GetModerationCase200ResponseDataReportersInnerIdentityStateEnum)[keyof typeof GetModerationCase200ResponseDataReportersInnerIdentityStateEnum]
@@ -7680,9 +8388,89 @@ export const GetModerationCase200ResponseDataSubjectStateEnum = {
   alias: 'alias',
   erased: 'erased',
   unknown: 'unknown',
+  screening: 'screening',
 } as const
 export type GetModerationCase200ResponseDataSubjectStateEnum =
   (typeof GetModerationCase200ResponseDataSubjectStateEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStateEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataSubjectStanding
+ */
+export interface GetModerationCase200ResponseDataSubjectStanding {
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetModerationCase200ResponseDataSubjectStanding
+   */
+  active: boolean
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSubjectStandingSanction}
+   * @memberof GetModerationCase200ResponseDataSubjectStanding
+   */
+  sanction: GetModerationCase200ResponseDataSubjectStandingSanction | null
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationCase200ResponseDataSubjectStanding
+   */
+  priorBanCount: number
+}
+/**
+ *
+ * @export
+ * @interface GetModerationCase200ResponseDataSubjectStandingSanction
+ */
+export interface GetModerationCase200ResponseDataSubjectStandingSanction {
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanction
+   */
+  sanctionId: string
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum}
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanction
+   */
+  kind: GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanction
+   */
+  expiresAt: string | null
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum}
+   * @memberof GetModerationCase200ResponseDataSubjectStandingSanction
+   */
+  appealStatus: GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum
+}
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum = {
+  temporary: 'temporary',
+  permanent: 'permanent',
+} as const
+export type GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum =
+  (typeof GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStandingSanctionKindEnum]
+
+/**
+ * @export
+ */
+export const GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum = {
+  not_requested: 'not_requested',
+  requested: 'requested',
+  upheld: 'upheld',
+  overturned: 'overturned',
+} as const
+export type GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum =
+  (typeof GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum)[keyof typeof GetModerationCase200ResponseDataSubjectStandingSanctionAppealStatusEnum]
 
 /**
  *
@@ -8516,6 +9304,12 @@ export interface ListModerationCases200ResponseDataItemsInner {
   acceptedAt: string
   /**
    *
+   * @type {boolean}
+   * @memberof ListModerationCases200ResponseDataItemsInner
+   */
+  escalated: boolean
+  /**
+   *
    * @type {number}
    * @memberof ListModerationCases200ResponseDataItemsInner
    */
@@ -9096,6 +9890,116 @@ export interface ModerationActionInput {
 /**
  *
  * @export
+ * @interface ModerationAppealInput
+ */
+export interface ModerationAppealInput {
+  /**
+   *
+   * @type {ModerationAppealInputStatusEnum}
+   * @memberof ModerationAppealInput
+   */
+  status: ModerationAppealInputStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationAppealInput
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationAppealInput
+   */
+  mutationId: string
+}
+
+/**
+ * @export
+ */
+export const ModerationAppealInputStatusEnum = {
+  requested: 'requested',
+  upheld: 'upheld',
+  overturned: 'overturned',
+} as const
+export type ModerationAppealInputStatusEnum =
+  (typeof ModerationAppealInputStatusEnum)[keyof typeof ModerationAppealInputStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationAppealResponse
+ */
+export interface ModerationAppealResponse {
+  /**
+   *
+   * @type {ModerationAppealResponseData}
+   * @memberof ModerationAppealResponse
+   */
+  data: ModerationAppealResponseData
+}
+/**
+ *
+ * @export
+ * @interface ModerationAppealResponseData
+ */
+export interface ModerationAppealResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationAppealResponseData
+   */
+  decisionId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationAppealResponseData
+   */
+  decidedAt: string
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseDataSanction}
+   * @memberof ModerationAppealResponseData
+   */
+  sanction: ApplyModerationDecision200ResponseDataSanction
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationAppealResponseData
+   */
+  active: boolean
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationAppealResponseData
+   */
+  restoredCount: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationAppealResponseData
+   */
+  replayed: boolean
+  /**
+   *
+   * @type {ModerationAppealResponseDataCacheInvalidationEnum}
+   * @memberof ModerationAppealResponseData
+   */
+  cacheInvalidation: ModerationAppealResponseDataCacheInvalidationEnum
+}
+
+/**
+ * @export
+ */
+export const ModerationAppealResponseDataCacheInvalidationEnum = {
+  completed: 'completed',
+  deferred: 'deferred',
+} as const
+export type ModerationAppealResponseDataCacheInvalidationEnum =
+  (typeof ModerationAppealResponseDataCacheInvalidationEnum)[keyof typeof ModerationAppealResponseDataCacheInvalidationEnum]
+
+/**
+ *
+ * @export
  * @interface ModerationCaseDetailResponse
  */
 export interface ModerationCaseDetailResponse {
@@ -9220,6 +10124,42 @@ export interface ModerationCaseDetailResponseData {
    * @memberof ModerationCaseDetailResponseData
    */
   viewerConflict: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  revision: string
+  /**
+   *
+   * @type {Array<ModerationCaseDetailResponseDataAllowedActionsEnum>}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  allowedActions: Array<ModerationCaseDetailResponseDataAllowedActionsEnum>
+  /**
+   *
+   * @type {Array<ModerationCaseDetailResponseDataBanKindsEnum>}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  banKinds: Array<ModerationCaseDetailResponseDataBanKindsEnum>
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  escalated: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  firstDecisionAt: string | null
+  /**
+   *
+   * @type {ModerationCaseDetailResponseDataSubjectStanding}
+   * @memberof ModerationCaseDetailResponseData
+   */
+  subjectStanding: ModerationCaseDetailResponseDataSubjectStanding | null
 }
 
 /**
@@ -9264,6 +10204,29 @@ export const ModerationCaseDetailResponseDataSlaStateEnum = {
 } as const
 export type ModerationCaseDetailResponseDataSlaStateEnum =
   (typeof ModerationCaseDetailResponseDataSlaStateEnum)[keyof typeof ModerationCaseDetailResponseDataSlaStateEnum]
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataAllowedActionsEnum = {
+  resolve: 'resolve',
+  release: 'release',
+  takedown: 'takedown',
+  escalate: 'escalate',
+  ban: 'ban',
+} as const
+export type ModerationCaseDetailResponseDataAllowedActionsEnum =
+  (typeof ModerationCaseDetailResponseDataAllowedActionsEnum)[keyof typeof ModerationCaseDetailResponseDataAllowedActionsEnum]
+
+/**
+ * @export
+ */
+export const ModerationCaseDetailResponseDataBanKindsEnum = {
+  temporary: 'temporary',
+  permanent: 'permanent',
+} as const
+export type ModerationCaseDetailResponseDataBanKindsEnum =
+  (typeof ModerationCaseDetailResponseDataBanKindsEnum)[keyof typeof ModerationCaseDetailResponseDataBanKindsEnum]
 
 /**
  *
@@ -9476,6 +10439,31 @@ export interface ModerationCaseDetailResponseDataSnapshot {
 /**
  *
  * @export
+ * @interface ModerationCaseDetailResponseDataSubjectStanding
+ */
+export interface ModerationCaseDetailResponseDataSubjectStanding {
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationCaseDetailResponseDataSubjectStanding
+   */
+  active: boolean
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseDataSanction}
+   * @memberof ModerationCaseDetailResponseDataSubjectStanding
+   */
+  sanction: ApplyModerationDecision200ResponseDataSanction | null
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationCaseDetailResponseDataSubjectStanding
+   */
+  priorBanCount: number
+}
+/**
+ *
+ * @export
  * @interface ModerationCaseDetailResponseDataTarget
  */
 export interface ModerationCaseDetailResponseDataTarget {
@@ -9603,6 +10591,12 @@ export interface ModerationCasesResponseDataItemsInner {
   acceptedAt: string
   /**
    *
+   * @type {boolean}
+   * @memberof ModerationCasesResponseDataItemsInner
+   */
+  escalated: boolean
+  /**
+   *
    * @type {number}
    * @memberof ModerationCasesResponseDataItemsInner
    */
@@ -9690,6 +10684,389 @@ export const ModerationCasesResponseDataItemsInnerReasonsEnum = {
 export type ModerationCasesResponseDataItemsInnerReasonsEnum =
   (typeof ModerationCasesResponseDataItemsInnerReasonsEnum)[keyof typeof ModerationCasesResponseDataItemsInnerReasonsEnum]
 
+/**
+ *
+ * @export
+ * @interface ModerationDecisionError
+ */
+export interface ModerationDecisionError {
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationDecisionError
+   */
+  statusCode: number
+  /**
+   *
+   * @type {ModerationDecisionErrorCodeEnum}
+   * @memberof ModerationDecisionError
+   */
+  code: ModerationDecisionErrorCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionError
+   */
+  message: string
+  /**
+   *
+   * @type {ModerationDecisionErrorDetailEnum}
+   * @memberof ModerationDecisionError
+   */
+  detail?: ModerationDecisionErrorDetailEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionError
+   */
+  currentRevision?: string
+}
+
+/**
+ * @export
+ */
+export const ModerationDecisionErrorCodeEnum = {
+  invalid_decision: 'invalid_decision',
+  case_not_found: 'case_not_found',
+  sanction_not_found: 'sanction_not_found',
+  moderation_console_disabled: 'moderation_console_disabled',
+  moderation_decisions_disabled: 'moderation_decisions_disabled',
+  self_review_refused: 'self_review_refused',
+  admin_required: 'admin_required',
+  operator_sanctioned: 'operator_sanctioned',
+  case_conflict: 'case_conflict',
+  action_not_applicable: 'action_not_applicable',
+  idempotency_mismatch: 'idempotency_mismatch',
+  appeal_transition_invalid: 'appeal_transition_invalid',
+  audit_unavailable: 'audit_unavailable',
+} as const
+export type ModerationDecisionErrorCodeEnum =
+  (typeof ModerationDecisionErrorCodeEnum)[keyof typeof ModerationDecisionErrorCodeEnum]
+
+/**
+ * @export
+ */
+export const ModerationDecisionErrorDetailEnum = {
+  no_open_reports: 'no_open_reports',
+  target_not_held: 'target_not_held',
+  target_not_published: 'target_not_published',
+  already_escalated: 'already_escalated',
+  target_erased: 'target_erased',
+  subject_banned: 'subject_banned',
+  already_banned: 'already_banned',
+  author_ineligible: 'author_ineligible',
+  community_writes_closed: 'community_writes_closed',
+} as const
+export type ModerationDecisionErrorDetailEnum =
+  (typeof ModerationDecisionErrorDetailEnum)[keyof typeof ModerationDecisionErrorDetailEnum]
+
+/**
+ * @type ModerationDecisionInput
+ *
+ * @export
+ */
+export type ModerationDecisionInput =
+  | ModerationDecisionInputOneOf
+  | ModerationDecisionInputOneOf1
+  | ModerationDecisionInputOneOf2
+  | ModerationDecisionInputOneOf3
+  | ModerationDecisionInputOneOf4
+/**
+ *
+ * @export
+ * @interface ModerationDecisionInputOneOf
+ */
+export interface ModerationDecisionInputOneOf {
+  /**
+   *
+   * @type {ModerationDecisionInputOneOfActionEnum}
+   * @memberof ModerationDecisionInputOneOf
+   */
+  action: ModerationDecisionInputOneOfActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf
+   */
+  mutationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf
+   */
+  expectedRevision: string
+}
+
+/**
+ * @export
+ */
+export const ModerationDecisionInputOneOfActionEnum = {
+  resolve: 'resolve',
+} as const
+export type ModerationDecisionInputOneOfActionEnum =
+  (typeof ModerationDecisionInputOneOfActionEnum)[keyof typeof ModerationDecisionInputOneOfActionEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationDecisionInputOneOf1
+ */
+export interface ModerationDecisionInputOneOf1 {
+  /**
+   *
+   * @type {ModerationDecisionInputOneOf1ActionEnum}
+   * @memberof ModerationDecisionInputOneOf1
+   */
+  action: ModerationDecisionInputOneOf1ActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf1
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf1
+   */
+  mutationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf1
+   */
+  expectedRevision: string
+}
+
+/**
+ * @export
+ */
+export const ModerationDecisionInputOneOf1ActionEnum = {
+  release: 'release',
+} as const
+export type ModerationDecisionInputOneOf1ActionEnum =
+  (typeof ModerationDecisionInputOneOf1ActionEnum)[keyof typeof ModerationDecisionInputOneOf1ActionEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationDecisionInputOneOf2
+ */
+export interface ModerationDecisionInputOneOf2 {
+  /**
+   *
+   * @type {ModerationDecisionInputOneOf2ActionEnum}
+   * @memberof ModerationDecisionInputOneOf2
+   */
+  action: ModerationDecisionInputOneOf2ActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf2
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf2
+   */
+  mutationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf2
+   */
+  expectedRevision: string
+}
+
+/**
+ * @export
+ */
+export const ModerationDecisionInputOneOf2ActionEnum = {
+  takedown: 'takedown',
+} as const
+export type ModerationDecisionInputOneOf2ActionEnum =
+  (typeof ModerationDecisionInputOneOf2ActionEnum)[keyof typeof ModerationDecisionInputOneOf2ActionEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationDecisionInputOneOf3
+ */
+export interface ModerationDecisionInputOneOf3 {
+  /**
+   *
+   * @type {ModerationDecisionInputOneOf3ActionEnum}
+   * @memberof ModerationDecisionInputOneOf3
+   */
+  action: ModerationDecisionInputOneOf3ActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf3
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf3
+   */
+  mutationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf3
+   */
+  expectedRevision: string
+}
+
+/**
+ * @export
+ */
+export const ModerationDecisionInputOneOf3ActionEnum = {
+  escalate: 'escalate',
+} as const
+export type ModerationDecisionInputOneOf3ActionEnum =
+  (typeof ModerationDecisionInputOneOf3ActionEnum)[keyof typeof ModerationDecisionInputOneOf3ActionEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationDecisionInputOneOf4
+ */
+export interface ModerationDecisionInputOneOf4 {
+  /**
+   *
+   * @type {ModerationDecisionInputOneOf4ActionEnum}
+   * @memberof ModerationDecisionInputOneOf4
+   */
+  action: ModerationDecisionInputOneOf4ActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf4
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf4
+   */
+  mutationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationDecisionInputOneOf4
+   */
+  expectedRevision: string
+  /**
+   *
+   * @type {ModerationDecisionInputOneOf4Ban}
+   * @memberof ModerationDecisionInputOneOf4
+   */
+  ban: ModerationDecisionInputOneOf4Ban
+}
+
+/**
+ * @export
+ */
+export const ModerationDecisionInputOneOf4ActionEnum = {
+  ban: 'ban',
+} as const
+export type ModerationDecisionInputOneOf4ActionEnum =
+  (typeof ModerationDecisionInputOneOf4ActionEnum)[keyof typeof ModerationDecisionInputOneOf4ActionEnum]
+
+/**
+ * @type ModerationDecisionInputOneOf4Ban
+ *
+ * @export
+ */
+export type ModerationDecisionInputOneOf4Ban =
+  | ModerationDecisionInputOneOf4BanOneOf
+  | ModerationDecisionInputOneOf4BanOneOf1
+/**
+ *
+ * @export
+ * @interface ModerationDecisionInputOneOf4BanOneOf
+ */
+export interface ModerationDecisionInputOneOf4BanOneOf {
+  /**
+   *
+   * @type {ModerationDecisionInputOneOf4BanOneOfKindEnum}
+   * @memberof ModerationDecisionInputOneOf4BanOneOf
+   */
+  kind: ModerationDecisionInputOneOf4BanOneOfKindEnum
+  /**
+   *
+   * @type {ModerationDecisionInputOneOf4BanOneOfDurationDaysEnum}
+   * @memberof ModerationDecisionInputOneOf4BanOneOf
+   */
+  durationDays: ModerationDecisionInputOneOf4BanOneOfDurationDaysEnum
+}
+
+/**
+ * @export
+ */
+export const ModerationDecisionInputOneOf4BanOneOfKindEnum = {
+  temporary: 'temporary',
+} as const
+export type ModerationDecisionInputOneOf4BanOneOfKindEnum =
+  (typeof ModerationDecisionInputOneOf4BanOneOfKindEnum)[keyof typeof ModerationDecisionInputOneOf4BanOneOfKindEnum]
+
+/**
+ * @export
+ */
+export const ModerationDecisionInputOneOf4BanOneOfDurationDaysEnum = {
+  NUMBER_1: 1,
+  NUMBER_7: 7,
+  NUMBER_30: 30,
+  NUMBER_90: 90,
+} as const
+export type ModerationDecisionInputOneOf4BanOneOfDurationDaysEnum =
+  (typeof ModerationDecisionInputOneOf4BanOneOfDurationDaysEnum)[keyof typeof ModerationDecisionInputOneOf4BanOneOfDurationDaysEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationDecisionInputOneOf4BanOneOf1
+ */
+export interface ModerationDecisionInputOneOf4BanOneOf1 {
+  /**
+   *
+   * @type {ModerationDecisionInputOneOf4BanOneOf1KindEnum}
+   * @memberof ModerationDecisionInputOneOf4BanOneOf1
+   */
+  kind: ModerationDecisionInputOneOf4BanOneOf1KindEnum
+}
+
+/**
+ * @export
+ */
+export const ModerationDecisionInputOneOf4BanOneOf1KindEnum = {
+  permanent: 'permanent',
+} as const
+export type ModerationDecisionInputOneOf4BanOneOf1KindEnum =
+  (typeof ModerationDecisionInputOneOf4BanOneOf1KindEnum)[keyof typeof ModerationDecisionInputOneOf4BanOneOf1KindEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationDecisionResponse
+ */
+export interface ModerationDecisionResponse {
+  /**
+   *
+   * @type {ApplyModerationDecision200ResponseData}
+   * @memberof ModerationDecisionResponse
+   */
+  data: ApplyModerationDecision200ResponseData
+}
 /**
  *
  * @export
@@ -12409,6 +13786,192 @@ export interface QueueMetrics {
    */
   paused?: number
 }
+/**
+ *
+ * @export
+ * @interface RecordModerationAppeal200Response
+ */
+export interface RecordModerationAppeal200Response {
+  /**
+   *
+   * @type {RecordModerationAppeal200ResponseData}
+   * @memberof RecordModerationAppeal200Response
+   */
+  data: RecordModerationAppeal200ResponseData
+}
+/**
+ *
+ * @export
+ * @interface RecordModerationAppeal200ResponseData
+ */
+export interface RecordModerationAppeal200ResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof RecordModerationAppeal200ResponseData
+   */
+  decisionId: string
+  /**
+   *
+   * @type {string}
+   * @memberof RecordModerationAppeal200ResponseData
+   */
+  decidedAt: string
+  /**
+   *
+   * @type {GetModerationCase200ResponseDataSubjectStandingSanction}
+   * @memberof RecordModerationAppeal200ResponseData
+   */
+  sanction: GetModerationCase200ResponseDataSubjectStandingSanction
+  /**
+   *
+   * @type {boolean}
+   * @memberof RecordModerationAppeal200ResponseData
+   */
+  active: boolean
+  /**
+   *
+   * @type {number}
+   * @memberof RecordModerationAppeal200ResponseData
+   */
+  restoredCount: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof RecordModerationAppeal200ResponseData
+   */
+  replayed: boolean
+  /**
+   *
+   * @type {RecordModerationAppeal200ResponseDataCacheInvalidationEnum}
+   * @memberof RecordModerationAppeal200ResponseData
+   */
+  cacheInvalidation: RecordModerationAppeal200ResponseDataCacheInvalidationEnum
+}
+
+/**
+ * @export
+ */
+export const RecordModerationAppeal200ResponseDataCacheInvalidationEnum = {
+  completed: 'completed',
+  deferred: 'deferred',
+} as const
+export type RecordModerationAppeal200ResponseDataCacheInvalidationEnum =
+  (typeof RecordModerationAppeal200ResponseDataCacheInvalidationEnum)[keyof typeof RecordModerationAppeal200ResponseDataCacheInvalidationEnum]
+
+/**
+ *
+ * @export
+ * @interface RecordModerationAppeal400Response
+ */
+export interface RecordModerationAppeal400Response {
+  /**
+   *
+   * @type {number}
+   * @memberof RecordModerationAppeal400Response
+   */
+  statusCode: number
+  /**
+   *
+   * @type {RecordModerationAppeal400ResponseCodeEnum}
+   * @memberof RecordModerationAppeal400Response
+   */
+  code: RecordModerationAppeal400ResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof RecordModerationAppeal400Response
+   */
+  message: string
+  /**
+   *
+   * @type {RecordModerationAppeal400ResponseDetailEnum}
+   * @memberof RecordModerationAppeal400Response
+   */
+  detail?: RecordModerationAppeal400ResponseDetailEnum
+  /**
+   *
+   * @type {string}
+   * @memberof RecordModerationAppeal400Response
+   */
+  currentRevision?: string
+}
+
+/**
+ * @export
+ */
+export const RecordModerationAppeal400ResponseCodeEnum = {
+  invalid_decision: 'invalid_decision',
+  case_not_found: 'case_not_found',
+  sanction_not_found: 'sanction_not_found',
+  moderation_console_disabled: 'moderation_console_disabled',
+  moderation_decisions_disabled: 'moderation_decisions_disabled',
+  self_review_refused: 'self_review_refused',
+  admin_required: 'admin_required',
+  operator_sanctioned: 'operator_sanctioned',
+  case_conflict: 'case_conflict',
+  action_not_applicable: 'action_not_applicable',
+  idempotency_mismatch: 'idempotency_mismatch',
+  appeal_transition_invalid: 'appeal_transition_invalid',
+  audit_unavailable: 'audit_unavailable',
+} as const
+export type RecordModerationAppeal400ResponseCodeEnum =
+  (typeof RecordModerationAppeal400ResponseCodeEnum)[keyof typeof RecordModerationAppeal400ResponseCodeEnum]
+
+/**
+ * @export
+ */
+export const RecordModerationAppeal400ResponseDetailEnum = {
+  no_open_reports: 'no_open_reports',
+  target_not_held: 'target_not_held',
+  target_not_published: 'target_not_published',
+  already_escalated: 'already_escalated',
+  target_erased: 'target_erased',
+  subject_banned: 'subject_banned',
+  already_banned: 'already_banned',
+  author_ineligible: 'author_ineligible',
+  community_writes_closed: 'community_writes_closed',
+} as const
+export type RecordModerationAppeal400ResponseDetailEnum =
+  (typeof RecordModerationAppeal400ResponseDetailEnum)[keyof typeof RecordModerationAppeal400ResponseDetailEnum]
+
+/**
+ *
+ * @export
+ * @interface RecordModerationAppealRequest
+ */
+export interface RecordModerationAppealRequest {
+  /**
+   *
+   * @type {RecordModerationAppealRequestStatusEnum}
+   * @memberof RecordModerationAppealRequest
+   */
+  status: RecordModerationAppealRequestStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof RecordModerationAppealRequest
+   */
+  reason: string
+  /**
+   *
+   * @type {string}
+   * @memberof RecordModerationAppealRequest
+   */
+  mutationId: string
+}
+
+/**
+ * @export
+ */
+export const RecordModerationAppealRequestStatusEnum = {
+  requested: 'requested',
+  upheld: 'upheld',
+  overturned: 'overturned',
+} as const
+export type RecordModerationAppealRequestStatusEnum =
+  (typeof RecordModerationAppealRequestStatusEnum)[keyof typeof RecordModerationAppealRequestStatusEnum]
+
 /**
  *
  * @export
