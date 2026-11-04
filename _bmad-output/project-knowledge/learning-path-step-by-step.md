@@ -9313,6 +9313,18 @@ Hard-won lessons from the implementation and review of this story:
     Adding two paths changed 3,000 lines of `models/index.ts` and `http.openapi.json` although the OpenAPI document only gained two paths and three schemas.
     No workspace imports a removed name, and tsc is clean in `apps/web`, `apps/mobile`, `apps/api` and `packages/api-client`.
 
+11. **A banner that keeps the last result is wrong for a lost permission.**
+    The independent review found that a failed Reload kept reporter details and the signed image on screen after a 403, a closed console, a 401 or a re-keyed case.
+    `ec279615` splits failures into terminal ones, which clear the data, and retryable ones, which keep it under a stale banner, and tests each reason on both views.
+12. **A timer is not a state clock.**
+    The countdown re-rendered every 60 seconds, so a breach or at-risk flip and its announcement could lag a minute, and a throttled background tab stayed stale.
+    It now fires at the minute boundary of the shown time and at each state boundary, and resyncs on `visibilitychange` and `focus`.
+13. **Two code paths that derive one value need one rule.**
+    The queue took `min(locale)` over a case's reports while the detail took the first report's locale, so a filter could match a case that showed another locale.
+    Both now take the earliest report's snapshot locale, then the live locale, and reject values the contract cannot carry with the same pattern in SQL and TypeScript.
+14. **Disable with `aria-disabled`, not `disabled`, when the control holds focus.**
+    A `disabled` Load more or Reload drops keyboard focus mid-task; `aria-disabled` plus a guard keeps it, and the first new case takes focus when Load more goes away.
+
 Story/Task mapping:
 
 - Story 6.10
@@ -9348,7 +9360,7 @@ Sequence to follow:
 4. `apps/api/src/modules/moderation/moderation-queue.service.ts` for the clock, the clamps, the snapshot projection, the audit-before-sign order and the media reasons.
 5. `apps/api/src/modules/moderation/moderation-queue.controller.ts`, `moderation-queue-cache-headers.middleware.ts` and `moderation.module.ts` for the guards, the flag check and the headers.
 6. `apps/web/src/lib/moderation.ts` for the transport, the server-clock offset and `useModerationTranslation`.
-7. `apps/web/src/app/components/moderation-queue.tsx`, `moderation-filters.tsx` and `moderation-case-detail.tsx` for the console, with `moderation-plain-text.tsx`, `moderation-case-media.tsx` and `moderation-sla-countdown.tsx` for the three single-owner pieces.
+7. `apps/web/src/app/components/moderation-queue.tsx`, `moderation-filters.tsx` and `moderation-case-detail.tsx` for the console, with `moderation-plain-text.tsx`, `moderation-case-media.tsx`, `moderation-sla-countdown.tsx` and `moderation-failure-notice.tsx` for the single-owner pieces.
 8. `packages/db/test/rls/moderation-queue.spec.ts` with `apps/api/src/modules/moderation/moderation-queue-tables.ts` for how direct database clients stay out.
 
 Task owner map:
@@ -9366,6 +9378,7 @@ Task owner map:
 - Story 6.10 Task 4 step 3 owner: render one case in `apps/web/src/app/components/moderation-case-detail.tsx`.
 - Story 6.10 Task 4 step 4 owner: render user text inertly in `apps/web/src/app/components/moderation-plain-text.tsx`.
 - Story 6.10 Task 4 step 5 owner: own the case image in `apps/web/src/app/components/moderation-case-media.tsx`.
+- Story 6.10 Task 4 step 6 owner: turn a failed read into one closed sentence in `apps/web/src/app/components/moderation-failure-notice.tsx`.
 
 Tests that cover this step:
 
@@ -9381,6 +9394,7 @@ API integration tests, against real PostgreSQL with the real guards:
 - [`apps/api/integration/moderation-queue.integration.spec.ts`](../../apps/api/integration/moderation-queue.integration.spec.ts): proves order, grouping, orphans, filters, the detail, the read-only guarantee, one audit row per view and the HTTP answers.
 - [`apps/api/integration/moderation-queue-paging.integration.spec.ts`](../../apps/api/integration/moderation-queue-paging.integration.spec.ts): proves keyset ties, change between pages, resolution, the erasure re-key and SQL safety.
 - [`apps/api/integration/moderation-queue-parity.integration.spec.ts`](../../apps/api/integration/moderation-queue-parity.integration.spec.ts): proves the SQL rank, the detail risk and `deriveCaseRisk` agree on every combination.
+- [`apps/api/integration/moderation-queue-locale.integration.spec.ts`](../../apps/api/integration/moderation-queue-locale.integration.spec.ts): proves the list, the detail and the `locale` filter agree on the locale of a multi-report case, and that an unusable locale reads as none.
 - [`apps/api/integration/moderation-queue-detail.integration.spec.ts`](../../apps/api/integration/moderation-queue-detail.integration.spec.ts): proves oversized, hostile and odd stored values never turn a read into a 500.
 - [`apps/api/integration/moderation-queue-intake.integration.spec.ts`](../../apps/api/integration/moderation-queue-intake.integration.spec.ts): proves a report filed through the real report routes is in the queue within five minutes, and concurrent reads stay consistent.
 - [`apps/api/integration/moderation-queue-plan.integration.spec.ts`](../../apps/api/integration/moderation-queue-plan.integration.spec.ts): proves the open set is read through the `(resolved_at, sla_due_at)` indexes.

@@ -294,6 +294,21 @@ Full reasoning and guards sit in `_bmad-output/test-artifacts/test-design/cc610-
 
 ## Review Triage Log
 
+- 2026-11-03, independent review of `8d6dec34` (13 findings, no blocker). Source findings fixed in `ec279615`, each with a test:
+  - 1 major, fixed: a failed reload or refresh kept stale case data whatever the failure. 401, 403, `moderation_console_disabled` and a 404 on a case now clear the data and render the terminal state. Only `unavailable`, `audit_unavailable` and `rate_limited` keep the stale banner.
+  - 2 major, fixed: a `<p>` inside the findings `<dl>` failed axe. The held-with-no-code message renders outside the list, and the a11y suite covers empty, full and unknown-category findings.
+  - 4 minor, fixed: Load more, Refresh and Reload use `aria-disabled` so focus stays put, and focus moves to the first new case after Load more.
+  - 5 minor, fixed: Refresh shows `Refreshing`, ignores a second click and says the list restarted from the first page.
+  - 6 minor, fixed: U+200E, U+200F and U+061C show as markers, and a marker an author typed gets an extra backslash so a bare `<U+XXXX>` always means a real control.
+  - 7 minor, fixed: an empty alt text reads "No description provided".
+  - 8 minor, fixed: 429 is `rate_limited`, an invalid filter keeps the filters visible, an invalid cursor on Load more offers a refresh, a signed-out moderator gets a sign-in link, a 404 on the queue reads as unavailable, a 400 on a case read is a server fault, and the client drops keys a newer server added instead of failing the parse.
+  - 9 minor, fixed: the countdown fires at each state boundary as well as each minute, and resyncs when the tab becomes visible or focused.
+  - 10 minor, fixed: a new case id clears the old case, and an answer for a case the view has left is dropped.
+  - 11 minor, fixed: the service clamps the excerpt to the contract bound without splitting a surrogate pair.
+  - 12 minor, fixed: the list and the detail both take the locale of the earliest report (its snapshot locale, else the live target's), and an unusable locale reads as none in both.
+  - 3 and 13 belong to TEA.
+- Decision: finding 8's version-skew item overrides TEA's earlier rule that an extra key makes the console unavailable. The console renders only declared fields, so a dropped key leaks nothing.
+
 ## Test Design (TEA)
 
 Full plan, reconciled to this spec (this spec wins on any disagreement):
