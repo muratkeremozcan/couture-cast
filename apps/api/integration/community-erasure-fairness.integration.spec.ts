@@ -34,6 +34,8 @@ const BATCH = 200
 const HOUR_MS = 60 * 60 * 1000
 const MINUTE_MS = 60 * 1000
 const SWEEP_MS = 15 * MINUTE_MS
+// The dedicated worker's tick. A stamp is the settle time, so the next pass is the first tick past the pace.
+const TICK_MS = 30 * 1000
 const later = (at: Date, ms: number) => new Date(at.getTime() + ms)
 
 const database = isolatedCommunityDatabase()
@@ -183,7 +185,30 @@ describe('erasure work is one queue ordered by due time', () => {
       expect(row.image_object_path).toBeNull()
     }, 120_000)
 
-    it('gets a retry at every sweep from 70 hours to 72 when it keeps failing', async () => {
+    it('gets eight retries from 70 hours to 72 on the 15 minute cron, whose start time jitters', async () => {
+      const storage = new InMemoryCommunityStorage()
+      const service = new CommunityMaintenanceService(prisma, storage)
+      const start = new Date('2026-11-04T00:00:00.000Z')
+      const row = await requested(storage, start)
+      await service.sweepErasureRequests(later(start, 1))
+
+      let attempts = 0
+      storage.remove = () => {
+        attempts += 1
+        return Promise.reject(new Error('storage down'))
+      }
+      // A job starts a moment after its cron tick, by a different amount each time.
+      const jitters = [300, 100, 450, 50, 700, 20, 250, 80]
+      for (const [index, jitter] of jitters.entries()) {
+        await service.sweepErasureRequests(
+          later(start, COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS + index * SWEEP_MS + jitter)
+        )
+      }
+      expect(attempts, 'a late start pushed the row past the next tick').toBe(8)
+      expect((await rowOf(row.id)).objects_purged_at).toBeNull()
+    })
+
+    it('gets eight retries from 70 hours to 72 on the worker tick when it keeps failing', async () => {
       const storage = new InMemoryCommunityStorage()
       const service = new CommunityMaintenanceService(prisma, storage)
       const start = new Date()
@@ -199,11 +224,13 @@ describe('erasure work is one queue ordered by due time', () => {
       const deadline = later(start, ERASURE_DEADLINE_HOURS * HOUR_MS)
       while (at < deadline) {
         await service.sweepErasureRequests(at)
-        at = later(at, SWEEP_MS)
+        at = later(at, TICK_MS)
       }
-      expect(attempts, 'the retries the spec claims').toBe(8)
+      expect(attempts, 'the retries the spec claims').toBeGreaterThanOrEqual(8)
+      // A stamp floored below the end of the window earns one early final retry, and no more.
+      expect(attempts, 'retried faster than the pace').toBeLessThanOrEqual(10)
       expect((await rowOf(row.id)).objects_purged_at).toBeNull()
-    })
+    }, 120_000)
   })
 
   describe('pacing reads the last delete attempt', () => {
@@ -235,7 +262,7 @@ describe('erasure work is one queue ordered by due time', () => {
       expect(attempts).toBe(1)
       await service.sweepErasureRequests(later(start, MINUTE_MS))
       expect(attempts, 'retried before the pace').toBe(1)
-      await service.sweepErasureRequests(later(start, SWEEP_MS))
+      await service.sweepErasureRequests(later(start, SWEEP_MS + TICK_MS))
       expect(attempts, 'not due at the pace').toBe(2)
     })
 
@@ -268,7 +295,7 @@ describe('erasure work is one queue ordered by due time', () => {
         where: { id: row.id },
         data: { updated_at: later(start, SWEEP_MS) },
       })
-      await service.sweepErasureRequests(later(start, SWEEP_MS))
+      await service.sweepErasureRequests(later(start, SWEEP_MS + TICK_MS))
       expect(attempts(), 'the update postponed the repeat').toBe(1)
     })
 

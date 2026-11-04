@@ -935,6 +935,9 @@ At `47aaf893`, 5 of the 6 new tests go red:
 
 A successful delete of an abandoned draft leaves no row, which stays green.
 
+Stamping the exact settle time cut retries to 4 in 2 hours on the 15 minute cron, because the stamp passed the next tick by milliseconds.
+Flooring only the elapsed time left the same miss from cron start jitter, so the jitter test pins 8 retries, and the 30 second worker tick pins 8 to 10.
+
 At `f8370db3` a full run left the Playwright database at 12 published rows after the moderation browser specs, which proves their teardown.
 That first full run also showed I wiped my own databases: `migrate-db.cjs` creates them empty, so the database tier and three API suites failed until `prisma migrate deploy` ran.
 Those failures were my setup, and the rerun below is the evidence.
