@@ -353,15 +353,24 @@ test.describe('Moderator queue read routes (Story 6.10)', () => {
     const on = await consoleIsOn(request, testInfo)
     const baseUrl = resolveApiBaseUrl(testInfo)
     const headers = authHeaders(buildUniqueId('moderator-reader', testInfo), 'moderator')
-    const bad = await request.get(`${baseUrl}${QUEUE_PATH}?risk=critical&limit=500`, {
-      headers,
-    })
+    // One invalid value per request, each beside a valid limit, so a 400 names the value that caused it.
+    // The control proves that limit alone is valid.
     if (on) {
-      expect(bad.status()).toBe(400)
-      expect(await bad.json()).toMatchObject({ statusCode: 400, code: 'invalid_filter' })
-    } else {
-      // The flag is read before the query, so a closed console answers the same for any input.
-      await expectClosedConsole(bad)
+      const control = await request.get(`${baseUrl}${QUEUE_PATH}?limit=10`, { headers })
+      expect(control.status(), 'a valid limit alone is accepted').toBe(200)
+    }
+    for (const query of ['risk=critical&limit=10', 'limit=500']) {
+      const bad = await request.get(`${baseUrl}${QUEUE_PATH}?${query}`, { headers })
+      if (on) {
+        expect(bad.status(), query).toBe(400)
+        expect(await bad.json(), query).toMatchObject({
+          statusCode: 400,
+          code: 'invalid_filter',
+        })
+      } else {
+        // The flag is read before the query, so a closed console answers the same for any input.
+        await expectClosedConsole(bad)
+      }
     }
     for (const method of ['post', 'put', 'patch', 'delete'] as const) {
       const response = await request[method](`${baseUrl}${QUEUE_PATH}`, { headers })

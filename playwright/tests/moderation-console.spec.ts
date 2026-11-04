@@ -149,7 +149,13 @@ async function loadCases(page: Page, caseIds: string[]) {
       .poll(() => page.locator('ol[aria-label="Cases"] > li').count())
       .toBeGreaterThan(before)
   }
-  for (const caseId of caseIds) await expect(linkFor(caseId)).toHaveCount(1)
+  // Open reports from earlier runs sort ahead of these cases until the database is reset, so a run that
+  // walks the whole queue without finding them names that cause instead of a bare count mismatch.
+  for (const caseId of caseIds)
+    await expect(
+      linkFor(caseId),
+      `${caseId} not found after walking the queue; reset the local database to drop open cases left by earlier runs`
+    ).toHaveCount(1)
 }
 
 const hrefsOf = async (links: Locator) =>
