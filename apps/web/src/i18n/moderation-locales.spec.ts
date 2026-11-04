@@ -16,8 +16,11 @@ import {
   moderationCaseStatusSchema,
   moderationMediaUnavailableReasonSchema,
 } from '@couture/api-client/contracts/http'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { MODERATION_FAILURE_REASONS } from '../lib/moderation'
 import { SUPPORTED_LOCALES, type SupportedLocale } from './index'
 
 import deDE from './locales/de-DE.json'
@@ -45,18 +48,6 @@ const CATALOGS: Record<SupportedLocale, Catalog> = {
   'pt-PT': ptPT as Catalog,
   'tr-TR': trTR as Catalog,
 }
-
-/** The failure states the console maps from a `ModerationFailureReason`. */
-const FAILURE_STATES = [
-  'audit_unavailable',
-  'disabled',
-  'forbidden',
-  'invalid_cursor',
-  'invalid_filter',
-  'not_found',
-  'signed_out',
-  'unavailable',
-] as const
 
 function tree(catalog: Catalog): Record<string, unknown> {
   return (catalog.moderation ?? {}) as Record<string, unknown>
@@ -170,7 +161,7 @@ describe('6.10 moderation enum coverage derives from the contract', () => {
     ['actor', moderationActorKindSchema.options],
     ['mediaReason', moderationMediaUnavailableReasonSchema.options],
     ['alias', moderationAliasStateSchema.options.filter((state) => state !== 'alias')],
-    ['state', [...FAILURE_STATES]],
+    ['state', [...MODERATION_FAILURE_REASONS]],
   ]
 
   it.each(enums)(
@@ -191,7 +182,11 @@ describe('6.10 moderation enum coverage derives from the contract', () => {
       )
       // `state` also carries loading, retry, stale and the states that are not failures.
       const allowed =
-        path === 'state' ? ['loading', 'retry', 'stale'] : path === 'alias' ? [] : []
+        path === 'state'
+          ? ['loading', 'retry', 'stale', 'signInLink', 'caseUnavailable']
+          : path === 'category'
+            ? ['unknown']
+            : []
       expect(
         extras.filter((key) => !allowed.includes(key)),
         `moderation.${path}`
@@ -199,19 +194,56 @@ describe('6.10 moderation enum coverage derives from the contract', () => {
     }
   })
 
-  it('6.10-I18N-WEB-08 covers the same enum members that the OpenAPI document exposes', () => {
-    expect(sorted(moderationCaseSlaStateSchema.options)).toEqual([
-      'at_risk',
-      'breached',
-      'on_track',
-      'resolved',
-    ])
-    expect(sorted(moderationMediaUnavailableReasonSchema.options)).toEqual([
-      'anonymized',
-      'no_image',
-      'purged',
-      'signing_failed',
-      'target_erased',
-    ])
+  it('6.10-I18N-WEB-08 exposes the same enum members in the committed OpenAPI document', () => {
+    const document = JSON.parse(
+      readFileSync(
+        path.resolve(__dirname, '../../../../packages/api-client/docs/http.openapi.json'),
+        'utf8'
+      )
+    ) as { components: { schemas: Record<string, unknown> } }
+    const roots = ['ModerationCasesResponse', 'ModerationCaseDetailResponse'].map(
+      (name) => document.components.schemas[name]
+    )
+    for (const root of roots) expect(root, 'moderation response schema').toBeDefined()
+
+    const byProperty = new Map<string, string[][]>()
+    const walk = (node: unknown) => {
+      if (Array.isArray(node)) return node.forEach(walk)
+      if (typeof node !== 'object' || node === null) return
+      const record = node as Record<string, unknown>
+      const properties = record.properties as Record<string, unknown> | undefined
+      if (properties) {
+        for (const [name, schema] of Object.entries(properties)) {
+          const values = (schema as { enum?: string[] } | undefined)?.enum
+          if (Array.isArray(values))
+            byProperty.set(name, [...(byProperty.get(name) ?? []), values])
+        }
+      }
+      Object.values(record).forEach(walk)
+    }
+    walk(roots)
+
+    const documented = (name: string) => (byProperty.get(name) ?? []).map(sorted)
+    expect(documented('slaState')).toContainEqual(
+      sorted(moderationCaseSlaStateSchema.options)
+    )
+    expect(documented('risk')).toContainEqual(sorted(moderationCaseRiskSchema.options))
+    expect(documented('status')).toContainEqual(
+      sorted(moderationCaseStatusSchema.options)
+    )
+    expect(documented('source')).toContainEqual(
+      sorted(moderationCaseSourceSchema.options)
+    )
+    expect(documented('actorKind')).toContainEqual(
+      sorted(moderationActorKindSchema.options)
+    )
+    expect(documented('state')).toContainEqual(sorted(moderationAliasStateSchema.options))
+    // `reason` appears on the reporter (a report reason) and on the unavailable media block.
+    expect(documented('reason')).toContainEqual(
+      sorted(communityReportReasonSchema.options)
+    )
+    expect(documented('reason')).toContainEqual(
+      sorted(moderationMediaUnavailableReasonSchema.options)
+    )
   })
 })
