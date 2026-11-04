@@ -694,3 +694,26 @@ describe('review findings: findings that a newer server may send', () => {
     expect(container.querySelectorAll('dl > p')).toHaveLength(0)
   })
 })
+
+describe('round 2: the Reload control keeps focus through the stale banner', () => {
+  it('is the same element, still focused, when a failed reload shows and then clears the banner', async () => {
+    mockApi(
+      detailHandler((_id, call) =>
+        call === 2 ? json({ statusCode: 500 }, 500) : json({ data: detail() })
+      )
+    )
+    render(<ModerationCaseDetailView caseId="post.p1" />)
+    await screen.findByRole('heading', { level: 1 })
+    const button = screen.getByRole('button', { name: 'Reload case' })
+    button.focus()
+    await userEvent.click(button)
+    await screen.findByRole('alert')
+    // Same node, relabelled, and keyboard focus has not moved.
+    expect(screen.getByRole('button', { name: 'Try again' })).toBe(button)
+    expect(document.activeElement).toBe(button)
+    await userEvent.click(button)
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Reload case' })).toBe(button)
+    expect(document.activeElement).toBe(button)
+  })
+})

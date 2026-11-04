@@ -913,7 +913,8 @@
       "unavailable": "Moderasyon kuyruğu kullanılamıyor. Tekrar dene.",
       "rate_limited": "Çok fazla istek. Biraz bekleyip tekrar dene.",
       "signInLink": "Giriş yap",
-      "caseUnavailable": "Bu vaka açılamadı. Tekrar dene."
+      "caseUnavailable": "Bu vaka açılamadı. Tekrar dene.",
+      "retrying": "Tekrar deneniyor"
     },
     "queue": {
       "count": "Gösterilen vaka: {{count}}",

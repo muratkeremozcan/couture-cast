@@ -913,7 +913,8 @@
       "unavailable": "A fila de moderação não está disponível. Tente novamente.",
       "rate_limited": "Demasiados pedidos. Aguarde um momento e tente novamente.",
       "signInLink": "Iniciar sessão",
-      "caseUnavailable": "Não foi possível abrir este caso. Tente novamente."
+      "caseUnavailable": "Não foi possível abrir este caso. Tente novamente.",
+      "retrying": "A tentar novamente"
     },
     "queue": {
       "count": "Casos apresentados: {{count}}",

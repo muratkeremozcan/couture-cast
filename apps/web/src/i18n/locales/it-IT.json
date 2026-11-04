@@ -913,7 +913,8 @@
       "unavailable": "La coda di moderazione non è disponibile. Riprova.",
       "rate_limited": "Troppe richieste. Attendi un momento e riprova.",
       "signInLink": "Accedi",
-      "caseUnavailable": "Impossibile aprire questo caso. Riprova."
+      "caseUnavailable": "Impossibile aprire questo caso. Riprova.",
+      "retrying": "Nuovo tentativo in corso"
     },
     "queue": {
       "count": "Casi mostrati: {{count}}",

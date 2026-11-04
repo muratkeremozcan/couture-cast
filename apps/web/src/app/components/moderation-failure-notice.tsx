@@ -54,11 +54,12 @@ export function FailureNotice({
           type="button"
           className={moderationControl}
           aria-disabled={busy}
+          aria-busy={busy}
           onClick={() => {
             if (!busy) onRetry()
           }}
         >
-          {t('moderation.state.retry')}
+          {t(busy ? 'moderation.state.retrying' : 'moderation.state.retry')}
         </button>
       ) : null}
     </div>

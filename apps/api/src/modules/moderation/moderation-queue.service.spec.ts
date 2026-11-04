@@ -576,3 +576,17 @@ describe('review findings: stored values never make the output parse fail', () =
     )
   })
 })
+
+describe('round 2: an operator note is cut without splitting a surrogate pair', () => {
+  it('keeps 1999 characters and drops the half pair at the 2000 unit bound', async () => {
+    const note = 'n'.repeat(1999) + '😀'.repeat(3)
+    const { service } = build(
+      postCase({
+        post: { ...postCase().post!, moderationReason: note },
+      })
+    )
+    const detail = (await service.getCase(AUTH, 'post.p1')).data
+    expect(detail.findings!.operatorNote).toBe('n'.repeat(1999))
+    expect(/[\ud800-\udbff]$/.test(detail.findings!.operatorNote!)).toBe(false)
+  })
+})

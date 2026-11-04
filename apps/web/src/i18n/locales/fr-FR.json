@@ -913,7 +913,8 @@
       "unavailable": "La file de modération est indisponible. Réessayez.",
       "rate_limited": "Trop de requêtes. Patientez un instant, puis réessayez.",
       "signInLink": "Se connecter",
-      "caseUnavailable": "Ce cas n’a pas pu être ouvert. Réessayez."
+      "caseUnavailable": "Ce cas n’a pas pu être ouvert. Réessayez.",
+      "retrying": "Nouvelle tentative"
     },
     "queue": {
       "count": "Cas affichés : {{count}}",

@@ -501,3 +501,51 @@ describe('review findings: focus and busy feedback', () => {
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
   })
 })
+
+describe('round 2: retry feedback and focus at the end of the list', () => {
+  it('the Try again of a failed first load shows it is busy and ignores a second click', async () => {
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const seen: RecordedQuery[] = []
+    mockApi(
+      queueHandler(async (_query, call) => {
+        if (call === 1) return json({ statusCode: 500 }, 500)
+        await gate
+        return json(page(three))
+      }, seen)
+    )
+    render(<ModerationQueueView />)
+    const alert = await screen.findByRole('alert')
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+    const busy = await screen.findByRole('button', { name: 'Trying again' })
+    expect(busy).toHaveAttribute('aria-busy', 'true')
+    expect(busy).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(busy)
+    expect(seen).toHaveLength(2)
+    act(() => release())
+    await screen.findByRole('list', { name: 'Cases' })
+  })
+
+  it('moves focus to Refresh when Load more returns only known cases and the list ends', async () => {
+    mockApi(queueHandler((query) => json(page(three, query.cursor ? null : 'c1'))))
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull()
+    )
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Refresh' }))
+  })
+
+  it('leaves focus on Load more when a page adds nothing but more pages remain', async () => {
+    mockApi(queueHandler(() => json(page(three, 'c1'))))
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    const more = screen.getByRole('button', { name: 'Load more' })
+    more.focus()
+    await userEvent.click(more)
+    await waitFor(() => expect(more).toHaveAttribute('aria-disabled', 'false'))
+    expect(document.activeElement).toBe(more)
+  })
+})

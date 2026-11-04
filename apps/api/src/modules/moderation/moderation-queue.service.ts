@@ -341,7 +341,7 @@ export class ModerationQueueService {
     const categories = communityModerationReasonCategories(reason)
     if (categories !== null) {
       return {
-        codes: splitCodes(reason).map((code) => code.slice(0, 64)),
+        codes: splitCodes(reason).flatMap((code) => clamp(code, 64) ?? []),
         categories,
         engineVersion,
         operatorNote: null,
@@ -359,7 +359,7 @@ export class ModerationQueueService {
         codes: [],
         categories: [],
         engineVersion,
-        operatorNote: reason.trim().slice(0, OPERATOR_NOTE_MAX),
+        operatorNote: clamp(reason.trim(), OPERATOR_NOTE_MAX),
       }
     }
     return null

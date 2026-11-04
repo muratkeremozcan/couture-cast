@@ -913,7 +913,8 @@
       "unavailable": "The moderation queue is unavailable. Try again.",
       "rate_limited": "Too many requests. Wait a moment, then try again.",
       "signInLink": "Sign in",
-      "caseUnavailable": "This case could not be opened. Try again."
+      "caseUnavailable": "This case could not be opened. Try again.",
+      "retrying": "Trying again"
     },
     "queue": {
       "count": "Cases shown: {{count}}",

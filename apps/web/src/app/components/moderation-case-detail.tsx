@@ -214,33 +214,22 @@ function DetailHeader({
           {t('moderation.detail.conflict')}
         </p>
       ) : null}
-      {stale ? (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center gap-3 rounded border border-amber-700 p-3 text-sm"
+      {/* One button in one place, so keyboard focus survives the stale banner appearing or clearing. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className={control}
+          aria-disabled={loading}
+          onClick={onReload}
         >
-          <p>{t('moderation.state.stale')}</p>
-          <button
-            type="button"
-            className={control}
-            aria-disabled={loading}
-            onClick={onReload}
-          >
-            {t('moderation.state.retry')}
-          </button>
-        </div>
-      ) : (
-        <div>
-          <button
-            type="button"
-            className={control}
-            aria-disabled={loading}
-            onClick={onReload}
-          >
-            {t('moderation.detail.reload')}
-          </button>
-        </div>
-      )}
+          {t(stale ? 'moderation.state.retry' : 'moderation.detail.reload')}
+        </button>
+        {stale ? (
+          <p role="alert" className="rounded border border-amber-700 p-3 text-sm">
+            {t('moderation.state.stale')}
+          </p>
+        ) : null}
+      </div>
     </header>
   )
 }

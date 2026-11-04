@@ -183,7 +183,7 @@ describe('6.10 moderation enum coverage derives from the contract', () => {
       // `state` also carries loading, retry, stale and the states that are not failures.
       const allowed =
         path === 'state'
-          ? ['loading', 'retry', 'stale', 'signInLink', 'caseUnavailable']
+          ? ['loading', 'retry', 'retrying', 'stale', 'signInLink', 'caseUnavailable']
           : path === 'category'
             ? ['unknown']
             : []

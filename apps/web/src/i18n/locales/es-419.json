@@ -913,7 +913,8 @@
       "unavailable": "La cola de moderación no está disponible. Inténtalo de nuevo.",
       "rate_limited": "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo.",
       "signInLink": "Iniciar sesión",
-      "caseUnavailable": "No se pudo abrir este caso. Inténtalo de nuevo."
+      "caseUnavailable": "No se pudo abrir este caso. Inténtalo de nuevo.",
+      "retrying": "Reintentando"
     },
     "queue": {
       "count": "Casos mostrados: {{count}}",

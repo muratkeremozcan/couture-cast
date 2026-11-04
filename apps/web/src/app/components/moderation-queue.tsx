@@ -26,6 +26,16 @@ const RISK_CLASS = {
 } as const
 
 type Phase = 'loading' | 'ready' | 'failed'
+const REFRESH_ID = 'moderation-refresh'
+
+/** Where focus goes after Load more: the first new case, else Refresh once the list has ended. */
+function focusTarget(
+  added: ModerationCaseSummary[],
+  nextCursor: string | null
+): string | null {
+  if (added[0]) return `case-link-${added[0].caseId}`
+  return nextCursor === null ? REFRESH_ID : null
+}
 
 function useModerationQueue(filters: ModerationQueueFilters) {
   const [items, setItems] = useState<ModerationCaseSummary[]>([])
@@ -36,7 +46,7 @@ function useModerationQueue(filters: ModerationQueueFilters) {
   const [stale, setStale] = useState(false)
   const [busy, setBusy] = useState<'refresh' | 'more' | null>(null)
   const [refreshed, setRefreshed] = useState(false)
-  const [focusCaseId, setFocusCaseId] = useState<string | null>(null)
+  const [focus, setFocus] = useState<{ id: string; at: number } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const itemsRef = useRef<ModerationCaseSummary[]>([])
   const countRef = useRef(0)
@@ -63,7 +73,9 @@ function useModerationQueue(filters: ModerationQueueFilters) {
         itemsRef.current = [...base, ...added]
         setItems(itemsRef.current)
         // The first new row takes focus, so a Load more that vanished or disabled never strands it.
-        setFocusCaseId(more ? (added[0]?.caseId ?? null) : null)
+        // A page of only known cases that ends the list sends focus to Refresh, the next stable control.
+        const target = more ? focusTarget(added, page.nextCursor) : null
+        setFocus(target ? { id: target, at: Date.now() } : null)
         setRefreshed(manual && !more)
         setCursor(page.nextCursor)
         setOffset(page.clockOffsetMs)
@@ -97,7 +109,7 @@ function useModerationQueue(filters: ModerationQueueFilters) {
     setItems([])
     setCursor(null)
     setRefreshed(false)
-    setFocusCaseId(null)
+    setFocus(null)
     setPhase('loading')
     void load(filters, null)
     return () => abortRef.current?.abort()
@@ -112,7 +124,7 @@ function useModerationQueue(filters: ModerationQueueFilters) {
     stale,
     busy,
     refreshed,
-    focusCaseId,
+    focus,
     load,
   }
 }
@@ -140,9 +152,8 @@ export function ModerationQueueView() {
   }
 
   useEffect(() => {
-    if (queue.focusCaseId)
-      document.getElementById(`case-link-${queue.focusCaseId}`)?.focus()
-  }, [queue.focusCaseId])
+    if (queue.focus) document.getElementById(queue.focus.id)?.focus()
+  }, [queue.focus])
 
   // Access reasons replace the whole console. An invalid filter keeps the filters visible so it can be fixed.
   const terminal = failure !== null && isTerminalFailure(failure)
@@ -174,6 +185,7 @@ export function ModerationQueueView() {
           {phase === 'failed' && failure ? (
             <FailureNotice
               reason={failure}
+              busy={busy !== null}
               onRetry={() => void load(filters, null, true)}
             />
           ) : null}
@@ -234,7 +246,7 @@ function StaleNotice({
           if (!busy) onRetry()
         }}
       >
-        {t('moderation.state.retry')}
+        {t(busy ? 'moderation.state.retrying' : 'moderation.state.retry')}
       </button>
     </div>
   )
@@ -276,6 +288,7 @@ function QueueList({
       {ready ? (
         <div className="flex flex-wrap gap-3">
           <button
+            id={REFRESH_ID}
             type="button"
             className={moderationControl}
             aria-disabled={busy !== null}

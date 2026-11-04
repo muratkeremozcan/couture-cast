@@ -913,7 +913,8 @@
       "unavailable": "Die Moderationswarteschlange ist nicht verfügbar. Versuche es erneut.",
       "rate_limited": "Zu viele Anfragen. Warte einen Moment und versuche es erneut.",
       "signInLink": "Anmelden",
-      "caseUnavailable": "Dieser Fall konnte nicht geöffnet werden. Versuche es erneut."
+      "caseUnavailable": "Dieser Fall konnte nicht geöffnet werden. Versuche es erneut.",
+      "retrying": "Neuer Versuch läuft"
     },
     "queue": {
       "count": "Angezeigte Fälle: {{count}}",
