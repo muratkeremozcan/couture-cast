@@ -329,6 +329,11 @@ jobs:
             packages/*/coverage/coverage-summary.json
             packages/*/coverage/lcov.info
 
+      # In a shard because it needs `yaml` from the install, and in one shard because once is enough.
+      - name: Require later checks to run after an earlier check fails
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' && matrix.shard == 'other' }}
+        run: node --test scripts/ci/workflow-step-shadowing.test.mjs
+
       - name: Fail if tests failed
         if: ${{ always() && steps.tests.outcome == 'failure' }}
         run: |
@@ -386,10 +391,6 @@ jobs:
           badge-gist-id: ${{ env.COVERAGE_GIST_ID }}
           badge-filename-prefix: couture-cast
           badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
-
-      - name: Require later checks to run after an earlier check fails
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node --test scripts/ci/workflow-step-shadowing.test.mjs
 
       - name: Keep every workspace in exactly one coverage shard
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
