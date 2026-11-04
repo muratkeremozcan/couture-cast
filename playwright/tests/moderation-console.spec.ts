@@ -258,6 +258,13 @@ const stubbedDetail = (caseId: string, media: unknown) =>
       priorActions: [],
       media,
       viewerConflict: false,
+      // Story 6.11: the decision state a read-only stub has, with no form offered.
+      revision: '0123456789abcdef',
+      allowedActions: [],
+      banKinds: [],
+      escalated: false,
+      firstDecisionAt: null,
+      subjectStanding: null,
     },
   })
 
