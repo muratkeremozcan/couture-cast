@@ -1,12 +1,18 @@
 // Story 4.4 Task 7 step 1 owner: wire real provider verification for onboarding and silhouette in pact/http/provider/provider-helper.ts
+import { ModerationDecisionsController } from '../../../apps/api/src/modules/moderation/moderation-decisions.controller'
+import { ModerationDecisionsService } from '../../../apps/api/src/modules/moderation/moderation-decisions.service'
+import { ModerationSanctionsService } from '../../../apps/api/src/modules/moderation/moderation-sanctions.service'
 import { ModerationQueueCacheHeadersMiddleware } from '../../../apps/api/src/modules/moderation/moderation-queue-cache-headers.middleware'
 import { ModerationQueueController } from '../../../apps/api/src/modules/moderation/moderation-queue.controller'
 import { ModerationQueueService } from '../../../apps/api/src/modules/moderation/moderation-queue.service'
 import { FeatureFlagsService } from '../../../apps/api/src/modules/feature-flags/feature-flags.service'
 import {
+  moderationDecisionsServiceDouble,
   moderationFlagsDouble,
   moderationQueueServiceDouble,
+  moderationSanctionsServiceDouble,
   resetModerationState,
+  withCommunityBan,
 } from './doubles/moderation'
 import { ShareCardsController } from '../../../apps/api/src/modules/share-cards/share-cards.controller'
 import { ShareCardsService } from '../../../apps/api/src/modules/share-cards/share-cards.service'
@@ -276,6 +282,7 @@ export async function startLocalPactProvider({
   const moduleFixture = await Test.createTestingModule({
     controllers: [
       ModerationQueueController,
+      ModerationDecisionsController,
       ShareCardsController,
       CommunitySyncController,
       PushRegistrationController,
@@ -304,6 +311,8 @@ export async function startLocalPactProvider({
     providers: [
       { provide: ShareCardsService, useValue: shareCardServiceDouble },
       { provide: ModerationQueueService, useValue: moderationQueueServiceDouble },
+      { provide: ModerationDecisionsService, useValue: moderationDecisionsServiceDouble },
+      { provide: ModerationSanctionsService, useValue: moderationSanctionsServiceDouble },
       { provide: FeatureFlagsService, useValue: moderationFlagsDouble },
       { provide: CommunityPreferencesService, useValue: engagement.preferences },
       { provide: CommunitySyncService, useValue: engagement.sync },
@@ -416,7 +425,7 @@ export async function startLocalPactProvider({
       },
       {
         provide: CommunityService,
-        useValue: mockCommunityService,
+        useValue: withCommunityBan(mockCommunityService),
       },
       {
         provide: CommunitySpotlightService,
@@ -495,7 +504,7 @@ export async function startLocalPactProvider({
   // calls. Without it the 401, 403 and 503 the contract records would miss the headers.
   const moderationCacheHeaders = new ModerationQueueCacheHeadersMiddleware()
   localApp.use(
-    '/api/v1/moderation/cases',
+    ['/api/v1/moderation/cases', '/api/v1/moderation/sanctions'],
     (req: Request, res: Response, next: NextFunction) => {
       moderationCacheHeaders.use(req, res, next)
     }
