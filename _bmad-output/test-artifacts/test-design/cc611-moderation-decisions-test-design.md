@@ -764,6 +764,13 @@ Every seeded defect went red for its own reason:
 
 A re-armed comment waits out the outbox's 30-second pause before it dispatches, which the test states.
 
+### Coordinator rulings on the left items
+
+An overturn of any ban returns rows held only by its marker to screening, an upgraded temporary ban's rows included: `an overturn of a permanent ban` in I-B-END-RESTORE.
+A member retracts their own comment on a hidden post with no reveal: `a member retracts their own comment on a hidden post (RG3)` in I-B-RETRACT.
+A foreign comment, an unknown comment and an unknown post give one 404 there, and a read, a report and an erased comment stay closed.
+`couture:account-erased` had no dispatcher in the web app, so the listeners and their tests went, and the photo draft cleanup moved to the sign-out path.
+
 ---
 
 ## Quality Gate Criteria

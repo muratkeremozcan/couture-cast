@@ -238,11 +238,6 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       window.dispatchEvent(new Event('couture:session'))
     })
 
-  const eraseAccount = () =>
-    act(() => {
-      window.dispatchEvent(new Event('couture:account-erased'))
-    })
-
   /** The whole page, so the live region that announced the ban counts too. */
   function expectNoSanctionOnPage() {
     const copy = enUS.community.banned
@@ -456,15 +451,6 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       serveAccounts()
       const onBannedChange = await showBannedMember()
       signOut()
-      await settle()
-      expectNoSanctionOnPage()
-      expect(onBannedChange).toHaveBeenLastCalledWith(false)
-    })
-
-    it('takes every sanction detail with it on account erasure', async () => {
-      serveAccounts()
-      const onBannedChange = await showBannedMember()
-      eraseAccount()
       await settle()
       expectNoSanctionOnPage()
       expect(onBannedChange).toHaveBeenLastCalledWith(false)
@@ -737,12 +723,9 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
         return { onBannedChange, release: () => act(() => release()) }
       }
 
-      it.each<[string, () => void]>([
-        ['account erasure', eraseAccount],
-        ['sign-out', signOut],
-      ])('shows nothing of a ban that answers after %s', async (_label, retire) => {
+      it('shows nothing of a ban that answers after sign-out', async () => {
         const { onBannedChange, release } = await startHeldProbe()
-        retire()
+        signOut()
         release()
         await settle()
         expectNoSanctionOnPage()

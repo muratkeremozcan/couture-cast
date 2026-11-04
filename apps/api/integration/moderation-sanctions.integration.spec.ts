@@ -35,6 +35,7 @@ import {
   vi,
 } from 'vitest'
 import {
+  COMMUNITY_POST_NOT_FOUND_MESSAGE,
   communityBannedErrorSchema,
   moderationAppealResponseSchema,
   moderationDecisionResponseSchema,
@@ -1584,6 +1585,74 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
     })
   })
 
+  describe('an overturn of a permanent ban', () => {
+    const overturn = async (sanctionId: string) => {
+      const staff = await admin()
+      for (const status of ['requested', 'overturned'] as const) {
+        const appeal = await staff.appeal(sanctionId, { status, reason: REASON })
+        expect(appeal.status, dump(appeal)).toBe(200)
+      }
+    }
+
+    it('returns never-public rows to screening and restores what was public, in its own transaction', async () => {
+      const author = await fx.member('author')
+      const seeded = await fx.postCase({ author })
+      const owner = await fx.member('owner')
+      const parent = await fx.post({ authorId: owner.id })
+      const { post } = await pendingPostWithImage(author.id)
+      const comment = await pendingComment(author.id)
+      const publicPost = await fx.post({ authorId: author.id, publishedAt: NOW })
+      const publicComment = await fx.comment({ postId: parent.id, authorId: author.id })
+      const applied = await ban(seeded.caseId, 'permanent')
+      await expectHeld({ post, comment }, banMarker(applied.sanctionId))
+
+      await overturn(applied.sanctionId)
+      await expectInScreening({ post, comment })
+      expect(await postOf(publicPost.id)).toMatchObject({
+        status: 'published',
+        moderation_reason: null,
+      })
+      expect(await commentOf(publicComment.id)).toMatchObject({
+        status: 'published',
+        screening_reason: null,
+      })
+      // The case target carries the moderator's reason, and an overturn does not reinstate it here.
+      expect((await postOf(seeded.postId)).moderation_reason).toBe(REASON)
+      expect((await sanctionOf(applied.sanctionId)).holds_released_at).not.toBeNull()
+      expect(await sweep()).toEqual({ subjects: 0, posts: 0, comments: 0 })
+    })
+
+    it('returns the rows an upgraded temporary ban held', async () => {
+      const held = await heldByTemporaryBan()
+      const staff = await admin()
+      const seeded = await fx.postCase({ author: held.author })
+      const upgrade = await staff.decide(seeded.caseId, {
+        action: 'ban',
+        reason: REASON,
+        ban: banTerms('permanent'),
+      })
+      expect(upgrade.status, dump(upgrade)).toBe(200)
+      const sanctionId = decisionData(upgrade).sanction!.sanctionId
+      await expectHeld(held, banMarker(sanctionId))
+      await overturn(sanctionId)
+      await expectInScreening(held)
+    })
+
+    it('leaves the rows held while an uphold keeps the ban in place', async () => {
+      const author = await fx.member('author')
+      const seeded = await fx.postCase({ author })
+      const { post } = await pendingPostWithImage(author.id)
+      const comment = await pendingComment(author.id)
+      const applied = await ban(seeded.caseId, 'permanent')
+      const staff = await admin()
+      for (const status of ['requested', 'upheld'] as const) {
+        const appeal = await staff.appeal(applied.sanctionId, { status, reason: REASON })
+        expect(appeal.status, dump(appeal)).toBe(200)
+      }
+      await expectHeld({ post, comment }, banMarker(applied.sanctionId))
+    })
+  })
+
   describe('a machine reason under the marker (RG6)', () => {
     const overturn = async (sanctionId: string) => {
       const staff = await admin()
@@ -1745,10 +1814,11 @@ describe('I-B-UPGRADE: an admin upgrades an active temporary ban', () => {
       status: 'published',
       moderation_reason: null,
     })
-    // Never public, so it stays held like any other pending item a ban held.
+    // Never public, so it returns to screening like any other pending item a ban held.
     expect(await postOf(heldByTemporary.id)).toMatchObject({
-      status: 'flagged',
-      moderation_reason: permanentMarker,
+      status: 'pending_review',
+      moderation_reason: null,
+      published_at: null,
     })
   })
 })
@@ -2192,6 +2262,125 @@ describe('I-B-RETRACT: retraction stays open during a ban (D8, TEA-18)', () => {
       expect((await commentOf(theirs.id)).status).toBe('published')
     }
   )
+
+  describe('a member retracts their own comment on a hidden post (RG3)', () => {
+    const NOT_FOUND = { statusCode: 404, message: COMMUNITY_POST_NOT_FOUND_MESSAGE }
+    const path = (postId: string, commentId: string) =>
+      `/api/v1/community/posts/${postId}/comments/${commentId}`
+
+    /** A post nobody can read, with one comment from the member and one from someone else. */
+    async function hiddenThread(status: 'flagged' | 'withdrawn') {
+      const commenter = await fx.member('commenter')
+      const owner = await fx.member('owner')
+      const post = await fx.post({ authorId: owner.id, publishedAt: NOW })
+      const own = await fx.comment({ postId: post.id, authorId: commenter.id })
+      const foreign = await fx.comment({ postId: post.id, authorId: owner.id })
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[]::text[], ARRAY[${post.id}]::text[], true)`
+        await tx.lookbookPost.update({ where: { id: post.id }, data: { status } })
+      })
+      return { commenter, owner, post, own, foreign }
+    }
+
+    it.each(['flagged', 'withdrawn'] as const)(
+      'on a %s post the comment goes, and the answer says nothing about the post',
+      async (status) => {
+        const thread = await hiddenThread(status)
+        const client = member(thread.commenter.id)
+        const answer = await client.delete(path(thread.post.id, thread.own.id))
+        expect(answer.status, dump(answer)).toBe(200)
+        expect(await commentOf(thread.own.id)).toMatchObject({
+          status: 'author_deleted',
+          body: null,
+          screening_reason: null,
+        })
+        expect(JSON.stringify(answer.body)).not.toContain(status)
+        expect(JSON.stringify(answer.body)).not.toContain(thread.owner.id)
+        expect((await postOf(thread.post.id)).status).toBe(status)
+
+        // The same shape as a retraction on a post anyone can read.
+        const open = await fx.post({
+          authorId: (await fx.member('owner')).id,
+          publishedAt: NOW,
+        })
+        const onOpen = await fx.comment({
+          postId: open.id,
+          authorId: thread.commenter.id,
+        })
+        const visible = await client.delete(path(open.id, onOpen.id))
+        expect(visible.status, dump(visible)).toBe(200)
+        expect(Object.keys(answer.body as object).sort()).toEqual(
+          Object.keys(visible.body as object).sort()
+        )
+
+        const again = await client.delete(path(thread.post.id, thread.own.id))
+        expect(again.status, dump(again)).toBe(200)
+      }
+    )
+
+    it('answers a foreign comment, an unknown comment and an unknown post with one 404', async () => {
+      const thread = await hiddenThread('flagged')
+      const client = member(thread.commenter.id)
+      for (const target of [
+        path(thread.post.id, thread.foreign.id),
+        path(thread.post.id, 'comment-that-never-existed'),
+        path('post-that-never-existed', thread.own.id),
+      ]) {
+        const answer = await client.delete(target)
+        expect(answer.status, `${target} ${dump(answer)}`).toBe(404)
+        expect(answer.body).toMatchObject(NOT_FOUND)
+      }
+      expect((await commentOf(thread.foreign.id)).status).toBe('published')
+    })
+
+    it('gives the post owner no way to retract a comment that is not theirs', async () => {
+      const thread = await hiddenThread('withdrawn')
+      const answer = await member(thread.owner.id).delete(
+        path(thread.post.id, thread.own.id)
+      )
+      expect(answer.status, dump(answer)).toBe(404)
+      expect((await commentOf(thread.own.id)).status).toBe('published')
+    })
+
+    it('opens nothing else on the hidden post: no read, no reply, no report', async () => {
+      const thread = await hiddenThread('flagged')
+      const client = member(thread.commenter.id)
+      const base = `/api/v1/community/posts/${thread.post.id}`
+      expect((await client.get(`${base}/comments`)).status).toBe(404)
+      expect((await client.get(base)).status).toBe(404)
+      const report = await client
+        .post(`${base}/comments/${thread.own.id}/report`)
+        .send({ reason: 'spam' })
+      expect(report.status, dump(report)).toBe(404)
+      expect((await commentOf(thread.own.id)).status).toBe('published')
+    })
+
+    it('still lets a banned member retract on a post the ban took down', async () => {
+      const author = await fx.member('author')
+      const seeded = await fx.postCase({ author })
+      const own = await fx.comment({ postId: seeded.postId, authorId: author.id })
+      await ban(seeded.caseId, 'temporary')
+      const answer = await member(author.id).delete(path(seeded.postId, own.id))
+      expect(answer.status, dump(answer)).toBe(200)
+      expect((await commentOf(own.id)).status).toBe('author_deleted')
+    })
+
+    it('does not bring an erased comment back to a deletable state', async () => {
+      const thread = await hiddenThread('flagged')
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[]::text[], ARRAY[${thread.post.id}]::text[], true)`
+        await tx.communityComment.update({
+          where: { id: thread.own.id },
+          data: { status: 'erased', body: null },
+        })
+      })
+      const answer = await member(thread.commenter.id).delete(
+        path(thread.post.id, thread.own.id)
+      )
+      expect(answer.status, dump(answer)).toBe(404)
+      expect((await commentOf(thread.own.id)).status).toBe('erased')
+    })
+  })
 
   it('a deleted marked comment and a withdrawn marked post stay gone after an overturn', async () => {
     const author = await fx.member('author')
@@ -2944,7 +3133,7 @@ describe('I-A-HAPPY: requested by a moderator, upheld by an admin', () => {
 })
 
 describe('I-A-OVERTURN: an admin overturns a ban (D10)', () => {
-  it('returns access and public content, and leaves the rest where the ban left it', async () => {
+  it('returns access and public content, sends the never-public back to screening, and leaves the rest', async () => {
     const author = await fx.member('author')
     const seeded = await fx.postCase({ author })
     const published = await fx.post({ authorId: author.id })
@@ -3021,13 +3210,13 @@ describe('I-A-OVERTURN: an admin overturns a ban (D10)', () => {
       publication_sequence: publicComment.publication_sequence,
     })
     expect(await postOf(neverPublished.id)).toMatchObject({
-      status: 'flagged',
-      moderation_reason: marker,
+      status: 'pending_review',
+      moderation_reason: null,
       published_at: null,
     })
     expect(await commentOf(pendingBody.id)).toMatchObject({
-      status: 'held_for_review',
-      screening_reason: marker,
+      status: 'pending_screening',
+      screening_reason: null,
       body: pendingBody.body,
     })
     expect(await postOf(seeded.postId)).toMatchObject({
