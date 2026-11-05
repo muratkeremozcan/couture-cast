@@ -325,6 +325,14 @@ Second walk at `1175a24c`, 2026-11-05, on a fresh database `cc613_walk_head` on 
 - Exports in a real browser, case and period, each at 1280 and 375 pixels in light and dark: a real `download` event, the digest recomputed from the file equal to the bundle's and the audit row's, no canary, no reporter or erased id, no `[erased]`, no overflow, and no control under 44 pixels on the case pages. A moderator's period request answered `admin_required`.
 - Screenshots and the full log, `head-walk.log`, are under `_bmad-output/test-artifacts/story-6-13/head/` and its parent. Nothing looked off this time.
 
+Third walk at `6deab76d`, 2026-11-05, on a fresh database `cc613_walk_head` on the disposable Supabase image, Redis db 9, with the built API, the real worker and the web server.
+
+- Direct writes: the same refusals as the second walk, and the row compared byte-identical with `xmin` unchanged.
+- Parent author, then commenter, through the real route and the running worker: after the first erasure the report kept the words with `comment_id` null for the third party, and after the second `comment_author_id` and `content_snapshot` were null. The scan found those members' ids only in the allow-listed tables and no canary.
+- An erased moderator got 403 `operator_sanctioned` on queue, case, decision, appeal, SLA, availability, export, erasure route and legacy actions, and no decision names that moderator.
+- `<html lang>` read `de-DE`, `pt-BR`, `tr-TR` and `en-US` with the matching page text in Chromium.
+- Exports in a real browser, case and period, at 1280 and 375 pixels in light and dark: digest and audit row matched, no canary, no overflow, no control under 44 pixels.
+
 Ship state, 2026-11-05: the owner said push now, and the owner's ruling drops the stacked 6.13b, so PR #197 carries everything and CodeRabbit skips above 100 files after filters.
 TEA's final seeded proofs and three full runs continue on `8e7e084c` and later, and the third real-stack walk reruns on the fixes after TEA reports.
 
