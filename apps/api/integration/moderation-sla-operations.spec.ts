@@ -324,9 +324,10 @@ describe('U-RB-RUNBOOK: moderation-sla-runbook.md', () => {
     expect(runbook).not.toMatch(/(^|\s)@[a-z][\w-]+/im)
   })
 
-  it('states the staffing signature as open (D16)', () => {
+  it('records the staffing sign-off Story 6.13 closed, with no roster behind it (D16)', () => {
     expect(runbook).toMatch(/D16/)
-    expect(runbook).toMatch(/not proved/)
+    expect(runbook).toMatch(/Signed off by the owner on 2026-11-05/)
+    expect(runbook).toMatch(/No roster or schedule exists/)
   })
 
   it('states that nobody is notified until a webhook is set (D8)', () => {

@@ -55,7 +55,7 @@ vi.mock('posthog-node', () => ({
   },
 }))
 
-vi.mock('@prisma/client', () => {
+vi.mock('@prisma/client', async (importOriginal) => {
   class PrismaClientMock {
     $disconnect = vi.fn()
     // createPrismaClient extends the client; the mock is its own extension.
@@ -63,7 +63,8 @@ vi.mock('@prisma/client', () => {
       return this
     }
   }
-  return { PrismaClient: PrismaClientMock }
+  // The namespace stays real: `community-erasure.ts` builds SQL fragments from it at import.
+  return { ...(await importOriginal<object>()), PrismaClient: PrismaClientMock }
 })
 
 /** Story 0.7 support file: integration assertions for analytics tracking.

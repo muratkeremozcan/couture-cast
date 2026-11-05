@@ -202,11 +202,6 @@ async function verifyEffect(name: string, f: Fixture) {
       binding_generation: f.binding.bindingGeneration + 1,
     },
     'author withdrawal': { status: 'withdrawn' },
-    'erasure maintenance': {
-      caption: null,
-      anonymized_at: expect.any(Date),
-      objects_purged_at: expect.any(Date),
-    },
     'moderator takedown': { status: 'flagged' },
     'comment author deletion': { status: 'author_deleted', body: null },
     'guardian revocation': { status: 'consent_suspended', body: null },
@@ -214,7 +209,9 @@ async function verifyEffect(name: string, f: Fixture) {
       preferences: { compliance: { guardianConsentRequired: false } },
     },
   }
-  if (name === 'registration unbind') expect(await reads[name]!()).toBeNull()
+  // Story 6.13: the sweep deletes a member's post row once its objects are purged.
+  if (name === 'registration unbind' || name === 'erasure maintenance')
+    expect(await reads[name]!()).toBeNull()
   else if (reads[name]) {
     const value = await reads[name]()
     expect(value).toMatchObject(expected[name]!)

@@ -41,6 +41,7 @@ import {
   moderationAppealResponseSchema,
   moderationDecisionResponseSchema,
   prepareShareCardResponseSchema,
+  MODERATION_ERASED_REASON,
 } from '@couture/api-client/contracts/http'
 import { bearer, checksumTables } from './helpers/moderation-queue-context.js'
 import {
@@ -4030,7 +4031,8 @@ describe('I-B-ERASURE-CASCADE: member erasure while banned', () => {
       subject_alias: subject.alias,
       moderator_id: applied.staff.id,
       action: 'ban',
-      reason: REASON,
+      // Story 6.13: a moderator's words about an erased member leave with the member.
+      reason: MODERATION_ERASED_REASON,
     })
     expect(
       await prisma.auditLog.count({
