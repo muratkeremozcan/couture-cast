@@ -2,6 +2,7 @@
 
 Updated: 2026-07-17 - Brownfield deep scan of deployment and operational configuration.
 Updated: 2026-10-16 (Story 6.2b): community worker container, canary, restart drill and rollback.
+Updated: 2026-11-05 (Story 6.12): the community worker is hosted on Northflank, SLA sweep rollout.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -23,7 +24,7 @@ tests.
 | Web           | Separate Vercel project                              | Vercel Git integration is expected; no deploy workflow is stored here | Preview web health/SHA, production web health/SHA, Playwright                |
 | API           | Separate Vercel project and Node serverless function | Vercel Git integration is expected; no deploy workflow is stored here | Preview API health/SHA; production only checks a secondary API route         |
 | Mobile        | Expo EAS Android production build                    | Manual GitHub `workflow_dispatch` or local npm command                | EAS authentication and build submission only; Maestro is separate and manual |
-| Workers       | Community worker container, Northflank (pending)     | `apps/api/Dockerfile.community-worker`; general and wardrobe: none    | Build-time model self-test, readiness log, `community:screening:canary`      |
+| Workers       | Community worker container, Northflank               | `apps/api/Dockerfile.community-worker`; general and wardrobe: none    | Build-time model self-test, readiness log, `community:screening:canary`      |
 | Database      | Supabase PostgreSQL through `DATABASE_URL`           | API Vercel build and local/API E2E startup paths                      | Prisma command exit status; no post-migration deployment probe               |
 | Observability | Optional Grafana OTLP endpoint; local LGTM stack     | API process startup when OTLP configuration is complete               | OTEL bootstrap log, integration test, dashboards and local manual checks     |
 
@@ -415,11 +416,11 @@ recorded in deferred work.
 separates them from posts a real model refused. Release or take down each one through the operator
 actions. The replay above re-screens only posts still in `pending_review`.
 
-The community worker has a container image and the runbook below, and no hosted target runs it
-yet: the Northflank service is created once the owner adds `NORTHFLANK_API_TOKEN`. The general
-bootstrap (`start:workers:prod`) and the wardrobe worker still have no hosted target at all: no
-Docker image, Vercel function, GitHub deployment workflow or process manifest starts either of
-them, and the Vercel API function does not start the dedicated workers.
+The community worker runs on Northflank as `couture-cast/community-worker`, one instance, confirmed
+through the Northflank API on 2026-11-05. The general bootstrap (`start:workers:prod`) and the
+wardrobe worker still have no hosted target at all: no Docker image, Vercel function, GitHub
+deployment workflow or process manifest starts either of them, and the Vercel API function does not
+start the dedicated workers.
 
 #### Hosted community worker (Story 6.2b)
 
@@ -520,9 +521,11 @@ canary's publication does not.
 
 `GRAFANA_OTLP_ENDPOINT` and its credentials are deliberately absent. The worker image does not
 start the OpenTelemetry SDK: `@opentelemetry/sdk-node` and its exporters would push `node_modules`
-past the 150 MB budget, so the variables would do nothing there. Until Story 6.12 adds an external
-alert on the oldest `pending_review` age, worker liveness rests on the host's restart policy, the
-readiness log line and the hosted canary.
+past the 150 MB budget, so the variables would do nothing there. Worker liveness rests on the host's
+restart policy, the readiness log line and the hosted canary. Since Story 6.12 the `/moderation/sla`
+page, served by the API with no worker running, shows the oldest `pending_review` time and a stale
+monitor once the flag is on. See the [moderation SLA runbook](./moderation-sla-runbook.md) for which
+push path exists.
 
 **Resource profile.** One replica at concurrency one, 512 MiB memory limit, the sandbox's
 fractional vCPU. Latency is measured inside the worker image at 0.2 vCPU and 512 MiB
@@ -849,12 +852,24 @@ Steps:
    - Every `community-worker:heartbeat:*` key has that `commitSha`, and a `startedAt` after the old processes' confirmed exit.
 5. Enable `moderation_console_enabled` and `moderation_decisions_enabled` only after steps 2 and 4 pass.
 
+## Story 6.12 SLA monitoring rollout
+
+`moderation-sla-sweep` runs in two places, and they share `CommunitySweeps.sweepModerationSla`:
+
+- The general bootstrap runs it every minute as a Job Scheduler on the `maintenance` queue.
+- `community.bootstrap.ts` runs it on a 60-second interval, because that process does not subscribe
+  to `maintenance`. This is the path that runs in production.
+
+The migration `20261105120000_moderation_sla_monitoring` is additive.
+The sweep reads its flags first, so a worker that starts before the migration does nothing while the
+flag is off.
+Follow the rollout and rollback steps in the [moderation SLA runbook](./moderation-sla-runbook.md).
+
 ## Concrete gaps
 
-1. **Workers have no deployment target yet.** The community worker has a container image, a
-   canary and a runbook; its hosted service waits on the owner's Northflank account. The general
-   and wardrobe workers have no image or hosted target, and no process verifies worker liveness
-   continuously.
+1. **Most workers have no deployment target yet.** The community worker runs on Northflank. The
+   general and wardrobe workers have no image or hosted target, and no process verifies worker
+   liveness continuously.
 2. **Root Expo configuration conflicts with the mobile app.** Two `app.json` files name different
    EAS projects, and root invocation behavior is undocumented.
 3. **Mobile delivery is Android-only and manual.** The workflow queues a build without waiting or
@@ -874,7 +889,11 @@ Steps:
    but cannot revert it.
 10. **Observability does not cover the deployed serverless bootstrap or critical dependencies.**
     Current custom queue/cache/realtime/database dashboards are placeholders rather than live
-    operational signals.
+    operational signals. The moderation SLA dashboard has real metrics locally, and its hosted
+    panels stay empty because neither hosted runtime starts the OpenTelemetry SDK.
+11. **No moderation alert reaches a person in production yet.** `MODERATION_OPS_WEBHOOK_URL` has no
+    production destination, so alerts stop at `/moderation/sla`, and staffing coverage is unsigned
+    (Story 6.12 D8, D16).
 
 ### Story 6.5 engagement dispatch controls
 

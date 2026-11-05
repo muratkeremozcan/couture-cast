@@ -202,12 +202,9 @@ export class ModerationSlaSweep {
       if (claim.firstProcessing && alert.kind === 'escalated') {
         this.recordAlertSignal(alert.kind, alert.source, alert.risk)
       }
-      if (claim.disposition === 'superseded') {
-        result.superseded += 1
-        continue
-      }
-      if (claim.disposition === 'console_only') {
-        result.consoleOnly += 1
+      if (claim.disposition !== 'claimed') {
+        if (claim.disposition === 'superseded') result.superseded += 1
+        else result.consoleOnly += 1
         continue
       }
 

@@ -6,6 +6,9 @@ Updated: 2026-03-21
 Reason: added testing, threshold rationale, troubleshooting,
 screenshot policy, and local Grafana stack guidance
 
+Updated: 2026-11-05
+Reason: Story 6.12 added worker metrics, the moderation SLA dashboard and its PostHog signal
+
 Status: active
 
 ## Current signals
@@ -87,6 +90,21 @@ Use `Text` panels for now:
 
 Do not create alerts from placeholder Text panels.
 
+Moderation SLA (Story 6.12):
+
+- `CoutureCast Moderation SLA` charts `moderation_sla_open_cases`,
+  `moderation_sla_oldest_pending_review_age_seconds`, `moderation_sla_alerts_total`
+  and `moderation_sla_delivery_failures_total`.
+- The general worker now starts the OpenTelemetry SDK, so these metrics export from
+  the local stack.
+- The hosted community worker omits the SDK for its 150 MB image budget, so the
+  hosted panels stay empty.
+  Its signal is PostHog: `moderation_sla_snapshot`, `moderation_sla_alert_recorded`
+  and `moderation_sla_delivery_failed`.
+- The no-notification policy below stands, so this dashboard has no alert rule.
+  Operator alerts go through the channel in the
+  [moderation SLA runbook](./moderation-sla-runbook.md).
+
 Dashboard exports belong in:
 
 - `infra/grafana/dashboards/`
@@ -97,6 +115,7 @@ Expected filenames:
 - `couturecast-queue-cache-metrics.json`
 - `couturecast-realtime-connections.json`
 - `couturecast-database-performance.json`
+- `couturecast-moderation-sla.json`
 
 Dashboard screenshots are intentionally skipped for now.
 

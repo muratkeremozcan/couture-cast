@@ -200,6 +200,7 @@ These files describe the repository state captured by the completed deep scan.
 - [Secrets and rotation](./secrets-management.md)
 - [Guardian invitation environment setup](./guardian-invitation-env-setup.md)
 - [Observability and local Grafana](./observability.md)
+- [Moderation SLA runbook](./moderation-sla-runbook.md)
 - [Test environment safety](../test-artifacts/test-environments.md)
 
 ## Getting started by part
