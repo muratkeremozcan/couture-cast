@@ -265,7 +265,8 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "none",
+          "noValue": "No samples"
         },
         "overrides": []
       },
@@ -298,8 +299,9 @@
           "editorMode": "code",
           "expr": "time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"})",
           "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Measurement age (s)",

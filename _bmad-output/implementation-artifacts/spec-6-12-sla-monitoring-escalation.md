@@ -255,6 +255,8 @@ Known limits recorded by TEA: a sweep that alerts before the first 60-second met
 
 Process note: `f126fa28` was committed with `--no-verify` by mistake. Prettier and eslint were then run by hand on its files, and the one finding was fixed in `0bc10229`.
 
+Ship state (update on every step, so a compaction costs nothing): Codex round 2 minors R2-1 and R2-2 in progress, waiting on TEA's red tests. Then node-test-gate, push, PR ready for review against main, report `cc612-builder pr <url>`, own CodeRabbit and CI, set spec and sprint-status to done before the last push, report `cc612-builder green <sha>` with the head the last CodeRabbit review covered. Never merge. Never use --no-verify.
+
 Open at hand-off, by design: D8 production destination, D13 hosted Grafana, D16 staffing coverage.
 
 Size: no split. The natural trim reached 100 files raw, and `.coderabbit.yaml` filters bring the reviewed count lower, so the owner's split ruling does not apply. No required work was cut. CodeRabbit confirms which count it uses on the first push.
@@ -289,11 +291,12 @@ Full evidence is in `_bmad-output/test-artifacts/test-design/cc612-sla-monitorin
 Codex round 1 on `6b438525`, recorded 2026-11-05. Each item amends a frozen sentence by the same rule as the TEA rulings.
 
 - CX-1 **(intent)** D8. The POST runs under `suppressTracing`, because starting the SDK in the general worker exported the webhook URL as span attributes. `@opentelemetry/core` joins the API's dependencies and the hosted image stays free of the SDK. KEEP: the HTTP client metric still carries `server.address`, the webhook host, with no path or query.
-- CX-2 **(intent)** amends TEA-01. The 45-second claim budget counts from the start of delivery, and every run claims at least once, because a detection scan of 45 seconds starved delivery forever while the monitor looked fresh. A run's length is then detection plus the budget. State and relevance still use the one sweep clock read.
+- CX-2 **(intent)** amends TEA-01. The 45-second claim budget counts from the start of delivery, and every run claims at least once, because a detection scan of 45 seconds starved delivery forever while the monitor looked fresh. A run's length is then detection plus the budget. Detection and its state use the one sweep clock read. Send relevance uses the fresh clock read at claim (R2-1), so an `at_risk` alert whose deadline passed during a slow scan is superseded, and the next sweep records the breach.
 - CX-3 **(intent)** D5, TEA-13. A failed detection or claim rejects the sweep at once. An alert-processing error lets the batch finish, then rejects. All use fixed text with no row data, write no stamp and no snapshot, and keep BullMQ's retries. Detected rows stay.
 - CX-4 **(intent)** D4, D9, TEA-04. New column `failure_owed_code`, written in the fenced failed-attempt write once `attempts` reaches 3, or by a claim that finds an expired lease and takes `attempts` to 3 or more, as TEA-04 rules, because a crash loop reaches no failure write. Two failures and then a success owe nothing. A repair pass escalates owed rows whatever their delivery state. Known bound: a crash between the commit of the stamp and the log and PostHog event loses that event, and the `JobFailure` row stays.
 - CX-5 **(intent)** D13. New gauge `moderation_sla_last_measured_timestamp_seconds`, set only after the counts read succeeds. Panels on case counts and pending-review age gate on an age under 300 seconds, and one panel shows the age.
 - Build fixes found by the full API suite, which the story's filtered runs missed: `CommunityWorkerRuntime` takes the sweep from each bootstrap through `createModerationSlaSweep`, because U-D-MODULE-WIRING keeps the community directory free of moderation imports. The SLA tables move to `MODERATION_SLA_TABLES`, because U-Q-READSET lists what queue reads touch, and the RLS suite proves both lists. The job constants and `registerModerationSlaScheduler` move into `workers/maintenance.scheduler.ts`.
+- R2-2 D13. Measurement age is an instant query with `noValue` `No samples`, because a range query with `lastNotNull` kept showing an earlier healthy age after the series disappeared.
 - CX-6 **(intent)** D11, TEA-09. The escalated count selects the logical latest decision by case key and sequence. The earlier note accepting clock-skew disagreement is removed.
 
 ## Review Triage Log

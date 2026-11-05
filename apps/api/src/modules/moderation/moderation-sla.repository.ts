@@ -191,10 +191,8 @@ export class ModerationSlaRepository {
    * that expired means a worker died mid-attempt, which is recorded as `interrupted`.
    */
   claimNext(input: {
-    /** A fresh clock read: lease and due checks follow real elapsed time. */
+    /** A fresh clock read: lease, due and relevance checks follow real elapsed time. */
     claimNow: Date
-    /** The sweep's one clock read: relevance sees the same instant as detection. */
-    sweepNow: Date
     channel: ModerationSlaChannel
   }): Promise<ModerationSlaClaim | null> {
     const nowText = input.claimNow.toISOString()
@@ -245,7 +243,7 @@ export class ModerationSlaRepository {
         kind: row.kind,
         slaDueAt: row.sla_due_at,
         anchorResolved: anchor ? anchor.resolved : null,
-        now: input.sweepNow,
+        now: input.claimNow,
       })
       const terminal =
         relevance === 'supersede'

@@ -123,7 +123,7 @@ export class ModerationSlaSweep {
       this.deps.logger.error({ event, prismaCode: prismaErrorCode(error) }, event)
       throw new Error(MODERATION_SLA_DETECTION_FAILED)
     }
-    await this.deliver(sweepNow, result)
+    await this.deliver(result)
     // A run that could not finish delivery must look like one: no stamp and no snapshot, so the
     // dashboard and the absence alert both show it, and the general worker's retries apply.
     if (result.errors > 0) throw new Error(MODERATION_SLA_DELIVERY_INCOMPLETE)
@@ -199,7 +199,7 @@ export class ModerationSlaSweep {
     }
   }
 
-  private async deliver(sweepNow: Date, result: ModerationSlaSweepResult): Promise<void> {
+  private async deliver(result: ModerationSlaSweepResult): Promise<void> {
     await this.repairOwedEscalations(result)
     const startedAt = this.deps.clock().getTime()
     for (let first = true; ; first = false) {
@@ -211,7 +211,6 @@ export class ModerationSlaSweep {
       try {
         claim = await this.repository.claimNext({
           claimNow,
-          sweepNow,
           channel: this.deps.channel.kind,
         })
       } catch (error) {
