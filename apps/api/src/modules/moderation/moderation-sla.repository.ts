@@ -13,6 +13,7 @@ import {
   type ModerationSlaDeliveryState,
   type ModerationSlaFailureCode,
 } from '@couture/api-client/contracts/http'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 import { listModerationCases } from './moderation-queue.repository.js'
 import {
   moderationSlaAlertRelevance,
@@ -197,7 +198,7 @@ export class ModerationSlaRepository {
     channel: ModerationSlaChannel
   }): Promise<ModerationSlaClaim | null> {
     const nowText = input.claimNow.toISOString()
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       const [row] = await tx.$queryRaw<
         {
           id: string
@@ -346,7 +347,7 @@ export class ModerationSlaRepository {
     code: ModerationSlaFailureCode,
     now: Date
   ): Promise<boolean> {
-    return this.prisma.$transaction(async (tx) => {
+    return interactiveTransaction(this.prisma, async (tx) => {
       const stamped = await tx.moderationSlaAlert.updateMany({
         where: { id: alert.id, failure_escalated_at: null },
         data: { failure_escalated_at: now },

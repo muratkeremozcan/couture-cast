@@ -294,7 +294,6 @@ Codex round 1 on `6b438525`, recorded 2026-11-05. Each item amends a frozen sent
 - Build fixes found by the full API suite, which the story's filtered runs missed: `CommunityWorkerRuntime` takes the sweep from each bootstrap through `createModerationSlaSweep`, because U-D-MODULE-WIRING keeps the community directory free of moderation imports. The SLA tables move to `MODERATION_SLA_TABLES`, because U-Q-READSET lists what queue reads touch, and the RLS suite proves both lists. The job constants and `registerModerationSlaScheduler` move into `workers/maintenance.scheduler.ts`.
 - CX-6 **(intent)** D11, TEA-09. The escalated count selects the logical latest decision by case key and sequence. The earlier note accepting clock-skew disagreement is removed.
 
-
 ## Review Triage Log
 
 ## Design Notes
