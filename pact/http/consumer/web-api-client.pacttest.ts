@@ -17,6 +17,11 @@ import {
   verifyModerationQueueOrphanInteraction,
   verifyModerationQueueInteraction,
   verifyModerationRefusal,
+  moderationEvidenceRefusals,
+  verifyModerationEvidenceAvailabilityInteraction,
+  verifyModerationEvidenceClosedInteraction,
+  verifyModerationEvidenceExportInteraction,
+  verifyModerationEvidenceRefusal,
   verifyModerationSlaInteraction,
 } from './interactions/moderation'
 import {
@@ -1002,6 +1007,19 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
   // Story 6.12: the SLA dashboard read. Its two refusals sit in moderationRefusals above.
   it('reads the moderation SLA summary', async () => {
     await verifyModerationSlaInteraction(pact)
+  })
+  // Story 6.13: the evidence export the console calls.
+  it('asks what evidence export a moderator may use', async () => {
+    await verifyModerationEvidenceAvailabilityInteraction(pact)
+  })
+  it('reads evidence export as closed while it is off', async () => {
+    await verifyModerationEvidenceClosedInteraction(pact)
+  })
+  it('exports the evidence of one case', async () => {
+    await verifyModerationEvidenceExportInteraction(pact)
+  })
+  it.each(moderationEvidenceRefusals)('refuses $name', async (refusal) => {
+    await verifyModerationEvidenceRefusal(pact, refusal)
   })
   // Story 6.11: the moderator's two write routes and the banned member's feed refusal.
   it('applies a moderation decision', async () => {

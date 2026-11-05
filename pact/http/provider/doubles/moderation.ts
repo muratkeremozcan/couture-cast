@@ -24,9 +24,11 @@ import {
   type ModerationAppealInput,
   type ModerationAvailabilityInput,
   type ModerationDecisionInput,
+  moderationEvidenceBundleSchema,
   moderationSlaResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { assertCommunityMemberNotSanctioned } from '../../../../apps/api/src/modules/community/community-access.service'
+import { moderationHistoryError } from '../../../../apps/api/src/modules/moderation/moderation-history.service'
 import { moderationDecisionError } from '../../../../apps/api/src/modules/moderation/moderation-decision-rules'
 
 export type ModerationScenario =
@@ -48,11 +50,13 @@ export type ModerationScenario =
   | 'admin_required'
   | 'appeal_applied'
   | 'banned_feed'
+  | 'export_too_large'
 
 let scenario: ModerationScenario = 'queue'
 let consoleEnabled = true
 let decisionsEnabled = true
 let slaEnabled = true
+let historyEnabled = true
 
 export function configureModerationScenario(next: ModerationScenario) {
   scenario = next
@@ -63,12 +67,16 @@ export function configureModerationConsole(enabled: boolean) {
 export function configureModerationSla(enabled: boolean) {
   slaEnabled = enabled
 }
+export function configureModerationHistory(enabled: boolean) {
+  historyEnabled = enabled
+}
 export function configureModerationDecisions(enabled: boolean) {
   decisionsEnabled = enabled
 }
 export function resetModerationState() {
   scenario = 'queue'
   consoleEnabled = true
+  historyEnabled = true
   decisionsEnabled = true
   slaEnabled = true
 }
@@ -198,6 +206,7 @@ const baseDetail = {
       actorKind: 'screening',
       action: 'flagged',
       reason: 'text_policy_match',
+      reasonRemoved: false,
       occurredAt: iso(-6),
     },
   ],
@@ -543,11 +552,90 @@ export const moderationSlaServiceDouble = {
 }
 
 /** The only flags the moderation controllers read. Every other flag answers on. */
+/** Story 6.13: the evidence bundle, parsed by the shipped contract so a drift fails here first. */
+export const moderationHistoryServiceDouble = {
+  exportEvidence: () => {
+    if (
+      scenario === 'self_review_refused' ||
+      scenario === 'admin_required' ||
+      scenario === 'export_too_large' ||
+      scenario === 'audit_unavailable'
+    )
+      return Promise.reject(moderationHistoryError(scenario))
+    return Promise.resolve(
+      moderationEvidenceBundleSchema.parse({
+        schemaVersion: 1,
+        exportId: '6f1d8c0a-6c9a-4f43-9a55-7a2a8d4d2c11',
+        generatedAt: PACT_SERVER_NOW,
+        scope: { scope: 'case', caseId: 'post.pactpost1' },
+        sha256: 'a'.repeat(64),
+        counts: {
+          decisions: 1,
+          reports: 1,
+          auditEvents: 1,
+          alerts: 1,
+          withheldForConflict: 0,
+        },
+        decisions: [
+          {
+            decisionId: 'decision-1',
+            caseId: 'post.pactpost1',
+            sequence: 1,
+            source: 'post',
+            action: 'resolve',
+            reason: null,
+            reasonRemoved: true,
+            moderatorId: null,
+            moderatorRole: 'moderator',
+            subjectAlias: 'Style Explorer',
+            isTerminal: true,
+            decidedAt: PACT_SERVER_NOW,
+            anonymizedAt: PACT_SERVER_NOW,
+          },
+        ],
+        reports: [
+          {
+            reportId: 'report-1',
+            source: 'post',
+            reason: 'harassment',
+            origin: 'member',
+            reporterState: 'erased',
+            acceptedAt: PACT_SERVER_NOW,
+            dueAt: PACT_SERVER_NOW,
+            resolvedAt: PACT_SERVER_NOW,
+          },
+        ],
+        auditEvents: [
+          {
+            eventType: 'moderation_decision_applied',
+            occurredAt: PACT_SERVER_NOW,
+            actorId: null,
+            role: 'moderator',
+            action: 'resolve',
+          },
+        ],
+        alerts: [
+          {
+            kind: 'breached',
+            delivery: 'delivered',
+            slaDueAt: PACT_SERVER_NOW,
+            detectedAt: PACT_SERVER_NOW,
+            deliveredAt: PACT_SERVER_NOW,
+          },
+        ],
+      })
+    )
+  },
+  requestErasure: () =>
+    Promise.reject(new Error('The web client does not call the erasure route.')),
+}
+
 export const moderationFlagsDouble = {
   getFeatureFlag: (key: string) => {
     if (key === 'moderation_console_enabled') return Promise.resolve(consoleEnabled)
     if (key === 'moderation_decisions_enabled') return Promise.resolve(decisionsEnabled)
     if (key === 'moderation_sla_monitoring_enabled') return Promise.resolve(slaEnabled)
+    if (key === 'moderation_history_enabled') return Promise.resolve(historyEnabled)
     return Promise.resolve(true)
   },
 }

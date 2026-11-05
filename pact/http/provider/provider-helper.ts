@@ -5,6 +5,8 @@ import { ModerationSanctionsService } from '../../../apps/api/src/modules/modera
 import { ModerationQueueCacheHeadersMiddleware } from '../../../apps/api/src/modules/moderation/moderation-queue-cache-headers.middleware'
 import { ModerationQueueController } from '../../../apps/api/src/modules/moderation/moderation-queue.controller'
 import { ModerationQueueService } from '../../../apps/api/src/modules/moderation/moderation-queue.service'
+import { ModerationHistoryController } from '../../../apps/api/src/modules/moderation/moderation-history.controller'
+import { ModerationHistoryService } from '../../../apps/api/src/modules/moderation/moderation-history.service'
 import { ModerationSlaController } from '../../../apps/api/src/modules/moderation/moderation-sla.controller'
 import { ModerationSlaService } from '../../../apps/api/src/modules/moderation/moderation-sla.service'
 import { FeatureFlagsService } from '../../../apps/api/src/modules/feature-flags/feature-flags.service'
@@ -13,6 +15,7 @@ import {
   moderationFlagsDouble,
   moderationQueueServiceDouble,
   moderationSanctionsServiceDouble,
+  moderationHistoryServiceDouble,
   moderationSlaServiceDouble,
   resetModerationState,
   withCommunityBan,
@@ -287,6 +290,7 @@ export async function startLocalPactProvider({
       ModerationQueueController,
       ModerationDecisionsController,
       ModerationSlaController,
+      ModerationHistoryController,
       ShareCardsController,
       CommunitySyncController,
       PushRegistrationController,
@@ -317,6 +321,7 @@ export async function startLocalPactProvider({
       { provide: ModerationQueueService, useValue: moderationQueueServiceDouble },
       { provide: ModerationDecisionsService, useValue: moderationDecisionsServiceDouble },
       { provide: ModerationSlaService, useValue: moderationSlaServiceDouble },
+      { provide: ModerationHistoryService, useValue: moderationHistoryServiceDouble },
       { provide: ModerationSanctionsService, useValue: moderationSanctionsServiceDouble },
       { provide: FeatureFlagsService, useValue: moderationFlagsDouble },
       { provide: CommunityPreferencesService, useValue: engagement.preferences },
@@ -513,6 +518,8 @@ export async function startLocalPactProvider({
       '/api/v1/moderation/cases',
       '/api/v1/moderation/sanctions',
       '/api/v1/moderation/sla',
+      '/api/v1/moderation/evidence-exports',
+      '/api/v1/moderation/erasure-requests',
     ],
     (req: Request, res: Response, next: NextFunction) => {
       moderationCacheHeaders.use(req, res, next)

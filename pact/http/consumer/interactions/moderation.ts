@@ -23,6 +23,10 @@ import {
 } from '../../../../apps/web/src/lib/community'
 import {
   applyModerationDecisionFromWeb,
+  exportModerationEvidenceFromWeb,
+  getModerationEvidenceAvailabilityFromWeb,
+  ModerationEvidenceRequestError,
+  type ModerationEvidenceFailure,
   getModerationCaseFromWeb,
   getModerationSlaFromWeb,
   listModerationCasesFromWeb,
@@ -167,6 +171,7 @@ const detailBody = {
     actorKind: regex('screening|reporter|operator', 'screening'),
     action: string('flagged'),
     reason: like('text_policy_match'),
+    reasonRemoved: false,
     occurredAt: iso('2026-11-03T06:00:00.000Z'),
   }),
   viewerConflict: like(false),
@@ -1143,5 +1148,244 @@ export async function verifyCommunityBannedFeedInteraction(pact: PactV4) {
         expiresAt: BAN_EXPIRES_AT,
         appealStatus: 'not_requested',
       })
+    })
+}
+
+/**
+ * Story 6.13 test owner: C-PACT-EXPORT, the evidence routes the console calls. The erasure route has no
+ * web caller, because it is an operator action, so its contract is the OpenAPI document and its route suite.
+ */
+const EVIDENCE_PATH = '/api/v1/moderation/evidence-exports'
+const EVIDENCE_AVAILABILITY_PATH = `${EVIDENCE_PATH}/availability`
+const EVIDENCE_CASE_REQUEST = { scope: 'case' as const, caseId: CASE_ID }
+
+// Provider endpoint: /api/v1/moderation/evidence-exports/availability -> GET ModerationHistoryController.evidenceAvailability
+export async function verifyModerationEvidenceAvailabilityInteraction(pact: PactV4) {
+  await pact
+    .addInteraction()
+    .given(...state('A moderator can export evidence'))
+    .uponReceiving('a moderator asking what evidence export it may use')
+    .withRequest(
+      'GET',
+      EVIDENCE_AVAILABILITY_PATH,
+      setJsonContent({ headers: pactModeratorHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { 'Cache-Control': 'private, no-store' },
+        body: { data: { rangeExport: false } },
+      })
+    )
+    .executeTest(async (server: V3MockServer) => {
+      const answer = await withWebSession(server, pactModeratorAuth.accessToken, () =>
+        getModerationEvidenceAvailabilityFromWeb()
+      )
+      expect(answer).toEqual({ rangeExport: false })
+    })
+}
+
+// Provider endpoint: /api/v1/moderation/evidence-exports/availability -> GET ModerationHistoryController.evidenceAvailability
+export async function verifyModerationEvidenceClosedInteraction(pact: PactV4) {
+  await pact
+    .addInteraction()
+    .given(...state('Evidence export is off for a moderator'))
+    .uponReceiving('a moderator asking about evidence export while it is off')
+    .withRequest(
+      'GET',
+      EVIDENCE_AVAILABILITY_PATH,
+      setJsonContent({ headers: pactModeratorHeaders })
+    )
+    .willRespondWith(
+      503,
+      setJsonContent({
+        headers: { 'Cache-Control': 'private, no-store' },
+        body: {
+          statusCode: 503,
+          code: 'moderation_history_disabled',
+          message: string('Moderation history is not available.'),
+        },
+      })
+    )
+    .executeTest(async (server: V3MockServer) => {
+      const answer = await withWebSession(server, pactModeratorAuth.accessToken, () =>
+        getModerationEvidenceAvailabilityFromWeb()
+      )
+      expect(answer).toBeNull()
+    })
+}
+
+// Provider endpoint: /api/v1/moderation/evidence-exports -> POST ModerationHistoryController.exportEvidence
+export async function verifyModerationEvidenceExportInteraction(pact: PactV4) {
+  await pact
+    .addInteraction()
+    .given(...state('A moderator can export evidence'))
+    .uponReceiving('a moderator exporting the evidence of one case')
+    .withRequest(
+      'POST',
+      EVIDENCE_PATH,
+      setJsonContent({ headers: pactModeratorHeaders, body: EVIDENCE_CASE_REQUEST })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { 'Cache-Control': 'private, no-store' },
+        body: {
+          schemaVersion: 1,
+          exportId: regex(
+            '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
+            '6f1d8c0a-6c9a-4f43-9a55-7a2a8d4d2c11'
+          ),
+          generatedAt: iso(SERVER_NOW),
+          scope: { scope: 'case', caseId: string(CASE_ID) },
+          sha256: regex('[0-9a-f]{64}', 'a'.repeat(64)),
+          counts: {
+            decisions: like(1),
+            reports: like(1),
+            auditEvents: like(1),
+            alerts: like(1),
+            withheldForConflict: like(0),
+          },
+          decisions: eachLike({
+            decisionId: string('decision-1'),
+            caseId: string(CASE_ID),
+            sequence: like(1),
+            source: 'post',
+            action: 'resolve',
+            reason: nullValue(),
+            reasonRemoved: true,
+            moderatorId: nullValue(),
+            moderatorRole: 'moderator',
+            subjectAlias: string('Style Explorer'),
+            isTerminal: true,
+            decidedAt: iso(SERVER_NOW),
+            anonymizedAt: iso(SERVER_NOW),
+          }),
+          reports: eachLike({
+            reportId: string('report-1'),
+            source: 'post',
+            reason: string('harassment'),
+            origin: 'member',
+            reporterState: 'erased',
+            acceptedAt: iso(SERVER_NOW),
+            dueAt: iso(SERVER_NOW),
+            resolvedAt: iso(SERVER_NOW),
+          }),
+          auditEvents: eachLike({
+            eventType: 'moderation_decision_applied',
+            occurredAt: iso(SERVER_NOW),
+            actorId: nullValue(),
+            role: 'moderator',
+            action: 'resolve',
+          }),
+          alerts: eachLike({
+            kind: 'breached',
+            delivery: 'delivered',
+            slaDueAt: iso(SERVER_NOW),
+            detectedAt: iso(SERVER_NOW),
+            deliveredAt: iso(SERVER_NOW),
+          }),
+        },
+      })
+    )
+    .executeTest(async (server: V3MockServer) => {
+      const file = await withWebSession(server, pactModeratorAuth.accessToken, () =>
+        exportModerationEvidenceFromWeb(EVIDENCE_CASE_REQUEST)
+      )
+      expect(file.fileName).toBe(`moderation-evidence-${file.bundle.exportId}.json`)
+      expect(file.bundle.decisions[0]?.reasonRemoved).toBe(true)
+    })
+}
+
+type EvidenceRefusal = {
+  name: string
+  given: string
+  request: typeof EVIDENCE_CASE_REQUEST | { scope: 'range'; from: string; to: string }
+  status: number
+  code: ModerationEvidenceFailure
+  message: string
+}
+
+export const moderationEvidenceRefusals: EvidenceRefusal[] = [
+  {
+    name: 'a moderator exporting a case it wrote or reported',
+    given: 'The moderator wrote or reported the case being exported',
+    request: EVIDENCE_CASE_REQUEST,
+    status: 403,
+    code: 'self_review_refused',
+    message: 'You cannot export a case you wrote or reported.',
+  },
+  {
+    name: 'a moderator exporting a period',
+    given: 'A moderator asks to export a period',
+    request: {
+      scope: 'range',
+      from: '2026-10-01T00:00:00.000Z',
+      to: '2026-10-02T23:59:59.999Z',
+    },
+    status: 403,
+    code: 'admin_required',
+    message: 'This action needs an admin.',
+  },
+  {
+    name: 'an export over the size limit',
+    given: 'The evidence bundle is over the limit',
+    request: EVIDENCE_CASE_REQUEST,
+    status: 413,
+    code: 'export_too_large',
+    message: 'This export is too large. Choose a shorter period.',
+  },
+  {
+    name: 'an export whose audit row cannot be written',
+    given: 'The evidence audit row cannot be written',
+    request: EVIDENCE_CASE_REQUEST,
+    status: 503,
+    code: 'audit_unavailable',
+    message: 'The audit record could not be written, so nothing was returned.',
+  },
+  {
+    name: 'an export while it is off',
+    given: 'Evidence export is off for a moderator',
+    request: EVIDENCE_CASE_REQUEST,
+    status: 503,
+    code: 'moderation_history_disabled',
+    message: 'Moderation history is not available.',
+  },
+]
+
+// Provider endpoint: /api/v1/moderation/evidence-exports -> POST ModerationHistoryController.exportEvidence
+export async function verifyModerationEvidenceRefusal(
+  pact: PactV4,
+  refusal: EvidenceRefusal
+) {
+  await pact
+    .addInteraction()
+    .given(...state(refusal.given))
+    .uponReceiving(refusal.name)
+    .withRequest(
+      'POST',
+      EVIDENCE_PATH,
+      setJsonContent({ headers: pactModeratorHeaders, body: refusal.request })
+    )
+    .willRespondWith(
+      refusal.status,
+      setJsonContent({
+        headers: { 'Cache-Control': 'private, no-store' },
+        body: {
+          statusCode: refusal.status,
+          code: refusal.code,
+          message: string(refusal.message),
+        },
+      })
+    )
+    .executeTest(async (server: V3MockServer) => {
+      const failure = await withWebSession(server, pactModeratorAuth.accessToken, () =>
+        exportModerationEvidenceFromWeb(refusal.request).then(
+          () => null,
+          (error: unknown) => error
+        )
+      )
+      expect(failure).toBeInstanceOf(ModerationEvidenceRequestError)
+      expect((failure as ModerationEvidenceRequestError).failure).toBe(refusal.code)
     })
 }

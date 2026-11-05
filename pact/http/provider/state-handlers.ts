@@ -15,6 +15,7 @@ import {
   configureModerationConsole,
   configureModerationDecisions,
   configureModerationScenario,
+  configureModerationHistory,
   configureModerationSla,
   type ModerationScenario,
 } from './doubles/moderation'
@@ -143,6 +144,44 @@ const moderationState =
   }
 
 export const stateHandlers: StateHandlers = {
+  // Story 6.13: the evidence export the console reads.
+  'A moderator can export evidence': () => {
+    configureModerationConsole(true)
+    configureModerationHistory(true)
+    configureModerationScenario('queue')
+    return Promise.resolve({ description: 'Configured an open export for a moderator' })
+  },
+  'Evidence export is off for a moderator': () => {
+    configureModerationConsole(true)
+    configureModerationHistory(false)
+    return Promise.resolve({
+      description: 'Configured the export off for this moderator',
+    })
+  },
+  'The moderator wrote or reported the case being exported': () => {
+    configureModerationConsole(true)
+    configureModerationHistory(true)
+    configureModerationScenario('self_review_refused')
+    return Promise.resolve({ description: 'Configured a self-review refusal' })
+  },
+  'A moderator asks to export a period': () => {
+    configureModerationConsole(true)
+    configureModerationHistory(true)
+    configureModerationScenario('admin_required')
+    return Promise.resolve({ description: 'Configured an admin-only refusal' })
+  },
+  'The evidence bundle is over the limit': () => {
+    configureModerationConsole(true)
+    configureModerationHistory(true)
+    configureModerationScenario('export_too_large')
+    return Promise.resolve({ description: 'Configured a too-large refusal' })
+  },
+  'The evidence audit row cannot be written': () => {
+    configureModerationConsole(true)
+    configureModerationHistory(true)
+    configureModerationScenario('audit_unavailable')
+    return Promise.resolve({ description: 'Configured a failing audit write' })
+  },
   // Story 6.12: the SLA dashboard read.
   'A moderator reads the SLA summary': () => {
     configureModerationConsole(true)
