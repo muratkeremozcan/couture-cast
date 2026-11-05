@@ -194,7 +194,6 @@ export async function removeMemberFromModerationRecords(
   await tx.communityAlias.deleteMany({ where: { user_id: member } })
 }
 
-/** An unlocked read, so a sweep with nothing to repair takes no guard for a member it has already finished. */
 /**
  * The sanction locks, always in id order. A decision or appeal holds its operator's lock shared while it
  * writes, and erasure holds the member's exclusively, so once a request row commits every writer naming
@@ -216,6 +215,7 @@ export async function lockCommunitySanctions(
   }
 }
 
+/** An unlocked read, so a sweep with nothing to repair takes no guard for a member it has already finished. */
 export async function memberIdentityRemains(
   prisma: PrismaClient,
   member: string

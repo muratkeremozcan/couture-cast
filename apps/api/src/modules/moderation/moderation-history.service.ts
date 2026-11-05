@@ -63,6 +63,7 @@ const ERROR_MESSAGES: Record<ModerationHistoryErrorCode, string> = {
   moderation_history_disabled: 'Moderation history is not available.',
   admin_required: 'This action needs an admin.',
   self_review_refused: 'You cannot export a case you wrote or reported.',
+  operator_sanctioned: 'This account cannot apply decisions while sanctioned.',
   member_not_found: 'No such member.',
   case_not_found: 'No such case.',
   invalid_request: 'Invalid request.',
@@ -83,6 +84,7 @@ export function moderationHistoryError(code: ModerationHistoryErrorCode): HttpEx
       return new ServiceUnavailableException(body(503))
     case 'admin_required':
     case 'self_review_refused':
+    case 'operator_sanctioned':
       return new ForbiddenException(body(403))
     case 'member_not_found':
     case 'case_not_found':

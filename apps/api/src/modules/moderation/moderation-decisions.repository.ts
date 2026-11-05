@@ -76,13 +76,13 @@ export class ModerationDecisionsRepository {
     await lockModerationCase(tx, caseKey)
   }
 
-  /** Story 6.13: read under the locks, so a decision after an erasure request stores no subject. */
   /** Call under the operator's sanction lock, which is what makes the answer hold until commit. */
   async assertOperatorNotErased(tx: Tx, operatorId: string): Promise<void> {
     if (await this.hasErasureRequest(tx, operatorId))
       throw moderationDecisionError('operator_sanctioned')
   }
 
+  /** Story 6.13: read under the locks, so a decision after an erasure request stores no subject. */
   async hasErasureRequest(tx: Tx, member: string): Promise<boolean> {
     const request = await tx.moderationErasureRequest.findUnique({
       where: { member_id: member },
