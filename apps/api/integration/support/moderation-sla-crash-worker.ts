@@ -27,6 +27,7 @@ async function main(database: string, webhook: string, now: string) {
       setOldestPendingReviewAgeSeconds: noop,
       countAlert: noop,
       countDeliveryFailure: noop,
+      setLastMeasuredAt: noop,
     },
     // Same value as the harness sweep, so the resend can be compared byte for byte.
     appUrl: 'https://app.test',

@@ -10,9 +10,9 @@ import { PrismaClient } from '@prisma/client'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { queueConfigs } from '../src/config/queues.js'
 import { createModerationOpsChannel } from '../src/modules/moderation/moderation-sla.channel.js'
-import { MODERATION_SLA_SWEEP_JOB_NAME } from '../src/modules/moderation/moderation-sla.scheduler.js'
 import { createWorker, defaultWorkerOptions } from '../src/workers/base.worker.js'
 import { createMaintenanceProcessor } from '../src/workers/maintenance.processor.js'
+import { MODERATION_SLA_SWEEP_JOB_NAME } from '../src/workers/maintenance.scheduler.js'
 import {
   SLA_HOUR_MS,
   SLA_MINUTE_MS,

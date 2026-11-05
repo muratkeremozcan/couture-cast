@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MODERATION_SLA_SWEEP_JOB_NAME } from '../modules/moderation/moderation-sla.scheduler'
 import {
   COMMUNITY_BAN_EXPIRY_JOB_NAME,
   registerCommunityMaintenanceSchedulers,
@@ -10,6 +9,7 @@ import {
   type MaintenanceProcessorDeps,
 } from './maintenance.processor'
 import {
+  MODERATION_SLA_SWEEP_JOB_NAME,
   ADMIN_JOB_FAILURE_PRUNE_JOB_NAME,
   FEATURE_FLAGS_SYNC_JOB_NAME,
   GUARDIAN_EMANCIPATION_JOB_NAME,

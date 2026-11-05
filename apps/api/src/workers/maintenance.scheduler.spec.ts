@@ -9,18 +9,16 @@ import {
   GUARDIAN_EMANCIPATION_JOB_NAME,
   GUARDIAN_EMANCIPATION_TIMEZONE,
   MAINTENANCE_JOB_NAMES,
+  MODERATION_SLA_SWEEP_CRON_PATTERN,
+  MODERATION_SLA_SWEEP_JOB_NAME,
   registerMaintenanceSchedulers,
+  registerModerationSlaScheduler,
   TELEMETRY_EVENT_PRUNE_CRON_PATTERN,
   TELEMETRY_EVENT_PRUNE_JOB_NAME,
   WARDROBE_RETENTION_PURGE_CRON_PATTERN,
   WARDROBE_RETENTION_PURGE_JOB_NAME,
 } from './maintenance.scheduler'
-import {
-  MODERATION_SLA_SWEEP_CRON_PATTERN,
-  MODERATION_SLA_SWEEP_INTERVAL_MS,
-  MODERATION_SLA_SWEEP_JOB_NAME,
-  registerModerationSlaScheduler,
-} from '../modules/moderation/moderation-sla.scheduler'
+import { MODERATION_SLA_SWEEP_INTERVAL_MS } from '../modules/moderation/moderation-sla.sweep'
 
 /**
  * The proof that the `@Cron` migration preserved timing. Each expectation below

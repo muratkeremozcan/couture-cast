@@ -12,6 +12,7 @@ import {
   performShutdown,
   startCommunityWorkers,
 } from './community.bootstrap.js'
+import { PostHogService } from '../posthog/posthog.service.js'
 
 type WorkerShutdownResources = ShutdownResourcesModule.WorkerShutdownResources
 type RealShutdown = (
@@ -22,6 +23,7 @@ type RealShutdown = (
 const harness = vi.hoisted(() => ({
   order: [] as string[],
   communityClose: vi.fn(),
+  createModerationSlaSweep: vi.fn(() => ({ run: vi.fn() })),
   createCommunityWorkerRuntime: vi.fn(),
   shutdownWorkerResources: vi.fn(),
   realShutdownWorkerResources: undefined as RealShutdown | undefined,
@@ -41,6 +43,11 @@ vi.mock('../posthog/posthog.service.js', () => ({
 
 vi.mock('../modules/community/community-worker-runtime', () => ({
   createCommunityWorkerRuntime: harness.createCommunityWorkerRuntime,
+}))
+
+vi.mock('../modules/moderation/moderation-sla.sweep', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  createModerationSlaSweep: harness.createModerationSlaSweep,
 }))
 
 vi.mock('./shutdown-resources', async (importOriginal) => {
@@ -123,13 +130,13 @@ describe('dedicated community worker bootstrap', () => {
       vi.useRealTimers()
     })
 
-    it('U-W-FACTORY: passes a flag service, because a composition with none stays off for good', async () => {
+    it('U-W-FACTORY: passes a sweep, because a composition with none stays off for good', async () => {
       runtimeWithSweep(vi.fn().mockResolvedValue({ recorded: 0 }))
       await freshProcess().startCommunityWorkers()
       expect(harness.createCommunityWorkerRuntime).toHaveBeenCalledWith(
         expect.objectContaining({
-          featureFlags: expect.objectContaining({
-            getFeatureFlag: expect.any(Function) as unknown,
+          moderationSla: expect.objectContaining({
+            run: expect.any(Function) as unknown,
           }) as unknown,
         })
       )
@@ -187,10 +194,14 @@ describe('dedicated community worker bootstrap', () => {
     it('passes PostHog to the runtime, because PostHog is the hosted signal (D13)', async () => {
       const bootstrap = freshProcess()
       await bootstrap.startCommunityWorkers()
-      const deps = harness.createCommunityWorkerRuntime.mock.calls.at(-1)?.[0] as {
-        analytics?: unknown
-      }
-      expect(deps.analytics).toBeDefined()
+      expect(harness.createModerationSlaSweep).toHaveBeenCalledWith(
+        expect.objectContaining({
+          analytics: expect.any(PostHogService) as unknown,
+          flags: expect.objectContaining({
+            getFeatureFlag: expect.any(Function) as unknown,
+          }) as unknown,
+        })
+      )
       await bootstrap.performShutdown()
     })
 

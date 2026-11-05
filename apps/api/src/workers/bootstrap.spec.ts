@@ -89,9 +89,6 @@ vi.mock('../modules/weather/weather-scheduler', () => ({
 
 vi.mock('./maintenance.scheduler', () => ({
   registerMaintenanceSchedulers: vi.fn().mockResolvedValue(undefined),
-}))
-
-vi.mock('../modules/moderation/moderation-sla.scheduler', () => ({
   registerModerationSlaScheduler: harness.registerModerationSlaScheduler,
   MODERATION_SLA_SWEEP_JOB_NAME: 'moderation-sla-sweep',
 }))
@@ -174,13 +171,13 @@ describe('general worker bootstrap', () => {
     await bootstrap.performShutdown()
   })
 
-  it('U-W-FACTORY: passes a flag service, because a composition with none stays off for good', async () => {
+  it('U-W-FACTORY: passes a sweep, because a composition with none stays off for good', async () => {
     const bootstrap = freshProcess()
     await bootstrap.startWorkers()
     expect(harness.createCommunityWorkerRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
-        featureFlags: expect.objectContaining({
-          getFeatureFlag: expect.any(Function) as unknown,
+        moderationSla: expect.objectContaining({
+          run: expect.any(Function) as unknown,
         }) as unknown,
       })
     )

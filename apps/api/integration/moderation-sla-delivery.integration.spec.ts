@@ -12,6 +12,7 @@ import { CommunityModerationActionsService } from '../src/modules/community/comm
 import { createModerationOpsChannel } from '../src/modules/moderation/moderation-sla.channel.js'
 import { ModerationSlaRepository } from '../src/modules/moderation/moderation-sla.repository.js'
 import { ModerationSlaService } from '../src/modules/moderation/moderation-sla.service.js'
+import { createModerationSlaSweep } from '../src/modules/moderation/moderation-sla.sweep.js'
 import { seedMember } from './helpers/moderation-queue-seed.js'
 import {
   SLA_HOUR_MS,
@@ -585,6 +586,26 @@ describe('U-S-ISOLATION: one bad alert leaves the batch running', () => {
     expect(sent).toHaveLength(seeds.length - 1)
     expect(await prisma.moderationSlaMonitor.findFirst()).toBeNull()
     expect(logs.named('moderation_sla_alert_processing_failed')).toHaveLength(1)
+  })
+})
+
+describe('U-W-FACTORY: the composition both worker processes use', () => {
+  it('reads the webhook and app URL from the environment and sends through the real adapter', async () => {
+    vi.stubEnv('MODERATION_OPS_WEBHOOK_URL', capture().url)
+    vi.stubEnv('APP_URL', 'https://composed.test')
+    try {
+      const seeded = await seedCase({ dueAt: new Date(Date.now() + SLA_HOUR_MS) })
+      const job = createModerationSlaSweep({
+        prisma,
+        flags: ctx.flags as never,
+        analytics,
+      })
+      await expect(job.run()).resolves.toMatchObject({ delivered: 1, errors: 0 })
+      const body = capture().received[0]!.body as { caseUrl: string }
+      expect(body.caseUrl).toBe(`https://composed.test/moderation/cases/${seeded.caseId}`)
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })
 

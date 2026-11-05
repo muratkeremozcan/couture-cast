@@ -379,34 +379,29 @@ describe('createCommunityWorkerRuntime', () => {
     expect(harness.sweepErasureRequests).toHaveBeenCalled()
   })
 
-  it('U-W-FACTORY: the one sweep both process groups call reads the flags it is given', async () => {
-    const getFeatureFlag = vi.fn().mockResolvedValue(false)
+  it('U-W-FACTORY: the one sweep both process groups call is the one it is given', async () => {
+    const run = vi.fn().mockResolvedValue({ recorded: 2 })
     const runtime = await createCommunityWorkerRuntime({
       prisma,
       telemetryService,
       meter: meter(),
-      featureFlags: { getFeatureFlag } as never,
+      moderationSla: { run } as never,
     })
 
-    await expect(runtime.sweeps.sweepModerationSla()).resolves.toMatchObject({
-      skipped: 1,
-      recorded: 0,
-    })
-    expect(getFeatureFlag).toHaveBeenCalledWith(
-      'moderation_sla_monitoring_enabled',
-      'system:moderation-sla'
-    )
+    await expect(runtime.sweeps.sweepModerationSla()).resolves.toEqual({ recorded: 2 })
+    expect(run).toHaveBeenCalledOnce()
   })
 
-  it('U-W-FACTORY: a composition with no flag service stays off', async () => {
+  it('U-W-FACTORY: a composition with no sweep stays off', async () => {
     const runtime = await createCommunityWorkerRuntime({
       prisma,
       telemetryService,
       meter: meter(),
     })
 
-    await expect(runtime.sweeps.sweepModerationSla()).resolves.toMatchObject({
+    await expect(runtime.sweeps.sweepModerationSla()).resolves.toEqual({
       skipped: 1,
+      recorded: 0,
     })
   })
 
