@@ -1,7 +1,7 @@
 // Learning path Step 52: Moderation SLA monitoring and escalation.
 // Story 6.12 test owner: the operations webhook receiver of the local E2E stack.
 // It answers the `/__admin/requests` format, so the playwright-utils webhook registry reads it.
-// Loopback only. `scripts/start-api-e2e-with-workers.mjs` points MODERATION_OPS_WEBHOOK_URL here.
+// Loopback only. `scripts/start-api-e2e-with-workers.mjs` starts it and points MODERATION_OPS_WEBHOOK_URL here.
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 
@@ -70,5 +70,6 @@ const server = createServer(async (request, response) => {
   return send(response, 404, { error: 'not_found' })
 })
 
-server.listen(port, '127.0.0.1')
+// The launcher waits for this line before it starts anything that can send an alert.
+server.listen(port, '127.0.0.1', () => console.log('moderation_ops_capture_ready'))
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close())

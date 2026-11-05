@@ -402,6 +402,16 @@ async function startWeatherProviderDouble() {
 }
 
 async function main() {
+  // Before anything that can send an alert, so no alert of this run meets a closed port.
+  const { ready: opsCaptureReady } = startManagedProcess(
+    'node',
+    ['playwright/support/moderation-ops-capture.mjs'],
+    { ...env, MODERATION_OPS_CAPTURE_PORT: OPS_CAPTURE_PORT },
+    repoRoot,
+    'moderation_ops_capture_ready'
+  )
+  await opsCaptureReady
+
   console.log('[start-api-e2e-with-workers] Preparing database and application builds...')
   const reuseExistingWeb =
     startWeb &&

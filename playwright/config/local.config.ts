@@ -8,7 +8,6 @@ import { e2eStackLauncherPath } from '../../scripts/e2e-stack-pid.mjs'
 
 const repoRoot = path.resolve(__dirname, '..', '..')
 const environment = resolveEnvironmentConfig('local')
-const moderationOpsCapturePort = process.env.MODERATION_OPS_CAPTURE_PORT || '4319'
 
 // IMPORTANT: the setup for logging to files needs to be uniform between test files
 // best place to put it is in a config file
@@ -46,41 +45,28 @@ export default defineConfig(
       apiBaseUrl: environment.apiBaseUrl,
       healthEndpoint: new URL('/api/health', environment.webBaseUrl).toString(),
     },
-    webServer: [
-      // Story 6.12: the receiver the live SLA sweep posts to. It starts first, so no alert of
-      // this run meets a closed port.
-      {
-        command: `node ${JSON.stringify(path.join(repoRoot, 'playwright/support/moderation-ops-capture.mjs'))}`,
-        url: `http://127.0.0.1:${moderationOpsCapturePort}/health`,
-        reuseExistingServer: false,
-        timeout: 30_000,
-        cwd: repoRoot,
-        env: { MODERATION_OPS_CAPTURE_PORT: moderationOpsCapturePort },
+    webServer: {
+      // The absolute launcher path, so the global teardown can find it on this
+      // process's command line before it signals it (Story 6.2b, CX8b).
+      command: `node ${JSON.stringify(e2eStackLauncherPath(repoRoot))} --with-web`,
+      url: environment.webBaseUrl,
+      reuseExistingServer: false,
+      timeout: 240_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      cwd: repoRoot,
+      // Only overrides belong here. Playwright already starts the web server
+      // with the runner's environment underneath these keys, and it serializes
+      // this object verbatim into every blob report, so spreading process.env
+      // here published the whole CI environment, secrets included.
+      env: {
+        API_BASE_URL: environment.apiBaseUrl,
+        PUBLIC_API_URL: environment.apiBaseUrl,
+        REUSE_EXISTING_WEB_SERVER: process.env.CI ? 'false' : 'true',
+        WEB_E2E_BASE_URL: environment.webBaseUrl,
+        POSTHOG_API_KEY: '',
+        TEST_ENV: 'local',
       },
-      {
-        // The absolute launcher path, so the global teardown can find it on this
-        // process's command line before it signals it (Story 6.2b, CX8b).
-        command: `node ${JSON.stringify(e2eStackLauncherPath(repoRoot))} --with-web`,
-        url: environment.webBaseUrl,
-        reuseExistingServer: false,
-        timeout: 240_000,
-        stdout: 'pipe',
-        stderr: 'pipe',
-        cwd: repoRoot,
-        // Only overrides belong here. Playwright already starts the web server
-        // with the runner's environment underneath these keys, and it serializes
-        // this object verbatim into every blob report, so spreading process.env
-        // here published the whole CI environment, secrets included.
-        env: {
-          API_BASE_URL: environment.apiBaseUrl,
-          PUBLIC_API_URL: environment.apiBaseUrl,
-          REUSE_EXISTING_WEB_SERVER: process.env.CI ? 'false' : 'true',
-          WEB_E2E_BASE_URL: environment.webBaseUrl,
-          POSTHOG_API_KEY: '',
-          TEST_ENV: 'local',
-          MODERATION_OPS_CAPTURE_PORT: moderationOpsCapturePort,
-        },
-      },
-    ],
+    },
   })
 )

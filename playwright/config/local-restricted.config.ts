@@ -2,7 +2,6 @@ import path from 'node:path'
 import merge from 'lodash.merge'
 import { defineConfig } from '@playwright/test'
 import localConfig from './local.config'
-import { E2E_STACK_LAUNCHER } from '../../scripts/e2e-stack-pid.mjs'
 
 // Story 6.2 AC 9. The restricted journey uploads real image bytes through the
 // real screening model, so nothing that could persist a frame of one survives:
@@ -38,20 +37,12 @@ export default defineConfig({
       video: 'off',
     },
     outputDir,
+    webServer: {
+      env: {
+        COMMUNITY_SCREENING_EVIDENCE_MODE: RESTRICTED_EVIDENCE_MODE,
+      },
+    },
   }),
-  // lodash.merge would set an object's keys on the array itself and no entry would see them.
-  // Only the launcher reads the mode, so the capture entry stays as it is.
-  webServer: [localConfig.webServer ?? []].flat().map((entry) =>
-    entry.command.includes(E2E_STACK_LAUNCHER)
-      ? {
-          ...entry,
-          env: {
-            ...entry.env,
-            COMMUNITY_SCREENING_EVIDENCE_MODE: RESTRICTED_EVIDENCE_MODE,
-          },
-        }
-      : entry
-  ),
   // lodash.merge walks arrays index by index, so overriding this inside the
   // merge above would leave base's html entry sitting at index 1.
   reporter: [['list']],
