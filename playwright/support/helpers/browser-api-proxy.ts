@@ -114,6 +114,24 @@ async function proxyApiRequest(route: Route, state: ApiProxyState) {
   })
 }
 
+/**
+ * A page can have a call in flight when its test ends, such as the console's availability read, and closing
+ * the context disposes the fetch under it. Nobody is waiting for that answer. Any other failure, or this one
+ * on a page that is still open, is real.
+ */
+export function isAbandonedByClose(
+  error: unknown,
+  page: Pick<Page, 'isClosed'>
+): boolean {
+  return (
+    page.isClosed() &&
+    error instanceof Error &&
+    /Request context disposed|Target page, context or browser has been closed/.test(
+      error.message
+    )
+  )
+}
+
 export async function installApiProxy(page: Page, testInfo: TestInfo): Promise<void> {
   if (apiProxyStates.has(page)) {
     return
@@ -125,7 +143,13 @@ export async function installApiProxy(page: Page, testInfo: TestInfo): Promise<v
   }
   apiProxyStates.set(page, state)
 
-  await page.route(apiRoutePattern, (route) => proxyApiRequest(route, state))
+  await page.route(apiRoutePattern, async (route) => {
+    try {
+      await proxyApiRequest(route, state)
+    } catch (error) {
+      if (!isAbandonedByClose(error, page)) throw error
+    }
+  })
 }
 
 export async function proxyApiCall<TRequest = unknown, TResponse = unknown>({

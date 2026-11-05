@@ -864,7 +864,7 @@ test.describe('Moderation history routes (Story 6.13)', () => {
     expect(guardian.status()).toBe(403)
   })
 
-  test('[P0] P-SECURITY-LIST refuses a moderator on erasure and on a period', async ({
+  test('[P0] P-SECURITY-LIST refuses a moderator on erasure, and on a period or by its closed flag', async ({
     request,
   }, testInfo) => {
     const baseUrl = resolveApiBaseUrl(testInfo)
@@ -881,10 +881,19 @@ test.describe('Moderation history routes (Story 6.13)', () => {
       },
       headers,
     })
-    for (const response of [erasure, period]) {
-      expect(response.status()).toBe(403)
-      expect(((await response.json()) as { code?: string }).code).toBe('admin_required')
-      expect(response.headers()['cache-control']).toBe('private, no-store')
+    const codeOf = async (response: APIResponse) =>
+      ((await response.json()) as { code?: string }).code
+    expect(erasure.status()).toBe(403)
+    expect(await codeOf(erasure)).toBe('admin_required')
+    // The erasure route checks the role first, because it has no flag. The export checks its flag first, and
+    // a deployed environment has that flag off, where a moderator reads the same closed answer as anyone.
+    if (isNonLocalEnvironment(testInfo) && period.status() === 503) {
+      expect(await codeOf(period)).toBe('moderation_history_disabled')
+    } else {
+      expect(period.status()).toBe(403)
+      expect(await codeOf(period)).toBe('admin_required')
     }
+    for (const response of [erasure, period])
+      expect(response.headers()['cache-control']).toBe('private, no-store')
   })
 })
