@@ -9974,17 +9974,21 @@ Evidence boundaries:
 
 - **Written before review and merge.**
   The code and tests are committed on `feat/cc-6-12-sla-monitoring-escalation`, nothing was pushed when this step was written, and no PR job has run.
-  The Codex re-read of the round 1 fixes had not run either.
 - **What ran locally.**
   TEA signed off at `ffdf6473`, with source at `c7a52fad` and tests at `c01a506b`, on three consecutive runs of the whole suites with identical results and no retries.
   Passing per run: `apps/api` 8343 with 38 existing skips, `packages/api-client` 1624, `packages/db` 282 with 1 skip, `packages/config` 31, `apps/web` 1886, the Pact consumer 447 with 1 provider verification, and Playwright 34.
   All 41 seeded-defect proofs were caught, with S-13 and S-16 also caught through the full stack.
   The local Grafana check passed with the worker alive: at a measurement age of 330 seconds the four stat panels read Stale.
   The other manual checks are in the Execution record of the test design.
-  tsc is clean in all seven projects, and all five `node-test-gate` suites passed before the Codex round 1 fixes and were not rerun by me afterwards.
+  tsc is clean in all seven projects.
+  All five `node-test-gate` suites passed at `ca90d9f1` and again at `3e1e680b`, the Codex round 2 fix.
 - **Codex round 1 on `6b438525` found four major and two minor defects.**
   All six are fixed and logged in the spec as CX-1 to CX-6, each with a red test first.
   The earlier sign-off had filtered to SLA specs, and the whole `apps/api` suite then caught three more failures: the Prisma transaction guard, the community module import rule and the queue read-set list.
+- **Codex round 2 verified those six and found two minor defects.**
+  Send relevance read the sweep's start time, so a long detection scan could send an `at_risk` alert after the deadline had passed; it now reads a fresh clock at each claim, and detection keeps the sweep time.
+  The Measurement age panel used a range query, so it kept showing an old value after samples stopped; it is now an instant query that reads `No samples` when the series is gone.
+  TEA then stopped a real worker and read the panels in Grafana: 300 seconds after the series went, the age panel read `No samples` and the four stats read Stale.
 - **A real stack walk proved delivery to a local endpoint.**
   The launcher ran the built API, the real `community.bootstrap` worker and the web server on the isolated database `cc612_walk`, with a local HTTP capture server as the webhook.
   One report aged across both boundaries and produced `at_risk`, then `breached`.
