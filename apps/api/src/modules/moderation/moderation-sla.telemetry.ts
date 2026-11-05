@@ -1,9 +1,11 @@
 // Story 6.12 owner: the SLA monitor's metrics and log vocabulary in `apps/api/src/modules/moderation/moderation-sla.telemetry.ts`.
 // Bounded attributes only, with no case or member label.
 import { metrics } from '@opentelemetry/api'
-import type {
-  ModerationSlaAlertKind,
-  ModerationSlaFailureCode,
+import {
+  moderationSlaAlertKinds,
+  moderationSlaFailureCodes,
+  type ModerationSlaAlertKind,
+  type ModerationSlaFailureCode,
 } from '@couture/api-client/contracts/http'
 
 /** The dashboard spec reads this list, so a panel cannot name a metric the code never emits. */
@@ -64,6 +66,12 @@ export function createOpenTelemetryModerationSlaMeter(
       // Metrics must not change monitor behaviour.
     }
   }
+  // Each series starts at 0. Prometheus `increase()` needs an earlier sample, so without this the
+  // first alert and the first failure after every worker start read as no change.
+  safely(() => {
+    for (const kind of moderationSlaAlertKinds) alerts.add(0, { kind })
+    for (const code of moderationSlaFailureCodes) failures.add(0, { code })
+  })
   return {
     setOpenCases: (state, count) => safely(() => openCases.record(count, { state })),
     setOldestPendingReviewAgeSeconds: (seconds) =>
