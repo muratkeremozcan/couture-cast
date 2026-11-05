@@ -2,7 +2,7 @@
 title: 'CC-6.12 SLA monitoring and escalation'
 type: 'feature'
 created: '2026-11-05'
-status: 'in-review'
+status: done
 baseline_commit: '3efd84239208b05b474a8de32d14c3943c6ed503'
 baseline_revision: '3efd84239208b05b474a8de32d14c3943c6ed503'
 route: 'dispatch'
@@ -255,7 +255,7 @@ Known limits recorded by TEA: a sweep that alerts before the first 60-second met
 
 Process note: `f126fa28` was committed with `--no-verify` by mistake. Prettier and eslint were then run by hand on its files, and the one finding was fixed in `0bc10229`.
 
-Ship state (update on every step, so a compaction costs nothing): Codex round 2 minors R2-1 and R2-2 fixed at `3e1e680b`, TEA's rendered R2-2 check passed in Grafana, PR 196 open. CI on `d64891aa` failed Lighthouse and burn-in on `playwright-config-secrets.spec.ts`, because a second `webServer` entry made the config an array and dropped the restricted config's evidence mode; `ef837ed8` moves the capture server into the launcher, which returns the Playwright config to main and the diff to 99 files. Then push, PR ready for review against main, report `cc612-builder pr <url>`, own CodeRabbit and CI, set spec and sprint-status to done before the last push, report `cc612-builder green <sha>` with the head the last CodeRabbit review covered. Never merge. Never use --no-verify.
+Ship state (update on every step, so a compaction costs nothing): PR 196 open. CodeRabbit reviewed `16bfd54f` with no actionable comments, and every finding from its review of `d64891aa` is fixed or answered. Vercel Preview e2e on `16bfd54f` failed when the supabase CLI's GitHub release answered 504 during `npm ci`, so `install-dependencies.sh` now treats those 5xx texts as transient, and `setup-node-env` installs through that script. Spec and sprint-status are done. Left: every check green on the final head, then report `cc612-builder green <sha>` with the head the last CodeRabbit review covered. Never merge. Never use --no-verify.
 
 Open at hand-off, by design: D8 production destination, D13 hosted Grafana, D16 staffing coverage.
 

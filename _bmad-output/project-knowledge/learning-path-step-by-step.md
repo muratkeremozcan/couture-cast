@@ -9999,6 +9999,11 @@ Evidence boundaries:
   Detection now reads 1000 cases a page: 10,000 open breached cases took 9035 ms at 50 a page and 508 ms at 1000, measured on real Postgres.
   No cap ends the scan, because a case past a cap would never alert.
   The drill's change has no red test; TEA checked that `prepare:shared-deps` builds `@couture/utils` and `@couture/api-client`.
+  CodeRabbit then reviewed `16bfd54f` and generated no actionable comments.
+- **A CI install failure was fixed in the shared setup.**
+  On `16bfd54f` GitHub release downloads answered 504: the supabase and onnxruntime postinstalls failed `npm ci` in the Vercel Preview e2e and burn-in jobs, and the Maestro installer failed two Android shards.
+  `install-dependencies.sh` now treats those 5xx texts as transient, waits longer between attempts and also retries `npm install`, and `setup-node-env` installs through it.
+  `maestro:install` retries the official installer the same way.
 - **A real stack walk proved delivery to a local endpoint.**
   The launcher ran the built API, the real `community.bootstrap` worker and the web server on the isolated database `cc612_walk`, with a local HTTP capture server as the webhook.
   One report aged across both boundaries and produced `at_risk`, then `breached`.

@@ -28,9 +28,6 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: |
-        if [ "${{ inputs.use-npm-ci }}" == "true" ]; then
-          npm ci
-        else
-          npm install
-        fi
+      env:
+        INSTALL_COMMAND: ${{ inputs.use-npm-ci == 'true' && 'npm ci' || 'npm install' }}
+      run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"
