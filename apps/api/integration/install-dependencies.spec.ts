@@ -420,15 +420,6 @@ process.exit(result.code)
     expect(lanes[1]).toContain('./gradlew')
   })
 
-  it('runs the Android jobs when the fetch script changes', () => {
-    const workflow = fs.readFileSync(
-      path.join(repoRoot, '.github/workflows/pr-accessibility-focus.yml'),
-      'utf8'
-    )
-    const triggers = workflow.slice(0, workflow.indexOf('\njobs:'))
-    expect(triggers.match(/- 'scripts\/ci\/fetch-gradle-wrapper\.sh'/g)).toHaveLength(2)
-  })
-
   it('fetches in both Android jobs before the first Gradle step', () => {
     const workflow = fs.readFileSync(
       path.join(repoRoot, '.github/workflows/pr-accessibility-focus.yml'),

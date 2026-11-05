@@ -846,7 +846,9 @@ It now retries that text and `Z_DATA_ERROR`, keeps a 404 red, also retries `npm 
 `setup-node-env` runs the same script, and `scripts/maestro-install.mjs` retries until the pinned binary exists.
 `install-dependencies.spec.ts` proved all of it red first against `16bfd54f`, with stubbed binaries for the installer.
 The burst then failed the Android module job at `aeb2297f` on the Gradle wrapper download, which has no retry.
-`scripts/ci/fetch-gradle-wrapper.sh` runs in both Android jobs and both share-card lanes before the first Gradle step, retries a 5xx or a timeout, keeps a 404 red, and was also red first.
+`scripts/ci/fetch-gradle-wrapper.sh` runs in both Android jobs and both share-card lanes before the first Gradle step, retries a 5xx or a timeout, keeps a 404 red, and was also red first, except the share-card lane check, written after the fix.
+The new paths-filter entry failed `accessibility-focus-workflow.spec.ts` in the Lighthouse job at `bb8d99cb`, because `test:playwright-unit` was not rerun after the workflow edit.
+That spec now lists the script, and owns the trigger check for both events.
 
 **Independent test review.**
 The report at the end of this document scored `bb8491d5` at 45 of 100 and blocked it.
