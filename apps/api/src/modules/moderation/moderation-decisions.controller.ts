@@ -15,6 +15,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { AuthContext, Roles } from '../auth/security.decorators.js'
 import { RequestAuthGuard, RolesGuard } from '../auth/security.guards.js'
+import { ModerationOperatorGuard } from './moderation-operator.guard.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import { moderationDecisionError } from './moderation-decision-rules.js'
@@ -22,7 +23,7 @@ import { ModerationDecisionsService } from './moderation-decisions.service.js'
 import { ModerationSanctionsService } from './moderation-sanctions.service.js'
 
 @Controller('/api/v1/moderation')
-@UseGuards(RequestAuthGuard, RolesGuard)
+@UseGuards(RequestAuthGuard, RolesGuard, ModerationOperatorGuard)
 @Roles('moderator', 'admin')
 export class ModerationDecisionsController {
   constructor(

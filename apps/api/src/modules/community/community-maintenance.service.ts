@@ -6,6 +6,7 @@ import { eraseCommunityComments } from './community-comments.privacy.js'
 import {
   assertReportedCasesUnchanged,
   lockReportedCases,
+  lockCommunitySanctions,
   memberIdentityRemains,
   removeMemberFromModerationRecords,
 } from './community-erasure.js'
@@ -474,6 +475,7 @@ export class CommunityMaintenanceService {
       if (await memberIdentityRemains(this.prisma, member))
         await communityPrivacyTransaction(this.prisma, async (tx) => {
           const lockedCases = await lockReportedCases(tx, member)
+          await lockCommunitySanctions(tx, null, member)
           await guardCommunitySubject(tx, member)
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${member}))`
           await assertReportedCasesUnchanged(tx, member, lockedCases)

@@ -10,6 +10,33 @@
 
 ALTER TABLE "ModerationDecision" ADD COLUMN "anonymized_at" TIMESTAMP(3);
 
+-- A comment report outlives its comment row, because erasing the parent post's author deletes that row.
+-- This link is how the commenter's own later erasure still finds the words the report holds.
+ALTER TABLE "CommunityCommentReport" ADD COLUMN "comment_author_id" TEXT;
+UPDATE "CommunityCommentReport" r
+SET "comment_author_id" = c."user_id"
+FROM "CommunityComment" c
+WHERE c."id" = r."comment_id" AND c."user_id" IS NOT NULL;
+CREATE INDEX "CommunityCommentReport_comment_author_id_idx"
+  ON "CommunityCommentReport"("comment_author_id");
+ALTER TABLE "CommunityCommentReport"
+  ADD CONSTRAINT "CommunityCommentReport_comment_author_id_fkey"
+  FOREIGN KEY ("comment_author_id") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- A direct account delete updates these rows from this trigger, and again when the comment's author is set
+-- null. That second update rechecks the foreign key after the parent row has gone, unless the link is already
+-- null here, and it also has to clear the words of an author whose comment row no longer exists.
+CREATE OR REPLACE FUNCTION scrub_comment_reports_on_user_delete() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE "CommunityCommentReport"
+    SET content_snapshot = NULL,
+        comment_author_id = NULLIF(comment_author_id, OLD.id)
+    WHERE reporter_id = OLD.id
+      OR comment_author_id = OLD.id
+      OR comment_id IN (SELECT id FROM "CommunityComment" WHERE user_id = OLD.id);
+  RETURN OLD;
+END $$;
+
 -- `member_id` is the one identity this story keeps, until the `User` row goes: a replay and the null
 -- subject rule read it. Both keys set null so neither account's removal is blocked by this record.
 CREATE TABLE "ModerationErasureRequest" (

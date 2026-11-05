@@ -166,6 +166,7 @@ export async function seedCommentReport(
     label: string
     commentId: string | null
     reporterId: string | null
+    authorId?: string | null
     reason: CommunityReportReason
     acceptedAt: Date
     resolvedAt?: Date | null
@@ -177,6 +178,7 @@ export async function seedCommentReport(
     data: {
       id: `${params.runId}-crep-${params.label}`,
       comment_id: params.commentId,
+      comment_author_id: params.authorId ?? null,
       reporter_id: params.reporterId,
       reason: params.reason,
       content_snapshot: (params.snapshot === undefined

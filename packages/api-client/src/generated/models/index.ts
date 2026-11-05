@@ -7304,6 +7304,7 @@ export const ExportModerationEvidence503ResponseCodeEnum = {
   moderation_history_disabled: 'moderation_history_disabled',
   admin_required: 'admin_required',
   self_review_refused: 'self_review_refused',
+  operator_sanctioned: 'operator_sanctioned',
   member_not_found: 'member_not_found',
   case_not_found: 'case_not_found',
   invalid_request: 'invalid_request',
@@ -9860,6 +9861,7 @@ export interface GetModerationSla503Response {
  */
 export const GetModerationSla503ResponseCodeEnum = {
   moderation_sla_disabled: 'moderation_sla_disabled',
+  operator_sanctioned: 'operator_sanctioned',
 } as const
 export type GetModerationSla503ResponseCodeEnum =
   (typeof GetModerationSla503ResponseCodeEnum)[keyof typeof GetModerationSla503ResponseCodeEnum]
@@ -10777,6 +10779,7 @@ export interface ListModerationCases400Response {
  * @export
  */
 export const ListModerationCases400ResponseCodeEnum = {
+  operator_sanctioned: 'operator_sanctioned',
   invalid_filter: 'invalid_filter',
   invalid_cursor: 'invalid_cursor',
   case_not_found: 'case_not_found',
@@ -12928,6 +12931,7 @@ export const ModerationHistoryErrorCodeEnum = {
   moderation_history_disabled: 'moderation_history_disabled',
   admin_required: 'admin_required',
   self_review_refused: 'self_review_refused',
+  operator_sanctioned: 'operator_sanctioned',
   member_not_found: 'member_not_found',
   case_not_found: 'case_not_found',
   invalid_request: 'invalid_request',
@@ -12968,6 +12972,7 @@ export interface ModerationQueueError {
  * @export
  */
 export const ModerationQueueErrorCodeEnum = {
+  operator_sanctioned: 'operator_sanctioned',
   invalid_filter: 'invalid_filter',
   invalid_cursor: 'invalid_cursor',
   case_not_found: 'case_not_found',
@@ -13008,6 +13013,7 @@ export interface ModerationSlaError {
  */
 export const ModerationSlaErrorCodeEnum = {
   moderation_sla_disabled: 'moderation_sla_disabled',
+  operator_sanctioned: 'operator_sanctioned',
 } as const
 export type ModerationSlaErrorCodeEnum =
   (typeof ModerationSlaErrorCodeEnum)[keyof typeof ModerationSlaErrorCodeEnum]
@@ -16599,6 +16605,7 @@ export const RequestModerationErasure400ResponseCodeEnum = {
   moderation_history_disabled: 'moderation_history_disabled',
   admin_required: 'admin_required',
   self_review_refused: 'self_review_refused',
+  operator_sanctioned: 'operator_sanctioned',
   member_not_found: 'member_not_found',
   case_not_found: 'case_not_found',
   invalid_request: 'invalid_request',

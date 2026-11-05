@@ -8,9 +8,16 @@ import type {
   Prisma,
 } from '@prisma/client'
 import type { ModerationCaseTargetState } from '@couture/api-client/contracts/http'
-import { lockModerationCase } from '../community/community-erasure.js'
+import {
+  lockCommunitySanctions,
+  lockModerationCase,
+} from '../community/community-erasure.js'
 import type { ParsedCaseId } from './moderation-queue.repository.js'
-import { inDecisionOrder, type DecisionHistoryRow } from './moderation-decision-rules.js'
+import {
+  inDecisionOrder,
+  moderationDecisionError,
+  type DecisionHistoryRow,
+} from './moderation-decision-rules.js'
 
 type Tx = Prisma.TransactionClient
 
@@ -70,6 +77,12 @@ export class ModerationDecisionsRepository {
   }
 
   /** Story 6.13: read under the locks, so a decision after an erasure request stores no subject. */
+  /** Call under the operator's sanction lock, which is what makes the answer hold until commit. */
+  async assertOperatorNotErased(tx: Tx, operatorId: string): Promise<void> {
+    if (await this.hasErasureRequest(tx, operatorId))
+      throw moderationDecisionError('operator_sanctioned')
+  }
+
   async hasErasureRequest(tx: Tx, member: string): Promise<boolean> {
     const request = await tx.moderationErasureRequest.findUnique({
       where: { member_id: member },
@@ -89,13 +102,7 @@ export class ModerationDecisionsRepository {
     operatorId: string,
     banSubjectId: string | null
   ): Promise<void> {
-    const ids = [...new Set([operatorId, ...(banSubjectId ? [banSubjectId] : [])])].sort()
-    for (const id of ids) {
-      if (id === banSubjectId)
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_sanction:' || ${id}))`
-      else
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtext('community_sanction:' || ${id}))`
-    }
+    await lockCommunitySanctions(tx, operatorId, banSubjectId)
   }
 
   findByMutation(

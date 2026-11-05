@@ -6,6 +6,7 @@ import { RequestAuthGuard, RolesGuard } from '../auth/security.guards'
 import { CommunityModule } from '../community/community.module.js'
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module.js'
 import { ModerationController } from './moderation.controller'
+import { ModerationOperatorGuard } from './moderation-operator.guard.js'
 import { ModerationService } from './moderation.service'
 import {
   MODERATION_QUEUE_CLOCK,
@@ -60,6 +61,7 @@ import { ModerationSlaService } from './moderation-sla.service.js'
     { provide: MODERATION_QUEUE_CLOCK, useValue: systemModerationQueueClock },
     RequestAuthGuard,
     RolesGuard,
+    ModerationOperatorGuard,
   ],
 })
 export class ModerationModule implements NestModule {

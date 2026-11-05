@@ -269,6 +269,16 @@ function build(seed: Seed = {}) {
       findMany: vi.fn(({ where }: { where: Row }) =>
         Promise.resolve(state.postReports.filter((row) => matches(row, where)))
       ),
+      count: vi.fn(
+        ({ where }: { where: { id: { in: string[] }; reporter_id: string } }) =>
+          Promise.resolve(
+            state.postReports.filter(
+              (row) =>
+                where.id.in.includes(row.id as string) &&
+                row.reporter_id === where.reporter_id
+            ).length
+          )
+      ),
       updateMany: vi.fn(({ where, data }: { where: Row; data: Row }) => {
         const rows = state.postReports.filter((row) => matches(row, where))
         rows.forEach((row) => applyData(row, data))
@@ -278,6 +288,20 @@ function build(seed: Seed = {}) {
     communityCommentReport: {
       findMany: vi.fn(({ where }: { where: Row }) =>
         Promise.resolve(state.commentReports.filter((row) => matches(row, where)))
+      ),
+      count: vi.fn(
+        ({
+          where,
+        }: {
+          where: { id: { in: string[] }; OR: { reporter_id?: string }[] }
+        }) =>
+          Promise.resolve(
+            state.commentReports.filter(
+              (row) =>
+                where.id.in.includes(row.id as string) &&
+                row.reporter_id === where.OR[0]?.reporter_id
+            ).length
+          )
       ),
       updateMany: vi.fn(({ where, data }: { where: Row; data: Row }) => {
         const rows = state.commentReports.filter((row) => matches(row, where))

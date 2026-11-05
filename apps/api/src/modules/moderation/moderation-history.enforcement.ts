@@ -138,6 +138,14 @@ export const MODERATION_HISTORY_ENFORCEMENT_CHECKS = Object.freeze([
       )
     ) AS ok`,
   },
+  {
+    // The other half of the check above: without this grant every erasure fails while the rest stays green.
+    name: 'function_execute_granted',
+    sql: `SELECT coalesce((
+      SELECT pg_catalog.has_function_privilege(current_user, f.oid, 'EXECUTE')
+      FROM (${functionRow('moderation_history_anonymize')}) f
+    ), false) AS ok`,
+  },
   { name: 'public_create_revoked', sql: schemaWithoutCreate('public') },
   { name: 'private_create_revoked', sql: schemaWithoutCreate('private') },
 ] as const)

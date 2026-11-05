@@ -332,7 +332,8 @@ model User {
   community_comment_analytics_subject CommunityCommentAnalyticsSubject?
   community_comments                  CommunityComment[]
   community_comment_receipts          CommunityCommentReceipt[]
-  community_comment_reports           CommunityCommentReport[]
+  community_comment_reports           CommunityCommentReport[]          @relation("CommunityCommentReporter")
+  community_comment_reports_received  CommunityCommentReport[]          @relation("CommunityCommentReportAuthor")
   community_reactions                 CommunityReaction[]
   community_reaction_receipts         CommunityReactionReceipt[]
   community_reaction_outbox           CommunityReactionOutbox[]
@@ -1865,23 +1866,27 @@ model CommunityCommentScreeningOutbox {
 }
 
 model CommunityCommentReport {
-  id               String                  @id @default(cuid())
-  comment_id       String?
-  comment          CommunityComment?       @relation(fields: [comment_id], references: [id], onDelete: SetNull)
-  reporter_id      String?
-  reporter         User?                   @relation(fields: [reporter_id], references: [id], onDelete: SetNull)
-  reason           CommunityReportReason
-  content_snapshot Json?
-  accepted_at      DateTime                @default(now())
-  routed_at        DateTime                @default(now())
-  sla_due_at       DateTime
-  resolved_at      DateTime?
-  origin           CommunityReportOrigin   @default(member)
-  audit            CommunityCommentAudit[]
+  id                String                  @id @default(cuid())
+  comment_id        String?
+  comment           CommunityComment?       @relation(fields: [comment_id], references: [id], onDelete: SetNull)
+  reporter_id       String?
+  reporter          User?                   @relation("CommunityCommentReporter", fields: [reporter_id], references: [id], onDelete: SetNull)
+  /// Story 6.13: whose words `content_snapshot` holds. It outlives the comment row, which a parent post's erasure deletes.
+  comment_author_id String?
+  comment_author    User?                   @relation("CommunityCommentReportAuthor", fields: [comment_author_id], references: [id], onDelete: SetNull)
+  reason            CommunityReportReason
+  content_snapshot  Json?
+  accepted_at       DateTime                @default(now())
+  routed_at         DateTime                @default(now())
+  sla_due_at        DateTime
+  resolved_at       DateTime?
+  origin            CommunityReportOrigin   @default(member)
+  audit             CommunityCommentAudit[]
 
   @@unique([comment_id, reporter_id])
   @@index([reporter_id, accepted_at])
   @@index([resolved_at, sla_due_at])
+  @@index([comment_author_id])
 }
 
 model CommunityCommentAudit {

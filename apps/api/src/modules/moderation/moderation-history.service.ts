@@ -24,6 +24,7 @@ import {
   type ModerationHistoryErrorCode,
 } from '@couture/api-client/contracts/http'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { viewerConflictsWithEvidence } from './moderation-case-conflict.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import {
   ModerationRecordWriteError,
@@ -129,6 +130,11 @@ export class ModerationHistoryService {
     const erasure = await auditedOrRefused(() =>
       this.community.requestAccountContentErasure(memberId, {
         id: auth.userId,
+        assertMayAct: async (tx) => {
+          // Self-erasure is the member's own request, and a repeat of it is already answered by the guard.
+          if (auth.userId !== memberId)
+            await this.decisions.assertOperatorNotErased(tx, auth.userId)
+        },
         auditData: (requestId) =>
           buildModerationHistoryAuditData({
             eventType: 'moderation_erasure_requested',
@@ -188,8 +194,17 @@ export class ModerationHistoryService {
 
     const caseReportIds = loaded.reports.map((report) => report.id)
     const decisions = await this.repository.decisionsOfCase(tx, caseId, caseReportIds)
-    // A target that cascaded away leaves the viewer named only on the decision row.
-    if (decisions.some((row) => row.subject_user_id === auth.userId))
+    // Judged on everything the bundle will hold. One orphan case reads one report, and its decisions then
+    // bring in the sibling reports of the deleted target, so the case's own reports are not enough.
+    const conflicting = await this.repository.conflictingDecisionIds(
+      tx,
+      auth.userId,
+      decisions
+    )
+    if (
+      conflicting.size > 0 ||
+      (await viewerConflictsWithEvidence(tx, auth.userId, caseId, caseReportIds))
+    )
       throw moderationHistoryError('self_review_refused')
     return this.assemble(tx, auth, {
       scope: { scope: 'case', caseId },

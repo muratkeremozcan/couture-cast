@@ -66,7 +66,11 @@ import {
   ModerationDecisionsRepository,
   type DecisionCase,
 } from './moderation-decisions.repository.js'
-import { parseModerationCaseId } from './moderation-queue.repository.js'
+import { viewerConflictsWithEvidence } from './moderation-case-conflict.js'
+import {
+  moderationCaseKey,
+  parseModerationCaseId,
+} from './moderation-queue.repository.js'
 import {
   ModerationAfterCommit,
   moderationSanctionExpiry,
@@ -185,7 +189,11 @@ export class ModerationDecisionsService {
     auth: RequestAuthContext,
     caseId: string,
     readVisible: (tx: Tx) => Promise<Visible | null>
-  ): Promise<{ visible: Visible; state: ModerationCaseDecisionState } | null> {
+  ): Promise<{
+    visible: Visible
+    viewerConflict: boolean
+    state: ModerationCaseDecisionState
+  } | null> {
     const id = parseModerationCaseId(caseId)
     if (!id) return null
     const now = this.clock()
@@ -241,6 +249,7 @@ export class ModerationDecisionsService {
     }
     return {
       visible: read.visible,
+      viewerConflict: availability.viewerConflict,
       state: {
         revision: computeModerationCaseRevision({
           sequence: history.sequence,
@@ -310,11 +319,18 @@ export class ModerationDecisionsService {
     const subject = decisionCaseSubject(loaded)
     return {
       role: auth.role === 'admin' ? 'admin' : 'moderator',
-      viewerConflict: computeViewerConflict({
-        viewerId: auth.userId,
-        authorId: subject,
-        reporterIds: loaded.reports.map((report) => report.reporterId),
-      }),
+      viewerConflict:
+        computeViewerConflict({
+          viewerId: auth.userId,
+          authorId: subject,
+          reporterIds: loaded.reports.map((report) => report.reporterId),
+        }) ||
+        (await viewerConflictsWithEvidence(
+          tx,
+          auth.userId,
+          moderationCaseKey(loaded.id),
+          loaded.reports.map((report) => report.id)
+        )),
       operatorSanctioned:
         (await findActiveCommunitySanction(tx, auth.userId, state.now)) !== null,
       escalated: state.escalated,
@@ -435,6 +451,7 @@ export class ModerationDecisionsService {
       auth.userId,
       input.action === 'ban' ? decisionCaseSubject(before) : null
     )
+    await this.repository.assertOperatorNotErased(tx, auth.userId)
     await this.takeTargetLocks(tx, before, input.action)
 
     // Everything below reads the case as the locks now hold it.

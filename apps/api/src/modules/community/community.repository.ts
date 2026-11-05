@@ -20,6 +20,7 @@ import { sharedCommunityReportRetryAfter } from './community-report-limit.js'
 import { eraseCommunityComments } from './community-comments.privacy.js'
 import {
   assertReportedCasesUnchanged,
+  lockCommunitySanctions,
   lockReportedCases,
   removeMemberFromModerationRecords,
 } from './community-erasure.js'
@@ -74,6 +75,8 @@ export interface CommunityAccountErasure {
 /** The community module imports nothing from the moderation module, so the caller builds the audit row. */
 export interface CommunityErasureOperator {
   id: string
+  /** Runs under the operator's shared sanction lock, so an operator erased in flight is refused here. */
+  assertMayAct?: (tx: Prisma.TransactionClient) => Promise<void>
   auditData?: (requestId: string) => Prisma.InputJsonValue
 }
 
@@ -614,6 +617,8 @@ export class CommunityRepository {
   ): Promise<CommunityAccountErasure> {
     return communityPrivacyTransaction(this.prisma, async (tx) => {
       const lockedCases = await lockReportedCases(tx, userId)
+      await lockCommunitySanctions(tx, operator?.id ?? null, userId)
+      await operator?.assertMayAct?.(tx)
       await guardCommunitySubject(tx, userId)
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id IN (SELECT post_id FROM "CommunityReaction" WHERE user_id = ${userId}) OR id IN (SELECT post_id FROM "CommunityComment" WHERE user_id = ${userId}) OR user_id = ${userId} ORDER BY id FOR UPDATE`

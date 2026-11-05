@@ -72,7 +72,8 @@ export class ModerationHistoryRepository {
   /**
    * Who wrote or reported each decision's target, for the range export's conflict rule. Not returned to
    * anyone. A report filed after a decision conflicts too, so reports match on the target as well as on
-   * the decision's own report ids, and one conflict withholds every row of that case.
+   * the decision's own report ids. One conflict withholds every row of that case, and of any case that
+   * shares a report with it, because an erasure re-key splits one target into several case keys.
    */
   async conflictingDecisionIds(
     tx: Tx,
@@ -94,8 +95,10 @@ export class ModerationHistoryRepository {
       }),
       tx.communityCommentReport.findMany({
         where: {
-          reporter_id: viewerId,
-          OR: [{ id: { in: reportIds } }, { comment_id: { in: commentIds } }],
+          AND: [
+            { OR: [{ reporter_id: viewerId }, { comment_author_id: viewerId }] },
+            { OR: [{ id: { in: reportIds } }, { comment_id: { in: commentIds } }] },
+          ],
         },
         select: { id: true, comment_id: true },
       }),
@@ -117,20 +120,30 @@ export class ModerationHistoryRepository {
       ...comments.map(({ id }) => id),
       ...commentReports.flatMap((row) => (row.comment_id ? [row.comment_id] : [])),
     ])
-    const conflictingCases = new Set(
-      decisions
-        .filter(
-          (row) =>
-            row.subject_user_id === viewerId ||
-            (row.post_id !== null && posted.has(row.post_id)) ||
-            (row.comment_id !== null && commented.has(row.comment_id)) ||
-            row.report_ids.some((id) => reported.has(id))
+    const conflicted = new Set<string>()
+    const cases = new Set<string>()
+    const reports = new Set(reported)
+    for (let grew = true; grew; ) {
+      grew = false
+      for (const row of decisions) {
+        if (conflicted.has(row.id)) continue
+        const direct =
+          row.subject_user_id === viewerId ||
+          (row.post_id !== null && posted.has(row.post_id)) ||
+          (row.comment_id !== null && commented.has(row.comment_id))
+        if (
+          !direct &&
+          !cases.has(row.case_key) &&
+          !row.report_ids.some((id) => reports.has(id))
         )
-        .map((row) => row.case_key)
-    )
-    return new Set(
-      decisions.filter((row) => conflictingCases.has(row.case_key)).map((row) => row.id)
-    )
+          continue
+        conflicted.add(row.id)
+        cases.add(row.case_key)
+        for (const id of row.report_ids) reports.add(id)
+        grew = true
+      }
+    }
+    return conflicted
   }
 
   async reports(

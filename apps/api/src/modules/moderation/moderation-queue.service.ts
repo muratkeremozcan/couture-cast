@@ -204,7 +204,11 @@ export class ModerationQueueService {
     if (!read) throw caseNotFound()
     const { visible: loaded, state: decisionState } = read
 
-    const detail = this.buildDetail(auth, caseId, loaded, now)
+    const built = this.buildDetail(auth, caseId, loaded, now)
+    const detail = {
+      ...built,
+      viewerConflict: built.viewerConflict || read.viewerConflict,
+    }
 
     // The audit row comes before any signed URL: a failed audit returns no case data and no media.
     try {

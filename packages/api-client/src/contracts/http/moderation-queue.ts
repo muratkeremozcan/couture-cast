@@ -37,6 +37,7 @@ export type ModerationCaseSlaState = z.infer<typeof moderationCaseSlaStateSchema
 
 /** The closed codes the two routes put on the wire next to the HTTP status. */
 export const moderationQueueErrorCodeSchema = z.enum([
+  'operator_sanctioned',
   'invalid_filter',
   'invalid_cursor',
   'case_not_found',
@@ -439,7 +440,7 @@ export function registerModerationQueueContracts(registry: OpenAPIRegistry) {
       },
       400: error('invalid_filter or invalid_cursor'),
       401: { description: 'Authentication required' },
-      403: { description: 'Insufficient role' },
+      403: { description: 'Insufficient role or operator_sanctioned' },
       503: error('moderation_console_disabled'),
     },
   })
@@ -460,7 +461,7 @@ export function registerModerationQueueContracts(registry: OpenAPIRegistry) {
         content: { 'application/json': { schema: moderationCaseDetailResponseSchema } },
       },
       401: { description: 'Authentication required' },
-      403: { description: 'Insufficient role' },
+      403: { description: 'Insufficient role or operator_sanctioned' },
       404: error('case_not_found'),
       503: error('moderation_console_disabled or audit_unavailable'),
     },

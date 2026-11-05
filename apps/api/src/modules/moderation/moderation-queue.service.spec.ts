@@ -77,6 +77,7 @@ function build(loaded: LoadedCase | null = postCase()) {
         return visible
           ? {
               visible,
+              viewerConflict: false,
               state: {
                 revision: '0123456789abcdef',
                 allowedActions: [],

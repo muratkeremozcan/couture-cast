@@ -44,6 +44,10 @@ export function parseModerationCaseId(caseId: string): ParsedCaseId | null {
   return { kind, source: kind.endsWith('post') ? 'post' : 'comment', ref } as ParsedCaseId
 }
 
+export function moderationCaseKey(id: ParsedCaseId): string {
+  return `${id.kind}.${id.ref}`
+}
+
 export interface CaseRow {
   caseKey: string
   source: ModerationCaseSource

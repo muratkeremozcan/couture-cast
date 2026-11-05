@@ -43,7 +43,10 @@ export const moderationSlaChannels = ['webhook', 'console'] as const
 export const moderationSlaChannelSchema = z.enum([...moderationSlaChannels])
 export type ModerationSlaChannel = z.infer<typeof moderationSlaChannelSchema>
 
-export const moderationSlaErrorCodeSchema = z.enum(['moderation_sla_disabled'])
+export const moderationSlaErrorCodeSchema = z.enum([
+  'moderation_sla_disabled',
+  'operator_sanctioned',
+])
 export type ModerationSlaErrorCode = z.infer<typeof moderationSlaErrorCodeSchema>
 
 export const moderationSlaErrorSchema = z
@@ -181,7 +184,7 @@ export function registerModerationSlaContracts(registry: OpenAPIRegistry) {
         content: { 'application/json': { schema: moderationSlaResponseSchema } },
       },
       401: { description: 'Authentication required' },
-      403: { description: 'Insufficient role' },
+      403: { description: 'Insufficient role or operator_sanctioned' },
       503: {
         description: 'moderation_sla_disabled',
         content: { 'application/json': { schema: moderationSlaErrorSchema } },

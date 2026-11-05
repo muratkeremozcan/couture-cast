@@ -23,6 +23,7 @@ export const moderationHistoryErrorCodeSchema = z.enum([
   'moderation_history_disabled',
   'admin_required',
   'self_review_refused',
+  'operator_sanctioned',
   'member_not_found',
   'case_not_found',
   'invalid_request',
@@ -274,7 +275,7 @@ export function registerModerationHistoryContracts(registry: OpenAPIRegistry) {
       },
       400: error('invalid_request'),
       401: { description: 'Authentication required' },
-      403: error('Insufficient role or admin_required'),
+      403: error('Insufficient role, admin_required or operator_sanctioned'),
       404: error('member_not_found'),
       503: error('moderation_history_disabled or audit_unavailable'),
     },
@@ -297,7 +298,7 @@ export function registerModerationHistoryContracts(registry: OpenAPIRegistry) {
         },
       },
       401: { description: 'Authentication required' },
-      403: { description: 'Insufficient role' },
+      403: { description: 'Insufficient role or operator_sanctioned' },
       503: error('moderation_history_disabled'),
     },
   })
@@ -326,7 +327,9 @@ export function registerModerationHistoryContracts(registry: OpenAPIRegistry) {
       },
       400: error('invalid_request or invalid_range'),
       401: { description: 'Authentication required' },
-      403: error('Insufficient role, admin_required or self_review_refused'),
+      403: error(
+        'Insufficient role, admin_required, self_review_refused or operator_sanctioned'
+      ),
       404: error('case_not_found'),
       413: error('export_too_large'),
       503: error('moderation_history_disabled or audit_unavailable'),

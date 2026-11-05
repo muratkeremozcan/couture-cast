@@ -18518,6 +18518,7 @@
           "code": {
             "type": "string",
             "enum": [
+              "operator_sanctioned",
               "invalid_filter",
               "invalid_cursor",
               "case_not_found",
@@ -19418,7 +19419,8 @@
           "code": {
             "type": "string",
             "enum": [
-              "moderation_sla_disabled"
+              "moderation_sla_disabled",
+              "operator_sanctioned"
             ]
           },
           "message": {
@@ -19936,6 +19938,7 @@
               "moderation_history_disabled",
               "admin_required",
               "self_review_refused",
+              "operator_sanctioned",
               "member_not_found",
               "case_not_found",
               "invalid_request",
@@ -30892,6 +30895,7 @@
                     "code": {
                       "type": "string",
                       "enum": [
+                        "operator_sanctioned",
                         "invalid_filter",
                         "invalid_cursor",
                         "case_not_found",
@@ -30918,7 +30922,7 @@
             "description": "Authentication required"
           },
           "403": {
-            "description": "Insufficient role"
+            "description": "Insufficient role or operator_sanctioned"
           },
           "503": {
             "description": "moderation_console_disabled",
@@ -30933,6 +30937,7 @@
                     "code": {
                       "type": "string",
                       "enum": [
+                        "operator_sanctioned",
                         "invalid_filter",
                         "invalid_cursor",
                         "case_not_found",
@@ -31590,7 +31595,7 @@
             "description": "Authentication required"
           },
           "403": {
-            "description": "Insufficient role"
+            "description": "Insufficient role or operator_sanctioned"
           },
           "404": {
             "description": "case_not_found",
@@ -31605,6 +31610,7 @@
                     "code": {
                       "type": "string",
                       "enum": [
+                        "operator_sanctioned",
                         "invalid_filter",
                         "invalid_cursor",
                         "case_not_found",
@@ -31640,6 +31646,7 @@
                     "code": {
                       "type": "string",
                       "enum": [
+                        "operator_sanctioned",
                         "invalid_filter",
                         "invalid_cursor",
                         "case_not_found",
@@ -33211,7 +33218,7 @@
             "description": "Authentication required"
           },
           "403": {
-            "description": "Insufficient role"
+            "description": "Insufficient role or operator_sanctioned"
           },
           "503": {
             "description": "moderation_sla_disabled",
@@ -33226,7 +33233,8 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "moderation_sla_disabled"
+                        "moderation_sla_disabled",
+                        "operator_sanctioned"
                       ]
                     },
                     "message": {
@@ -33386,6 +33394,7 @@
                         "moderation_history_disabled",
                         "admin_required",
                         "self_review_refused",
+                        "operator_sanctioned",
                         "member_not_found",
                         "case_not_found",
                         "invalid_request",
@@ -33413,7 +33422,7 @@
             "description": "Authentication required"
           },
           "403": {
-            "description": "Insufficient role or admin_required",
+            "description": "Insufficient role, admin_required or operator_sanctioned",
             "content": {
               "application/json": {
                 "schema": {
@@ -33428,6 +33437,7 @@
                         "moderation_history_disabled",
                         "admin_required",
                         "self_review_refused",
+                        "operator_sanctioned",
                         "member_not_found",
                         "case_not_found",
                         "invalid_request",
@@ -33467,6 +33477,7 @@
                         "moderation_history_disabled",
                         "admin_required",
                         "self_review_refused",
+                        "operator_sanctioned",
                         "member_not_found",
                         "case_not_found",
                         "invalid_request",
@@ -33506,6 +33517,7 @@
                         "moderation_history_disabled",
                         "admin_required",
                         "self_review_refused",
+                        "operator_sanctioned",
                         "member_not_found",
                         "case_not_found",
                         "invalid_request",
@@ -33578,7 +33590,7 @@
             "description": "Authentication required"
           },
           "403": {
-            "description": "Insufficient role"
+            "description": "Insufficient role or operator_sanctioned"
           },
           "503": {
             "description": "moderation_history_disabled",
@@ -33596,6 +33608,7 @@
                         "moderation_history_disabled",
                         "admin_required",
                         "self_review_refused",
+                        "operator_sanctioned",
                         "member_not_found",
                         "case_not_found",
                         "invalid_request",
@@ -34106,6 +34119,7 @@
                         "moderation_history_disabled",
                         "admin_required",
                         "self_review_refused",
+                        "operator_sanctioned",
                         "member_not_found",
                         "case_not_found",
                         "invalid_request",
@@ -34133,7 +34147,7 @@
             "description": "Authentication required"
           },
           "403": {
-            "description": "Insufficient role, admin_required or self_review_refused",
+            "description": "Insufficient role, admin_required, self_review_refused or operator_sanctioned",
             "content": {
               "application/json": {
                 "schema": {
@@ -34148,6 +34162,7 @@
                         "moderation_history_disabled",
                         "admin_required",
                         "self_review_refused",
+                        "operator_sanctioned",
                         "member_not_found",
                         "case_not_found",
                         "invalid_request",
@@ -34187,6 +34202,7 @@
                         "moderation_history_disabled",
                         "admin_required",
                         "self_review_refused",
+                        "operator_sanctioned",
                         "member_not_found",
                         "case_not_found",
                         "invalid_request",
@@ -34226,6 +34242,7 @@
                         "moderation_history_disabled",
                         "admin_required",
                         "self_review_refused",
+                        "operator_sanctioned",
                         "member_not_found",
                         "case_not_found",
                         "invalid_request",
@@ -34265,6 +34282,7 @@
                         "moderation_history_disabled",
                         "admin_required",
                         "self_review_refused",
+                        "operator_sanctioned",
                         "member_not_found",
                         "case_not_found",
                         "invalid_request",

@@ -35,6 +35,7 @@ import { AccessTokenIdentityService } from '../auth/access-token-identity.servic
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service.js'
 import { API_ROLES_KEY } from '../auth/security.decorators.js'
 import { RequestAuthGuard, RolesGuard } from '../auth/security.guards.js'
+import { ModerationOperatorGuard } from './moderation-operator.guard.js'
 import { UserSessionService } from '../auth/user-session.service.js'
 import { CommunityModule } from '../community/community.module.js'
 import { CommunityModerationQueue } from '../community/community-moderation.queue.js'
@@ -120,6 +121,7 @@ const flags = {
 const analytics = { capture: vi.fn() }
 const queue = { listCases: vi.fn(), getCase: vi.fn() }
 const prisma = {
+  moderationErasureRequest: { findUnique: vi.fn().mockResolvedValue(null) },
   user: { findMany: vi.fn().mockResolvedValue([{ id: 'member-1' }]) },
   userProfile: {
     findUnique: vi.fn().mockResolvedValue({
@@ -281,6 +283,7 @@ describe('U-D-CTRL-ROLES: the declarations', () => {
     expect(Reflect.getMetadata(GUARDS_METADATA, ModerationDecisionsController)).toEqual([
       RequestAuthGuard,
       RolesGuard,
+      ModerationOperatorGuard,
     ])
   })
 

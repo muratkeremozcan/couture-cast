@@ -195,6 +195,27 @@ export async function removeMemberFromModerationRecords(
 }
 
 /** An unlocked read, so a sweep with nothing to repair takes no guard for a member it has already finished. */
+/**
+ * The sanction locks, always in id order. A decision or appeal holds its operator's lock shared while it
+ * writes, and erasure holds the member's exclusively, so once a request row commits every writer naming
+ * that member either finished first, and erasure sees its row, or starts later and sees the request.
+ */
+export async function lockCommunitySanctions(
+  tx: Prisma.TransactionClient,
+  shared: string | null,
+  exclusive: string | null
+): Promise<void> {
+  const ids = [
+    ...new Set([shared, exclusive].flatMap((id) => (id === null ? [] : [id]))),
+  ].sort()
+  for (const id of ids) {
+    if (id === exclusive)
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_sanction:' || ${id}))`
+    else
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtext('community_sanction:' || ${id}))`
+  }
+}
+
 export async function memberIdentityRemains(
   prisma: PrismaClient,
   member: string
@@ -203,7 +224,8 @@ export async function memberIdentityRemains(
     SELECT
       EXISTS (SELECT 1 FROM "ModerationDecision" WHERE subject_user_id = ${member} OR moderator_id = ${member})
       OR EXISTS (SELECT 1 FROM "CommunityPostReport" WHERE reporter_id = ${member})
-      OR EXISTS (SELECT 1 FROM "CommunityCommentReport" WHERE reporter_id = ${member})
+      OR EXISTS (SELECT 1 FROM "CommunityCommentReport" WHERE reporter_id = ${member} OR comment_author_id = ${member})
+      OR EXISTS (SELECT 1 FROM "CommunityComment" WHERE user_id = ${member})
       OR EXISTS (SELECT 1 FROM "ModerationEvent" WHERE flagged_by_id = ${member} OR reviewed_by_id = ${member})
       OR EXISTS (SELECT 1 FROM "CommunitySanction" WHERE user_id = ${member})
       OR EXISTS (SELECT 1 FROM "CommunityAlias" WHERE user_id = ${member})

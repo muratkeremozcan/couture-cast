@@ -11,8 +11,18 @@ export async function eraseCommunityComments(
   })
   const ids = authored.map((row) => row.id)
   await tx.communityCommentReport.updateMany({
-    where: { OR: [{ reporter_id: userId }, { comment_id: { in: ids } }] },
+    where: {
+      OR: [
+        { reporter_id: userId },
+        { comment_id: { in: ids } },
+        { comment_author_id: userId },
+      ],
+    },
     data: { content_snapshot: Prisma.DbNull },
+  })
+  await tx.communityCommentReport.updateMany({
+    where: { comment_author_id: userId },
+    data: { comment_author_id: null },
   })
   await tx.communityCommentReport.updateMany({
     where: { reporter_id: userId },

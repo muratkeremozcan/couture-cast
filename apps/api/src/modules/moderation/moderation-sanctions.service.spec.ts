@@ -159,6 +159,7 @@ function buildAppeal(
       findUniqueOrThrow: vi.fn(({ where }: { where: { id: string } }) =>
         Promise.resolve(state.decisions.find((row) => row.id === where.id))
       ),
+      findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn(() =>
         Promise.resolve({
           sequence: Math.max(...state.decisions.map((row) => row.sequence as number)),
@@ -168,6 +169,9 @@ function buildAppeal(
         state.decisions.push(data)
         return Promise.resolve(data)
       }),
+    },
+    moderationErasureRequest: {
+      findUnique: vi.fn().mockResolvedValue(null),
     },
     communityPostReport: {
       findMany: vi.fn(() =>
@@ -182,9 +186,11 @@ function buildAppeal(
           ]
         )
       ),
+      count: vi.fn().mockResolvedValue(0),
     },
     communityCommentReport: {
       findMany: vi.fn(() => Promise.resolve(seed.commentReports ?? [])),
+      count: vi.fn().mockResolvedValue(0),
     },
     lookbookPost: {
       findMany: vi.fn().mockResolvedValue([]),
