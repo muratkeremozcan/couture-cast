@@ -3,6 +3,7 @@
 Updated: 2026-07-17 - Brownfield deep scan of deployment and operational configuration.
 Updated: 2026-10-16 (Story 6.2b): community worker container, canary, restart drill and rollback.
 Updated: 2026-11-05 (Story 6.12): the community worker is hosted on Northflank, SLA sweep rollout.
+Updated: 2026-11-05 (Story 6.13): append-only moderation history, its limits, retention and account erasure.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -913,6 +914,7 @@ The daily retention job runs the same checks and logs `moderation_history_enforc
 A session running arbitrary DDL as the migration role can defeat enforcement: it holds `ADMIN` on the owner role, so it can `GRANT` itself access, and as schema owner it can `DROP TABLE` or `DROP FUNCTION ... CASCADE`, or put code in an object the definer function touches.
 That takes a compromise of the same class as a reviewed migration.
 A superuser under `session_replication_role = replica` skips the triggers too.
+The Supabase image lets the application role set that parameter, and its `UPDATE`, `DELETE` and `TRUNCATE` are still refused there, because the privilege layer does not depend on triggers (measured on `supabase/postgres:17.6.1.054`).
 A role that can call the function can also forge a request row and strip identity from real rows, and that cannot alter what any decision says.
 
 **A later migration that changes `ModerationDecision`** follows this sequence, and `packages/db/test/migration-hygiene.spec.ts` enforces the revoke:

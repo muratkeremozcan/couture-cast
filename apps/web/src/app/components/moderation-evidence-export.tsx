@@ -20,7 +20,7 @@ import { moderationControl } from './moderation-failure-notice'
 
 const card = 'rounded-lg border border-neutral-400 p-4 dark:border-neutral-600'
 const input =
-  'min-h-[44px] rounded border border-neutral-500 bg-white px-3 py-2 text-sm text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)] dark:bg-neutral-900 dark:text-neutral-100'
+  'min-h-[44px] rounded border border-neutral-500 bg-white px-3 py-2 text-sm text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)] dark:bg-neutral-900 dark:text-neutral-100 dark:[color-scheme:dark]'
 
 type Availability = 'loading' | 'off' | 'case' | 'range'
 
@@ -187,7 +187,10 @@ export function ModerationEvidenceRange() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <header className="flex flex-col gap-3">
-        <Link href="/moderation" className="text-sm underline underline-offset-2">
+        <Link
+          href="/moderation"
+          className="inline-flex min-h-[44px] items-center self-start rounded underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)]"
+        >
           {t('moderation.backToQueue')}
         </Link>
         <h1 className="text-3xl font-semibold">{t('moderation.evidence.title')}</h1>
