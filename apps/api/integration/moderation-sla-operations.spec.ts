@@ -128,10 +128,22 @@ describe('U-GF-METRICS: couturecast-moderation-sla.json', () => {
     panels?: {
       title?: string
       type?: string
-      targets?: { expr?: string; instant?: boolean; range?: boolean }[]
+      datasource?: { uid?: string }
+      targets?: {
+        expr?: string
+        instant?: boolean
+        range?: boolean
+        datasource?: { uid?: string }
+      }[]
       fieldConfig?: { defaults?: { noValue?: string } }
     }[]
   }
+  const datasourceUids = (dashboard.panels ?? []).flatMap((panel) =>
+    [
+      panel.datasource,
+      ...(panel.targets ?? []).map((target) => target.datasource),
+    ].flatMap((source) => (source?.uid ? [source.uid] : []))
+  )
   const expressions = (dashboard.panels ?? []).flatMap((panel) =>
     (panel.targets ?? []).map((target) => target.expr ?? '')
   )
@@ -202,6 +214,41 @@ describe('U-GF-METRICS: couturecast-moderation-sla.json', () => {
         /^time\(\)\s*-\s*max\(moderation_sla_last_measured_timestamp_seconds/.test(expr)
       )
     ).toBe(true)
+  })
+
+  it('reads the datasource the local stack rewrites to one it provisions', () => {
+    const rewrites = new Map(
+      [
+        ...read('scripts/prepare-local-grafana-dashboards.mjs').matchAll(
+          /\['([^']+)',\s*'([^']+)'\]/g
+        ),
+      ].map((match) => [match[1] as string, match[2] as string])
+    )
+    const provisioned = [
+      ...read('infra/grafana/local/provisioning/datasources/datasources.yaml').matchAll(
+        /uid:\s*(\S+)/g
+      ),
+    ].map((match) => match[1] as string)
+    expect(datasourceUids.length).toBeGreaterThan(0)
+    for (const uid of datasourceUids) {
+      expect([...rewrites.keys()]).toContain(uid)
+      expect(provisioned).toContain(rewrites.get(uid))
+    }
+  })
+
+  it('filters on the service name the exporter defaults to', () => {
+    const exporterDefault = /OTEL_SERVICE_NAME \?\? '([^']+)'/.exec(
+      read('apps/api/src/instrumentation.ts')
+    )?.[1]
+    expect(exporterDefault).toBeDefined()
+    const metricQueries = expressions.filter((expr) => expr.includes('moderation_sla_'))
+    expect(metricQueries.length).toBeGreaterThan(0)
+    for (const expr of metricQueries) {
+      for (const [, name] of expr.matchAll(/service_name="([^"]+)"/g)) {
+        expect(name).toBe(exporterDefault)
+      }
+      expect(expr).toContain(`service_name="${exporterDefault}"`)
+    }
   })
 
   it('names only metrics the code exports', () => {

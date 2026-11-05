@@ -816,6 +816,26 @@ R2-1: send relevance reads the fresh claim time, so an at-risk alert whose deadl
 R2-2: Measurement age is an instant query that reads `No samples`. U-GF-METRICS holds it.
 Real Grafana at `3e1e680b`: with the worker stopped and the series gone after the 300-second lookback, the age panel read `No samples` and the four stat panels read `Stale`, in `lgtm-moderation-sla-no-samples.png`, same folder as the other captures.
 
+**CodeRabbit round 1 on `d64891aa`, with source fixes red first against `dd3ae629`.**
+Red there, green with the fix:
+
+- I-R-PENDING-AGE: a post leaving through erasure is not waiting. The real `requestErasureForUser` moves `updated_at` to now, and the post now drops out.
+- C-WEB-LINKS: each alert link names its case, with the visible words kept in the accessible name.
+- C-WEB-ANNOUNCE: a manual refresh announces with no count in every locale, and a manual refresh a timer replaced settles on both outcomes.
+- U-W-OTEL: telemetry flushes when a close rejects, and the process exits 1.
+
+Test defects fixed, each proved by a mutant in a throwaway worktree:
+
+- "Writes one record when two workers repair together" never contended, because a preliminary sweep repaired the row first and removing that sweep still survived 3 of 3 runs with the fence gone. Both workers now meet after reading the row as owed, and the same mutant fails 3 of 3 runs.
+- I-P-ANALYTICS let an unlisted event with no properties through. An injected event of that shape now fails.
+- U-WEB-CLIENT classified a resolved summary as `unavailable`. A read that resolves on a 500 now fails.
+- U-GF-METRICS now ties the dashboard datasource to the rewrite map and the provisioned uid, and `service_name` to the exporter default. Three mutants fail.
+- The retried-claim test drops its trigger at the start of the retry, so the retry can no longer overtake the drop.
+- P-SLA-HOSTED-PATH polls for the monitor row, so a run of that test alone does not arrive before the first 60-second tick.
+  Run alone with the row deleted first, it passes in 1.5 minutes, and the whole P-SLA and security Playwright set passes at 34.
+
+I-S-PAGING sets `detectionPageSize: 50` to cross pages, and a second case seeds 1010 breached cases to read past the shipped page size of 1000.
+
 **Independent test review.**
 The report at the end of this document scored `bb8491d5` at 45 of 100 and blocked it.
 Its Resolution section lists what each finding became.

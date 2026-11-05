@@ -737,6 +737,15 @@ describe('U-WEB-CLIENT: getModerationSlaFromWeb', () => {
     },
   }
 
+  // A read that resolved fails here: a summary object would otherwise classify as `unavailable`.
+  const rejection = () =>
+    getModerationSlaFromWeb().then(
+      () => {
+        throw new Error('a failed read resolved')
+      },
+      (error: unknown) => error
+    )
+
   it('reads the route with the bearer and returns the parsed summary', async () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
     let authorization: string | null = null
@@ -758,14 +767,14 @@ describe('U-WEB-CLIENT: getModerationSlaFromWeb', () => {
   ])('maps %d %j to %s', async (status, response, reason) => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
     useMswHandlers(http.get(SLA, () => HttpResponse.json(response, { status })))
-    const failure = await getModerationSlaFromWeb().catch((error: unknown) => error)
-    expect(moderationFailureReason(failure)).toBe(reason)
+    expect(moderationFailureReason(await rejection())).toBe(reason)
   })
 
   it('maps a network failure to a retryable state', async () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
     useMswHandlers(http.get(SLA, () => HttpResponse.error()))
-    const failure = await getModerationSlaFromWeb().catch((error: unknown) => error)
-    expect(isTerminalFailure(moderationFailureReason(failure))).toBe(false)
+    const reason = moderationFailureReason(await rejection())
+    expect(reason).toBe('unavailable')
+    expect(isTerminalFailure(reason)).toBe(false)
   })
 })

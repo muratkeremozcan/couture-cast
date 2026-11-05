@@ -509,7 +509,17 @@ describe('I-D-BULLMQ: the general bootstrap path on real Redis', () => {
       table: 'ModerationSlaAlert',
       event: 'UPDATE',
     })
-    const sweepOnce = vi.fn(() => sweep().run())
+    let runs = 0
+    let released = false
+    const sweepOnce = vi.fn(async () => {
+      runs += 1
+      // The retry opens the table itself, so the drop finishes before its first write.
+      if (runs === 2) {
+        released = true
+        await allow()
+      }
+      return sweep().run()
+    })
     const processor = createMaintenanceProcessor({
       admin: {} as never,
       featureFlags: {} as never,
@@ -521,13 +531,6 @@ describe('I-D-BULLMQ: the general bootstrap path on real Redis', () => {
     })
     const queue = new Queue(queueName, production.options)
     const worker = createWorker(queueName, processor, defaultWorkerOptions(1))
-    let allowed = false
-    worker.on('failed', () => {
-      if (!allowed) {
-        allowed = true
-        void allow()
-      }
-    })
     try {
       await worker.waitUntilReady()
       const done = new Promise<void>((resolve) => {
@@ -544,9 +547,8 @@ describe('I-D-BULLMQ: the general bootstrap path on real Redis', () => {
       await worker.close()
       await queue.obliterate({ force: true })
       await queue.close()
-      if (!allowed) await allow()
+      if (!released) await allow()
     }
-    expect(allowed).toBe(true)
     expect(sweepOnce).toHaveBeenCalledTimes(2)
     const [failure] = await prisma.jobFailure.findMany({
       where: { queue_name: queueName },

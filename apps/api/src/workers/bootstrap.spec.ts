@@ -203,6 +203,16 @@ describe('general worker bootstrap', () => {
     expect(harness.shutdownOpenTelemetry).toHaveBeenCalledOnce()
   })
 
+  it('U-W-OTEL: still flushes telemetry when a close rejects, and exits 1', async () => {
+    harness.shutdownOpenTelemetry.mockClear()
+    const bootstrap = freshProcess()
+    await bootstrap.startWorkers()
+    harness.shutdownWorkerResources.mockRejectedValueOnce(new Error('redis close failed'))
+    await bootstrap.performShutdown()
+    expect(harness.shutdownOpenTelemetry).toHaveBeenCalledOnce()
+    expect(harness.exit).toHaveBeenCalledWith(1)
+  })
+
   it('waits for community readiness before it has a consumer to shut down', async () => {
     const bootstrap = freshProcess()
 

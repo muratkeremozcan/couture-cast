@@ -115,11 +115,32 @@ describe('I-S-PAGING: a sweep reads every page', () => {
     await bulk(`${ctx.runId}a2`, 'harassment', 60, inMs(2 * SLA_HOUR_MS))
     await bulk(`${ctx.runId}b1`, 'spam', 60, inMs(-SLA_HOUR_MS))
     await bulk(`${ctx.runId}b2`, 'harassment', 60, inMs(-2 * SLA_HOUR_MS))
-    await sweep({ channel: createModerationOpsChannel({ url: '' }) }).run()
+    await sweep({
+      channel: createModerationOpsChannel({ url: '' }),
+      detectionPageSize: 50,
+    }).run()
     const written = await alerts()
     expect(written.filter((alert) => alert.kind === 'at_risk')).toHaveLength(120)
     expect(written.filter((alert) => alert.kind === 'breached')).toHaveLength(120)
     expect(new Set(written.map((alert) => alert.case_key)).size).toBe(240)
+  })
+
+  it('reads past the shipped page size, because a case past a cap would never alert', async () => {
+    const author = await seedMember(prisma, `${ctx.runId}d`, 'author')
+    const reporter = await seedMember(prisma, `${ctx.runId}d`, 'reporter')
+    const dueAt = inMs(-SLA_HOUR_MS)
+    await seedBulkOpenPosts(prisma, {
+      runId: `${ctx.runId}d1`,
+      count: 1010,
+      authorId: author.id,
+      reporterId: reporter.id,
+      reason: 'spam',
+      createdAt: new Date(dueAt.getTime() - 24 * SLA_HOUR_MS),
+      dueAt,
+    })
+    await sweep({ channel: createModerationOpsChannel({ url: '' }) }).run()
+    const written = await alerts()
+    expect(new Set(written.map((alert) => alert.case_key)).size).toBe(1010)
   })
 })
 

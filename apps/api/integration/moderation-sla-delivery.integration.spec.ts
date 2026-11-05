@@ -687,6 +687,30 @@ describe('I-W-CLAIM-FAILS: a delivery fault is a failed sweep (CX-3)', () => {
 describe('I-W-OWED-ESCALATION: an owed failure record outlives later outcomes (CX-4)', () => {
   const jobFailures = () => prisma.jobFailure.findMany()
   /** Attempts 1 and 2 fail, and the third fails with its JobFailure insert refused. */
+  /** Runs `after` once a client's read of the owed rows returns, before the sweep acts on them. */
+  const afterOwedRead = (client: PrismaClient, after: () => Promise<void>) =>
+    new Proxy(client, {
+      get(target, property): unknown {
+        const value: unknown = Reflect.get(target, property)
+        if (property !== 'moderationSlaAlert') {
+          return typeof value === 'function'
+            ? (value as (...args: unknown[]) => unknown).bind(target)
+            : value
+        }
+        const model = target.moderationSlaAlert
+        return new Proxy(model, {
+          get(delegate, method): unknown {
+            if (method !== 'findMany') return Reflect.get(delegate, method) as unknown
+            return async (args: Parameters<typeof model.findMany>[0]) => {
+              const rows = await model.findMany(args)
+              if (args?.where?.failure_owed_code) await after()
+              return rows
+            }
+          },
+        })
+      },
+    })
+
   async function thirdFailureUnrecorded(seeded: Awaited<ReturnType<typeof seedCase>>) {
     capture().respondWith(500)
     await sweep().run()
@@ -821,8 +845,22 @@ describe('I-W-OWED-ESCALATION: an owed failure record outlives later outcomes (C
     const key = slaKey(seeded, 'at_risk')
     await thirdFailureUnrecorded(seeded)
     clock.advance(4 * SLA_MINUTE_MS)
-    await sweep().run()
-    await Promise.all([sweep().run(), sweep({ prisma: ctx.newClient() }).run()])
+    // Both workers read the row as owed before either writes, so only the stamp keeps it to one.
+    let arrived = 0
+    let bothRead: () => void = () => undefined
+    const opened = new Promise<void>((resolve) => {
+      bothRead = resolve
+    })
+    const meetAfterOwedRead = async () => {
+      arrived += 1
+      if (arrived === 2) bothRead()
+      if (arrived <= 2) await opened
+    }
+    await Promise.all([
+      sweep({ prisma: afterOwedRead(prisma, meetAfterOwedRead) }).run(),
+      sweep({ prisma: afterOwedRead(ctx.newClient(), meetAfterOwedRead) }).run(),
+    ])
+    expect(arrived).toBeGreaterThanOrEqual(2)
     await expectOneRecord(key)
   })
 
@@ -1103,9 +1141,10 @@ describe('I-P: private data on no surface', () => {
     expect(events.length).toBeGreaterThan(2)
     for (const event of events) {
       expect(event.distinctId).toBe('system:moderation-sla')
-      // An event missing from the list fails here, so a new one has to declare its properties.
+      // A new event has to join the list, even one that carries no properties.
+      expect(Object.keys(allowed)).toContain(event.event)
       expect(Object.keys(event.properties ?? {}).sort(), event.event).toEqual(
-        [...(allowed[event.event] ?? [])].sort()
+        [...allowed[event.event]!].sort()
       )
       expect(JSON.stringify(event.properties ?? {})).not.toMatch(
         /post\.|comment\.|orphan-/

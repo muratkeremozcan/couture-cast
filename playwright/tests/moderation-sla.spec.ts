@@ -260,8 +260,16 @@ test.describe('P-SLA: the real sweep, the real channel, the real page', () => {
 
   test('[P0] P-SLA-HOSTED-PATH the stack delivers from community.bootstrap, the production path', async ({
     prisma,
+    recurse,
   }) => {
-    expect(await prisma.moderationSlaMonitor.findFirst()).not.toBeNull()
+    // Only a finished sweep writes this row, and the hosted interval first fires 60 seconds after
+    // the worker starts, so a run of this test alone can arrive first.
+    test.setTimeout(150_000)
+    await recurse(
+      () => prisma.moderationSlaMonitor.findFirst(),
+      (row) => row !== null,
+      { timeout: 90_000, interval: 1_000 }
+    )
     // The processes under this run's launcher, because other stacks can share the machine. With no
     // general bootstrap among them, the delivery above came through the hosted 60-second interval.
     const { port } = new URL(process.env.WEB_E2E_BASE_URL ?? 'http://127.0.0.1:3005')

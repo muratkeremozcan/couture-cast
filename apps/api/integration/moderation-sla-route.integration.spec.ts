@@ -20,6 +20,11 @@ import {
 } from '@couture/api-client/contracts/http'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service.js'
+import {
+  communityPrivacyTransaction,
+  guardCommunityPost,
+} from '../src/modules/community/community-privacy.js'
+import { CommunityRepository } from '../src/modules/community/community.repository.js'
 import { SupabaseCommunityStorageAdapter } from '../src/modules/community/community-storage.adapter.js'
 import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
 import { ModerationModule } from '../src/modules/moderation/moderation.module.js'
@@ -642,6 +647,43 @@ describe('I-R-PENDING-AGE: the BH18 signal', () => {
       inMs(-2 * HOUR).toISOString()
     )
   })
+})
+
+describe('I-R-PENDING-AGE: a post leaving through erasure is not waiting', () => {
+  const stamp = (id: string, at: Date) =>
+    prisma.$executeRaw`UPDATE "LookbookPost" SET updated_at = ${at.toISOString()}::timestamp WHERE id = ${id}`
+
+  it('drops a post once the erasure request moves its clock to now', async () => {
+    const author = await fx.member('erasing-author')
+    const post = await fx.post({ authorId: author.id, status: 'pending_review' })
+    await stamp(post.id, inMs(-2 * HOUR))
+    await new CommunityRepository(prisma).requestErasureForUser(author.id, new Date())
+    const row = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: post.id } })
+    expect(row.status).toBe('pending_review')
+    expect(row.updated_at.getTime()).toBeGreaterThan(inMs(-MINUTE).getTime())
+    expect((await summary()).screening.oldestPendingReviewAt).toBeNull()
+  })
+
+  it.each(['erasure_requested_at', 'anonymized_at'] as const)(
+    'reports the older live wait next to a post with %s set',
+    async (column) => {
+      const author = await fx.member(`erasing-${column}`)
+      const leaving = await fx.post({ authorId: author.id, status: 'pending_review' })
+      const waiting = await fx.post({ authorId: author.id, status: 'pending_review' })
+      await communityPrivacyTransaction(prisma, async (tx) => {
+        await guardCommunityPost(tx, leaving.id)
+        await tx.lookbookPost.update({
+          where: { id: leaving.id },
+          data: { [column]: new Date() },
+        })
+      })
+      await stamp(leaving.id, inMs(-3 * HOUR))
+      await stamp(waiting.id, inMs(-2 * HOUR))
+      expect((await summary()).screening.oldestPendingReviewAt).toBe(
+        inMs(-2 * HOUR).toISOString()
+      )
+    }
+  )
 })
 
 describe('I-R-SANCTIONED: an operator under a sanction', () => {

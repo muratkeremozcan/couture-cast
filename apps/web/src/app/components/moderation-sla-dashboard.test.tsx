@@ -1,6 +1,8 @@
 // Story 6.12 test owner: C-WEB-STATES, -NO-WRITE, -LINKS, -ANNOUNCE, -LABELS, -TIME, -A11Y.
 // The page is read-only and every state it can reach renders on its own. Fixtures parse through the
 // shipped contract, so a drifting field fails here first.
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
@@ -78,6 +80,9 @@ afterEach(() => {
   window.sessionStorage.clear()
 })
 
+const openCaseName = (caseId: string) =>
+  `${labels.openCase}: ${enUS.moderation.queue.caseRef.replace('{{id}}', caseId)}`
+
 const metric = (label: string, region: HTMLElement) =>
   within(region).getByText(label).parentElement!.querySelector('dd')!.textContent
 
@@ -131,7 +136,7 @@ describe('C-WEB-STATES: every state renders on its own', () => {
     await screen.findByRole('region', { name: labels.queueTitle })
     const banner = container.querySelector('[data-monitor-stale="true"]')
     expect(banner?.textContent).toContain('has not run since')
-    expect(screen.getByRole('link', { name: labels.openCase })).toBeVisible()
+    expect(screen.getByRole('link', { name: openCaseName('post.abc') })).toBeVisible()
   })
 
   it('a healthy monitor shows no stale banner', async () => {
@@ -217,13 +222,27 @@ describe('C-WEB-LINKS', () => {
   it('links an alert to its case, an orphan id included, and links back to the queue', async () => {
     serve(summary({ recentAlerts: [alert({ caseId: 'orphan-post.r_1-a' })] }))
     render(<ModerationSlaDashboard />)
-    expect(await screen.findByRole('link', { name: labels.openCase })).toHaveAttribute(
-      'href',
-      '/moderation/cases/orphan-post.r_1-a'
-    )
+    expect(
+      await screen.findByRole('link', { name: openCaseName('orphan-post.r_1-a') })
+    ).toHaveAttribute('href', '/moderation/cases/orphan-post.r_1-a')
     expect(
       screen.getByRole('link', { name: enUS.moderation.backToQueue })
     ).toHaveAttribute('href', '/moderation')
+  })
+
+  it('names each alert link after its case, and keeps the visible words in the name', async () => {
+    const ids = ['post.abc', 'post.def']
+    serve(
+      summary({
+        recentAlerts: ids.map((caseId, index) => alert({ id: `alert-${index}`, caseId })),
+      })
+    )
+    render(<ModerationSlaDashboard />)
+    for (const caseId of ids) {
+      const link = await screen.findByRole('link', { name: openCaseName(caseId) })
+      expect(link).toHaveAttribute('href', `/moderation/cases/${caseId}`)
+      expect(link).toHaveTextContent(labels.openCase)
+    }
   })
 
   it('the queue header links to the dashboard', async () => {
@@ -253,6 +272,82 @@ describe('C-WEB-ANNOUNCE (D12): one polite announcement per change', () => {
       enUS.moderation.slaState.on_track,
       screen.getByRole('region', { name: labels.queueTitle })
     )
+
+  it('announces a manual refresh with no count, because the page has none to give', async () => {
+    serve(summary())
+    const user = userEvent.setup()
+    render(<ModerationSlaDashboard />)
+    await screen.findByRole('region', { name: labels.queueTitle })
+    await user.click(screen.getByRole('button', { name: enUS.moderation.queue.refresh }))
+    await waitFor(() => expect(liveText()).toBe(labels.refreshed))
+    expect(liveText()).not.toMatch(/\{\{|\d/)
+  })
+
+  it('every locale has a refreshed announcement with nothing to interpolate', () => {
+    const dir = join(__dirname, '../../i18n/locales')
+    const locales = readdirSync(dir).filter((name) => name.endsWith('.json'))
+    expect(locales.length).toBeGreaterThan(1)
+    for (const name of locales) {
+      const text = (JSON.parse(readFileSync(join(dir, name), 'utf8')) as typeof enUS)
+        .moderation.sla.refreshed
+      expect(text, name).toMatch(/\S/)
+      expect(text, name).not.toContain('{{')
+    }
+  })
+
+  describe('a timed refresh replaces a manual one', () => {
+    const replaced = (later: () => Response) => {
+      let release: () => void = () => undefined
+      const held = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      let reads = 0
+      mockApi(
+        http.get(SLA_PATH, async () => {
+          reads += 1
+          if (reads === 1) return json(withOnTrack(4))
+          if (reads === 2) {
+            await held
+            return json(withOnTrack(9))
+          }
+          return later()
+        })
+      )
+      return { release, reads: () => reads }
+    }
+
+    const clickThenTimer = async (reads: () => number) => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      render(<ModerationSlaDashboard />)
+      await screen.findByRole('region', { name: labels.queueTitle })
+      await user.click(
+        screen.getByRole('button', { name: enUS.moderation.queue.refresh })
+      )
+      await waitFor(() => expect(reads()).toBe(2))
+      expect(liveText()).toBe(enUS.moderation.queue.refreshing)
+      await act(() => vi.advanceTimersByTimeAsync(REFRESH_MS))
+      await waitFor(() => expect(reads()).toBe(3))
+    }
+
+    it('settles to refreshed when the later read answers', async () => {
+      const { release, reads } = replaced(() => json(withOnTrack(5)))
+      await clickThenTimer(reads)
+      await waitFor(() => expect(onTrackShown()).toBe('5'))
+      expect(liveText()).toBe(labels.refreshed)
+      release()
+    })
+
+    it('stops saying refreshing when the later read fails', async () => {
+      const { release, reads } = replaced(() => json({ message: 'boom' }, 500))
+      await clickThenTimer(reads)
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        enUS.moderation.state.stale
+      )
+      expect(liveText()).toBe('')
+      release()
+    })
+  })
 
   it('stays silent through an auto refresh, in flight and after', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
