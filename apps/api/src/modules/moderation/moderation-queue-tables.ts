@@ -16,4 +16,6 @@ export const MODERATION_QUEUE_READ_TABLES = Object.freeze([
   'CommunityCommentAudit',
   'ModerationDecision',
   'CommunitySanction',
+  'ModerationSlaAlert',
+  'ModerationSlaMonitor',
 ] as const)

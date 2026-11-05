@@ -65,6 +65,8 @@ const canonicalFlagOverrides: Record<FeatureFlagKey, FeatureFlagStoredValue> = {
   moderation_console_enabled: true,
   // Story 6.11: same reasoning for moderation decisions. Production never runs it.
   moderation_decisions_enabled: true,
+  // Story 6.12: same reasoning for the SLA sweep and its route. Production never runs it.
+  moderation_sla_monitoring_enabled: true,
 }
 
 const supplementalFeatureFlags: SeededFeatureFlag[] = [

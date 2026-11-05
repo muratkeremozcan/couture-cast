@@ -157,6 +157,14 @@ const FEATURE_FLAG_DEFINITIONS = {
     kind: 'boolean',
     defaultValue: false,
   },
+  // Story 6.12: the kill switch for the SLA sweep, its alerts and the SLA read route.
+  // The sweep also needs the console flag, because an alert about a case nobody can
+  // open is noise. It evaluates both for one system subject, so a per-moderator rule
+  // opens the read route for that moderator and leaves the worker off.
+  moderation_sla_monitoring_enabled: {
+    kind: 'boolean',
+    defaultValue: false,
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<FeatureFlagStoredValue>>
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAG_DEFINITIONS
