@@ -255,7 +255,7 @@ Known limits recorded by TEA: a sweep that alerts before the first 60-second met
 
 Process note: `f126fa28` was committed with `--no-verify` by mistake. Prettier and eslint were then run by hand on its files, and the one finding was fixed in `0bc10229`.
 
-Ship state (update on every step, so a compaction costs nothing): PR 196 open. CodeRabbit reviewed `16bfd54f` with no actionable comments, and every finding from its review of `d64891aa` is fixed or answered. Vercel Preview e2e on `16bfd54f` failed when the supabase CLI's GitHub release answered 504 during `npm ci`, so `install-dependencies.sh` now treats those 5xx texts as transient, and `setup-node-env` installs through that script. Spec and sprint-status are done. Left: every check green on the final head, then report `cc612-builder green <sha>` with the head the last CodeRabbit review covered. Never merge. Never use --no-verify.
+Ship state (update on every step, so a compaction costs nothing): PR 196 open. CodeRabbit reviewed `16bfd54f` with no actionable comments, and every finding from its review of `d64891aa` is fixed or answered. Vercel Preview e2e on `16bfd54f` failed when the supabase CLI's GitHub release answered 504 during `npm ci`, so `install-dependencies.sh` now treats those 5xx texts as transient, and `setup-node-env` installs through that script. `maestro:install` and the new `fetch-gradle-wrapper.sh` retry the same burst. Spec and sprint-status are done. Left: every check green on the final head, then report `cc612-builder green <sha>` with the head the last CodeRabbit review covered. Never merge. Never use --no-verify.
 
 Open at hand-off, by design: D8 production destination, D13 hosted Grafana, D16 staffing coverage.
 

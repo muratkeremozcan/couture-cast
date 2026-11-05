@@ -10004,6 +10004,7 @@ Evidence boundaries:
   On `16bfd54f` GitHub release downloads answered 504: the supabase and onnxruntime postinstalls failed `npm ci` in the Vercel Preview e2e and burn-in jobs, and the Maestro installer failed two Android shards.
   `install-dependencies.sh` now treats those 5xx texts as transient, waits longer between attempts and also retries `npm install`, and `setup-node-env` installs through it.
   `maestro:install` retries the official installer the same way.
+  The Gradle wrapper failed the same way on `aeb2297f`, so `fetch-gradle-wrapper.sh` downloads it with retries before the Android jobs of the accessibility and share-card workflows build.
 - **A real stack walk proved delivery to a local endpoint.**
   The launcher ran the built API, the real `community.bootstrap` worker and the web server on the isolated database `cc612_walk`, with a local HTTP capture server as the webhook.
   One report aged across both boundaries and produced `at_risk`, then `breached`.
