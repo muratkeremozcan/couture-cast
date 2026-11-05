@@ -730,6 +730,155 @@ Stated residuals with no test that could close them: TEA-03 (arbitrary DDL as th
 
 ---
 
+## Execution record
+
+Sign-off runs at `743f179ab544ddac55358cf1748e9e540f122309`, 2026-11-05.
+Three consecutive full unfiltered runs, one suite at a time, each count identical across all three.
+No test failed, none was retried, and none was flaky.
+
+| Lane                                                                                                                               | Passed in each run | Skipped in each run |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------- |
+| `packages/db`, plain Postgres at 54339                                                                                             | 441                | 1                   |
+| `packages/db`, Supabase image at 54341                                                                                             | 441                | 1                   |
+| `apps/api`, every unit and integration suite, plain Postgres                                                                       | 8565               | 38                  |
+| `moderation-history` sequential, route, erasure and completion, Supabase image                                                     | 120                | 0                   |
+| `packages/api-client`                                                                                                              | 1757               | 0                   |
+| `packages/config`                                                                                                                  | 31                 | 0                   |
+| `apps/web`                                                                                                                         | 1931               | 0                   |
+| Pact consumer                                                                                                                      | 456                | 0                   |
+| Pact provider                                                                                                                      | 1                  | 0                   |
+| Playwright: `moderation-history`, `-console`, `-decisions`, `-sla`, `auth-moderation-security`, real browser on the Supabase image | 85                 | 1                   |
+
+13828 tests passed in each run.
+`moderation:history:verify` passed 16 of 16 checks on the Playwright database in each run.
+`node --test` for `coverage-shards`, `workflow-step-shadowing` and `prisma-migrate-connection` passed in each run.
+
+None of the skips is a planned scenario of this story.
+`6.1-DB-015` needs a storage schema these databases do not have.
+`P-Q-DISABLED-REAL` needs an environment with the console off.
+The `apps/api` skips are in `location-capture`, `location-capture.lifecycle`, `community-storage-capability`, `community-comments-measurement`, `integration-schema-required`, `location-preferences` and `weather`.
+
+### Red proofs
+
+A throwaway worktree at `5f611865`, before the fixes for the independent review, on the Supabase image: 17 tests failed against the unfixed source.
+C1 4, C2 6, C3 1, C4 1, conflict on an orphan sibling 2, an erased operator on the staff routes 3.
+The first database proof at the baseline `56509fa8`: 71 failed and 42 passed.
+
+### Seeded defects
+
+Each ran in a throwaway worktree at `743f179a`, one mutation at a time, against the named tests.
+44 of 44 were caught.
+`S-1b` shows `0/0` because the migration itself refuses, and no test assertion runs.
+`P-LANG` has no seed: it was red against the shipped source before its fix.
+
+| Seed  | Defect                                                                      | Failed / ran |
+| ----- | --------------------------------------------------------------------------- | ------------ |
+| S-1   | Application role left holding every privilege on the table                  | 1/11         |
+| S-1b  | Ownership move removed                                                      | 0/0          |
+| S-2   | BEFORE UPDATE trigger removed                                               | 14/16        |
+| S-3   | BEFORE TRUNCATE trigger removed                                             | 1/3          |
+| S-4   | Function request check removed                                              | 1/1          |
+| S-5   | Function guard call removed                                                 | 3/4          |
+| S-6   | Owner role left without BYPASSRLS                                           | 2/2          |
+| S-7   | service_role grants left in place                                           | 5/19         |
+| S-8   | Guard keyed on session_user                                                 | 2/2          |
+| S-9   | Owner path may change action                                                | 1/13         |
+| S-10  | anonymized_at set unconditionally, and redacted rows reselected             | 1/2          |
+| S-11  | Function called after eraseCommunityComments                                | 1/1          |
+| S-12  | Snapshot scrub skipped                                                      | 1/2          |
+| S-13  | CommunityAlias kept                                                         | 1/2          |
+| S-14  | Case locks removed from erasure                                             | 2/2          |
+| S-15  | completed_at stamped before the purge                                       | 1/2          |
+| S-16  | Export audit row removed                                                    | 1/1          |
+| S-17a | Report schema loses strict                                                  | 38/118       |
+| S-17b | Reporter id added to the report mapping                                     | 2/2          |
+| S-18  | Audit actor copied with no erasure check                                    | 1/1          |
+| S-19  | Byte cap removed                                                            | 1/2          |
+| S-20  | Pending included in the prune                                               | 1/1          |
+| S-21  | 365-day cutoff                                                              | 4/8          |
+| S-22  | Range open to a moderator                                                   | 1/1          |
+| S-23a | Queue shows the constant raw                                                | 1/1          |
+| S-23b | Console ignores the removed marker                                          | 1/1          |
+| S-24  | Verifier uses has_table_privilege                                           | 1/2          |
+| S-25  | A service updates a decision row                                            | 1/1          |
+| S-26  | Role creation no longer tolerates the concurrent winner                     | 1/1          |
+| S-27  | Queue link rendered without the admin answer                                | 1/4          |
+| S-28  | A raw prune of ModerationEvent                                              | 1/1          |
+| S-29  | Publish loses the subject gate                                              | 1/1          |
+| S-30  | Decision row re-granted to the application role, triggers kept              | 1/10         |
+| S-31  | Member report stores no comment author                                      | 5/6          |
+| S-32  | Erasure ignores the author link                                             | 3/5          |
+| S-33  | Erasure takes no sanction lock                                              | 4/4          |
+| S-34  | Decision does not check its operator                                        | 1/2          |
+| S-35  | Appeal does not check its operator                                          | 1/2          |
+| S-36  | Queue controller loses the operator guard                                   | 1/3          |
+| S-37  | Decision and read ignore joined reports                                     | 2/2          |
+| S-38  | Case export ignores the final evidence set                                  | 1/1          |
+| S-39  | Range closure stops after one pass                                          | 2/2          |
+| S-40  | Verifier loses the granted check                                            | 1/27         |
+| S-41  | Erased operator reads the evidence page: history controller loses the guard | 2/3          |
+
+The reworked `scrub_comment_reports_on_user_delete` has no seed, because the API suite runs on an already migrated database.
+The builder saw the 23503 it fixes in `community-comments-privacy`, and `I-S-COMMENT-LINK` proves the direct delete.
+
+### Differences from the plan
+
+| Scenario                  | What happened                                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `C-PACT-ERASURE`          | Dropped. The erasure route has no web caller, so no consumer exists to pin it. `A-ER-*` and `http-openapi.spec.ts` cover its contract |
+| `C-PACT-EXPORT`           | The two evidence export interactions, plus the refusals, in `web-api-client.pacttest.ts`, and a second interaction pins live rows     |
+| `U-R-FLAG`, `U-R-HEADERS` | Run through the real module as `A-FLAG-OFF` and `A-X-CASE`, which is stronger than the planned unit                                   |
+| `U-FLAG-REGISTRY`         | `packages/config/src/flags.spec.ts` and `feature-flags.service.spec.ts`                                                               |
+| `U-S-OVERDUE-LOG`         | `I-C-STORAGE-DOWN` in the completion suite reads the real logger                                                                      |
+| `U-C-OPENAPI`             | `packages/api-client/testing/http-openapi.spec.ts`, and `schema-validation.yml` regenerates the SDK                                   |
+| `W-CLIENT`                | The real client under `moderation-evidence-export.test.tsx` and the Pact consumer                                                     |
+| `D-HYGIENE-RULE`          | `DB-HYGIENE-04` in `migration-hygiene.spec.ts`                                                                                        |
+| `D-BACKFILL-FIX`          | `moderation-decisions-backfill.spec.ts`                                                                                               |
+| `D-MIG-PREVIEW-FAIL-SAFE` | `scripts/lib/prisma-migrate-connection.test.mjs`                                                                                      |
+
+Added after the plan, because review found the gaps it did not name:
+
+- `I-S-MATRIX`: every ordered pair of five erasures, scanned for ids and for authored words.
+- `I-S-COMMENT-LINK`, `I-S-CONCURRENT`, `I-O-RACE-DECISION`, `I-O-RACE-APPEAL`, `I-O-AFTER`, `I-O-SUBJECT`, `I-O-SIBLING-CONFLICT`.
+- `A-X-ORPHAN-SIBLING`, `A-X-RANGE-CLOSURE`, `A-X-APPEAL`, `A-AVAILABILITY`, `I-E-OPERATOR-COPIES`, `D-COMMENT-AUDIT`, `D-MIG-ROLE-RACE`, `P-LANG`.
+
+This plan missed C1, C2 and C3, which an independent Codex review found.
+`I-C-THIRD-PARTY-COMMENT` stopped before the second erasure, no scenario made an operator the subject of an erasure, and conflict was planned per case.
+The sequential matrix and the `I-O` set exist to close that kind of gap.
+
+### Manual checks
+
+| Check              | Result                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `M-SIGNOFF-BURN`   | Done: the three runs above, with injected faults through `V-FAULTS` and the seeded defects                                                                                                                                                                                                                                                                                                                                             |
+| `M-LOCAL-SUPABASE` | Done on the disposable Supabase image: the verifier exits 0 in `V-CLEAN` and in each run, and exits non-zero after each injected fault, including a `GRANT`, in `V-FAULTS`                                                                                                                                                                                                                                                             |
+| `M-VISUAL`         | Done. At `7cc95652`: case detail and `/moderation/evidence` in light and dark, at 1280 and 320 pixels, in de-DE and pt-BR, which hold the longest labels, with a long unbroken reason and no horizontal overflow. An erased case at 1280 and 375 pixels at `104ef810`, and in the builder's second walk at `1175a24c`. Only `lang` handling changed on the web after `7cc95652`. This pass found the `lang` defect `P-LANG` now covers |
+| `M-BUNDLE-READ`    | Done: a downloaded bundle read as a compliance reviewer holds no reporter id or erased subject id. It keeps the alias, moderator ids of members who are not erased, and the post id inside `caseId`, as D2 and D8 rule. `P-DOWNLOAD` proves it on raw bytes in each run                                                                                                                                                                |
+| `M-GATE-READ`      | Done: dates, sources and limits are right, no person is named, and the proof commit named there exists in this repository                                                                                                                                                                                                                                                                                                              |
+| `M-PREVIEW-VERIFY` | **Open.** It needs this PR's Preview deployment, and this brief forbids a push. The coordinator read the hosted role on 2026-11-05 (spec CX-6), which is not the same proof. Run `moderation:history:verify` against the Preview database once the PR deploys                                                                                                                                                                          |
+
+### Traceability: acceptance criterion to test file
+
+| AC             | Test files                                                                                                                                                                                                                                                                                                                                                                          |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E1, S1, S2, S3 | `packages/db/test/moderation-history-immutability.spec.ts`, `-function.spec.ts`, `-migration.spec.ts`, `-verifier.spec.ts`, `playwright/tests/moderation-history.spec.ts`                                                                                                                                                                                                           |
+| E2, S4, S5     | `apps/api/integration/moderation-history-erasure.integration.spec.ts`, `-completion`, `-sequential`, `packages/db/test/moderation-history-function.spec.ts`, `playwright/tests/moderation-history.spec.ts`                                                                                                                                                                          |
+| E3, S7         | `apps/api/integration/moderation-history-route.integration.spec.ts`, `-route-period`, `packages/api-client/testing/moderation-history-contract.spec.ts`, `apps/web/src/app/components/moderation-evidence-export.test.tsx`, `pact/http/consumer/web-api-client.pacttest.ts`, `playwright/tests/moderation-history.spec.ts`, `playwright/tests/api/auth-moderation-security.spec.ts` |
+| S6             | `apps/api/integration/moderation-history-retention.integration.spec.ts`, `apps/api/src/modules/moderation/moderation-history.retention.spec.ts`, `apps/api/src/workers/community.bootstrap.spec.ts`, `apps/api/integration/community-worker-release-gate.spec.ts`                                                                                                                   |
+| S8             | `apps/api/integration/moderation-history-route-period.integration.spec.ts`, `apps/web/src/app/components/moderation-evidence-export.test.tsx`, `packages/config/src/flags.spec.ts`, `playwright/tests/moderation-history.spec.ts`                                                                                                                                                   |
+| S9             | `apps/api/integration/moderation-history-gate.spec.ts`, `apps/api/integration/moderation-sla-operations.spec.ts`                                                                                                                                                                                                                                                                    |
+
+The scenario-level map is the Traceability section above.
+Every planned scenario outside the Differences table and the manual checks appears by name in a test that passed in the third run.
+
+### Limits of these proofs
+
+- The hosted Preview outcome is open, as `M-PREVIEW-VERIFY` says.
+- `I-D-ATOMIC` and `I-R-DRIFT-LOG` add triggers or grants the Supabase image's `postgres` cannot, so the whole `apps/api` lane runs on plain Postgres, and the erasure, completion, route and sequential suites also run on the image.
+- `AuditLog` and `CommunityCommentAudit` stay trigger-only by the frozen scope, and the Supabase application role can skip those triggers with `session_replication_role = replica` (TEA-24). The gate record states this.
+
+---
+
 ## Mitigation Plans
 
 - **R-001 Convention only (6).** Build D1 and D2. Verified by `D-IMM-*`, `D-EX-*`.
