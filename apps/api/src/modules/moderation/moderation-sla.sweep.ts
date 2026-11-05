@@ -9,6 +9,7 @@ import {
   type ModerationCaseRisk,
   type ModerationSlaFailureCode,
 } from '@couture/api-client/contracts/http'
+import { createBaseLogger } from '../../logger/pino.config.js'
 import type { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import {
   countModerationCases,
@@ -17,24 +18,36 @@ import {
 import type { ModerationQueuePosition } from './moderation-queue-cursor.js'
 import {
   buildModerationSlaPayload,
+  createModerationOpsChannel,
+  resolveModerationSlaAppUrl,
   type ModerationOpsChannel,
 } from './moderation-sla.channel.js'
 import {
-  MODERATION_SLA_ESCALATE_AT_ATTEMPT,
   ModerationSlaRepository,
   type ClaimedModerationSlaAlert,
   type ModerationSlaClaim,
+  type OwedModerationSlaEscalation,
 } from './moderation-sla.repository.js'
 import { moderationSlaAlertKind, moderationSlaDedupeKey } from './moderation-sla.rules.js'
 import {
   MODERATION_SLA_ANALYTICS_EVENTS,
+  createOpenTelemetryModerationSlaMeter,
   MODERATION_SLA_LOG_EVENTS,
   type ModerationSlaMeter,
 } from './moderation-sla.telemetry.js'
 
 export const MODERATION_SLA_SUBJECT = 'system:moderation-sla'
-/** Thirteen failing 5-second sends would outlive a 60-second lease, so claiming stops here. */
+/** The hosted worker's trigger: it does not subscribe to `maintenance`, so it has no scheduler. */
+export const MODERATION_SLA_SWEEP_INTERVAL_MS = 60_000
+/**
+ * Claiming stops this long after delivery starts. It counts from delivery and not from the sweep,
+ * so a slow detection scan can never use up delivery's share, and every run claims at least once.
+ */
 export const MODERATION_SLA_CLAIM_BUDGET_MS = 45_000
+/** Fixed text: a worker copies an error message into logs and `JobFailure`, so these hold no row data. */
+export const MODERATION_SLA_DETECTION_FAILED = 'moderation_sla_detection_failed'
+export const MODERATION_SLA_CLAIM_FAILED = 'moderation_sla_claim_failed'
+export const MODERATION_SLA_DELIVERY_INCOMPLETE = 'moderation_sla_delivery_incomplete'
 const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000
 
 interface SweepLogger {
@@ -103,8 +116,17 @@ export class ModerationSlaSweep {
     }
 
     const sweepNow = this.deps.clock()
-    await this.detect(sweepNow, result)
+    try {
+      await this.detect(sweepNow, result)
+    } catch (error) {
+      const event = MODERATION_SLA_LOG_EVENTS.detectionFailed
+      this.deps.logger.error({ event, prismaCode: prismaErrorCode(error) }, event)
+      throw new Error(MODERATION_SLA_DETECTION_FAILED)
+    }
     await this.deliver(sweepNow, result)
+    // A run that could not finish delivery must look like one: no stamp and no snapshot, so the
+    // dashboard and the absence alert both show it, and the general worker's retries apply.
+    if (result.errors > 0) throw new Error(MODERATION_SLA_DELIVERY_INCOMPLETE)
     await this.repository.stampMonitor(this.deps.clock(), this.deps.channel.kind)
     await this.publishSignals(sweepNow, result)
     return result
@@ -178,10 +200,12 @@ export class ModerationSlaSweep {
   }
 
   private async deliver(sweepNow: Date, result: ModerationSlaSweepResult): Promise<void> {
-    for (;;) {
+    await this.repairOwedEscalations(result)
+    const startedAt = this.deps.clock().getTime()
+    for (let first = true; ; first = false) {
       const claimNow = this.deps.clock()
-      if (claimNow.getTime() - sweepNow.getTime() >= MODERATION_SLA_CLAIM_BUDGET_MS)
-        return
+      if (!first && claimNow.getTime() - startedAt >= MODERATION_SLA_CLAIM_BUDGET_MS)
+        break
 
       let claim: ModerationSlaClaim | null
       try {
@@ -193,10 +217,9 @@ export class ModerationSlaSweep {
       } catch (error) {
         const event = MODERATION_SLA_LOG_EVENTS.claimFailed
         this.deps.logger.error({ event, prismaCode: prismaErrorCode(error) }, event)
-        result.errors += 1
-        return
+        throw new Error(MODERATION_SLA_CLAIM_FAILED)
       }
-      if (!claim) return
+      if (!claim) break
 
       const { alert } = claim
       if (claim.firstProcessing && alert.kind === 'escalated') {
@@ -209,10 +232,7 @@ export class ModerationSlaSweep {
       }
 
       try {
-        if (claim.interrupted) {
-          this.recordAttemptFailure(alert, 'interrupted')
-          await this.escalateIfDue(alert, 'interrupted')
-        }
+        if (claim.interrupted) this.recordAttemptFailure(alert, 'interrupted')
         await this.attempt(alert, result)
       } catch (error) {
         // The lease stays, so the row returns as `interrupted` once it expires. One alert's
@@ -225,6 +245,7 @@ export class ModerationSlaSweep {
         result.errors += 1
       }
     }
+    await this.repairOwedEscalations(result)
   }
 
   private async attempt(
@@ -254,9 +275,8 @@ export class ModerationSlaSweep {
 
     result.failed += 1
     this.recordAttemptFailure(alert, outcome)
-    // A stale claimant lost the fence: a later worker owns this row, so it raises no alarm.
-    const recorded = await this.repository.recordFailedAttempt(alert, outcome, now)
-    if (recorded) await this.escalateIfDue(alert, outcome)
+    // A stale claimant loses the fence: a later worker owns this row, so nothing is owed by it.
+    await this.repository.recordFailedAttempt(alert, outcome, now)
   }
 
   private recordAttemptFailure(
@@ -271,35 +291,43 @@ export class ModerationSlaSweep {
     )
   }
 
-  /** The established failure path, once per alert. A failed write retries at the next attempt. */
-  private async escalateIfDue(
-    alert: ClaimedModerationSlaAlert,
-    code: ModerationSlaFailureCode
-  ): Promise<void> {
-    if (alert.attempts < MODERATION_SLA_ESCALATE_AT_ATTEMPT || alert.failureEscalatedAt) {
-      return
-    }
-    let escalated: boolean
+  /**
+   * The established failure path, once per alert, on its own record of what is owed: a later
+   * delivery or a crash after the third failure cannot lose it. A failed write stays owed and
+   * retries on the next pass.
+   */
+  private async repairOwedEscalations(result: ModerationSlaSweepResult): Promise<void> {
+    let owed: OwedModerationSlaEscalation[]
     try {
-      escalated = await this.repository.escalateFailure(alert, code, this.deps.clock())
+      owed = await this.repository.owedEscalations()
     } catch (error) {
       const event = MODERATION_SLA_LOG_EVENTS.failureRecordFailed
-      this.deps.logger.error(
-        { event, alertId: alert.id, code, prismaCode: prismaErrorCode(error) },
-        event
-      )
+      this.deps.logger.error({ event, prismaCode: prismaErrorCode(error) }, event)
+      result.errors += 1
       return
     }
-    if (!escalated) return
-    const event = MODERATION_SLA_LOG_EVENTS.deliveryFailed
-    this.deps.logger.error(
-      { event, alertId: alert.id, kind: alert.kind, code, attempts: alert.attempts },
-      event
-    )
-    this.capture(MODERATION_SLA_ANALYTICS_EVENTS.deliveryFailed, {
-      kind: alert.kind,
-      code,
-    })
+    for (const escalation of owed) {
+      const { id: alertId, kind, code, attempts } = escalation
+      let escalated: boolean
+      try {
+        escalated = await this.repository.escalateFailure(
+          escalation,
+          code,
+          this.deps.clock()
+        )
+      } catch (error) {
+        const event = MODERATION_SLA_LOG_EVENTS.failureRecordFailed
+        this.deps.logger.error(
+          { event, alertId, code, prismaCode: prismaErrorCode(error) },
+          event
+        )
+        continue
+      }
+      if (!escalated) continue
+      const event = MODERATION_SLA_LOG_EVENTS.deliveryFailed
+      this.deps.logger.error({ event, alertId, kind, code, attempts }, event)
+      this.capture(MODERATION_SLA_ANALYTICS_EVENTS.deliveryFailed, { kind, code })
+    }
   }
 
   private recordAlertSignal(
@@ -331,6 +359,7 @@ export class ModerationSlaSweep {
       this.deps.meter.setOpenCases('at_risk', counts.atRisk)
       this.deps.meter.setOpenCases('breached', counts.breached)
       this.deps.meter.setOldestPendingReviewAgeSeconds(pendingAgeSeconds)
+      this.deps.meter.setLastMeasuredAt(Math.floor(now.getTime() / 1000))
 
       const nowMs = now.getTime()
       if (
@@ -365,4 +394,18 @@ export class ModerationSlaSweep {
       // Analytics must not change monitor behaviour.
     }
   }
+}
+
+/** One composition for both worker processes, so they cannot drift. */
+export function createModerationSlaSweep(
+  deps: Pick<ModerationSlaSweepDeps, 'prisma' | 'flags' | 'analytics'>
+): ModerationSlaSweep {
+  return new ModerationSlaSweep({
+    ...deps,
+    clock: () => new Date(),
+    channel: createModerationOpsChannel({ url: process.env.MODERATION_OPS_WEBHOOK_URL }),
+    logger: createBaseLogger().child({ feature: 'moderation-sla' }),
+    meter: createOpenTelemetryModerationSlaMeter(),
+    appUrl: resolveModerationSlaAppUrl(),
+  })
 }

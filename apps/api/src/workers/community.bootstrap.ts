@@ -6,7 +6,10 @@ import { FeatureFlagsService } from '../modules/feature-flags/feature-flags.serv
 import { FeatureFlagsRepository } from '../modules/feature-flags/feature-flags.repository.js'
 import type { Worker } from 'bullmq'
 import { createCommunityWorkerRuntime } from '../modules/community/community-worker-runtime'
-import { MODERATION_SLA_SWEEP_INTERVAL_MS } from '../modules/moderation/moderation-sla.scheduler'
+import {
+  createModerationSlaSweep,
+  MODERATION_SLA_SWEEP_INTERVAL_MS,
+} from '../modules/moderation/moderation-sla.sweep'
 import { PostHogService } from '../posthog/posthog.service.js'
 import { TelemetryService } from '../modules/telemetry/telemetry.service.js'
 import { createBaseLogger } from '../logger/pino.config.js'
@@ -128,15 +131,20 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
     // Readiness first, consumption second. `createCommunityWorkerRuntime`
     // resolves only once the selected screener has loaded and verified whatever
     // it needs, so no job is ever screened by a half-built engine.
+    const runtimeFlags = new FeatureFlagsService(
+      new FeatureFlagsRepository(prisma),
+      posthogService,
+      new CommunityFlagEvaluationService(prisma, posthogService)
+    )
     const community = await createCommunityWorkerRuntime({
       prisma,
       telemetryService,
-      analytics: posthogService,
-      featureFlags: new FeatureFlagsService(
-        new FeatureFlagsRepository(prisma),
-        posthogService,
-        new CommunityFlagEvaluationService(prisma, posthogService)
-      ),
+      featureFlags: runtimeFlags,
+      moderationSla: createModerationSlaSweep({
+        prisma,
+        flags: runtimeFlags,
+        analytics: posthogService,
+      }),
     })
     state.workers.push(community.worker)
     state.closeRuntime = async () => {

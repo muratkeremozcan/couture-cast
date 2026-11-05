@@ -93,8 +93,14 @@ Do not create alerts from placeholder Text panels.
 Moderation SLA (Story 6.12):
 
 - `CoutureCast Moderation SLA` charts `moderation_sla_open_cases`,
-  `moderation_sla_oldest_pending_review_age_seconds`, `moderation_sla_alerts_total`
+  `moderation_sla_oldest_pending_review_age_seconds`,
+  `moderation_sla_last_measured_timestamp_seconds`, `moderation_sla_alerts_total`
   and `moderation_sla_delivery_failures_total`.
+- A synchronous gauge re-exports its last value with a fresh timestamp, so the case
+  and pending-review panels gate on the measurement time and go empty after 300
+  seconds, and one panel shows the age.
+- The webhook POST runs with tracing suppressed, because auto-instrumentation copies
+  a request URL into span attributes and that URL is a secret.
 - The general worker now starts the OpenTelemetry SDK, so these metrics export from
   the local stack.
 - The hosted community worker omits the SDK for its 150 MB image budget, so the

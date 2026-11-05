@@ -77,11 +77,12 @@ The `Idempotency-Key` header carries that id, so a receiver can drop the repeat.
 
 ## Stale monitor
 
-`/moderation/sla` shows a red banner when the last sweep is older than 5 minutes.
-No alert goes out while this holds, and the banner comes from the API, so it needs no worker.
+`/moderation/sla` shows a red banner when the last completed sweep is older than 5 minutes.
+The banner comes from the API, so it needs no worker.
+A running worker can cause it too: a sweep that cannot read cases, claim alerts or record an outcome ends without its stamp, and alerts may be stuck.
 
 1. Check the flags. The worker evaluates `moderation_sla_monitoring_enabled` and `moderation_console_enabled` for the subject `system:moderation-sla`. A rule that targets only moderators opens the page and leaves the worker off, and the banner is then correct.
-2. Check that the hosted worker `couture-cast/community-worker` is running on Northflank, and read its logs for `community_sweep_failed` and `moderation_sla_flag_unavailable`.
+2. Check that the hosted worker `couture-cast/community-worker` is running on Northflank, and read its logs for `community_sweep_failed`, `moderation_sla_detection_failed`, `moderation_sla_claim_failed`, `moderation_sla_alert_processing_failed` and `moderation_sla_flag_unavailable`. A `prismaCode` field names a database failure.
 3. Restart the worker if it is down.
 4. Work the queue by hand from `/moderation` until the banner clears. Alerts missed during the outage are detected on the first sweep back. A case that passed its due time alerts as `breached` only.
 
@@ -91,7 +92,8 @@ The same page shows the oldest post waiting in `pending_review`, which is the si
 
 `/moderation/sla` counts failing alerts and names the last error of each.
 Attempts retry after 1, 2, 4, 8, 16, then every 30 minutes while the case is still open.
-The third failed attempt writes one `JobFailure` row, the error log `moderation_sla_delivery_failed` and a PostHog event of the same name.
+The third failed attempt owes one `JobFailure` row, the error log `moderation_sla_delivery_failed` and a PostHog event of the same name.
+They are written in the same sweep, or a later one if that write fails, even if the alert has delivered by then.
 
 1. Run the drill to confirm: `npm run moderation:sla:drill -- --env-file .env.prod`.
 2. Fix the webhook or its destination. Alerts still relevant then deliver by themselves, with no operator step.
@@ -156,4 +158,4 @@ When the flag returns, rows whose case closed are marked superseded and never se
 - `/moderation/sla`: the operator view. It needs no worker, and it is the only view that shows every alert.
 - PostHog project `couturecast-prod`: [Moderation SLA dashboard](https://us.posthog.com/project/329012/dashboard/2307559), from the hosted worker's events.
 - PostHog alert `Moderation SLA monitor stopped` on the [heartbeat insight](https://us.posthog.com/project/329012/insights/PMQhTqjE): fires when an hour has no `moderation_sla_snapshot`. It is the only push signal for a dead monitor, and it is disabled until step 6 of the rollout, because the flag-off monitor sends no events. It emails its subscribers. Replace the placeholder subscriber with the on-duty responder at rollout.
-- Grafana `CoutureCast Moderation SLA`: local stack only, because the hosted image omits the OpenTelemetry SDK. See [observability](./observability.md).
+- Grafana `CoutureCast Moderation SLA`: local stack only, because the hosted image omits the OpenTelemetry SDK. Its case and pending-review panels go empty when `Measurement age` passes 300 seconds, because a gauge repeats its last value with fresh timestamps. See [observability](./observability.md).

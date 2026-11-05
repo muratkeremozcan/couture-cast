@@ -308,9 +308,20 @@ export async function listModerationCases(
   }))
 }
 
+/** A row of `ModerationDecision` that decides a scored case. An orphan also matches by its report. */
+const decidesCaseSql = (alias: string) =>
+  Prisma.raw(`${alias}.action::text IN ('resolve', 'release', 'takedown', 'ban', 'escalate')
+              AND (
+                ${alias}.case_key = scored.case_key
+                OR (scored.case_key LIKE 'orphan-%'
+                  AND ${alias}.report_ids @> ARRAY[split_part(scored.case_key, '.', 2)])
+              )`)
+
 /**
  * The open cases by SLA state, in SQL over the same CTE as the queue. `escalated` is the count of
- * open cases `escalatedCaseKeys` would mark: the newest deciding row is an escalation.
+ * open cases `escalatedCaseKeys` would mark. `inDecisionOrder` places rows by time across case keys
+ * and restores sequence order inside each key, so the newest row by time picks the key, and that
+ * key's highest sequence is the logical latest decision, whatever the instances' clocks said.
  */
 export async function countModerationCases(
   client: CaseQueryClient,
@@ -331,14 +342,15 @@ export async function countModerationCases(
         count(*) FILTER (WHERE sla_state = 'at_risk')::int AS at_risk,
         count(*) FILTER (WHERE sla_state = 'breached')::int AS breached,
         count(*) FILTER (WHERE (
-          SELECT d.action::text FROM "ModerationDecision" d
-          WHERE d.action::text IN ('resolve', 'release', 'takedown', 'ban', 'escalate')
-            AND (
-              d.case_key = scored.case_key
-              OR (scored.case_key LIKE 'orphan-%'
-                AND d.report_ids @> ARRAY[split_part(scored.case_key, '.', 2)])
+          SELECT latest.action::text FROM "ModerationDecision" latest
+          WHERE ${decidesCaseSql('latest')}
+            AND latest.case_key = (
+              SELECT head.case_key FROM "ModerationDecision" head
+              WHERE ${decidesCaseSql('head')}
+              ORDER BY head.decided_at DESC, head.sequence DESC
+              LIMIT 1
             )
-          ORDER BY d.decided_at DESC, d.sequence DESC
+          ORDER BY latest.sequence DESC
           LIMIT 1
         ) = 'escalate')::int AS escalated,
         to_char(min(due), ${DUE_KEY_FORMAT}) AS oldest_due_text

@@ -11,11 +11,11 @@ import {
   COMMUNITY_ERASURE_JOB_NAME,
   COMMUNITY_BAN_EXPIRY_JOB_NAME,
 } from '../modules/community/community-maintenance.scheduler'
-import { MODERATION_SLA_SWEEP_JOB_NAME } from '../modules/moderation/moderation-sla.scheduler'
 import {
   ADMIN_JOB_FAILURE_PRUNE_JOB_NAME,
   FEATURE_FLAGS_SYNC_JOB_NAME,
   GUARDIAN_EMANCIPATION_JOB_NAME,
+  MODERATION_SLA_SWEEP_JOB_NAME,
   TELEMETRY_EVENT_PRUNE_JOB_NAME,
   WARDROBE_RETENTION_PURGE_JOB_NAME,
 } from './maintenance.scheduler'

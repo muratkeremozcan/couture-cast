@@ -35,7 +35,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 6,
+        "w": 5,
         "x": 0,
         "y": 0
       },
@@ -60,7 +60,7 @@
             "uid": "grafanacloud-couturecastobservability-prom"
           },
           "editorMode": "code",
-          "expr": "sum(moderation_sla_open_cases{service_name=\"couturecast-api\",state=\"breached\"})",
+          "expr": "sum(moderation_sla_open_cases{service_name=\"couturecast-api\",state=\"breached\"}) and on() (time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"}) < 300)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -91,8 +91,8 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 6,
-        "x": 6,
+        "w": 5,
+        "x": 5,
         "y": 0
       },
       "id": 2,
@@ -116,7 +116,7 @@
             "uid": "grafanacloud-couturecastobservability-prom"
           },
           "editorMode": "code",
-          "expr": "sum(moderation_sla_open_cases{service_name=\"couturecast-api\",state=\"at_risk\"})",
+          "expr": "sum(moderation_sla_open_cases{service_name=\"couturecast-api\",state=\"at_risk\"}) and on() (time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"}) < 300)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -147,8 +147,8 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 6,
-        "x": 12,
+        "w": 5,
+        "x": 10,
         "y": 0
       },
       "id": 3,
@@ -172,7 +172,7 @@
             "uid": "grafanacloud-couturecastobservability-prom"
           },
           "editorMode": "code",
-          "expr": "sum(moderation_sla_open_cases{service_name=\"couturecast-api\",state=\"on_track\"})",
+          "expr": "sum(moderation_sla_open_cases{service_name=\"couturecast-api\",state=\"on_track\"}) and on() (time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"}) < 300)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -203,8 +203,8 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 6,
-        "x": 18,
+        "w": 5,
+        "x": 15,
         "y": 0
       },
       "id": 4,
@@ -228,7 +228,7 @@
             "uid": "grafanacloud-couturecastobservability-prom"
           },
           "editorMode": "code",
-          "expr": "max(moderation_sla_oldest_pending_review_age_seconds{service_name=\"couturecast-api\"})",
+          "expr": "max(moderation_sla_oldest_pending_review_age_seconds{service_name=\"couturecast-api\"}) and on() (time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"}) < 300)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -236,6 +236,67 @@
       ],
       "title": "Oldest pending review (s)",
       "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-couturecastobservability-prom"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "id": 9,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-couturecastobservability-prom"
+          },
+          "editorMode": "code",
+          "expr": "time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Measurement age (s)",
+      "type": "stat",
+      "description": "Seconds since a sweep last measured the open cases. Over 300, the gauge panels go empty on purpose: their last values would otherwise repeat with fresh timestamps."
     },
     {
       "datasource": {
@@ -285,7 +346,7 @@
             "uid": "grafanacloud-couturecastobservability-prom"
           },
           "editorMode": "code",
-          "expr": "sum by (state) (moderation_sla_open_cases{service_name=\"couturecast-api\"})",
+          "expr": "sum by (state) (moderation_sla_open_cases{service_name=\"couturecast-api\"}) and on() (time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"}) < 300)",
           "legendFormat": "{{state}}",
           "range": true,
           "refId": "A"
@@ -456,7 +517,7 @@
             "uid": "grafanacloud-couturecastobservability-prom"
           },
           "editorMode": "code",
-          "expr": "max(moderation_sla_oldest_pending_review_age_seconds{service_name=\"couturecast-api\"})",
+          "expr": "max(moderation_sla_oldest_pending_review_age_seconds{service_name=\"couturecast-api\"}) and on() (time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"}) < 300)",
           "legendFormat": "age",
           "range": true,
           "refId": "A"

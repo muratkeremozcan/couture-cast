@@ -16,6 +16,10 @@ export const MODERATION_QUEUE_READ_TABLES = Object.freeze([
   'CommunityCommentAudit',
   'ModerationDecision',
   'CommunitySanction',
+] as const)
+
+/** Story 6.12: the monitor's tables, which no queue read touches. The same RLS proof covers them. */
+export const MODERATION_SLA_TABLES = Object.freeze([
   'ModerationSlaAlert',
   'ModerationSlaMonitor',
 ] as const)

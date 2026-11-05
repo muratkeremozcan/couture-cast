@@ -226,8 +226,8 @@ Decisions made while building:
 - Route: the bmad-build gate selects the subagent route for a change this size. I implemented directly as the named fleet peer `cc612-builder`, because TEA and the coordinator address this pane for commit windows and findings, and a subagent could receive neither. The review step stays with TEA per commit and the coordinator's Codex review.
 - `moderation_sla_monitoring_enabled` is read first, then `moderation_console_enabled`, each once per sweep.
 - `listModerationCases` and `countModerationCases` are free functions over one `scoredCasesSql`, so the decision transaction can read through its own client with no new constructor dependency. `ModerationQueueRepository.listCases` delegates to it.
-- `escalated` in `queue` orders by `decided_at`, then `sequence`. `inDecisionOrder` agrees except under clock skew between API instances, and only one decision per case runs at a time under the case lock.
-- `recordFailedAttempt` and the escalation are separate writes, so a failed escalation leaves the attempt counted and retries at the next attempt (D9).
+- `escalated` in `queue` selects the same logical latest decision as `escalatedCaseKeys`: the newest row by `decided_at`, then `sequence`, picks the case key, and that key's highest `sequence` decides (CX-6).
+- `recordFailedAttempt` and the escalation are separate writes, so a failed escalation leaves the attempt counted. `failure_owed_code` is written with the third failure, and a repair pass at the start and end of delivery escalates every owed row in any delivery state (CX-4).
 - The webhook line is hidden while the monitor is stale, because it would contradict the banner.
 - Refresh moved to the page header, because a phone needed about 2500 pixels of scrolling to reach it.
 - The drill runs under `tsx` and reads both modules from the default export, because `apps/api` and `packages/api-client` load as CommonJS there.
@@ -283,6 +283,17 @@ Full evidence is in `_bmad-output/test-artifacts/test-design/cc612-sla-monitorin
 - TEA-18 Tasks, Verification, Design Notes. Five integration specs and one crash worker, and a budget of about 86 files.
 - TEA-19 Residual, no change. D6 supersedes on a resolved anchor, and `resolveReport` could resolve one report of a case. It has no production caller at `3efd8423`. A story that wires it must move `escalated` relevance to the case.
 - TEA-20 Acceptance. "Touches no table" reads as no table of this feature and no report table. The flag fallback read of `FeatureFlag` is the one permitted read.
+
+Codex round 1 on `6b438525`, recorded 2026-11-05. Each item amends a frozen sentence by the same rule as the TEA rulings.
+
+- CX-1 **(intent)** D8. The POST runs under `suppressTracing`, because starting the SDK in the general worker exported the webhook URL as span attributes. `@opentelemetry/core` joins the API's dependencies and the hosted image stays free of the SDK. KEEP: the HTTP client metric still carries `server.address`, the webhook host, with no path or query.
+- CX-2 **(intent)** amends TEA-01. The 45-second claim budget counts from the start of delivery, and every run claims at least once, because a detection scan of 45 seconds starved delivery forever while the monitor looked fresh. A run's length is then detection plus the budget. State and relevance still use the one sweep clock read.
+- CX-3 **(intent)** D5, TEA-13. A failed detection or claim rejects the sweep at once. An alert-processing error lets the batch finish, then rejects. All use fixed text with no row data, write no stamp and no snapshot, and keep BullMQ's retries. Detected rows stay.
+- CX-4 **(intent)** D4, D9, TEA-04. New column `failure_owed_code`, written in the fenced failed-attempt write once `attempts` reaches 3, or by a claim that finds an expired lease and takes `attempts` to 3 or more, as TEA-04 rules, because a crash loop reaches no failure write. Two failures and then a success owe nothing. A repair pass escalates owed rows whatever their delivery state. Known bound: a crash between the commit of the stamp and the log and PostHog event loses that event, and the `JobFailure` row stays.
+- CX-5 **(intent)** D13. New gauge `moderation_sla_last_measured_timestamp_seconds`, set only after the counts read succeeds. Panels on case counts and pending-review age gate on an age under 300 seconds, and one panel shows the age.
+- Build fixes found by the full API suite, which the story's filtered runs missed: `CommunityWorkerRuntime` takes the sweep from each bootstrap through `createModerationSlaSweep`, because U-D-MODULE-WIRING keeps the community directory free of moderation imports. The SLA tables move to `MODERATION_SLA_TABLES`, because U-Q-READSET lists what queue reads touch, and the RLS suite proves both lists. The job constants and `registerModerationSlaScheduler` move into `workers/maintenance.scheduler.ts`.
+- CX-6 **(intent)** D11, TEA-09. The escalated count selects the logical latest decision by case key and sequence. The earlier note accepting clock-skew disagreement is removed.
+
 
 ## Review Triage Log
 

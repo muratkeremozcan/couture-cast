@@ -9804,16 +9804,17 @@ Key takeaways:
 4. **Never hold a transaction across a POST.**
    Each claim is one row in one short transaction, using `FOR UPDATE SKIP LOCKED` and a 60-second lease from a fresh clock read.
    The outcome write is fenced on the claimed `attempts`, so a worker that lost its lease cannot overwrite a later one or raise a false alarm.
-   Claiming stops 45 seconds after the sweep began, because 13 failing 5-second sends would outlive the lease.
+   Claiming stops 45 seconds after delivery starts, and every run claims at least once, so a slow detection scan cannot starve delivery.
    A crash between the POST and the write repeats a send with the same id, which is the honest at-least-once bound, and the `Idempotency-Key` header lets a receiver drop it.
 5. **Relevance is checked at send.**
    An alert whose anchor report is resolved or gone, or an `at_risk` alert past its due time, becomes `superseded` and is never sent.
    A backlog after an outage or after the flag opens therefore announces only live problems.
 6. **Delivery failure uses the established path.**
    Each failed attempt logs and counts, with backoff of 1, 2, 4, 8, 16, then 30 minutes.
-   The third writes one `JobFailure` row with a stamp in one transaction, plus an error log and a PostHog event, as `recordStallAlert` does.
+   The third records `failure_owed_code` in the same fenced write, and a repair pass then writes one `JobFailure` row with a stamp in one transaction, plus an error log and a PostHog event, as `recordStallAlert` does.
+   Owed work has its own column, so a later delivery or a crash after the third failure cannot lose it.
    Attempts continue, so a recovered channel catches up with no operator step.
-   A crash loop never reaches a failure write, so a claim that finds an expired lease records `interrupted` and runs the same escalation.
+   A crash loop never reaches a failure write, so a claim that finds an expired lease records `interrupted` and owes the same escalation.
 7. **Escalation commits with its decision.**
    The insert sits in `applyDecision` after `writeRecord`, through `writeModerationRecord`, so a failure rolls the decision back to 503 `audit_unavailable`.
    A replay writes nothing, and re-escalating is a new decision and a new alert.
@@ -9827,8 +9828,10 @@ Key takeaways:
    With no URL the console is the channel, and the dashboard says that nobody is notified.
 10. **The webhook URL is a secret, so errors are too.**
     `fetch` prints a credentials URL in its error message, so the URL is validated before any call and only a closed code leaves the adapter.
+    Auto-instrumentation copies a request URL into span attributes, so the POST also runs with tracing suppressed.
 11. **A monitor must report its own death from somewhere else.**
-    `ModerationSlaMonitor` is stamped at the end of each sweep, and the API serves `stale` from it with no worker running.
+    `ModerationSlaMonitor` is stamped only at the end of a sweep that finished delivery, and the API serves `stale` from it with no worker running.
+    A failed claim or outcome write rejects the sweep with fixed text, so a broken worker that is still running reads as stopped.
     The only push path is a PostHog alert on `moderation_sla_snapshot`, which stays disabled until rollout because a flag-off monitor sends no events.
 12. **Bind time as text.**
     A JS `Date` binds as `timestamptz` and shifts a `timestamp` comparison by the session offset, 6 hours on a Chicago session.
@@ -9863,6 +9866,18 @@ Hard-won lessons from the implementation and review of this story:
     `next build` with `WEB_NEXT_DIST_DIR` rewrote `apps/web/tsconfig.json`, so the walk's tree needs cleaning before any commit.
 11. **Workspace packages can read as CommonJS under tsx.**
     The drill's named imports failed on both packages, so it reads them from the default export.
+12. **Starting an SDK changes what every request exports.**
+    Codex found the webhook URL in trace attributes the day the general worker started OpenTelemetry, and the OTLP test could not see it because it discarded traces.
+    A privacy test must read every signal the process exports.
+13. **Happy-path counters can report a dead pipeline as healthy.**
+    A failed claim counted an error and returned, so the stamp, the snapshot and the job's success all said fine while nothing was sent.
+    Success must be earned by the work finishing.
+14. **Owed work needs its own record.**
+    Inferring an owed escalation from a state that later outcomes clear means a success can erase it.
+15. **A budget shared by two phases belongs to the first.**
+    A sweep-wide budget let detection spend all of delivery's time, so each phase with a promise needs its own.
+16. **A gauge's timestamp says when it was exported, not when it was measured.**
+    Grafana showed an old zero with a fresh time, so the panels now gate on a published measurement time.
 
 Story/Task mapping:
 
@@ -9921,7 +9936,7 @@ Task owner map:
 - Story 6.12 Task 6 step 5 owner: name metrics and log events in `apps/api/src/modules/moderation/moderation-sla.telemetry.ts`.
 - Story 6.12 Task 7 step 1 owner: insert the alert in `applyDecision` in `apps/api/src/modules/moderation/moderation-decisions.service.ts`.
 - Story 6.12 Task 8 step 1 owner: guard and route in `apps/api/src/modules/moderation/moderation-sla.controller.ts`, with the projection in `moderation-sla.service.ts`.
-- Story 6.12 Task 9 step 1 owner: register the job in `apps/api/src/modules/moderation/moderation-sla.scheduler.ts`, route it in `apps/api/src/workers/maintenance.processor.ts` and run the interval in `community.bootstrap.ts`.
+- Story 6.12 Task 9 step 1 owner: register the job in `apps/api/src/workers/maintenance.scheduler.ts`, route it in `maintenance.processor.ts`, and run the interval in `community.bootstrap.ts`, both from `createModerationSlaSweep`.
 - Story 6.12 Task 10 step 1 owner: read the route from the web in `apps/web/src/lib/moderation.ts` and render it in `apps/web/src/app/components/moderation-sla-dashboard.tsx`.
 - Story 6.12 Task 11 step 1 owner: chart real metrics in `infra/grafana/dashboards/couturecast-moderation-sla.json`.
 - Story 6.12 Task 12 step 1 owner: write response steps in `_bmad-output/project-knowledge/moderation-sla-runbook.md`, with the drill in `scripts/moderation-sla-drill.mjs`.
@@ -9941,7 +9956,7 @@ API integration tests, against real PostgreSQL with a real local HTTP server:
 - [`apps/api/integration/moderation-sla-delivery.integration.spec.ts`](../../apps/api/integration/moderation-sla-delivery.integration.spec.ts): proves real delivery of each kind, failure escalation, recovery, the crash loop and the privacy canary.
 - [`apps/api/integration/moderation-sla-escalate.integration.spec.ts`](../../apps/api/integration/moderation-sla-escalate.integration.spec.ts): proves the alert commits with its decision or rolls back with it.
 - [`apps/api/integration/moderation-sla-route.integration.spec.ts`](../../apps/api/integration/moderation-sla-route.integration.spec.ts): proves the role and flag matrix and each count.
-- [`apps/api/integration/moderation-sla-docs.spec.ts`](../../apps/api/integration/moderation-sla-docs.spec.ts) and [`apps/api/integration/moderation-sla-drill.spec.ts`](../../apps/api/integration/moderation-sla-drill.spec.ts): prove the runbook, the dashboard's metric names and the drill.
+- [`apps/api/integration/moderation-sla-operations.spec.ts`](../../apps/api/integration/moderation-sla-operations.spec.ts): proves the runbook, the dashboard's metric names and the drill.
 
 Contract and database tests:
 

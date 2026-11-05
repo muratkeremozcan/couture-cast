@@ -21,10 +21,13 @@ import { WardrobeRetentionService } from '../modules/wardrobe/wardrobe-retention
 import { SupabaseWardrobeStorageAdapter } from '../modules/wardrobe/wardrobe-storage.adapter'
 import { createCommunityWorkerRuntime } from '../modules/community/community-worker-runtime'
 import { registerCommunityMaintenanceSchedulers } from '../modules/community/community-maintenance.scheduler'
-import { registerModerationSlaScheduler } from '../modules/moderation/moderation-sla.scheduler'
+import { createModerationSlaSweep } from '../modules/moderation/moderation-sla.sweep'
 import { initializeOpenTelemetry, shutdownOpenTelemetry } from '../instrumentation'
 import { createMaintenanceProcessor } from './maintenance.processor'
-import { registerMaintenanceSchedulers } from './maintenance.scheduler'
+import {
+  registerMaintenanceSchedulers,
+  registerModerationSlaScheduler,
+} from './maintenance.scheduler'
 import { createQueues, queueConfigs } from '../config/queues'
 import { getRedisConfig, redisOptionsFromConfig } from '../config/redis'
 import { AlertFanoutProcessor } from '../modules/alerts/alert-fanout.processor'
@@ -309,15 +312,20 @@ export async function startWorkers(state: WorkerProcessState) {
     // so the two process groups cannot drift.
     // Awaited, because a BullMQ worker consumes the moment it is constructed
     // and the screener behind it may still be loading and verifying a model.
+    const runtimeFlags = new FeatureFlagsService(
+      new FeatureFlagsRepository(prisma),
+      posthogService,
+      new CommunityFlagEvaluationService(prisma, posthogService)
+    )
     const community = await createCommunityWorkerRuntime({
       prisma,
       telemetryService,
-      analytics: posthogService,
-      featureFlags: new FeatureFlagsService(
-        new FeatureFlagsRepository(prisma),
-        posthogService,
-        new CommunityFlagEvaluationService(prisma, posthogService)
-      ),
+      featureFlags: runtimeFlags,
+      moderationSla: createModerationSlaSweep({
+        prisma,
+        flags: runtimeFlags,
+        analytics: posthogService,
+      }),
     })
     closeables.push({
       close: () => community.close(),

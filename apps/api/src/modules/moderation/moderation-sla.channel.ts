@@ -1,6 +1,9 @@
 // Story 6.12 owner: the operations channel in `apps/api/src/modules/moderation/moderation-sla.channel.ts`.
 // The webhook URL is a secret. `fetch` prints a credentials URL in its error text, so the URL is
-// validated before any call and no exception text ever leaves this file.
+// validated before any call and no exception text ever leaves this file. Auto-instrumentation copies
+// a request URL into span attributes, so the POST also runs with tracing suppressed.
+import { context } from '@opentelemetry/api'
+import { suppressTracing } from '@opentelemetry/core'
 import type {
   ModerationCaseRisk,
   ModerationCaseSource,
@@ -67,18 +70,20 @@ export function createModerationOpsChannel(options: {
     async deliver(payload) {
       if (!usable) return 'invalid_config'
       try {
-        const response = await send(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': payload.id,
-          },
-          body: JSON.stringify(payload),
-          // A manual redirect exposes the status. `redirect: 'error'` throws with none, and no
-          // redirect is followed either way.
-          redirect: 'manual',
-          signal: AbortSignal.timeout(timeoutMs),
-        })
+        const response = await context.with(suppressTracing(context.active()), () =>
+          send(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Idempotency-Key': payload.id,
+            },
+            body: JSON.stringify(payload),
+            // A manual redirect exposes the status. `redirect: 'error'` throws with none, and no
+            // redirect is followed either way.
+            redirect: 'manual',
+            signal: AbortSignal.timeout(timeoutMs),
+          })
+        )
         await response.body?.cancel().catch(() => undefined)
         return response.ok ? 'delivered' : failureCodeForStatus(response.status)
       } catch (error) {

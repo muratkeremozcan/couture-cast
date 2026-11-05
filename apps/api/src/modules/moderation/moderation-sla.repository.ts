@@ -26,8 +26,9 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 /** Longer than one 5-second send, so a live attempt keeps its row. */
 export const MODERATION_SLA_LEASE_MS = 60_000
-/** At this many attempts a delivery failure escalates, once. */
+/** At this many failed attempts a delivery failure escalates, once. */
 export const MODERATION_SLA_ESCALATE_AT_ATTEMPT = 3
+const OWED_ESCALATION_BATCH = 100
 
 export const moderationSlaFailureJobId = (alertId: string) =>
   `moderation_sla_delivery__${alertId}`
@@ -56,6 +57,13 @@ export interface ClaimedModerationSlaAlert {
   /** The value this claim wrote, which fences the outcome write. */
   attempts: number
   failureEscalatedAt: Date | null
+}
+
+export interface OwedModerationSlaEscalation {
+  id: string
+  kind: ModerationSlaAlertKind
+  attempts: number
+  code: ModerationSlaFailureCode
 }
 
 export type ModerationSlaClaim =
@@ -260,6 +268,12 @@ export class ModerationSlaRepository {
           attempts,
           lease_until: new Date(input.claimNow.getTime() + MODERATION_SLA_LEASE_MS),
           ...(interrupted ? { last_error_code: 'interrupted' } : {}),
+          // A crash loop reaches no failure write, so this claim owes it before it sends (TEA-04).
+          ...(interrupted &&
+          attempts >= MODERATION_SLA_ESCALATE_AT_ATTEMPT &&
+          !row.failure_escalated_at
+            ? { failure_owed_code: 'interrupted' }
+            : {}),
         },
       })
       return {
@@ -296,18 +310,39 @@ export class ModerationSlaRepository {
         last_error_code: code,
         lease_until: null,
         next_attempt_at: new Date(now.getTime() + moderationSlaBackoffMs(alert.attempts)),
+        // In this one write, so a crash right after it still owes the escalation.
+        ...(alert.attempts >= MODERATION_SLA_ESCALATE_AT_ATTEMPT &&
+        !alert.failureEscalatedAt
+          ? { failure_owed_code: code }
+          : {}),
       },
     })
     return result.count === 1
   }
 
+  /** Every escalation still owed, whatever the alert's delivery state has become since. */
+  async owedEscalations(): Promise<OwedModerationSlaEscalation[]> {
+    const rows = await this.prisma.moderationSlaAlert.findMany({
+      where: { failure_owed_code: { not: null }, failure_escalated_at: null },
+      orderBy: { id: 'asc' },
+      take: OWED_ESCALATION_BATCH,
+      select: { id: true, kind: true, attempts: true, failure_owed_code: true },
+    })
+    return rows.map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      attempts: row.attempts,
+      code: row.failure_owed_code as ModerationSlaFailureCode,
+    }))
+  }
+
   /**
    * Stamps the alert and writes its one `JobFailure` row together, the established operator record
-   * (`recordStallAlert`). False when another attempt already did. A thrown write leaves the stamp
-   * null, so the next attempt tries again.
+   * (`recordStallAlert`). False when another worker already did. A thrown write leaves the stamp
+   * null, so the next repair pass tries again.
    */
   escalateFailure(
-    alert: ClaimedModerationSlaAlert,
+    alert: Pick<OwedModerationSlaEscalation, 'id' | 'kind' | 'attempts'>,
     code: ModerationSlaFailureCode,
     now: Date
   ): Promise<boolean> {
