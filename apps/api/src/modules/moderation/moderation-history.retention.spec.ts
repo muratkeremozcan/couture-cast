@@ -175,6 +175,14 @@ describe('source scans', () => {
     }
   })
 
+  it('[U-W-BOTH-PATHS] builds the job from one factory on both worker paths', () => {
+    for (const file of [
+      'apps/api/src/workers/bootstrap.ts',
+      'apps/api/src/workers/community.bootstrap.ts',
+    ])
+      expect(read(file), file).toMatch(/\bcreateModerationHistoryRetention\(\{/)
+  })
+
   it('[V-SAME-SOURCE] gives the script and the sweep one check list', () => {
     const module = 'moderation-history.enforcement'
     expect(read('scripts/verify-moderation-history.mjs')).toContain(module)
