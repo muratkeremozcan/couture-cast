@@ -1,6 +1,6 @@
 # Moderation SLA runbook
 
-Updated: 2026-11-05 - created for Story 6.12.
+Updated: 2026-11-05 - created for Story 6.12, staffing sign-off recorded by Story 6.13.
 
 This runbook covers the at-risk, breach and escalation alerts for moderation cases.
 Every report carries a 24-hour review target.
@@ -10,7 +10,7 @@ The definition lives in `deriveSlaState` in `@couture/api-client`.
 ## Roles
 
 This runbook names roles only.
-The coverage table below is empty until the release owner fills it.
+The coverage table below stays empty until the release owner chooses to fill it.
 
 ### Community moderator
 
@@ -31,13 +31,15 @@ Handles a stale monitor and a failing channel, and pulls in a moderator or an ad
 ### Release owner
 
 Decides rollout and rollback of the flags.
-Sets the webhook, assigns the coverage table and signs the Community Beta gate item.
+Sets the webhook, assigns the coverage table and decides the Community Beta gate items.
+The owner signed off moderation staffing on 2026-11-05, as Coverage records.
 
 ## Coverage
 
-Open under Story 6.12 D16: staffing coverage and named ownership are not proved.
-No staff exist to name, so this story does not claim this Community Beta gate signature.
-It stays unsigned until the release owner fills every row.
+Signed off by the owner on 2026-11-05. Source: the owner's statement that staffing is ok, relayed by the coordinator in the Story 6.13 fleet rules.
+This closes the coverage sign-off Story 6.12 D16 left open, and the signature is recorded in [the Community Beta gate record](../test-artifacts/community-beta-gate-signatures.md).
+The sign-off rests on the owner's statement and on the roles above.
+No roster or schedule exists, so the table below stays blank.
 
 | Role                | Assignee | Hours covered |
 | ------------------- | -------- | ------------- |

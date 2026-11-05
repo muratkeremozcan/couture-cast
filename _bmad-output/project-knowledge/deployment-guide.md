@@ -365,7 +365,8 @@ Deploy sequence:
    the selector, engine version, policy version, model hash, backend and startup duration, before
    enabling community writes.
 5. Leave `community_read_enabled` and `community_write_enabled` disabled. Model readiness authorizes
-   one gate signature and Story 6.2b records it; seven other signatures remain open.
+   one gate signature and Story 6.2b records it. The current state of every signature is in the
+   [Community Beta gate record](../test-artifacts/community-beta-gate-signatures.md).
 
 Startup rejects a missing artifact, a changed hash, a diverging threshold, an unexpected class-name
 set, an unapproved policy, or an unusable selector before the BullMQ consumer is constructed. That
@@ -892,8 +893,54 @@ Follow the rollout and rollback steps in the [moderation SLA runbook](./moderati
     operational signals. The moderation SLA dashboard has real metrics locally, and its hosted
     panels stay empty because neither hosted runtime starts the OpenTelemetry SDK.
 11. **No moderation alert reaches a person in production yet.** `MODERATION_OPS_WEBHOOK_URL` has no
-    production destination, so alerts stop at `/moderation/sla`, and staffing coverage is unsigned
-    (Story 6.12 D8, D16).
+    production destination, so alerts stop at `/moderation/sla` (Story 6.12 D8). The owner signed off
+    staffing on 2026-11-05, and no roster or schedule exists
+    ([gate record](../test-artifacts/community-beta-gate-signatures.md)).
+
+### Story 6.13 moderation history
+
+Migration `20261105150000_immutable_moderation_history` goes live on deploy, with no flag.
+It makes the role `moderation_history_owner` the owner of `ModerationDecision`.
+The application role keeps `SELECT` and `INSERT`, and `anon`, `authenticated` and `service_role` hold nothing.
+Three triggers refuse `UPDATE`, `DELETE` and `TRUNCATE` for everyone, and the one exception removes identity: a foreign key `SET NULL` action, or `private.moderation_history_anonymize`, which needs the privacy guard and an erasure request row.
+The migrating role needs `CREATEROLE` and `BYPASSRLS`, and without them the build fails and leaves nothing behind.
+The application role reads this table through `BYPASSRLS`, now that it does not own it.
+
+Check it with `npm run moderation:history:verify`, which reads the catalog through `DATABASE_URL` and prints check names only.
+The daily retention job runs the same checks and logs `moderation_history_enforcement_drift`.
+
+**What this does not stop.** Every DML statement, every non-DDL path and every role other than the migration role is refused.
+A session running arbitrary DDL as the migration role can defeat enforcement: it holds `ADMIN` on the owner role, so it can `GRANT` itself access, and as schema owner it can `DROP TABLE` or `DROP FUNCTION ... CASCADE`, or put code in an object the definer function touches.
+That takes a compromise of the same class as a reviewed migration.
+A superuser under `session_replication_role = replica` skips the triggers too.
+A role that can call the function can also forge a request row and strip identity from real rows, and that cannot alter what any decision says.
+
+**A later migration that changes `ModerationDecision`** follows this sequence, and `packages/db/test/migration-hygiene.spec.ts` enforces the revoke:
+
+```sql
+GRANT moderation_history_owner TO CURRENT_USER WITH SET TRUE, INHERIT FALSE;
+SET ROLE moderation_history_owner;
+-- the change
+RESET ROLE;
+REVOKE moderation_history_owner FROM CURRENT_USER;
+```
+
+**Retention.**
+
+| Table                                                          | Rule                                                                                        |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `ModerationDecision`, `AuditLog`                               | Never pruned, and the database refuses it                                                   |
+| `ModerationEvent`, `CommunityCommentAudit`, both report tables | Never pruned by any job. They change only through erasure and foreign keys                  |
+| `ModerationSlaAlert`, terminal                                 | Deleted 400 days after `detected_at`, 500 rows a run, unless it still owes a failure record |
+| `ModerationSlaAlert`, `pending`                                | Never pruned                                                                                |
+
+**Account erasure.** An admin starts it with `POST /api/v1/moderation/erasure-requests` on a request received through support.
+Identity leaves moderation records in that transaction, and the community sweep deletes the member's purged post rows and stamps `completed_at` within 72 hours.
+`moderation_erasure_overdue` logs a count when a request passes that.
+It covers community and moderation data only: no member self-service exists, and the account-deletion story owns the `User` row, wardrobe and billing.
+
+`moderation_history_enabled` defaults off, and gates both routes, the console controls and the alert prune.
+The erasure extension has no flag, because it is a privacy duty on the established path.
 
 ### Story 6.5 engagement dispatch controls
 

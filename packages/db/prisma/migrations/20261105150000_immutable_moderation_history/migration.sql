@@ -39,6 +39,20 @@ ALTER TABLE "ModerationErasureRequest"
 ALTER TABLE "ModerationErasureRequest" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON "ModerationErasureRequest" FROM PUBLIC, anon, authenticated, service_role;
 
+-- A comment decision copies the moderator's words here, and erasure has to remove them with the decision's.
+-- This admits that one change and nothing else, so the audit row stays append-only in every other way.
+CREATE OR REPLACE FUNCTION enforce_comment_audit_append_only() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'UPDATE'
+    AND NEW.reason = '[erased]'
+    AND OLD.reason <> '[erased]'
+    AND (to_jsonb(NEW) - 'reason') = (to_jsonb(OLD) - 'reason')
+  THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'comment audit is append-only' USING ERRCODE = '23514';
+END $$;
+
 -- A role is global to the cluster, so another database may already have created it, or be creating it now.
 DO $$
 BEGIN

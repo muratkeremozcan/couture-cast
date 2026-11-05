@@ -152,4 +152,4 @@ All updates and retros are stored as **BMAD sprint logs** in the GitHub `/_bmad-
 
 **Total Duration:** ~6 months (including QA + Beta feedback)
 
-**Next Step:** Run Phase 1 exit review. Open Community Beta only after moderation staffing, SLA alerts, privacy, deletion, localization, accessibility, model, and rollback evidence are signed. Production read and write rollout controls stay off until every one of those is signed.
+**Next Step:** Run Phase 1 exit review. Open Community Beta only after moderation staffing, SLA alerts, privacy, deletion, localization, accessibility, model, and rollback evidence are signed. Production read and write rollout controls stay off until every one of those is signed. Current state: [Community Beta gate record](../test-artifacts/community-beta-gate-signatures.md).

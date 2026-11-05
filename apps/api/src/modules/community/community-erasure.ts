@@ -70,22 +70,25 @@ const stripSnapshots = (table: 'CommunityPostReport' | 'ModerationEvent') => {
 const stripReportSnapshots = stripSnapshots('CommunityPostReport')
 const stripEventSnapshots = stripSnapshots('ModerationEvent')
 
-interface OperatorReasonCopies {
-  reasons: string[]
-  postIds: string[]
-  reportIds: string[]
+/** One decision whose words the function is about to redact, with where those words were copied. */
+interface RedactedDecision {
+  reason: string
+  post_id: string | null
+  report_ids: string[]
+  subject_alias: string | null
 }
 
 /**
  * A decision's reason is also written to its prior-action row and, for a takedown, to the post, so
  * redacting only the decision would leave the same words in three other tables. This reads the words the
- * function is about to redact, with the same rule it uses, so the copies can be matched exactly.
+ * function is about to redact, with the same rule it uses, so the copies can be matched exactly. A
+ * moderator's own erasure is not in this rule: it keeps the words, which are about someone else.
  */
-async function operatorReasonCopies(
+async function decisionsToRedact(
   tx: Tx,
   member: string,
   alias: string | null
-): Promise<OperatorReasonCopies> {
+): Promise<RedactedDecision[]> {
   const [postReports, commentReports] = await Promise.all([
     tx.communityPostReport.findMany({
       where: { reporter_id: member },
@@ -97,7 +100,7 @@ async function operatorReasonCopies(
     }),
   ])
   const reported = [...postReports, ...commentReports].map(({ id }) => id)
-  const decisions = await tx.moderationDecision.findMany({
+  return tx.moderationDecision.findMany({
     where: {
       reason: { not: MODERATION_ERASED_REASON },
       OR: [
@@ -106,37 +109,49 @@ async function operatorReasonCopies(
         ...(reported.length > 0 ? [{ report_ids: { hasSome: reported } }] : []),
       ],
     },
-    select: { reason: true, post_id: true, report_ids: true },
+    select: { reason: true, post_id: true, report_ids: true, subject_alias: true },
   })
-  return {
-    reasons: [...new Set(decisions.map((row) => row.reason))],
-    postIds: [...new Set(decisions.flatMap((row) => (row.post_id ? [row.post_id] : [])))],
-    reportIds: [...new Set(decisions.flatMap((row) => row.report_ids))],
-  }
 }
 
+/**
+ * Each copy is matched on the words and on the decision's own target, because moderators reuse wording
+ * and audit evidence must not be destroyed by a coincidence of text. An orphan's events lost `post_id`,
+ * so only a decision that lost it too looks there, and its alias stands in for the post.
+ */
 async function redactOperatorReasonCopies(
   tx: Tx,
-  { reasons, postIds, reportIds }: OperatorReasonCopies
+  decisions: readonly RedactedDecision[]
 ): Promise<void> {
-  if (reasons.length === 0) return
-  // An orphan's events lost their `post_id`, so a null key still has to match on the words.
-  await tx.moderationEvent.updateMany({
-    where: {
-      reason: { in: reasons },
-      reviewed_by_id: { not: null },
-      OR: [{ post_id: { in: postIds } }, { post_id: null }],
-    },
-    data: { reason: MODERATION_ERASED_REASON },
-  })
-  await tx.communityCommentAudit.updateMany({
-    where: { reason: { in: reasons }, report_id: { in: reportIds } },
-    data: { reason: MODERATION_ERASED_REASON },
-  })
-  await tx.lookbookPost.updateMany({
-    where: { id: { in: postIds }, moderation_reason: { in: reasons } },
-    data: { moderation_reason: null },
-  })
+  const onPosts = decisions.flatMap(({ reason, post_id }) =>
+    post_id ? [{ reason, post_id }] : []
+  )
+  const onOrphans = decisions.flatMap(({ reason, post_id, subject_alias }) =>
+    !post_id && subject_alias ? [{ reason, post_id: null, subject_alias }] : []
+  )
+  const onEvents = [...onPosts, ...onOrphans]
+  if (onEvents.length > 0)
+    await tx.moderationEvent.updateMany({
+      where: { OR: onEvents },
+      data: { reason: MODERATION_ERASED_REASON },
+    })
+  const onAudits = decisions.flatMap(({ reason, report_ids }) =>
+    report_ids.length > 0 ? [{ reason, report_id: { in: report_ids } }] : []
+  )
+  if (onAudits.length > 0)
+    await tx.communityCommentAudit.updateMany({
+      where: { OR: onAudits },
+      data: { reason: MODERATION_ERASED_REASON },
+    })
+  if (onPosts.length > 0)
+    await tx.lookbookPost.updateMany({
+      where: {
+        OR: onPosts.map(({ reason, post_id }) => ({
+          id: post_id,
+          moderation_reason: reason,
+        })),
+      },
+      data: { moderation_reason: null },
+    })
 }
 
 /**
@@ -154,9 +169,9 @@ export async function removeMemberFromModerationRecords(
         select: { alias: true },
       })
     )?.alias ?? null
-  const copies = await operatorReasonCopies(tx, member, alias)
+  const redacted = await decisionsToRedact(tx, member, alias)
   await tx.$executeRaw`SELECT private.moderation_history_anonymize(${member})`
-  await redactOperatorReasonCopies(tx, copies)
+  await redactOperatorReasonCopies(tx, redacted)
   await tx.communityPostReport.updateMany({
     where: { reporter_id: member },
     data: { reporter_id: null, details: null },

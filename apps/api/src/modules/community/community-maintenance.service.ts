@@ -417,26 +417,32 @@ export class CommunityMaintenanceService {
     now: Date,
     result: CommunityErasureSweepResult
   ): Promise<void> {
-    const open = await this.prisma.moderationErasureRequest.findMany({
-      where: { completed_at: null },
-      orderBy: { requested_at: 'asc' },
-      take: MAX_SWEEP_BATCH,
-      select: { id: true, member_id: true },
-    })
-    for (const request of open) {
-      try {
-        if (await this.settleAccountErasure(request.id, request.member_id, now))
-          result.requestsCompleted += 1
-      } catch (error) {
-        // The next pass retries, and one member's failure must not stop the others.
-        this.logger.error(
-          {
-            event: 'moderation_erasure_settle_failed',
-            prismaCode: (error as { code?: unknown } | null)?.code ?? null,
-          },
-          'Failed to settle an account erasure; will retry'
-        )
+    // Every open request on every pass, paged, so a request that cannot finish yet never starves a newer one.
+    let after: string | undefined
+    for (;;) {
+      const open = await this.prisma.moderationErasureRequest.findMany({
+        where: { completed_at: null, ...(after ? { id: { gt: after } } : {}) },
+        orderBy: { id: 'asc' },
+        take: MAX_SWEEP_BATCH,
+        select: { id: true, member_id: true },
+      })
+      for (const request of open) {
+        try {
+          if (await this.settleAccountErasure(request.id, request.member_id, now))
+            result.requestsCompleted += 1
+        } catch (error) {
+          // The next pass retries, and one member's failure must not stop the others.
+          this.logger.error(
+            {
+              event: 'moderation_erasure_settle_failed',
+              prismaCode: (error as { code?: unknown } | null)?.code ?? null,
+            },
+            'Failed to settle an account erasure; will retry'
+          )
+        }
       }
+      if (open.length < MAX_SWEEP_BATCH) break
+      after = open[open.length - 1]?.id
     }
 
     result.requestsOverdue = await this.prisma.moderationErasureRequest.count({
