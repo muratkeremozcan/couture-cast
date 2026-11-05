@@ -282,6 +282,32 @@ Verified against `main` at `56509fa8`.
 
 ## Implementation Notes
 
+Decisions logged by the builder under the owner's delegated approval, 2026-11-05.
+
+- Build-01 (real defect, frozen Design Notes corrected here). `GRANT role TO CURRENT_USER`, `GRANT role TO SESSION_USER` and `REVOKE role FROM CURRENT_USER` segfault the backend in `supautils` on `supabase/postgres:17.6.1.054`, and the whole server restarts. The Design Notes' migration shape did exactly this, and it passed on plain Postgres. It crashed the shared local stack at 54322 once, and it recovered with the migration rolled back and no role left behind. The migration now names the role through `format()`, `migration-hygiene.spec.ts` refuses the keyword, and role migrations run first on a disposable container of the same image, here at 54341.
+- Build-02 (extends D4). A moderator's reason is also copied to `ModerationEvent.reason`, `CommunityCommentAudit.reason` and `LookbookPost.moderation_reason`, so redacting only the decision left the words in three tables. `community-erasure.ts` reads the decisions about to be redacted and redacts each copy, matched on the words and on that decision's own target (TEA findings: an orphan branch keyed on the alias, and no `reviewed_by_id` filter). TEA-22 amends the comment audit trigger to admit that one change.
+- Build-03 (extends D4). `recordReport` had no subject check, so an erased member could file a report and put their id back on a moderation record. It now refuses a member with no `CommunitySubject`.
+- Build-04 (extends D6, D8, D9). New read route `GET /api/v1/moderation/evidence-exports/availability`, answering `{data:{rangeExport}}` or 503 `moderation_history_disabled`. The console knows nothing about roles or flags by design, and a control must be absent when the feature is off, so it asks the API. The routes still decide on every request.
+- Build-05 (D3). `requestErasureForUser` keeps its signature for its roughly 40 integration callers, with an optional `requestedBy`. New `requestAccountErasure` returns the request row, and the caller builds the audit data, because the community module imports nothing from the moderation module.
+- Build-06. `writeModerationRecord` moved to `community-moderation-record.ts`, re-exported from `community-moderation.actions.ts`, because the repository importing the actions file would close an import cycle through `isPubliclyVisiblePost`.
+- Build-07. Three triggers (`_update`, `_delete`, `_truncate`), following `AuditLog` and D5's count. The guard function and behavior are D1's.
+- Build-08 (D5, TEA measured). No retry loop around the role grant: `GRANT` holds a lock on the role until the transaction ends, so concurrent migrations wait. `ALTER ROLE` runs after it for that reason.
+- Build-09 (fact against D1). The Supabase image lets the non-superuser `postgres` set `session_replication_role = replica`, where plain Postgres refuses. On that image `UPDATE`, `DELETE` and `TRUNCATE` are still 42501 in replica mode, which is the privilege layer doing its job. The guide states this.
+- Build-10. `settleAccountErasures` pages through every open request on each pass, because a 200-row cap would let requests inside their 70-hour window starve newer ones.
+- Build-11 (CI). `pr-pw-e2e-local.yml` runs the verifier after `db:reset`, because it is the one PR job whose application role is the real non-superuser.
+- Build-12 (permission boundary). The Prisma CLI refuses `migrate reset` from an agent without the user's explicit consent, and I did not set its consent variable. On a throwaway database on the disposable image I ran the same effect instead: `DROP SCHEMA public CASCADE`, `CREATE SCHEMA public`, then `migrate deploy`, twice, and the verifier passed all 15 checks. The real `db:reset` on the Supabase image first runs in the `pr-pw-e2e-local` job.
+- Build-13 (known bound). `lockReportedCases` takes one advisory lock per case a member reported, as TEA-09 rules. The daily report cap bounds this per day, with no lifetime cap, and an extreme reporter could press `max_locks_per_transaction`. Failure rolls back and retries, and the overdue log reports it.
+
+Real stack walk, 2026-11-05, on the disposable Supabase image at 54341, database `cc613_real`, Redis db 7, through the launcher with the built API, the real `community.bootstrap` worker and the web server. Sign-in used the `NEXT_PUBLIC_E2E_AUTH` fixture token.
+
+- Connected as the non-superuser `postgres`: `UPDATE`, `DELETE`, `TRUNCATE`, `DISABLE TRIGGER` and `SET ROLE moderation_history_owner` all answered 42501, and the function answered 23514 with no guard. As `anon`, `authenticated` and `service_role`: `SELECT`, `UPDATE`, `DELETE` and the function all answered 42501. The row compared byte-identical afterward.
+- An admin's ban decision, then erasure through the real route: a moderator got 403 `admin_required`, the admin 201, the replay 200 with the same deadline. At commit the decision held `[erased]` and a null subject, each operator copy held `[erased]`, snapshots kept only metadata, and the alias and sanction rows were gone.
+- Aged 71 hours under the real guard, the running worker deleted the post and stamped `completed_at`. The old case id answered 404, and the orphan case showed the action, time and role with "Reason removed by erasure".
+- Exports in a real browser, before and after, and a period as admin. The after bundle held no canary for the reporter's details, caption, alt text, reason, reporter id or member id. A moderator's period request answered `admin_required`.
+- Queue, case detail, evidence page as admin and as moderator, read in Chromium at 1280 and 375 pixels in light and dark, with zero horizontal overflow. Screenshots are under `_bmad-output/test-artifacts/story-6-13/`.
+- Fixes the walk caused: "1 decisions" reworded with no plural, the date field's calendar icon was dark on dark, and the back link missed the 44-pixel target.
+- Not run: `M-PREVIEW-VERIFY`, the hosted role check, which needs the PR's Preview deployment.
+
 ## Spec Change Log
 
 2026-11-05, TEA review, Task 1. Evidence for each entry is in the Spec review section of `_bmad-output/test-artifacts/test-design/cc613-moderation-history-test-design.md`, including the probes.

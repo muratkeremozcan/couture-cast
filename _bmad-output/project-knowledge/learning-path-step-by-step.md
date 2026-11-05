@@ -15,7 +15,8 @@ Added Steps 40 to 52:
 - Step 49: Story 6.9, native platform sharing, `6d92598f` (PR #167), merged on 2026-10-31.
 - Step 50: Story 6.10, moderator queue and case detail, `6337dc8c` (PR #194), merged on 2026-11-04.
 - Step 51: Story 6.11, moderation decisions and account sanctions, `3efd8423` (PR #195), merged on 2026-11-05.
-- Step 52: Story 6.12, SLA monitoring and escalation, in review on `feat/cc-6-12-sla-monitoring-escalation`, not yet merged.
+- Step 52: Story 6.12, SLA monitoring and escalation, `56509fa8` (PR #196), merged on 2026-11-05.
+- Step 53: Story 6.13, immutable moderation history, in review on `feat/cc-6-13-immutable-moderation-history`, not yet merged.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -23,6 +24,8 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Step 53 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
+Moved Step 52 to completed after PR #196 merged as `56509fa8`.
 Step 52 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 Moved Step 51 to completed after PR #195 merged as `3efd8423`.
 Step 51 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
@@ -107,12 +110,12 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- In review: Step 52, Story 6.12, SLA monitoring and escalation, not yet merged, on `feat/cc-6-12-sla-monitoring-escalation`.
+- In review: Step 53, Story 6.13, immutable moderation history, not yet merged, on `feat/cc-6-13-immutable-moderation-history`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-6-13-immutable-moderation-history.md`.
+  Production stays dark because `moderation_history_enabled` defaults to false, and the database enforcement has no flag.
+- Latest completed step: Step 52, Story 6.12, SLA monitoring and escalation, status `done`, merged as `56509fa8` (PR #196) on 2026-11-05.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-12-sla-monitoring-escalation.md`.
-  Production stays dark because `moderation_sla_monitoring_enabled` defaults to false.
-- Latest completed step: Step 51, Story 6.11, Moderation decisions and account sanctions, status `done`, merged as `3efd8423` (PR #195) on 2026-11-05.
-  Its plan is `_bmad-output/implementation-artifacts/spec-6-11-moderation-decisions-account-sanctions.md`.
-  Step 51 was written before review and merge, and its `Evidence boundaries` section says so.
+  Step 52 was written before review and merge, and its `Evidence boundaries` section says so.
   Production stays dark because `moderation_decisions_enabled` and `moderation_console_enabled` default to false.
 - Step 50, Story 6.10, Moderator queue and case detail, status `done`, merged as `6337dc8c` (PR #194) on 2026-11-04.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-10-moderator-queue-case-detail.md`.
@@ -9972,8 +9975,9 @@ Web and Playwright tests:
 
 Evidence boundaries:
 
-- **Written before merge.**
-  The code and tests are on `feat/cc-6-12-sla-monitoring-escalation`, in PR 196.
+- **Written before merge, and merged since.**
+  PR 196 squash-merged as `56509fa8` on 2026-11-05.
+  The commit hashes below are from the PR branch, before that squash.
 - **What ran locally.**
   TEA signed off at `ffdf6473`, with source at `c7a52fad` and tests at `c01a506b`, on three consecutive runs of the whole suites with identical results and no retries.
   Passing per run: `apps/api` 8343 with 38 existing skips, `packages/api-client` 1624, `packages/db` 282 with 1 skip, `packages/config` 31, `apps/web` 1886, the Pact consumer 447 with 1 provider verification, and Playwright 34.
@@ -10048,4 +10052,223 @@ flowchart TD
   Sweep --> Stamp["ModerationSlaMonitor stamp"]
   Stamp --> Page["GET /moderation/sla\nstale from the API alone"]
   Alert --> Page
+```
+
+## Step 53: Immutable moderation history
+
+User/business impact:
+
+Until this step `ModerationDecision` was append-only by convention: the application role owned the table and could update, delete, truncate or disable a trigger on it.
+This step moves the table to a dedicated owner role the application cannot act as, so history cannot be rewritten through any normal statement.
+Account erasure now reaches moderation records: identity leaves decisions, reports and audit rows in the request transaction, and the sweep finishes within the 72-hour deadline.
+An admin can start that erasure, a moderator can export one case as an audited JSON file and an admin can export a period.
+A new record holds the Community Beta gate signatures, with the owner's sign-off for audit, privacy, deletion and moderation staffing, each with its date, source and limit.
+The routes and the alert prune sit behind `moderation_history_enabled`, off in production, and the database enforcement has no flag on purpose.
+
+Key takeaways:
+
+1. **A trigger is a rule its owner can switch off.**
+   `AuditLog` has triggers, and the application role owns that table, so one `ALTER TABLE ... DISABLE TRIGGER` removes them.
+   Moving ownership to `moderation_history_owner` turns "nobody should run that" into a privilege the application role lacks.
+   The trigger stays, because it holds where a superuser connects and it enforces column rules on the owner too.
+2. **Key an exception on what the caller cannot set.**
+   Postgres runs as the owner role in exactly two cases: a foreign key `ON DELETE SET NULL` action and a `SECURITY DEFINER` function it owns.
+   So the guard reads `current_user`, and a session variable, `session_user` or `pg_trigger_depth()` would each have been forgeable or wrong.
+3. **Make the exception unable to do harm.**
+   The guard compares the row with the allowed columns removed, so a column added later is refused by default.
+   Identity columns may only become null, `reason` may only become the constant `[erased]`, and `anonymized_at` moves once.
+   The exception can remove who, and it cannot change what was decided, by which role, when or in what order.
+4. **A definer function must trust nothing the caller owns.**
+   It pins `search_path`, qualifies every name, and reads `pg_locks` itself for the privacy guard.
+   `community_require_guard` is a no-op at `privacy_version` 0 and the application role can replace it, and a replacement would run as the owner.
+5. **Follow the data, including its copies.**
+   A moderator's reason is also written to `ModerationEvent.reason`, `CommunityCommentAudit.reason` and `LookbookPost.moderation_reason`.
+   Each copy is matched on the words and on that decision's own target, because moderators reuse wording and evidence must not be destroyed by a coincidence of text.
+6. **Anonymizing a row can mean deleting another one.**
+   `LookbookPost.user_id` cannot be null, so `case_key` could still reach the member through the post row.
+   Once every post is purged, the sweep deletes those rows, and the foreign keys null `post_id` and re-key the case to `orphan-post`.
+7. **Keep the digest and the audit row in the read's transaction.**
+   Repeatable read means `counts`, the arrays and the digest describe one snapshot, and a failed audit write returns no bytes.
+   The strict schema is the exclusion list, so a new database column cannot reach a compliance reviewer's file by accident.
+   The saved file is the response text as sent, so its digest can be compared with the audit row later.
+8. **State what a guarantee does not cover.**
+   Every DML statement, every non-DDL path and every role other than the migration role is refused.
+   A session running arbitrary DDL as the migration role can defeat it, and that takes a compromise of the same class as a reviewed migration.
+   The guide and the gate record say so, and a catalog verifier plus a daily drift log watch for it.
+9. **Record a sign-off as what it is.**
+   Only `model` has a signing mechanism, so the other signatures had no record at all.
+   `community-beta-gate-signatures.md` writes each owner ruling with its date, source, proof and limit, and claims no cryptographic signature.
+   `GATE_SIGNATURES` stays as it is, because it describes the payload the model signature is bound to.
+
+Hard-won lessons from the implementation and review of this story:
+
+- **A migration that passed 113 tests would have crashed hosted Supabase.**
+  `GRANT role TO CURRENT_USER` segfaults the backend in `supautils`, and the whole server restarts.
+  Plain Postgres has no `supautils`, so every suite was green.
+  It surfaced only when the migration ran on the real image, and it took down the shared local stack once.
+  The role is now named through `format()`, a hygiene rule refuses the keyword, and role migrations run first on a disposable container of the same image.
+- **A plain non-superuser test role reads as a false defect.**
+  The function could not see its request row, because those tables have RLS on with zero policies, and `AuditLog` forces RLS.
+  The owner role needs `BYPASSRLS`, and the application role reads the table through that attribute now that it does not own it.
+  Proofs run as a login with `NOSUPERUSER CREATEROLE BYPASSRLS`, the attributes of Supabase's `postgres`.
+- **`has_table_privilege` answers true for a superuser.**
+  A verifier built on it could never fail where CI connects, so it reads `relacl`, `pg_auth_members` and `pg_roles`.
+- **The first redaction was too broad and then too narrow.**
+  Matching any orphan event by its words alone erased evidence on an unrelated case that used the same boilerplate.
+  A `reviewed_by_id` filter left the words behind once that moderator was erased first.
+- **Another append-only trigger blocked the erasure.**
+  `comment_audit_append_only` refused every update, so one comment case made a member impossible to erase.
+  It now admits one change: `reason` to the constant, with every other column equal.
+- **An erased member could still file a report.**
+  `recordReport` had no subject check, so a report after erasure put the id back on a moderation record.
+- **A read can undo an erasure.**
+  `resolveAlias` mints on first use, so a feed read after erasure recreated the mapping that erasure deleted.
+  It now returns null for a member with no `CommunitySubject`, and the repair pass removes one that raced that check.
+- **A response limit is a contract.**
+  5,000 decisions at 1,000 characters reach 5 MB, and Vercel Functions refuse responses past 4.5 MB.
+  The audit row would have committed and the bytes would never have arrived, so 4,000,000 bytes is refused first.
+- **The real browser found what the components did not.**
+  "1 decisions", a dark calendar icon on a dark field and a back link under 44 pixels all passed their tests.
+- **A proof commit cannot be a hard reference in a squash-merged repo.**
+  A branch SHA leaves history at merge, so the gate spec checks its format and resolves it only when it is present.
+
+Story/Task mapping:
+
+- Story 6.13
+- Task 1 (migration, schema, owner role, triggers, function, grants)
+- Task 2 (database proof, RLS list, hygiene rule, backfill helper)
+- Task 3 (catalog verifier and its fault test)
+- Task 4 (erasure scrub, repair, completion and overdue)
+- Task 5 (null subject after a request, refusal of the reserved reason, redacted label, audit helper)
+- Task 6 (strict contracts, OpenAPI, regenerated SDK)
+- Task 7 (erasure, export and availability routes)
+- Task 8 (alert prune and drift check on both worker paths)
+- Task 9 (flag `moderation_history_enabled`, default false, seeded true)
+- Task 10 (export control, `/moderation/evidence`, removed label, ten web catalogs)
+- Task 11 (unit tests for the column rules, audit helper, schema exclusions, digest and matrix edges)
+- Task 12 (integration suites on real Postgres)
+- Task 13 (Playwright journey)
+- Task 14 (Community Beta gate record)
+- Task 15 (staffing sign-off in the runbook)
+- Task 16 (deployment guide, roadmap, epic context, deferred work)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/spec-6-13-immutable-moderation-history.md`, with decisions D1 to D10, the Spec Change Log and the Implementation Notes
+- `_bmad-output/test-artifacts/test-design/cc613-moderation-history-test-design.md`
+- `_bmad-output/test-artifacts/community-beta-gate-signatures.md`
+- `_bmad-output/project-knowledge/deployment-guide.md`, section "Story 6.13 moderation history"
+- `_bmad-output/test-artifacts/story-6-13/` (screenshots of the real pages in light and dark at desktop and phone widths)
+- Commits on `feat/cc-6-13-immutable-moderation-history`, not yet pushed or merged when this step was written
+
+Cross-links:
+
+- Step 51 provides `ModerationDecision`, `writeModerationRecord` and the note that database enforcement belongs here.
+- Step 52 provides `ModerationSlaAlert`, whose retention this step sets, and the two worker paths this step reuses.
+- Step 50 provides the case model, the `orphan-post` re-key and the console.
+- Step 38 provides the erasure sweep and the 72-hour deadline.
+- Step 18 provides `AuditLog` and its immutability migration.
+
+Sequence to follow:
+
+1. `packages/db/prisma/migrations/20261105150000_immutable_moderation_history/migration.sql` for the role, the guard and the exception.
+2. `apps/api/src/modules/community/community-erasure.ts` for what erasure removes and how copies match.
+3. `apps/api/src/modules/community/community.repository.ts`, `requestAccountErasure`, for the transaction and its lock order.
+4. `apps/api/src/modules/community/community-maintenance.service.ts`, `settleAccountErasures`, for repair, completion and overdue.
+5. `packages/api-client/src/contracts/http/moderation-history.ts` for the strict bundle.
+6. `apps/api/src/modules/moderation/moderation-history.service.ts` for the export transaction.
+7. `apps/api/src/modules/moderation/moderation-history.retention.ts` and `moderation-history.enforcement.ts` for the prune and the catalog checks.
+8. `apps/web/src/app/components/moderation-evidence-export.tsx` for the console.
+9. `_bmad-output/test-artifacts/community-beta-gate-signatures.md` for what is signed and what each signature leaves out.
+
+Task owner map:
+
+- Story 6.13 Task 1 owner: add the column and table in `packages/db/prisma/schema.prisma`, with the role, triggers, function and grants in `packages/db/prisma/migrations/20261105150000_immutable_moderation_history/migration.sql`.
+- Story 6.13 Task 3 owner: run the checks in `scripts/verify-moderation-history.mjs`, defined in `apps/api/src/modules/moderation/moderation-history.enforcement.ts`.
+- Story 6.13 Task 4 owner: remove identity in `apps/api/src/modules/community/community-erasure.ts`, called from `apps/api/src/modules/community/community.repository.ts` and `apps/api/src/modules/community/community-maintenance.service.ts`.
+- Story 6.13 Task 5 owner: store a null subject in `apps/api/src/modules/moderation/moderation-decisions.service.ts`, and map the constant in `apps/api/src/modules/moderation/moderation-history.rules.ts`.
+- Story 6.13 Task 6 owner: define the contract in `packages/api-client/src/contracts/http/moderation-history.ts`.
+- Story 6.13 Task 7 owner: guard and route in `apps/api/src/modules/moderation/moderation-history.controller.ts`, with the reads in `moderation-history.repository.ts` and the transaction in `moderation-history.service.ts`.
+- Story 6.13 Task 8 owner: prune in `apps/api/src/modules/moderation/moderation-history.retention.ts`, register in `apps/api/src/workers/maintenance.scheduler.ts`, and run at boot and daily in `apps/api/src/workers/community.bootstrap.ts`.
+- Story 6.13 Task 9 owner: declare the flag in `packages/config/src/flags.ts`, seeded true in `packages/db/prisma/seeds/feature-flags.ts`.
+- Story 6.13 Task 10 owner: read the routes in `apps/web/src/lib/moderation.ts` and render them in `apps/web/src/app/components/moderation-evidence-export.tsx` and `apps/web/src/app/moderation/evidence/page.tsx`.
+- Story 6.13 Task 14 owner: record signatures in `_bmad-output/test-artifacts/community-beta-gate-signatures.md`.
+
+Tests that cover this step:
+
+API unit tests:
+
+- [`apps/api/src/modules/moderation/moderation-history.rules.spec.ts`](../../apps/api/src/modules/moderation/moderation-history.rules.spec.ts): proves the audit helper's exact keys, the digest, the reason and reporter mapping, and the cutoff arithmetic.
+- [`apps/api/src/modules/moderation/moderation-history.retention.spec.ts`](../../apps/api/src/modules/moderation/moderation-history.retention.spec.ts): proves the flag gates the prune alone and the drift check always runs.
+
+API integration tests, against real PostgreSQL:
+
+- [`apps/api/integration/moderation-history-erasure.integration.spec.ts`](../../apps/api/integration/moderation-history-erasure.integration.spec.ts): proves subject, reporter and moderator erasure, the copies, atomicity, replay, races and that no alias is minted again.
+- [`apps/api/integration/moderation-history-completion.integration.spec.ts`](../../apps/api/integration/moderation-history-completion.integration.spec.ts): proves the 72-hour bound with an injected clock, the re-key, repair and overdue.
+- [`apps/api/integration/moderation-history-retention.integration.spec.ts`](../../apps/api/integration/moderation-history-retention.integration.spec.ts): proves the 400-day boundary, that nothing else is pruned, and a real injected drift.
+- [`apps/api/integration/moderation-history-route.integration.spec.ts`](../../apps/api/integration/moderation-history-route.integration.spec.ts): proves both routes over real HTTP, every refusal, the canary exclusions, the byte cap and the audit row.
+- [`apps/api/integration/moderation-history-gate.spec.ts`](../../apps/api/integration/moderation-history-gate.spec.ts): reads the gate record, runbook and guide, and proves the readiness scripts are unchanged.
+
+Contract and database tests:
+
+- [`packages/db/test/moderation-history-immutability.spec.ts`](../../packages/db/test/moderation-history-immutability.spec.ts): proves every refusal and every exception rule, as a non-superuser that ran the migrations itself.
+- [`packages/db/test/moderation-history-verifier.spec.ts`](../../packages/db/test/moderation-history-verifier.spec.ts): proves the verifier fails on each injected fault and passes clean.
+- [`packages/db/test/migration-hygiene.spec.ts`](../../packages/db/test/migration-hygiene.spec.ts): proves a later migration gives the owner role back and uses no role keyword.
+- [`packages/api-client/testing/moderation-history-contract.spec.ts`](../../packages/api-client/testing/moderation-history-contract.spec.ts): proves the bundle rejects each excluded field and the reserved reason is refused.
+
+Web and Playwright tests:
+
+- [`apps/web/src/app/components/moderation-evidence-export.test.tsx`](../../apps/web/src/app/components/moderation-evidence-export.test.tsx): proves control states, the saved bytes, flag off and admin-only access.
+- [`playwright/tests/moderation-history.spec.ts`](../../playwright/tests/moderation-history.spec.ts): proves the journey in a real browser against the real API and worker, including refusals with the API's own connection string on local Supabase.
+
+Evidence boundaries:
+
+- **Written before merge.**
+  The code and tests are on `feat/cc-6-13-immutable-moderation-history`, not yet pushed when this step was written.
+- **A real stack walk ran on the real image.**
+  The launcher ran the built API, the real `community.bootstrap` worker and the web server on a disposable `supabase/postgres:17.6.1.054` container, as its non-superuser `postgres`.
+  Every refused statement answered 42501 and the row compared byte-identical, including `UPDATE`, `DELETE` and `TRUNCATE` under `session_replication_role = replica`, which that image lets the role set.
+  An aged erasure completed through the running worker, the old case id answered 404, and exports in a real browser held no canary.
+  Sign-in used the `NEXT_PUBLIC_E2E_AUTH` fixture token, so no real Supabase Auth session was involved.
+- **`prisma migrate reset` did not run on the Supabase image locally.**
+  The Prisma CLI refuses it from an agent without the user's consent, so the local proof dropped and recreated `public` and ran `migrate deploy`, twice.
+  The real `db:reset` first runs there in the `pr-pw-e2e-local` job.
+- **The hosted role was not read.**
+  The migration needs `CREATEROLE` and `BYPASSRLS`, and a hosted role without them fails the build visibly.
+  `M-PREVIEW-VERIFY` needs the PR's Preview deployment.
+- **Sign-offs are owner rulings.**
+  The gate record carries no cryptographic signature, and staffing rests on the owner's statement, with no roster or schedule.
+- **Production stays dark.**
+  `moderation_history_enabled`, `community_read_enabled` and `community_write_enabled` default to false, while the database enforcement goes live with the migration.
+- **Known limits by design.**
+  A session running arbitrary DDL as the migration role can defeat enforcement.
+  Report `details` a third party wrote stays, and a reason typed after an erasure commits stays.
+  No member self-service deletion exists, and the account-deletion story owns the `User` row, wardrobe and billing.
+  Screenshots under `_bmad-output/test-artifacts/story-6-13/` are git-ignored local evidence.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  App["application role\nSELECT and INSERT only"] -->|"UPDATE, DELETE, TRUNCATE"| Deny["42501"]
+  Client["anon, authenticated, service_role"] -->|"any statement"| Deny
+  App -->|"INSERT"| MD["ModerationDecision\nowner: moderation_history_owner"]
+  Route["admin: POST erasure-requests"] --> Tx["requestAccountErasure transaction\ncase locks, then privacy guards"]
+  Tx --> Req["ModerationErasureRequest"]
+  Tx --> Fn["private.moderation_history_anonymize\nneeds guard and request row"]
+  Fn -->|"runs as owner"| Guard{"guard: identity removal only?"}
+  FK["foreign key SET NULL"] -->|"runs as owner"| Guard
+  Guard -- "yes" --> MD
+  Guard -- "no" --> Deny
+  Fn --> Audit["AuditLog\nno subject, reporter, alias or reason"]
+  Tx --> Scrub["reports, events, copies, alias, sanction"]
+  Sweep["sweepErasureRequests, every 30 seconds"] --> Repair["repair if identity remains"]
+  Sweep --> Done{"all posts purged?"}
+  Done -- "yes" --> Del["delete post rows, re-key to orphan-post,\nstamp completed_at"]
+  Done -- "past 72 hours" --> Over["moderation_erasure_overdue"]
+  Export["moderator or admin: POST evidence-exports"] --> Read["repeatable read, strict schema, digest"]
+  Read --> Audit
+  Read --> File["JSON attachment"]
+  Daily["daily job"] --> Prune["terminal alerts past 400 days"]
+  Daily --> Drift["catalog checks, drift log"]
 ```
