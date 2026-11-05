@@ -322,3 +322,132 @@ chmod +x "$HOME/.maestro/bin/maestro"`
     }
   )
 })
+
+describe('Gradle distribution recovery', () => {
+  const fetchScript = path.join(repoRoot, 'scripts/ci/fetch-gradle-wrapper.sh')
+  const RELEASE_504 =
+    'Exception in thread "main" java.io.IOException: Server returned HTTP response code: 504 for URL: https://github.com/gradle/gradle-distributions/releases/download/v8.14.3/gradle-8.14.3-bin.zip'
+
+  /** A wrapper that answers each attempt from `results`, as one facing a release host does. */
+  function fetchDistribution(results: InstallResult[]) {
+    const project = path.join(fixture, 'android')
+    const attempts = path.join(fixture, 'attempts')
+    const waits = path.join(fixture, 'waits')
+    fs.mkdirSync(project)
+    fs.writeFileSync(
+      path.join(project, 'gradlew'),
+      `#!/usr/bin/env node
+const fs = require('node:fs')
+const count = fs.existsSync('${attempts}') ? Number(fs.readFileSync('${attempts}', 'utf8')) : 0
+fs.writeFileSync('${attempts}', String(count + 1))
+const results = ${JSON.stringify(results)}
+const result = results[Math.min(count, results.length - 1)]
+console.error(result.message)
+process.exit(result.code)
+`,
+      { mode: 0o755 }
+    )
+    fs.writeFileSync(
+      path.join(fixture, 'bin/sleep'),
+      `#!/bin/sh\necho "$1" >> "${waits}"\n`,
+      {
+        mode: 0o755,
+      }
+    )
+    const result = spawnSync('bash', [fetchScript, project], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${path.join(fixture, 'bin')}${path.delimiter}${process.env.PATH ?? ''}`,
+      },
+    })
+    return {
+      status: result.status,
+      output: `${result.stdout}${result.stderr}`,
+      attempts: Number(fs.readFileSync(attempts, 'utf8')),
+      waits: fs.existsSync(waits)
+        ? fs.readFileSync(waits, 'utf8').trim().split('\n')
+        : [],
+    }
+  }
+
+  it('recovers the wrapper download that a gateway timeout broke', () => {
+    const result = fetchDistribution([
+      { code: 1, message: RELEASE_504 },
+      { code: 0, message: 'Gradle 8.14.3' },
+    ])
+    expect(result.status, result.output).toBe(0)
+    expect(result.attempts).toBe(2)
+    expect(result.waits).toEqual(['30'])
+    expect(result.output).toContain('::warning::')
+  })
+
+  it('stops after three attempts and keeps the error', () => {
+    const result = fetchDistribution([{ code: 1, message: RELEASE_504 }])
+    expect(result.status).toBe(1)
+    expect(result.attempts).toBe(3)
+    expect(result.waits).toEqual(['30', '60'])
+    expect(result.output).toContain('response code: 504')
+  })
+
+  it.each([
+    [
+      'a missing distribution',
+      'Server returned HTTP response code: 404 for URL: https://x',
+    ],
+    ['a broken wrapper', 'Error: Could not find or load main class GradleWrapperMain'],
+  ])('keeps %s red without retrying', (_name, message) => {
+    const result = fetchDistribution([{ code: 1, message }])
+    expect(result.status).toBe(1)
+    expect(result.attempts).toBe(1)
+    expect(result.waits).toEqual([])
+  })
+
+  it('leaves a working wrapper at one attempt', () => {
+    const result = fetchDistribution([{ code: 0, message: 'Gradle 8.14.3' }])
+    expect(result.status).toBe(0)
+    expect(result.attempts).toBe(1)
+  })
+
+  it('fetches in both share-card lanes before their first Gradle call', () => {
+    const workflow = fs.readFileSync(
+      path.join(repoRoot, '.github/workflows/pr-share-card-native.yml'),
+      'utf8'
+    )
+    const lanes = workflow.split('scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android')
+    expect(lanes).toHaveLength(3)
+    expect(lanes[0]).not.toContain('./gradlew')
+    expect(lanes[1]).toContain('./gradlew')
+  })
+
+  it('runs the Android jobs when the fetch script changes', () => {
+    const workflow = fs.readFileSync(
+      path.join(repoRoot, '.github/workflows/pr-accessibility-focus.yml'),
+      'utf8'
+    )
+    const triggers = workflow.slice(0, workflow.indexOf('\njobs:'))
+    expect(triggers.match(/- 'scripts\/ci\/fetch-gradle-wrapper\.sh'/g)).toHaveLength(2)
+  })
+
+  it('fetches in both Android jobs before the first Gradle step', () => {
+    const workflow = fs.readFileSync(
+      path.join(repoRoot, '.github/workflows/pr-accessibility-focus.yml'),
+      'utf8'
+    )
+    const jobs = workflow.split(/\n {2}(?=[\w-]+:\n {4}name: )/)
+    const android = jobs.filter((job) => job.includes('Generate the Android project'))
+    expect(android).toHaveLength(2)
+    for (const job of android) {
+      const fetchAt = job.indexOf(
+        'scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android'
+      )
+      expect(fetchAt, job.slice(0, 60)).toBeGreaterThan(
+        job.indexOf('Generate the Android project')
+      )
+      const firstGradle = job.search(
+        /Robolectric tests for the focus observer|accessibility-focus-device-tests\.sh/
+      )
+      expect(fetchAt).toBeLessThan(firstGradle)
+    }
+  })
+})
