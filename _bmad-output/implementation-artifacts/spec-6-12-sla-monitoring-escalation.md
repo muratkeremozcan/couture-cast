@@ -2,10 +2,11 @@
 title: 'CC-6.12 SLA monitoring and escalation'
 type: 'feature'
 created: '2026-11-05'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: '3efd84239208b05b474a8de32d14c3943c6ed503'
 baseline_revision: '3efd84239208b05b474a8de32d14c3943c6ed503'
 route: 'dispatch'
+review_source: 'coordinator: TEA per commit, Codex after handoff'
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-6-context.md'
