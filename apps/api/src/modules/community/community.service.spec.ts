@@ -1,6 +1,6 @@
 // Learning path Step 38: Community feed by climate band.
 /* eslint-disable @typescript-eslint/no-unsafe-assignment -- assertions nest expect.objectContaining() and vi.fn() members, which is the established pattern for these suites. */
-import { ServiceUnavailableException } from '@nestjs/common'
+import { ForbiddenException, ServiceUnavailableException } from '@nestjs/common'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   COMMUNITY_CURSOR_INVALID_MESSAGE,
@@ -8,6 +8,7 @@ import {
   communityFeedSchema,
   encodeCommunityFeedCursor,
 } from '@couture/api-client/contracts/http'
+import { CommunitySpotlightService } from './community-spotlight.service'
 import {
   SERVICE_REFERENCE_TIME,
   viewerUserId,
@@ -337,6 +338,35 @@ describe('CommunityService feed', () => {
       expect(result.authorStates[0]?.moderationReason).toBe('screening_unavailable')
     })
 
+    // Story 6.11 test owner: U-B-D14. An author sees a code the client can localize and nothing else.
+    describe('U-B-D14: the author state passes only recognized screening codes', () => {
+      const moderationReasonFor = async (moderation_reason: string | null) => {
+        const { service } = createService({
+          authorPosts: [
+            { ...ownPendingPost, status: 'flagged' as never, moderation_reason },
+          ],
+        })
+        const result = await service.getFeed({ userId: viewerUserId, platform: 'web' })
+        return result.authorStates[0]?.moderationReason
+      }
+
+      it.each([
+        ['a recognized code', 'unsafe_class'],
+        ['a joined code list', 'unsafe_class, low_confidence'],
+      ])('passes %s', async (_name, reason) => {
+        await expect(moderationReasonFor(reason)).resolves.toBe(reason)
+      })
+
+      it.each([
+        ['null', null],
+        ['an operator takedown in their own words', 'Taken down for doxxing a member'],
+        ['the ban marker', 'community_ban:0a3f6e0c-9e1c-4c0a-9a0c-1f2e3d4c5b6a'],
+        ['a code list with one unknown entry', 'unsafe_class, doxxing a member'],
+      ])('sends null for %s', async (_name, reason) => {
+        await expect(moderationReasonFor(reason)).resolves.toBeNull()
+      })
+    })
+
     it('renders an author state with no signable object as a null imageAccess', async () => {
       // The public projection has no way to say "this post is here but its media
       // is gone"; the author's own section does, and that is where the localized
@@ -541,6 +571,99 @@ describe('CommunityService feed', () => {
       const result = await service.getFeed({ userId: viewerUserId, platform: 'web' })
 
       expect(result.items.length).toBe(1)
+    })
+  })
+
+  // Story 6.11 test owner: U-B-ROUTE-MATRIX, the paths its source walk cannot judge alone.
+  // The banned double stands in for the real read, so these fail on a path that skips the check.
+  describe('U-B-ROUTE-MATRIX: a banned member on each arm of a route', () => {
+    const banned = () =>
+      new ForbiddenException({
+        statusCode: 403,
+        code: 'community_banned',
+        message: 'Community access is suspended for this account.',
+        sanction: { kind: 'permanent', expiresAt: null, appealStatus: 'not_requested' },
+      })
+    const refusal = { status: 403, response: { code: 'community_banned' } }
+
+    it('refuses a feed card open ahead of the read, so a 404 tells nothing (TEA-17)', async () => {
+      const { service, assertNotSanctioned, findPostById, captureEvent } = createService()
+      assertNotSanctioned.mockRejectedValue(banned())
+      findPostById.mockResolvedValue(publishedPost)
+
+      await expect(
+        service.recordCardOpened({
+          userId: viewerUserId,
+          postId: publishedPost.id,
+          platform: 'web',
+          input: { surface: 'feed', rank: 0 } as never,
+        })
+      ).rejects.toMatchObject(refusal)
+      expect(findPostById).not.toHaveBeenCalled()
+      expect(captureEvent).not.toHaveBeenCalled()
+    })
+
+    it('refuses a spotlight open the same way (TEA-17)', async () => {
+      const { service, assertNotSanctioned, findPostById } = createService()
+      assertNotSanctioned.mockRejectedValue(banned())
+      findPostById.mockResolvedValue(publishedPost)
+      const capture = vi.fn().mockResolvedValue(undefined)
+      const spotlight = new CommunitySpotlightService(
+        {} as never,
+        service,
+        { captureEvent: capture } as never,
+        {} as never,
+        { now: () => new Date(SERVICE_REFERENCE_TIME) } as never,
+        'test'
+      )
+
+      await expect(
+        spotlight.recordOpened({
+          userId: viewerUserId,
+          postId: publishedPost.id,
+          platform: 'web',
+          surface: 'spotlight',
+          rank: 0,
+          level: 'city',
+        })
+      ).rejects.toMatchObject(refusal)
+      expect(capture).not.toHaveBeenCalled()
+    })
+
+    it('refuses an allocation replay, which would hand a banned member an upload URL (D8)', async () => {
+      const {
+        service,
+        assertNotSanctioned,
+        findPostByIdempotencyKey,
+        createUploadSession,
+      } = createService()
+      assertNotSanctioned.mockRejectedValue(banned())
+      const input = {
+        locale: 'en-US' as const,
+        contentType: 'image/jpeg' as const,
+        byteSize: 1024,
+        sha256: 'a'.repeat(64),
+        widthPx: 1080,
+        heightPx: 1350,
+      }
+      findPostByIdempotencyKey.mockResolvedValue({
+        ...ownPendingPost,
+        status: 'draft',
+        image_object_path: 'community/post-1/11111111-1111-4111-8111-111111111111.jpg',
+        image_checksum: input.sha256,
+        image_byte_size: input.byteSize,
+        image_content_type: input.contentType,
+      })
+
+      await expect(
+        service.allocatePost({
+          userId: viewerUserId,
+          idempotencyKey: 'replayed-key',
+          platform: 'web',
+          input,
+        })
+      ).rejects.toMatchObject(refusal)
+      expect(createUploadSession).not.toHaveBeenCalled()
     })
   })
 })

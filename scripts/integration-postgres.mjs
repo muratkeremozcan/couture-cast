@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Starts the same database the CI integration tier uses: stock postgres:17-alpine with
-// the roles and auth schema the PR checks' tests job provisions, read from pr-checks.yml so the
+// the roles and auth schema the PR checks' coverage shards provision, read from pr-checks.yml so the
 // two cannot drift.
 //
 // Local Supabase preloads extensions that CI's database does not, plpgsql_check among
@@ -30,16 +30,16 @@ const docker = (...args) => {
   return result.stdout.trim()
 }
 
-/** The provisioning SQL from the tests job's own step. */
+/** The provisioning SQL from the coverage shards' own step. */
 export function qualityGateProvisioningSql(
   workflow = fs.readFileSync('.github/workflows/pr-checks.yml', 'utf8')
 ) {
-  const step = parse(workflow).jobs.tests.steps.find(
+  const step = parse(workflow).jobs['tests-shard']?.steps.find(
     (candidate) =>
       candidate.name === 'Provision Supabase-compatible roles and auth schema'
   )
   const sql = /<<'SQL'\n([\s\S]*?)\nSQL/.exec(step?.run ?? '')?.[1]
-  if (!sql) throw new Error('tests job provisioning SQL not found')
+  if (!sql) throw new Error('coverage shard provisioning SQL not found')
   return sql
 }
 

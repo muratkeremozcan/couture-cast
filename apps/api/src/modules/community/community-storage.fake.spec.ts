@@ -54,7 +54,12 @@ describe('InMemoryCommunityStorage', () => {
 
   it('round-trips an uploaded object', async () => {
     const storage = new InMemoryCommunityStorage()
-    await storage.upload('community/p/s.jpg', Buffer.from('bytes'), 'image/jpeg')
+    await storage.upload(
+      'community/p/s.jpg',
+      Buffer.from('bytes'),
+      'image/jpeg',
+      await storage.createOverwriteCapability('community/p/s.jpg')
+    )
 
     await expect(storage.download('community/p/s.jpg')).resolves.toEqual(
       Buffer.from('bytes')

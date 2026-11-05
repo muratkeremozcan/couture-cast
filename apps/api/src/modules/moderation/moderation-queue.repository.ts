@@ -4,7 +4,9 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 import {
+  COMMUNITY_BAN_MARKER_PREFIX,
   COMMUNITY_MODERATION_REASON_CATEGORY,
+  MODERATION_OPERATOR_TAKEDOWN_REASON,
   MODERATION_REASON_RISK_RANK,
   MODERATION_REPORTER_BUMP_THRESHOLD,
   MODERATION_RISK_BY_RANK,
@@ -13,9 +15,17 @@ import {
   type ModerationCaseSource,
   type ModerationCasesQuery,
 } from '@couture/api-client/contracts/http'
+import { escalatedCaseKeys, orphanDecisions } from './moderation-decisions.repository.js'
 import type { ModerationQueuePosition } from './moderation-queue-cursor.js'
 
 export { MODERATION_QUEUE_READ_TABLES } from './moderation-queue-tables.js'
+
+/** The actions only the screening processor writes to `CommunityCommentAudit`. */
+const SCREENING_AUDIT_ACTIONS: readonly string[] = [
+  'held_for_review',
+  'blocked',
+  'screening_failed',
+]
 
 export type ParsedCaseId =
   | { kind: 'post'; source: 'post'; ref: string }
@@ -60,6 +70,8 @@ export interface ReportRecord {
   dueAt: Date
   acceptedAt: Date
   resolvedAt: Date | null
+  /** `screening` when the screener filed it, so a null reporter is not read as erased. */
+  origin: 'member' | 'screening'
 }
 
 export interface LoadedCase {
@@ -165,7 +177,9 @@ export class ModerationQueueRepository {
           r.sla_due_at, r.resolved_at,
           COALESCE(${validLocale("(r.content_snapshot->>'locale')")}, ${validLocale('c.locale')}) AS locale,
           NULLIF(r.content_snapshot->>'body', '') AS excerpt,
-          COALESCE(c.status::text IN ('held_for_review', 'blocked'), false) AS finding
+          COALESCE(c.status::text IN ('held_for_review', 'blocked'), false)
+            AND COALESCE(c.screening_reason <> ${MODERATION_OPERATOR_TAKEDOWN_REASON}
+              AND c.screening_reason NOT LIKE ${`${COMMUNITY_BAN_MARKER_PREFIX}%`}, true) AS finding
         FROM "CommunityCommentReport" r
         LEFT JOIN "CommunityComment" c ON c.id = r.comment_id
         ${reportFilter}`)
@@ -268,20 +282,25 @@ export class ModerationQueueRepository {
   }
 
   /** Loads everything one case detail needs, or null when no such case exists. */
-  async loadCase(id: ParsedCaseId): Promise<LoadedCase | null> {
-    return id.source === 'post' ? this.loadPostCase(id) : this.loadCommentCase(id)
+  /** Pass a transaction client so the case reads from the caller's snapshot. */
+  async loadCase(
+    id: ParsedCaseId,
+    db: Prisma.TransactionClient = this.prisma
+  ): Promise<LoadedCase | null> {
+    return id.source === 'post' ? this.loadPostCase(db, id) : this.loadCommentCase(db, id)
   }
 
   private async loadPostCase(
+    db: Prisma.TransactionClient,
     id: Extract<ParsedCaseId, { source: 'post' }>
   ): Promise<LoadedCase | null> {
     const rows =
       id.kind === 'post'
-        ? await this.prisma.communityPostReport.findMany({
+        ? await db.communityPostReport.findMany({
             where: { post_id: id.ref },
             orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
           })
-        : await this.prisma.communityPostReport.findMany({
+        : await db.communityPostReport.findMany({
             where: { id: id.ref, post_id: null },
           })
     if (rows.length === 0) return null
@@ -297,11 +316,12 @@ export class ModerationQueueRepository {
       dueAt: row.sla_due_at,
       acceptedAt: row.created_at,
       resolvedAt: row.resolved_at,
+      origin: row.origin,
     }))
 
     const post =
       id.kind === 'post'
-        ? await this.prisma.lookbookPost.findUnique({
+        ? await db.lookbookPost.findUnique({
             where: { id: id.ref },
             select: {
               user_id: true,
@@ -319,7 +339,7 @@ export class ModerationQueueRepository {
 
     const events =
       id.kind === 'post'
-        ? await this.prisma.moderationEvent.findMany({
+        ? await db.moderationEvent.findMany({
             where: {
               post_id: id.ref,
               OR: [{ action: null }, { action: { not: 'reported' } }],
@@ -333,6 +353,13 @@ export class ModerationQueueRepository {
               flagged_by_id: true,
             },
           })
+        : []
+    const decisions =
+      id.kind === 'orphan-post'
+        ? await orphanDecisions(
+            db,
+            reports.map((report) => report.id)
+          )
         : []
 
     return {
@@ -353,33 +380,43 @@ export class ModerationQueueRepository {
           }
         : null,
       comment: null,
-      aliases: await this.aliasesFor([
+      aliases: await this.aliasesFor(db, [
         ...reports.map((report) => report.reporterId),
         post?.user_id ?? null,
       ]),
-      priorActions: events.map((event) => ({
-        actorKind: event.reviewed_by_id
-          ? ('operator' as const)
-          : event.flagged_by_id
-            ? ('reporter' as const)
-            : ('screening' as const),
-        action: event.action ?? 'unknown',
-        reason: event.reason,
-        occurredAt: event.created_at,
-      })),
+      // An orphan's events lost their `post_id`, so its decision rows tell the history.
+      priorActions: [
+        ...events.map((event) => ({
+          actorKind: event.reviewed_by_id
+            ? ('operator' as const)
+            : event.flagged_by_id
+              ? ('reporter' as const)
+              : ('screening' as const),
+          action: event.action ?? 'unknown',
+          reason: event.reason,
+          occurredAt: event.created_at,
+        })),
+        ...decisions.map((decision) => ({
+          actorKind: 'operator' as const,
+          action: decision.action,
+          reason: decision.reason,
+          occurredAt: decision.decided_at,
+        })),
+      ],
     }
   }
 
   private async loadCommentCase(
+    db: Prisma.TransactionClient,
     id: Extract<ParsedCaseId, { source: 'comment' }>
   ): Promise<LoadedCase | null> {
     const rows =
       id.kind === 'comment'
-        ? await this.prisma.communityCommentReport.findMany({
+        ? await db.communityCommentReport.findMany({
             where: { comment_id: id.ref },
             orderBy: [{ accepted_at: 'asc' }, { id: 'asc' }],
           })
-        : await this.prisma.communityCommentReport.findMany({
+        : await db.communityCommentReport.findMany({
             where: { id: id.ref, comment_id: null },
           })
     if (rows.length === 0) return null
@@ -395,11 +432,12 @@ export class ModerationQueueRepository {
       dueAt: row.sla_due_at,
       acceptedAt: row.accepted_at,
       resolvedAt: row.resolved_at,
+      origin: row.origin,
     }))
 
     const comment =
       id.kind === 'comment'
-        ? await this.prisma.communityComment.findUnique({
+        ? await db.communityComment.findUnique({
             where: { id: id.ref },
             select: {
               user_id: true,
@@ -413,7 +451,7 @@ export class ModerationQueueRepository {
           })
         : null
 
-    const audits = await this.prisma.communityCommentAudit.findMany({
+    const audits = await db.communityCommentAudit.findMany({
       where: {
         report_id: { in: reports.map((report) => report.id) },
         action: { not: 'reported' },
@@ -439,13 +477,15 @@ export class ModerationQueueRepository {
               comment.parent?.status === 'published' ? comment.parent.body : null,
           }
         : null,
-      aliases: await this.aliasesFor([
+      aliases: await this.aliasesFor(db, [
         ...reports.map((report) => report.reporterId),
         comment?.user_id ?? null,
       ]),
-      // Comment audit rows carry no actor. Until 6.11 writes decisions the only row is `reported`.
+      // Comment audit rows carry no actor, so the action names who wrote it.
       priorActions: audits.map((audit) => ({
-        actorKind: 'operator' as const,
+        actorKind: SCREENING_AUDIT_ACTIONS.includes(audit.action)
+          ? ('screening' as const)
+          : ('operator' as const),
         action: audit.action,
         reason: audit.reason,
         occurredAt: audit.occurred_at,
@@ -453,11 +493,19 @@ export class ModerationQueueRepository {
     }
   }
 
+  /** The page's escalated cases, read after paging so the queue order and keyset are untouched. */
+  async escalatedCaseKeys(caseKeys: readonly string[]): Promise<ReadonlySet<string>> {
+    return escalatedCaseKeys(this.prisma, caseKeys)
+  }
+
   /** Reads aliases and never creates one. */
-  private async aliasesFor(userIds: (string | null)[]): Promise<Map<string, string>> {
+  private async aliasesFor(
+    db: Prisma.TransactionClient,
+    userIds: (string | null)[]
+  ): Promise<Map<string, string>> {
     const ids = [...new Set(userIds.filter((id): id is string => id !== null))]
     if (ids.length === 0) return new Map()
-    const rows = await this.prisma.communityAlias.findMany({
+    const rows = await db.communityAlias.findMany({
       where: { user_id: { in: ids } },
       select: { user_id: true, alias: true },
     })

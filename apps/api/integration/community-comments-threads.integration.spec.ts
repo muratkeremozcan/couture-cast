@@ -40,7 +40,10 @@ describe('Story 6.4 comment publication, threading and paging', () => {
     expect(
       (await service.submissions({ userId, postId, limit: 20 })).items[0]?.body
     ).toBe(request.body)
-    await Promise.all([processor.process(pending.id), processor.process(pending.id)])
+    await Promise.all([
+      processor.process(pending.id, 0),
+      processor.process(pending.id, 0),
+    ])
     expect((await roots(other.userId, postId)).items).toHaveLength(1)
     expect((await create(userId, postId, request)).status).toBe('published')
     const subject = await prisma.communityCommentAnalyticsSubject.findUniqueOrThrow({
@@ -223,11 +226,11 @@ describe('Story 6.4 comment publication, threading and paging', () => {
       pending
         .slice(0, 4)
         .reverse()
-        .map((row) => processor.process(row.id))
+        .map((row) => processor.process(row.id, 0))
     )
     const first = await roots(userId, postId, undefined, 2)
     expect(first.items).toHaveLength(2)
-    await Promise.all(pending.slice(4).map((row) => processor.process(row.id)))
+    await Promise.all(pending.slice(4).map((row) => processor.process(row.id, 0)))
     const second = await roots(userId, postId, first.nextCursor ?? undefined, 2)
     expect(second.hasNewer).toBe(true)
     expect(second.nextCursor).toBeNull()
@@ -317,7 +320,7 @@ describe('Story 6.4 comment publication, threading and paging', () => {
     const root = await publish(userId, postId)
     const reply = await create(userId, postId, input('Queued reply', root.id))
     await service.delete({ userId, postId, commentId: root.id, platform: 'web' })
-    await processor.process(reply.id)
+    await processor.process(reply.id, 0)
     expect(
       (await service.submissions({ userId, postId, limit: 20 })).items.find(
         (row) => row.id === reply.id
@@ -325,7 +328,7 @@ describe('Story 6.4 comment publication, threading and paging', () => {
     ).toBe('consent_suspended')
     const neverPublic = await create(userId, postId)
     await service.delete({ userId, postId, commentId: neverPublic.id, platform: 'web' })
-    await processor.process(neverPublic.id)
+    await processor.process(neverPublic.id, 0)
     expect((await roots(userId, postId)).items.map((row) => row.id)).toEqual([root.id])
   })
 
@@ -338,7 +341,7 @@ describe('Story 6.4 comment publication, threading and paging', () => {
       where: { id: author.postId },
       data: { status: 'withdrawn' },
     })
-    await processor.process(pending.id)
+    await processor.process(pending.id, 0)
     expect(
       await prisma.communityComment.findUniqueOrThrow({ where: { id: pending.id } })
     ).toMatchObject({

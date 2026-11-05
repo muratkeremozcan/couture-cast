@@ -16,12 +16,14 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type {
+  CommunityBannedError,
   CommunitySponsoredFeedItem as CommunityFeedItem,
   CommunitySponsoredSpotlightItem as CommunitySpotlightItem,
   CommunitySpotlightLevel,
 } from '@couture/api-client/contracts/http'
 import {
   communityFailureReason,
+  communitySanctionOf,
   getCommunityPostFromWeb,
   getCommunitySpotlightFromWeb,
 } from '../../lib/community'
@@ -69,6 +71,8 @@ const IDLE: CommunitySpotlightState = {
 type PostUpdate = (post: CommunityFeedItem | null) => CommunityFeedItem | null
 
 export interface UseCommunitySpotlightOptions<Token = number> {
+  /** Story 6.11: a read refused for a ban closes the whole community surface, on any page. */
+  onBanned?: (sanction: CommunityBannedError['sanction']) => void
   /** The session identity. Null keeps the module idle; a change reloads page one. */
   scope: string | null
   /**
@@ -108,11 +112,15 @@ function newEntries(
 /** Same read refusals as the feed render the localized disabled state, like mobile. */
 function isDisabledRefusal(error: unknown): boolean {
   const reason = communityFailureReason(error)
-  return reason === 'disabled' || reason === 'age_gate'
+  return reason === 'disabled' || reason === 'age_gate' || reason === 'banned'
 }
+
+const bannedSanctionOf = (error: unknown) =>
+  communityFailureReason(error) === 'banned' ? communitySanctionOf(error) : null
 
 export function useCommunitySpotlight<Token = number>({
   scope,
+  onBanned,
   beginRead,
   reconcile,
   announce,
@@ -126,6 +134,8 @@ export function useCommunitySpotlight<Token = number>({
   reconcileRef.current = reconcile
   const announceRef = useRef(announce)
   announceRef.current = announce
+  const onBannedRef = useRef(onBanned)
+  onBannedRef.current = onBanned
   // A response for an abandoned request (a reset, a reload or a newer page)
   // is dropped rather than painted over newer state.
   const generationRef = useRef(0)
@@ -174,6 +184,8 @@ export function useCommunitySpotlight<Token = number>({
           announceRef.current({ key: 'community.spotlight.announceRefreshed' })
       } catch (error: unknown) {
         if (!request.current()) return
+        const sanction = bannedSanctionOf(error)
+        if (sanction) onBannedRef.current?.(sanction)
         setState({ ...IDLE, status: isDisabledRefusal(error) ? 'disabled' : 'error' })
       }
     },
@@ -220,6 +232,12 @@ export function useCommunitySpotlight<Token = number>({
       // either moved, the server refuses it and paging restarts from page one.
       if (communityFailureReason(error) === 'cursor_invalid') {
         await loadFirstPage(true)
+        return
+      }
+      const sanction = bannedSanctionOf(error)
+      if (sanction) {
+        onBannedRef.current?.(sanction)
+        setState({ ...IDLE, status: 'disabled' })
         return
       }
       setState((current) => ({ ...current, loadingMore: false, moreFailed: true }))

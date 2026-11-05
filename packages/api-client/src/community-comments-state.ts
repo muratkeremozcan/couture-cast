@@ -575,6 +575,15 @@ export class CommunityCommentsState {
     // A target's reply page may still be loading when this refresh captures its bounds.
     if (focus?.parentId && !replyBounds.has(focus.parentId))
       replyBounds.set(focus.parentId, 1)
+    // Invalidating dropped the answer of any first expansion in flight, and its parent has no captured
+    // page, so nothing else would read it again and its Replies button would stay collapsed.
+    for (const pending of this.pendingLoads.values())
+      if (
+        pending.postId === postId &&
+        pending.parentId &&
+        !replyBounds.has(pending.parentId)
+      )
+        replyBounds.set(pending.parentId, 1)
     try {
       await this.refreshLocation(postId, owns, signal)
       if (!owns()) throw new CommunityRequestSuperseded()

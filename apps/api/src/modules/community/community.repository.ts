@@ -4,6 +4,7 @@
 import type { CommunityAuthorizationBudget } from './community-availability.js'
 import {
   assertCommunityDatabaseAccess,
+  assertCommunityMemberNotSanctioned,
   assertCommunityReadEligibility,
   assertCommunitySubjectPresent,
 } from './community-access.service.js'
@@ -213,6 +214,10 @@ export class CommunityRepository {
   assertSubjectAvailable(member: string, budget: CommunityAuthorizationBudget) {
     return assertCommunitySubjectPresent(this.prisma, member, budget)
   }
+  /** For a route with no transaction of its own. */
+  assertNotSanctioned(member: string) {
+    return assertCommunityMemberNotSanctioned(this.prisma, member)
+  }
 
   /** One statement supplies every aggregate and viewer revision from one MVCC snapshot. */
   async reactionSummaries(
@@ -256,6 +261,7 @@ export class CommunityRepository {
     return interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       await assertCommunitySubjectAvailable(tx, userId)
+      await assertCommunityMemberNotSanctioned(tx, userId)
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
       await params.assertEligible(tx, false)
       const post = await tx.lookbookPost.findUnique({ where: { id: postId } })
@@ -440,6 +446,13 @@ export class CommunityRepository {
       where: {
         user_id: userId,
         status: { in: [...AUTHOR_STATE_STATUSES] as never },
+        // An expired draft waits for storage cleanup and can no longer publish. Filtered before the
+        // limit, so a pile of them cannot push out a held or failed post.
+        OR: [
+          { status: { not: 'draft' } },
+          { upload_expires_at: null },
+          { upload_expires_at: { gte: new Date() } },
+        ],
       },
       orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
       take: MAX_AUTHOR_STATES,
@@ -674,6 +687,27 @@ export class CommunityRepository {
     })
   }
 
+  /**
+   * Run after a replay mints its token, because the row can change while minting waits. A draft's
+   * expiry only moves forward, since two replays can finish in either order. False means the row has
+   * gone or erasure has taken it, and the token must never reach the client.
+   */
+  async confirmAllocationReplay(postId: string, expiresAt: Date): Promise<boolean> {
+    await this.prisma.lookbookPost.updateMany({
+      where: {
+        id: postId,
+        status: 'draft',
+        erasure_requested_at: null,
+        OR: [{ upload_expires_at: null }, { upload_expires_at: { lt: expiresAt } }],
+      },
+      data: { upload_expires_at: expiresAt },
+    })
+    const live = await this.prisma.lookbookPost.count({
+      where: { id: postId, erasure_requested_at: null, anonymized_at: null },
+    })
+    return live === 1
+  }
+
   async createModerationOutbox(postId: string): Promise<CommunityModerationOutbox> {
     return this.prisma.communityModerationOutbox.upsert({
       where: { post_id: postId },
@@ -724,6 +758,7 @@ export class CommunityRepository {
     try {
       return await interactiveTransaction(this.prisma, async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_report:' || ${reporterId}))`
+        await assertCommunityMemberNotSanctioned(tx, reporterId)
 
         const locked = await tx.$queryRaw<
           {

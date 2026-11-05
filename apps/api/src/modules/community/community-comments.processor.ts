@@ -13,6 +13,11 @@ import { PUBLICLY_VISIBLE_POST_WHERE } from './community.repository.js'
 import { commentAnalytics } from './community-comments.repository.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
+export interface StaleScreeningSelection {
+  generation: number
+  updatedAt: Date
+}
+
 export class CommunityCommentsProcessor {
   constructor(
     private readonly prisma: PrismaClient,
@@ -20,16 +25,14 @@ export class CommunityCommentsProcessor {
     private readonly flags?: Pick<FeatureFlagsService, 'getFeatureFlag'>
   ) {}
 
-  async process(commentId: string, generation?: number): Promise<void> {
+  async process(commentId: string, generation: number): Promise<void> {
     const input = await this.prisma.communityComment.findUnique({
       where: { id: commentId },
     })
-    if (generation !== undefined) {
-      const outbox = await this.prisma.communityCommentScreeningOutbox.findUnique({
-        where: { comment_id: commentId },
-      })
-      if (!outbox || outbox.generation !== generation) return
-    }
+    const outbox = await this.prisma.communityCommentScreeningOutbox.findUnique({
+      where: { comment_id: commentId },
+    })
+    if (!outbox || outbox.generation !== generation) return
     if (!input || input.status !== 'pending_screening' || !input.body || !input.user_id)
       return
     if (!(await this.rolloutAllows(input.user_id))) {
@@ -58,7 +61,7 @@ export class CommunityCommentsProcessor {
         const [owned] = await tx.$queryRaw<
           { generation: number }[]
         >`SELECT generation FROM "CommunityCommentScreeningOutbox" WHERE comment_id=${commentId} FOR UPDATE`
-        if (generation !== undefined && owned?.generation !== generation) return
+        if (owned?.generation !== generation) return
         const current = await tx.communityComment.findUnique({ where: { id: commentId } })
         if (
           !current ||
@@ -139,13 +142,39 @@ export class CommunityCommentsProcessor {
     )
   }
 
-  async markFailed(commentId: string, stale = false, generation?: number): Promise<void> {
+  /** A final-attempt failure. Old work's failure says nothing about the generation that replaced it. */
+  async markFailed(commentId: string, generation: number): Promise<void> {
+    await this.fail(commentId, generation, (owned) => owned?.generation === generation)
+  }
+
+  /**
+   * The stale sweep's failure, fenced on the outbox row the sweep selected: recovery may have
+   * re-armed it since, and a re-armed row has a fresh clock. `selected` is null when the comment had
+   * no outbox row, and then a row appearing since is new work too.
+   */
+  async failStale(
+    commentId: string,
+    selected: StaleScreeningSelection | null
+  ): Promise<void> {
+    await this.fail(commentId, selected?.generation, (owned) =>
+      selected
+        ? owned?.generation === selected.generation &&
+          owned.updated_at.getTime() === selected.updatedAt.getTime()
+        : !owned
+    )
+  }
+
+  private async fail(
+    commentId: string,
+    generation: number | undefined,
+    owns: (owned: { generation: number; updated_at: Date } | undefined) => boolean
+  ): Promise<void> {
     const row = await this.prisma.communityComment.findUnique({
       where: { id: commentId },
     })
     if (!row?.user_id) return
     if (!(await this.rolloutAllows(row.user_id))) {
-      await this.defer(commentId, generation)
+      if (generation !== undefined) await this.defer(commentId, generation)
       return
     }
     await interactiveTransaction(this.prisma, async (tx) => {
@@ -154,8 +183,7 @@ export class CommunityCommentsProcessor {
       const [owned] = await tx.$queryRaw<
         { generation: number; updated_at: Date }[]
       >`SELECT generation,updated_at FROM "CommunityCommentScreeningOutbox" WHERE comment_id=${commentId} FOR UPDATE`
-      if (generation !== undefined && owned?.generation !== generation) return
-      if (stale && owned && owned.updated_at.getTime() > Date.now() - 15 * 60_000) return
+      if (!owns(owned)) return
       const updated = await tx.communityComment.updateMany({
         where: { id: commentId, status: 'pending_screening' },
         data: {
@@ -183,11 +211,11 @@ export class CommunityCommentsProcessor {
     }
   }
 
-  private async defer(commentId: string, generation?: number): Promise<void> {
+  private async defer(commentId: string, generation: number): Promise<void> {
     await this.prisma.communityCommentScreeningOutbox.updateMany({
       where: {
         comment_id: commentId,
-        ...(generation === undefined ? {} : { generation }),
+        generation,
         comment: { status: 'pending_screening' },
       },
       data: { generation: { increment: 1 }, dispatched_at: null },
@@ -205,6 +233,7 @@ export class CommunityCommentsProcessor {
       data: {
         comment_id: commentId,
         reason: 'inappropriate_content',
+        origin: 'screening',
         accepted_at: now,
         routed_at: now,
         sla_due_at: new Date(now.getTime() + 86_400_000),

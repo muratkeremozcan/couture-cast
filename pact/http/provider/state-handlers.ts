@@ -13,6 +13,7 @@ import {
 } from './doubles/share-cards'
 import {
   configureModerationConsole,
+  configureModerationDecisions,
   configureModerationScenario,
   type ModerationScenario,
 } from './doubles/moderation'
@@ -127,10 +128,16 @@ const nativeShareState = (value: ShareCardNativeShare, description: string) => (
 
 /** Story 6.10: the moderator console world a state names. */
 const moderationState =
-  (scenario: ModerationScenario, description: string, enabled = true) =>
+  (
+    scenario: ModerationScenario,
+    description: string,
+    enabled = true,
+    decisionsEnabled = true
+  ) =>
   () => {
     configureModerationScenario(scenario)
     configureModerationConsole(enabled)
+    configureModerationDecisions(decisionsEnabled)
     return Promise.resolve({ description })
   }
 
@@ -179,6 +186,45 @@ export const stateHandlers: StateHandlers = {
     'queue',
     'Configured moderation_console_enabled off',
     false
+  ),
+  // Story 6.11: the decision and appeal writes, and the banned member's feed refusal.
+  'A moderator applies a decision to an open case': moderationState(
+    'decision_applied',
+    'Configured an open case with a published target'
+  ),
+  'A moderator retries a ban that already applied': moderationState(
+    'decision_replayed',
+    'Configured a stored ban decision for the presented mutation id'
+  ),
+  'A moderator decides from a stale reading of the case': moderationState(
+    'case_conflict',
+    'Configured a case whose revision moved'
+  ),
+  'A moderator releases a case whose target is not held': moderationState(
+    'action_not_applicable',
+    'Configured an open case whose target is published'
+  ),
+  'A moderator rules on a case they reported': moderationState(
+    'self_review_refused',
+    'Configured a case the moderator is party to'
+  ),
+  'A moderator orders a ban only an admin may order': moderationState(
+    'admin_required',
+    'Configured an open case for a moderator who is not an admin'
+  ),
+  'Moderation decisions are turned off': moderationState(
+    'decision_applied',
+    'Configured moderation_decisions_enabled off',
+    true,
+    false
+  ),
+  'A moderator records an appeal request on a ban': moderationState(
+    'appeal_applied',
+    'Configured an active ban whose appeal was never requested'
+  ),
+  'A banned member reads the community feed': moderationState(
+    'banned_feed',
+    'Configured an active temporary ban on the reading member'
   ),
   'An eligible member prepares a share card': shareCardState(
     'prepared',

@@ -1,7 +1,9 @@
 import { ServiceUnavailableException } from '@nestjs/common'
-import type {
-  CommunityStorage,
-  CommunityUploadSession,
+import {
+  COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS,
+  type CommunityOverwriteCapability,
+  type CommunityStorage,
+  type CommunityUploadSession,
 } from './community-storage.adapter.js'
 
 /**
@@ -64,7 +66,20 @@ export class InMemoryCommunityStorage implements CommunityStorage {
     return Promise.resolve(bytes)
   }
 
-  upload(objectPath: string, bytes: Buffer, _mimeType: string): Promise<void> {
+  createOverwriteCapability(objectPath: string): Promise<CommunityOverwriteCapability> {
+    return Promise.resolve({
+      objectPath,
+      token: `overwrite:${objectPath}`,
+      expiresAt: new Date(Date.now() + COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS),
+    })
+  }
+
+  upload(
+    objectPath: string,
+    bytes: Buffer,
+    _mimeType: string,
+    _capability: CommunityOverwriteCapability
+  ): Promise<void> {
     this.objects.set(objectPath, bytes)
     return Promise.resolve()
   }

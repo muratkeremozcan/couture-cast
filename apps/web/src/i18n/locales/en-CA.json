@@ -608,7 +608,8 @@
       "notFound": "This look is no longer available.",
       "disabled": "The community feed is temporarily unavailable.",
       "mediaUnavailable": "This look is temporarily unavailable. Try again shortly.",
-      "generic": "Something went wrong. Try again."
+      "generic": "Something went wrong. Try again.",
+      "banned": "Your community access is suspended."
     },
     "reactions": {
       "label": "Reactions",
@@ -703,6 +704,18 @@
       "back": "Back to community",
       "bindingConflict": "This device's notification registration changed. Try again.",
       "pushUnavailable": "Push notifications are not available on this device."
+    },
+    "banned": {
+      "title": "Your community access is suspended",
+      "temporary": "You can return after {{until}}. Until then you cannot view or take part in the community.",
+      "permanent": "This suspension has no end date. You cannot view or take part in the community.",
+      "scope": "Your wardrobe, daily ritual, alerts and account settings are not affected.",
+      "appeal": {
+        "not_requested": "If you think this is a mistake, contact CoutureCast support to ask for a review.",
+        "requested": "Your request for a review has been recorded and is waiting for a decision.",
+        "upheld": "Your request for a review was considered, and this suspension stays in place.",
+        "overturned": "This suspension was lifted."
+      }
     }
   },
   "locations": {
@@ -929,7 +942,8 @@
       "reports": "Reports: {{count}}",
       "finding": "Screening finding",
       "refreshing": "Refreshing",
-      "refreshed": "Refreshed from the first page. Cases shown: {{count}}"
+      "refreshed": "Refreshed from the first page. Cases shown: {{count}}",
+      "escalated": "Escalated"
     },
     "detail": {
       "title": "{{source}} case",
@@ -958,7 +972,153 @@
       "heldNoCodes": "Held for review without a recorded code.",
       "reporters": "Reporters",
       "priorActions": "Prior actions",
-      "noPriorActions": "No prior actions."
+      "noPriorActions": "No prior actions.",
+      "firstDecision": "First decision {{when}}",
+      "escalated": "This case is waiting for an admin. Only an admin can close it.",
+      "reporterScreening": "Automated screening"
+    },
+    "action": {
+      "flagged": "Flagged by screening",
+      "screening_passed": "Passed screening",
+      "held_for_review": "Held for review",
+      "blocked": "Blocked by screening",
+      "screening_failed": "Screening could not finish",
+      "released_by_operator": "Released",
+      "release": "Released",
+      "taken_down_by_operator": "Taken down",
+      "takedown": "Taken down",
+      "report_resolved": "Report resolved",
+      "resolve": "Report resolved",
+      "escalated_by_operator": "Escalated to an admin",
+      "escalate": "Escalated to an admin",
+      "banned_by_operator": "Author banned",
+      "ban": "Author banned",
+      "appeal_requested": "Appeal recorded",
+      "appeal_upheld": "Ban upheld on appeal",
+      "appeal_overturned": "Ban overturned on appeal",
+      "unknown": "Other action"
+    },
+    "decision": {
+      "title": "Decision",
+      "actionLabel": "Action",
+      "action": {
+        "resolve": "Resolve",
+        "release": "Release",
+        "takedown": "Take down",
+        "escalate": "Escalate",
+        "ban": "Ban the author"
+      },
+      "hint": {
+        "resolve": "Close every open report. The content stays as it is.",
+        "release": "Publish the held content and close every open report.",
+        "takedown": "Remove the content from the community and close every open report.",
+        "escalate": "Ask an admin to decide. The reports stay open and the time keeps running.",
+        "ban": "Close the author's community access, take this content down and close every open report."
+      },
+      "banKind": "Ban type",
+      "duration": "Duration",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "reason": "Reason (required)",
+      "reasonCount": "{{count}} of {{max}} characters, at least {{min}}",
+      "submit": "Apply decision",
+      "submitting": "Applying",
+      "confirmYes": "Yes, apply it",
+      "cancel": "Cancel",
+      "confirm": {
+        "takedown": "Take this content down now? Readers lose it on their next read.",
+        "ban_temporary": "Ban this author for the chosen time? Their community access closes at once.",
+        "ban_permanent": "Ban this author permanently? All their community content is hidden and their reactions are withdrawn."
+      },
+      "outcome": {
+        "resolve": "The reports are resolved.",
+        "release": "The content is published and the reports are resolved.",
+        "takedown": "The content is down and the reports are resolved.",
+        "escalate": "The case is escalated to an admin.",
+        "banTemporary": "The author is banned until {{until}}.",
+        "banPermanent": "The author is permanently banned.",
+        "deferred": "Some public pages may take a moment to catch up."
+      },
+      "detail": {
+        "no_open_reports": "This case has no open reports.",
+        "target_not_held": "This content is not being held, so it cannot be released.",
+        "target_not_published": "This content is not published, so it cannot be taken down.",
+        "already_escalated": "This case is already escalated.",
+        "target_erased": "The content or its author has been erased, so this action no longer applies.",
+        "subject_banned": "The author is banned, so this content cannot be released.",
+        "already_banned": "The author already has a ban that covers this.",
+        "author_ineligible": "The author cannot take part in the community right now, so this content cannot be released.",
+        "community_writes_closed": "Community publishing is closed for this author, so this content cannot be released yet."
+      },
+      "error": {
+        "invalid_decision": "The decision could not be read. Check the reason and try again.",
+        "case_not_found": "This case no longer exists. It may have been re-keyed after an erasure.",
+        "sanction_not_found": "This sanction no longer exists.",
+        "moderation_console_disabled": "The moderation console is turned off.",
+        "moderation_decisions_disabled": "Moderation decisions are turned off. Cases stay readable.",
+        "self_review_refused": "You wrote this content or filed one of its reports, so another moderator must decide.",
+        "admin_required": "This decision needs an admin. Escalate the case to hand it over.",
+        "operator_sanctioned": "This account has an active community ban, so it cannot apply decisions.",
+        "case_conflict": "This case changed since you opened it. Reload to see what changed. Your reason stays here.",
+        "action_not_applicable": "That action does not apply to the case as it stands.",
+        "idempotency_mismatch": "This request was already used for a different decision. Reload and try again.",
+        "appeal_transition_invalid": "That appeal step does not apply to this sanction now.",
+        "audit_unavailable": "The decision could not be recorded, so nothing changed. Try again.",
+        "signed_out": "Sign in again to continue.",
+        "forbidden": "This account cannot apply moderation decisions.",
+        "rate_limited": "Too many requests. Wait a moment, then try again.",
+        "offline": "The decision may not have reached the server. Try again: it will not apply twice.",
+        "unavailable": "The decision could not be applied right now. Try again."
+      }
+    },
+    "standing": {
+      "title": "Author standing",
+      "state": "Ban",
+      "active": "Active",
+      "ended": "Ended",
+      "kindLabel": "Type",
+      "kind": {
+        "temporary": "Temporary",
+        "permanent": "Permanent"
+      },
+      "expires": "Ends",
+      "appealLabel": "Appeal",
+      "appeal": {
+        "not_requested": "None recorded",
+        "requested": "Waiting for a decision",
+        "upheld": "Ban upheld",
+        "overturned": "Ban overturned"
+      },
+      "priorBans": "Earlier bans",
+      "none": "No bans on record.",
+      "appealReason": "Appeal note (required)",
+      "step": {
+        "requested": "Record an appeal",
+        "upheld": "Uphold the ban",
+        "overturned": "Overturn the ban"
+      },
+      "outcome": {
+        "requested": "The appeal is recorded.",
+        "upheld": "The ban stays in place.",
+        "overturned": "The ban is lifted. The member's content returned where they are still eligible."
+      }
+    },
+    "targetStatus": {
+      "draft": "Draft",
+      "uploading": "Uploading",
+      "pending_review": "Waiting for screening",
+      "pending_screening": "Waiting for screening",
+      "published": "Published",
+      "flagged": "Hidden, held for moderation",
+      "review_failed": "Screening failed",
+      "screening_failed": "Screening failed",
+      "withdrawn": "Withdrawn by the author",
+      "consent_suspended": "Suspended, consent lapsed",
+      "held_for_review": "Held for review",
+      "blocked": "Blocked",
+      "author_deleted": "Deleted by the author",
+      "erased": "Erased",
+      "unknown": "Other status"
     }
   }
 }

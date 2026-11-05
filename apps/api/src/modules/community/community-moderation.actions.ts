@@ -9,9 +9,50 @@ import {
   ForbiddenException,
   ServiceUnavailableException,
 } from '@nestjs/common'
-import { PrismaClient, type LookbookPost } from '@prisma/client'
+import {
+  Prisma,
+  PrismaClient,
+  type CommunityComment,
+  type LookbookPost,
+} from '@prisma/client'
+import { MODERATION_OPERATOR_TAKEDOWN_REASON } from '@couture/api-client/contracts/http'
 import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
+import { commentAnalytics } from './community-comments.repository.js'
+import { recordCommunityEngagement } from './community-engagement-intent.js'
+import { isPubliclyVisiblePost } from './community.repository.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { postgresError } from '../../prisma/postgres-error.js'
+
+/** A moderation record could not be written, so the decision cannot be attributed. */
+export class ModerationRecordWriteError extends Error {
+  constructor(cause: unknown) {
+    super('A moderation record could not be written.', { cause })
+    this.name = 'ModerationRecordWriteError'
+  }
+}
+
+/**
+ * Writes one attributed record. A failure rolls the transaction back and reads as one closed
+ * error, except a unique violation and a retryable lock failure, which their callers handle.
+ */
+export async function writeModerationRecord<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write()
+  } catch (error) {
+    const prisma = error instanceof Prisma.PrismaClientKnownRequestError ? error.code : ''
+    const sql = postgresError(error)?.code ?? ''
+    if (['P2002', 'P2034'].includes(prisma) || ['40001', '40P01', '55P03'].includes(sql))
+      throw error
+    throw new ModerationRecordWriteError(error)
+  }
+}
+
+/** Who decided, in their words, at the one time of the decision. */
+export interface OperatorEffect {
+  operatorId: string
+  reason: string
+  at: Date
+}
 
 /**
  * The operator half of moderation: resolving a report, releasing a post the
@@ -32,16 +73,10 @@ import { interactiveTransaction } from '../../prisma/prisma-client.js'
  * action against a safety verdict that cannot be attributed is worth less than
  * one that can.
  *
- * ONLY THE READ HALF ROUTES TODAY. Story 6.10 added the moderator queue and case detail
- * (`GET /api/v1/moderation/cases` and `.../cases/:caseId`, `moderation-queue.controller.ts`),
- * which read the report tables and change nothing. The methods below still have no HTTP path:
- * a flagged post can only be released, and a published one only taken down, by calling them from
- * a script against the production database, until Story 6.11 routes the decision actions through
- * canonical contracts. Anyone operating this feature before 6.11 should know that up front.
- *
- * The write endpoint was left out deliberately rather than forgotten. Story 6.11 owns the
- * decision contract, and inventing it before the queue existed would have committed 6.11 to a
- * shape drawn without its requirements.
+ * Story 6.10 added the reads and Story 6.11 routes the writes: `POST /api/v1/moderation/cases/:caseId/decisions`
+ * composes the transaction-scoped `apply*` and `resolveOpen*` methods below inside one decision
+ * transaction, and writes the attributed `ModerationDecision` beside them. The three standalone
+ * methods remain for controlled operator scripts and test helpers. They write no decision row.
  */
 @Injectable()
 export class CommunityModerationActionsService {
@@ -107,34 +142,7 @@ export class CommunityModerationActionsService {
         throw error
       }
 
-      await tx.lookbookPost.update({
-        where: { id: postId },
-        data: {
-          status: 'published',
-          // `??` rather than an assignment: a post that was published, taken
-          // down, and then released keeps its original publication time, so it
-          // returns to where it was in the feed instead of jumping to the top of
-          // it. Feed ordering is `published_at, id` DESC.
-          published_at: post.published_at ?? releasedAt,
-          // `moderation_reason` and `moderation_engine_version` are left exactly
-          // as the screener wrote them. See the method comment.
-        },
-      })
-
-      await tx.moderationEvent.create({
-        data: {
-          post_id: postId,
-          reviewed_by_id: operatorId,
-          action: 'released_by_operator',
-          // The operator's own words, and NULL when they give none, rather than
-          // a sentence assembled around a machine value.
-          reason: reason.trim() || null,
-          overridden_engine_version: post.moderation_engine_version,
-          image_object_path: post.image_object_path,
-          content_snapshot: buildCommunityContentSnapshot(post, releasedAt),
-          created_at: releasedAt,
-        },
-      })
+      await this.applyPostRelease(tx, post, { operatorId, reason, at: releasedAt })
 
       return { released: true as const, engineVersion: post.moderation_engine_version }
     })
@@ -180,25 +188,7 @@ export class CommunityModerationActionsService {
         return { takenDown: false }
       }
 
-      await tx.lookbookPost.update({
-        where: { id: postId },
-        data: {
-          status: 'flagged',
-          moderation_reason: reason,
-        },
-      })
-
-      await tx.moderationEvent.create({
-        data: {
-          post_id: postId,
-          reviewed_by_id: operatorId,
-          action: 'taken_down_by_operator',
-          reason,
-          image_object_path: post.image_object_path,
-          content_snapshot: buildCommunityContentSnapshot(post, takenDownAt),
-          created_at: takenDownAt,
-        },
-      })
+      await this.applyPostTakedown(tx, post, { operatorId, reason, at: takenDownAt })
 
       return { takenDown: true }
     })
@@ -283,6 +273,223 @@ export class CommunityModerationActionsService {
     return { resolved: outcome.resolved }
   }
 
+  /** Publishes a flagged post. The caller holds the locks and has checked eligibility. */
+  async applyPostRelease(
+    tx: Prisma.TransactionClient,
+    post: LookbookPost,
+    { operatorId, reason, at }: OperatorEffect
+  ): Promise<void> {
+    await tx.lookbookPost.update({
+      where: { id: post.id },
+      data: {
+        status: 'published',
+        // `??` rather than an assignment: a post that was published, taken
+        // down, and then released keeps its original publication time, so it
+        // returns to where it was in the feed instead of jumping to the top of
+        // it. Feed ordering is `published_at, id` DESC.
+        published_at: post.published_at ?? at,
+        // `moderation_reason` and `moderation_engine_version` are left exactly
+        // as the screener wrote them. See `releaseFlaggedPost`.
+      },
+    })
+
+    await writeModerationRecord(() =>
+      tx.moderationEvent.create({
+        data: {
+          post_id: post.id,
+          reviewed_by_id: operatorId,
+          action: 'released_by_operator',
+          // The operator's own words, and NULL when they give none, rather than
+          // a sentence assembled around a machine value.
+          reason: reason.trim() || null,
+          overridden_engine_version: post.moderation_engine_version,
+          image_object_path: post.image_object_path,
+          content_snapshot: buildCommunityContentSnapshot(post, at),
+          created_at: at,
+        },
+      })
+    )
+  }
+
+  /** Hides a published post as `flagged`. See `takeDownPublishedPost` for why that status. */
+  async applyPostTakedown(
+    tx: Prisma.TransactionClient,
+    post: LookbookPost,
+    { operatorId, reason, at }: OperatorEffect
+  ): Promise<void> {
+    await tx.lookbookPost.update({
+      where: { id: post.id },
+      data: { status: 'flagged', moderation_reason: reason },
+    })
+
+    await writeModerationRecord(() =>
+      tx.moderationEvent.create({
+        data: {
+          post_id: post.id,
+          reviewed_by_id: operatorId,
+          action: 'taken_down_by_operator',
+          reason,
+          image_object_path: post.image_object_path,
+          content_snapshot: buildCommunityContentSnapshot(post, at),
+          created_at: at,
+        },
+      })
+    )
+  }
+
+  /**
+   * True when a held comment could publish now: its post is public and, for a reply, its root is
+   * published. The rule the screening processor applies at publication.
+   */
+  async commentCanPublish(
+    tx: Prisma.TransactionClient,
+    comment: Pick<CommunityComment, 'post_id' | 'parent_id'>
+  ): Promise<boolean> {
+    const post = await tx.lookbookPost.findUnique({ where: { id: comment.post_id } })
+    if (!post || !isPubliclyVisiblePost(post)) return false
+    if (!comment.parent_id) return true
+    const root = await tx.communityComment.findFirst({
+      where: {
+        id: comment.parent_id,
+        post_id: comment.post_id,
+        parent_id: null,
+        status: 'published',
+      },
+      select: { id: true },
+    })
+    return root !== null
+  }
+
+  /**
+   * Publishes a held comment.
+   *
+   * A comment published before keeps its sequence, so it returns to its place in the thread.
+   * Engagement and analytics have no dedupe for a second publication, so only a first one
+   * records them.
+   */
+  async applyCommentRelease(
+    tx: Prisma.TransactionClient,
+    comment: CommunityComment,
+    { at }: Pick<OperatorEffect, 'at'>
+  ): Promise<void> {
+    const firstPublication = comment.publication_sequence === null
+    let sequence = comment.publication_sequence
+    let postAuthor: string | null = null
+    if (firstPublication) {
+      const post = await tx.lookbookPost.update({
+        where: { id: comment.post_id },
+        data: { comment_publication_sequence: { increment: 1 } },
+      })
+      sequence = post.comment_publication_sequence
+      postAuthor = post.user_id
+    }
+    await tx.communityComment.update({
+      where: { id: comment.id },
+      data: {
+        status: 'published',
+        published_at: comment.published_at ?? at,
+        publication_sequence: sequence,
+        screening_reason: null,
+      },
+    })
+    if (firstPublication && comment.user_id) {
+      await commentAnalytics(
+        tx,
+        comment.user_id,
+        'community_comment_published',
+        comment.platform,
+        comment.user_id === postAuthor,
+        comment.parent_id !== null
+      )
+      await recordCommunityEngagement(tx, {
+        actor: comment.user_id,
+        post: comment.post_id,
+        comment: comment.id,
+      })
+    }
+  }
+
+  /**
+   * Hides a published comment as `blocked`. The body stays as evidence and the operator's words
+   * stay on the decision, so the stored reason is one closed value that reads as no finding.
+   */
+  async applyCommentTakedown(
+    tx: Prisma.TransactionClient,
+    comment: Pick<CommunityComment, 'id'>
+  ): Promise<void> {
+    await tx.communityComment.update({
+      where: { id: comment.id },
+      data: {
+        status: 'blocked',
+        screening_reason: MODERATION_OPERATOR_TAKEDOWN_REASON,
+      },
+    })
+  }
+
+  /**
+   * Stamps every still-open post report among `reportIds` with one time and records each one.
+   * The null predicate keeps a stamped `resolved_at` where it is, so a later decision cannot make
+   * a late resolution look punctual.
+   */
+  async resolveOpenPostReports(
+    tx: Prisma.TransactionClient,
+    reportIds: readonly string[],
+    { operatorId, reason, at }: OperatorEffect
+  ): Promise<number> {
+    const open = await tx.communityPostReport.findMany({
+      where: { id: { in: [...reportIds] }, resolved_at: null },
+    })
+    if (open.length === 0) return 0
+    await tx.communityPostReport.updateMany({
+      where: { id: { in: open.map((report) => report.id) }, resolved_at: null },
+      data: { resolved_at: at },
+    })
+    await writeModerationRecord(() =>
+      tx.moderationEvent.createMany({
+        data: open.map((report) => ({
+          post_id: report.post_id,
+          reviewed_by_id: operatorId,
+          action: 'report_resolved',
+          reason,
+          subject_alias: report.subject_alias,
+          image_object_path: report.image_object_path,
+          content_snapshot: (report.content_snapshot ??
+            undefined) as Prisma.InputJsonValue,
+          created_at: at,
+        })),
+      })
+    )
+    return open.length
+  }
+
+  /** The comment form of `resolveOpenPostReports`, with one audit row per stamped report. */
+  async resolveOpenCommentReports(
+    tx: Prisma.TransactionClient,
+    reportIds: readonly string[],
+    { reason, at }: Pick<OperatorEffect, 'reason' | 'at'>
+  ): Promise<number> {
+    const open = await tx.communityCommentReport.findMany({
+      where: { id: { in: [...reportIds] }, resolved_at: null },
+      select: { id: true },
+    })
+    if (open.length === 0) return 0
+    await tx.communityCommentReport.updateMany({
+      where: { id: { in: open.map((report) => report.id) }, resolved_at: null },
+      data: { resolved_at: at },
+    })
+    await writeModerationRecord(() =>
+      tx.communityCommentAudit.createMany({
+        data: open.map((report) => ({
+          report_id: report.id,
+          action: 'report_resolved',
+          reason,
+          occurred_at: at,
+        })),
+      })
+    )
+    return open.length
+  }
+
   /**
    * Locks the post row for the duration of the transaction.
    *
@@ -290,7 +497,7 @@ export class CommunityModerationActionsService {
    * without the lock two operators acting at once could each read `flagged` and
    * both write an audit row for a release that only happened once.
    */
-  private async lockPost(
+  async lockPost(
     tx: Pick<PrismaClient, '$queryRaw' | 'lookbookPost'>,
     postId: string
   ): Promise<LookbookPost> {

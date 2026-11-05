@@ -13,14 +13,23 @@
 
 import * as runtime from '../runtime'
 import type {
+  ApplyModerationDecision200Response,
+  ApplyModerationDecisionRequest,
   GetModerationCase200Response,
   ListModerationCases200Response,
   ModerationActionInput,
+  RecordModerationAppeal200Response,
+  RecordModerationAppealRequest,
   TrackedResponse,
 } from '../models/index'
 
 export interface ApiV1ModerationActionsPostRequest {
   moderationActionInput: ModerationActionInput
+}
+
+export interface ApplyModerationDecisionOperationRequest {
+  caseId: string
+  applyModerationDecisionRequest: ApplyModerationDecisionRequest
 }
 
 export interface GetModerationCaseRequest {
@@ -35,6 +44,11 @@ export interface ListModerationCasesRequest {
   sla?: ListModerationCasesSlaEnum
   limit?: number
   cursor?: string
+}
+
+export interface RecordModerationAppealOperationRequest {
+  sanctionId: string
+  recordModerationAppealRequest: RecordModerationAppealRequest
 }
 
 /**
@@ -95,6 +109,86 @@ export class ModerationApi extends runtime.BaseAPI {
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<TrackedResponse> {
     const response = await this.apiV1ModerationActionsPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for applyModerationDecision without sending the request
+   */
+  async applyModerationDecisionRequestOpts(
+    requestParameters: ApplyModerationDecisionOperationRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['caseId'] == null) {
+      throw new runtime.RequiredError(
+        'caseId',
+        'Required parameter "caseId" was null or undefined when calling applyModerationDecision().'
+      )
+    }
+
+    if (requestParameters['applyModerationDecisionRequest'] == null) {
+      throw new runtime.RequiredError(
+        'applyModerationDecisionRequest',
+        'Required parameter "applyModerationDecisionRequest" was null or undefined when calling applyModerationDecision().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/moderation/cases/{caseId}/decisions`
+    urlPath = urlPath.replace(
+      `{${'caseId'}}`,
+      encodeURIComponent(String(requestParameters['caseId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['applyModerationDecisionRequest'],
+    }
+  }
+
+  /**
+   * Moderator and admin only. The moderator is the session. One transaction per decision, idempotent per moderator and mutationId.
+   * Apply one decision to a whole case (private, no-store)
+   */
+  async applyModerationDecisionRaw(
+    requestParameters: ApplyModerationDecisionOperationRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<ApplyModerationDecision200Response>> {
+    const requestOptions =
+      await this.applyModerationDecisionRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Moderator and admin only. The moderator is the session. One transaction per decision, idempotent per moderator and mutationId.
+   * Apply one decision to a whole case (private, no-store)
+   */
+  async applyModerationDecision(
+    requestParameters: ApplyModerationDecisionOperationRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<ApplyModerationDecision200Response> {
+    const response = await this.applyModerationDecisionRaw(
       requestParameters,
       initOverrides
     )
@@ -247,6 +341,85 @@ export class ModerationApi extends runtime.BaseAPI {
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<ListModerationCases200Response> {
     const response = await this.listModerationCasesRaw(requestParameters, initOverrides)
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for recordModerationAppeal without sending the request
+   */
+  async recordModerationAppealRequestOpts(
+    requestParameters: RecordModerationAppealOperationRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['sanctionId'] == null) {
+      throw new runtime.RequiredError(
+        'sanctionId',
+        'Required parameter "sanctionId" was null or undefined when calling recordModerationAppeal().'
+      )
+    }
+
+    if (requestParameters['recordModerationAppealRequest'] == null) {
+      throw new runtime.RequiredError(
+        'recordModerationAppealRequest',
+        'Required parameter "recordModerationAppealRequest" was null or undefined when calling recordModerationAppeal().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/moderation/sanctions/{sanctionId}/appeal`
+    urlPath = urlPath.replace(
+      `{${'sanctionId'}}`,
+      encodeURIComponent(String(requestParameters['sanctionId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['recordModerationAppealRequest'],
+    }
+  }
+
+  /**
+   * Moderator and admin may record requested. Only an admin may record upheld or overturned.
+   * Record one appeal step on a sanction (private, no-store)
+   */
+  async recordModerationAppealRaw(
+    requestParameters: RecordModerationAppealOperationRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<RecordModerationAppeal200Response>> {
+    const requestOptions = await this.recordModerationAppealRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Moderator and admin may record requested. Only an admin may record upheld or overturned.
+   * Record one appeal step on a sanction (private, no-store)
+   */
+  async recordModerationAppeal(
+    requestParameters: RecordModerationAppealOperationRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<RecordModerationAppeal200Response> {
+    const response = await this.recordModerationAppealRaw(
+      requestParameters,
+      initOverrides
+    )
     return await response.value()
   }
 }

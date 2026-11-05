@@ -86,6 +86,14 @@ const test = base.extend<Fixtures>({
 })
 
 test.afterAll(async () => {
+  // A look left published here takes a slot on the first feed page, which seeded rows already fill.
+  if (seededQueue) {
+    const { runId } = await seededQueue
+    await databaseClient().lookbookPost.updateMany({
+      where: { id: { startsWith: `${runId}-` }, status: 'published' },
+      data: { status: 'withdrawn' },
+    })
+  }
   await prismaClient?.$disconnect()
 })
 
@@ -249,6 +257,7 @@ const stubbedDetail = (caseId: string, media: unknown) =>
       reporters: [
         {
           identity: { state: 'alias', alias: 'stub-reporter' },
+          origin: 'member',
           reason: 'spam',
           details: null,
           reportedAt: new Date(Date.now() - 3_600_000).toISOString(),
@@ -258,6 +267,13 @@ const stubbedDetail = (caseId: string, media: unknown) =>
       priorActions: [],
       media,
       viewerConflict: false,
+      // Story 6.11: the decision state a read-only stub has, with no form offered.
+      revision: '0123456789abcdef',
+      allowedActions: [],
+      banKinds: [],
+      escalated: false,
+      firstDecisionAt: null,
+      subjectStanding: null,
     },
   })
 

@@ -1,6 +1,7 @@
 // Learning path Step 50: Moderator queue and case detail.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-50-moderator-queue-and-case-detail
 // Story 6.10 test owner: U-WEB-Q-LOCALES. Ten-locale parity for the `moderation.*` tree.
+// Story 6.11 test owner: U-WEB-D-LOCALES and U-D-ENUM-COVERAGE. The decision, standing and banned keys derive from the contract.
 //
 // Every enum the console renders derives its expected key set from the shipped contract, so a new
 // report reason, finding category or media reason turns this spec red before a raw code reaches a
@@ -10,17 +11,28 @@ import {
   communityReportReasonSchema,
   moderationActorKindSchema,
   moderationAliasStateSchema,
+  moderationAppealStatusSchema,
+  moderationAppealStepSchema,
+  moderationCacheInvalidationSchema,
   moderationCaseRiskSchema,
   moderationCaseSlaStateSchema,
   moderationCaseSourceSchema,
   moderationCaseStatusSchema,
+  moderationDecisionActionSchema,
+  moderationDecisionDetailSchema,
+  moderationDecisionErrorCodeSchema,
   moderationMediaUnavailableReasonSchema,
+  moderationSanctionKindSchema,
 } from '@couture/api-client/contracts/http'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { MODERATION_FAILURE_REASONS } from '../lib/moderation'
+import {
+  MODERATION_FAILURE_REASONS,
+  RETRYABLE_DECISION_FAILURES,
+  type ModerationDecisionFailure,
+} from '../lib/moderation'
 import { SUPPORTED_LOCALES, type SupportedLocale } from './index'
 
 import deDE from './locales/de-DE.json'
@@ -78,6 +90,11 @@ function childKeys(catalog: Catalog, path: string): string[] {
 
 function placeholders(value: string): string[] {
   return [...value.matchAll(/\{\{(\w+)\}\}/g)].map((match) => match[1] ?? '').sort()
+}
+
+function bannedTree(catalog: Catalog): Record<string, unknown> {
+  const community = (catalog.community ?? {}) as Record<string, unknown>
+  return (community.banned ?? {}) as Record<string, unknown>
 }
 
 const reference = flatten(tree(enUS as Catalog))
@@ -245,5 +262,118 @@ describe('6.10 moderation enum coverage derives from the contract', () => {
     expect(documented('reason')).toContainEqual(
       sorted(moderationMediaUnavailableReasonSchema.options)
     )
+  })
+})
+
+describe('U-D-ENUM-COVERAGE: the 6.11 key set derives from the exported contract arrays', () => {
+  const ACTIONS = moderationDecisionActionSchema.options
+  const KINDS = moderationSanctionKindSchema.options
+  const APPEAL = moderationAppealStatusSchema.options
+  const STEPS = moderationAppealStepSchema.options
+  /** Failures the client adds to the closed codes, because no body carried a code. */
+  const CLIENT_FAILURES: readonly ModerationDecisionFailure[] = [
+    'signed_out',
+    'forbidden',
+    'rate_limited',
+    'offline',
+    'unavailable',
+  ]
+  const FAILURES = [...moderationDecisionErrorCodeSchema.options, ...CLIENT_FAILURES]
+  const capitalized = (kind: string) => `${kind[0]?.toUpperCase()}${kind.slice(1)}`
+  const OUTCOMES = [
+    ...ACTIONS.filter((action) => action !== 'ban'),
+    ...KINDS.map((kind) => `ban${capitalized(kind)}`),
+    ...moderationCacheInvalidationSchema.options.filter((value) => value !== 'completed'),
+  ]
+  const CONFIRMS = [
+    ...ACTIONS.filter((action) => action === 'takedown'),
+    ...KINDS.map((kind) => `ban_${kind}`),
+  ]
+  const closedSets: [string, readonly string[]][] = [
+    ['decision.action', ACTIONS],
+    ['decision.hint', ACTIONS],
+    ['decision.outcome', OUTCOMES],
+    ['decision.confirm', CONFIRMS],
+    ['decision.detail', moderationDecisionDetailSchema.options],
+    ['decision.error', FAILURES],
+    ['standing.kind', KINDS],
+    ['standing.appeal', APPEAL],
+    ['standing.step', STEPS],
+    ['standing.outcome', STEPS],
+    ['alias', moderationAliasStateSchema.options.filter((state) => state !== 'alias')],
+    ['actor', moderationActorKindSchema.options],
+  ]
+
+  it.each(closedSets)(
+    'moderation.%s holds exactly the contract set in every locale',
+    (keyPath, options) => {
+      for (const locale of SUPPORTED_LOCALES)
+        expect(childKeys(CATALOGS[locale], keyPath), locale).toEqual(sorted(options))
+    }
+  )
+
+  it('every retryable failure is a failure the catalog labels', () => {
+    for (const failure of RETRYABLE_DECISION_FAILURES) expect(FAILURES).toContain(failure)
+  })
+
+  it('moderation.action labels every action a prior action row can hold', () => {
+    const appealRows = STEPS.map((step) => `appeal_${step}`)
+    for (const locale of SUPPORTED_LOCALES) {
+      const keys = childKeys(CATALOGS[locale], 'action')
+      for (const key of [...ACTIONS, ...appealRows, 'unknown'])
+        expect(keys, `${locale} moderation.action.${key}`).toContain(key)
+    }
+  })
+
+  it('community.banned.appeal holds exactly the contract set in every locale', () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      const banned = bannedTree(CATALOGS[locale])
+      expect(Object.keys(banned.appeal as object).sort(), locale).toEqual(sorted(APPEAL))
+    }
+  })
+})
+
+describe('U-WEB-D-LOCALES: decision, standing and banned copy in ten locales', () => {
+  const sub = (catalog: Catalog, name: string) =>
+    new Map(
+      [...flatten(tree(catalog)).entries()].filter(([key]) => key.startsWith(`${name}.`))
+    )
+  const groups: [string, (catalog: Catalog) => Map<string, string>][] = [
+    ['moderation.decision', (catalog) => sub(catalog, 'decision')],
+    ['moderation.standing', (catalog) => sub(catalog, 'standing')],
+    ['community.banned', (catalog) => flatten(bannedTree(catalog))],
+  ]
+  it.each(groups)('%s has the same keys and placeholders everywhere', (_name, read) => {
+    const english = read(enUS as Catalog)
+    expect(english.size).toBeGreaterThan(0)
+    for (const locale of SUPPORTED_LOCALES) {
+      const catalog = read(CATALOGS[locale])
+      expect([...catalog.keys()].sort(), locale).toEqual([...english.keys()].sort())
+      for (const [key, value] of catalog) {
+        expect(value.trim().length, `${locale}.${key}`).toBeGreaterThan(0)
+        expect(placeholders(value), `${locale}.${key}`).toEqual(
+          placeholders(english.get(key) ?? '')
+        )
+      }
+    }
+  })
+
+  it.each(groups)('%s holds no English-only value outside English', (_name, read) => {
+    const english = read(enUS as Catalog)
+    for (const locale of SUPPORTED_LOCALES) {
+      if (locale === 'en-US' || locale === 'en-CA') continue
+      const same: string[] = []
+      for (const [key, value] of read(CATALOGS[locale]))
+        if (value === english.get(key) && value.trim().split(/\s+/).length > 1)
+          same.push(key)
+      expect(same, `${locale} values still in English`).toEqual([])
+    }
+  })
+
+  it('community.banned keeps the support directive and names no reason or moderator', () => {
+    const english = flatten(bannedTree(enUS as Catalog))
+    expect(english.get('appeal.not_requested')).toContain('support')
+    for (const value of english.values())
+      expect(value).not.toMatch(/moderator|operator|reason/i)
   })
 })

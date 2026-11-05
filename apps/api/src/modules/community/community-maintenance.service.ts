@@ -1,7 +1,12 @@
 // Story 6.1 maintenance owner: own the expiry and retention sweeps in `apps/api/src/modules/community/community-maintenance.service.ts` and their schedule in `community-maintenance.scheduler.ts`
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
-import { communityPrivacyTransaction, guardCommunityPost } from './community-privacy.js'
+import { returnBanHoldsToScreening } from './community-ban-holds.js'
+import {
+  communityPrivacyTransaction,
+  guardCommunityPost,
+  guardCommunitySubject,
+} from './community-privacy.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import {
   SupabaseCommunityStorageAdapter,
@@ -28,7 +33,58 @@ export const MODERATION_STALLED_REASON = 'moderation_stalled'
  */
 export const ERASURE_DEADLINE_HOURS = 72
 
+/**
+ * How long erasure keeps deleting after a request. Storage refuses a write that starts more than
+ * 2 hours later (`COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS`), and no measured limit proves when a write
+ * already running ends, so this runs as far as the 72-hour deadline allows and leaves 2 hours for a
+ * failed final delete to retry. It runs from the request, so a late first delete never pushes it out.
+ */
+export const COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS = 70 * 60 * 60 * 1000
+
+/** How often a row inside the window has its object deleted again. The sweep runs far more often. */
+const ERASURE_REPEAT_DELETE_MS = 15 * 60 * 1000
+
 const MAX_SWEEP_BATCH = 200
+
+/**
+ * The sweep's clock at a later moment, to the whole minute. Deletes run one at a time, so a slow one
+ * must not backdate the attempts after it to when the sweep began. Whole minutes keep a batch's first
+ * minute on the cron's tick: a stamp seconds past the tick, from a slow batch or a job that starts a
+ * little late, would miss the next pass by those seconds and wait a whole extra cycle. So a repeat can
+ * run up to a minute under the pace.
+ */
+function sweepClock(now: Date): () => Date {
+  const startedAt = Date.now()
+  return () => {
+    const settled = now.getTime() + Date.now() - startedAt
+    return new Date(settled - (settled % 60_000))
+  }
+}
+
+/** The delete pace, shared with the erasure queue: an abandoned draft's retry waits for it too. */
+const deleteIsDue = (now: Date): Prisma.LookbookPostWhereInput => ({
+  OR: [
+    { image_delete_attempted_at: null },
+    {
+      image_delete_attempted_at: {
+        lte: new Date(now.getTime() - ERASURE_REPEAT_DELETE_MS),
+      },
+    },
+  ],
+})
+
+const OPEN_ERASURE = {
+  erasure_requested_at: { not: null },
+  objects_purged_at: null,
+} satisfies Prisma.LookbookPostWhereInput
+
+interface ErasureWork {
+  id: string
+  status: string
+  image_object_path: string | null
+  anonymized_at: Date | null
+  erasure_requested_at: Date | null
+}
 
 export interface CommunityStaleReviewSweepResult {
   stalled: number
@@ -37,6 +93,12 @@ export interface CommunityStaleReviewSweepResult {
 export interface CommunityUploadExpirySweepResult {
   objectsDeleted: number
   draftsDeleted: number
+}
+
+export interface CommunityBanExpirySweepResult {
+  subjects: number
+  posts: number
+  comments: number
 }
 
 export interface CommunityErasureSweepResult {
@@ -59,6 +121,91 @@ export class CommunityMaintenanceService {
     @Inject(SupabaseCommunityStorageAdapter)
     private readonly storage: CommunityStorage
   ) {}
+
+  /**
+   * Returns what ended bans held to screening (Story 6.11, CR-2): a temporary ban that expired, or
+   * an overturn whose access check refused at the time. A ban ends by the clock with no request to
+   * hang off, so only a sweep can reach it. A member with an active ban stays out
+   * until that ban ends, when every older marker releases with it. One transaction per subject, so
+   * one bad subject cannot block the rest, and a failure still fails the job so an operator sees it.
+   */
+  async sweepExpiredBanHolds(
+    now: Date = new Date()
+  ): Promise<CommunityBanExpirySweepResult> {
+    const subjects = await this.prisma.$queryRaw<{ user_id: string }[]>`
+      SELECT s.user_id
+      FROM "CommunitySanction" s
+      WHERE s.holds_released_at IS NULL
+        AND (s.expires_at <= ${now} OR s.lifted_at IS NOT NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM "CommunitySanction" a
+          WHERE a.user_id = s.user_id
+            AND a.lifted_at IS NULL
+            AND (a.expires_at IS NULL OR a.expires_at > ${now})
+        )
+      GROUP BY s.user_id
+      ORDER BY MIN(s.expires_at)
+      LIMIT ${MAX_SWEEP_BATCH}
+    `
+    const result: CommunityBanExpirySweepResult = { subjects: 0, posts: 0, comments: 0 }
+    let failed = 0
+    for (const { user_id: subjectId } of subjects) {
+      try {
+        const moved = await communityPrivacyTransaction(this.prisma, (tx) =>
+          this.releaseSubjectBanHolds(tx, subjectId, now)
+        )
+        if (moved.posts + moved.comments > 0) result.subjects += 1
+        result.posts += moved.posts
+        result.comments += moved.comments
+      } catch (error) {
+        failed += 1
+        this.logger.error(
+          {
+            event: 'community_ban_expiry_release_failed',
+            error: error instanceof Error ? error.name : 'unknown',
+          },
+          'Ban hold release failed for one subject'
+        )
+      }
+    }
+    if (failed > 0) throw new Error(`Ban hold release failed for ${failed} subject(s)`)
+    return result
+  }
+
+  private async releaseSubjectBanHolds(
+    tx: Prisma.TransactionClient,
+    subjectId: string,
+    now: Date
+  ): Promise<{ posts: number; comments: number }> {
+    // The same lock a new ban takes, so a ban and this release cannot interleave.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_sanction:' || ${subjectId}))`
+    await guardCommunitySubject(tx, subjectId)
+    const active = await tx.communitySanction.findFirst({
+      where: {
+        user_id: subjectId,
+        lifted_at: null,
+        OR: [{ expires_at: null }, { expires_at: { gt: now } }],
+      },
+      select: { id: true },
+    })
+    if (active) return { posts: 0, comments: 0 }
+    const ended = await tx.communitySanction.findMany({
+      where: {
+        user_id: subjectId,
+        holds_released_at: null,
+        OR: [{ expires_at: { lte: now } }, { lifted_at: { not: null } }],
+      },
+      select: { id: true },
+    })
+    const ids = ended.map((sanction) => sanction.id)
+    if (ids.length === 0) return { posts: 0, comments: 0 }
+    const moved = await returnBanHoldsToScreening(tx, subjectId, ids, now)
+    await tx.communitySanction.updateMany({
+      where: { id: { in: ids } },
+      data: { holds_released_at: now },
+    })
+    return moved
+  }
 
   /**
    * Moves posts stuck in `pending_review` past the stall deadline to
@@ -87,7 +234,9 @@ export class CommunityMaintenanceService {
     let transitioned = 0
     for (const post of stalled) {
       const updated = await this.prisma.lookbookPost.updateMany({
-        where: { id: post.id, status: 'pending_review' },
+        // On the selected clock too: recovery can return this post to `pending_review` after the
+        // select above, and its fresh clock is what says that work has not stalled.
+        where: { id: post.id, status: 'pending_review', updated_at: post.updated_at },
         data: {
           status: 'review_failed',
           moderation_reason: MODERATION_STALLED_REASON,
@@ -153,25 +302,17 @@ export class CommunityMaintenanceService {
    * `image_object_path` with both foreign keys nulled, which is what "retain
    * anonymized moderation audit metadata" means: the fact survives, the person
    * does not.
+   *
+   * A worker lost mid-upload can recreate the object after a delete, with no owner left to remove
+   * it. So the row keeps its path and stays open until the late-write window has passed: the object
+   * is deleted again on the way, and once more past the window before `objects_purged_at` is
+   * stamped. Anonymization has already closed every read of that path.
    */
   async sweepErasureRequests(
     now: Date = new Date()
   ): Promise<CommunityErasureSweepResult> {
-    const pending = await this.prisma.lookbookPost.findMany({
-      where: {
-        erasure_requested_at: { not: null },
-        objects_purged_at: null,
-      },
-      orderBy: { erasure_requested_at: 'asc' },
-      take: MAX_SWEEP_BATCH,
-      select: {
-        id: true,
-        status: true,
-        image_object_path: true,
-        anonymized_at: true,
-        erasure_requested_at: true,
-      },
-    })
+    const settledAt = sweepClock(now)
+    const pending = await this.selectErasureWork(now)
 
     const result: CommunityErasureSweepResult = {
       hidden: 0,
@@ -179,8 +320,6 @@ export class CommunityMaintenanceService {
       objectsPurged: 0,
       overdue: 0,
     }
-
-    const deadlineMs = ERASURE_DEADLINE_HOURS * 60 * 60 * 1000
 
     for (const post of pending) {
       const metadata = await this.eraseMetadata(post.id, now)
@@ -202,15 +341,19 @@ export class CommunityMaintenanceService {
             },
             'Failed to purge community object during erasure; will retry'
           )
-          if (
-            post.erasure_requested_at &&
-            now.getTime() - post.erasure_requested_at.getTime() > deadlineMs
-          ) {
-            result.overdue += 1
-          }
+          await this.recordDeleteAttempts([post.id], settledAt())
           continue
         }
+        await this.recordDeleteAttempts([post.id], settledAt())
       }
+
+      if (
+        metadata.image_object_path &&
+        post.erasure_requested_at &&
+        now.getTime() <
+          post.erasure_requested_at.getTime() + COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS
+      )
+        continue
 
       const purged = await communityPrivacyTransaction(this.prisma, async (tx) => {
         await guardCommunityPost(tx, post.id)
@@ -227,6 +370,15 @@ export class CommunityMaintenanceService {
       result.objectsPurged += purged.count
     }
 
+    // Over every open row, because a row this pass never selected is overdue too.
+    result.overdue = await this.prisma.lookbookPost.count({
+      where: {
+        ...OPEN_ERASURE,
+        erasure_requested_at: {
+          lt: new Date(now.getTime() - ERASURE_DEADLINE_HOURS * 60 * 60 * 1000),
+        },
+      },
+    })
     if (result.overdue > 0) {
       this.logger.error(
         {
@@ -239,6 +391,53 @@ export class CommunityMaintenanceService {
     }
 
     return result
+  }
+
+  /**
+   * One queue, earliest due first, so waiting work ages past whatever arrives later and nothing starves
+   * behind a stream of new requests. A new request is due at its request time. After an attempt the
+   * next delete is due at the pace, and no later than the end of the window for the final one.
+   */
+  private selectErasureWork(now: Date) {
+    const pace = Prisma.sql`(${ERASURE_REPEAT_DELETE_MS}::double precision * interval '1 millisecond')`
+    const windowEnd = Prisma.sql`(erasure_requested_at + ${COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS}::double precision * interval '1 millisecond')`
+    return this.prisma.$queryRaw<ErasureWork[]>(Prisma.sql`
+      SELECT id, status::text AS status, image_object_path, anonymized_at, erasure_requested_at
+      FROM (
+        SELECT *, CASE
+          WHEN image_delete_attempted_at IS NULL THEN erasure_requested_at
+          WHEN image_delete_attempted_at >= ${windowEnd} THEN image_delete_attempted_at + ${pace}
+          ELSE LEAST(image_delete_attempted_at + ${pace}, ${windowEnd})
+        END AS due_at
+        FROM "LookbookPost"
+        WHERE erasure_requested_at IS NOT NULL AND objects_purged_at IS NULL
+      ) AS open_erasure
+      WHERE due_at <= ${now.toISOString()}::timestamp
+      ORDER BY due_at, id
+      LIMIT ${MAX_SWEEP_BATCH}`)
+  }
+
+  /**
+   * After the delete settles, so a crash before it leaves the row due and a failure paces its retry.
+   * Forward only: a slower sweep finishing last must not make a newer attempt look old.
+   */
+  private recordDeleteAttempts(ids: string[], at: Date) {
+    if (ids.length === 0) return
+    return communityPrivacyTransaction(this.prisma, async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT community_privacy_guards(ARRAY[]::text[],ARRAY[${Prisma.join(ids)}]::text[],true)`
+      )
+      await tx.lookbookPost.updateMany({
+        where: {
+          id: { in: ids },
+          OR: [
+            { image_delete_attempted_at: null },
+            { image_delete_attempted_at: { lt: at } },
+          ],
+        },
+        data: { image_delete_attempted_at: at },
+      })
+    })
   }
 
   private eraseMetadata(id: string, now: Date) {
@@ -268,6 +467,8 @@ export class CommunityMaintenanceService {
                 area_region: null,
                 area_city: null,
                 image_checksum: null,
+                image_pending_checksum: null,
+                image_pending_byte_size: null,
                 anonymized_at: now,
               }
             : {}),
@@ -289,10 +490,15 @@ export class CommunityMaintenanceService {
   async sweepExpiredUploads(
     now: Date = new Date()
   ): Promise<CommunityUploadExpirySweepResult> {
+    // The token handed to the client outlives this expiry, and a write landing after the row is gone
+    // would leave an object nothing names. A replay moves the expiry, so this covers its token too.
+    const deadline = new Date(now.getTime() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS)
+    const settledAt = sweepClock(now)
     const abandoned = await this.prisma.lookbookPost.findMany({
       where: {
         status: 'draft',
-        upload_expires_at: { lt: now },
+        upload_expires_at: { lt: deadline },
+        ...deleteIsDue(now),
       },
       orderBy: { upload_expires_at: 'asc' },
       take: MAX_SWEEP_BATCH,
@@ -315,7 +521,8 @@ export class CommunityMaintenanceService {
         where: {
           id: { in: candidateIds },
           status: 'draft',
-          upload_expires_at: { lt: now },
+          upload_expires_at: { lt: deadline },
+          ...deleteIsDue(now),
         },
         select: { id: true, image_object_path: true },
       })
@@ -332,11 +539,15 @@ export class CommunityMaintenanceService {
       .map((post) => post.image_object_path)
       .filter((path): path is string => Boolean(path))
 
+    const attempted = claimed
+      .filter((post) => Boolean(post.image_object_path))
+      .map((post) => post.id)
     let objectsDeleted = 0
     if (objectPaths.length > 0) {
       try {
         await this.storage.remove(objectPaths)
         objectsDeleted = objectPaths.length
+        await this.recordDeleteAttempts(attempted, settledAt())
       } catch (error: unknown) {
         // The rows stay so the next sweep retries the delete. Dropping them here
         // would orphan the objects permanently.
@@ -348,6 +559,7 @@ export class CommunityMaintenanceService {
           },
           'Failed to delete abandoned community upload objects; rows retained for retry'
         )
+        await this.recordDeleteAttempts(attempted, settledAt())
         return { objectsDeleted: 0, draftsDeleted: 0 }
       }
     }
@@ -364,7 +576,7 @@ export class CommunityMaintenanceService {
         where: {
           id: { in: ids },
           status: 'draft',
-          upload_expires_at: { lt: now },
+          upload_expires_at: { lt: deadline },
           erasure_requested_at: { not: null },
         },
       })

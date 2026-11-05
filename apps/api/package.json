@@ -93,6 +93,8 @@
     "start:workers:wardrobe:prod": "npm run verify:tagging-model && node dist/src/workers/wardrobe.bootstrap.js",
     "prestart:workers:community:prod": "npm run prepare:shared-deps",
     "start:workers:community:prod": "npm run verify:community-screening-model && node dist/src/workers/community.bootstrap.js",
+    "pretest:community-storage": "npm run prepare:shared-deps",
+    "test:community-storage": "cross-env COMMUNITY_REAL_STORAGE_TEST=true NODE_OPTIONS=--conditions=development vitest run community-storage-capability",
     "test:community-realtime-budget": "cross-env NODE_OPTIONS=--conditions=development vitest run --config vitest.realtime-budget.config.ts"
   },
   "dependencies": {

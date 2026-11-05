@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-03.
-Added Steps 40 to 50:
+Updated: 2026-11-04.
+Added Steps 40 to 51:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -13,7 +13,8 @@ Added Steps 40 to 50:
 - Step 47: Story 6.7b, sponsored community highlights, `1d7b9848` (PR #161).
 - Step 48: Story 6.8, safe branded share-card export, `67806196` (PR #162), with native-lane fixes `3112efbd` (PR #165) and `185e827c` (PR #166).
 - Step 49: Story 6.9, native platform sharing, `6d92598f` (PR #167), merged on 2026-10-31.
-- Step 50: Story 6.10, moderator queue and case detail, in PR review on `feat/cc-6-10-moderator-queue`, not yet merged.
+- Step 50: Story 6.10, moderator queue and case detail, `6337dc8c` (PR #194), merged on 2026-11-04.
+- Step 51: Story 6.11, moderation decisions and account sanctions, in review on `feat/cc-6-11-moderation-decisions`, not yet merged.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -21,7 +22,8 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
-Step 50 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
+Step 51 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
+Moved Step 50 to completed after PR #194 merged as `6337dc8c`.
 Step 49 departs from instruction 2 the same way Steps 38 and 39 did, and its `Evidence boundaries` section says what passed, what timed out, and what only a physical device can prove.
 Moved Step 49 to completed after PR #167 merged as `6d92598f`.
 Moved Step 39 to completed, since PR #151 closed Story 6.2.
@@ -102,14 +104,18 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- In PR review: Step 50, Story 6.10, Moderator queue and case detail, status `done` in sprint tracking and not yet merged, on `feat/cc-6-10-moderator-queue`.
+- In review: Step 51, Story 6.11, Moderation decisions and account sanctions, not yet merged, on `feat/cc-6-11-moderation-decisions`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-6-11-moderation-decisions-account-sanctions.md`.
+  Production stays dark because `moderation_decisions_enabled` and `moderation_console_enabled` default to false.
+- Latest completed step: Step 50, Story 6.10, Moderator queue and case detail, status `done`, merged as `6337dc8c` (PR #194) on 2026-11-04.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-10-moderator-queue-case-detail.md`.
+  Step 50 was written before review and merge, and its `Evidence boundaries` section says so.
   Production stays dark because `moderation_console_enabled` defaults to false.
-- Latest completed step: Step 49, Story 6.9, Native platform sharing, status `done`, merged as `6d92598f` (PR #167) on 2026-10-31.
+- Step 49, Story 6.9, Native platform sharing, status `done`, merged as `6d92598f` (PR #167) on 2026-10-31.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`.
   Step 49 was written from the PR head `37a00d33` before merge, and its `Evidence boundaries` section says so.
   Production stays dark because `share_card_native_share_enabled` defaults to false.
-- Next in `backlog` under epic 6, which is `in-progress`: Stories 6.11 to 6.13 (moderation decisions and sanctions, SLA monitoring, immutable moderation history), 6.14 (complimentary full access) and 6.15 (Expo SDK 58 live font-scale layout).
+- Next in `backlog` under epic 6, which is `in-progress`: Stories 6.12 and 6.13 (SLA monitoring, immutable moderation history), 6.14 (complimentary full access) and 6.15 (Expo SDK 58 live font-scale layout).
 - Step 48, Story 6.8, Safe branded share-card export, status `done`, merged as `67806196` (PR #162) with native-lane fixes in `3112efbd` (PR #165) and `185e827c` (PR #166).
   Its plan is `_bmad-output/implementation-artifacts/spec-6-8-safe-branded-share-card-export.md`.
 - Step 47, Story 6.7b, Sponsored community highlights, status `done`, merged as `1d7b9848` (PR #161).
@@ -9346,7 +9352,7 @@ Story reference:
 - `_bmad-output/implementation-artifacts/spec-6-10-moderator-queue-case-detail.md`, with decisions D1 to D13 and the Spec Change Log TEA-01 to TEA-18
 - `_bmad-output/test-artifacts/test-design/cc610-moderator-queue-test-design.md`
 - `_bmad-output/test-artifacts/story-6-10/` (screenshots of the real console in light and dark at desktop and phone widths)
-- Commits on `feat/cc-6-10-moderator-queue`, not yet pushed or merged when this step was written
+- Merged as `6337dc8c` (PR #194) on 2026-11-04
 
 Cross-links:
 
@@ -9430,8 +9436,9 @@ Playwright tests:
 Evidence boundaries:
 
 - **Written before review and merge.**
-  The code and tests are committed on `feat/cc-6-10-moderator-queue` and nothing was pushed when this step was written.
-  No PR job has run, and the Codex review that follows is not recorded here.
+  The code and tests were committed on `feat/cc-6-10-moderator-queue` and nothing was pushed when this step was written.
+  PR #194 then merged as `6337dc8c`, and the local evidence below describes the pre-merge state.
+  The PR jobs and the Codex review that followed are not recorded here.
 - **What ran locally.**
   TEA's final run at `e884d62a`, three consecutive times where noted: API unit tests 87 (6 files), API integration `moderation-queue*` 92 (8 files) against stock PostgreSQL 17 with the real guards, the contract spec 88, the config flag spec 26, the database specs 8, web `vitest run moderation` 225 (11 files), the web Pact 230 with the provider verification passing, Playwright 27 three times, and tsc with 0 errors in `apps/api`, `apps/web`, `packages/db`, `packages/api-client` and `pact`.
   A production `next build` of `apps/web` passed at the first commit of the console.
@@ -9467,4 +9474,297 @@ flowchart TD
   Audit -- "ok" --> Sign["sign image 120 s"]
   Sign --> Clamp["clamp stored values,\nstrict output parse"]
   Clamp --> UI["console: PlainText, CaseMedia,\ncountdown, one read per navigation"]
+```
+
+## Step 51: Moderation decisions and account sanctions
+
+User/business impact:
+
+Since Step 50 a moderator could read every case and change none of them.
+Comment cases had no operator action, posts the screener flagged never reached the queue, and repeat abuse had no consequence.
+This step adds one moderator-only write route that applies a decision to a whole case in one transaction: resolve, release, takedown, escalate or ban.
+A second route records appeal steps on a ban.
+The console gains a decision panel and an account standing section, and a banned member sees a localized notice on the web community page and the mobile community screen.
+A ban closes community access only, so the member keeps wardrobe, daily ritual, weather alerts, billing and privacy rights.
+Both routes sit behind `moderation_decisions_enabled` and `moderation_console_enabled`, and both default to false in production.
+Ban enforcement has no flag, so turning the console off never lifts a ban.
+SLA timers and escalation delivery are Story 6.12, and database-level immutability of the record is Story 6.13.
+
+Key takeaways:
+
+1. **One append-only row is the record.**
+   `ModerationDecision` holds the action, reason, moderator, role, subject, report ids, payload hash and stored response.
+   No code path updates or deletes it, and a case stays derived from reports as Step 50 designed.
+   `firstDecisionAt` is the smallest `decided_at` of a terminal row matching the case key or overlapping its report ids, so a retry, a later decision or a re-key cannot move it, and an escalation cannot make a late resolution look punctual.
+2. **Lock first, then read, then compare.**
+   The transaction order is case advisory lock, replay check, case read, sanction eligibility locks, privacy guard, member lock, post row lock, then a re-read and the revision check.
+   Report intake holds only the post row lock, so a revision read before that lock could miss a report and stamp it unseen.
+   The revision is 16 hex characters of a SHA-256 over the newest sequence, the sorted open report ids and the target status, so a new report, a withdrawal or another decision all move it.
+   A mismatch answers 409 `case_conflict` with `currentRevision`, and nothing is written.
+   The GET reads the displayed evidence and the revision in one RepeatableRead snapshot, so a revision can only approve what the moderator saw.
+3. **A refusal order is part of the contract.**
+   After input validation the order is replay or mismatch, not found, `operator_sanctioned`, `self_review_refused`, `admin_required`, `case_conflict`, `action_not_applicable`.
+   The author of a target and anyone who reported it are refused for every action, admins included.
+   Every decision and appeal holds its operator's `community_sanction` advisory lock shared, and a ban holds its subject's exclusive, so two operators banning each other queue and the second answers `operator_sanctioned`.
+   One function, `deriveAllowedActions`, computes what the console offers and what the route enforces, so the panel cannot offer a button the API refuses for a reason it already knew.
+4. **Idempotency survives a reload.**
+   `(moderator_id, mutation_id)` is unique and `payload_hash` covers route, case or sanction id, action, trimmed reason and ban.
+   `expectedRevision` is outside the hash, so a retry after a lost response and a reload replays the stored response with `replayed: true`.
+   The stored response omits `cacheInvalidation`, and every 200 reruns the bounded after-commit steps, so a crash after commit is repaired by the retry.
+5. **Enforce a ban where the community access check already lives.**
+   `assertCommunityMemberNotSanctioned` reads the primary database with no cache from `assertCommunityDatabaseReadAccess`, which covers authorization, read eligibility, realtime, the send guard, share cards, publication and both processors.
+   It is also called directly on the paths that bypass that check: comment create and report, reaction set and remove, post report, and post opened.
+   Active means not lifted and either no expiry or an expiry after a `new Date()` bound as a query parameter, so a temporary ban ends with no worker.
+6. **Retraction stays open during a ban.**
+   Withdrawing one's own post and deleting one's own comment skip the check, because retraction is the author's right.
+   It also survives a takedown: a member can delete their own comment on a hidden post, and an unknown or foreign comment still answers the post's 404.
+7. **A ban holds content with a marker a lift can find.**
+   Held rows carry `community_ban:<sanctionId>` in `moderation_reason` or `screening_reason`, the marker never leaves the API, and the author-state projection passes only recognized moderation categories.
+   An overturned appeal always lifts the ban, and restoration runs only when `assertCommunityDatabaseAccess` passes under the subject guard, so a lifted ban cannot republish a teen's content after consent lapsed.
+   A taken-down case target keeps its operator reason, stays down, and can be released from its case.
+   Upgrading a temporary ban moves what it held to the permanent ban's marker, so overturning the permanent ban reaches it.
+   When a temporary ban ends, `sweepExpiredBanHolds` returns what only it held to screening on the `maintenance` queue, because a ban ending has no request to hang off; `holds_released_at` makes the sweep retry-safe and a new outbox `generation` gives a re-armed post a job id no retained job can swallow.
+   An overturn of any ban returns its never-public rows to screening the same way.
+   `ban_prior_reason` keeps a machine reason through a permanent ban, and an overturn restores it.
+8. **Screening intake is a report row.**
+   `flagPost` writes a `CommunityPostReport` with a null reporter and `origin: screening`, as comment intake already did, so the queue, keyset, SLA, risk and erasure re-key apply unchanged.
+   The case detail marks such a reporter with `origin: screening`, because adding a value to the alias state enum is a breaking response change that Optic refuses.
+   The migration backfills flagged posts whose newest status-changing event is `flagged`, and it skips canary, erasure-requested and anonymized posts.
+9. **An operator hold is not a machine finding.**
+   Both finding predicates exclude operator takedown and ban values through `isOperatorHoldReason`, and a comment takedown writes the closed value `operator_takedown` while the operator's words stay on the decision row.
+10. **Public caches move with no worker.**
+    After commit the request bumps the affected spotlight areas, or the epoch for a permanent ban or an overturned appeal, and calls the stream assist, each in a bounded step that cannot throw.
+    A Redis outage changes only `cacheInvalidation` to `deferred`, and the decision stands.
+11. **The audit row outlives erasure, so it names no subject.**
+    `AuditLog` holds the moderator, the case, the action, the role and the ban kind, and it never holds the subject, the alias or the reason.
+    `ModerationDecision` holds those, and Story 6.13 anonymizes it.
+    A failed insert rolls everything back with 503 `audit_unavailable`.
+12. **The panel keeps a moderator's work.**
+    One `mutationId` is minted per intent and reused on every retry of the same payload, a conflict keeps the typed reason, and focus returns to the submit button after a reload.
+    Try again leaves once the form differs from the failed attempt, because changed terms are a new intent that needs its own confirmation.
+    Every outcome goes through one polite live region and is announced once in all ten web locales.
+
+Hard-won lessons from the implementation and review of this story:
+
+1. **Read the real error shape before you branch on it.**
+   The foreign-key handler read `meta.field_name`, and Prisma 6.19 reports `meta.constraint`.
+   Every non-audit insert failure answered 500.
+   `writeModerationRecord` now turns a failed record insert into `audit_unavailable` and lets unique violations and retryable lock errors pass through to their own handlers.
+2. **A replay path is a read path.**
+   The first ban check sat behind the replay branches of allocate and publish, so a banned member could read a stored response.
+   The check moved ahead of every replay, and `assertPublicPostReadable` carries it too.
+3. **A send guard must separate the actor from the recipient.**
+   A banned actor's engagement dropped the whole notification, which silently stopped other members' pushes in one early version.
+   The banned actor now drops alone.
+4. **A stable key can be the bug.**
+   `key={detail.revision}` remounted the panel on every reload, so the typed reason and focus died on the conflict path built to save them.
+   Removing the key and passing an effective action through `stillOffered` kept both.
+5. **Global minimum sizes reach into controls.**
+   The 44-pixel `:where` rule stretched radio inputs into tall ovals.
+   `min-h-0 min-w-0` on the radios fixed it, and only the real page showed it.
+6. **Raw enums leak when nobody looks in German.**
+   The case view printed `flagged` and `published` in all ten locales.
+   TEA's locale screenshots caught it, and `moderation.targetStatus` now maps every post and comment status with an unknown fallback.
+7. **A notice is not a closed surface.**
+   The banned page kept live climate chips, and one click fired a feed read, an events read and a probe, all 403.
+   Disabled chips then kept a selected look and stranded a heading far from the notice, and the spotlight said it was temporarily unavailable beside the notice.
+   The grid now lifts `onBannedChange` to the layout, and the filter nav, its heading, the notifications link and the spotlight all leave the page.
+8. **A dark card needs a dark page.**
+   The notice followed `prefers-color-scheme` while the lookbook surface around it stays light, so dark mode showed a black card on a white page.
+   The notice now uses the surface it sits on.
+9. **An operator's words do not belong under Machine findings.**
+   A note alone under that heading read as a machine verdict, so it first gained a "No machine findings" line and then its own section.
+10. **`TEST_ENV=local` overrides your isolated database.**
+    The first browser walk's API read the default database, because `.env.local` wins over the shell unless `E2E_CALLER_OWNED_ENV_KEYS` names the key.
+    It only read and wrote nothing, and the walk moved to `cc611_walk` with that key set.
+11. **lint-staged does not run tsc.**
+    A regex wrap committed `() => await tx`, and only the next tsc run caught it.
+    tsc now runs per workspace before each commit.
+12. **Two reads of one thing can disagree inside a single response.**
+    The Codex review found the GET built its evidence and its revision from separate reads, so a report committing between them could be stamped unseen.
+    The earlier race test filed its report after a complete GET, so it passed.
+13. **Per-row locks miss a cycle across rows.**
+    Two operators banning each other touched disjoint subjects, so every existing lock passed and both actor checks read no sanction.
+    Taking the eligibility locks in id order makes the pair queue with no deadlock.
+14. **Session state includes the refusal.**
+    `clearScope` cleared a member's cards and left their sanction, so ban details outlived sign-out on a mounted page.
+15. **Two ways to learn one fact need one cleanup.**
+    The feed path cleared the weekly challenge and the socket path did not, so `closeForBan` now serves both.
+    The re-review then found a rebuild already in flight could restore the challenge, so `closeForBan` also bumps the feed generation.
+16. **A half-pixel transform paints a line.**
+    A full-bleed wrapper centered with `left-1/2 -translate-x-1/2` lands on -187.5 pixels at 375, and column 0 blends the dark page into white.
+    Margins bleed to the same place, and layout snaps them to a pixel.
+17. **Re-arming a row makes every older reader of that row a suspect.**
+    Once recovery could bump a generation, the post dispatcher's stamp by id and the comment cleanup's delete by id could each undo it, and normalization could delete the object recovery needed.
+    Each now re-checks the generation or the hold it expects.
+18. **A generator can turn a correct union into an impossible type.**
+    The TypeScript generator flattened `anyOf` into one interface requiring both bodies' fields, so the document publishes those 403 unions as `oneOf`.
+19. **Deferring for a budget hid real gaps.**
+    Held content with no way back, undocumented 403 bodies and a mobile screen with no explanation all sat as follow-ups under a file limit until the owner lifted it.
+
+20. **When a row can return to an earlier state, status stops being evidence of ownership.**
+    A ban held a pending post, an overturn returned it to pending, and old screening work saw `pending_review` and took it for its own.
+    Codex found this five times in five different writers, because only the BullMQ job id carried the generation.
+    The fix is one rule: the job payload names its generation, and every settlement proves that generation under the outbox row lock, failures, acknowledgements and storage removal included.
+    Removal asks a different question from settlement: losing ownership means stop, and only a row that no longer owns the object may delete it.
+    A write outside the transaction needs its own answer: record the intent under the fence first, so a worker lost between the two leaves bytes the next owner can recognize.
+    The same write can outlive its owner entirely, so a timer on our side bounds nothing: a pause can follow any check, and only the system taking the write can refuse it. A signed token minted before the reservation gives storage that refusal, and the delete obligation lasts until it has expired.
+    A longer deletion window then turned into a scheduling problem: priority tiers starved whichever tier came last, and a shared timestamp hid failed deletes. One queue ordered by due time, with its own attempt column written after the delete settles, ages all waiting work.
+
+Story/Task mapping:
+
+- Story 6.11
+- Task 1 (sprint status and epic context)
+- Task 2 (schema, migration, backfill, RLS, zero grants, constraints)
+- Task 3 (flag `moderation_decisions_enabled`, default false, seeded true)
+- Task 4 (decision contract, `deriveAllowedActions`, queue contract additions, OpenAPI paths, regenerated SDK)
+- Task 5 (operator actions for posts and comments, bulk report resolution)
+- Task 6 (ban enforcement and the author-state projection)
+- Task 7 (screening intake in both processors)
+- Task 8 (spotlight invalidation)
+- Task 9 (decision and sanction services, repository, controller, module, cache headers)
+- Task 10 (detail additions, identity and actor kinds, orphan prior actions, finding predicates)
+- Task 11 (decision panel, account standing, case view, queue marker)
+- Task 12 (banned notice on web and mobile, closed filters)
+- Task 13 (ten web catalogs and parity)
+- Task 14 (Pact, Playwright, tests per the test design)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/spec-6-11-moderation-decisions-account-sanctions.md`, with decisions D1 to D16, the Spec Change Log TEA-01 to TEA-22 and the Review Triage Log
+- `_bmad-output/test-artifacts/test-design/cc611-moderation-decisions-test-design.md`
+- `_bmad-output/test-artifacts/story-6-11/` (screenshots of the real console and notice in light and dark at desktop and phone widths)
+- Commits on `feat/cc-6-11-moderation-decisions`, not yet pushed or merged when this step was written
+
+Cross-links:
+
+- Step 50 provides the case model, the revisionless detail this step extends, the queue contract and the console.
+- Step 38 provides the post report table and `CommunityModerationActionsService`, and Step 42 provides the comment reports and audit rows.
+- Step 43 provides the realtime revalidation that delivers `denied` to a banned member's socket and the send guard that stops pushes.
+- Step 44 and Step 46 provide the spotlight read model and teaser this step invalidates.
+- Step 18 provides the `AuditLog` the decision writes to.
+- Step 22 provides catalog parity across ten locales.
+
+Sequence to follow:
+
+1. `packages/db/prisma/migrations/20261104120000_moderation_decisions/migration.sql` for the tables, constraints, grants and backfill.
+2. `packages/api-client/src/contracts/http/moderation-decisions.ts` for the body, the closed codes, the banned refusal and `deriveAllowedActions`.
+3. `apps/api/src/modules/moderation/moderation-decision-rules.ts` for the revision, the payload hash and the audit shape.
+4. `apps/api/src/modules/moderation/moderation-decisions.service.ts` for the transaction order, refusals, replay and effects.
+5. `apps/api/src/modules/moderation/moderation-sanctions.service.ts` for ban effects, appeal steps, restoration and `ModerationAfterCommit`.
+6. `apps/api/src/modules/community/community-access.service.ts` for enforcement, then `community.service.ts`, `community.repository.ts` and `community-comments.repository.ts` for its direct call sites.
+7. `apps/api/src/modules/community/community-moderation.actions.ts` for the post and comment effects.
+8. `apps/web/src/app/components/moderation-decision-panel.tsx` and `moderation-account-standing.tsx` for the console, then `community-banned-notice.tsx` and `community-lookbook-grid.tsx` for the member.
+
+Task owner map:
+
+- Story 6.11 Task 2 step 1 owner: add the models and enums in `packages/db/prisma/schema.prisma`, with constraints, grants and the backfill in `packages/db/prisma/migrations/20261104120000_moderation_decisions/migration.sql`.
+- Story 6.11 Task 3 step 1 owner: declare the flag in `packages/config/src/flags.ts`, seeded true in `packages/db/prisma/seeds/feature-flags.ts`.
+- Story 6.11 Task 4 step 1 owner: define the decision contract in `packages/api-client/src/contracts/http/moderation-decisions.ts`, and the ban refusal every enforced 403 names in `community-banned.ts`.
+- Story 6.11 Task 5 step 1 owner: apply post and comment effects in `apps/api/src/modules/community/community-moderation.actions.ts`.
+- Story 6.11 Task 6 step 1 owner: refuse a banned member in `apps/api/src/modules/community/community-access.service.ts`.
+- Story 6.11 Task 7 step 1 owner: write screening reports in `apps/api/src/modules/community/community-moderation.processor.ts` and `community-comments.processor.ts`.
+- Story 6.11 Task 8 step 1 owner: expose area and epoch invalidation in `apps/api/src/modules/community/community-spotlight.service.ts`.
+- Story 6.11 Task 9 step 1 owner: compute the revision, hash and audit data in `apps/api/src/modules/moderation/moderation-decision-rules.ts`.
+- Story 6.11 Task 9 step 2 owner: read decisions, escalation and orphan history in `apps/api/src/modules/moderation/moderation-decisions.repository.ts`.
+- Story 6.11 Task 9 step 3 owner: serialize and apply a decision in `apps/api/src/modules/moderation/moderation-decisions.service.ts`.
+- Story 6.11 Task 9 step 4 owner: apply ban effects and appeal steps in `apps/api/src/modules/moderation/moderation-sanctions.service.ts`.
+- Story 6.11 Task 9 step 5 owner: guard and route in `apps/api/src/modules/moderation/moderation-decisions.controller.ts`.
+- Story 6.11 Task 9 step 6 owner: return ended bans' holds to screening in `apps/api/src/modules/community/community-ban-holds.ts` and `community-maintenance.service.ts`.
+- Story 6.11 Task 10 step 1 owner: extend the case detail in `apps/api/src/modules/moderation/moderation-queue.service.ts` and `moderation-queue.repository.ts`.
+- Story 6.11 Task 11 step 1 owner: read and write decisions from the web in `apps/web/src/lib/moderation.ts`.
+- Story 6.11 Task 11 step 2 owner: collect and submit a decision in `apps/web/src/app/components/moderation-decision-panel.tsx`.
+- Story 6.11 Task 11 step 3 owner: show sanctions and appeal controls in `apps/web/src/app/components/moderation-account-standing.tsx`.
+- Story 6.11 Task 12 step 1 owner: read the refusal by code in `apps/web/src/lib/community.ts` and `apps/mobile/src/lib/community.ts`.
+- Story 6.11 Task 12 step 2 owner: tell the member in `apps/web/src/app/components/community-banned-notice.tsx` and `apps/mobile/src/features/community/community-banned-notice.tsx`.
+- Story 6.11 Task 12 step 3 owner: close the surface in `apps/web/src/app/components/community-lookbook-grid.tsx` and `lookbook-prism-layout.tsx`.
+
+Tests that cover this step:
+
+API unit tests:
+
+- [`apps/api/src/modules/moderation/moderation-decisions.service.spec.ts`](../../apps/api/src/modules/moderation/moderation-decisions.service.spec.ts): proves the revision, the refusal order, what the same payload means, the clock read and closed logging.
+- [`apps/api/src/modules/moderation/moderation-sanctions.service.spec.ts`](../../apps/api/src/modules/moderation/moderation-sanctions.service.spec.ts): proves appeal transitions, the active rule, the refusal body and the route matrix.
+- [`apps/api/src/modules/moderation/moderation-decisions.controller.spec.ts`](../../apps/api/src/modules/moderation/moderation-decisions.controller.spec.ts): proves role declarations, the identical refusal for real and unknown ids, identity from auth only, strict validation and that the analytics route stays as it was.
+- [`apps/api/src/modules/community/community-moderation.actions.spec.ts`](../../apps/api/src/modules/community/community-moderation.actions.spec.ts) and [`apps/api/src/modules/community/community-moderation.worker.spec.ts`](../../apps/api/src/modules/community/community-moderation.worker.spec.ts): prove the record write and that the processors tolerate the ban.
+
+API integration tests, against real PostgreSQL with the real guards:
+
+- [`apps/api/integration/moderation-decisions.integration.spec.ts`](../../apps/api/integration/moderation-decisions.integration.spec.ts): proves each action, grouped and orphan cases, each refusal from a real state, the record and the audit row.
+- [`apps/api/integration/moderation-decisions-concurrency.integration.spec.ts`](../../apps/api/integration/moderation-decisions-concurrency.integration.spec.ts): proves two moderators on one reading, a report committing while a decision waits, a withdrawal race, parallel sends of one key and the first decision time.
+- [`apps/api/integration/moderation-decisions-cache.integration.spec.ts`](../../apps/api/integration/moderation-decisions-cache.integration.spec.ts): proves every public read reflects a takedown, ban or overturned appeal with no worker, that a Redis outage changes only `cacheInvalidation`, and that a retry repairs a crash after commit.
+- [`apps/api/integration/moderation-sanctions.integration.spec.ts`](../../apps/api/integration/moderation-sanctions.integration.spec.ts): proves every community route refuses a banned member and only a banned member, the wire body, temporary and permanent content effects, realtime, push and appeals.
+
+Contract and database tests:
+
+- [`packages/api-client/testing/moderation-decisions-contract.spec.ts`](../../packages/api-client/testing/moderation-decisions-contract.spec.ts): proves the strict body, the reason rules, `isOperatorHoldReason` and `deriveAllowedActions` with its closed refusals.
+- [`packages/db/test/moderation-decisions-backfill.spec.ts`](../../packages/db/test/moderation-decisions-backfill.spec.ts): proves the backfill and the database backstops.
+- [`packages/db/test/rls/moderation-queue.spec.ts`](../../packages/db/test/rls/moderation-queue.spec.ts): proves direct clients are denied on the two new tables through `MODERATION_QUEUE_READ_TABLES`.
+- [`pact/http/consumer/interactions/moderation.ts`](../../pact/http/consumer/interactions/moderation.ts) with [`pact/http/provider/doubles/moderation.ts`](../../pact/http/provider/doubles/moderation.ts): record and verify decisions, appeals and the banned refusal.
+
+Web and mobile tests:
+
+- [`apps/web/src/app/components/moderation-decision-panel.test.tsx`](../../apps/web/src/app/components/moderation-decision-panel.test.tsx): proves what the panel offers, key reuse, every state and the kept reason.
+- [`apps/web/src/app/components/moderation-account-standing.test.tsx`](../../apps/web/src/app/components/moderation-account-standing.test.tsx): proves the standing section and appeal controls per role.
+- [`apps/web/src/app/components/community-banned-notice.test.tsx`](../../apps/web/src/app/components/community-banned-notice.test.tsx): proves the notice, its locales, the cleared feed and the closed filters.
+- [`apps/web/src/i18n/moderation-locales.spec.ts`](../../apps/web/src/i18n/moderation-locales.spec.ts): proves ten-locale parity with keys derived from the contract enums.
+- [`apps/mobile/src/lib/community-sponsorship.test.ts`](../../apps/mobile/src/lib/community-sponsorship.test.ts): proves `community_banned` reads by code as the existing denied state.
+
+Playwright tests:
+
+- [`playwright/tests/moderation-decisions.spec.ts`](../../playwright/tests/moderation-decisions.spec.ts): drives decisions, conflict, keyboard use, the ban journey to the member's notice, axe in light and dark, and 375 and 1280 pixel widths.
+- [`playwright/tests/api/auth-moderation-security.spec.ts`](../../playwright/tests/api/auth-moderation-security.spec.ts): the role matrix on both new routes.
+
+Evidence boundaries:
+
+- **Written before review and merge.**
+  The code and tests are committed on `feat/cc-6-11-moderation-decisions`, nothing was pushed when this step was written, and no PR job has run.
+  The Codex review of `4cf4b128` found six defects, and they are fixed and logged in the spec as C1 to C6.
+  Its re-review of `1d49278a` found one more, fixed as R2-1 with a test that was red first.
+  The full runs above predate R2-1, the Optic change, the CodeRabbit fixes and the screening ownership work of Codex round 5, which CI on the PR covers.
+- **What ran locally.**
+  TEA signed off with three consecutive clean runs of every tier at `5cbf216f`, after the Codex review fixes; the only later commits are the test design and this evidence.
+  Passing per run: `apps/api` 7887 with 28 skipped, `packages/api-client` 1580, `packages/config` 29, `packages/db` 266 with 1 skipped, `apps/web` 1825, `apps/mobile` 1905, the Pact consumer 444 with the provider verified, and Playwright 62 with 1 skipped.
+  The skipped Playwright test is `P-D-PREVIEW-CLOSED`, which needs flags off, and no moderation test in the API or database tiers skips.
+  All 17 seeded defects went red, and two comment forms of S-17 survived at first and are now caught.
+  Each regression test for review findings C1 to C6 and F23 was red before its fix.
+  tsc and eslint are clean in all workspaces, and all five `node-test-gate` suites pass.
+  Limits are in the test design under Execution results, and nothing has run on a deployed preview.
+- **A real browser walk used doubles for the edges.**
+  The built API and `next dev` ran against the isolated database `cc611_walk`, a mock origin served the image, and sign-in used the `NEXT_PUBLIC_E2E_AUTH` fixture token.
+  Each decision, a temporary ban and an admin's permanent ban were applied in Chromium, decision, sanction and audit rows were read back, and the banned accounts saw the notice in light and dark at 1280 and 375 pixels.
+  No real Supabase Auth session or real storage object was involved.
+- **Production stays dark.**
+  `moderation_decisions_enabled` and `moderation_console_enabled` default to false and are true only in the dev seed.
+- **Known limits by design.**
+  A signed image URL issued before a decision lives up to 900 seconds.
+  Appeal intake is operator-recorded, and the notice sends the member to support.
+  With the filters gone, a member whose ban ends while the page stays open sees the feed on the next reload or session change.
+  Screenshots under `_bmad-output/test-artifacts/story-6-11/` are git-ignored local evidence.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Screener["screener flags post\nnull-reporter report"] --> Case
+  Member["member report"] --> Case["case from open reports"]
+  Case --> Detail["GET case detail\nrevision, allowedActions, standing"]
+  Detail --> Panel["decision panel\nreason, one mutationId per intent"]
+  Panel --> Post["POST /moderation/cases/:id/decisions"]
+  Post --> Gate{"role, flags, strict body"}
+  Gate -- "refused" --> R4xx["closed 400, 403 or 503\nno oracle for the caller"]
+  Gate -- "ok" --> Tx["case lock, replay check, read,\nprivacy guard, member lock, post lock"]
+  Tx --> Replay{"same key?"}
+  Replay -- "same payload" --> Stored["stored response\nreplayed: true"]
+  Replay -- "different payload" --> Mis["409 idempotency_mismatch"]
+  Replay -- "new" --> Rev{"revision still current?"}
+  Rev -- "no" --> Conf["409 case_conflict\nno write"]
+  Rev -- "yes" --> Effects["target effect, report stamps,\nban and hold markers"]
+  Effects --> Record["ModerationDecision + AuditLog\n+ prior-action rows"]
+  Record -- "insert fails" --> A503["503 audit_unavailable\nfull rollback"]
+  Record -- "commit" --> After["bounded after-commit:\nspotlight bump, stream assist"]
+  Stored --> After
+  Effects --> Ban["CommunitySanction"]
+  Ban --> Enforce["assertCommunityMemberNotSanctioned\nno cache, no flag"]
+  Enforce --> Notice["403 community_banned\nweb notice, mobile denied"]
 ```

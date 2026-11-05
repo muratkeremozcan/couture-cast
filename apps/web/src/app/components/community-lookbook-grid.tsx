@@ -34,6 +34,7 @@ import {
   type ShareCardHost,
 } from './share-card-dialog'
 
+import { CommunityBannedNotice } from './community-banned-notice'
 import { CommunityComments } from './community-comments'
 import {
   ResponseError,
@@ -57,6 +58,7 @@ import {
   allocateCommunityLookFromWeb,
   CommunityRequestError,
   communityFailureReason,
+  communitySanctionOf,
   setCommunityReactionFromWeb,
   communityRetryAfterSeconds,
   generateIdempotencyKey,
@@ -123,6 +125,7 @@ import {
   type CommunityReportReason,
   type EmbeddedCommunityChallenge,
   type SupportedLocale,
+  type CommunityBannedError,
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
@@ -185,7 +188,7 @@ const MERLOT = '#7A1F2D'
 function notificationFailureIsRetryable(error: unknown) {
   if (
     error instanceof CommunityRequestError &&
-    ['signed_out', 'age_gate', 'not_found', 'disabled'].includes(error.reason)
+    ['signed_out', 'age_gate', 'banned', 'not_found', 'disabled'].includes(error.reason)
   )
     return false
   const status =
@@ -200,6 +203,7 @@ function notificationFailureIsRetryable(error: unknown) {
 const FAILURE_KEYS: Record<CommunityFailureReason, string> = {
   signed_out: 'community.error.signedOut',
   age_gate: 'community.error.ageGate',
+  banned: 'community.error.banned',
   rate_limited: 'community.error.rateLimited',
   not_found: 'community.error.notFound',
   reason_changed: 'community.error.reasonChanged',
@@ -430,15 +434,25 @@ export interface LookbookFilterNavProps {
   onTabChange: (tab: FilterCategory) => void
   /** The band `auto` resolved to, so that chip can name it instead of saying "your climate". */
   viewerBand?: ClimateBand | null
+  /** Story 6.11: a banned member has no feed to filter, so the nav and its heading leave the page. */
+  closed?: boolean
 }
+
+// A phone row scrolls and fades at its right edge, so a chip the edge cuts reads as more to scroll
+// to. From 768 pixels the column has room for whole chips, so they wrap.
+const CHIP_ROW_SCROLL =
+  'flex items-center gap-2 overflow-x-auto pb-1 pr-6 scrollbar-thin [mask-image:linear-gradient(to_right,black_calc(100%-1.5rem),transparent)]'
+const CHIP_ROW = `${CHIP_ROW_SCROLL} min-[768px]:flex-wrap min-[768px]:overflow-visible min-[768px]:pr-0 min-[768px]:[mask-image:none]`
 
 export function LookbookFilterNav({
   activeTab,
   isMobilePreview = false,
   onTabChange,
   viewerBand = null,
+  closed = false,
 }: LookbookFilterNavProps) {
   const { t } = useCommunityTranslation()
+  if (closed) return null
 
   const handleTabClick = (tab: FilterCategory) => {
     onTabChange(tab)
@@ -467,7 +481,7 @@ export function LookbookFilterNav({
       >
         {t('community.heading')}
       </h2>
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+      <div className={isMobilePreview ? CHIP_ROW_SCROLL : CHIP_ROW}>
         {COMMUNITY_FEED_MODES.map((mode) => {
           const isActive = activeTab === mode
           const tabletStyles = isMobilePreview
@@ -1939,6 +1953,8 @@ export interface CommunityLookbookGridProps {
    * `auto` chip pressed over a feed carrying every region.
    */
   onServedModeChange?: (mode: CommunityFeedMode) => void
+  /** Story 6.11: the same lift for the ban, so the page's other filter nav closes with the feed. */
+  onBannedChange?: (banned: boolean) => void
   /**
    * Story 6.7: a Home teaser activation. A new token asks this section to focus
    * that spotlight entry, or to focus one notice saying why it cannot.
@@ -1992,6 +2008,9 @@ function SpotlightFocusNotice({
   )
 }
 
+/** A ban hides the feed, its author states and every action, like lost access does. */
+const feedVisible = (available: boolean, banned: unknown) => available && !banned
+
 function communityPresentation(
   available: boolean,
   hasSession: boolean,
@@ -2015,6 +2034,28 @@ function communityPresentation(
   }
 }
 
+/** Story 6.11: the notifications link holds the section off the divider, and a ban removes it. */
+const communityAsideClass = (banned: boolean) =>
+  banned ? 'flex flex-col gap-6 pt-6' : 'flex flex-col gap-6'
+
+/** Story 6.11: a banned member has no community notifications to manage. */
+function CommunitySettingsLink({
+  banned,
+  href,
+  label,
+}: {
+  banned: boolean
+  href: string
+  label: string
+}) {
+  if (banned) return null
+  return (
+    <Link href={href} className="min-h-12 self-start py-3 underline">
+      {label}
+    </Link>
+  )
+}
+
 export function CommunityLookbookGrid({
   activeTab = 'auto',
   onTabChange,
@@ -2024,6 +2065,7 @@ export function CommunityLookbookGrid({
   showFilterNav = false,
   onViewerBandChange,
   onServedModeChange,
+  onBannedChange,
   spotlightFocusIntent,
 }: CommunityLookbookGridProps) {
   const { t, i18n } = useCommunityTranslation()
@@ -2172,10 +2214,20 @@ export function CommunityLookbookGrid({
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [feedError, setFeedError] = useState<Message | null>(null)
+  // Story 6.11: the member's own ban replaces the feed with a notice.
+  const [bannedSanction, setBannedSanction] = useState<
+    CommunityBannedError['sanction'] | null
+  >(null)
   // What the one live region holds, in the order it happened. A message replaces the list,
   // except the feed's own completion message, which follows anything announced while that
   // same read was in flight (see announceFeed).
   const [announcements, setAnnouncements] = useState<Message[]>([])
+  const bannedRef = useRef(false)
+  const banned = Boolean(bannedSanction)
+  useEffect(() => {
+    bannedRef.current = banned
+    onBannedChange?.(banned)
+  }, [banned, onBannedChange])
   /** Monotonic request id, so a late response for an abandoned filter is dropped. */
   const feedGenerationRef = useRef(0)
   const announcedDuringReadRef = useRef<number | null>(null)
@@ -2183,6 +2235,34 @@ export function CommunityLookbookGrid({
     announcedDuringReadRef.current = feedGenerationRef.current
     setAnnouncements(message ? [message] : [])
   }, [])
+  /** Every path that learns of a ban leaves the same page: the notice and nothing of the feed. */
+  const closeForBan = useCallback(
+    (sanction: CommunityBannedError['sanction']) => {
+      // A read still in flight was authorized before the ban, so its answer can never land.
+      feedGenerationRef.current++
+      setIsLoading(false)
+      setIsLoadingMore(false)
+      actionControllerRef.current?.abort()
+      setBannedSanction(sanction)
+      setItems([])
+      setAuthorStates([])
+      setActiveChallenge(null)
+      setNextCursor(null)
+      setFeedError(null)
+      setOpenedItem(null)
+      setDeepLinkedItem(null)
+      setCommentTarget(undefined)
+      setReportingPostId(null)
+      setIsCreateModalOpen(false)
+      setIsSubmittingReport(false)
+      setIsPreparingPhoto(false)
+      setIsPublishing(false)
+      setNewLooks([])
+      // The notice mounts with its words, which a screen reader may not hear, so the live region says it.
+      setAnnouncement({ key: 'community.error.banned' })
+    },
+    [setAnnouncement]
+  )
   /**
    * The feed's own messages. The loading message always starts a fresh list; the completion
    * message joins the list when something else was announced during the same read, a
@@ -2254,6 +2334,7 @@ export function CommunityLookbookGrid({
   // or superseded read leaves nothing behind.
   const spotlight = useCommunitySpotlight<{ ticket: number; stamp: LiveReadStamp }>({
     scope: sessionScope,
+    onBanned: closeForBan,
     beginRead: () => ({
       ticket: reactionState.beginRead(),
       stamp: liveSponsorships.begin(),
@@ -2455,6 +2536,7 @@ export function CommunityLookbookGrid({
         setActiveChallenge(feed.activeChallenge)
         setNextCursor(feed.nextCursor)
         setFeedError(null)
+        setBannedSanction(null)
         // A refetch that hands back a freshly signed URL clears the failure: not
         // clearing it is what left a recovered card reading "Image unavailable"
         // for the rest of the session.
@@ -2513,6 +2595,11 @@ export function CommunityLookbookGrid({
         if (controller.signal.aborted || generation !== feedGenerationRef.current) {
           return
         }
+        const sanction = communitySanctionOf(error)
+        if (sanction) {
+          closeForBan(sanction)
+          return
+        }
         const message = messageForError(
           error,
           'community.error.load',
@@ -2530,6 +2617,7 @@ export function CommunityLookbookGrid({
     [
       announceFeed,
       applyLiveSponsorship,
+      closeForBan,
       liveSponsorships,
       reactionState,
       revalidateHighlighted,
@@ -2551,6 +2639,11 @@ export function CommunityLookbookGrid({
       // A teaser intent and its notice belong to the member who tapped it.
       setPendingFocus(null)
       setSpotlightNotice(null)
+      // A sanction names one member's ban, its expiry and appeal, so it leaves with that member.
+      setBannedSanction(null)
+      setAnnouncements((previous) =>
+        previous.filter((message) => message.key !== 'community.error.banned')
+      )
       setItems([])
       itemsRef.current = []
       setAuthorStates([])
@@ -2588,20 +2681,14 @@ export function CommunityLookbookGrid({
         if (identity) void loadFeed(modeRef.current)
       }
     }
-    const erase = () => {
-      comments.reset()
-      clearScope()
-    }
     syncSession()
     const timer = setInterval(syncSession, 1000)
     window.addEventListener('storage', syncSession)
     window.addEventListener('couture:session', syncSession)
-    window.addEventListener('couture:account-erased', erase)
     return () => {
       clearInterval(timer)
       window.removeEventListener('storage', syncSession)
       window.removeEventListener('couture:session', syncSession)
-      window.removeEventListener('couture:account-erased', erase)
     }
   }, [comments, reactionState, loadFeed, resetSpotlight, liveSponsorships])
 
@@ -2824,6 +2911,19 @@ export function CommunityLookbookGrid({
           setItems([])
           setOpenedItem(null)
           setNewLooks([])
+          // A denied socket says nothing about why. One read asks, so a member banned while
+          // the page was open sees the notice. A member already told needs no second answer.
+          if (!bannedRef.current) {
+            // The answer belongs to the session scope it was asked in.
+            const scope = feedScopeRef.current
+            void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
+              (error: unknown) => {
+                const sanction = communitySanctionOf(error)
+                if (!active || scope !== feedScopeRef.current || !sanction) return
+                closeForBan(sanction)
+              }
+            )
+          }
         }
       },
     })
@@ -2852,6 +2952,7 @@ export function CommunityLookbookGrid({
     }
   }, [
     applyLiveSponsorship,
+    closeForBan,
     liveSponsorships,
     comments,
     currentMode,
@@ -3476,7 +3577,7 @@ export function CommunityLookbookGrid({
   ])
 
   const presentation = communityPresentation(
-    communityAvailable,
+    feedVisible(communityAvailable, bannedSanction),
     hasSession,
     displayedItems,
     authorStates,
@@ -3499,11 +3600,14 @@ export function CommunityLookbookGrid({
 
   return (
     <ShareCardHostContext.Provider value={shareHost}>
-      <aside aria-label={t('community.sectionLabel')} className="flex flex-col gap-6">
+      <aside
+        aria-label={t('community.sectionLabel')}
+        className={communityAsideClass(banned)}
+      >
         <SpotlightFocusNotice notice={spotlightNotice} t={t} />
         <CommunitySpotlightSection
           state={spotlight.state}
-          available={communityAvailable}
+          available={feedVisible(communityAvailable, bannedSanction)}
           isMobilePreview={isMobilePreview}
           t={t}
           onLoadMore={() => {
@@ -3549,15 +3653,15 @@ export function CommunityLookbookGrid({
             isMobilePreview={isMobilePreview}
             onTabChange={handleModeChange}
             viewerBand={viewerBand}
+            closed={banned}
           />
         )}
 
-        <Link
+        <CommunitySettingsLink
+          banned={banned}
           href={presentation.settingsHref}
-          className="min-h-12 self-start py-3 underline"
-        >
-          {t(presentation.settingsLabel)}
-        </Link>
+          label={t(presentation.settingsLabel)}
+        />
         <CommunityHeader canShare={presentation.canAct} onShare={openCreateModal} t={t} />
 
         <CommunityNotices
@@ -3577,16 +3681,24 @@ export function CommunityLookbookGrid({
           />
         )}
 
-        <CommunityFeedStates
-          isLoading={isLoading}
-          errorText={renderMessage(feedError, t, viewerBand)}
-          itemCount={displayedItems.length}
-          gridColumns={gridColumns}
-          canShare={presentation.canAct}
-          onRetry={handleRetry}
-          onShare={openCreateModal}
-          t={t}
-        />
+        {bannedSanction ? (
+          <CommunityBannedNotice
+            sanction={bannedSanction}
+            language={i18n.language}
+            t={t}
+          />
+        ) : (
+          <CommunityFeedStates
+            isLoading={isLoading}
+            errorText={renderMessage(feedError, t, viewerBand)}
+            itemCount={displayedItems.length}
+            gridColumns={gridColumns}
+            canShare={presentation.canAct}
+            onRetry={handleRetry}
+            onShare={openCreateModal}
+            t={t}
+          />
+        )}
 
         <div
           ref={gridRef}

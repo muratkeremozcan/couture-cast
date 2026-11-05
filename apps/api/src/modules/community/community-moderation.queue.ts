@@ -24,16 +24,24 @@ export const communityModerationJobSchema = z
     postId: z.string().trim().min(1).max(128),
     uploadSessionId: z.string().trim().min(1).max(128),
     platform: z.enum(['web', 'mobile']).optional(),
+    // Optional only for jobs queued before this field existed. Those ran before any row could be
+    // re-armed, so `communityModerationJobGeneration` reads them as generation 0.
+    generation: z.number().int().nonnegative().optional(),
   })
   .strict()
 
 export type CommunityModerationJob = z.infer<typeof communityModerationJobSchema>
 
+/** The outbox generation this job works for. Only that generation may settle the post. */
+export const communityModerationJobGeneration = (job: CommunityModerationJob): number =>
+  job.generation ?? 0
+
 export interface CommunityModerationPublisher {
   enqueue(
     postId: string,
     uploadSessionId: string,
-    platform?: 'web' | 'mobile'
+    platform?: 'web' | 'mobile',
+    generation?: number
   ): Promise<void>
 }
 
@@ -50,7 +58,8 @@ export interface CommunityModerationPublisher {
  *
  * That is the correct behaviour — it is what makes a duplicate dispatch safe —
  * but an operator who needs a genuine re-screen has to do one of two things:
- * remove the retained job from the queue first (`queue.getJob(id)` then
+ * bump the outbox `generation`, which changes the job id (how a ban's held post
+ * returns to screening), remove the retained job from the queue first (`queue.getJob(id)` then
  * `job.remove()`), or give the post a new upload session, which changes the
  * object path and therefore the job id. Re-arming the outbox row alone is not
  * enough and looks like it worked. Either way the post must still be in
@@ -63,9 +72,11 @@ export interface CommunityModerationPublisher {
  */
 export function buildCommunityModerationJobId(
   postId: string,
-  uploadSessionId: string
+  uploadSessionId: string,
+  generation = 0
 ): string {
-  return `${postId}__${uploadSessionId}`
+  const base = `${postId}__${uploadSessionId}`
+  return generation > 0 ? `${base}__g${generation}` : base
 }
 
 /**
@@ -102,15 +113,17 @@ export class CommunityModerationQueue
   async enqueue(
     postId: string,
     uploadSessionId: string,
-    platform?: 'web' | 'mobile'
+    platform?: 'web' | 'mobile',
+    generation = 0
   ): Promise<void> {
     const data = communityModerationJobSchema.parse({
       postId,
       uploadSessionId,
       platform,
+      generation,
     })
     await this.getQueue().add(COMMUNITY_MODERATION_JOB, data, {
-      jobId: buildCommunityModerationJobId(postId, uploadSessionId),
+      jobId: buildCommunityModerationJobId(postId, uploadSessionId, generation),
       removeOnComplete: { age: JOB_RETENTION_SECONDS },
       removeOnFail: { age: JOB_RETENTION_SECONDS },
     })

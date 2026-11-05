@@ -5,8 +5,14 @@ import {
   verifyShareCardInteraction,
 } from './interactions/share-cards'
 import {
+  moderationDecisionRefusals,
   moderationRefusals,
+  verifyCommunityBannedFeedInteraction,
+  verifyModerationAppealInteraction,
   verifyModerationCaseInteraction,
+  verifyModerationDecisionAppliedInteraction,
+  verifyModerationDecisionRefusal,
+  verifyModerationDecisionReplayedInteraction,
   verifyModerationQueueEmptyInteraction,
   verifyModerationQueueOrphanInteraction,
   verifyModerationQueueInteraction,
@@ -991,5 +997,21 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
   })
   it.each(moderationRefusals)('refuses $name', async (refusal) => {
     await verifyModerationRefusal(pact, refusal)
+  })
+  // Story 6.11: the moderator's two write routes and the banned member's feed refusal.
+  it('applies a moderation decision', async () => {
+    await verifyModerationDecisionAppliedInteraction(pact)
+  })
+  it('replays a moderation decision retried with the same mutation id', async () => {
+    await verifyModerationDecisionReplayedInteraction(pact)
+  })
+  it.each(moderationDecisionRefusals)('refuses $name', async (refusal) => {
+    await verifyModerationDecisionRefusal(pact, refusal)
+  })
+  it('records an appeal step on a sanction', async () => {
+    await verifyModerationAppealInteraction(pact)
+  })
+  it('names the sanction to a banned member reading the feed', async () => {
+    await verifyCommunityBannedFeedInteraction(pact)
   })
 })

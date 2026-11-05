@@ -6,6 +6,7 @@ import {
   communityFeedModeSchema,
   communityReactionFeedItemSchema,
   communityReactionSummarySchema,
+  communityDeniedOrBannedResponseSchema,
 } from './community'
 import { alertPreferencesSchema } from './alerts'
 import { type RegisteredCommonHttpSchemas } from './common'
@@ -354,7 +355,12 @@ export function registerCommunitySyncContracts(
           },
         },
         401: { description: 'Unauthorized' },
-        403: { description: 'Denied' },
+        403: {
+          description: 'Denied, or the member is banned',
+          content: {
+            'application/json': { schema: communityDeniedOrBannedResponseSchema },
+          },
+        },
         409: {
           description: 'Revision conflict, binding conflict or resync_required',
           content: { 'application/json': { schema: communityConflictResponseSchema } },

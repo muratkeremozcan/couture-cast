@@ -26,6 +26,7 @@ describe('feature flag registry', () => {
       'premium_planner_enabled',
       'share_card_native_share_enabled',
       'moderation_console_enabled',
+      'moderation_decisions_enabled',
     ])
   })
 
@@ -83,6 +84,23 @@ describe('feature flag registry', () => {
     const readFallbackFlag = vi.fn().mockResolvedValue(null)
     await expect(
       getFeatureFlag('moderation_console_enabled', 'moderator-1', {
+        readRemoteFlag,
+        readFallbackFlag,
+      })
+    ).resolves.toBe(false)
+  })
+
+  it('U-D-FLAG: defaults the decisions kill switch to off, last in the registry', () => {
+    // Story 6.11 D3: production stays off until someone flips it. Only the dev seed turns it on.
+    expect(getDefaultFeatureFlagValue('moderation_decisions_enabled')).toBe(false)
+    expect(FEATURE_FLAG_KEYS.at(-1)).toBe('moderation_decisions_enabled')
+  })
+
+  it('U-D-FLAG: resolves the decisions flag to false when PostHog and the cache both fail', async () => {
+    const readRemoteFlag = vi.fn().mockRejectedValue(new Error('posthog down'))
+    const readFallbackFlag = vi.fn().mockResolvedValue(null)
+    await expect(
+      getFeatureFlag('moderation_decisions_enabled', 'moderator-1', {
         readRemoteFlag,
         readFallbackFlag,
       })

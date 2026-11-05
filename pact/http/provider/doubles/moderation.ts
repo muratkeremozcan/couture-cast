@@ -4,15 +4,29 @@
 // cache-header middleware run; only the service behind them and the flag answer are doubled, so
 // the 403, 400 and 503 shapes come from the shipped code and the 200 bodies are parsed by the
 // shipped contract before they are served.
+// Story 6.11 test owner: C-D-PACT. The answers to a decision come from the shipped availability rule
+// over the world a scenario names, the same rule the real service runs, and the refusal bodies come
+// from the shipped error builder and the shipped ban refusal.
 import {
   BadRequestException,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common'
+import type { Prisma } from '@prisma/client'
 import {
+  deriveAllowedActions,
+  deriveAllowedAppealSteps,
+  moderationActionAvailability,
+  moderationAppealResponseSchema,
   moderationCaseDetailResponseSchema,
   moderationCasesResponseSchema,
+  moderationDecisionResponseSchema,
+  type ModerationAppealInput,
+  type ModerationAvailabilityInput,
+  type ModerationDecisionInput,
 } from '@couture/api-client/contracts/http'
+import { assertCommunityMemberNotSanctioned } from '../../../../apps/api/src/modules/community/community-access.service'
+import { moderationDecisionError } from '../../../../apps/api/src/modules/moderation/moderation-decision-rules'
 
 export type ModerationScenario =
   | 'queue'
@@ -25,9 +39,18 @@ export type ModerationScenario =
   | 'detail_signing_failed'
   | 'unknown_case'
   | 'audit_unavailable'
+  | 'decision_applied'
+  | 'decision_replayed'
+  | 'case_conflict'
+  | 'action_not_applicable'
+  | 'self_review_refused'
+  | 'admin_required'
+  | 'appeal_applied'
+  | 'banned_feed'
 
 let scenario: ModerationScenario = 'queue'
 let consoleEnabled = true
+let decisionsEnabled = true
 
 export function configureModerationScenario(next: ModerationScenario) {
   scenario = next
@@ -35,9 +58,13 @@ export function configureModerationScenario(next: ModerationScenario) {
 export function configureModerationConsole(enabled: boolean) {
   consoleEnabled = enabled
 }
+export function configureModerationDecisions(enabled: boolean) {
+  decisionsEnabled = enabled
+}
 export function resetModerationState() {
   scenario = 'queue'
   consoleEnabled = true
+  decisionsEnabled = true
 }
 
 /** Fixed instants keep the recorded pact byte-stable across the three determinism runs. */
@@ -48,6 +75,37 @@ const iso = (hours: number) =>
 export const PACT_QUEUE_CURSOR = 'eyJ2IjoxfQ.c2lnbmF0dXJl'
 export const PACT_SIGNED_URL =
   'https://storage.example.test/object/sign/community/p1/a.jpg?token=pact-signature'
+
+export const PACT_CASE_REVISION = '0123456789abcdef'
+const PACT_NEXT_REVISION = 'aaaabbbbccccdddd'
+const PACT_SANCTION_ID = 'pact-sanction-1'
+const BAN_EXPIRES_AT = iso(7 * 24)
+
+/** An open reported post with a published target, read by a moderator with no conflict. */
+const openCase: ModerationAvailabilityInput = {
+  role: 'moderator',
+  viewerConflict: false,
+  operatorSanctioned: false,
+  escalated: false,
+  openReportCount: 1,
+  target: { state: 'live', kind: 'post', status: 'published', erasureRequested: false },
+  subjectBan: null,
+  authorEligible: true,
+  writesOpen: true,
+}
+const standingClean = {
+  active: false,
+  sanction: null,
+  priorBanCount: 0,
+  allowedAppealSteps: [],
+}
+const decisionState = (world: ModerationAvailabilityInput) => ({
+  revision: PACT_CASE_REVISION,
+  ...deriveAllowedActions(world),
+  escalated: world.escalated,
+  firstDecisionAt: null,
+  subjectStanding: standingClean,
+})
 
 const fullItem = {
   caseId: 'post.pactpost1',
@@ -62,6 +120,7 @@ const fullItem = {
   locale: 'en-US',
   hasFinding: true,
   excerpt: 'A reported caption',
+  escalated: false,
 }
 const queueItems = [
   fullItem,
@@ -88,6 +147,7 @@ const orphanItem = {
   locale: null,
   hasFinding: false,
   excerpt: null,
+  escalated: false,
 }
 
 const baseDetail = {
@@ -120,6 +180,7 @@ const baseDetail = {
   reporters: [
     {
       identity: { state: 'alias', alias: 'brave-owl-9876' },
+      origin: 'member',
       reason: 'harassment',
       details: 'Reporter note',
       reportedAt: iso(-2),
@@ -141,6 +202,7 @@ const baseDetail = {
     altText: 'Alt text',
   },
   viewerConflict: false,
+  ...decisionState(openCase),
 }
 
 export const moderationQueueServiceDouble = {
@@ -215,6 +277,7 @@ export const moderationQueueServiceDouble = {
             reporters: [
               {
                 identity: { state: 'unknown', alias: null },
+                origin: 'member',
                 reason: 'other',
                 details: null,
                 reportedAt: iso(-2),
@@ -224,6 +287,8 @@ export const moderationQueueServiceDouble = {
             priorActions: [],
             media: { state: 'unavailable', reason: 'no_image' },
             viewerConflict: true,
+            ...decisionState({ ...openCase, viewerConflict: true }),
+            firstDecisionAt: iso(-1),
           },
         })
       )
@@ -269,17 +334,175 @@ export const moderationQueueServiceDouble = {
                 {
                   ...baseDetail.reporters[0],
                   identity: { state: 'erased', alias: null },
+                  origin: 'member',
                 },
               ],
+              ...decisionState({ ...openCase, target: { state: 'erased' } }),
+              subjectStanding: null,
             }
-          : { ...baseDetail, caseId },
+          : {
+              ...baseDetail,
+              caseId,
+              // The author holds a temporary ban whose appeal this moderator may record.
+              ...deriveAllowedActions({ ...openCase, subjectBan: 'temporary' }),
+              subjectStanding: {
+                active: true,
+                sanction: {
+                  sanctionId: PACT_SANCTION_ID,
+                  kind: 'temporary',
+                  expiresAt: BAN_EXPIRES_AT,
+                  appealStatus: 'not_requested',
+                },
+                priorBanCount: 1,
+                allowedAppealSteps: deriveAllowedAppealSteps({
+                  role: 'moderator',
+                  viewerConflict: false,
+                  operatorSanctioned: false,
+                  sanctionActive: true,
+                  appealStatus: 'not_requested',
+                }),
+              },
+            },
       })
     )
   },
 }
 
-/** The only flag the moderation controller reads. Every other flag answers on. */
+const DECISION_WORLDS: Partial<Record<ModerationScenario, ModerationAvailabilityInput>> =
+  {
+    self_review_refused: { ...openCase, viewerConflict: true },
+  }
+
+const decisionResult = (
+  caseId: string,
+  input: ModerationDecisionInput,
+  replayed: boolean
+) =>
+  moderationDecisionResponseSchema.parse({
+    data: {
+      decisionId: 'pact-decision-1',
+      caseId,
+      action: input.action,
+      decidedAt: PACT_SERVER_NOW,
+      firstDecisionAt: PACT_SERVER_NOW,
+      revision: PACT_NEXT_REVISION,
+      caseStatus: 'resolved',
+      escalated: false,
+      // A post takedown or a ban on a published post leaves the post flagged.
+      targetStatus: 'flagged',
+      sanction:
+        input.action === 'ban'
+          ? {
+              sanctionId: PACT_SANCTION_ID,
+              kind: 'temporary',
+              expiresAt: BAN_EXPIRES_AT,
+              appealStatus: 'not_requested',
+            }
+          : null,
+      replayed,
+      cacheInvalidation: 'completed',
+    },
+  })
+
+export const moderationDecisionsServiceDouble = {
+  decide: (_auth: unknown, caseId: string, input: ModerationDecisionInput) => {
+    if (scenario === 'decision_replayed')
+      return Promise.resolve(decisionResult(caseId, input, true))
+    // The real service checks the revision between the viewer half and the state half of the rule.
+    if (scenario === 'case_conflict' && input.expectedRevision !== PACT_CASE_REVISION)
+      throw moderationDecisionError('case_conflict', {
+        currentRevision: PACT_CASE_REVISION,
+      })
+    const verdict = moderationActionAvailability(
+      DECISION_WORLDS[scenario] ?? openCase,
+      input.action,
+      input.action === 'ban' ? input.ban.kind : undefined
+    )
+    if (!verdict.available)
+      throw moderationDecisionError(
+        verdict.code,
+        verdict.code === 'action_not_applicable' ? { detail: verdict.detail } : {}
+      )
+    return Promise.resolve(decisionResult(caseId, input, false))
+  },
+}
+
+export const moderationSanctionsServiceDouble = {
+  recordAppeal: (_auth: unknown, sanctionId: string, input: ModerationAppealInput) => {
+    const allowed = deriveAllowedAppealSteps({
+      role: 'moderator',
+      viewerConflict: false,
+      operatorSanctioned: false,
+      sanctionActive: true,
+      appealStatus: 'not_requested',
+    })
+    if (!allowed.includes(input.status))
+      throw moderationDecisionError('appeal_transition_invalid')
+    return Promise.resolve(
+      moderationAppealResponseSchema.parse({
+        data: {
+          decisionId: 'pact-decision-2',
+          decidedAt: PACT_SERVER_NOW,
+          sanction: {
+            sanctionId,
+            kind: 'temporary',
+            expiresAt: BAN_EXPIRES_AT,
+            appealStatus: input.status,
+          },
+          active: true,
+          restoredCount: 0,
+          replayed: false,
+          cacheInvalidation: 'completed',
+        },
+      })
+    )
+  },
+}
+
+/** The member the provider's auth double signs in. */
+const BANNED_MEMBER = 'guardian-1'
+
+/** One active ban on that member alone, so the refusal below is the one the shipped read gate builds. */
+const bannedMemberTx = {
+  communitySanction: {
+    findFirst: ({ where }: { where: { user_id: string } }) =>
+      Promise.resolve(
+        where.user_id === BANNED_MEMBER
+          ? {
+              kind: 'temporary',
+              expires_at: new Date(BAN_EXPIRES_AT),
+              appeal_status: 'not_requested',
+            }
+          : null
+      ),
+  },
+} as unknown as Pick<Prisma.TransactionClient, 'communitySanction'>
+
+/**
+ * The feed of a banned member. `CommunityService.getFeed` runs the read gate first, so the double
+ * answers with the gate's own refusal and every other scenario reads the wrapped service.
+ * The gate reads the id the controller forwards, so a controller that drops it gets no refusal.
+ */
+export function withCommunityBan<S extends { getFeed: (params: never) => unknown }>(
+  service: S
+): S {
+  return {
+    ...service,
+    getFeed: async (params: never) => {
+      if (scenario === 'banned_feed') {
+        const { userId } = params as { userId: string }
+        await assertCommunityMemberNotSanctioned(bannedMemberTx, userId)
+      }
+      return service.getFeed(params)
+    },
+  }
+}
+
+/** The only flags the moderation controllers read. Every other flag answers on. */
 export const moderationFlagsDouble = {
-  getFeatureFlag: (key: string) =>
-    Promise.resolve(key === 'moderation_console_enabled' ? consoleEnabled : true),
+  getFeatureFlag: (key: string) => {
+    if (key === 'moderation_console_enabled') return Promise.resolve(consoleEnabled)
+    if (key === 'moderation_decisions_enabled') return Promise.resolve(decisionsEnabled)
+    return Promise.resolve(true)
+  },
 }

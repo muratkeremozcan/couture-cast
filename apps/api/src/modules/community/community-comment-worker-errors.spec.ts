@@ -57,11 +57,7 @@ describe('comment worker screening error ownership', () => {
     harness.markFailed.mockRejectedValue(new Error('confidential SQL settlement error'))
 
     await expect(harness.registered!(job(2))).rejects.toBe(screening)
-    expect(harness.markFailed).toHaveBeenCalledExactlyOnceWith(
-      'comment-confidential',
-      false,
-      2
-    )
+    expect(harness.markFailed).toHaveBeenCalledExactlyOnceWith('comment-confidential', 2)
     expect(harness.warn).toHaveBeenCalledExactlyOnceWith(
       {
         event: 'community_comment_failure_settlement_failed',
@@ -79,11 +75,7 @@ describe('comment worker screening error ownership', () => {
     const screening = new Error('screening failed')
     harness.process.mockRejectedValue(screening)
     await expect(harness.registered!(job(2))).rejects.toBe(screening)
-    expect(harness.markFailed).toHaveBeenCalledExactlyOnceWith(
-      'comment-confidential',
-      false,
-      2
-    )
+    expect(harness.markFailed).toHaveBeenCalledExactlyOnceWith('comment-confidential', 2)
     expect(harness.warn).not.toHaveBeenCalled()
   })
 

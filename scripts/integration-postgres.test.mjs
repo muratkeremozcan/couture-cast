@@ -15,7 +15,7 @@ test('local integration Postgres provisions exactly what the tests job provision
 
 test('a workflow without the provisioning step is refused', () => {
   assert.throws(
-    () => qualityGateProvisioningSql('jobs:\n  tests:\n    steps: []\n'),
+    () => qualityGateProvisioningSql('jobs:\n  tests-shard:\n    steps: []\n'),
     /provisioning SQL not found/
   )
 })

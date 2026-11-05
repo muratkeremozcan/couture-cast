@@ -9,6 +9,7 @@ import {
   COMMUNITY_STALE_REVIEW_JOB_NAME,
   COMMUNITY_UPLOAD_EXPIRY_JOB_NAME,
   COMMUNITY_ERASURE_JOB_NAME,
+  COMMUNITY_BAN_EXPIRY_JOB_NAME,
 } from '../modules/community/community-maintenance.scheduler'
 import {
   ADMIN_JOB_FAILURE_PRUNE_JOB_NAME,
@@ -58,6 +59,7 @@ export type MaintenanceSweeps = {
     sweepStalePendingReview: () => Promise<unknown>
     sweepExpiredUploads: () => Promise<unknown>
     sweepErasureRequests: () => Promise<unknown>
+    sweepExpiredBanHolds: () => Promise<unknown>
   }
 }
 
@@ -149,6 +151,13 @@ export function createMaintenanceProcessor(deps: MaintenanceProcessorDeps) {
           'community_erasure_sweep_completed',
           'community_erasure_sweep_failed',
           () => deps.community.sweepErasureRequests()
+        )
+      case COMMUNITY_BAN_EXPIRY_JOB_NAME:
+        return run(
+          job.name,
+          'community_ban_expiry_sweep_completed',
+          'community_ban_expiry_sweep_failed',
+          () => deps.community.sweepExpiredBanHolds()
         )
       default:
         // Not thrown: an unknown name is almost always a scheduler left behind

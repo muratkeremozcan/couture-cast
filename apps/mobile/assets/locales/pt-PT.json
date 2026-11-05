@@ -771,7 +771,8 @@
       "notFound": "Este visual já não está disponível.",
       "disabled": "O feed da comunidade está temporariamente indisponível.",
       "mediaUnavailable": "Este visual está temporariamente indisponível. Tente novamente dentro de momentos.",
-      "generic": "Algo correu mal. Tente novamente."
+      "generic": "Algo correu mal. Tente novamente.",
+      "banned": "O seu acesso à comunidade está suspenso."
     },
     "reactions": {
       "label": "Reações",
@@ -888,6 +889,18 @@
       "announceRefreshed": "Os destaques da cidade foram atualizados com a classificação mais recente.",
       "targetUnavailable": "Esse visual já não está nos Destaques da cidade.",
       "destinationUnavailable": "Os Destaques da cidade não estão disponíveis neste momento."
+    },
+    "banned": {
+      "title": "O seu acesso à comunidade está suspenso",
+      "temporary": "Poderá voltar depois de {{until}}. Até lá, não pode ver a comunidade nem participar nela.",
+      "permanent": "Esta suspensão não tem data de fim. Não pode ver a comunidade nem participar nela.",
+      "scope": "O seu roupeiro, ritual diário, alertas e definições da conta não são afetados.",
+      "appeal": {
+        "not_requested": "Se acha que é um erro, contacte o apoio da CoutureCast para pedir uma revisão.",
+        "requested": "O seu pedido de revisão foi registado e aguarda uma decisão.",
+        "upheld": "O seu pedido de revisão foi analisado e esta suspensão mantém-se.",
+        "overturned": "Esta suspensão foi levantada."
+      }
     }
   },
   "locations": {

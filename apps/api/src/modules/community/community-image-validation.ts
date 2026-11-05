@@ -121,6 +121,48 @@ function assertDimensionsInRange(width: number, height: number): void {
   }
 }
 
+async function openVerifiedImage(
+  bytes: Buffer,
+  sniffedMime: GarmentMimeType,
+  timeoutSeconds?: number,
+  signal?: AbortSignal
+) {
+  const format = SHARP_FORMAT_BY_MIME[sniffedMime]
+  const pipeline = sharp(bytes, {
+    failOn: 'error',
+    limitInputPixels: MAX_COMMUNITY_IMAGE_DIMENSION * MAX_COMMUNITY_IMAGE_DIMENSION,
+    sequentialRead: true,
+  })
+
+  if (timeoutSeconds) pipeline.timeout({ seconds: timeoutSeconds })
+  const metadata = await runAbortableSharp(pipeline, signal, () => pipeline.metadata())
+  if (metadata.format !== format || (metadata.pages ?? 1) !== 1) {
+    throw new CommunityImageValidationError(CODE.IMAGE_DECODE_FAILED)
+  }
+  return { format, pipeline, metadata }
+}
+
+/**
+ * The same size, MIME, checksum, format and dimension checks as a normalization, for bytes this
+ * pipeline already encoded. It encodes nothing, so those bytes stay as they are.
+ */
+export async function verifyCommunityImage(
+  bytes: Buffer,
+  declaration: CommunityImageDeclaration
+): Promise<{ mimeType: GarmentMimeType }> {
+  const sniffedMime = verifyDeclaration(bytes, declaration)
+  try {
+    const { metadata, pipeline } = await openVerifiedImage(bytes, sniffedMime)
+    assertDimensionsInRange(metadata.width ?? 0, metadata.height ?? 0)
+    // Headers can read fine over truncated pixels, so decode every one, to raw and not to a format.
+    await pipeline.raw().toBuffer()
+    return { mimeType: sniffedMime }
+  } catch (error) {
+    if (error instanceof CommunityImageValidationError) throw error
+    throw new CommunityImageValidationError(CODE.IMAGE_DECODE_FAILED)
+  }
+}
+
 /**
  * Verifies the uploaded bytes against what the client declared at allocate time,
  * then orients, decodes and re-encodes them.
@@ -150,18 +192,12 @@ export async function verifyAndNormalizeCommunityImage(
   const sniffedMime = verifyDeclaration(bytes, declaration)
 
   try {
-    const format = SHARP_FORMAT_BY_MIME[sniffedMime]
-    const pipeline = sharp(bytes, {
-      failOn: 'error',
-      limitInputPixels: MAX_COMMUNITY_IMAGE_DIMENSION * MAX_COMMUNITY_IMAGE_DIMENSION,
-      sequentialRead: true,
-    })
-
-    if (timeoutSeconds) pipeline.timeout({ seconds: timeoutSeconds })
-    const metadata = await runAbortableSharp(pipeline, signal, () => pipeline.metadata())
-    if (metadata.format !== format || (metadata.pages ?? 1) !== 1) {
-      throw new CommunityImageValidationError(CODE.IMAGE_DECODE_FAILED)
-    }
+    const { format, pipeline } = await openVerifiedImage(
+      bytes,
+      sniffedMime,
+      timeoutSeconds,
+      signal
+    )
 
     const output = pipeline.rotate().toFormat(format)
     const { data, info } = await runAbortableSharp(output, signal, () =>

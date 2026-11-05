@@ -3,19 +3,32 @@
 // Story 6.7b owner: the mobile community reads opt into the sponsorship block
 // and parse the sponsored variants at the trust boundary. Requests go through
 // the real SDK to MSW, so the assertions read the headers that left the device.
+// Story 6.11 test owner: U-MOB-D-DENIED. `community_banned` reads by code as the existing denied state (TEA-22, D15).
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
+  COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+  COMMUNITY_BANNED_MESSAGE,
+  COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_SELF_REPORT_MESSAGE,
   COMMUNITY_SPONSORSHIP_HEADER,
+  moderationAppealStatusSchema,
+  type CommunityBannedError,
   type CommunitySponsoredFeedItem,
   type CommunitySponsorship,
 } from '@couture/api-client/contracts/http'
+import enUS from '../../assets/locales/en-US.json'
 import { server } from '../test-utils/msw/server'
 import { setMobileAccessTokenResolver } from './mobile-auth'
 import {
+  communityCommentsRootsFromMobile,
+  communityFailureReason,
+  communitySanctionOf,
   getCommunityFeedFromMobile,
   getCommunityPostFromMobile,
   getCommunitySpotlightFromMobile,
+  recordCommunityCardOpenedFromMobile,
+  setCommunityReactionFromMobile,
 } from './community'
 
 const SPONSORSHIP: CommunitySponsorship = {
@@ -161,5 +174,126 @@ describe('mobile community reads opt into sponsorship (Story 6.7b)', () => {
     await expect(getCommunityPostFromMobile('post-a')).rejects.toMatchObject({
       reason: 'unknown',
     })
+  })
+})
+
+describe('U-MOB-D-DENIED: community_banned reads as banned, with its terms', () => {
+  let restoreToken: (() => void) | undefined
+
+  beforeAll(() => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
+  })
+  beforeEach(() => {
+    restoreToken = setMobileAccessTokenResolver(() => 'session-token')
+  })
+  afterEach(() => {
+    restoreToken?.()
+    restoreToken = undefined
+  })
+
+  const banned = (message: string = COMMUNITY_BANNED_MESSAGE): CommunityBannedError => ({
+    statusCode: 403,
+    code: 'community_banned',
+    message,
+    sanction: {
+      kind: 'temporary',
+      expiresAt: '2026-11-10T12:00:00.000Z',
+      appealStatus: 'not_requested',
+    },
+  })
+  const refuseEverything = (body: object = banned()) => {
+    const calls: string[] = []
+    const refuse = ({ request }: { request: Request }) => {
+      calls.push(new URL(request.url).pathname)
+      return HttpResponse.json(body, { status: 403 })
+    }
+    server.use(
+      http.get('*/api/v1/community/*', refuse),
+      http.post('*/api/v1/community/*', refuse),
+      http.put('*/api/v1/community/*', refuse)
+    )
+    return calls
+  }
+  const failureOf = (run: () => Promise<unknown>) =>
+    run().then(
+      () => {
+        throw new Error('expected the request to be refused')
+      },
+      (error: unknown) => error
+    )
+
+  it.each<[string, () => Promise<unknown>]>([
+    ['the feed', () => getCommunityFeedFromMobile({ mode: 'auto' })],
+    ['a single post', () => getCommunityPostFromMobile('post-a')],
+    ['the spotlight', () => getCommunitySpotlightFromMobile()],
+    [
+      'the home teaser',
+      () => getCommunitySpotlightFromMobile({ surface: 'home_teaser' }),
+    ],
+    ['a card open', () => recordCommunityCardOpenedFromMobile('post-a', 'auto')],
+    ['comment roots', () => communityCommentsRootsFromMobile('post-a')],
+  ])('%s reads as banned, with one request and no retry', async (_route, run) => {
+    const calls = refuseEverything()
+    const failure = await failureOf(run)
+    expect(communityFailureReason(failure)).toBe('banned')
+    expect(communitySanctionOf(failure)).toEqual(banned().sanction)
+    expect(calls).toHaveLength(1)
+  })
+
+  it('a reaction reads as banned, ahead of the eligibility rule', async () => {
+    refuseEverything()
+    const failure = await failureOf(() =>
+      setCommunityReactionFromMobile('post-a', {
+        selection: 'love',
+        mutationId: '00000000-0000-4000-8000-000000000001',
+        baseRevision: 0,
+      })
+    )
+    expect(communityFailureReason(failure)).toBe('banned')
+  })
+
+  it.each([
+    ['the age gate', COMMUNITY_AGE_GATE_DENIED_MESSAGE],
+    ['a self report', COMMUNITY_SELF_REPORT_MESSAGE],
+    ['the rollout', COMMUNITY_FEED_DISABLED_MESSAGE],
+  ])('reads the code ahead of the %s message rule', async (_rule, message) => {
+    refuseEverything(banned(message))
+    const failure = await failureOf(() => getCommunityFeedFromMobile({ mode: 'auto' }))
+    expect(communityFailureReason(failure)).toBe('banned')
+  })
+
+  it('still closes the community when a newer server sends terms it cannot read', async () => {
+    const body = banned(COMMUNITY_SELF_REPORT_MESSAGE)
+    refuseEverything({ ...body, sanction: { ...body.sanction, addedLater: 'x' } })
+    const failure = await failureOf(() => getCommunityFeedFromMobile({ mode: 'auto' }))
+    expect(communityFailureReason(failure)).toBe('banned')
+    expect(communitySanctionOf(failure)).toEqual({
+      kind: 'permanent',
+      expiresAt: null,
+      appealStatus: 'not_requested',
+    })
+  })
+
+  it('names no sanction on any other failure', () => {
+    expect(communitySanctionOf(new Error('offline'))).toBeNull()
+    expect(communitySanctionOf(undefined)).toBeNull()
+  })
+
+  it('leaves another 403 to its own rule', async () => {
+    refuseEverything({
+      statusCode: 403,
+      code: 'denied',
+      message: COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+    })
+    const failure = await failureOf(() => getCommunityFeedFromMobile({ mode: 'auto' }))
+    expect(communityFailureReason(failure)).toBe('age_gate')
+  })
+
+  it('has the notice copy in the catalog, for the term and each appeal state', () => {
+    expect(Object.keys(enUS.community.banned.appeal).sort()).toEqual(
+      [...moderationAppealStatusSchema.options].sort()
+    )
+    expect(enUS.community.banned.temporary).toContain('{{until}}')
+    expect(enUS.community.error.banned).toBeTruthy()
   })
 })

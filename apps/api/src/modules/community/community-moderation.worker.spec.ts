@@ -79,6 +79,8 @@ describe('CommunityModerationProcessor & Worker', () => {
   const mockPostUpdateMany = vi.fn().mockResolvedValue({ count: 1 })
   const mockOutboxUpdateMany = vi.fn().mockResolvedValue({ count: 1 })
   const mockModerationEventCreate = vi.fn().mockResolvedValue({ id: 'mod-1' })
+  const mockAliasFindUnique = vi.fn().mockResolvedValue(null)
+  const mockPostReportCreate = vi.fn().mockResolvedValue({ id: 'report-1' })
   const mockTransaction = vi
     .fn()
     .mockImplementation((callback: (tx: PrismaClient) => Promise<unknown>) =>
@@ -92,6 +94,7 @@ describe('CommunityModerationProcessor & Worker', () => {
   const mockPrisma = {
     $executeRaw: vi.fn().mockResolvedValue(1),
     $queryRaw: vi.fn().mockResolvedValue([{ id: 'post-fixture' }]),
+    communitySanction: { findFirst: vi.fn().mockResolvedValue(null) },
     userProfile: { findUnique: vi.fn().mockResolvedValue(eligibleProfile) },
     user: {
       findUnique: vi.fn().mockResolvedValue({ profile: eligibleProfile, teen_roles: [] }),
@@ -102,11 +105,14 @@ describe('CommunityModerationProcessor & Worker', () => {
       updateMany: mockPostUpdateMany,
     },
     communityModerationOutbox: {
+      findUnique: vi.fn().mockResolvedValue({ generation: 0 }),
       updateMany: mockOutboxUpdateMany,
     },
     moderationEvent: {
       create: mockModerationEventCreate,
     },
+    communityAlias: { findUnique: mockAliasFindUnique },
+    communityPostReport: { create: mockPostReportCreate },
     $transaction: mockTransaction,
   } as unknown as PrismaClient
 
@@ -115,6 +121,11 @@ describe('CommunityModerationProcessor & Worker', () => {
   const mockStorage: CommunityStorage = {
     download: mockDownload,
     upload: mockUpload,
+    createOverwriteCapability: vi
+      .fn()
+      .mockImplementation((objectPath: string) =>
+        Promise.resolve({ objectPath, token: 'token', expiresAt: new Date(0) })
+      ),
     signReadUrl: vi.fn(),
     signReadUrls: vi.fn(),
     createUploadSession: vi.fn(),
@@ -176,6 +187,8 @@ describe('CommunityModerationProcessor & Worker', () => {
     mockPostUpdateMany.mockResolvedValue({ count: 1 })
     mockOutboxUpdateMany.mockResolvedValue({ count: 1 })
     mockModerationEventCreate.mockResolvedValue({ id: 'mod-1' })
+    mockAliasFindUnique.mockResolvedValue(null)
+    mockPostReportCreate.mockResolvedValue({ id: 'report-1' })
     mockDownload.mockResolvedValue(jpegBytes)
   })
 
@@ -257,7 +270,7 @@ describe('CommunityModerationProcessor & Worker', () => {
       })
 
       expect(mockOutboxUpdateMany).toHaveBeenCalledWith({
-        where: { post_id: 'post-100' },
+        where: { post_id: 'post-100', generation: 0 },
         data: expect.objectContaining({ dispatched_at: expect.any(Date) }),
       })
 
@@ -496,17 +509,11 @@ describe('CommunityModerationProcessor & Worker', () => {
       expect(mockUpload).toHaveBeenCalledWith(
         'community/post-reencode/session-r.jpg',
         expect.any(Buffer),
-        'image/jpeg'
+        'image/jpeg',
+        expect.objectContaining({ token: 'token' })
       )
-      expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: {
-          id: 'post-reencode',
-          user_id: 'user-r',
-          status: 'pending_review',
-          image_object_path: 'community/post-reencode/session-r.jpg',
-          erasure_requested_at: null,
-          anonymized_at: null,
-        },
+      expect(mockPostUpdate).toHaveBeenCalledWith({
+        where: { id: 'post-reencode' },
         data: expect.objectContaining({
           image_checksum: expect.any(String),
           image_byte_size: expect.any(Number),
@@ -588,8 +595,88 @@ describe('CommunityModerationProcessor & Worker', () => {
       })
 
       expect(mockOutboxUpdateMany).toHaveBeenCalledWith({
-        where: { post_id: 'post-flagged-outbox' },
+        where: { post_id: 'post-flagged-outbox', generation: 0 },
         data: { dispatched_at: expect.any(Date) },
+      })
+    })
+
+    // Story 6.11 test owner: U-S-FLAG-REPORT. A flagged post enters the moderator queue (D11).
+    describe('U-S-FLAG-REPORT', () => {
+      const flagging = () =>
+        createProcessor(
+          new FixtureCommunityModerationEngine({
+            textOutcome: { passed: false, reasons: ['profanity'] },
+            imageOutcome: { passed: true, reasons: [] },
+          })
+        )
+      const flaggedPost = (overrides: Record<string, unknown> = {}) =>
+        pendingPost({
+          id: 'post-intake',
+          user_id: 'user-intake',
+          caption: 'Seen caption',
+          alt_text: 'Seen alt',
+          image_object_path: 'community/post-intake/session-i.jpg',
+          ...overrides,
+        })
+      const reportData = () =>
+        (mockPostReportCreate.mock.calls[0] as [{ data: Record<string, unknown> }])[0]
+          .data
+
+      it('writes one screening report with a null reporter, the snapshot, the path and a 24-hour due time', async () => {
+        mockFindUnique.mockResolvedValue(flaggedPost())
+        await flagging().process({ postId: 'post-intake', uploadSessionId: 'session-i' })
+
+        expect(mockPostReportCreate).toHaveBeenCalledTimes(1)
+        const data = reportData()
+        expect(data).toMatchObject({
+          post_id: 'post-intake',
+          reason: 'inappropriate_content',
+          origin: 'screening',
+          subject_alias: null,
+          image_object_path: 'community/post-intake/session-i.jpg',
+        })
+        // A null reporter reads as screening or erased, so the key must be absent or null.
+        expect(data.reporter_id ?? null).toBeNull()
+        expect(data.content_snapshot).toMatchObject({
+          caption: 'Seen caption',
+          altText: 'Seen alt',
+        })
+        const createdAt = data.created_at as Date
+        const dueAt = data.sla_due_at as Date
+        expect(dueAt.getTime() - createdAt.getTime()).toBe(24 * 3_600_000)
+      })
+
+      it('copies an existing alias and creates none', async () => {
+        mockFindUnique.mockResolvedValue(flaggedPost())
+        mockAliasFindUnique.mockResolvedValue({ alias: 'quiet-fox' })
+        await flagging().process({ postId: 'post-intake', uploadSessionId: 'session-i' })
+
+        expect(mockAliasFindUnique).toHaveBeenCalledWith({
+          where: { user_id: 'user-intake' },
+          select: { alias: true },
+        })
+        expect(reportData().subject_alias).toBe('quiet-fox')
+      })
+
+      it('writes no report when the status update lost the race', async () => {
+        mockFindUnique.mockResolvedValue(flaggedPost())
+        mockPostUpdateMany.mockResolvedValue({ count: 0 })
+        await flagging().process({ postId: 'post-intake', uploadSessionId: 'session-i' })
+
+        expect(mockPostUpdateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ status: 'flagged' }),
+          })
+        )
+        expect(mockPostReportCreate).not.toHaveBeenCalled()
+      })
+
+      it('sends the operations canary to no human reviewer', async () => {
+        mockFindUnique.mockResolvedValue(flaggedPost({ user_id: 'canary-user-1' }))
+        await flagging().process({ postId: 'post-intake', uploadSessionId: 'session-i' })
+
+        expect(mockModerationEventCreate).toHaveBeenCalledTimes(1)
+        expect(mockPostReportCreate).not.toHaveBeenCalled()
       })
     })
 
@@ -721,7 +808,8 @@ describe('CommunityModerationProcessor & Worker', () => {
 
       await processor.markFailed(
         'post-fail',
-        'Exhausted 3 retry attempts due to network timeout'
+        'Exhausted 3 retry attempts due to network timeout',
+        { generation: 0 }
       )
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
@@ -738,7 +826,7 @@ describe('CommunityModerationProcessor & Worker', () => {
         },
       })
       expect(mockOutboxUpdateMany).toHaveBeenCalledWith({
-        where: { post_id: 'post-fail' },
+        where: { post_id: 'post-fail', generation: 0 },
         data: { dispatched_at: expect.any(Date) },
       })
     })
@@ -788,6 +876,49 @@ describe('CommunityModerationProcessor & Worker', () => {
           moderation_reason: SCREENING_UNAVAILABLE_REASON,
         },
       })
+    })
+
+    it.each([
+      ['the generation in the payload', { generation: 2 }, 2],
+      ['generation 0 for a job queued before payloads carried one', {}, 0],
+    ])('settles a final failure as %s', async (_name, payload, generation) => {
+      const markFailed = vi
+        .spyOn(CommunityModerationProcessor.prototype, 'markFailed')
+        .mockResolvedValue(undefined)
+      createCommunityModerationWorker({
+        featureFlags: communityRolloutFixture,
+        prisma: mockPrisma,
+        storage: mockStorage,
+        telemetryService: mockTelemetryService,
+      })
+      mockFindUnique.mockResolvedValue(
+        pendingPost({
+          id: 'post-owned',
+          user_id: 'user-owned',
+          image_object_path: 'community/post-owned/session-o.jpg',
+        })
+      )
+      const outbox = mockPrisma.communityModerationOutbox as unknown as {
+        findUnique: ReturnType<typeof vi.fn>
+      }
+      outbox.findUnique.mockResolvedValueOnce({ generation })
+      mockDownload.mockRejectedValueOnce(new Error('Permanent failure'))
+
+      await expect(
+        workerHarness.registeredProcessor!(
+          asJob({
+            data: { postId: 'post-owned', uploadSessionId: 'sess-o', ...payload },
+            opts: { attempts: 3 },
+            attemptsMade: 2,
+          })
+        )
+      ).rejects.toThrow('Permanent failure')
+      expect(markFailed).toHaveBeenCalledWith(
+        'post-owned',
+        SCREENING_UNAVAILABLE_REASON,
+        expect.objectContaining({ generation })
+      )
+      markFailed.mockRestore()
     })
 
     it('rethrows without markFailed when retry attempts remain', async () => {
@@ -1276,7 +1407,7 @@ describe('CommunityModerationProcessor & Worker', () => {
       const processor = createProcessor(new FixtureCommunityModerationEngine())
       mockPostUpdateMany.mockResolvedValueOnce({ count: 0 })
 
-      await processor.markFailed('post-terminal', 'already terminal')
+      await processor.markFailed('post-terminal', 'already terminal', { generation: 0 })
 
       expect(mockOutboxUpdateMany).not.toHaveBeenCalled()
     })

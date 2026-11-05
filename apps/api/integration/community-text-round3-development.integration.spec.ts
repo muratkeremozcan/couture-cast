@@ -48,7 +48,7 @@ describe('released v4 development copy through actual guarded HTTP and screening
       ).send({ ...input(row.text), locale: row.locale })
       expect(response.status).toBe(200)
       const { id } = communityCommentSubmissionResponseSchema.parse(response.body).data
-      await processor.process(id)
+      await processor.process(id, 0)
       expect(
         (await prisma.communityComment.findUniqueOrThrow({ where: { id } })).status
       ).toBe('published')

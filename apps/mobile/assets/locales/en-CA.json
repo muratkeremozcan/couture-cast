@@ -771,7 +771,8 @@
       "notFound": "This look is no longer available.",
       "disabled": "The community feed is temporarily unavailable.",
       "mediaUnavailable": "This look is temporarily unavailable. Try again shortly.",
-      "generic": "Something went wrong. Try again."
+      "generic": "Something went wrong. Try again.",
+      "banned": "Your community access is suspended."
     },
     "reactions": {
       "label": "Reactions",
@@ -888,6 +889,18 @@
       "announceRefreshed": "The City Spotlight was refreshed with the latest ranking.",
       "targetUnavailable": "That look is no longer in the City Spotlight.",
       "destinationUnavailable": "The City Spotlight is not available right now."
+    },
+    "banned": {
+      "title": "Your community access is suspended",
+      "temporary": "You can return after {{until}}. Until then you cannot view or take part in the community.",
+      "permanent": "This suspension has no end date. You cannot view or take part in the community.",
+      "scope": "Your wardrobe, daily ritual, alerts and account settings are not affected.",
+      "appeal": {
+        "not_requested": "If you think this is a mistake, contact CoutureCast support to ask for a review.",
+        "requested": "Your request for a review has been recorded and is waiting for a decision.",
+        "upheld": "Your request for a review was considered, and this suspension stays in place.",
+        "overturned": "This suspension was lifted."
+      }
     }
   },
   "locations": {

@@ -2,11 +2,20 @@
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { analyticsDeliveryFailureReason } from './community-analytics-delivery.js'
 import { randomUUID } from 'node:crypto'
-import type { PrismaClient } from '@prisma/client'
+import { COMMUNITY_BAN_MARKER_PREFIX } from '@couture/api-client/contracts/http'
+import type { Prisma, PrismaClient } from '@prisma/client'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import type { CommunityModerationQueue } from './community-moderation.queue.js'
 import type { CommunityCommentsProcessor } from './community-comments.processor.js'
 import { singleRunTransaction } from '../../prisma/prisma-client.js'
+
+const finishedScreening = {
+  status: { not: 'pending_screening' },
+  NOT: {
+    status: 'held_for_review',
+    screening_reason: { startsWith: COMMUNITY_BAN_MARKER_PREFIX },
+  },
+} satisfies Prisma.CommunityCommentWhereInput
 
 export class CommunityCommentsOutbox {
   private readonly logger = createBaseLogger().child({ feature: 'community-comments' })
@@ -48,7 +57,7 @@ export class CommunityCommentsOutbox {
           'Comment screening dispatch deferred'
         )
         await this.prisma.communityCommentScreeningOutbox.updateMany({
-          where: { id: row.id },
+          where: { id: row.id, generation: row.generation },
           data: { attempts: { increment: 1 } },
         })
       }
@@ -72,11 +81,20 @@ export class CommunityCommentsOutbox {
       },
       take: 100,
       orderBy: { created_at: 'asc' },
-      select: { id: true },
+      select: {
+        id: true,
+        screening_outbox: { select: { generation: true, updated_at: true } },
+      },
     })
     for (const row of rows) {
       try {
-        await this.processor.markFailed(row.id, true)
+        await this.processor.failStale(
+          row.id,
+          row.screening_outbox && {
+            generation: row.screening_outbox.generation,
+            updatedAt: row.screening_outbox.updated_at,
+          }
+        )
       } catch {
         this.logger.warn(
           { event: 'community_comment_stale_deferred', reason: 'dependency_unavailable' },
@@ -92,17 +110,25 @@ export class CommunityCommentsOutbox {
         select: { id: true },
       }),
       this.prisma.communityCommentScreeningOutbox.findMany({
-        where: { comment: { status: { not: 'pending_screening' } } },
+        where: { comment: finishedScreening },
         take: 100,
-        select: { id: true },
+        select: { id: true, generation: true },
       }),
     ])
     await this.prisma.communityCommentAnalyticsOutbox.deleteMany({
       where: { id: { in: expired.map((row) => row.id) } },
     })
-    await this.prisma.communityCommentScreeningOutbox.deleteMany({
-      where: { id: { in: finished.map((row) => row.id) } },
-    })
+    // By generation and current status: recovery may have re-armed a row since it was selected, and
+    // that row is live work. If recovery holds its row lock, the delete waits and then re-checks.
+    // A comment a ban holds keeps its row, so re-arming it moves past every generation it has had.
+    for (const row of finished)
+      await this.prisma.communityCommentScreeningOutbox.deleteMany({
+        where: {
+          id: row.id,
+          generation: row.generation,
+          comment: finishedScreening,
+        },
+      })
   }
 
   private async deliverAnalytics(): Promise<void> {

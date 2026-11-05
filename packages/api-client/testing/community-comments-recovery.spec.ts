@@ -229,6 +229,63 @@ describe('comments recovery cancellation and focused page ownership', () => {
       expect(state.current('post').error).toBeNull()
     }
   })
+  // Burn-in trace at 07dce93c: the reply read answered 200, a reconcile refresh had started 37 ms
+  // after it, and the Replies button stayed collapsed for good.
+  describe('a first reply expansion still loading when a refresh starts', () => {
+    const reply = item('reply', 2)
+
+    it('expands when the first read answers after the refresh settled', async () => {
+      const { state, transport } = setup()
+      await state.load('post')
+      const first = deferred<ReturnType<typeof page>>()
+      transport.replies.mockReturnValueOnce(first.promise)
+      transport.replies.mockResolvedValue(page([reply]))
+
+      const expanding = state.load('post', 'root')
+      await state.refresh('post')
+      first.resolve(page([reply]))
+      await expanding
+
+      expect(state.current('post').replies.get('root')?.items).toEqual([reply])
+    })
+
+    it('expands when the first read answers while the refresh is still reading', async () => {
+      const { state, transport } = setup()
+      await state.load('post')
+      const first = deferred<ReturnType<typeof page>>()
+      const roots = deferred<ReturnType<typeof page>>()
+      transport.replies.mockReturnValueOnce(first.promise)
+      transport.replies.mockResolvedValue(page([reply]))
+      transport.roots.mockReturnValueOnce(roots.promise)
+
+      const expanding = state.load('post', 'root')
+      const refreshing = state.refresh('post')
+      first.resolve(page([reply]))
+      await expanding
+      roots.resolve(page())
+      await refreshing
+
+      expect(state.current('post').replies.get('root')?.items).toEqual([reply])
+      expect(state.current('post').loading).toBe(false)
+    })
+
+    it('does not expand a parent the refresh found gone', async () => {
+      const { state, transport } = setup()
+      await state.load('post')
+      const first = deferred<ReturnType<typeof page>>()
+      transport.replies.mockReturnValueOnce(first.promise)
+      transport.replies.mockResolvedValue(page([reply]))
+      transport.roots.mockResolvedValueOnce(page([item('other')]))
+
+      const expanding = state.load('post', 'root')
+      await state.refresh('post')
+      first.resolve(page([reply]))
+      await expanding
+
+      expect(state.current('post').replies.has('root')).toBe(false)
+    })
+  })
+
   it('retires expanded pages and their cursors when the post is evicted', async () => {
     const { state, transport } = setup()
     await state.loadTarget('post', location)

@@ -1,6 +1,7 @@
 // Learning path Step 50: Moderator queue and case detail.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-50-moderator-queue-and-case-detail
-// Story 6.10 test owner: C-WEB-Q-DETAIL, -DETAIL-ONE-READ, -STATES, -NO-ACTIONS, -CONFLICT-NOTICE, -HOSTILE-TEXT.
+// Story 6.10 test owner: C-WEB-Q-DETAIL, -DETAIL-ONE-READ, -STATES, -CONFLICT-NOTICE, -HOSTILE-TEXT.
+// Story 6.11 retired C-WEB-Q-NO-ACTIONS because the controls now exist: the empty-list rule stands in its place.
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
@@ -49,7 +50,7 @@ describe('C-WEB-Q-DETAIL', () => {
       within(content).getByText('Alt the reporter saw', { selector: 'bdi' })
     ).toBeInTheDocument()
     expect(within(content).getByText('Current state')).toBeInTheDocument()
-    expect(within(content).getByText('published')).toBeInTheDocument()
+    expect(within(content).getByText('Status: Published')).toBeInTheDocument()
 
     const reporters = screen.getByRole('region', { name: 'Reporters' })
     expect(within(reporters).getByText('brave-owl-9876')).toBeInTheDocument()
@@ -110,8 +111,11 @@ describe('C-WEB-Q-DETAIL', () => {
         operatorNote: 'Removed for doxxing',
       },
     })
-    expect(screen.getByText('Operator note')).toBeInTheDocument()
-    expect(screen.getByText('Removed for doxxing')).toBeInTheDocument()
+    const findings = screen.getByRole('region', { name: 'Machine findings' })
+    expect(within(findings).getByText('No machine findings.')).toBeInTheDocument()
+    expect(within(findings).queryByText('Removed for doxxing')).toBeNull()
+    const note = screen.getByRole('region', { name: 'Operator note' })
+    expect(within(note).getByText('Removed for doxxing')).toBeInTheDocument()
   })
 
   it('names erased and unknown members without an id and marks resolved reports', async () => {
@@ -120,6 +124,7 @@ describe('C-WEB-Q-DETAIL', () => {
       reporters: [
         {
           identity: { state: 'unknown', alias: null },
+          origin: 'member',
           reason: 'spam',
           details: null,
           reportedAt: '2026-11-03T10:00:00.000Z',
@@ -127,6 +132,7 @@ describe('C-WEB-Q-DETAIL', () => {
         },
         {
           identity: { state: 'erased', alias: null },
+          origin: 'member',
           reason: 'violence',
           details: null,
           reportedAt: '2026-11-03T10:30:00.000Z',
@@ -139,6 +145,37 @@ describe('C-WEB-Q-DETAIL', () => {
     expect(screen.getByText('Unnamed member')).toBeInTheDocument()
     const reporters = screen.getByRole('region', { name: 'Reporters' })
     expect(within(reporters).getAllByText(/Resolved/)).toHaveLength(1)
+  })
+
+  it('names a screening report by its origin and leaves an unknown member an unnamed member', async () => {
+    const reporter = {
+      identity: { state: 'unknown' as const, alias: null },
+      reason: 'spam' as const,
+      details: null,
+      reportedAt: '2026-11-03T10:00:00.000Z',
+      resolved: false,
+    }
+    await openCase({
+      reporters: [
+        { ...reporter, origin: 'screening' as const },
+        { ...reporter, origin: 'member' as const },
+      ],
+      reportCount: 2,
+    })
+    const reporters = screen.getByRole('region', { name: 'Reporters' })
+    const [screening, member] = within(reporters).getAllByRole('listitem')
+    expect(screening).toHaveTextContent('Automated screening')
+    expect(screening).not.toHaveTextContent('Unnamed member')
+    expect(member).toHaveTextContent('Unnamed member')
+    expect(member).not.toHaveTextContent('Automated screening')
+  })
+
+  it('shows the engine version of a held item that has no codes or categories', async () => {
+    await openCase({
+      findings: { codes: [], categories: [], engineVersion: '2.1.0', operatorNote: null },
+    })
+    const findings = screen.getByRole('region', { name: 'Machine findings' })
+    expect(within(findings).getByText('2.1.0')).toBeInTheDocument()
   })
 
   it('shows prior actions with the actor, the action and the time, or says there are none', async () => {
@@ -166,7 +203,8 @@ describe('C-WEB-Q-DETAIL', () => {
     const items = within(actions).getAllByRole('listitem')
     expect(items).toHaveLength(2)
     expect(within(items[0]!).getByText(/Screening/)).toBeInTheDocument()
-    expect(within(items[0]!).getByText('flagged')).toBeInTheDocument()
+    expect(within(items[0]!).getByText(/Flagged by screening/)).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/\b(flagged|released_by_operator)\b/)
     expect(within(items[1]!).getByText(/Operator/)).toBeInTheDocument()
     expect(within(items[1]!).getByText('Looks fine')).toBeInTheDocument()
   })
@@ -405,17 +443,15 @@ describe('C-WEB-Q-STATES', () => {
   })
 })
 
-describe('C-WEB-Q-NO-ACTIONS: the detail view decides nothing', () => {
+describe('C-WEB-D-PANEL: the detail shows no action control when allowedActions is empty', () => {
   it('offers only navigation and reload, with no decision control or placeholder', async () => {
-    await openCase()
+    await openCase({ allowedActions: [], banKinds: [] })
     const buttons = screen.getAllByRole('button').map((button) => button.textContent)
     expect(buttons).toEqual(['Reload case'])
+    expect(screen.queryByRole('region', { name: 'Decision' })).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
-    expect(document.body.textContent?.toLowerCase()).not.toMatch(
-      /\b(resolve case|release|take ?down|escalate|ban|sanction|decision)\b/
-    )
     expect(document.querySelectorAll('button[disabled]')).toHaveLength(0)
   })
 })
@@ -450,6 +486,7 @@ describe('C-WEB-Q-HOSTILE-TEXT: every user-authored string is inert', () => {
       reporters: [
         {
           identity: { state: 'alias', alias: hostile('reporter').slice(0, 64) },
+          origin: 'member',
           reason: 'other',
           details: hostile('details').slice(0, 500),
           reportedAt: '2026-11-03T10:00:00.000Z',

@@ -13,13 +13,84 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
 import { expect, it } from 'vitest'
-import { COMMUNITY_SELF_REPORT_MESSAGE } from '@couture/api-client/contracts/http'
+import {
+  COMMUNITY_BANNED_MESSAGE,
+  COMMUNITY_SELF_REPORT_MESSAGE,
+  type CommunityBannedError,
+} from '@couture/api-client/contracts/http'
 import { CommunityScreen } from '@/src/features/community/community-screen'
 import enUS from '@/assets/locales/en-US.json'
 import { press } from '@/src/test-utils/press'
 import { server } from '@/src/test-utils/msw/server'
 
+const banned = (sanction: CommunityBannedError['sanction']) =>
+  HttpResponse.json(
+    {
+      statusCode: 403,
+      code: 'community_banned',
+      message: COMMUNITY_BANNED_MESSAGE,
+      sanction,
+    } satisfies CommunityBannedError,
+    { status: 403 }
+  )
+
+const TEMPORARY: CommunityBannedError['sanction'] = {
+  kind: 'temporary',
+  expiresAt: '2026-11-11T12:00:00.000Z',
+  appealStatus: 'not_requested',
+}
+const PERMANENT: CommunityBannedError['sanction'] = {
+  kind: 'permanent',
+  expiresAt: null,
+  appealStatus: 'requested',
+}
+
 export function registerCommunityModerationCases() {
+  // --- Story 6.11: the banned notice ----------------------------------------
+
+  it('C-MOB-D-NOTICE a temporary ban names its end, its scope and the appeal state, and offers no retry', async () => {
+    let reads = 0
+    serveFeed(() => {
+      reads += 1
+      return banned(TEMPORARY)
+    })
+    await render(<CommunityScreen />)
+    const notice = await screen.findByTestId('community-banned-notice')
+    const copy = enUS.community.banned
+    expect(notice.textContent).toContain(copy.title)
+    expect(notice.textContent).toContain(copy.temporary.split('{{until}}')[0]!)
+    expect(notice.textContent).toContain('2026')
+    expect(notice.textContent).toContain(copy.scope)
+    expect(notice.textContent).toContain(copy.appeal.not_requested)
+    expect(notice.textContent).not.toContain(COMMUNITY_BANNED_MESSAGE)
+    expect(screen.queryByTestId('community-feed-unavailable')).toBeNull()
+    expect(screen.queryByRole('button', { name: /try again|retry/i })).toBeNull()
+    expect(reads).toBe(1)
+  })
+
+  it('C-MOB-D-NOTICE a permanent ban names no end date and reads its own appeal state', async () => {
+    serveFeed(() => banned(PERMANENT))
+    await render(<CommunityScreen />)
+    const notice = await screen.findByTestId('community-banned-notice')
+    const copy = enUS.community.banned
+    expect(notice.textContent).toContain(copy.permanent)
+    expect(notice.textContent).toContain(copy.appeal.requested)
+    expect(notice.textContent).not.toContain(copy.appeal.not_requested)
+  })
+
+  it('C-MOB-D-NOTICE a ban found on a later read takes the feed and the composer away', async () => {
+    let refuse = false
+    serveFeed(() => (refuse ? banned(TEMPORARY) : feedJson({ items: [item()] })))
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-post-card-post-a')
+    refuse = true
+    press(await screen.findByTestId('community-filter-chip-all'))
+    await screen.findByTestId('community-banned-notice')
+    expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+    expect(screen.queryByTestId('community-new-post-button')).toBeNull()
+    expect(screen.queryByTestId('community-filter-chip-all')).toBeNull()
+  })
+
   // --- Author states --------------------------------------------------------
 
   it('6.2-MOB-001 explains a stable screening code in words, never as the raw code', async () => {

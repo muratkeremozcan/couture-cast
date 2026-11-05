@@ -116,6 +116,7 @@ export interface CommunitySweeps {
   sweepStalePendingReview: () => Promise<unknown>
   sweepExpiredUploads: () => Promise<unknown>
   sweepErasureRequests: () => Promise<unknown>
+  sweepExpiredBanHolds: () => Promise<unknown>
 }
 
 /** What the process knows about its own screening posture once it is ready. */
@@ -465,6 +466,7 @@ export async function createCommunityWorkerRuntime(deps: {
         ]),
       sweepExpiredUploads: () => maintenance.sweepExpiredUploads(),
       sweepErasureRequests: () => maintenance.sweepErasureRequests(),
+      sweepExpiredBanHolds: () => maintenance.sweepExpiredBanHolds(),
     },
     ...(selection ? { readiness: selection.readiness } : {}),
     close: async () => {

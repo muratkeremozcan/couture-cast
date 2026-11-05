@@ -191,11 +191,17 @@ describe('C-WEB-Q-A11Y: the case view', () => {
     expect(screen.getByRole('article')).toHaveAccessibleName('Post case')
   })
 
-  it('announces state through one polite live region and never through the minute ticks', async () => {
+  it('announces state through polite live regions only and never through the minute ticks', async () => {
     await openDetail()
-    const live = document.querySelectorAll('[aria-live], [role="status"], [role="alert"]')
-    expect(live).toHaveLength(1)
+    // The SLA state from 6.10, and the decision outcome that 6.11 adds. Neither holds the minute text.
+    const live = [
+      ...document.querySelectorAll('[aria-live], [role="status"], [role="alert"]'),
+    ]
+    expect(live).toHaveLength(2)
+    expect(live.filter((region) => region.getAttribute('role') === 'alert')).toEqual([])
     expect(live[0]).toHaveAttribute('aria-live', 'polite')
+    expect(live[1]).toBe(screen.getByTestId('moderation-decision-outcome'))
+    for (const region of live) expect(region.textContent).not.toMatch(/left|over/)
   })
 
   it('tabs from the back link to Reload before any content link or control', async () => {

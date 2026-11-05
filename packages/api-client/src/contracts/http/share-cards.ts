@@ -2,6 +2,7 @@
 // Story 6.9 Task 2 step 1 owner: define the share purpose and capabilities contract in `packages/api-client/src/contracts/http/share-cards.ts`
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
+import { communityDeniedOrBannedResponseSchema } from './community'
 import { supportedLocaleSchema } from './localization'
 
 export const SHARE_CARD_MAX_BYTES = 3 * 1024 * 1024
@@ -107,7 +108,10 @@ export function registerShareCardsContracts(registry: OpenAPIRegistry) {
       401: { description: 'Authentication required' },
       403: {
         description:
-          'share_disabled: native share is off for this member (share purpose only), or access denied',
+          'share_disabled: native share is off for this member (share purpose only), access denied, or the member is banned',
+        content: {
+          'application/json': { schema: communityDeniedOrBannedResponseSchema },
+        },
       },
       404: { description: 'source_unavailable' },
       409: { description: 'preview_changed' },

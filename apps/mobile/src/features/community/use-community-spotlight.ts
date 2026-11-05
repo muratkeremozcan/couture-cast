@@ -2,6 +2,7 @@
 // Story 6.6 mobile state owner: paging, identity changes and eviction in `apps/mobile/src/features/community/use-community-spotlight.ts`
 import type { CommunityReactionState } from '@couture/api-client'
 import type {
+  CommunityBannedError,
   CommunityReactionFeedItem,
   CommunityReactionSpotlightItem,
   CommunityReactionSummary,
@@ -10,6 +11,7 @@ import type {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   communityFailureReason,
+  communitySanctionOf,
   getCommunityPostFromMobile,
   getCommunitySpotlightFromMobile,
 } from '@/src/lib/community'
@@ -75,7 +77,7 @@ export interface CommunitySpotlightView {
 /** Same read refusals as the feed render the localized disabled state. */
 function isDisabledRefusal(error: unknown): boolean {
   const reason = communityFailureReason(error)
-  return reason === 'disabled' || reason === 'age_gate'
+  return reason === 'disabled' || reason === 'age_gate' || reason === 'banned'
 }
 
 /**
@@ -99,7 +101,10 @@ export function useCommunitySpotlight({
   sessionScope,
   reactionState,
   sponsorships,
+  onBanned,
 }: {
+  /** Story 6.11: a read refused for a ban closes the whole community screen, on any page. */
+  onBanned?: (sanction: CommunityBannedError['sanction']) => void
   /** Undefined until the screen first resolves the member; null when signed out. */
   sessionScope: string | null | undefined
   reactionState: CommunityReactionState
@@ -113,6 +118,8 @@ export function useCommunitySpotlight({
   const [nextCursor, setNextCursorState] = useState<string | null>(null)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [loadMoreFailed, setLoadMoreFailed] = useState(false)
+  const onBannedRef = useRef(onBanned)
+  onBannedRef.current = onBanned
   const [focusRequest, setFocusRequest] = useState<SpotlightFocusRequest | null>(null)
   // A page settles after later renders, so it compares against the cards shown now.
   const itemsRef = useRef(items)
@@ -191,6 +198,8 @@ export function useCommunitySpotlight({
         setItems([])
         setNextCursor(null)
         setFocusRequest(null)
+        const sanction = communitySanctionOf(error)
+        if (sanction) onBannedRef.current?.(sanction)
         setStatus(isDisabledRefusal(error) ? 'disabled' : 'error')
       }
     },
@@ -244,6 +253,12 @@ export function useCommunitySpotlight({
         // which then takes focus and announces the refresh.
         if (communityFailureReason(error) === 'cursor_invalid') {
           void load(true)
+          return
+        }
+        const sanction = communitySanctionOf(error)
+        if (sanction) {
+          onBannedRef.current?.(sanction)
+          setStatus('disabled')
           return
         }
         setLoadMoreFailed(true)

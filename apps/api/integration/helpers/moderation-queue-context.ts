@@ -28,6 +28,15 @@ import { CommunitySponsorshipService } from '../../src/modules/commerce/communit
 import { SupabaseCommunityStorageAdapter } from '../../src/modules/community/community-storage.adapter.js'
 import { FeatureFlagsService } from '../../src/modules/feature-flags/feature-flags.service.js'
 import { GuardianService } from '../../src/modules/guardian/guardian.service.js'
+import { UserSessionService } from '../../src/modules/auth/user-session.service.js'
+import { CommunityModerationActionsService } from '../../src/modules/community/community-moderation.actions.js'
+import { CommunityStreamRepository } from '../../src/modules/community/community-stream.repository.js'
+import { ModerationDecisionsRepository } from '../../src/modules/moderation/moderation-decisions.repository.js'
+import { ModerationDecisionsService } from '../../src/modules/moderation/moderation-decisions.service.js'
+import {
+  ModerationAfterCommit,
+  ModerationSanctionsService,
+} from '../../src/modules/moderation/moderation-sanctions.service.js'
 import { ModerationQueueCacheHeadersMiddleware } from '../../src/modules/moderation/moderation-queue-cache-headers.middleware.js'
 import { ModerationQueueController } from '../../src/modules/moderation/moderation-queue.controller.js'
 import { ModerationQueueRepository } from '../../src/modules/moderation/moderation-queue.repository.js'
@@ -131,6 +140,17 @@ export function moderationQueueTestContext() {
       providers: [
         ModerationQueueService,
         ModerationQueueRepository,
+        // Story 6.11: the case detail reads its decision fields from the real decision service.
+        ModerationDecisionsService,
+        ModerationDecisionsRepository,
+        ModerationSanctionsService,
+        ModerationAfterCommit,
+        CommunityModerationActionsService,
+        { provide: CommunityStreamRepository, useValue: { assist: vi.fn() } },
+        {
+          provide: UserSessionService,
+          useValue: { invalidateUserSessions: vi.fn() },
+        },
         { provide: PrismaClient, useValue: prisma },
         { provide: MODERATION_QUEUE_CLOCK, useValue: clock.now },
         { provide: SupabaseCommunityStorageAdapter, useValue: storage },

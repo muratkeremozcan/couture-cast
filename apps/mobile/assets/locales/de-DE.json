@@ -771,7 +771,8 @@
       "notFound": "Dieser Look ist nicht mehr verfügbar.",
       "disabled": "Der Community-Feed ist vorübergehend nicht verfügbar.",
       "mediaUnavailable": "Dieser Look ist vorübergehend nicht verfügbar. Versuche es in Kürze erneut.",
-      "generic": "Etwas ist schiefgelaufen. Versuche es erneut."
+      "generic": "Etwas ist schiefgelaufen. Versuche es erneut.",
+      "banned": "Dein Community-Zugang ist gesperrt."
     },
     "reactions": {
       "label": "Reaktionen",
@@ -888,6 +889,18 @@
       "announceRefreshed": "Die Stadt-Highlights wurden mit der neuesten Rangfolge aktualisiert.",
       "targetUnavailable": "Dieser Look ist nicht mehr in den Stadt-Highlights.",
       "destinationUnavailable": "Die Stadt-Highlights sind gerade nicht verfügbar."
+    },
+    "banned": {
+      "title": "Dein Community-Zugang ist gesperrt",
+      "temporary": "Du kannst ab {{until}} zurückkehren. Bis dahin kannst du die Community weder ansehen noch mitmachen.",
+      "permanent": "Diese Sperre hat kein Enddatum. Du kannst die Community weder ansehen noch mitmachen.",
+      "scope": "Dein Kleiderschrank, dein tägliches Ritual, deine Warnungen und Kontoeinstellungen sind nicht betroffen.",
+      "appeal": {
+        "not_requested": "Wenn du das für einen Fehler hältst, bitte den CoutureCast-Support um eine Überprüfung.",
+        "requested": "Deine Bitte um Überprüfung wurde erfasst und wartet auf eine Entscheidung.",
+        "upheld": "Deine Bitte um Überprüfung wurde geprüft, und diese Sperre bleibt bestehen.",
+        "overturned": "Diese Sperre wurde aufgehoben."
+      }
     }
   },
   "locations": {

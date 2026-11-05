@@ -5,6 +5,16 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { communityReportReasonSchema, type CommunityReportReason } from './community'
+import {
+  moderationAppealStatusSchema,
+  moderationSanctionKindSchema,
+} from './community-banned'
+export {
+  moderationAppealStatusSchema,
+  moderationSanctionKindSchema,
+  type ModerationAppealStatus,
+  type ModerationSanctionKind,
+} from './community-banned'
 
 // --- Vocabulary -------------------------------------------------------------
 
@@ -56,12 +66,82 @@ export type ModerationMediaUnavailableReason = z.infer<
   typeof moderationMediaUnavailableReasonSchema
 >
 
-/** `unknown` means the reporter has no alias row yet. A read never creates one. */
+/** `unknown` means the reporter has no alias row yet, and a read never creates one. */
 export const moderationAliasStateSchema = z.enum(['alias', 'erased', 'unknown'])
 export type ModerationAliasState = z.infer<typeof moderationAliasStateSchema>
 
+/** `screening` means the screener filed the report, so no member stands behind it. */
+export const moderationReportOriginSchema = z.enum(['member', 'screening'])
+export type ModerationReportOrigin = z.infer<typeof moderationReportOriginSchema>
+
 export const moderationActorKindSchema = z.enum(['screening', 'reporter', 'operator'])
 export type ModerationActorKind = z.infer<typeof moderationActorKindSchema>
+
+// --- Decision vocabulary (Story 6.11) --------------------------------------
+
+/** The five decisions. `escalate` alone is not terminal: it changes no report and no target. */
+export const moderationDecisionActionSchema = z.enum([
+  'resolve',
+  'release',
+  'takedown',
+  'escalate',
+  'ban',
+])
+export type ModerationDecisionAction = z.infer<typeof moderationDecisionActionSchema>
+
+/** The steps an operator can record. `not_requested` is only ever the starting state. */
+export const moderationAppealStepSchema = z.enum(['requested', 'upheld', 'overturned'])
+export type ModerationAppealStep = z.infer<typeof moderationAppealStepSchema>
+
+/** A sanction as an operator sees it. The member's own view is `communityBannedErrorSchema`. */
+export const moderationSanctionSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      sanctionId: z.string().min(1).max(64),
+      kind: z.literal('temporary'),
+      expiresAt: z.string().datetime(),
+      appealStatus: moderationAppealStatusSchema,
+    })
+    .strict(),
+  z
+    .object({
+      sanctionId: z.string().min(1).max(64),
+      kind: z.literal('permanent'),
+      expiresAt: z.null(),
+      appealStatus: moderationAppealStatusSchema,
+    })
+    .strict(),
+])
+export type ModerationSanction = z.infer<typeof moderationSanctionSchema>
+
+/** The author's standing. `sanction` is the newest row, active or not. Null when the author is gone. */
+export const moderationSubjectStandingSchema = z
+  .object({
+    active: z.boolean(),
+    sanction: moderationSanctionSchema.nullable(),
+    /** Bans older than `sanction`. */
+    priorBanCount: z.number().int().min(0),
+    /** The steps this viewer may record on `sanction` now. */
+    allowedAppealSteps: z.array(moderationAppealStepSchema),
+  })
+  .strict()
+export type ModerationSubjectStanding = z.infer<typeof moderationSubjectStandingSchema>
+
+/** The fields 6.11 adds to the case detail. `allowedActions` and `banKinds` are computed for the viewer. */
+export const moderationCaseDecisionStateSchema = z
+  .object({
+    revision: z.string().regex(/^[0-9a-f]{16}$/),
+    allowedActions: z.array(moderationDecisionActionSchema),
+    banKinds: z.array(moderationSanctionKindSchema),
+    escalated: z.boolean(),
+    /** The earliest terminal decision of the case. It never moves. */
+    firstDecisionAt: z.string().datetime().nullable(),
+    subjectStanding: moderationSubjectStandingSchema.nullable(),
+  })
+  .strict()
+export type ModerationCaseDecisionState = z.infer<
+  typeof moderationCaseDecisionStateSchema
+>
 
 // --- Risk and SLA: the single definition ----------------------------------
 
@@ -193,6 +273,8 @@ export const moderationCaseSummarySchema = z
     slaDueAt: isoSchema,
     /** The earliest accepted time among the case's open reports. */
     acceptedAt: isoSchema,
+    /** An escalation is waiting for an admin. It changes no SLA value or ordering. */
+    escalated: z.boolean(),
     reportCount: z.number().int().min(1),
     reasons: z.array(communityReportReasonSchema).min(1),
     locale: z.string().min(1).max(35).nullable(),
@@ -251,6 +333,7 @@ export const moderationIdentitySchema = z
 export const moderationReporterSchema = z
   .object({
     identity: moderationIdentitySchema,
+    origin: moderationReportOriginSchema,
     reason: communityReportReasonSchema,
     /** Reporter free text from post reports, at most 500 characters. Plain text only. */
     details: z.string().max(500).nullable(),
@@ -318,6 +401,7 @@ export const moderationCaseDetailSchema = z
     media: moderationMediaSchema,
     /** The moderator wrote the target or filed one of its reports. 6.11 refuses self-review. */
     viewerConflict: z.boolean(),
+    ...moderationCaseDecisionStateSchema.shape,
   })
   .strict()
 export type ModerationCaseDetail = z.infer<typeof moderationCaseDetailSchema>

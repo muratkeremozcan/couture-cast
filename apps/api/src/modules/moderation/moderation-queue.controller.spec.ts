@@ -184,7 +184,9 @@ describe('U-Q-READSET: the repository reads only the tables the RLS suite proves
 
   it('maps every Prisma delegate it reads to a listed table', () => {
     const delegates = [
-      ...source.matchAll(/this\.prisma\.([a-zA-Z]+)\.(?:find|count|aggregate|groupBy)/g),
+      ...source.matchAll(
+        /(?:this\.prisma|\bdb)\.([a-zA-Z]+)\.(?:find|count|aggregate|groupBy)/g
+      ),
     ].map((match) => match[1]!)
     expect(delegates.length).toBeGreaterThan(0)
     for (const delegate of new Set(delegates)) {
@@ -196,7 +198,7 @@ describe('U-Q-READSET: the repository reads only the tables the RLS suite proves
   it('writes nothing except the audit row', () => {
     const writes = [
       ...source.matchAll(
-        /this\.prisma\.([a-zA-Z]+)\.(create|createMany|update|updateMany|upsert|delete|deleteMany)\b/g
+        /(?:this\.prisma|\bdb)\.([a-zA-Z]+)\.(create|createMany|update|updateMany|upsert|delete|deleteMany)\b/g
       ),
     ].map((match) => `${match[1]}.${match[2]}`)
     expect(writes).toEqual(['auditLog.create'])
@@ -214,7 +216,9 @@ describe('U-Q-READSET: the repository reads only the tables the RLS suite proves
         'CommunityCommentAudit',
         'CommunityCommentReport',
         'CommunityPostReport',
+        'CommunitySanction',
         'LookbookPost',
+        'ModerationDecision',
         'ModerationEvent',
       ].sort()
     )

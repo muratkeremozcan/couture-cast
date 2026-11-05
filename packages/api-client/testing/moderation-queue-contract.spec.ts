@@ -15,6 +15,8 @@ import {
   moderationCaseDetailSchema,
   moderationCaseIdSchema,
   moderationCaseSummarySchema,
+  moderationAliasStateSchema,
+  moderationSanctionSchema,
   moderationCasesQuerySchema,
   moderationCasesResponseSchema,
   moderationQueueErrorSchema,
@@ -190,6 +192,7 @@ const summary = {
   locale: 'es-419',
   hasFinding: true,
   excerpt: 'Caption',
+  escalated: false,
 } as const
 const identity = { state: 'alias', alias: 'quiet-fox-1234' } as const
 const detail = {
@@ -222,6 +225,7 @@ const detail = {
   reporters: [
     {
       identity: { state: 'erased', alias: null },
+      origin: 'member',
       reason: 'spam',
       details: 'note',
       reportedAt: iso,
@@ -243,6 +247,17 @@ const detail = {
     altText: 'a',
   },
   viewerConflict: false,
+  revision: '0123456789abcdef',
+  allowedActions: ['resolve'],
+  banKinds: [],
+  escalated: false,
+  firstDecisionAt: null,
+  subjectStanding: {
+    active: false,
+    sanction: null,
+    priorBanCount: 0,
+    allowedAppealSteps: [],
+  },
 } as const
 
 /** Every key the spec forbids on the wire (D9, Never list). */
@@ -281,6 +296,46 @@ describe('U-Q-CONTRACT-STRICT: strict schemas and forbidden keys', () => {
         media: { state: 'unavailable', reason: 'signing_failed' },
       }).success
     ).toBe(true)
+  })
+
+  describe('a reporter says who filed the report', () => {
+    const withReporter = (change: object) =>
+      moderationCaseDetailSchema.safeParse({
+        ...detail,
+        reporters: [{ ...detail.reporters[0], ...change }],
+      }).success
+
+    it('takes member and screening, and an alias state of unknown with either', () => {
+      expect(withReporter({ origin: 'member' })).toBe(true)
+      expect(
+        withReporter({ origin: 'screening', identity: { state: 'unknown', alias: null } })
+      ).toBe(true)
+    })
+
+    it('refuses an origin it does not name, or none at all', () => {
+      expect(withReporter({ origin: 'system' })).toBe(false)
+      expect(withReporter({ origin: undefined })).toBe(false)
+    })
+
+    it('keeps the published alias states, since a new response value breaks older clients', () => {
+      expect(moderationAliasStateSchema.options).toEqual(['alias', 'erased', 'unknown'])
+    })
+  })
+
+  describe('a sanction ties its kind to its expiry', () => {
+    const sanction = { sanctionId: 's1', appealStatus: 'not_requested' }
+    const EXPIRY = '2026-11-11T12:00:00.000Z'
+
+    it.each([
+      ['temporary', EXPIRY, true],
+      ['permanent', null, true],
+      ['temporary', null, false],
+      ['permanent', EXPIRY, false],
+    ])('kind %s with expiry %s parses as %s', (kind, expiresAt, valid) => {
+      expect(
+        moderationSanctionSchema.safeParse({ ...sanction, kind, expiresAt }).success
+      ).toBe(valid)
+    })
   })
 
   it('holds no forbidden key anywhere in the maximal detail fixture', () => {

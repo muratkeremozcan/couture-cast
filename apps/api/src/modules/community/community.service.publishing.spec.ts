@@ -114,6 +114,76 @@ describe('CommunityService publishing and challenges', () => {
       )
     })
 
+    describe('a replay of a draft mints a token the row has to outlive', () => {
+      const draftOnFile = {
+        ...ownPendingPost,
+        id: 'existing-post-1',
+        status: 'draft',
+        image_checksum: validAllocateInput.sha256,
+        image_byte_size: validAllocateInput.byteSize,
+        image_object_path: 'community/existing-post-1/session-xyz.jpg',
+        image_content_type: 'image/jpeg',
+      }
+
+      it('renews the client expiry to the fresh session it hands back', async () => {
+        const { service, findPostByIdempotencyKey, confirmAllocationReplay } =
+          createService()
+        findPostByIdempotencyKey.mockResolvedValueOnce(draftOnFile)
+
+        await allocate(service, { idempotencyKey: 'idemp-renew' })
+
+        expect(confirmAllocationReplay).toHaveBeenCalledTimes(1)
+        expect(confirmAllocationReplay).toHaveBeenCalledWith(
+          'existing-post-1',
+          new Date(SERVICE_REFERENCE_TIME.getTime() + 900_000)
+        )
+      })
+
+      it('keeps the token from the client when the expiry sweep claimed the draft first', async () => {
+        const { service, findPostByIdempotencyKey, confirmAllocationReplay } =
+          createService()
+        findPostByIdempotencyKey.mockResolvedValueOnce(draftOnFile)
+        confirmAllocationReplay.mockResolvedValueOnce(false)
+
+        await expect(
+          allocate(service, { idempotencyKey: 'idemp-claimed' })
+        ).rejects.toThrow(ConflictException)
+      })
+
+      it('mints nothing for a row with erasure requested', async () => {
+        const {
+          service,
+          findPostByIdempotencyKey,
+          confirmAllocationReplay,
+          createUploadSession,
+        } = createService()
+        findPostByIdempotencyKey.mockResolvedValueOnce({
+          ...draftOnFile,
+          erasure_requested_at: SERVICE_REFERENCE_TIME,
+        })
+
+        await expect(
+          allocate(service, { idempotencyKey: 'idemp-erased' })
+        ).rejects.toThrow(ConflictException)
+        expect(createUploadSession).not.toHaveBeenCalled()
+        expect(confirmAllocationReplay).not.toHaveBeenCalled()
+      })
+
+      it('rechecks a post past draft too, and hands back no token once erasure has taken it', async () => {
+        const { service, findPostByIdempotencyKey, confirmAllocationReplay } =
+          createService()
+        findPostByIdempotencyKey.mockResolvedValueOnce({
+          ...draftOnFile,
+          status: 'pending_review',
+        })
+        confirmAllocationReplay.mockResolvedValueOnce(false)
+
+        await expect(
+          allocate(service, { idempotencyKey: 'idemp-pending' })
+        ).rejects.toThrow(ConflictException)
+      })
+    })
+
     it.each([
       ['checksum', { image_checksum: 'b'.repeat(64) }],
       ['byte size', { image_byte_size: 1 }],

@@ -20,6 +20,7 @@ import {
   areaHash,
   availableAreaLevels,
   viewerAreaLabel,
+  areaHashesOf,
   type SpotlightAreaComponents,
   type SpotlightAreaLevel,
   type SpotlightLocation,
@@ -145,6 +146,20 @@ export class CommunitySpotlightService {
     keyPrefix: string
   ) {
     this.cache = new CommunitySpotlightCache(redis, keyPrefix)
+  }
+
+  /**
+   * Story 6.11 D12: the after-commit bump of a moderation decision, so the next read rebuilds with
+   * no worker running. A post never stamped with an area belongs to no snapshot. It throws on a
+   * Redis failure, and the caller reports that as deferred.
+   */
+  async invalidatePostAreas(post: SpotlightAreaComponents): Promise<void> {
+    await this.cache.bumpAreas(areaHashesOf(post))
+  }
+
+  /** Every area at once, for a change that spans a member's content. */
+  async invalidateAllAreas(): Promise<void> {
+    await this.cache.bumpEpoch()
   }
 
   /** Read authorization, rollout, consent, age, erasure and canary rules match the feed. */

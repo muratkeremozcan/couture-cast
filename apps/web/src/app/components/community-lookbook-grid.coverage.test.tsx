@@ -24,7 +24,7 @@ afterEach(() => {
   window.sessionStorage.clear()
 })
 describe('community scope erasure', () => {
-  it('removes loaded posts and the prepared photo draft when the account is erased', async () => {
+  it('removes loaded posts and the prepared photo draft when the session ends', async () => {
     signIn()
     const restore = installImagePrepMocks()
     const revoke = vi.spyOn(URL, 'revokeObjectURL')
@@ -41,7 +41,8 @@ describe('community scope erasure', () => {
       await choosePhoto(user)
       await screen.findByDisplayValue(SUGGESTED_ALT_TEXT)
       act(() => {
-        window.dispatchEvent(new Event('couture:account-erased'))
+        window.sessionStorage.clear()
+        window.dispatchEvent(new Event('couture:session'))
       })
       expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
       expect(screen.queryByTestId('post-caption-input')).toBeNull()

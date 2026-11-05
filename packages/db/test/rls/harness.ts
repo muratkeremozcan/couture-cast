@@ -106,6 +106,9 @@ export const workerOnlyTables = [
   // Story 6.7b: post-to-offer sponsorship links, written only by the owner's
   // operator command and read only by the API.
   'CommunityPostSponsorship',
+  // Story 6.11: moderation decisions and community sanctions, API-only like the queue they serve.
+  'ModerationDecision',
+  'CommunitySanction',
 ] as const
 
 export const selfOnlyTables = [

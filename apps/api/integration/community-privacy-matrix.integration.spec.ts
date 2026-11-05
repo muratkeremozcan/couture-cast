@@ -3,7 +3,10 @@
 import 'reflect-metadata'
 import { z } from 'zod'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CommunityMaintenanceService } from '../src/modules/community/community-maintenance.service.js'
+import {
+  COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS,
+  CommunityMaintenanceService,
+} from '../src/modules/community/community-maintenance.service.js'
 import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
 import { CommunityCommentsRepository } from '../src/modules/community/community-comments.repository.js'
@@ -118,7 +121,7 @@ const mutations: {
     run: async (f) => {
       await new CommunityRepository(h.prisma).requestErasureForUser(
         f.author.id,
-        new Date()
+        new Date(Date.now() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS - 1000)
       )
       return new CommunityMaintenanceService(
         h.prisma,

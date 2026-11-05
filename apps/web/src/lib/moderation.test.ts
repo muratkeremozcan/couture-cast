@@ -1,34 +1,77 @@
 // Learning path Step 50: Moderator queue and case detail.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-50-moderator-queue-and-case-detail
 // Story 6.10 test owner: U-WEB-Q-CLIENT. Transport, server-clock offset and closed failure states.
+// Story 6.11 test owner: U-WEB-D-CLIENT and U-WEB-D-NO-DIRECT. Decision and appeal transport, closed failures and the id keeper.
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { HttpResponse, http, type JsonBodyType } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  moderationDecisionDetailSchema,
+  moderationDecisionErrorCodeSchema,
+  type ModerationAppealInput,
+  type ModerationDecisionErrorCode,
+  type ModerationDecisionInput,
+  COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+  COMMUNITY_BANNED_MESSAGE,
+  COMMUNITY_COMMENT_SELF_REPORT_MESSAGE,
+  COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_SELF_REPORT_MESSAGE,
+  type CommunityBannedError,
+} from '@couture/api-client/contracts/http'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 import {
   MODERATION_FAILURE_REASONS,
+  RETRYABLE_DECISION_FAILURES,
+  applyModerationDecisionFromWeb,
+  createMutationIdKeeper,
   getModerationCaseFromWeb,
   isTerminalFailure,
   listModerationCasesFromWeb,
+  moderationDecisionFailure,
   moderationFailureReason,
+  recordModerationAppealFromWeb,
+  type ModerationDecisionFailure,
   type ModerationRequestError,
   remainingMs,
 } from './moderation'
 import { useMswHandlers } from '../test-utils/msw/runtime'
 import {
+  APPEAL_PATH,
+  DECISION_PATH,
   DETAIL_PATH,
   MODERATOR_TOKEN,
   QUEUE_PATH,
+  REVISION,
   SERVER_NOW,
+  appealBody,
+  decisionBody,
   detail,
   detailHandler,
   errorBody,
   json,
+  mutationHandler,
   page,
   queueHandler,
   signIn,
   summary,
   type RecordedQuery,
 } from '../test-utils/moderation-console'
+import {
+  communityCommentsRepliesFromWeb,
+  communityCommentsRootsFromWeb,
+  communityCommentsSubmissionsFromWeb,
+  communityFailureReason,
+  communitySanctionOf,
+  getCommunityFeedFromWeb,
+  getCommunityPostFromWeb,
+  getCommunitySpotlightFromWeb,
+  isCommunityPostVisibleFromWeb,
+  openCommunityPostFromWeb,
+  openCommunitySpotlightPostFromWeb,
+  reportCommunityPostFromWeb,
+  setCommunityReactionFromWeb,
+} from './community'
 
 beforeEach(() => signIn())
 afterEach(() => {
@@ -254,5 +297,427 @@ describe('U-WEB-Q-CLIENT: closed failure states', () => {
     )
     const failure = await failureOf(list)
     expect(failure.message).not.toContain('secret-detail')
+  })
+})
+
+describe('U-WEB-D-CLIENT: the decision and appeal routes', () => {
+  const MUTATION_ID = '00000000-0000-4000-8000-000000000001'
+  const decision: ModerationDecisionInput = {
+    action: 'resolve',
+    reason: 'A fair reason',
+    mutationId: MUTATION_ID,
+    expectedRevision: REVISION,
+  }
+  const appeal: ModerationAppealInput = {
+    status: 'requested',
+    reason: 'A fair reason',
+    mutationId: MUTATION_ID,
+  }
+  const applyDecision = () => applyModerationDecisionFromWeb('post.p1', decision)
+  const recordAppeal = () => recordModerationAppealFromWeb('sanction-1', appeal)
+  const closedFailure = async (run: () => Promise<unknown>) =>
+    moderationDecisionFailure(await failureOf(run))
+
+  /** The status each closed code travels with on the real routes. */
+  const CODE_STATUS: Record<ModerationDecisionErrorCode, number> = {
+    invalid_decision: 400,
+    case_not_found: 404,
+    sanction_not_found: 404,
+    moderation_console_disabled: 503,
+    moderation_decisions_disabled: 503,
+    self_review_refused: 403,
+    admin_required: 403,
+    operator_sanctioned: 403,
+    case_conflict: 409,
+    action_not_applicable: 409,
+    idempotency_mismatch: 409,
+    appeal_transition_invalid: 409,
+    audit_unavailable: 503,
+  }
+
+  it('posts the input and the bearer to each route, once per call', async () => {
+    const seen: { url: string; bearer: string | null; body: unknown }[] = []
+    const record = async (request: Request) => {
+      seen.push({
+        url: new URL(request.url).pathname,
+        bearer: request.headers.get('authorization'),
+        body: await request.json(),
+      })
+    }
+    useMswHandlers(
+      http.post(DECISION_PATH, async ({ request }) => {
+        await record(request)
+        return json(decisionBody())
+      }),
+      http.post(APPEAL_PATH, async ({ request }) => {
+        await record(request)
+        return json(appealBody())
+      })
+    )
+    await applyDecision()
+    await recordAppeal()
+    expect(seen).toEqual([
+      {
+        url: '/api/v1/moderation/cases/post.p1/decisions',
+        bearer: `Bearer ${MODERATOR_TOKEN}`,
+        body: decision,
+      },
+      {
+        url: '/api/v1/moderation/sanctions/sanction-1/appeal',
+        bearer: `Bearer ${MODERATOR_TOKEN}`,
+        body: appeal,
+      },
+    ])
+  })
+
+  it.each(['completed', 'deferred'] as const)(
+    'passes cacheInvalidation %s on to the panel, from both routes',
+    async (cacheInvalidation) => {
+      useMswHandlers(
+        mutationHandler(DECISION_PATH, () => json(decisionBody({ cacheInvalidation }))),
+        mutationHandler(APPEAL_PATH, () => json(appealBody({ cacheInvalidation })))
+      )
+      expect((await applyDecision()).cacheInvalidation).toBe(cacheInvalidation)
+      expect((await recordAppeal()).cacheInvalidation).toBe(cacheInvalidation)
+    }
+  )
+
+  it('passes a replay on as replayed', async () => {
+    useMswHandlers(
+      mutationHandler(DECISION_PATH, () => json(decisionBody({ replayed: true })))
+    )
+    expect((await applyDecision()).replayed).toBe(true)
+  })
+
+  it('drops a key a newer server added to an applied response', async () => {
+    const body = decisionBody()
+    useMswHandlers(
+      mutationHandler(DECISION_PATH, () =>
+        json({ data: { ...body.data, addedLater: 'x' }, alsoNew: 1 })
+      )
+    )
+    const result = await applyDecision()
+    expect(result.decisionId).toBe(body.data.decisionId)
+    expect(JSON.stringify(result)).not.toContain('addedLater')
+  })
+
+  it('fails as signed_out without any request when no session token exists', async () => {
+    const bodies: unknown[] = []
+    useMswHandlers(
+      mutationHandler(DECISION_PATH, () => json(decisionBody()), bodies),
+      mutationHandler(APPEAL_PATH, () => json(appealBody()), bodies)
+    )
+    signIn(null)
+    expect((await closedFailure(applyDecision)).failure).toBe('signed_out')
+    expect((await closedFailure(recordAppeal)).failure).toBe('signed_out')
+    expect(bodies).toEqual([])
+  })
+
+  it.each(moderationDecisionErrorCodeSchema.options)(
+    'maps the closed code %s to one state on both routes',
+    async (code) => {
+      const status = CODE_STATUS[code]
+      const body = { statusCode: status, code, message: 'Closed message.' }
+      useMswHandlers(
+        mutationHandler(DECISION_PATH, () => json(body, status)),
+        mutationHandler(APPEAL_PATH, () => json(body, status))
+      )
+      expect(await closedFailure(applyDecision)).toEqual({ failure: code, detail: null })
+      expect(await closedFailure(recordAppeal)).toEqual({ failure: code, detail: null })
+    }
+  )
+
+  it.each(moderationDecisionDetailSchema.options)(
+    'carries the closed detail %s',
+    async (detailCode) => {
+      useMswHandlers(
+        mutationHandler(DECISION_PATH, () =>
+          json(
+            {
+              statusCode: 409,
+              code: 'action_not_applicable',
+              message: 'Closed message.',
+              detail: detailCode,
+            },
+            409
+          )
+        )
+      )
+      expect(await closedFailure(applyDecision)).toEqual({
+        failure: 'action_not_applicable',
+        detail: detailCode,
+      })
+    }
+  )
+
+  it('drops a detail the contract does not list, and keeps the code', async () => {
+    useMswHandlers(
+      mutationHandler(DECISION_PATH, () =>
+        json(
+          {
+            statusCode: 409,
+            code: 'action_not_applicable',
+            message: 'Closed message.',
+            detail: 'something_new',
+          },
+          409
+        )
+      )
+    )
+    expect(await closedFailure(applyDecision)).toEqual({
+      failure: 'action_not_applicable',
+      detail: null,
+    })
+  })
+
+  const unclosed: [string, () => Response, ModerationDecisionFailure][] = [
+    ['401', () => json({ statusCode: 401 }, 401), 'signed_out'],
+    ['403 with no code', () => json({ statusCode: 403 }, 403), 'forbidden'],
+    ['429', () => json({ statusCode: 429 }, 429), 'rate_limited'],
+    ['500', () => json({ statusCode: 500 }, 500), 'unavailable'],
+    ['503 with no code', () => json({ statusCode: 503 }, 503), 'unavailable'],
+    [
+      'a code the contract does not list',
+      () => json({ statusCode: 409, code: 'something_new' }, 409),
+      'unavailable',
+    ],
+    [
+      'a body that is not JSON',
+      () => new HttpResponse('<html>bad gateway</html>', { status: 502 }),
+      'unavailable',
+    ],
+    ['no answer at all', () => HttpResponse.error(), 'offline'],
+    ['an applied body that breaks the contract', () => json({ data: {} }), 'offline'],
+  ]
+  it.each(unclosed)('maps %s to one state', async (_name, respond, failure) => {
+    useMswHandlers(mutationHandler(DECISION_PATH, respond))
+    expect(await closedFailure(applyDecision)).toEqual({ failure, detail: null })
+  })
+
+  it('maps anything else it is handed to unavailable', () => {
+    expect(moderationDecisionFailure(new Error('anything'))).toEqual({
+      failure: 'unavailable',
+      detail: null,
+    })
+  })
+
+  it('never copies a response body into the error', async () => {
+    useMswHandlers(
+      mutationHandler(DECISION_PATH, () =>
+        json({ statusCode: 403, code: 'admin_required', message: 'secret-detail' }, 403)
+      )
+    )
+    const failure = await failureOf(applyDecision)
+    expect(failure.message).not.toContain('secret-detail')
+  })
+
+  it('treats only the failures a same-payload retry can get past as retryable', () => {
+    expect([...RETRYABLE_DECISION_FAILURES].sort()).toEqual([
+      'audit_unavailable',
+      'offline',
+      'rate_limited',
+      'unavailable',
+    ])
+  })
+})
+
+describe('U-WEB-D-CLIENT: the mutation id keeper', () => {
+  const counting = () => {
+    let minted = 0
+    return createMutationIdKeeper(() => `id-${(minted += 1)}`)
+  }
+
+  it('holds one id for one payload, whatever the object identity', () => {
+    const keeper = counting()
+    expect(keeper.idFor({ action: 'resolve', reason: 'abc' })).toBe('id-1')
+    expect(keeper.idFor({ action: 'resolve', reason: 'abc' })).toBe('id-1')
+  })
+
+  it('mints for a new reason, a new action and new ban terms', () => {
+    const keeper = counting()
+    expect(keeper.idFor({ action: 'resolve', reason: 'abc' })).toBe('id-1')
+    expect(keeper.idFor({ action: 'resolve', reason: 'abcd' })).toBe('id-2')
+    expect(keeper.idFor({ action: 'escalate', reason: 'abcd' })).toBe('id-3')
+    expect(keeper.idFor({ action: 'ban', reason: 'abcd', ban: { days: 1 } })).toBe('id-4')
+    expect(keeper.idFor({ action: 'ban', reason: 'abcd', ban: { days: 7 } })).toBe('id-5')
+  })
+
+  it('mints after clear, so the next intent never reuses a finished id', () => {
+    const keeper = counting()
+    const payload = { action: 'resolve', reason: 'abc' }
+    expect(keeper.idFor(payload)).toBe('id-1')
+    keeper.clear()
+    expect(keeper.idFor(payload)).toBe('id-2')
+  })
+
+  it('mints a real UUID by default', () => {
+    expect(createMutationIdKeeper().idFor({})).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    )
+  })
+})
+
+describe('U-WEB-D-NO-DIRECT: the console and the notice reach data only through the API', () => {
+  const SOURCES = [
+    '../app/components/moderation-decision-panel.tsx',
+    '../app/components/moderation-account-standing.tsx',
+    '../app/components/community-banned-notice.tsx',
+  ]
+  const read = (file: string) => readFileSync(path.resolve(__dirname, file), 'utf8')
+
+  it.each(SOURCES)('%s imports no table client, Prisma or server action', (file) => {
+    const source = read(file)
+    const imports = [...source.matchAll(/from\s+'([^']+)'/g)].map((match) => match[1])
+    expect(imports.length).toBeGreaterThan(0)
+    for (const from of imports)
+      expect(from).not.toMatch(/supabase|prisma|next\/headers|\/actions?\b|server/i)
+    expect(source).not.toMatch(/['"]use server['"]/)
+    expect(source).not.toMatch(/\bfetch\(/)
+  })
+
+  it.each(SOURCES)('%s holds no browser dialog', (file) => {
+    expect(read(file)).not.toMatch(/(?<![\w.])(?:window\.)?(?:alert|confirm|prompt)\s*\(/)
+  })
+})
+
+describe('U-WEB-D-CLIENT: community_banned reads by code (TEA-22)', () => {
+  beforeEach(() => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  })
+
+  const sanction: CommunityBannedError['sanction'] = {
+    kind: 'temporary',
+    expiresAt: '2026-11-10T12:00:00.000Z',
+    appealStatus: 'not_requested',
+  }
+  const banned = (message: string = COMMUNITY_BANNED_MESSAGE): CommunityBannedError => ({
+    statusCode: 403,
+    code: 'community_banned',
+    message,
+    sanction,
+  })
+  /** Every community route answers the same refusal, and counts what reached it. */
+  const refuseEverything = (body: object = banned()) => {
+    const calls: string[] = []
+    const refuse = ({ request }: { request: Request }) => {
+      calls.push(new URL(request.url).pathname)
+      return HttpResponse.json(body, { status: 403 })
+    }
+    const install = useMswHandlers
+    install(
+      http.get('/api/v1/community/*', refuse),
+      http.post('/api/v1/community/*', refuse),
+      http.put('/api/v1/community/*', refuse)
+    )
+    return calls
+  }
+  const failureOf = (run: () => Promise<unknown>) =>
+    run().then(
+      () => {
+        throw new Error('expected the request to be refused')
+      },
+      (error: unknown) => error
+    )
+
+  const READ_ROUTES: [string, () => Promise<unknown>][] = [
+    ['the feed', () => getCommunityFeedFromWeb({ mode: 'auto' })],
+    ['a single post', () => getCommunityPostFromWeb('post-1')],
+    ['the spotlight', () => getCommunitySpotlightFromWeb()],
+    ['the home teaser', () => getCommunitySpotlightFromWeb({ surface: 'home_teaser' })],
+    ['a card open', () => openCommunityPostFromWeb('post-1', 'auto')],
+    ['a spotlight open', () => openCommunitySpotlightPostFromWeb('post-1', 1, 'city')],
+    ['comment roots', () => communityCommentsRootsFromWeb('post-1')],
+    ['comment replies', () => communityCommentsRepliesFromWeb('post-1', 'comment-1')],
+    ['own submissions', () => communityCommentsSubmissionsFromWeb('post-1')],
+  ]
+
+  it.each(READ_ROUTES)('%s reaches the banned state, once', async (_route, run) => {
+    const calls = refuseEverything()
+    const failure = await failureOf(run)
+    expect(communityFailureReason(failure)).toBe('banned')
+    expect(communitySanctionOf(failure)).toEqual(sanction)
+    expect(calls).toHaveLength(1)
+  })
+
+  it('a report reaches the banned state', async () => {
+    refuseEverything()
+    const failure = await failureOf(() => reportCommunityPostFromWeb('post-1', 'spam'))
+    expect(communityFailureReason(failure)).toBe('banned')
+  })
+
+  it('a reaction reaches the banned state ahead of the eligibility rule', async () => {
+    refuseEverything()
+    const failure = await failureOf(() =>
+      setCommunityReactionFromWeb('post-1', {
+        selection: 'love',
+        mutationId: '00000000-0000-4000-8000-000000000001',
+        baseRevision: 0,
+      })
+    )
+    expect(communityFailureReason(failure)).toBe('banned')
+    expect(communitySanctionOf(failure)).toEqual(sanction)
+  })
+
+  it('a deep link answers false, and asks once', async () => {
+    const calls = refuseEverything()
+    await expect(isCommunityPostVisibleFromWeb('post-1')).resolves.toBe(false)
+    expect(calls).toHaveLength(1)
+  })
+
+  it.each([
+    ['the age gate', COMMUNITY_AGE_GATE_DENIED_MESSAGE],
+    ['the rollout', COMMUNITY_FEED_DISABLED_MESSAGE],
+    ['a self report', COMMUNITY_SELF_REPORT_MESSAGE],
+    ['a comment self report', COMMUNITY_COMMENT_SELF_REPORT_MESSAGE],
+  ])('beats the %s message rule', async (_rule, message) => {
+    refuseEverything(banned(message))
+    const failure = await failureOf(() => getCommunityFeedFromWeb({ mode: 'auto' }))
+    expect(communityFailureReason(failure)).toBe('banned')
+    expect(communitySanctionOf(failure)).toEqual(sanction)
+  })
+
+  it('keeps the message distinct from the rollout and age gate copy', () => {
+    for (const copy of [
+      COMMUNITY_FEED_DISABLED_MESSAGE,
+      COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+    ]) {
+      expect(COMMUNITY_BANNED_MESSAGE).not.toContain(copy)
+      expect(copy).not.toContain(COMMUNITY_BANNED_MESSAGE)
+    }
+  })
+
+  it('reads the code, so a body a newer server extended still reaches the banned state', async () => {
+    refuseEverything({
+      ...banned(COMMUNITY_FEED_DISABLED_MESSAGE),
+      sanction: { ...sanction, addedLater: 'x' },
+    })
+    const failure = await failureOf(() => getCommunityFeedFromWeb({ mode: 'auto' }))
+    expect(communityFailureReason(failure)).toBe('banned')
+  })
+
+  it('leaves every other 403 to its own rule, and no sanction on it', async () => {
+    refuseEverything({
+      statusCode: 403,
+      code: 'denied',
+      message: COMMUNITY_FEED_DISABLED_MESSAGE,
+    })
+    const rollout = await failureOf(() => getCommunityFeedFromWeb({ mode: 'auto' }))
+    expect(communityFailureReason(rollout)).toBe('disabled')
+    expect(communitySanctionOf(rollout)).toBeNull()
+
+    refuseEverything({ statusCode: 403, message: COMMUNITY_BANNED_MESSAGE })
+    const noCode = await failureOf(() => getCommunityFeedFromWeb({ mode: 'auto' }))
+    expect(communityFailureReason(noCode)).toBe('unknown')
+    expect(communitySanctionOf(noCode)).toBeNull()
+  })
+
+  it('never reads a ban from any status but 403', async () => {
+    useMswHandlers(
+      http.get('/api/v1/community/feed', () =>
+        HttpResponse.json({ ...banned(), statusCode: 500 }, { status: 500 })
+      )
+    )
+    const failure = await failureOf(() => getCommunityFeedFromWeb({ mode: 'auto' }))
+    expect(communityFailureReason(failure)).toBe('unknown')
   })
 })

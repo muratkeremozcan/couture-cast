@@ -6,9 +6,19 @@ import { useTranslation } from 'react-i18next'
 import type { z } from 'zod'
 import { ResponseError } from '@couture/api-client'
 import {
+  moderationAppealResponseSchema,
   moderationCaseDetailResponseSchema,
   moderationCasesResponseSchema,
+  moderationDecisionDetailSchema,
+  moderationDecisionErrorCodeSchema,
+  moderationDecisionResponseSchema,
   moderationQueueErrorCodeSchema,
+  type ModerationAppealInput,
+  type ModerationAppealResult,
+  type ModerationDecisionDetail,
+  type ModerationDecisionErrorCode,
+  type ModerationDecisionInput,
+  type ModerationDecisionResult,
   type ModerationQueueErrorCode,
   type ModerationCaseDetail,
   type ModerationCasesPage,
@@ -202,6 +212,126 @@ export async function getModerationCaseFromWeb(
   } catch (error: unknown) {
     throw await moderationError(error)
   }
+}
+
+/** Why a decision or an appeal step did not apply. `offline` is a request that never got an answer. */
+export type ModerationDecisionFailure =
+  | ModerationDecisionErrorCode
+  | 'signed_out'
+  | 'forbidden'
+  | 'rate_limited'
+  | 'offline'
+  | 'unavailable'
+
+export class ModerationDecisionRequestError extends Error {
+  constructor(
+    readonly failure: ModerationDecisionFailure,
+    readonly detail: ModerationDecisionDetail | null = null
+  ) {
+    super(`Moderation decision failed (${failure}).`)
+    this.name = 'ModerationDecisionRequestError'
+  }
+}
+
+/** Failures that a retry of the same mutation can get past, so the typed reason stays ready. */
+export const RETRYABLE_DECISION_FAILURES: readonly ModerationDecisionFailure[] = [
+  'offline',
+  'unavailable',
+  'audit_unavailable',
+  'rate_limited',
+]
+
+async function decisionFailure(error: unknown): Promise<ModerationDecisionRequestError> {
+  if (error instanceof ModerationDecisionRequestError) return error
+  if (!(error instanceof ResponseError))
+    return new ModerationDecisionRequestError('offline')
+  const { status } = error.response
+  let code: unknown
+  let detail: unknown
+  try {
+    const body = (await error.response.clone().json()) as {
+      code?: unknown
+      detail?: unknown
+    } | null
+    code = body?.code
+    detail = body?.detail
+  } catch {
+    code = undefined
+  }
+  const parsed = moderationDecisionErrorCodeSchema.safeParse(code)
+  if (parsed.success) {
+    const closed = moderationDecisionDetailSchema.safeParse(detail)
+    return new ModerationDecisionRequestError(
+      parsed.data,
+      closed.success ? closed.data : null
+    )
+  }
+  if (status === 401) return new ModerationDecisionRequestError('signed_out')
+  if (status === 403) return new ModerationDecisionRequestError('forbidden')
+  if (status === 429) return new ModerationDecisionRequestError('rate_limited')
+  return new ModerationDecisionRequestError('unavailable')
+}
+
+function readDecisionToken(): string {
+  const token = window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim()
+  if (!token) throw new ModerationDecisionRequestError('signed_out')
+  return token
+}
+
+export async function applyModerationDecisionFromWeb(
+  caseId: string,
+  input: ModerationDecisionInput
+): Promise<ModerationDecisionResult> {
+  const accessToken = readDecisionToken()
+  try {
+    const response = await createWebApiClient({ accessToken }).applyModerationDecision({
+      caseId,
+      applyModerationDecisionRequest: input,
+    })
+    return parseTolerant(moderationDecisionResponseSchema, response).data
+  } catch (error: unknown) {
+    throw await decisionFailure(error)
+  }
+}
+
+export async function recordModerationAppealFromWeb(
+  sanctionId: string,
+  input: ModerationAppealInput
+): Promise<ModerationAppealResult> {
+  const accessToken = readDecisionToken()
+  try {
+    const response = await createWebApiClient({ accessToken }).recordModerationAppeal({
+      sanctionId,
+      recordModerationAppealRequest: input,
+    })
+    return parseTolerant(moderationAppealResponseSchema, response).data
+  } catch (error: unknown) {
+    throw await decisionFailure(error)
+  }
+}
+
+/** One id per intent: a retry of the same payload reuses it, and an edit mints a new one. */
+export function createMutationIdKeeper(mint: () => string = () => crypto.randomUUID()) {
+  let held: { payload: string; id: string } | null = null
+  return {
+    idFor(payload: unknown): string {
+      const key = JSON.stringify(payload)
+      if (held?.payload !== key) held = { payload: key, id: mint() }
+      return held.id
+    },
+    clear() {
+      held = null
+    },
+  }
+}
+
+export function moderationDecisionFailure(error: unknown): {
+  failure: ModerationDecisionFailure
+  detail: ModerationDecisionDetail | null
+} {
+  return error instanceof ModerationDecisionRequestError
+    ? { failure: error.failure, detail: error.detail }
+    : { failure: 'unavailable', detail: null }
 }
 
 /** Milliseconds until `dueAt`, on the server's clock. Negative once breached. */

@@ -54,6 +54,7 @@ import {
   type SupportedLocale,
   type UpdateCommunityChallengeInput,
   type WithdrawCommunityPostResponse,
+  communityModerationReasonCategories,
 } from '@couture/api-client/contracts/http'
 import { randomUUID } from 'node:crypto'
 import {
@@ -145,6 +146,10 @@ function missingReactionSnapshot(
 ): boolean {
   return include && isPubliclyVisiblePost(post) && summary === undefined
 }
+
+/** Erasure keeps the path for a while to catch a late write. It is never readable from then on. */
+const readableObjectPath = (post: LookbookPost): string | null =>
+  post.erasure_requested_at || post.anonymized_at ? null : post.image_object_path
 
 @Injectable()
 export class CommunityService {
@@ -740,9 +745,8 @@ export class CommunityService {
     const signedUrls = await this.signPage(posts)
 
     return posts.map((post) => {
-      const signedUrl = post.image_object_path
-        ? signedUrls.get(post.image_object_path)
-        : undefined
+      const objectPath = readableObjectPath(post)
+      const signedUrl = objectPath ? signedUrls.get(objectPath) : undefined
 
       return {
         id: post.id,
@@ -754,7 +758,12 @@ export class CommunityService {
         publishedAt: post.published_at?.toISOString() ?? null,
         status: post.status,
         challengeId: post.challenge_id ?? null,
-        moderationReason: post.moderation_reason ?? null,
+        // Only a screening code the client can localize. An operator's words or a ban marker
+        // stay private, and the author sees the generic removed state.
+        moderationReason:
+          communityModerationReasonCategories(post.moderation_reason) === null
+            ? null
+            : post.moderation_reason,
       }
     })
   }
@@ -779,9 +788,7 @@ export class CommunityService {
   private async signPage(posts: LookbookPost[]): Promise<Map<string, string>> {
     const objectPaths = Array.from(
       new Set(
-        posts
-          .map((post) => post.image_object_path)
-          .filter((path): path is string => Boolean(path))
+        posts.map(readableObjectPath).filter((path): path is string => Boolean(path))
       )
     )
     if (objectPaths.length === 0) {
@@ -951,6 +958,8 @@ export class CommunityService {
    * not confirmed to exist).
    */
   async assertPublicPostReadable(userId: string, postId: string): Promise<LookbookPost> {
+    // Ahead of the read, because the 404 below would tell a banned member which posts are live.
+    await this.repository.assertNotSanctioned(userId)
     await this.assertReadEnabled(userId)
     const post = await this.repository.findPostById(postId)
     if (!post || !isPubliclyVisiblePost(post)) {
@@ -970,6 +979,8 @@ export class CommunityService {
 
     await this.assertWriteEnabled(userId)
     await this.assertAgeGateAllows(userId, role)
+    // Ahead of the replay below, which would otherwise hand a banned member a fresh upload URL.
+    await this.repository.assertNotSanctioned(userId)
 
     const { viewerBand } = await this.resolveViewerBand(userId)
     const altTextSuggestion = buildAltTextSuggestion({
@@ -1068,7 +1079,8 @@ export class CommunityService {
       existingPost.image_byte_size !== input.byteSize ||
       existingPost.image_content_type !== input.contentType ||
       !objectPath ||
-      !parsed
+      !parsed ||
+      existingPost.erasure_requested_at
     ) {
       throw new ConflictException(COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE)
     }
@@ -1077,6 +1089,14 @@ export class CommunityService {
       objectPath,
       UPLOAD_URL_EXPIRES_IN_SECONDS
     )
+    if (
+      !(await this.repository.confirmAllocationReplay(
+        existingPost.id,
+        new Date(uploadSession.expiresAt)
+      ))
+    ) {
+      throw new ConflictException(COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE)
+    }
 
     return {
       postId: existingPost.id,
@@ -1102,6 +1122,8 @@ export class CommunityService {
 
     await this.assertWriteEnabled(userId)
     await this.assertAgeGateAllows(userId, role)
+    // A replay refuses like every other engagement replay.
+    await this.repository.assertNotSanctioned(userId)
 
     const { post, altText, objectPath } = await this.loadPublishablePost(userId, input)
 

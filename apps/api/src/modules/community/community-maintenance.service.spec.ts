@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
 import {
+  COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS,
   CommunityMaintenanceService,
   ERASURE_DEADLINE_HOURS,
   STALE_PENDING_REVIEW_MINUTES,
@@ -12,7 +13,10 @@ describe('CommunityMaintenanceService', () => {
   const now = new Date('2026-09-05T12:00:00.000Z')
 
   const createService = () => {
-    const findMany = vi.fn<() => Promise<Record<string, unknown>[]>>()
+    const findMany = vi
+      .fn<() => Promise<Record<string, unknown>[]>>()
+      .mockResolvedValue([])
+    const count = vi.fn().mockResolvedValue(0)
     const update = vi.fn().mockResolvedValue({})
     const updateMany = vi.fn().mockResolvedValue({ count: 1 })
     const deleteMany = vi.fn()
@@ -26,8 +30,9 @@ describe('CommunityMaintenanceService', () => {
     const findFirst = vi.fn(async () => (await firstRows())[0])
     const transaction = {
       $executeRaw: vi.fn().mockResolvedValue(1),
-      $queryRaw: vi.fn().mockResolvedValue([]),
-      lookbookPost: { findMany, findFirst, update, updateMany, deleteMany },
+      // The erasure queue's select, read from the rows a test hands `findMany`.
+      $queryRaw: vi.fn(() => findMany()),
+      lookbookPost: { findMany, findFirst, update, updateMany, deleteMany, count },
       communityPostSponsorship: { deleteMany: sponsorshipDeleteMany },
       jobFailure: { create: jobFailureCreate },
     }
@@ -42,6 +47,7 @@ describe('CommunityMaintenanceService', () => {
     return {
       prisma,
       service: new CommunityMaintenanceService(prisma, storage),
+      count,
       storage,
       findMany,
       update,
@@ -87,7 +93,11 @@ describe('CommunityMaintenanceService', () => {
 
       expect(result).toEqual({ stalled: 1 })
       expect(updateMany).toHaveBeenCalledWith({
-        where: { id: 'post-stalled', status: 'pending_review' },
+        where: {
+          id: 'post-stalled',
+          status: 'pending_review',
+          updated_at: new Date('2026-09-05T11:00:00.000Z'),
+        },
         data: { status: 'review_failed', moderation_reason: 'moderation_stalled' },
       })
       // The alert lands in the repository's existing dead-letter surface, so
@@ -141,21 +151,23 @@ describe('CommunityMaintenanceService', () => {
       status: 'published',
       image_object_path: 'community/post-erase/s.jpg',
       anonymized_at: null,
-      erasure_requested_at: new Date('2026-09-05T11:00:00.000Z'),
+      // Past the late-write window, so a pass finishes the row. The window has its own cases.
+      erasure_requested_at: new Date(
+        now.getTime() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS - 1
+      ),
       ...overrides,
     })
 
-    it('claims requests that have not had their objects purged', async () => {
+    it('does nothing when no erasure work is due', async () => {
       const { service, findMany } = createService()
-      findMany.mockResolvedValueOnce([])
+      findMany.mockResolvedValue([])
 
-      await service.sweepErasureRequests(now)
-
-      expect(findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { erasure_requested_at: { not: null }, objects_purged_at: null },
-        })
-      )
+      await expect(service.sweepErasureRequests(now)).resolves.toEqual({
+        hidden: 0,
+        anonymized: 0,
+        objectsPurged: 0,
+        overdue: 0,
+      })
     })
 
     it('hides the post before deleting its object', async () => {
@@ -208,6 +220,8 @@ describe('CommunityMaintenanceService', () => {
           area_region: null,
           area_city: null,
           image_checksum: null,
+          image_pending_checksum: null,
+          image_pending_byte_size: null,
           anonymized_at: now,
         },
       })
@@ -242,7 +256,8 @@ describe('CommunityMaintenanceService', () => {
     })
 
     it('leaves objects_purged_at unset when the delete fails, and flags an overdue request', async () => {
-      const { prisma, findMany, update, updateMany } = createService()
+      const { prisma, findMany, update, updateMany, count } = createService()
+      count.mockResolvedValueOnce(1)
       findMany.mockResolvedValueOnce([
         erasureRow({
           status: 'withdrawn',
@@ -319,7 +334,9 @@ describe('CommunityMaintenanceService', () => {
         where: {
           id: { in: ['post-abandoned'] },
           status: 'draft',
-          upload_expires_at: { lt: now },
+          upload_expires_at: {
+            lt: new Date(now.getTime() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS),
+          },
           erasure_requested_at: { not: null },
         },
       })

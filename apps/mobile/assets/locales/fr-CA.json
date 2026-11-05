@@ -771,7 +771,8 @@
       "notFound": "Ce look n’est plus disponible.",
       "disabled": "Le fil de la communauté est temporairement non disponible.",
       "mediaUnavailable": "Ce look est temporairement non disponible. Réessayez dans quelques instants.",
-      "generic": "Une erreur s’est produite. Réessayez."
+      "generic": "Une erreur s’est produite. Réessayez.",
+      "banned": "Votre accès à la communauté est suspendu."
     },
     "reactions": {
       "label": "Réactions",
@@ -888,6 +889,18 @@
       "announceRefreshed": "Les vedettes de la ville ont été actualisées selon le classement le plus récent.",
       "targetUnavailable": "Ce look ne fait plus partie des Vedettes de la ville.",
       "destinationUnavailable": "Les Vedettes de la ville ne sont pas disponibles pour le moment."
+    },
+    "banned": {
+      "title": "Votre accès à la communauté est suspendu",
+      "temporary": "Vous pourrez revenir après le {{until}}. D'ici là, vous ne pouvez ni consulter la communauté ni y participer.",
+      "permanent": "Cette suspension n'a pas de date de fin. Vous ne pouvez ni consulter la communauté ni y participer.",
+      "scope": "Votre garde-robe, votre rituel quotidien, vos alertes et les réglages de votre compte ne sont pas touchés.",
+      "appeal": {
+        "not_requested": "Si vous pensez qu'il s'agit d'une erreur, contactez l'assistance CoutureCast pour demander un réexamen.",
+        "requested": "Votre demande de réexamen a été enregistrée et attend une décision.",
+        "upheld": "Votre demande de réexamen a été étudiée et cette suspension est maintenue.",
+        "overturned": "Cette suspension a été levée."
+      }
     }
   },
   "locations": {

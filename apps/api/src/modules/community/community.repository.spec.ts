@@ -215,6 +215,7 @@ describe('CommunityRepository reads', () => {
       expect(lookbookPostFindMany).toHaveBeenCalledWith({
         where: {
           user_id: viewerUserId,
+          OR: expect.any(Array) as unknown,
           status: {
             in: [
               'draft',

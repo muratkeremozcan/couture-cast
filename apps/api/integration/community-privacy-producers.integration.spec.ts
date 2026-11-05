@@ -1,5 +1,6 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
+import type { CommunityOverwriteCapability } from '../src/modules/community/community-storage.adapter.js'
 import { GuardianService } from '../src/modules/guardian/guardian.service.js'
 import 'reflect-metadata'
 import { ServiceUnavailableException } from '@nestjs/common'
@@ -134,8 +135,16 @@ describe('Story 6.5 cross-feature privacy producers', () => {
           Promise.reject(new ServiceUnavailableException('fixture unavailable')),
       }
     )
-    await expect(processor.process(comment.id)).resolves.toBeUndefined()
-    await expect(processor.markFailed(comment.id, true)).resolves.toBeUndefined()
+    await expect(processor.process(comment.id, 0)).resolves.toBeUndefined()
+    const deferred = await prisma.communityCommentScreeningOutbox.findUniqueOrThrow({
+      where: { comment_id: comment.id },
+    })
+    await expect(
+      processor.failStale(comment.id, {
+        generation: deferred.generation,
+        updatedAt: deferred.updated_at,
+      })
+    ).resolves.toBeUndefined()
     expect(
       await prisma.communityComment.findUnique({ where: { id: comment.id } })
     ).toMatchObject({ status: 'pending_screening' })
@@ -190,10 +199,15 @@ describe('Story 6.5 cross-feature privacy producers', () => {
     const entered = barrier(),
       release = barrier()
     class HeldStorage extends InMemoryCommunityStorage {
-      override async upload(path: string, data: Buffer, mime: string) {
+      override async upload(
+        path: string,
+        data: Buffer,
+        mime: string,
+        capability: CommunityOverwriteCapability
+      ) {
         entered.release()
         await release.promise
-        return super.upload(path, data, mime)
+        return super.upload(path, data, mime, capability)
       }
     }
     const storage = new HeldStorage()
@@ -222,7 +236,8 @@ describe('Story 6.5 cross-feature privacy producers', () => {
       ).toMatchObject({
         status: 'withdrawn',
         image_checksum: null,
-        image_object_path: null,
+        image_object_path: post.image_object_path,
+        objects_purged_at: null,
       })
       expect(storage.objects.has(post.image_object_path!)).toBe(false)
       expect(await prisma.moderationEvent.count({ where: { post_id: post.id } })).toBe(0)

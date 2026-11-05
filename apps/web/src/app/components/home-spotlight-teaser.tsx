@@ -53,12 +53,10 @@ function useCommunityMember(): string | null | undefined {
     const timer = setInterval(sync, SESSION_SYNC_MS)
     window.addEventListener('storage', sync)
     window.addEventListener('couture:session', sync)
-    window.addEventListener('couture:account-erased', sync)
     return () => {
       clearInterval(timer)
       window.removeEventListener('storage', sync)
       window.removeEventListener('couture:session', sync)
-      window.removeEventListener('couture:account-erased', sync)
     }
   }, [])
   return member

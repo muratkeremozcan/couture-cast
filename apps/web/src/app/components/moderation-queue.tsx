@@ -410,6 +410,7 @@ function CaseRow({
         {item.reasons.map((reason) => t(`moderation.reason.${reason}`)).join(', ')}
         {item.locale ? ` · ${item.locale}` : ''}
         {item.hasFinding ? ` · ${t('moderation.queue.finding')}` : ''}
+        {item.escalated ? ` · ${t('moderation.queue.escalated')}` : ''}
       </p>
     </article>
   )

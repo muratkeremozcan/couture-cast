@@ -212,6 +212,7 @@ export function LookbookPrismLayout() {
   // about which chip is pressed. `null` until the grid's first response lands,
   // so this nav starts by mirroring the click like the grid itself does.
   const [servedMode, setServedMode] = useState<FilterCategory | null>(null)
+  const [communityBanned, setCommunityBanned] = useState(false)
 
   // Deep Link & Notification States
   const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
@@ -507,6 +508,7 @@ export function LookbookPrismLayout() {
             isMobilePreview={isMobilePreview}
             onTabChange={setActiveTab}
             viewerBand={viewerBand}
+            closed={communityBanned}
           />
 
           {/* Outfit Tiles */}
@@ -600,7 +602,7 @@ export function LookbookPrismLayout() {
           {/* Story 6.7: only while stacked; the value itself lives above. */}
           <HomeSpotlightTeaserSlot
             stacked={isStacked}
-            teaser={teaser}
+            teaser={communityBanned ? { ...teaser, value: null } : teaser}
             t={(key, options) => i18n.t(key, options)}
             onLeaveWhileFocused={() => {
               requestAnimationFrame(() => heroCanvasRef.current?.focus())
@@ -617,6 +619,7 @@ export function LookbookPrismLayout() {
             highlightedCardId={highlightedCardId}
             onViewerBandChange={setViewerBand}
             onServedModeChange={setServedMode}
+            onBannedChange={setCommunityBanned}
             spotlightFocusIntent={teaser.focusIntent}
           />
         </section>

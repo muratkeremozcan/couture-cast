@@ -18,6 +18,7 @@ import {
   COMMUNITY_MODERATION_QUEUE,
   COMMUNITY_COMMENT_JOB,
   communityCommentJobSchema,
+  communityModerationJobGeneration,
   communityModerationJobSchema,
 } from './community-moderation.queue.js'
 import {
@@ -246,7 +247,7 @@ export function createCommunityModerationWorker(
         } catch (error) {
           if (job.attemptsMade + 1 >= (job.opts.attempts ?? 3)) {
             try {
-              await comments.markFailed(data.commentId, false, data.generation)
+              await comments.markFailed(data.commentId, data.generation)
             } catch {
               logger.warn(
                 {
@@ -275,6 +276,7 @@ export function createCommunityModerationWorker(
           await processor.markFailed(data.postId, terminalReason(error), {
             attempt,
             maxAttempts,
+            generation: communityModerationJobGeneration(data),
           })
         }
         throw error

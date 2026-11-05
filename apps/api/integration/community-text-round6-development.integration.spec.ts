@@ -36,7 +36,7 @@ describe('round6 high-severity occurrence boundaries through actual guarded HTTP
       ).send({ ...input(row.text), locale: row.locale })
       expect(response.status).toBe(200)
       const { id } = communityCommentSubmissionResponseSchema.parse(response.body).data
-      await processor.process(id)
+      await processor.process(id, 0)
       const result = await prisma.communityComment.findUniqueOrThrow({ where: { id } })
       expect(result.status).toBe(row.expected)
       const visible = await authorized(

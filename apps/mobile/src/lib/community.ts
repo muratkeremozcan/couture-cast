@@ -30,6 +30,8 @@ import {
 // shape for `expo-web-browser`.
 import {
   allocateCommunityPostResponseSchema,
+  communityBannedErrorSchema,
+  type CommunityBannedError,
   communitySponsoredFeedResponseSchema,
   communitySponsoredPostResponseSchema,
   communitySponsoredSpotlightResponseSchema,
@@ -77,6 +79,7 @@ export type CommunityFailureReason =
   | 'reason_changed'
   | 'self_report'
   | 'disabled'
+  | 'banned'
   | 'cursor_invalid'
   | 'media_unavailable'
   | 'upload_failed'
@@ -94,7 +97,9 @@ export class CommunityRequestError extends Error {
     reason: CommunityFailureReason,
     message: string,
     retryAfterSeconds?: number,
-    readonly httpStatus?: number
+    readonly httpStatus?: number,
+    /** Story 6.11: the ban's term and appeal state, on a `banned` refusal only. */
+    readonly sanction?: CommunityBannedError['sanction']
   ) {
     super(message)
     this.name = 'CommunityRequestError'
@@ -128,6 +133,30 @@ async function readServerMessage(response: Response, fallback: string): Promise<
     return typeof message === 'string' && message.trim().length > 0 ? message : fallback
   } catch {
     return fallback
+  }
+}
+
+/** By the code alone, so a key a newer server added cannot send a ban to the message rules. */
+async function isCommunityBanned(response: Response): Promise<boolean> {
+  if (response.status !== 403) return false
+  try {
+    const body: unknown = await response.clone().json()
+    return (body as { code?: unknown } | null)?.code === 'community_banned'
+  } catch {
+    return false
+  }
+}
+
+/** The ban's terms when the body carries a readable set. A ban without them still closes the screen. */
+async function readBannedSanction(
+  response: Response
+): Promise<CommunityBannedError['sanction'] | undefined> {
+  try {
+    const body = (await response.clone().json()) as { sanction?: unknown } | null
+    const sanction = communityBannedErrorSchema.shape.sanction.safeParse(body?.sanction)
+    return sanction.success ? sanction.data : undefined
+  } catch {
+    return undefined
   }
 }
 
@@ -204,9 +233,19 @@ async function communityError(
     return error
   }
   if (error instanceof ResponseError) {
-    const message = await readServerMessage(error.response, fallback)
+    const message = await readServerMessage(error.response.clone(), fallback)
+    // The code comes first, ahead of every message rule.
+    if (await isCommunityBanned(error.response))
+      return new CommunityRequestError(
+        'banned',
+        message,
+        undefined,
+        error.response.status,
+        await readBannedSanction(error.response)
+      )
+    const reason = reasonForResponse(error.response.status, message)
     return new CommunityRequestError(
-      reasonForResponse(error.response.status, message),
+      reason,
       message,
       readRetryAfterSeconds(error.response),
       error.response.status
@@ -220,6 +259,20 @@ async function communityError(
 
 export function communityFailureReason(error: unknown): CommunityFailureReason {
   return error instanceof CommunityRequestError ? error.reason : 'unknown'
+}
+
+/** The ban on a `banned` refusal. A body with no readable terms still reads as permanent. */
+export function communitySanctionOf(
+  error: unknown
+): CommunityBannedError['sanction'] | null {
+  if (!(error instanceof CommunityRequestError) || error.reason !== 'banned') return null
+  return (
+    error.sanction ?? {
+      kind: 'permanent',
+      expiresAt: null,
+      appealStatus: 'not_requested',
+    }
+  )
 }
 
 /** Seconds until posting is allowed again, when the failure was a 429. */
@@ -742,8 +795,11 @@ export async function setCommunityReactionFromMobile(
       conflict: false,
     }
   } catch (error: unknown) {
-    if (error instanceof ResponseError && error.response.status === 403)
+    if (error instanceof ResponseError && error.response.status === 403) {
+      if (await isCommunityBanned(error.response))
+        throw await communityError(error, 'Community access is suspended.')
       throw new CommunityRequestError('age_gate', 'Reaction eligibility required.')
+    }
     if (error instanceof ResponseError && error.response.status === 409) {
       const conflict = communityReactionConflictResponseSchema.safeParse(
         await error.response.clone().json()

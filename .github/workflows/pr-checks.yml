@@ -138,10 +138,16 @@ jobs:
           name: lighthouse-accessibility-${{ github.event.pull_request.number || github.sha }}
           path: playwright/artifacts/lighthouse/
 
-  tests:
-    name: Workspace tests with coverage
+  # One job for all workspaces took 19m41s of a 20 minute limit. The shards split it, and
+  # `scripts/ci/coverage-shards.mjs` keeps every workspace in exactly one of them.
+  tests-shard:
+    name: Workspace coverage (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [api, mobile, other]
     # `packages/db/test/**` holds the RLS actor matrix and every schema
     # constraint assertion, and it talks to a real PostgreSQL. It only started
     # running here when story 5.1 added `test:coverage` to that workspace, at
@@ -272,30 +278,113 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.roles.outcome == 'success' }}
         run: node scripts/prisma-migrate-deploy.mjs
 
-      - name: Build packages
+      # Together, because a slow apt mirror once added 2 minutes to the Chromium install and more than
+      # 4 in another run. Only `apps/mobile` runs tests in a browser.
+      - name: Build packages and install Playwright Chromium
         id: build
-        if: ${{ !cancelled() && steps.prisma.outcome == 'success' }}
-        run: npm run build
-
-      - name: Install Playwright Chromium
-        id: chromium
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: npx playwright install --with-deps chromium
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.prisma.outcome == 'success' }}
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          chromium=
+          if [ "$SHARD" = mobile ]; then
+            npx playwright install --with-deps chromium &
+            chromium=$!
+          fi
+          npm run build
+          if [ -n "$chromium" ]; then wait "$chromium"; fi
 
       - name: Run tests with coverage
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.migrations.outcome == 'success' && steps.chromium.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.migrations.outcome == 'success' }}
         id: tests
         continue-on-error: true
+        env:
+          COVERAGE_SHARD: ${{ matrix.shard }}
+          # The Prisma and build steps above already did what each workspace's pre-hook repeats.
+          COVERAGE_SHARED_DEPS_BUILT: 'true'
         run: npm run test:coverage
 
-      - name: Coverage report and PR comment
+      - name: Record this shard's result
         if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+        env:
+          SHARD: ${{ matrix.shard }}
+          OUTCOME: ${{ steps.tests.outcome }}
+          DIRS: ${{ steps.tests.outputs.coverage_dirs }}
+          FAILURES: ${{ steps.tests.outputs.failures }}
+        run: node scripts/ci/coverage-shards.mjs record
+
+      # The result file sits at the repository root, which keeps every coverage path repo-relative in
+      # the artifact: its root is the deepest folder the uploaded files share.
+      - name: Upload this shard's coverage
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-shard-${{ matrix.shard }}
+          overwrite: true
+          retention-days: 1
+          path: |
+            coverage-shard-result-${{ matrix.shard }}.json
+            apps/*/coverage/coverage-summary.json
+            apps/*/coverage/lcov.info
+            packages/*/coverage/coverage-summary.json
+            packages/*/coverage/lcov.info
+
+      # In a shard because it needs `yaml` from the install, and in one shard because once is enough.
+      - name: Require later checks to run after an earlier check fails
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' && matrix.shard == 'other' }}
+        run: node --test scripts/ci/workflow-step-shadowing.test.mjs
+
+      - name: Fail if tests failed
+        if: ${{ always() && steps.tests.outcome == 'failure' }}
+        run: |
+          echo "::error::Workspace tests failed"
+          exit 1
+
+  # The name every reader knows. It reports all shards as one coverage comment and goes red unless
+  # every shard passed, so a skipped or cancelled shard is a failure too.
+  tests:
+    name: Workspace tests with coverage
+    needs: [tests-shard]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        id: setup
+        if: ${{ !cancelled() }}
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Download every shard's coverage
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-shard-*
+          merge-multiple: true
+          path: .
+
+      - name: Merge shard results
+        id: tests
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node scripts/ci/coverage-shards.mjs merge
+
+      # Named `tests` so the comment reads the same outputs a single job gave it.
+      - name: Coverage report and PR comment
+        if: ${{ !cancelled() && steps.tests.outcome == 'success' }}
         uses: ./.github/actions/unit-test-coverage-comment
         with:
           coverage-path: ./coverage
           coverage-summary-path: ./coverage/coverage-summary.json
           report-name: coverage-report-${{ github.event.pull_request.number || github.sha }}
-          test-outcome: ${{ steps.tests.outcome }}
+          test-outcome: ${{ steps.tests.outputs.outcome }}
           workspace-dirs: ${{ steps.tests.outputs.coverage_dirs }}
           failures: ${{ steps.tests.outputs.failures }}
           diff-coverage-threshold: '80'
@@ -303,22 +392,18 @@ jobs:
           badge-filename-prefix: couture-cast
           badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
 
-      - name: Require later checks to run after an earlier check fails
+      - name: Keep every workspace in exactly one coverage shard
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node --test scripts/ci/workflow-step-shadowing.test.mjs
+        run: node --test scripts/ci/coverage-shards.test.mjs
 
-      # `always()` so this runs even when the coverage-comment step above has
-      # already failed. `continue-on-error` on the test step is deliberate and
-      # should stay: it is what lets the coverage comment post on a red run,
-      # which is when it is most useful. But it means a failing test run reaches
-      # the comment step, which then dies on the missing lcov and takes the job
-      # down with an error about a missing file rather than about the tests.
-      # This step always runs and names the real cause. It still exits 0 when the
-      # tests passed, so a comment step that fails for its own reasons is not masked.
-      - name: Fail if tests failed
-        if: ${{ always() && steps.tests.outcome == 'failure' }}
+      # `always()` so this names the real cause when the comment step above dies on missing coverage.
+      - name: Fail unless every shard passed
+        if: ${{ always() && (needs.tests-shard.result != 'success' || steps.tests.outputs.outcome != 'success') }}
+        env:
+          SHARDS: ${{ needs.tests-shard.result }}
+          OUTCOME: ${{ steps.tests.outputs.outcome }}
         run: |
-          echo "::error::Workspace tests failed"
+          echo "::error::Workspace tests failed: shards ${SHARDS:-unknown}, merged outcome ${OUTCOME:-unknown}"
           exit 1
 
   # The one job a ruleset or reader needs: red when any quality check is red,

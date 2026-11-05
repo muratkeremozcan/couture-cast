@@ -43,6 +43,15 @@ describe('buildCommunityModerationJobId', () => {
     expect(id1).toBe(id2)
   })
 
+  it('keeps the old id at generation 0 and a new one after a ban returns the post to screening', () => {
+    expect(buildCommunityModerationJobId('post-abc', 'session-xyz', 0)).toBe(
+      'post-abc__session-xyz'
+    )
+    expect(buildCommunityModerationJobId('post-abc', 'session-xyz', 2)).toBe(
+      'post-abc__session-xyz__g2'
+    )
+  })
+
   it('distinguishes different sessions for the same post to allow re-screening', () => {
     const id1 = buildCommunityModerationJobId('post-abc', 'session-1')
     const id2 = buildCommunityModerationJobId('post-abc', 'session-2')
@@ -139,6 +148,7 @@ describe('CommunityModerationQueue', () => {
         postId: 'post-1',
         uploadSessionId: 'session-1',
         platform: 'web',
+        generation: 0,
       },
       {
         jobId: 'post-1__session-1',
@@ -146,6 +156,18 @@ describe('CommunityModerationQueue', () => {
         removeOnFail: { age: 7 * 24 * 60 * 60 },
       }
     )
+  })
+
+  it('adds a job BullMQ will not swallow for a post the ban returned to screening', async () => {
+    const queue = new CommunityModerationQueue()
+    await queue.enqueue('post-1', 'session-1', undefined, 1)
+    expect(queueAdd).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.anything(),
+      expect.objectContaining({ jobId: 'post-1__session-1__g1' })
+    )
+    // The processor needs the generation too, because only the job id carried it before.
+    expect(queueAdd.mock.lastCall?.[1]).toMatchObject({ generation: 1 })
   })
 
   it('reuses same BullMQ Queue client across multiple enqueues', async () => {

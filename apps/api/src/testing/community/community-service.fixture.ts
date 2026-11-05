@@ -121,6 +121,9 @@ export const basePost = {
   image_content_type: 'image/jpeg',
   image_checksum: 'a'.repeat(64),
   image_byte_size: 1024,
+  image_pending_checksum: null,
+  image_pending_byte_size: null,
+  image_normalized_at: null,
   upload_expires_at: null,
   submitted_at: new Date('2026-09-05T11:00:00.000Z'),
   moderation_reason: null as string | null,
@@ -241,6 +244,7 @@ export const createService = (
   const findAuthorPostStates = vi.fn().mockResolvedValue(authorPosts)
   const findActiveChallenge = vi.fn().mockResolvedValue(challenge)
   const findPostByIdempotencyKey = vi.fn().mockResolvedValue(null)
+  const confirmAllocationReplay = vi.fn().mockResolvedValue(true)
   const createPostDraft = vi
     .fn()
     .mockImplementation((data) =>
@@ -334,7 +338,9 @@ export const createService = (
       return { summary: reactionSummary }
     })
   const reactionSummaries = vi.fn().mockResolvedValue(new Map())
+  const assertNotSanctioned = vi.fn().mockResolvedValue(undefined)
   const repository = {
+    assertNotSanctioned,
     assertReadEligibility: vi.fn().mockResolvedValue(undefined),
     assertSubjectAvailable: vi.fn().mockResolvedValue(undefined),
     setReaction,
@@ -345,6 +351,7 @@ export const createService = (
     findAuthorPostStates,
     findActiveChallenge,
     findPostByIdempotencyKey,
+    confirmAllocationReplay,
     createPostDraft,
     findPostById,
     updatePost,
@@ -411,6 +418,7 @@ export const createService = (
 
   return {
     service,
+    assertNotSanctioned,
     setReaction,
     reactionSummaries,
     getFeatureFlag,
@@ -421,6 +429,7 @@ export const createService = (
     findAuthorPostStates,
     findActiveChallenge,
     findPostByIdempotencyKey,
+    confirmAllocationReplay,
     createPostDraft,
     findPostById,
     updatePost,

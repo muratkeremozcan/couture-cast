@@ -40,7 +40,10 @@ describe('moderation console RLS', () => {
     scenarioTest(
       'D-RLS-DENIED lists the tables the moderation routes read and none is empty or duplicated',
       async () => {
-        expect(MODERATION_QUEUE_READ_TABLES.length).toBeGreaterThanOrEqual(7)
+        expect(MODERATION_QUEUE_READ_TABLES.length).toBeGreaterThanOrEqual(9)
+        expect(MODERATION_QUEUE_READ_TABLES).toEqual(
+          expect.arrayContaining(['ModerationDecision', 'CommunitySanction'])
+        )
         expect(new Set(MODERATION_QUEUE_READ_TABLES).size).toBe(
           MODERATION_QUEUE_READ_TABLES.length
         )

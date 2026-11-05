@@ -33,6 +33,11 @@ function createPrismaStub(row: { id: string }) {
 }
 
 describe('user factory', () => {
+  it('gives every user its own email, since the column is unique and large suites make thousands', () => {
+    const emails = Array.from({ length: 5000 }, () => createUser().email)
+    expect(new Set(emails).size).toBe(emails.length)
+  })
+
   it('creates a schema-valid user fixture and nested Prisma input', () => {
     const user = createUser({
       id: 'user-1',

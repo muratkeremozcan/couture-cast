@@ -17829,6 +17829,9 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "escalated": {
+                      "type": "boolean"
+                    },
                     "reportCount": {
                       "type": "integer",
                       "minimum": 1
@@ -17875,6 +17878,7 @@
                     "slaState",
                     "slaDueAt",
                     "acceptedAt",
+                    "escalated",
                     "reportCount",
                     "reasons",
                     "locale",
@@ -18169,6 +18173,13 @@
                       ],
                       "additionalProperties": false
                     },
+                    "origin": {
+                      "type": "string",
+                      "enum": [
+                        "member",
+                        "screening"
+                      ]
+                    },
                     "reason": {
                       "type": "string",
                       "enum": [
@@ -18197,6 +18208,7 @@
                   },
                   "required": [
                     "identity",
+                    "origin",
                     "reason",
                     "details",
                     "reportedAt",
@@ -18309,6 +18321,154 @@
               },
               "viewerConflict": {
                 "type": "boolean"
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{16}$"
+              },
+              "allowedActions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "resolve",
+                    "release",
+                    "takedown",
+                    "escalate",
+                    "ban"
+                  ]
+                }
+              },
+              "banKinds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "temporary",
+                    "permanent"
+                  ]
+                }
+              },
+              "escalated": {
+                "type": "boolean"
+              },
+              "firstDecisionAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "subjectStanding": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "sanction": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "sanctionId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "temporary"
+                            ]
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "appealStatus": {
+                            "type": "string",
+                            "enum": [
+                              "not_requested",
+                              "requested",
+                              "upheld",
+                              "overturned"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "sanctionId",
+                          "kind",
+                          "expiresAt",
+                          "appealStatus"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "sanctionId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "permanent"
+                            ]
+                          },
+                          "expiresAt": {
+                            "type": "null"
+                          },
+                          "appealStatus": {
+                            "type": "string",
+                            "enum": [
+                              "not_requested",
+                              "requested",
+                              "upheld",
+                              "overturned"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "sanctionId",
+                          "kind",
+                          "expiresAt",
+                          "appealStatus"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "priorBanCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "allowedAppealSteps": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "requested",
+                        "upheld",
+                        "overturned"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "active",
+                  "sanction",
+                  "priorBanCount",
+                  "allowedAppealSteps"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -18329,7 +18489,13 @@
               "reporters",
               "priorActions",
               "media",
-              "viewerConflict"
+              "viewerConflict",
+              "revision",
+              "allowedActions",
+              "banKinds",
+              "escalated",
+              "firstDecisionAt",
+              "subjectStanding"
             ],
             "additionalProperties": false
           }
@@ -18358,6 +18524,613 @@
           "message": {
             "type": "string",
             "minLength": 1
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationDecisionInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "resolve"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 1000,
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+              },
+              "mutationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "expectedRevision": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{16}$"
+              }
+            },
+            "required": [
+              "action",
+              "reason",
+              "mutationId",
+              "expectedRevision"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "release"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 1000,
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+              },
+              "mutationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "expectedRevision": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{16}$"
+              }
+            },
+            "required": [
+              "action",
+              "reason",
+              "mutationId",
+              "expectedRevision"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "takedown"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 1000,
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+              },
+              "mutationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "expectedRevision": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{16}$"
+              }
+            },
+            "required": [
+              "action",
+              "reason",
+              "mutationId",
+              "expectedRevision"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "escalate"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 1000,
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+              },
+              "mutationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "expectedRevision": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{16}$"
+              }
+            },
+            "required": [
+              "action",
+              "reason",
+              "mutationId",
+              "expectedRevision"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "ban"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 1000,
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+              },
+              "mutationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "expectedRevision": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{16}$"
+              },
+              "ban": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "temporary"
+                        ]
+                      },
+                      "durationDays": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "enum": [
+                              1
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              7
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              30
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              90
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "durationDays"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "permanent"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": [
+              "action",
+              "reason",
+              "mutationId",
+              "expectedRevision",
+              "ban"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ModerationDecisionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "decisionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "caseId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "resolve",
+                  "release",
+                  "takedown",
+                  "escalate",
+                  "ban"
+                ]
+              },
+              "decidedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "firstDecisionAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{16}$"
+              },
+              "caseStatus": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "resolved"
+                ]
+              },
+              "escalated": {
+                "type": "boolean"
+              },
+              "targetStatus": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "sanction": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "sanctionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "temporary"
+                        ]
+                      },
+                      "expiresAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "appealStatus": {
+                        "type": "string",
+                        "enum": [
+                          "not_requested",
+                          "requested",
+                          "upheld",
+                          "overturned"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "sanctionId",
+                      "kind",
+                      "expiresAt",
+                      "appealStatus"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "sanctionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "permanent"
+                        ]
+                      },
+                      "expiresAt": {
+                        "type": "null"
+                      },
+                      "appealStatus": {
+                        "type": "string",
+                        "enum": [
+                          "not_requested",
+                          "requested",
+                          "upheld",
+                          "overturned"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "sanctionId",
+                      "kind",
+                      "expiresAt",
+                      "appealStatus"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "replayed": {
+                "type": "boolean"
+              },
+              "cacheInvalidation": {
+                "type": "string",
+                "enum": [
+                  "completed",
+                  "deferred"
+                ]
+              }
+            },
+            "required": [
+              "decisionId",
+              "caseId",
+              "action",
+              "decidedAt",
+              "firstDecisionAt",
+              "revision",
+              "caseStatus",
+              "escalated",
+              "targetStatus",
+              "sanction",
+              "replayed",
+              "cacheInvalidation"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationAppealInput": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "requested",
+              "upheld",
+              "overturned"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+          },
+          "mutationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "status",
+          "reason",
+          "mutationId"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationAppealResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "decisionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "decidedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "sanction": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "sanctionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "temporary"
+                        ]
+                      },
+                      "expiresAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "appealStatus": {
+                        "type": "string",
+                        "enum": [
+                          "not_requested",
+                          "requested",
+                          "upheld",
+                          "overturned"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "sanctionId",
+                      "kind",
+                      "expiresAt",
+                      "appealStatus"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "sanctionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "permanent"
+                        ]
+                      },
+                      "expiresAt": {
+                        "type": "null"
+                      },
+                      "appealStatus": {
+                        "type": "string",
+                        "enum": [
+                          "not_requested",
+                          "requested",
+                          "upheld",
+                          "overturned"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "sanctionId",
+                      "kind",
+                      "expiresAt",
+                      "appealStatus"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "restoredCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "replayed": {
+                "type": "boolean"
+              },
+              "cacheInvalidation": {
+                "type": "string",
+                "enum": [
+                  "completed",
+                  "deferred"
+                ]
+              }
+            },
+            "required": [
+              "decisionId",
+              "decidedAt",
+              "sanction",
+              "active",
+              "restoredCount",
+              "replayed",
+              "cacheInvalidation"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationDecisionError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "invalid_decision",
+              "case_not_found",
+              "sanction_not_found",
+              "moderation_console_disabled",
+              "moderation_decisions_disabled",
+              "self_review_refused",
+              "admin_required",
+              "operator_sanctioned",
+              "case_conflict",
+              "action_not_applicable",
+              "idempotency_mismatch",
+              "appeal_transition_invalid",
+              "audit_unavailable"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "detail": {
+            "type": "string",
+            "enum": [
+              "no_open_reports",
+              "target_not_held",
+              "target_not_published",
+              "already_escalated",
+              "target_erased",
+              "subject_banned",
+              "already_banned",
+              "author_ineligible",
+              "community_writes_closed"
+            ]
+          },
+          "currentRevision": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{16}$"
           }
         },
         "required": [
@@ -18634,6 +19407,124 @@
         },
         "required": [
           "data"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityRolloutDeniedError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              403
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "denied"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityBannedError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              403
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "community_banned"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sanction": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "temporary"
+                    ]
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "appealStatus": {
+                    "type": "string",
+                    "enum": [
+                      "not_requested",
+                      "requested",
+                      "upheld",
+                      "overturned"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "expiresAt",
+                  "appealStatus"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "permanent"
+                    ]
+                  },
+                  "expiresAt": {
+                    "type": "null"
+                  },
+                  "appealStatus": {
+                    "type": "string",
+                    "enum": [
+                      "not_requested",
+                      "requested",
+                      "upheld",
+                      "overturned"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "expiresAt",
+                  "appealStatus"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message",
+          "sanction"
         ],
         "additionalProperties": false
       }
@@ -24103,7 +24994,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityRolloutDeniedError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -24219,7 +25120,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityRolloutDeniedError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -24385,7 +25296,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityRolloutDeniedError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -24514,7 +25435,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityRolloutDeniedError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -24756,7 +25687,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityRolloutDeniedError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -24902,7 +25843,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -25623,6 +26571,46 @@
               }
             }
           },
+          "403": {
+            "description": "The read rollout refuses this viewer, or the member is banned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error occurred.",
             "content": {
@@ -25810,30 +26798,37 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "enum": [
-                        403
-                      ]
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
                     },
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "error": {
-                      "type": "string"
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
                     }
-                  },
-                  "required": [
-                    "statusCode",
-                    "message"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -25995,7 +26990,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -26316,6 +27318,46 @@
               }
             }
           },
+          "403": {
+            "description": "The read rollout refuses this viewer, or the member is banned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
           "404": {
             "description": "Post not found or not visible to the caller.",
             "content": {
@@ -26432,7 +27474,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -26581,7 +27630,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -26721,6 +27777,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The read rollout refuses this viewer, or the member is banned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
                 }
               }
             }
@@ -27160,7 +28256,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -27345,7 +28478,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -27537,7 +28707,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -27731,7 +28938,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -27925,7 +29169,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -28108,7 +29389,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -28312,7 +29630,44 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Denied"
+            "description": "Denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "409": {
             "description": "Revision conflict, binding conflict or resync_required",
@@ -28598,6 +29953,9 @@
                                 "type": "string",
                                 "format": "date-time"
                               },
+                              "escalated": {
+                                "type": "boolean"
+                              },
                               "reportCount": {
                                 "type": "integer",
                                 "minimum": 1
@@ -28644,6 +30002,7 @@
                               "slaState",
                               "slaDueAt",
                               "acceptedAt",
+                              "escalated",
                               "reportCount",
                               "reasons",
                               "locale",
@@ -29051,6 +30410,13 @@
                                 ],
                                 "additionalProperties": false
                               },
+                              "origin": {
+                                "type": "string",
+                                "enum": [
+                                  "member",
+                                  "screening"
+                                ]
+                              },
                               "reason": {
                                 "type": "string",
                                 "enum": [
@@ -29079,6 +30445,7 @@
                             },
                             "required": [
                               "identity",
+                              "origin",
                               "reason",
                               "details",
                               "reportedAt",
@@ -29191,6 +30558,154 @@
                         },
                         "viewerConflict": {
                           "type": "boolean"
+                        },
+                        "revision": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{16}$"
+                        },
+                        "allowedActions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "resolve",
+                              "release",
+                              "takedown",
+                              "escalate",
+                              "ban"
+                            ]
+                          }
+                        },
+                        "banKinds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "temporary",
+                              "permanent"
+                            ]
+                          }
+                        },
+                        "escalated": {
+                          "type": "boolean"
+                        },
+                        "firstDecisionAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        },
+                        "subjectStanding": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "active": {
+                              "type": "boolean"
+                            },
+                            "sanction": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "sanctionId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 64
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "temporary"
+                                      ]
+                                    },
+                                    "expiresAt": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "appealStatus": {
+                                      "type": "string",
+                                      "enum": [
+                                        "not_requested",
+                                        "requested",
+                                        "upheld",
+                                        "overturned"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "sanctionId",
+                                    "kind",
+                                    "expiresAt",
+                                    "appealStatus"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "sanctionId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 64
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "permanent"
+                                      ]
+                                    },
+                                    "expiresAt": {
+                                      "type": "null"
+                                    },
+                                    "appealStatus": {
+                                      "type": "string",
+                                      "enum": [
+                                        "not_requested",
+                                        "requested",
+                                        "upheld",
+                                        "overturned"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "sanctionId",
+                                    "kind",
+                                    "expiresAt",
+                                    "appealStatus"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "priorBanCount": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "allowedAppealSteps": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "requested",
+                                  "upheld",
+                                  "overturned"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "active",
+                            "sanction",
+                            "priorBanCount",
+                            "allowedAppealSteps"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -29211,7 +30726,13 @@
                         "reporters",
                         "priorActions",
                         "media",
-                        "viewerConflict"
+                        "viewerConflict",
+                        "revision",
+                        "allowedActions",
+                        "banKinds",
+                        "escalated",
+                        "firstDecisionAt",
+                        "subjectStanding"
                       ],
                       "additionalProperties": false
                     }
@@ -29288,6 +30809,1262 @@
                     "message": {
                       "type": "string",
                       "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/moderation/cases/{caseId}/decisions": {
+      "post": {
+        "operationId": "applyModerationDecision",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Apply one decision to a whole case (private, no-store)",
+        "description": "Moderator and admin only. The moderator is the session. One transaction per decision, idempotent per moderator and mutationId.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+            },
+            "required": true,
+            "name": "caseId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "resolve"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 1000,
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                      },
+                      "mutationId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedRevision": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{16}$"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "reason",
+                      "mutationId",
+                      "expectedRevision"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "release"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 1000,
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                      },
+                      "mutationId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedRevision": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{16}$"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "reason",
+                      "mutationId",
+                      "expectedRevision"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "takedown"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 1000,
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                      },
+                      "mutationId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedRevision": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{16}$"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "reason",
+                      "mutationId",
+                      "expectedRevision"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "escalate"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 1000,
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                      },
+                      "mutationId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedRevision": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{16}$"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "reason",
+                      "mutationId",
+                      "expectedRevision"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ban"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 1000,
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                      },
+                      "mutationId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedRevision": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{16}$"
+                      },
+                      "ban": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "temporary"
+                                ]
+                              },
+                              "durationDays": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "enum": [
+                                      1
+                                    ]
+                                  },
+                                  {
+                                    "type": "number",
+                                    "enum": [
+                                      7
+                                    ]
+                                  },
+                                  {
+                                    "type": "number",
+                                    "enum": [
+                                      30
+                                    ]
+                                  },
+                                  {
+                                    "type": "number",
+                                    "enum": [
+                                      90
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "durationDays"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "permanent"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "reason",
+                      "mutationId",
+                      "expectedRevision",
+                      "ban"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The decision applied, or the stored response of a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "decisionId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "caseId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+                        },
+                        "action": {
+                          "type": "string",
+                          "enum": [
+                            "resolve",
+                            "release",
+                            "takedown",
+                            "escalate",
+                            "ban"
+                          ]
+                        },
+                        "decidedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "firstDecisionAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        },
+                        "revision": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{16}$"
+                        },
+                        "caseStatus": {
+                          "type": "string",
+                          "enum": [
+                            "open",
+                            "resolved"
+                          ]
+                        },
+                        "escalated": {
+                          "type": "boolean"
+                        },
+                        "targetStatus": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "sanction": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "sanctionId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "temporary"
+                                  ]
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "appealStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_requested",
+                                    "requested",
+                                    "upheld",
+                                    "overturned"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "sanctionId",
+                                "kind",
+                                "expiresAt",
+                                "appealStatus"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "sanctionId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "permanent"
+                                  ]
+                                },
+                                "expiresAt": {
+                                  "type": "null"
+                                },
+                                "appealStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_requested",
+                                    "requested",
+                                    "upheld",
+                                    "overturned"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "sanctionId",
+                                "kind",
+                                "expiresAt",
+                                "appealStatus"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "replayed": {
+                          "type": "boolean"
+                        },
+                        "cacheInvalidation": {
+                          "type": "string",
+                          "enum": [
+                            "completed",
+                            "deferred"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "decisionId",
+                        "caseId",
+                        "action",
+                        "decidedAt",
+                        "firstDecisionAt",
+                        "revision",
+                        "caseStatus",
+                        "escalated",
+                        "targetStatus",
+                        "sanction",
+                        "replayed",
+                        "cacheInvalidation"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_decision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_decision",
+                        "case_not_found",
+                        "sanction_not_found",
+                        "moderation_console_disabled",
+                        "moderation_decisions_disabled",
+                        "self_review_refused",
+                        "admin_required",
+                        "operator_sanctioned",
+                        "case_conflict",
+                        "action_not_applicable",
+                        "idempotency_mismatch",
+                        "appeal_transition_invalid",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "detail": {
+                      "type": "string",
+                      "enum": [
+                        "no_open_reports",
+                        "target_not_held",
+                        "target_not_published",
+                        "already_escalated",
+                        "target_erased",
+                        "subject_banned",
+                        "already_banned",
+                        "author_ineligible",
+                        "community_writes_closed"
+                      ]
+                    },
+                    "currentRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient role, self_review_refused, admin_required or operator_sanctioned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_decision",
+                        "case_not_found",
+                        "sanction_not_found",
+                        "moderation_console_disabled",
+                        "moderation_decisions_disabled",
+                        "self_review_refused",
+                        "admin_required",
+                        "operator_sanctioned",
+                        "case_conflict",
+                        "action_not_applicable",
+                        "idempotency_mismatch",
+                        "appeal_transition_invalid",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "detail": {
+                      "type": "string",
+                      "enum": [
+                        "no_open_reports",
+                        "target_not_held",
+                        "target_not_published",
+                        "already_escalated",
+                        "target_erased",
+                        "subject_banned",
+                        "already_banned",
+                        "author_ineligible",
+                        "community_writes_closed"
+                      ]
+                    },
+                    "currentRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "case_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_decision",
+                        "case_not_found",
+                        "sanction_not_found",
+                        "moderation_console_disabled",
+                        "moderation_decisions_disabled",
+                        "self_review_refused",
+                        "admin_required",
+                        "operator_sanctioned",
+                        "case_conflict",
+                        "action_not_applicable",
+                        "idempotency_mismatch",
+                        "appeal_transition_invalid",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "detail": {
+                      "type": "string",
+                      "enum": [
+                        "no_open_reports",
+                        "target_not_held",
+                        "target_not_published",
+                        "already_escalated",
+                        "target_erased",
+                        "subject_banned",
+                        "already_banned",
+                        "author_ineligible",
+                        "community_writes_closed"
+                      ]
+                    },
+                    "currentRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "case_conflict, action_not_applicable or idempotency_mismatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_decision",
+                        "case_not_found",
+                        "sanction_not_found",
+                        "moderation_console_disabled",
+                        "moderation_decisions_disabled",
+                        "self_review_refused",
+                        "admin_required",
+                        "operator_sanctioned",
+                        "case_conflict",
+                        "action_not_applicable",
+                        "idempotency_mismatch",
+                        "appeal_transition_invalid",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "detail": {
+                      "type": "string",
+                      "enum": [
+                        "no_open_reports",
+                        "target_not_held",
+                        "target_not_published",
+                        "already_escalated",
+                        "target_erased",
+                        "subject_banned",
+                        "already_banned",
+                        "author_ineligible",
+                        "community_writes_closed"
+                      ]
+                    },
+                    "currentRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "moderation_console_disabled, moderation_decisions_disabled or audit_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_decision",
+                        "case_not_found",
+                        "sanction_not_found",
+                        "moderation_console_disabled",
+                        "moderation_decisions_disabled",
+                        "self_review_refused",
+                        "admin_required",
+                        "operator_sanctioned",
+                        "case_conflict",
+                        "action_not_applicable",
+                        "idempotency_mismatch",
+                        "appeal_transition_invalid",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "detail": {
+                      "type": "string",
+                      "enum": [
+                        "no_open_reports",
+                        "target_not_held",
+                        "target_not_published",
+                        "already_escalated",
+                        "target_erased",
+                        "subject_banned",
+                        "already_banned",
+                        "author_ineligible",
+                        "community_writes_closed"
+                      ]
+                    },
+                    "currentRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/moderation/sanctions/{sanctionId}/appeal": {
+      "post": {
+        "operationId": "recordModerationAppeal",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Record one appeal step on a sanction (private, no-store)",
+        "description": "Moderator and admin may record requested. Only an admin may record upheld or overturned.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "name": "sanctionId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "requested",
+                      "upheld",
+                      "overturned"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1000,
+                    "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                  },
+                  "mutationId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "status",
+                  "reason",
+                  "mutationId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The step recorded, or the stored response of a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "decisionId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "decidedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "sanction": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "sanctionId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "temporary"
+                                  ]
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "appealStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_requested",
+                                    "requested",
+                                    "upheld",
+                                    "overturned"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "sanctionId",
+                                "kind",
+                                "expiresAt",
+                                "appealStatus"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "sanctionId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "permanent"
+                                  ]
+                                },
+                                "expiresAt": {
+                                  "type": "null"
+                                },
+                                "appealStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_requested",
+                                    "requested",
+                                    "upheld",
+                                    "overturned"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "sanctionId",
+                                "kind",
+                                "expiresAt",
+                                "appealStatus"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "restoredCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "replayed": {
+                          "type": "boolean"
+                        },
+                        "cacheInvalidation": {
+                          "type": "string",
+                          "enum": [
+                            "completed",
+                            "deferred"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "decisionId",
+                        "decidedAt",
+                        "sanction",
+                        "active",
+                        "restoredCount",
+                        "replayed",
+                        "cacheInvalidation"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_decision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_decision",
+                        "case_not_found",
+                        "sanction_not_found",
+                        "moderation_console_disabled",
+                        "moderation_decisions_disabled",
+                        "self_review_refused",
+                        "admin_required",
+                        "operator_sanctioned",
+                        "case_conflict",
+                        "action_not_applicable",
+                        "idempotency_mismatch",
+                        "appeal_transition_invalid",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "detail": {
+                      "type": "string",
+                      "enum": [
+                        "no_open_reports",
+                        "target_not_held",
+                        "target_not_published",
+                        "already_escalated",
+                        "target_erased",
+                        "subject_banned",
+                        "already_banned",
+                        "author_ineligible",
+                        "community_writes_closed"
+                      ]
+                    },
+                    "currentRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient role, self_review_refused, admin_required or operator_sanctioned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_decision",
+                        "case_not_found",
+                        "sanction_not_found",
+                        "moderation_console_disabled",
+                        "moderation_decisions_disabled",
+                        "self_review_refused",
+                        "admin_required",
+                        "operator_sanctioned",
+                        "case_conflict",
+                        "action_not_applicable",
+                        "idempotency_mismatch",
+                        "appeal_transition_invalid",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "detail": {
+                      "type": "string",
+                      "enum": [
+                        "no_open_reports",
+                        "target_not_held",
+                        "target_not_published",
+                        "already_escalated",
+                        "target_erased",
+                        "subject_banned",
+                        "already_banned",
+                        "author_ineligible",
+                        "community_writes_closed"
+                      ]
+                    },
+                    "currentRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "sanction_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_decision",
+                        "case_not_found",
+                        "sanction_not_found",
+                        "moderation_console_disabled",
+                        "moderation_decisions_disabled",
+                        "self_review_refused",
+                        "admin_required",
+                        "operator_sanctioned",
+                        "case_conflict",
+                        "action_not_applicable",
+                        "idempotency_mismatch",
+                        "appeal_transition_invalid",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "detail": {
+                      "type": "string",
+                      "enum": [
+                        "no_open_reports",
+                        "target_not_held",
+                        "target_not_published",
+                        "already_escalated",
+                        "target_erased",
+                        "subject_banned",
+                        "already_banned",
+                        "author_ineligible",
+                        "community_writes_closed"
+                      ]
+                    },
+                    "currentRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "appeal_transition_invalid or idempotency_mismatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_decision",
+                        "case_not_found",
+                        "sanction_not_found",
+                        "moderation_console_disabled",
+                        "moderation_decisions_disabled",
+                        "self_review_refused",
+                        "admin_required",
+                        "operator_sanctioned",
+                        "case_conflict",
+                        "action_not_applicable",
+                        "idempotency_mismatch",
+                        "appeal_transition_invalid",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "detail": {
+                      "type": "string",
+                      "enum": [
+                        "no_open_reports",
+                        "target_not_held",
+                        "target_not_published",
+                        "already_escalated",
+                        "target_erased",
+                        "subject_banned",
+                        "already_banned",
+                        "author_ineligible",
+                        "community_writes_closed"
+                      ]
+                    },
+                    "currentRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "moderation_console_disabled, moderation_decisions_disabled or audit_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_decision",
+                        "case_not_found",
+                        "sanction_not_found",
+                        "moderation_console_disabled",
+                        "moderation_decisions_disabled",
+                        "self_review_refused",
+                        "admin_required",
+                        "operator_sanctioned",
+                        "case_conflict",
+                        "action_not_applicable",
+                        "idempotency_mismatch",
+                        "appeal_transition_invalid",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "detail": {
+                      "type": "string",
+                      "enum": [
+                        "no_open_reports",
+                        "target_not_held",
+                        "target_not_published",
+                        "already_escalated",
+                        "target_erased",
+                        "subject_banned",
+                        "already_banned",
+                        "author_ineligible",
+                        "community_writes_closed"
+                      ]
+                    },
+                    "currentRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
                     }
                   },
                   "required": [
@@ -29586,7 +32363,44 @@
             "description": "Authentication required"
           },
           "403": {
-            "description": "share_disabled: native share is off for this member (share purpose only), or access denied"
+            "description": "share_disabled: native share is off for this member (share purpose only), access denied, or the member is banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            403
+                          ]
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "404": {
             "description": "source_unavailable"

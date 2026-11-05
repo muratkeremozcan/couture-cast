@@ -110,7 +110,7 @@ export function ChipNavigation({
               }}
               onKeyDown={(e) => handleKeyDown(e, index)}
               data-testid={`chip-${category.toLowerCase()}`}
-              className={`snap-start min-h-[44px] whitespace-nowrap rounded-full border px-5 py-2.5 text-xs font-semibold uppercase tracking-wider motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
+              className={`snap-start shrink-0 min-h-[44px] whitespace-nowrap rounded-full border px-5 py-2.5 text-xs font-semibold uppercase tracking-wider motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
                 isActive
                   ? 'border-[#C9A14A] bg-[#C9A14A] text-[#111111] shadow-sm'
                   : 'border-[#E6E6ED] bg-[#F5F5F7] text-[#5C5C66] hover:border-[#C9A14A]/60 hover:text-[#111111]'

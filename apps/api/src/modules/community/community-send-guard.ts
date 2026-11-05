@@ -11,7 +11,10 @@ import {
 } from '@prisma/client'
 import type { CommunityFlagEvaluationService } from '../feature-flags/community-flag-evaluation.service.js'
 import { CommunityUnavailableException } from './community-availability.js'
-import { assertCommunityDatabaseAccess } from './community-access.service.js'
+import {
+  assertCommunityDatabaseAccess,
+  isCommunityBannedRefusal,
+} from './community-access.service.js'
 import {
   CommunityPushProvider,
   type CommunityPushMessage,
@@ -427,6 +430,9 @@ export class CommunitySendGuard {
         await assertCommunityDatabaseAccess(tx, subject.member_id)
       } catch (error) {
         if (!(error instanceof ForbiddenException)) throw error
+        // A ban keeps the member's actor link, where consent revocation forgets it. The banned
+        // actor already dropped through `sourceEligible`, and other actors still notify.
+        if (subject.role === 'actor' && isCommunityBannedRefusal(error)) continue
         return false
       }
     }

@@ -55,7 +55,12 @@ export class CommunityModerationOutboxDispatcher {
     let failed = 0
 
     for (const row of pending) {
-      const ok = await this.dispatchOne(row.id, row.post_id, row.post.image_object_path)
+      const ok = await this.dispatchOne(
+        row.id,
+        row.post_id,
+        row.post.image_object_path,
+        row.generation
+      )
       if (ok) {
         dispatched += 1
       } else {
@@ -69,7 +74,8 @@ export class CommunityModerationOutboxDispatcher {
   private async dispatchOne(
     outboxId: string,
     postId: string,
-    imageObjectPath: string | null
+    imageObjectPath: string | null,
+    generation: number
   ): Promise<boolean> {
     // The upload session is the random middle segment of the object path, so it
     // survives a restart without a column of its own and keeps the job id stable
@@ -81,9 +87,11 @@ export class CommunityModerationOutboxDispatcher {
         : null) ?? postId
 
     try {
-      await this.queue.enqueue(postId, uploadSessionId)
-      await this.prisma.communityModerationOutbox.update({
-        where: { id: outboxId },
+      await this.queue.enqueue(postId, uploadSessionId, undefined, generation)
+      // Only the generation this call enqueued. Recovery may have re-armed the row meanwhile, and
+      // that newer generation still needs its own job.
+      await this.prisma.communityModerationOutbox.updateMany({
+        where: { id: outboxId, generation, dispatched_at: null },
         data: {
           dispatched_at: new Date(),
           attempts: { increment: 1 },
@@ -98,9 +106,10 @@ export class CommunityModerationOutboxDispatcher {
         'Community moderation enqueue failed; outbox row stays claimable for retry'
       )
 
+      // Also only this generation: a failure from old work says nothing about the re-armed row.
       await this.prisma.communityModerationOutbox
-        .update({
-          where: { id: outboxId },
+        .updateMany({
+          where: { id: outboxId, generation },
           data: { attempts: { increment: 1 }, last_error: message.slice(0, 500) },
         })
         .catch(() => {

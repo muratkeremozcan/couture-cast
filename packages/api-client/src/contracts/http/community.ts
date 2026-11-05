@@ -16,6 +16,7 @@ import {
   trackedResponseSchema,
 } from './common'
 import { communitySponsorshipSchema } from './commerce'
+import { communityBannedErrorSchema } from './community-banned'
 import { supportedLocaleSchema } from './localization'
 
 // --- Error message constants ------------------------------------------------
@@ -1032,6 +1033,22 @@ export const communitySpotlightDeniedResponseSchema = z
     error: z.string().optional(),
   })
   .strict()
+
+/** A comment route's refusal while the member's rollout is off. It carries no Nest `error` name. */
+export const communityRolloutDeniedErrorSchema = z
+  .object({
+    statusCode: z.literal(403),
+    code: z.literal('denied'),
+    message: nonEmptyStringSchema,
+  })
+  .strict()
+  .openapi('CommunityRolloutDeniedError')
+
+/** A member's 403 from any enforced community route: the ban, or the refusal it had before. */
+export const communityDeniedOrBannedResponseSchema = z.union([
+  communitySpotlightDeniedResponseSchema,
+  communityBannedErrorSchema,
+])
 export const communitySpotlightUnavailableResponseSchema = z
   .object({
     statusCode: z.literal(503),
@@ -1586,7 +1603,19 @@ function registerCommunityCommentContracts(
         },
         403: {
           description: 'Participation or ownership denied.',
-          content: { 'application/json': { schema: common.forbiddenHttpErrorSchema } },
+          content: {
+            'application/json': {
+              // Retraction stays open during a ban, so only delete keeps the plain refusal.
+              schema:
+                route.method === 'delete'
+                  ? common.forbiddenHttpErrorSchema
+                  : z.union([
+                      common.forbiddenHttpErrorSchema,
+                      communityRolloutDeniedErrorSchema,
+                      communityBannedErrorSchema,
+                    ]),
+            },
+          },
         },
         404: {
           description: 'Thread unavailable.',
@@ -1690,7 +1719,12 @@ export function registerCommunityContracts(
       403: {
         description: 'Age or guardian consent prevents participation.',
         content: {
-          'application/json': { schema: commonSchemas.forbiddenHttpErrorSchema },
+          'application/json': {
+            schema: z.union([
+              commonSchemas.forbiddenHttpErrorSchema,
+              communityBannedErrorSchema,
+            ]),
+          },
         },
       },
       404: {
@@ -1885,6 +1919,12 @@ export function registerCommunityContracts(
           'application/json': { schema: commonSchemas.unauthorizedHttpErrorSchema },
         },
       },
+      403: {
+        description: 'The read rollout refuses this viewer, or the member is banned.',
+        content: {
+          'application/json': { schema: communityDeniedOrBannedResponseSchema },
+        },
+      },
       500: {
         description: 'Internal server error occurred.',
         content: {
@@ -2015,7 +2055,7 @@ export function registerCommunityContracts(
       403: {
         description: 'The community read rollout or age eligibility refuses this viewer.',
         content: {
-          'application/json': { schema: communitySpotlightDeniedResponseSchema },
+          'application/json': { schema: communityDeniedOrBannedResponseSchema },
         },
       },
       429: {
@@ -2101,7 +2141,12 @@ export function registerCommunityContracts(
       403: {
         description: 'Age gate requirement not satisfied.',
         content: {
-          'application/json': { schema: commonSchemas.forbiddenHttpErrorSchema },
+          'application/json': {
+            schema: z.union([
+              commonSchemas.forbiddenHttpErrorSchema,
+              communityBannedErrorSchema,
+            ]),
+          },
         },
       },
       409: {
@@ -2192,6 +2237,12 @@ export function registerCommunityContracts(
           'application/json': { schema: commonSchemas.unauthorizedHttpErrorSchema },
         },
       },
+      403: {
+        description: 'The read rollout refuses this viewer, or the member is banned.',
+        content: {
+          'application/json': { schema: communityDeniedOrBannedResponseSchema },
+        },
+      },
       404: {
         description: 'Post not found or not visible to the caller.',
         content: {
@@ -2271,7 +2322,12 @@ export function registerCommunityContracts(
       403: {
         description: 'Age gate requirement not satisfied.',
         content: {
-          'application/json': { schema: commonSchemas.forbiddenHttpErrorSchema },
+          'application/json': {
+            schema: z.union([
+              commonSchemas.forbiddenHttpErrorSchema,
+              communityBannedErrorSchema,
+            ]),
+          },
         },
       },
       404: {
@@ -2372,7 +2428,12 @@ export function registerCommunityContracts(
       403: {
         description: 'A caller cannot report their own post.',
         content: {
-          'application/json': { schema: commonSchemas.forbiddenHttpErrorSchema },
+          'application/json': {
+            schema: z.union([
+              commonSchemas.forbiddenHttpErrorSchema,
+              communityBannedErrorSchema,
+            ]),
+          },
         },
       },
       404: {
@@ -2474,6 +2535,12 @@ export function registerCommunityContracts(
         description: 'Missing or invalid authentication headers.',
         content: {
           'application/json': { schema: commonSchemas.unauthorizedHttpErrorSchema },
+        },
+      },
+      403: {
+        description: 'The read rollout refuses this viewer, or the member is banned.',
+        content: {
+          'application/json': { schema: communityDeniedOrBannedResponseSchema },
         },
       },
       404: {

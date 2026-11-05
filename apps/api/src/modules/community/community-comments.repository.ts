@@ -1,4 +1,5 @@
 import {
+  assertCommunityMemberNotSanctioned,
   assertCommunityReadEligibility,
   assertCommunitySubjectPresent,
 } from './community-access.service.js'
@@ -130,7 +131,10 @@ export class CommunityCommentsRepository {
       post: { user_id: string; comment_publication_sequence: number }
     ) => Promise<T>,
     readOnly = false,
-    privacyMutation = false
+    privacyMutation = false,
+    admitHiddenPost?: (
+      tx: Tx
+    ) => Promise<{ user_id: string; comment_publication_sequence: number } | null>
   ): Promise<T> {
     return interactiveTransaction(
       this.prisma,
@@ -143,11 +147,14 @@ export class CommunityCommentsRepository {
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
           await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
         }
-        const post = await tx.lookbookPost.findFirst({
+        const visible = await tx.lookbookPost.findFirst({
           where: { id: postId, ...PUBLICLY_VISIBLE_POST_WHERE },
         })
-        if (!post || !isPubliclyVisiblePost(post))
-          throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
+        const post =
+          visible && isPubliclyVisiblePost(visible)
+            ? visible
+            : ((await admitHiddenPost?.(tx)) ?? null)
+        if (!post) throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
         await assertCommunitySubjectAvailable(tx, userId)
         await eligible(tx, false)
         return work(tx, post)
@@ -332,6 +339,9 @@ export class CommunityCommentsRepository {
       .update(JSON.stringify([postId, input.parentId, input.body, input.locale]))
       .digest('hex')
     return this.withThread(userId, postId, params.eligible, async (tx, post) => {
+      // Here and in `report`, never in the shared eligibility closure: delete uses that closure,
+      // and retracting one's own comment stays open during a ban.
+      await assertCommunityMemberNotSanctioned(tx, userId)
       const receipt = await tx.communityCommentReceipt.findUnique({
         where: {
           user_id_mutation_id: { user_id: userId, mutation_id: input.mutationId },
@@ -449,7 +459,21 @@ export class CommunityCommentsRepository {
         return commentSubmission(deleted)
       },
       false,
-      true
+      true,
+      // Story 6.11: retraction is the author's right, and a takedown must not cost it. An unknown or
+      // foreign comment keeps the post's 404, so the route tells nobody a hidden post exists.
+      async (tx) => {
+        const own = await tx.communityComment.findFirst({
+          where: {
+            id: params.commentId,
+            post_id: params.postId,
+            user_id: params.userId,
+            status: { not: 'erased' },
+          },
+          select: { id: true },
+        })
+        return own ? tx.lookbookPost.findUnique({ where: { id: params.postId } }) : null
+      }
     )
   }
 
@@ -467,6 +491,7 @@ export class CommunityCommentsRepository {
       async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${params.userId}))`
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_report:' || ${params.userId}))`
+        await assertCommunityMemberNotSanctioned(tx, params.userId)
         await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${params.postId} FOR UPDATE`
         const post = await tx.lookbookPost.findFirst({
           where: { id: params.postId, ...PUBLICLY_VISIBLE_POST_WHERE },

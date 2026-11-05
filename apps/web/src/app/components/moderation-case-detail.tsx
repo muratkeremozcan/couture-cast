@@ -17,7 +17,9 @@ import {
   type ModerationCaseResult,
   type ModerationFailureReason,
 } from '../../lib/moderation'
+import { ModerationAccountStanding } from './moderation-account-standing'
 import { CaseMedia } from './moderation-case-media'
+import { ModerationDecisionPanel } from './moderation-decision-panel'
 import { FailureNotice, moderationControl } from './moderation-failure-notice'
 import { PlainText } from './moderation-plain-text'
 import { SlaCountdown } from './moderation-sla-countdown'
@@ -60,6 +62,9 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
   const sequence = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
   hasDetail.current = detail !== null
+  // One polite region outside the panel, so an outcome is announced once and survives the reload.
+  const [outcome, setOutcome] = useState<string | null>(null)
+  const outcomeRef = useRef<HTMLParagraphElement>(null)
 
   const read = useCallback(async () => {
     // A newer read, or a new case id, makes every older answer stale. It is dropped, never applied.
@@ -98,6 +103,7 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
       setDetail(null)
       setFailure(null)
       setStale(false)
+      setOutcome(null)
       void read()
     }
     return () => {
@@ -107,6 +113,11 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
 
   const reload = () => {
     if (!loading) void read()
+  }
+
+  const applied = (message: string) => {
+    setOutcome(message)
+    void read().then(() => outcomeRef.current?.focus())
   }
 
   const back = (
@@ -142,7 +153,27 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
       aria-labelledby="case-heading"
     >
       {back}
-      <DetailHeader detail={detail} stale={stale} loading={loading} onReload={reload} />
+      <DetailHeader
+        detail={detail}
+        stale={stale}
+        loading={loading}
+        onReload={reload}
+        announceSla={outcome === null}
+      />
+      <p
+        ref={outcomeRef}
+        role="status"
+        tabIndex={-1}
+        data-testid="moderation-decision-outcome"
+        className={
+          outcome
+            ? 'rounded border border-green-800 p-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)] dark:border-green-500'
+            : 'sr-only'
+        }
+      >
+        {outcome}
+      </p>
+      <ModerationDecisionPanel detail={detail} onApplied={applied} onReload={reload} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <ContentSection detail={detail} />
@@ -160,6 +191,11 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
         <div className="flex flex-col gap-6">
           <FindingsSection detail={detail} />
           <ReportersSection detail={detail} />
+          <ModerationAccountStanding
+            detail={detail}
+            onApplied={applied}
+            onReload={reload}
+          />
           <PriorActionsSection detail={detail} />
         </div>
       </div>
@@ -172,11 +208,14 @@ function DetailHeader({
   stale,
   loading,
   onReload,
+  announceSla,
 }: {
   detail: ModerationCaseResult
   stale: boolean
   loading: boolean
   onReload: () => void
+  /** A decision's own outcome is the one announcement, so the SLA change it causes stays silent. */
+  announceSla: boolean
 }) {
   const { t } = useModerationTranslation()
   const format = useDateFormat()
@@ -193,22 +232,36 @@ function DetailHeader({
         >
           {t('moderation.riskLabel', { risk: t(`moderation.risk.${detail.risk}`) })}
         </span>
-        <span className="text-sm font-medium">
+        <span
+          className="text-sm font-medium"
+          data-sla-state={detail.status === 'resolved' ? 'resolved' : undefined}
+        >
           {t(`moderation.status.${detail.status}`)}
         </span>
-        <SlaCountdown
-          dueAt={detail.slaDueAt}
-          clockOffsetMs={detail.clockOffsetMs}
-          resolved={detail.status === 'resolved'}
-          announce
-        />
+        {/* A resolved case says so once, in the status beside this. */}
+        {detail.status === 'open' ? (
+          <SlaCountdown
+            dueAt={detail.slaDueAt}
+            clockOffsetMs={detail.clockOffsetMs}
+            resolved={false}
+            announce={announceSla}
+          />
+        ) : null}
       </div>
       <p className="text-sm text-neutral-700 dark:text-neutral-300">
         {t('moderation.detail.accepted', { when: format(detail.acceptedAt) })}
         {' · '}
         {t('moderation.queue.reports', { count: detail.reportCount })}
         {detail.locale ? ` · ${detail.locale}` : ''}
+        {detail.firstDecisionAt
+          ? ` · ${t('moderation.detail.firstDecision', { when: format(detail.firstDecisionAt) })}`
+          : ''}
       </p>
+      {detail.escalated ? (
+        <p role="note" className="rounded border border-amber-700 p-3 text-sm">
+          {t('moderation.detail.escalated')}
+        </p>
+      ) : null}
       {detail.viewerConflict ? (
         <p role="note" className="rounded border border-amber-700 p-3 text-sm">
           {t('moderation.detail.conflict')}
@@ -298,7 +351,10 @@ function ContentSection({ detail }: { detail: ModerationCaseDetail }) {
             ) : (
               <>
                 <span>
-                  {t('moderation.detail.targetStatus')}: <code>{target.status}</code>
+                  {t('moderation.detail.targetStatus')}:{' '}
+                  {t(`moderation.targetStatus.${target.status ?? 'unknown'}`, {
+                    defaultValue: t('moderation.targetStatus.unknown'),
+                  })}
                 </span>
                 {target.publishedAt ? (
                   <span>
@@ -336,53 +392,62 @@ const categoryKey = (category: string) =>
 function FindingsSection({ detail }: { detail: ModerationCaseDetail }) {
   const { t } = useModerationTranslation()
   const { findings } = detail
-  const empty =
-    findings !== null &&
-    findings.categories.length === 0 &&
-    findings.codes.length === 0 &&
-    !findings.operatorNote
+  const machine =
+    findings !== null && (findings.categories.length > 0 || findings.codes.length > 0)
+  const note = findings?.operatorNote ?? null
   return (
-    <section aria-labelledby="findings-heading" className={card}>
-      <h2 id="findings-heading" className="mb-3 text-lg font-semibold">
-        {t('moderation.detail.findings')}
-      </h2>
-      {!findings ? <p className="text-sm">{t('moderation.detail.noFindings')}</p> : null}
-      {empty ? <p className="text-sm">{t('moderation.detail.heldNoCodes')}</p> : null}
-      {findings && !empty ? (
-        <dl className="grid grid-cols-1 gap-3 text-sm">
-          {findings.categories.length > 0 ? (
-            <div>
-              <dt className="font-medium">{t('moderation.detail.categories')}</dt>
-              <dd>{findings.categories.map((c) => t(categoryKey(c))).join(', ')}</dd>
-            </div>
-          ) : null}
-          {findings.codes.length > 0 ? (
-            <div>
-              <dt className="font-medium">{t('moderation.detail.codes')}</dt>
-              <dd>
-                <code>{findings.codes.join(', ')}</code>
-              </dd>
-            </div>
-          ) : null}
-          {findings.engineVersion ? (
-            <div>
-              <dt className="font-medium">{t('moderation.detail.engine')}</dt>
-              <dd>
-                <code>{findings.engineVersion}</code>
-              </dd>
-            </div>
-          ) : null}
-          {findings.operatorNote ? (
-            <div>
-              <dt className="font-medium">{t('moderation.detail.operatorNote')}</dt>
-              <dd>
-                <PlainText value={findings.operatorNote} />
-              </dd>
-            </div>
-          ) : null}
-        </dl>
+    <>
+      <section aria-labelledby="findings-heading" className={card}>
+        <h2 id="findings-heading" className="mb-3 text-lg font-semibold">
+          {t('moderation.detail.findings')}
+        </h2>
+        {machine ? (
+          <dl className="grid grid-cols-1 gap-3 text-sm">
+            {findings.categories.length > 0 ? (
+              <div>
+                <dt className="font-medium">{t('moderation.detail.categories')}</dt>
+                <dd>{findings.categories.map((c) => t(categoryKey(c))).join(', ')}</dd>
+              </div>
+            ) : null}
+            {findings.codes.length > 0 ? (
+              <div>
+                <dt className="font-medium">{t('moderation.detail.codes')}</dt>
+                <dd>
+                  <code>{findings.codes.join(', ')}</code>
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : (
+          <p className="text-sm">
+            {t(
+              findings && !note
+                ? 'moderation.detail.heldNoCodes'
+                : 'moderation.detail.noFindings'
+            )}
+          </p>
+        )}
+        {findings?.engineVersion ? (
+          <dl className="mt-3 text-sm">
+            <dt className="font-medium">{t('moderation.detail.engine')}</dt>
+            <dd>
+              <code>{findings.engineVersion}</code>
+            </dd>
+          </dl>
+        ) : null}
+      </section>
+      {/* An operator's words are no machine verdict, so they sit under their own heading. */}
+      {note ? (
+        <section aria-labelledby="operator-note-heading" className={card}>
+          <h2 id="operator-note-heading" className="mb-3 text-lg font-semibold">
+            {t('moderation.detail.operatorNote')}
+          </h2>
+          <div className="text-sm">
+            <PlainText value={note} />
+          </div>
+        </section>
       ) : null}
-    </section>
+    </>
   )
 }
 
@@ -398,7 +463,11 @@ function ReportersSection({ detail }: { detail: ModerationCaseDetail }) {
         {detail.reporters.map((reporter, index) => (
           <li key={index} className="text-sm">
             <p className="font-medium">
-              <Identity identity={reporter.identity} />
+              {reporter.origin === 'screening' ? (
+                t('moderation.detail.reporterScreening')
+              ) : (
+                <Identity identity={reporter.identity} />
+              )}
               {' · '}
               {t(`moderation.reason.${reporter.reason}`)}
             </p>
@@ -435,7 +504,9 @@ function PriorActionsSection({ detail }: { detail: ModerationCaseDetail }) {
               <p className="font-medium">
                 {t(`moderation.actor.${action.actorKind}`)}
                 {' · '}
-                <code>{action.action}</code>
+                {t(`moderation.action.${action.action}`, {
+                  defaultValue: t('moderation.action.unknown'),
+                })}
               </p>
               <p className="text-neutral-700 dark:text-neutral-300">
                 {format(action.occurredAt)}

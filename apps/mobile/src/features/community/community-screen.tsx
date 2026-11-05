@@ -24,6 +24,7 @@ import {
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
 import { CommunityCommentsSheet } from '@/components/community/community-comments-sheet'
+import { CommunityBannedNotice } from './community-banned-notice'
 import { useCommunityScrollRestore } from './use-community-scroll-restore'
 import { CommunityCommentDrafts } from './community-comment-drafts'
 import {
@@ -39,6 +40,7 @@ import {
   communityFailureReason,
   generateIdempotencyKey,
   setCommunityReactionFromMobile,
+  communitySanctionOf,
   getCommunityFeedFromMobile,
   getCommunityPostFromMobile,
   recordCommunityCardOpenedFromMobile,
@@ -53,6 +55,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -71,6 +74,7 @@ import {
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
 import {
+  type CommunityBannedError,
   communityModerationReasonCategories,
   type CommunityReactionSummary,
   type ClimateBand,
@@ -205,6 +209,10 @@ function spotlightDetailForVisit(
   return available && currentVisit ? item : null
 }
 
+function UnlessBanned({ banned, children }: { banned: boolean; children: ReactNode }) {
+  return banned ? null : <>{children}</>
+}
+
 export function CommunityScreen() {
   const { t, i18n } = useTranslation()
   const palette = useHeroPalette()
@@ -255,7 +263,16 @@ export function CommunityScreen() {
   const [servedMode, setServedMode] = useState<CommunityFeedMode>('auto')
   const [experimentVariant, setExperimentVariant] =
     useState<CommunityExperimentVariant | null>(null)
-  const [communityAvailable, setCommunityAvailable] = useState(true)
+  const [realtimeAvailable, setCommunityAvailable] = useState(true)
+  // Story 6.11: everything that follows availability closes with a ban.
+  const [bannedSanction, setBannedSanction] = useState<
+    CommunityBannedError['sanction'] | null
+  >(null)
+  const bannedRef = useRef(false)
+  // A denial stops the sync for good, so an authorized read has to start a new one.
+  const syncDeniedRef = useRef(false)
+  const [syncEpoch, setSyncEpoch] = useState(0)
+  const communityAvailable = realtimeAvailable && !bannedSanction
   // Undefined until the first identity resolution, so the spotlight can tell a
   // later sign-in apart from the first one.
   const [sessionScope, setSessionScope] = useState<string | null | undefined>(undefined)
@@ -355,7 +372,12 @@ export function CommunityScreen() {
   )
   // Story 6.7b: the latest live sponsorship answer per post, for every copy.
   const [sponsorships] = useState(() => new LiveCommunitySponsorships())
-  const spotlight = useCommunitySpotlight({ sessionScope, reactionState, sponsorships })
+  const spotlight = useCommunitySpotlight({
+    sessionScope,
+    reactionState,
+    sponsorships,
+    onBanned: setBannedSanction,
+  })
   // Every live read (feed page, rebuild, single post, spotlight) applies its
   // sponsorship answers to the copies already on screen.
   useEffect(
@@ -826,6 +848,24 @@ export function CommunityScreen() {
     [reactionState]
   )
 
+  const reportFeedFailure = useCallback((error: unknown, isFirstPage: boolean) => {
+    const sanction = communitySanctionOf(error)
+    if (sanction) {
+      setBannedSanction(sanction)
+      setFeedError(null)
+      setFeedState('ready')
+      return
+    }
+    // A first page that fails owns the screen; a refresh or a next page that
+    // fails keeps what is already on screen and speaks up beside it.
+    if (isFirstPage) {
+      setFeedError(error)
+      setFeedState('error')
+    } else {
+      setActionError({ error, fallbackKey: 'community.error.load' })
+    }
+  }, [])
+
   const loadFeed = useCallback(
     async (
       targetMode: CommunityFeedMode,
@@ -905,6 +945,12 @@ export function CommunityScreen() {
             setBandUnresolvedReason(feed.bandUnresolvedReason)
             setActiveChallenge(feed.activeChallenge)
             setFeedError(null)
+            setBannedSanction(null)
+            if (syncDeniedRef.current) {
+              syncDeniedRef.current = false
+              setCommunityAvailable(true)
+              setSyncEpoch((epoch) => epoch + 1)
+            }
             setFeedState('ready')
             return
           } catch (error: unknown) {
@@ -928,14 +974,7 @@ export function CommunityScreen() {
               pageCursor = undefined
               continue
             }
-            // A first page that fails owns the screen; a refresh or a next page that
-            // fails keeps what is already on screen and speaks up beside it.
-            if (isFirstPage) {
-              setFeedError(error)
-              setFeedState('error')
-            } else {
-              setActionError({ error, fallbackKey: 'community.error.load' })
-            }
+            reportFeedFailure(error, isFirstPage)
             return
           }
         }
@@ -958,6 +997,8 @@ export function CommunityScreen() {
       comments.setSession(identity)
       setSessionScope(identity)
       if (previous === undefined || previous === identity) return
+      // A sanction names one member's ban, so it leaves with that member.
+      setBannedSanction(null)
       // A block is per viewer: a new member starts with no live answers.
       sponsorships.clear()
       commentDrafts.forgetAll()
@@ -1216,8 +1257,11 @@ export function CommunityScreen() {
         if (state === 'connected') {
           setFeedState('ready')
           setFeedError(null)
+          // The socket authorized this member, so any ban has ended.
+          setBannedSanction(null)
         }
         if (state === 'denied') {
+          syncDeniedRef.current = true
           setIsPostSheetVisible(false)
           actionControllerRef.current?.abort()
           setIsSubmittingReport(false)
@@ -1227,6 +1271,18 @@ export function CommunityScreen() {
           setItems([])
           setNewLooks([])
           setCommentsPostId(null)
+          // A denied socket says nothing about why. One read asks, so a member banned while
+          // the screen was open sees the notice.
+          if (!bannedRef.current) {
+            const scope = feedScopeRef.current
+            void getCommunityFeedFromMobile({ mode, limit: 1 }).catch(
+              (error: unknown) => {
+                const sanction = communitySanctionOf(error)
+                if (active && scope === feedScopeRef.current && sanction)
+                  setBannedSanction(sanction)
+              }
+            )
+          }
         }
       },
     })
@@ -1246,7 +1302,7 @@ export function CommunityScreen() {
       comments.setRealtimeHealthy(false)
       lifecycle.remove()
     }
-  }, [comments, mode, reactionState, sessionScope])
+  }, [comments, mode, reactionState, sessionScope, syncEpoch])
 
   const modeLabel = useMemo(
     () =>
@@ -1608,6 +1664,28 @@ export function CommunityScreen() {
     })
   }, [feedListRef, screenFocused, spotlightNotice])
 
+  // A read still in flight was authorized before the ban, so its answer can never land.
+  useEffect(() => {
+    bannedRef.current = bannedSanction !== null
+    if (!bannedSanction) return
+    requestGenerationRef.current++
+    detailGenerationRef.current++
+    controllerRef.current?.abort()
+    actionControllerRef.current?.abort()
+    setItems([])
+    setNewLooks([])
+    setAuthorStates([])
+    setActiveChallenge(null)
+    setNextCursor(null)
+    setIsPostSheetVisible(false)
+    setCommentsPostId(null)
+    setIsSubmittingReport(false)
+    setIsLoadingMore(false)
+    setIsRefreshing(false)
+    comments.reset()
+    reactionState.reset()
+  }, [bannedSanction, comments, reactionState])
+
   const feedErrorMessage = useMemo(() => {
     const { key, options } = communityErrorTranslation(
       feedError,
@@ -1637,6 +1715,15 @@ export function CommunityScreen() {
   }, [])
 
   const renderEmptyComponent = () => {
+    if (bannedSanction)
+      return (
+        <CommunityBannedNotice
+          sanction={bannedSanction}
+          locale={locale}
+          textColor={palette.text}
+          mutedColor={palette.mutedText}
+        />
+      )
     if (!communityAvailable)
       return (
         <View style={styles.stateContainer} testID="community-feed-unavailable">
@@ -1985,26 +2072,29 @@ export function CommunityScreen() {
         style={[styles.container, { backgroundColor: palette.background }]}
         testID="community-screen"
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            ref={newPostButtonRef}
-            testID="community-new-post-button"
-            style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
-            onPress={() => openPostSheet(false)}
-            accessibilityRole="button"
-            accessibilityLabel={t('community.newPost')}
-          >
-            <Text style={[styles.primaryButtonText, { color: ON_ACCENT }]}>
-              {t('community.newPost')}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Story 6.11: a banned member has nothing to post to or filter. */}
+        <UnlessBanned banned={bannedSanction !== null}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              ref={newPostButtonRef}
+              testID="community-new-post-button"
+              style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
+              onPress={() => openPostSheet(false)}
+              accessibilityRole="button"
+              accessibilityLabel={t('community.newPost')}
+            >
+              <Text style={[styles.primaryButtonText, { color: ON_ACCENT }]}>
+                {t('community.newPost')}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        <CommunityFilterChips
-          selectedMode={servedMode}
-          onSelectMode={handleSelectMode}
-          viewerBand={viewerBand}
-        />
+          <CommunityFilterChips
+            selectedMode={servedMode}
+            onSelectMode={handleSelectMode}
+            viewerBand={viewerBand}
+          />
+        </UnlessBanned>
 
         {newLooks.length > 0 && communityAvailable && (
           <TouchableOpacity

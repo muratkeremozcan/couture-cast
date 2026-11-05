@@ -426,7 +426,7 @@ describe('Story 6.4 comment eligibility at the HTTP boundary', () => {
     }
   })
 
-  it('answers create, delete and report with 404 once the post is withdrawn', async () => {
+  it('answers create and report with 404 once the post is withdrawn, and lets the author retract', async () => {
     const author = await fixture(),
       member = await fixture()
     const own = await publish(member.userId, author.postId)
@@ -439,7 +439,6 @@ describe('Story 6.4 comment eligibility at the HTTP boundary', () => {
     const url = postPath(author.postId)
     try {
       expect((await authorized('post', `${url}/comments`).send(input())).status).toBe(404)
-      expect((await authorized('delete', `${url}/comments/${own.id}`)).status).toBe(404)
       expect(
         (
           await authorized('post', `${url}/comments/${target.id}/report`).send({
@@ -453,6 +452,11 @@ describe('Story 6.4 comment eligibility at the HTTP boundary', () => {
       expect(
         await prisma.communityComment.count({ where: { user_id: member.userId } })
       ).toBe(1)
+      // Story 6.11: a member keeps the right to retract their own words (RG3).
+      expect((await authorized('delete', `${url}/comments/${own.id}`)).status).toBe(200)
+      expect(
+        await prisma.communityComment.findUniqueOrThrow({ where: { id: own.id } })
+      ).toMatchObject({ status: 'author_deleted', body: null })
       expect(
         await prisma.communityCommentReport.count({
           where: { reporter_id: member.userId },

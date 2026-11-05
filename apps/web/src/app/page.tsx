@@ -54,7 +54,9 @@ export default function Home() {
         tabIndex={-1}
         className="max-w-6xl mx-auto space-y-16 px-6 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] outline-none"
       >
-        <div className="relative left-1/2 w-[100vw] max-w-[1440px] -translate-x-1/2">
+        {/* Margins bleed to the viewport edge. A -50% transform lands on a half pixel at odd widths
+            and blends the dark page into column 0. */}
+        <div className="relative mx-[calc(50%-min(50vw,720px))] w-[min(100vw,1440px)]">
           <LookbookPrismLayout />
         </div>
         <StickyBottomNav />

@@ -7,9 +7,9 @@ import type { CommunityModerationPublisher } from './community-moderation.queue'
 describe('CommunityModerationOutboxDispatcher', () => {
   const createDispatcher = () => {
     const findMany = vi.fn()
-    const update = vi.fn().mockResolvedValue({})
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 })
     const prisma = {
-      communityModerationOutbox: { findMany, update },
+      communityModerationOutbox: { findMany, updateMany },
     } as unknown as PrismaClient
 
     const enqueue = vi.fn().mockResolvedValue(undefined)
@@ -18,7 +18,7 @@ describe('CommunityModerationOutboxDispatcher', () => {
     return {
       dispatcher: new CommunityModerationOutboxDispatcher(prisma, queue),
       findMany,
-      update,
+      updateMany,
       enqueue,
     }
   }
@@ -26,6 +26,7 @@ describe('CommunityModerationOutboxDispatcher', () => {
   const outboxRow = (overrides: Record<string, unknown> = {}) => ({
     id: 'outbox-1',
     post_id: 'post-1',
+    generation: 0,
     post: { image_object_path: 'community/post-1/session-abc.jpg' },
     ...overrides,
   })
@@ -47,14 +48,14 @@ describe('CommunityModerationOutboxDispatcher', () => {
   it('enqueues with the upload session parsed out of the object path', async () => {
     // The job id is `postId__uploadSessionId`, so taking the session from the
     // path keeps it stable across retries without needing a column of its own.
-    const { dispatcher, findMany, enqueue, update } = createDispatcher()
+    const { dispatcher, findMany, enqueue, updateMany } = createDispatcher()
     findMany.mockResolvedValueOnce([outboxRow()])
 
     const result = await dispatcher.dispatchPending()
 
-    expect(enqueue).toHaveBeenCalledWith('post-1', 'session-abc')
-    expect(update).toHaveBeenCalledWith({
-      where: { id: 'outbox-1' },
+    expect(enqueue).toHaveBeenCalledWith('post-1', 'session-abc', undefined, 0)
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: 'outbox-1', generation: 0, dispatched_at: null },
       data: {
         dispatched_at: expect.any(Date) as Date,
         attempts: { increment: 1 },
@@ -72,7 +73,7 @@ describe('CommunityModerationOutboxDispatcher', () => {
 
     await dispatcher.dispatchPending()
 
-    expect(enqueue).toHaveBeenCalledWith('post-1', 'post-1')
+    expect(enqueue).toHaveBeenCalledWith('post-1', 'post-1', undefined, 0)
   })
 
   it('falls back to the post id when the post has no object path at all', async () => {
@@ -81,11 +82,11 @@ describe('CommunityModerationOutboxDispatcher', () => {
 
     await dispatcher.dispatchPending()
 
-    expect(enqueue).toHaveBeenCalledWith('post-1', 'post-1')
+    expect(enqueue).toHaveBeenCalledWith('post-1', 'post-1', undefined, 0)
   })
 
   it('leaves a row claimable and records the error when the enqueue fails', async () => {
-    const { dispatcher, findMany, enqueue, update } = createDispatcher()
+    const { dispatcher, findMany, enqueue, updateMany } = createDispatcher()
     findMany.mockResolvedValueOnce([outboxRow()])
     enqueue.mockRejectedValueOnce(new Error('redis unavailable'))
 
@@ -93,8 +94,8 @@ describe('CommunityModerationOutboxDispatcher', () => {
 
     expect(result).toEqual({ dispatched: 0, failed: 1 })
     // No `dispatched_at`: the row must stay claimable for the next sweep.
-    expect(update).toHaveBeenCalledWith({
-      where: { id: 'outbox-1' },
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: 'outbox-1', generation: 0 },
       data: { attempts: { increment: 1 }, last_error: 'redis unavailable' },
     })
   })

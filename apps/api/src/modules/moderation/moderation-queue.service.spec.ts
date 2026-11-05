@@ -30,6 +30,7 @@ const postCase = (overrides: Overrides = {}): LoadedCase => ({
     {
       id: 'rep-1',
       reporterId: 'reporter-1',
+      origin: 'member',
       reason: 'harassment',
       details: 'reporter typed this',
       snapshot: {
@@ -67,15 +68,37 @@ function build(loaded: LoadedCase | null = postCase()) {
     loadCase: vi.fn().mockResolvedValue(loaded),
     listCases: vi.fn().mockResolvedValue([]),
     recordCaseView: vi.fn().mockResolvedValue(undefined),
+    escalatedCaseKeys: vi.fn().mockResolvedValue(new Set<string>()),
+  }
+  const decisions = {
+    describeCase: vi.fn(
+      async (_auth: unknown, _caseId: unknown, readVisible: (tx: unknown) => unknown) => {
+        const visible = await readVisible({})
+        return visible
+          ? {
+              visible,
+              state: {
+                revision: '0123456789abcdef',
+                allowedActions: [],
+                banKinds: [],
+                escalated: false,
+                firstDecisionAt: null,
+                subjectStanding: null,
+              },
+            }
+          : null
+      }
+    ),
   }
   const storage = { signReadUrl: vi.fn().mockResolvedValue(SIGNED) }
   const clock = vi.fn(() => new Date(NOW))
   const service = new ModerationQueueService(
     repository as unknown as ModerationQueueRepository,
     storage,
-    clock
+    clock,
+    decisions as never
   )
-  return { service, repository, storage, clock }
+  return { service, repository, storage, clock, decisions }
 }
 
 let logged: unknown[][]
@@ -251,6 +274,35 @@ describe('U-Q-SVC-IDENTITY', () => {
     expect(JSON.stringify(data)).not.toMatch(
       /reporter-1|reporter-no-alias|author-user-1|mod-user-1/
     )
+  })
+
+  it('keeps a member report with no alias row a member report', async () => {
+    const loaded = postCase()
+    loaded.reports = [
+      {
+        ...loaded.reports[0]!,
+        id: 'r1',
+        reporterId: 'reporter-no-alias',
+        origin: 'member',
+      },
+    ]
+    const { data } = await build(loaded).service.getCase(AUTH, 'post.p1')
+    expect(data.reporters.map(({ identity, origin }) => ({ identity, origin }))).toEqual([
+      { identity: { state: 'unknown', alias: null }, origin: 'member' },
+    ])
+  })
+
+  it('reads a screening report as screening and keeps an erased reporter erased (D11)', async () => {
+    const loaded = postCase()
+    loaded.reports = [
+      { ...loaded.reports[0]!, id: 'r1', reporterId: null, origin: 'screening' },
+      { ...loaded.reports[0]!, id: 'r2', reporterId: null, origin: 'member' },
+    ]
+    const { data } = await build(loaded).service.getCase(AUTH, 'post.p1')
+    expect(data.reporters.map(({ identity, origin }) => ({ identity, origin }))).toEqual([
+      { identity: { state: 'unknown', alias: null }, origin: 'screening' },
+      { identity: { state: 'erased', alias: null }, origin: 'member' },
+    ])
   })
 
   it('takes a post subject from the report row and a comment subject from the live author alias', async () => {
@@ -492,7 +544,7 @@ describe('U-Q-SVC-LOGGING', () => {
     repository.recordCaseView.mockRejectedValue(
       new Error('connection to db.internal:5432 refused')
     )
-    await service.getCase(AUTH, 'post.p1').catch(() => undefined)
+    await expect(service.getCase(AUTH, 'post.p1')).rejects.toThrow()
     const text = JSON.stringify(logged)
     expect(text).toContain('audit_unavailable')
     expect(text).not.toMatch(/db\.internal|5432|Seen caption/)

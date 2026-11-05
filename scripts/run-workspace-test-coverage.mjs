@@ -3,6 +3,7 @@
 import { spawn } from 'node:child_process'
 import { appendFileSync, existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { COVERAGE_SHARDS, coverageShardOf } from './ci/coverage-shards.mjs'
 import { classifyWorkspaceOutput } from '../.github/actions/unit-test-coverage-comment/test-failures.mjs'
 
 const workspaceRoots = ['apps', 'packages']
@@ -40,7 +41,15 @@ function findCoverageWorkspaces() {
   return workspaces.sort((left, right) => left.path.localeCompare(right.path))
 }
 
-const workspaces = findCoverageWorkspaces()
+const shard = process.env.COVERAGE_SHARD
+if (shard && !COVERAGE_SHARDS.includes(shard)) {
+  console.error(`Unknown coverage shard ${shard}. Known: ${COVERAGE_SHARDS.join(', ')}.`)
+  process.exit(1)
+}
+
+const workspaces = findCoverageWorkspaces().filter(
+  (workspace) => !shard || coverageShardOf(workspace.path) === shard
+)
 const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const coverageDirs = JSON.stringify(
   workspaces.map((workspace) => `${workspace.path}/coverage`)
@@ -55,6 +64,13 @@ if (process.env.GITHUB_OUTPUT) {
   appendFileSync(process.env.GITHUB_OUTPUT, `coverage_dirs=${coverageDirs}\n`)
 }
 
+// CI has built the shared packages one step earlier, so each workspace's pre-hook would only
+// repeat that work, about 30 seconds a workspace inside a 20 minute job.
+const coverageArguments = ['run', 'test:coverage']
+if (process.env.COVERAGE_SHARED_DEPS_BUILT === 'true') {
+  coverageArguments.push('--ignore-scripts')
+}
+
 // Streams the workspace's output as before and keeps a copy, so a failure can be
 // classified as a failing test or a missed coverage threshold.
 function runWorkspace(workspace) {
@@ -62,7 +78,7 @@ function runWorkspace(workspace) {
     let output = ''
     const child = spawn(
       npmExecutable,
-      ['run', 'test:coverage', '--workspace', workspace.path],
+      [...coverageArguments, '--workspace', workspace.path],
       {
         cwd: process.cwd(),
         stdio: ['inherit', 'pipe', 'pipe'],

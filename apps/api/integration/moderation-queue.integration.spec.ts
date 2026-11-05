@@ -244,6 +244,7 @@ describe('I-Q-DETAIL', () => {
     expect(data.reporters).toEqual([
       {
         identity: { state: 'alias', alias: seed.reporters.r1.alias },
+        origin: 'member',
         reason: 'hate_speech',
         details: 'Reporter note for A',
         reportedAt: anyString,

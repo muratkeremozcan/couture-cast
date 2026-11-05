@@ -26,6 +26,7 @@ import { GuardianService } from '../src/modules/guardian/guardian.service.js'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
 import {
+  COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS,
   CommunityMaintenanceService,
   ERASURE_DEADLINE_HOURS,
   STALE_PENDING_REVIEW_MINUTES,
@@ -131,7 +132,9 @@ function storageThatCannotRemove(storage: InMemoryCommunityStorage): CommunitySt
     createUploadSession: (path, expiresIn) =>
       storage.createUploadSession(path, expiresIn),
     download: (path) => storage.download(path),
-    upload: (path, bytes, mimeType) => storage.upload(path, bytes, mimeType),
+    createOverwriteCapability: (path) => storage.createOverwriteCapability(path),
+    upload: (path, bytes, mimeType, capability) =>
+      storage.upload(path, bytes, mimeType, capability),
     remove: () => Promise.reject(new Error('STORAGE_PERMISSION_DENIED')),
   }
 }
@@ -435,7 +438,9 @@ describe('6.1 community lifecycle sweeps', () => {
       const storage = new InMemoryCommunityStorage()
       const maintenance = new CommunityMaintenanceService(prisma, storage)
       const userId = await createUser('erasure')
-      const requestedAt = new Date(Date.now() - 60 * 60 * 1000)
+      const requestedAt = new Date(
+        Date.now() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS - 60 * 60 * 1000
+      )
 
       const post = await createPost(storage, {
         id: postId('erasure'),
@@ -553,7 +558,10 @@ describe('6.1 community lifecycle sweeps', () => {
         status: 'draft',
         publishedAt: null,
         submittedAt: null,
-        uploadExpiresAt: new Date(Date.now() - 60 * 1000),
+        // Past the client's window and the late-write window after it.
+        uploadExpiresAt: new Date(
+          Date.now() - COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS - 60 * 1000
+        ),
       })
       // A draft whose reservation has not lapsed yet is left alone; the sweep
       // must be bounded by the expiry column, not by the status alone.
