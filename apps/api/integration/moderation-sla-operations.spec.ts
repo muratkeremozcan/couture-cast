@@ -178,6 +178,24 @@ describe('U-GF-METRICS: couturecast-moderation-sla.json', () => {
     }
   })
 
+  it('gives the age panel no older value to fall back on when samples stop (R2-2)', () => {
+    // With no samples, a range query and `lastNotNull` keep the last age under the 300-second red
+    // threshold, so a dead exporter would read as healthy beside panels that say Stale.
+    const age = (dashboard.panels ?? []).find((panel) =>
+      panel.targets?.some(
+        (target) =>
+          target.expr?.includes('moderation_sla_last_measured_timestamp_seconds') &&
+          !/moderation_sla_(open_cases|oldest_pending)/.test(target.expr)
+      )
+    )
+    expect(age?.type).toBe('stat')
+    for (const target of age?.targets ?? []) {
+      expect(target.instant).toBe(true)
+      expect(target.range).toBe(false)
+    }
+    expect(age?.fieldConfig?.defaults?.noValue).toBe('No samples')
+  })
+
   it('shows the age of the last measurement in its own panel (CX-5)', () => {
     expect(
       expressions.some((expr) =>

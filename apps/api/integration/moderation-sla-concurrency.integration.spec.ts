@@ -439,6 +439,40 @@ describe('U-S-BUDGET: delivery has its own share of every run (CX-2)', () => {
     expect((await alertByKey(slaKey(seeded, 'at_risk')))!.delivery).toBe('delivered')
   })
 
+  it('never sends an at-risk alert whose deadline passed during the scan (R2-1)', async () => {
+    // Due 30 seconds after the sweep's clock read, inside the 46 seconds detection takes.
+    const seeded = await seedCase({ dueAt: inMs(30 * SLA_SECOND_MS) })
+    const first = await sweep({ prisma: slowDetection() }).run()
+    expect(first).toMatchObject({ recorded: 1, delivered: 0, superseded: 1, errors: 0 })
+    expect(capture().received).toEqual([])
+    expect((await alertByKey(slaKey(seeded, 'at_risk')))!.delivery).toBe('superseded')
+
+    await sweep().run()
+    expect(capture().received.map((request) => request.body.kind)).toEqual(['breached'])
+    expect((await alertByKey(slaKey(seeded, 'breached')))!.delivery).toBe('delivered')
+    // The state fact keeps the sweep's own clock read, however long the scan took.
+    expect((await alertByKey(slaKey(seeded, 'at_risk')))!.detected_at.getTime()).toBe(
+      NOW.getTime()
+    )
+  })
+
+  it('supersedes a later row whose deadline passes while earlier rows send (R2-1)', async () => {
+    await seedCase({ dueAt: inMs(10 * SLA_SECOND_MS) })
+    await seedCase({ dueAt: inMs(5 * SLA_SECOND_MS) })
+    const channel = {
+      kind: 'webhook' as const,
+      deliver: vi.fn(() => {
+        clock.advance(20 * SLA_SECOND_MS)
+        return Promise.resolve('delivered' as const)
+      }),
+    }
+    const result = await sweep({ channel: channel as never }).run()
+    expect(channel.deliver).toHaveBeenCalledOnce()
+    expect(result).toMatchObject({ delivered: 1, superseded: 1 })
+    const rows = await alerts()
+    expect(rows.map((row) => row.delivery).sort()).toEqual(['delivered', 'superseded'])
+  })
+
   it('works through a backlog over repeated slow sweeps, a bounded batch at a time', async () => {
     await Promise.all(
       Array.from({ length: 12 }, () => seedCase({ dueAt: inMs(SLA_HOUR_MS) }))
