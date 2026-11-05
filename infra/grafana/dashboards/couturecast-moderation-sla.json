@@ -29,7 +29,8 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "none",
+          "noValue": "Stale"
         },
         "overrides": []
       },
@@ -62,8 +63,9 @@
           "editorMode": "code",
           "expr": "sum(moderation_sla_open_cases{service_name=\"couturecast-api\",state=\"breached\"}) and on() (time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"}) < 300)",
           "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Breached cases",
@@ -85,7 +87,8 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "none",
+          "noValue": "Stale"
         },
         "overrides": []
       },
@@ -118,8 +121,9 @@
           "editorMode": "code",
           "expr": "sum(moderation_sla_open_cases{service_name=\"couturecast-api\",state=\"at_risk\"}) and on() (time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"}) < 300)",
           "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "At-risk cases",
@@ -141,7 +145,8 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "none",
+          "noValue": "Stale"
         },
         "overrides": []
       },
@@ -174,8 +179,9 @@
           "editorMode": "code",
           "expr": "sum(moderation_sla_open_cases{service_name=\"couturecast-api\",state=\"on_track\"}) and on() (time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"}) < 300)",
           "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "On-track cases",
@@ -197,7 +203,8 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "none",
+          "noValue": "Stale"
         },
         "overrides": []
       },
@@ -230,8 +237,9 @@
           "editorMode": "code",
           "expr": "max(moderation_sla_oldest_pending_review_age_seconds{service_name=\"couturecast-api\"}) and on() (time() - max(moderation_sla_last_measured_timestamp_seconds{service_name=\"couturecast-api\"}) < 300)",
           "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Oldest pending review (s)",

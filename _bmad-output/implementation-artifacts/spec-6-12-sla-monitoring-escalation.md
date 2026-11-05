@@ -395,7 +395,7 @@ What the tests can and cannot prove: delivery is proved to a real HTTP endpoint 
 - tsc in `apps/api`, `apps/web`, `apps/mobile` and `packages/api-client`, counted by code (only the symlink TS2742 is ignorable), and lint: clean.
 - `git grep` every changed export across `scripts/`, `package.json`, Dockerfile CMD and `apps/api/api/`: no broken caller.
 - `git grep -nE '6 \* 60 \* 60|21_?600' apps/api/src/modules/moderation`: no copied threshold.
-- `git diff --name-only main... | wc -l`: below 100 as the goal.
+- `git diff --name-only main... | wc -l`: at or below 100 after `.coderabbit.yaml` path filters. Raw count reported at hand-off.
 
 **Manual checks:**
 
