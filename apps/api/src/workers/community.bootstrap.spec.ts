@@ -123,6 +123,18 @@ describe('dedicated community worker bootstrap', () => {
       vi.useRealTimers()
     })
 
+    it('U-W-FACTORY: passes a flag service, because a composition with none stays off for good', async () => {
+      runtimeWithSweep(vi.fn().mockResolvedValue({ recorded: 0 }))
+      await freshProcess().startCommunityWorkers()
+      expect(harness.createCommunityWorkerRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({
+          featureFlags: expect.objectContaining({
+            getFeatureFlag: expect.any(Function) as unknown,
+          }) as unknown,
+        })
+      )
+    })
+
     it('runs the sweep every 60 seconds, starting with the first tick', async () => {
       vi.useFakeTimers()
       const sweep = vi.fn().mockResolvedValue({ recorded: 0 })

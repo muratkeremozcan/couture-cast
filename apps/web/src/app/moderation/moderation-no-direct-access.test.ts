@@ -118,6 +118,16 @@ describe('U-WEB-Q-NO-DIRECT', () => {
     )
   })
 
+  // Story 6.12: a move out of these two folders would drop the SLA page from the scan unnoticed.
+  it('U-WEB-NO-DIRECT: the SLA page and dashboard sit inside the scan', () => {
+    expect(consoleSources.map((path) => relative(SRC, path))).toEqual(
+      expect.arrayContaining([
+        'app/moderation/sla/page.tsx',
+        'app/components/moderation-sla-dashboard.tsx',
+      ])
+    )
+  })
+
   it.each(consoleSources.map((path) => [relative(SRC, path), path]))(
     '%s imports no database, Supabase or storage client and declares no server action',
     (_name, path) => {

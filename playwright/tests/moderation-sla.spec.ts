@@ -461,17 +461,18 @@ test.describe('P-SLA: the page', () => {
         expect(await page.locator('main').innerText()).not.toMatch(
           /moderation\.sla\.|\{\{/
         )
-        const clipped = await page
-          .locator('main')
-          .evaluate(
-            (root) =>
-              Array.from(root.querySelectorAll('h1, h2, dt, a, button, span')).filter(
-                (node) =>
-                  node.scrollWidth > node.clientWidth + 1 &&
-                  getComputedStyle(node).overflow !== 'visible'
-              ).length
-          )
-        expect(clipped).toBe(0)
+        const clipped = await page.locator('main').evaluate((root) =>
+          Array.from(root.querySelectorAll('h1, h2, dt, a, button, span'))
+            .filter(
+              (node) =>
+                // A screen-reader heading is one pixel wide by design.
+                !node.closest('.sr-only') &&
+                node.scrollWidth > node.clientWidth + 1 &&
+                getComputedStyle(node).overflow !== 'visible'
+            )
+            .map((node) => node.outerHTML.slice(0, 200))
+        )
+        expect(clipped).toEqual([])
       })
     })
   }
@@ -505,10 +506,10 @@ test.describe('P-SLA: the page', () => {
       order.push(focused.label)
     }
     expect(order.slice(0, 4)).toEqual([
+      'Refresh',
       'Back to queue',
       'Open case',
       'Open case',
-      'Refresh',
     ])
   })
 })

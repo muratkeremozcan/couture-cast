@@ -174,6 +174,19 @@ describe('general worker bootstrap', () => {
     await bootstrap.performShutdown()
   })
 
+  it('U-W-FACTORY: passes a flag service, because a composition with none stays off for good', async () => {
+    const bootstrap = freshProcess()
+    await bootstrap.startWorkers()
+    expect(harness.createCommunityWorkerRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        featureFlags: expect.objectContaining({
+          getFeatureFlag: expect.any(Function) as unknown,
+        }) as unknown,
+      })
+    )
+    await bootstrap.performShutdown()
+  })
+
   it('U-W-SCHEDULER: registers the SLA sweep on the maintenance queue', async () => {
     harness.registerModerationSlaScheduler.mockClear()
     const bootstrap = freshProcess()

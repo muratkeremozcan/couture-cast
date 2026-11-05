@@ -404,7 +404,7 @@ describe('I-S-MONITOR: the singleton stamp', () => {
     expect(second.channel).toBe('console')
   })
 
-  it('leaves the stamp when the sweep fails', async () => {
+  it('U-S-SWEEP-FAILS: a detection failure rejects, sends nothing and leaves the stamp', async () => {
     await sweep().run()
     const before = await prisma.moderationSlaMonitor.findUniqueOrThrow({
       where: { id: 'default' },
@@ -480,7 +480,7 @@ describe('I-S-FLAG-OUTAGE: PostHog and the fallback both fail (TEA-05)', () => {
     expect(await prisma.moderationSlaMonitor.findFirst()).toBeNull()
   })
 
-  it('a thrown read skips the run and logs moderation_sla_flag_unavailable', async () => {
+  it('U-S-FLAG-THROW: a thrown read skips the run and logs moderation_sla_flag_unavailable', async () => {
     await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
     ctx.failingFlags.add('moderation_sla_monitoring_enabled')
     await expect(sweep().run()).resolves.toBeDefined()

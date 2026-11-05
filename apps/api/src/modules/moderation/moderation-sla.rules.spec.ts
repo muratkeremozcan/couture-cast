@@ -136,7 +136,8 @@ describe('source scans', () => {
     )
     for (const { name, text } of sources)
       expect(text, name).not.toMatch(
-        /21_?600(_?000)?\b|\b6 \* 60 \* 60|interval '\d+ hours?'/
+        // Any literal hour count except the 24 in the resolution window's day length.
+        /21_?600(_?000)?\b|\b(?!24\b)\d+ \* 60 \* 60|interval '\d+ hours?'/
       )
   })
 

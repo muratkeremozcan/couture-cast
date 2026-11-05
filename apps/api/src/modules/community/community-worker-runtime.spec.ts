@@ -334,7 +334,7 @@ describe('createCommunityWorkerRuntime', () => {
     }
   })
 
-  it('exposes exactly the five sweeps both process groups drive', async () => {
+  it('exposes exactly the six sweeps both process groups drive', async () => {
     const runtime = await createCommunityWorkerRuntime({
       prisma,
       telemetryService,
@@ -377,6 +377,37 @@ describe('createCommunityWorkerRuntime', () => {
     expect(harness.sweepStalePendingReview).toHaveBeenCalled()
     expect(harness.sweepExpiredUploads).toHaveBeenCalled()
     expect(harness.sweepErasureRequests).toHaveBeenCalled()
+  })
+
+  it('U-W-FACTORY: the one sweep both process groups call reads the flags it is given', async () => {
+    const getFeatureFlag = vi.fn().mockResolvedValue(false)
+    const runtime = await createCommunityWorkerRuntime({
+      prisma,
+      telemetryService,
+      meter: meter(),
+      featureFlags: { getFeatureFlag } as never,
+    })
+
+    await expect(runtime.sweeps.sweepModerationSla()).resolves.toMatchObject({
+      skipped: 1,
+      recorded: 0,
+    })
+    expect(getFeatureFlag).toHaveBeenCalledWith(
+      'moderation_sla_monitoring_enabled',
+      'system:moderation-sla'
+    )
+  })
+
+  it('U-W-FACTORY: a composition with no flag service stays off', async () => {
+    const runtime = await createCommunityWorkerRuntime({
+      prisma,
+      telemetryService,
+      meter: meter(),
+    })
+
+    await expect(runtime.sweeps.sweepModerationSla()).resolves.toMatchObject({
+      skipped: 1,
+    })
   })
 
   it('writes its presence heartbeat on the worker connection and removes it before the worker closes', async () => {
