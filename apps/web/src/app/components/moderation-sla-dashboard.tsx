@@ -97,8 +97,14 @@ function useFormatTime() {
   return useCallback(
     (iso: string) =>
       new Intl.DateTimeFormat(i18n.language || 'en-US', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
+        // The zone tells apart the two hours a DST change repeats. `dateStyle` cannot combine with
+        // `timeZoneName`, so the parts are spelled out.
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short',
       }).format(new Date(iso)),
     [i18n.language]
   )
