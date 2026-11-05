@@ -10,8 +10,11 @@ import {
 
 // --- Vocabulary -------------------------------------------------------------
 
+// Each schema owns a copy of its list, and each `.nullable()` sits on its own instance: zod-to-openapi
+// pushes null into the enum values of a nullable enum, which would corrupt a shared array or schema.
+
 export const moderationSlaAlertKinds = ['at_risk', 'breached', 'escalated'] as const
-export const moderationSlaAlertKindSchema = z.enum(moderationSlaAlertKinds)
+export const moderationSlaAlertKindSchema = z.enum([...moderationSlaAlertKinds])
 export type ModerationSlaAlertKind = z.infer<typeof moderationSlaAlertKindSchema>
 
 export const moderationSlaDeliveryStates = [
@@ -20,7 +23,7 @@ export const moderationSlaDeliveryStates = [
   'console_only',
   'superseded',
 ] as const
-export const moderationSlaDeliveryStateSchema = z.enum(moderationSlaDeliveryStates)
+export const moderationSlaDeliveryStateSchema = z.enum([...moderationSlaDeliveryStates])
 export type ModerationSlaDeliveryState = z.infer<typeof moderationSlaDeliveryStateSchema>
 
 /** `interrupted` is recorded by a claim that finds a lease a dead worker left behind. */
@@ -33,10 +36,11 @@ export const moderationSlaFailureCodes = [
   'invalid_config',
   'interrupted',
 ] as const
-export const moderationSlaFailureCodeSchema = z.enum(moderationSlaFailureCodes)
+export const moderationSlaFailureCodeSchema = z.enum([...moderationSlaFailureCodes])
 export type ModerationSlaFailureCode = z.infer<typeof moderationSlaFailureCodeSchema>
 
-export const moderationSlaChannelSchema = z.enum(['webhook', 'console'])
+export const moderationSlaChannels = ['webhook', 'console'] as const
+export const moderationSlaChannelSchema = z.enum([...moderationSlaChannels])
 export type ModerationSlaChannel = z.infer<typeof moderationSlaChannelSchema>
 
 export const moderationSlaErrorCodeSchema = z.enum(['moderation_sla_disabled'])
@@ -72,7 +76,7 @@ export const moderationSlaRecentAlertSchema = z
     detectedAt: isoSchema,
     delivery: moderationSlaDeliveryStateSchema,
     attempts: countSchema,
-    lastErrorCode: moderationSlaFailureCodeSchema.nullable(),
+    lastErrorCode: z.enum([...moderationSlaFailureCodes]).nullable(),
     deliveredAt: isoSchema.nullable(),
   })
   .strict()
@@ -85,7 +89,7 @@ export const moderationSlaSummarySchema = z
       .object({
         lastSweepAt: isoSchema.nullable(),
         stale: z.boolean(),
-        channel: moderationSlaChannelSchema.nullable(),
+        channel: z.enum([...moderationSlaChannels]).nullable(),
       })
       .strict(),
     queue: z

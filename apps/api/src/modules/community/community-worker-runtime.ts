@@ -7,6 +7,12 @@ import type { PrismaClient } from '@prisma/client'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
 import { CommunityMaintenanceService } from './community-maintenance.service.js'
+import {
+  createModerationOpsChannel,
+  resolveModerationSlaAppUrl,
+} from '../moderation/moderation-sla.channel.js'
+import { ModerationSlaSweep } from '../moderation/moderation-sla.sweep.js'
+import { createOpenTelemetryModerationSlaMeter } from '../moderation/moderation-sla.telemetry.js'
 import { CommunityModerationOutboxDispatcher } from './community-moderation.outbox.js'
 import { CommunityModerationQueue } from './community-moderation.queue.js'
 import {
@@ -47,6 +53,7 @@ import {
 import { CommunityTextScreener } from './community-text-screener.js'
 import { SupabaseCommunityStorageAdapter } from './community-storage.adapter.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
+import type { PostHogService } from '../../posthog/posthog.service.js'
 
 /** The value that selects the fail-closed adapter with no model behind it. */
 export const COMMUNITY_NSFW_SCREENER_UNAVAILABLE = 'unavailable'
@@ -117,6 +124,8 @@ export interface CommunitySweeps {
   sweepExpiredUploads: () => Promise<unknown>
   sweepErasureRequests: () => Promise<unknown>
   sweepExpiredBanHolds: () => Promise<unknown>
+  /** Story 6.12: at-risk and breach alerts, driven by whichever substrate this process has. */
+  sweepModerationSla: () => Promise<unknown>
 }
 
 /** What the process knows about its own screening posture once it is ready. */
@@ -383,6 +392,8 @@ export async function createCommunityWorkerRuntime(deps: {
   prisma: PrismaClient
   featureFlags?: Pick<FeatureFlagsService, 'getFeatureFlag'>
   telemetryService: TelemetryService
+  /** The hosted worker's signal path: its image has no OpenTelemetry SDK. */
+  analytics?: Pick<PostHogService, 'capture'>
   /** Overrides the environment selection; specs inject a pinned engine here. */
   engine?: CommunityModerationEngine
   meter?: CommunityModerationMeter
@@ -391,6 +402,16 @@ export async function createCommunityWorkerRuntime(deps: {
   const queue = new CommunityModerationQueue()
   const maintenance = new CommunityMaintenanceService(deps.prisma, storage)
   const dispatcher = new CommunityModerationOutboxDispatcher(deps.prisma, queue)
+  const moderationSla = new ModerationSlaSweep({
+    prisma: deps.prisma,
+    clock: () => new Date(),
+    channel: createModerationOpsChannel({ url: process.env.MODERATION_OPS_WEBHOOK_URL }),
+    flags: deps.featureFlags ?? { getFeatureFlag: () => Promise.resolve(false as never) },
+    analytics: deps.analytics ?? { capture: () => undefined },
+    logger: createBaseLogger().child({ feature: 'moderation-sla' }),
+    meter: createOpenTelemetryModerationSlaMeter(),
+    appUrl: resolveModerationSlaAppUrl(),
+  })
   const meter =
     deps.meter ??
     createSafeCommunityModerationMeter(createOpenTelemetryCommunityModerationMeter())
@@ -467,6 +488,7 @@ export async function createCommunityWorkerRuntime(deps: {
       sweepExpiredUploads: () => maintenance.sweepExpiredUploads(),
       sweepErasureRequests: () => maintenance.sweepErasureRequests(),
       sweepExpiredBanHolds: () => maintenance.sweepExpiredBanHolds(),
+      sweepModerationSla: () => moderationSla.run(),
     },
     ...(selection ? { readiness: selection.readiness } : {}),
     close: async () => {

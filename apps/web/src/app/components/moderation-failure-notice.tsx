@@ -28,22 +28,22 @@ export function FailureNotice({
   reason: ModerationFailureReason
   onRetry?: () => void
   busy?: boolean
-  /** A case read has its own wording for a generic failure. */
-  scope?: 'queue' | 'case'
+  /** A case read and the SLA page have their own wording for what they cannot show. */
+  scope?: 'queue' | 'case' | 'sla'
 }) {
   const { t } = useModerationTranslation()
+  const message =
+    scope === 'case' && reason === 'unavailable'
+      ? 'moderation.state.caseUnavailable'
+      : scope === 'sla' && (reason === 'unavailable' || reason === 'disabled')
+        ? `moderation.sla.${reason}`
+        : `moderation.state.${reason}`
   return (
     <div
       role="alert"
       className="flex flex-col items-start gap-3 rounded border border-neutral-500 p-4"
     >
-      <p>
-        {t(
-          scope === 'case' && reason === 'unavailable'
-            ? 'moderation.state.caseUnavailable'
-            : `moderation.state.${reason}`
-        )}
-      </p>
+      <p>{t(message)}</p>
       {reason === 'signed_out' ? (
         <Link href="/signin" className={`${moderationControl} inline-flex items-center`}>
           {t('moderation.state.signInLink')}

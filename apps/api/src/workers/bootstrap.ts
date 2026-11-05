@@ -21,6 +21,8 @@ import { WardrobeRetentionService } from '../modules/wardrobe/wardrobe-retention
 import { SupabaseWardrobeStorageAdapter } from '../modules/wardrobe/wardrobe-storage.adapter'
 import { createCommunityWorkerRuntime } from '../modules/community/community-worker-runtime'
 import { registerCommunityMaintenanceSchedulers } from '../modules/community/community-maintenance.scheduler'
+import { registerModerationSlaScheduler } from '../modules/moderation/moderation-sla.scheduler'
+import { initializeOpenTelemetry, shutdownOpenTelemetry } from '../instrumentation'
 import { createMaintenanceProcessor } from './maintenance.processor'
 import { registerMaintenanceSchedulers } from './maintenance.scheduler'
 import { createQueues, queueConfigs } from '../config/queues'
@@ -120,6 +122,9 @@ export function createStandaloneWeatherFanout(
 export async function startWorkers(state: WorkerProcessState) {
   const { workers, queues, closeables, redisClients } = state
   try {
+    // Story 6.12: worker meters export nothing without this, and only `main.ts` started it.
+    // The hosted community worker omits the SDK for its image budget, so PostHog is its signal.
+    initializeOpenTelemetry()
     // Flow ref S0.4/T5: create queue clients for the known queues before any
     // workers start consuming jobs.
     const startedQueues = createQueues()
@@ -307,6 +312,7 @@ export async function startWorkers(state: WorkerProcessState) {
     const community = await createCommunityWorkerRuntime({
       prisma,
       telemetryService,
+      analytics: posthogService,
       featureFlags: new FeatureFlagsService(
         new FeatureFlagsRepository(prisma),
         posthogService,
@@ -346,6 +352,7 @@ export async function startWorkers(state: WorkerProcessState) {
 
     await registerMaintenanceSchedulers(maintenanceQueue)
     await registerCommunityMaintenanceSchedulers(maintenanceQueue)
+    await registerModerationSlaScheduler(maintenanceQueue)
 
     workers.push(
       // Serial on purpose. Every sweep is a batched DB scan and two of them
@@ -403,6 +410,9 @@ export async function performShutdown(state: WorkerProcessState) {
       queues: [...queues, ...closeables],
       redisClients,
       disconnectPrisma: disconnectPrismaClient,
+    })
+    await shutdownOpenTelemetry().catch((err: unknown) => {
+      logger.error(err, 'Error shutting down OpenTelemetry')
     })
   } catch (err) {
     logger.error(err, 'Error closing workers or queues')

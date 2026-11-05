@@ -6,6 +6,7 @@ import { FeatureFlagsService } from '../modules/feature-flags/feature-flags.serv
 import { FeatureFlagsRepository } from '../modules/feature-flags/feature-flags.repository.js'
 import type { Worker } from 'bullmq'
 import { createCommunityWorkerRuntime } from '../modules/community/community-worker-runtime'
+import { MODERATION_SLA_SWEEP_INTERVAL_MS } from '../modules/moderation/moderation-sla.scheduler'
 import { PostHogService } from '../posthog/posthog.service.js'
 import { TelemetryService } from '../modules/telemetry/telemetry.service.js'
 import { createBaseLogger } from '../logger/pino.config.js'
@@ -130,6 +131,7 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
     const community = await createCommunityWorkerRuntime({
       prisma,
       telemetryService,
+      analytics: posthogService,
       featureFlags: new FeatureFlagsService(
         new FeatureFlagsRepository(prisma),
         posthogService,
@@ -170,6 +172,14 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
       'ban-expiry',
       SWEEP_INTERVAL_MS,
       community.sweeps.sweepExpiredBanHolds
+    )
+    // Story 6.12: this is the path that runs in production, because the hosted process has no
+    // `maintenance` consumer. The sweep's keys make an overlap with the general worker harmless.
+    schedule(
+      state.timers,
+      'moderation-sla',
+      MODERATION_SLA_SWEEP_INTERVAL_MS,
+      community.sweeps.sweepModerationSla
     )
 
     logger.info(

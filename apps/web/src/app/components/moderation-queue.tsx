@@ -194,11 +194,19 @@ export function ModerationQueueView() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-3xl font-semibold">{t('moderation.title')}</h1>
-        <p className="text-sm text-neutral-700 dark:text-neutral-300">
-          {t('moderation.subtitle')}
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-semibold">{t('moderation.title')}</h1>
+          <p className="text-sm text-neutral-700 dark:text-neutral-300">
+            {t('moderation.subtitle')}
+          </p>
+        </div>
+        <Link
+          href="/moderation/sla"
+          className={`${moderationControl} inline-flex items-center`}
+        >
+          {t('moderation.sla.dashboardLink')}
+        </Link>
       </header>
 
       {terminal && failure ? (

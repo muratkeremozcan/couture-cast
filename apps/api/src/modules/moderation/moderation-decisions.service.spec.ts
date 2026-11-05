@@ -187,12 +187,30 @@ function build(seed: Seed = {}) {
       log.push(rawLabel(strings.join('?')))
       return Promise.resolve(1)
     }),
-    $queryRaw: vi.fn((strings: TemplateStringsArray) => {
-      const label = rawLabel(strings.join('?'))
+    $queryRaw: vi.fn((query: TemplateStringsArray | { strings: readonly string[] }) => {
+      const text = 'strings' in query ? query.strings.join('?') : query.join('?')
+      // Story 6.12: the escalated alert reads its anchor through the queue's own SQL.
+      if (text.includes('anchor_report_id')) {
+        return Promise.resolve([
+          {
+            case_key: 'post.post-1',
+            source: 'post',
+            risk_rank: 1,
+            due: new Date('2026-11-05T12:00:00.000Z'),
+            anchor_report_id: 'r1',
+          },
+        ])
+      }
+      const label = rawLabel(text)
       log.push(label)
       if (label === 'post row lock') onPostRowLock.run?.()
       return Promise.resolve([{ id: 'locked' }])
     }),
+    moderationSlaAlert: {
+      createMany: vi.fn(({ data }: { data: Row[] }) =>
+        Promise.resolve({ count: data.length })
+      ),
+    },
     moderationDecision: {
       findUnique: vi.fn(
         ({
