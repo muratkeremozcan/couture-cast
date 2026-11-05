@@ -58,6 +58,8 @@ vi.mock('posthog-node', () => ({
 vi.mock('@prisma/client', async (importOriginal) => {
   class PrismaClientMock {
     $disconnect = vi.fn()
+    // The operator guard on the moderation routes asks this before anything else. Nobody here is erased.
+    moderationErasureRequest = { findUnique: vi.fn().mockResolvedValue(null) }
     // createPrismaClient extends the client; the mock is its own extension.
     $extends() {
       return this

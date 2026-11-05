@@ -49,6 +49,7 @@ import { AccessTokenIdentityService } from '../../../apps/api/src/modules/auth/a
 import { GuardianConsentStateService } from '../../../apps/api/src/modules/auth/guardian-consent-state.service'
 import { GuardianService } from '../../../apps/api/src/modules/guardian/guardian.service'
 import { RequestAuthGuard } from '../../../apps/api/src/modules/auth/security.guards'
+import { ModerationOperatorGuard } from '../../../apps/api/src/modules/moderation/moderation-operator.guard'
 import { EventsController } from '../../../apps/api/src/modules/events/events.controller'
 import { EventsRepository } from '../../../apps/api/src/modules/events/events.repository'
 import { EventsService } from '../../../apps/api/src/modules/events/events.service'
@@ -465,6 +466,9 @@ export async function startLocalPactProvider({
       PremiumEntitlementGuard,
     ],
   })
+    // No database in this harness. `moderation-history-route-period` proves the guard on the real one.
+    .overrideGuard(ModerationOperatorGuard)
+    .useValue({ canActivate: () => true })
     .overrideGuard(RequestAuthGuard)
     .useValue(
       new RequestAuthGuard(guardianConsentStateService, accessTokenIdentityService)
