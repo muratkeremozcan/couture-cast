@@ -559,3 +559,18 @@ test.describe('P-HISTORY: the flag', () => {
     }
   )
 })
+
+test.describe('P-LANG: the page says what language it is in', () => {
+  test.use({ locale: 'de-DE' })
+
+  test('[P1] P-LANG names the rendered language on the evidence page, WCAG 3.1.1', async ({
+    page,
+    fx,
+  }) => {
+    const admin = await fx.operator()
+    await signInAs(page, admin.id, 'admin')
+    await page.goto('/moderation/evidence')
+    await expect(page.getByRole('heading', { name: 'Nachweisexport' })).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('lang', /^de\b/)
+  })
+})
