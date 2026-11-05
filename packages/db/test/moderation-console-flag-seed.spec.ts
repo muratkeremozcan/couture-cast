@@ -20,3 +20,17 @@ describe('6.10-SEED-001 moderation_console_enabled', () => {
     expect(getDefaultFeatureFlagValue('moderation_console_enabled')).toBe(false)
   })
 })
+
+describe('U-F-REGISTRY moderation_sla_monitoring_enabled', () => {
+  it('is seeded true for local and test environments', () => {
+    expect(
+      SEEDED_FEATURE_FLAGS.find(
+        (flag) => flag.key === 'moderation_sla_monitoring_enabled'
+      )
+    ).toEqual({ key: 'moderation_sla_monitoring_enabled', value: true })
+  })
+
+  it('stays false in the registry, which is what production resolves', () => {
+    expect(getDefaultFeatureFlagValue('moderation_sla_monitoring_enabled')).toBe(false)
+  })
+})

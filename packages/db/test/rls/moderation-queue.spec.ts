@@ -42,7 +42,12 @@ describe('moderation console RLS', () => {
       async () => {
         expect(MODERATION_QUEUE_READ_TABLES.length).toBeGreaterThanOrEqual(9)
         expect(MODERATION_QUEUE_READ_TABLES).toEqual(
-          expect.arrayContaining(['ModerationDecision', 'CommunitySanction'])
+          expect.arrayContaining([
+            'ModerationDecision',
+            'CommunitySanction',
+            'ModerationSlaAlert',
+            'ModerationSlaMonitor',
+          ])
         )
         expect(new Set(MODERATION_QUEUE_READ_TABLES).size).toBe(
           MODERATION_QUEUE_READ_TABLES.length

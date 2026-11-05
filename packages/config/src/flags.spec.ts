@@ -27,6 +27,7 @@ describe('feature flag registry', () => {
       'share_card_native_share_enabled',
       'moderation_console_enabled',
       'moderation_decisions_enabled',
+      'moderation_sla_monitoring_enabled',
     ])
   })
 
@@ -90,10 +91,25 @@ describe('feature flag registry', () => {
     ).resolves.toBe(false)
   })
 
-  it('U-D-FLAG: defaults the decisions kill switch to off, last in the registry', () => {
+  it('U-D-FLAG: defaults the decisions kill switch to off', () => {
     // Story 6.11 D3: production stays off until someone flips it. Only the dev seed turns it on.
     expect(getDefaultFeatureFlagValue('moderation_decisions_enabled')).toBe(false)
-    expect(FEATURE_FLAG_KEYS.at(-1)).toBe('moderation_decisions_enabled')
+    expect(FEATURE_FLAG_KEYS).toContain('moderation_decisions_enabled')
+  })
+
+  it('U-F-REGISTRY: defaults SLA monitoring to off, last in the registry', () => {
+    // Story 6.12 D10: production stays off until the release owner opens it for the system subject.
+    expect(getDefaultFeatureFlagValue('moderation_sla_monitoring_enabled')).toBe(false)
+    expect(FEATURE_FLAG_KEYS.at(-1)).toBe('moderation_sla_monitoring_enabled')
+  })
+
+  it('U-F-REGISTRY: resolves SLA monitoring to false when PostHog and the cache both fail', async () => {
+    await expect(
+      getFeatureFlag('moderation_sla_monitoring_enabled', 'system:moderation-sla', {
+        readRemoteFlag: vi.fn().mockRejectedValue(new Error('posthog down')),
+        readFallbackFlag: vi.fn().mockRejectedValue(new Error('database down')),
+      })
+    ).resolves.toBe(false)
   })
 
   it('U-D-FLAG: resolves the decisions flag to false when PostHog and the cache both fail', async () => {
