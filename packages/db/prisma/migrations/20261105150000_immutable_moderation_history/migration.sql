@@ -5,7 +5,8 @@
 --
 -- A LATER MIGRATION THAT CHANGES "ModerationDecision" FOLLOWS THE SAME SEQUENCE, because the role that
 -- runs migrations no longer owns the table: grant SET on the owner role to itself, SET ROLE, change,
--- RESET ROLE, revoke. `packages/db/test/migration-hygiene.spec.ts` enforces the revoke.
+-- RESET ROLE, revoke. `packages/db/test/migration-hygiene.spec.ts` enforces the revoke, and refuses a role
+-- keyword in either statement, which crashes Supabase's server.
 
 ALTER TABLE "ModerationDecision" ADD COLUMN "anonymized_at" TIMESTAMP(3);
 
@@ -67,7 +68,12 @@ END $$;
 
 -- Temporary, and revoked below. GRANT holds a lock on the role until this transaction ends, so migrations
 -- of other databases in the cluster wait here and cannot revoke this grant underneath this one.
-GRANT moderation_history_owner TO CURRENT_USER WITH SET TRUE, INHERIT FALSE;
+-- The role is named through format(): on Supabase, `GRANT ... TO CURRENT_USER` and `REVOKE ... FROM
+-- CURRENT_USER` segfault the backend in supautils and restart the server (measured on 17.6.1.054).
+DO $$
+BEGIN
+  EXECUTE format('GRANT moderation_history_owner TO %I WITH SET TRUE, INHERIT FALSE', current_user);
+END $$;
 
 -- The function reads tables with RLS on and no policy, and writes `AuditLog`, which forces RLS. Policies
 -- for this role would give the application role expressions that run as the owner, so it bypasses RLS.
@@ -254,4 +260,7 @@ RESET ROLE;
 
 REVOKE CREATE ON SCHEMA public FROM moderation_history_owner;
 REVOKE CREATE ON SCHEMA private FROM moderation_history_owner;
-REVOKE moderation_history_owner FROM CURRENT_USER;
+DO $$
+BEGIN
+  EXECUTE format('REVOKE moderation_history_owner FROM %I', current_user);
+END $$;

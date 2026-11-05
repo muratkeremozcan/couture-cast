@@ -918,12 +918,20 @@ A role that can call the function can also forge a request row and strip identit
 **A later migration that changes `ModerationDecision`** follows this sequence, and `packages/db/test/migration-hygiene.spec.ts` enforces the revoke:
 
 ```sql
-GRANT moderation_history_owner TO CURRENT_USER WITH SET TRUE, INHERIT FALSE;
+DO $$ BEGIN
+  EXECUTE format('GRANT moderation_history_owner TO %I WITH SET TRUE, INHERIT FALSE', current_user);
+END $$;
 SET ROLE moderation_history_owner;
 -- the change
 RESET ROLE;
-REVOKE moderation_history_owner FROM CURRENT_USER;
+DO $$ BEGIN
+  EXECUTE format('REVOKE moderation_history_owner FROM %I', current_user);
+END $$;
 ```
+
+**Never write `GRANT ... TO CURRENT_USER`, `TO SESSION_USER` or `REVOKE ... FROM CURRENT_USER` in a migration.**
+On Supabase those keywords segfault the backend in `supautils` and restart the whole server, which drops every connection (measured on `supabase/postgres:17.6.1.054`).
+A plain Postgres image does not show this, so a migration that changes roles has to run on the Supabase image before it merges.
 
 **Retention.**
 

@@ -334,7 +334,8 @@ export function saveModerationEvidenceFile(file: ModerationEvidenceFile): void {
   document.body.append(link)
   link.click()
   link.remove()
-  URL.revokeObjectURL(url)
+  // On a later tick, because some browsers abort a download whose URL is revoked during the click.
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 /** Why a decision or an appeal step did not apply. `offline` is a request that never got an answer. */
