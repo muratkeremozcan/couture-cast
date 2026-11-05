@@ -7,7 +7,12 @@ import request from 'supertest'
 import { PrismaClient } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
 import { ModerationHistoryRepository } from '../src/modules/moderation/moderation-history.repository.js'
-import { seedDecision } from './helpers/moderation-history-seed.js'
+import {
+  COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS,
+  CommunityMaintenanceService,
+} from '../src/modules/community/community-maintenance.service.js'
+import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
+import { erase, seedDecision } from './helpers/moderation-history-seed.js'
 import {
   NOW,
   ERASURE,
@@ -416,4 +421,174 @@ describe('A-X-DENIED-NO-AUDIT and A-FLAG-OFF', () => {
       ).rejects.toThrow()
     }
   )
+})
+
+/** Completes an erasure on the real sweep, so a later step meets what a real one leaves. */
+async function completeErasure(memberId: string) {
+  const service = new CommunityMaintenanceService(prisma, new InMemoryCommunityStorage())
+  await erase(prisma, memberId, NOW)
+  const atWindow = new Date(NOW.getTime() + COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS)
+  await service.sweepErasureRequests(atWindow)
+  await service.sweepErasureRequests(new Date(atWindow.getTime() + 30_000))
+  expect(
+    (
+      await prisma.moderationErasureRequest.findUniqueOrThrow({
+        where: { member_id: memberId },
+      })
+    ).completed_at
+  ).not.toBeNull()
+}
+
+describe('Evidence across the reports a decision joined', () => {
+  /** A post with two reports, the first by the exporter, and a decision over both. */
+  async function joined(role: 'moderator' | 'admin') {
+    const seeded = await fx.postCase({ reports: 2 })
+    const [mine, other] = seeded.reportIds as [string, string]
+    const decision = await seedDecision(prisma, {
+      caseKey: seeded.caseId,
+      at: NOW,
+      postId: seeded.postId,
+      subjectId: seeded.author.id,
+      reportIds: [mine, other],
+    })
+    return {
+      seeded,
+      mine,
+      other,
+      decision,
+      exporter: { id: seeded.reporters[0]!.id, role },
+    }
+  }
+
+  it('[A-X-ORPHAN-SIBLING] refuses the other report once the post is gone, with no audit row', async () => {
+    const { seeded, other, exporter } = await joined('moderator')
+    const direct = await exportAs(exporter, { scope: 'case', caseId: seeded.caseId })
+    expect([direct.status, codeOf(direct)]).toEqual([403, 'self_review_refused'])
+    await completeErasure(seeded.author.id)
+
+    const sibling = await exportAs(exporter, {
+      scope: 'case',
+      caseId: `orphan-post.${other}`,
+    })
+    expect([sibling.status, codeOf(sibling)]).toEqual([403, 'self_review_refused'])
+    expect(await auditCount('moderation_evidence_exported', exporter.id)).toBe(0)
+  })
+
+  it('[A-X-RANGE-CLOSURE] withholds every decision reached through a shared report', async () => {
+    const { mine, other, decision, exporter } = await joined('admin')
+    // A chain across re-keyed cases: neither names the exporter's report, and neither shares its case key.
+    const reachedOnlyThroughOther = await seedDecision(prisma, {
+      caseKey: `orphan-post.${other}`,
+      at: NOW,
+      reportIds: [other, 'a-third-report'],
+    })
+    const reachedAtTheEnd = await seedDecision(prisma, {
+      caseKey: 'orphan-post.a-third-report',
+      at: NOW,
+      reportIds: ['a-third-report'],
+    })
+    const unrelated = await fx.postCase()
+    const kept = await seedDecision(prisma, {
+      caseKey: unrelated.caseId,
+      at: NOW,
+      reportIds: unrelated.reportIds,
+    })
+    const day = NOW.toISOString().slice(0, 10)
+    const answered = await exportAs(exporter, {
+      scope: 'range',
+      from: `${day}T00:00:00.000Z`,
+      to: `${day}T23:59:59.999Z`,
+    })
+    expect(answered.status, JSON.stringify(answered.body)).toBe(200)
+    const bundle = parsed(answered)
+    const decisionIds = bundle.decisions.map((row) => row.decisionId)
+    expect(decisionIds).not.toContain(decision.id)
+    expect(decisionIds).not.toContain(reachedOnlyThroughOther.id)
+    expect(decisionIds).not.toContain(reachedAtTheEnd.id)
+    expect(decisionIds).toContain(kept.id)
+    const reportIds = bundle.reports.map((row) => row.reportId)
+    expect(reportIds).not.toContain(mine)
+    expect(reportIds).not.toContain(other)
+    expect(bundle.counts.withheldForConflict).toBeGreaterThanOrEqual(3)
+  })
+
+  it('[A-X-RANGE-CLOSURE] withholds a decision whose only link to the exporter is outside the period', async () => {
+    const { seeded, other, exporter } = await joined('admin')
+    await completeErasure(seeded.author.id)
+    // The decision that joined the reports is on NOW's day. This one is two days later.
+    const later = new Date(NOW.getTime() + 2 * DAY)
+    const reached = await seedDecision(prisma, {
+      caseKey: `orphan-post.${other}`,
+      at: later,
+      reportIds: [other],
+    })
+    const day = later.toISOString().slice(0, 10)
+    const answered = await exportAs(exporter, {
+      scope: 'range',
+      from: `${day}T00:00:00.000Z`,
+      to: `${day}T23:59:59.999Z`,
+    })
+    expect(answered.status, JSON.stringify(answered.body)).toBe(200)
+    const bundle = parsed(answered)
+    expect(bundle.decisions.map((row) => row.decisionId)).not.toContain(reached.id)
+    expect(bundle.reports.map((row) => row.reportId)).not.toContain(other)
+  })
+})
+
+describe('I-O-AFTER: an erased operator on the routes that read or write for staff', () => {
+  const erased = async (role: 'moderator' | 'admin') => {
+    const who = await operator(role)
+    await completeErasure(who.id)
+    return who
+  }
+  const getAs = (who: { id: string; role: string }, path: string) =>
+    request(serverUrl())
+      .get(path)
+      .set('Authorization', auth(who.role, who.id))
+      .set('x-couture-platform', 'web')
+
+  it('refuses the queue, the case, the SLA page and the export availability', async () => {
+    const seeded = await fx.postCase()
+    const who = await erased('admin')
+    for (const path of [
+      '/api/v1/moderation/cases',
+      `/api/v1/moderation/cases/${seeded.caseId}`,
+      '/api/v1/moderation/sla',
+      `${EXPORT}/availability`,
+    ]) {
+      const answered = await getAs(who, path)
+      expect([path, answered.status]).toEqual([path, 403])
+    }
+  })
+
+  it('refuses an export and an erasure request, and writes no audit row', async () => {
+    const seeded = await fx.postCase()
+    const target = await fx.member('target')
+    const who = await erased('admin')
+    const exported = await exportAs(who, { scope: 'case', caseId: seeded.caseId })
+    expect(exported.status).toBe(403)
+    const requested = await postAs(ERASURE, who.role, who.id).send({
+      memberId: target.id,
+    })
+    expect(requested.status).toBe(403)
+    expect(
+      await prisma.moderationErasureRequest.count({ where: { member_id: target.id } })
+    ).toBe(0)
+    expect(await auditCount('moderation_evidence_exported', who.id)).toBe(0)
+    expect(await auditCount('moderation_erasure_requested', who.id)).toBe(0)
+  })
+
+  it('refuses the older actions route', async () => {
+    const who = await erased('admin')
+    const answered = await postAs('/api/v1/moderation/actions', who.role, who.id).send({
+      moderatorId: who.id,
+      targetId: randomUUID(),
+      action: 'note',
+      reason: 'Words.',
+    })
+    expect(answered.status).toBe(403)
+    expect(
+      await prisma.moderationEvent.count({ where: { reviewed_by_id: who.id } })
+    ).toBe(0)
+  })
 })

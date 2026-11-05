@@ -795,7 +795,7 @@ describe('races, with the order forced by a barrier', () => {
    * reports it blocked behind `first`, then lets both finish. A second that does not wait fails here.
    */
   async function inForcedOrder<A, B>(
-    table: 'ModerationDecision' | 'ModerationErasureRequest',
+    table: 'AuditLog' | 'ModerationErasureRequest',
     first: () => Promise<A>,
     second: () => Promise<B>
   ): Promise<[A, B]> {
@@ -827,7 +827,7 @@ describe('races, with the order forced by a barrier', () => {
   it('[I-E-RACE-REPORTER] redacts a decision that was running when a reporter was erased', async () => {
     const seeded = await fx.postCase()
     const decision = await decide(seeded.caseId, 'escalate')
-    const [answered] = await inForcedOrder('ModerationDecision', decision, () =>
+    const [answered] = await inForcedOrder('AuditLog', decision, () =>
       erase(prisma, seeded.reporters[0]!.id, NOW)
     )
     expect(answered.status).toBe(200)
@@ -861,7 +861,7 @@ describe('races, with the order forced by a barrier', () => {
   it('[I-E-RACE-SUBJECT] strips a decision that was running when its subject was erased', async () => {
     const seeded = await fx.postCase()
     const decision = await decide(seeded.caseId, 'resolve')
-    const [answered] = await inForcedOrder('ModerationDecision', decision, () =>
+    const [answered] = await inForcedOrder('AuditLog', decision, () =>
       erase(prisma, seeded.author.id, NOW)
     )
     expect(answered.status).toBe(200)

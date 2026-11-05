@@ -217,10 +217,17 @@ describe.runIf(reachable || automated)('moderation:history:verify', () => {
         `REVOKE ALL ON FUNCTION ${FUNCTION} FROM service_role`,
       ],
       [
+        'EXECUTE revoked from the connecting role',
+        'function_execute_granted',
+        `REVOKE EXECUTE ON FUNCTION ${FUNCTION} FROM ${APP_LOGIN}`,
+        `GRANT EXECUTE ON FUNCTION ${FUNCTION} TO ${APP_LOGIN}`,
+      ],
+      [
         'the function owner changed',
         'function_owner',
         `ALTER FUNCTION ${FUNCTION} OWNER TO ${APP_LOGIN}`,
-        `ALTER FUNCTION ${FUNCTION} OWNER TO ${OWNER_ROLE}`,
+        // The login's grant merged into the owner entry, so moving ownership back leaves it with none.
+        `ALTER FUNCTION ${FUNCTION} OWNER TO ${OWNER_ROLE}; GRANT EXECUTE ON FUNCTION ${FUNCTION} TO ${APP_LOGIN}`,
       ],
       [
         'the function made invoker',
