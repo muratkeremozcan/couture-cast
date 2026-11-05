@@ -333,11 +333,10 @@ describe.runIf(process.env.COMMUNITY_REAL_STORAGE_TEST === 'true')(
         expect(await stored(path)).toBeNull()
         const finalAt = later(requestedAt, COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS + 1)
         await eraser(storage).sweepErasureRequests(finalAt)
-        const done = await prisma.lookbookPost.findUniqueOrThrow({
-          where: { id: post.id },
-        })
-        expect(done.image_object_path).toBeNull()
-        expect(done.objects_purged_at).not.toBeNull()
+        // Story 6.13: once the objects are gone, completing the erasure deletes the post row too.
+        expect(
+          await prisma.lookbookPost.findUnique({ where: { id: post.id } })
+        ).toBeNull()
 
         // Source that mints no token has nothing to wait for, and fails below on the late write.
         const expiry = storage.capability?.expiresAt.getTime() ?? 0
