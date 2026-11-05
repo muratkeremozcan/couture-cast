@@ -32,6 +32,7 @@ import { moderationHistoryError } from '../../../../apps/api/src/modules/moderat
 import { moderationDecisionError } from '../../../../apps/api/src/modules/moderation/moderation-decision-rules'
 
 export type ModerationScenario =
+  | 'evidence_live'
   | 'queue'
   | 'empty'
   | 'orphan_queue'
@@ -562,6 +563,8 @@ export const moderationHistoryServiceDouble = {
       scenario === 'audit_unavailable'
     )
       return Promise.reject(moderationHistoryError(scenario))
+    // The two shapes of one row: untouched, and after erasure took its identity.
+    const live = scenario === 'evidence_live'
     return Promise.resolve(
       moderationEvidenceBundleSchema.parse({
         schemaVersion: 1,
@@ -583,14 +586,14 @@ export const moderationHistoryServiceDouble = {
             sequence: 1,
             source: 'post',
             action: 'resolve',
-            reason: null,
-            reasonRemoved: true,
-            moderatorId: null,
+            reason: live ? 'Breaks the community rules.' : null,
+            reasonRemoved: !live,
+            moderatorId: live ? 'moderator-1' : null,
             moderatorRole: 'moderator',
             subjectAlias: 'Style Explorer',
             isTerminal: true,
             decidedAt: PACT_SERVER_NOW,
-            anonymizedAt: PACT_SERVER_NOW,
+            anonymizedAt: live ? null : PACT_SERVER_NOW,
           },
         ],
         reports: [
@@ -599,7 +602,7 @@ export const moderationHistoryServiceDouble = {
             source: 'post',
             reason: 'harassment',
             origin: 'member',
-            reporterState: 'erased',
+            reporterState: live ? 'member' : 'erased',
             acceptedAt: PACT_SERVER_NOW,
             dueAt: PACT_SERVER_NOW,
             resolvedAt: PACT_SERVER_NOW,
@@ -609,7 +612,7 @@ export const moderationHistoryServiceDouble = {
           {
             eventType: 'moderation_decision_applied',
             occurredAt: PACT_SERVER_NOW,
-            actorId: null,
+            actorId: live ? 'moderator-1' : null,
             role: 'moderator',
             action: 'resolve',
           },

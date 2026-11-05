@@ -6,6 +6,7 @@
 // -RACE-SUBJECT, -RACE-REPORTER, -SWEEP-GUARD-GONE
 import { randomUUID } from 'node:crypto'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { buildCommunityObjectPath } from '@couture/utils'
 import { moderationDecisionResponseSchema } from '@couture/api-client/contracts/http'
 import { generateCommunityAuthorAlias } from '../src/modules/community/community-alias.js'
 import { memberIdentityRemains } from '../src/modules/community/community-erasure.js'
@@ -19,6 +20,7 @@ import {
   ERASED_REASON,
   erase,
   holdBarrier,
+  waitForLockWaiters,
   installTrigger,
   seedDecision,
   seedErasableMember,
@@ -536,9 +538,33 @@ describe('I-E-NO-REMINT', () => {
 })
 
 describe('I-E-LOCKED-OUT', () => {
-  it('denies an erased member report, reaction and comment, and writes nothing', async () => {
+  it('denies an erased member allocate, publish, report, comment and reaction, and writes nothing', async () => {
     const seeded = await seedErasableMember(prisma, fx, NOW)
+    // Allocate mints the upload session before the draft's transaction refuses the member.
+    Object.assign(ctx.storage, {
+      createUploadSession: () =>
+        Promise.resolve({ signedUrl: 'https://storage.test/upload', token: 'token' }),
+    })
     const target = await fx.post({ authorId: seeded.thirdParty.id })
+    // A draft with a live upload session, which is the one post a member could still try to publish.
+    const draftId = randomUUID()
+    const uploadSessionId = randomUUID()
+    const draftPath = buildCommunityObjectPath(draftId, uploadSessionId, 'jpg')
+    await prisma.lookbookPost.create({
+      data: {
+        id: draftId,
+        user_id: seeded.member.id,
+        status: 'draft',
+        image_object_path: draftPath,
+        upload_expires_at: new Date(Date.now() + 3_600_000),
+      },
+    })
+    Object.assign(ctx.storage, {
+      signReadUrls: (paths: string[]) =>
+        Promise.resolve(
+          new Map(paths.map((path) => [path, 'https://storage.test/read']))
+        ),
+    })
     await erase(prisma, seeded.member.id, NOW)
     const member = boot.member(seeded.member.id)
     const before = await prisma.communityPostReport.count({
@@ -546,37 +572,69 @@ describe('I-E-LOCKED-OUT', () => {
     })
     expect(before).toBe(0)
 
-    const report = await member.post(`/api/v1/community/posts/${target.id}/report`).send({
-      reason: 'harassment',
+    const postsBefore = await prisma.lookbookPost.count({
+      where: { user_id: seeded.member.id },
     })
-    expect(report.status).toBeGreaterThanOrEqual(403)
-    const comment = await member
-      .post(`/api/v1/community/posts/${target.id}/comments`)
-      .send({
+    const answers = {
+      report: await member.post(`/api/v1/community/posts/${target.id}/report`).send({
+        reason: 'harassment',
+      }),
+      reaction: await member
+        .put(`/api/v1/community/posts/${target.id}/reaction`)
+        .set('x-couture-platform', 'web')
+        .send({ selection: 'love', mutationId: randomUUID(), baseRevision: 0 }),
+      comment: await member.post(`/api/v1/community/posts/${target.id}/comments`).send({
         mutationId: randomUUID(),
         body: 'A new comment',
         locale: 'en-US',
         parentId: null,
-      })
-    expect(comment.status).toBeGreaterThanOrEqual(403)
-    const postsBefore = await prisma.lookbookPost.count({
-      where: { user_id: seeded.member.id },
-    })
-    const allocate = await member
-      .post('/api/v1/community/posts/allocate')
+      }),
+      allocate: await member
+        .post('/api/v1/community/posts/allocate')
+        .set('Idempotency-Key', randomUUID())
+        .send({
+          locale: 'en-US',
+          contentType: 'image/jpeg',
+          byteSize: 1000,
+          sha256: 'a'.repeat(64),
+          widthPx: 512,
+          heightPx: 640,
+        }),
+    }
+    for (const [route, answer] of Object.entries(answers))
+      expect([
+        route,
+        answer.status,
+        (answer.body as { message?: string }).message,
+      ]).toEqual([route, 403, expect.stringMatching(/^Community account unavailable/)])
+    // A draft with a live session, the one post a member could still try to move.
+    const publish = await member
+      .post('/api/v1/community/posts/publish')
       .set('Idempotency-Key', randomUUID())
       .send({
+        postId: draftId,
+        uploadSessionId,
+        altText: 'An outfit on a sunny day',
+        altTextConfirmed: true,
+        caption: null,
         locale: 'en-US',
-        contentType: 'image/jpeg',
-        byteSize: 1000,
-        sha256: 'a'.repeat(64),
-        widthPx: 512,
-        heightPx: 640,
       })
-    expect(allocate.status).toBeGreaterThanOrEqual(403)
+    expect([publish.status, (publish.body as { message?: string }).message]).toEqual([
+      403,
+      expect.stringMatching(/^Community account unavailable/),
+    ])
+    expect(
+      await prisma.lookbookPost.findUniqueOrThrow({
+        where: { id: draftId },
+        select: { status: true, submitted_at: true },
+      })
+    ).toEqual({ status: 'draft', submitted_at: null })
     expect(
       await prisma.lookbookPost.count({ where: { user_id: seeded.member.id } })
     ).toBe(postsBefore)
+    expect(
+      await prisma.communityReaction.count({ where: { user_id: seeded.member.id } })
+    ).toBe(0)
 
     expect(
       await prisma.communityPostReport.count({ where: { reporter_id: seeded.member.id } })
@@ -639,7 +697,11 @@ describe('I-E-SANCTION', () => {
     const service = new CommunityMaintenanceService(prisma, {
       remove: () => Promise.resolve(),
     } as never)
-    await expect(service.sweepExpiredBanHolds(LATER)).resolves.toBeDefined()
+    await expect(service.sweepExpiredBanHolds(LATER)).resolves.toEqual({
+      subjects: 0,
+      posts: 0,
+      comments: 0,
+    })
   })
 })
 
@@ -728,100 +790,102 @@ describe('I-E-DECIDE-AFTER, I-E-CONSOLE-AFTER, I-E-MUTATION-REPLAY: the case aft
 describe('races, with the order forced by a barrier', () => {
   const barrierBody = (key: number) => `PERFORM pg_advisory_xact_lock(${key});`
 
-  it('[I-E-RACE-REPORTER] redacts a decision that was running when a reporter was erased', async () => {
-    const seeded = await fx.postCase()
-    const reporter = seeded.reporters[0]!
-    const staff = await moderator()
-    const expectedRevision = (await staff.detail(seeded.caseId)).revision
+  /**
+   * Holds `first` at a barrier inside its transaction, starts `second` and waits until the database
+   * reports it blocked behind `first`, then lets both finish. A second that does not wait fails here.
+   */
+  async function inForcedOrder<A, B>(
+    table: 'ModerationDecision' | 'ModerationErasureRequest',
+    first: () => Promise<A>,
+    second: () => Promise<B>
+  ): Promise<[A, B]> {
     const key = 900_000 + Math.floor(Math.random() * 90_000)
     const release = await holdBarrier(ctx.database.url, key)
-    const remove = await installTrigger(
-      prisma,
-      'ModerationDecision',
-      'BEFORE INSERT',
-      barrierBody(key)
-    )
+    const remove = await installTrigger(prisma, table, 'BEFORE INSERT', barrierBody(key))
     try {
-      const decision = staff.decide(seeded.caseId, {
-        action: 'escalate',
-        reason: REASON,
-        expectedRevision,
-      })
-      void decision.then(() => undefined)
+      const running = first()
+      running.catch(() => undefined)
       await waitForBarrierWaiter(prisma, key)
-      const erasure = erase(prisma, reporter.id, NOW)
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      const blocked = second()
+      blocked.catch(() => undefined)
+      await waitForLockWaiters(prisma, 2)
       await release()
-      const [answered] = await Promise.all([decision, erasure])
-      expect(answered.status).toBe(200)
+      return await Promise.all([running, blocked])
     } finally {
+      await release()
       await remove()
     }
-    const [row] = await prisma.moderationDecision.findMany({
+  }
+
+  const decide = async (caseId: string, action: 'escalate' | 'resolve') => {
+    const staff = await moderator()
+    const expectedRevision = (await staff.detail(caseId)).revision
+    return () =>
+      Promise.resolve(staff.decide(caseId, { action, reason: REASON, expectedRevision }))
+  }
+
+  it('[I-E-RACE-REPORTER] redacts a decision that was running when a reporter was erased', async () => {
+    const seeded = await fx.postCase()
+    const decision = await decide(seeded.caseId, 'escalate')
+    const [answered] = await inForcedOrder('ModerationDecision', decision, () =>
+      erase(prisma, seeded.reporters[0]!.id, NOW)
+    )
+    expect(answered.status).toBe(200)
+    const rows = await prisma.moderationDecision.findMany({
       where: { case_key: seeded.caseId },
     })
-    expect(row!.reason).toBe(ERASED_REASON)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.reason).toBe(ERASED_REASON)
   })
 
   it('[I-E-RACE-REPORTER] lets a decision run after a reporter erasure with no deadlock', async () => {
     const seeded = await fx.postCase({ reports: 2 })
-    const reporter = seeded.reporters[0]!
-    const staff = await moderator()
-    const expectedRevision = (await staff.detail(seeded.caseId)).revision
-    const key = 900_000 + Math.floor(Math.random() * 90_000)
-    const release = await holdBarrier(ctx.database.url, key)
-    const remove = await installTrigger(
-      prisma,
+    const decision = await decide(seeded.caseId, 'resolve')
+    const [, answered] = await inForcedOrder(
       'ModerationErasureRequest',
-      'BEFORE INSERT',
-      barrierBody(key)
+      () => erase(prisma, seeded.reporters[0]!.id, NOW),
+      decision
     )
-    try {
-      const erasure = erase(prisma, reporter.id, NOW)
-      await waitForBarrierWaiter(prisma, key)
-      const decision = staff.decide(seeded.caseId, {
-        action: 'resolve',
-        reason: REASON,
-        expectedRevision,
-      })
-      void decision.then(() => undefined)
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      await release()
-      await erasure
-      expect((await decision).status).toBeLessThan(500)
-    } finally {
-      await remove()
-    }
+    expect(answered.status).toBe(200)
     const report = await prisma.communityPostReport.findUniqueOrThrow({
       where: { id: seeded.reportIds[0]! },
     })
     expect(report.reporter_id).toBeNull()
-  })
-
-  it('[I-E-RACE-SUBJECT] leaves no subject id when a decision and the subject erasure run together', async () => {
-    const seeded = await fx.postCase()
-    const staff = await moderator()
-    const expectedRevision = (await staff.detail(seeded.caseId)).revision
-    const [answered] = await Promise.all([
-      staff.decide(seeded.caseId, {
-        action: 'resolve',
-        reason: REASON,
-        expectedRevision,
-      }),
-      erase(prisma, seeded.author.id, NOW),
-    ])
-    expect(answered.status).toBeLessThan(500)
-    const { CommunityMaintenanceService } = await import(
-      '../src/modules/community/community-maintenance.service.js'
-    )
-    const service = new CommunityMaintenanceService(prisma, {
-      remove: () => Promise.resolve(),
-    } as never)
-    await service.sweepErasureRequests(LATER)
     const rows = await prisma.moderationDecision.findMany({
       where: { case_key: seeded.caseId },
     })
-    expect(rows.every((row) => row.subject_user_id === null)).toBe(true)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.reason).toBe(REASON)
+  })
+
+  it('[I-E-RACE-SUBJECT] strips a decision that was running when its subject was erased', async () => {
+    const seeded = await fx.postCase()
+    const decision = await decide(seeded.caseId, 'resolve')
+    const [answered] = await inForcedOrder('ModerationDecision', decision, () =>
+      erase(prisma, seeded.author.id, NOW)
+    )
+    expect(answered.status).toBe(200)
+    const rows = await prisma.moderationDecision.findMany({
+      where: { case_key: seeded.caseId },
+    })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ subject_user_id: null, reason: ERASED_REASON })
+  })
+
+  it('[I-E-RACE-SUBJECT] stores no subject on a decision that waited behind the erasure', async () => {
+    const seeded = await fx.postCase()
+    const decision = await decide(seeded.caseId, 'resolve')
+    const [, answered] = await inForcedOrder(
+      'ModerationErasureRequest',
+      () => erase(prisma, seeded.author.id, NOW),
+      decision
+    )
+    expect(answered.status).toBe(200)
+    const rows = await prisma.moderationDecision.findMany({
+      where: { case_key: seeded.caseId },
+    })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.subject_user_id).toBeNull()
   })
 })
 

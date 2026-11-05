@@ -132,7 +132,10 @@ describe('source scans', () => {
       .filter((file) => /\.(ts|tsx|mjs|js|cjs)$/.test(file))
       // These specs name the statements in order to prove they are refused.
       .filter(
-        (file) => !/moderation-history|moderation-decisions\.service\.spec/.test(file)
+        (file) =>
+          !/(moderation-history[\w.-]*\.spec\.ts|moderation-decisions\.service\.spec\.ts)$/.test(
+            file
+          )
       )
       .filter((file) => {
         const text = read(file)
@@ -165,6 +168,10 @@ describe('source scans', () => {
         expect(`${file}: ${new RegExp(`${table}\\s*\\.\\s*delete`).test(text)}`).toBe(
           `${file}: false`
         )
+      // The prunes in this repository are mostly raw SQL, which the client-call check above cannot see.
+      expect(
+        `${file}: ${/(DELETE\s+FROM|TRUNCATE)\s+(public\.)?"(ModerationDecision|ModerationEvent|CommunityCommentAudit|CommunityPostReport|CommunityCommentReport|AuditLog)"/i.test(text)}`
+      ).toBe(`${file}: false`)
     }
   })
 

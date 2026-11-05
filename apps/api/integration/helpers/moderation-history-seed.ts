@@ -264,7 +264,11 @@ export async function holdBarrier(databaseUrl: string, key: number) {
   const client = new Client({ connectionString: databaseUrl })
   await client.connect()
   await client.query('SELECT pg_advisory_lock($1)', [key])
+  let released = false
+  // Safe to call twice, so a failed test can release it in `finally` and leave nothing waiting.
   return async () => {
+    if (released) return
+    released = true
     await client.query('SELECT pg_advisory_unlock($1)', [key])
     await client.end()
   }
@@ -283,4 +287,19 @@ export async function waitForBarrierWaiter(prisma: PrismaClient, key: number) {
     await new Promise((resolve) => setTimeout(resolve, 25))
   }
   throw new Error(`Nothing reached barrier ${key} within 15 seconds.`)
+}
+
+/** True once this many sessions on this database are blocked on a lock of any kind. */
+export async function waitForLockWaiters(prisma: PrismaClient, count: number) {
+  const deadline = Date.now() + 15_000
+  let waiting = 0
+  while (Date.now() < deadline) {
+    const rows = await prisma.$queryRaw<{ waiting: number }[]>`
+      SELECT count(*)::int AS waiting FROM pg_stat_activity
+      WHERE datname = current_database() AND wait_event_type = 'Lock'`
+    waiting = rows[0]?.waiting ?? 0
+    if (waiting >= count) return
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+  throw new Error(`${waiting} of ${count} sessions blocked on a lock after 15 seconds.`)
 }

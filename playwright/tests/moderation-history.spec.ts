@@ -255,6 +255,9 @@ test.describe('P-HISTORY: enforcement on the real role', () => {
           )
         ).rows[0]
       const before = await read()
+      // In one rolled-back transaction: on a regression, TRUNCATE would otherwise commit under the
+      // parallel workers that share this stack.
+      await client.query('BEGIN')
       for (const statement of [
         {
           sql: 'UPDATE "ModerationDecision" SET reason = \'rewritten\' WHERE id = $1',
@@ -262,12 +265,16 @@ test.describe('P-HISTORY: enforcement on the real role', () => {
         },
         { sql: 'DELETE FROM "ModerationDecision" WHERE id = $1', values: [row!.id] },
         { sql: 'TRUNCATE "ModerationDecision" CASCADE', values: [] },
-      ])
+      ]) {
+        await client.query('SAVEPOINT refused')
         await expect(client.query(statement.sql, statement.values)).rejects.toMatchObject(
           {
             code: '42501',
           }
         )
+        await client.query('ROLLBACK TO SAVEPOINT refused')
+      }
+      await client.query('ROLLBACK')
       expect(await read()).toEqual(before)
     } finally {
       await client.end()
@@ -427,7 +434,11 @@ test.describe('P-HISTORY: account erasure through the real route and the real sw
     await adminPage.goto('/moderation')
     await adminPage.getByRole('link', { name: 'Evidence export' }).click()
     await expect(adminPage).toHaveURL(/\/moderation\/evidence$/)
-    const today = new Date().toISOString().slice(0, 10)
+    // The decision's own day, so a run that crosses UTC midnight still selects it.
+    const { decided_at: decidedAt } = await prisma.moderationDecision.findFirstOrThrow({
+      where: { case_key: seeded.caseId },
+    })
+    const today = decidedAt.toISOString().slice(0, 10)
     await adminPage.getByLabel('From (UTC)').fill(today)
     await adminPage.getByLabel('To (UTC)').fill(today)
     const file = await downloadVia(adminPage, () =>
@@ -495,6 +506,7 @@ test.describe('P-HISTORY: account erasure through the real route and the real sw
     const moderator = await fx.operator()
     await signInAs(page, moderator.id)
     await page.goto(caseUrl(seeded.caseId))
+    await expect(panelOf(page)).toBeVisible()
     await expect(page.locator('body')).not.toContainText(seeded.canaries.details)
     await decideInBrowser(page, /^Resolve/)
     const resolved = await prisma.communityPostReport.findUniqueOrThrow({

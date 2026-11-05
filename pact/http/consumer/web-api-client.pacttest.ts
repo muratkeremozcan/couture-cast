@@ -21,6 +21,7 @@ import {
   verifyModerationEvidenceAvailabilityInteraction,
   verifyModerationEvidenceClosedInteraction,
   verifyModerationEvidenceExportInteraction,
+  LIVE_EVIDENCE_ROWS,
   verifyModerationEvidenceRefusal,
   verifyModerationSlaInteraction,
 } from './interactions/moderation'
@@ -1017,6 +1018,10 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
   })
   it('exports the evidence of one case', async () => {
     await verifyModerationEvidenceExportInteraction(pact)
+  })
+
+  it('exports the evidence of a case nobody has erased', async () => {
+    await verifyModerationEvidenceExportInteraction(pact, LIVE_EVIDENCE_ROWS)
   })
   it.each(moderationEvidenceRefusals)('refuses $name', async (refusal) => {
     await verifyModerationEvidenceRefusal(pact, refusal)

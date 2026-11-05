@@ -215,9 +215,15 @@ export async function createHistoryDatabase(): Promise<HistoryDatabase> {
     await admin.end()
   }
 
+  await dropAbandonedDatabases(superBase)
   const name = await createEmptyDatabase()
   const appUrl = appLoginUrl(name)
-  await migrateAs(appUrl)
+  try {
+    await migrateAs(appUrl)
+  } catch (error) {
+    await dropDatabase(superBase, name)
+    throw error
+  }
 
   const superUrl = urlFor(superBase, name)
   const connect = async (url: string) => {
@@ -241,6 +247,27 @@ export async function createHistoryDatabase(): Promise<HistoryDatabase> {
       }
     },
     drop: () => dropDatabase(superBase, name),
+  }
+}
+
+/**
+ * A killed run cannot clean up after itself. Age keeps this off a live run's database: the suites in
+ * this workspace run one file at a time, and a run takes minutes.
+ */
+async function dropAbandonedDatabases(superBase: string): Promise<void> {
+  const admin = new Client({ connectionString: superBase })
+  await admin.connect()
+  try {
+    const { rows } = await admin.query<{ datname: string }>(
+      `SELECT datname FROM pg_database
+       WHERE datname ~ '^mh_[0-9a-f]{24}$'
+         AND (pg_stat_file('base/' || oid || '/PG_VERSION')).modification
+           < now() - interval '6 hours'`
+    )
+    for (const { datname } of rows)
+      await admin.query(`DROP DATABASE IF EXISTS ${datname} WITH (FORCE)`)
+  } finally {
+    await admin.end()
   }
 }
 

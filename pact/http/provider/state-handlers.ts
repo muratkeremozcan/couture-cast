@@ -151,6 +151,12 @@ export const stateHandlers: StateHandlers = {
     configureModerationScenario('queue')
     return Promise.resolve({ description: 'Configured an open export for a moderator' })
   },
+  'A moderator can export the evidence of a case nobody has erased': () => {
+    configureModerationConsole(true)
+    configureModerationHistory(true)
+    configureModerationScenario('evidence_live')
+    return Promise.resolve({ description: 'Configured an export of untouched rows' })
+  },
   'Evidence export is off for a moderator': () => {
     configureModerationConsole(true)
     configureModerationHistory(false)

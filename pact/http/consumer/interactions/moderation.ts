@@ -1215,12 +1215,46 @@ export async function verifyModerationEvidenceClosedInteraction(pact: PactV4) {
     })
 }
 
+/** One case's rows before and after erasure, because a nullable column pins nothing on its null side. */
+interface EvidenceRows {
+  state: string
+  description: string
+  reason: unknown
+  reasonRemoved: boolean
+  actorId: unknown
+  anonymizedAt: unknown
+  reporterState: 'member' | 'erased'
+}
+
+const ERASED_EVIDENCE_ROWS: EvidenceRows = {
+  state: 'A moderator can export evidence',
+  description: 'a moderator exporting the evidence of one case',
+  reason: nullValue(),
+  reasonRemoved: true,
+  actorId: nullValue(),
+  anonymizedAt: iso(SERVER_NOW),
+  reporterState: 'erased',
+}
+
+export const LIVE_EVIDENCE_ROWS: EvidenceRows = {
+  state: 'A moderator can export the evidence of a case nobody has erased',
+  description: 'a moderator exporting the evidence of a case nobody has erased',
+  reason: string('Breaks the community rules.'),
+  reasonRemoved: false,
+  actorId: string('moderator-1'),
+  anonymizedAt: nullValue(),
+  reporterState: 'member',
+}
+
 // Provider endpoint: /api/v1/moderation/evidence-exports -> POST ModerationHistoryController.exportEvidence
-export async function verifyModerationEvidenceExportInteraction(pact: PactV4) {
+export async function verifyModerationEvidenceExportInteraction(
+  pact: PactV4,
+  rows: EvidenceRows = ERASED_EVIDENCE_ROWS
+) {
   await pact
     .addInteraction()
-    .given(...state('A moderator can export evidence'))
-    .uponReceiving('a moderator exporting the evidence of one case')
+    .given(...state(rows.state))
+    .uponReceiving(rows.description)
     .withRequest(
       'POST',
       EVIDENCE_PATH,
@@ -1252,21 +1286,21 @@ export async function verifyModerationEvidenceExportInteraction(pact: PactV4) {
             sequence: like(1),
             source: 'post',
             action: 'resolve',
-            reason: nullValue(),
-            reasonRemoved: true,
-            moderatorId: nullValue(),
+            reason: rows.reason,
+            reasonRemoved: rows.reasonRemoved,
+            moderatorId: rows.actorId,
             moderatorRole: 'moderator',
             subjectAlias: string('Style Explorer'),
             isTerminal: true,
             decidedAt: iso(SERVER_NOW),
-            anonymizedAt: iso(SERVER_NOW),
+            anonymizedAt: rows.anonymizedAt,
           }),
           reports: eachLike({
             reportId: string('report-1'),
             source: 'post',
             reason: string('harassment'),
             origin: 'member',
-            reporterState: 'erased',
+            reporterState: rows.reporterState,
             acceptedAt: iso(SERVER_NOW),
             dueAt: iso(SERVER_NOW),
             resolvedAt: iso(SERVER_NOW),
@@ -1274,7 +1308,7 @@ export async function verifyModerationEvidenceExportInteraction(pact: PactV4) {
           auditEvents: eachLike({
             eventType: 'moderation_decision_applied',
             occurredAt: iso(SERVER_NOW),
-            actorId: nullValue(),
+            actorId: rows.actorId,
             role: 'moderator',
             action: 'resolve',
           }),
@@ -1293,7 +1327,7 @@ export async function verifyModerationEvidenceExportInteraction(pact: PactV4) {
         exportModerationEvidenceFromWeb(EVIDENCE_CASE_REQUEST)
       )
       expect(file.fileName).toBe(`moderation-evidence-${file.bundle.exportId}.json`)
-      expect(file.bundle.decisions[0]?.reasonRemoved).toBe(true)
+      expect(file.bundle.decisions[0]?.reasonRemoved).toBe(rows.reasonRemoved)
     })
 }
 

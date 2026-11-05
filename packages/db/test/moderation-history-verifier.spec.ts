@@ -79,6 +79,8 @@ describe.runIf(reachable || automated)('moderation:history:verify', () => {
          END IF;
        END $$`
     )
+    // A run killed inside V-FAULTS leaves its grant, and the role outlives the database.
+    await root.query(`REVOKE ${OWNER_ROLE} FROM ${MEMBER_LOGIN}`)
   }, 180_000)
 
   afterAll(async () => {

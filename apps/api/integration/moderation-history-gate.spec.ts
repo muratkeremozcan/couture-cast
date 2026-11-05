@@ -75,10 +75,9 @@ describe('U-GATE-RECORD', () => {
       for (const file of files)
         expect(existsSync(path.join(repoRoot, file)), file).toBe(true)
       const commits = [...proof.matchAll(/\b[0-9a-f]{40}\b/g)].map((match) => match[0])
+      // The commit's existence is not checked here: the repository merges by squash and CI can be
+      // shallow, so a true proof commit can be absent from any later checkout. M-GATE-READ checked it.
       expect(commits.length, proof).toBeGreaterThan(0)
-      // The repository merges by squash and CI can be shallow, so a proof commit can be absent from
-      // this checkout. The format always holds, and a shallow history cannot prove it false.
-      expect(commits.every((commit) => commit.length === 40)).toBe(true)
     }
   )
 

@@ -4,6 +4,7 @@
 // Layout-dependent checks (contrast, real target pixels, widths and themes) run in the browser, M-VISUAL.
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { Profiler, type ReactElement } from 'react'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
@@ -346,25 +347,30 @@ describe('W-REMOVED-LABEL', () => {
 })
 
 describe('W-FLAG-OFF', () => {
-  it('renders no case control', async () => {
-    let answered = false
-    mockApi(
-      http.get(AVAILABILITY, () => {
-        answered = true
-        return json(errorBody(503, 'moderation_history_disabled'), 503)
-      })
+  /** The second commit is the availability answer rendering, so an empty DOM then means something. */
+  const renderUntilAnswered = async (element: ReactElement) => {
+    const commits = vi.fn()
+    const view = render(
+      <Profiler id="evidence" onRender={commits}>
+        {element}
+      </Profiler>
     )
-    const { container } = render(<ModerationEvidenceExport caseId="post.p1" />)
-    await waitFor(() => expect(answered).toBe(true))
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await waitFor(() => expect(commits.mock.calls.length).toBeGreaterThanOrEqual(2))
+    return view
+  }
+
+  it('renders no case control', async () => {
+    mockApi(closed())
+    const { container } = await renderUntilAnswered(
+      <ModerationEvidenceExport caseId="post.p1" />
+    )
     expect(container).toBeEmptyDOMElement()
   })
 
   it('renders no queue link, for a moderator or with the flag off', async () => {
     for (const handler of [available(false), closed()]) {
       mockApi(handler)
-      const view = render(<ModerationEvidenceLink />)
-      await new Promise((resolve) => setTimeout(resolve, 20))
+      const view = await renderUntilAnswered(<ModerationEvidenceLink />)
       expect(view.container).toBeEmptyDOMElement()
       view.unmount()
     }
