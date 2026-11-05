@@ -327,8 +327,10 @@ describe('C-WEB-Q-HOSTILE-TEXT: the excerpt', () => {
     await openQueue([summary({ excerpt: hostile })])
     expect(document.querySelector('script')).toBeNull()
     expect(document.querySelector('img')).toBeNull()
-    // The only link is the case link; the excerpt's markdown link is text.
+    // The header links to the SLA page, and the only link in the list is the case link: the
+    // excerpt's markdown link is text.
     expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      '/moderation/sla',
       '/moderation/cases/post.p1',
     ])
     expect(screen.getByText(/alert\(1\)/)).toBeInTheDocument()
@@ -618,7 +620,9 @@ describe('CodeRabbit review: empty state, retry and link names', () => {
       summary({ caseId: 'post.a', excerpt: 'Same caption' }),
       summary({ caseId: 'post.b', excerpt: 'Same caption' }),
     ])
-    const names = screen.getAllByRole('link').map((link) => link.textContent)
+    const names = within(screen.getByRole('list', { name: 'Cases' }))
+      .getAllByRole('link')
+      .map((link) => link.textContent)
     expect(
       screen.getByRole('link', { name: 'Post case Same caption Case post.a' })
     ).toHaveAttribute('href', '/moderation/cases/post.a')

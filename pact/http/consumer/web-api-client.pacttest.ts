@@ -17,6 +17,7 @@ import {
   verifyModerationQueueOrphanInteraction,
   verifyModerationQueueInteraction,
   verifyModerationRefusal,
+  verifyModerationSlaInteraction,
 } from './interactions/moderation'
 import {
   communityEngagementInteractions,
@@ -997,6 +998,10 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
   })
   it.each(moderationRefusals)('refuses $name', async (refusal) => {
     await verifyModerationRefusal(pact, refusal)
+  })
+  // Story 6.12: the SLA dashboard read. Its two refusals sit in moderationRefusals above.
+  it('reads the moderation SLA summary', async () => {
+    await verifyModerationSlaInteraction(pact)
   })
   // Story 6.11: the moderator's two write routes and the banned member's feed refusal.
   it('applies a moderation decision', async () => {

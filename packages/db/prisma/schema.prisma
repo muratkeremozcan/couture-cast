@@ -249,6 +249,21 @@ enum CommunityReportOrigin {
   screening
 }
 
+/// Story 6.12: what an operations alert announces.
+enum ModerationSlaAlertKind {
+  at_risk
+  breached
+  escalated
+}
+
+/// Story 6.12: where an operations alert stands. Only `pending` can still send.
+enum ModerationSlaAlertDelivery {
+  pending
+  delivered
+  console_only
+  superseded
+}
+
 /// Story 6.11: the decision vocabulary of `ModerationDecision`. The appeal steps
 /// share the table so they share its attribution, sequence and idempotency.
 enum ModerationDecisionAction {
@@ -1087,6 +1102,52 @@ model ModerationDecision {
   @@index([comment_id])
   @@index([subject_user_id])
   @@index([report_ids], type: Gin)
+}
+
+/// Story 6.12: one operations alert, which is both the console record and the delivery outbox.
+/// `dedupe_key` is `sla:<source>:<anchorReportId>:<kind>` or `escalated:<decisionId>`, so a retry,
+/// a restart and a concurrent worker all write one row. `anchor_report_id` and `decision_id` are
+/// plain columns, because a report id survives the erasure re-key and CC-6.13 owns the retention
+/// of both records. The row holds no reason, excerpt, alias, reporter or subject.
+/// RLS: API-only, enabled with zero policies and zero grants.
+///
+/// The migration adds the partial indexes `ModerationSlaAlert_deliverable_idx` ON
+/// (next_attempt_at, id) WHERE delivery = 'pending' and `ModerationSlaAlert_owed_escalation_idx`
+/// ON (id) WHERE an escalation is owed, and CHECKs on `source`, `risk`, `last_error_code` and
+/// `failure_owed_code`, none of which Prisma can express.
+model ModerationSlaAlert {
+  id                   String                     @id @default(cuid())
+  dedupe_key           String                     @unique
+  kind                 ModerationSlaAlertKind
+  case_key             String
+  source               String
+  anchor_report_id     String
+  risk                 String
+  sla_due_at           DateTime
+  decision_id          String?
+  detected_at          DateTime
+  delivery             ModerationSlaAlertDelivery @default(pending)
+  attempts             Int                        @default(0)
+  next_attempt_at      DateTime
+  lease_until          DateTime?
+  last_error_code      String?
+  delivered_at         DateTime?
+  /// The closed code of an owed failure escalation, set with the third recorded failure. A later
+  /// delivery leaves it, so the repair pass owes the record whatever the alert does next.
+  failure_owed_code    String?
+  failure_escalated_at DateTime?
+
+  @@index([detected_at(sort: Desc), id(sort: Desc)])
+}
+
+/// Story 6.12: the monitor's own record, one row with id `default`, stamped at the end of each
+/// completed sweep so a serverless read can tell that the monitor stopped.
+/// RLS: API-only, enabled with zero policies and zero grants.
+model ModerationSlaMonitor {
+  id            String   @id @default("default")
+  last_sweep_at DateTime
+  /// `webhook` or `console`, as the sweep that stamped this row resolved its channel.
+  channel       String
 }
 
 /// Story 6.11: a community ban. Active means `lifted_at IS NULL AND (expires_at IS

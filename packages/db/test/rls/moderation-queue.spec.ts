@@ -9,7 +9,10 @@
 // without passing through this proof.
 import { randomUUID } from 'node:crypto'
 import { describe, expect } from 'vitest'
-import { MODERATION_QUEUE_READ_TABLES } from '../../../../apps/api/src/modules/moderation/moderation-queue-tables.ts'
+import {
+  MODERATION_QUEUE_READ_TABLES,
+  MODERATION_SLA_TABLES,
+} from '../../../../apps/api/src/modules/moderation/moderation-queue-tables.ts'
 import {
   adminPool,
   buildClaims,
@@ -17,6 +20,9 @@ import {
   useRlsDatabase,
   withRole,
 } from './harness.js'
+
+/** The queue's read set and the SLA monitor's tables, under one RLS proof. */
+const MODERATED_TABLES = [...MODERATION_QUEUE_READ_TABLES, ...MODERATION_SLA_TABLES]
 
 /** Postgres `insufficient_privilege`. `anon` may also be refused at the schema first. */
 const PERMISSION_DENIED = '42501'
@@ -40,16 +46,19 @@ describe('moderation console RLS', () => {
     scenarioTest(
       'D-RLS-DENIED lists the tables the moderation routes read and none is empty or duplicated',
       async () => {
-        expect(MODERATION_QUEUE_READ_TABLES.length).toBeGreaterThanOrEqual(9)
-        expect(MODERATION_QUEUE_READ_TABLES).toEqual(
-          expect.arrayContaining(['ModerationDecision', 'CommunitySanction'])
+        expect(MODERATED_TABLES.length).toBeGreaterThanOrEqual(11)
+        expect(MODERATED_TABLES).toEqual(
+          expect.arrayContaining([
+            'ModerationDecision',
+            'CommunitySanction',
+            'ModerationSlaAlert',
+            'ModerationSlaMonitor',
+          ])
         )
-        expect(new Set(MODERATION_QUEUE_READ_TABLES).size).toBe(
-          MODERATION_QUEUE_READ_TABLES.length
-        )
+        expect(new Set(MODERATED_TABLES).size).toBe(MODERATED_TABLES.length)
         const client = await adminPool.connect()
         try {
-          for (const table of MODERATION_QUEUE_READ_TABLES) {
+          for (const table of MODERATED_TABLES) {
             const { rows } = await client.query<{ present: boolean }>(
               'SELECT to_regclass($1) IS NOT NULL AS present',
               [`public."${table}"`]
@@ -67,7 +76,7 @@ describe('moderation console RLS', () => {
       async () => {
         const client = await adminPool.connect()
         try {
-          for (const table of MODERATION_QUEUE_READ_TABLES)
+          for (const table of MODERATED_TABLES)
             for (const role of CLIENT_ROLES)
               for (const privilege of PRIVILEGES) {
                 const { rows } = await client.query<{ granted: boolean }>(
@@ -85,7 +94,7 @@ describe('moderation console RLS', () => {
     scenarioTest(
       'D-RLS-DENIED refuses a live SELECT, INSERT, UPDATE and DELETE from anon and authenticated',
       async ({ scenario }) => {
-        for (const table of MODERATION_QUEUE_READ_TABLES)
+        for (const table of MODERATED_TABLES)
           for (const role of CLIENT_ROLES) {
             const claims =
               role === 'anon' ? null : buildClaims(scenario.teenEmail, 'moderator')
@@ -111,7 +120,7 @@ describe('moderation console RLS', () => {
       'D-RLS-DENIED keeps a moderator or admin claim from opening the tables: the API role is the only reader',
       async ({ scenario }) => {
         for (const claimedRole of ['moderator', 'admin'])
-          for (const table of MODERATION_QUEUE_READ_TABLES)
+          for (const table of MODERATED_TABLES)
             await withRole(
               'authenticated',
               buildClaims(scenario.teenEmail, claimedRole),

@@ -100,3 +100,22 @@ export async function registerMaintenanceSchedulers(
     ),
   ])
 }
+
+/**
+ * Story 6.12: the SLA sweep. Every minute, so a breach alert waits at most one sweep plus the
+ * channel. The hosted community worker does not subscribe to this queue, so it runs the same
+ * function on `MODERATION_SLA_SWEEP_INTERVAL_MS` instead.
+ */
+export const MODERATION_SLA_SWEEP_JOB_NAME = 'moderation-sla-sweep'
+export const MODERATION_SLA_SWEEP_CRON_PATTERN = '* * * * *'
+
+/** Keyed on the scheduler id, so each worker start updates the one scheduler. */
+export async function registerModerationSlaScheduler(
+  queue: MaintenanceSchedulerQueue
+): Promise<void> {
+  await queue.upsertJobScheduler(
+    MODERATION_SLA_SWEEP_JOB_NAME,
+    { pattern: MODERATION_SLA_SWEEP_CRON_PATTERN },
+    { name: MODERATION_SLA_SWEEP_JOB_NAME, data: {} }
+  )
+}

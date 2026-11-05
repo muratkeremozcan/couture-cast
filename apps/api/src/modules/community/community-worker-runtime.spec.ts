@@ -334,7 +334,7 @@ describe('createCommunityWorkerRuntime', () => {
     }
   })
 
-  it('exposes exactly the five sweeps both process groups drive', async () => {
+  it('exposes exactly the six sweeps both process groups drive', async () => {
     const runtime = await createCommunityWorkerRuntime({
       prisma,
       telemetryService,
@@ -370,12 +370,39 @@ describe('createCommunityWorkerRuntime', () => {
       'sweepErasureRequests',
       'sweepExpiredBanHolds',
       'sweepExpiredUploads',
+      'sweepModerationSla',
       'sweepStalePendingReview',
     ])
     expect(harness.dispatchPending).toHaveBeenCalled()
     expect(harness.sweepStalePendingReview).toHaveBeenCalled()
     expect(harness.sweepExpiredUploads).toHaveBeenCalled()
     expect(harness.sweepErasureRequests).toHaveBeenCalled()
+  })
+
+  it('U-W-FACTORY: the one sweep both process groups call is the one it is given', async () => {
+    const run = vi.fn().mockResolvedValue({ recorded: 2 })
+    const runtime = await createCommunityWorkerRuntime({
+      prisma,
+      telemetryService,
+      meter: meter(),
+      moderationSla: { run } as never,
+    })
+
+    await expect(runtime.sweeps.sweepModerationSla()).resolves.toEqual({ recorded: 2 })
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('U-W-FACTORY: a composition with no sweep stays off', async () => {
+    const runtime = await createCommunityWorkerRuntime({
+      prisma,
+      telemetryService,
+      meter: meter(),
+    })
+
+    await expect(runtime.sweeps.sweepModerationSla()).resolves.toEqual({
+      skipped: 1,
+      recorded: 0,
+    })
   })
 
   it('writes its presence heartbeat on the worker connection and removes it before the worker closes', async () => {

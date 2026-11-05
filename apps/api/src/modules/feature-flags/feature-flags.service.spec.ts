@@ -144,6 +144,7 @@ describe('FeatureFlagsService', () => {
       ['share_card_native_share_enabled', false],
       ['moderation_console_enabled', false],
       ['moderation_decisions_enabled', false],
+      ['moderation_sla_monitoring_enabled', false],
     ])
 
     const cachedValues = new Map<string, boolean | null>([
@@ -158,6 +159,7 @@ describe('FeatureFlagsService', () => {
       ['share_card_native_share_enabled', null],
       ['moderation_console_enabled', null],
       ['moderation_decisions_enabled', null],
+      ['moderation_sla_monitoring_enabled', null],
     ])
 
     const findValue = vi
@@ -179,7 +181,7 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 11, fallbackCount: 0 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 12, fallbackCount: 0 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: true },
       { key: 'community_read_enabled', value: false },
@@ -192,6 +194,7 @@ describe('FeatureFlagsService', () => {
       { key: 'share_card_native_share_enabled', value: false },
       { key: 'moderation_console_enabled', value: false },
       { key: 'moderation_decisions_enabled', value: false },
+      { key: 'moderation_sla_monitoring_enabled', value: false },
     ])
   })
 
@@ -217,7 +220,7 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 11, fallbackCount: 11 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 12, fallbackCount: 12 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: false },
       { key: 'community_read_enabled', value: false },
@@ -238,6 +241,7 @@ describe('FeatureFlagsService', () => {
       { key: 'share_card_native_share_enabled', value: false },
       { key: 'moderation_console_enabled', value: false },
       { key: 'moderation_decisions_enabled', value: false },
+      { key: 'moderation_sla_monitoring_enabled', value: false },
     ])
   })
 })

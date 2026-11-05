@@ -8,6 +8,8 @@ import {
   moderationCaseDetailResponseSchema,
   moderationDecisionErrorSchema,
   moderationQueueErrorSchema,
+  moderationSlaErrorSchema,
+  moderationSlaResponseSchema,
   trackedResponseSchema,
   unauthorizedHttpErrorSchema,
 } from '@couture/api-client/contracts/http'
@@ -756,6 +758,57 @@ test.describe('P-D-ROLES moderation decision write routes (Story 6.11)', () => {
         const response = await request[method](`${baseUrl}${path}`, { headers })
         expect([404, 405], `${method} ${path}`).toContain(response.status())
       }
+    }
+  })
+})
+
+test.describe('Moderation SLA read route (Story 6.12)', () => {
+  const SLA_PATH = '/api/v1/moderation/sla'
+
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      isProdEnvironment(testInfo),
+      'Synthetic moderator identities are not provisioned in production.'
+    )
+  })
+
+  test('[P0] P-SLA-ROLES refuses anonymous, guardian and teen with one body each, in private', async ({
+    request,
+  }, testInfo) => {
+    const baseUrl = resolveApiBaseUrl(testInfo)
+    const anonymous = await request.get(`${baseUrl}${SLA_PATH}`)
+    expect(anonymous.status()).toBe(401)
+    unauthorizedHttpErrorSchema.parse(await anonymous.json())
+    expect(anonymous.headers()['cache-control']).toBe('private, no-store')
+
+    for (const role of ['guardian', 'teen'] as const) {
+      const headers = authHeaders(buildUniqueId(`${role}-sla`, testInfo), role)
+      const sla = await request.get(`${baseUrl}${SLA_PATH}`, { headers })
+      const queue = await request.get(`${baseUrl}/api/v1/moderation/cases`, { headers })
+      expect(sla.status(), role).toBe(403)
+      expect(sla.headers()['cache-control']).toBe('private, no-store')
+      // Identical to the 6.10 refusal, so the body reveals neither the flag nor the route.
+      expect(await sla.json()).toEqual(await queue.json())
+    }
+  })
+
+  test('[P0] P-SLA-ROLES lets a moderator and an admin read a strict body, or a closed 503', async ({
+    request,
+  }, testInfo) => {
+    const baseUrl = resolveApiBaseUrl(testInfo)
+    for (const role of ['moderator', 'admin'] as const) {
+      const response = await request.get(`${baseUrl}${SLA_PATH}`, {
+        headers: authHeaders(buildUniqueId(`${role}-sla`, testInfo), role),
+      })
+      expect(response.headers()['cache-control']).toBe('private, no-store')
+      if (response.status() === 503) {
+        expect(moderationSlaErrorSchema.parse(await response.json()).code).toBe(
+          'moderation_sla_disabled'
+        )
+        continue
+      }
+      expect(response.status(), role).toBe(200)
+      moderationSlaResponseSchema.parse(await response.json())
     }
   })
 })

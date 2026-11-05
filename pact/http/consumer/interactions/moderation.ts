@@ -24,6 +24,7 @@ import {
 import {
   applyModerationDecisionFromWeb,
   getModerationCaseFromWeb,
+  getModerationSlaFromWeb,
   listModerationCasesFromWeb,
   ModerationDecisionRequestError,
   ModerationRequestError,
@@ -49,6 +50,7 @@ const iso = (example: string) => regex(ISO, example)
 const SERVER_NOW = '2026-11-03T12:00:00.000Z'
 const CURSOR = 'eyJ2IjoxfQ.c2lnbmF0dXJl'
 const QUEUE_PATH = '/api/v1/moderation/cases'
+const SLA_PATH = '/api/v1/moderation/sla'
 const CASE_PATH = '/api/v1/moderation/cases/post.pactpost1'
 const CASE_ID = 'post.pactpost1'
 const DECISION_PATH = `${CASE_PATH}/decisions`
@@ -602,6 +604,36 @@ type Refusal = {
 
 export const moderationRefusals: Refusal[] = [
   {
+    name: 'a guardian reading the SLA summary while the console is off',
+    given: consoleOff,
+    path: SLA_PATH,
+    headers: pactEventHeaders,
+    token: pactEventAuth.accessToken,
+    status: 403,
+    reason: 'forbidden',
+    body: {
+      statusCode: like(403),
+      message: string('Insufficient role'),
+      error: string('Forbidden'),
+    },
+    call: () => getModerationSlaFromWeb(),
+  },
+  {
+    name: 'a moderator reading the SLA summary while monitoring is off',
+    given: 'SLA monitoring is off for a moderator',
+    path: SLA_PATH,
+    headers: pactModeratorHeaders,
+    token: pactModeratorAuth.accessToken,
+    status: 503,
+    reason: 'disabled',
+    body: {
+      statusCode: 503,
+      code: 'moderation_sla_disabled',
+      message: string('SLA monitoring is not available.'),
+    },
+    call: () => getModerationSlaFromWeb(),
+  },
+  {
     name: 'a guardian reading the queue while the console is off',
     given: consoleOff,
     path: QUEUE_PATH,
@@ -680,6 +712,66 @@ export const moderationRefusals: Refusal[] = [
     call: () => getModerationCaseFromWeb('post.pactpost1'),
   },
 ]
+
+/**
+ * Story 6.12 test owner: C-PACT, the SLA summary the dashboard reads.
+ * Closed values the provider state fixes are exact. Counts and times use matchers.
+ */
+// Provider endpoint: /api/v1/moderation/sla -> GET ModerationSlaController.getSla
+export async function verifyModerationSlaInteraction(pact: PactV4) {
+  await pact
+    .addInteraction()
+    .given(...state('A moderator reads the SLA summary'))
+    .uponReceiving('a moderator reading the SLA summary')
+    .withRequest('GET', SLA_PATH, setJsonContent({ headers: pactModeratorHeaders }))
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { 'Cache-Control': 'private, no-store' },
+        body: {
+          data: {
+            serverNow: iso(SERVER_NOW),
+            monitor: { lastSweepAt: iso(SERVER_NOW), stale: false, channel: 'webhook' },
+            queue: {
+              onTrack: like(1),
+              atRisk: like(1),
+              breached: like(1),
+              escalated: like(1),
+              oldestDueAt: iso(SERVER_NOW),
+            },
+            resolution: {
+              windowDays: 7,
+              resolved: like(2),
+              withinSla: like(1),
+              late: like(1),
+            },
+            alerts: { pending: like(0), failing: like(0), consoleOnly: like(0) },
+            screening: { oldestPendingReviewAt: nullValue() },
+            recentAlerts: eachLike({
+              id: string('alert-1'),
+              kind: 'breached',
+              caseId: string(CASE_ID),
+              source: 'post',
+              risk: 'high',
+              slaDueAt: iso(SERVER_NOW),
+              detectedAt: iso(SERVER_NOW),
+              delivery: 'delivered',
+              attempts: like(1),
+              lastErrorCode: nullValue(),
+              deliveredAt: iso(SERVER_NOW),
+            }),
+          },
+        },
+      })
+    )
+    .executeTest(async (server: V3MockServer) => {
+      const data = await withWebSession(server, pactModeratorAuth.accessToken, () =>
+        getModerationSlaFromWeb()
+      )
+      expect(data.monitor.channel).toBe('webhook')
+      expect(data.recentAlerts[0]?.caseId).toBe(CASE_ID)
+    })
+}
 
 export async function verifyModerationRefusal(pact: PactV4, refusal: Refusal) {
   await pact

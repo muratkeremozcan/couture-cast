@@ -34,6 +34,7 @@ const REQUIRED = [
   'package-lock.json',
   'scripts/ci/android-talkback.sh',
   'scripts/ci/accessibility-focus-device-tests.sh',
+  'scripts/ci/fetch-gradle-wrapper.sh',
   'scripts/ci/check-accessibility-focus-results.mjs',
   'scripts/ci/check-accessibility-focus-builds.sh',
   'scripts/run-story67-talkback.mjs',

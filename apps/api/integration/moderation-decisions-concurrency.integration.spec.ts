@@ -196,6 +196,24 @@ async function waitForBlocked(count: number): Promise<string[]> {
   }
 }
 
+/**
+ * Waits for a session held on one named statement. `pg_stat_activity` copies each session's
+ * statement once per query while `pg_blocking_pids` reads live, so under load a real waiter can show
+ * the statement before the one it waits in. A later pass shows the right one, and a session truly
+ * stuck elsewhere fails here with what it was seen on.
+ */
+async function waitForBlockedOn(statement: RegExp): Promise<void> {
+  const deadline = performance.now() + WAITER_DEADLINE_MS
+  for (;;) {
+    const blocked = await blockedStatements()
+    if (blocked.some((query) => statement.test(query))) return
+    if (performance.now() > deadline)
+      throw new Error(
+        `no session blocked on ${statement}, saw ${JSON.stringify(blocked)}`
+      )
+  }
+}
+
 /** Report intake as both intake routes run it: the post row lock, then the insert, uncommitted. */
 async function openPostReportInsert(
   held: HeldConnection,
@@ -361,8 +379,7 @@ describe('I-C-REPORT-RACE: a report commits while a decision waits (TEA-01, S-3)
         reason: REASON,
         expectedRevision: revision,
       })
-      const waiting = await waitForBlocked(1)
-      expect(waiting[0]).toMatch(/LookbookPost.*FOR UPDATE/s)
+      await waitForBlockedOn(/LookbookPost.*FOR UPDATE/s)
       await held.query('COMMIT')
       return { response: await pending, newReportId: inserted }
     })
@@ -412,8 +429,7 @@ describe('I-C-REPORT-RACE: a report commits while a decision waits (TEA-01, S-3)
         reason: REASON,
         expectedRevision: revision,
       })
-      const waiting = await waitForBlocked(1)
-      expect(waiting[0]).toMatch(/LookbookPost.*FOR UPDATE/s)
+      await waitForBlockedOn(/LookbookPost.*FOR UPDATE/s)
       await held.query('COMMIT')
       return { response: await pending, newReportId: inserted }
     })

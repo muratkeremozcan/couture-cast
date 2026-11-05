@@ -16,6 +16,9 @@ import type * as WeatherConfigModule from '../modules/weather/providers/weather.
 import { createWorkerProcessState, performShutdown, startWorkers } from './bootstrap.js'
 
 const harness = vi.hoisted(() => ({
+  registerModerationSlaScheduler: vi.fn().mockResolvedValue(undefined),
+  initializeOpenTelemetry: vi.fn(() => false),
+  shutdownOpenTelemetry: vi.fn().mockResolvedValue(undefined),
   exit: vi.fn(),
   engagement: vi.fn().mockResolvedValue({ close: vi.fn() }),
   communityClose: vi.fn().mockResolvedValue(undefined),
@@ -86,6 +89,13 @@ vi.mock('../modules/weather/weather-scheduler', () => ({
 
 vi.mock('./maintenance.scheduler', () => ({
   registerMaintenanceSchedulers: vi.fn().mockResolvedValue(undefined),
+  registerModerationSlaScheduler: harness.registerModerationSlaScheduler,
+  MODERATION_SLA_SWEEP_JOB_NAME: 'moderation-sla-sweep',
+}))
+
+vi.mock('../instrumentation', () => ({
+  initializeOpenTelemetry: harness.initializeOpenTelemetry,
+  shutdownOpenTelemetry: harness.shutdownOpenTelemetry,
 }))
 
 vi.mock('../modules/community/community-maintenance.scheduler', () => ({
@@ -159,6 +169,48 @@ describe('general worker bootstrap', () => {
     expect(harness.createCommunityWorkerRuntime).toHaveBeenCalledTimes(1)
     expect(harness.exit).not.toHaveBeenCalled()
     await bootstrap.performShutdown()
+  })
+
+  it('U-W-FACTORY: passes a sweep, because a composition with none stays off for good', async () => {
+    const bootstrap = freshProcess()
+    await bootstrap.startWorkers()
+    expect(harness.createCommunityWorkerRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        moderationSla: expect.objectContaining({
+          run: expect.any(Function) as unknown,
+        }) as unknown,
+      })
+    )
+    await bootstrap.performShutdown()
+  })
+
+  it('U-W-SCHEDULER: registers the SLA sweep on the maintenance queue', async () => {
+    harness.registerModerationSlaScheduler.mockClear()
+    const bootstrap = freshProcess()
+    await bootstrap.startWorkers()
+    expect(harness.registerModerationSlaScheduler).toHaveBeenCalledOnce()
+    await bootstrap.performShutdown()
+  })
+
+  it('U-W-OTEL: starts OpenTelemetry and closes it on shutdown', async () => {
+    harness.initializeOpenTelemetry.mockClear()
+    harness.shutdownOpenTelemetry.mockClear()
+    const bootstrap = freshProcess()
+    await bootstrap.startWorkers()
+    expect(harness.initializeOpenTelemetry).toHaveBeenCalledOnce()
+    expect(harness.shutdownOpenTelemetry).not.toHaveBeenCalled()
+    await bootstrap.performShutdown()
+    expect(harness.shutdownOpenTelemetry).toHaveBeenCalledOnce()
+  })
+
+  it('U-W-OTEL: still flushes telemetry when a close rejects, and exits 1', async () => {
+    harness.shutdownOpenTelemetry.mockClear()
+    const bootstrap = freshProcess()
+    await bootstrap.startWorkers()
+    harness.shutdownWorkerResources.mockRejectedValueOnce(new Error('redis close failed'))
+    await bootstrap.performShutdown()
+    expect(harness.shutdownOpenTelemetry).toHaveBeenCalledOnce()
+    expect(harness.exit).toHaveBeenCalledWith(1)
   })
 
   it('waits for community readiness before it has a consumer to shut down', async () => {

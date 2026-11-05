@@ -9,6 +9,7 @@ import {
   type MaintenanceProcessorDeps,
 } from './maintenance.processor'
 import {
+  MODERATION_SLA_SWEEP_JOB_NAME,
   ADMIN_JOB_FAILURE_PRUNE_JOB_NAME,
   FEATURE_FLAGS_SYNC_JOB_NAME,
   GUARDIAN_EMANCIPATION_JOB_NAME,
@@ -43,6 +44,7 @@ function build() {
       sweepExpiredBanHolds: vi
         .fn()
         .mockResolvedValue({ subjects: 1, posts: 1, comments: 0 }),
+      sweepModerationSla: vi.fn().mockResolvedValue({ recorded: 1, delivered: 1 }),
     },
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   } as unknown as MaintenanceProcessorDeps & {
@@ -55,6 +57,38 @@ function build() {
 
   return { deps, process: createMaintenanceProcessor(deps) }
 }
+
+describe('U-W-ROUTE: the SLA sweep on the maintenance queue', () => {
+  it('routes the job name to the shared sweep and logs its counts', async () => {
+    const harness = build()
+    await harness.process({ name: MODERATION_SLA_SWEEP_JOB_NAME })
+    expect(harness.deps.community.sweepModerationSla).toHaveBeenCalledOnce()
+    expect(harness.deps.logger.info).toHaveBeenCalledWith(
+      { job: MODERATION_SLA_SWEEP_JOB_NAME, result: { recorded: 1, delivered: 1 } },
+      expect.any(String)
+    )
+  })
+
+  it('logs and rethrows a failure, so BullMQ applies attempts: 3', async () => {
+    const harness = build()
+    const failure = new Error('database down')
+    vi.mocked(harness.deps.community.sweepModerationSla).mockRejectedValueOnce(failure)
+    await expect(harness.process({ name: MODERATION_SLA_SWEEP_JOB_NAME })).rejects.toBe(
+      failure
+    )
+    expect(harness.deps.logger.error).toHaveBeenCalledOnce()
+  })
+
+  it('still warns and returns on an unknown name', async () => {
+    const harness = build()
+    await harness.process({ name: 'moderation-sla-sweep-typo' })
+    expect(harness.deps.community.sweepModerationSla).not.toHaveBeenCalled()
+    expect(harness.deps.logger.warn).toHaveBeenCalledWith(
+      { job: 'moderation-sla-sweep-typo' },
+      'unknown_maintenance_job'
+    )
+  })
+})
 
 describe('createMaintenanceProcessor: routing', () => {
   let harness: ReturnType<typeof build>

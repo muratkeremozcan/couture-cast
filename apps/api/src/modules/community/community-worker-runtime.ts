@@ -117,6 +117,8 @@ export interface CommunitySweeps {
   sweepExpiredUploads: () => Promise<unknown>
   sweepErasureRequests: () => Promise<unknown>
   sweepExpiredBanHolds: () => Promise<unknown>
+  /** Story 6.12: at-risk and breach alerts, driven by whichever substrate this process has. */
+  sweepModerationSla: () => Promise<unknown>
 }
 
 /** What the process knows about its own screening posture once it is ready. */
@@ -383,6 +385,11 @@ export async function createCommunityWorkerRuntime(deps: {
   prisma: PrismaClient
   featureFlags?: Pick<FeatureFlagsService, 'getFeatureFlag'>
   telemetryService: TelemetryService
+  /**
+   * Story 6.12: passed in by each bootstrap, because the community module imports nothing from the
+   * moderation module. Absent means off.
+   */
+  moderationSla?: { run: () => Promise<unknown> }
   /** Overrides the environment selection; specs inject a pinned engine here. */
   engine?: CommunityModerationEngine
   meter?: CommunityModerationMeter
@@ -467,6 +474,8 @@ export async function createCommunityWorkerRuntime(deps: {
       sweepExpiredUploads: () => maintenance.sweepExpiredUploads(),
       sweepErasureRequests: () => maintenance.sweepErasureRequests(),
       sweepExpiredBanHolds: () => maintenance.sweepExpiredBanHolds(),
+      sweepModerationSla: () =>
+        deps.moderationSla?.run() ?? Promise.resolve({ skipped: 1, recorded: 0 }),
     },
     ...(selection ? { readiness: selection.readiness } : {}),
     close: async () => {

@@ -16,6 +16,7 @@ import type {
   ApplyModerationDecision200Response,
   ApplyModerationDecisionRequest,
   GetModerationCase200Response,
+  GetModerationSla200Response,
   ListModerationCases200Response,
   ModerationActionInput,
   RecordModerationAppeal200Response,
@@ -258,6 +259,57 @@ export class ModerationApi extends runtime.BaseAPI {
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<GetModerationCase200Response> {
     const response = await this.getModerationCaseRaw(requestParameters, initOverrides)
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for getModerationSla without sending the request
+   */
+  async getModerationSlaRequestOpts(): Promise<runtime.RequestOpts> {
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/moderation/sla`
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Moderator and admin only. Read-only. Counts, monitor health and the newest operations alerts, with no case content.
+   * SLA state of the queue and the monitor (private, no-store)
+   */
+  async getModerationSlaRaw(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<GetModerationSla200Response>> {
+    const requestOptions = await this.getModerationSlaRequestOpts()
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Moderator and admin only. Read-only. Counts, monitor health and the newest operations alerts, with no case content.
+   * SLA state of the queue and the monitor (private, no-store)
+   */
+  async getModerationSla(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<GetModerationSla200Response> {
+    const response = await this.getModerationSlaRaw(initOverrides)
     return await response.value()
   }
 

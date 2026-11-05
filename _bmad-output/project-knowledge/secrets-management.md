@@ -1,6 +1,7 @@
 # Secrets management
 
 Updated: 2026-10-16 - linked the secret rotation runbook.
+Updated: 2026-11-05 - added the optional moderation operations webhook.
 
 ## Decision
 
@@ -71,6 +72,14 @@ rerunning pre-fix workflow runs.
 - Rotate weather provider keys immediately if logs, tickets, screenshots, or test artifacts expose a
   provider key. Validate rotation by running the worker startup health check and observing provider
   request metrics in Grafana.
+
+## Moderation operations webhook (story 6.12)
+
+`MODERATION_OPS_WEBHOOK_URL` is optional and unset today.
+It belongs on the worker that runs the SLA sweep, and in `.env.prod` when set.
+A webhook URL is its own credential, so treat it like a key: it appears in no log, row or error.
+Rotate it by creating a new webhook at the destination, replacing the value, restarting the worker and running `npm run moderation:sla:drill`.
+See the [moderation SLA runbook](./moderation-sla-runbook.md).
 
 ## Affiliate partner secrets (story 5.1)
 

@@ -151,6 +151,16 @@ loadLauncherEnv(env, () => {
   }
 })
 
+// Story 6.12: the live SLA sweep sends real alerts during a local run, so this launcher owns the
+// webhook. It always points at the Playwright capture server, and joining the caller-owned keys
+// keeps a real URL in `.env.local` from winning inside the children.
+const OPS_CAPTURE_PORT = env.MODERATION_OPS_CAPTURE_PORT || '4319'
+env.MODERATION_OPS_WEBHOOK_URL = `http://127.0.0.1:${OPS_CAPTURE_PORT}/webhook`
+env.E2E_CALLER_OWNED_ENV_KEYS = [
+  ...(env.E2E_CALLER_OWNED_ENV_KEYS ?? '').split(',').filter(Boolean),
+  'MODERATION_OPS_WEBHOOK_URL',
+].join(',')
+
 // Story 1.2b: this stack must never reach a live weather provider. An origin
 // from the shell, `.env.local` or `.env` that is not loopback is refused here,
 // before anything is built or started, because the API honours the override
@@ -392,6 +402,16 @@ async function startWeatherProviderDouble() {
 }
 
 async function main() {
+  // Before anything that can send an alert, so no alert of this run meets a closed port.
+  const { ready: opsCaptureReady } = startManagedProcess(
+    'node',
+    ['playwright/support/moderation-ops-capture.mjs'],
+    { ...env, MODERATION_OPS_CAPTURE_PORT: OPS_CAPTURE_PORT },
+    repoRoot,
+    'moderation_ops_capture_ready'
+  )
+  await opsCaptureReady
+
   console.log('[start-api-e2e-with-workers] Preparing database and application builds...')
   const reuseExistingWeb =
     startWeb &&

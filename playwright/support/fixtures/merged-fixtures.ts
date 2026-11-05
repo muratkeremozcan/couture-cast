@@ -13,6 +13,8 @@ import { captureTestContext } from '@seontechnologies/playwright-utils/log'
 import { test as log } from '@seontechnologies/playwright-utils/log/fixtures'
 import { test as networkRecorder } from '@seontechnologies/playwright-utils/network-recorder/fixtures'
 import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-utils/network-error-monitor/fixtures'
+import { WireMockWebhookProvider } from '@seontechnologies/playwright-utils/webhook'
+import { test as webhookFixture } from '@seontechnologies/playwright-utils/webhook/fixtures'
 import { test as recurse } from '@seontechnologies/playwright-utils/recurse/fixtures'
 import { resolveEnvironmentConfig } from '../../config/environments'
 import coutureCastAuthProvider from '../auth-session/custom-auth-provider'
@@ -63,9 +65,20 @@ const serviceRequest = base.extend({
   },
 })
 
+// Story 6.12: the capture server the local stack's SLA sweep posts to. Lazy: only a test that asks
+// for `webhookRegistry` pays for it, and matched-only cleanup keeps parallel workers apart.
+const webhookProvider = base.extend<{ webhookProvider: WireMockWebhookProvider }>({
+  webhookProvider: async ({ request }, use) => {
+    const port = process.env.MODERATION_OPS_CAPTURE_PORT || '4319'
+    await use(new WireMockWebhookProvider(`http://127.0.0.1:${port}`, request))
+  },
+})
+
 // Compose base Playwright test with playwright-utils fixtures and local fixtures.
 export const test = mergeTests(
   base,
+  webhookFixture,
+  webhookProvider,
   serviceRequest,
   authSession,
   interceptNetworkCall,

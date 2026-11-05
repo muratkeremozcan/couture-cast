@@ -8843,6 +8843,388 @@ export type GetModerationCase200ResponseDataTargetStateEnum =
 /**
  *
  * @export
+ * @interface GetModerationSla200Response
+ */
+export interface GetModerationSla200Response {
+  /**
+   *
+   * @type {GetModerationSla200ResponseData}
+   * @memberof GetModerationSla200Response
+   */
+  data: GetModerationSla200ResponseData
+}
+/**
+ *
+ * @export
+ * @interface GetModerationSla200ResponseData
+ */
+export interface GetModerationSla200ResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationSla200ResponseData
+   */
+  serverNow: string
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataMonitor}
+   * @memberof GetModerationSla200ResponseData
+   */
+  monitor: GetModerationSla200ResponseDataMonitor
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataQueue}
+   * @memberof GetModerationSla200ResponseData
+   */
+  queue: GetModerationSla200ResponseDataQueue
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataResolution}
+   * @memberof GetModerationSla200ResponseData
+   */
+  resolution: GetModerationSla200ResponseDataResolution
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataAlerts}
+   * @memberof GetModerationSla200ResponseData
+   */
+  alerts: GetModerationSla200ResponseDataAlerts
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataScreening}
+   * @memberof GetModerationSla200ResponseData
+   */
+  screening: GetModerationSla200ResponseDataScreening
+  /**
+   *
+   * @type {Array<GetModerationSla200ResponseDataRecentAlertsInner>}
+   * @memberof GetModerationSla200ResponseData
+   */
+  recentAlerts: Array<GetModerationSla200ResponseDataRecentAlertsInner>
+}
+/**
+ *
+ * @export
+ * @interface GetModerationSla200ResponseDataAlerts
+ */
+export interface GetModerationSla200ResponseDataAlerts {
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla200ResponseDataAlerts
+   */
+  pending: number
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla200ResponseDataAlerts
+   */
+  failing: number
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla200ResponseDataAlerts
+   */
+  consoleOnly: number
+}
+/**
+ *
+ * @export
+ * @interface GetModerationSla200ResponseDataMonitor
+ */
+export interface GetModerationSla200ResponseDataMonitor {
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationSla200ResponseDataMonitor
+   */
+  lastSweepAt: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetModerationSla200ResponseDataMonitor
+   */
+  stale: boolean
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataMonitorChannelEnum}
+   * @memberof GetModerationSla200ResponseDataMonitor
+   */
+  channel: GetModerationSla200ResponseDataMonitorChannelEnum | null
+}
+
+/**
+ * @export
+ */
+export const GetModerationSla200ResponseDataMonitorChannelEnum = {
+  webhook: 'webhook',
+  console: 'console',
+} as const
+export type GetModerationSla200ResponseDataMonitorChannelEnum =
+  (typeof GetModerationSla200ResponseDataMonitorChannelEnum)[keyof typeof GetModerationSla200ResponseDataMonitorChannelEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationSla200ResponseDataQueue
+ */
+export interface GetModerationSla200ResponseDataQueue {
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla200ResponseDataQueue
+   */
+  onTrack: number
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla200ResponseDataQueue
+   */
+  atRisk: number
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla200ResponseDataQueue
+   */
+  breached: number
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla200ResponseDataQueue
+   */
+  escalated: number
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationSla200ResponseDataQueue
+   */
+  oldestDueAt: string | null
+}
+/**
+ *
+ * @export
+ * @interface GetModerationSla200ResponseDataRecentAlertsInner
+ */
+export interface GetModerationSla200ResponseDataRecentAlertsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationSla200ResponseDataRecentAlertsInner
+   */
+  id: string
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataRecentAlertsInnerKindEnum}
+   * @memberof GetModerationSla200ResponseDataRecentAlertsInner
+   */
+  kind: GetModerationSla200ResponseDataRecentAlertsInnerKindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationSla200ResponseDataRecentAlertsInner
+   */
+  caseId: string
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataRecentAlertsInnerSourceEnum}
+   * @memberof GetModerationSla200ResponseDataRecentAlertsInner
+   */
+  source: GetModerationSla200ResponseDataRecentAlertsInnerSourceEnum
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataRecentAlertsInnerRiskEnum}
+   * @memberof GetModerationSla200ResponseDataRecentAlertsInner
+   */
+  risk: GetModerationSla200ResponseDataRecentAlertsInnerRiskEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationSla200ResponseDataRecentAlertsInner
+   */
+  slaDueAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationSla200ResponseDataRecentAlertsInner
+   */
+  detectedAt: string
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataRecentAlertsInnerDeliveryEnum}
+   * @memberof GetModerationSla200ResponseDataRecentAlertsInner
+   */
+  delivery: GetModerationSla200ResponseDataRecentAlertsInnerDeliveryEnum
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla200ResponseDataRecentAlertsInner
+   */
+  attempts: number
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataRecentAlertsInnerLastErrorCodeEnum}
+   * @memberof GetModerationSla200ResponseDataRecentAlertsInner
+   */
+  lastErrorCode: GetModerationSla200ResponseDataRecentAlertsInnerLastErrorCodeEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationSla200ResponseDataRecentAlertsInner
+   */
+  deliveredAt: string | null
+}
+
+/**
+ * @export
+ */
+export const GetModerationSla200ResponseDataRecentAlertsInnerKindEnum = {
+  at_risk: 'at_risk',
+  breached: 'breached',
+  escalated: 'escalated',
+} as const
+export type GetModerationSla200ResponseDataRecentAlertsInnerKindEnum =
+  (typeof GetModerationSla200ResponseDataRecentAlertsInnerKindEnum)[keyof typeof GetModerationSla200ResponseDataRecentAlertsInnerKindEnum]
+
+/**
+ * @export
+ */
+export const GetModerationSla200ResponseDataRecentAlertsInnerSourceEnum = {
+  post: 'post',
+  comment: 'comment',
+} as const
+export type GetModerationSla200ResponseDataRecentAlertsInnerSourceEnum =
+  (typeof GetModerationSla200ResponseDataRecentAlertsInnerSourceEnum)[keyof typeof GetModerationSla200ResponseDataRecentAlertsInnerSourceEnum]
+
+/**
+ * @export
+ */
+export const GetModerationSla200ResponseDataRecentAlertsInnerRiskEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type GetModerationSla200ResponseDataRecentAlertsInnerRiskEnum =
+  (typeof GetModerationSla200ResponseDataRecentAlertsInnerRiskEnum)[keyof typeof GetModerationSla200ResponseDataRecentAlertsInnerRiskEnum]
+
+/**
+ * @export
+ */
+export const GetModerationSla200ResponseDataRecentAlertsInnerDeliveryEnum = {
+  pending: 'pending',
+  delivered: 'delivered',
+  console_only: 'console_only',
+  superseded: 'superseded',
+} as const
+export type GetModerationSla200ResponseDataRecentAlertsInnerDeliveryEnum =
+  (typeof GetModerationSla200ResponseDataRecentAlertsInnerDeliveryEnum)[keyof typeof GetModerationSla200ResponseDataRecentAlertsInnerDeliveryEnum]
+
+/**
+ * @export
+ */
+export const GetModerationSla200ResponseDataRecentAlertsInnerLastErrorCodeEnum = {
+  timeout: 'timeout',
+  network: 'network',
+  http_3xx: 'http_3xx',
+  http_4xx: 'http_4xx',
+  http_5xx: 'http_5xx',
+  invalid_config: 'invalid_config',
+  interrupted: 'interrupted',
+} as const
+export type GetModerationSla200ResponseDataRecentAlertsInnerLastErrorCodeEnum =
+  (typeof GetModerationSla200ResponseDataRecentAlertsInnerLastErrorCodeEnum)[keyof typeof GetModerationSla200ResponseDataRecentAlertsInnerLastErrorCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationSla200ResponseDataResolution
+ */
+export interface GetModerationSla200ResponseDataResolution {
+  /**
+   *
+   * @type {GetModerationSla200ResponseDataResolutionWindowDaysEnum}
+   * @memberof GetModerationSla200ResponseDataResolution
+   */
+  windowDays: GetModerationSla200ResponseDataResolutionWindowDaysEnum
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla200ResponseDataResolution
+   */
+  resolved: number
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla200ResponseDataResolution
+   */
+  withinSla: number
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla200ResponseDataResolution
+   */
+  late: number
+}
+
+/**
+ * @export
+ */
+export const GetModerationSla200ResponseDataResolutionWindowDaysEnum = {
+  NUMBER_7: 7,
+} as const
+export type GetModerationSla200ResponseDataResolutionWindowDaysEnum =
+  (typeof GetModerationSla200ResponseDataResolutionWindowDaysEnum)[keyof typeof GetModerationSla200ResponseDataResolutionWindowDaysEnum]
+
+/**
+ *
+ * @export
+ * @interface GetModerationSla200ResponseDataScreening
+ */
+export interface GetModerationSla200ResponseDataScreening {
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationSla200ResponseDataScreening
+   */
+  oldestPendingReviewAt: string | null
+}
+/**
+ *
+ * @export
+ * @interface GetModerationSla503Response
+ */
+export interface GetModerationSla503Response {
+  /**
+   *
+   * @type {number}
+   * @memberof GetModerationSla503Response
+   */
+  statusCode: number
+  /**
+   *
+   * @type {GetModerationSla503ResponseCodeEnum}
+   * @memberof GetModerationSla503Response
+   */
+  code: GetModerationSla503ResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationSla503Response
+   */
+  message: string
+}
+
+/**
+ * @export
+ */
+export const GetModerationSla503ResponseCodeEnum = {
+  moderation_sla_disabled: 'moderation_sla_disabled',
+} as const
+export type GetModerationSla503ResponseCodeEnum =
+  (typeof GetModerationSla503ResponseCodeEnum)[keyof typeof GetModerationSla503ResponseCodeEnum]
+
+/**
+ *
+ * @export
  * @interface GetPushRegistrationsResponse
  */
 export interface GetPushRegistrationsResponse {
@@ -11390,6 +11772,388 @@ export const ModerationQueueErrorCodeEnum = {
 export type ModerationQueueErrorCodeEnum =
   (typeof ModerationQueueErrorCodeEnum)[keyof typeof ModerationQueueErrorCodeEnum]
 
+/**
+ *
+ * @export
+ * @interface ModerationSlaError
+ */
+export interface ModerationSlaError {
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaError
+   */
+  statusCode: number
+  /**
+   *
+   * @type {ModerationSlaErrorCodeEnum}
+   * @memberof ModerationSlaError
+   */
+  code: ModerationSlaErrorCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationSlaError
+   */
+  message: string
+}
+
+/**
+ * @export
+ */
+export const ModerationSlaErrorCodeEnum = {
+  moderation_sla_disabled: 'moderation_sla_disabled',
+} as const
+export type ModerationSlaErrorCodeEnum =
+  (typeof ModerationSlaErrorCodeEnum)[keyof typeof ModerationSlaErrorCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationSlaResponse
+ */
+export interface ModerationSlaResponse {
+  /**
+   *
+   * @type {ModerationSlaResponseData}
+   * @memberof ModerationSlaResponse
+   */
+  data: ModerationSlaResponseData
+}
+/**
+ *
+ * @export
+ * @interface ModerationSlaResponseData
+ */
+export interface ModerationSlaResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationSlaResponseData
+   */
+  serverNow: string
+  /**
+   *
+   * @type {ModerationSlaResponseDataMonitor}
+   * @memberof ModerationSlaResponseData
+   */
+  monitor: ModerationSlaResponseDataMonitor
+  /**
+   *
+   * @type {ModerationSlaResponseDataQueue}
+   * @memberof ModerationSlaResponseData
+   */
+  queue: ModerationSlaResponseDataQueue
+  /**
+   *
+   * @type {ModerationSlaResponseDataResolution}
+   * @memberof ModerationSlaResponseData
+   */
+  resolution: ModerationSlaResponseDataResolution
+  /**
+   *
+   * @type {ModerationSlaResponseDataAlerts}
+   * @memberof ModerationSlaResponseData
+   */
+  alerts: ModerationSlaResponseDataAlerts
+  /**
+   *
+   * @type {ModerationSlaResponseDataScreening}
+   * @memberof ModerationSlaResponseData
+   */
+  screening: ModerationSlaResponseDataScreening
+  /**
+   *
+   * @type {Array<ModerationSlaResponseDataRecentAlertsInner>}
+   * @memberof ModerationSlaResponseData
+   */
+  recentAlerts: Array<ModerationSlaResponseDataRecentAlertsInner>
+}
+/**
+ *
+ * @export
+ * @interface ModerationSlaResponseDataAlerts
+ */
+export interface ModerationSlaResponseDataAlerts {
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaResponseDataAlerts
+   */
+  pending: number
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaResponseDataAlerts
+   */
+  failing: number
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaResponseDataAlerts
+   */
+  consoleOnly: number
+}
+/**
+ *
+ * @export
+ * @interface ModerationSlaResponseDataMonitor
+ */
+export interface ModerationSlaResponseDataMonitor {
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationSlaResponseDataMonitor
+   */
+  lastSweepAt: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationSlaResponseDataMonitor
+   */
+  stale: boolean
+  /**
+   *
+   * @type {ModerationSlaResponseDataMonitorChannelEnum}
+   * @memberof ModerationSlaResponseDataMonitor
+   */
+  channel: ModerationSlaResponseDataMonitorChannelEnum | null
+}
+
+/**
+ * @export
+ */
+export const ModerationSlaResponseDataMonitorChannelEnum = {
+  webhook: 'webhook',
+  console: 'console',
+} as const
+export type ModerationSlaResponseDataMonitorChannelEnum =
+  (typeof ModerationSlaResponseDataMonitorChannelEnum)[keyof typeof ModerationSlaResponseDataMonitorChannelEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationSlaResponseDataQueue
+ */
+export interface ModerationSlaResponseDataQueue {
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaResponseDataQueue
+   */
+  onTrack: number
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaResponseDataQueue
+   */
+  atRisk: number
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaResponseDataQueue
+   */
+  breached: number
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaResponseDataQueue
+   */
+  escalated: number
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationSlaResponseDataQueue
+   */
+  oldestDueAt: string | null
+}
+/**
+ *
+ * @export
+ * @interface ModerationSlaResponseDataRecentAlertsInner
+ */
+export interface ModerationSlaResponseDataRecentAlertsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationSlaResponseDataRecentAlertsInner
+   */
+  id: string
+  /**
+   *
+   * @type {ModerationSlaResponseDataRecentAlertsInnerKindEnum}
+   * @memberof ModerationSlaResponseDataRecentAlertsInner
+   */
+  kind: ModerationSlaResponseDataRecentAlertsInnerKindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationSlaResponseDataRecentAlertsInner
+   */
+  caseId: string
+  /**
+   *
+   * @type {ModerationSlaResponseDataRecentAlertsInnerSourceEnum}
+   * @memberof ModerationSlaResponseDataRecentAlertsInner
+   */
+  source: ModerationSlaResponseDataRecentAlertsInnerSourceEnum
+  /**
+   *
+   * @type {ModerationSlaResponseDataRecentAlertsInnerRiskEnum}
+   * @memberof ModerationSlaResponseDataRecentAlertsInner
+   */
+  risk: ModerationSlaResponseDataRecentAlertsInnerRiskEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationSlaResponseDataRecentAlertsInner
+   */
+  slaDueAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationSlaResponseDataRecentAlertsInner
+   */
+  detectedAt: string
+  /**
+   *
+   * @type {ModerationSlaResponseDataRecentAlertsInnerDeliveryEnum}
+   * @memberof ModerationSlaResponseDataRecentAlertsInner
+   */
+  delivery: ModerationSlaResponseDataRecentAlertsInnerDeliveryEnum
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaResponseDataRecentAlertsInner
+   */
+  attempts: number
+  /**
+   *
+   * @type {ModerationSlaResponseDataRecentAlertsInnerLastErrorCodeEnum}
+   * @memberof ModerationSlaResponseDataRecentAlertsInner
+   */
+  lastErrorCode: ModerationSlaResponseDataRecentAlertsInnerLastErrorCodeEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationSlaResponseDataRecentAlertsInner
+   */
+  deliveredAt: string | null
+}
+
+/**
+ * @export
+ */
+export const ModerationSlaResponseDataRecentAlertsInnerKindEnum = {
+  at_risk: 'at_risk',
+  breached: 'breached',
+  escalated: 'escalated',
+} as const
+export type ModerationSlaResponseDataRecentAlertsInnerKindEnum =
+  (typeof ModerationSlaResponseDataRecentAlertsInnerKindEnum)[keyof typeof ModerationSlaResponseDataRecentAlertsInnerKindEnum]
+
+/**
+ * @export
+ */
+export const ModerationSlaResponseDataRecentAlertsInnerSourceEnum = {
+  post: 'post',
+  comment: 'comment',
+} as const
+export type ModerationSlaResponseDataRecentAlertsInnerSourceEnum =
+  (typeof ModerationSlaResponseDataRecentAlertsInnerSourceEnum)[keyof typeof ModerationSlaResponseDataRecentAlertsInnerSourceEnum]
+
+/**
+ * @export
+ */
+export const ModerationSlaResponseDataRecentAlertsInnerRiskEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type ModerationSlaResponseDataRecentAlertsInnerRiskEnum =
+  (typeof ModerationSlaResponseDataRecentAlertsInnerRiskEnum)[keyof typeof ModerationSlaResponseDataRecentAlertsInnerRiskEnum]
+
+/**
+ * @export
+ */
+export const ModerationSlaResponseDataRecentAlertsInnerDeliveryEnum = {
+  pending: 'pending',
+  delivered: 'delivered',
+  console_only: 'console_only',
+  superseded: 'superseded',
+} as const
+export type ModerationSlaResponseDataRecentAlertsInnerDeliveryEnum =
+  (typeof ModerationSlaResponseDataRecentAlertsInnerDeliveryEnum)[keyof typeof ModerationSlaResponseDataRecentAlertsInnerDeliveryEnum]
+
+/**
+ * @export
+ */
+export const ModerationSlaResponseDataRecentAlertsInnerLastErrorCodeEnum = {
+  timeout: 'timeout',
+  network: 'network',
+  http_3xx: 'http_3xx',
+  http_4xx: 'http_4xx',
+  http_5xx: 'http_5xx',
+  invalid_config: 'invalid_config',
+  interrupted: 'interrupted',
+} as const
+export type ModerationSlaResponseDataRecentAlertsInnerLastErrorCodeEnum =
+  (typeof ModerationSlaResponseDataRecentAlertsInnerLastErrorCodeEnum)[keyof typeof ModerationSlaResponseDataRecentAlertsInnerLastErrorCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationSlaResponseDataResolution
+ */
+export interface ModerationSlaResponseDataResolution {
+  /**
+   *
+   * @type {ModerationSlaResponseDataResolutionWindowDaysEnum}
+   * @memberof ModerationSlaResponseDataResolution
+   */
+  windowDays: ModerationSlaResponseDataResolutionWindowDaysEnum
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaResponseDataResolution
+   */
+  resolved: number
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaResponseDataResolution
+   */
+  withinSla: number
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationSlaResponseDataResolution
+   */
+  late: number
+}
+
+/**
+ * @export
+ */
+export const ModerationSlaResponseDataResolutionWindowDaysEnum = {
+  NUMBER_7: 7,
+} as const
+export type ModerationSlaResponseDataResolutionWindowDaysEnum =
+  (typeof ModerationSlaResponseDataResolutionWindowDaysEnum)[keyof typeof ModerationSlaResponseDataResolutionWindowDaysEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationSlaResponseDataScreening
+ */
+export interface ModerationSlaResponseDataScreening {
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationSlaResponseDataScreening
+   */
+  oldestPendingReviewAt: string | null
+}
 /**
  *
  * @export

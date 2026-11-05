@@ -15,6 +15,7 @@ import {
   ADMIN_JOB_FAILURE_PRUNE_JOB_NAME,
   FEATURE_FLAGS_SYNC_JOB_NAME,
   GUARDIAN_EMANCIPATION_JOB_NAME,
+  MODERATION_SLA_SWEEP_JOB_NAME,
   TELEMETRY_EVENT_PRUNE_JOB_NAME,
   WARDROBE_RETENTION_PURGE_JOB_NAME,
 } from './maintenance.scheduler'
@@ -60,6 +61,7 @@ export type MaintenanceSweeps = {
     sweepExpiredUploads: () => Promise<unknown>
     sweepErasureRequests: () => Promise<unknown>
     sweepExpiredBanHolds: () => Promise<unknown>
+    sweepModerationSla: () => Promise<unknown>
   }
 }
 
@@ -158,6 +160,13 @@ export function createMaintenanceProcessor(deps: MaintenanceProcessorDeps) {
           'community_ban_expiry_sweep_completed',
           'community_ban_expiry_sweep_failed',
           () => deps.community.sweepExpiredBanHolds()
+        )
+      case MODERATION_SLA_SWEEP_JOB_NAME:
+        return run(
+          job.name,
+          'moderation_sla_sweep_completed',
+          'moderation_sla_sweep_failed',
+          () => deps.community.sweepModerationSla()
         )
       default:
         // Not thrown: an unknown name is almost always a scheduler left behind

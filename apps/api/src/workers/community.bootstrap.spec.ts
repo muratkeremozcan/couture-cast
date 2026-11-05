@@ -2,7 +2,9 @@
 // Learning path Step 40: Community screening release gate and hosted worker.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Story 6.2 Task 5: the dedicated community process starts ready and closes clean.
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as ShutdownResourcesModule from './shutdown-resources'
 import {
   COMMUNITY_SHUTDOWN_TIMEOUT_MS,
@@ -10,6 +12,7 @@ import {
   performShutdown,
   startCommunityWorkers,
 } from './community.bootstrap.js'
+import { PostHogService } from '../posthog/posthog.service.js'
 
 type WorkerShutdownResources = ShutdownResourcesModule.WorkerShutdownResources
 type RealShutdown = (
@@ -20,6 +23,7 @@ type RealShutdown = (
 const harness = vi.hoisted(() => ({
   order: [] as string[],
   communityClose: vi.fn(),
+  createModerationSlaSweep: vi.fn(() => ({ run: vi.fn() })),
   createCommunityWorkerRuntime: vi.fn(),
   shutdownWorkerResources: vi.fn(),
   realShutdownWorkerResources: undefined as RealShutdown | undefined,
@@ -39,6 +43,11 @@ vi.mock('../posthog/posthog.service.js', () => ({
 
 vi.mock('../modules/community/community-worker-runtime', () => ({
   createCommunityWorkerRuntime: harness.createCommunityWorkerRuntime,
+}))
+
+vi.mock('../modules/moderation/moderation-sla.sweep', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  createModerationSlaSweep: harness.createModerationSlaSweep,
 }))
 
 vi.mock('./shutdown-resources', async (importOriginal) => {
@@ -96,6 +105,114 @@ describe('dedicated community worker bootstrap', () => {
       close: harness.communityClose,
     })
     vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+  })
+
+  describe('U-W-INTERVAL: the hosted path of the SLA sweep', () => {
+    const slaIntervalMs = 60_000
+
+    function runtimeWithSweep(sweepModerationSla: () => Promise<unknown>) {
+      harness.createCommunityWorkerRuntime.mockResolvedValue({
+        worker: { on: vi.fn(), close: vi.fn() },
+        sweeps: {
+          dispatchPending: vi.fn().mockResolvedValue(undefined),
+          sweepStalePendingReview: vi.fn().mockResolvedValue(undefined),
+          sweepExpiredUploads: vi.fn().mockResolvedValue(undefined),
+          sweepErasureRequests: vi.fn().mockResolvedValue(undefined),
+          sweepExpiredBanHolds: vi.fn().mockResolvedValue(undefined),
+          sweepModerationSla,
+        },
+        readiness: { selector: 'fixture', engineVersion: 'x', startupDurationMs: 1 },
+        close: harness.communityClose,
+      })
+    }
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('U-W-FACTORY: passes a sweep, because a composition with none stays off for good', async () => {
+      runtimeWithSweep(vi.fn().mockResolvedValue({ recorded: 0 }))
+      await freshProcess().startCommunityWorkers()
+      expect(harness.createCommunityWorkerRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({
+          moderationSla: expect.objectContaining({
+            run: expect.any(Function) as unknown,
+          }) as unknown,
+        })
+      )
+    })
+
+    it('runs the sweep every 60 seconds, starting with the first tick', async () => {
+      vi.useFakeTimers()
+      const sweep = vi.fn().mockResolvedValue({ recorded: 0 })
+      runtimeWithSweep(sweep)
+      const bootstrap = freshProcess()
+      await bootstrap.startCommunityWorkers()
+      expect(sweep).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(slaIntervalMs - 1)
+      expect(sweep).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(sweep).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(slaIntervalMs)
+      expect(sweep).toHaveBeenCalledTimes(2)
+      await bootstrap.performShutdown()
+    })
+
+    it('does not overlap a slow sweep', async () => {
+      vi.useFakeTimers()
+      let finish!: () => void
+      const sweep = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve
+          })
+      )
+      runtimeWithSweep(sweep)
+      const bootstrap = freshProcess()
+      await bootstrap.startCommunityWorkers()
+      await vi.advanceTimersByTimeAsync(3 * slaIntervalMs)
+      expect(sweep).toHaveBeenCalledTimes(1)
+      finish()
+      await vi.advanceTimersByTimeAsync(slaIntervalMs)
+      expect(sweep).toHaveBeenCalledTimes(2)
+      finish()
+      await bootstrap.performShutdown()
+    })
+
+    it('survives a rejected sweep and keeps its interval', async () => {
+      vi.useFakeTimers()
+      const sweep = vi.fn().mockRejectedValue(new Error('database down'))
+      runtimeWithSweep(sweep)
+      const bootstrap = freshProcess()
+      await bootstrap.startCommunityWorkers()
+      await vi.advanceTimersByTimeAsync(slaIntervalMs)
+      await vi.advanceTimersByTimeAsync(slaIntervalMs)
+      expect(sweep).toHaveBeenCalledTimes(2)
+      await bootstrap.performShutdown()
+    })
+
+    it('passes PostHog to the runtime, because PostHog is the hosted signal (D13)', async () => {
+      const bootstrap = freshProcess()
+      await bootstrap.startCommunityWorkers()
+      expect(harness.createModerationSlaSweep).toHaveBeenCalledWith(
+        expect.objectContaining({
+          analytics: expect.any(PostHogService) as unknown,
+          flags: expect.objectContaining({
+            getFeatureFlag: expect.any(Function) as unknown,
+          }) as unknown,
+        })
+      )
+      await bootstrap.performShutdown()
+    })
+
+    it('U-W-OTEL: starts no SDK and subscribes to no maintenance queue in this image', () => {
+      const source = readFileSync(join(__dirname, 'community.bootstrap.ts'), 'utf8')
+      const code = source.replace(/^\s*(\/\/|\*|\/\*).*$/gm, '')
+      expect(code).not.toMatch(/initializeOpenTelemetry|instrumentation/)
+      expect(code).not.toMatch(
+        /createWorker\(\s*'maintenance'|new Worker\(\s*'maintenance'/
+      )
+    })
   })
 
   it('awaits the runtime before it reports itself started', async () => {

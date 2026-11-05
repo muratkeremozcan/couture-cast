@@ -20,6 +20,9 @@ import {
   MAESTRO_PINNED_VERSION as PINNED_VERSION,
 } from './maestro-version.mjs'
 
+const INSTALL_ATTEMPTS = 3
+const INSTALL_RETRY_DELAY_SECONDS = 30
+
 const log = (msg) => console.log(`[maestro:install] ${msg}`)
 
 const capture = (cmd) => {
@@ -102,9 +105,20 @@ try {
       )
       process.exit(1)
     }
-    run(
-      `curl -Ls "https://get.maestro.mobile.dev" | MAESTRO_VERSION=${PINNED_VERSION} bash`
-    )
+    // The installer downloads a GitHub release, which can answer a short burst of 5xx. Its failure
+    // shows only as no pinned binary afterwards, because the pipe hides the exit code.
+    for (let attempt = 1; attempt <= INSTALL_ATTEMPTS; attempt++) {
+      try {
+        run(
+          `curl -Ls "https://get.maestro.mobile.dev" | MAESTRO_VERSION=${PINNED_VERSION} bash`
+        )
+      } catch (error) {
+        log(`Installer failed: ${error.message}`)
+      }
+      if (versionOf(MAESTRO_BIN) === PINNED_VERSION || attempt === INSTALL_ATTEMPTS) break
+      log(`Maestro ${PINNED_VERSION} not installed on attempt ${attempt}; retrying.`)
+      run(`sleep ${attempt * INSTALL_RETRY_DELAY_SECONDS}`)
+    }
   }
 
   const installedVersion = versionOf(MAESTRO_BIN)

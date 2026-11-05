@@ -1402,6 +1402,7 @@ file's own Code Review Findings section.
 - source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
   summary: Alert from outside the community worker on the age of the oldest `pending_review` post, so a dead hosted worker is noticed.
   evidence: Review finding BH18; the hosted worker has no health check and the stale-review sweep runs inside the worker itself. Belongs with Story 6.12 SLA monitoring.
+  status: Story 6.12 shipped the pull signal: `/moderation/sla`, served by the API with no worker, shows the oldest `pending_review` time and a stale monitor. The push path is recorded in `_bmad-output/project-knowledge/moderation-sla-runbook.md`, and it only runs once the monitoring flag is on.
 - source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
   summary: Close the image safe-corpus gate (holdout withheld rate at or below 5%) with a stronger SFW classifier, for example CLIP zero-shot through the existing FashionCLIP stack.
   evidence: The creator-split holdout still fails the 5% gate and blocks ordinary photographs with mobilenet_v2_mid under policy v2 (figures and a description of every withheld photograph in `_bmad-output/test-artifacts/community-content-screening-model-readiness.json`, `safeCorpus`); the other bundled NSFWJS models withheld more on the calibration half.

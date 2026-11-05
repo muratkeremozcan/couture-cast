@@ -23,6 +23,9 @@ import {
   ModerationSanctionsService,
 } from './moderation-sanctions.service.js'
 
+import { ModerationSlaController } from './moderation-sla.controller.js'
+import { ModerationSlaService } from './moderation-sla.service.js'
+
 @Module({
   // CommunityModule supplies the storage adapter that signs case images. It does not
   // re-export FeatureFlagsModule, so the flag service is imported here directly.
@@ -37,6 +40,7 @@ import {
     ModerationController,
     ModerationQueueController,
     ModerationDecisionsController,
+    ModerationSlaController,
   ],
   providers: [
     ModerationService,
@@ -46,6 +50,7 @@ import {
     ModerationDecisionsService,
     ModerationSanctionsService,
     ModerationAfterCommit,
+    ModerationSlaService,
     { provide: MODERATION_QUEUE_CLOCK, useValue: systemModerationQueueClock },
     RequestAuthGuard,
     RolesGuard,
@@ -55,6 +60,10 @@ export class ModerationModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply(ModerationQueueCacheHeadersMiddleware)
-      .forRoutes(ModerationQueueController, ModerationDecisionsController)
+      .forRoutes(
+        ModerationQueueController,
+        ModerationDecisionsController,
+        ModerationSlaController
+      )
   }
 }

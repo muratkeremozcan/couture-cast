@@ -38,6 +38,7 @@ import {
   writeModerationRecord,
   type OperatorEffect,
 } from '../community/community-moderation.actions.js'
+import { insertEscalatedAlert } from './moderation-sla.repository.js'
 import {
   communityPrivacyTransaction,
   guardCommunityPost,
@@ -471,6 +472,11 @@ export class ModerationDecisionsService {
       sequence: history.sequence + 1,
       at,
     })
+    if (input.action === 'escalate') {
+      await writeModerationRecord(() =>
+        insertEscalatedAlert(tx, { decisionId, caseId, at })
+      )
+    }
     return {
       replayed: false,
       stored,

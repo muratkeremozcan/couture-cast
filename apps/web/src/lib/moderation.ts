@@ -13,6 +13,8 @@ import {
   moderationDecisionErrorCodeSchema,
   moderationDecisionResponseSchema,
   moderationQueueErrorCodeSchema,
+  moderationSlaErrorCodeSchema,
+  moderationSlaResponseSchema,
   type ModerationAppealInput,
   type ModerationAppealResult,
   type ModerationDecisionDetail,
@@ -23,6 +25,8 @@ import {
   type ModerationCaseDetail,
   type ModerationCasesPage,
   type ModerationCasesQuery,
+  type ModerationSlaErrorCode,
+  type ModerationSlaSummary,
 } from '@couture/api-client/contracts/http'
 import { createWebApiClient } from './api-client'
 import { getI18n } from '../i18n'
@@ -127,7 +131,9 @@ async function readErrorCode(response: Response) {
   try {
     const body: unknown = await response.clone().json()
     const code = (body as { code?: unknown } | null)?.code
-    const parsed = moderationQueueErrorCodeSchema.safeParse(code)
+    const parsed = moderationQueueErrorCodeSchema
+      .or(moderationSlaErrorCodeSchema)
+      .safeParse(code)
     return parsed.success ? parsed.data : null
   } catch {
     return null
@@ -136,7 +142,7 @@ async function readErrorCode(response: Response) {
 
 function reasonForResponse(
   status: number,
-  code: ModerationQueueErrorCode | null
+  code: ModerationQueueErrorCode | ModerationSlaErrorCode | null
 ): ModerationFailureReason {
   if (status === 401) return 'signed_out'
   if (status === 403) return 'forbidden'
@@ -145,6 +151,7 @@ function reasonForResponse(
   if (status === 400)
     return code === 'invalid_cursor' ? 'invalid_cursor' : 'invalid_filter'
   if (status === 503 && code === 'moderation_console_disabled') return 'disabled'
+  if (status === 503 && code === 'moderation_sla_disabled') return 'disabled'
   if (status === 503 && code === 'audit_unavailable') return 'audit_unavailable'
   return 'unavailable'
 }
@@ -209,6 +216,21 @@ export async function getModerationCaseFromWeb(
     )
     const data = parseTolerant(moderationCaseDetailResponseSchema, response).data
     return { ...data, clockOffsetMs: Date.parse(data.serverNow) - Date.now() }
+  } catch (error: unknown) {
+    throw await moderationError(error)
+  }
+}
+
+/** The SLA summary. Reads write nothing on the server, so the dashboard may refresh on a timer. */
+export async function getModerationSlaFromWeb(
+  signal?: AbortSignal
+): Promise<ModerationSlaSummary> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({ accessToken }).getModerationSla({
+      signal,
+    })
+    return parseTolerant(moderationSlaResponseSchema, response).data
   } catch (error: unknown) {
     throw await moderationError(error)
   }

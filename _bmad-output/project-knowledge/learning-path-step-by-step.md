@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-04.
-Added Steps 40 to 51:
+Updated: 2026-11-05.
+Added Steps 40 to 52:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -14,7 +14,8 @@ Added Steps 40 to 51:
 - Step 48: Story 6.8, safe branded share-card export, `67806196` (PR #162), with native-lane fixes `3112efbd` (PR #165) and `185e827c` (PR #166).
 - Step 49: Story 6.9, native platform sharing, `6d92598f` (PR #167), merged on 2026-10-31.
 - Step 50: Story 6.10, moderator queue and case detail, `6337dc8c` (PR #194), merged on 2026-11-04.
-- Step 51: Story 6.11, moderation decisions and account sanctions, in review on `feat/cc-6-11-moderation-decisions`, not yet merged.
+- Step 51: Story 6.11, moderation decisions and account sanctions, `3efd8423` (PR #195), merged on 2026-11-05.
+- Step 52: Story 6.12, SLA monitoring and escalation, in review on `feat/cc-6-12-sla-monitoring-escalation`, not yet merged.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -22,6 +23,8 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Step 52 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
+Moved Step 51 to completed after PR #195 merged as `3efd8423`.
 Step 51 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 Moved Step 50 to completed after PR #194 merged as `6337dc8c`.
 Step 49 departs from instruction 2 the same way Steps 38 and 39 did, and its `Evidence boundaries` section says what passed, what timed out, and what only a physical device can prove.
@@ -104,10 +107,14 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- In review: Step 51, Story 6.11, Moderation decisions and account sanctions, not yet merged, on `feat/cc-6-11-moderation-decisions`.
+- In review: Step 52, Story 6.12, SLA monitoring and escalation, not yet merged, on `feat/cc-6-12-sla-monitoring-escalation`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-6-12-sla-monitoring-escalation.md`.
+  Production stays dark because `moderation_sla_monitoring_enabled` defaults to false.
+- Latest completed step: Step 51, Story 6.11, Moderation decisions and account sanctions, status `done`, merged as `3efd8423` (PR #195) on 2026-11-05.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-11-moderation-decisions-account-sanctions.md`.
+  Step 51 was written before review and merge, and its `Evidence boundaries` section says so.
   Production stays dark because `moderation_decisions_enabled` and `moderation_console_enabled` default to false.
-- Latest completed step: Step 50, Story 6.10, Moderator queue and case detail, status `done`, merged as `6337dc8c` (PR #194) on 2026-11-04.
+- Step 50, Story 6.10, Moderator queue and case detail, status `done`, merged as `6337dc8c` (PR #194) on 2026-11-04.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-10-moderator-queue-case-detail.md`.
   Step 50 was written before review and merge, and its `Evidence boundaries` section says so.
   Production stays dark because `moderation_console_enabled` defaults to false.
@@ -115,7 +122,7 @@ Read it before changing or adding a numbered step.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`.
   Step 49 was written from the PR head `37a00d33` before merge, and its `Evidence boundaries` section says so.
   Production stays dark because `share_card_native_share_enabled` defaults to false.
-- Next in `backlog` under epic 6, which is `in-progress`: Stories 6.12 and 6.13 (SLA monitoring, immutable moderation history), 6.14 (complimentary full access) and 6.15 (Expo SDK 58 live font-scale layout).
+- Next in `backlog` under epic 6, which is `in-progress`: Stories 6.13 (immutable moderation history), 6.14 (complimentary full access) and 6.15 (Expo SDK 58 live font-scale layout).
 - Step 48, Story 6.8, Safe branded share-card export, status `done`, merged as `67806196` (PR #162) with native-lane fixes in `3112efbd` (PR #165) and `185e827c` (PR #166).
   Its plan is `_bmad-output/implementation-artifacts/spec-6-8-safe-branded-share-card-export.md`.
 - Step 47, Story 6.7b, Sponsored community highlights, status `done`, merged as `1d7b9848` (PR #161).
@@ -9634,7 +9641,7 @@ Story reference:
 - `_bmad-output/implementation-artifacts/spec-6-11-moderation-decisions-account-sanctions.md`, with decisions D1 to D16, the Spec Change Log TEA-01 to TEA-22 and the Review Triage Log
 - `_bmad-output/test-artifacts/test-design/cc611-moderation-decisions-test-design.md`
 - `_bmad-output/test-artifacts/story-6-11/` (screenshots of the real console and notice in light and dark at desktop and phone widths)
-- Commits on `feat/cc-6-11-moderation-decisions`, not yet pushed or merged when this step was written
+- Squash-merged as `3efd8423` (PR #195) on 2026-11-05, after this step was written on `feat/cc-6-11-moderation-decisions`
 
 Cross-links:
 
@@ -9718,7 +9725,7 @@ Playwright tests:
 Evidence boundaries:
 
 - **Written before review and merge.**
-  The code and tests are committed on `feat/cc-6-11-moderation-decisions`, nothing was pushed when this step was written, and no PR job has run.
+  PR #195 merged as `3efd8423` on 2026-11-05, and the rest of this section describes the state when the step was written, on `feat/cc-6-11-moderation-decisions`, before any PR job had run.
   The Codex review of `4cf4b128` found six defects, and they are fixed and logged in the spec as C1 to C6.
   Its re-review of `1d49278a` found one more, fixed as R2-1 with a test that was red first.
   The full runs above predate R2-1, the Optic change, the CodeRabbit fixes and the screening ownership work of Codex round 5, which CI on the PR covers.
@@ -9767,4 +9774,278 @@ flowchart TD
   Effects --> Ban["CommunitySanction"]
   Ban --> Enforce["assertCommunityMemberNotSanctioned\nno cache, no flag"]
   Enforce --> Notice["403 community_banned\nweb notice, mobile denied"]
+```
+
+## Step 52: SLA monitoring and escalation
+
+User/business impact:
+
+Since Step 50 every report has carried a 24-hour `sla_due_at`, and only a moderator who opened `/moderation` could see one running out.
+Nothing watched the clock while the console was closed, and the Step 51 `escalate` decision recorded a row and notified nobody.
+This step adds one retry-safe sweep that writes each at-risk, breach and escalation alert once into a durable table and delivers it through an operations channel.
+A moderator-only page at `/moderation/sla` shows open cases by SLA state, alert delivery and whether the monitor is running, and an operating runbook names the roles and the response steps.
+Everything sits behind `moderation_sla_monitoring_enabled` and `moderation_console_enabled`, and both default to false in production.
+Two things stay open by design: no production webhook is configured, so production alerts stop at the console and nobody is paged, and staffing coverage is unsigned because no staff exist to name.
+Append-only enforcement and evidence retention are Story 6.13.
+
+Key takeaways:
+
+1. **Reuse the definition, including its SQL.**
+   `deriveSlaState` and `SLA_AT_RISK_WINDOW_MS` from Step 50 stay the only definition.
+   The sweep pages `listModerationCases` with the queue's own filters, then decides with `deriveSlaState`, so grouping, risk and state cannot drift from what a moderator sees.
+   `scoredCasesSql` became the one CTE behind the queue, the sweep, the escalated alert and the SLA counts.
+2. **Key on the thing that survives.**
+   `dedupe_key` is `sla:<source>:<anchorReportId>:<kind>`, or `escalated:<decisionId>`.
+   A report id survives the erasure re-key from Step 50, so the alerted report's orphan case does not alert again and each other report alerts once as the case it now is.
+   A retry, a restart and a concurrent worker all land on `ON CONFLICT DO NOTHING`.
+3. **The alert row is both the record and the outbox.**
+   The console needs the record and the sender needs the queue, with one lifecycle: `pending`, then `delivered`, `console_only` or `superseded`.
+   `AlertDeliveryOutbox` is bound to `EventEnvelope` and member fan-out, so it does not fit.
+4. **Never hold a transaction across a POST.**
+   Each claim is one row in one short transaction, using `FOR UPDATE SKIP LOCKED` and a 60-second lease from a fresh clock read.
+   The outcome write is fenced on the claimed `attempts`, so a worker that lost its lease cannot overwrite a later one or raise a false alarm.
+   Claiming stops 45 seconds after delivery starts, and every run claims at least once, so a slow detection scan cannot starve delivery.
+   A crash between the POST and the write repeats a send with the same id, which is the honest at-least-once bound, and the `Idempotency-Key` header lets a receiver drop it.
+5. **Relevance is checked at send.**
+   An alert whose anchor report is resolved or gone, or an `at_risk` alert past its due time, becomes `superseded` and is never sent.
+   A backlog after an outage or after the flag opens therefore announces only live problems.
+6. **Delivery failure uses the established path.**
+   Each failed attempt logs and counts, with backoff of 1, 2, 4, 8, 16, then 30 minutes.
+   The third records `failure_owed_code` in the same fenced write, and a repair pass then writes one `JobFailure` row with a stamp in one transaction, plus an error log and a PostHog event, as `recordStallAlert` does.
+   Owed work has its own column, so a later delivery or a crash after the third failure cannot lose it.
+   Attempts continue, so a recovered channel catches up with no operator step.
+   A crash loop never reaches a failure write, so a claim that finds an expired lease records `interrupted` and owes the same escalation.
+7. **Escalation commits with its decision.**
+   The insert sits in `applyDecision` after `writeRecord`, through `writeModerationRecord`, so a failure rolls the decision back to 503 `audit_unavailable`.
+   A replay writes nothing, and re-escalating is a new decision and a new alert.
+8. **Verify where it really runs.**
+   The guide said the hosted worker was pending, and the Northflank API showed it deployed.
+   That process deliberately does not subscribe to `maintenance`, so a Job Scheduler alone would never have fired in production.
+   The sweep runs from one factory on both paths: a scheduler on `maintenance` for the general worker and a 60-second interval in `community.bootstrap.ts`.
+9. **Choose a channel the repo can really deliver to.**
+   The repo has no email, Slack or PagerDuty, and Expo push targets members with no moderator list.
+   `ModerationOpsChannel` has one real adapter: a webhook with a 5-second timeout, HTTPS except loopback, and no redirects followed.
+   With no URL the console is the channel, and the dashboard says that nobody is notified.
+10. **The webhook URL is a secret, so errors are too.**
+    `fetch` prints a credentials URL in its error message, so the URL is validated before any call and only a closed code leaves the adapter.
+    Auto-instrumentation copies a request URL into span attributes, so the POST also runs with tracing suppressed.
+11. **A monitor must report its own death from somewhere else.**
+    `ModerationSlaMonitor` is stamped only at the end of a sweep that finished delivery, and the API serves `stale` from it with no worker running.
+    A failed claim or outcome write rejects the sweep with fixed text, so a broken worker that is still running reads as stopped.
+    The only push path is a PostHog alert on `moderation_sla_snapshot`, which stays disabled until rollout because a flag-off monitor sends no events.
+12. **Bind time as text.**
+    A JS `Date` binds as `timestamptz` and shifts a `timestamp` comparison by the session offset, 6 hours on a Chicago session.
+    Every new raw instant is ISO text with a `::timestamp` cast, and no database clock is used.
+
+Hard-won lessons from the implementation and review of this story:
+
+1. **A library can write through your exported array.**
+   zod-to-openapi pushes null into the enum values of a nullable enum, and `z.enum` shares the array it was given, so generating the document put null into `moderationSlaFailureCodes`.
+   Each schema now owns a copy, and each `.nullable()` sits on its own instance.
+2. **A row's stored key can outlive the row's meaning.**
+   The first payload linked the stored `case_key`, so an alert sent after erasure pointed at a 404.
+   The claim now reads the anchor report and builds the case id from what it is now.
+3. **Ignoring a boolean raised a false alarm.**
+   A stale claimant ignored the result of its fenced write and still escalated a row a later worker had delivered.
+   Escalation now runs only when the fenced write won.
+4. **A budget starts when the work starts.**
+   The 45 seconds began at delivery, so slow detection extended the window past the lease it protects.
+5. **`redirect: 'error'` hides the status.**
+   It throws with no status on Node 24, which made `http_3xx` unreachable, so the adapter uses `manual`.
+6. **A timer must not talk.**
+   The dashboard refreshes every minute so a stale banner can appear on an open page, and its live region first announced each refresh.
+   Only a refresh someone asked for and a monitor that stopped now speak.
+7. **A local time can name two instants.**
+   The two hours a DST change repeats rendered identically, so two alerts looked the same under `America/Chicago`.
+   The page now shows the zone, because `dateStyle` cannot combine with `timeZoneName`, and the parts are spelled out.
+8. **`increase()` needs an earlier sample.**
+   The first alert after a worker start read as 0 in Grafana, so each closed counter series now starts at 0 when the meter is created.
+9. **A union member with two literals resists narrowing.**
+   Two `=== ` checks left a `'superseded' | 'console_only'` member in the type, and lint-staged does not run tsc, so TEA's tsc run caught it.
+10. **Local builds edit tracked files.**
+    `next build` with `WEB_NEXT_DIST_DIR` rewrote `apps/web/tsconfig.json`, so the walk's tree needs cleaning before any commit.
+11. **Workspace packages can read as CommonJS under tsx.**
+    The drill's named imports failed on both packages, so it reads them from the default export.
+12. **Starting an SDK changes what every request exports.**
+    Codex found the webhook URL in trace attributes the day the general worker started OpenTelemetry, and the OTLP test could not see it because it discarded traces.
+    A privacy test must read every signal the process exports.
+13. **Happy-path counters can report a dead pipeline as healthy.**
+    A failed claim counted an error and returned, so the stamp, the snapshot and the job's success all said fine while nothing was sent.
+    Success must be earned by the work finishing.
+14. **Owed work needs its own record.**
+    Inferring an owed escalation from a state that later outcomes clear means a success can erase it.
+15. **A budget shared by two phases belongs to the first.**
+    A sweep-wide budget let detection spend all of delivery's time, so each phase with a promise needs its own.
+16. **A gauge's timestamp says when it was exported, not when it was measured.**
+    Grafana showed an old zero with a fresh time, so the panels now gate on a published measurement time.
+
+Story/Task mapping:
+
+- Story 6.12
+- Task 1 (sprint status and epic context)
+- Task 2 (schema, migration, RLS, zero grants, partial index)
+- Task 3 (flag `moderation_sla_monitoring_enabled`, default false, seeded true)
+- Task 4 (SLA contract, webhook payloads, OpenAPI path, regenerated SDK)
+- Task 5 (shared case CTE and `anchorReportId`)
+- Task 6 (rules, channel, telemetry, repository, sweep, scheduler)
+- Task 7 (escalated alert in the decision transaction)
+- Task 8 (SLA route and module)
+- Task 9 (both worker triggers and the general worker OTEL start)
+- Task 10 (`/moderation/sla`, queue link, ten web catalogs)
+- Task 11 (Grafana dashboard, PostHog dashboard and alert)
+- Task 12 (runbook, drill, environment and secrets docs, deployment guide, deferred work)
+- Task 13 (Pact, Playwright, tests per the test design)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/spec-6-12-sla-monitoring-escalation.md`, with decisions D1 to D16, the Spec Change Log and the Review Triage Log
+- `_bmad-output/test-artifacts/test-design/cc612-sla-monitoring-test-design.md`
+- `_bmad-output/project-knowledge/moderation-sla-runbook.md`
+- `_bmad-output/test-artifacts/story-6-12/` (screenshots of the real page in light and dark at desktop and phone widths)
+- Commits on `feat/cc-6-12-sla-monitoring-escalation`, not yet pushed or merged when this step was written
+
+Cross-links:
+
+- Step 50 provides the case model, `deriveSlaState`, the queue SQL and the console.
+- Step 51 provides the `escalate` decision and `writeModerationRecord`.
+- Step 40 provides the hosted community worker and the BH18 finding this step answers in part.
+- Step 22 provides catalog parity across ten locales.
+
+Sequence to follow:
+
+1. `packages/db/prisma/migrations/20261105120000_moderation_sla_monitoring/migration.sql` for the tables, constraints and grants.
+2. `packages/api-client/src/contracts/http/moderation-sla.ts` for the route, the webhook payload and the closed codes.
+3. `apps/api/src/modules/moderation/moderation-sla.rules.ts` for kind, dedupe key, relevance, backoff and staleness.
+4. `apps/api/src/modules/moderation/moderation-sla.repository.ts` for claim, fence, escalation and the read counts.
+5. `apps/api/src/modules/moderation/moderation-sla.sweep.ts` for the run order.
+6. `apps/api/src/modules/moderation/moderation-sla.channel.ts` for the adapter and the payload.
+7. `apps/api/src/modules/community/community-worker-runtime.ts`, `apps/api/src/workers/community.bootstrap.ts` and `maintenance.processor.ts` for the two triggers.
+8. `apps/web/src/app/components/moderation-sla-dashboard.tsx` for the page.
+9. `_bmad-output/project-knowledge/moderation-sla-runbook.md` for roles, response steps, rollout and what stays open.
+
+Task owner map:
+
+- Story 6.12 Task 2 step 1 owner: add the models and enums in `packages/db/prisma/schema.prisma`, with constraints and grants in `packages/db/prisma/migrations/20261105120000_moderation_sla_monitoring/migration.sql`.
+- Story 6.12 Task 3 step 1 owner: declare the flag in `packages/config/src/flags.ts`, seeded true in `packages/db/prisma/seeds/feature-flags.ts`.
+- Story 6.12 Task 4 step 1 owner: define the contract in `packages/api-client/src/contracts/http/moderation-sla.ts`.
+- Story 6.12 Task 5 step 1 owner: share the case CTE in `apps/api/src/modules/moderation/moderation-queue.repository.ts`.
+- Story 6.12 Task 6 step 1 owner: decide kind, key, relevance and backoff in `apps/api/src/modules/moderation/moderation-sla.rules.ts`.
+- Story 6.12 Task 6 step 2 owner: claim, fence and escalate in `apps/api/src/modules/moderation/moderation-sla.repository.ts`.
+- Story 6.12 Task 6 step 3 owner: run a sweep in `apps/api/src/modules/moderation/moderation-sla.sweep.ts`.
+- Story 6.12 Task 6 step 4 owner: deliver in `apps/api/src/modules/moderation/moderation-sla.channel.ts`.
+- Story 6.12 Task 6 step 5 owner: name metrics and log events in `apps/api/src/modules/moderation/moderation-sla.telemetry.ts`.
+- Story 6.12 Task 7 step 1 owner: insert the alert in `applyDecision` in `apps/api/src/modules/moderation/moderation-decisions.service.ts`.
+- Story 6.12 Task 8 step 1 owner: guard and route in `apps/api/src/modules/moderation/moderation-sla.controller.ts`, with the projection in `moderation-sla.service.ts`.
+- Story 6.12 Task 9 step 1 owner: register the job in `apps/api/src/workers/maintenance.scheduler.ts`, route it in `maintenance.processor.ts`, and run the interval in `community.bootstrap.ts`, both from `createModerationSlaSweep`.
+- Story 6.12 Task 10 step 1 owner: read the route from the web in `apps/web/src/lib/moderation.ts` and render it in `apps/web/src/app/components/moderation-sla-dashboard.tsx`.
+- Story 6.12 Task 11 step 1 owner: chart real metrics in `infra/grafana/dashboards/couturecast-moderation-sla.json`.
+- Story 6.12 Task 12 step 1 owner: write response steps in `_bmad-output/project-knowledge/moderation-sla-runbook.md`, with the drill in `scripts/moderation-sla-drill.mjs`.
+
+Tests that cover this step:
+
+API unit tests:
+
+- [`apps/api/src/modules/moderation/moderation-sla.rules.spec.ts`](../../apps/api/src/modules/moderation/moderation-sla.rules.spec.ts): proves the boundaries, keys, relevance, backoff and staleness.
+- [`apps/api/src/modules/moderation/moderation-sla.channel.spec.ts`](../../apps/api/src/modules/moderation/moderation-sla.channel.spec.ts): proves URL validation, closed codes, the request shape, the golden payload and that no URL leaks.
+- [`apps/api/src/workers/maintenance.processor.spec.ts`](../../apps/api/src/workers/maintenance.processor.spec.ts) and [`apps/api/src/workers/community.bootstrap.spec.ts`](../../apps/api/src/workers/community.bootstrap.spec.ts): prove both triggers.
+
+API integration tests, against real PostgreSQL with a real local HTTP server:
+
+- [`apps/api/integration/moderation-sla.integration.spec.ts`](../../apps/api/integration/moderation-sla.integration.spec.ts): proves detection, paging, anchors and the time zone guard.
+- [`apps/api/integration/moderation-sla-concurrency.integration.spec.ts`](../../apps/api/integration/moderation-sla-concurrency.integration.spec.ts): proves dedup, concurrent workers, the lease, the fence and a crash after the POST.
+- [`apps/api/integration/moderation-sla-delivery.integration.spec.ts`](../../apps/api/integration/moderation-sla-delivery.integration.spec.ts): proves real delivery of each kind, failure escalation, recovery, the crash loop and the privacy canary.
+- [`apps/api/integration/moderation-sla-escalate.integration.spec.ts`](../../apps/api/integration/moderation-sla-escalate.integration.spec.ts): proves the alert commits with its decision or rolls back with it.
+- [`apps/api/integration/moderation-sla-route.integration.spec.ts`](../../apps/api/integration/moderation-sla-route.integration.spec.ts): proves the role and flag matrix and each count.
+- [`apps/api/integration/moderation-sla-operations.spec.ts`](../../apps/api/integration/moderation-sla-operations.spec.ts): proves the runbook, the dashboard's metric names and the drill.
+
+Contract and database tests:
+
+- [`packages/api-client/testing/moderation-sla-contract.spec.ts`](../../packages/api-client/testing/moderation-sla-contract.spec.ts): proves strict schemas and that the enums stay clean after generation.
+- [`packages/db/test/rls/moderation-queue.spec.ts`](../../packages/db/test/rls/moderation-queue.spec.ts): proves direct clients are denied on both new tables.
+- [`pact/http/consumer/interactions/moderation.ts`](../../pact/http/consumer/interactions/moderation.ts): records and verifies the SLA route.
+
+Web and Playwright tests:
+
+- [`apps/web/src/i18n/moderation-locales.spec.ts`](../../apps/web/src/i18n/moderation-locales.spec.ts): proves ten-locale parity with keys derived from the contract enums.
+- [`playwright/tests/moderation-sla.spec.ts`](../../playwright/tests/moderation-sla.spec.ts): drives the page, axe, widths and real delivery to the capture server.
+- [`playwright/tests/api/auth-moderation-security.spec.ts`](../../playwright/tests/api/auth-moderation-security.spec.ts): the role matrix on the new route.
+
+Evidence boundaries:
+
+- **Written before merge.**
+  The code and tests are on `feat/cc-6-12-sla-monitoring-escalation`, in PR 196.
+- **What ran locally.**
+  TEA signed off at `ffdf6473`, with source at `c7a52fad` and tests at `c01a506b`, on three consecutive runs of the whole suites with identical results and no retries.
+  Passing per run: `apps/api` 8343 with 38 existing skips, `packages/api-client` 1624, `packages/db` 282 with 1 skip, `packages/config` 31, `apps/web` 1886, the Pact consumer 447 with 1 provider verification, and Playwright 34.
+  All 41 seeded-defect proofs were caught, with S-13 and S-16 also caught through the full stack.
+  The local Grafana check passed with the worker alive: at a measurement age of 330 seconds the four stat panels read Stale.
+  The other manual checks are in the Execution record of the test design.
+  tsc is clean in all seven projects.
+  All five `node-test-gate` suites passed at `ca90d9f1` and again at `3e1e680b`, the Codex round 2 fix.
+- **Codex round 1 on `6b438525` found four major and two minor defects.**
+  All six are fixed and logged in the spec as CX-1 to CX-6, each with a red test first.
+  The earlier sign-off had filtered to SLA specs, and the whole `apps/api` suite then caught three more failures: the Prisma transaction guard, the community module import rule and the queue read-set list.
+- **Codex round 2 verified those six and found two minor defects.**
+  Send relevance read the sweep's start time, so a long detection scan could send an `at_risk` alert after the deadline had passed; it now reads a fresh clock at each claim, and detection keeps the sweep time.
+  The Measurement age panel used a range query, so it kept showing an old value after samples stopped; it is now an instant query that reads `No samples` when the series is gone.
+  TEA then stopped a real worker and read the panels in Grafana: 300 seconds after the series went, the age panel read `No samples` and the four stats read Stale.
+- **CI on PR 196 caught what the local burn-in missed.**
+  The Lighthouse and burn-in jobs run `test:playwright-unit`, which sat outside that burn-in.
+  A second `webServer` entry for the capture server made the Playwright config an array, which failed `playwright-config-secrets.spec.ts` and silently dropped the restricted config's evidence mode.
+  The launcher now starts the capture server, and the Playwright config matches `main`.
+  After that move, `test:playwright-unit` passed 310, `apps/mobile` 1911, `packages/utils` 217 and `packages/testing` 109.
+- **CodeRabbit reviewed `d64891aa` and found 15 items.**
+  The source fixes: the oldest pending age skips posts marked for erasure, a timed refresh settles a manual one it replaced, the refresh announcement has its own count-free string, each `Open case` link names its case, telemetry flushes when a close rejects, and the drill builds shared packages first.
+  Detection now reads 1000 cases a page: 10,000 open breached cases took 9035 ms at 50 a page and 508 ms at 1000, measured on real Postgres.
+  No cap ends the scan, because a case past a cap would never alert.
+  The drill's change has no red test; TEA checked that `prepare:shared-deps` builds `@couture/utils` and `@couture/api-client`.
+  CodeRabbit then reviewed `16bfd54f` and generated no actionable comments.
+- **A CI install failure was fixed in the shared setup.**
+  On `16bfd54f` GitHub release downloads answered 504: the supabase and onnxruntime postinstalls failed `npm ci` in the Vercel Preview e2e and burn-in jobs, and the Maestro installer failed two Android shards.
+  `install-dependencies.sh` now treats those 5xx texts as transient, waits longer between attempts and also retries `npm install`, and `setup-node-env` installs through it.
+  `maestro:install` retries the official installer the same way.
+  The Gradle wrapper failed the same way on `aeb2297f`, so `fetch-gradle-wrapper.sh` downloads it with retries before the Android jobs of the accessibility and share-card workflows build.
+- **A real stack walk proved delivery to a local endpoint.**
+  The launcher ran the built API, the real `community.bootstrap` worker and the web server on the isolated database `cc612_walk`, with a local HTTP capture server as the webhook.
+  One report aged across both boundaries and produced `at_risk`, then `breached`.
+  An `escalate` through the real route produced one alert, and its replay produced none.
+  With the capture answering 500, each alert took three attempts, then one `JobFailure` row and a stamp, and answering 200 delivered both with no operator step.
+  A canary in the decision reason appeared in no capture and no worker log.
+  Sign-in used the `NEXT_PUBLIC_E2E_AUTH` fixture token, so no real Supabase Auth session was involved.
+- **Nothing reached a production destination.**
+  Slack and Discord acceptance is unverified, because the repo holds no such account.
+  The PostHog dashboard and its disabled alert exist, and no event has reached them, because the flag is off.
+- **Production stays dark.**
+  `moderation_sla_monitoring_enabled` defaults to false and is true only in the dev seed.
+- **Known limits by design.**
+  A breach alerts once, and nothing repeats or pages.
+  Hosted Grafana panels stay empty, because neither hosted runtime starts the OpenTelemetry SDK.
+  A sweep that alerts before the first 60-second metric export has no zero sample, so that alert stays off the rate panel.
+  The Stale text on a Grafana stat panel takes the base green color, beside the red age panel.
+  Staffing coverage is an open Community Beta signature (D16).
+  Screenshots under `_bmad-output/test-artifacts/story-6-12/` are git-ignored local evidence.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Sched["general worker: maintenance job"] --> Sweep
+  Timer["hosted worker: 60-second interval"] --> Sweep["ModerationSlaSweep.run"]
+  Sweep --> Flags{"both flags on?"}
+  Flags -- "no" --> Skip["no read, no write, no send"]
+  Flags -- "yes" --> Detect["queue SQL plus deriveSlaState"]
+  Detect --> Alert["ModerationSlaAlert\nunique dedupe_key"]
+  Decision["escalate decision transaction"] --> Alert
+  Alert --> Claim["claim one row, 60-second lease"]
+  Claim --> Rel{"still relevant?"}
+  Rel -- "no" --> Sup["superseded, never sent"]
+  Rel -- "yes, no webhook" --> Con["console_only"]
+  Rel -- "yes" --> Post["POST to webhook\nno transaction held"]
+  Post -- "2xx" --> Del["delivered"]
+  Post -- "failure" --> Retry["fenced write, backoff"]
+  Retry -- "third attempt" --> Fail["JobFailure, error log, PostHog"]
+  Retry --> Claim
+  Sweep --> Stamp["ModerationSlaMonitor stamp"]
+  Stamp --> Page["GET /moderation/sla\nstale from the API alone"]
+  Alert --> Page
 ```

@@ -19140,6 +19140,295 @@
         ],
         "additionalProperties": false
       },
+      "ModerationSlaResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "serverNow": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "monitor": {
+                "type": "object",
+                "properties": {
+                  "lastSweepAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "stale": {
+                    "type": "boolean"
+                  },
+                  "channel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "webhook",
+                      "console",
+                      null
+                    ]
+                  }
+                },
+                "required": [
+                  "lastSweepAt",
+                  "stale",
+                  "channel"
+                ],
+                "additionalProperties": false
+              },
+              "queue": {
+                "type": "object",
+                "properties": {
+                  "onTrack": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "atRisk": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "breached": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "escalated": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "oldestDueAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "onTrack",
+                  "atRisk",
+                  "breached",
+                  "escalated",
+                  "oldestDueAt"
+                ],
+                "additionalProperties": false
+              },
+              "resolution": {
+                "type": "object",
+                "properties": {
+                  "windowDays": {
+                    "type": "number",
+                    "enum": [
+                      7
+                    ]
+                  },
+                  "resolved": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "withinSla": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "late": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "windowDays",
+                  "resolved",
+                  "withinSla",
+                  "late"
+                ],
+                "additionalProperties": false
+              },
+              "alerts": {
+                "type": "object",
+                "properties": {
+                  "pending": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "failing": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "consoleOnly": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "pending",
+                  "failing",
+                  "consoleOnly"
+                ],
+                "additionalProperties": false
+              },
+              "screening": {
+                "type": "object",
+                "properties": {
+                  "oldestPendingReviewAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "oldestPendingReviewAt"
+                ],
+                "additionalProperties": false
+              },
+              "recentAlerts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "at_risk",
+                        "breached",
+                        "escalated"
+                      ]
+                    },
+                    "caseId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "post",
+                        "comment"
+                      ]
+                    },
+                    "risk": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    },
+                    "slaDueAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "detectedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "delivery": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "delivered",
+                        "console_only",
+                        "superseded"
+                      ]
+                    },
+                    "attempts": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "lastErrorCode": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "timeout",
+                        "network",
+                        "http_3xx",
+                        "http_4xx",
+                        "http_5xx",
+                        "invalid_config",
+                        "interrupted",
+                        null
+                      ]
+                    },
+                    "deliveredAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "caseId",
+                    "source",
+                    "risk",
+                    "slaDueAt",
+                    "detectedAt",
+                    "delivery",
+                    "attempts",
+                    "lastErrorCode",
+                    "deliveredAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 50
+              }
+            },
+            "required": [
+              "serverNow",
+              "monitor",
+              "queue",
+              "resolution",
+              "alerts",
+              "screening",
+              "recentAlerts"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationSlaError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "moderation_sla_disabled"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      },
       "PrepareShareCardInput": {
         "oneOf": [
           {
@@ -32065,6 +32354,332 @@
                     "currentRevision": {
                       "type": "string",
                       "pattern": "^[0-9a-f]{16}$"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/moderation/sla": {
+      "get": {
+        "operationId": "getModerationSla",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "SLA state of the queue and the monitor (private, no-store)",
+        "description": "Moderator and admin only. Read-only. Counts, monitor health and the newest operations alerts, with no case content.",
+        "responses": {
+          "200": {
+            "description": "The SLA summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "serverNow": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "monitor": {
+                          "type": "object",
+                          "properties": {
+                            "lastSweepAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            },
+                            "stale": {
+                              "type": "boolean"
+                            },
+                            "channel": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "webhook",
+                                "console",
+                                null
+                              ]
+                            }
+                          },
+                          "required": [
+                            "lastSweepAt",
+                            "stale",
+                            "channel"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "queue": {
+                          "type": "object",
+                          "properties": {
+                            "onTrack": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "atRisk": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "breached": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "escalated": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "oldestDueAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "onTrack",
+                            "atRisk",
+                            "breached",
+                            "escalated",
+                            "oldestDueAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "resolution": {
+                          "type": "object",
+                          "properties": {
+                            "windowDays": {
+                              "type": "number",
+                              "enum": [
+                                7
+                              ]
+                            },
+                            "resolved": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "withinSla": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "late": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "windowDays",
+                            "resolved",
+                            "withinSla",
+                            "late"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "alerts": {
+                          "type": "object",
+                          "properties": {
+                            "pending": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "failing": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "consoleOnly": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "pending",
+                            "failing",
+                            "consoleOnly"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "screening": {
+                          "type": "object",
+                          "properties": {
+                            "oldestPendingReviewAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "oldestPendingReviewAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "recentAlerts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "at_risk",
+                                  "breached",
+                                  "escalated"
+                                ]
+                              },
+                              "caseId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+                              },
+                              "source": {
+                                "type": "string",
+                                "enum": [
+                                  "post",
+                                  "comment"
+                                ]
+                              },
+                              "risk": {
+                                "type": "string",
+                                "enum": [
+                                  "low",
+                                  "medium",
+                                  "high"
+                                ]
+                              },
+                              "slaDueAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "detectedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "delivery": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "delivered",
+                                  "console_only",
+                                  "superseded"
+                                ]
+                              },
+                              "attempts": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "lastErrorCode": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "enum": [
+                                  "timeout",
+                                  "network",
+                                  "http_3xx",
+                                  "http_4xx",
+                                  "http_5xx",
+                                  "invalid_config",
+                                  "interrupted",
+                                  null
+                                ]
+                              },
+                              "deliveredAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind",
+                              "caseId",
+                              "source",
+                              "risk",
+                              "slaDueAt",
+                              "detectedAt",
+                              "delivery",
+                              "attempts",
+                              "lastErrorCode",
+                              "deliveredAt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "maxItems": 50
+                        }
+                      },
+                      "required": [
+                        "serverNow",
+                        "monitor",
+                        "queue",
+                        "resolution",
+                        "alerts",
+                        "screening",
+                        "recentAlerts"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient role"
+          },
+          "503": {
+            "description": "moderation_sla_disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "moderation_sla_disabled"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "required": [

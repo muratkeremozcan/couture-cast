@@ -2266,6 +2266,39 @@ describe('evidence input set', () => {
     expect(seen.size).toBeGreaterThan(20)
   })
 
+  it('U-W-IMAGE-GRAPH: the SLA sweep is in the worker graph and pulls no OpenTelemetry SDK', async () => {
+    const ts = await import('typescript')
+    const seen = new Set<string>()
+    const bare = new Map<string, string>()
+    const queue = ['apps/api/src/workers/community.bootstrap.ts']
+    while (queue.length > 0) {
+      const file = queue.shift() as string
+      if (seen.has(file)) continue
+      seen.add(file)
+      const { importedFiles } = ts.preProcessFile(read(file), true, true)
+      for (const { fileName } of importedFiles) {
+        if (!fileName.startsWith('.')) {
+          bare.set(fileName, file)
+          continue
+        }
+        const base = path.join(path.dirname(file), fileName).replace(/\.js$/, '')
+        const resolved = [`${base}.ts`, `${base}/index.ts`].find((candidate) =>
+          fs.existsSync(path.join(repoRoot, candidate))
+        )
+        if (resolved) queue.push(resolved)
+      }
+    }
+    for (const name of ['sweep', 'channel', 'repository', 'rules', 'telemetry'])
+      expect(seen).toContain(`apps/api/src/modules/moderation/moderation-sla.${name}.ts`)
+    expect(seen).not.toContain('apps/api/src/instrumentation.ts')
+    for (const heavy of [
+      '@opentelemetry/sdk-node',
+      '@opentelemetry/auto-instrumentations-node',
+      '@opentelemetry/exporter-metrics-otlp-http',
+    ])
+      expect(bare.get(heavy), `imported by ${bare.get(heavy)}`).toBeUndefined()
+  })
+
   it('carries the source of every entry the image prune trace starts from', async () => {
     const { WORKER_SOURCE_ENTRIES } = await inputSet()
     const prune = read('scripts/prune-community-worker-deps.mjs')

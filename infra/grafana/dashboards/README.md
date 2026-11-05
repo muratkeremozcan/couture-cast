@@ -1,6 +1,7 @@
 # Grafana dashboard exports
 
 Updated: 2026-03-13 - created dashboard export folder and naming contract
+Updated: 2026-11-05 - added the moderation SLA dashboard (Story 6.12)
 
 Store exported Grafana dashboard JSON files here.
 
@@ -15,6 +16,7 @@ Expected files:
 - `couturecast-realtime-connections.json`
 - `couturecast-database-performance.json`
 - `couturecast-weather-ingestion.json`
+- `couturecast-moderation-sla.json`
 
 Export workflow:
 
