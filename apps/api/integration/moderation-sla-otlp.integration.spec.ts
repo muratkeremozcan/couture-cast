@@ -156,9 +156,28 @@ describe('I-O-OTLP: a real sweep reaches a real OTLP server', () => {
       )
       expect(openByState.get('at_risk')).toBe(1)
       expect(openByState.get('breached')).toBe(1)
-      expect(
-        dataPoints(byName('moderation_sla_delivery_failures_total')).map(value)
-      ).toEqual([2])
+      const byLabel = (name: string, label: string) =>
+        new Map(
+          dataPoints(byName(name)).map((point) => {
+            const attribute = point.attributes?.find(({ key }) => key === label)
+            return [attribute?.value.stringValue as string, value(point)]
+          })
+        )
+      // Every closed value starts at zero, because `increase` needs an earlier sample and would
+      // otherwise hide the first alert and the first failure after each worker start.
+      const failures = byLabel('moderation_sla_delivery_failures_total', 'code')
+      expect([...failures.keys()].sort()).toEqual(
+        [...CLOSED_LABELS.moderation_sla_delivery_failures_total!.code!].sort()
+      )
+      expect(failures.get('http_5xx')).toBe(2)
+      expect(failures.get('timeout')).toBe(0)
+      const recorded = byLabel('moderation_sla_alerts_total', 'kind')
+      expect([...recorded.keys()].sort()).toEqual(
+        [...CLOSED_LABELS.moderation_sla_alerts_total!.kind!].sort()
+      )
+      expect(recorded.get('at_risk')).toBe(1)
+      expect(recorded.get('breached')).toBe(1)
+      expect(recorded.get('escalated')).toBe(0)
 
       for (const identifier of [
         atRisk.caseId,
