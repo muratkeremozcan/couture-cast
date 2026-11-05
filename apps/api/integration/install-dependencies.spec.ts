@@ -70,6 +70,98 @@ describe('dependency download recovery', () => {
     expect(result.stdout).toContain('::warning::')
   })
 
+  // PR 196: the supabase CLI postinstall downloads from a GitHub release, which answered 504.
+  it('recovers the supabase postinstall download that a gateway timeout broke', () => {
+    const result = install([
+      {
+        code: 1,
+        message: [
+          'npm error path node_modules/supabase',
+          'npm error Could not fetch checksum file 504 Gateway Time-out',
+          'npm error Error: incorrect header check',
+          "npm error   code: 'Z_DATA_ERROR'",
+        ].join('\n'),
+      },
+      { code: 0, message: 'installed' },
+    ])
+    expect(result.status).toBe(0)
+    expect(result.attempts).toBe(2)
+    expect(result.stdout).toContain('::warning::')
+  })
+
+  it.each([
+    [
+      'a checksum 503 alone',
+      'npm error Could not fetch checksum file 503 Service Unavailable',
+    ],
+    ['a garbled archive alone', "npm error   code: 'Z_DATA_ERROR'"],
+  ])('recovers %s', (_name, message) => {
+    const result = install([
+      { code: 1, message },
+      { code: 0, message: 'installed' },
+    ])
+    expect(result.status).toBe(0)
+    expect(result.attempts).toBe(2)
+  })
+
+  // PR 196 again: the onnxruntime postinstall reports the same burst in its own words.
+  it('recovers a package that words the 504 its own way', () => {
+    const result = install([
+      {
+        code: 1,
+        message:
+          'npm error Error: Failed to download the binaries: 504 Gateway Time-out.',
+      },
+      { code: 0, message: 'installed' },
+    ])
+    expect(result.status).toBe(0)
+    expect(result.attempts).toBe(2)
+  })
+
+  it('retries npm install too, because pr-checks installs that way', () => {
+    const result = install(
+      [
+        {
+          code: 1,
+          message: 'npm error Could not fetch checksum file 504 Gateway Time-out',
+        },
+        { code: 0, message: 'installed' },
+      ],
+      'npm install'
+    )
+    expect(result.status).toBe(0)
+    expect(result.attempts).toBe(2)
+    expect(result.stdout).toContain('::warning::npm install')
+  })
+
+  it('waits 30 then 60 seconds by default, long enough to outlast a short burst', () => {
+    const waits = path.join(fixture, 'waits')
+    fs.writeFileSync(
+      path.join(fixture, 'bin/sleep'),
+      `#!/bin/sh\necho "$1" >> "${waits}"\n`,
+      { mode: 0o755 }
+    )
+    const env: NodeJS.ProcessEnv = installEnvironment([
+      { code: 1, message: 'ECONNRESET' },
+    ])
+    delete env.INSTALL_RETRY_DELAY_SECONDS
+    const result = spawnSync('bash', [installScript], {
+      cwd: fixture,
+      encoding: 'utf8',
+      env,
+    })
+    expect(result.status).toBe(1)
+    expect(fs.readFileSync(waits, 'utf8').trim().split('\n')).toEqual(['30', '60'])
+  })
+
+  it('keeps a missing release red, because a 404 stays a 404', () => {
+    const result = install([
+      { code: 1, message: 'npm error Could not fetch checksum file 404 Not Found' },
+    ])
+    expect(result.status).toBe(1)
+    expect(result.attempts).toBe(1)
+  })
+
   it('keeps deterministic install errors red without retrying', () => {
     const result = install([
       { code: 1, message: 'npm error code EUSAGE: lockfile mismatch' },
@@ -143,4 +235,90 @@ describe('dependency download recovery', () => {
       'run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"'
     )
   })
+
+  it('routes the other setup action through the same script, with no retry of its own', () => {
+    const action = fs.readFileSync(
+      path.join(repoRoot, '.github/actions/setup-node-env/action.yml'),
+      'utf8'
+    )
+    expect(action).toContain('INSTALL_COMMAND:')
+    expect(action).toContain(
+      'run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"'
+    )
+    expect(action).not.toMatch(/for attempt/)
+  })
+})
+
+describe('Maestro installer recovery', () => {
+  const installerScript = path.join(repoRoot, 'scripts/maestro-install.mjs')
+  const pinned = /MAESTRO_PINNED_VERSION = .*\?\? '([^']+)'/.exec(
+    fs.readFileSync(path.join(repoRoot, 'scripts/maestro-version.mjs'), 'utf8')
+  )?.[1] as string
+
+  /** The installer fails until `succeedOn`, as a release host answering 504 does. */
+  function runInstaller(succeedOn: number | null) {
+    const home = path.join(fixture, 'home')
+    const attempts = path.join(fixture, 'attempts')
+    const waits = path.join(fixture, 'waits')
+    fs.mkdirSync(home)
+    const stub = (name: string, body: string) =>
+      fs.writeFileSync(path.join(fixture, 'bin', name), `#!/bin/sh\n${body}\n`, {
+        mode: 0o755,
+      })
+    stub('curl', 'exit 0')
+    stub('sleep', `echo "$1" >> "${waits}"`)
+    stub(
+      'bash',
+      `cat > /dev/null
+count=$(cat "${attempts}" 2>/dev/null || echo 0)
+count=$((count + 1))
+echo "$count" > "${attempts}"
+[ "$count" = "${succeedOn ?? 0}" ] || exit 0
+mkdir -p "$HOME/.maestro/bin"
+printf '#!/bin/sh\\necho ${pinned}\\n' > "$HOME/.maestro/bin/maestro"
+chmod +x "$HOME/.maestro/bin/maestro"`
+    )
+    const result = spawnSync(process.execPath, [installerScript], {
+      encoding: 'utf8',
+      env: {
+        HOME: home,
+        PATH: `${path.join(fixture, 'bin')}${path.delimiter}/usr/bin${path.delimiter}/bin`,
+      },
+    })
+    const read = (file: string) =>
+      fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim() : ''
+    return {
+      status: result.status,
+      output: `${result.stdout}${result.stderr}`,
+      attempts: Number(read(attempts)),
+      waits: read(waits).split('\n').filter(Boolean),
+    }
+  }
+
+  it.skipIf(process.platform === 'win32')(
+    'retries an installer that left no binary, and waits between attempts',
+    () => {
+      const result = runInstaller(3)
+      expect(result.status, result.output).toBe(0)
+      expect(result.attempts).toBe(3)
+      expect(result.waits).toEqual(['30', '60'])
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')('stops once the first attempt installs', () => {
+    const result = runInstaller(1)
+    expect(result.status, result.output).toBe(0)
+    expect(result.attempts).toBe(1)
+    expect(result.waits).toEqual([])
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'fails after three attempts with no binary',
+    () => {
+      const result = runInstaller(null)
+      expect(result.status).toBe(1)
+      expect(result.attempts).toBe(3)
+      expect(result.output).toContain(`expected ${pinned}`)
+    }
+  )
 })

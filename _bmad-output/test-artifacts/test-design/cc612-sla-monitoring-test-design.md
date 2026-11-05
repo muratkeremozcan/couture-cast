@@ -836,6 +836,16 @@ Test defects fixed, each proved by a mutant in a throwaway worktree:
 
 I-S-PAGING sets `detectionPageSize: 50` to cross pages, and a second case seeds 1010 breached cases to read past the shipped page size of 1000.
 
+Whole suites three runs at `16bfd54f`, identical, no retries: apps/api 8353 with 38 skips, api-client 1624, db 282 with 1 skip, config 31, web 1891, Pact 447 and 1.
+Playwright ran once on that tree at 34, and the CI burn-in job covers its repeats.
+
+**CI at `16bfd54f`: a burst of 504s from GitHub releases stopped jobs before any test ran.**
+`npm ci` failed on the supabase and onnxruntime postinstall downloads, and Android shards 1 and 5 failed in the Maestro installer.
+`scripts/ci/install-dependencies.sh` did not treat that text as transient and waited only 15 seconds in total.
+It now retries that text and `Z_DATA_ERROR`, keeps a 404 red, also retries `npm install`, and waits 30 then 60 seconds.
+`setup-node-env` runs the same script, and `scripts/maestro-install.mjs` retries until the pinned binary exists.
+`install-dependencies.spec.ts` proved all of it red first against `16bfd54f`, with stubbed binaries for the installer.
+
 **Independent test review.**
 The report at the end of this document scored `bb8491d5` at 45 of 100 and blocked it.
 Its Resolution section lists what each finding became.
