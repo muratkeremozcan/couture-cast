@@ -179,27 +179,27 @@ Verified against `main` at `3efd8423`.
 
 **Execution:**
 
-- [ ] `_bmad-output/implementation-artifacts/sprint-status.yaml`, `epic-6-context.md`: set 6-12 to `in-progress` and name it the current story when the build starts; `review` when it ends.
-- [ ] `packages/db/prisma/schema.prisma`, one new migration, `moderation-queue-tables.ts`: `ModerationSlaAlert`, `ModerationSlaMonitor`, enums, unique key, partial index on deliverable rows, RLS with zero grants. D4.
-- [ ] `packages/config/src/flags.ts`, flag spec, `seeds/feature-flags.ts`, seed spec, service count spec: `moderation_sla_monitoring_enabled`. D10.
-- [ ] `packages/api-client/src/contracts/http/moderation-sla.ts` (new), `index.ts`, `openapi.ts`, then `npm run generate:http-openapi && npm run generate:api-client`, with no hand edit of generated files. D11, webhook payload schema.
-- [ ] `apps/api/src/modules/moderation/moderation-queue.repository.ts`: `anchorReportId`. D1.
-- [ ] `apps/api/src/modules/moderation/moderation-sla.repository.ts`, `moderation-sla.sweep.ts`, `moderation-sla.channel.ts`, `moderation-sla.telemetry.ts`, `moderation-sla.scheduler.ts` (new): sweep, claim, relevance, delivery, failure escalation, metrics, snapshot. D1, D2, D5, D6, D8, D9, D13.
-- [ ] `apps/api/src/modules/moderation/moderation-decisions.service.ts`: escalated alert in the transaction. D7.
-- [ ] `apps/api/src/modules/moderation/moderation-sla.controller.ts`, `moderation-sla.service.ts` (new), `moderation.module.ts`: D11.
-- [ ] `apps/api/src/workers/maintenance.processor.ts`, `bootstrap.ts`, `community.bootstrap.ts` and their specs: both triggers and the general worker OTEL start. D3, D13.
-- [ ] `apps/web/src/lib/moderation.ts`, `apps/web/src/app/moderation/sla/page.tsx`, `apps/web/src/app/components/moderation-sla-dashboard.tsx` (new), `moderation-queue.tsx` link: D12.
-- [ ] 10 files `apps/web/src/i18n/locales/*.json`, `moderation-locales.spec.ts`: `moderation.sla.*`, with enum coverage from the contract.
-- [ ] `infra/grafana/dashboards/couturecast-moderation-sla.json`, `README.md`, `observability.md`, a metric-existence spec: D13.
-- [ ] PostHog dashboard and alert through the PostHog tools, ids recorded in the runbook. D13.
-- [ ] `_bmad-output/project-knowledge/moderation-sla-runbook.md`, `scripts/moderation-sla-drill.mjs`, root `package.json`, `.env.example`, `secrets-management.md`, `index.md`: D8, D15, D16.
+- [x] `_bmad-output/implementation-artifacts/sprint-status.yaml`, `epic-6-context.md`: set 6-12 to `in-progress` and name it the current story when the build starts; `review` when it ends.
+- [x] `packages/db/prisma/schema.prisma`, one new migration, `moderation-queue-tables.ts`: `ModerationSlaAlert`, `ModerationSlaMonitor`, enums, unique key, partial index on deliverable rows, RLS with zero grants. D4.
+- [x] `packages/config/src/flags.ts`, flag spec, `seeds/feature-flags.ts`, seed spec, service count spec: `moderation_sla_monitoring_enabled`. D10.
+- [x] `packages/api-client/src/contracts/http/moderation-sla.ts` (new), `index.ts`, `openapi.ts`, then `npm run generate:http-openapi && npm run generate:api-client`, with no hand edit of generated files. D11, webhook payload schema.
+- [x] `apps/api/src/modules/moderation/moderation-queue.repository.ts`: `anchorReportId`. D1.
+- [x] `apps/api/src/modules/moderation/moderation-sla.repository.ts`, `moderation-sla.sweep.ts`, `moderation-sla.channel.ts`, `moderation-sla.telemetry.ts`, `moderation-sla.scheduler.ts` (new): sweep, claim, relevance, delivery, failure escalation, metrics, snapshot. D1, D2, D5, D6, D8, D9, D13.
+- [x] `apps/api/src/modules/moderation/moderation-decisions.service.ts`: escalated alert in the transaction. D7.
+- [x] `apps/api/src/modules/moderation/moderation-sla.controller.ts`, `moderation-sla.service.ts` (new), `moderation.module.ts`: D11.
+- [x] `apps/api/src/workers/maintenance.processor.ts`, `bootstrap.ts`, `community.bootstrap.ts` and their specs: both triggers and the general worker OTEL start. D3, D13.
+- [x] `apps/web/src/lib/moderation.ts`, `apps/web/src/app/moderation/sla/page.tsx`, `apps/web/src/app/components/moderation-sla-dashboard.tsx` (new), `moderation-queue.tsx` link: D12.
+- [x] 10 files `apps/web/src/i18n/locales/*.json`, `moderation-locales.spec.ts`: `moderation.sla.*`, with enum coverage from the contract.
+- [x] `infra/grafana/dashboards/couturecast-moderation-sla.json`, `README.md`, `observability.md`, a metric-existence spec: D13.
+- [x] PostHog dashboard and alert through the PostHog tools, ids recorded in the runbook. D13.
+- [x] `_bmad-output/project-knowledge/moderation-sla-runbook.md`, `scripts/moderation-sla-drill.mjs`, root `package.json`, `.env.example`, `secrets-management.md`, `index.md`: D8, D15, D16.
       The rollout step names both flags and the subject `system:moderation-sla`, says the fallback table does not carry a production opening (TEA-06), and lists `APP_URL` beside the webhook secret for the hosted worker (TEA-12).
       The failing-channel step gives the exact `DELETE FROM "JobFailure" WHERE job_id = ...` for the Supabase SQL editor, warns against `failed-jobs/retry`, and states that rows stay until removed (TEA-16).
-- [ ] `deployment-guide.md`, `deferred-work.md`: the hosted worker correction, a 6.12 rollout section, Concrete gaps, BH18. D3, D14.
-- [ ] `pact/http/consumer/interactions/moderation.ts`, `web-api-client.pacttest.ts`, `provider/state-handlers.ts`, `provider/doubles/moderation.ts`: summary, 403, 503.
-- [ ] `playwright/tests/moderation-sla.spec.ts` (new), `api/auth-moderation-security.spec.ts`: role matrix, seeded states, stale banner, light and dark, 375 and 1280 widths, axe, real delivery.
-- [ ] `playwright/support/moderation-ops-capture.mjs` (new) as a second `webServer` in `playwright/config/local.config.ts`, answering `/__admin/requests` on loopback. `scripts/start-api-e2e-with-workers.mjs` forces `MODERATION_OPS_WEBHOOK_URL` to it and adds the key to `E2E_CALLER_OWNED_ENV_KEYS`, so a value in `.env.local` can never receive test data (TEA-14).
-- [ ] Tests per the Test Design (TEA) section, written first against the contract and watched fail. Matrix edge cases are covered by unit and integration specs. `apps/api/integration/moderation-sla{,-concurrency,-delivery,-escalate,-route}.integration.spec.ts` and `support/moderation-sla-crash-worker.mjs` run real Postgres and a real local HTTP server.
+- [x] `deployment-guide.md`, `deferred-work.md`: the hosted worker correction, a 6.12 rollout section, Concrete gaps, BH18. D3, D14.
+- [x] `pact/http/consumer/interactions/moderation.ts`, `web-api-client.pacttest.ts`, `provider/state-handlers.ts`, `provider/doubles/moderation.ts`: summary, 403, 503.
+- [x] `playwright/tests/moderation-sla.spec.ts` (new), `api/auth-moderation-security.spec.ts`: role matrix, seeded states, stale banner, light and dark, 375 and 1280 widths, axe, real delivery.
+- [x] `playwright/support/moderation-ops-capture.mjs` (new) as a second `webServer` in `playwright/config/local.config.ts`, answering `/__admin/requests` on loopback. `scripts/start-api-e2e-with-workers.mjs` forces `MODERATION_OPS_WEBHOOK_URL` to it and adds the key to `E2E_CALLER_OWNED_ENV_KEYS`, so a value in `.env.local` can never receive test data (TEA-14).
+- [x] Tests per the Test Design (TEA) section, written first against the contract and watched fail. Matrix edge cases are covered by unit and integration specs. `apps/api/integration/moderation-sla{,-concurrency,-delivery,-escalate,-route}.integration.spec.ts` and `support/moderation-sla-crash-worker.mjs` run real Postgres and a real local HTTP server.
 
 **Acceptance Criteria:**
 
@@ -217,6 +217,38 @@ Verified against `main` at `3efd8423`.
 - Given the PR, then it aims for fewer than 100 changed files, generated files included, and every PR job stays under 20 minutes.
 
 ## Implementation Notes
+
+Built on `feat/cc-6-12-sla-monitoring-escalation` from `3efd8423`.
+
+Decisions made while building:
+
+- Route: the bmad-build gate selects the subagent route for a change this size. I implemented directly as the named fleet peer `cc612-builder`, because TEA and the coordinator address this pane for commit windows and findings, and a subagent could receive neither. The review step stays with TEA per commit and the coordinator's Codex review.
+- `moderation_sla_monitoring_enabled` is read first, then `moderation_console_enabled`, each once per sweep.
+- `listModerationCases` and `countModerationCases` are free functions over one `scoredCasesSql`, so the decision transaction can read through its own client with no new constructor dependency. `ModerationQueueRepository.listCases` delegates to it.
+- `escalated` in `queue` orders by `decided_at`, then `sequence`. `inDecisionOrder` agrees except under clock skew between API instances, and only one decision per case runs at a time under the case lock.
+- `recordFailedAttempt` and the escalation are separate writes, so a failed escalation leaves the attempt counted and retries at the next attempt (D9).
+- The webhook line is hidden while the monitor is stale, because it would contradict the banner.
+- Refresh moved to the page header, because a phone needed about 2500 pixels of scrolling to reach it.
+- The drill runs under `tsx` and reads both modules from the default export, because `apps/api` and `packages/api-client` load as CommonJS there.
+
+PostHog (D13), created in project `couturecast-prod` (329012): dashboard `2307559`, insights `zKbHePW9`, `SRa75Ar5`, `ml0by3nV`, `PMQhTqjE`, and the disabled alert `Moderation SLA monitor stopped` on `PMQhTqjE`.
+The plan allowed an hourly check. The alert names one required subscriber, and it stays disabled, so it sends nothing until the rollout step replaces that subscriber.
+
+Real stack walk, 2026-11-05, on the isolated database `cc612_walk`, Redis db 5 and a local capture server on 4319, through the launcher with the built API, the real `community.bootstrap` worker and the web server:
+
+- First sweep: one `at_risk` and one `breached` (a case first seen past due) reached the capture server, and `breached` alone was written for the overdue case.
+- One report aged by SQL across 5 hours 50 minutes, then past due, produced `at_risk`, then `breached`, one sweep each.
+- `escalate` through the real route produced one alert, its replay answered `replayed: true` with no new row, and `resolve` stamped its report.
+- With the capture answering 500: attempts at 1, 2 and 4 minutes, one `JobFailure` row and a stamp at the third attempt per alert, and `moderation_sla_delivery_attempt_failed` per attempt. Answering 200 delivered both on the next due attempt with no operator step.
+- A canary in the decision reason appeared in no capture and not in the stack log.
+- The worker paused with SIGSTOP: the API-served page showed the stale banner 5 minutes after the last stamp, and it cleared one sweep after SIGCONT.
+- Flag off: the route answered 503 `moderation_sla_disabled`, and two sweep intervals changed neither the monitor stamp nor the alert count nor the capture.
+- Forbidden, disabled, stale, console-only and failing states were read in Chromium at 1280 and 375 pixels in light and dark, with zero horizontal overflow. Screenshots are under `_bmad-output/test-artifacts/story-6-12/`.
+- Sign-in used the `NEXT_PUBLIC_E2E_AUTH` fixture token. Console-only was set by SQL on the row and the stamp, because the launcher owns the webhook. The unset-URL path itself is covered by `I-W-NO-CHANNEL`.
+
+Fixes the walk caused: Refresh moved to the header, and the banner insets now match (TEA nit).
+
+Open at hand-off, by design: D8 production destination, D13 hosted Grafana, D16 staffing coverage.
 
 ## Spec Change Log
 

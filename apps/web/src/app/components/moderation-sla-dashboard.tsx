@@ -45,29 +45,34 @@ const badge =
   'inline-flex min-h-[28px] items-center rounded px-2 text-sm font-semibold ring-1 ring-inset'
 const card = 'rounded-lg border border-neutral-400 p-4 dark:border-neutral-600'
 
+type ManualRefresh = 'idle' | 'refreshing' | 'refreshed'
+
 function useModerationSla() {
   const [summary, setSummary] = useState<ModerationSlaSummary | null>(null)
   const [failure, setFailure] = useState<ModerationFailureReason | null>(null)
   const [busy, setBusy] = useState(false)
-  const loaded = useRef(false)
+  // Only a refresh someone asked for speaks. A timed refresh changes nothing they did.
+  const [manual, setManual] = useState<ManualRefresh>('idle')
   const inFlight = useRef<AbortController | null>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (requested = false) => {
     inFlight.current?.abort()
     const controller = new AbortController()
     inFlight.current = controller
     setBusy(true)
+    if (requested) setManual('refreshing')
     try {
       const next = await getModerationSlaFromWeb(controller.signal)
       if (controller.signal.aborted) return
-      loaded.current = true
       setSummary(next)
       setFailure(null)
+      if (requested) setManual('refreshed')
     } catch (error) {
       if (controller.signal.aborted) return
       const reason = moderationFailureReason(error)
       if (isTerminalFailure(reason)) setSummary(null)
       setFailure(reason)
+      if (requested) setManual('idle')
     } finally {
       if (!controller.signal.aborted) setBusy(false)
     }
@@ -84,7 +89,7 @@ function useModerationSla() {
     }
   }, [load])
 
-  return { summary, failure, busy, load }
+  return { summary, failure, busy, manual, load }
 }
 
 function useFormatTime() {
@@ -101,32 +106,18 @@ function useFormatTime() {
 
 export function ModerationSlaDashboard() {
   const { t } = useModerationTranslation()
-  const { summary, failure, busy, load } = useModerationSla()
+  const { summary, failure, busy, manual, load } = useModerationSla()
   const terminal = failure !== null && isTerminalFailure(failure)
-  const status = busy
-    ? t('moderation.queue.refreshing')
-    : summary
-      ? monitorSentenceKey(summary)
-        ? t(monitorSentenceKey(summary))
-        : ''
-      : ''
+  const key = statusKey(summary, manual)
+  const status = key ? t(key) : ''
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-semibold">{t('moderation.sla.title')}</h1>
-          <p className="text-sm text-neutral-700 dark:text-neutral-300">
-            {t('moderation.sla.subtitle')}
-          </p>
-        </div>
-        <Link
-          href="/moderation"
-          className={`${moderationControl} inline-flex items-center`}
-        >
-          {t('moderation.backToQueue')}
-        </Link>
-      </header>
+      <SlaHeader
+        canRefresh={summary !== null}
+        busy={busy}
+        onRefresh={() => void load(true)}
+      />
 
       <p role="status" aria-live="polite" className="sr-only">
         {status}
@@ -144,7 +135,7 @@ export function ModerationSlaDashboard() {
               reason={failure}
               scope="sla"
               busy={busy}
-              onRetry={() => void load()}
+              onRetry={() => void load(true)}
             />
           ) : null}
           {summary && failure ? (
@@ -152,29 +143,68 @@ export function ModerationSlaDashboard() {
               {t('moderation.state.stale')}
             </p>
           ) : null}
-          {summary ? <SlaBody summary={summary} busy={busy} onRefresh={load} /> : null}
+          {summary ? <SlaBody summary={summary} /> : null}
         </>
       )}
     </div>
   )
 }
 
-/** What a screen reader hears when the monitor's health changes. Silence while it is healthy. */
-function monitorSentenceKey(summary: ModerationSlaSummary): string {
-  if (!summary.monitor.lastSweepAt) return 'moderation.sla.monitorNever'
-  return summary.monitor.stale ? 'moderation.sla.monitorStaleShort' : ''
+/**
+ * What a screen reader hears: a refresh someone asked for, and a monitor that stopped. A timed
+ * refresh of a healthy page says nothing, so an open page stays quiet between real changes.
+ */
+function statusKey(summary: ModerationSlaSummary | null, manual: ManualRefresh): string {
+  if (manual === 'refreshing') return 'moderation.queue.refreshing'
+  if (summary && !summary.monitor.lastSweepAt) return 'moderation.sla.monitorNever'
+  if (summary?.monitor.stale) return 'moderation.sla.monitorStaleShort'
+  return manual === 'refreshed' ? 'moderation.queue.refreshed' : ''
 }
 
-function SlaBody({
-  summary,
+function SlaHeader({
+  canRefresh,
   busy,
   onRefresh,
 }: {
-  summary: ModerationSlaSummary
+  canRefresh: boolean
   busy: boolean
-  onRefresh: () => Promise<void>
+  onRefresh: () => void
 }) {
   const { t } = useModerationTranslation()
+  return (
+    <header className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-3xl font-semibold">{t('moderation.sla.title')}</h1>
+        <p className="text-sm text-neutral-700 dark:text-neutral-300">
+          {t('moderation.sla.subtitle')}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {canRefresh ? (
+          <button
+            type="button"
+            className={moderationControl}
+            aria-disabled={busy}
+            aria-busy={busy}
+            onClick={() => {
+              if (!busy) onRefresh()
+            }}
+          >
+            {t(busy ? 'moderation.queue.refreshing' : 'moderation.queue.refresh')}
+          </button>
+        ) : null}
+        <Link
+          href="/moderation"
+          className={`${moderationControl} inline-flex items-center`}
+        >
+          {t('moderation.backToQueue')}
+        </Link>
+      </div>
+    </header>
+  )
+}
+
+function SlaBody({ summary }: { summary: ModerationSlaSummary }) {
   return (
     <>
       <MonitorPanel summary={summary} />
@@ -185,19 +215,6 @@ function SlaBody({
         <ScreeningPanel summary={summary} />
       </div>
       <RecentAlerts alerts={summary.recentAlerts} />
-      <div>
-        <button
-          type="button"
-          className={moderationControl}
-          aria-disabled={busy}
-          aria-busy={busy}
-          onClick={() => {
-            if (!busy) void onRefresh()
-          }}
-        >
-          {t(busy ? 'moderation.queue.refreshing' : 'moderation.queue.refresh')}
-        </button>
-      </div>
     </>
   )
 }
@@ -220,7 +237,7 @@ function MonitorPanel({ summary }: { summary: ModerationSlaSummary }) {
         data-monitor-stale={stale}
         className={
           stale
-            ? 'rounded border-2 border-red-800 bg-red-100 p-4 font-semibold text-red-950 dark:border-red-400 dark:bg-red-950 dark:text-red-100'
+            ? 'rounded border border-red-800 bg-red-100 p-4 font-semibold text-red-950 ring-1 ring-inset ring-red-800 dark:border-red-400 dark:bg-red-950 dark:text-red-100 dark:ring-red-400'
             : 'rounded border border-neutral-400 p-4 dark:border-neutral-600'
         }
       >
@@ -234,7 +251,7 @@ function MonitorPanel({ summary }: { summary: ModerationSlaSummary }) {
           {t('moderation.sla.channelConsole')}
         </p>
       ) : null}
-      {channel === 'webhook' ? (
+      {channel === 'webhook' && !stale ? (
         <p data-channel={channel} className="text-sm">
           {t('moderation.sla.channelWebhook')}
         </p>

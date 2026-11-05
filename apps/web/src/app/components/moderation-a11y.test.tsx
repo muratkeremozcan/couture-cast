@@ -79,12 +79,12 @@ describe('C-WEB-Q-A11Y: the queue', () => {
     for (const link of screen.getAllByRole('link')) expect(link).toHaveAccessibleName()
   })
 
-  it('tabs through the filters, then each case link, then Refresh and Load more, in reading order', async () => {
+  it('tabs through the SLA link, the filters, each case link, then Refresh and Load more, in reading order', async () => {
     mockApi(queueHandler(() => json(page(items, 'c1'))))
     render(<ModerationQueueView />)
     await screen.findByRole('list', { name: 'Cases' })
     const order: string[] = []
-    for (let step = 0; step < 9; step++) {
+    for (let step = 0; step < 10; step++) {
       await userEvent.tab()
       const active = document.activeElement as HTMLElement
       order.push(
@@ -96,6 +96,7 @@ describe('C-WEB-Q-A11Y: the queue', () => {
       )
     }
     expect(order).toEqual([
+      'link:/moderation/sla',
       'select:source',
       'select:locale',
       'select:risk',
