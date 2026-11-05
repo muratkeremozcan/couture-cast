@@ -24,6 +24,7 @@ import {
   type ModerationAppealInput,
   type ModerationAvailabilityInput,
   type ModerationDecisionInput,
+  moderationSlaResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { assertCommunityMemberNotSanctioned } from '../../../../apps/api/src/modules/community/community-access.service'
 import { moderationDecisionError } from '../../../../apps/api/src/modules/moderation/moderation-decision-rules'
@@ -51,12 +52,16 @@ export type ModerationScenario =
 let scenario: ModerationScenario = 'queue'
 let consoleEnabled = true
 let decisionsEnabled = true
+let slaEnabled = true
 
 export function configureModerationScenario(next: ModerationScenario) {
   scenario = next
 }
 export function configureModerationConsole(enabled: boolean) {
   consoleEnabled = enabled
+}
+export function configureModerationSla(enabled: boolean) {
+  slaEnabled = enabled
 }
 export function configureModerationDecisions(enabled: boolean) {
   decisionsEnabled = enabled
@@ -65,6 +70,7 @@ export function resetModerationState() {
   scenario = 'queue'
   consoleEnabled = true
   decisionsEnabled = true
+  slaEnabled = true
 }
 
 /** Fixed instants keep the recorded pact byte-stable across the three determinism runs. */
@@ -498,11 +504,50 @@ export function withCommunityBan<S extends { getFeed: (params: never) => unknown
   }
 }
 
+/** Story 6.12: the SLA summary, parsed by the shipped contract so a drift fails here first. */
+export const moderationSlaServiceDouble = {
+  summary: () =>
+    Promise.resolve(
+      moderationSlaResponseSchema.parse({
+        data: {
+          serverNow: PACT_SERVER_NOW,
+          monitor: { lastSweepAt: PACT_SERVER_NOW, stale: false, channel: 'webhook' },
+          queue: {
+            onTrack: 1,
+            atRisk: 1,
+            breached: 1,
+            escalated: 1,
+            oldestDueAt: PACT_SERVER_NOW,
+          },
+          resolution: { windowDays: 7, resolved: 2, withinSla: 1, late: 1 },
+          alerts: { pending: 0, failing: 0, consoleOnly: 0 },
+          screening: { oldestPendingReviewAt: null },
+          recentAlerts: [
+            {
+              id: 'alert-1',
+              kind: 'breached',
+              caseId: 'post.pactpost1',
+              source: 'post',
+              risk: 'high',
+              slaDueAt: PACT_SERVER_NOW,
+              detectedAt: PACT_SERVER_NOW,
+              delivery: 'delivered',
+              attempts: 1,
+              lastErrorCode: null,
+              deliveredAt: PACT_SERVER_NOW,
+            },
+          ],
+        },
+      })
+    ),
+}
+
 /** The only flags the moderation controllers read. Every other flag answers on. */
 export const moderationFlagsDouble = {
   getFeatureFlag: (key: string) => {
     if (key === 'moderation_console_enabled') return Promise.resolve(consoleEnabled)
     if (key === 'moderation_decisions_enabled') return Promise.resolve(decisionsEnabled)
+    if (key === 'moderation_sla_monitoring_enabled') return Promise.resolve(slaEnabled)
     return Promise.resolve(true)
   },
 }

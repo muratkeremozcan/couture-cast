@@ -26,6 +26,7 @@ import {
   applyModerationDecisionFromWeb,
   createMutationIdKeeper,
   getModerationCaseFromWeb,
+  getModerationSlaFromWeb,
   isTerminalFailure,
   listModerationCasesFromWeb,
   moderationDecisionFailure,
@@ -719,5 +720,52 @@ describe('U-WEB-D-CLIENT: community_banned reads by code (TEA-22)', () => {
     )
     const failure = await failureOf(() => getCommunityFeedFromWeb({ mode: 'auto' }))
     expect(communityFailureReason(failure)).toBe('unknown')
+  })
+})
+
+describe('U-WEB-CLIENT: getModerationSlaFromWeb', () => {
+  const SLA = '*/api/v1/moderation/sla'
+  const body = {
+    data: {
+      serverNow: '2026-11-05T12:00:00.000Z',
+      monitor: { lastSweepAt: null, stale: true, channel: null },
+      queue: { onTrack: 0, atRisk: 0, breached: 0, escalated: 0, oldestDueAt: null },
+      resolution: { windowDays: 7, resolved: 0, withinSla: 0, late: 0 },
+      alerts: { pending: 0, failing: 0, consoleOnly: 0 },
+      screening: { oldestPendingReviewAt: null },
+      recentAlerts: [],
+    },
+  }
+
+  it('reads the route with the bearer and returns the parsed summary', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+    let authorization: string | null = null
+    useMswHandlers(
+      http.get(SLA, ({ request }) => {
+        authorization = request.headers.get('authorization')
+        return HttpResponse.json(body)
+      })
+    )
+    await expect(getModerationSlaFromWeb()).resolves.toEqual(body.data)
+    expect(authorization).toBe('Bearer token-1')
+  })
+
+  it.each([
+    [401, { message: 'x' }, 'signed_out'],
+    [403, { message: 'x' }, 'forbidden'],
+    [503, { statusCode: 503, code: 'moderation_sla_disabled', message: 'x' }, 'disabled'],
+    [500, { message: 'x' }, 'unavailable'],
+  ])('maps %d %j to %s', async (status, response, reason) => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+    useMswHandlers(http.get(SLA, () => HttpResponse.json(response, { status })))
+    const failure = await getModerationSlaFromWeb().catch((error: unknown) => error)
+    expect(moderationFailureReason(failure)).toBe(reason)
+  })
+
+  it('maps a network failure to a retryable state', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+    useMswHandlers(http.get(SLA, () => HttpResponse.error()))
+    const failure = await getModerationSlaFromWeb().catch((error: unknown) => error)
+    expect(isTerminalFailure(moderationFailureReason(failure))).toBe(false)
   })
 })

@@ -23,6 +23,9 @@ import {
   moderationDecisionErrorCodeSchema,
   moderationMediaUnavailableReasonSchema,
   moderationSanctionKindSchema,
+  moderationSlaAlertKinds,
+  moderationSlaDeliveryStates,
+  moderationSlaFailureCodes,
 } from '@couture/api-client/contracts/http'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -375,5 +378,35 @@ describe('U-WEB-D-LOCALES: decision, standing and banned copy in ten locales', (
     expect(english.get('appeal.not_requested')).toContain('support')
     for (const value of english.values())
       expect(value).not.toMatch(/moderator|operator|reason/i)
+  })
+})
+
+describe('U-WEB-LOCALES: the SLA page copy in ten locales', () => {
+  it.each([
+    ['sla.alertKind', moderationSlaAlertKinds],
+    ['sla.delivery', moderationSlaDeliveryStates],
+    ['sla.failure', moderationSlaFailureCodes],
+  ] as const)('%s labels exactly the contract set in every locale', (path, members) => {
+    for (const locale of SUPPORTED_LOCALES)
+      expect(childKeys(CATALOGS[locale], path), `${locale} ${path}`).toEqual(
+        sorted(members)
+      )
+  })
+
+  it('holds no moderation.sla value equal to its key', () => {
+    for (const locale of SUPPORTED_LOCALES)
+      for (const [key, value] of flatten(tree(CATALOGS[locale])))
+        if (key.startsWith('sla.'))
+          expect(value, `${locale} ${key}`).not.toBe(key.split('.').at(-1))
+  })
+
+  it('tells the moderator in every locale that a stale monitor sends nothing', () => {
+    const stale = flatten(tree(enUS as Catalog)).get('sla.monitorStale')
+    expect(stale).toContain('{{time}}')
+    for (const locale of SUPPORTED_LOCALES)
+      expect(
+        placeholders(flatten(tree(CATALOGS[locale])).get('sla.monitorStale') ?? ''),
+        locale
+      ).toEqual(['time'])
   })
 })

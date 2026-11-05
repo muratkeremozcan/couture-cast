@@ -370,6 +370,7 @@ describe('createCommunityWorkerRuntime', () => {
       'sweepErasureRequests',
       'sweepExpiredBanHolds',
       'sweepExpiredUploads',
+      'sweepModerationSla',
       'sweepStalePendingReview',
     ])
     expect(harness.dispatchPending).toHaveBeenCalled()

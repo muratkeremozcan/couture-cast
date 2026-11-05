@@ -15,6 +15,7 @@ import {
   configureModerationConsole,
   configureModerationDecisions,
   configureModerationScenario,
+  configureModerationSla,
   type ModerationScenario,
 } from './doubles/moderation'
 import type {
@@ -142,6 +143,21 @@ const moderationState =
   }
 
 export const stateHandlers: StateHandlers = {
+  // Story 6.12: the SLA dashboard read.
+  'A moderator reads the SLA summary': () => {
+    configureModerationConsole(true)
+    configureModerationSla(true)
+    return Promise.resolve({
+      description: 'Configured an open console and monitoring on',
+    })
+  },
+  'SLA monitoring is off for a moderator': () => {
+    configureModerationConsole(true)
+    configureModerationSla(false)
+    return Promise.resolve({
+      description: 'Configured monitoring off for this moderator',
+    })
+  },
   'A moderator reads a queue with open cases': moderationState(
     'queue',
     'Configured a queue with two open cases and a next page'
