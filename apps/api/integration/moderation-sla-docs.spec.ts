@@ -1,24 +1,22 @@
 // Story 6.12 test owner: U-GF-METRICS and U-RB-RUNBOOK. What the dashboard and the runbook claim
 // is checked against the code and against what this story can honestly state.
-import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { describe, it } from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { describe, expect, it } from 'vitest'
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const read = (relative) => readFileSync(path.join(repoRoot, relative), 'utf8')
+const repoRoot = path.resolve(__dirname, '../../..')
+const read = (relative: string) => readFileSync(path.join(repoRoot, relative), 'utf8')
 
 const telemetry = read('apps/api/src/modules/moderation/moderation-sla.telemetry.ts')
 const exported = [
   ...(/MODERATION_SLA_METRIC_NAMES = \[([\s\S]*?)\]/.exec(telemetry)?.[1] ?? '').matchAll(
     /'([^']+)'/g
   ),
-].map((match) => match[1])
+].map((match) => match[1] as string)
 
 describe('U-GF-METRICS: couturecast-moderation-sla.json', () => {
   const raw = read('infra/grafana/dashboards/couturecast-moderation-sla.json')
-  const dashboard = JSON.parse(raw)
+  const dashboard = JSON.parse(raw) as { panels?: { targets?: { expr?: string }[] }[] }
   const expressions = (dashboard.panels ?? []).flatMap((panel) =>
     (panel.targets ?? []).map((target) => target.expr ?? '')
   )
@@ -27,36 +25,34 @@ describe('U-GF-METRICS: couturecast-moderation-sla.json', () => {
   )
 
   it('reads four metric names from the code', () => {
-    assert.equal(exported.length, 4, exported.join(','))
+    expect(exported.length).toBe(4)
   })
 
   it('names only metrics the code exports', () => {
-    assert.ok(named.size > 0)
-    for (const name of named)
-      assert.ok(exported.includes(name), `invented metric ${name}`)
+    expect(named.size).toBeGreaterThan(0)
+    for (const name of named) expect(exported).toContain(name)
   })
 
   it('gives every exported metric a panel', () => {
-    for (const name of exported) assert.ok(named.has(name), `no panel for ${name}`)
+    for (const name of exported) expect([...named]).toContain(name)
   })
 
   it('groups by closed labels only, with no case or member label', () => {
     for (const expr of expressions) {
       const labels = expr.replace(/moderation_sla_[a-z_]+/g, '')
-      assert.doesNotMatch(labels, /case|member|user|reporter|subject|alert_id/i, expr)
+      expect(labels).not.toMatch(/case|member|user|reporter|subject|alert_id/i)
       for (const match of expr.matchAll(/by \(([^)]*)\)/g))
-        for (const label of match[1].split(',').map((item) => item.trim()))
-          assert.ok(['state', 'kind', 'code'].includes(label), `open label ${label}`)
+        for (const label of (match[1] ?? '').split(',').map((item) => item.trim()))
+          expect(['state', 'kind', 'code']).toContain(label)
     }
   })
 
   it('adds no alert rule or notification policy, per the 0.7 no-notification policy', () => {
-    assert.doesNotMatch(raw, /"alert"\s*:|notificationPolicy|contactPoint/i)
+    expect(raw).not.toMatch(/"alert"\s*:|notificationPolicy|contactPoint/i)
   })
 
   it('is listed in the dashboards README', () => {
-    assert.match(
-      read('infra/grafana/dashboards/README.md'),
+    expect(read('infra/grafana/dashboards/README.md')).toMatch(
       /couturecast-moderation-sla\.json/
     )
   })
@@ -81,7 +77,7 @@ describe('U-RB-RUNBOOK: moderation-sla-runbook.md', () => {
     '## Rollback',
   ]) {
     it(`has ${heading}`, () => {
-      assert.ok(runbook.includes(`\n${heading}\n`), heading)
+      expect(runbook).toContain(`\n${heading}\n`)
     })
   }
 
@@ -92,40 +88,39 @@ describe('U-RB-RUNBOOK: moderation-sla-runbook.md', () => {
       .filter((line) =>
         /^\| (Community moderator|Admin|On-duty responder|Release owner)/.test(line)
       )
-    assert.equal(rows.length, 4)
+    expect(rows.length).toBe(4)
     for (const row of rows) {
       const cells = row.split('|').map((cell) => cell.trim())
-      assert.equal(cells[2], '', row)
-      assert.equal(cells[3], '', row)
+      expect(cells[2]).toBe('')
+      expect(cells[3]).toBe('')
     }
   })
 
   it('names no person: no email address and no at-handle', () => {
-    assert.doesNotMatch(runbook, /[\w.+-]+@[\w-]+\.[a-z]{2,}/i)
-    assert.doesNotMatch(runbook, /(^|\s)@[a-z][\w-]+/im)
+    expect(runbook).not.toMatch(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i)
+    expect(runbook).not.toMatch(/(^|\s)@[a-z][\w-]+/im)
   })
 
   it('states the staffing signature as open (D16)', () => {
-    assert.match(runbook, /D16/)
-    assert.match(runbook, /not proved/)
+    expect(runbook).toMatch(/D16/)
+    expect(runbook).toMatch(/not proved/)
   })
 
   it('states that nobody is notified until a webhook is set (D8)', () => {
-    assert.match(runbook, /nobody is notified/)
+    expect(runbook).toMatch(/nobody is notified/)
   })
 
   it('names the system subject in the rollout (TEA-06)', () => {
-    assert.ok(
-      runbook.slice(runbook.indexOf('## Rollout')).includes('system:moderation-sla')
+    expect(runbook.slice(runbook.indexOf('## Rollout'))).toContain(
+      'system:moderation-sla'
     )
   })
 
   it('gives the JobFailure removal SQL and warns against retry (TEA-16)', () => {
-    assert.match(
-      runbook,
+    expect(runbook).toMatch(
       /DELETE FROM "JobFailure" WHERE job_id = 'moderation_sla_delivery__/
     )
-    assert.match(runbook, /Do not use the admin `failed-jobs\/retry` route/)
+    expect(runbook).toMatch(/Do not use the admin `failed-jobs\/retry` route/)
   })
 
   it('lists APP_URL beside the webhook setup (TEA-12)', () => {
@@ -133,7 +128,7 @@ describe('U-RB-RUNBOOK: moderation-sla-runbook.md', () => {
       runbook.indexOf('## Webhook setup'),
       runbook.indexOf('## Drill')
     )
-    assert.match(setup, /APP_URL/)
-    assert.match(setup, /MODERATION_OPS_WEBHOOK_URL/)
+    expect(setup).toMatch(/APP_URL/)
+    expect(setup).toMatch(/MODERATION_OPS_WEBHOOK_URL/)
   })
 })
