@@ -24,7 +24,9 @@ import { SupabaseCommunityStorageAdapter } from '../src/modules/community/commun
 import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
 import { ModerationModule } from '../src/modules/moderation/moderation.module.js'
 import { MODERATION_QUEUE_CLOCK } from '../src/modules/moderation/moderation-decision-rules.js'
+import { createModerationOpsChannel } from '../src/modules/moderation/moderation-sla.channel.js'
 import { ModerationSlaService } from '../src/modules/moderation/moderation-sla.service.js'
+import { ModerationSlaSweep } from '../src/modules/moderation/moderation-sla.sweep.js'
 import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import {
   decisionFixtures,
@@ -40,6 +42,8 @@ const NOW = new Date('2026-11-05T12:00:00.000Z')
 const HOUR = 3_600_000
 const MINUTE = 60_000
 const ROUTE = '/api/v1/moderation/sla'
+/** What both routes answer an operator under a sanction, pinned so a later change is deliberate. */
+const SANCTIONED_STATUS = 200
 const REASON = 'Needs a second reader.'
 const inMs = (ms: number) => new Date(NOW.getTime() + ms)
 
@@ -99,6 +103,7 @@ afterAll(async () => {
 /** Every test reads a closed world: no open report, alert, monitor row or pending post. */
 beforeEach(async () => {
   clock.at(NOW)
+  flagValues.clear()
   await prisma.communityPostReport.updateMany({
     where: { resolved_at: null },
     data: { resolved_at: inMs(-30 * SEED_DAY_MS) },
@@ -206,7 +211,6 @@ describe('I-R-HTTP: who can read', () => {
       flagValues.set('moderation_sla_monitoring_enabled', false)
       flagValues.set('moderation_console_enabled', false)
       const closed = (await get(role).expect(403)).body as unknown
-      flagValues.clear()
       expect(forbiddenHttpErrorSchema.parse(open)).toEqual(queueBody)
       expect(closed).toEqual(open)
       expect(flags.getFeatureFlag).not.toHaveBeenCalled()
@@ -218,7 +222,6 @@ describe('I-R-HTTP: who can read', () => {
     async (flag) => {
       flagValues.set(flag, false)
       const response = await get('moderator').expect(503)
-      flagValues.clear()
       expect(moderationSlaErrorSchema.parse(response.body)).toEqual({
         statusCode: 503,
         code: 'moderation_sla_disabled',
@@ -256,7 +259,6 @@ describe('I-R-HEADERS: the shipped module marks every answer private', () => {
     ]
     flagValues.set('moderation_console_enabled', false)
     answers.push(await get('moderator').expect(503))
-    flagValues.clear()
     for (const answer of answers) {
       expect(answer.headers['cache-control']).toBe('private, no-store')
       expect(String(answer.headers.vary)).toMatch(/authorization/i)
@@ -528,16 +530,34 @@ describe('I-R-STALE: a dead worker reads as dead, from the API alone', () => {
   })
 
   it('opening the route for one viewer leaves a stale monitor stale (D10)', async () => {
-    flags.getFeatureFlag.mockImplementation((key: string, subject: string) =>
-      Promise.resolve(subject === 'system:moderation-sla' ? key !== key : true)
+    const sweep = () =>
+      new ModerationSlaSweep({
+        prisma,
+        clock: clock.now,
+        channel: createModerationOpsChannel({ url: null }),
+        flags: flags as never,
+        analytics: { capture: () => undefined },
+        logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
+        meter: {
+          setOpenCases: () => undefined,
+          setOldestPendingReviewAgeSeconds: () => undefined,
+          countAlert: () => undefined,
+          countDeliveryFailure: () => undefined,
+        },
+      })
+    const original = flags.getFeatureFlag.getMockImplementation()
+    flags.getFeatureFlag.mockImplementation((_key: string, subject: string) =>
+      Promise.resolve(subject !== 'system:moderation-sla')
     )
     try {
+      await expect(sweep().run()).resolves.toMatchObject({ skipped: 1 })
+      expect(await prisma.moderationSlaMonitor.findFirst()).toBeNull()
       expect((await summary()).monitor.stale).toBe(true)
     } finally {
-      flags.getFeatureFlag.mockImplementation((key: string) =>
-        Promise.resolve(flagValues.get(key) ?? true)
-      )
+      flags.getFeatureFlag.mockImplementation(original!)
     }
+    await expect(sweep().run()).resolves.toMatchObject({ skipped: 0 })
+    expect((await summary()).monitor.stale).toBe(false)
   })
 })
 
@@ -570,7 +590,8 @@ describe('I-R-SANCTIONED: an operator under a sanction', () => {
       request(server).get(path).set('Authorization', auth('moderator', operator.id))
     const queue = await call('/api/v1/moderation/cases')
     const sla = await call(ROUTE)
-    expect(sla.status).toBe(queue.status)
+    expect(queue.status).toBe(SANCTIONED_STATUS)
+    expect(sla.status).toBe(SANCTIONED_STATUS)
   })
 })
 

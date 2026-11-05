@@ -286,6 +286,8 @@ export function moderationSlaTestContext(options: { now: Date }) {
     details?: string
     alias?: string
     laterReportGapMs?: number
+    /** Report id suffixes, in insert order, for a test about how ids sort. */
+    reportLabels?: readonly string[]
   }) {
     const label = `c${++sequence}`
     const source = params.source ?? 'post'
@@ -309,7 +311,7 @@ export function moderationSlaTestContext(options: { now: Date }) {
         const dueAt = new Date(params.dueAt.getTime() + index * gap)
         const row = await seedPostReport(prisma, {
           runId,
-          label: `${label}-${index}`,
+          label: `${label}-${params.reportLabels?.[index] ?? index}`,
           postId: post.id,
           reporterId: reporter.id,
           reason,

@@ -3,7 +3,7 @@
 // I-E-ATOMIC, -ROLLBACK, -REPLAY, -REPLAY-RACE, -REESCALATE, -PARITY, -FLAG-OFF, -NEXT-SWEEP,
 // -ORPHAN, -DECISION-UNCHANGED, I-W-RESOLVED-DECISION. Real routes, real guards, real transaction.
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   moderationCasesQuerySchema,
   moderationDecisionResponseSchema,
@@ -65,6 +65,11 @@ beforeAll(async () => {
   receiver = await startCaptureServer()
   boot = await ctx.bootApp()
 }, 120_000)
+
+beforeEach(() => {
+  flagValues.clear()
+  receiver.reset()
+})
 
 afterAll(async () => {
   await receiver.close()

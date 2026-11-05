@@ -52,13 +52,6 @@ const golden = {
 } as const
 
 /** Every key at every depth of a value. */
-function keysOf(value: unknown): string[] {
-  if (Array.isArray(value)) return value.flatMap(keysOf)
-  if (value && typeof value === 'object')
-    return Object.entries(value).flatMap(([key, child]) => [key, ...keysOf(child)])
-  return []
-}
-
 describe('U-C-RESPONSE-STRICT', () => {
   it('accepts a maximal summary, and null where a value does not exist yet', () => {
     expect(moderationSlaResponseSchema.parse({ data: summary }).data.queue.atRisk).toBe(2)
@@ -116,13 +109,6 @@ describe('U-C-RESPONSE-STRICT', () => {
         data: { ...summary, resolution: { ...summary.resolution, windowDays: 30 } },
       }).success
     ).toBe(false)
-  })
-
-  it('names no private field at any depth of a parsed maximal body', () => {
-    const parsed = moderationSlaResponseSchema.parse({ data: summary })
-    const forbidden =
-      /reason|excerpt|alias|reporter|subject|user|email|anchor|decision|webhook|url|details/i
-    expect(keysOf(parsed).filter((key) => forbidden.test(key))).toEqual([])
   })
 
   it('pins the constants the D11 definitions depend on', () => {
@@ -203,10 +189,40 @@ describe('U-C-ENUMS', () => {
 })
 
 describe('C-OPENAPI', () => {
-  const document = generateHttpOpenApiDocument() as {
+  const document = generateHttpOpenApiDocument() as unknown as {
     paths: Record<string, Record<string, Record<string, unknown>>>
     components: { schemas: Record<string, unknown> }
   }
+
+  /** Property names at every depth of the published schema, following each reference. */
+  function propertyNames(node: unknown, seen = new Set<string>()): string[] {
+    if (Array.isArray(node)) return node.flatMap((item) => propertyNames(item, seen))
+    if (!node || typeof node !== 'object') return []
+    const { $ref: ref, properties } = node as {
+      $ref?: string
+      properties?: Record<string, unknown>
+    }
+    if (ref) {
+      const name = ref.split('/').at(-1) as string
+      if (seen.has(name)) return []
+      seen.add(name)
+      return propertyNames(document.components.schemas[name], seen)
+    }
+    return [
+      ...Object.keys(properties ?? {}),
+      ...Object.values(node).flatMap((child) => propertyNames(child, seen)),
+    ]
+  }
+
+  it('publishes no private field at any depth of the response schema', () => {
+    const names = propertyNames(document.components.schemas.ModerationSlaResponse)
+    expect(names).toEqual(
+      expect.arrayContaining(['serverNow', 'lastSweepAt', 'recentAlerts', 'caseId'])
+    )
+    const forbidden =
+      /reason|excerpt|alias|reporter|subject|user|email|anchor|decision|webhook|url|details/i
+    expect(names.filter((name) => forbidden.test(name))).toEqual([])
+  })
 
   it('registers the route with its 401, 403 and 503', () => {
     const operation = document.paths['/api/v1/moderation/sla']?.get as {

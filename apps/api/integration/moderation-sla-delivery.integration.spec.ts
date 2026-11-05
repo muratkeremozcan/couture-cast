@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { moderationSlaWebhookPayloadSchema } from '@couture/api-client/contracts/http'
 import { CommunityModerationActionsService } from '../src/modules/community/community-moderation.actions.js'
 import { createModerationOpsChannel } from '../src/modules/moderation/moderation-sla.channel.js'
+import { ModerationSlaRepository } from '../src/modules/moderation/moderation-sla.repository.js'
 import { seedMember } from './helpers/moderation-queue-seed.js'
 import {
   SLA_HOUR_MS,
@@ -167,7 +168,7 @@ describe('I-W-THIRD-FAILURE: a failing channel escalates once', () => {
     expect(meter.countDeliveryFailure.mock.calls).toEqual(Array(5).fill(['http_5xx']))
   })
 
-  it('writes one row when two workers meet the third attempt', async () => {
+  it('lets the lease keep a second sweep out at the third attempt', async () => {
     const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
     capture().respondWith(500)
     await sweep().run()
@@ -177,6 +178,36 @@ describe('I-W-THIRD-FAILURE: a failing channel escalates once', () => {
     await Promise.all([sweep().run(), sweep({ prisma: ctx.newClient() }).run()])
     expect(await prisma.jobFailure.count()).toBe(1)
     expect((await alertByKey(slaKey(seeded, 'at_risk')))!.attempts).toBe(3)
+  })
+
+  it('writes one row when two workers reach the failure write together', async () => {
+    const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+    const channel = createModerationOpsChannel({ url: capture().url })
+    capture().respondWith(500)
+    await sweep({ channel }).run()
+    const row = (await alertByKey(slaKey(seeded, 'at_risk')))!
+    const claimed = {
+      id: row.id,
+      kind: 'at_risk' as const,
+      caseId: seeded.caseId,
+      source: 'post' as const,
+      anchorReportId: seeded.anchorReportId,
+      risk: row.risk as 'low',
+      slaDueAt: row.sla_due_at,
+      detectedAt: row.detected_at,
+      attempts: 3,
+      failureEscalatedAt: null,
+    }
+    const outcomes = await Promise.all([
+      new ModerationSlaRepository(prisma).escalateFailure(claimed, 'http_5xx', NOW),
+      new ModerationSlaRepository(ctx.newClient()).escalateFailure(
+        claimed,
+        'http_5xx',
+        NOW
+      ),
+    ])
+    expect(outcomes.filter(Boolean)).toHaveLength(1)
+    expect(await prisma.jobFailure.count()).toBe(1)
   })
 })
 
@@ -241,12 +272,12 @@ describe('I-W-CODES-REAL: closed codes from real responses', () => {
     expect((await alertByKey(slaKey(seeded, 'at_risk')))!.last_error_code).toBe('timeout')
   })
 
-  it('a closed port records network', async () => {
-    const closed = await startCaptureServer()
-    const url = closed.url
-    await closed.close()
+  it('a dropped connection records network', async () => {
+    capture().script((_request, response) => {
+      response.socket?.destroy()
+    })
     const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
-    await sweep({ channel: createModerationOpsChannel({ url }) }).run()
+    await sweep().run()
     expect((await alertByKey(slaKey(seeded, 'at_risk')))!.last_error_code).toBe('network')
   })
 })
@@ -267,7 +298,6 @@ describe('I-W-CRASH-LOOP: claims that never finish (TEA-04)', () => {
   it('records interrupted and escalates once attempts reaches 3', async () => {
     const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
     const key = slaKey(seeded, 'at_risk')
-    capture().hang()
     capture().respondWith(500)
     await sweep().run()
     const row = (await alertByKey(key))!
@@ -569,7 +599,11 @@ describe('U-S-RESULT-SAFE and U-S-FLAG-ORDER', () => {
         },
       }
     )
-    await expect(sweep({ prisma: explosive as never }).run()).resolves.toBeDefined()
+    await expect(sweep({ prisma: explosive as never }).run()).resolves.toMatchObject({
+      skipped: 1,
+      recorded: 0,
+      delivered: 0,
+    })
   })
 })
 
@@ -587,10 +621,17 @@ describe('U-S-SNAPSHOT: the PostHog liveness signal', () => {
     clock.advance(1)
     await job.run()
     expect(snapshots()).toHaveLength(2)
-    const [event] = analytics.capture.mock.calls.map(
-      ([call]) => call as Record<string, unknown>
-    )
-    expect(JSON.stringify(event)).not.toMatch(/post\.|comment\.|orphan-/)
+    expect(snapshots()[0]).toEqual({
+      distinctId: 'system:moderation-sla',
+      event: 'moderation_sla_snapshot',
+      properties: {
+        on_track: 0,
+        at_risk: 1,
+        breached: 0,
+        escalated: 0,
+        oldest_pending_review_age_seconds: 0,
+      },
+    })
   })
 
   it('a capture failure leaves the sweep result unchanged', async () => {
@@ -665,19 +706,30 @@ describe('I-P: private data on no surface', () => {
       data: { content_snapshot: { body: hostile, locale: 'en-US' } },
     })
     const reporterIds = (
-      await prisma.communityPostReport.findMany({ where: { post_id: seeded.targetId } })
-    ).map((report) => report.reporter_id as string)
+      await Promise.all([
+        prisma.communityPostReport.findMany({ where: { post_id: seeded.targetId } }),
+        prisma.communityCommentReport.findMany({
+          where: { comment_id: comment.targetId },
+        }),
+      ])
+    )
+      .flat()
+      .map((report) => report.reporter_id as string)
+    expect(reporterIds).toHaveLength(3)
     capture().respondWith(500)
     await sweep().run()
     clock.advance(SLA_MINUTE_MS)
     await sweep().run()
     clock.advance(2 * SLA_MINUTE_MS)
     await sweep().run()
+    const failedSends = JSON.stringify(capture().received)
+    expect(capture().received.length).toBeGreaterThan(0)
     capture().reset()
     clock.advance(4 * SLA_MINUTE_MS)
     await sweep().run()
+    expect(capture().received.length).toBeGreaterThan(0)
     expect(await prisma.jobFailure.count()).toBeGreaterThan(0)
-    for (const surface of await everySurface()) {
+    for (const surface of await everySurface([failedSends])) {
       expect(surface).not.toContain(CANARY)
       for (const id of [...reporterIds, seeded.authorId])
         expect(surface).not.toContain(id)
@@ -731,6 +783,13 @@ describe('I-P: private data on no surface', () => {
     const allowed: Record<string, string[]> = {
       moderation_sla_alert_recorded: ['kind', 'risk', 'source'],
       moderation_sla_delivery_failed: ['code', 'kind'],
+      moderation_sla_snapshot: [
+        'at_risk',
+        'breached',
+        'escalated',
+        'on_track',
+        'oldest_pending_review_age_seconds',
+      ],
     }
     const events = analytics.capture.mock.calls.map(
       ([call]) =>
@@ -743,8 +802,10 @@ describe('I-P: private data on no surface', () => {
     expect(events.length).toBeGreaterThan(2)
     for (const event of events) {
       expect(event.distinctId).toBe('system:moderation-sla')
-      if (allowed[event.event])
-        expect(Object.keys(event.properties ?? {}).sort()).toEqual(allowed[event.event])
+      // An event missing from the list fails here, so a new one has to declare its properties.
+      expect(Object.keys(event.properties ?? {}).sort(), event.event).toEqual(
+        [...(allowed[event.event] ?? [])].sort()
+      )
       expect(JSON.stringify(event.properties ?? {})).not.toMatch(
         /post\.|comment\.|orphan-/
       )

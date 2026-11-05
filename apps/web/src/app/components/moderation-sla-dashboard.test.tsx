@@ -188,15 +188,21 @@ describe('C-WEB-STATES: every state renders on its own', () => {
 
 describe('C-WEB-NO-WRITE: the page is read-only', () => {
   it('holds links and a refresh only, and sends only GETs', async () => {
-    const calls = serve(summary())
+    const methods: string[] = []
+    mockApi(
+      http.all('*/api/*', ({ request }) => {
+        methods.push(request.method)
+        return json(summary())
+      })
+    )
     render(<ModerationSlaDashboard />)
     await screen.findByRole('region', { name: labels.queueTitle })
-    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
-      enUS.moderation.queue.refresh,
-    ])
+    const refresh = screen.getByRole('button', { name: enUS.moderation.queue.refresh })
+    expect(screen.getAllByRole('button')).toEqual([refresh])
     expect(screen.queryByRole('form')).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
-    expect(calls.every((call) => call.method === 'GET')).toBe(true)
+    await userEvent.click(refresh)
+    await waitFor(() => expect(methods).toEqual(['GET', 'GET']))
   })
 
   it('sends the bearer the console holds', async () => {
@@ -237,9 +243,20 @@ describe('C-WEB-ANNOUNCE (D12): one polite announcement per change', () => {
   const REFRESH_MS = 60_000
   const liveText = () => screen.getByRole('status').textContent
 
-  it('stays silent through an auto refresh with equal data', async () => {
+  const withOnTrack = (onTrack: number, overrides: Partial<ModerationSlaSummary> = {}) =>
+    summary({
+      queue: { onTrack, atRisk: 3, breached: 2, escalated: 1, oldestDueAt: NOW },
+      ...overrides,
+    })
+  const onTrackShown = () =>
+    metric(
+      enUS.moderation.slaState.on_track,
+      screen.getByRole('region', { name: labels.queueTitle })
+    )
+
+  it('stays silent through an auto refresh', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const calls = serve(summary())
+    serve(withOnTrack(4), withOnTrack(5))
     render(<ModerationSlaDashboard />)
     await screen.findByRole('region', { name: labels.queueTitle })
     const seen = new Set<string | null>([liveText()])
@@ -250,22 +267,31 @@ describe('C-WEB-ANNOUNCE (D12): one polite announcement per change', () => {
       subtree: true,
     })
     await act(() => vi.advanceTimersByTimeAsync(REFRESH_MS))
-    await waitFor(() => expect(calls).toHaveLength(2))
-    await act(() => vi.advanceTimersByTimeAsync(0))
+    // The rendered count proves the second answer landed before the silence is read.
+    await waitFor(() => expect(onTrackShown()).toBe('5'))
     observer.disconnect()
     expect([...seen]).toEqual([''])
   })
 
   it('announces once when the monitor turns stale', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const stale = summary({
-      monitor: { lastSweepAt: NOW, stale: true, channel: 'webhook' },
-    })
-    serve(summary(), stale)
+    const monitor = { lastSweepAt: NOW, stale: true, channel: 'webhook' as const }
+    serve(withOnTrack(4), withOnTrack(5, { monitor }), withOnTrack(6, { monitor }))
     render(<ModerationSlaDashboard />)
     await screen.findByRole('region', { name: labels.queueTitle })
+    const announced: (string | null)[] = []
+    const observer = new MutationObserver(() => announced.push(liveText()))
+    observer.observe(screen.getByRole('status'), {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    })
     await act(() => vi.advanceTimersByTimeAsync(REFRESH_MS))
-    await waitFor(() => expect(liveText()).toBe(labels.monitorStaleShort))
+    await waitFor(() => expect(onTrackShown()).toBe('5'))
+    await act(() => vi.advanceTimersByTimeAsync(REFRESH_MS))
+    await waitFor(() => expect(onTrackShown()).toBe('6'))
+    observer.disconnect()
+    expect(announced).toEqual([labels.monitorStaleShort])
   })
 })
 
@@ -319,14 +345,17 @@ describe('C-WEB-TIME', () => {
         ],
       })
     )
-    render(<ModerationSlaDashboard />)
-    const articles = await screen.findAllByRole('article')
-    const format = new Intl.DateTimeFormat('en-US', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    })
-    expect(articles[0]!.textContent).toContain(format.format(new Date(first)))
-    expect(articles[1]!.textContent).toContain(format.format(new Date(second)))
+    const zone = process.env.TZ
+    process.env.TZ = 'America/Chicago'
+    try {
+      render(<ModerationSlaDashboard />)
+      const articles = await screen.findAllByRole('article')
+      expect(articles[0]!.textContent).toContain('Nov 1, 2026, 1:30 AM CDT')
+      expect(articles[1]!.textContent).toContain('Nov 1, 2026, 1:30 AM CST')
+    } finally {
+      if (zone === undefined) delete process.env.TZ
+      else process.env.TZ = zone
+    }
   })
 })
 

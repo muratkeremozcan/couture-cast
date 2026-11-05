@@ -5,12 +5,13 @@
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
-import { Queue, Worker } from 'bullmq'
+import { Queue } from 'bullmq'
 import { PrismaClient } from '@prisma/client'
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis.js'
+import { queueConfigs } from '../src/config/queues.js'
 import { createModerationOpsChannel } from '../src/modules/moderation/moderation-sla.channel.js'
 import { MODERATION_SLA_SWEEP_JOB_NAME } from '../src/modules/moderation/moderation-sla.scheduler.js'
+import { createWorker, defaultWorkerOptions } from '../src/workers/base.worker.js'
 import { createMaintenanceProcessor } from '../src/workers/maintenance.processor.js'
 import {
   SLA_HOUR_MS,
@@ -18,6 +19,13 @@ import {
   SLA_SECOND_MS,
   moderationSlaTestContext,
 } from './helpers/moderation-sla-harness.js'
+
+/** `createWorker` writes its `JobFailure` row through this client, so it has to be this file's. */
+const workerPrisma = vi.hoisted(() => ({ client: null as unknown }))
+vi.mock('../src/workers/prisma.js', () => ({
+  getPrismaClient: () => workerPrisma.client,
+  disconnectPrismaClient: () => Promise.resolve(),
+}))
 
 vi.setConfig({ testTimeout: 60_000 })
 
@@ -99,7 +107,9 @@ describe('I-D-SKIP-LOCKED: a row another transaction holds', () => {
     await isLocked
     try {
       // A waiting claim would hang here until the holder lets go, which is after this returns.
-      await sweep({ prisma: ctx.newClient() }).run()
+      const result = await sweep({ prisma: ctx.newClient() }).run()
+      // A claim that waited on the lock would surface as an error here, whichever row sorts first.
+      expect(result).toMatchObject({ delivered: 2, errors: 0 })
       const ids = capture().idsReceived()
       expect(ids).toHaveLength(2)
       expect(ids).not.toContain(held.id)
@@ -437,11 +447,11 @@ describe('I-D-BULLMQ: the general bootstrap path on real Redis', () => {
   it('retries an injected first failure through attempts, with one row per key', async () => {
     const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
     const queueName = `moderation-sla-${randomUUID().slice(0, 8)}`
-    const connection = redisOptionsFromConfig(getRedisConfig())
+    const production = queueConfigs.find((config) => config.name === 'maintenance')!
+    workerPrisma.client = prisma
     const broken = new PrismaClient({
-      datasourceUrl: 'postgresql://x:x@127.0.0.1:1/none',
+      datasourceUrl: 'postgresql://x:CANARYSECRET@127.0.0.1:1/none',
     })
-    const failures: { message: string; attemptsMade: number }[] = []
     const sweepOnce = vi
       .fn<() => Promise<unknown>>()
       .mockImplementationOnce(() =>
@@ -468,30 +478,35 @@ describe('I-D-BULLMQ: the general bootstrap path on real Redis', () => {
       community: { sweepModerationSla: sweepOnce } as never,
       logger: ctx.logs.logger as never,
     })
-    const queue = new Queue(queueName, { connection })
-    const worker = new Worker(queueName, processor, { connection, concurrency: 1 })
-    worker.on('failed', (_job, error) => {
-      failures.push({ message: error.message, attemptsMade: _job?.attemptsMade ?? 0 })
-    })
+    // The production queue options and worker factory, so a queue that stopped retrying fails here.
+    const queue = new Queue(queueName, production.options)
+    const worker = createWorker(queueName, processor, defaultWorkerOptions(1))
     try {
       await worker.waitUntilReady()
       const done = new Promise<void>((resolve) => {
         worker.once('completed', () => resolve())
       })
-      await queue.add(
-        MODERATION_SLA_SWEEP_JOB_NAME,
-        {},
-        { attempts: 3, backoff: { type: 'fixed', delay: 10 } }
-      )
+      await queue.add(MODERATION_SLA_SWEEP_JOB_NAME, {})
       await done
+      await vi.waitFor(async () => {
+        expect(await prisma.jobFailure.count({ where: { queue_name: queueName } })).toBe(
+          1
+        )
+      })
     } finally {
       await worker.close()
       await queue.obliterate({ force: true })
       await queue.close()
       await broken.$disconnect()
     }
-    expect(failures).toHaveLength(1)
-    expect(failures[0]!.message).not.toContain('CANARYSECRET')
+    const [failure] = await prisma.jobFailure.findMany({
+      where: { queue_name: queueName },
+    })
+    expect(failure!.attempts).toBe(1)
+    for (const surface of [JSON.stringify(failure), ctx.logs.text()]) {
+      expect(surface).not.toContain('CANARYSECRET')
+      expect(surface).not.toContain(capture().url)
+    }
     expect(sweepOnce).toHaveBeenCalledTimes(2)
     expect(await alerts()).toHaveLength(1)
     expect((await alertByKey(slaKey(seeded, 'at_risk')))!.delivery).toBe('delivered')

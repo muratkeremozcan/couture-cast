@@ -6,6 +6,7 @@
 // every 60 seconds during this file (TEA-14). Every assertion scopes to the seeded case ids, nothing
 // asserts a global count, and a stamp seeded by hand would be overwritten within a minute, so the
 // stale state stubs the response. moderation-sla-route.integration.spec.ts owns the stale logic.
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { PrismaClient } from '@prisma/client'
@@ -16,6 +17,7 @@ import {
   moderationSlaWebhookPayloadSchema,
   type ModerationSlaSummary,
 } from '@couture/api-client/contracts/http'
+import { e2eStackRecordPath, readE2eStackRecord } from '../../scripts/e2e-stack-pid.mjs'
 import { test as base, expect } from '../support/fixtures/merged-fixtures'
 import { checkA11y } from '../support/helpers/accessibility'
 import { isNonLocalEnvironment, isProdEnvironment } from '../support/helpers/api-test'
@@ -33,6 +35,14 @@ const databaseUrl =
 const SLA_URL = '/moderation/sla'
 const SLA_API = '**/api/v1/moderation/sla'
 const HOUR = 3_600_000
+const slaCopy = (
+  JSON.parse(
+    fs.readFileSync(
+      path.resolve(__dirname, '../../apps/web/src/i18n/locales/en-US.json'),
+      'utf8'
+    )
+  ) as { moderation: { sla: { disabled: string; unavailable: string } } }
+).moderation.sla
 const SCREENSHOT_DIR = path.resolve(
   __dirname,
   '../../_bmad-output/test-artifacts/story-6-12'
@@ -48,8 +58,16 @@ const databaseClient = () =>
 function slaSeed(prisma: PrismaClient) {
   const runId = newRunId()
   let sequence = 0
+  const cases: { caseId: string; postId: string }[] = []
   return {
     runId,
+    /** Closes what this test opened, whether or not it passed. */
+    async cleanUp() {
+      for (const { caseId, postId } of cases) {
+        await closeCase(prisma, postId)
+        await prisma.moderationSlaAlert.deleteMany({ where: { case_key: caseId } })
+      }
+    },
     operator: () => seedMember(prisma, runId, `operator${++sequence}`, { alias: false }),
     async postCase(dueAt: Date) {
       const label = `c${++sequence}`
@@ -66,7 +84,9 @@ function slaSeed(prisma: PrismaClient) {
         createdAt: new Date(dueAt.getTime() - 24 * HOUR),
         dueAt,
       })
-      return { caseId: `post.${post.id}`, postId: post.id, reportId: report.id }
+      const seeded = { caseId: `post.${post.id}`, postId: post.id, reportId: report.id }
+      cases.push(seeded)
+      return seeded
     },
   }
 }
@@ -83,6 +103,7 @@ const test = base.extend<{ prisma: PrismaClient; fx: Seed; moderator: { id: stri
   fx: async ({ prisma }, use) => {
     const seed = slaSeed(prisma)
     await use(seed)
+    await seed.cleanUp()
     // A look left published here takes a slot on the first feed page.
     await prisma.lookbookPost.updateMany({
       where: { id: { startsWith: `${seed.runId}-` }, status: 'published' },
@@ -175,6 +196,7 @@ test.describe('P-SLA: the real sweep, the real channel, the real page', () => {
     fx,
     moderator,
     webhookRegistry,
+    recurse,
   }) => {
     const atRisk = await fx.postCase(new Date(Date.now() + HOUR))
     const breached = await fx.postCase(new Date(Date.now() - HOUR))
@@ -212,6 +234,16 @@ test.describe('P-SLA: the real sweep, the real channel, the real page', () => {
       expect(webhook.rawBody).not.toMatch(/Caption|Snapshot|reporter/i)
     }
 
+    // The receiver logs a request before the worker writes its outcome.
+    const seededCases = [atRisk, breached, escalated].map(({ caseId }) => caseId)
+    await recurse(
+      () =>
+        prisma.moderationSlaAlert.findMany({ where: { case_key: { in: seededCases } } }),
+      (rows) =>
+        rows.length === seededCases.length &&
+        rows.every((row) => row.delivery === 'delivered'),
+      { timeout: 30_000, interval: 500 }
+    )
     await page.goto(SLA_URL)
     const recent = page.getByRole('region', { name: 'Recent alerts' })
     for (const seeded of [atRisk, breached, escalated]) {
@@ -224,21 +256,54 @@ test.describe('P-SLA: the real sweep, the real channel, the real page', () => {
       await expect(row).toContainText('Delivered')
     }
     await expect(page.locator('[data-channel="webhook"]')).toBeVisible()
-
-    for (const seeded of [atRisk, breached, escalated])
-      await closeCase(prisma, seeded.postId)
   })
 
-  test('[P0] P-SLA-HOSTED-PATH the stack delivers from community.bootstrap, the production path', () => {
-    const launcher = fs.readFileSync(
-      path.resolve(__dirname, '../../scripts/start-api-e2e-with-workers.mjs'),
-      'utf8'
+  test('[P0] P-SLA-HOSTED-PATH the stack delivers from community.bootstrap, the production path', async ({
+    prisma,
+  }) => {
+    expect(await prisma.moderationSlaMonitor.findFirst()).not.toBeNull()
+    // The processes under this run's launcher, because other stacks can share the machine. With no
+    // general bootstrap among them, the delivery above came through the hosted 60-second interval.
+    const { port } = new URL(process.env.WEB_E2E_BASE_URL ?? 'http://127.0.0.1:3005')
+    const record = readE2eStackRecord(
+      e2eStackRecordPath(path.resolve(__dirname, '../..'), port || '3005')
     )
-    // The worker this stack starts, with no general bootstrap beside it, so the delivery above
-    // can only have come through the 60-second interval the hosted process runs.
-    expect(launcher).toContain("'apps/api/dist/src/workers/community.bootstrap.js'")
-    expect(launcher).not.toContain("'apps/api/dist/src/workers/bootstrap.js'")
-    expect(launcher).toContain('MODERATION_OPS_WEBHOOK_URL')
+    expect(record, 'the launcher wrote its ownership record').not.toBeNull()
+    const processes = execFileSync('ps', ['-axww', '-o', 'pid=,ppid=,command='], {
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .flatMap((line) => {
+        const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line)
+        return match
+          ? [
+              {
+                pid: Number(match[1]),
+                ppid: Number(match[2]),
+                command: match[3] as string,
+              },
+            ]
+          : []
+      })
+    const stack = new Set([record!.pid])
+    for (let grew = true; grew; ) {
+      grew = false
+      for (const { pid, ppid } of processes) {
+        if (stack.has(ppid) && !stack.has(pid)) {
+          stack.add(pid)
+          grew = true
+        }
+      }
+    }
+    const commands = processes
+      .filter(({ pid }) => stack.has(pid))
+      .map(({ command }) => command)
+    expect(
+      commands.filter((command) => command.includes('workers/community.bootstrap'))
+    ).toHaveLength(1)
+    expect(commands.filter((command) => /workers\/bootstrap\.js/.test(command))).toEqual(
+      []
+    )
   })
 })
 
@@ -278,8 +343,6 @@ test.describe('P-SLA: the page', () => {
     await expect(link).toBeVisible()
     await link.click()
     await expect(page.getByRole('heading', { level: 1, name: 'Post case' })).toBeVisible()
-    await closeCase(prisma, seeded.postId)
-    await prisma.moderationSlaAlert.deleteMany({ where: { case_key: seeded.caseId } })
   })
 
   test('[P0] P-SLA-AXE passes axe on the live page, in light and dark', async ({
@@ -302,9 +365,9 @@ test.describe('P-SLA: the page', () => {
       'disabled',
       503,
       { statusCode: 503, code: 'moderation_sla_disabled', message: 'x' },
-      'SLA monitoring is turned off.',
+      slaCopy.disabled,
     ],
-    ['error', 500, { message: 'x' }, 'SLA monitoring is unavailable. Try again.'],
+    ['error', 500, { message: 'x' }, slaCopy.unavailable],
   ] as const) {
     test(
       `[P0] P-SLA-AXE passes axe on the ${name} state, in light and dark`,
@@ -367,6 +430,9 @@ test.describe('P-SLA: the page', () => {
         channel: 'webhook',
       },
     })
+    // One count moves, so the page has visibly taken the second answer before anything is read.
+    const moved = structuredClone(body)
+    moved.data.queue.onTrack = body.data.queue.onTrack + 100
     let reads = 0
     void interceptNetworkCall({
       url: SLA_API,
@@ -375,9 +441,18 @@ test.describe('P-SLA: the page', () => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify(body),
+          body: JSON.stringify(reads === 1 ? body : moved),
         })
       },
+    })
+    // Records every announcement from the first paint, so a brief one cannot pass unseen.
+    await page.addInitScript(() => {
+      const announced: string[] = []
+      ;(window as unknown as { announced: string[] }).announced = announced
+      new MutationObserver(() => {
+        const text = document.querySelector('[role="status"]')?.textContent
+        if (text && announced.at(-1) !== text) announced.push(text)
+      }).observe(document, { childList: true, characterData: true, subtree: true })
     })
     await page.clock.install()
     await signInAs(page, moderator.id)
@@ -385,10 +460,13 @@ test.describe('P-SLA: the page', () => {
     const heading = page.getByRole('heading', { name: 'Recent alerts' })
     await expect(heading).toBeVisible()
     const before = await heading.boundingBox()
-    await expect(page.getByRole('status')).toHaveText('')
     await page.clock.fastForward(60_000)
-    await expect.poll(() => reads).toBeGreaterThanOrEqual(2)
-    await expect(page.getByRole('status')).toHaveText('')
+    await expect(page.getByRole('region', { name: 'Open cases' })).toContainText(
+      String(moved.data.queue.onTrack)
+    )
+    expect(
+      await page.evaluate(() => (window as unknown as { announced: string[] }).announced)
+    ).toEqual([])
     expect(await heading.boundingBox()).toEqual(before)
   })
 
@@ -418,10 +496,13 @@ test.describe('P-SLA: the page', () => {
         )
         expect(overflow, `${label} ${colorScheme}`).toBeLessThanOrEqual(0)
         const main = page.locator('main')
-        const controls = main.locator('a, button')
-        for (const control of await controls.all()) {
+        const controls = await main.locator('a, button').all()
+        expect(controls.length).toBeGreaterThan(0)
+        for (const control of controls) {
           const box = await control.boundingBox()
-          expect(box?.height ?? 0, await control.innerText()).toBeGreaterThanOrEqual(44)
+          const name = await control.innerText()
+          expect(box?.height ?? 0, name).toBeGreaterThanOrEqual(44)
+          expect(box?.width ?? 0, name).toBeGreaterThanOrEqual(44)
         }
         await page.screenshot({
           path: path.join(SCREENSHOT_DIR, `sla-stale-${label}-${colorScheme}.png`),
@@ -495,10 +576,18 @@ test.describe('P-SLA: the page', () => {
       const focused = await page.evaluate(() => {
         const element = document.activeElement as HTMLElement | null
         if (!element || !element.closest('main')) return null
-        const style = getComputedStyle(element)
+        const look = () => {
+          const style = getComputedStyle(element)
+          return `${style.outlineStyle} ${style.outlineWidth} ${style.boxShadow}`
+        }
+        // The ring is whatever focus adds, so a permanent shadow cannot pass for one.
+        const focusedLook = look()
+        element.blur()
+        const restingLook = look()
+        element.focus()
         return {
           label: element.textContent?.trim() ?? '',
-          ring: style.outlineStyle !== 'none' || style.boxShadow !== 'none',
+          ring: focusedLook !== restingLook,
         }
       })
       if (!focused) continue

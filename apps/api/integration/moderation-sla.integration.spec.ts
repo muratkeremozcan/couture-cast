@@ -16,7 +16,11 @@ import { getFeatureFlag } from '@couture/config'
 import { ModerationQueueRepository } from '../src/modules/moderation/moderation-queue.repository.js'
 import { createModerationOpsChannel } from '../src/modules/moderation/moderation-sla.channel.js'
 import { ModerationSlaSweep } from '../src/modules/moderation/moderation-sla.sweep.js'
-import { seedBulkOpenPosts, seedMember } from './helpers/moderation-queue-seed.js'
+import {
+  seedBulkOpenPosts,
+  seedMember,
+  seedPostReport,
+} from './helpers/moderation-queue-seed.js'
 import {
   SLA_HOUR_MS,
   SLA_MINUTE_MS,
@@ -127,16 +131,15 @@ describe('I-S-ANCHOR: the anchor is the earliest open report', () => {
   })
 
   it('breaks an equal due time by report id in byte order', async () => {
+    // Byte order puts Z before a, a locale collation puts a before Z, and neither id is inserted first.
     const seeded = await seedCase({
       dueAt: inMs(SLA_HOUR_MS),
       reporters: 3,
       laterReportGapMs: 0,
+      reportLabels: ['aa', 'Zb', 'ab'],
     })
     const [row] = await repository().listCases(query('at_risk'), NOW, null)
-    const byBytes = seeded.reports
-      .map((report) => report.id)
-      .sort((a, b) => (Buffer.compare(Buffer.from(a), Buffer.from(b)) < 0 ? -1 : 1))
-    expect(row!.anchorReportId).toBe(byBytes[0])
+    expect(row!.anchorReportId).toBe(seeded.reports[1]!.id)
   })
 
   it('skips a resolved earlier report', async () => {
@@ -285,17 +288,15 @@ describe('I-S-NEW-REPORT: reports arriving around an alert', () => {
       where: { id: seeded.anchorReportId },
       data: { resolved_at: NOW },
     })
-    const later = await prisma.communityPostReport.create({
-      data: {
-        id: `${ctx.runId}-newrep`,
-        post_id: seeded.targetId,
-        reporter_id: (
-          await seedMember(prisma, ctx.runId, 'newreporter', { alias: false })
-        ).id,
-        reason: 'spam',
-        sla_due_at: inMs(2 * SLA_HOUR_MS),
-        created_at: NOW,
-      },
+    const later = await seedPostReport(prisma, {
+      runId: ctx.runId,
+      label: 'newrep',
+      postId: seeded.targetId,
+      reporterId: (await seedMember(prisma, ctx.runId, 'newreporter', { alias: false }))
+        .id,
+      reason: 'spam',
+      createdAt: NOW,
+      dueAt: inMs(2 * SLA_HOUR_MS),
     })
     await sweep().run()
     const key = `sla:post:${later.id}:at_risk`
@@ -431,7 +432,7 @@ describe('I-S-FLAG-OFF: either flag off', () => {
   ]
   for (const combo of combos) {
     it(`monitoring ${combo.monitoring}, console ${combo.console}: no read, no write, no send`, async () => {
-      const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+      await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
       flagValues.set('moderation_sla_monitoring_enabled', combo.monitoring)
       flagValues.set('moderation_console_enabled', combo.console)
       const logged = new PrismaClient({
@@ -449,7 +450,6 @@ describe('I-S-FLAG-OFF: either flag off', () => {
       expect(await prisma.moderationSlaMonitor.findFirst()).toBeNull()
       expect(ctx.capture().received).toEqual([])
       expect(ctx.analytics.capture).not.toHaveBeenCalled()
-      expect(seeded.caseId).toBeTruthy()
     })
   }
 

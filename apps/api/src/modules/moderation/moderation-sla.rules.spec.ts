@@ -169,7 +169,7 @@ describe('source scans', () => {
         const text = readFileSync(path, 'utf8')
         return (
           /data:\s*\{[^}]*resolved_at:\s*null/s.test(text) ||
-          /SET\s+"?resolved_at"?\s*=\s*NULL/i.test(text)
+          /"?resolved_at"?\s*=\s*NULL/i.test(text)
         )
       })
     expect(offenders).toEqual([])
