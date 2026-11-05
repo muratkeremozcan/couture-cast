@@ -154,15 +154,17 @@ test.beforeEach(({}, testInfo) => {
   )
 })
 
-/** Decides a case the way a moderator does, in the panel. */
+/** Decides a case the way a moderator does, in the panel, and waits for the route's answer. */
 async function decideInBrowser(page: Page, action: RegExp) {
   const panel = panelOf(page)
   await panel.getByRole('radio', { name: action }).check()
   await panel.getByRole('textbox', { name: 'Reason (required)' }).fill(REASON)
+  const answered = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' && response.url().endsWith('/decisions')
+  )
   await panel.getByRole('button', { name: 'Apply decision' }).click()
-  const confirm = panel.getByRole('button', { name: 'Yes, apply it' })
-  if (await confirm.isVisible()) await confirm.click()
-  await expect(page.getByTestId('moderation-decision-outcome')).toBeVisible()
+  expect((await answered).status()).toBe(200)
 }
 
 /** The real guard, as the erasure sweep's own transaction takes it. */
@@ -445,9 +447,9 @@ test.describe('P-HISTORY: account erasure through the real route and the real sw
     const moderator = await fx.operator()
     await signInAs(page, moderator.id)
     await page.goto('/moderation/evidence')
-    await expect(page.getByRole('alert')).toContainText(
-      'Only an admin can export a period.'
-    )
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'Only an admin can export a period.' })
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Export period' })).toHaveCount(0)
     const refused = await request.post(`${resolveApiBaseUrl(testInfo)}${EXPORT_PATH}`, {
       headers: {
@@ -538,9 +540,9 @@ test.describe('P-HISTORY: the flag', () => {
       })
       await page.goto('/moderation/evidence')
       await onPage
-      await expect(page.getByRole('alert')).toContainText(
-        'Evidence export is turned off.'
-      )
+      await expect(
+        page.getByRole('alert').filter({ hasText: 'Evidence export is turned off.' })
+      ).toBeVisible()
       await expect(page.getByRole('button', { name: 'Export period' })).toHaveCount(0)
     }
   )
