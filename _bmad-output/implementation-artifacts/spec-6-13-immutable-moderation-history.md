@@ -309,6 +309,21 @@ Real stack walk, 2026-11-05, on the disposable Supabase image at 54341, database
 - Fixes the walk caused: "1 decisions" reworded with no plural, the date field's calendar icon was dark on dark, and the back link missed the 44-pixel target.
 - Not run: `M-PREVIEW-VERIFY`, the hosted role check, which needs the PR's Preview deployment.
 
+Second walk at `1175a24c`, 2026-11-05, on a fresh database `cc613_walk_head` on the same disposable image, Redis db 9, after a machine restart.
+
+- Direct writes on one real decision row, compared by `row_to_json` and `xmin`, both unchanged afterward:
+  - `postgres`, the application role, non-superuser: `UPDATE`, `DELETE`, `TRUNCATE`, `DISABLE TRIGGER`, `DROP TRIGGER` and `SET ROLE` answered 42501, the function with no guard answered 23514, and `UPDATE`, `DELETE`, `TRUNCATE` under `session_replication_role = replica` answered 42501.
+  - `anon`, `authenticated`, `service_role`: `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` and the function each answered 42501.
+  - `supabase_admin`, the superuser: `UPDATE` and `DELETE` hit the trigger's immutable message. `TRUNCATE ... CASCADE` printed its cascade notice first and left the row intact.
+- Erasure of a subject, a reporter and a moderator through the real route, read row by row at commit and after completion:
+  - Subject: ban decision and comment takedown hold `[erased]` and a null subject, every event and comment audit copy of those words holds `[erased]`, `moderation_reason` is null, snapshots keep only locale, climate band and time, comment body and author are gone, and alias and sanction rows are gone. The aged request completed through the running worker, which deleted the post and nulled `post_id` on its decision, report and events.
+  - Reporter: `reporter_id` and `details` null, the overlapping decision's reason `[erased]`, the third party stays as that decision's subject, and the case stays open.
+  - Moderator: `moderator_id` and the event's `reviewed_by_id` null, role and reason kept.
+  - Kept as designed: a third party's `details` on the subject's post, third-party captions.
+- A scan of every text and JSON column in `public` for each id, alias and canary found the erased members' ids only in `User`, `UserProfile`, `ComfortPreferences`, `ModerationErasureRequest.member_id`, and for the moderator `AuditLog.user_id`. The subject's alias stays in `ModerationDecision.subject_alias`. Every content and reason canary found nothing. Those are the gate record's stated limits.
+- Exports in a real browser, case and period, each at 1280 and 375 pixels in light and dark: a real `download` event, the digest recomputed from the file equal to the bundle's and the audit row's, no canary, no reporter or erased id, no `[erased]`, no overflow, and no control under 44 pixels on the case pages. A moderator's period request answered `admin_required`.
+- Screenshots and the full log, `head-walk.log`, are under `_bmad-output/test-artifacts/story-6-13/head/` and its parent. Nothing looked off this time.
+
 ## Spec Change Log
 
 2026-11-05, TEA review, Task 1. Evidence for each entry is in the Spec review section of `_bmad-output/test-artifacts/test-design/cc613-moderation-history-test-design.md`, including the probes.

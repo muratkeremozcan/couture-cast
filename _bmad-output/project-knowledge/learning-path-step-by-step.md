@@ -10233,6 +10233,7 @@ Evidence boundaries:
   The launcher ran the built API, the real `community.bootstrap` worker and the web server on a disposable `supabase/postgres:17.6.1.054` container, as its non-superuser `postgres`.
   Every refused statement answered 42501 and the row compared byte-identical, including `UPDATE`, `DELETE` and `TRUNCATE` under `session_replication_role = replica`, which that image lets the role set.
   An aged erasure completed through the running worker, the old case id answered 404, and exports in a real browser held no canary.
+  A second walk at `1175a24c` repeated this on a fresh database, added the superuser, erased a subject, a reporter and a moderator, and scanned every text and JSON column: erased ids remained only in the account tables, `ModerationErasureRequest.member_id` and an erased moderator's `AuditLog.user_id`, which are the record's stated limits.
   Sign-in used the `NEXT_PUBLIC_E2E_AUTH` fixture token, so no real Supabase Auth session was involved.
 - **`prisma migrate reset` did not run on the Supabase image locally.**
   The Prisma CLI refuses it from an agent without the user's consent, so the local proof dropped and recreated `public` and ran `migrate deploy`, twice.
