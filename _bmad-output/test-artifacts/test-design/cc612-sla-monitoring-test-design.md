@@ -810,6 +810,11 @@ Each test failed against `6b438525` for the reason Codex reproduced.
 Added by TEA in the same round: a detection failure also rejects with fixed text (S-38), and `failure_owed_code` has a closed CHECK and a partial index.
 F-8 came from the real Grafana proof: with the gates empty, a range query and `lastNotNull` still printed the last count, so a stale zero read as a fresh zero. Query checks alone had passed it.
 
+**Codex round 2 on `ca90d9f1`, fixed at `3e1e680b`, with tests written first and red against unfixed source at `632d656e`.**
+R2-1: send relevance reads the fresh claim time, so an at-risk alert whose deadline passes during a slow scan or a long batch is superseded and the next sweep sends the breach. U-S-BUDGET holds both cases.
+R2-2: Measurement age is an instant query that reads `No samples`. U-GF-METRICS holds it.
+Real Grafana at `3e1e680b`: with the worker stopped and the series gone after the 300-second lookback, the age panel read `No samples` and the four stat panels read `Stale`, in `lgtm-moderation-sla-no-samples.png`, same folder as the other captures.
+
 **Independent test review.**
 The report at the end of this document scored `bb8491d5` at 45 of 100 and blocked it.
 Its Resolution section lists what each finding became.
