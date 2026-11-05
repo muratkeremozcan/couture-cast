@@ -144,6 +144,20 @@ export function activateBrowserLocale(): void {
   void getI18n().changeLanguage(locale)
 }
 
+/**
+ * Keeps `<html lang>` on the language the page renders, for screen readers (WCAG 3.1.1).
+ * The server markup stays on the default, so this runs after hydration and follows every later change.
+ */
+export function syncDocumentLanguage(): () => void {
+  const i18n = getI18n()
+  const apply = (language: string) => {
+    document.documentElement.lang = language
+  }
+  i18n.on('languageChanged', apply)
+  apply(i18n.language)
+  return () => i18n.off('languageChanged', apply)
+}
+
 /** Read the mounted language without re-resolving browser defaults during a render. */
 export function currentI18n(): I18nInstance {
   return instance ?? getI18n()

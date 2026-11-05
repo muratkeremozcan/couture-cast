@@ -1,9 +1,10 @@
 'use client'
 import { useEffect } from 'react'
 import { startWebSession } from '../../lib/web-session'
-import { activateBrowserLocale } from '../../i18n'
+import { activateBrowserLocale, syncDocumentLanguage } from '../../i18n'
 export function SessionBridge() {
   useEffect(() => {
+    const stopLanguageSync = syncDocumentLanguage()
     activateBrowserLocale()
     let stopped = false
     let cleanup: (() => void) | undefined
@@ -15,6 +16,7 @@ export function SessionBridge() {
       .catch(() => undefined)
     return () => {
       stopped = true
+      stopLanguageSync()
       cleanup?.()
     }
   }, [])
