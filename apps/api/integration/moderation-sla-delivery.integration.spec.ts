@@ -718,6 +718,42 @@ describe('I-W-OWED-ESCALATION: an owed failure record outlives later outcomes (C
     await expectOneRecord(key)
   })
 
+  // The sweep's first repair pass runs while the row is still pending, so only a record that stays
+  // refused through the terminal sweep proves a terminal row is repaired at all.
+  it.each([
+    ['delivered', () => undefined],
+    [
+      'superseded',
+      (seeded: Awaited<ReturnType<typeof seedCase>>) =>
+        prisma.communityPostReport.update({
+          where: { id: seeded.anchorReportId },
+          data: { resolved_at: NOW },
+        }),
+    ],
+  ] as const)(
+    'repairs it on a %s row when the record stayed refused through that sweep',
+    async (delivery, settle) => {
+      const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+      const key = slaKey(seeded, 'at_risk')
+      await thirdFailureUnrecorded(seeded)
+      await settle(seeded)
+      const allow = await refuseWrites(prisma, { table: 'JobFailure', event: 'INSERT' })
+      try {
+        clock.advance(4 * SLA_MINUTE_MS)
+        await sweep().run()
+      } finally {
+        await allow()
+      }
+      expect((await alertByKey(key))!).toMatchObject({
+        delivery,
+        failure_escalated_at: null,
+      })
+      expect(await jobFailures()).toEqual([])
+      await sweep().run()
+      await expectOneRecord(key)
+    }
+  )
+
   it('repairs it after a crash between the third failure and its record', async () => {
     const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
     const key = slaKey(seeded, 'at_risk')
