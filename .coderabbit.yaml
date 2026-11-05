@@ -49,6 +49,7 @@ reviews:
     auto_incremental_review: true
     base_branches:
       - main
+      - "^feat/.*"
   path_filters:
     # Whitelist-first: keep review context focused on actual repo surfaces.
     - ".coderabbit.yaml"
