@@ -10099,6 +10099,17 @@ Key takeaways:
    Only `model` has a signing mechanism, so the other signatures had no record at all.
    `community-beta-gate-signatures.md` writes each owner ruling with its date, source, proof and limit, and claims no cryptographic signature.
    `GATE_SIGNATURES` stays as it is, because it describes the payload the model signature is bound to.
+10. **One erasure can remove the link the next erasure needs.**
+    Erasing a post's author deleted other members' comments, and each surviving report still held the commenter's words with nothing pointing back at the commenter.
+    `CommunityCommentReport.comment_author_id` keeps that link until the commenter's own erasure clears the words and then the link.
+    Testing each erasure alone missed this, so a matrix now runs every ordered pair of erasures through the real sweep and scans for ids and canaries.
+11. **A rule about identity has to hold against the writer already running.**
+    A decision in flight could commit its moderator's id after that moderator's erasure completed, and an erased moderator could still decide.
+    Erasure now takes `community_sanction:<member>` exclusively, and a decision or appeal takes it shared and reads the request row inside the lock.
+    So every writer either finished first and erasure sees its row, or starts later and sees the request.
+12. **Judge a conflict on the evidence it reaches.**
+    After a post's erasure each report has its own orphan case, so a moderator who reported the post could rule on or export a sibling report's case.
+    `viewerConflictsWithEvidence` follows decision report ids until the set stops growing, and decide, case detail, appeal and case export all ask it.
 
 Hard-won lessons from the implementation and review of this story:
 
@@ -10178,8 +10189,9 @@ Sequence to follow:
 5. `packages/api-client/src/contracts/http/moderation-history.ts` for the strict bundle.
 6. `apps/api/src/modules/moderation/moderation-history.service.ts` for the export transaction.
 7. `apps/api/src/modules/moderation/moderation-history.retention.ts` and `moderation-history.enforcement.ts` for the prune and the catalog checks.
-8. `apps/web/src/app/components/moderation-evidence-export.tsx` for the console.
-9. `_bmad-output/test-artifacts/community-beta-gate-signatures.md` for what is signed and what each signature leaves out.
+8. `apps/api/src/modules/moderation/moderation-case-conflict.ts` and `moderation-operator.guard.ts` for the conflict rule over a case's evidence and the erased operator's denial.
+9. `apps/web/src/app/components/moderation-evidence-export.tsx` for the console.
+10. `_bmad-output/test-artifacts/community-beta-gate-signatures.md` for what is signed and what each signature leaves out.
 
 Task owner map:
 
@@ -10207,6 +10219,7 @@ API integration tests, against real PostgreSQL:
 - [`apps/api/integration/moderation-history-completion.integration.spec.ts`](../../apps/api/integration/moderation-history-completion.integration.spec.ts): proves the 72-hour bound with an injected clock, the re-key, repair and overdue.
 - [`apps/api/integration/moderation-history-retention.integration.spec.ts`](../../apps/api/integration/moderation-history-retention.integration.spec.ts): proves the 400-day boundary, that nothing else is pruned, and a real injected drift.
 - [`apps/api/integration/moderation-history-route.integration.spec.ts`](../../apps/api/integration/moderation-history-route.integration.spec.ts): proves both routes over real HTTP, every refusal, the canary exclusions, the byte cap and the audit row.
+- [`apps/api/integration/moderation-history-sequential.integration.spec.ts`](../../apps/api/integration/moderation-history-sequential.integration.spec.ts): proves every ordered pair of erasures through the real sweep, the comment report link, operators erased before and during a decision or appeal, and the conflict rule on orphan siblings.
 - [`apps/api/integration/moderation-history-route-period.integration.spec.ts`](../../apps/api/integration/moderation-history-route-period.integration.spec.ts): proves the period export's role, limits, conflicts and time bounds, on the shared context in [`apps/api/integration/helpers/moderation-history-route-context.ts`](../../apps/api/integration/helpers/moderation-history-route-context.ts).
 - [`apps/api/integration/moderation-history-gate.spec.ts`](../../apps/api/integration/moderation-history-gate.spec.ts): reads the gate record, runbook and guide, and proves the readiness scripts are unchanged.
 
@@ -10227,6 +10240,8 @@ Web and Playwright tests:
 
 Evidence boundaries:
 
+- **An independent review found what the suites missed.**
+  Codex reviewed `1175a24c` on the real image and reproduced three major gaps and two minor ones, each now with a red-first test or spec correction, recorded as `CX-1` to `CX-6` in the spec.
 - **Written before merge.**
   The code and tests are on `feat/cc-6-13-immutable-moderation-history`, not yet pushed when this step was written.
 - **A real stack walk ran on the real image.**
@@ -10238,9 +10253,9 @@ Evidence boundaries:
 - **`prisma migrate reset` did not run on the Supabase image locally.**
   The Prisma CLI refuses it from an agent without the user's consent, so the local proof dropped and recreated `public` and ran `migrate deploy`, twice.
   The real `db:reset` first runs there in the `pr-pw-e2e-local` job.
-- **The hosted role was not read.**
-  The migration needs `CREATEROLE` and `BYPASSRLS`, and a hosted role without them fails the build visibly.
-  `M-PREVIEW-VERIFY` needs the PR's Preview deployment.
+- **The hosted migration has not run.**
+  The coordinator's read-only queries on 2026-11-05 show Production and Preview on Postgres 17.6, with `postgres` as NOSUPERUSER, CREATEROLE, BYPASSRLS, `moderation_history_owner` absent and 55 migrations finished.
+  The outcome stays unproven until deploy, the Supabase patch version was not read, and `M-PREVIEW-VERIFY` needs the PR's Preview deployment.
 - **Sign-offs are owner rulings.**
   The gate record carries no cryptographic signature, and staffing rests on the owner's statement, with no roster or schedule.
 - **Production stays dark.**
@@ -10249,6 +10264,8 @@ Evidence boundaries:
   A session running arbitrary DDL as the migration role can defeat enforcement.
   On the Supabase image the application role can set `session_replication_role = replica`, and in that mode it can update and delete `AuditLog` and `CommunityCommentAudit` rows, which stay trigger-only by this story's scope.
   Report `details` a third party wrote stays, and a reason typed after an erasure commits stays.
+  Two reports on one deleted post with no decision between them have no surviving link, so they cannot be read as a conflict.
+  A comment report orphaned before `comment_author_id` existed has no link, and none exist in production because the hard delete is new in this story.
   No member self-service deletion exists, and the account-deletion story owns the `User` row, wardrobe and billing.
   Screenshots under `_bmad-output/test-artifacts/story-6-13/` are git-ignored local evidence.
 

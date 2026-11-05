@@ -307,7 +307,8 @@ Real stack walk, 2026-11-05, on the disposable Supabase image at 54341, database
 - Exports in a real browser, before and after, and a period as admin. The after bundle held no canary for the reporter's details, caption, alt text, reason, reporter id or member id. A moderator's period request answered `admin_required`.
 - Queue, case detail, evidence page as admin and as moderator, read in Chromium at 1280 and 375 pixels in light and dark, with zero horizontal overflow. Screenshots are under `_bmad-output/test-artifacts/story-6-13/`.
 - Fixes the walk caused: "1 decisions" reworded with no plural, the date field's calendar icon was dark on dark, and the back link missed the 44-pixel target.
-- Not run: `M-PREVIEW-VERIFY`, the hosted role check, which needs the PR's Preview deployment.
+- Not run: `M-PREVIEW-VERIFY`, which needs the PR's Preview deployment.
+  The coordinator's read-only check on 2026-11-05 is in the gate record: Production and Preview on Postgres 17.6, `postgres` NOSUPERUSER, CREATEROLE, BYPASSRLS, owner role absent, 55 migrations finished. The 6.13 migration has run on neither, and the Supabase patch version was not read.
 
 Second walk at `1175a24c`, 2026-11-05, on a fresh database `cc613_walk_head` on the same disposable image, Redis db 9, after a machine restart.
 
@@ -354,6 +355,13 @@ Builder told. Entries marked (intent) change or extend a frozen decision, and th
 - TEA-22, D4, D7, Boundaries: `comment_audit_append_only` refuses every update, so redacting a reason copy on a comment case aborted the erasure transaction. The 6.13 migration replaces `enforce_comment_audit_append_only` so it admits one change, `reason` to `[erased]` with every other column equal, and still refuses `DELETE` and everything else. Rows that read the audit reason map it through `mapModerationReason`.
 - TEA-23, D4: a decision's words are also copied to `ModerationEvent.reason`, `CommunityCommentAudit.reason` and `LookbookPost.moderation_reason`, so erasure redacts those copies by exact words scoped to the case. Scope comes from the post or report ids of the redacted decisions, and from the alias on an orphan event, so identical words on an unrelated case stay. A moderator's own erasure keeps the words.
 
+- CX-1 (intent), D4, matrix (Codex C1): erasing a post's author deletes other members' comments, and their reports survive with `comment_id` null and the commenter's words in `content_snapshot`, so the commenter's own later erasure could not find them. `CommunityCommentReport.comment_author_id` keeps the link, set at both intake paths and backfilled, with `SET NULL`, and that member's erasure clears the snapshot and then the column. Rejected: scrubbing the snapshot when the parent post is erased, because it destroys evidence for a third party's open report while the commenter has asked for nothing. Rows orphaned before this column carry no link, and none exist in production because the hard delete is new in this story. `scrub_comment_reports_on_user_delete` clears the link too, because a direct `User` delete otherwise updates the report twice and rechecks the new foreign key after the parent row has gone, which `community-comments-privacy` caught as a 23503.
+- CX-2 (intent), D4, D7 (Codex C2): an operator's own erasure did not serialize against that operator's in-flight decision or appeal, and an already erased operator could still decide, so `moderator_id` came back after completion. Erasure now holds `community_sanction:<member>` exclusively, and decisions and appeals hold it shared and then read the request row inside that lock, answering 403 `operator_sanctioned` with nothing written. Once a request row commits, every writer naming that member either finished first and erasure sees its row, or starts later and sees the request. `ModerationOperatorGuard` gives the same 403 on the moderation reads, the export, the erasure route and the legacy actions route, because those write audit rows naming the operator or send the id to analytics. The erasure route repeats the check inside its transaction, because `requested_by` is an identity field too. Rejected: a new error code, because a distinct answer would tell a caller the account was erased.
+- CX-3 (intent), D6, D8 (Codex C3): after a post's erasure each report has its own orphan case, and decisions tie them together, so a conflict check on a case's own reports missed the viewer's report on the same post. `viewerConflictsWithEvidence` reads transitively through decision report ids, and decide, case detail, appeal and case export all use it. The range export withholds across shared report ids and case keys for the same reason. Two reports on one deleted post with no decision between them have no surviving link, so that pair cannot be seen as a conflict; the report holds nothing of the deleted post by then.
+- CX-4, D5 (Codex C4): `function_execute_granted` requires the connecting role's EXECUTE on `private.moderation_history_anonymize`, because `function_execute` only refused unexpected grantees and a missing grant broke every erasure with the verifier green. The list is now 16 checks.
+- CX-5, Design Notes (Codex C5): the migration example named `CURRENT_USER`, which crashes the Supabase server (Build-01), so it now shows `format('... %I', current_user)`.
+- CX-6, D1: the coordinator read hosted Production and Preview on 2026-11-05 with read-only queries, which supersedes D1's "Hosted role attributes were not read". Both report Postgres 17.6 and `postgres` as NOSUPERUSER, CREATEROLE, BYPASSRLS, the owner role absent and 55 migrations finished. The 6.13 migration has run on neither, so its outcome stays unproven until deploy, and the Supabase patch version was not read.
+
 ## Review Triage Log
 
 ## Design Notes
@@ -384,12 +392,13 @@ Prisma sends a migration file as one batch, so `SET ROLE` and `RESET ROLE` run i
 
 ```sql
 -- CREATE ROLE ... NOLOGIN BYPASSRLS in a DO block tolerating duplicate_object, then ALTER ROLE ... BYPASSRLS (TEA-01).
-GRANT moderation_history_owner TO CURRENT_USER WITH SET TRUE, INHERIT FALSE;
+-- Name the role through format(): GRANT role TO CURRENT_USER segfaults the Supabase server (Build-01).
+EXECUTE format('GRANT moderation_history_owner TO %I WITH SET TRUE, INHERIT FALSE', current_user); -- inside a DO block
 GRANT CREATE ON SCHEMA public, private TO moderation_history_owner;
 ALTER TABLE "ModerationDecision" OWNER TO moderation_history_owner;
 -- CREATE OR REPLACE for guard, require-guard and function under SET ROLE (TEA-17), grants applied, then:
 REVOKE CREATE ON SCHEMA public, private FROM moderation_history_owner;
-REVOKE moderation_history_owner FROM CURRENT_USER;
+EXECUTE format('REVOKE moderation_history_owner FROM %I', current_user); -- inside a DO block
 ```
 
 ## Test Design (TEA)
@@ -424,7 +433,7 @@ Build rules the tests rely on:
 - One helper builds every new audit row. One exported list holds the enforcement checks, which the script and the sweep both read.
 - No test deletes a decision row. Cleanup deletes users and lets the foreign keys act.
 
-What the tests can and cannot prove: enforcement is proved on a real non-superuser role and on local Supabase's own role. The hosted role is read on Preview only (`M-PREVIEW-VERIFY`), and production stays unread. A session running arbitrary DDL as the migration role is a stated residual (TEA-03). The E2E backdates rows and runs the real sweep, and the injected clock in `I-C-*` proves the 70-hour and 72-hour edges.
+What the tests can and cannot prove: enforcement is proved on a real non-superuser role and on local Supabase's own role. The coordinator read the hosted role on Production and Preview on 2026-11-05, and the migration's outcome there stays unproven until deploy (`M-PREVIEW-VERIFY`). A session running arbitrary DDL as the migration role is a stated residual (TEA-03). The E2E backdates rows and runs the real sweep, and the injected clock in `I-C-*` proves the 70-hour and 72-hour edges.
 
 ## Verification
 
