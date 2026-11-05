@@ -24,6 +24,7 @@ const DUMMY_SECRETS = {
 
 const LOCAL_WEB_SERVER_ENV_KEYS = [
   'API_BASE_URL',
+  'MODERATION_OPS_CAPTURE_PORT',
   'POSTHOG_API_KEY',
   'PUBLIC_API_URL',
   'REUSE_EXISTING_WEB_SERVER',
@@ -38,12 +39,15 @@ async function loadConfig(file: string): Promise<PlaywrightTestConfig> {
   return module.default
 }
 
-function webServerEnv(config: PlaywrightTestConfig) {
-  const webServer = config.webServer
-  if (!webServer || Array.isArray(webServer)) {
-    throw new Error('expected a single webServer entry')
+/** Every server entry's env, by the script it starts. Each one is serialized verbatim. */
+function webServerEnvs(config: PlaywrightTestConfig) {
+  const servers = [config.webServer ?? []].flat()
+  const envOf = (script: string) => {
+    const server = servers.find((entry) => entry.command.includes(script))
+    if (!server) throw new Error(`expected a webServer entry that runs ${script}`)
+    return Object.keys(server.env ?? {}).sort()
   }
-  return webServer.env ?? {}
+  return { count: servers.length, envOf }
 }
 
 function expectNoDummySecret(serialized: unknown) {
@@ -61,7 +65,10 @@ describe('Playwright configs keep the environment out of reports', () => {
   it('local webServer.env holds only its explicit overrides', async () => {
     const config = await loadConfig('../../config/local.config')
 
-    expect(Object.keys(webServerEnv(config)).sort()).toEqual(LOCAL_WEB_SERVER_ENV_KEYS)
+    const { count, envOf } = webServerEnvs(config)
+    expect(count).toBe(2)
+    expect(envOf('start-api-e2e-with-workers')).toEqual(LOCAL_WEB_SERVER_ENV_KEYS)
+    expect(envOf('moderation-ops-capture')).toEqual(['MODERATION_OPS_CAPTURE_PORT'])
     expect(config.use?.extraHTTPHeaders).toBeUndefined()
     expectNoDummySecret({ webServer: config.webServer, metadata: config.metadata })
   })
@@ -69,9 +76,11 @@ describe('Playwright configs keep the environment out of reports', () => {
   it('restricted-evidence webServer.env adds only the evidence mode', async () => {
     const config = await loadConfig('../../config/local-restricted.config')
 
-    expect(Object.keys(webServerEnv(config)).sort()).toEqual(
+    const { envOf } = webServerEnvs(config)
+    expect(envOf('start-api-e2e-with-workers')).toEqual(
       [...LOCAL_WEB_SERVER_ENV_KEYS, 'COMMUNITY_SCREENING_EVIDENCE_MODE'].sort()
     )
+    expect(envOf('moderation-ops-capture')).toEqual(['MODERATION_OPS_CAPTURE_PORT'])
     expect(config.use?.extraHTTPHeaders).toBeUndefined()
     expectNoDummySecret({ webServer: config.webServer, metadata: config.metadata })
   })
