@@ -2,7 +2,7 @@
 title: 'CC-6.13 Immutable moderation history'
 type: 'feature'
 created: '2026-11-05'
-status: in-progress
+status: done
 baseline_commit: '56509fa8ece5e9b514a294e0f7398ceec888ee82'
 baseline_revision: '56509fa8ece5e9b514a294e0f7398ceec888ee82'
 route: 'dispatch'
@@ -307,7 +307,7 @@ Real stack walk, 2026-11-05, on the disposable Supabase image at 54341, database
 - Exports in a real browser, before and after, and a period as admin. The after bundle held no canary for the reporter's details, caption, alt text, reason, reporter id or member id. A moderator's period request answered `admin_required`.
 - Queue, case detail, evidence page as admin and as moderator, read in Chromium at 1280 and 375 pixels in light and dark, with zero horizontal overflow. Screenshots are under `_bmad-output/test-artifacts/story-6-13/`.
 - Fixes the walk caused: "1 decisions" reworded with no plural, the date field's calendar icon was dark on dark, and the back link missed the 44-pixel target.
-- Not run: `M-PREVIEW-VERIFY`, which needs the PR's Preview deployment.
+- `M-PREVIEW-VERIFY`, 2026-11-05, on hosted Preview after PR #197 deployed: 56 migrations finished, `20261105150000_immutable_moderation_history` applied with no error, `ModerationDecision` owned by `moderation_history_owner` (NOLOGIN, BYPASSRLS), 16 of 16 checks and exit 0 through the fixed script with the certificate verified. The coordinator's first run used `sslmode=no-verify` as a one-off, because the script could not reach a hosted database.
   The coordinator's read-only check on 2026-11-05 is in the gate record: Production and Preview on Postgres 17.6, `postgres` NOSUPERUSER, CREATEROLE, BYPASSRLS, owner role absent, 55 migrations finished. The 6.13 migration has run on neither, and the Supabase patch version was not read.
 
 Second walk at `1175a24c`, 2026-11-05, on a fresh database `cc613_walk_head` on the same disposable image, Redis db 9, after a machine restart.
@@ -324,6 +324,9 @@ Second walk at `1175a24c`, 2026-11-05, on a fresh database `cc613_walk_head` on 
 - A scan of every text and JSON column in `public` for each id, alias and canary found the erased members' ids only in `User`, `UserProfile`, `ComfortPreferences`, `ModerationErasureRequest.member_id`, and for the moderator `AuditLog.user_id`. The subject's alias stays in `ModerationDecision.subject_alias`. Every content and reason canary found nothing. Those are the gate record's stated limits.
 - Exports in a real browser, case and period, each at 1280 and 375 pixels in light and dark: a real `download` event, the digest recomputed from the file equal to the bundle's and the audit row's, no canary, no reporter or erased id, no `[erased]`, no overflow, and no control under 44 pixels on the case pages. A moderator's period request answered `admin_required`.
 - Screenshots and the full log, `head-walk.log`, are under `_bmad-output/test-artifacts/story-6-13/head/` and its parent. Nothing looked off this time.
+
+Ship state, 2026-11-05: the owner said push now, and the owner's ruling drops the stacked 6.13b, so PR #197 carries everything and CodeRabbit skips above 100 files after filters.
+TEA's final seeded proofs and three full runs continue on `8e7e084c` and later, and the third real-stack walk reruns on the fixes after TEA reports.
 
 ## Spec Change Log
 
@@ -354,6 +357,10 @@ Builder told. Entries marked (intent) change or extend a frozen decision, and th
 - TEA-21, Tasks: "confirm the row refuses change" runs on the local Supabase job, with the API's own connection string. `pr-checks` connects as a superuser.
 - TEA-22, D4, D7, Boundaries: `comment_audit_append_only` refuses every update, so redacting a reason copy on a comment case aborted the erasure transaction. The 6.13 migration replaces `enforce_comment_audit_append_only` so it admits one change, `reason` to `[erased]` with every other column equal, and still refuses `DELETE` and everything else. Rows that read the audit reason map it through `mapModerationReason`.
 - TEA-23, D4: a decision's words are also copied to `ModerationEvent.reason`, `CommunityCommentAudit.reason` and `LookbookPost.moderation_reason`, so erasure redacts those copies by exact words scoped to the case. Scope comes from the post or report ids of the redacted decisions, and from the alias on an orphan event, so identical words on an unrelated case stay. A moderator's own erasure keeps the words.
+- TEA-24, D1 matrix: the bypass row says `session_replication_role` is refused for the application role. On the Supabase image `postgres` may set it, and `UPDATE`, `DELETE` and `TRUNCATE` on `ModerationDecision` still answer 42501 there, because the privilege layer holds alone. `D-IMM-BYPASS` matches the privilege's own message, so a plain image proves it too. Measured on the same image: in that mode the application role can `UPDATE` and `DELETE` `AuditLog`, which is trigger-only, and `CommunityCommentAudit` has the same exposure. Frozen scope leaves both as they are, and the gate record and the guide state it.
+- TEA-25, D4: `I-E-LOCKED-OUT` asserted `status >= 403`, which hid a 500 from an incomplete storage double and a 409 on publish. It now pins all five routes, and publish gives the same 403 (Build-14).
+- TEA-26, test plan: the plan missed C1, C2 and C3. It stopped `I-C-THIRD-PARTY-COMMENT` before the second erasure, made no operator the subject of an erasure, and planned conflict per case. `I-S-MATRIX` now runs every ordered pair of five erasures, and `I-O-*` covers an operator erased in flight and afterwards. Review also found conflict lost on an orphan sibling for the case read and a decision, and a range export missing a link outside its period (CX-3).
+- TEA-27 (intent), Boundaries: every page answered `lang="en"` in every locale, which fails WCAG 3.1.1 on the surfaces this story ships, so the root layout's language now follows the resolved locale. `P-LANG` proves it in a real browser.
 
 - CX-1 (intent), D4, matrix (Codex C1): erasing a post's author deletes other members' comments, and their reports survive with `comment_id` null and the commenter's words in `content_snapshot`, so the commenter's own later erasure could not find them. `CommunityCommentReport.comment_author_id` keeps the link, set at both intake paths and backfilled, with `SET NULL`, and that member's erasure clears the snapshot and then the column. Rejected: scrubbing the snapshot when the parent post is erased, because it destroys evidence for a third party's open report while the commenter has asked for nothing. Rows orphaned before this column carry no link, and none exist in production because the hard delete is new in this story. `scrub_comment_reports_on_user_delete` clears the link too, because a direct `User` delete otherwise updates the report twice and rechecks the new foreign key after the parent row has gone, which `community-comments-privacy` caught as a 23503.
 - CX-2 (intent), D4, D7 (Codex C2): an operator's own erasure did not serialize against that operator's in-flight decision or appeal, and an already erased operator could still decide, so `moderator_id` came back after completion. Erasure now holds `community_sanction:<member>` exclusively, and decisions and appeals hold it shared and then read the request row inside that lock, answering 403 `operator_sanctioned` with nothing written. Once a request row commits, every writer naming that member either finished first and erasure sees its row, or starts later and sees the request. `ModerationOperatorGuard` gives the same 403 on the moderation reads, the export, the erasure route and the legacy actions route, because those write audit rows naming the operator or send the id to analytics. The erasure route repeats the check inside its transaction, because `requested_by` is an identity field too. Rejected: a new error code, because a distinct answer would tell a caller the account was erased.
@@ -361,6 +368,9 @@ Builder told. Entries marked (intent) change or extend a frozen decision, and th
 - CX-4, D5 (Codex C4): `function_execute_granted` requires the connecting role's EXECUTE on `private.moderation_history_anonymize`, because `function_execute` only refused unexpected grantees and a missing grant broke every erasure with the verifier green. The list is now 16 checks.
 - CX-5, Design Notes (Codex C5): the migration example named `CURRENT_USER`, which crashes the Supabase server (Build-01), so it now shows `format('... %I', current_user)`.
 - CX-6, D1: the coordinator read hosted Production and Preview on 2026-11-05 with read-only queries, which supersedes D1's "Hosted role attributes were not read". Both report Postgres 17.6 and `postgres` as NOSUPERUSER, CREATEROLE, BYPASSRLS, the owner role absent and 55 migrations finished. The 6.13 migration has run on neither, so its outcome stays unproven until deploy, and the Supabase patch version was not read.
+
+- CX-7, D5 (coordinator on PR #197): `moderation:history:verify` exited 2 with SELF_SIGNED_CERT_IN_CHAIN on a hosted database, because `pg` ignores Prisma's TLS parameters. `verifiedPgConnection` in `scripts/lib/database-tls.mjs` drops every `ssl*` parameter from a remote URL and passes the CA explicitly, with the rule `database-tls.ts` already has: an absolute `sslcert` that exists, otherwise the committed Supabase root. A local host stays plain, an unknown chain exits 2 with no `ok` line, and a server refusing TLS gets no plaintext fallback.
+- CX-8, D7 (Optic on PR #197): adding `operator_sanctioned` to the queue and SLA error enums is breaking for clients already reading those routes, so the code stays out of both and only the new history routes' enum holds it. Those routes' 403 declares no body schema, and the web console maps any 403 to `forbidden` by status. Rejected: `x-optic-exemptions`, because this is a closed set.
 
 ## Review Triage Log
 
@@ -408,7 +418,8 @@ Full plan, reconciled to this spec (this spec wins on any disagreement):
 26 risks (12 high, one at score 9 until TEA-01 is built); 170 scenarios: P0 112, P1 53, P2 5 (Unit 32, Integration 51, API 25, DB 41, Contract 2, Component 6, E2E 7, Manual 6).
 157 are red-first, 7 are green guards and 6 are manual.
 24 seeded-defect proofs (S-1 to S-24) run in a throwaway worktree and are recorded under `_bmad-output/test-artifacts/story-6-13/`.
-Review findings TEA-01 to TEA-21 are in the Spec Change Log.
+Review findings TEA-01 to TEA-27 are in the Spec Change Log.
+The plan's Execution record holds the sign-off runs, the seeded defects and what differs from this plan.
 
 Red-first order for the build:
 

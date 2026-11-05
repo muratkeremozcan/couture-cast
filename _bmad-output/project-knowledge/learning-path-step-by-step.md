@@ -16,7 +16,7 @@ Added Steps 40 to 52:
 - Step 50: Story 6.10, moderator queue and case detail, `6337dc8c` (PR #194), merged on 2026-11-04.
 - Step 51: Story 6.11, moderation decisions and account sanctions, `3efd8423` (PR #195), merged on 2026-11-05.
 - Step 52: Story 6.12, SLA monitoring and escalation, `56509fa8` (PR #196), merged on 2026-11-05.
-- Step 53: Story 6.13, immutable moderation history, in review on `feat/cc-6-13-immutable-moderation-history`, not yet merged.
+- Step 53: Story 6.13, immutable moderation history, in review on `feat/cc-6-13-immutable-moderation-history` (PR #197), not yet merged.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -10113,6 +10113,22 @@ Key takeaways:
 
 Hard-won lessons from the implementation and review of this story:
 
+- **The verifier could not reach the database it exists to prove.**
+  `pg` ignores Prisma's TLS parameters, and any `ssl*` in the URL replaces its `ssl` option, so the script failed with SELF_SIGNED_CERT_IN_CHAIN on hosted Preview while every local run was green.
+  `verifiedPgConnection` drops them and passes the committed CA, so `sslmode=no-verify` in a URL cannot switch verification off.
+- **A new value in a shared error enum is breaking on the routes already using it.**
+  Optic refused `operator_sanctioned` on the queue and SLA enums, whose 403 declares no body, so the code stays out of them and web clients answer by status.
+- **A new foreign key broke a trigger from an older migration.**
+  A direct `User` delete updates a comment report from a `BEFORE DELETE` trigger and again when the comment's author goes null.
+  The second update rechecks every key on that row, so `comment_author_id` failed with 23503 after its parent had gone, until the trigger cleared the link itself.
+- **Moving a function's owner away and back drops a grant.**
+  `ALTER FUNCTION ... OWNER TO` a role merges that role's grant into the owner entry, so moving ownership back leaves it with no `EXECUTE`.
+  The verifier's new `function_execute_granted` check found this in a fault test's restore.
+- **A green typecheck can read a stale build.**
+  `apps/api` resolves `@couture/api-client` through its built `dist`, so a new error code looked clean until the commit hook rebuilt it.
+- **`<html lang>` was hard-coded to `en` under ten locales.**
+  A German evidence page was read with English pronunciation, which fails WCAG 3.1.1, and only a visual pass in `de-DE` caught it.
+  `SessionBridge` now keeps the attribute on the resolved language after hydration.
 - **A migration that passed 113 tests would have crashed hosted Supabase.**
   `GRANT role TO CURRENT_USER` segfaults the backend in `supautils`, and the whole server restarts.
   Plain Postgres has no `supautils`, so every suite was green.
@@ -10229,6 +10245,8 @@ Contract and database tests:
 - [`packages/db/test/moderation-history-function.spec.ts`](../../packages/db/test/moderation-history-function.spec.ts): proves the exception function's guard, request check, redaction, idempotence and audit row.
 - [`packages/db/test/moderation-history-migration.spec.ts`](../../packages/db/test/moderation-history-migration.spec.ts): proves the role, the grants and the migration on a second database, concurrently and after a reset.
 - [`packages/db/test/support/moderation-history-fixture.ts`](../../packages/db/test/support/moderation-history-fixture.ts): the shared seed for those database suites.
+- [`packages/db/test/moderation-history-verifier-tls.spec.ts`](../../packages/db/test/moderation-history-verifier-tls.spec.ts): proves the verifier on a hosted-style endpoint through a TLS proxy: a trusted chain runs every check, and an unknown chain or a server refusing TLS exits 2.
+- [`apps/api/src/prisma/database-tls-pg.spec.ts`](../../apps/api/src/prisma/database-tls-pg.spec.ts): proves the real `pg` driver refuses a certificate the committed CA did not sign, even when the URL asks for no verification.
 - [`packages/db/test/moderation-history-verifier.spec.ts`](../../packages/db/test/moderation-history-verifier.spec.ts): proves the verifier fails on each injected fault and passes clean.
 - [`packages/db/test/migration-hygiene.spec.ts`](../../packages/db/test/migration-hygiene.spec.ts): proves a later migration gives the owner role back and uses no role keyword.
 - [`packages/api-client/testing/moderation-history-contract.spec.ts`](../../packages/api-client/testing/moderation-history-contract.spec.ts): proves the bundle rejects each excluded field and the reserved reason is refused.
@@ -10243,7 +10261,12 @@ Evidence boundaries:
 - **An independent review found what the suites missed.**
   Codex reviewed `1175a24c` on the real image and reproduced three major gaps and two minor ones, each now with a red-first test or spec correction, recorded as `CX-1` to `CX-6` in the spec.
 - **Written before merge.**
-  The code and tests are on `feat/cc-6-13-immutable-moderation-history`, not yet pushed when this step was written.
+  The code and tests are in PR #197, on `feat/cc-6-13-immutable-moderation-history`, when this step was written.
+- **Sign-off runs at `743f179a`.**
+  Three consecutive full unfiltered runs, each count identical, 13828 tests per run, with no failure and no retry.
+  `packages/db` 441 on plain Postgres and 441 on the Supabase image, `apps/api` 8565 on plain Postgres, 120 `moderation-history` tests on the image, `packages/api-client` 1757, `packages/config` 31, `apps/web` 1931, Pact consumer 456, Pact provider 1, and Playwright 85 in a real browser on the image.
+  44 of 44 seeded defects were caught.
+  These runs predate the verifier's TLS fix and the contract change in the two error enums, which CI covers on the final head.
 - **A real stack walk ran on the real image.**
   The launcher ran the built API, the real `community.bootstrap` worker and the web server on a disposable `supabase/postgres:17.6.1.054` container, as its non-superuser `postgres`.
   Every refused statement answered 42501 and the row compared byte-identical, including `UPDATE`, `DELETE` and `TRUNCATE` under `session_replication_role = replica`, which that image lets the role set.
@@ -10253,9 +10276,9 @@ Evidence boundaries:
 - **`prisma migrate reset` did not run on the Supabase image locally.**
   The Prisma CLI refuses it from an agent without the user's consent, so the local proof dropped and recreated `public` and ran `migrate deploy`, twice.
   The real `db:reset` first runs there in the `pr-pw-e2e-local` job.
-- **The hosted migration has not run.**
-  The coordinator's read-only queries on 2026-11-05 show Production and Preview on Postgres 17.6, with `postgres` as NOSUPERUSER, CREATEROLE, BYPASSRLS, `moderation_history_owner` absent and 55 migrations finished.
-  The outcome stays unproven until deploy, the Supabase patch version was not read, and `M-PREVIEW-VERIFY` needs the PR's Preview deployment.
+- **The migration ran on hosted Preview and has not run on Production.**
+  `M-PREVIEW-VERIFY` on 2026-11-05 shows 56 migrations finished, `moderation_history_owner` owning the table, and 16 of 16 checks through the fixed script with the certificate verified.
+  Read-only queries show Production on Postgres 17.6 with `postgres` as NOSUPERUSER, CREATEROLE, BYPASSRLS, so its outcome stays unproven until deploy, and the Supabase patch version was not read.
 - **Sign-offs are owner rulings.**
   The gate record carries no cryptographic signature, and staffing rests on the owner's statement, with no roster or schedule.
 - **Production stays dark.**
