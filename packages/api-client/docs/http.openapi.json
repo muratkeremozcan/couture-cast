@@ -18518,7 +18518,6 @@
           "code": {
             "type": "string",
             "enum": [
-              "operator_sanctioned",
               "invalid_filter",
               "invalid_cursor",
               "case_not_found",
@@ -19419,8 +19418,7 @@
           "code": {
             "type": "string",
             "enum": [
-              "moderation_sla_disabled",
-              "operator_sanctioned"
+              "moderation_sla_disabled"
             ]
           },
           "message": {
@@ -30895,7 +30893,6 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "operator_sanctioned",
                         "invalid_filter",
                         "invalid_cursor",
                         "case_not_found",
@@ -30937,7 +30934,6 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "operator_sanctioned",
                         "invalid_filter",
                         "invalid_cursor",
                         "case_not_found",
@@ -31610,7 +31606,6 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "operator_sanctioned",
                         "invalid_filter",
                         "invalid_cursor",
                         "case_not_found",
@@ -31646,7 +31641,6 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "operator_sanctioned",
                         "invalid_filter",
                         "invalid_cursor",
                         "case_not_found",
@@ -33233,8 +33227,7 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "moderation_sla_disabled",
-                        "operator_sanctioned"
+                        "moderation_sla_disabled"
                       ]
                     },
                     "message": {

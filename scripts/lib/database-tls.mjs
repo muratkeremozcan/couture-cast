@@ -11,7 +11,7 @@
  * to one table and checks every result against the worker launcher's refusal
  * rules.
  */
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -127,4 +127,38 @@ export function withVerifiedDatabaseTls(raw, options = {}) {
   }
   if (url.searchParams.get('sslaccept') !== 'strict') updates.set('sslaccept', 'strict')
   return updates.size === 0 ? raw : setQueryParams(raw, updates)
+}
+
+/**
+ * Connection options for the `pg` driver, with the same guarantee for a remote URL: the certificate is
+ * verified against the committed CA, or nothing connects.
+ * `pg` reads `sslcert` as a client certificate, and any `ssl*` in the URL replaces the `ssl` option, so
+ * `sslmode=no-verify` would win. A remote URL therefore loses all of them and carries the CA explicitly.
+ * Node verifies the chain and the host name, and a server that refuses TLS fails the connection.
+ *
+ * @param {string} raw
+ * @param {{ caPath?: string, fileExists?: (candidate: string) => boolean, readFile?: (file: string) => string }} [options]
+ * @returns {{ connectionString: string, ssl?: { ca: string, rejectUnauthorized: true } }}
+ */
+export function verifiedPgConnection(raw, options = {}) {
+  const url = new URL(withVerifiedDatabaseTls(raw, options))
+  const host = url.hostname.replace(/^\[(.*)\]$/, '$1').toLowerCase()
+  if (LOCAL_DATABASE_HOSTS.has(host)) return { connectionString: raw }
+
+  // The rule above already settled this: an absolute `sslcert` that exists, otherwise the committed CA.
+  const caPath = url.searchParams.get('sslcert') ?? DATABASE_CA_PATH
+  const queryAt = raw.indexOf('?')
+  const base = queryAt === -1 ? raw : raw.slice(0, queryAt)
+  const query = queryAt === -1 ? '' : raw.slice(queryAt + 1).split('#')[0]
+  const kept = (query ?? '').split('&').filter((segment) => {
+    const key = queryKey(segment)
+    return segment && !key.startsWith('ssl') && key !== 'uselibpqcompat'
+  })
+  return {
+    connectionString: kept.length > 0 ? `${base}?${kept.join('&')}` : base,
+    ssl: {
+      ca: (options.readFile ?? ((file) => readFileSync(file, 'utf8')))(caPath),
+      rejectUnauthorized: true,
+    },
+  }
 }

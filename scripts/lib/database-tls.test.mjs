@@ -4,6 +4,7 @@ import { describe, test } from 'node:test'
 import {
   DATABASE_CA_PATH,
   DatabaseTlsRefusedError,
+  verifiedPgConnection,
   withVerifiedDatabaseTls,
 } from './database-tls.mjs'
 
@@ -68,5 +69,51 @@ describe('withVerifiedDatabaseTls', () => {
       DatabaseTlsRefusedError
     )
     assert.throws(() => withVerifiedDatabaseTls('not a url'), DatabaseTlsRefusedError)
+  })
+})
+
+describe('verifiedPgConnection', () => {
+  const tls = { caPath: CA, fileExists: exists, readFile: () => 'THE CA' }
+
+  test('verifies a remote URL against the CA', () => {
+    assert.deepEqual(verifiedPgConnection(SESSION, tls), {
+      connectionString: SESSION,
+      ssl: { ca: 'THE CA', rejectUnauthorized: true },
+    })
+  })
+
+  test('drops every ssl parameter, because one in the URL would replace the ssl option', () => {
+    const { connectionString, ssl } = verifiedPgConnection(
+      `${SESSION}?sslmode=no-verify&pgbouncer=true&sslcert=/tmp/c.pem&sslaccept=accept_invalid_certs&uselibpqcompat=true`,
+      tls
+    )
+    assert.equal(connectionString, `${SESSION}?pgbouncer=true`)
+    assert.equal(ssl.rejectUnauthorized, true)
+  })
+
+  test('reads an absolute sslcert in the URL as the CA, as the API does', () => {
+    const named = verifiedPgConnection(`${SESSION}?sslcert=/srv/own.pem`, {
+      fileExists: (candidate) => candidate === '/srv/own.pem',
+      readFile: (file) => `CA at ${file}`,
+    })
+    assert.equal(named.ssl.ca, 'CA at /srv/own.pem')
+    assert.equal(named.connectionString, SESSION)
+  })
+
+  test('leaves a local host alone', () => {
+    const local =
+      'postgresql://postgres:postgres@127.0.0.1:54322/postgres?sslmode=disable'
+    assert.deepEqual(verifiedPgConnection(local), { connectionString: local })
+  })
+
+  test('refuses a remote URL when the CA is missing', () => {
+    assert.throws(
+      () => verifiedPgConnection(SESSION, { caPath: CA, fileExists: () => false }),
+      DatabaseTlsRefusedError
+    )
+  })
+
+  test('loads the committed CA when nothing overrides it', () => {
+    assert.match(verifiedPgConnection(SESSION).ssl?.ca ?? '', /BEGIN CERTIFICATE/)
   })
 })

@@ -43,10 +43,7 @@ export const moderationSlaChannels = ['webhook', 'console'] as const
 export const moderationSlaChannelSchema = z.enum([...moderationSlaChannels])
 export type ModerationSlaChannel = z.infer<typeof moderationSlaChannelSchema>
 
-export const moderationSlaErrorCodeSchema = z.enum([
-  'moderation_sla_disabled',
-  'operator_sanctioned',
-])
+export const moderationSlaErrorCodeSchema = z.enum(['moderation_sla_disabled'])
 export type ModerationSlaErrorCode = z.infer<typeof moderationSlaErrorCodeSchema>
 
 export const moderationSlaErrorSchema = z

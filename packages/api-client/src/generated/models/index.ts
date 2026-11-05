@@ -9861,7 +9861,6 @@ export interface GetModerationSla503Response {
  */
 export const GetModerationSla503ResponseCodeEnum = {
   moderation_sla_disabled: 'moderation_sla_disabled',
-  operator_sanctioned: 'operator_sanctioned',
 } as const
 export type GetModerationSla503ResponseCodeEnum =
   (typeof GetModerationSla503ResponseCodeEnum)[keyof typeof GetModerationSla503ResponseCodeEnum]
@@ -10779,7 +10778,6 @@ export interface ListModerationCases400Response {
  * @export
  */
 export const ListModerationCases400ResponseCodeEnum = {
-  operator_sanctioned: 'operator_sanctioned',
   invalid_filter: 'invalid_filter',
   invalid_cursor: 'invalid_cursor',
   case_not_found: 'case_not_found',
@@ -12972,7 +12970,6 @@ export interface ModerationQueueError {
  * @export
  */
 export const ModerationQueueErrorCodeEnum = {
-  operator_sanctioned: 'operator_sanctioned',
   invalid_filter: 'invalid_filter',
   invalid_cursor: 'invalid_cursor',
   case_not_found: 'case_not_found',
@@ -13013,7 +13010,6 @@ export interface ModerationSlaError {
  */
 export const ModerationSlaErrorCodeEnum = {
   moderation_sla_disabled: 'moderation_sla_disabled',
-  operator_sanctioned: 'operator_sanctioned',
 } as const
 export type ModerationSlaErrorCodeEnum =
   (typeof ModerationSlaErrorCodeEnum)[keyof typeof ModerationSlaErrorCodeEnum]

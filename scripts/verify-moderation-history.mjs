@@ -3,6 +3,7 @@
 // It connects through DATABASE_URL, whichever role that is, and exits non-zero on any failed check.
 import { config as loadEnv } from 'dotenv'
 import pg from 'pg'
+import { verifiedPgConnection } from './lib/database-tls.mjs'
 // The API package is CommonJS, so its named exports arrive on the default export here.
 import enforcementModule from '../apps/api/src/modules/moderation/moderation-history.enforcement.ts'
 
@@ -16,7 +17,7 @@ async function main() {
     console.error('moderation:history:verify: DATABASE_URL is not set')
     return 2
   }
-  const client = new pg.Client({ connectionString })
+  const client = new pg.Client(verifiedPgConnection(connectionString))
   await client.connect()
   try {
     const failed = await failedModerationHistoryChecks(
@@ -31,7 +32,9 @@ async function main() {
 }
 
 process.exitCode = await main().catch((error) => {
-  // A driver message can name a host, so only the SQLSTATE leaves.
-  console.error(`moderation:history:verify: could not run (${error?.code ?? 'unknown'})`)
+  // A driver message can name a host, so only the SQLSTATE or the refusal's class leaves.
+  console.error(
+    `moderation:history:verify: could not run (${error?.code ?? error?.name ?? 'unknown'})`
+  )
   return 2
 })

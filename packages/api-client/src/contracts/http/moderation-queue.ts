@@ -37,7 +37,6 @@ export type ModerationCaseSlaState = z.infer<typeof moderationCaseSlaStateSchema
 
 /** The closed codes the two routes put on the wire next to the HTTP status. */
 export const moderationQueueErrorCodeSchema = z.enum([
-  'operator_sanctioned',
   'invalid_filter',
   'invalid_cursor',
   'case_not_found',
