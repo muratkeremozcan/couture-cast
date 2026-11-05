@@ -914,7 +914,10 @@ The daily retention job runs the same checks and logs `moderation_history_enforc
 A session running arbitrary DDL as the migration role can defeat enforcement: it holds `ADMIN` on the owner role, so it can `GRANT` itself access, and as schema owner it can `DROP TABLE` or `DROP FUNCTION ... CASCADE`, or put code in an object the definer function touches.
 That takes a compromise of the same class as a reviewed migration.
 A superuser under `session_replication_role = replica` skips the triggers too.
-The Supabase image lets the application role set that parameter, and its `UPDATE`, `DELETE` and `TRUNCATE` are still refused there, because the privilege layer does not depend on triggers (measured on `supabase/postgres:17.6.1.054`).
+The Supabase image lets the application role set that parameter (measured on `supabase/postgres:17.6.1.054`).
+In that mode its `UPDATE`, `DELETE` and `TRUNCATE` on `ModerationDecision` are still refused, because the privilege layer does not depend on triggers.
+`AuditLog` and `CommunityCommentAudit` have no such layer: the application role owns both and their enforcement is trigger-only, so in that mode it can update and delete their rows, `moderation_evidence_exported` included.
+Story 6.13 keeps that enforcement as it was, by its frozen scope.
 A role that can call the function can also forge a request row and strip identity from real rows, and that cannot alter what any decision says.
 
 **A later migration that changes `ModerationDecision`** follows this sequence, and `packages/db/test/migration-hygiene.spec.ts` enforces the revoke:

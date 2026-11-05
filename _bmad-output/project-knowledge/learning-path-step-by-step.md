@@ -10207,11 +10207,15 @@ API integration tests, against real PostgreSQL:
 - [`apps/api/integration/moderation-history-completion.integration.spec.ts`](../../apps/api/integration/moderation-history-completion.integration.spec.ts): proves the 72-hour bound with an injected clock, the re-key, repair and overdue.
 - [`apps/api/integration/moderation-history-retention.integration.spec.ts`](../../apps/api/integration/moderation-history-retention.integration.spec.ts): proves the 400-day boundary, that nothing else is pruned, and a real injected drift.
 - [`apps/api/integration/moderation-history-route.integration.spec.ts`](../../apps/api/integration/moderation-history-route.integration.spec.ts): proves both routes over real HTTP, every refusal, the canary exclusions, the byte cap and the audit row.
+- [`apps/api/integration/moderation-history-route-period.integration.spec.ts`](../../apps/api/integration/moderation-history-route-period.integration.spec.ts): proves the period export's role, limits, conflicts and time bounds, on the shared context in [`apps/api/integration/helpers/moderation-history-route-context.ts`](../../apps/api/integration/helpers/moderation-history-route-context.ts).
 - [`apps/api/integration/moderation-history-gate.spec.ts`](../../apps/api/integration/moderation-history-gate.spec.ts): reads the gate record, runbook and guide, and proves the readiness scripts are unchanged.
 
 Contract and database tests:
 
 - [`packages/db/test/moderation-history-immutability.spec.ts`](../../packages/db/test/moderation-history-immutability.spec.ts): proves every refusal and every exception rule, as a non-superuser that ran the migrations itself.
+- [`packages/db/test/moderation-history-function.spec.ts`](../../packages/db/test/moderation-history-function.spec.ts): proves the exception function's guard, request check, redaction, idempotence and audit row.
+- [`packages/db/test/moderation-history-migration.spec.ts`](../../packages/db/test/moderation-history-migration.spec.ts): proves the role, the grants and the migration on a second database, concurrently and after a reset.
+- [`packages/db/test/support/moderation-history-fixture.ts`](../../packages/db/test/support/moderation-history-fixture.ts): the shared seed for those database suites.
 - [`packages/db/test/moderation-history-verifier.spec.ts`](../../packages/db/test/moderation-history-verifier.spec.ts): proves the verifier fails on each injected fault and passes clean.
 - [`packages/db/test/migration-hygiene.spec.ts`](../../packages/db/test/migration-hygiene.spec.ts): proves a later migration gives the owner role back and uses no role keyword.
 - [`packages/api-client/testing/moderation-history-contract.spec.ts`](../../packages/api-client/testing/moderation-history-contract.spec.ts): proves the bundle rejects each excluded field and the reserved reason is refused.
@@ -10242,6 +10246,7 @@ Evidence boundaries:
   `moderation_history_enabled`, `community_read_enabled` and `community_write_enabled` default to false, while the database enforcement goes live with the migration.
 - **Known limits by design.**
   A session running arbitrary DDL as the migration role can defeat enforcement.
+  On the Supabase image the application role can set `session_replication_role = replica`, and in that mode it can update and delete `AuditLog` and `CommunityCommentAudit` rows, which stay trigger-only by this story's scope.
   Report `details` a third party wrote stays, and a reason typed after an erasure commits stays.
   No member self-service deletion exists, and the account-deletion story owns the `User` row, wardrobe and billing.
   Screenshots under `_bmad-output/test-artifacts/story-6-13/` are git-ignored local evidence.

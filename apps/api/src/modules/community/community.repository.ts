@@ -701,6 +701,8 @@ export class CommunityRepository {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_submission:' || ${userId}))`
 
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} ORDER BY id FOR UPDATE`
+      // Story 6.13: the denial every other write gives an erased member, ahead of the idempotency answer.
+      await assertCommunitySubjectAvailable(tx, userId)
       await assertCommunityDatabaseAccess(tx, userId)
 
       // `submitted_at`, not `created_at`. The row is created at allocate time
