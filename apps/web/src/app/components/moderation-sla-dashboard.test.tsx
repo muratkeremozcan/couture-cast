@@ -254,9 +254,22 @@ describe('C-WEB-ANNOUNCE (D12): one polite announcement per change', () => {
       screen.getByRole('region', { name: labels.queueTitle })
     )
 
-  it('stays silent through an auto refresh', async () => {
+  it('stays silent through an auto refresh, in flight and after', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    serve(withOnTrack(4), withOnTrack(5))
+    // A held answer lets the in-flight state render, which `act` would otherwise batch away.
+    let release: () => void = () => undefined
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let reads = 0
+    mockApi(
+      http.get(SLA_PATH, async () => {
+        reads += 1
+        if (reads === 1) return json(withOnTrack(4))
+        await held
+        return json(withOnTrack(5))
+      })
+    )
     render(<ModerationSlaDashboard />)
     await screen.findByRole('region', { name: labels.queueTitle })
     const seen = new Set<string | null>([liveText()])
@@ -267,6 +280,9 @@ describe('C-WEB-ANNOUNCE (D12): one polite announcement per change', () => {
       subtree: true,
     })
     await act(() => vi.advanceTimersByTimeAsync(REFRESH_MS))
+    await waitFor(() => expect(reads).toBe(2))
+    await act(() => vi.advanceTimersByTimeAsync(0))
+    release()
     // The rendered count proves the second answer landed before the silence is read.
     await waitFor(() => expect(onTrackShown()).toBe('5'))
     observer.disconnect()

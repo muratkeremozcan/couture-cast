@@ -131,15 +131,34 @@ describe('I-S-ANCHOR: the anchor is the earliest open report', () => {
   })
 
   it('breaks an equal due time by report id in byte order', async () => {
-    // Byte order puts Z before a, a locale collation puts a before Z, and neither id is inserted first.
+    // Byte order puts Z before a, a locale collation puts a before Z, and neither id is inserted
+    // first. CI's Alpine Postgres sorts its default collation by bytes while production's does not,
+    // so the columns take a locale collation here and only the query's own COLLATE can hold.
     const seeded = await seedCase({
       dueAt: inMs(SLA_HOUR_MS),
       reporters: 3,
       laterReportGapMs: 0,
       reportLabels: ['aa', 'Zb', 'ab'],
     })
-    const [row] = await repository().listCases(query('at_risk'), NOW, null)
-    expect(row!.anchorReportId).toBe(seeded.reports[1]!.id)
+    // A fresh client, because a connection that cached a plan refuses the changed column type.
+    const client = ctx.newClient()
+    const setIdCollation = async (collation: string) => {
+      for (const table of ['CommunityPostReport', 'CommunityCommentReport'])
+        await client.$executeRawUnsafe(
+          `ALTER TABLE "${table}" ALTER COLUMN id TYPE text COLLATE "${collation}"`
+        )
+    }
+    await setIdCollation('en-US-x-icu')
+    try {
+      const [row] = await new ModerationQueueRepository(client).listCases(
+        query('at_risk'),
+        NOW,
+        null
+      )
+      expect(row!.anchorReportId).toBe(seeded.reports[1]!.id)
+    } finally {
+      await setIdCollation('default')
+    }
   })
 
   it('skips a resolved earlier report', async () => {
@@ -309,17 +328,15 @@ describe('I-S-NEW-REPORT: reports arriving around an alert', () => {
     const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
     await sweep().run()
     const before = await alerts()
-    await prisma.communityPostReport.create({
-      data: {
-        id: `${ctx.runId}-laterrep`,
-        post_id: seeded.targetId,
-        reporter_id: (
-          await seedMember(prisma, ctx.runId, 'laterreporter', { alias: false })
-        ).id,
-        reason: 'spam',
-        sla_due_at: inMs(20 * SLA_HOUR_MS),
-        created_at: NOW,
-      },
+    await seedPostReport(prisma, {
+      runId: ctx.runId,
+      label: 'laterrep',
+      postId: seeded.targetId,
+      reporterId: (await seedMember(prisma, ctx.runId, 'laterreporter', { alias: false }))
+        .id,
+      reason: 'spam',
+      createdAt: NOW,
+      dueAt: inMs(20 * SLA_HOUR_MS),
     })
     await sweep().run()
     expect((await alerts()).map((alert) => alert.id)).toEqual(
