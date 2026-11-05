@@ -18,9 +18,10 @@ import type { Prisma } from '@prisma/client'
  * left out because it is the one anonymized field that is about the author's
  * whereabouts rather than about the content under review.
  *
- * The retention is intentional and is recorded in
- * `CommunityMaintenanceService.sweepErasureRequests`: "the fact survives, the
- * person does not".
+ * Story 6.13: this retention ends at account erasure, which strips the user's
+ * words and keeps `COMMUNITY_SNAPSHOT_METADATA_KEYS`, because AC 2 says erasure
+ * removes personal content. A post's own withdrawal keeps the whole snapshot:
+ * retracting a reported post must not destroy the evidence.
  */
 export interface CommunityAuditSnapshotSource {
   caption: string | null
@@ -40,4 +41,23 @@ export function buildCommunityContentSnapshot(
     climateBand: post.climate_band,
     capturedAt: capturedAt.toISOString(),
   }
+}
+
+/** What a snapshot keeps after its subject's account erasure. */
+export const COMMUNITY_SNAPSHOT_METADATA_KEYS = Object.freeze([
+  'locale',
+  'climateBand',
+  'capturedAt',
+] as const)
+
+/** The rule the erasure SQL applies, for one value. Any other key is dropped, an unknown one included. */
+export function stripCommunitySnapshot(snapshot: unknown): Prisma.InputJsonValue | null {
+  if (snapshot === null || typeof snapshot !== 'object' || Array.isArray(snapshot))
+    return null
+  const source = snapshot as Record<string, Prisma.InputJsonValue>
+  return Object.fromEntries(
+    COMMUNITY_SNAPSHOT_METADATA_KEYS.flatMap((key) =>
+      key in source ? [[key, source[key]] as const] : []
+    )
+  )
 }

@@ -19,6 +19,12 @@ import { recordCommunityEngagement } from './community-engagement-intent.js'
 import { sharedCommunityReportRetryAfter } from './community-report-limit.js'
 import { eraseCommunityComments } from './community-comments.privacy.js'
 import {
+  assertReportedCasesUnchanged,
+  lockReportedCases,
+  removeMemberFromModerationRecords,
+} from './community-erasure.js'
+import { writeModerationRecord } from './community-moderation-record.js'
+import {
   findSpotlightLocation,
   type SpotlightAreaComponents,
   type SpotlightLocation,
@@ -56,6 +62,20 @@ import {
   COMMUNITY_POST_NOT_FOUND_MESSAGE,
 } from '@couture/api-client/contracts/http'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+
+/** Story 6.13: what starting an account erasure answers. `replayed` means an earlier request stands. */
+export interface CommunityAccountErasure {
+  postsMarked: number
+  requestId: string
+  requestedAt: Date
+  replayed: boolean
+}
+
+/** The community module imports nothing from the moderation module, so the caller builds the audit row. */
+export interface CommunityErasureOperator {
+  id: string
+  auditData?: (requestId: string) => Prisma.InputJsonValue
+}
 
 export interface FindFeedPostsParams {
   filterBand?: ClimateBand
@@ -568,21 +588,81 @@ export class CommunityRepository {
    * was never published. Erasure that skipped either would leave exactly the
    * bytes the request was about.
    */
-  async requestErasureForUser(userId: string, requestedAt: Date): Promise<number> {
+  async requestErasureForUser(
+    userId: string,
+    requestedAt: Date,
+    requestedBy?: string
+  ): Promise<number> {
+    const { postsMarked } = await this.requestAccountErasure(
+      userId,
+      requestedAt,
+      requestedBy ? { id: requestedBy } : undefined
+    )
+    return postsMarked
+  }
+
+  /**
+   * Story 6.13: the whole of account erasure's synchronous half, with the request row that starts the
+   * 72-hour clock. A repeat returns the first row, keeps its time and writes no audit row. Rerunning the
+   * rest is harmless, and it is how a repeat picks up anything that committed around the first request.
+   * The lock order is the decision service's: case locks, then the privacy guards.
+   */
+  async requestAccountErasure(
+    userId: string,
+    requestedAt: Date,
+    operator?: CommunityErasureOperator
+  ): Promise<CommunityAccountErasure> {
     return communityPrivacyTransaction(this.prisma, async (tx) => {
+      const lockedCases = await lockReportedCases(tx, userId)
       await guardCommunitySubject(tx, userId)
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id IN (SELECT post_id FROM "CommunityReaction" WHERE user_id = ${userId}) OR id IN (SELECT post_id FROM "CommunityComment" WHERE user_id = ${userId}) OR user_id = ${userId} ORDER BY id FOR UPDATE`
+      await assertReportedCasesUnchanged(tx, userId, lockedCases)
+
+      const existing = await tx.moderationErasureRequest.findUnique({
+        where: { member_id: userId },
+      })
+      const request =
+        existing ??
+        (await writeModerationRecord(() =>
+          tx.moderationErasureRequest.create({
+            data: {
+              id: randomUUID(),
+              member_id: userId,
+              requested_by: operator?.id ?? null,
+              requested_at: requestedAt,
+            },
+          })
+        ))
+      if (!existing && operator?.auditData) {
+        const eventData = operator.auditData(request.id)
+        await writeModerationRecord(() =>
+          tx.auditLog.create({
+            data: {
+              user_id: operator.id,
+              event_type: 'moderation_erasure_requested',
+              event_data: eventData,
+            },
+          })
+        )
+      }
+
+      await removeMemberFromModerationRecords(tx, userId)
       await eraseCommunityComments(tx, userId)
       await tx.communityReaction.deleteMany({ where: { user_id: userId } })
       await tx.communityReactionReceipt.deleteMany({ where: { user_id: userId } })
       await tx.communityReactionOutbox.deleteMany({ where: { user_id: userId } })
       const { count } = await tx.lookbookPost.updateMany({
         where: { user_id: userId, erasure_requested_at: null },
-        data: { erasure_requested_at: requestedAt },
+        data: { erasure_requested_at: request.requested_at },
       })
       await forgetCommunitySubject(tx, userId, true)
-      return count
+      return {
+        postsMarked: count,
+        requestId: request.id,
+        requestedAt: request.requested_at,
+        replayed: existing !== null,
+      }
     })
   }
 
@@ -759,6 +839,9 @@ export class CommunityRepository {
       return await interactiveTransaction(this.prisma, async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_report:' || ${reporterId}))`
         await assertCommunityMemberNotSanctioned(tx, reporterId)
+        // Story 6.13: account erasure deletes the subject, and a report after it would put the member's
+        // id back on a moderation record. Comments, reactions and every read already refuse this way.
+        await assertCommunitySubjectAvailable(tx, reporterId)
 
         const locked = await tx.$queryRaw<
           {
@@ -892,6 +975,16 @@ export class CommunityRepository {
     })
     if (existing) {
       return existing.alias
+    }
+
+    // Story 6.13: account erasure deletes this member's subject and alias together, and a read after it
+    // must not mint the mapping again. The sweep's repair pass removes one that raced this check.
+    const subject = await this.prisma.communitySubject.findUnique({
+      where: { member_id: userId },
+      select: { member_id: true },
+    })
+    if (!subject) {
+      return null
     }
 
     try {

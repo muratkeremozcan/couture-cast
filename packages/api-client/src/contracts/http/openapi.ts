@@ -18,6 +18,7 @@ import { registerModerationContracts } from './moderation'
 import { registerModerationDecisionContracts } from './moderation-decisions'
 import { registerModerationQueueContracts } from './moderation-queue'
 import { registerModerationSlaContracts } from './moderation-sla'
+import { registerModerationHistoryContracts } from './moderation-history'
 import { registerUserContracts } from './user'
 import { registerWeatherContracts } from './weather'
 import { registerRitualContracts } from './ritual'
@@ -127,6 +128,7 @@ export function createHttpOpenApiRegistry() {
   registerModerationQueueContracts(registry)
   registerModerationDecisionContracts(registry)
   registerModerationSlaContracts(registry)
+  registerModerationHistoryContracts(registry)
   registerShareCardsContracts(registry)
 
   return registry

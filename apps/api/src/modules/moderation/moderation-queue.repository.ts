@@ -16,6 +16,7 @@ import {
   type ModerationCasesQuery,
 } from '@couture/api-client/contracts/http'
 import { escalatedCaseKeys, orphanDecisions } from './moderation-decisions.repository.js'
+import { mapModerationReason } from './moderation-history.rules.js'
 import type { ModerationQueuePosition } from './moderation-queue-cursor.js'
 
 export { MODERATION_QUEUE_READ_TABLES } from './moderation-queue-tables.js'
@@ -116,6 +117,7 @@ export interface LoadedCase {
     actorKind: 'screening' | 'reporter' | 'operator'
     action: string
     reason: string | null
+    reasonRemoved: boolean
     occurredAt: Date
   }[]
 }
@@ -495,13 +497,15 @@ export class ModerationQueueRepository {
               ? ('reporter' as const)
               : ('screening' as const),
           action: event.action ?? 'unknown',
-          reason: event.reason,
+          ...(event.reason === null
+            ? { reason: null, reasonRemoved: false }
+            : mapModerationReason(event.reason)),
           occurredAt: event.created_at,
         })),
         ...decisions.map((decision) => ({
           actorKind: 'operator' as const,
           action: decision.action,
-          reason: decision.reason,
+          ...mapModerationReason(decision.reason),
           occurredAt: decision.decided_at,
         })),
       ],
@@ -589,7 +593,7 @@ export class ModerationQueueRepository {
           ? ('screening' as const)
           : ('operator' as const),
         action: audit.action,
-        reason: audit.reason,
+        ...mapModerationReason(audit.reason),
         occurredAt: audit.occurred_at,
       })),
     }

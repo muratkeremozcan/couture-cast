@@ -2,6 +2,13 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { returnBanHoldsToScreening } from './community-ban-holds.js'
+import { eraseCommunityComments } from './community-comments.privacy.js'
+import {
+  assertReportedCasesUnchanged,
+  lockReportedCases,
+  memberIdentityRemains,
+  removeMemberFromModerationRecords,
+} from './community-erasure.js'
 import {
   communityPrivacyTransaction,
   guardCommunityPost,
@@ -106,6 +113,10 @@ export interface CommunityErasureSweepResult {
   anonymized: number
   objectsPurged: number
   overdue: number
+  /** Story 6.13: account erasure requests finished by this pass. */
+  requestsCompleted: number
+  /** Story 6.13: account erasure requests still open past the 72-hour deadline. */
+  requestsOverdue: number
 }
 
 /**
@@ -297,11 +308,11 @@ export class CommunityMaintenanceService {
    * timestamp so a sweep interrupted halfway re-drives only the step that did
    * not finish.
    *
-   * The moderation audit is deliberately left standing. `ModerationEvent` and
-   * `CommunityPostReport` keep `subject_alias`, `content_snapshot` and
-   * `image_object_path` with both foreign keys nulled, which is what "retain
-   * anonymized moderation audit metadata" means: the fact survives, the person
-   * does not.
+   * The moderation audit is deliberately left standing: the fact survives, the
+   * person does not. A post's own withdrawal keeps its evidence whole, because
+   * retracting a reported post must not destroy it. Account erasure (Story 6.13)
+   * goes further: the request transaction strips the user's words from the
+   * snapshots, and `settleAccountErasures` here deletes the post rows once purged.
    *
    * A worker lost mid-upload can recreate the object after a delete, with no owner left to remove
    * it. So the row keeps its path and stays open until the late-write window has passed: the object
@@ -319,6 +330,8 @@ export class CommunityMaintenanceService {
       anonymized: 0,
       objectsPurged: 0,
       overdue: 0,
+      requestsCompleted: 0,
+      requestsOverdue: 0,
     }
 
     for (const post of pending) {
@@ -390,7 +403,113 @@ export class CommunityMaintenanceService {
       )
     }
 
+    await this.settleAccountErasures(now, result)
     return result
+  }
+
+  /**
+   * Story 6.13. For each open account erasure: repair anything that committed around the request, and
+   * once every post of the member is purged, delete those rows and stamp `completed_at`. Deleting them is
+   * what ends the link from a case key to the member: `LookbookPost.user_id` cannot be null, and the
+   * foreign keys null `post_id` everywhere, which re-keys the case to `orphan-post`.
+   */
+  private async settleAccountErasures(
+    now: Date,
+    result: CommunityErasureSweepResult
+  ): Promise<void> {
+    const open = await this.prisma.moderationErasureRequest.findMany({
+      where: { completed_at: null },
+      orderBy: { requested_at: 'asc' },
+      take: MAX_SWEEP_BATCH,
+      select: { id: true, member_id: true },
+    })
+    for (const request of open) {
+      try {
+        if (await this.settleAccountErasure(request.id, request.member_id, now))
+          result.requestsCompleted += 1
+      } catch (error) {
+        // The next pass retries, and one member's failure must not stop the others.
+        this.logger.error(
+          {
+            event: 'moderation_erasure_settle_failed',
+            prismaCode: (error as { code?: unknown } | null)?.code ?? null,
+          },
+          'Failed to settle an account erasure; will retry'
+        )
+      }
+    }
+
+    result.requestsOverdue = await this.prisma.moderationErasureRequest.count({
+      where: {
+        completed_at: null,
+        requested_at: {
+          lt: new Date(now.getTime() - ERASURE_DEADLINE_HOURS * 60 * 60 * 1000),
+        },
+      },
+    })
+    if (result.requestsOverdue > 0)
+      this.logger.error(
+        {
+          event: 'moderation_erasure_overdue',
+          count: result.requestsOverdue,
+          deadlineHours: ERASURE_DEADLINE_HOURS,
+        },
+        'Account erasure requests passed their 72-hour deadline'
+      )
+  }
+
+  private async settleAccountErasure(
+    requestId: string,
+    member: string | null,
+    now: Date
+  ): Promise<boolean> {
+    // The `User` row went, and its foreign keys already removed everything this would.
+    if (member) {
+      if (await memberIdentityRemains(this.prisma, member))
+        await communityPrivacyTransaction(this.prisma, async (tx) => {
+          const lockedCases = await lockReportedCases(tx, member)
+          await guardCommunitySubject(tx, member)
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${member}))`
+          await assertReportedCasesUnchanged(tx, member, lockedCases)
+          await removeMemberFromModerationRecords(tx, member)
+          await eraseCommunityComments(tx, member)
+        })
+
+      const unpurged = await this.prisma.lookbookPost.count({
+        where: { user_id: member, objects_purged_at: null },
+      })
+      if (unpurged > 0) return false
+
+      for (;;) {
+        const deleted = await communityPrivacyTransaction(this.prisma, async (tx) => {
+          await guardCommunitySubject(tx, member)
+          const posts = await tx.lookbookPost.findMany({
+            where: { user_id: member, objects_purged_at: { not: null } },
+            orderBy: { id: 'asc' },
+            take: MAX_SWEEP_BATCH,
+            select: { id: true },
+          })
+          const ids = posts.map((post) => post.id)
+          await tx.communityPostReport.updateMany({
+            where: { post_id: { in: ids } },
+            data: { image_object_path: null },
+          })
+          await tx.moderationEvent.updateMany({
+            where: { post_id: { in: ids } },
+            data: { image_object_path: null },
+          })
+          await tx.lookbookPost.deleteMany({ where: { id: { in: ids } } })
+          return ids.length
+        })
+        if (deleted < MAX_SWEEP_BATCH) break
+      }
+    }
+
+    const { count } = await this.prisma.moderationErasureRequest.updateMany({
+      where: { id: requestId, completed_at: null },
+      data: { completed_at: now },
+    })
+    return count > 0
   }
 
   /**

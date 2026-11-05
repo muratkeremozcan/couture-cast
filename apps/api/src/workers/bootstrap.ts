@@ -21,11 +21,13 @@ import { WardrobeRetentionService } from '../modules/wardrobe/wardrobe-retention
 import { SupabaseWardrobeStorageAdapter } from '../modules/wardrobe/wardrobe-storage.adapter'
 import { createCommunityWorkerRuntime } from '../modules/community/community-worker-runtime'
 import { registerCommunityMaintenanceSchedulers } from '../modules/community/community-maintenance.scheduler'
+import { createModerationHistoryRetention } from '../modules/moderation/moderation-history.retention'
 import { createModerationSlaSweep } from '../modules/moderation/moderation-sla.sweep'
 import { initializeOpenTelemetry, shutdownOpenTelemetry } from '../instrumentation'
 import { createMaintenanceProcessor } from './maintenance.processor'
 import {
   registerMaintenanceSchedulers,
+  registerModerationHistoryScheduler,
   registerModerationSlaScheduler,
 } from './maintenance.scheduler'
 import { createQueues, queueConfigs } from '../config/queues'
@@ -326,6 +328,10 @@ export async function startWorkers(state: WorkerProcessState) {
         flags: runtimeFlags,
         analytics: posthogService,
       }),
+      moderationHistoryRetention: createModerationHistoryRetention({
+        prisma,
+        flags: runtimeFlags,
+      }),
     })
     closeables.push({
       close: () => community.close(),
@@ -361,6 +367,7 @@ export async function startWorkers(state: WorkerProcessState) {
     await registerMaintenanceSchedulers(maintenanceQueue)
     await registerCommunityMaintenanceSchedulers(maintenanceQueue)
     await registerModerationSlaScheduler(maintenanceQueue)
+    await registerModerationHistoryScheduler(maintenanceQueue)
 
     workers.push(
       // Serial on purpose. Every sweep is a batched DB scan and two of them

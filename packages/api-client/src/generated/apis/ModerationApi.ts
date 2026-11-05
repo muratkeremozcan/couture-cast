@@ -15,12 +15,17 @@ import * as runtime from '../runtime'
 import type {
   ApplyModerationDecision200Response,
   ApplyModerationDecisionRequest,
+  ExportModerationEvidence200Response,
+  ExportModerationEvidenceRequest,
   GetModerationCase200Response,
+  GetModerationEvidenceAvailability200Response,
   GetModerationSla200Response,
   ListModerationCases200Response,
   ModerationActionInput,
   RecordModerationAppeal200Response,
   RecordModerationAppealRequest,
+  RequestModerationErasure200Response,
+  RequestModerationErasureRequest,
   TrackedResponse,
 } from '../models/index'
 
@@ -31,6 +36,10 @@ export interface ApiV1ModerationActionsPostRequest {
 export interface ApplyModerationDecisionOperationRequest {
   caseId: string
   applyModerationDecisionRequest: ApplyModerationDecisionRequest
+}
+
+export interface ExportModerationEvidenceOperationRequest {
+  exportModerationEvidenceRequest: ExportModerationEvidenceRequest
 }
 
 export interface GetModerationCaseRequest {
@@ -50,6 +59,10 @@ export interface ListModerationCasesRequest {
 export interface RecordModerationAppealOperationRequest {
   sanctionId: string
   recordModerationAppealRequest: RecordModerationAppealRequest
+}
+
+export interface RequestModerationErasureOperationRequest {
+  requestModerationErasureRequest: RequestModerationErasureRequest
 }
 
 /**
@@ -197,6 +210,75 @@ export class ModerationApi extends runtime.BaseAPI {
   }
 
   /**
+   * Creates request options for exportModerationEvidence without sending the request
+   */
+  async exportModerationEvidenceRequestOpts(
+    requestParameters: ExportModerationEvidenceOperationRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['exportModerationEvidenceRequest'] == null) {
+      throw new runtime.RequiredError(
+        'exportModerationEvidenceRequest',
+        'Required parameter "exportModerationEvidenceRequest" was null or undefined when calling exportModerationEvidence().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/moderation/evidence-exports`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['exportModerationEvidenceRequest'],
+    }
+  }
+
+  /**
+   * A moderator or admin exports one case, and an admin alone exports a period. POST because each export writes one audit row in the transaction that reads the bundle.
+   * Download a moderation evidence bundle (private, no-store)
+   */
+  async exportModerationEvidenceRaw(
+    requestParameters: ExportModerationEvidenceOperationRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<ExportModerationEvidence200Response>> {
+    const requestOptions =
+      await this.exportModerationEvidenceRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * A moderator or admin exports one case, and an admin alone exports a period. POST because each export writes one audit row in the transaction that reads the bundle.
+   * Download a moderation evidence bundle (private, no-store)
+   */
+  async exportModerationEvidence(
+    requestParameters: ExportModerationEvidenceOperationRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<ExportModerationEvidence200Response> {
+    const response = await this.exportModerationEvidenceRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
    * Creates request options for getModerationCase without sending the request
    */
   async getModerationCaseRequestOpts(
@@ -259,6 +341,57 @@ export class ModerationApi extends runtime.BaseAPI {
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<GetModerationCase200Response> {
     const response = await this.getModerationCaseRaw(requestParameters, initOverrides)
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for getModerationEvidenceAvailability without sending the request
+   */
+  async getModerationEvidenceAvailabilityRequestOpts(): Promise<runtime.RequestOpts> {
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/moderation/evidence-exports/availability`
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Moderator and admin only. Answers 503 while the feature is off.
+   * Whether the console offers evidence export to this viewer (private, no-store)
+   */
+  async getModerationEvidenceAvailabilityRaw(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<GetModerationEvidenceAvailability200Response>> {
+    const requestOptions = await this.getModerationEvidenceAvailabilityRequestOpts()
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Moderator and admin only. Answers 503 while the feature is off.
+   * Whether the console offers evidence export to this viewer (private, no-store)
+   */
+  async getModerationEvidenceAvailability(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<GetModerationEvidenceAvailability200Response> {
+    const response = await this.getModerationEvidenceAvailabilityRaw(initOverrides)
     return await response.value()
   }
 
@@ -469,6 +602,75 @@ export class ModerationApi extends runtime.BaseAPI {
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<RecordModerationAppeal200Response> {
     const response = await this.recordModerationAppealRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for requestModerationErasure without sending the request
+   */
+  async requestModerationErasureRequestOpts(
+    requestParameters: RequestModerationErasureOperationRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['requestModerationErasureRequest'] == null) {
+      throw new runtime.RequiredError(
+        'requestModerationErasureRequest',
+        'Required parameter "requestModerationErasureRequest" was null or undefined when calling requestModerationErasure().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/moderation/erasure-requests`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['requestModerationErasureRequest'],
+    }
+  }
+
+  /**
+   * Admin only. Identity leaves moderation records in the same transaction, and the rest completes within 72 hours. A repeat returns the first request and never moves the clock.
+   * Start the account erasure of community and moderation data (private, no-store)
+   */
+  async requestModerationErasureRaw(
+    requestParameters: RequestModerationErasureOperationRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<RequestModerationErasure200Response>> {
+    const requestOptions =
+      await this.requestModerationErasureRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Admin only. Identity leaves moderation records in the same transaction, and the rest completes within 72 hours. A repeat returns the first request and never moves the clock.
+   * Start the account erasure of community and moderation data (private, no-store)
+   */
+  async requestModerationErasure(
+    requestParameters: RequestModerationErasureOperationRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<RequestModerationErasure200Response> {
+    const response = await this.requestModerationErasureRaw(
       requestParameters,
       initOverrides
     )

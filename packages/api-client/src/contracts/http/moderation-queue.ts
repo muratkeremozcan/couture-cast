@@ -358,6 +358,8 @@ export const moderationPriorActionSchema = z
     actorKind: moderationActorKindSchema,
     action: z.string().min(1).max(64),
     reason: z.string().max(2000).nullable(),
+    /** Story 6.13: erasure removed this reason, and `reason` is null. */
+    reasonRemoved: z.boolean(),
     occurredAt: isoSchema,
   })
   .strict()

@@ -1,5 +1,5 @@
 // Story 6.11 owner: the SQL of moderation decisions in `apps/api/src/modules/moderation/moderation-decisions.repository.ts`.
-// A decision row is only ever inserted. Story 6.13 enforces that at the database boundary.
+// A decision row is only ever inserted, and Story 6.13 enforces that at the database boundary.
 import { Injectable } from '@nestjs/common'
 import type {
   CommunityComment,
@@ -8,6 +8,7 @@ import type {
   Prisma,
 } from '@prisma/client'
 import type { ModerationCaseTargetState } from '@couture/api-client/contracts/http'
+import { lockModerationCase } from '../community/community-erasure.js'
 import type { ParsedCaseId } from './moderation-queue.repository.js'
 import { inDecisionOrder, type DecisionHistoryRow } from './moderation-decision-rules.js'
 
@@ -65,7 +66,16 @@ export function decisionCaseTargetState(loaded: DecisionCase): ModerationCaseTar
 export class ModerationDecisionsRepository {
   /** Every decision on one case runs under this lock, ahead of every privacy and engagement lock. */
   async lockCase(tx: Tx, caseKey: string): Promise<void> {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('moderation_case:' || ${caseKey}))`
+    await lockModerationCase(tx, caseKey)
+  }
+
+  /** Story 6.13: read under the locks, so a decision after an erasure request stores no subject. */
+  async hasErasureRequest(tx: Tx, member: string): Promise<boolean> {
+    const request = await tx.moderationErasureRequest.findUnique({
+      where: { member_id: member },
+      select: { id: true },
+    })
+    return request !== null
   }
 
   /**

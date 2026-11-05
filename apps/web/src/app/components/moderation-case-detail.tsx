@@ -20,6 +20,7 @@ import {
 import { ModerationAccountStanding } from './moderation-account-standing'
 import { CaseMedia } from './moderation-case-media'
 import { ModerationDecisionPanel } from './moderation-decision-panel'
+import { ModerationEvidenceExport } from './moderation-evidence-export'
 import { FailureNotice, moderationControl } from './moderation-failure-notice'
 import { PlainText } from './moderation-plain-text'
 import { SlaCountdown } from './moderation-sla-countdown'
@@ -174,6 +175,7 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
         {outcome}
       </p>
       <ModerationDecisionPanel detail={detail} onApplied={applied} onReload={reload} />
+      <ModerationEvidenceExport caseId={detail.caseId} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <ContentSection detail={detail} />
@@ -511,7 +513,13 @@ function PriorActionsSection({ detail }: { detail: ModerationCaseDetail }) {
               <p className="text-neutral-700 dark:text-neutral-300">
                 {format(action.occurredAt)}
               </p>
-              {action.reason ? <PlainText value={action.reason} /> : null}
+              {action.reasonRemoved ? (
+                <p className="text-neutral-700 italic dark:text-neutral-300">
+                  {t('moderation.detail.reasonRemoved')}
+                </p>
+              ) : action.reason ? (
+                <PlainText value={action.reason} />
+              ) : null}
             </li>
           ))}
         </ol>

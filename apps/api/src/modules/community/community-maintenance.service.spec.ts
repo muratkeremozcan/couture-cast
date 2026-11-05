@@ -35,6 +35,11 @@ describe('CommunityMaintenanceService', () => {
       lookbookPost: { findMany, findFirst, update, updateMany, deleteMany, count },
       communityPostSponsorship: { deleteMany: sponsorshipDeleteMany },
       jobFailure: { create: jobFailureCreate },
+      // Story 6.13: no account erasure is open here. The integration suite covers those.
+      moderationErasureRequest: {
+        findMany: vi.fn().mockResolvedValue([]),
+        count: vi.fn().mockResolvedValue(0),
+      },
     }
     const prisma = {
       ...transaction,
@@ -167,6 +172,8 @@ describe('CommunityMaintenanceService', () => {
         anonymized: 0,
         objectsPurged: 0,
         overdue: 0,
+        requestsCompleted: 0,
+        requestsOverdue: 0,
       })
     })
 
@@ -188,7 +195,14 @@ describe('CommunityMaintenanceService', () => {
         updateMany.mock.invocationCallOrder[0]!
       )
       expect(storage.removed).toEqual(['community/post-erase/s.jpg'])
-      expect(result).toEqual({ hidden: 1, anonymized: 1, objectsPurged: 1, overdue: 0 })
+      expect(result).toEqual({
+        hidden: 1,
+        anonymized: 1,
+        objectsPurged: 1,
+        overdue: 0,
+        requestsCompleted: 0,
+        requestsOverdue: 0,
+      })
     })
 
     it('anonymizes the retained content fields and stamps each step separately', async () => {
@@ -276,7 +290,14 @@ describe('CommunityMaintenanceService', () => {
       const result = await service.sweepErasureRequests(now)
 
       // Stamping the purge here would record a deletion that never happened.
-      expect(result).toEqual({ hidden: 0, anonymized: 0, objectsPurged: 0, overdue: 1 })
+      expect(result).toEqual({
+        hidden: 0,
+        anonymized: 0,
+        objectsPurged: 0,
+        overdue: 1,
+        requestsCompleted: 0,
+        requestsOverdue: 0,
+      })
       expect(update).toHaveBeenCalledWith({
         where: { id: 'post-erase' },
         data: { status: 'withdrawn' },

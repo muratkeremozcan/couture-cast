@@ -334,7 +334,7 @@ describe('createCommunityWorkerRuntime', () => {
     }
   })
 
-  it('exposes exactly the six sweeps both process groups drive', async () => {
+  it('exposes exactly the seven sweeps both process groups drive', async () => {
     const runtime = await createCommunityWorkerRuntime({
       prisma,
       telemetryService,
@@ -370,6 +370,7 @@ describe('createCommunityWorkerRuntime', () => {
       'sweepErasureRequests',
       'sweepExpiredBanHolds',
       'sweepExpiredUploads',
+      'sweepModerationHistoryRetention',
       'sweepModerationSla',
       'sweepStalePendingReview',
     ])

@@ -240,13 +240,17 @@ describe('CommunityService moderation and erasure', () => {
     // `community_erasure_overdue` could not fire even in principle. Withdrawal
     // is one producer; account deletion is the other.
     it('marks every unclaimed post of the member and reports the count', async () => {
-      const { service, requestErasureForUser } = createService()
+      const { service, requestAccountErasure } = createService()
 
-      await expect(service.requestAccountContentErasure(viewerUserId)).resolves.toEqual({
-        postsMarked: 2,
-      })
+      await expect(service.requestAccountContentErasure(viewerUserId)).resolves.toEqual(
+        expect.objectContaining({ postsMarked: 2 })
+      )
 
-      expect(requestErasureForUser).toHaveBeenCalledWith(viewerUserId, expect.any(Date))
+      expect(requestAccountErasure).toHaveBeenCalledWith(
+        viewerUserId,
+        expect.any(Date),
+        undefined
+      )
     })
 
     it('is not gated on either rollout flag, because erasure is not a feature', async () => {
@@ -254,9 +258,9 @@ describe('CommunityService moderation and erasure', () => {
       // because the beta happens to be closed.
       const { service, getFeatureFlag } = createService({ flagEnabled: false })
 
-      await expect(service.requestAccountContentErasure(viewerUserId)).resolves.toEqual({
-        postsMarked: 2,
-      })
+      await expect(service.requestAccountContentErasure(viewerUserId)).resolves.toEqual(
+        expect.objectContaining({ postsMarked: 2 })
+      )
 
       expect(getFeatureFlag).not.toHaveBeenCalled()
     })

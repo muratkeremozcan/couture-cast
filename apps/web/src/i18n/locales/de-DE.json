@@ -1030,7 +1030,8 @@
       "noPriorActions": "Keine früheren Maßnahmen.",
       "firstDecision": "Erste Entscheidung {{when}}",
       "escalated": "Dieser Fall wartet auf einen Admin. Nur ein Admin kann ihn abschließen.",
-      "reporterScreening": "Automatisches Screening"
+      "reporterScreening": "Automatisches Screening",
+      "reasonRemoved": "Begründung durch Löschung entfernt"
     },
     "action": {
       "flagged": "Vom Screening markiert",
@@ -1174,6 +1175,35 @@
       "author_deleted": "Vom Autor gelöscht",
       "erased": "Gelöscht",
       "unknown": "Anderer Status"
+    },
+    "evidence": {
+      "link": "Nachweisexport",
+      "title": "Nachweisexport",
+      "subtitle": "Laden Sie die Moderationsaufzeichnung eines Zeitraums als JSON-Datei für eine Compliance-Prüfung herunter.",
+      "caseTitle": "Nachweise",
+      "caseHelp": "Laden Sie die Moderationsaufzeichnung dieses Falls als JSON-Datei herunter. Jeder Export wird protokolliert.",
+      "exportCase": "Nachweise exportieren",
+      "exportRange": "Zeitraum exportieren",
+      "working": "Nachweisdatei wird vorbereitet",
+      "done": "Nachweisdatei heruntergeladen: {{decisions}} Entscheidungen, {{reports}} Meldungen, {{auditEvents}} Audit-Ereignisse, {{alerts}} Warnungen.",
+      "withheld": "{{count}} Entscheidungen ausgelassen, weil Sie diese Fälle verfasst oder gemeldet haben.",
+      "digest": "SHA-256-Prüfsumme:",
+      "to": "Bis (UTC)",
+      "rangeHelp": "Ganze UTC-Tage, bis zu 90 Tage. Jeder Export wird protokolliert.",
+      "from": "Von (UTC)",
+      "failure": {
+        "moderation_history_disabled": "Der Nachweisexport ist deaktiviert.",
+        "admin_required": "Nur ein Admin kann einen Zeitraum exportieren.",
+        "self_review_refused": "Sie haben diesen Inhalt verfasst oder gemeldet, daher muss eine andere Moderationsperson ihn exportieren.",
+        "case_not_found": "Dieser Fall existiert nicht mehr. Er wurde nach einer Löschung möglicherweise neu zugeordnet.",
+        "invalid_range": "Wählen Sie ein Start- und ein Enddatum mit höchstens 90 Tagen Abstand.",
+        "export_too_large": "Dieser Export ist zu groß. Wählen Sie einen kürzeren Zeitraum.",
+        "audit_unavailable": "Der Export konnte nicht protokolliert werden, daher wurde nichts heruntergeladen. Versuchen Sie es erneut.",
+        "signed_out": "Melden Sie sich erneut an, um fortzufahren.",
+        "forbidden": "Dieses Konto kann keine Nachweise exportieren.",
+        "rate_limited": "Zu viele Anfragen. Warten Sie einen Moment und versuchen Sie es erneut.",
+        "unavailable": "Der Export ist nicht verfügbar. Versuchen Sie es erneut."
+      }
     }
   }
 }

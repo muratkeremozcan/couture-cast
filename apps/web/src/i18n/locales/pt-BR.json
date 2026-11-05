@@ -1030,7 +1030,8 @@
       "noPriorActions": "Nenhuma ação anterior.",
       "firstDecision": "Primeira decisão: {{when}}",
       "escalated": "Este caso aguarda um administrador. Só um administrador pode encerrá-lo.",
-      "reporterScreening": "Triagem automática"
+      "reporterScreening": "Triagem automática",
+      "reasonRemoved": "Motivo removido pelo apagamento"
     },
     "action": {
       "flagged": "Sinalizado pela triagem",
@@ -1174,6 +1175,35 @@
       "author_deleted": "Excluído pelo autor",
       "erased": "Apagado",
       "unknown": "Outro status"
+    },
+    "evidence": {
+      "link": "Exportar evidências",
+      "title": "Exportar evidências",
+      "subtitle": "Baixe o registro de moderação de um período, em arquivo JSON para uma revisão de conformidade.",
+      "caseTitle": "Evidências",
+      "caseHelp": "Baixe o registro de moderação deste caso em arquivo JSON. Cada exportação é registrada.",
+      "exportCase": "Exportar evidências",
+      "exportRange": "Exportar período",
+      "working": "Preparando o arquivo de evidências",
+      "done": "Arquivo de evidências baixado: {{decisions}} decisões, {{reports}} denúncias, {{auditEvents}} eventos de auditoria, {{alerts}} alertas.",
+      "withheld": "{{count}} decisões omitidas porque você escreveu ou denunciou esses casos.",
+      "digest": "Resumo SHA-256:",
+      "to": "Até (UTC)",
+      "rangeHelp": "Dias UTC inteiros, até 90 dias. Cada exportação é registrada.",
+      "from": "De (UTC)",
+      "failure": {
+        "moderation_history_disabled": "A exportação de evidências está desativada.",
+        "admin_required": "Somente um administrador pode exportar um período.",
+        "self_review_refused": "Você escreveu este conteúdo ou fez uma das denúncias, então outra pessoa precisa exportá-lo.",
+        "case_not_found": "Este caso não existe mais. O identificador pode ter mudado após um apagamento.",
+        "invalid_range": "Escolha uma data inicial e uma final, com até 90 dias de diferença.",
+        "export_too_large": "Esta exportação é grande demais. Escolha um período menor.",
+        "audit_unavailable": "Não foi possível registrar a exportação, então nada foi baixado. Tente novamente.",
+        "signed_out": "Entre novamente para continuar.",
+        "forbidden": "Esta conta não pode exportar evidências.",
+        "rate_limited": "Muitas solicitações. Aguarde um momento e tente novamente.",
+        "unavailable": "A exportação está indisponível. Tente novamente."
+      }
     }
   }
 }

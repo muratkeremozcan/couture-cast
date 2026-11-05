@@ -69,6 +69,7 @@
     "community:screening:measure:memory": "mkdir -p apps/api/.cache/community-screening && node scripts/measure-community-worker-memory.mjs > apps/api/.cache/community-screening/container-memory.json",
     "community:screening:measure:redis": "mkdir -p apps/api/.cache/community-screening && node scripts/measure-community-worker-redis.mjs --minutes 30 > apps/api/.cache/community-screening/redis-idle.json",
     "moderation:sla:drill": "npm run prepare:shared-deps --workspace api && tsx scripts/moderation-sla-drill.mjs",
+    "moderation:history:verify": "npm run prepare:shared-deps --workspace api && tsx scripts/verify-moderation-history.mjs",
     "community:screening:canary": "node scripts/community-screening-canary.mjs",
     "community:screening:canary:local": "node scripts/community-screening-canary.mjs --target local --env-file .env.local --json-out apps/api/.cache/community-screening/canary-local.json",
     "community:screening:canary:restart-drill": "node scripts/community-screening-canary.mjs --target local --env-file .env.local --restart-drill --timeout-ms 180000 --json-out apps/api/.cache/community-screening/canary-restart-local.json",

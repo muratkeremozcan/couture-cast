@@ -23,6 +23,9 @@ import {
   ModerationSanctionsService,
 } from './moderation-sanctions.service.js'
 
+import { ModerationHistoryController } from './moderation-history.controller.js'
+import { ModerationHistoryRepository } from './moderation-history.repository.js'
+import { ModerationHistoryService } from './moderation-history.service.js'
 import { ModerationSlaController } from './moderation-sla.controller.js'
 import { ModerationSlaService } from './moderation-sla.service.js'
 
@@ -41,6 +44,7 @@ import { ModerationSlaService } from './moderation-sla.service.js'
     ModerationQueueController,
     ModerationDecisionsController,
     ModerationSlaController,
+    ModerationHistoryController,
   ],
   providers: [
     ModerationService,
@@ -51,6 +55,8 @@ import { ModerationSlaService } from './moderation-sla.service.js'
     ModerationSanctionsService,
     ModerationAfterCommit,
     ModerationSlaService,
+    ModerationHistoryRepository,
+    ModerationHistoryService,
     { provide: MODERATION_QUEUE_CLOCK, useValue: systemModerationQueueClock },
     RequestAuthGuard,
     RolesGuard,
@@ -63,7 +69,8 @@ export class ModerationModule implements NestModule {
       .forRoutes(
         ModerationQueueController,
         ModerationDecisionsController,
-        ModerationSlaController
+        ModerationSlaController,
+        ModerationHistoryController
       )
   }
 }

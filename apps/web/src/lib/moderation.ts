@@ -12,6 +12,9 @@ import {
   moderationDecisionDetailSchema,
   moderationDecisionErrorCodeSchema,
   moderationDecisionResponseSchema,
+  moderationEvidenceAvailabilityResponseSchema,
+  moderationEvidenceBundleSchema,
+  moderationHistoryErrorCodeSchema,
   moderationQueueErrorCodeSchema,
   moderationSlaErrorCodeSchema,
   moderationSlaResponseSchema,
@@ -25,6 +28,10 @@ import {
   type ModerationCaseDetail,
   type ModerationCasesPage,
   type ModerationCasesQuery,
+  type ModerationEvidenceAvailability,
+  type ModerationEvidenceBundle,
+  type ModerationEvidenceExportRequest,
+  type ModerationHistoryErrorCode,
   type ModerationSlaErrorCode,
   type ModerationSlaSummary,
 } from '@couture/api-client/contracts/http'
@@ -234,6 +241,100 @@ export async function getModerationSlaFromWeb(
   } catch (error: unknown) {
     throw await moderationError(error)
   }
+}
+
+/** Why an evidence export did not run. Each maps to one localized sentence. */
+export type ModerationEvidenceFailure =
+  | Exclude<ModerationHistoryErrorCode, 'member_not_found' | 'invalid_request'>
+  | 'signed_out'
+  | 'forbidden'
+  | 'rate_limited'
+  | 'unavailable'
+
+export class ModerationEvidenceRequestError extends Error {
+  constructor(readonly failure: ModerationEvidenceFailure) {
+    super(`Moderation evidence export failed (${failure}).`)
+    this.name = 'ModerationEvidenceRequestError'
+  }
+}
+
+async function evidenceError(error: unknown): Promise<ModerationEvidenceRequestError> {
+  if (error instanceof ModerationEvidenceRequestError) return error
+  if (error instanceof ModerationRequestError && error.reason === 'signed_out')
+    return new ModerationEvidenceRequestError('signed_out')
+  if (!(error instanceof ResponseError))
+    return new ModerationEvidenceRequestError('unavailable')
+  const { status } = error.response
+  let code: unknown = null
+  try {
+    code = ((await error.response.clone().json()) as { code?: unknown } | null)?.code
+  } catch {
+    // A body that is not ours falls through to the status.
+  }
+  const parsed = moderationHistoryErrorCodeSchema.safeParse(code)
+  if (
+    parsed.success &&
+    parsed.data !== 'member_not_found' &&
+    parsed.data !== 'invalid_request'
+  )
+    return new ModerationEvidenceRequestError(parsed.data)
+  if (status === 401) return new ModerationEvidenceRequestError('signed_out')
+  if (status === 403) return new ModerationEvidenceRequestError('forbidden')
+  if (status === 429) return new ModerationEvidenceRequestError('rate_limited')
+  return new ModerationEvidenceRequestError('unavailable')
+}
+
+/** Whether to offer the controls. A failure of any kind reads as off, because the route refuses anyway. */
+export async function getModerationEvidenceAvailabilityFromWeb(
+  signal?: AbortSignal
+): Promise<ModerationEvidenceAvailability | null> {
+  try {
+    const response = await createWebApiClient({
+      accessToken: readAccessToken(),
+    }).getModerationEvidenceAvailability({ signal })
+    return parseTolerant(moderationEvidenceAvailabilityResponseSchema, response).data
+  } catch {
+    return null
+  }
+}
+
+export interface ModerationEvidenceFile {
+  bundle: ModerationEvidenceBundle
+  /** The response bytes as sent, so the saved file is exactly what the audit row's digest describes. */
+  text: string
+  /** Built from `exportId`, because CORS hides `Content-Disposition` from a cross-origin read. */
+  fileName: string
+}
+
+/** One call is one export and one audit row on the server, so nothing here retries by itself. */
+export async function exportModerationEvidenceFromWeb(
+  request: ModerationEvidenceExportRequest
+): Promise<ModerationEvidenceFile> {
+  try {
+    const response = await createWebApiClient({
+      accessToken: readAccessToken(),
+    }).exportModerationEvidenceRaw({ exportModerationEvidenceRequest: request })
+    const text = await response.raw.text()
+    const bundle = moderationEvidenceBundleSchema.parse(JSON.parse(text))
+    return {
+      bundle,
+      text,
+      fileName: `moderation-evidence-${bundle.exportId}.json`,
+    }
+  } catch (error: unknown) {
+    throw await evidenceError(error)
+  }
+}
+
+export function saveModerationEvidenceFile(file: ModerationEvidenceFile): void {
+  const url = URL.createObjectURL(new Blob([file.text], { type: 'application/json' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = file.fileName
+  document.body.append(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 /** Why a decision or an appeal step did not apply. `offline` is a request that never got an answer. */

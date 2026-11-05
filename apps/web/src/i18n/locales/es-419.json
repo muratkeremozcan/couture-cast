@@ -1030,7 +1030,8 @@
       "noPriorActions": "Sin acciones previas.",
       "firstDecision": "Primera decisión: {{when}}",
       "escalated": "Este caso está a la espera de un administrador. Solo un administrador puede cerrarlo.",
-      "reporterScreening": "Revisión automática"
+      "reporterScreening": "Revisión automática",
+      "reasonRemoved": "Motivo eliminado por el borrado"
     },
     "action": {
       "flagged": "Marcado por la revisión automática",
@@ -1174,6 +1175,35 @@
       "author_deleted": "Eliminado por el autor",
       "erased": "Borrado",
       "unknown": "Otro estado"
+    },
+    "evidence": {
+      "link": "Exportar evidencia",
+      "title": "Exportar evidencia",
+      "subtitle": "Descarga el registro de moderación de un período, como archivo JSON para una revisión de cumplimiento.",
+      "caseTitle": "Evidencia",
+      "caseHelp": "Descarga el registro de moderación de este caso como archivo JSON. Cada exportación queda registrada.",
+      "exportCase": "Exportar evidencia",
+      "exportRange": "Exportar período",
+      "working": "Preparando el archivo de evidencia",
+      "done": "Archivo de evidencia descargado: {{decisions}} decisiones, {{reports}} reportes, {{auditEvents}} eventos de auditoría, {{alerts}} alertas.",
+      "withheld": "{{count}} decisiones omitidas porque escribiste o reportaste esos casos.",
+      "digest": "Resumen SHA-256:",
+      "to": "Hasta (UTC)",
+      "rangeHelp": "Días UTC completos, hasta 90 días. Cada exportación queda registrada.",
+      "from": "Desde (UTC)",
+      "failure": {
+        "moderation_history_disabled": "La exportación de evidencia está desactivada.",
+        "admin_required": "Solo un administrador puede exportar un período.",
+        "self_review_refused": "Escribiste este contenido o presentaste uno de sus reportes, así que otra persona moderadora debe exportarlo.",
+        "case_not_found": "Este caso ya no existe. Pudo cambiar de identificador tras un borrado.",
+        "invalid_range": "Elige una fecha de inicio y una de fin, con hasta 90 días de diferencia.",
+        "export_too_large": "Esta exportación es demasiado grande. Elige un período más corto.",
+        "audit_unavailable": "No se pudo registrar la exportación, así que no se descargó nada. Inténtalo de nuevo.",
+        "signed_out": "Inicia sesión de nuevo para continuar.",
+        "forbidden": "Esta cuenta no puede exportar evidencia.",
+        "rate_limited": "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo.",
+        "unavailable": "La exportación no está disponible. Inténtalo de nuevo."
+      }
     }
   }
 }

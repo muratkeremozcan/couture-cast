@@ -165,6 +165,12 @@ const FEATURE_FLAG_DEFINITIONS = {
     kind: 'boolean',
     defaultValue: false,
   },
+  // Story 6.13: the erasure route, the evidence export and the alert prune. Off in production by the same
+  // reasoning as the console. The append-only enforcement is a migration and has no flag on purpose.
+  moderation_history_enabled: {
+    kind: 'boolean',
+    defaultValue: false,
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<FeatureFlagStoredValue>>
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAG_DEFINITIONS

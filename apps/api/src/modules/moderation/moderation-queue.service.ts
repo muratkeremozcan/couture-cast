@@ -293,6 +293,7 @@ export class ModerationQueueService {
         actorKind: action.actorKind,
         action: clamp(action.action, 64) ?? 'unknown',
         reason: clamp(action.reason, OPERATOR_NOTE_MAX),
+        reasonRemoved: action.reasonRemoved,
         occurredAt: action.occurredAt.toISOString(),
       })),
       viewerConflict:

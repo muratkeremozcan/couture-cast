@@ -17,6 +17,7 @@ import { createWorkerProcessState, performShutdown, startWorkers } from './boots
 
 const harness = vi.hoisted(() => ({
   registerModerationSlaScheduler: vi.fn().mockResolvedValue(undefined),
+  registerModerationHistoryScheduler: vi.fn().mockResolvedValue(undefined),
   initializeOpenTelemetry: vi.fn(() => false),
   shutdownOpenTelemetry: vi.fn().mockResolvedValue(undefined),
   exit: vi.fn(),
@@ -90,7 +91,9 @@ vi.mock('../modules/weather/weather-scheduler', () => ({
 vi.mock('./maintenance.scheduler', () => ({
   registerMaintenanceSchedulers: vi.fn().mockResolvedValue(undefined),
   registerModerationSlaScheduler: harness.registerModerationSlaScheduler,
+  registerModerationHistoryScheduler: harness.registerModerationHistoryScheduler,
   MODERATION_SLA_SWEEP_JOB_NAME: 'moderation-sla-sweep',
+  MODERATION_HISTORY_RETENTION_JOB_NAME: 'moderation-history-retention',
 }))
 
 vi.mock('../instrumentation', () => ({

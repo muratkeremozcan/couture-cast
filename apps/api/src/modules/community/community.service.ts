@@ -97,6 +97,8 @@ import {
   isPubliclyVisiblePost,
   type ChallengeRowWithZone,
   type CommunityChallengeWriteData,
+  type CommunityAccountErasure,
+  type CommunityErasureOperator,
 } from './community.repository.js'
 
 export interface GetFeedParams {
@@ -1431,58 +1433,49 @@ export class CommunityService {
   /**
    * Marks every piece of a member's community content for erasure.
    *
-   * THIS METHOD IS DELIBERATELY UNCALLED. It is not a producer defect and it has
-   * been re-filed as one enough times to be worth stating outright.
+   * Story 6.13: its one production caller is the admin route
+   * `POST /api/v1/moderation/erasure-requests`, which acts on a request received
+   * through support. Identity leaves moderation records in this transaction, and
+   * `CommunityMaintenanceService.sweepErasureRequests` finishes the rest within
+   * 72 hours.
    *
-   * There is no account-deletion flow anywhere in `apps/api` to call it. Every
-   * `@Delete` route in the codebase is resource-scoped — a garment, a capsule, a
-   * saved location, a palette, My Form — and there is no user deletion, no GDPR
-   * erasure endpoint and no maintenance job that erases an account.
-   * (`premium-entitlement.service.ts:145` records the same absence about its own
-   * hook point.) Building one here would mean inventing an account-deletion
-   * contract, along with decisions about wardrobe garments, palette insights and
-   * saved locations that belong to whichever story owns that work.
-   *
-   * WHAT WILL CALL IT: the account-deletion flow, when a story builds it. It
-   * calls this to erase the community half, and the two ordering constraints
-   * below are what it has to honour. Writing the community half now means that
-   * flow calls one method instead of rediscovering which columns start the
-   * clock; leaving it out would mean account deletion silently skipping
-   * community content the first time someone wires it up.
-   *
-   * THE OTHER TRIGGER IS LIVE AND MUST STAY. `withdrawPost` schedules erasure
-   * today through `withdrawPostAndRequestErasure`, so the sweep is reachable in
-   * production and this method's absence of a caller does not make the erasure
-   * path dead code.
-   *
-   * TWO ORDERING CONSTRAINTS FOR THAT FUTURE CALLER, both load-bearing:
+   * There is still no member self-service account deletion, and no flow deletes
+   * the `User` row. (`premium-entitlement.service.ts:145` records the same absence
+   * about its own hook point.) That story owns wardrobe, billing and the `User`
+   * row, and it has two ordering constraints, both load-bearing:
    *
    *   1. Call this BEFORE deleting the `User` row. `LookbookPost.user_id` is
    *      `onDelete: Cascade`, so deleting the user first drops the very rows
    *      that name the storage objects, and those objects then leak with nothing
    *      left in the database pointing at them.
-   *   2. Do not delete the `User` row until the sweep has stamped
-   *      `objects_purged_at` on the marked rows. This method starts a deletion;
-   *      `CommunityMaintenanceService.sweepErasureRequests` completes it, and it
-   *      needs the rows to still exist to do so.
+   *   2. Do not delete the `User` row until the request has `completed_at`. This
+   *      method starts a deletion, and the sweep needs the rows to still exist to
+   *      finish it.
    *
-   * It deliberately does not touch `CommunityAlias`. The alias is the pseudonym
-   * an orphaned report is still attributed to after erasure nulls `post_id`, so
-   * dropping it would destroy the moderation trail the erasure design keeps on
-   * purpose.
+   * THE OTHER TRIGGER IS LIVE AND MUST STAY. `withdrawPost` schedules erasure of
+   * one post through `withdrawPostAndRequestErasure`. It creates no request row and
+   * keeps that post's moderation evidence.
    */
-  async requestAccountContentErasure(userId: string): Promise<{ postsMarked: number }> {
-    const postsMarked = await this.repository.requestErasureForUser(userId, new Date())
+  async requestAccountContentErasure(
+    userId: string,
+    operator?: CommunityErasureOperator
+  ): Promise<CommunityAccountErasure> {
+    const erasure = await this.repository.requestAccountErasure(
+      userId,
+      new Date(),
+      operator
+    )
 
     this.logger.log(
       {
         event: 'community_account_erasure_requested',
-        postsMarked,
+        postsMarked: erasure.postsMarked,
+        replayed: erasure.replayed,
       },
       'Marked community content for erasure following an account erasure request'
     )
 
-    return { postsMarked }
+    return erasure
   }
 
   async createChallenge(

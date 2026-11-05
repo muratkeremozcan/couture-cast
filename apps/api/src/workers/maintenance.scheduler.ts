@@ -119,3 +119,21 @@ export async function registerModerationSlaScheduler(
     { name: MODERATION_SLA_SWEEP_JOB_NAME, data: {} }
   )
 }
+
+/**
+ * Story 6.13: the alert prune and enforcement drift check, daily. The hosted community worker does not
+ * subscribe to this queue, so it runs the same function at boot and on an interval.
+ */
+export const MODERATION_HISTORY_RETENTION_JOB_NAME = 'moderation-history-retention'
+export const MODERATION_HISTORY_RETENTION_CRON_PATTERN = '25 3 * * *'
+
+/** Keyed on the scheduler id, so each worker start updates the one scheduler. */
+export async function registerModerationHistoryScheduler(
+  queue: MaintenanceSchedulerQueue
+): Promise<void> {
+  await queue.upsertJobScheduler(
+    MODERATION_HISTORY_RETENTION_JOB_NAME,
+    { pattern: MODERATION_HISTORY_RETENTION_CRON_PATTERN },
+    { name: MODERATION_HISTORY_RETENTION_JOB_NAME, data: {} }
+  )
+}

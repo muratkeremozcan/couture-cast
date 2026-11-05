@@ -1030,7 +1030,8 @@
       "noPriorActions": "Önceki işlem yok.",
       "firstDecision": "İlk karar: {{when}}",
       "escalated": "Bu vaka bir yöneticiyi bekliyor. Yalnızca bir yönetici kapatabilir.",
-      "reporterScreening": "Otomatik tarama"
+      "reporterScreening": "Otomatik tarama",
+      "reasonRemoved": "Gerekçe silme işlemiyle kaldırıldı"
     },
     "action": {
       "flagged": "Tarama tarafından işaretlendi",
@@ -1174,6 +1175,35 @@
       "author_deleted": "Yazar tarafından silindi",
       "erased": "Silindi",
       "unknown": "Diğer durum"
+    },
+    "evidence": {
+      "link": "Kanıt dışa aktarma",
+      "title": "Kanıt dışa aktarma",
+      "subtitle": "Bir dönemin moderasyon kaydını uyumluluk incelemesi için JSON dosyası olarak indirin.",
+      "caseTitle": "Kanıt",
+      "caseHelp": "Bu vakanın moderasyon kaydını JSON dosyası olarak indirin. Her dışa aktarma kaydedilir.",
+      "exportCase": "Kanıtı dışa aktar",
+      "exportRange": "Dönemi dışa aktar",
+      "working": "Kanıt dosyası hazırlanıyor",
+      "done": "Kanıt dosyası indirildi: {{decisions}} karar, {{reports}} bildirim, {{auditEvents}} denetim olayı, {{alerts}} uyarı.",
+      "withheld": "Bu vakaları siz yazdığınız veya bildirdiğiniz için {{count}} karar çıkarıldı.",
+      "digest": "SHA-256 özeti:",
+      "to": "Bitiş (UTC)",
+      "rangeHelp": "Tam UTC günleri, en fazla 90 gün. Her dışa aktarma kaydedilir.",
+      "from": "Başlangıç (UTC)",
+      "failure": {
+        "moderation_history_disabled": "Kanıt dışa aktarma kapalı.",
+        "admin_required": "Bir dönemi yalnızca yönetici dışa aktarabilir.",
+        "self_review_refused": "Bu içeriği siz yazdınız veya bildirimlerinden birini siz yaptınız, bu nedenle başka bir moderatör dışa aktarmalı.",
+        "case_not_found": "Bu vaka artık yok. Silme işleminden sonra kimliği değişmiş olabilir.",
+        "invalid_range": "En fazla 90 gün arayla bir başlangıç ve bitiş tarihi seçin.",
+        "export_too_large": "Bu dışa aktarma çok büyük. Daha kısa bir dönem seçin.",
+        "audit_unavailable": "Dışa aktarma kaydedilemedi, bu nedenle hiçbir şey indirilmedi. Yeniden deneyin.",
+        "signed_out": "Devam etmek için yeniden oturum açın.",
+        "forbidden": "Bu hesap kanıt dışa aktaramaz.",
+        "rate_limited": "Çok fazla istek. Biraz bekleyin ve yeniden deneyin.",
+        "unavailable": "Dışa aktarma kullanılamıyor. Yeniden deneyin."
+      }
     }
   }
 }

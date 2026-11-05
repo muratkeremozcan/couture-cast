@@ -322,6 +322,9 @@ export class ModerationDecisionsService {
       target: decisionCaseTargetState(loaded),
       subjectBan: state.subjectBan,
       authorEligible: await this.authorEligible(tx, loaded),
+      subjectErasureRequested: subject
+        ? await this.repository.hasErasureRequest(tx, subject)
+        : false,
       writesOpen: state.writesOpen,
     }
   }
@@ -574,7 +577,9 @@ export class ModerationDecisionsService {
     }
   ): Promise<void> {
     const { decisionId, sanctionId, caseId, input, loaded, at } = params
-    const subject = decisionCaseSubject(loaded)
+    const author = decisionCaseSubject(loaded)
+    const subject =
+      author && !(await this.repository.hasErasureRequest(tx, author)) ? author : null
     const subjectAlias = await this.repository.subjectAlias(tx, loaded)
     await writeModerationRecord(() =>
       this.repository.insertDecision(tx, {

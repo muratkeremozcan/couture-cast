@@ -1030,7 +1030,8 @@
       "noPriorActions": "Nessuna azione precedente.",
       "firstDecision": "Prima decisione: {{when}}",
       "escalated": "Questo caso è in attesa di un amministratore. Solo un amministratore può chiuderlo.",
-      "reporterScreening": "Controllo automatico"
+      "reporterScreening": "Controllo automatico",
+      "reasonRemoved": "Motivo rimosso dalla cancellazione"
     },
     "action": {
       "flagged": "Segnalato dal controllo automatico",
@@ -1174,6 +1175,35 @@
       "author_deleted": "Eliminato dall'autore",
       "erased": "Cancellato",
       "unknown": "Altro stato"
+    },
+    "evidence": {
+      "link": "Esporta prove",
+      "title": "Esporta prove",
+      "subtitle": "Scarica il registro di moderazione di un periodo, come file JSON per una verifica di conformità.",
+      "caseTitle": "Prove",
+      "caseHelp": "Scarica il registro di moderazione di questo caso come file JSON. Ogni esportazione viene registrata.",
+      "exportCase": "Esporta prove",
+      "exportRange": "Esporta periodo",
+      "working": "Preparazione del file delle prove",
+      "done": "File delle prove scaricato: {{decisions}} decisioni, {{reports}} segnalazioni, {{auditEvents}} eventi di audit, {{alerts}} avvisi.",
+      "withheld": "{{count}} decisioni omesse perché hai scritto o segnalato quei casi.",
+      "digest": "Impronta SHA-256:",
+      "to": "Al (UTC)",
+      "rangeHelp": "Giorni UTC interi, fino a 90 giorni. Ogni esportazione viene registrata.",
+      "from": "Dal (UTC)",
+      "failure": {
+        "moderation_history_disabled": "L'esportazione delle prove è disattivata.",
+        "admin_required": "Solo un amministratore può esportare un periodo.",
+        "self_review_refused": "Hai scritto questo contenuto o inviato una delle sue segnalazioni, quindi deve esportarlo un'altra persona.",
+        "case_not_found": "Questo caso non esiste più. Il suo identificatore può essere cambiato dopo una cancellazione.",
+        "invalid_range": "Scegli una data di inizio e una di fine, a non più di 90 giorni di distanza.",
+        "export_too_large": "Questa esportazione è troppo grande. Scegli un periodo più breve.",
+        "audit_unavailable": "L'esportazione non è stata registrata, quindi non è stato scaricato nulla. Riprova.",
+        "signed_out": "Accedi di nuovo per continuare.",
+        "forbidden": "Questo account non può esportare prove.",
+        "rate_limited": "Troppe richieste. Attendi un momento, poi riprova.",
+        "unavailable": "L'esportazione non è disponibile. Riprova."
+      }
     }
   }
 }

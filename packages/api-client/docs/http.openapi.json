@@ -18243,6 +18243,9 @@
                       ],
                       "maxLength": 2000
                     },
+                    "reasonRemoved": {
+                      "type": "boolean"
+                    },
                     "occurredAt": {
                       "type": "string",
                       "format": "date-time"
@@ -18252,6 +18255,7 @@
                     "actorKind",
                     "action",
                     "reason",
+                    "reasonRemoved",
                     "occurredAt"
                   ],
                   "additionalProperties": false
@@ -18548,7 +18552,7 @@
                 "type": "string",
                 "minLength": 3,
                 "maxLength": 1000,
-                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18580,7 +18584,7 @@
                 "type": "string",
                 "minLength": 3,
                 "maxLength": 1000,
-                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18612,7 +18616,7 @@
                 "type": "string",
                 "minLength": 3,
                 "maxLength": 1000,
-                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18644,7 +18648,7 @@
                 "type": "string",
                 "minLength": 3,
                 "maxLength": 1000,
-                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18676,7 +18680,7 @@
                 "type": "string",
                 "minLength": 3,
                 "maxLength": 1000,
-                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
               },
               "mutationId": {
                 "type": "string",
@@ -18947,7 +18951,7 @@
             "type": "string",
             "minLength": 3,
             "maxLength": 1000,
-            "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+            "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
           },
           "mutationId": {
             "type": "string",
@@ -19426,6 +19430,550 @@
           "statusCode",
           "code",
           "message"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationErasureRequest": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "memberId"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationErasureResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "requestId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "requestedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "deadlineAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "replayed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "requestId",
+              "requestedAt",
+              "deadlineAt",
+              "replayed"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationEvidenceExportRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "case"
+                ]
+              },
+              "caseId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+              }
+            },
+            "required": [
+              "scope",
+              "caseId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "range"
+                ]
+              },
+              "from": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "to": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "scope",
+              "from",
+              "to"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ModerationEvidenceBundle": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "number",
+            "enum": [
+              1
+            ]
+          },
+          "exportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scope": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "case"
+                    ]
+                  },
+                  "caseId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+                  }
+                },
+                "required": [
+                  "scope",
+                  "caseId"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "range"
+                    ]
+                  },
+                  "from": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "to": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "scope",
+                  "from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "decisions": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reports": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "auditEvents": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "alerts": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "withheldForConflict": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "decisions",
+              "reports",
+              "auditEvents",
+              "alerts",
+              "withheldForConflict"
+            ],
+            "additionalProperties": false
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "decisionId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "caseId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+                },
+                "sequence": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "post",
+                    "comment"
+                  ]
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "resolve",
+                    "release",
+                    "takedown",
+                    "escalate",
+                    "ban",
+                    "appeal_requested",
+                    "appeal_upheld",
+                    "appeal_overturned"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 2000
+                },
+                "reasonRemoved": {
+                  "type": "boolean"
+                },
+                "moderatorId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "moderatorRole": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32
+                },
+                "subjectAlias": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 128
+                },
+                "isTerminal": {
+                  "type": "boolean"
+                },
+                "decidedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "anonymizedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "decisionId",
+                "caseId",
+                "sequence",
+                "source",
+                "action",
+                "reason",
+                "reasonRemoved",
+                "moderatorId",
+                "moderatorRole",
+                "subjectAlias",
+                "isTerminal",
+                "decidedAt",
+                "anonymizedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "reportId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "post",
+                    "comment"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "origin": {
+                  "type": "string",
+                  "enum": [
+                    "member",
+                    "screening"
+                  ]
+                },
+                "reporterState": {
+                  "type": "string",
+                  "enum": [
+                    "member",
+                    "screening",
+                    "erased"
+                  ]
+                },
+                "acceptedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "dueAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "resolvedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "reportId",
+                "source",
+                "reason",
+                "origin",
+                "reporterState",
+                "acceptedAt",
+                "dueAt",
+                "resolvedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "auditEvents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "eventType": {
+                  "type": "string",
+                  "enum": [
+                    "moderation_decision_applied",
+                    "moderation_appeal_recorded",
+                    "moderation_case_viewed"
+                  ]
+                },
+                "occurredAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "actorId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "role": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1,
+                  "maxLength": 32
+                },
+                "action": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "required": [
+                "eventType",
+                "occurredAt",
+                "actorId",
+                "role",
+                "action"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "alerts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "at_risk",
+                    "breached",
+                    "escalated"
+                  ]
+                },
+                "delivery": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "delivered",
+                    "console_only",
+                    "superseded"
+                  ]
+                },
+                "slaDueAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "detectedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "deliveredAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "kind",
+                "delivery",
+                "slaDueAt",
+                "detectedAt",
+                "deliveredAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "exportId",
+          "generatedAt",
+          "scope",
+          "sha256",
+          "counts",
+          "decisions",
+          "reports",
+          "auditEvents",
+          "alerts"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationHistoryError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "moderation_history_disabled",
+              "admin_required",
+              "self_review_refused",
+              "member_not_found",
+              "case_not_found",
+              "invalid_request",
+              "invalid_range",
+              "export_too_large",
+              "audit_unavailable"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "ModerationEvidenceAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "rangeExport": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "rangeExport"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
         ],
         "additionalProperties": false
       },
@@ -30769,6 +31317,9 @@
                                 ],
                                 "maxLength": 2000
                               },
+                              "reasonRemoved": {
+                                "type": "boolean"
+                              },
                               "occurredAt": {
                                 "type": "string",
                                 "format": "date-time"
@@ -30778,6 +31329,7 @@
                               "actorKind",
                               "action",
                               "reason",
+                              "reasonRemoved",
                               "occurredAt"
                             ],
                             "additionalProperties": false
@@ -31158,7 +31710,7 @@
                         "type": "string",
                         "minLength": 3,
                         "maxLength": 1000,
-                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -31190,7 +31742,7 @@
                         "type": "string",
                         "minLength": 3,
                         "maxLength": 1000,
-                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -31222,7 +31774,7 @@
                         "type": "string",
                         "minLength": 3,
                         "maxLength": 1000,
-                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -31254,7 +31806,7 @@
                         "type": "string",
                         "minLength": 3,
                         "maxLength": 1000,
-                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -31286,7 +31838,7 @@
                         "type": "string",
                         "minLength": 3,
                         "maxLength": 1000,
-                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                        "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
                       },
                       "mutationId": {
                         "type": "string",
@@ -31908,7 +32460,7 @@
                     "type": "string",
                     "minLength": 3,
                     "maxLength": 1000,
-                    "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused."
+                    "description": "Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused."
                   },
                   "mutationId": {
                     "type": "string",
@@ -32675,6 +33227,1050 @@
                       "type": "string",
                       "enum": [
                         "moderation_sla_disabled"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/moderation/erasure-requests": {
+      "post": {
+        "operationId": "requestModerationErasure",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Start the account erasure of community and moderation data (private, no-store)",
+        "description": "Admin only. Identity leaves moderation records in the same transaction, and the rest completes within 72 hours. A repeat returns the first request and never moves the clock.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "memberId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "memberId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The member already had a request, which is returned unchanged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "requestedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "deadlineAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "replayed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "requestedAt",
+                        "deadlineAt",
+                        "replayed"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The request was recorded and identity removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "requestedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "deadlineAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "replayed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "requestedAt",
+                        "deadlineAt",
+                        "replayed"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "moderation_history_disabled",
+                        "admin_required",
+                        "self_review_refused",
+                        "member_not_found",
+                        "case_not_found",
+                        "invalid_request",
+                        "invalid_range",
+                        "export_too_large",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient role or admin_required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "moderation_history_disabled",
+                        "admin_required",
+                        "self_review_refused",
+                        "member_not_found",
+                        "case_not_found",
+                        "invalid_request",
+                        "invalid_range",
+                        "export_too_large",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "member_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "moderation_history_disabled",
+                        "admin_required",
+                        "self_review_refused",
+                        "member_not_found",
+                        "case_not_found",
+                        "invalid_request",
+                        "invalid_range",
+                        "export_too_large",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "moderation_history_disabled or audit_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "moderation_history_disabled",
+                        "admin_required",
+                        "self_review_refused",
+                        "member_not_found",
+                        "case_not_found",
+                        "invalid_request",
+                        "invalid_range",
+                        "export_too_large",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/moderation/evidence-exports/availability": {
+      "get": {
+        "operationId": "getModerationEvidenceAvailability",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Whether the console offers evidence export to this viewer (private, no-store)",
+        "description": "Moderator and admin only. Answers 503 while the feature is off.",
+        "responses": {
+          "200": {
+            "description": "What this viewer may export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "rangeExport": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "rangeExport"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient role"
+          },
+          "503": {
+            "description": "moderation_history_disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "moderation_history_disabled",
+                        "admin_required",
+                        "self_review_refused",
+                        "member_not_found",
+                        "case_not_found",
+                        "invalid_request",
+                        "invalid_range",
+                        "export_too_large",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/moderation/evidence-exports": {
+      "post": {
+        "operationId": "exportModerationEvidence",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Download a moderation evidence bundle (private, no-store)",
+        "description": "A moderator or admin exports one case, and an admin alone exports a period. POST because each export writes one audit row in the transaction that reads the bundle.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "scope": {
+                        "type": "string",
+                        "enum": [
+                          "case"
+                        ]
+                      },
+                      "caseId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160,
+                        "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+                      }
+                    },
+                    "required": [
+                      "scope",
+                      "caseId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "scope": {
+                        "type": "string",
+                        "enum": [
+                          "range"
+                        ]
+                      },
+                      "from": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "to": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "scope",
+                      "from",
+                      "to"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The bundle, as a file attachment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "number",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    "exportId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "generatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "scope": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "scope": {
+                              "type": "string",
+                              "enum": [
+                                "case"
+                              ]
+                            },
+                            "caseId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+                            }
+                          },
+                          "required": [
+                            "scope",
+                            "caseId"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "scope": {
+                              "type": "string",
+                              "enum": [
+                                "range"
+                              ]
+                            },
+                            "from": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "to": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "scope",
+                            "from",
+                            "to"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "decisions": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "reports": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "auditEvents": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "alerts": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "withheldForConflict": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "decisions",
+                        "reports",
+                        "auditEvents",
+                        "alerts",
+                        "withheldForConflict"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "decisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "decisionId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "caseId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160,
+                            "pattern": "^(post|comment|orphan-post|orphan-comment)\\.[A-Za-z0-9_-]+$"
+                          },
+                          "sequence": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "post",
+                              "comment"
+                            ]
+                          },
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "resolve",
+                              "release",
+                              "takedown",
+                              "escalate",
+                              "ban",
+                              "appeal_requested",
+                              "appeal_upheld",
+                              "appeal_overturned"
+                            ]
+                          },
+                          "reason": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 2000
+                          },
+                          "reasonRemoved": {
+                            "type": "boolean"
+                          },
+                          "moderatorId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "moderatorRole": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 32
+                          },
+                          "subjectAlias": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 128
+                          },
+                          "isTerminal": {
+                            "type": "boolean"
+                          },
+                          "decidedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "anonymizedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "decisionId",
+                          "caseId",
+                          "sequence",
+                          "source",
+                          "action",
+                          "reason",
+                          "reasonRemoved",
+                          "moderatorId",
+                          "moderatorRole",
+                          "subjectAlias",
+                          "isTerminal",
+                          "decidedAt",
+                          "anonymizedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "reports": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "reportId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "post",
+                              "comment"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "origin": {
+                            "type": "string",
+                            "enum": [
+                              "member",
+                              "screening"
+                            ]
+                          },
+                          "reporterState": {
+                            "type": "string",
+                            "enum": [
+                              "member",
+                              "screening",
+                              "erased"
+                            ]
+                          },
+                          "acceptedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "dueAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "resolvedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "reportId",
+                          "source",
+                          "reason",
+                          "origin",
+                          "reporterState",
+                          "acceptedAt",
+                          "dueAt",
+                          "resolvedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "auditEvents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "eventType": {
+                            "type": "string",
+                            "enum": [
+                              "moderation_decision_applied",
+                              "moderation_appeal_recorded",
+                              "moderation_case_viewed"
+                            ]
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "actorId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "role": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "minLength": 1,
+                            "maxLength": 32
+                          },
+                          "action": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "eventType",
+                          "occurredAt",
+                          "actorId",
+                          "role",
+                          "action"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "alerts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "at_risk",
+                              "breached",
+                              "escalated"
+                            ]
+                          },
+                          "delivery": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "delivered",
+                              "console_only",
+                              "superseded"
+                            ]
+                          },
+                          "slaDueAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "detectedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "deliveredAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "delivery",
+                          "slaDueAt",
+                          "detectedAt",
+                          "deliveredAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "exportId",
+                    "generatedAt",
+                    "scope",
+                    "sha256",
+                    "counts",
+                    "decisions",
+                    "reports",
+                    "auditEvents",
+                    "alerts"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_request or invalid_range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "moderation_history_disabled",
+                        "admin_required",
+                        "self_review_refused",
+                        "member_not_found",
+                        "case_not_found",
+                        "invalid_request",
+                        "invalid_range",
+                        "export_too_large",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient role, admin_required or self_review_refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "moderation_history_disabled",
+                        "admin_required",
+                        "self_review_refused",
+                        "member_not_found",
+                        "case_not_found",
+                        "invalid_request",
+                        "invalid_range",
+                        "export_too_large",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "case_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "moderation_history_disabled",
+                        "admin_required",
+                        "self_review_refused",
+                        "member_not_found",
+                        "case_not_found",
+                        "invalid_request",
+                        "invalid_range",
+                        "export_too_large",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "export_too_large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "moderation_history_disabled",
+                        "admin_required",
+                        "self_review_refused",
+                        "member_not_found",
+                        "case_not_found",
+                        "invalid_request",
+                        "invalid_range",
+                        "export_too_large",
+                        "audit_unavailable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "moderation_history_disabled or audit_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "moderation_history_disabled",
+                        "admin_required",
+                        "self_review_refused",
+                        "member_not_found",
+                        "case_not_found",
+                        "invalid_request",
+                        "invalid_range",
+                        "export_too_large",
+                        "audit_unavailable"
                       ]
                     },
                     "message": {

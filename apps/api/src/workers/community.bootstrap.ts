@@ -7,6 +7,10 @@ import { FeatureFlagsRepository } from '../modules/feature-flags/feature-flags.r
 import type { Worker } from 'bullmq'
 import { createCommunityWorkerRuntime } from '../modules/community/community-worker-runtime'
 import {
+  createModerationHistoryRetention,
+  MODERATION_HISTORY_RETENTION_INTERVAL_MS,
+} from '../modules/moderation/moderation-history.retention'
+import {
   createModerationSlaSweep,
   MODERATION_SLA_SWEEP_INTERVAL_MS,
 } from '../modules/moderation/moderation-sla.sweep'
@@ -91,10 +95,11 @@ function schedule(
   timers: NodeJS.Timeout[],
   name: string,
   intervalMs: number,
-  sweep: () => Promise<unknown>
+  sweep: () => Promise<unknown>,
+  options: { runAtStart?: boolean } = {}
 ): void {
   let running = false
-  const timer = setInterval(() => {
+  const tick = () => {
     if (running) return
     running = true
     void sweep()
@@ -110,7 +115,9 @@ function schedule(
       .finally(() => {
         running = false
       })
-  }, intervalMs)
+  }
+  if (options.runAtStart) tick()
+  const timer = setInterval(tick, intervalMs)
   timer.unref()
   timers.push(timer)
 }
@@ -144,6 +151,10 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
         prisma,
         flags: runtimeFlags,
         analytics: posthogService,
+      }),
+      moderationHistoryRetention: createModerationHistoryRetention({
+        prisma,
+        flags: runtimeFlags,
       }),
     })
     state.workers.push(community.worker)
@@ -188,6 +199,14 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
       'moderation-sla',
       MODERATION_SLA_SWEEP_INTERVAL_MS,
       community.sweeps.sweepModerationSla
+    )
+    // Story 6.13: daily, and once now, because a worker that restarts daily never reaches the interval.
+    schedule(
+      state.timers,
+      'moderation-history-retention',
+      MODERATION_HISTORY_RETENTION_INTERVAL_MS,
+      community.sweeps.sweepModerationHistoryRetention,
+      { runAtStart: true }
     )
 
     logger.info(

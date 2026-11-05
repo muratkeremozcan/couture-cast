@@ -254,6 +254,12 @@ export const createService = (
   const updatePost = vi.fn().mockResolvedValue(ownPendingPost)
   const withdrawPostAndRequestErasure = vi.fn().mockResolvedValue(undefined)
   const requestErasureForUser = vi.fn().mockResolvedValue(2)
+  const requestAccountErasure = vi.fn().mockResolvedValue({
+    postsMarked: 2,
+    requestId: 'erasure-request-1',
+    requestedAt: new Date('2026-11-05T00:00:00.000Z'),
+    replayed: false,
+  })
   const publishWithinQuota = vi.fn().mockImplementation(
     ({
       postId,
@@ -357,6 +363,7 @@ export const createService = (
     updatePost,
     withdrawPostAndRequestErasure,
     requestErasureForUser,
+    requestAccountErasure,
     publishWithinQuota,
     recordReport,
     findChallengeById,
@@ -435,6 +442,7 @@ export const createService = (
     updatePost,
     withdrawPostAndRequestErasure,
     requestErasureForUser,
+    requestAccountErasure,
     publishWithinQuota,
     recordReport,
     findChallengeById,

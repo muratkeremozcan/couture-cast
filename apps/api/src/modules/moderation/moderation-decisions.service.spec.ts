@@ -317,6 +317,9 @@ function build(seed: Seed = {}) {
         return Promise.resolve({ count: 1 })
       }),
     },
+    moderationErasureRequest: {
+      findUnique: vi.fn(() => Promise.resolve(null)),
+    },
     communityAlias: {
       findUnique: vi.fn(() => Promise.resolve({ alias: ALIAS })),
     },

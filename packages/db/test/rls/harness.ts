@@ -108,6 +108,8 @@ export const workerOnlyTables = [
   'CommunityPostSponsorship',
   // Story 6.11: moderation decisions and community sanctions, API-only like the queue they serve.
   'ModerationDecision',
+  // Story 6.13: the erasure request record, API-only like the decisions it anonymizes.
+  'ModerationErasureRequest',
   'CommunitySanction',
 ] as const
 
