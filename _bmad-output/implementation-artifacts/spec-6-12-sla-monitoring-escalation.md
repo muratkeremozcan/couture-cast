@@ -199,7 +199,7 @@ Verified against `main` at `3efd8423`.
 - [x] `deployment-guide.md`, `deferred-work.md`: the hosted worker correction, a 6.12 rollout section, Concrete gaps, BH18. D3, D14.
 - [x] `pact/http/consumer/interactions/moderation.ts`, `web-api-client.pacttest.ts`, `provider/state-handlers.ts`, `provider/doubles/moderation.ts`: summary, 403, 503.
 - [x] `playwright/tests/moderation-sla.spec.ts` (new), `api/auth-moderation-security.spec.ts`: role matrix, seeded states, stale banner, light and dark, 375 and 1280 widths, axe, real delivery.
-- [x] `playwright/support/moderation-ops-capture.mjs` (new) as a second `webServer` in `playwright/config/local.config.ts`, answering `/__admin/requests` on loopback. `scripts/start-api-e2e-with-workers.mjs` forces `MODERATION_OPS_WEBHOOK_URL` to it and adds the key to `E2E_CALLER_OWNED_ENV_KEYS`, so a value in `.env.local` can never receive test data (TEA-14).
+- [x] `playwright/support/moderation-ops-capture.mjs` (new), answering `/__admin/requests` on loopback. `scripts/start-api-e2e-with-workers.mjs` starts it before anything that can send an alert, forces `MODERATION_OPS_WEBHOOK_URL` to it and adds the key to `E2E_CALLER_OWNED_ENV_KEYS`, so a value in `.env.local` can never receive test data (TEA-14).
 - [x] Tests per the Test Design (TEA) section, written first against the contract and watched fail. Matrix edge cases are covered by unit and integration specs. `apps/api/integration/moderation-sla{,-concurrency,-delivery,-escalate,-route}.integration.spec.ts` and `support/moderation-sla-crash-worker.mjs` run real Postgres and a real local HTTP server.
 
 **Acceptance Criteria:**
@@ -255,7 +255,7 @@ Known limits recorded by TEA: a sweep that alerts before the first 60-second met
 
 Process note: `f126fa28` was committed with `--no-verify` by mistake. Prettier and eslint were then run by hand on its files, and the one finding was fixed in `0bc10229`.
 
-Ship state (update on every step, so a compaction costs nothing): Codex round 2 minors R2-1 and R2-2 fixed at `3e1e680b`, node-test-gate green there, TEA's rendered R2-2 check passed in Grafana. Then push, PR ready for review against main, report `cc612-builder pr <url>`, own CodeRabbit and CI, set spec and sprint-status to done before the last push, report `cc612-builder green <sha>` with the head the last CodeRabbit review covered. Never merge. Never use --no-verify.
+Ship state (update on every step, so a compaction costs nothing): Codex round 2 minors R2-1 and R2-2 fixed at `3e1e680b`, TEA's rendered R2-2 check passed in Grafana, PR 196 open. CI on `d64891aa` failed Lighthouse and burn-in on `playwright-config-secrets.spec.ts`, because a second `webServer` entry made the config an array and dropped the restricted config's evidence mode; `ef837ed8` moves the capture server into the launcher, which returns the Playwright config to main and the diff to 99 files. Then push, PR ready for review against main, report `cc612-builder pr <url>`, own CodeRabbit and CI, set spec and sprint-status to done before the last push, report `cc612-builder green <sha>` with the head the last CodeRabbit review covered. Never merge. Never use --no-verify.
 
 Open at hand-off, by design: D8 production destination, D13 hosted Grafana, D16 staffing coverage.
 
@@ -280,7 +280,7 @@ Full evidence is in `_bmad-output/test-artifacts/test-design/cc612-sla-monitorin
 - TEA-11 D6, D8. Relevance runs before the channel check. `console_only` is terminal, and setting a URL later replays nothing.
 - TEA-12 Design Notes. The hosted worker has no `APP_URL`. `caseUrl` is nullable, with null when neither variable is set, and `text` uses the path.
 - TEA-13 Boundaries. The sweep returns integer counts only, because `run` logs the result.
-- TEA-14 Tasks. A live sweep runs during local Playwright. A capture script is the second `webServer`, the launcher owns `MODERATION_OPS_WEBHOOK_URL`, and assertions scope to seeded ids.
+- TEA-14 Tasks. A live sweep runs during local Playwright. The launcher starts a capture script and owns `MODERATION_OPS_WEBHOOK_URL`, and assertions scope to seeded ids.
 - TEA-15 D2. Every instant in new raw SQL binds as ISO text with a `::timestamp` cast, with no database clock. Why: probe on a Chicago session shows a JS `Date` binds as `timestamptz` and shifts a `timestamp` comparison by 6 hours.
 - TEA-16 Tasks. The runbook gives the `JobFailure` removal SQL, because no delete route exists and the prune job is not hosted.
 - TEA-17 Code Map. The readiness generator and artifacts stay unchanged, because the owner signature binds the payload hash.

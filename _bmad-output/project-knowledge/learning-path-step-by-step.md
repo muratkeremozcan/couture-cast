@@ -9972,8 +9972,8 @@ Web and Playwright tests:
 
 Evidence boundaries:
 
-- **Written before review and merge.**
-  The code and tests are committed on `feat/cc-6-12-sla-monitoring-escalation`, nothing was pushed when this step was written, and no PR job has run.
+- **Written before merge.**
+  The code and tests are on `feat/cc-6-12-sla-monitoring-escalation`, in PR 196.
 - **What ran locally.**
   TEA signed off at `ffdf6473`, with source at `c7a52fad` and tests at `c01a506b`, on three consecutive runs of the whole suites with identical results and no retries.
   Passing per run: `apps/api` 8343 with 38 existing skips, `packages/api-client` 1624, `packages/db` 282 with 1 skip, `packages/config` 31, `apps/web` 1886, the Pact consumer 447 with 1 provider verification, and Playwright 34.
@@ -9989,6 +9989,11 @@ Evidence boundaries:
   Send relevance read the sweep's start time, so a long detection scan could send an `at_risk` alert after the deadline had passed; it now reads a fresh clock at each claim, and detection keeps the sweep time.
   The Measurement age panel used a range query, so it kept showing an old value after samples stopped; it is now an instant query that reads `No samples` when the series is gone.
   TEA then stopped a real worker and read the panels in Grafana: 300 seconds after the series went, the age panel read `No samples` and the four stats read Stale.
+- **CI on PR 196 caught what the local burn-in missed.**
+  The Lighthouse and burn-in jobs run `test:playwright-unit`, which sat outside that burn-in.
+  A second `webServer` entry for the capture server made the Playwright config an array, which failed `playwright-config-secrets.spec.ts` and silently dropped the restricted config's evidence mode.
+  The launcher now starts the capture server, and the Playwright config matches `main`.
+  After that move, `test:playwright-unit` passed 310, `apps/mobile` 1911, `packages/utils` 217 and `packages/testing` 109.
 - **A real stack walk proved delivery to a local endpoint.**
   The launcher ran the built API, the real `community.bootstrap` worker and the web server on the isolated database `cc612_walk`, with a local HTTP capture server as the webhook.
   One report aged across both boundaries and produced `at_risk`, then `breached`.
