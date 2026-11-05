@@ -124,7 +124,14 @@ const exported = [
 
 describe('U-GF-METRICS: couturecast-moderation-sla.json', () => {
   const raw = read('infra/grafana/dashboards/couturecast-moderation-sla.json')
-  const dashboard = JSON.parse(raw) as { panels?: { targets?: { expr?: string }[] }[] }
+  const dashboard = JSON.parse(raw) as {
+    panels?: {
+      title?: string
+      type?: string
+      targets?: { expr?: string; instant?: boolean }[]
+      fieldConfig?: { defaults?: { noValue?: string } }
+    }[]
+  }
   const expressions = (dashboard.panels ?? []).flatMap((panel) =>
     (panel.targets ?? []).map((target) => target.expr ?? '')
   )
@@ -146,6 +153,25 @@ describe('U-GF-METRICS: couturecast-moderation-sla.json', () => {
       expect(expr).toContain(LAST)
       expect(expr).toMatch(/time\(\)\s*-/)
       expect(expr).toMatch(/<\s*300\b/)
+    }
+  })
+
+  it('lets no stat panel on a gauge fall back to an older point in the time range (CX-5)', () => {
+    // Real Grafana on 2026-11-05: with the gate empty, a range query and `lastNotNull` still showed
+    // the last count from before the gate, so a stale zero read as a fresh zero.
+    const stats = (dashboard.panels ?? []).filter(
+      (panel) =>
+        panel.type === 'stat' &&
+        panel.targets?.some((target) =>
+          /moderation_sla_(open_cases|oldest_pending_review_age_seconds)/.test(
+            target.expr ?? ''
+          )
+        )
+    )
+    expect(stats.length).toBeGreaterThan(0)
+    for (const panel of stats) {
+      for (const target of panel.targets ?? []) expect(target.instant).toBe(true)
+      expect(panel.fieldConfig?.defaults?.noValue, panel.title).toBe('Stale')
     }
   })
 
