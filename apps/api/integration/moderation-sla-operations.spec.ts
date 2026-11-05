@@ -128,7 +128,7 @@ describe('U-GF-METRICS: couturecast-moderation-sla.json', () => {
     panels?: {
       title?: string
       type?: string
-      targets?: { expr?: string; instant?: boolean }[]
+      targets?: { expr?: string; instant?: boolean; range?: boolean }[]
       fieldConfig?: { defaults?: { noValue?: string } }
     }[]
   }
@@ -170,7 +170,10 @@ describe('U-GF-METRICS: couturecast-moderation-sla.json', () => {
     )
     expect(stats.length).toBeGreaterThan(0)
     for (const panel of stats) {
-      for (const target of panel.targets ?? []) expect(target.instant).toBe(true)
+      for (const target of panel.targets ?? []) {
+        expect(target.instant).toBe(true)
+        expect(target.range).toBe(false)
+      }
       expect(panel.fieldConfig?.defaults?.noValue, panel.title).toBe('Stale')
     }
   })
