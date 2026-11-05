@@ -54,8 +54,11 @@ function useModerationSla() {
   // Only a refresh someone asked for speaks. A timed refresh changes nothing they did.
   const [manual, setManual] = useState<ManualRefresh>('idle')
   const inFlight = useRef<AbortController | null>(null)
+  // A timed refresh can replace a manual one, so the later load settles what was asked for.
+  const manualPending = useRef(false)
 
   const load = useCallback(async (requested = false) => {
+    if (requested) manualPending.current = true
     inFlight.current?.abort()
     const controller = new AbortController()
     inFlight.current = controller
@@ -66,13 +69,15 @@ function useModerationSla() {
       if (controller.signal.aborted) return
       setSummary(next)
       setFailure(null)
-      if (requested) setManual('refreshed')
+      if (manualPending.current) setManual('refreshed')
+      manualPending.current = false
     } catch (error) {
       if (controller.signal.aborted) return
       const reason = moderationFailureReason(error)
       if (isTerminalFailure(reason)) setSummary(null)
       setFailure(reason)
-      if (requested) setManual('idle')
+      if (manualPending.current) setManual('idle')
+      manualPending.current = false
     } finally {
       if (!controller.signal.aborted) setBusy(false)
     }
@@ -164,7 +169,7 @@ function statusKey(summary: ModerationSlaSummary | null, manual: ManualRefresh):
   if (manual === 'refreshing') return 'moderation.queue.refreshing'
   if (summary && !summary.monitor.lastSweepAt) return 'moderation.sla.monitorNever'
   if (summary?.monitor.stale) return 'moderation.sla.monitorStaleShort'
-  return manual === 'refreshed' ? 'moderation.queue.refreshed' : ''
+  return manual === 'refreshed' ? 'moderation.sla.refreshed' : ''
 }
 
 function SlaHeader({
@@ -448,6 +453,7 @@ function AlertRow({ alert }: { alert: ModerationSlaRecentAlert }) {
       </dl>
       <Link
         href={`/moderation/cases/${encodeURIComponent(alert.caseId)}`}
+        aria-label={`${t('moderation.sla.openCase')}: ${t('moderation.queue.caseRef', { id: alert.caseId })}`}
         aria-describedby={labelId}
         className={`${moderationControl} mt-3 inline-flex items-center`}
       >

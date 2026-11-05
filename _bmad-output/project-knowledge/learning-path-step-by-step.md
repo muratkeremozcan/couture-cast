@@ -9994,6 +9994,11 @@ Evidence boundaries:
   A second `webServer` entry for the capture server made the Playwright config an array, which failed `playwright-config-secrets.spec.ts` and silently dropped the restricted config's evidence mode.
   The launcher now starts the capture server, and the Playwright config matches `main`.
   After that move, `test:playwright-unit` passed 310, `apps/mobile` 1911, `packages/utils` 217 and `packages/testing` 109.
+- **CodeRabbit reviewed `d64891aa` and found 15 items.**
+  The source fixes: the oldest pending age skips posts marked for erasure, a timed refresh settles a manual one it replaced, the refresh announcement has its own count-free string, each `Open case` link names its case, telemetry flushes when a close rejects, and the drill builds shared packages first.
+  Detection now reads 1000 cases a page: 10,000 open breached cases took 9035 ms at 50 a page and 508 ms at 1000, measured on real Postgres.
+  No cap ends the scan, because a case past a cap would never alert.
+  The drill's change has no red test; TEA checked that `prepare:shared-deps` builds `@couture/utils` and `@couture/api-client`.
 - **A real stack walk proved delivery to a local endpoint.**
   The launcher ran the built API, the real `community.bootstrap` worker and the web server on the isolated database `cc612_walk`, with a local HTTP capture server as the webhook.
   One report aged across both boundaries and produced `at_risk`, then `breached`.

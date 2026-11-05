@@ -374,7 +374,13 @@ export class ModerationSlaRepository {
 
   async oldestPendingReviewAt(): Promise<Date | null> {
     const result = await this.prisma.lookbookPost.aggregate({
-      where: { status: 'pending_review' },
+      // A post marked for erasure can no longer be screened or published, so it is not waiting.
+      // Its mark also moves `updated_at`, which would hide an older wait.
+      where: {
+        status: 'pending_review',
+        erasure_requested_at: null,
+        anonymized_at: null,
+      },
       _min: { updated_at: true },
     })
     return result._min.updated_at

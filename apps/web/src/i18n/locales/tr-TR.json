@@ -901,6 +901,7 @@
       "attempts_one": "{{count}} deneme",
       "attempts_other": "{{count}} deneme",
       "openCase": "Vakayı aç",
+      "refreshed": "Yenilendi",
       "alertKind": {
         "at_risk": "Risk altında",
         "breached": "Aşıldı",

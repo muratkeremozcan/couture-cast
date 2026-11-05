@@ -413,15 +413,19 @@ export async function performShutdown(state: WorkerProcessState) {
         logger.error(err, 'Error shutting down PostHogService')
       }
     }
-    await shutdownWorkerResources({
-      workers,
-      queues: [...queues, ...closeables],
-      redisClients,
-      disconnectPrisma: disconnectPrismaClient,
-    })
-    await shutdownOpenTelemetry().catch((err: unknown) => {
-      logger.error(err, 'Error shutting down OpenTelemetry')
-    })
+    try {
+      await shutdownWorkerResources({
+        workers,
+        queues: [...queues, ...closeables],
+        redisClients,
+        disconnectPrisma: disconnectPrismaClient,
+      })
+    } finally {
+      // Buffered metrics still export when a worker, queue or Redis close rejects.
+      await shutdownOpenTelemetry().catch((err: unknown) => {
+        logger.error(err, 'Error shutting down OpenTelemetry')
+      })
+    }
   } catch (err) {
     logger.error(err, 'Error closing workers or queues')
     exitCode = 1

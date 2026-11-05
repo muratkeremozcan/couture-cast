@@ -901,6 +901,7 @@
       "attempts_one": "{{count}} Versuch",
       "attempts_other": "{{count}} Versuche",
       "openCase": "Fall öffnen",
+      "refreshed": "Aktualisiert",
       "alertKind": {
         "at_risk": "Gefährdet",
         "breached": "Überschritten",

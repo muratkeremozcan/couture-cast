@@ -901,6 +901,7 @@
       "attempts_one": "{{count}} attempt",
       "attempts_other": "{{count}} attempts",
       "openCase": "Open case",
+      "refreshed": "Refreshed",
       "alertKind": {
         "at_risk": "At risk",
         "breached": "Breached",
