@@ -722,6 +722,7 @@ Run on 2026-11-05 at source `43e4b1e4` and tests `98ac40d8` on isolated Postgres
 **Seeded-defect proofs.**
 Thirty proofs in a throwaway worktree, each restored afterwards: the seventeen planned, with S-4 and S-10 in two variants each, and eleven added.
 A control run on unmodified code passed 185 of 185 across the seven files the proofs use.
+The unit and integration half of every proof was re-run at `e342de70`, and each stayed red for the same reason.
 Each listed test was red for the stated reason.
 S-13 and S-16 also ran through the full stack, where P-SLA-REAL-DELIVERY timed out at 150 seconds.
 S-18 onward were added during the build, mostly from surviving mutants found by the independent review.
@@ -742,7 +743,7 @@ S-28 was observed directly: I-O-OTLP was red until `43e4b1e4`.
 | S-10a | excerpt added to the payload the sweep sends                               | I-P-CANARY                                                                                | 2         |
 | S-10b | excerpt added to the payload contract                                      | U-C-PAYLOAD-STRICT                                                                        | 1         |
 | S-11  | Alert insert outside the decision transaction                              | I-E-ROLLBACK                                                                              | 9         |
-| S-12  | JobFailure written on every failure past the third                         | I-W-THIRD-FAILURE                                                                         | 2         |
+| S-12  | JobFailure written on every failure past the third                         | I-W-THIRD-FAILURE                                                                         | 3         |
 | S-13  | Interval schedule removed from community.bootstrap.ts                      | U-W-INTERVAL, P-SLA-REAL-DELIVERY (webhook timeout, worker never sent)                    | 3         |
 | S-14  | SLA controller left out of forRoutes                                       | I-R-HEADERS                                                                               | 1         |
 | S-15  | Flag check moved after detection                                           | U-S-FLAG-ORDER, I-S-FLAG-OFF                                                              | 6         |
