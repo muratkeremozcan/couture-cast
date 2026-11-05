@@ -2,6 +2,7 @@
 // Story 6.12 test owner: one disposable database, a real HTTP receiver and the real sweep.
 // Flags, analytics, the logger, the meter and the clock are the only doubles.
 // The adapter under test always talks to a real socket, so a passing delivery test proves bytes arrived.
+import { randomUUID } from 'node:crypto'
 import 'reflect-metadata'
 import { once } from 'node:events'
 import {
@@ -183,6 +184,44 @@ export function createMeterSpy() {
     setOldestPendingReviewAgeSeconds: vi.fn<(seconds: number) => void>(),
     countAlert: vi.fn<(kind: string) => void>(),
     countDeliveryFailure: vi.fn<(code: string) => void>(),
+    setLastMeasuredAt: vi.fn<(epochSeconds: number) => void>(),
+  }
+}
+
+/** The real client, with `around` wrapped about each top-level raw query. */
+export function aroundRawQueries(
+  prisma: PrismaClient,
+  around: (query: { sql?: string }, run: () => unknown) => unknown
+): PrismaClient {
+  return new Proxy(prisma, {
+    get(target, property): unknown {
+      const value: unknown = Reflect.get(target, property)
+      if (typeof value !== 'function') return value
+      const method = value as (...args: unknown[]) => unknown
+      if (property !== '$queryRaw') return method.bind(target)
+      return (query: { sql?: string }, ...rest: unknown[]): unknown =>
+        around(query, () => method.call(target, query, ...rest))
+    },
+  })
+}
+
+/** A real database fault: a trigger that refuses a write until the returned function drops it. */
+export async function refuseWrites(
+  prisma: PrismaClient,
+  params: { table: string; event: 'INSERT' | 'UPDATE'; when?: string }
+): Promise<() => Promise<void>> {
+  const name = `tea_refuse_${randomUUID().replaceAll('-', '')}`
+  await prisma.$executeRawUnsafe(`
+    CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    BEGIN RAISE EXCEPTION 'tea refuses this write'; END $fn$`)
+  await prisma.$executeRawUnsafe(
+    `CREATE TRIGGER ${name} BEFORE ${params.event} ON "${params.table}" FOR EACH ROW ${
+      params.when ? `WHEN (${params.when}) ` : ''
+    }EXECUTE FUNCTION ${name}()`
+  )
+  return async () => {
+    await prisma.$executeRawUnsafe(`DROP TRIGGER ${name} ON "${params.table}"`)
+    await prisma.$executeRawUnsafe(`DROP FUNCTION ${name}()`)
   }
 }
 

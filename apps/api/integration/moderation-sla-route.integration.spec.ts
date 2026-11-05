@@ -34,6 +34,7 @@ import {
   type DecisionBoot,
 } from './helpers/moderation-decisions-seed.js'
 import { checksumTables } from './helpers/moderation-queue-context.js'
+import { createMeterSpy } from './helpers/moderation-sla-harness.js'
 import { SEED_DAY_MS } from './helpers/moderation-queue-seed.js'
 
 vi.setConfig({ testTimeout: 60_000 })
@@ -330,6 +331,72 @@ describe('I-R-COUNT-PARITY: the dashboard agrees with the queue (TEA-09)', () =>
   })
 })
 
+describe("I-R-COUNT-PARITY: the latest decision is the queue's, not the clock's (CX-6)", () => {
+  const T = inMs(-HOUR)
+  const at = (seconds: number) => new Date(T.getTime() + seconds * 1000)
+  const decision = (
+    caseKey: string,
+    sequence: number,
+    action: 'resolve' | 'escalate',
+    decidedAt: Date,
+    reportIds: string[] = []
+  ) =>
+    prisma.moderationDecision.create({
+      data: {
+        case_key: caseKey,
+        sequence,
+        source: 'post',
+        report_ids: reportIds,
+        action,
+        reason: REASON,
+        moderator_id: null,
+        moderator_role: 'admin',
+        mutation_id: randomUUID(),
+        payload_hash: 'seeded',
+        response: {},
+        is_terminal: action === 'resolve',
+        decided_at: decidedAt,
+      },
+    })
+  const expectParity = async (caseId: string, escalated: boolean) => {
+    const item = (await queueItems()).find((row) => row.caseId === caseId)
+    expect(item?.escalated, 'the queue').toBe(escalated)
+    expect((await summary()).queue.escalated, 'the dashboard').toBe(escalated ? 1 : 0)
+  }
+
+  it('a later escalation stamped by a slower instance still counts', async () => {
+    const { caseId } = await fx.postCase({ reports: 1 })
+    await decision(caseId, 1, 'resolve', at(1))
+    await decision(caseId, 2, 'escalate', at(0))
+    await expectParity(caseId, true)
+  })
+
+  it('a later terminal decision stamped by a slower instance still clears', async () => {
+    const { caseId } = await fx.postCase({ reports: 1 })
+    await decision(caseId, 1, 'escalate', at(1))
+    await decision(caseId, 2, 'resolve', at(0))
+    await expectParity(caseId, false)
+  })
+
+  it('orders each key by sequence and places keys by time across a re-key', async () => {
+    const orphan = await fx.orphanPostCase()
+    const formerKey = `post.${randomUUID()}`
+    // Time slots 0, 1, 2. The former key fills 0 and 2 in sequence order, the orphan fills 1.
+    await decision(formerKey, 1, 'resolve', at(2), [orphan.reportId])
+    await decision(formerKey, 2, 'escalate', at(0), [orphan.reportId])
+    await decision(orphan.caseId, 1, 'resolve', at(1), [orphan.reportId])
+    await expectParity(orphan.caseId, true)
+  })
+
+  it('a terminal decision on the orphan key after the re-key clears the escalation', async () => {
+    const orphan = await fx.orphanPostCase()
+    const formerKey = `post.${randomUUID()}`
+    await decision(formerKey, 1, 'escalate', at(0), [orphan.reportId])
+    await decision(orphan.caseId, 1, 'resolve', at(1), [orphan.reportId])
+    await expectParity(orphan.caseId, false)
+  })
+})
+
 describe('I-R-NO-LOAD: a read changes nothing', () => {
   it('runs no write and leaves every table as it was', async () => {
     await postCaseDue(HOUR)
@@ -538,12 +605,7 @@ describe('I-R-STALE: a dead worker reads as dead, from the API alone', () => {
         flags: flags as never,
         analytics: { capture: () => undefined },
         logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
-        meter: {
-          setOpenCases: () => undefined,
-          setOldestPendingReviewAgeSeconds: () => undefined,
-          countAlert: () => undefined,
-          countDeliveryFailure: () => undefined,
-        },
+        meter: createMeterSpy(),
       })
     const original = flags.getFeatureFlag.getMockImplementation()
     flags.getFeatureFlag.mockImplementation((_key: string, subject: string) =>

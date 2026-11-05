@@ -17,7 +17,9 @@ import {
   SLA_HOUR_MS,
   SLA_MINUTE_MS,
   SLA_SECOND_MS,
+  aroundRawQueries,
   moderationSlaTestContext,
+  refuseWrites,
 } from './helpers/moderation-sla-harness.js'
 
 /** `createWorker` writes its `JobFailure` row through this client, so it has to be this file's. */
@@ -421,29 +423,105 @@ describe('U-S-BUDGET: the 45-second claim budget (TEA-01)', () => {
   })
 })
 
-describe('U-S-BUDGET counts from the start of the sweep (TEA-01)', () => {
-  it('claims nothing when detection used the whole budget', async () => {
-    await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+describe('U-S-BUDGET: delivery has its own share of every run (CX-2)', () => {
+  /** The real detection queries, each 23 seconds long, so detection alone takes 46 seconds. */
+  const slowDetection = () =>
+    aroundRawQueries(prisma, (_query, run) => {
+      clock.advance(23 * SLA_SECOND_MS)
+      return run()
+    })
+
+  it('sends in the same run when detection took longer than the budget', async () => {
+    const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+    const result = await sweep({ prisma: slowDetection() }).run()
+    expect(result).toMatchObject({ recorded: 1, delivered: 1, errors: 0 })
+    expect(capture().received).toHaveLength(1)
+    expect((await alertByKey(slaKey(seeded, 'at_risk')))!.delivery).toBe('delivered')
+  })
+
+  it('works through a backlog over repeated slow sweeps, a bounded batch at a time', async () => {
+    await Promise.all(
+      Array.from({ length: 12 }, () => seedCase({ dueAt: inMs(SLA_HOUR_MS) }))
+    )
+    const sent: string[] = []
     const channel = {
       kind: 'webhook' as const,
-      deliver: vi.fn(() => Promise.resolve('delivered' as const)),
-    }
-    // Moves the clock between the sweep's first read and delivery, as a long detection would.
-    let reads = 0
-    const job = sweep({
-      channel: channel as never,
-      clock: () => {
-        reads += 1
-        return reads === 1 ? new Date(NOW) : inMs(45 * SLA_SECOND_MS)
+      deliver: (payload: { id: string }) => {
+        sent.push(payload.id)
+        clock.advance(5 * SLA_SECOND_MS)
+        return Promise.resolve('delivered' as const)
       },
-    })
-    await job.run()
-    expect(channel.deliver).not.toHaveBeenCalled()
-    expect((await alerts()).map((row) => row.delivery)).toEqual(['pending'])
+    }
+    const perRun: number[] = []
+    for (let run = 0; run < 2; run++) {
+      const before = sent.length
+      await sweep({ channel: channel as never, prisma: slowDetection() }).run()
+      perRun.push(sent.length - before)
+    }
+    // Elapsed 0, 5, ... 40 seconds of delivery claim, and at exactly 45 the share is spent.
+    expect(perRun).toEqual([9, 3])
+    expect(new Set(sent).size).toBe(12)
+    expect((await alerts()).every((row) => row.delivery === 'delivered')).toBe(true)
   })
 })
 
 describe('I-D-BULLMQ: the general bootstrap path on real Redis', () => {
+  it('retries a failed claim through attempts, and writes the fixed text to JobFailure (CX-3)', async () => {
+    const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+    const queueName = `moderation-sla-${randomUUID().slice(0, 8)}`
+    const production = queueConfigs.find((config) => config.name === 'maintenance')!
+    workerPrisma.client = prisma
+    const allow = await refuseWrites(prisma, {
+      table: 'ModerationSlaAlert',
+      event: 'UPDATE',
+    })
+    const sweepOnce = vi.fn(() => sweep().run())
+    const processor = createMaintenanceProcessor({
+      admin: {} as never,
+      featureFlags: {} as never,
+      guardian: {} as never,
+      telemetry: {} as never,
+      wardrobeRetention: {} as never,
+      community: { sweepModerationSla: sweepOnce } as never,
+      logger: ctx.logs.logger as never,
+    })
+    const queue = new Queue(queueName, production.options)
+    const worker = createWorker(queueName, processor, defaultWorkerOptions(1))
+    let allowed = false
+    worker.on('failed', () => {
+      if (!allowed) {
+        allowed = true
+        void allow()
+      }
+    })
+    try {
+      await worker.waitUntilReady()
+      const done = new Promise<void>((resolve) => {
+        worker.once('completed', () => resolve())
+      })
+      await queue.add(MODERATION_SLA_SWEEP_JOB_NAME, {})
+      await done
+      await vi.waitFor(async () => {
+        expect(await prisma.jobFailure.count({ where: { queue_name: queueName } })).toBe(
+          1
+        )
+      })
+    } finally {
+      await worker.close()
+      await queue.obliterate({ force: true })
+      await queue.close()
+      if (!allowed) await allow()
+    }
+    expect(allowed).toBe(true)
+    expect(sweepOnce).toHaveBeenCalledTimes(2)
+    const [failure] = await prisma.jobFailure.findMany({
+      where: { queue_name: queueName },
+    })
+    expect(failure!.error_message).toBe('moderation_sla_claim_failed')
+    expect((await alertByKey(slaKey(seeded, 'at_risk')))!.delivery).toBe('delivered')
+    expect(capture().received).toHaveLength(1)
+  })
+
   it('retries an injected first failure through attempts, with one row per key', async () => {
     const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
     const queueName = `moderation-sla-${randomUUID().slice(0, 8)}`

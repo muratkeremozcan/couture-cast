@@ -5,16 +5,20 @@
 // -BACKOFF-HONORED, -NO-CHANNEL, -BAD-CONFIG, -BACKLOG, -RESOLVED, I-P-CANARY, -WEBHOOK-SECRET,
 // -ANALYTICS, U-S-ISOLATION, U-S-RESULT-SAFE, U-S-SNAPSHOT, U-S-RECORDED, U-S-FLAG-ORDER.
 import { randomUUID } from 'node:crypto'
+import { PrismaClient } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
 import { moderationSlaWebhookPayloadSchema } from '@couture/api-client/contracts/http'
 import { CommunityModerationActionsService } from '../src/modules/community/community-moderation.actions.js'
 import { createModerationOpsChannel } from '../src/modules/moderation/moderation-sla.channel.js'
 import { ModerationSlaRepository } from '../src/modules/moderation/moderation-sla.repository.js'
+import { ModerationSlaService } from '../src/modules/moderation/moderation-sla.service.js'
 import { seedMember } from './helpers/moderation-queue-seed.js'
 import {
   SLA_HOUR_MS,
   SLA_MINUTE_MS,
+  aroundRawQueries,
   moderationSlaTestContext,
+  refuseWrites,
   startCaptureServer,
 } from './helpers/moderation-sla-harness.js'
 
@@ -416,7 +420,7 @@ describe('I-W-RECORD-FAILS: the escalation write itself fails', () => {
     clock.advance(4 * SLA_MINUTE_MS)
     await sweep().run()
     expect((await alertByKey(key))!.failure_escalated_at).not.toBeNull()
-    expect(await prisma.jobFailure.findMany()).toMatchObject([{ attempts: 4 }])
+    expect(await prisma.jobFailure.count()).toBe(1)
   })
 })
 
@@ -575,8 +579,235 @@ describe('U-S-ISOLATION: one bad alert leaves the batch running', () => {
         return Promise.resolve('delivered' as const)
       },
     }
-    await expect(sweep({ channel: channel as never }).run()).resolves.toBeDefined()
+    await expect(sweep({ channel: channel as never }).run()).rejects.toThrow(
+      /^moderation_sla_delivery_incomplete$/
+    )
     expect(sent).toHaveLength(seeds.length - 1)
+    expect(await prisma.moderationSlaMonitor.findFirst()).toBeNull()
+    expect(logs.named('moderation_sla_alert_processing_failed')).toHaveLength(1)
+  })
+})
+
+describe('I-W-CLAIM-FAILS: a delivery fault is a failed sweep (CX-3)', () => {
+  const service = () => new ModerationSlaService(prisma, clock.now)
+
+  it('rejects with fixed text, leaves the stamp and the snapshot, and the page goes stale', async () => {
+    await sweep().run()
+    const stamped = await prisma.moderationSlaMonitor.findFirstOrThrow()
+    capture().reset()
+    const seeded = await seedCase({ dueAt: inMs(-SLA_HOUR_MS) })
+    clock.advance(SLA_MINUTE_MS)
+    analytics.capture.mockClear()
+    const allow = await refuseWrites(prisma, {
+      table: 'ModerationSlaAlert',
+      event: 'UPDATE',
+    })
+    try {
+      const failure = await sweep()
+        .run()
+        .then(
+          () => null,
+          (error: Error) => error
+        )
+      expect(failure).toBeInstanceOf(Error)
+      expect(failure!.message).toBe('moderation_sla_claim_failed')
+      expect(failure!.cause).toBeUndefined()
+      expect(logs.named('moderation_sla_claim_failed')).toHaveLength(1)
+      expect(await prisma.moderationSlaMonitor.findFirstOrThrow()).toEqual(stamped)
+      expect(eventsNamed('moderation_sla_snapshot')).toEqual([])
+      expect(capture().received).toEqual([])
+      expect((await alertByKey(slaKey(seeded, 'breached')))!.delivery).toBe('pending')
+      clock.advance(5 * SLA_MINUTE_MS)
+      const { data } = await service().summary()
+      expect(data.monitor.stale).toBe(true)
+      expect(data.alerts.pending).toBe(1)
+    } finally {
+      await allow()
+    }
+    await sweep().run()
+    expect((await alertByKey(slaKey(seeded, 'breached')))!.delivery).toBe('delivered')
+    expect(
+      (await prisma.moderationSlaMonitor.findFirstOrThrow()).last_sweep_at.getTime()
+    ).toBeGreaterThan(stamped.last_sweep_at.getTime())
+  })
+
+  it('finishes the batch when an outcome write fails, then fails the run with no stamp', async () => {
+    await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+    await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+    const allow = await refuseWrites(prisma, {
+      table: 'ModerationSlaAlert',
+      event: 'UPDATE',
+      when: "NEW.delivery = 'delivered'",
+    })
+    try {
+      await expect(sweep().run()).rejects.toThrow(/^moderation_sla_delivery_incomplete$/)
+      expect(capture().received).toHaveLength(2)
+      expect(logs.named('moderation_sla_alert_processing_failed')).toHaveLength(2)
+      expect(await prisma.moderationSlaMonitor.findFirst()).toBeNull()
+    } finally {
+      await allow()
+    }
+  })
+})
+
+describe('I-W-OWED-ESCALATION: an owed failure record outlives later outcomes (CX-4)', () => {
+  const jobFailures = () => prisma.jobFailure.findMany()
+  /** Attempts 1 and 2 fail, and the third fails with its JobFailure insert refused. */
+  async function thirdFailureUnrecorded(seeded: Awaited<ReturnType<typeof seedCase>>) {
+    capture().respondWith(500)
+    await sweep().run()
+    clock.advance(SLA_MINUTE_MS)
+    await sweep().run()
+    const allow = await refuseWrites(prisma, { table: 'JobFailure', event: 'INSERT' })
+    try {
+      clock.advance(2 * SLA_MINUTE_MS)
+      await sweep().run()
+    } finally {
+      await allow()
+    }
+    const row = (await alertByKey(slaKey(seeded, 'at_risk')))!
+    expect(row).toMatchObject({ attempts: 3, failure_escalated_at: null })
+    expect(await jobFailures()).toEqual([])
+    capture().reset()
+  }
+  const expectOneRecord = async (key: string) => {
+    const row = (await alertByKey(key))!
+    expect(row.failure_escalated_at).not.toBeNull()
+    expect(await jobFailures()).toMatchObject([
+      {
+        job_id: `moderation_sla_delivery__${row.id}`,
+        job_data: { alertId: row.id, kind: row.kind, code: 'http_5xx' },
+      },
+    ])
+    expect(logs.named('moderation_sla_delivery_failed', 'error')).toHaveLength(1)
+    expect(eventsNamed('moderation_sla_delivery_failed')).toHaveLength(1)
+  }
+
+  it('repairs it after a later delivery succeeds, once', async () => {
+    const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+    const key = slaKey(seeded, 'at_risk')
+    await thirdFailureUnrecorded(seeded)
+    clock.advance(4 * SLA_MINUTE_MS)
+    await sweep().run()
+    expect((await alertByKey(key))!.delivery).toBe('delivered')
+    expect(capture().received).toHaveLength(1)
+    await sweep().run()
+    await expectOneRecord(key)
+    await sweep().run()
+    await expectOneRecord(key)
+  })
+
+  it('repairs it after a crash between the third failure and its record', async () => {
+    const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+    const key = slaKey(seeded, 'at_risk')
+    capture().respondWith(500)
+    await sweep().run()
+    clock.advance(SLA_MINUTE_MS)
+    await sweep().run()
+    // What the row holds when the process dies right after `recordFailedAttempt`.
+    await prisma.$executeRaw`
+      UPDATE "ModerationSlaAlert"
+      SET attempts = 3, last_error_code = 'http_5xx', failure_owed_code = 'http_5xx',
+        lease_until = NULL, next_attempt_at = ${inMs(10 * SLA_MINUTE_MS).toISOString()}::timestamp
+      WHERE dedupe_key = ${key}`
+    capture().reset()
+    clock.advance(11 * SLA_MINUTE_MS)
+    await sweep().run()
+    await sweep().run()
+    expect((await alertByKey(key))!.delivery).toBe('delivered')
+    await expectOneRecord(key)
+  })
+
+  it('repairs it on a superseded alert, because the channel still failed three times', async () => {
+    const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+    const key = slaKey(seeded, 'at_risk')
+    await thirdFailureUnrecorded(seeded)
+    await prisma.communityPostReport.update({
+      where: { id: seeded.anchorReportId },
+      data: { resolved_at: NOW },
+    })
+    clock.advance(4 * SLA_MINUTE_MS)
+    await sweep().run()
+    await sweep().run()
+    expect((await alertByKey(key))!.delivery).toBe('superseded')
+    expect(capture().received).toEqual([])
+    await expectOneRecord(key)
+  })
+
+  it('repairs it after the webhook is removed and the alert turns console-only', async () => {
+    const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+    const key = slaKey(seeded, 'at_risk')
+    await thirdFailureUnrecorded(seeded)
+    clock.advance(4 * SLA_MINUTE_MS)
+    const channel = createModerationOpsChannel({ url: null })
+    await sweep({ channel }).run()
+    await sweep({ channel }).run()
+    expect((await alertByKey(key))!.delivery).toBe('console_only')
+    await expectOneRecord(key)
+  })
+
+  it('writes one record when two workers repair together', async () => {
+    const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+    const key = slaKey(seeded, 'at_risk')
+    await thirdFailureUnrecorded(seeded)
+    clock.advance(4 * SLA_MINUTE_MS)
+    await sweep().run()
+    await Promise.all([sweep().run(), sweep({ prisma: ctx.newClient() }).run()])
+    await expectOneRecord(key)
+  })
+
+  it('owes nothing when the third attempt succeeds', async () => {
+    const seeded = await seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+    const key = slaKey(seeded, 'at_risk')
+    capture().respondWith(500)
+    await sweep().run()
+    clock.advance(SLA_MINUTE_MS)
+    await sweep().run()
+    capture().reset()
+    clock.advance(2 * SLA_MINUTE_MS)
+    await sweep().run()
+    await sweep().run()
+    expect((await alertByKey(key))!).toMatchObject({
+      attempts: 3,
+      delivery: 'delivered',
+      failure_escalated_at: null,
+    })
+    expect(await jobFailures()).toEqual([])
+    expect(eventsNamed('moderation_sla_delivery_failed')).toEqual([])
+  })
+})
+
+describe('U-S-LAST-MEASURED: the time Grafana gates stale counts on (CX-5)', () => {
+  it('publishes the measurement time on a successful sweep', async () => {
+    await sweep().run()
+    expect(meter.setLastMeasuredAt.mock.calls).toEqual([[NOW.getTime() / 1000]])
+  })
+
+  it('publishes nothing while a flag holds the sweep off', async () => {
+    ctx.flagValues.set('moderation_sla_monitoring_enabled', false)
+    await sweep().run()
+    expect(meter.setLastMeasuredAt).not.toHaveBeenCalled()
+    expect(meter.setOpenCases).not.toHaveBeenCalled()
+  })
+
+  it('publishes nothing when detection fails', async () => {
+    const broken = new PrismaClient({
+      datasourceUrl: 'postgresql://x:x@127.0.0.1:1/none',
+    })
+    await expect(sweep({ prisma: broken }).run()).rejects.toThrow()
+    await broken.$disconnect()
+    expect(meter.setLastMeasuredAt).not.toHaveBeenCalled()
+  })
+
+  it('publishes nothing when the counts read fails', async () => {
+    const failingCounts = aroundRawQueries(prisma, (query, run) =>
+      query.sql?.includes('oldest_due_text')
+        ? Promise.reject(new Error('counts unavailable'))
+        : run()
+    )
+    await sweep({ prisma: failingCounts }).run()
+    expect(meter.setLastMeasuredAt).not.toHaveBeenCalled()
+    expect(logs.named('moderation_sla_signals_failed')).toHaveLength(1)
   })
 })
 

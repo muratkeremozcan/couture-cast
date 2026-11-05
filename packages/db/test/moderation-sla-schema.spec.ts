@@ -89,6 +89,7 @@ describe('D-SCHEMA: ModerationSlaAlert', () => {
     ['source', 'wardrobe'],
     ['risk', 'critical'],
     ['last_error_code', 'teapot'],
+    ['failure_owed_code', 'teapot'],
   ])('refuses %s = %s', async (column, value) => {
     await expect(insertAlert({ [column]: value })).rejects.toMatchObject({
       code: expect.stringMatching(/^(22P02|23514)$/) as string,
@@ -142,6 +143,7 @@ describe('D-SCHEMA: ModerationSlaAlert', () => {
         'last_error_code',
         'delivered_at',
         'failure_escalated_at',
+        'failure_owed_code',
       ].sort()
     )
   })

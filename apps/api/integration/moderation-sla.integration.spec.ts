@@ -431,7 +431,10 @@ describe('I-S-MONITOR: the singleton stamp', () => {
       datasourceUrl: 'postgresql://x:x@127.0.0.1:1/none',
     })
     clock.at(inMs(SLA_MINUTE_MS))
-    await expect(sweep({ prisma: broken }).run()).rejects.toThrow()
+    // Fixed text, because a worker copies an error message into logs and `JobFailure`.
+    await expect(sweep({ prisma: broken }).run()).rejects.toThrow(
+      /^moderation_sla_detection_failed$/
+    )
     await broken.$disconnect()
     const after = await prisma.moderationSlaMonitor.findUniqueOrThrow({
       where: { id: 'default' },

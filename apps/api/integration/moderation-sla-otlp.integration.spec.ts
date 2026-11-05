@@ -4,6 +4,7 @@
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { context, metrics, propagation, trace } from '@opentelemetry/api'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   initializeOpenTelemetry,
@@ -39,11 +40,15 @@ type OtlpMetricsBody = {
 
 async function startOtlpServer() {
   const bodies: OtlpMetricsBody[] = []
+  /** Every signal as sent, because a secret has to be absent from all of them. */
+  const rawBySignal = new Map<string, string[]>()
   const server = createServer((request, response) => {
     void (async () => {
       let raw = ''
       for await (const chunk of request) raw += String(chunk)
-      if (request.url?.endsWith('/v1/metrics') && raw) {
+      const signal = request.url?.split('/').at(-1) ?? ''
+      rawBySignal.set(signal, [...(rawBySignal.get(signal) ?? []), raw])
+      if (signal === 'metrics' && raw) {
         bodies.push(JSON.parse(raw) as OtlpMetricsBody)
       }
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -55,6 +60,8 @@ async function startOtlpServer() {
   const { port } = server.address() as AddressInfo
   return {
     endpoint: `http://127.0.0.1:${port}/otlp`,
+    raw: (signal: string) => (rawBySignal.get(signal) ?? []).join('\n'),
+    allRaw: () => [...rawBySignal.values()].flat().join('\n'),
     metrics: () =>
       bodies.flatMap((body) =>
         (body.resourceMetrics ?? []).flatMap((resource) =>
@@ -72,6 +79,7 @@ const dataPoints = (metric: OtlpMetric) =>
 const CLOSED_LABELS: Record<string, Record<string, readonly string[]>> = {
   moderation_sla_open_cases: { state: ['on_track', 'at_risk', 'breached'] },
   moderation_sla_oldest_pending_review_age_seconds: {},
+  moderation_sla_last_measured_timestamp_seconds: {},
   moderation_sla_alerts_total: { kind: ['at_risk', 'breached', 'escalated'] },
   moderation_sla_delivery_failures_total: {
     code: [
@@ -87,17 +95,20 @@ const CLOSED_LABELS: Record<string, Record<string, readonly string[]>> = {
 }
 
 describe('I-O-OTLP: a real sweep reaches a real OTLP server', () => {
-  beforeEach(async () => {
+  /** The API keeps the first provider it is given, so each test's SDK needs the globals cleared. */
+  const resetTelemetry = async () => {
     await shutdownOpenTelemetry()
     resetOpenTelemetryForTests()
-  })
+    trace.disable()
+    metrics.disable()
+    context.disable()
+    propagation.disable()
+  }
 
-  afterEach(async () => {
-    await shutdownOpenTelemetry()
-    resetOpenTelemetryForTests()
-  })
+  beforeEach(resetTelemetry)
+  afterEach(resetTelemetry)
 
-  it('exports the four metric names, each with only its closed labels', async () => {
+  it('exports every metric name, each with only its closed labels', async () => {
     const otlp = await startOtlpServer()
     try {
       expect(
@@ -156,6 +167,9 @@ describe('I-O-OTLP: a real sweep reaches a real OTLP server', () => {
       )
       expect(openByState.get('at_risk')).toBe(1)
       expect(openByState.get('breached')).toBe(1)
+      expect(
+        dataPoints(byName('moderation_sla_last_measured_timestamp_seconds')).map(value)
+      ).toEqual([NOW.getTime() / 1000])
       const byLabel = (name: string, label: string) =>
         new Map(
           dataPoints(byName(name)).map((point) => {
@@ -188,6 +202,41 @@ describe('I-O-OTLP: a real sweep reaches a real OTLP server', () => {
       ]) {
         expect(wire).not.toContain(identifier)
       }
+    } finally {
+      await otlp.close()
+    }
+  })
+
+  it('I-O-TRACE-SECRET: the webhook URL reaches no signal, on success or failure (CX-1)', async () => {
+    const otlp = await startOtlpServer()
+    const token = 'CANARYSECRET'
+    try {
+      expect(
+        initializeOpenTelemetry({
+          GRAFANA_API_KEY: 'secret',
+          GRAFANA_INSTANCE_ID: '1555123',
+          GRAFANA_OTLP_ENDPOINT: otlp.endpoint,
+          NODE_ENV: 'development',
+        })
+      ).toBe(true)
+      const meter = createOpenTelemetryModerationSlaMeter()
+      const run = async (url: string) => {
+        await ctx.seedCase({ dueAt: inMs(SLA_HOUR_MS) })
+        await ctx.sweep({ channel: createModerationOpsChannel({ url }), meter }).run()
+      }
+      await run(ctx.capture().tokenUrl(token))
+      expect(ctx.capture().received).toHaveLength(1)
+      ctx.capture().respondWith(500)
+      await run(ctx.capture().tokenUrl(token))
+      await run(`https://${token}.invalid/ops`)
+
+      // A plain fetch beside it, so a tracer that recorded nothing at all cannot pass this test.
+      await fetch(`${ctx.capture().url}/tea-trace-control`)
+      await shutdownOpenTelemetry()
+
+      expect(otlp.raw('traces')).toContain('tea-trace-control')
+      expect(otlp.allRaw()).not.toContain(token)
+      expect(ctx.logs.text()).not.toContain(token)
     } finally {
       await otlp.close()
     }
