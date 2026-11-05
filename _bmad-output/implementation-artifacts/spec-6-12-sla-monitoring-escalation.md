@@ -249,7 +249,13 @@ Real stack walk, 2026-11-05, on the isolated database `cc612_walk`, Redis db 5 a
 
 Fixes the walk caused: Refresh moved to the header, and the banner insets now match (TEA nit).
 
+TEA signed off at `d93a8cfc` (source `43e4b1e4`, tests `98ac40d8`): three consecutive identical runs with no retries, and all 30 seeded-defect proofs caught. The per-tier numbers are in the test design's Execution record and learning path Step 52.
+
+Known limit recorded by TEA: a sweep that alerts before the first 60-second metric export has no zero sample, so that alert stays off the Grafana rate panel.
+
 Open at hand-off, by design: D8 production destination, D13 hosted Grafana, D16 staffing coverage.
+
+Changed files: 101 with the learning path, above the under-100 goal, so CodeRabbit may skip this PR. No required work was cut.
 
 ## Spec Change Log
 

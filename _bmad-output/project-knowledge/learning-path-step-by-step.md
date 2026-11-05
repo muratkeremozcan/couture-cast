@@ -9852,12 +9852,17 @@ Hard-won lessons from the implementation and review of this story:
 6. **A timer must not talk.**
    The dashboard refreshes every minute so a stale banner can appear on an open page, and its live region first announced each refresh.
    Only a refresh someone asked for and a monitor that stopped now speak.
-7. **A union member with two literals resists narrowing.**
+7. **A local time can name two instants.**
+   The two hours a DST change repeats rendered identically, so two alerts looked the same under `America/Chicago`.
+   The page now shows the zone, because `dateStyle` cannot combine with `timeZoneName`, and the parts are spelled out.
+8. **`increase()` needs an earlier sample.**
+   The first alert after a worker start read as 0 in Grafana, so each closed counter series now starts at 0 when the meter is created.
+9. **A union member with two literals resists narrowing.**
    Two `=== ` checks left a `'superseded' | 'console_only'` member in the type, and lint-staged does not run tsc, so TEA's tsc run caught it.
-8. **Local builds edit tracked files.**
-   `next build` with `WEB_NEXT_DIST_DIR` rewrote `apps/web/tsconfig.json`, so the walk's tree needs cleaning before any commit.
-9. **Workspace packages can read as CommonJS under tsx.**
-   The drill's named imports failed on both packages, so it reads them from the default export.
+10. **Local builds edit tracked files.**
+    `next build` with `WEB_NEXT_DIST_DIR` rewrote `apps/web/tsconfig.json`, so the walk's tree needs cleaning before any commit.
+11. **Workspace packages can read as CommonJS under tsx.**
+    The drill's named imports failed on both packages, so it reads them from the default export.
 
 Story/Task mapping:
 
@@ -9954,6 +9959,12 @@ Evidence boundaries:
 
 - **Written before review and merge.**
   The code and tests are committed on `feat/cc-6-12-sla-monitoring-escalation`, nothing was pushed when this step was written, and no PR job has run.
+- **What ran locally.**
+  TEA signed off at `d93a8cfc`, with source at `43e4b1e4` and tests at `98ac40d8`, on three consecutive runs with identical results and no retries.
+  Passing per run: API integration and units 312, image graph 1, contract 26, database and RLS 23, migration hygiene 3, config 31, web 287, Pact consumer 447 with the provider verified, and Playwright 34.
+  All 30 seeded-defect proofs were caught, with S-13 and S-16 also caught through the full stack.
+  The manual checks are in the Execution record of the test design, and the local Grafana check passed at the rebuilt worker.
+  tsc is clean by workspace, and all five `node-test-gate` suites pass.
 - **A real stack walk proved delivery to a local endpoint.**
   The launcher ran the built API, the real `community.bootstrap` worker and the web server on the isolated database `cc612_walk`, with a local HTTP capture server as the webhook.
   One report aged across both boundaries and produced `at_risk`, then `breached`.
@@ -9969,6 +9980,7 @@ Evidence boundaries:
 - **Known limits by design.**
   A breach alerts once, and nothing repeats or pages.
   Hosted Grafana panels stay empty, because neither hosted runtime starts the OpenTelemetry SDK.
+  A sweep that alerts before the first 60-second metric export has no zero sample, so that alert stays off the rate panel.
   Staffing coverage is an open Community Beta signature (D16).
   Screenshots under `_bmad-output/test-artifacts/story-6-12/` are git-ignored local evidence.
 
