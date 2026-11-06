@@ -23,17 +23,30 @@ export const createRepo = () => {
   const moderationEventFindMany = vi.fn()
   const moderationEventCreate = vi.fn()
   const reportFindUnique = vi.fn()
-  const reportFindMany = vi.fn()
+  const reportFindMany = vi.fn().mockResolvedValue([])
   const reportCreate = vi.fn()
   const aliasFindUnique = vi.fn()
   const aliasFindMany = vi.fn()
   const aliasCreate = vi.fn()
   const executeRaw = vi.fn().mockResolvedValue(1)
-  const queryRaw = vi.fn()
+  const queryRaw = vi.fn().mockResolvedValue([])
   const transaction = vi.fn()
 
   const client = {
-    communitySanction: { findFirst: vi.fn().mockResolvedValue(null) },
+    communitySanction: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    // Story 6.13: account erasure's moderation half. The integration suites prove what it does.
+    moderationErasureRequest: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn(({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve(data)
+      ),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    moderationDecision: { findMany: vi.fn().mockResolvedValue([]) },
+    communityCommentAudit: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     communitySubject: { findUnique: vi.fn().mockResolvedValue({ generation: 0 }) },
     userProfile: {
       findUnique: vi.fn().mockResolvedValue({
@@ -75,6 +88,7 @@ export const createRepo = () => {
       findFirst: moderationEventFindFirst,
       findMany: moderationEventFindMany,
       create: moderationEventCreate,
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     communityComment: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -95,11 +109,13 @@ export const createRepo = () => {
       findUnique: reportFindUnique,
       findMany: reportFindMany,
       create: reportCreate,
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     communityAlias: {
       findUnique: aliasFindUnique,
       findMany: aliasFindMany,
       create: aliasCreate,
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     $executeRaw: executeRaw,
     $queryRaw: queryRaw,

@@ -358,6 +358,8 @@ export const moderationPriorActionSchema = z
     actorKind: moderationActorKindSchema,
     action: z.string().min(1).max(64),
     reason: z.string().max(2000).nullable(),
+    /** Story 6.13: erasure removed this reason, and `reason` is null. */
+    reasonRemoved: z.boolean(),
     occurredAt: isoSchema,
   })
   .strict()
@@ -437,7 +439,7 @@ export function registerModerationQueueContracts(registry: OpenAPIRegistry) {
       },
       400: error('invalid_filter or invalid_cursor'),
       401: { description: 'Authentication required' },
-      403: { description: 'Insufficient role' },
+      403: { description: 'Insufficient role or operator_sanctioned' },
       503: error('moderation_console_disabled'),
     },
   })
@@ -458,7 +460,7 @@ export function registerModerationQueueContracts(registry: OpenAPIRegistry) {
         content: { 'application/json': { schema: moderationCaseDetailResponseSchema } },
       },
       401: { description: 'Authentication required' },
-      403: { description: 'Insufficient role' },
+      403: { description: 'Insufficient role or operator_sanctioned' },
       404: error('case_not_found'),
       503: error('moderation_console_disabled or audit_unavailable'),
     },

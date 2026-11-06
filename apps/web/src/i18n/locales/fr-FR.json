@@ -1030,7 +1030,8 @@
       "noPriorActions": "Aucune action précédente.",
       "firstDecision": "Première décision : {{when}}",
       "escalated": "Ce cas attend un administrateur. Seul un administrateur peut le clore.",
-      "reporterScreening": "Filtrage automatique"
+      "reporterScreening": "Filtrage automatique",
+      "reasonRemoved": "Motif retiré par l'effacement"
     },
     "action": {
       "flagged": "Signalé par le filtrage",
@@ -1174,6 +1175,35 @@
       "author_deleted": "Supprimé par l'auteur",
       "erased": "Effacé",
       "unknown": "Autre statut"
+    },
+    "evidence": {
+      "link": "Export des preuves",
+      "title": "Export des preuves",
+      "subtitle": "Téléchargez le dossier de modération d'une période, en fichier JSON pour un contrôle de conformité.",
+      "caseTitle": "Preuves",
+      "caseHelp": "Téléchargez le dossier de modération de ce cas en fichier JSON. Chaque export est consigné.",
+      "exportCase": "Exporter les preuves",
+      "exportRange": "Exporter la période",
+      "working": "Préparation du fichier de preuves",
+      "done": "Fichier de preuves téléchargé. Décisions : {{decisions}}. Signalements : {{reports}}. Événements d'audit : {{auditEvents}}. Alertes : {{alerts}}.",
+      "withheld": "Décisions omises, car vous avez rédigé ou signalé ces cas : {{count}}.",
+      "digest": "Empreinte SHA-256 :",
+      "to": "Au (UTC)",
+      "rangeHelp": "Jours UTC entiers, jusqu'à 90 jours. Chaque export est consigné.",
+      "from": "Du (UTC)",
+      "failure": {
+        "moderation_history_disabled": "L'export des preuves est désactivé.",
+        "admin_required": "Seul un administrateur peut exporter une période.",
+        "self_review_refused": "Vous avez rédigé ce contenu ou déposé l'un de ses signalements : une autre personne doit l'exporter.",
+        "case_not_found": "Ce cas n'existe plus. Son identifiant a pu changer après un effacement.",
+        "invalid_range": "Choisissez une date de début et une date de fin, à 90 jours d'écart au plus.",
+        "export_too_large": "Cet export est trop volumineux. Choisissez une période plus courte.",
+        "audit_unavailable": "L'export n'a pas pu être consigné, donc rien n'a été téléchargé. Réessayez.",
+        "signed_out": "Reconnectez-vous pour continuer.",
+        "forbidden": "Ce compte ne peut pas exporter de preuves.",
+        "rate_limited": "Trop de requêtes. Patientez un instant, puis réessayez.",
+        "unavailable": "L'export est indisponible. Réessayez."
+      }
     }
   }
 }

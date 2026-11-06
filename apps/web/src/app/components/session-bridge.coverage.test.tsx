@@ -4,6 +4,7 @@ import { act, render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 const start = vi.hoisted(() => vi.fn())
 vi.mock('../../lib/web-session', () => ({ startWebSession: start }))
+import { getI18n } from '../../i18n'
 import { SessionBridge } from './session-bridge'
 describe('session bridge lifecycle ownership', () => {
   it('disposes an installed session when its host unmounts', async () => {
@@ -32,6 +33,26 @@ describe('session bridge lifecycle ownership', () => {
       await Promise.resolve()
     })
     expect(cleanup).toHaveBeenCalledOnce()
+  })
+  it('names the rendered language on the document and follows later changes (WCAG 3.1.1)', async () => {
+    start.mockResolvedValue(vi.fn())
+    const languages = vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['de-DE'])
+    const view = render(<SessionBridge />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(document.documentElement.lang).toBe('de-DE')
+    await act(async () => {
+      await getI18n().changeLanguage('pt-BR')
+    })
+    expect(document.documentElement.lang).toBe('pt-BR')
+    view.unmount()
+    await act(async () => {
+      await getI18n().changeLanguage('tr-TR')
+    })
+    expect(document.documentElement.lang).toBe('pt-BR')
+    languages.mockRestore()
+    await getI18n().changeLanguage('en-US')
   })
   it('contains startup rejection without inventing a cleanup callback', async () => {
     start.mockRejectedValue(new Error('SDK unavailable'))

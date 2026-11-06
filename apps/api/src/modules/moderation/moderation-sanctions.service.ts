@@ -41,6 +41,7 @@ import {
   moderatorLogRef,
   type ModerationQueueClock,
 } from './moderation-decision-rules.js'
+import { viewerConflictsWithEvidence } from './moderation-case-conflict.js'
 import { ModerationDecisionsRepository } from './moderation-decisions.repository.js'
 import { parseModerationCaseId } from './moderation-queue.repository.js'
 
@@ -370,7 +371,13 @@ export class ModerationSanctionsService {
     if (existing) return this.replay(existing, payloadHash)
     if (!head) throw moderationDecisionError('sanction_not_found')
 
-    await this.repository.lockSanctionEligibility(tx, auth.userId, null)
+    // The subject's lock too, shared: erasure holds it exclusively before it locks any post and deletes this
+    // sanction, while this step locks the sanction before its insert needs the post. Waiting here breaks
+    // that cycle, and an erasure that got in first has removed the sanction, which is a plain 404.
+    await this.repository.lockSanctionEligibility(tx, auth.userId, null, [head.user_id])
+    await this.repository.assertOperatorNotErased(tx, auth.userId)
+    if (!(await tx.communitySanction.findUnique({ where: { id: sanctionId } })))
+      throw moderationDecisionError('sanction_not_found')
     const at = this.clock()
     if (await findActiveCommunitySanction(tx, auth.userId, at))
       throw moderationDecisionError('operator_sanctioned')
@@ -465,11 +472,19 @@ export class ModerationSanctionsService {
       where: { id: sanction.decision_id },
       select: { report_ids: true },
     })
-    return computeViewerConflict({
-      viewerId,
-      authorId: sanction.user_id,
-      reporterIds: await this.originReporters(tx, sanction.case_key, origin.report_ids),
-    })
+    return (
+      computeViewerConflict({
+        viewerId,
+        authorId: sanction.user_id,
+        reporterIds: await this.originReporters(tx, sanction.case_key, origin.report_ids),
+      }) ||
+      (await viewerConflictsWithEvidence(
+        tx,
+        viewerId,
+        sanction.case_key,
+        origin.report_ids
+      ))
+    )
   }
 
   /** The reporters of the originating case, those of the decision and any filed since. */

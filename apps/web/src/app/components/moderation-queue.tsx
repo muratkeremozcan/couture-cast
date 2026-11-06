@@ -14,6 +14,7 @@ import {
   type ModerationQueueFilters,
 } from '../../lib/moderation'
 import { FailureNotice, moderationControl } from './moderation-failure-notice'
+import { ModerationEvidenceLink } from './moderation-evidence-export'
 import { ModerationFilters } from './moderation-filters'
 import { PlainText } from './moderation-plain-text'
 import { SlaCountdown } from './moderation-sla-countdown'
@@ -201,12 +202,15 @@ export function ModerationQueueView() {
             {t('moderation.subtitle')}
           </p>
         </div>
-        <Link
-          href="/moderation/sla"
-          className={`${moderationControl} inline-flex items-center`}
-        >
-          {t('moderation.sla.dashboardLink')}
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/moderation/sla"
+            className={`${moderationControl} inline-flex items-center`}
+          >
+            {t('moderation.sla.dashboardLink')}
+          </Link>
+          <ModerationEvidenceLink />
+        </div>
       </header>
 
       {terminal && failure ? (

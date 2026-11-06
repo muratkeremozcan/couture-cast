@@ -28,6 +28,7 @@ describe('feature flag registry', () => {
       'moderation_console_enabled',
       'moderation_decisions_enabled',
       'moderation_sla_monitoring_enabled',
+      'moderation_history_enabled',
     ])
   })
 
@@ -100,7 +101,7 @@ describe('feature flag registry', () => {
   it('U-F-REGISTRY: defaults SLA monitoring to off, last in the registry', () => {
     // Story 6.12 D10: production stays off until the release owner opens it for the system subject.
     expect(getDefaultFeatureFlagValue('moderation_sla_monitoring_enabled')).toBe(false)
-    expect(FEATURE_FLAG_KEYS.at(-1)).toBe('moderation_sla_monitoring_enabled')
+    expect(FEATURE_FLAG_KEYS.at(-1)).toBe('moderation_history_enabled')
   })
 
   it('U-F-REGISTRY: resolves SLA monitoring to false when PostHog and the cache both fail', async () => {

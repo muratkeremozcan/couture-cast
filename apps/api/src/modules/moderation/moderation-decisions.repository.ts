@@ -1,5 +1,5 @@
 // Story 6.11 owner: the SQL of moderation decisions in `apps/api/src/modules/moderation/moderation-decisions.repository.ts`.
-// A decision row is only ever inserted. Story 6.13 enforces that at the database boundary.
+// A decision row is only ever inserted, and Story 6.13 enforces that at the database boundary.
 import { Injectable } from '@nestjs/common'
 import type {
   CommunityComment,
@@ -8,8 +8,16 @@ import type {
   Prisma,
 } from '@prisma/client'
 import type { ModerationCaseTargetState } from '@couture/api-client/contracts/http'
+import {
+  lockCommunitySanctions,
+  lockModerationCase,
+} from '../community/community-erasure.js'
 import type { ParsedCaseId } from './moderation-queue.repository.js'
-import { inDecisionOrder, type DecisionHistoryRow } from './moderation-decision-rules.js'
+import {
+  inDecisionOrder,
+  moderationDecisionError,
+  type DecisionHistoryRow,
+} from './moderation-decision-rules.js'
 
 type Tx = Prisma.TransactionClient
 
@@ -18,6 +26,7 @@ export interface DecisionCaseReport {
   reporterId: string | null
   resolvedAt: Date | null
   subjectAlias: string | null
+  commentAuthorId: string | null
 }
 
 /** A case as a decision sees it. `reports` is every report of the case, oldest first. */
@@ -30,6 +39,17 @@ export interface DecisionCase {
 
 export const decisionCaseSubject = (loaded: DecisionCase): string | null =>
   loaded.post?.user_id ?? loaded.comment?.user_id ?? null
+
+/**
+ * Whom a decision's words are about, which can be more than `decisionCaseSubject` knows. An orphan comment
+ * has lost its row, and the report still names the commenter, whose erasure has to reach these words. It
+ * stays out of `decisionCaseSubject` because an orphan has no standing to ban or restore.
+ */
+export const decisionCaseWordsSubject = (loaded: DecisionCase): string | null =>
+  decisionCaseSubject(loaded) ??
+  (loaded.id.kind === 'orphan-comment'
+    ? (loaded.reports[0]?.commentAuthorId ?? null)
+    : null)
 
 export const decisionCaseTargetStatus = (loaded: DecisionCase): string | null =>
   loaded.post?.status ?? loaded.comment?.status ?? null
@@ -65,7 +85,22 @@ export function decisionCaseTargetState(loaded: DecisionCase): ModerationCaseTar
 export class ModerationDecisionsRepository {
   /** Every decision on one case runs under this lock, ahead of every privacy and engagement lock. */
   async lockCase(tx: Tx, caseKey: string): Promise<void> {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('moderation_case:' || ${caseKey}))`
+    await lockModerationCase(tx, caseKey)
+  }
+
+  /** Call under the operator's sanction lock, which is what makes the answer hold until commit. */
+  async assertOperatorNotErased(tx: Tx, operatorId: string): Promise<void> {
+    if (await this.hasErasureRequest(tx, operatorId))
+      throw moderationDecisionError('operator_sanctioned')
+  }
+
+  /** Story 6.13: read under the locks, so a decision after an erasure request stores no subject. */
+  async hasErasureRequest(tx: Tx, member: string): Promise<boolean> {
+    const request = await tx.moderationErasureRequest.findUnique({
+      where: { member_id: member },
+      select: { id: true },
+    })
+    return request !== null
   }
 
   /**
@@ -77,15 +112,10 @@ export class ModerationDecisionsRepository {
   async lockSanctionEligibility(
     tx: Tx,
     operatorId: string,
-    banSubjectId: string | null
+    banSubjectId: string | null,
+    sharedSubjectIds: readonly string[] = []
   ): Promise<void> {
-    const ids = [...new Set([operatorId, ...(banSubjectId ? [banSubjectId] : [])])].sort()
-    for (const id of ids) {
-      if (id === banSubjectId)
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_sanction:' || ${id}))`
-      else
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtext('community_sanction:' || ${id}))`
-    }
+    await lockCommunitySanctions(tx, [operatorId, ...sharedSubjectIds], banSubjectId)
   }
 
   findByMutation(
@@ -117,6 +147,7 @@ export class ModerationDecisionsRepository {
             reporterId: row.reporter_id,
             resolvedAt: row.resolved_at,
             subjectAlias: row.subject_alias,
+            commentAuthorId: null,
           })),
           post:
             id.kind === 'post'
@@ -142,6 +173,7 @@ export class ModerationDecisionsRepository {
             reporterId: row.reporter_id,
             resolvedAt: row.resolved_at,
             subjectAlias: null,
+            commentAuthorId: row.comment_author_id,
           })),
           post: null,
           comment:

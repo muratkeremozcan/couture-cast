@@ -30,7 +30,7 @@ import {
   isProdEnvironment,
   resolveApiBaseUrl,
 } from '../support/helpers/api-test'
-import { installApiProxy } from '../support/helpers/browser-api-proxy'
+import { drainApiProxy, installApiProxy } from '../support/helpers/browser-api-proxy'
 import {
   seedWebSession,
   WEB_ACCESS_TOKEN_STORAGE_KEY,
@@ -338,6 +338,7 @@ test.describe('Moderator console, live (Story 6.10)', () => {
           await expect(view.getByRole('list', { name: 'Cases' })).toHaveCount(0)
           await expect(view.locator('a[href^="/moderation/cases/"]')).toHaveCount(0)
         }
+        await drainApiProxy(view)
         await context.close()
       }
     }

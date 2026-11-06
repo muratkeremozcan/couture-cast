@@ -126,6 +126,13 @@ jobs:
         env:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
 
+      # Story 6.13: local Supabase is the one PR job whose application role is the real non-superuser,
+      # so this is where the catalog proof of the append-only enforcement means something.
+      - name: Verify moderation history enforcement
+        run: npx tsx scripts/verify-moderation-history.mjs
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+
       - name: Build web app
         run: npm run build --workspace web
 

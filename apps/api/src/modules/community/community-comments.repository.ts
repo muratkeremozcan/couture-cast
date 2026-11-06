@@ -529,6 +529,7 @@ export class CommunityCommentsRepository {
         const report = await tx.communityCommentReport.create({
           data: {
             comment_id: row.id,
+            comment_author_id: row.user_id,
             reporter_id: params.userId,
             reason: params.reason,
             content_snapshot:

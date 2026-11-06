@@ -229,9 +229,14 @@ export class CommunityCommentsProcessor {
     reason: string
   ): Promise<void> {
     const now = new Date()
+    const comment = await tx.communityComment.findUniqueOrThrow({
+      where: { id: commentId },
+      select: { user_id: true },
+    })
     await tx.communityCommentReport.create({
       data: {
         comment_id: commentId,
+        comment_author_id: comment.user_id,
         reason: 'inappropriate_content',
         origin: 'screening',
         accepted_at: now,

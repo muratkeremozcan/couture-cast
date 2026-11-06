@@ -2204,7 +2204,7 @@ export interface ApplyModerationDecisionRequestOneOf {
    */
   action: ApplyModerationDecisionRequestOneOfActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf
    */
@@ -2245,7 +2245,7 @@ export interface ApplyModerationDecisionRequestOneOf1 {
    */
   action: ApplyModerationDecisionRequestOneOf1ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf1
    */
@@ -2286,7 +2286,7 @@ export interface ApplyModerationDecisionRequestOneOf2 {
    */
   action: ApplyModerationDecisionRequestOneOf2ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf2
    */
@@ -2327,7 +2327,7 @@ export interface ApplyModerationDecisionRequestOneOf3 {
    */
   action: ApplyModerationDecisionRequestOneOf3ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf3
    */
@@ -2368,7 +2368,7 @@ export interface ApplyModerationDecisionRequestOneOf4 {
    */
   action: ApplyModerationDecisionRequestOneOf4ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ApplyModerationDecisionRequestOneOf4
    */
@@ -6779,6 +6779,617 @@ export interface EventsPollResult {
 /**
  *
  * @export
+ * @interface ExportModerationEvidence200Response
+ */
+export interface ExportModerationEvidence200Response {
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseSchemaVersionEnum}
+   * @memberof ExportModerationEvidence200Response
+   */
+  schemaVersion: ExportModerationEvidence200ResponseSchemaVersionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200Response
+   */
+  exportId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200Response
+   */
+  generatedAt: string
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseScope}
+   * @memberof ExportModerationEvidence200Response
+   */
+  scope: ExportModerationEvidence200ResponseScope
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200Response
+   */
+  sha256: string
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseCounts}
+   * @memberof ExportModerationEvidence200Response
+   */
+  counts: ExportModerationEvidence200ResponseCounts
+  /**
+   *
+   * @type {Array<ExportModerationEvidence200ResponseDecisionsInner>}
+   * @memberof ExportModerationEvidence200Response
+   */
+  decisions: Array<ExportModerationEvidence200ResponseDecisionsInner>
+  /**
+   *
+   * @type {Array<ExportModerationEvidence200ResponseReportsInner>}
+   * @memberof ExportModerationEvidence200Response
+   */
+  reports: Array<ExportModerationEvidence200ResponseReportsInner>
+  /**
+   *
+   * @type {Array<ExportModerationEvidence200ResponseAuditEventsInner>}
+   * @memberof ExportModerationEvidence200Response
+   */
+  auditEvents: Array<ExportModerationEvidence200ResponseAuditEventsInner>
+  /**
+   *
+   * @type {Array<ExportModerationEvidence200ResponseAlertsInner>}
+   * @memberof ExportModerationEvidence200Response
+   */
+  alerts: Array<ExportModerationEvidence200ResponseAlertsInner>
+}
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence200ResponseSchemaVersionEnum = {
+  NUMBER_1: 1,
+} as const
+export type ExportModerationEvidence200ResponseSchemaVersionEnum =
+  (typeof ExportModerationEvidence200ResponseSchemaVersionEnum)[keyof typeof ExportModerationEvidence200ResponseSchemaVersionEnum]
+
+/**
+ *
+ * @export
+ * @interface ExportModerationEvidence200ResponseAlertsInner
+ */
+export interface ExportModerationEvidence200ResponseAlertsInner {
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseAlertsInnerKindEnum}
+   * @memberof ExportModerationEvidence200ResponseAlertsInner
+   */
+  kind: ExportModerationEvidence200ResponseAlertsInnerKindEnum
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseAlertsInnerDeliveryEnum}
+   * @memberof ExportModerationEvidence200ResponseAlertsInner
+   */
+  delivery: ExportModerationEvidence200ResponseAlertsInnerDeliveryEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseAlertsInner
+   */
+  slaDueAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseAlertsInner
+   */
+  detectedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseAlertsInner
+   */
+  deliveredAt: string | null
+}
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence200ResponseAlertsInnerKindEnum = {
+  at_risk: 'at_risk',
+  breached: 'breached',
+  escalated: 'escalated',
+} as const
+export type ExportModerationEvidence200ResponseAlertsInnerKindEnum =
+  (typeof ExportModerationEvidence200ResponseAlertsInnerKindEnum)[keyof typeof ExportModerationEvidence200ResponseAlertsInnerKindEnum]
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence200ResponseAlertsInnerDeliveryEnum = {
+  pending: 'pending',
+  delivered: 'delivered',
+  console_only: 'console_only',
+  superseded: 'superseded',
+} as const
+export type ExportModerationEvidence200ResponseAlertsInnerDeliveryEnum =
+  (typeof ExportModerationEvidence200ResponseAlertsInnerDeliveryEnum)[keyof typeof ExportModerationEvidence200ResponseAlertsInnerDeliveryEnum]
+
+/**
+ *
+ * @export
+ * @interface ExportModerationEvidence200ResponseAuditEventsInner
+ */
+export interface ExportModerationEvidence200ResponseAuditEventsInner {
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseAuditEventsInnerEventTypeEnum}
+   * @memberof ExportModerationEvidence200ResponseAuditEventsInner
+   */
+  eventType: ExportModerationEvidence200ResponseAuditEventsInnerEventTypeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseAuditEventsInner
+   */
+  occurredAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseAuditEventsInner
+   */
+  actorId: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseAuditEventsInner
+   */
+  role: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseAuditEventsInner
+   */
+  action: string | null
+}
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence200ResponseAuditEventsInnerEventTypeEnum = {
+  moderation_decision_applied: 'moderation_decision_applied',
+  moderation_appeal_recorded: 'moderation_appeal_recorded',
+  moderation_case_viewed: 'moderation_case_viewed',
+} as const
+export type ExportModerationEvidence200ResponseAuditEventsInnerEventTypeEnum =
+  (typeof ExportModerationEvidence200ResponseAuditEventsInnerEventTypeEnum)[keyof typeof ExportModerationEvidence200ResponseAuditEventsInnerEventTypeEnum]
+
+/**
+ *
+ * @export
+ * @interface ExportModerationEvidence200ResponseCounts
+ */
+export interface ExportModerationEvidence200ResponseCounts {
+  /**
+   *
+   * @type {number}
+   * @memberof ExportModerationEvidence200ResponseCounts
+   */
+  decisions: number
+  /**
+   *
+   * @type {number}
+   * @memberof ExportModerationEvidence200ResponseCounts
+   */
+  reports: number
+  /**
+   *
+   * @type {number}
+   * @memberof ExportModerationEvidence200ResponseCounts
+   */
+  auditEvents: number
+  /**
+   *
+   * @type {number}
+   * @memberof ExportModerationEvidence200ResponseCounts
+   */
+  alerts: number
+  /**
+   *
+   * @type {number}
+   * @memberof ExportModerationEvidence200ResponseCounts
+   */
+  withheldForConflict: number
+}
+/**
+ *
+ * @export
+ * @interface ExportModerationEvidence200ResponseDecisionsInner
+ */
+export interface ExportModerationEvidence200ResponseDecisionsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  decisionId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  caseId: string
+  /**
+   *
+   * @type {number}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  sequence: number
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseDecisionsInnerSourceEnum}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  source: ExportModerationEvidence200ResponseDecisionsInnerSourceEnum
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseDecisionsInnerActionEnum}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  action: ExportModerationEvidence200ResponseDecisionsInnerActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  reason: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  reasonRemoved: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  moderatorId: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  moderatorRole: string
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  subjectAlias: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  isTerminal: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  decidedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseDecisionsInner
+   */
+  anonymizedAt: string | null
+}
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence200ResponseDecisionsInnerSourceEnum = {
+  post: 'post',
+  comment: 'comment',
+} as const
+export type ExportModerationEvidence200ResponseDecisionsInnerSourceEnum =
+  (typeof ExportModerationEvidence200ResponseDecisionsInnerSourceEnum)[keyof typeof ExportModerationEvidence200ResponseDecisionsInnerSourceEnum]
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence200ResponseDecisionsInnerActionEnum = {
+  resolve: 'resolve',
+  release: 'release',
+  takedown: 'takedown',
+  escalate: 'escalate',
+  ban: 'ban',
+  appeal_requested: 'appeal_requested',
+  appeal_upheld: 'appeal_upheld',
+  appeal_overturned: 'appeal_overturned',
+} as const
+export type ExportModerationEvidence200ResponseDecisionsInnerActionEnum =
+  (typeof ExportModerationEvidence200ResponseDecisionsInnerActionEnum)[keyof typeof ExportModerationEvidence200ResponseDecisionsInnerActionEnum]
+
+/**
+ *
+ * @export
+ * @interface ExportModerationEvidence200ResponseReportsInner
+ */
+export interface ExportModerationEvidence200ResponseReportsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseReportsInner
+   */
+  reportId: string
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseReportsInnerSourceEnum}
+   * @memberof ExportModerationEvidence200ResponseReportsInner
+   */
+  source: ExportModerationEvidence200ResponseReportsInnerSourceEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseReportsInner
+   */
+  reason: string
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseReportsInnerOriginEnum}
+   * @memberof ExportModerationEvidence200ResponseReportsInner
+   */
+  origin: ExportModerationEvidence200ResponseReportsInnerOriginEnum
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseReportsInnerReporterStateEnum}
+   * @memberof ExportModerationEvidence200ResponseReportsInner
+   */
+  reporterState: ExportModerationEvidence200ResponseReportsInnerReporterStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseReportsInner
+   */
+  acceptedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseReportsInner
+   */
+  dueAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseReportsInner
+   */
+  resolvedAt: string | null
+}
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence200ResponseReportsInnerSourceEnum = {
+  post: 'post',
+  comment: 'comment',
+} as const
+export type ExportModerationEvidence200ResponseReportsInnerSourceEnum =
+  (typeof ExportModerationEvidence200ResponseReportsInnerSourceEnum)[keyof typeof ExportModerationEvidence200ResponseReportsInnerSourceEnum]
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence200ResponseReportsInnerOriginEnum = {
+  member: 'member',
+  screening: 'screening',
+} as const
+export type ExportModerationEvidence200ResponseReportsInnerOriginEnum =
+  (typeof ExportModerationEvidence200ResponseReportsInnerOriginEnum)[keyof typeof ExportModerationEvidence200ResponseReportsInnerOriginEnum]
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence200ResponseReportsInnerReporterStateEnum = {
+  member: 'member',
+  screening: 'screening',
+  erased: 'erased',
+} as const
+export type ExportModerationEvidence200ResponseReportsInnerReporterStateEnum =
+  (typeof ExportModerationEvidence200ResponseReportsInnerReporterStateEnum)[keyof typeof ExportModerationEvidence200ResponseReportsInnerReporterStateEnum]
+
+/**
+ * @type ExportModerationEvidence200ResponseScope
+ *
+ * @export
+ */
+export type ExportModerationEvidence200ResponseScope =
+  | ExportModerationEvidence200ResponseScopeOneOf
+  | ExportModerationEvidence200ResponseScopeOneOf1
+/**
+ *
+ * @export
+ * @interface ExportModerationEvidence200ResponseScopeOneOf
+ */
+export interface ExportModerationEvidence200ResponseScopeOneOf {
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseScopeOneOfScopeEnum}
+   * @memberof ExportModerationEvidence200ResponseScopeOneOf
+   */
+  scope: ExportModerationEvidence200ResponseScopeOneOfScopeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseScopeOneOf
+   */
+  caseId: string
+}
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence200ResponseScopeOneOfScopeEnum = {
+  case: 'case',
+} as const
+export type ExportModerationEvidence200ResponseScopeOneOfScopeEnum =
+  (typeof ExportModerationEvidence200ResponseScopeOneOfScopeEnum)[keyof typeof ExportModerationEvidence200ResponseScopeOneOfScopeEnum]
+
+/**
+ *
+ * @export
+ * @interface ExportModerationEvidence200ResponseScopeOneOf1
+ */
+export interface ExportModerationEvidence200ResponseScopeOneOf1 {
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseScopeOneOf1ScopeEnum}
+   * @memberof ExportModerationEvidence200ResponseScopeOneOf1
+   */
+  scope: ExportModerationEvidence200ResponseScopeOneOf1ScopeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseScopeOneOf1
+   */
+  from: string
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence200ResponseScopeOneOf1
+   */
+  to: string
+}
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence200ResponseScopeOneOf1ScopeEnum = {
+  range: 'range',
+} as const
+export type ExportModerationEvidence200ResponseScopeOneOf1ScopeEnum =
+  (typeof ExportModerationEvidence200ResponseScopeOneOf1ScopeEnum)[keyof typeof ExportModerationEvidence200ResponseScopeOneOf1ScopeEnum]
+
+/**
+ *
+ * @export
+ * @interface ExportModerationEvidence503Response
+ */
+export interface ExportModerationEvidence503Response {
+  /**
+   *
+   * @type {number}
+   * @memberof ExportModerationEvidence503Response
+   */
+  statusCode: number
+  /**
+   *
+   * @type {ExportModerationEvidence503ResponseCodeEnum}
+   * @memberof ExportModerationEvidence503Response
+   */
+  code: ExportModerationEvidence503ResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidence503Response
+   */
+  message: string
+}
+
+/**
+ * @export
+ */
+export const ExportModerationEvidence503ResponseCodeEnum = {
+  moderation_history_disabled: 'moderation_history_disabled',
+  admin_required: 'admin_required',
+  self_review_refused: 'self_review_refused',
+  operator_sanctioned: 'operator_sanctioned',
+  member_not_found: 'member_not_found',
+  case_not_found: 'case_not_found',
+  invalid_request: 'invalid_request',
+  invalid_range: 'invalid_range',
+  export_too_large: 'export_too_large',
+  audit_unavailable: 'audit_unavailable',
+} as const
+export type ExportModerationEvidence503ResponseCodeEnum =
+  (typeof ExportModerationEvidence503ResponseCodeEnum)[keyof typeof ExportModerationEvidence503ResponseCodeEnum]
+
+/**
+ * @type ExportModerationEvidenceRequest
+ *
+ * @export
+ */
+export type ExportModerationEvidenceRequest =
+  | ExportModerationEvidenceRequestOneOf
+  | ExportModerationEvidenceRequestOneOf1
+/**
+ *
+ * @export
+ * @interface ExportModerationEvidenceRequestOneOf
+ */
+export interface ExportModerationEvidenceRequestOneOf {
+  /**
+   *
+   * @type {ExportModerationEvidenceRequestOneOfScopeEnum}
+   * @memberof ExportModerationEvidenceRequestOneOf
+   */
+  scope: ExportModerationEvidenceRequestOneOfScopeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidenceRequestOneOf
+   */
+  caseId: string
+}
+
+/**
+ * @export
+ */
+export const ExportModerationEvidenceRequestOneOfScopeEnum = {
+  case: 'case',
+} as const
+export type ExportModerationEvidenceRequestOneOfScopeEnum =
+  (typeof ExportModerationEvidenceRequestOneOfScopeEnum)[keyof typeof ExportModerationEvidenceRequestOneOfScopeEnum]
+
+/**
+ *
+ * @export
+ * @interface ExportModerationEvidenceRequestOneOf1
+ */
+export interface ExportModerationEvidenceRequestOneOf1 {
+  /**
+   *
+   * @type {ExportModerationEvidenceRequestOneOf1ScopeEnum}
+   * @memberof ExportModerationEvidenceRequestOneOf1
+   */
+  scope: ExportModerationEvidenceRequestOneOf1ScopeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidenceRequestOneOf1
+   */
+  from: string
+  /**
+   *
+   * @type {string}
+   * @memberof ExportModerationEvidenceRequestOneOf1
+   */
+  to: string
+}
+
+/**
+ * @export
+ */
+export const ExportModerationEvidenceRequestOneOf1ScopeEnum = {
+  range: 'range',
+} as const
+export type ExportModerationEvidenceRequestOneOf1ScopeEnum =
+  (typeof ExportModerationEvidenceRequestOneOf1ScopeEnum)[keyof typeof ExportModerationEvidenceRequestOneOf1ScopeEnum]
+
+/**
+ *
+ * @export
  * @interface FavoriteOutfitCapsuleInput
  */
 export interface FavoriteOutfitCapsuleInput {
@@ -8449,6 +9060,12 @@ export interface GetModerationCase200ResponseDataPriorActionsInner {
   reason: string | null
   /**
    *
+   * @type {boolean}
+   * @memberof GetModerationCase200ResponseDataPriorActionsInner
+   */
+  reasonRemoved: boolean
+  /**
+   *
    * @type {string}
    * @memberof GetModerationCase200ResponseDataPriorActionsInner
    */
@@ -8840,6 +9457,32 @@ export const GetModerationCase200ResponseDataTargetStateEnum = {
 export type GetModerationCase200ResponseDataTargetStateEnum =
   (typeof GetModerationCase200ResponseDataTargetStateEnum)[keyof typeof GetModerationCase200ResponseDataTargetStateEnum]
 
+/**
+ *
+ * @export
+ * @interface GetModerationEvidenceAvailability200Response
+ */
+export interface GetModerationEvidenceAvailability200Response {
+  /**
+   *
+   * @type {GetModerationEvidenceAvailability200ResponseData}
+   * @memberof GetModerationEvidenceAvailability200Response
+   */
+  data: GetModerationEvidenceAvailability200ResponseData
+}
+/**
+ *
+ * @export
+ * @interface GetModerationEvidenceAvailability200ResponseData
+ */
+export interface GetModerationEvidenceAvailability200ResponseData {
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetModerationEvidenceAvailability200ResponseData
+   */
+  rangeExport: boolean
+}
 /**
  *
  * @export
@@ -10608,7 +11251,7 @@ export interface ModerationAppealInput {
    */
   status: ModerationAppealInputStatusEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationAppealInput
    */
@@ -11022,6 +11665,12 @@ export interface ModerationCaseDetailResponseDataPriorActionsInner {
    * @memberof ModerationCaseDetailResponseDataPriorActionsInner
    */
   reason: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationCaseDetailResponseDataPriorActionsInner
+   */
+  reasonRemoved: boolean
   /**
    *
    * @type {string}
@@ -11450,7 +12099,7 @@ export interface ModerationDecisionInputOneOf {
    */
   action: ModerationDecisionInputOneOfActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf
    */
@@ -11491,7 +12140,7 @@ export interface ModerationDecisionInputOneOf1 {
    */
   action: ModerationDecisionInputOneOf1ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf1
    */
@@ -11532,7 +12181,7 @@ export interface ModerationDecisionInputOneOf2 {
    */
   action: ModerationDecisionInputOneOf2ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf2
    */
@@ -11573,7 +12222,7 @@ export interface ModerationDecisionInputOneOf3 {
    */
   action: ModerationDecisionInputOneOf3ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf3
    */
@@ -11614,7 +12263,7 @@ export interface ModerationDecisionInputOneOf4 {
    */
   action: ModerationDecisionInputOneOf4ActionEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof ModerationDecisionInputOneOf4
    */
@@ -11733,6 +12382,564 @@ export interface ModerationDecisionResponse {
    */
   data: ApplyModerationDecision200ResponseData
 }
+/**
+ *
+ * @export
+ * @interface ModerationErasureRequest
+ */
+export interface ModerationErasureRequest {
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationErasureRequest
+   */
+  memberId: string
+}
+/**
+ *
+ * @export
+ * @interface ModerationErasureResponse
+ */
+export interface ModerationErasureResponse {
+  /**
+   *
+   * @type {ModerationErasureResponseData}
+   * @memberof ModerationErasureResponse
+   */
+  data: ModerationErasureResponseData
+}
+/**
+ *
+ * @export
+ * @interface ModerationErasureResponseData
+ */
+export interface ModerationErasureResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationErasureResponseData
+   */
+  requestId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationErasureResponseData
+   */
+  requestedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationErasureResponseData
+   */
+  deadlineAt: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationErasureResponseData
+   */
+  replayed: boolean
+}
+/**
+ *
+ * @export
+ * @interface ModerationEvidenceAvailabilityResponse
+ */
+export interface ModerationEvidenceAvailabilityResponse {
+  /**
+   *
+   * @type {ModerationEvidenceAvailabilityResponseData}
+   * @memberof ModerationEvidenceAvailabilityResponse
+   */
+  data: ModerationEvidenceAvailabilityResponseData
+}
+/**
+ *
+ * @export
+ * @interface ModerationEvidenceAvailabilityResponseData
+ */
+export interface ModerationEvidenceAvailabilityResponseData {
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationEvidenceAvailabilityResponseData
+   */
+  rangeExport: boolean
+}
+/**
+ *
+ * @export
+ * @interface ModerationEvidenceBundle
+ */
+export interface ModerationEvidenceBundle {
+  /**
+   *
+   * @type {ModerationEvidenceBundleSchemaVersionEnum}
+   * @memberof ModerationEvidenceBundle
+   */
+  schemaVersion: ModerationEvidenceBundleSchemaVersionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundle
+   */
+  exportId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundle
+   */
+  generatedAt: string
+  /**
+   *
+   * @type {ExportModerationEvidence200ResponseScope}
+   * @memberof ModerationEvidenceBundle
+   */
+  scope: ExportModerationEvidence200ResponseScope
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundle
+   */
+  sha256: string
+  /**
+   *
+   * @type {ModerationEvidenceBundleCounts}
+   * @memberof ModerationEvidenceBundle
+   */
+  counts: ModerationEvidenceBundleCounts
+  /**
+   *
+   * @type {Array<ModerationEvidenceBundleDecisionsInner>}
+   * @memberof ModerationEvidenceBundle
+   */
+  decisions: Array<ModerationEvidenceBundleDecisionsInner>
+  /**
+   *
+   * @type {Array<ModerationEvidenceBundleReportsInner>}
+   * @memberof ModerationEvidenceBundle
+   */
+  reports: Array<ModerationEvidenceBundleReportsInner>
+  /**
+   *
+   * @type {Array<ModerationEvidenceBundleAuditEventsInner>}
+   * @memberof ModerationEvidenceBundle
+   */
+  auditEvents: Array<ModerationEvidenceBundleAuditEventsInner>
+  /**
+   *
+   * @type {Array<ModerationEvidenceBundleAlertsInner>}
+   * @memberof ModerationEvidenceBundle
+   */
+  alerts: Array<ModerationEvidenceBundleAlertsInner>
+}
+
+/**
+ * @export
+ */
+export const ModerationEvidenceBundleSchemaVersionEnum = {
+  NUMBER_1: 1,
+} as const
+export type ModerationEvidenceBundleSchemaVersionEnum =
+  (typeof ModerationEvidenceBundleSchemaVersionEnum)[keyof typeof ModerationEvidenceBundleSchemaVersionEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationEvidenceBundleAlertsInner
+ */
+export interface ModerationEvidenceBundleAlertsInner {
+  /**
+   *
+   * @type {ModerationEvidenceBundleAlertsInnerKindEnum}
+   * @memberof ModerationEvidenceBundleAlertsInner
+   */
+  kind: ModerationEvidenceBundleAlertsInnerKindEnum
+  /**
+   *
+   * @type {ModerationEvidenceBundleAlertsInnerDeliveryEnum}
+   * @memberof ModerationEvidenceBundleAlertsInner
+   */
+  delivery: ModerationEvidenceBundleAlertsInnerDeliveryEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleAlertsInner
+   */
+  slaDueAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleAlertsInner
+   */
+  detectedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleAlertsInner
+   */
+  deliveredAt: string | null
+}
+
+/**
+ * @export
+ */
+export const ModerationEvidenceBundleAlertsInnerKindEnum = {
+  at_risk: 'at_risk',
+  breached: 'breached',
+  escalated: 'escalated',
+} as const
+export type ModerationEvidenceBundleAlertsInnerKindEnum =
+  (typeof ModerationEvidenceBundleAlertsInnerKindEnum)[keyof typeof ModerationEvidenceBundleAlertsInnerKindEnum]
+
+/**
+ * @export
+ */
+export const ModerationEvidenceBundleAlertsInnerDeliveryEnum = {
+  pending: 'pending',
+  delivered: 'delivered',
+  console_only: 'console_only',
+  superseded: 'superseded',
+} as const
+export type ModerationEvidenceBundleAlertsInnerDeliveryEnum =
+  (typeof ModerationEvidenceBundleAlertsInnerDeliveryEnum)[keyof typeof ModerationEvidenceBundleAlertsInnerDeliveryEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationEvidenceBundleAuditEventsInner
+ */
+export interface ModerationEvidenceBundleAuditEventsInner {
+  /**
+   *
+   * @type {ModerationEvidenceBundleAuditEventsInnerEventTypeEnum}
+   * @memberof ModerationEvidenceBundleAuditEventsInner
+   */
+  eventType: ModerationEvidenceBundleAuditEventsInnerEventTypeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleAuditEventsInner
+   */
+  occurredAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleAuditEventsInner
+   */
+  actorId: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleAuditEventsInner
+   */
+  role: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleAuditEventsInner
+   */
+  action: string | null
+}
+
+/**
+ * @export
+ */
+export const ModerationEvidenceBundleAuditEventsInnerEventTypeEnum = {
+  moderation_decision_applied: 'moderation_decision_applied',
+  moderation_appeal_recorded: 'moderation_appeal_recorded',
+  moderation_case_viewed: 'moderation_case_viewed',
+} as const
+export type ModerationEvidenceBundleAuditEventsInnerEventTypeEnum =
+  (typeof ModerationEvidenceBundleAuditEventsInnerEventTypeEnum)[keyof typeof ModerationEvidenceBundleAuditEventsInnerEventTypeEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationEvidenceBundleCounts
+ */
+export interface ModerationEvidenceBundleCounts {
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationEvidenceBundleCounts
+   */
+  decisions: number
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationEvidenceBundleCounts
+   */
+  reports: number
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationEvidenceBundleCounts
+   */
+  auditEvents: number
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationEvidenceBundleCounts
+   */
+  alerts: number
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationEvidenceBundleCounts
+   */
+  withheldForConflict: number
+}
+/**
+ *
+ * @export
+ * @interface ModerationEvidenceBundleDecisionsInner
+ */
+export interface ModerationEvidenceBundleDecisionsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  decisionId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  caseId: string
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  sequence: number
+  /**
+   *
+   * @type {ModerationEvidenceBundleDecisionsInnerSourceEnum}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  source: ModerationEvidenceBundleDecisionsInnerSourceEnum
+  /**
+   *
+   * @type {ModerationEvidenceBundleDecisionsInnerActionEnum}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  action: ModerationEvidenceBundleDecisionsInnerActionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  reason: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  reasonRemoved: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  moderatorId: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  moderatorRole: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  subjectAlias: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  isTerminal: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  decidedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleDecisionsInner
+   */
+  anonymizedAt: string | null
+}
+
+/**
+ * @export
+ */
+export const ModerationEvidenceBundleDecisionsInnerSourceEnum = {
+  post: 'post',
+  comment: 'comment',
+} as const
+export type ModerationEvidenceBundleDecisionsInnerSourceEnum =
+  (typeof ModerationEvidenceBundleDecisionsInnerSourceEnum)[keyof typeof ModerationEvidenceBundleDecisionsInnerSourceEnum]
+
+/**
+ * @export
+ */
+export const ModerationEvidenceBundleDecisionsInnerActionEnum = {
+  resolve: 'resolve',
+  release: 'release',
+  takedown: 'takedown',
+  escalate: 'escalate',
+  ban: 'ban',
+  appeal_requested: 'appeal_requested',
+  appeal_upheld: 'appeal_upheld',
+  appeal_overturned: 'appeal_overturned',
+} as const
+export type ModerationEvidenceBundleDecisionsInnerActionEnum =
+  (typeof ModerationEvidenceBundleDecisionsInnerActionEnum)[keyof typeof ModerationEvidenceBundleDecisionsInnerActionEnum]
+
+/**
+ *
+ * @export
+ * @interface ModerationEvidenceBundleReportsInner
+ */
+export interface ModerationEvidenceBundleReportsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleReportsInner
+   */
+  reportId: string
+  /**
+   *
+   * @type {ModerationEvidenceBundleReportsInnerSourceEnum}
+   * @memberof ModerationEvidenceBundleReportsInner
+   */
+  source: ModerationEvidenceBundleReportsInnerSourceEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleReportsInner
+   */
+  reason: string
+  /**
+   *
+   * @type {ModerationEvidenceBundleReportsInnerOriginEnum}
+   * @memberof ModerationEvidenceBundleReportsInner
+   */
+  origin: ModerationEvidenceBundleReportsInnerOriginEnum
+  /**
+   *
+   * @type {ModerationEvidenceBundleReportsInnerReporterStateEnum}
+   * @memberof ModerationEvidenceBundleReportsInner
+   */
+  reporterState: ModerationEvidenceBundleReportsInnerReporterStateEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleReportsInner
+   */
+  acceptedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleReportsInner
+   */
+  dueAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationEvidenceBundleReportsInner
+   */
+  resolvedAt: string | null
+}
+
+/**
+ * @export
+ */
+export const ModerationEvidenceBundleReportsInnerSourceEnum = {
+  post: 'post',
+  comment: 'comment',
+} as const
+export type ModerationEvidenceBundleReportsInnerSourceEnum =
+  (typeof ModerationEvidenceBundleReportsInnerSourceEnum)[keyof typeof ModerationEvidenceBundleReportsInnerSourceEnum]
+
+/**
+ * @export
+ */
+export const ModerationEvidenceBundleReportsInnerOriginEnum = {
+  member: 'member',
+  screening: 'screening',
+} as const
+export type ModerationEvidenceBundleReportsInnerOriginEnum =
+  (typeof ModerationEvidenceBundleReportsInnerOriginEnum)[keyof typeof ModerationEvidenceBundleReportsInnerOriginEnum]
+
+/**
+ * @export
+ */
+export const ModerationEvidenceBundleReportsInnerReporterStateEnum = {
+  member: 'member',
+  screening: 'screening',
+  erased: 'erased',
+} as const
+export type ModerationEvidenceBundleReportsInnerReporterStateEnum =
+  (typeof ModerationEvidenceBundleReportsInnerReporterStateEnum)[keyof typeof ModerationEvidenceBundleReportsInnerReporterStateEnum]
+
+/**
+ * @type ModerationEvidenceExportRequest
+ *
+ * @export
+ */
+export type ModerationEvidenceExportRequest =
+  | ExportModerationEvidence200ResponseScopeOneOf
+  | ExportModerationEvidence200ResponseScopeOneOf1
+/**
+ *
+ * @export
+ * @interface ModerationHistoryError
+ */
+export interface ModerationHistoryError {
+  /**
+   *
+   * @type {number}
+   * @memberof ModerationHistoryError
+   */
+  statusCode: number
+  /**
+   *
+   * @type {ModerationHistoryErrorCodeEnum}
+   * @memberof ModerationHistoryError
+   */
+  code: ModerationHistoryErrorCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationHistoryError
+   */
+  message: string
+}
+
+/**
+ * @export
+ */
+export const ModerationHistoryErrorCodeEnum = {
+  moderation_history_disabled: 'moderation_history_disabled',
+  admin_required: 'admin_required',
+  self_review_refused: 'self_review_refused',
+  operator_sanctioned: 'operator_sanctioned',
+  member_not_found: 'member_not_found',
+  case_not_found: 'case_not_found',
+  invalid_request: 'invalid_request',
+  invalid_range: 'invalid_range',
+  export_too_large: 'export_too_large',
+  audit_unavailable: 'audit_unavailable',
+} as const
+export type ModerationHistoryErrorCodeEnum =
+  (typeof ModerationHistoryErrorCodeEnum)[keyof typeof ModerationHistoryErrorCodeEnum]
+
 /**
  *
  * @export
@@ -15004,7 +16211,7 @@ export interface RecordModerationAppealRequest {
    */
   status: RecordModerationAppealRequestStatusEnum
   /**
-   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.
+   * Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.
    * @type {string}
    * @memberof RecordModerationAppealRequest
    */
@@ -15317,6 +16524,107 @@ export const ReportCommunityPostInputReasonEnum = {
 export type ReportCommunityPostInputReasonEnum =
   (typeof ReportCommunityPostInputReasonEnum)[keyof typeof ReportCommunityPostInputReasonEnum]
 
+/**
+ *
+ * @export
+ * @interface RequestModerationErasure200Response
+ */
+export interface RequestModerationErasure200Response {
+  /**
+   *
+   * @type {RequestModerationErasure200ResponseData}
+   * @memberof RequestModerationErasure200Response
+   */
+  data: RequestModerationErasure200ResponseData
+}
+/**
+ *
+ * @export
+ * @interface RequestModerationErasure200ResponseData
+ */
+export interface RequestModerationErasure200ResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof RequestModerationErasure200ResponseData
+   */
+  requestId: string
+  /**
+   *
+   * @type {string}
+   * @memberof RequestModerationErasure200ResponseData
+   */
+  requestedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof RequestModerationErasure200ResponseData
+   */
+  deadlineAt: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof RequestModerationErasure200ResponseData
+   */
+  replayed: boolean
+}
+/**
+ *
+ * @export
+ * @interface RequestModerationErasure400Response
+ */
+export interface RequestModerationErasure400Response {
+  /**
+   *
+   * @type {number}
+   * @memberof RequestModerationErasure400Response
+   */
+  statusCode: number
+  /**
+   *
+   * @type {RequestModerationErasure400ResponseCodeEnum}
+   * @memberof RequestModerationErasure400Response
+   */
+  code: RequestModerationErasure400ResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof RequestModerationErasure400Response
+   */
+  message: string
+}
+
+/**
+ * @export
+ */
+export const RequestModerationErasure400ResponseCodeEnum = {
+  moderation_history_disabled: 'moderation_history_disabled',
+  admin_required: 'admin_required',
+  self_review_refused: 'self_review_refused',
+  operator_sanctioned: 'operator_sanctioned',
+  member_not_found: 'member_not_found',
+  case_not_found: 'case_not_found',
+  invalid_request: 'invalid_request',
+  invalid_range: 'invalid_range',
+  export_too_large: 'export_too_large',
+  audit_unavailable: 'audit_unavailable',
+} as const
+export type RequestModerationErasure400ResponseCodeEnum =
+  (typeof RequestModerationErasure400ResponseCodeEnum)[keyof typeof RequestModerationErasure400ResponseCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface RequestModerationErasureRequest
+ */
+export interface RequestModerationErasureRequest {
+  /**
+   *
+   * @type {string}
+   * @memberof RequestModerationErasureRequest
+   */
+  memberId: string
+}
 /**
  * Resolve one to fifty targets with unique correlation keys. Every parentId requires commentId.
  * @export

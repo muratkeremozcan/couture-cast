@@ -77,6 +77,7 @@ function build(loaded: LoadedCase | null = postCase()) {
         return visible
           ? {
               visible,
+              viewerConflict: false,
               state: {
                 revision: '0123456789abcdef',
                 allowedActions: [],
@@ -482,11 +483,18 @@ describe('U-Q-SVC-PRIOR-ACTIONS', () => {
   it('clamps action, reason and keeps actor kinds without ids', async () => {
     const loaded = postCase({
       priorActions: [
-        { actorKind: 'screening', action: '', reason: null, occurredAt: NOW },
+        {
+          actorKind: 'screening',
+          action: '',
+          reason: null,
+          reasonRemoved: false,
+          occurredAt: NOW,
+        },
         {
           actorKind: 'operator',
           action: 'a'.repeat(200),
           reason: 'r'.repeat(5000),
+          reasonRemoved: false,
           occurredAt: NOW,
         },
       ],

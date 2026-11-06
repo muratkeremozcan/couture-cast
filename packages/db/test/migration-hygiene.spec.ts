@@ -328,3 +328,69 @@ describe('migration hygiene', () => {
     }
   })
 })
+
+// Story 6.13. The role that runs migrations no longer owns "ModerationDecision", so a change to it has to
+// grant that role SET on the owner and revoke it again. A migration that forgets the revoke leaves the
+// application role able to act as the owner, which is the one path around the append-only guarantee.
+const DECISION_DDL =
+  /\b(?:ALTER\s+TABLE|DROP\s+TABLE|CREATE\s+TRIGGER|DROP\s+TRIGGER)\b[^;]*"ModerationDecision"/i
+const OWNER_REVOKE = /REVOKE\s+moderation_history_owner\s+FROM\b/i
+// `supautils` on Supabase segfaults the backend on these role keywords and restarts the server, which a
+// plain Postgres image never shows. Measured on 17.6.1.054, so the rule names the statement shape.
+const ROLE_KEYWORD_GRANT =
+  /\b(?:GRANT\s+[\w"]+\s+TO|REVOKE\s+[\w"]+\s+FROM)\s+(?:CURRENT_USER|SESSION_USER|CURRENT_ROLE)\b/i
+
+const leavesModerationHistoryOwnerGranted = (sql: string): boolean =>
+  DECISION_DDL.test(sql) && !OWNER_REVOKE.test(sql)
+
+describe('DB-HYGIENE-04: migrations that change ModerationDecision give back the owner role', () => {
+  const firstProtected = '20261105150000_immutable_moderation_history'
+
+  it('finds a later migration with DDL and no revoke, and passes one that only reads the table', () => {
+    expect(
+      leavesModerationHistoryOwnerGranted(
+        'ALTER TABLE "ModerationDecision" ADD COLUMN x int;'
+      )
+    ).toBe(true)
+    expect(
+      leavesModerationHistoryOwnerGranted(
+        'SET ROLE moderation_history_owner; ALTER TABLE "ModerationDecision" ADD COLUMN x int; RESET ROLE; REVOKE moderation_history_owner FROM CURRENT_USER;'
+      )
+    ).toBe(false)
+    expect(
+      leavesModerationHistoryOwnerGranted(
+        'INSERT INTO "X" SELECT id FROM "ModerationDecision";'
+      )
+    ).toBe(false)
+  })
+
+  it('finds a role keyword in a role grant, and passes a named role and a table grant', () => {
+    expect(
+      ROLE_KEYWORD_GRANT.test('GRANT owner_role TO CURRENT_USER WITH SET TRUE;')
+    ).toBe(true)
+    expect(ROLE_KEYWORD_GRANT.test('REVOKE owner_role FROM CURRENT_USER;')).toBe(true)
+    expect(ROLE_KEYWORD_GRANT.test('GRANT owner_role TO SESSION_USER;')).toBe(true)
+    expect(
+      ROLE_KEYWORD_GRANT.test("EXECUTE format('GRANT owner_role TO %I', current_user);")
+    ).toBe(false)
+    expect(ROLE_KEYWORD_GRANT.test('GRANT SELECT ON "T" TO authenticated;')).toBe(false)
+  })
+
+  it('has no role keyword in a role grant from 6.13 on', () => {
+    const offenders = readMigrations()
+      .filter((migration) => migration.name >= firstProtected)
+      .filter((migration) =>
+        ROLE_KEYWORD_GRANT.test(migration.sql.replace(/^\s*--.*$/gm, ''))
+      )
+      .map((migration) => migration.name)
+    expect(offenders).toEqual([])
+  })
+
+  it('holds for 6.13 and every later migration', () => {
+    const offenders = readMigrations()
+      .filter((migration) => migration.name >= firstProtected)
+      .filter((migration) => leavesModerationHistoryOwnerGranted(migration.sql))
+      .map((migration) => migration.name)
+    expect(offenders).toEqual([])
+  })
+})

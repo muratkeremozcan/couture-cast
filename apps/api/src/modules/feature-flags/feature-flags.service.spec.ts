@@ -145,6 +145,7 @@ describe('FeatureFlagsService', () => {
       ['moderation_console_enabled', false],
       ['moderation_decisions_enabled', false],
       ['moderation_sla_monitoring_enabled', false],
+      ['moderation_history_enabled', false],
     ])
 
     const cachedValues = new Map<string, boolean | null>([
@@ -160,6 +161,7 @@ describe('FeatureFlagsService', () => {
       ['moderation_console_enabled', null],
       ['moderation_decisions_enabled', null],
       ['moderation_sla_monitoring_enabled', null],
+      ['moderation_history_enabled', null],
     ])
 
     const findValue = vi
@@ -181,7 +183,7 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 12, fallbackCount: 0 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 13, fallbackCount: 0 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: true },
       { key: 'community_read_enabled', value: false },
@@ -195,6 +197,7 @@ describe('FeatureFlagsService', () => {
       { key: 'moderation_console_enabled', value: false },
       { key: 'moderation_decisions_enabled', value: false },
       { key: 'moderation_sla_monitoring_enabled', value: false },
+      { key: 'moderation_history_enabled', value: false },
     ])
   })
 
@@ -220,7 +223,7 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 12, fallbackCount: 12 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 13, fallbackCount: 13 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: false },
       { key: 'community_read_enabled', value: false },
@@ -242,6 +245,7 @@ describe('FeatureFlagsService', () => {
       { key: 'moderation_console_enabled', value: false },
       { key: 'moderation_decisions_enabled', value: false },
       { key: 'moderation_sla_monitoring_enabled', value: false },
+      { key: 'moderation_history_enabled', value: false },
     ])
   })
 })

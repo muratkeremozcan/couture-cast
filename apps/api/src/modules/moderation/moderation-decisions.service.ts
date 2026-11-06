@@ -61,12 +61,17 @@ import {
 import {
   decisionCaseOpenReportIds,
   decisionCaseSubject,
+  decisionCaseWordsSubject,
   decisionCaseTargetState,
   decisionCaseTargetStatus,
   ModerationDecisionsRepository,
   type DecisionCase,
 } from './moderation-decisions.repository.js'
-import { parseModerationCaseId } from './moderation-queue.repository.js'
+import { viewerConflictsWithEvidence } from './moderation-case-conflict.js'
+import {
+  moderationCaseKey,
+  parseModerationCaseId,
+} from './moderation-queue.repository.js'
 import {
   ModerationAfterCommit,
   moderationSanctionExpiry,
@@ -185,7 +190,11 @@ export class ModerationDecisionsService {
     auth: RequestAuthContext,
     caseId: string,
     readVisible: (tx: Tx) => Promise<Visible | null>
-  ): Promise<{ visible: Visible; state: ModerationCaseDecisionState } | null> {
+  ): Promise<{
+    visible: Visible
+    viewerConflict: boolean
+    state: ModerationCaseDecisionState
+  } | null> {
     const id = parseModerationCaseId(caseId)
     if (!id) return null
     const now = this.clock()
@@ -241,6 +250,7 @@ export class ModerationDecisionsService {
     }
     return {
       visible: read.visible,
+      viewerConflict: availability.viewerConflict,
       state: {
         revision: computeModerationCaseRevision({
           sequence: history.sequence,
@@ -310,11 +320,18 @@ export class ModerationDecisionsService {
     const subject = decisionCaseSubject(loaded)
     return {
       role: auth.role === 'admin' ? 'admin' : 'moderator',
-      viewerConflict: computeViewerConflict({
-        viewerId: auth.userId,
-        authorId: subject,
-        reporterIds: loaded.reports.map((report) => report.reporterId),
-      }),
+      viewerConflict:
+        computeViewerConflict({
+          viewerId: auth.userId,
+          authorId: subject,
+          reporterIds: loaded.reports.map((report) => report.reporterId),
+        }) ||
+        (await viewerConflictsWithEvidence(
+          tx,
+          auth.userId,
+          moderationCaseKey(loaded.id),
+          loaded.reports.map((report) => report.id)
+        )),
       operatorSanctioned:
         (await findActiveCommunitySanction(tx, auth.userId, state.now)) !== null,
       escalated: state.escalated,
@@ -322,6 +339,9 @@ export class ModerationDecisionsService {
       target: decisionCaseTargetState(loaded),
       subjectBan: state.subjectBan,
       authorEligible: await this.authorEligible(tx, loaded),
+      subjectErasureRequested: subject
+        ? await this.repository.hasErasureRequest(tx, subject)
+        : false,
       writesOpen: state.writesOpen,
     }
   }
@@ -432,6 +452,7 @@ export class ModerationDecisionsService {
       auth.userId,
       input.action === 'ban' ? decisionCaseSubject(before) : null
     )
+    await this.repository.assertOperatorNotErased(tx, auth.userId)
     await this.takeTargetLocks(tx, before, input.action)
 
     // Everything below reads the case as the locks now hold it.
@@ -574,7 +595,10 @@ export class ModerationDecisionsService {
     }
   ): Promise<void> {
     const { decisionId, sanctionId, caseId, input, loaded, at } = params
-    const subject = decisionCaseSubject(loaded)
+    // Read under the member lock `takeTargetLocks` took: an erasure that went first has cleared the link.
+    const author = decisionCaseWordsSubject(loaded)
+    const subject =
+      author && !(await this.repository.hasErasureRequest(tx, author)) ? author : null
     const subjectAlias = await this.repository.subjectAlias(tx, loaded)
     await writeModerationRecord(() =>
       this.repository.insertDecision(tx, {
@@ -630,14 +654,15 @@ export class ModerationDecisionsService {
     action: ModerationDecisionAction
   ): Promise<void> {
     const subject = decisionCaseSubject(loaded)
+    const wordsSubject = decisionCaseWordsSubject(loaded)
     const postId = loaded.post?.id ?? loaded.comment?.post_id ?? null
     if (action === 'ban' && subject) {
       // Takes the member guard, every related post guard, the member, report and submission locks and the post rows.
       await guardCommunitySubject(tx, subject)
     } else {
       if (postId) await guardCommunityPost(tx, postId)
-      if (subject)
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${subject}))`
+      if (wordsSubject)
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${wordsSubject}))`
     }
     if (!postId) return
     try {

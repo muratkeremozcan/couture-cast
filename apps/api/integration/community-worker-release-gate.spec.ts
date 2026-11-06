@@ -2290,6 +2290,13 @@ describe('evidence input set', () => {
     }
     for (const name of ['sweep', 'channel', 'repository', 'rules', 'telemetry'])
       expect(seen).toContain(`apps/api/src/modules/moderation/moderation-sla.${name}.ts`)
+    // Story 6.13: the retention job, its check list and erasure all run in this image.
+    for (const file of [
+      'moderation/moderation-history.retention',
+      'moderation/moderation-history.enforcement',
+      'community/community-erasure',
+    ])
+      expect(seen).toContain(`apps/api/src/modules/${file}.ts`)
     expect(seen).not.toContain('apps/api/src/instrumentation.ts')
     for (const heavy of [
       '@opentelemetry/sdk-node',

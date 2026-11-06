@@ -96,6 +96,9 @@ describe('dedicated community worker bootstrap', () => {
         sweepStalePendingReview: vi.fn().mockResolvedValue(undefined),
         sweepExpiredUploads: vi.fn().mockResolvedValue(undefined),
         sweepErasureRequests: vi.fn().mockResolvedValue(undefined),
+        sweepExpiredBanHolds: vi.fn().mockResolvedValue(undefined),
+        sweepModerationSla: vi.fn().mockResolvedValue(undefined),
+        sweepModerationHistoryRetention: vi.fn().mockResolvedValue(undefined),
       },
       readiness: {
         selector: 'fixture',
@@ -120,6 +123,7 @@ describe('dedicated community worker bootstrap', () => {
           sweepErasureRequests: vi.fn().mockResolvedValue(undefined),
           sweepExpiredBanHolds: vi.fn().mockResolvedValue(undefined),
           sweepModerationSla,
+          sweepModerationHistoryRetention: vi.fn().mockResolvedValue(undefined),
         },
         readiness: { selector: 'fixture', engineVersion: 'x', startupDurationMs: 1 },
         close: harness.communityClose,
@@ -155,6 +159,7 @@ describe('dedicated community worker bootstrap', () => {
       expect(sweep).toHaveBeenCalledTimes(1)
       await vi.advanceTimersByTimeAsync(slaIntervalMs)
       expect(sweep).toHaveBeenCalledTimes(2)
+      vi.useRealTimers()
       await bootstrap.performShutdown()
     })
 
@@ -176,6 +181,7 @@ describe('dedicated community worker bootstrap', () => {
       await vi.advanceTimersByTimeAsync(slaIntervalMs)
       expect(sweep).toHaveBeenCalledTimes(2)
       finish()
+      vi.useRealTimers()
       await bootstrap.performShutdown()
     })
 
@@ -188,6 +194,7 @@ describe('dedicated community worker bootstrap', () => {
       await vi.advanceTimersByTimeAsync(slaIntervalMs)
       await vi.advanceTimersByTimeAsync(slaIntervalMs)
       expect(sweep).toHaveBeenCalledTimes(2)
+      vi.useRealTimers()
       await bootstrap.performShutdown()
     })
 
@@ -202,6 +209,7 @@ describe('dedicated community worker bootstrap', () => {
           }) as unknown,
         })
       )
+      vi.useRealTimers()
       await bootstrap.performShutdown()
     })
 
@@ -212,6 +220,103 @@ describe('dedicated community worker bootstrap', () => {
       expect(code).not.toMatch(
         /createWorker\(\s*'maintenance'|new Worker\(\s*'maintenance'/
       )
+    })
+  })
+
+  describe('U-W-BOOT-RUN: the hosted path of the history retention', () => {
+    const dayMs = 86_400_000
+
+    function runtimeWithRetention(
+      sweepModerationHistoryRetention: () => Promise<unknown>
+    ) {
+      harness.createCommunityWorkerRuntime.mockResolvedValue({
+        worker: { on: vi.fn(), close: vi.fn() },
+        sweeps: {
+          dispatchPending: vi.fn().mockResolvedValue(undefined),
+          sweepStalePendingReview: vi.fn().mockResolvedValue(undefined),
+          sweepExpiredUploads: vi.fn().mockResolvedValue(undefined),
+          sweepErasureRequests: vi.fn().mockResolvedValue(undefined),
+          sweepExpiredBanHolds: vi.fn().mockResolvedValue(undefined),
+          sweepModerationSla: vi.fn().mockResolvedValue(undefined),
+          sweepModerationHistoryRetention,
+        },
+        readiness: { selector: 'fixture', engineVersion: 'x', startupDurationMs: 1 },
+        close: harness.communityClose,
+      })
+    }
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('passes a composition with a run function', async () => {
+      runtimeWithRetention(vi.fn().mockResolvedValue({ skipped: true }))
+      const bootstrap = freshProcess()
+      await bootstrap.startCommunityWorkers()
+      expect(harness.createCommunityWorkerRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({
+          moderationHistoryRetention: expect.objectContaining({
+            run: expect.any(Function) as unknown,
+          }) as unknown,
+        })
+      )
+      vi.useRealTimers()
+      await bootstrap.performShutdown()
+    })
+
+    /** The tick behind the 24-hour timer. Advancing a fake day through every 30-second sweep is too slow. */
+    const dailyTick = (setIntervalSpy: { mock: { calls: unknown[][] } }) => {
+      const call = setIntervalSpy.mock.calls.find(([, delay]) => delay === dayMs)
+      expect(call, 'a timer at exactly 24 hours').toBeDefined()
+      return call![0] as () => void
+    }
+    const settle = async () => {
+      for (let turn = 0; turn < 5; turn++) await Promise.resolve()
+    }
+
+    it('runs once at boot and then every 24 hours, so a daily restart still prunes', async () => {
+      const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
+      const sweep = vi.fn().mockResolvedValue({ skipped: false })
+      runtimeWithRetention(sweep)
+      const bootstrap = freshProcess()
+      await bootstrap.startCommunityWorkers()
+      expect(sweep).toHaveBeenCalledTimes(1)
+      await settle()
+      dailyTick(setIntervalSpy)()
+      expect(sweep).toHaveBeenCalledTimes(2)
+      setIntervalSpy.mockRestore()
+      await bootstrap.performShutdown()
+    })
+
+    it('[U-W-OVERLAP] does not overlap a slow run, and survives a rejected one', async () => {
+      const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
+      let finish: (() => void) | undefined
+      const sweep = vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise<void>((resolve) => {
+              finish = resolve
+            })
+        )
+        .mockRejectedValueOnce(new Error('row data: member-1'))
+        .mockResolvedValue({ skipped: false })
+      runtimeWithRetention(sweep)
+      const bootstrap = freshProcess()
+      await bootstrap.startCommunityWorkers()
+      expect(sweep).toHaveBeenCalledTimes(1)
+      const tick = dailyTick(setIntervalSpy)
+      tick()
+      expect(sweep).toHaveBeenCalledTimes(1)
+      finish?.()
+      await settle()
+      tick()
+      expect(sweep).toHaveBeenCalledTimes(2)
+      await settle()
+      tick()
+      expect(sweep).toHaveBeenCalledTimes(3)
+      setIntervalSpy.mockRestore()
+      await bootstrap.performShutdown()
     })
   })
 

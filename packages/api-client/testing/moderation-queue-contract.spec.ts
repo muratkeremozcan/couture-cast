@@ -237,6 +237,7 @@ const detail = {
       actorKind: 'screening',
       action: 'flagged',
       reason: 'text_policy_match',
+      reasonRemoved: false,
       occurredAt: iso,
     },
   ],

@@ -6,6 +6,7 @@ import { RequestAuthGuard, RolesGuard } from '../auth/security.guards'
 import { CommunityModule } from '../community/community.module.js'
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module.js'
 import { ModerationController } from './moderation.controller'
+import { ModerationOperatorGuard } from './moderation-operator.guard.js'
 import { ModerationService } from './moderation.service'
 import {
   MODERATION_QUEUE_CLOCK,
@@ -23,6 +24,9 @@ import {
   ModerationSanctionsService,
 } from './moderation-sanctions.service.js'
 
+import { ModerationHistoryController } from './moderation-history.controller.js'
+import { ModerationHistoryRepository } from './moderation-history.repository.js'
+import { ModerationHistoryService } from './moderation-history.service.js'
 import { ModerationSlaController } from './moderation-sla.controller.js'
 import { ModerationSlaService } from './moderation-sla.service.js'
 
@@ -41,6 +45,7 @@ import { ModerationSlaService } from './moderation-sla.service.js'
     ModerationQueueController,
     ModerationDecisionsController,
     ModerationSlaController,
+    ModerationHistoryController,
   ],
   providers: [
     ModerationService,
@@ -51,9 +56,12 @@ import { ModerationSlaService } from './moderation-sla.service.js'
     ModerationSanctionsService,
     ModerationAfterCommit,
     ModerationSlaService,
+    ModerationHistoryRepository,
+    ModerationHistoryService,
     { provide: MODERATION_QUEUE_CLOCK, useValue: systemModerationQueueClock },
     RequestAuthGuard,
     RolesGuard,
+    ModerationOperatorGuard,
   ],
 })
 export class ModerationModule implements NestModule {
@@ -63,7 +71,8 @@ export class ModerationModule implements NestModule {
       .forRoutes(
         ModerationQueueController,
         ModerationDecisionsController,
-        ModerationSlaController
+        ModerationSlaController,
+        ModerationHistoryController
       )
   }
 }

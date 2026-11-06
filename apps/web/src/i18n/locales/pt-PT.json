@@ -1030,7 +1030,8 @@
       "noPriorActions": "Nenhuma ação anterior.",
       "firstDecision": "Primeira decisão: {{when}}",
       "escalated": "Este caso aguarda um administrador. Só um administrador o pode encerrar.",
-      "reporterScreening": "Triagem automática"
+      "reporterScreening": "Triagem automática",
+      "reasonRemoved": "Motivo removido pelo apagamento"
     },
     "action": {
       "flagged": "Sinalizado pela triagem",
@@ -1174,6 +1175,35 @@
       "author_deleted": "Eliminado pelo autor",
       "erased": "Apagado",
       "unknown": "Outro estado"
+    },
+    "evidence": {
+      "link": "Exportar provas",
+      "title": "Exportar provas",
+      "subtitle": "Transfira o registo de moderação de um período, em ficheiro JSON para uma revisão de conformidade.",
+      "caseTitle": "Provas",
+      "caseHelp": "Transfira o registo de moderação deste caso em ficheiro JSON. Cada exportação fica registada.",
+      "exportCase": "Exportar provas",
+      "exportRange": "Exportar período",
+      "working": "A preparar o ficheiro de provas",
+      "done": "Ficheiro de provas transferido. Decisões: {{decisions}}. Denúncias: {{reports}}. Eventos de auditoria: {{auditEvents}}. Alertas: {{alerts}}.",
+      "withheld": "Decisões omitidas porque escreveu ou denunciou esses casos: {{count}}.",
+      "digest": "Resumo SHA-256:",
+      "to": "Até (UTC)",
+      "rangeHelp": "Dias UTC inteiros, até 90 dias. Cada exportação fica registada.",
+      "from": "De (UTC)",
+      "failure": {
+        "moderation_history_disabled": "A exportação de provas está desativada.",
+        "admin_required": "Só um administrador pode exportar um período.",
+        "self_review_refused": "Escreveu este conteúdo ou apresentou uma das denúncias, por isso outra pessoa tem de o exportar.",
+        "case_not_found": "Este caso já não existe. O identificador pode ter mudado após um apagamento.",
+        "invalid_range": "Escolha uma data inicial e uma final, com até 90 dias de diferença.",
+        "export_too_large": "Esta exportação é demasiado grande. Escolha um período mais curto.",
+        "audit_unavailable": "Não foi possível registar a exportação, por isso nada foi transferido. Tente novamente.",
+        "signed_out": "Inicie sessão novamente para continuar.",
+        "forbidden": "Esta conta não pode exportar provas.",
+        "rate_limited": "Demasiados pedidos. Aguarde um momento e tente novamente.",
+        "unavailable": "A exportação não está disponível. Tente novamente."
+      }
     }
   }
 }

@@ -1030,7 +1030,8 @@
       "noPriorActions": "No prior actions.",
       "firstDecision": "First decision {{when}}",
       "escalated": "This case is waiting for an admin. Only an admin can close it.",
-      "reporterScreening": "Automated screening"
+      "reporterScreening": "Automated screening",
+      "reasonRemoved": "Reason removed by erasure"
     },
     "action": {
       "flagged": "Flagged by screening",
@@ -1174,6 +1175,35 @@
       "author_deleted": "Deleted by the author",
       "erased": "Erased",
       "unknown": "Other status"
+    },
+    "evidence": {
+      "link": "Evidence export",
+      "title": "Evidence export",
+      "subtitle": "Download the moderation record for a period, as a JSON file for a compliance review.",
+      "caseTitle": "Evidence",
+      "caseHelp": "Download this case's moderation record as a JSON file. Each export is recorded.",
+      "exportCase": "Export evidence",
+      "exportRange": "Export period",
+      "working": "Preparing the evidence file",
+      "done": "Evidence file downloaded. Decisions: {{decisions}}. Reports: {{reports}}. Audit events: {{auditEvents}}. Alerts: {{alerts}}.",
+      "withheld": "Decisions left out because you wrote or reported those cases: {{count}}.",
+      "digest": "SHA-256 digest:",
+      "to": "To (UTC)",
+      "rangeHelp": "Whole UTC days, up to 90 days. Each export is recorded.",
+      "from": "From (UTC)",
+      "failure": {
+        "moderation_history_disabled": "Evidence export is turned off.",
+        "admin_required": "Only an admin can export a period.",
+        "self_review_refused": "You wrote this content or filed one of its reports, so another moderator has to export it.",
+        "case_not_found": "This case no longer exists. It may have been re-keyed after an erasure.",
+        "invalid_range": "Choose a start date and an end date, up to 90 days apart.",
+        "export_too_large": "This export is too large. Choose a shorter period.",
+        "audit_unavailable": "The export could not be recorded, so nothing was downloaded. Try again.",
+        "signed_out": "Sign in again to continue.",
+        "forbidden": "This account cannot export evidence.",
+        "rate_limited": "Too many requests. Wait a moment, then try again.",
+        "unavailable": "The export is unavailable. Try again."
+      }
     }
   }
 }

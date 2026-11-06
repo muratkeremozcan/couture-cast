@@ -285,14 +285,17 @@ describe.runIf(reachable || automated)('moderation decisions database', () => {
         sequence: number
         moderator: string | null
         mutation: string
+        subject: string
+        alias: string
       }> = {}
     ) => {
       const id = patch.id ?? randomUUID()
       await db.query(
         `INSERT INTO "ModerationDecision"
            (id, case_key, sequence, source, report_ids, action, reason, moderator_id,
-            moderator_role, mutation_id, payload_hash, response, is_terminal, decided_at)
-         VALUES ($1, $2, $3, 'post', '{}', 'ban', 'r', $4, 'admin', $5, 'h', '{}', true, $6)`,
+            moderator_role, mutation_id, payload_hash, response, is_terminal, decided_at,
+            subject_user_id, subject_alias)
+         VALUES ($1, $2, $3, 'post', '{}', 'ban', 'r', $4, 'admin', $5, 'h', '{}', true, $6, $7, $8)`,
         [
           id,
           patch.caseKey ?? `post.${randomUUID()}`,
@@ -300,6 +303,8 @@ describe.runIf(reachable || automated)('moderation decisions database', () => {
           patch.moderator === undefined ? 'reporter' : patch.moderator,
           patch.mutation ?? randomUUID(),
           NOW,
+          patch.subject ?? null,
+          patch.alias ?? null,
         ]
       )
       return id
@@ -409,11 +414,7 @@ describe.runIf(reachable || automated)('moderation decisions database', () => {
 
     it('cascades a sanction with its member and keeps the decision with a null subject', async () => {
       await member('erased-member')
-      const id = await decision()
-      await db.query(
-        "UPDATE \"ModerationDecision\" SET subject_user_id = 'erased-member', subject_alias = 'Kept Alias' WHERE id = $1",
-        [id]
-      )
+      const id = await decision({ subject: 'erased-member', alias: 'Kept Alias' })
       await sanction(id, 'temporary', { user: 'erased-member' })
       await db.query('BEGIN')
       try {

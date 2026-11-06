@@ -812,3 +812,88 @@ test.describe('Moderation SLA read route (Story 6.12)', () => {
     }
   })
 })
+
+test.describe('Moderation history routes (Story 6.13)', () => {
+  const ERASURE_PATH = '/api/v1/moderation/erasure-requests'
+  const EXPORT_PATH = '/api/v1/moderation/evidence-exports'
+  const AVAILABILITY_PATH = '/api/v1/moderation/evidence-exports/availability'
+  const CASE_BODY = { scope: 'case', caseId: 'post.never-existed' }
+
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      isProdEnvironment(testInfo),
+      'Synthetic moderator identities are not provisioned in production.'
+    )
+  })
+
+  test('[P0] P-SECURITY-LIST refuses anonymous, a tampered token, guardian and teen, in private', async ({
+    request,
+  }, testInfo) => {
+    const baseUrl = resolveApiBaseUrl(testInfo)
+    const calls = [
+      { path: ERASURE_PATH, data: { memberId: 'never-existed' } },
+      { path: EXPORT_PATH, data: CASE_BODY },
+    ]
+    for (const { path, data } of calls) {
+      const anonymous = await request.post(`${baseUrl}${path}`, { data })
+      expect(anonymous.status(), path).toBe(401)
+      unauthorizedHttpErrorSchema.parse(await anonymous.json())
+      expect(anonymous.headers()['cache-control']).toBe('private, no-store')
+
+      const tampered = await request.post(`${baseUrl}${path}`, {
+        data,
+        headers: { Authorization: 'Bearer not-a-real-token' },
+      })
+      expect(tampered.status(), path).toBe(401)
+
+      for (const role of ['guardian', 'teen'] as const) {
+        const headers = authHeaders(buildUniqueId(`${role}-history`, testInfo), role)
+        const refused = await request.post(`${baseUrl}${path}`, { data, headers })
+        const queue = await request.get(`${baseUrl}/api/v1/moderation/cases`, { headers })
+        expect(refused.status(), `${path} ${role}`).toBe(403)
+        expect(refused.headers()['cache-control']).toBe('private, no-store')
+        // Identical to the 6.10 refusal, so the body reveals neither the flag nor the route.
+        expect(await refused.json()).toEqual(await queue.json())
+      }
+    }
+    const anonymous = await request.get(`${baseUrl}${AVAILABILITY_PATH}`)
+    expect(anonymous.status()).toBe(401)
+    const guardian = await request.get(`${baseUrl}${AVAILABILITY_PATH}`, {
+      headers: authHeaders(buildUniqueId('guardian-history', testInfo), 'guardian'),
+    })
+    expect(guardian.status()).toBe(403)
+  })
+
+  test('[P0] P-SECURITY-LIST refuses a moderator on erasure, and on a period or by its closed flag', async ({
+    request,
+  }, testInfo) => {
+    const baseUrl = resolveApiBaseUrl(testInfo)
+    const headers = authHeaders(buildUniqueId('moderator-history', testInfo), 'moderator')
+    const erasure = await request.post(`${baseUrl}${ERASURE_PATH}`, {
+      data: { memberId: 'never-existed' },
+      headers,
+    })
+    const period = await request.post(`${baseUrl}${EXPORT_PATH}`, {
+      data: {
+        scope: 'range',
+        from: '2026-01-01T00:00:00.000Z',
+        to: '2026-01-02T00:00:00.000Z',
+      },
+      headers,
+    })
+    const codeOf = async (response: APIResponse) =>
+      ((await response.json()) as { code?: string }).code
+    expect(erasure.status()).toBe(403)
+    expect(await codeOf(erasure)).toBe('admin_required')
+    // The erasure route checks the role first, because it has no flag. The export checks its flag first, and
+    // a deployed environment has that flag off, where a moderator reads the same closed answer as anyone.
+    if (isNonLocalEnvironment(testInfo) && period.status() === 503) {
+      expect(await codeOf(period)).toBe('moderation_history_disabled')
+    } else {
+      expect(period.status()).toBe(403)
+      expect(await codeOf(period)).toBe('admin_required')
+    }
+    for (const response of [erasure, period])
+      expect(response.headers()['cache-control']).toBe('private, no-store')
+  })
+})

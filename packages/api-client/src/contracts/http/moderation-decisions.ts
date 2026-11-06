@@ -30,6 +30,9 @@ export const COMMUNITY_BAN_MARKER_PREFIX = 'community_ban:'
 /** The closed `CommunityComment.screening_reason` of a comment takedown. The operator's words stay on the decision. */
 export const MODERATION_OPERATOR_TAKEDOWN_REASON = 'operator_takedown'
 
+/** Story 6.13: what erasure leaves in a decision's `reason`. The API maps it to `reasonRemoved`, so no screen shows it. */
+export const MODERATION_ERASED_REASON = '[erased]'
+
 /** True for a stored reason written by a ban or a comment takedown, which is never a screening finding. */
 export function isOperatorHoldReason(reason: string | null | undefined): boolean {
   return (
@@ -56,12 +59,13 @@ export const moderationDecisionReasonSchema = z
   .refine(
     (reason) =>
       communityModerationReasonCategories(reason) === null &&
-      !isOperatorHoldReason(reason),
+      !isOperatorHoldReason(reason) &&
+      reason !== MODERATION_ERASED_REASON,
     { message: 'Reason is reserved.' }
   )
   .openapi({
     description:
-      'Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or begins with the ban marker prefix is refused.',
+      'Plain text from the moderator. A value that matches a screening category, equals the operator takedown marker or the erased marker, or begins with the ban marker prefix is refused.',
   })
 
 const revisionSchema = z.string().regex(/^[0-9a-f]{16}$/)
@@ -251,6 +255,8 @@ export interface ModerationAvailabilityInput {
   subjectBan: ModerationSanctionKind | null
   /** `assertCommunityDatabaseAccess` passes for the author, ban aside. */
   authorEligible: boolean
+  /** Story 6.13: the author has an erasure request, so there is no member left to ban. */
+  subjectErasureRequested?: boolean
   /** `community_write_enabled` for the author. */
   writesOpen: boolean
 }
@@ -294,6 +300,7 @@ const banAvailability = (
   banKind?: ModerationSanctionKind
 ): ModerationAvailability => {
   if (input.target.state === 'erased') return notApplicable('target_erased')
+  if (input.subjectErasureRequested) return notApplicable('author_ineligible')
   if (input.subjectBan === 'permanent') return notApplicable('already_banned')
   if (input.subjectBan === 'temporary' && banKind !== 'permanent')
     return notApplicable('already_banned')

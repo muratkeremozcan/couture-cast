@@ -20,32 +20,13 @@ import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
 import { commentAnalytics } from './community-comments.repository.js'
 import { recordCommunityEngagement } from './community-engagement-intent.js'
 import { isPubliclyVisiblePost } from './community.repository.js'
+import {
+  ModerationRecordWriteError,
+  writeModerationRecord,
+} from './community-moderation-record.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
-import { postgresError } from '../../prisma/postgres-error.js'
 
-/** A moderation record could not be written, so the decision cannot be attributed. */
-export class ModerationRecordWriteError extends Error {
-  constructor(cause: unknown) {
-    super('A moderation record could not be written.', { cause })
-    this.name = 'ModerationRecordWriteError'
-  }
-}
-
-/**
- * Writes one attributed record. A failure rolls the transaction back and reads as one closed
- * error, except a unique violation and a retryable lock failure, which their callers handle.
- */
-export async function writeModerationRecord<T>(write: () => Promise<T>): Promise<T> {
-  try {
-    return await write()
-  } catch (error) {
-    const prisma = error instanceof Prisma.PrismaClientKnownRequestError ? error.code : ''
-    const sql = postgresError(error)?.code ?? ''
-    if (['P2002', 'P2034'].includes(prisma) || ['40001', '40P01', '55P03'].includes(sql))
-      throw error
-    throw new ModerationRecordWriteError(error)
-  }
-}
+export { ModerationRecordWriteError, writeModerationRecord }
 
 /** Who decided, in their words, at the one time of the decision. */
 export interface OperatorEffect {

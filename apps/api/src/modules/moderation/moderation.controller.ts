@@ -11,6 +11,7 @@ import {
 import { moderationActionInputSchema } from '../../contracts/http'
 import { AuthContext, Roles } from '../auth/security.decorators'
 import { RequestAuthGuard, RolesGuard } from '../auth/security.guards'
+import { ModerationOperatorGuard } from './moderation-operator.guard.js'
 import type { RequestAuthContext } from '../auth/security.types'
 import { ModerationService } from './moderation.service'
 
@@ -22,7 +23,7 @@ export class ModerationController {
 
   @Post('actions')
   @HttpCode(200)
-  @UseGuards(RequestAuthGuard, RolesGuard)
+  @UseGuards(RequestAuthGuard, RolesGuard, ModerationOperatorGuard)
   @Roles('moderator', 'admin')
   recordAction(@AuthContext() auth: RequestAuthContext, @Body() payload: unknown) {
     const parsed = moderationActionInputSchema.safeParse(payload)

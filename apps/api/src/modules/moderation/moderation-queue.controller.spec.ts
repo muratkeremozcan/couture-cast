@@ -11,6 +11,7 @@ import { RequestMethod } from '@nestjs/common'
 import { describe, expect, it, vi } from 'vitest'
 import { API_ROLES_KEY } from '../auth/security.decorators.js'
 import { RequestAuthGuard, RolesGuard } from '../auth/security.guards.js'
+import { ModerationOperatorGuard } from './moderation-operator.guard.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { ModerationController } from './moderation.controller.js'
 import { ModerationQueueController } from './moderation-queue.controller.js'
@@ -46,6 +47,7 @@ describe('U-Q-CTRL-ROLES: the guard declarations', () => {
     expect(Reflect.getMetadata(GUARDS_METADATA, ModerationQueueController)).toEqual([
       RequestAuthGuard,
       RolesGuard,
+      ModerationOperatorGuard,
     ])
   })
 
@@ -219,6 +221,7 @@ describe('U-Q-READSET: the repository reads only the tables the RLS suite proves
         'CommunitySanction',
         'LookbookPost',
         'ModerationDecision',
+        'ModerationErasureRequest',
         'ModerationEvent',
       ].sort()
     )

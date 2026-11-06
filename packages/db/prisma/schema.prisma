@@ -332,7 +332,8 @@ model User {
   community_comment_analytics_subject CommunityCommentAnalyticsSubject?
   community_comments                  CommunityComment[]
   community_comment_receipts          CommunityCommentReceipt[]
-  community_comment_reports           CommunityCommentReport[]
+  community_comment_reports           CommunityCommentReport[]          @relation("CommunityCommentReporter")
+  community_comment_reports_received  CommunityCommentReport[]          @relation("CommunityCommentReportAuthor")
   community_reactions                 CommunityReaction[]
   community_reaction_receipts         CommunityReactionReceipt[]
   community_reaction_outbox           CommunityReactionOutbox[]
@@ -345,6 +346,8 @@ model User {
   community_sponsorships_ended        CommunityPostSponsorship[]        @relation("CommunitySponsorshipEnder")
   moderation_decisions_made           ModerationDecision[]              @relation("ModerationDecisionModerator")
   moderation_decisions_received       ModerationDecision[]              @relation("ModerationDecisionSubject")
+  moderation_erasure_request          ModerationErasureRequest?         @relation("ModerationErasureMember")
+  moderation_erasures_requested       ModerationErasureRequest[]        @relation("ModerationErasureRequester")
   community_sanctions                 CommunitySanction[]
 }
 
@@ -786,6 +789,9 @@ model CommunityPostReport {
   id                String                @id @default(cuid())
   post              LookbookPost?         @relation(fields: [post_id], references: [id], onDelete: SetNull)
   post_id           String?
+  /// Story 6.13: the post this report was about, with no foreign key, so it outlives the row. A database
+  /// trigger sets it, and sibling reports of an erased target still find each other through it.
+  origin_post_id    String?
   reporter          User?                 @relation("CommunityReporter", fields: [reporter_id], references: [id], onDelete: SetNull)
   reporter_id       String?
   reason            CommunityReportReason
@@ -800,6 +806,7 @@ model CommunityPostReport {
 
   @@unique([post_id, reporter_id])
   @@index([post_id])
+  @@index([origin_post_id])
   @@index([reporter_id])
   @@index([resolved_at, sla_due_at])
 }
@@ -1028,6 +1035,9 @@ model ModerationEvent {
   /// BillingEvent.user_id — the audit fact outlives its subject.
   post                      LookbookPost?      @relation(fields: [post_id], references: [id], onDelete: SetNull)
   post_id                   String?
+  /// Story 6.13: the post this row was about, kept after `post_id` is nulled, so erasure can still pair
+  /// an operator's words with their target. A database trigger sets it, and it names no member.
+  origin_post_id            String?
   garment                   GarmentItem?       @relation(fields: [garment_item_id], references: [id])
   garment_item_id           String?
   silhouette_profile        SilhouetteProfile? @relation(fields: [silhouette_profile_id], references: [id])
@@ -1055,20 +1065,25 @@ model ModerationEvent {
   created_at                DateTime           @default(now())
 
   @@index([post_id])
+  @@index([origin_post_id])
   @@index([flagged_by_id])
 }
 
 /// Story 6.11: one row per applied moderation decision or appeal step, and the
 /// source of truth for attribution, serialization, idempotency and the first
-/// effective decision time. No code path updates or deletes a row; Story 6.13
-/// enforces that at the database boundary.
+/// effective decision time.
+/// Story 6.13: append-only at the database boundary. The role `moderation_history_owner` owns this
+/// table, the application role holds only SELECT and INSERT, and a trigger refuses every change except
+/// removal of identity by a foreign key action or `private.moderation_history_anonymize`.
+/// A migration that changes this table has to follow the sequence in its 6.13 migration.
 /// RLS: API-only, enabled with zero policies and zero grants.
 ///
 /// `case_key` has no foreign key because a case is derived from its reports.
 /// `report_ids` holds every report of the case at decision time, so the history
-/// survives the re-key erasure causes. The three identity columns are SetNull so
+/// survives the re-key erasure causes. The identity columns are SetNull so
 /// neither a moderator's nor a subject's erasure destroys the record, and
-/// `subject_alias` is what is left of the subject afterwards.
+/// `subject_alias` is what is left of the subject afterwards: it is random, and
+/// erasure deletes the `CommunityAlias` row that mapped it to the member.
 model ModerationDecision {
   id              String                   @id @default(cuid())
   case_key        String
@@ -1094,6 +1109,9 @@ model ModerationDecision {
   /// True for resolve, release, takedown and ban. `firstDecisionAt` reads only these.
   is_terminal     Boolean
   decided_at      DateTime
+  /// Set when erasure first removed identity from this row. `reason` reads `[erased]` only when the erased
+  /// member was the subject or a reporter: a moderator's erasure sets this and keeps the reason.
+  anonymized_at   DateTime?
   sanction        CommunitySanction?
 
   @@unique([case_key, sequence])
@@ -1104,11 +1122,28 @@ model ModerationDecision {
   @@index([report_ids], type: Gin)
 }
 
+/// Story 6.13: one account erasure of community and moderation data. It starts the 72-hour clock, and
+/// `completed_at` records when the member's posts were purged and their rows deleted. `member_id` is the
+/// one identity this story keeps until the `User` row goes, because a replay and the null subject rule read it.
+/// RLS: API-only, enabled with zero policies and zero grants.
+model ModerationErasureRequest {
+  id           String    @id
+  member       User?     @relation("ModerationErasureMember", fields: [member_id], references: [id], onDelete: SetNull)
+  member_id    String?   @unique
+  requester    User?     @relation("ModerationErasureRequester", fields: [requested_by], references: [id], onDelete: SetNull)
+  requested_by String?
+  requested_at DateTime
+  completed_at DateTime?
+
+  @@index([requested_by])
+  @@index([completed_at, requested_at])
+}
+
 /// Story 6.12: one operations alert, which is both the console record and the delivery outbox.
 /// `dedupe_key` is `sla:<source>:<anchorReportId>:<kind>` or `escalated:<decisionId>`, so a retry,
 /// a restart and a concurrent worker all write one row. `anchor_report_id` and `decision_id` are
-/// plain columns, because a report id survives the erasure re-key and CC-6.13 owns the retention
-/// of both records. The row holds no reason, excerpt, alias, reporter or subject.
+/// plain columns, because a report id survives the erasure re-key. Story 6.13: a terminal row with no owed
+/// failure record is deleted 400 days after `detected_at`, and a `pending` row is never deleted. The row holds no reason, excerpt, alias, reporter or subject.
 /// RLS: API-only, enabled with zero policies and zero grants.
 ///
 /// The migration adds the partial indexes `ModerationSlaAlert_deliverable_idx` ON
@@ -1839,23 +1874,31 @@ model CommunityCommentScreeningOutbox {
 }
 
 model CommunityCommentReport {
-  id               String                  @id @default(cuid())
-  comment_id       String?
-  comment          CommunityComment?       @relation(fields: [comment_id], references: [id], onDelete: SetNull)
-  reporter_id      String?
-  reporter         User?                   @relation(fields: [reporter_id], references: [id], onDelete: SetNull)
-  reason           CommunityReportReason
-  content_snapshot Json?
-  accepted_at      DateTime                @default(now())
-  routed_at        DateTime                @default(now())
-  sla_due_at       DateTime
-  resolved_at      DateTime?
-  origin           CommunityReportOrigin   @default(member)
-  audit            CommunityCommentAudit[]
+  id                String                  @id @default(cuid())
+  comment_id        String?
+  comment           CommunityComment?       @relation(fields: [comment_id], references: [id], onDelete: SetNull)
+  reporter_id       String?
+  reporter          User?                   @relation("CommunityCommentReporter", fields: [reporter_id], references: [id], onDelete: SetNull)
+  /// Story 6.13: the comment this report was about, with no foreign key, so it outlives the row. A database
+  /// trigger sets it, and sibling reports of an erased target still find each other through it.
+  origin_comment_id String?
+  /// Story 6.13: whose words `content_snapshot` holds. It outlives the comment row, which a parent post's erasure deletes.
+  comment_author_id String?
+  comment_author    User?                   @relation("CommunityCommentReportAuthor", fields: [comment_author_id], references: [id], onDelete: SetNull)
+  reason            CommunityReportReason
+  content_snapshot  Json?
+  accepted_at       DateTime                @default(now())
+  routed_at         DateTime                @default(now())
+  sla_due_at        DateTime
+  resolved_at       DateTime?
+  origin            CommunityReportOrigin   @default(member)
+  audit             CommunityCommentAudit[]
 
   @@unique([comment_id, reporter_id])
   @@index([reporter_id, accepted_at])
   @@index([resolved_at, sla_due_at])
+  @@index([comment_author_id])
+  @@index([origin_comment_id])
 }
 
 model CommunityCommentAudit {
