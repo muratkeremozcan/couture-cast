@@ -11,6 +11,13 @@ const page = (closed: boolean) => ({ isClosed: () => closed })
 describe('isAbandonedByClose', () => {
   it('ignores the disposal of a fetch on a page that closed', () => {
     expect(isAbandonedByClose(DISPOSED, page(true))).toBe(true)
+    // Preview CI, P-D-DISABLED: the context closed between the fetch and reading its body.
+    expect(
+      isAbandonedByClose(
+        new Error('apiResponse.text: Response has been disposed'),
+        page(true)
+      )
+    ).toBe(true)
     expect(
       isAbandonedByClose(
         new Error('route.fulfill: Target page, context or browser has been closed'),

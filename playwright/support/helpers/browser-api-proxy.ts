@@ -126,7 +126,7 @@ export function isAbandonedByClose(
   return (
     page.isClosed() &&
     error instanceof Error &&
-    /Request context disposed|Target page, context or browser has been closed/.test(
+    /Request context disposed|Response has been disposed|Target page, context or browser has been closed/.test(
       error.message
     )
   )
