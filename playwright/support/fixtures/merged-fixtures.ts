@@ -17,6 +17,7 @@ import { WireMockWebhookProvider } from '@seontechnologies/playwright-utils/webh
 import { test as webhookFixture } from '@seontechnologies/playwright-utils/webhook/fixtures'
 import { test as recurse } from '@seontechnologies/playwright-utils/recurse/fixtures'
 import { resolveEnvironmentConfig } from '../../config/environments'
+import { drainApiProxy } from '../helpers/browser-api-proxy'
 import coutureCastAuthProvider from '../auth-session/custom-auth-provider'
 
 // Register the provider in the fixture module, not only global setup, so UI mode,
@@ -53,6 +54,14 @@ const authSession = base.extend<AuthFixtures>({
 // every other endpoint.
 const networkErrorMonitor = base.extend(createNetworkErrorMonitorFixture())
 
+// Story 6.13: before the context closes, so a proxied call still in flight cannot leave a report secret.
+const drainedProxyPage = base.extend({
+  page: async ({ page }, use) => {
+    await use(page)
+    await drainApiProxy(page)
+  },
+})
+
 // Service-role headers belong to API seeding only. Browser contexts carry none, so
 // every page proves the app sends its own bearer (see environments.ts apiHeaders).
 const serviceRequest = base.extend({
@@ -88,7 +97,8 @@ export const test = mergeTests(
   log,
   networkRecorder,
   networkErrorMonitor,
-  recurse
+  recurse,
+  drainedProxyPage
 )
 
 // Capture Playwright test context and mock PostHog ingest endpoints before every test.

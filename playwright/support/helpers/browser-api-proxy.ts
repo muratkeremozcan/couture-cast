@@ -115,9 +115,21 @@ async function proxyApiRequest(route: Route, state: ApiProxyState) {
 }
 
 /**
- * A page can have a call in flight when its test ends, such as the console's availability read, and closing
- * the context disposes the fetch under it. Nobody is waiting for that answer. Any other failure, or this one
- * on a page that is still open, is real.
+ * Lets a proxied call in flight finish, so call before the page's context closes.
+ * Closing first disposes the fetch, and Playwright records a failed step in the report even in a passing test.
+ * That step's call log lists the request headers, with the Vercel `_vercel_jwt` cookie among them, and the
+ * cookie's payload carries the bypass secret, so `check-artifact-secrets` rightly refuses the upload.
+ */
+export async function drainApiProxy(
+  page: Pick<Page, 'isClosed' | 'unrouteAll'>
+): Promise<void> {
+  if (!apiProxyStates.has(page as Page) || page.isClosed()) return
+  await page.unrouteAll({ behavior: 'wait' })
+}
+
+/**
+ * A last resort for a page something closed mid-call, which `drainApiProxy` could not reach. Nobody is waiting
+ * for that answer. Any other failure, or this one on a page that is still open, is real.
  */
 export function isAbandonedByClose(
   error: unknown,
@@ -126,7 +138,7 @@ export function isAbandonedByClose(
   return (
     page.isClosed() &&
     error instanceof Error &&
-    /Request context disposed|Response has been disposed|Target page, context or browser has been closed/.test(
+    /Request context disposed|Response has been disposed|Test ended|Target page, context or browser has been closed/.test(
       error.message
     )
   )

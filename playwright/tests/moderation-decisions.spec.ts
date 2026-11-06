@@ -19,6 +19,7 @@ import { PrismaClient } from '@prisma/client'
 import {
   errors,
   type APIRequestContext,
+  type BrowserContext,
   type BrowserContextOptions,
   type Locator,
   type Page,
@@ -57,7 +58,7 @@ import {
   isProdEnvironment,
   resolveApiBaseUrl,
 } from '../support/helpers/api-test'
-import { installApiProxy } from '../support/helpers/browser-api-proxy'
+import { drainApiProxy, installApiProxy } from '../support/helpers/browser-api-proxy'
 import {
   seedWebSession,
   WEB_ACCESS_TOKEN_STORAGE_KEY,
@@ -212,7 +213,7 @@ const test = base.extend<Fixtures>({
     await use(await fx.operator())
   },
   openAs: async ({ browser }, use) => {
-    const contexts: { close: () => Promise<void> }[] = []
+    const contexts: BrowserContext[] = []
     await use(async (userId, role, options = {}) => {
       const context = await browser.newContext(options)
       contexts.push(context)
@@ -226,7 +227,12 @@ const test = base.extend<Fixtures>({
       })
       return page
     })
-    await Promise.all(contexts.map((context) => context.close()))
+    await Promise.all(
+      contexts.map(async (context) => {
+        await Promise.all(context.pages().map(drainApiProxy))
+        await context.close()
+      })
+    )
   },
 })
 
