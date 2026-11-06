@@ -789,6 +789,9 @@ model CommunityPostReport {
   id                String                @id @default(cuid())
   post              LookbookPost?         @relation(fields: [post_id], references: [id], onDelete: SetNull)
   post_id           String?
+  /// Story 6.13: the post this report was about, with no foreign key, so it outlives the row. A database
+  /// trigger sets it, and sibling reports of an erased target still find each other through it.
+  origin_post_id    String?
   reporter          User?                 @relation("CommunityReporter", fields: [reporter_id], references: [id], onDelete: SetNull)
   reporter_id       String?
   reason            CommunityReportReason
@@ -803,6 +806,7 @@ model CommunityPostReport {
 
   @@unique([post_id, reporter_id])
   @@index([post_id])
+  @@index([origin_post_id])
   @@index([reporter_id])
   @@index([resolved_at, sla_due_at])
 }
@@ -1031,6 +1035,9 @@ model ModerationEvent {
   /// BillingEvent.user_id — the audit fact outlives its subject.
   post                      LookbookPost?      @relation(fields: [post_id], references: [id], onDelete: SetNull)
   post_id                   String?
+  /// Story 6.13: the post this row was about, kept after `post_id` is nulled, so erasure can still pair
+  /// an operator's words with their target. A database trigger sets it, and it names no member.
+  origin_post_id            String?
   garment                   GarmentItem?       @relation(fields: [garment_item_id], references: [id])
   garment_item_id           String?
   silhouette_profile        SilhouetteProfile? @relation(fields: [silhouette_profile_id], references: [id])
@@ -1058,6 +1065,7 @@ model ModerationEvent {
   created_at                DateTime           @default(now())
 
   @@index([post_id])
+  @@index([origin_post_id])
   @@index([flagged_by_id])
 }
 
@@ -1871,6 +1879,9 @@ model CommunityCommentReport {
   comment           CommunityComment?       @relation(fields: [comment_id], references: [id], onDelete: SetNull)
   reporter_id       String?
   reporter          User?                   @relation("CommunityCommentReporter", fields: [reporter_id], references: [id], onDelete: SetNull)
+  /// Story 6.13: the comment this report was about, with no foreign key, so it outlives the row. A database
+  /// trigger sets it, and sibling reports of an erased target still find each other through it.
+  origin_comment_id String?
   /// Story 6.13: whose words `content_snapshot` holds. It outlives the comment row, which a parent post's erasure deletes.
   comment_author_id String?
   comment_author    User?                   @relation("CommunityCommentReportAuthor", fields: [comment_author_id], references: [id], onDelete: SetNull)
@@ -1887,6 +1898,7 @@ model CommunityCommentReport {
   @@index([reporter_id, accepted_at])
   @@index([resolved_at, sla_due_at])
   @@index([comment_author_id])
+  @@index([origin_comment_id])
 }
 
 model CommunityCommentAudit {

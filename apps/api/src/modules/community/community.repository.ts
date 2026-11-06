@@ -617,7 +617,7 @@ export class CommunityRepository {
   ): Promise<CommunityAccountErasure> {
     return communityPrivacyTransaction(this.prisma, async (tx) => {
       const lockedCases = await lockReportedCases(tx, userId)
-      await lockCommunitySanctions(tx, operator?.id ?? null, userId)
+      await lockCommunitySanctions(tx, operator ? [operator.id] : [], userId)
       await operator?.assertMayAct?.(tx)
       await guardCommunitySubject(tx, userId)
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`

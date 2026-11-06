@@ -73,10 +73,15 @@ const stripEventSnapshots = stripSnapshots('ModerationEvent')
 /** One decision whose words the function is about to redact, with where those words were copied. */
 interface RedactedDecision {
   reason: string
+  case_key: string
   post_id: string | null
   report_ids: string[]
   subject_alias: string | null
 }
+
+/** The post a decision was about. `case_key` keeps it after the row has gone. */
+const decisionTargetPost = ({ post_id, case_key }: RedactedDecision): string | null =>
+  post_id ?? (case_key.startsWith('post.') ? case_key.slice('post.'.length) : null)
 
 /**
  * A decision's reason is also written to its prior-action row and, for a takedown, to the post, so
@@ -109,14 +114,20 @@ async function decisionsToRedact(
         ...(reported.length > 0 ? [{ report_ids: { hasSome: reported } }] : []),
       ],
     },
-    select: { reason: true, post_id: true, report_ids: true, subject_alias: true },
+    select: {
+      reason: true,
+      case_key: true,
+      post_id: true,
+      report_ids: true,
+      subject_alias: true,
+    },
   })
 }
 
 /**
  * Each copy is matched on the words and on the decision's own target, because moderators reuse wording
- * and audit evidence must not be destroyed by a coincidence of text. An orphan's events lost `post_id`,
- * so only a decision that lost it too looks there, and its alias stands in for the post.
+ * and audit evidence must not be destroyed by a coincidence of text. An event keeps `origin_post_id` after
+ * its post has gone, so the words still pair with the right target. The alias covers a row older than that.
  */
 async function redactOperatorReasonCopies(
   tx: Tx,
@@ -128,7 +139,11 @@ async function redactOperatorReasonCopies(
   const onOrphans = decisions.flatMap(({ reason, post_id, subject_alias }) =>
     !post_id && subject_alias ? [{ reason, post_id: null, subject_alias }] : []
   )
-  const onEvents = [...onPosts, ...onOrphans]
+  const onOrigins = decisions.flatMap((decision) => {
+    const origin = decisionTargetPost(decision)
+    return origin ? [{ reason: decision.reason, origin_post_id: origin }] : []
+  })
+  const onEvents = [...onOrigins, ...onOrphans]
   if (onEvents.length > 0)
     await tx.moderationEvent.updateMany({
       where: { OR: onEvents },
@@ -201,12 +216,10 @@ export async function removeMemberFromModerationRecords(
  */
 export async function lockCommunitySanctions(
   tx: Prisma.TransactionClient,
-  shared: string | null,
+  shared: readonly string[],
   exclusive: string | null
 ): Promise<void> {
-  const ids = [
-    ...new Set([shared, exclusive].flatMap((id) => (id === null ? [] : [id]))),
-  ].sort()
+  const ids = [...new Set([...shared, ...(exclusive === null ? [] : [exclusive])])].sort()
   for (const id of ids) {
     if (id === exclusive)
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_sanction:' || ${id}))`

@@ -9,6 +9,7 @@ import {
   type ModerationEvidenceDecision,
   type ModerationEvidenceReport,
 } from '@couture/api-client/contracts/http'
+import { closeOverEvidence } from './moderation-case-conflict.js'
 import {
   mapModerationAuditEvent,
   mapModerationReason,
@@ -71,11 +72,8 @@ export class ModerationHistoryRepository {
 
   /**
    * Which of these decisions the viewer may not see, for the range export's conflict rule. Not returned to
-   * anyone. A report filed after a decision conflicts too, so reports match on the target as well as on
-   * the decision's own report ids. One conflict withholds every row of that case, and of any case that
-   * shares a report with it, because an erasure re-key splits one target into several case keys.
-   * The link can sit in a decision outside these rows, so the closure reads every decision, and it stops
-   * when a pass adds nothing, which the rows it can reach bound.
+   * anyone. It starts from everything the viewer filed, wrote or is named on and closes over all evidence,
+   * because the only link to the viewer can sit outside the period.
    */
   async conflictingDecisionIds(
     tx: Tx,
@@ -86,14 +84,14 @@ export class ModerationHistoryRepository {
     const commentIds = decisions.flatMap((row) =>
       row.comment_id ? [row.comment_id] : []
     )
-    const [postReports, commentReports, posts, comments] = await Promise.all([
+    const [postReports, commentReports, posts, comments, named] = await Promise.all([
       tx.communityPostReport.findMany({
         where: { reporter_id: viewerId },
-        select: { id: true, post_id: true },
+        select: { id: true },
       }),
       tx.communityCommentReport.findMany({
         where: { OR: [{ reporter_id: viewerId }, { comment_author_id: viewerId }] },
-        select: { id: true, comment_id: true },
+        select: { id: true },
       }),
       tx.lookbookPost.findMany({
         where: { id: { in: postIds }, user_id: viewerId },
@@ -103,42 +101,26 @@ export class ModerationHistoryRepository {
         where: { id: { in: commentIds }, user_id: viewerId },
         select: { id: true },
       }),
+      tx.moderationDecision.findMany({
+        where: { subject_user_id: viewerId },
+        select: { case_key: true },
+      }),
     ])
-    const posted = new Set([
-      ...posts.map(({ id }) => id),
-      ...postReports.flatMap((row) => (row.post_id ? [row.post_id] : [])),
-    ])
-    const commented = new Set([
-      ...comments.map(({ id }) => id),
-      ...commentReports.flatMap((row) => (row.comment_id ? [row.comment_id] : [])),
-    ])
-    const reports = new Set([...postReports, ...commentReports].map(({ id }) => id))
-    const cases = new Set(
-      decisions
-        .filter(
-          (row) =>
-            (row.post_id !== null && posted.has(row.post_id)) ||
-            (row.comment_id !== null && commented.has(row.comment_id))
-        )
-        .map((row) => row.case_key)
-    )
-    for (let size = -1; size !== reports.size + cases.size; ) {
-      size = reports.size + cases.size
-      const reached = await tx.moderationDecision.findMany({
-        where: {
-          OR: [
-            { subject_user_id: viewerId },
-            { case_key: { in: [...cases] } },
-            { report_ids: { hasSome: [...reports] } },
-          ],
-        },
-        select: { case_key: true, report_ids: true },
-      })
-      for (const row of reached) {
-        cases.add(row.case_key)
-        for (const id of row.report_ids) reports.add(id)
-      }
-    }
+    const posted = new Set(posts.map(({ id }) => id))
+    const commented = new Set(comments.map(({ id }) => id))
+    const { cases } = await closeOverEvidence(tx, {
+      reports: [...postReports, ...commentReports].map(({ id }) => id),
+      cases: [
+        ...named.map(({ case_key }) => case_key),
+        ...decisions
+          .filter(
+            (row) =>
+              (row.post_id !== null && posted.has(row.post_id)) ||
+              (row.comment_id !== null && commented.has(row.comment_id))
+          )
+          .map((row) => row.case_key),
+      ],
+    })
     return new Set(
       decisions.filter((row) => cases.has(row.case_key)).map((row) => row.id)
     )

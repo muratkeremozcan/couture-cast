@@ -61,6 +61,7 @@ import {
 import {
   decisionCaseOpenReportIds,
   decisionCaseSubject,
+  decisionCaseWordsSubject,
   decisionCaseTargetState,
   decisionCaseTargetStatus,
   ModerationDecisionsRepository,
@@ -594,7 +595,8 @@ export class ModerationDecisionsService {
     }
   ): Promise<void> {
     const { decisionId, sanctionId, caseId, input, loaded, at } = params
-    const author = decisionCaseSubject(loaded)
+    // Read under the member lock `takeTargetLocks` took: an erasure that went first has cleared the link.
+    const author = decisionCaseWordsSubject(loaded)
     const subject =
       author && !(await this.repository.hasErasureRequest(tx, author)) ? author : null
     const subjectAlias = await this.repository.subjectAlias(tx, loaded)
@@ -652,14 +654,15 @@ export class ModerationDecisionsService {
     action: ModerationDecisionAction
   ): Promise<void> {
     const subject = decisionCaseSubject(loaded)
+    const wordsSubject = decisionCaseWordsSubject(loaded)
     const postId = loaded.post?.id ?? loaded.comment?.post_id ?? null
     if (action === 'ban' && subject) {
       // Takes the member guard, every related post guard, the member, report and submission locks and the post rows.
       await guardCommunitySubject(tx, subject)
     } else {
       if (postId) await guardCommunityPost(tx, postId)
-      if (subject)
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${subject}))`
+      if (wordsSubject)
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${wordsSubject}))`
     }
     if (!postId) return
     try {

@@ -475,7 +475,7 @@ export class CommunityMaintenanceService {
       if (await memberIdentityRemains(this.prisma, member))
         await communityPrivacyTransaction(this.prisma, async (tx) => {
           const lockedCases = await lockReportedCases(tx, member)
-          await lockCommunitySanctions(tx, null, member)
+          await lockCommunitySanctions(tx, [], member)
           await guardCommunitySubject(tx, member)
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${member}))`
           await assertReportedCasesUnchanged(tx, member, lockedCases)

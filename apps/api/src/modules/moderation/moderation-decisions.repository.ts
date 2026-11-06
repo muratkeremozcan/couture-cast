@@ -26,6 +26,7 @@ export interface DecisionCaseReport {
   reporterId: string | null
   resolvedAt: Date | null
   subjectAlias: string | null
+  commentAuthorId: string | null
 }
 
 /** A case as a decision sees it. `reports` is every report of the case, oldest first. */
@@ -38,6 +39,17 @@ export interface DecisionCase {
 
 export const decisionCaseSubject = (loaded: DecisionCase): string | null =>
   loaded.post?.user_id ?? loaded.comment?.user_id ?? null
+
+/**
+ * Whom a decision's words are about, which can be more than `decisionCaseSubject` knows. An orphan comment
+ * has lost its row, and the report still names the commenter, whose erasure has to reach these words. It
+ * stays out of `decisionCaseSubject` because an orphan has no standing to ban or restore.
+ */
+export const decisionCaseWordsSubject = (loaded: DecisionCase): string | null =>
+  decisionCaseSubject(loaded) ??
+  (loaded.id.kind === 'orphan-comment'
+    ? (loaded.reports[0]?.commentAuthorId ?? null)
+    : null)
 
 export const decisionCaseTargetStatus = (loaded: DecisionCase): string | null =>
   loaded.post?.status ?? loaded.comment?.status ?? null
@@ -100,9 +112,10 @@ export class ModerationDecisionsRepository {
   async lockSanctionEligibility(
     tx: Tx,
     operatorId: string,
-    banSubjectId: string | null
+    banSubjectId: string | null,
+    sharedSubjectIds: readonly string[] = []
   ): Promise<void> {
-    await lockCommunitySanctions(tx, operatorId, banSubjectId)
+    await lockCommunitySanctions(tx, [operatorId, ...sharedSubjectIds], banSubjectId)
   }
 
   findByMutation(
@@ -134,6 +147,7 @@ export class ModerationDecisionsRepository {
             reporterId: row.reporter_id,
             resolvedAt: row.resolved_at,
             subjectAlias: row.subject_alias,
+            commentAuthorId: null,
           })),
           post:
             id.kind === 'post'
@@ -159,6 +173,7 @@ export class ModerationDecisionsRepository {
             reporterId: row.reporter_id,
             resolvedAt: row.resolved_at,
             subjectAlias: null,
+            commentAuthorId: row.comment_author_id,
           })),
           post: null,
           comment:
