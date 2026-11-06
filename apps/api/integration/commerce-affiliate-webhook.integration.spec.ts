@@ -472,6 +472,15 @@ describe('Story 5.1 affiliate conversion webhook against real PostgreSQL', () =>
     it('5.1-INT-07 rejects every signature failure with the identical 401 and no rows', async (context) => {
       if (!requireSchema(context)) return
 
+      // Reading the clock at dispatch was not enough: a request that crossed a second boundary before
+      // the server read its clock came back inside the window, and 5.1-INT-07 answered 200 on CI at
+      // e7cae073. Frozen mid-second, as 5.1-INT-08 is, the skew the server reads is exactly tolerance + 1.
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(Math.floor(Date.now() / 1000) * 1000 + 500)
+      onTestFinished(() => {
+        vi.useRealTimers()
+      })
+
       const partner = await createPartner()
       const eventId = `evt-${randomUUID()}`
       const payload = { ...VALID_PAYLOAD, eventId, clickToken: 'unmatched' }
