@@ -10109,7 +10109,8 @@ Key takeaways:
     So every writer either finished first and erasure sees its row, or starts later and sees the request.
 12. **Judge a conflict on the evidence it reaches.**
     After a post's erasure each report has its own orphan case, so a moderator who reported the post could rule on or export a sibling report's case.
-    `viewerConflictsWithEvidence` follows decision report ids until the set stops growing, and decide, case detail, appeal and case export all ask it.
+    Decision rows link only the reports they name, so each report also keeps an origin id with no foreign key.
+    `closeOverEvidence` follows both until a pass adds nothing, and decide, case detail, appeal and both exports ask it.
 
 Hard-won lessons from the implementation and review of this story:
 
@@ -10202,6 +10203,7 @@ Cross-links:
 Sequence to follow:
 
 1. `packages/db/prisma/migrations/20261105150000_immutable_moderation_history/migration.sql` for the role, the guard and the exception.
+   `20261106120000_moderation_report_origins` adds the origin ids that outlive a report's or event's target.
 2. `apps/api/src/modules/community/community-erasure.ts` for what erasure removes and how copies match.
 3. `apps/api/src/modules/community/community.repository.ts`, `requestAccountErasure`, for the transaction and its lock order.
 4. `apps/api/src/modules/community/community-maintenance.service.ts`, `settleAccountErasures`, for repair, completion and overdue.
@@ -10292,8 +10294,8 @@ Evidence boundaries:
   A session running arbitrary DDL as the migration role can defeat enforcement.
   On the Supabase image the application role can set `session_replication_role = replica`, and in that mode it can update and delete `AuditLog` and `CommunityCommentAudit` rows, which stay trigger-only by this story's scope.
   Report `details` a third party wrote stays, and a reason typed after an erasure commits stays.
-  Two reports on one deleted post with no decision between them have no surviving link, so they cannot be read as a conflict.
-  A comment report orphaned before `comment_author_id` existed has no link, and none exist in production because the hard delete is new in this story.
+  A report orphaned before `comment_author_id` and the origin ids existed has no link, and none exist in production because the hard delete is new in this story.
+  Words written after a member's erasure was requested answer only to the reports they rest on.
   No member self-service deletion exists, and the account-deletion story owns the `User` row, wardrobe and billing.
   Screenshots under `_bmad-output/test-artifacts/story-6-13/` are git-ignored local evidence.
 
