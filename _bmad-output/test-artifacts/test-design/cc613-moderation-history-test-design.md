@@ -732,31 +732,35 @@ Stated residuals with no test that could close them: TEA-03 (arbitrary DDL as th
 
 ## Execution record
 
-Sign-off runs at `743f179ab544ddac55358cf1748e9e540f122309`, 2026-11-05.
+Sign-off runs at `4d280d906bb7b25d0528d8fdf7f59080dd4d5806`, 2026-11-05.
 Three consecutive full unfiltered runs, one suite at a time, each count identical across all three.
 No test failed, none was retried, and none was flaky.
 
 | Lane                                                                                                                               | Passed in each run | Skipped in each run |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------- |
-| `packages/db`, plain Postgres at 54339                                                                                             | 441                | 1                   |
-| `packages/db`, Supabase image at 54341                                                                                             | 441                | 1                   |
-| `apps/api`, every unit and integration suite, plain Postgres                                                                       | 8565               | 38                  |
+| `packages/db`, plain Postgres at 54339                                                                                             | 449                | 1                   |
+| `packages/db`, Supabase image at 54341                                                                                             | 449                | 1                   |
+| `apps/api`, every unit and integration suite, plain Postgres                                                                       | 8568               | 38                  |
 | `moderation-history` sequential, route, erasure and completion, Supabase image                                                     | 120                | 0                   |
+| `location-capture`, `location-preferences` and `weather` with the flags `pr-checks` sets, plain Postgres                           | 34                 | 0                   |
+| `community-storage-capability` on the local stack's real Storage, Supabase image                                                   | 10                 | 0                   |
 | `packages/api-client`                                                                                                              | 1757               | 0                   |
 | `packages/config`                                                                                                                  | 31                 | 0                   |
 | `apps/web`                                                                                                                         | 1931               | 0                   |
 | Pact consumer                                                                                                                      | 456                | 0                   |
 | Pact provider                                                                                                                      | 1                  | 0                   |
+| `browser-api-proxy.spec.ts`                                                                                                        | 3                  | 0                   |
 | Playwright: `moderation-history`, `-console`, `-decisions`, `-sla`, `auth-moderation-security`, real browser on the Supabase image | 85                 | 1                   |
 
-13828 tests passed in each run.
+13894 tests passed in each run.
 `moderation:history:verify` passed 16 of 16 checks on the Playwright database in each run.
-`node --test` for `coverage-shards`, `workflow-step-shadowing` and `prisma-migrate-connection` passed in each run.
+`node --test` for `coverage-shards`, `workflow-step-shadowing`, `prisma-migrate-connection` and `database-tls` passed in each run.
 
 None of the skips is a planned scenario of this story.
 `6.1-DB-015` needs a storage schema these databases do not have.
 `P-Q-DISABLED-REAL` needs an environment with the console off.
-The `apps/api` skips are in `location-capture`, `location-capture.lifecycle`, `community-storage-capability`, `community-comments-measurement`, `integration-schema-required`, `location-preferences` and `weather`.
+The `apps/api` lane skips what needs a flag or real Storage, and the two lanes after it run those suites with them.
+Two skips stay: one in `community-comments-measurement` and one in `integration-schema-required`.
 
 ### Red proofs
 
@@ -766,10 +770,11 @@ The first database proof at the baseline `56509fa8`: 71 failed and 42 passed.
 
 ### Seeded defects
 
-Each ran in a throwaway worktree at `743f179a`, one mutation at a time, against the named tests.
-44 of 44 were caught.
+Each ran in a throwaway worktree at `c546b130`, one mutation at a time, against the named tests.
+48 of 48 were caught.
 `S-1b` shows `0/0` because the migration itself refuses, and no test assertion runs.
 `P-LANG` has no seed: it was red against the shipped source before its fix.
+After `c546b130` only test files changed.
 
 | Seed  | Defect                                                                      | Failed / ran |
 | ----- | --------------------------------------------------------------------------- | ------------ |
@@ -817,6 +822,10 @@ Each ran in a throwaway worktree at `743f179a`, one mutation at a time, against 
 | S-39  | Range closure stops after one pass                                          | 2/2          |
 | S-40  | Verifier loses the granted check                                            | 1/27         |
 | S-41  | Erased operator reads the evidence page: history controller loses the guard | 2/3          |
+| S-42  | Verifier stops verifying the certificate                                    | 5/8          |
+| S-43  | Verifier skips the host name check                                          | 1/1          |
+| S-44  | Verifier keeps the URL ssl settings on a remote host                        | 2/8          |
+| S-45  | Verifier connects with the raw URL                                          | 2/8          |
 
 The reworked `scrub_comment_reports_on_user_delete` has no seed, because the API suite runs on an already migrated database.
 The builder saw the 23503 it fixes in `community-comments-privacy`, and `I-S-COMMENT-LINK` proves the direct delete.
@@ -841,10 +850,12 @@ Added after the plan, because review found the gaps it did not name:
 - `I-S-MATRIX`: every ordered pair of five erasures, scanned for ids and for authored words.
 - `I-S-COMMENT-LINK`, `I-S-CONCURRENT`, `I-O-RACE-DECISION`, `I-O-RACE-APPEAL`, `I-O-AFTER`, `I-O-SUBJECT`, `I-O-SIBLING-CONFLICT`.
 - `A-X-ORPHAN-SIBLING`, `A-X-RANGE-CLOSURE`, `A-X-APPEAL`, `A-AVAILABILITY`, `I-E-OPERATOR-COPIES`, `D-COMMENT-AUDIT`, `D-MIG-ROLE-RACE`, `P-LANG`.
+- `V-TLS-*`: the verifier against a hosted-style endpoint, through an in-process proxy that terminates TLS with a generated root, intermediate and leaf and forwards to the real database.
 
 This plan missed C1, C2 and C3, which an independent Codex review found.
 `I-C-THIRD-PARTY-COMMENT` stopped before the second erasure, no scenario made an operator the subject of an erasure, and conflict was planned per case.
 The sequential matrix and the `I-O` set exist to close that kind of gap.
+It also never ran the verifier against a TLS endpoint, so the script failed on hosted Preview with `SELF_SIGNED_CERT_IN_CHAIN` on its first real use.
 
 ### Manual checks
 
@@ -855,7 +866,7 @@ The sequential matrix and the `I-O` set exist to close that kind of gap.
 | `M-VISUAL`         | Done. At `7cc95652`: case detail and `/moderation/evidence` in light and dark, at 1280 and 320 pixels, in de-DE and pt-BR, which hold the longest labels, with a long unbroken reason and no horizontal overflow. An erased case at 1280 and 375 pixels at `104ef810`, and in the builder's second walk at `1175a24c`. Only `lang` handling changed on the web after `7cc95652`. This pass found the `lang` defect `P-LANG` now covers |
 | `M-BUNDLE-READ`    | Done: a downloaded bundle read as a compliance reviewer holds no reporter id or erased subject id. It keeps the alias, moderator ids of members who are not erased, and the post id inside `caseId`, as D2 and D8 rule. `P-DOWNLOAD` proves it on raw bytes in each run                                                                                                                                                                |
 | `M-GATE-READ`      | Done: dates, sources and limits are right, no person is named, and the proof commit named there exists in this repository                                                                                                                                                                                                                                                                                                              |
-| `M-PREVIEW-VERIFY` | **Open.** It needs this PR's Preview deployment, and this brief forbids a push. The coordinator read the hosted role on 2026-11-05 (spec CX-6), which is not the same proof. Run `moderation:history:verify` against the Preview database once the PR deploys                                                                                                                                                                          |
+| `M-PREVIEW-VERIFY` | Done on hosted Preview after PR #197 deployed, recorded in the spec by the builder and the coordinator, not run by this role: the fixed script passed 16 of 16 and exited 0. The first run needed `sslmode=no-verify`, which is how the `V-TLS` gap surfaced                                                                                                                                                                           |
 
 ### Traceability: acceptance criterion to test file
 
@@ -873,7 +884,7 @@ Every planned scenario outside the Differences table and the manual checks appea
 
 ### Limits of these proofs
 
-- The hosted Preview outcome is open, as `M-PREVIEW-VERIFY` says.
+- The hosted Production outcome stays unproven until deploy. `V-TLS` uses a generated chain, so only `M-PREVIEW-VERIFY` proves the committed root against the real hosted chain.
 - `I-D-ATOMIC` and `I-R-DRIFT-LOG` add triggers or grants the Supabase image's `postgres` cannot, so the whole `apps/api` lane runs on plain Postgres, and the erasure, completion, route and sequential suites also run on the image.
 - `AuditLog` and `CommunityCommentAudit` stay trigger-only by the frozen scope, and the Supabase application role can skip those triggers with `session_replication_role = replica` (TEA-24). The gate record states this.
 
