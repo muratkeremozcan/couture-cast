@@ -882,6 +882,18 @@ It also never ran the verifier against a TLS endpoint, so the script failed on h
 The scenario-level map is the Traceability section above.
 Every planned scenario outside the Differences table and the manual checks appears by name in a test that passed in the third run.
 
+### Preview artifact guard
+
+The Preview job's artifact guard refused the upload on three runs in a row, and on the last of them every test had passed.
+The HTML report held the Vercel `_vercel_jwt` cookie and the bypass secret, and no artifact was uploaded.
+Trace was off throughout, as `preview.config.ts` sets it, so the location was a report JSON entry and no trace zip.
+A proxied call in flight when a test ended had its fetch disposed by the closing context, which leaves a failed step in the report even when the test passes.
+That step's call log lists the request headers, and the cookie's payload carries the secret.
+`drainApiProxy` now lets the call finish before the context closes.
+Proved locally with a canary cookie through the real helpers and fixtures and `check-artifact-secrets.mjs`: at `e7cae073` the test passes and the guard exits 1, and with the drain the test passes and the guard exits 0.
+`guardian-consent-ui` uses the same proxy and takes the same fixture.
+The prod lane is not exposed: its run step holds no bypass secret, so it mints no cookie.
+
 ### Limits of these proofs
 
 - The hosted Production outcome stays unproven until deploy. `V-TLS` uses a generated chain, so only `M-PREVIEW-VERIFY` proves the committed root against the real hosted chain.
