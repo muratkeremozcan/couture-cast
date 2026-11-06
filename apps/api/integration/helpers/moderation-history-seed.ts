@@ -5,6 +5,7 @@
 // scrubbed or named here.
 import { randomUUID } from 'node:crypto'
 import type { PrismaClient } from '@prisma/client'
+import { expect, vi } from 'vitest'
 import { buildCommunityContentSnapshot } from '../../src/modules/community/community-audit-snapshot.js'
 import { CommunityRepository } from '../../src/modules/community/community.repository.js'
 import type { DecisionFixtures, SeededMember } from './moderation-decisions-seed.js'
@@ -302,4 +303,58 @@ export async function waitForLockWaiters(prisma: PrismaClient, count: number) {
     await new Promise((resolve) => setTimeout(resolve, 25))
   }
   throw new Error(`${waiting} of ${count} sessions blocked on a lock after 15 seconds.`)
+}
+
+/**
+ * Holds `first` at a barrier inside its transaction and starts `second`, then waits until the database
+ * reports `second` blocked or `second` has finished, and only then lets `first` go. Waiting for "blocked"
+ * alone would report a missing lock as a timeout, and what matters is the state the race leaves.
+ * The decision's barrier is on its audit row, in the same transaction after the decision row: the
+ * application role owns `AuditLog` and cannot put a trigger on `ModerationDecision` on the real image.
+ */
+export async function runInOrder<A, B>(
+  prisma: PrismaClient,
+  databaseUrl: string,
+  table: 'AuditLog' | 'ModerationErasureRequest',
+  first: () => Promise<A>,
+  second: () => Promise<B>
+): Promise<[A, B]> {
+  const key = 800_000 + Math.floor(Math.random() * 90_000)
+  const release = await holdBarrier(databaseUrl, key)
+  const remove = await installTrigger(
+    prisma,
+    table,
+    'BEFORE INSERT',
+    `PERFORM pg_advisory_xact_lock(${key});`
+  )
+  try {
+    const running = first()
+    running.catch(() => undefined)
+    await waitForBarrierWaiter(prisma, key)
+    let finished = false
+    const following = second()
+    following.then(
+      () => {
+        finished = true
+      },
+      () => {
+        finished = true
+      }
+    )
+    await vi.waitFor(
+      async () => {
+        if (finished) return
+        const rows = await prisma.$queryRaw<{ waiting: number }[]>`
+          SELECT count(*)::int AS waiting FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event_type = 'Lock'`
+        expect(rows[0]!.waiting).toBeGreaterThanOrEqual(2)
+      },
+      { timeout: 15_000, interval: 25 }
+    )
+    await release()
+    return await Promise.all([running, following])
+  } finally {
+    await release()
+    await remove()
+  }
 }

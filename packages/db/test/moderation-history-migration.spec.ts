@@ -12,6 +12,7 @@ import {
   createEmptyDatabase,
   dropDatabase,
   APP_LOGIN,
+  inRollback,
   migrateAs,
   NO_BYPASS_LOGIN,
   OWNER_ROLE,
@@ -171,6 +172,113 @@ describe.runIf(enforcementRuns)('moderation history migration', () => {
         await root.query(`DROP ROLE IF EXISTS ${race}`)
       }
     }, 60_000)
+
+    it('[P0] D-MIG-ORIGINS backfills what still has a target, and a writer cannot set the origin', async () => {
+      const sql = readFileSync(
+        fileURLToPath(
+          new URL(
+            '../prisma/migrations/20261106120000_moderation_report_origins/migration.sql',
+            import.meta.url
+          )
+        ),
+        'utf8'
+      )
+      await inRollback(root, async () => {
+        await root.query(`
+          DROP TRIGGER post_report_origin ON "CommunityPostReport";
+          DROP TRIGGER comment_report_origin ON "CommunityCommentReport";
+          DROP TRIGGER moderation_event_origin ON "ModerationEvent";
+          DROP FUNCTION set_post_report_origin();
+          DROP FUNCTION set_comment_report_origin();
+          DROP FUNCTION set_moderation_event_origin();
+          ALTER TABLE "CommunityPostReport" DROP COLUMN origin_post_id;
+          ALTER TABLE "CommunityCommentReport" DROP COLUMN origin_comment_id;
+          ALTER TABLE "ModerationEvent" DROP COLUMN origin_post_id;
+        `)
+        const author = await fixture.member('origin-author')
+        const postId = await fixture.post(author)
+        const commentId = `origin-comment-${randomUUID()}`
+        await root.query(
+          `INSERT INTO "CommunityComment" (id, post_id, user_id, body, locale, status, platform, updated_at)
+           VALUES ($1, $2, $3, 'Words.', 'en-US', 'held_for_review', 'web', now())`,
+          [commentId, postId, author]
+        )
+        const orphanPostReport = await fixture.postReport(null)
+        const livePostReport = await fixture.postReport(null)
+        await root.query('UPDATE "CommunityPostReport" SET post_id = $2 WHERE id = $1', [
+          livePostReport,
+          postId,
+        ])
+        const orphanCommentReport = await fixture.commentReport(null)
+        const liveCommentReport = await fixture.commentReport(null)
+        await root.query(
+          'UPDATE "CommunityCommentReport" SET comment_id = $2 WHERE id = $1',
+          [liveCommentReport, commentId]
+        )
+        const eventOf = async (post: string | null) => {
+          const id = randomUUID()
+          await root.query(
+            `INSERT INTO "ModerationEvent" (id, post_id, action, reason)
+             VALUES ($1, $2, 'flagged', 'Words.')`,
+            [id, post]
+          )
+          return id
+        }
+        const liveEvent = await eventOf(postId)
+        const orphanEvent = await eventOf(null)
+
+        await root.query(sql)
+
+        const originOf = async (table: string, column: string, id: string) =>
+          (
+            await root.query<{ origin: string | null }>(
+              `SELECT ${column} AS origin FROM "${table}" WHERE id = $1`,
+              [id]
+            )
+          ).rows[0]!.origin
+        expect(
+          await originOf('CommunityPostReport', 'origin_post_id', livePostReport)
+        ).toBe(postId)
+        expect(
+          await originOf('CommunityPostReport', 'origin_post_id', orphanPostReport)
+        ).toBeNull()
+        expect(
+          await originOf('CommunityCommentReport', 'origin_comment_id', liveCommentReport)
+        ).toBe(commentId)
+        expect(
+          await originOf(
+            'CommunityCommentReport',
+            'origin_comment_id',
+            orphanCommentReport
+          )
+        ).toBeNull()
+        expect(await originOf('ModerationEvent', 'origin_post_id', liveEvent)).toBe(
+          postId
+        )
+        expect(
+          await originOf('ModerationEvent', 'origin_post_id', orphanEvent)
+        ).toBeNull()
+
+        // The database's answer, whatever a writer sends, and it outlives the target.
+        const spoofed = `spoofed-${randomUUID()}`
+        const filed = await root.query<{ id: string; origin_post_id: string | null }>(
+          `INSERT INTO "CommunityPostReport"
+             (id, post_id, origin_post_id, reason, sla_due_at)
+           VALUES ($1, $2, $3, 'inappropriate_content', now())
+           RETURNING id, origin_post_id`,
+          [`origin-report-${randomUUID()}`, postId, spoofed]
+        )
+        expect(filed.rows[0]!.origin_post_id).toBe(postId)
+        await root.query('DELETE FROM "LookbookPost" WHERE id = $1', [postId])
+        const after = await root.query<{
+          post_id: string | null
+          origin_post_id: string | null
+        }>('SELECT post_id, origin_post_id FROM "CommunityPostReport" WHERE id = $1', [
+          filed.rows[0]!.id,
+        ])
+        expect(after.rows).toEqual([{ post_id: null, origin_post_id: postId }])
+      })
+    })
 
     it('[P1] D-MIG-RESET applies again after a reset drops public and leaves private', async () => {
       const superBase = await resolveSuperuserUrl()

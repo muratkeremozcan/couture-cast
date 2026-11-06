@@ -2,7 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-53-immutable-moderation-history
 // Story 6.13 test owner: what one erasure leaves for the next, and operators who are themselves erased.
 // I-S-MATRIX, I-S-COMMENT-LINK, I-S-CONCURRENT; I-O-RACE-DECISION, I-O-RACE-APPEAL, I-O-AFTER, I-O-SUBJECT;
-// I-O-SIBLING-CONFLICT. The routes this boot does not serve are in `moderation-history-route-period`.
+// I-O-APPEAL-SUBJECT, I-O-SIBLING-CONFLICT. The routes this boot does not serve are in `moderation-history-route-period`.
 //
 // Every setup here goes through the real routes and the real sweep, because the gaps this file exists for
 // sat between steps that each passed alone: a sweep that deleted the only link a later erasure needed.
@@ -13,6 +13,7 @@ import {
   CommunityMaintenanceService,
 } from '../src/modules/community/community-maintenance.service.js'
 import { CommunityCommentsProcessor } from '../src/modules/community/community-comments.processor.js'
+import { ModerationDecisionsRepository } from '../src/modules/moderation/moderation-decisions.repository.js'
 import {
   communityPrivacyTransaction,
   guardCommunitySubject,
@@ -29,6 +30,7 @@ import {
   holdBarrier,
   IDENTITY_ALLOW_LIST,
   installTrigger,
+  runInOrder,
   scanForIdentity,
   waitForBarrierWaiter,
 } from './helpers/moderation-history-seed.js'
@@ -254,7 +256,7 @@ describe('I-S-COMMENT-LINK: a comment report outlives its post, and its author c
     expect(row).toMatchObject({ subject_user_id: null, reason: ERASED_REASON })
   })
 
-  it('also finds the author of a comment that screening reported', async () => {
+  it('names the author of a comment that screening reported, in the link alone', async () => {
     const body = `I am Carol at 789 Test Street ${randomUUID()}`
     const parentAuthor = await fx.member('parent-author')
     const commenter = await fx.member('commenter')
@@ -278,13 +280,22 @@ describe('I-S-COMMENT-LINK: a comment report outlives its post, and its author c
     const report = await prisma.communityCommentReport.findFirstOrThrow({
       where: { comment_id: comment.id, origin: 'screening' },
     })
+    // A screening report holds no snapshot: this link is all that names the commenter once the comment goes.
+    expect(report).toMatchObject({
+      comment_author_id: commenter.id,
+      content_snapshot: null,
+    })
     let at = new Date(NOW.getTime() + HOUR_MS)
     at = await eraseToCompletion(parentAuthor.id, at)
+    const orphan = await prisma.communityCommentReport.findUniqueOrThrow({
+      where: { id: report.id },
+    })
+    expect(orphan).toMatchObject({ comment_id: null, comment_author_id: commenter.id })
     await eraseToCompletion(commenter.id, at)
     const kept = await prisma.communityCommentReport.findUniqueOrThrow({
       where: { id: report.id },
     })
-    expect(kept.content_snapshot).toBeNull()
+    expect(kept.comment_author_id).toBeNull()
     expect(await scanForIdentity(prisma, [body])).toEqual([])
   })
 
@@ -341,72 +352,78 @@ describe('I-S-COMMENT-LINK: a comment report outlives its post, and its author c
   })
 })
 
+/**
+ * Counts the transactions an erasure opens. The privacy transaction retries a deadlock, so a test that only
+ * reads the end state cannot see one: a retried erasure opens a second transaction, and that is what this reads.
+ */
+function countingAttempts() {
+  let attempts = 0
+  const client = new Proxy(prisma, {
+    get(target, key) {
+      if (key !== '$transaction') return Reflect.get(target, key) as unknown
+      return (...args: Parameters<typeof prisma.$transaction>) => {
+        attempts += 1
+        return target.$transaction(...args)
+      }
+    },
+  })
+  return { client, attempts: () => attempts }
+}
+
 describe('I-S-CONCURRENT', () => {
-  it('finishes two erasures of one case in both start orders, with no deadlock', async () => {
-    for (const flip of [false, true]) {
-      const seeded = await fx.postCase({ reports: 1 })
-      const ids = [seeded.author.id, seeded.reporters[0]!.id]
-      if (flip) ids.reverse()
-      await Promise.all(ids.map((id) => erase(prisma, id, NOW)))
-      const report = await prisma.communityPostReport.findUniqueOrThrow({
-        where: { id: seeded.reportIds[0]! },
-      })
-      expect(report.reporter_id).toBeNull()
+  it.each([
+    ['the author', 'the reporter'],
+    ['the reporter', 'the author'],
+  ])('runs %s to its barrier, then %s, each in one attempt', async (first) => {
+    const seeded = await fx.postCase({ reports: 1 })
+    const reporter = seeded.reporters[0]!.id
+    const [leading, following] =
+      first === 'the author' ? [seeded.author.id, reporter] : [reporter, seeded.author.id]
+    const key = 700_000 + Math.floor(Math.random() * 90_000)
+    const release = await holdBarrier(ctx.database.url, key)
+    // The first write each erasure makes after its locks, so the second finds them held.
+    const remove = await installTrigger(
+      prisma,
+      first === 'the author' ? 'LookbookPost' : 'CommunityPostReport',
+      'BEFORE UPDATE',
+      `PERFORM pg_advisory_xact_lock(${key});`
+    )
+    const ahead = countingAttempts()
+    const behind = countingAttempts()
+    try {
+      const running = erase(ahead.client, leading, NOW)
+      await waitForBarrierWaiter(prisma, key)
+      const waiting = erase(behind.client, following, NOW)
+      // The second must wait on a row the first holds, or this has not raced anything. The barrier is advisory.
+      await vi.waitFor(
+        async () => {
+          const rows = await prisma.$queryRaw<{ waiting: number }[]>`
+            SELECT count(*)::int AS waiting FROM pg_stat_activity
+            WHERE datname = current_database() AND wait_event_type = 'Lock'
+              AND wait_event <> 'advisory'`
+          expect(rows[0]!.waiting).toBeGreaterThanOrEqual(1)
+        },
+        { timeout: 15_000, interval: 25 }
+      )
+      await release()
+      await Promise.all([running, waiting])
+    } finally {
+      await release()
+      await remove()
     }
+    expect([ahead.attempts(), behind.attempts()]).toEqual([1, 1])
+    const report = await prisma.communityPostReport.findUniqueOrThrow({
+      where: { id: seeded.reportIds[0]! },
+    })
+    expect(report.reporter_id).toBeNull()
   })
 })
 
-/**
- * Holds `first` at a barrier inside its transaction and starts `second`, then waits until the database
- * reports `second` blocked or `second` has finished, and only then lets `first` go. Waiting for "blocked"
- * alone would report a missing lock as a timeout, and what matters is the state the race leaves.
- * The decision's barrier is on its audit row, in the same transaction after the decision row: the
- * application role owns `AuditLog` and cannot put a trigger on `ModerationDecision` on the real image.
- */
-async function inOrder<A, B>(
+const inOrder = <A, B>(
   table: 'AuditLog' | 'ModerationErasureRequest',
   first: () => Promise<A>,
   second: () => Promise<B>
-): Promise<[A, B]> {
-  const key = 800_000 + Math.floor(Math.random() * 90_000)
-  const release = await holdBarrier(ctx.database.url, key)
-  const remove = await installTrigger(
-    prisma,
-    table,
-    'BEFORE INSERT',
-    `PERFORM pg_advisory_xact_lock(${key});`
-  )
-  try {
-    const running = first()
-    running.catch(() => undefined)
-    await waitForBarrierWaiter(prisma, key)
-    let finished = false
-    const following = second()
-    following.then(
-      () => {
-        finished = true
-      },
-      () => {
-        finished = true
-      }
-    )
-    await vi.waitFor(
-      async () => {
-        if (finished) return
-        const rows = await prisma.$queryRaw<{ waiting: number }[]>`
-          SELECT count(*)::int AS waiting FROM pg_stat_activity
-          WHERE datname = current_database() AND wait_event_type = 'Lock'`
-        expect(rows[0]!.waiting).toBeGreaterThanOrEqual(2)
-      },
-      { timeout: 15_000, interval: 25 }
-    )
-    await release()
-    return await Promise.all([running, following])
-  } finally {
-    await release()
-    await remove()
-  }
-}
+) => runInOrder(prisma, ctx.database.url, table, first, second)
 
 async function liftableSanction() {
   const author = await fx.member('banned')
@@ -615,6 +632,91 @@ describe('I-O: an operator who is erased', () => {
       expect(about).toMatchObject({ subject_user_id: null, reason: ERASED_REASON })
       expect(await scanForIdentity(prisma, [aboutThem])).toEqual([])
     })
+  })
+})
+
+describe('I-O-APPEAL-SUBJECT: an appeal meets the erasure of the member it is about', () => {
+  async function bannedAuthor(status: 'requested' | 'upheld') {
+    const author = await fx.member('banned')
+    const seeded = await fx.postCase({ author })
+    const banned = await boot.staff('admin', await fx.operator()).decide(seeded.caseId, {
+      action: 'ban',
+      reason: 'A ban rationale.',
+      ban: { kind: 'permanent' },
+    })
+    expect(banned.status, JSON.stringify(banned.body)).toBe(200)
+    const sanctionId = (banned.body as { data: { sanction: { sanctionId: string } } })
+      .data.sanction.sanctionId
+    if (status === 'upheld') {
+      const asked = await boot
+        .staff('admin', await fx.operator())
+        .appeal(sanctionId, { status: 'requested', reason: 'Asked.' })
+      expect(asked.status, JSON.stringify(asked.body)).toBe(200)
+    }
+    return { author, seeded, sanctionId, staff: boot.staff('admin', await fx.operator()) }
+  }
+
+  it.each(['requested', 'upheld'] as const)(
+    'lets a %s step already running finish, then erases its words',
+    async (status) => {
+      const { author, sanctionId, staff, seeded } = await bannedAuthor(status)
+      const canary = `appeal-words-${randomUUID()}`
+      const erasure = countingAttempts()
+      const [answered] = await inOrder(
+        'AuditLog',
+        () => Promise.resolve(staff.appeal(sanctionId, { status, reason: canary })),
+        () => erase(erasure.client, author.id, NOW)
+      )
+      expect(answered.status, JSON.stringify(answered.body)).toBe(200)
+      expect(erasure.attempts()).toBe(1)
+      await sweepAt(new Date(NOW.getTime() + 80 * HOUR_MS))
+      expect(await scanForIdentity(prisma, [canary])).toEqual([])
+      const rows = await prisma.moderationDecision.findMany({
+        where: { case_key: seeded.caseId },
+      })
+      expect(rows.every((row) => row.subject_user_id === null)).toBe(true)
+    }
+  )
+
+  it.each(['requested', 'upheld'] as const)(
+    'answers 404 to a %s step that waited behind the erasure',
+    async (status) => {
+      const { author, sanctionId, staff, seeded } = await bannedAuthor(status)
+      const before = await prisma.moderationDecision.count({
+        where: { case_key: seeded.caseId },
+      })
+      const [, answered] = await inOrder(
+        'ModerationErasureRequest',
+        () => erase(prisma, author.id, NOW),
+        () => Promise.resolve(staff.appeal(sanctionId, { status, reason: 'Words.' }))
+      )
+      expect([answered.status, codeOf(answered)]).toEqual([404, 'sanction_not_found'])
+      expect(
+        await prisma.moderationDecision.count({ where: { case_key: seeded.caseId } })
+      ).toBe(before)
+    }
+  )
+
+  it('answers 404 when the sanction went before the appeal took its locks', async () => {
+    const { author, sanctionId, staff } = await bannedAuthor('requested')
+    let erased = false
+    const spy = vi
+      .spyOn(ModerationDecisionsRepository.prototype, 'lockSanctionEligibility')
+      .mockImplementationOnce(async function (
+        this: ModerationDecisionsRepository,
+        ...args: Parameters<ModerationDecisionsRepository['lockSanctionEligibility']>
+      ) {
+        erased = true
+        await erase(prisma, author.id, NOW)
+        spy.mockRestore()
+        await this.lockSanctionEligibility(...args)
+      })
+    const answered = await staff.appeal(sanctionId, {
+      status: 'upheld',
+      reason: 'Words.',
+    })
+    expect(erased).toBe(true)
+    expect([answered.status, codeOf(answered)]).toEqual([404, 'sanction_not_found'])
   })
 })
 

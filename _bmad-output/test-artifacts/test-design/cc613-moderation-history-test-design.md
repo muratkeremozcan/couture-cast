@@ -848,7 +848,20 @@ The builder saw the 23503 it fixes in `community-comments-privacy`, and `I-S-COM
 Added after the plan, because review found the gaps it did not name:
 
 - `I-S-MATRIX`: every ordered pair of five erasures, scanned for ids and for authored words.
-- `I-S-COMMENT-LINK`, `I-S-CONCURRENT`, `I-O-RACE-DECISION`, `I-O-RACE-APPEAL`, `I-O-AFTER`, `I-O-SUBJECT`, `I-O-SIBLING-CONFLICT`.
+- `I-S-COMMENT-LINK`, `I-S-CONCURRENT`, `I-O-RACE-DECISION`, `I-O-RACE-APPEAL`, `I-O-AFTER`, `I-O-SUBJECT`, `I-O-APPEAL-SUBJECT`, `I-O-SIBLING-CONFLICT`.
+- `I-S-CONCURRENT` forces each order at a real row lock and counts each erasure's attempts, because the privacy transaction retries a deadlock and the end state cannot show one. It proves those orders only, and claims nothing about other interleavings.
+
+Independent review 3 found R3-1 and R3-2, both in a sequence that acts after the orphaning step, so `moderation-history-orphaning.integration.spec.ts` plans that family as a matrix.
+
+- `I-P-DECIDE`: resolve, escalate, takedown and ban before the author's request and inside the window, resolve and escalate on the orphan case, on the post and on the comment, then each of six other people erased. Exact words, ids and export.
+- `I-P-THREE`: one person leaves, the post goes, an operator decides, a second person leaves, for every ordered pair on both targets.
+- `I-P-CONFLICT`: every viewer on every orphan case, on read, decide, case export and range export, with no decision, a decision that joined the reports, a report filed after the decision, and a decision after the post went. The two sides of one post stay separate, and the matrix pins the negative.
+- `I-P-CHAIN`, `I-P-APPEAL`, `I-P-WINDOW`, `I-P-OWN-COMMENT`, `I-P-LIVE-AFTER-COMMENTER`, `I-P-ACCOUNT`, `I-P-SCREENING`, `I-P-RACE`.
+
+Decisions this matrix records.
+Words written after a member's erasure request answer only to the reports they rest on, because that member is unreachable and their words have gone.
+A sibling reporter on an orphan case is not on that decision, so their erasure leaves its words.
+
 - `A-X-ORPHAN-SIBLING`, `A-X-RANGE-CLOSURE`, `A-X-APPEAL`, `A-AVAILABILITY`, `I-E-OPERATOR-COPIES`, `D-COMMENT-AUDIT`, `D-MIG-ROLE-RACE`, `P-LANG`.
 - `V-TLS-*`: the verifier against a hosted-style endpoint, through an in-process proxy that terminates TLS with a generated root, intermediate and leaf and forwards to the real database.
 
