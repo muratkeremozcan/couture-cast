@@ -10116,6 +10116,9 @@ Hard-won lessons from the implementation and review of this story:
 - **The verifier could not reach the database it exists to prove.**
   `pg` ignores Prisma's TLS parameters, and any `ssl*` in the URL replaces its `ssl` option, so the script failed with SELF_SIGNED_CERT_IN_CHAIN on hosted Preview while every local run was green.
   `verifiedPgConnection` drops them and passes the committed CA, so `sslmode=no-verify` in a URL cannot switch verification off.
+- **A one-off assertion found an environment wrong for eleven months.**
+  `SUPABASE_URL` on Vercel Preview had a typo host, so every bad token on Preview answered 503, and every test before this one used a synthetic identity that skips that fetch.
+  A tampered-token check against the real deployment was the first thing to reach it.
 - **A new value in a shared error enum is breaking on the routes already using it.**
   Optic refused `operator_sanctioned` on the queue and SLA enums, whose 403 declares no body, so the code stays out of them and web clients answer by status.
 - **A new foreign key broke a trigger from an older migration.**
@@ -10254,6 +10257,7 @@ Contract and database tests:
 Web and Playwright tests:
 
 - [`apps/web/src/app/components/moderation-evidence-export.test.tsx`](../../apps/web/src/app/components/moderation-evidence-export.test.tsx): proves control states, the saved bytes, flag off and admin-only access.
+- [`playwright/support/helpers/browser-api-proxy.spec.ts`](../../playwright/support/helpers/browser-api-proxy.spec.ts): proves the API proxy lets a closed page end a request in flight, which a new background request made fail three older specs on Preview.
 - [`playwright/tests/moderation-history.spec.ts`](../../playwright/tests/moderation-history.spec.ts): proves the journey in a real browser against the real API and worker, including refusals with the API's own connection string on local Supabase.
 
 Evidence boundaries:
@@ -10262,11 +10266,11 @@ Evidence boundaries:
   Codex reviewed `1175a24c` on the real image and reproduced three major gaps and two minor ones, each now with a red-first test or spec correction, recorded as `CX-1` to `CX-6` in the spec.
 - **Written before merge.**
   The code and tests are in PR #197, on `feat/cc-6-13-immutable-moderation-history`, when this step was written.
-- **Sign-off runs at `743f179a`.**
-  Three consecutive full unfiltered runs, each count identical, 13828 tests per run, with no failure and no retry.
-  `packages/db` 441 on plain Postgres and 441 on the Supabase image, `apps/api` 8565 on plain Postgres, 120 `moderation-history` tests on the image, `packages/api-client` 1757, `packages/config` 31, `apps/web` 1931, Pact consumer 456, Pact provider 1, and Playwright 85 in a real browser on the image.
-  44 of 44 seeded defects were caught.
-  These runs predate the verifier's TLS fix and the contract change in the two error enums, which CI covers on the final head.
+- **Sign-off runs at `4d280d90`.**
+  Three consecutive full unfiltered runs, each count identical, 13894 tests per run, with no failure and no retry.
+  `packages/db` 449 on plain Postgres and 449 on the Supabase image, `apps/api` 8568 on plain Postgres, 120 `moderation-history` tests on the image, location and weather 34 with the `pr-checks` flags, real Storage 10, `packages/api-client` 1757, `packages/config` 31, `apps/web` 1931, Pact consumer 456, Pact provider 1, the proxy helper 3, and Playwright 85 in a real browser on the image.
+  The verifier passed 16 of 16, `node --test` 43, and 48 of 48 seeded defects were caught at `c546b130`, with only test files changed after.
+  The numbers per lane are in the test design's Execution record.
 - **A real stack walk ran on the real image.**
   The launcher ran the built API, the real `community.bootstrap` worker and the web server on a disposable `supabase/postgres:17.6.1.054` container, as its non-superuser `postgres`.
   Every refused statement answered 42501 and the row compared byte-identical, including `UPDATE`, `DELETE` and `TRUNCATE` under `session_replication_role = replica`, which that image lets the role set.
