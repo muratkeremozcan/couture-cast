@@ -378,7 +378,7 @@ describe('complimentary access command', () => {
     const member = await newMember()
     vi.stubEnv(
       'DATABASE_URL',
-      'postgresql://ambient:ambient@db.ambientref000000.supabase.co:5432/postgres'
+      'postgresql://db.ambientref000000.supabase.co:5432/postgres'
     )
     try {
       const run = await cli(grantArgs(member.email))
@@ -391,7 +391,7 @@ describe('complimentary access command', () => {
 
   it('U-CLI-TARGET-REMOTE: a remote host without --confirm-target, or with the wrong ref, is refused before any client exists', async () => {
     const remoteUrl =
-      'postgresql://postgres.abcdefghijklmnopqrst:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres'
+      'postgresql://postgres.abcdefghijklmnopqrst@aws-0-us-east-1.pooler.supabase.com:6543/postgres'
     const member = await newMember()
     for (const extra of [[], ['--confirm-target', 'wrongrefwrongrefwron']]) {
       const run = await cli(
