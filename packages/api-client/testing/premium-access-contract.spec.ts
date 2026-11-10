@@ -1,8 +1,7 @@
 // Story 6.14 TEA, slice 9: the premium access contract (D6).
 //
 // The access read is a new strict schema; the subscription response must stay byte-identical
-// to `main`, because installed web and mobile builds parse it strictly.
-import { execFileSync } from 'node:child_process'
+// to `main` before this story, because installed web and mobile builds parse it strictly.
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -14,25 +13,21 @@ import { generateHttpOpenApiDocument } from '../src/contracts/http/openapi'
 import { SubscriptionApi } from '../src/generated/apis/SubscriptionApi'
 
 const packageRoot = resolve(__dirname, '..')
-const repoRoot = resolve(packageRoot, '../..')
 
 type OpenApiDocument = {
   paths: Record<string, Record<string, Record<string, unknown>>>
   components: { schemas: Record<string, unknown> }
 }
 
-function baselineDocument(): OpenApiDocument | null {
-  try {
-    return JSON.parse(
-      execFileSync('git', ['show', 'main:packages/api-client/docs/http.openapi.json'], {
-        cwd: repoRoot,
-        encoding: 'utf8',
-        maxBuffer: 64 * 1024 * 1024,
-      })
-    ) as OpenApiDocument
-  } catch {
-    return null
-  }
+/**
+ * The subscription contract as `main` published it before this story (OpenAPI 1.7.0), checked
+ * in so the proof needs no git history: CI checks out one commit with no `main` ref.
+ */
+const baseline = JSON.parse(
+  readFileSync(resolve(__dirname, 'subscription-contract-1.7.0.baseline.json'), 'utf8')
+) as {
+  schemas: Record<string, unknown>
+  statusResponses: Record<string, unknown>
 }
 
 describe('premium access contract', () => {
@@ -91,22 +86,21 @@ describe('premium access contract', () => {
   })
 
   it('U-C-SUBSCRIPTION-FROZEN: the subscription response schemas are unchanged from main', () => {
-    const baseline = baselineDocument()
-    if (!baseline)
-      throw new Error('git show main failed: the frozen-contract proof needs main')
     const current = generateHttpOpenApiDocument() as unknown as OpenApiDocument
-    const names = Object.keys(baseline.components.schemas).filter((name) =>
-      /^Subscription/.test(name)
-    )
-    expect(names.length).toBeGreaterThan(0)
+    const names = Object.keys(baseline.schemas)
+    expect(names.sort()).toEqual([
+      'Subscription',
+      'SubscriptionPlan',
+      'SubscriptionResponse',
+      'SubscriptionStatus',
+    ])
     for (const name of names)
       expect({ name, schema: current.components.schemas[name] }).toEqual({
         name,
-        schema: baseline.components.schemas[name],
+        schema: baseline.schemas[name],
       })
-    const statusPath = '/api/v1/commerce/subscription'
-    expect(current.paths[statusPath]!.get!.responses).toEqual(
-      baseline.paths[statusPath]!.get!.responses
+    expect(current.paths['/api/v1/commerce/subscription']!.get!.responses).toEqual(
+      baseline.statusResponses
     )
   })
 })
