@@ -1024,9 +1024,17 @@ complimentary members, so also turn the switch off:
 
 1. In PostHog, create or edit the boolean flag `complimentary_access_enabled` and set it to
    false for everyone. This holds within 60 seconds while PostHog answers.
-2. When PostHog is slow or down, the API falls back to the `FeatureFlag` row, which the flag
-   sync refreshes every 5 minutes. For an immediate stop, also set the row:
-   `UPDATE "FeatureFlag" SET value = 'false' WHERE key = 'complimentary_access_enabled';`
+2. When PostHog is slow or down, the API falls back to the `feature_flags` row, which the flag
+   sync refreshes every 5 minutes. For an immediate stop, also set the row. The row may not
+   exist before the first sync, so the statement upserts it:
+
+   ```sql
+   INSERT INTO feature_flags (key, value, updated_at)
+   VALUES ('complimentary_access_enabled', to_jsonb(false), now())
+   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+   ```
+
+   A PostHog flag still set to true overwrites the row on the next sync, so do step 1 too.
 
 **Push.** Push reaches a grantee only when the hosted community worker dispatches. Enable it on
 the Northflank `couture-cast/community-worker` service:
