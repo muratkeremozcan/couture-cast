@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 // Story 6.14 TEA, slice 9: the premium access contract (D6).
 //
 // The access read is a new strict schema; the subscription response must stay byte-identical

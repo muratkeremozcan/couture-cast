@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 import { describe, expect, it } from 'vitest'
 import {
   COMPLIMENTARY_MEMBER_FLAGS,

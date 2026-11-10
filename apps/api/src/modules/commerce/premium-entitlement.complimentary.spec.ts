@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
 import { PremiumEntitlementService } from './premium-entitlement.service.js'

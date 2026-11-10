@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 // Story 6.14 TEA, slice 7: the owner's complimentary access command end to end.
 // `runComplimentaryAccessCli` runs with real arguments and a real Prisma client against a
 // database this file owns, so every refusal is proven to leave that database untouched,

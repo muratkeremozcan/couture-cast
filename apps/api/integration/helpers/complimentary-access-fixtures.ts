@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 // Story 6.14 TEA: shared fixtures for the complimentary access integration suites.
 //
 // Every override proof seeds the six member flags false in its own database and asks a

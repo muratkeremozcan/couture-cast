@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 // Story 6.14 TEA, slice 5: the community flag cache with complimentary grants, on real
 // Postgres. These are the TEA-01 and TEA-04 proofs: a grant or revoke is visible on the
 // next request with no 503, an in-flight refresh can never write a stale answer back,

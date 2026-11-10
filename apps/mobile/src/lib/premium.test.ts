@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 // Story 5.2 Task 6: the mobile premium boundary.
 //
 // The SDK under test is the vitest alias mock (`react-native-purchases`

@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 // Story 6.14 TEA (TEA-15): the complimentary access E2E on its own runtime.
 //
 // The shared local E2E stack seeds every member flag true and runs specs in parallel

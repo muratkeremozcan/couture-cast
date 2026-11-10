@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 // Story 6.14 TEA, slice 11: the complimentary states of the web settings Premium section.
 //
 // Same seams as subscription-section.test.tsx: real `lib/premium` through MSW, the real

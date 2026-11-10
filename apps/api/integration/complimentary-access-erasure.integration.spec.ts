@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 // Story 6.14 TEA, slice 8: account erasure against complimentary grants, and the grant
 // lifecycle as ordered pairs of events across the member, the granting admin and a second
 // admin. Everything runs through the real operator service and the real erasure

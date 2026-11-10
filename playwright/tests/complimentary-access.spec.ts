@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 // Story 6.14 TEA (TEA-15): complimentary full access, end to end, with every member flag
 // off globally. Runs only through `npm run test:pw-complimentary`, which owns the
 // database (scripts/e2e-complimentary/run.mjs); every other config ignores this file.

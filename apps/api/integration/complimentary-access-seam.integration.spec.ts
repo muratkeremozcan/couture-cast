@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 // Story 6.14 TEA, slices 3 and 5: the read seam and the flag overrides on real Postgres.
 //
 // Scenario ids are the plan's (`cc614-complimentary-access-test-design.md`). The seam and

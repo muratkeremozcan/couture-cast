@@ -1,3 +1,5 @@
+// Learning path Step 54: Complimentary full access.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 // Story 6.14 TEA, slice 11: the complimentary states of the mobile settings Premium section.
 //
 // Same boundary as settings-premium-section.test.tsx: the premium network and SDK seams are
