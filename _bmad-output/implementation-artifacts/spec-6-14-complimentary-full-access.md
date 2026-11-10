@@ -243,6 +243,20 @@ Pass 1, quick lens, 2026-11-10: 17 findings. 11 patch, 3 rejected, 3 in flight (
 | 16  | Tracking status disagrees                             | low     | patch: ticked at completion                                              |
 | 17  | TEA-23 vs guide (same as 4)                           | n/a     | merged with 4 by shared root cause                                       |
 
+Pass 2, fable at high effort standing in for CodeRabbit (skipped at 128 files), 2026-11-10: 9 findings. 8 patch, 1 rejected.
+
+| #   | Finding                                                        | Verdict  | Route and evidence                                    |
+| --- | -------------------------------------------------------------- | -------- | ----------------------------------------------------- |
+| F1  | Kill switch fails open when its fallback row read throws       | high     | patch: a throwing row read answers false              |
+| F2  | Mobile Manage dead for a paying grantee (SDK never configured) | medium   | patch: the tap configures the SDK first               |
+| F3  | Slow grant read gives a non-grantee 45 s of 503                | low      | patch: the released claim reopens at once             |
+| F4  | Checkout refusal fails open on a grant read error              | medium   | patch: tri-state check; unavailable answers 503       |
+| F5  | Operator lock order differs from the send guard                | low      | patch: both member guards in one call first           |
+| F6  | One PostHog call per grantee check                             | rejected | D2 rules out caching; a cost the spec accepts         |
+| F7  | Bare catch drops the cause                                     | low      | patch: logs Prisma code or error name                 |
+| F8  | E2E job timeout leaves no room for a cold cache                | low      | TEA: measured against CI and trimmed under 20 minutes |
+| F9  | Web access read can hang the section                           | low      | patch: 5-second race to null                          |
+
 ## Test Design (TEA)
 
 Full plan, reconciled to this spec (this spec wins on any disagreement):

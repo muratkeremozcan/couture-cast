@@ -79,20 +79,15 @@ export class ComplimentaryAccessService {
   ): Promise<ComplimentaryAccessCheck> {
     const budgetMs = options.budgetMs
     const answer = this.answer(memberId, options)
-    const outcome =
-      budgetMs === undefined
-        ? await answer
-        : await Promise.race([
-            answer,
-            delay(Math.max(1, Math.floor(budgetMs))).then(() => 'unavailable' as const),
-          ])
-    if (outcome === 'unavailable') {
-      this.logger.warn(
-        { code: 'complimentary_access_unavailable' },
-        'complimentary_access_unavailable'
-      )
-    }
-    return outcome
+    if (budgetMs === undefined) return answer
+    const outcome = await Promise.race([
+      answer,
+      delay(Math.max(1, Math.floor(budgetMs))).then(() => 'timeout' as const),
+    ])
+    if (outcome !== 'timeout') return outcome
+    // A failed read logs its own cause in `answer`; only the budget running out logs here.
+    this.logUnavailable('timeout')
+    return 'unavailable'
   }
 
   private async answer(
@@ -119,17 +114,43 @@ export class ComplimentaryAccessService {
           : Math.max(1, Math.floor(options.budgetMs * 0.8))
       const timeout = AbortSignal.timeout(remoteMs)
       const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
-      return (await this.killSwitchOpen(signal, runRead)) === true
-        ? 'granted'
-        : 'not_granted'
-    } catch {
+      let rowFailure: { error: unknown } | undefined
+      const open = await this.killSwitchOpen(signal, runRead, (error) => {
+        rowFailure = { error }
+      })
+      // An unknown switch is unavailable, so the community refresh never caches a false on it.
+      if (rowFailure) {
+        this.logUnavailable(rowFailure.error)
+        return 'unavailable'
+      }
+      return open === true ? 'granted' : 'not_granted'
+    } catch (error: unknown) {
+      this.logUnavailable(error)
       return 'unavailable'
     }
   }
 
+  /** The cause, by class or Prisma code only: neither carries a member id. */
+  private logUnavailable(error: unknown): void {
+    const code = error instanceof Error ? (error as { code?: unknown }).code : undefined
+    const cause =
+      error === 'timeout'
+        ? 'timeout'
+        : typeof code === 'string'
+          ? code
+          : error instanceof Error
+            ? error.name
+            : 'unknown'
+    this.logger.warn(
+      { code: 'complimentary_access_unavailable', cause },
+      'complimentary_access_unavailable'
+    )
+  }
+
   private async killSwitchOpen(
     bound: AbortSignal,
-    runRead: <T>(read: () => Promise<T>) => Promise<T>
+    runRead: <T>(read: () => Promise<T>) => Promise<T>,
+    onRowFailure: (error: unknown) => void
   ): Promise<FeatureFlagStoredValue> {
     return resolveFeatureFlag(
       'complimentary_access_enabled',
@@ -141,10 +162,17 @@ export class ComplimentaryAccessService {
             aborted(bound),
           ]),
         readFallbackFlag: async (key) => {
-          const row = await runRead(() =>
-            this.prisma.featureFlag.findUnique({ where: { key } })
-          )
-          return (row?.value as FeatureFlagStoredValue | undefined) ?? null
+          // A failed row read must not throw: the resolver would hand its code default, true, to
+          // a switch an operator may have turned off. `answer` reports it as unavailable.
+          try {
+            const row = await runRead(() =>
+              this.prisma.featureFlag.findUnique({ where: { key } })
+            )
+            return (row?.value as FeatureFlagStoredValue | undefined) ?? null
+          } catch (error: unknown) {
+            onRowFailure(error)
+            return false
+          }
         },
       }
     )

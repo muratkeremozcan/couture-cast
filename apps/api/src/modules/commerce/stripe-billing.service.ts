@@ -86,9 +86,14 @@ export class StripeBillingService {
     if (entitlement?.status === 'active' || entitlement?.status === 'grace_period') {
       throw new ConflictException(SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE)
     }
-    // Story 6.14 D5: nobody is charged for what a complimentary grant already gives them.
-    if ((await this.entitlements.premiumAccessSource(userId)) === 'complimentary') {
+    // Story 6.14 D5: nobody is charged for what a complimentary grant already gives them, and
+    // a grant that cannot be read right now stops checkout rather than risk the charge.
+    const complimentary = await this.entitlements.complimentaryAccessCheck(userId)
+    if (complimentary === 'granted') {
       throw new ConflictException(COMPLIMENTARY_ACCESS_ACTIVE_MESSAGE)
+    }
+    if (complimentary === 'unavailable') {
+      throw new ServiceUnavailableException(COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE)
     }
 
     const baseUrl = resolveWebBaseUrl()

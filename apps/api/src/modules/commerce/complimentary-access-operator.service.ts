@@ -214,7 +214,11 @@ export class ComplimentaryAccessOperatorService {
         'No app user has that --member-email.'
       )
     }
-    for (const id of [...new Set([actorUserId, member.id])].sort()) {
+    const parties = [...new Set([actorUserId, member.id])].sort()
+    // Both members' privacy guards in one call first, in the function's own order, as the push
+    // send guard and notifications worker take them, so this command cannot deadlock with them.
+    await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${Prisma.join(parties)}]::text[],ARRAY[]::text[],true)`
+    for (const id of parties) {
       await guardCommunitySubject(tx, id)
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${id}))`
     }

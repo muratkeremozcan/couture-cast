@@ -23,6 +23,7 @@ describe('StripeBillingService for a complimentary member', () => {
   const entitlements = {
     getEntitlement: vi.fn(),
     premiumAccessSource: vi.fn(),
+    complimentaryAccessCheck: vi.fn(),
     hasPremiumAccess: vi.fn(),
   }
   const telemetry = { captureEvent: vi.fn() }
@@ -36,6 +37,7 @@ describe('StripeBillingService for a complimentary member', () => {
       paid ? { status: paid, store: 'stripe' } : null
     )
     entitlements.premiumAccessSource.mockResolvedValue('complimentary')
+    entitlements.complimentaryAccessCheck.mockResolvedValue('granted')
     entitlements.hasPremiumAccess.mockResolvedValue(true)
   }
 
@@ -55,6 +57,7 @@ describe('StripeBillingService for a complimentary member', () => {
     featureFlags.getFeatureFlag.mockReset().mockResolvedValue(true)
     entitlements.getEntitlement.mockReset().mockResolvedValue(null)
     entitlements.premiumAccessSource.mockReset().mockResolvedValue('none')
+    entitlements.complimentaryAccessCheck.mockReset().mockResolvedValue('not_granted')
     entitlements.hasPremiumAccess.mockReset().mockResolvedValue(false)
     telemetry.captureEvent.mockReset().mockResolvedValue(undefined)
     billingCustomer.findUnique.mockReset().mockResolvedValue(null)
@@ -123,6 +126,7 @@ describe('StripeBillingService for a complimentary member', () => {
       async (status) => {
         entitlements.getEntitlement.mockResolvedValue({ status, store: 'stripe' })
         entitlements.premiumAccessSource.mockResolvedValue('complimentary')
+        entitlements.complimentaryAccessCheck.mockResolvedValue('granted')
         entitlements.hasPremiumAccess.mockResolvedValue(true)
 
         const attempt = service.createCheckoutSession('member-1', 'premium_monthly')
@@ -134,12 +138,26 @@ describe('StripeBillingService for a complimentary member', () => {
       }
     )
 
+    it('purchasing on, the grant cannot be read: 503, nothing reaches Stripe (never fails open into a charge)', async () => {
+      entitlements.complimentaryAccessCheck.mockResolvedValue('unavailable')
+
+      const attempt = service.createCheckoutSession('member-1', 'premium_monthly')
+
+      await expect(attempt).rejects.toBeInstanceOf(ServiceUnavailableException)
+      await expect(messageOf(attempt)).resolves.toBe(
+        COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE
+      )
+      expectNoStripeOrCustomerWrite()
+      expect(telemetry.captureEvent).not.toHaveBeenCalled()
+    })
+
     it('purchasing on, neither paid nor granted: proceeds to Stripe', async () => {
       const session = await service.createCheckoutSession('member-1', 'premium_monthly')
 
       expect(session.url).toContain('https://checkout.stripe.test/')
       expect(stripeClient.checkoutSessions).toHaveLength(1)
       expect(billingCustomer.upsert).toHaveBeenCalledTimes(1)
+      expect(entitlements.complimentaryAccessCheck).toHaveBeenCalledWith('member-1')
     })
   })
 

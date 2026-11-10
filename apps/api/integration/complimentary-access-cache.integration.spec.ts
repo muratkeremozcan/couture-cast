@@ -176,6 +176,34 @@ describe('complimentary grants in the community flag cache', () => {
     expect(performance.now() - started).toBeLessThan(1_950)
   })
 
+  it('I-CLAIM-RETRY-NOW: a false that rests on an unavailable grant check is never cached, and the next request may claim at once', async () => {
+    const id = await member(prisma)
+    const remote = recordingRemote({ community_read_enabled: false })
+    const hangingGrantRead = new Proxy(prisma, {
+      get(target, key, receiver) {
+        if (key === 'complimentaryAccessGrant')
+          return new Proxy({}, { get: () => () => never() })
+        return Reflect.get(target, key, receiver) as unknown
+      },
+    })
+    const degraded = evaluator(
+      remote,
+      new ComplimentaryAccessService(hangingGrantRead, remote.provider)
+    )
+
+    await expect(value(degraded.service, id)).rejects.toBeInstanceOf(
+      CommunityUnavailableException
+    )
+    const [row] = await prisma.$queryRaw<
+      { remote_value: boolean | null; claimable: boolean; refresh_owner: string | null }[]
+    >`SELECT remote_value, next_claim_at <= clock_timestamp() AS claimable, refresh_owner
+      FROM "CommunityFlagEvaluation" WHERE member_id = ${id} AND flag_key = 'community_read_enabled'`
+    expect(row).toEqual({ remote_value: null, claimable: true, refresh_owner: null })
+
+    // A healthy instance answers the very next request, with no 45 s lockout.
+    expect(await value(evaluator().service, id)).toBe(false)
+  })
+
   it('U-REFRESH-ERROR: a failing grant read falls through to the remote answer', async () => {
     const id = await member(prisma)
     const remote = recordingRemote({ community_read_enabled: true })

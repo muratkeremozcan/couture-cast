@@ -417,6 +417,8 @@ export async function restorePremiumPurchases(): Promise<RestoreOutcome> {
  * Returns false when the flow could not open so the caller can surface it.
  */
 export async function showManageSubscriptionsInStore(): Promise<boolean> {
+  // Story 6.14: a paying grantee's section never configured the SDK on entry, so the tap does.
+  if (configuredAvailability !== 'ready') await ensurePurchasesConfigured()
   const purchasesModule = await loadPurchasesModule()
   if (!purchasesModule || configuredAvailability !== 'ready') {
     return false

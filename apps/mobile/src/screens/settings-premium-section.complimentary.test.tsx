@@ -3,7 +3,7 @@
 // Same boundary as settings-premium-section.test.tsx: the premium network and SDK seams are
 // mocked, the render-state resolver and entitlement predicate stay real, and copy comes from
 // the real locale catalog. Scenario ids are the plan's (`cc614-complimentary-access-test-design.md`).
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PremiumAccess } from '@couture/api-client/contracts/http'
@@ -253,6 +253,19 @@ describe('SettingsScreen premium section, complimentary access', () => {
     )
     expect(screen.getByTestId('premium-manage')).toBeTruthy()
     for (const id of PURCHASE_CONTROLS) expect(screen.queryByTestId(id)).toBeNull()
+  })
+
+  it('M-MANAGE-TAP: a paying grantee can still open the store manage flow from the Manage button', async () => {
+    getSubscriptionMock.mockResolvedValue(mockSubscriptionActive.data)
+
+    await render(<SettingsScreen />)
+
+    await screen.findByTestId('premium-complimentary-note')
+    // Nothing configured the SDK on entry; the tap path owns that now.
+    expect(ensurePurchasesConfiguredMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('premium-manage'))
+    await waitFor(() => expect(showManageSubscriptionsMock).toHaveBeenCalledTimes(1))
+    expect(purchasePremiumPlanMock).not.toHaveBeenCalled()
   })
 
   it('M-HIDE-PURCHASE: a complimentary member never configures the RevenueCat SDK (TEA-07, Boundaries: no RevenueCat call)', async () => {

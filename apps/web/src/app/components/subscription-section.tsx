@@ -44,6 +44,9 @@ const SIGNED_OUT_HINT_ID = 'premium-signed-out-hint'
 const ACTIVATION_POLL_INTERVAL_MS = 5_000
 const ACTIVATION_POLL_MAX_ATTEMPTS = 24
 
+/** Story 6.14: how long the section waits for the premium access source before ignoring it. */
+const ACCESS_READ_TIMEOUT_MS = 5_000
+
 /**
  * `checking` is the server render and the first client tick, before
  * `sessionStorage` can be read, so hydration never reconciles two trees.
@@ -384,7 +387,13 @@ export function SubscriptionSection() {
          * Story 6.14 D6: the access source rides beside the subscription. Its failure
          * renders the section exactly as before (TEA-14), so it can never break the read.
          */
-        const accessRead = getPremiumAccessFromWeb(controller.signal).catch(() => null)
+        const accessRead = Promise.race([
+          getPremiumAccessFromWeb(controller.signal).catch(() => null),
+          // A hung access read never holds the section: it renders as it did before 6.14.
+          new Promise<null>((resolve) => {
+            window.setTimeout(() => resolve(null), ACCESS_READ_TIMEOUT_MS)
+          }),
+        ])
         const next = isPortalReturn
           ? await refreshSubscriptionFromWeb(controller.signal).catch(() =>
               getSubscriptionFromWeb(controller.signal)

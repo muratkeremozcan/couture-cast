@@ -235,6 +235,30 @@ describe('SubscriptionSection complimentary access', () => {
     )
   })
 
+  it(
+    'W-ACCESS-HUNG: an access read that never answers gives up after its timeout and renders the section as today',
+    { timeout: 15_000 },
+    async () => {
+      useMswHandlers(
+        http.get(SUBSCRIPTION_PATH, () => HttpResponse.json({ data: NONE_SUBSCRIPTION })),
+        // Never answers: the section must not wait on it forever.
+        http.get(ACCESS_PATH, () => new Promise<Response>(() => undefined))
+      )
+
+      renderSection()
+
+      expect(
+        await screen.findByTestId('premium-subscribe-monthly', {}, { timeout: 8_000 })
+      ).toBeInTheDocument()
+      expect(screen.getByTestId('premium-subscribe-annual')).toBeInTheDocument()
+      expect(screen.getByTestId('premium-disclosure')).toBeInTheDocument()
+      expect(screen.getByTestId('premium-status-line')).not.toHaveTextContent(
+        COMPLIMENTARY_STATUS
+      )
+      expect(screen.queryByTestId('premium-complimentary-note')).not.toBeInTheDocument()
+    }
+  )
+
   it('W-SOURCE-SUBSCRIPTION: a non-complimentary access answer changes nothing', async () => {
     useMswHandlers(...handlersFor(NONE_SUBSCRIPTION, { premium: false, source: 'none' }))
 

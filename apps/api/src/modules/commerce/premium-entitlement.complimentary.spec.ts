@@ -13,13 +13,14 @@ import { FakeStripeBillingClient } from './stripe-client.js'
 describe('PremiumEntitlementService with complimentary access', () => {
   const findUnique = vi.fn()
   const isActive = vi.fn()
+  const check = vi.fn()
   const prisma = { premiumEntitlement: { findUnique } } as unknown as PrismaClient
   const service = () =>
     new PremiumEntitlementService(
       prisma,
       new FakeRevenueCatClient(),
       new FakeStripeBillingClient(),
-      { isActive }
+      { isActive, check }
     )
   const paidRow = (status: string | null) =>
     findUnique.mockResolvedValue(status === null ? null : { status })
@@ -27,6 +28,7 @@ describe('PremiumEntitlementService with complimentary access', () => {
   beforeEach(() => {
     findUnique.mockReset()
     isActive.mockReset().mockResolvedValue(false)
+    check.mockReset().mockResolvedValue('not_granted')
   })
 
   describe('U-PREMIUM-PAID-FIRST', () => {

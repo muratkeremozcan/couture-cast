@@ -27,7 +27,11 @@ import { StripeBillingService } from './stripe-billing.service.js'
  */
 describe('StripeBillingService', () => {
   const featureFlags = { getFeatureFlag: vi.fn() }
-  const entitlements = { getEntitlement: vi.fn(), premiumAccessSource: vi.fn() }
+  const entitlements = {
+    getEntitlement: vi.fn(),
+    premiumAccessSource: vi.fn(),
+    complimentaryAccessCheck: vi.fn(),
+  }
   const telemetry = { captureEvent: vi.fn() }
   const billingCustomer = { findUnique: vi.fn(), upsert: vi.fn() }
   const prisma = { billingCustomer } as unknown as PrismaClient
@@ -38,6 +42,7 @@ describe('StripeBillingService', () => {
     featureFlags.getFeatureFlag.mockReset().mockResolvedValue(true)
     entitlements.getEntitlement.mockReset().mockResolvedValue(null)
     entitlements.premiumAccessSource.mockReset().mockResolvedValue('none')
+    entitlements.complimentaryAccessCheck.mockReset().mockResolvedValue('not_granted')
     telemetry.captureEvent.mockReset().mockResolvedValue(undefined)
     billingCustomer.findUnique.mockReset().mockResolvedValue(null)
     billingCustomer.upsert

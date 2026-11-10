@@ -301,7 +301,12 @@ export class CommunityFlagEvaluationService {
     }
     // A false that rests on a grant check that could not finish is not cached: every instance,
     // realtime and the push guard read this row, and a grantee would be shut out for a minute.
-    if (value === false && grantCheck === 'unavailable') value = undefined
+    if (value === false && grantCheck === 'unavailable') {
+      // ...and the claim reopens at once, so the next request retries in place of waiting out
+      // the claim cadence with a 503 a non-grantee never saw before 6.14.
+      await this.releaseFailedClaim(member, owner, claim.subject_generation, true)
+      return
+    }
     if (typeof value !== 'boolean' || performance.now() >= invocationDeadline) {
       await this.releaseFailedClaim(member, owner, claim.subject_generation)
       return
@@ -341,7 +346,12 @@ export class CommunityFlagEvaluationService {
       throw error
     }
   }
-  private async releaseFailedClaim(member: string, owner: string, generation: number) {
+  private async releaseFailedClaim(
+    member: string,
+    owner: string,
+    generation: number,
+    retryNow = false
+  ) {
     await interactiveTransaction(
       this.prisma,
       async (tx) => {
@@ -349,7 +359,8 @@ export class CommunityFlagEvaluationService {
         await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
         // Failure finishes this claim without changing its original cadence or authorization.
         await tx.$executeRaw`
-        UPDATE "CommunityFlagEvaluation" e SET refresh_until = NULL, refresh_owner = NULL
+        UPDATE "CommunityFlagEvaluation" e SET refresh_until = NULL, refresh_owner = NULL,
+          next_claim_at = CASE WHEN ${retryNow} THEN clock_timestamp() ELSE e.next_claim_at END
         FROM "CommunitySubject" s WHERE e.member_id = ${member} AND e.flag_key = 'community_read_enabled'
           AND e.refresh_owner = ${owner}::uuid AND e.refresh_until > clock_timestamp()
           AND e.subject_generation = ${generation} AND s.member_id = e.member_id AND s.generation = e.subject_generation

@@ -61,6 +61,18 @@ const loadProfileStub = () =>
     linkedTeens: [],
   })
 
+const profileBody = {
+  user: {
+    id: 'user-premium-1',
+    email: 'premium@example.test',
+    displayName: null,
+    birthdate: null,
+    role: 'guardian',
+  },
+  linkedGuardians: [],
+  linkedTeens: [],
+}
+
 /** Puts the SDK boundary into the state a real iOS dev build would see. */
 async function configureReady() {
   ;(Platform as { OS: string }).OS = 'ios'
@@ -352,9 +364,45 @@ describe('mobile premium boundary', () => {
       expect(PurchasesMock.showManageSubscriptions).toHaveBeenCalledTimes(1)
     })
 
-    it('answers false before configuration and on SDK failure', async () => {
-      await expect(showManageSubscriptionsInStore()).resolves.toBe(false)
+    // Story 6.14: a paying grantee's section never configures the SDK on entry, so the
+    // Manage tap configures it first, then opens the store's manage flow.
+    it('configures the SDK on the tap when it is not configured yet, then opens manage', async () => {
+      ;(Platform as { OS: string }).OS = 'ios'
+      process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY = 'test-apple-sdk-key'
+      // The tap configures through the real profile read, which names the app_user_id.
+      server.use(http.get('*/api/v1/user/profile', () => HttpResponse.json(profileBody)))
+      expect(PurchasesMock.configure).not.toHaveBeenCalled()
 
+      await expect(showManageSubscriptionsInStore()).resolves.toBe(true)
+
+      expect(PurchasesMock.configure).toHaveBeenCalledTimes(1)
+      expect(PurchasesMock.configure).toHaveBeenCalledWith({
+        apiKey: 'test-apple-sdk-key',
+        appUserID: 'user-premium-1',
+      })
+      expect(PurchasesMock.showManageSubscriptions).toHaveBeenCalledTimes(1)
+      expect(PurchasesMock.configure.mock.invocationCallOrder[0]).toBeLessThan(
+        PurchasesMock.showManageSubscriptions.mock.invocationCallOrder[0]!
+      )
+    })
+
+    it('answers false with no store SDK (web, Expo Go) and never opens manage', async () => {
+      await expect(showManageSubscriptionsInStore()).resolves.toBe(false)
+      expect(PurchasesMock.configure).not.toHaveBeenCalled()
+      expect(PurchasesMock.showManageSubscriptions).not.toHaveBeenCalled()
+    })
+
+    it('answers false when the SDK fails to configure on the tap', async () => {
+      ;(Platform as { OS: string }).OS = 'ios'
+      process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY = 'test-apple-sdk-key'
+      server.use(http.get('*/api/v1/user/profile', () => HttpResponse.json(profileBody)))
+      PurchasesMock.configure.mockRejectedValue(new Error('configure failed'))
+
+      await expect(showManageSubscriptionsInStore()).resolves.toBe(false)
+      expect(PurchasesMock.showManageSubscriptions).not.toHaveBeenCalled()
+    })
+
+    it('answers false on SDK failure once configured', async () => {
       await configureReady()
       PurchasesMock.showManageSubscriptions.mockRejectedValue(new Error('no UI'))
       await expect(showManageSubscriptionsInStore()).resolves.toBe(false)

@@ -8,7 +8,10 @@ import {
   type Prisma,
 } from '@prisma/client'
 import { createBaseLogger } from '../../logger/pino.config.js'
-import { ComplimentaryAccessService } from '../feature-flags/complimentary-access.service.js'
+import {
+  ComplimentaryAccessService,
+  type ComplimentaryAccessCheck,
+} from '../feature-flags/complimentary-access.service.js'
 import { RevenueCatClient } from './revenuecat-client.js'
 import { StripeBillingClient } from './stripe-client.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
@@ -141,7 +144,7 @@ export class PremiumEntitlementService {
     @Inject(StripeBillingClient) private readonly stripeBilling: StripeBillingClient,
     // Story 6.14 D5: read-side only. No ledger write path in this class consults it.
     @Inject(ComplimentaryAccessService)
-    private readonly complimentary: Pick<ComplimentaryAccessService, 'isActive'>
+    private readonly complimentary: Pick<ComplimentaryAccessService, 'isActive' | 'check'>
   ) {}
 
   /**
@@ -214,6 +217,14 @@ export class PremiumEntitlementService {
     ])
     if (complimentary) return 'complimentary'
     return paid ? 'subscription' : 'none'
+  }
+
+  /**
+   * Story 6.14 D5: the three-way grant answer for checkout, which must not fail open: a
+   * grantee whose grant cannot be read right now is not sold what they may already have.
+   */
+  complimentaryAccessCheck(userId: string): Promise<ComplimentaryAccessCheck> {
+    return this.complimentary.check(userId)
   }
 
   private async hasPaidAccess(userId: string): Promise<boolean> {

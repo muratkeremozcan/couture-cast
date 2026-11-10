@@ -238,6 +238,35 @@ describe('ComplimentaryAccessService.isActive', () => {
     ).toBe(true)
   })
 
+  it('U-KILL-ROW-FAILS: remote silent and the fallback row read throwing answers false, with the cause logged and no member id', async () => {
+    const id = await member(prisma)
+    await grant(prisma, id)
+    // The kill switch could be off in that row; a code default of true must not stand in for it.
+    const failingFlagRow = new Proxy(prisma, {
+      get(target, key, receiver) {
+        if (key === 'featureFlag')
+          return new Proxy(
+            {},
+            { get: () => () => Promise.reject(new Error('feature flag row unavailable')) }
+          )
+        return Reflect.get(target, key, receiver) as unknown
+      },
+    })
+    const service = new ComplimentaryAccessService(
+      failingFlagRow,
+      recordingRemote({ complimentary_access_enabled: undefined }).provider
+    )
+
+    expect(await service.isActive(id)).toBe(false)
+    expect(await service.check(id)).toBe('unavailable')
+    const lines = logLines.filter((line) =>
+      line.includes('complimentary_access_unavailable')
+    )
+    expect(lines.length).toBeGreaterThanOrEqual(1)
+    expect(lines.every((line) => /"cause":"[^"]+"/.test(line))).toBe(true)
+    expect(logLines.join('\n')).not.toContain(id)
+  })
+
   it('U-KILL-DEADLINE: a hanging kill-switch remote falls back to the row inside 600 ms', async () => {
     const id = await member(prisma)
     await grant(prisma, id)
