@@ -360,13 +360,15 @@ jobs:
         run: npm run test:pw-complimentary
 
       - name: Check complimentary artifacts for secret values
+        id: secret_scan
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/check-artifact-secrets.mjs --names GH_TOKEN playwright/artifacts
 
       - name: Upload complimentary artifacts
-        if: failure()
+        # Only artifacts that passed the secret scan leave the runner.
+        if: always() && steps.secret_scan.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: complimentary-access-e2e
