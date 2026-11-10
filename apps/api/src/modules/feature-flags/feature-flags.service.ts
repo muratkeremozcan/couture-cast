@@ -72,19 +72,15 @@ export class FeatureFlagsService {
       database &&
       ['localhost', '127.0.0.1'].includes(new URL(database).hostname)
     if (fixture) {
-      // Story 6.14 D4: the fixture path skips the cache, so it asks the grant first (TEA-03).
-      if (await budget.run(() => this.complimentary.isActive(userId))) {
-        return {
-          value: true,
-          expiresAt: new Date(Date.now() + 60000),
-          validUntil: performance.now() + 60000,
-        }
-      }
-      const value = coerceFeatureFlagValue(
+      const stored = coerceFeatureFlagValue(
         'community_read_enabled',
         await budget.run(() => this.repository.findValue('community_read_enabled'))
       )
-      if (value === undefined) throw new CommunityUnavailableException()
+      if (stored === undefined) throw new CommunityUnavailableException()
+      // Story 6.14 D4: the fixture path skips the cache, so it asks the grant itself (TEA-03),
+      // and only when the global row says no: a flag-on stack pays nothing per request.
+      const value =
+        stored || (await budget.run(() => this.complimentary.isActive(userId)))
       return {
         value,
         expiresAt: new Date(Date.now() + 60000),
