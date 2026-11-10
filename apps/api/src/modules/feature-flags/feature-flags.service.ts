@@ -13,6 +13,7 @@ import {
   FEATURE_FLAG_SYNC_DISTINCT_ID,
   coerceFeatureFlagValue,
   getDefaultFeatureFlagValue,
+  isComplimentaryMemberFlag,
   getFeatureFlag as resolveFeatureFlag,
   type FeatureFlagKey,
   type FeatureFlagRecord,
@@ -20,6 +21,7 @@ import {
 } from '@couture/config'
 import { createBaseLogger } from '../../logger/pino.config'
 
+import { ComplimentaryAccessService } from './complimentary-access.service'
 import { FeatureFlagsRepository } from './feature-flags.repository'
 import {
   InjectRemoteFeatureFlagProvider,
@@ -53,7 +55,10 @@ export class FeatureFlagsService {
     private readonly remoteProvider: RemoteFeatureFlagProvider,
     @Optional()
     @Inject(CommunityFlagEvaluationService)
-    private readonly communityCache?: CommunityFlagEvaluationService
+    private readonly communityCache: CommunityFlagEvaluationService | undefined,
+    // Story 6.14 D2: required, so no composition can drop the complimentary shortcut.
+    @Inject(ComplimentaryAccessService)
+    private readonly complimentary: Pick<ComplimentaryAccessService, 'isActive'>
   ) {}
 
   async communityReadEvaluation(
@@ -67,6 +72,14 @@ export class FeatureFlagsService {
       database &&
       ['localhost', '127.0.0.1'].includes(new URL(database).hostname)
     if (fixture) {
+      // Story 6.14 D4: the fixture path skips the cache, so it asks the grant first (TEA-03).
+      if (await budget.run(() => this.complimentary.isActive(userId))) {
+        return {
+          value: true,
+          expiresAt: new Date(Date.now() + 60000),
+          validUntil: performance.now() + 60000,
+        }
+      }
       const value = coerceFeatureFlagValue(
         'community_read_enabled',
         await budget.run(() => this.repository.findValue('community_read_enabled'))
@@ -90,6 +103,16 @@ export class FeatureFlagsService {
       const grant = await this.communityReadEvaluation(userId)
       new CommunityAuthorizationBudget().check(grant)
       return coerceFeatureFlagValue(flagKey, grant.value)!
+    }
+    // Story 6.14 D4: a member with an active complimentary grant receives the other five
+    // complimentary flags as true before PostHog is asked. community_read_enabled returned
+    // above, through the cache whose refresh carries the same override (TEA-02). Grants are
+    // read only for these keys (TEA-16); everyone else takes the path below.
+    if (
+      isComplimentaryMemberFlag(flagKey) &&
+      (await this.complimentary.isActive(userId))
+    ) {
+      return true as FeatureFlagValue<K>
     }
     // Flow ref S0.7/T8/1-3: one call path for all request-time reads: validate
     // key, ask PostHog, then fall back safely if needed.

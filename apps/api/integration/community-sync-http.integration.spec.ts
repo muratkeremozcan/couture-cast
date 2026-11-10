@@ -1,5 +1,6 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { UserController } from '../src/modules/user/user.controller.js'
 import { UserService } from '../src/modules/user/user.service.js'
 import { bindRequestContext } from '../src/logger/request-context.js'
@@ -51,7 +52,8 @@ const remote = { getFeatureFlagValue: vi.fn(() => Promise.resolve<unknown>(true)
 const flags = new FeatureFlagsService(
   new FeatureFlagsRepository(prisma),
   remote,
-  new CommunityFlagEvaluationService(prisma, remote)
+  new CommunityFlagEvaluationService(prisma, remote, noComplimentaryGrants),
+  noComplimentaryGrants
 )
 const repository = new CommunityRepository(prisma)
 let identityDatabase: PrismaClient = prisma

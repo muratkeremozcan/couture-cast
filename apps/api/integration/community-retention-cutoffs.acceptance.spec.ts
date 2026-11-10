@@ -4,6 +4,7 @@
 //
 // The compiled runtime runs its own loops in an owned child. Each cutoff is seeded one minute
 // inside and one minute outside by writing row timestamps; no process clock moves.
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
 import {
@@ -215,9 +216,13 @@ describe('retention cutoffs', { concurrent: false }, () => {
     await terminal(newDelivery!, inside(30 * DAY))
 
     // 24 h flag cache, written by the production evaluator.
-    const evaluator = new CommunityFlagEvaluationService(prisma, {
-      getFeatureFlagValue: () => Promise.resolve(true),
-    })
+    const evaluator = new CommunityFlagEvaluationService(
+      prisma,
+      {
+        getFeatureFlagValue: () => Promise.resolve(true),
+      },
+      noComplimentaryGrants
+    )
     const [oldFlag, newFlag] = [oldToken.id, newToken.id]
     await evaluator.evaluate(oldFlag)
     await evaluator.evaluate(newFlag)

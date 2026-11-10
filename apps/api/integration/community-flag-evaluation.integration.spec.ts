@@ -8,6 +8,7 @@
 // member, a second instance waiting on another owner's refresh, and a caller that joined
 // a shorter-lived flight.
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { PrismaClient, Prisma } from '@prisma/client'
 import { createUser, persistUser } from '@couture/testing'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -33,8 +34,8 @@ afterAll(async () => {
 const remote = {
   getFeatureFlagValue: vi.fn<() => Promise<unknown>>().mockResolvedValue(true),
 }
-const a = new CommunityFlagEvaluationService(prisma, remote)
-const b = new CommunityFlagEvaluationService(prisma, remote)
+const a = new CommunityFlagEvaluationService(prisma, remote, noComplimentaryGrants)
+const b = new CommunityFlagEvaluationService(prisma, remote, noComplimentaryGrants)
 const member = async () =>
   (
     await persistUser(
@@ -80,9 +81,11 @@ describe('community flag evaluation claims', () => {
         },
       })
       const provider = { getFeatureFlagValue: vi.fn(() => Promise.resolve(value)) }
-      const grant = await new CommunityFlagEvaluationService(observed, provider).evaluate(
-        id
-      )
+      const grant = await new CommunityFlagEvaluationService(
+        observed,
+        provider,
+        noComplimentaryGrants
+      ).evaluate(id)
       const row = await prisma.communityFlagEvaluation.findUniqueOrThrow({
         where: {
           member_id_flag_key: { member_id: id, flag_key: 'community_read_enabled' },
@@ -100,7 +103,11 @@ describe('community flag evaluation claims', () => {
   it('cannot return a refreshed grant after the subject generation changes during the provider call', async () => {
     const id = await member()
     const remote = heldRemote()
-    const service = new CommunityFlagEvaluationService(prisma, remote.provider)
+    const service = new CommunityFlagEvaluationService(
+      prisma,
+      remote.provider,
+      noComplimentaryGrants
+    )
     const result = service.evaluate(id)
     const outcome = expect(result).rejects.toBeInstanceOf(CommunityUnavailableException)
     await until(
@@ -124,7 +131,11 @@ describe('community flag evaluation claims', () => {
 
   it('reports an unknown member as unavailable with the default retry, without a remote call', async () => {
     const remote = heldRemote()
-    const service = new CommunityFlagEvaluationService(prisma, remote.provider)
+    const service = new CommunityFlagEvaluationService(
+      prisma,
+      remote.provider,
+      noComplimentaryGrants
+    )
     const outcome = await service
       .evaluate('member-without-subject')
       .catch((error: unknown) => error)
@@ -136,8 +147,16 @@ describe('community flag evaluation claims', () => {
   it('serves a second instance the refresh another instance owns once it lands', async () => {
     const id = await member()
     const remote = heldRemote()
-    const owner = new CommunityFlagEvaluationService(prisma, remote.provider)
-    const waiter = new CommunityFlagEvaluationService(prisma, remote.provider)
+    const owner = new CommunityFlagEvaluationService(
+      prisma,
+      remote.provider,
+      noComplimentaryGrants
+    )
+    const waiter = new CommunityFlagEvaluationService(
+      prisma,
+      remote.provider,
+      noComplimentaryGrants
+    )
     const owned = owner.evaluate(id)
     await until(
       () => Promise.resolve(remote.calls()),
@@ -157,8 +176,16 @@ describe('community flag evaluation claims', () => {
   it('reports unavailable with the claim cadence when another owner never lands its refresh', async () => {
     const id = await member()
     const remote = heldRemote()
-    const owner = new CommunityFlagEvaluationService(prisma, remote.provider)
-    const waiter = new CommunityFlagEvaluationService(prisma, remote.provider)
+    const owner = new CommunityFlagEvaluationService(
+      prisma,
+      remote.provider,
+      noComplimentaryGrants
+    )
+    const waiter = new CommunityFlagEvaluationService(
+      prisma,
+      remote.provider,
+      noComplimentaryGrants
+    )
     const owned = owner.evaluate(id).catch((error: unknown) => error)
     await until(
       () => Promise.resolve(remote.calls()),
@@ -179,7 +206,11 @@ describe('community flag evaluation claims', () => {
   it('lets a caller with a longer budget retry when the flight it joined expires first', async () => {
     const id = await member()
     const remote = heldRemote()
-    const service = new CommunityFlagEvaluationService(prisma, remote.provider)
+    const service = new CommunityFlagEvaluationService(
+      prisma,
+      remote.provider,
+      noComplimentaryGrants
+    )
     const short = service
       .evaluate(id, new CommunityAuthorizationBudget(performance.now() + 300))
       .catch((error: unknown) => error)
@@ -231,7 +262,11 @@ describe('Story 6.5 remote-only shared flag cache', () => {
         return Reflect.get(target, key, receiver) as unknown
       },
     })
-    const evaluator = new CommunityFlagEvaluationService(observed, remote)
+    const evaluator = new CommunityFlagEvaluationService(
+      observed,
+      remote,
+      noComplimentaryGrants
+    )
     const first = evaluator.evaluate(
       id,
       new CommunityAuthorizationBudget(performance.now() + 50)
@@ -268,7 +303,8 @@ describe('Story 6.5 remote-only shared flag cache', () => {
         ...tx,
         $transaction: (work: (value: typeof tx) => Promise<unknown>) => work(tx),
       } as never,
-      remote
+      remote,
+      noComplimentaryGrants
     )
     const start = performance.now()
     await expect(delayed.evaluate('held-member')).rejects.toMatchObject({ status: 503 })
@@ -350,8 +386,8 @@ describe('Story 6.5 remote-only shared flag cache', () => {
       },
     })
     const instances = [
-      new CommunityFlagEvaluationService(observed, remote),
-      new CommunityFlagEvaluationService(observed, remote),
+      new CommunityFlagEvaluationService(observed, remote, noComplimentaryGrants),
+      new CommunityFlagEvaluationService(observed, remote, noComplimentaryGrants),
     ]
     const started = performance.now()
     let results: Awaited<ReturnType<CommunityFlagEvaluationService['evaluate']>>[] = []
@@ -450,8 +486,8 @@ describe('Story 6.5 remote-only shared flag cache', () => {
       },
     })
     const instances = [
-      new CommunityFlagEvaluationService(observed, provider),
-      new CommunityFlagEvaluationService(observed, provider),
+      new CommunityFlagEvaluationService(observed, provider, noComplimentaryGrants),
+      new CommunityFlagEvaluationService(observed, provider, noComplimentaryGrants),
     ]
     try {
       const results = await Promise.all(
@@ -527,7 +563,11 @@ describe('Story 6.5 remote-only shared flag cache', () => {
     const provider = { getFeatureFlagValue: vi.fn(() => Promise.resolve(true)) }
     try {
       await expect(
-        new CommunityFlagEvaluationService(observed, provider).evaluate(id)
+        new CommunityFlagEvaluationService(
+          observed,
+          provider,
+          noComplimentaryGrants
+        ).evaluate(id)
       ).rejects.toBeInstanceOf(CommunityUnavailableException)
       // Three attempts, then refusal. An unbounded retry would keep timing out until
       // the 1950 ms budget ran out, far past three.
@@ -585,7 +625,11 @@ describe('Story 6.5 remote-only shared flag cache', () => {
     })
     try {
       await expect(
-        new CommunityFlagEvaluationService(observed, provider).evaluate(id)
+        new CommunityFlagEvaluationService(
+          observed,
+          provider,
+          noComplimentaryGrants
+        ).evaluate(id)
       ).rejects.toBeInstanceOf(CommunityUnavailableException)
       expect(transactions).toBe(2) // Initial read and exactly one guarded claim.
       expect(provider.getFeatureFlagValue).not.toHaveBeenCalled()

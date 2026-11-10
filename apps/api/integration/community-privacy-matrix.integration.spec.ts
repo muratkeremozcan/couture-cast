@@ -1,6 +1,7 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { z } from 'zod'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -40,7 +41,8 @@ function preferences() {
   const flags = new FeatureFlagsService(
     new FeatureFlagsRepository(h.prisma),
     { getFeatureFlagValue: () => Promise.resolve(true) },
-    h.flags
+    h.flags,
+    noComplimentaryGrants
   )
   return new CommunityPreferencesService(
     h.prisma,

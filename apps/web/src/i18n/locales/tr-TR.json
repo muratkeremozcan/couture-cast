@@ -26,7 +26,8 @@
         "active": "Premium etkin: {{plan}}. Geçerli dönem {{date}} tarihinde sona eriyor.",
         "gracePeriod": "Premium etkin, ancak bir ödeme sorunu var.",
         "expired": "Premium aboneliğinin süresi doldu.",
-        "revoked": "Premium aboneliğin iptal edildi."
+        "revoked": "Premium aboneliğin iptal edildi.",
+        "complimentary": "CoutureCast'ten ücretsiz Premium erişimin var."
       },
       "planMonthly": "Aylık Premium",
       "planAnnual": "Yıllık Premium",
@@ -40,9 +41,11 @@
       "portalLagHint": "Faturalama portalında yapılan değişikliklerin, özellikle iptallerin burada görünmesi birkaç saat sürebilir.",
       "graceBanner": "Ödeme yönteminde bir sorun var. Premium'u korumak için abone olduğun mağaza veya faturalama portalından güncelle.",
       "endedNote": "Aboneliğin sona erdi. İstediğin zaman yeniden abone olabilirsin.",
+      "complimentaryNote": "Ayrıca ücretsiz Premium erişimin de var; bu abonelikle ne olursa olsun Premium açık kalır.",
       "errorLoad": "Abonelik durumu yüklenemedi.",
       "errorPurchase": "Ödeme başlatılamadı. Lütfen tekrar dene.",
       "errorAlreadySubscribed": "Zaten etkin bir Premium aboneliğin var. Görmek için bu sayfayı yeniden yükle.",
+      "errorComplimentary": "Bu hesabın zaten ücretsiz Premium erişimi var, satın alınacak bir şey yok.",
       "errorNoWebSubscription": "Bu hesapta yönetilecek bir web aboneliği yok.",
       "errorSubscribeDisabled": "Yeni Premium abonelikleri şu an duraklatıldı. Lütfen kısa süre sonra tekrar dene.",
       "signedOutHint": "Premium'a abone olmak veya yönetmek için giriş yap",

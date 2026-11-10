@@ -35,6 +35,9 @@ export const DEFAULT_FACTORY_REGISTRY_KEYS = [
   // Story 5.5. Owner-only planner cache rows, reachable by the user filter
   // like every other user-keyed key above.
   'plannerDayPlans',
+  // Story 6.14. Owner-granted complimentary access, keyed by member_id. Member
+  // deletion cascades, and the tracked ids catch a grant whose member survives.
+  'complimentaryAccessGrants',
   // Story 6.1 community posts and challenges. The outbox, alias and report
   // rows are tracked in their own right rather than swept through the post:
   // a report survives its post (ON DELETE SET NULL), so deleting the post no

@@ -120,6 +120,7 @@ export type ContractApiClient = Pick<
   | 'apiV1CommerceAffiliateClicksPostRaw'
   | 'apiV1CommerceAffiliateWebhookPost'
   | 'apiV1CommerceSubscriptionGet'
+  | 'apiV1CommercePremiumAccessGet'
   | 'apiV1CommerceSubscriptionRefreshPost'
   | 'apiV1CommerceSubscriptionCheckoutSessionPost'
   | 'apiV1CommerceSubscriptionPortalSessionPost'

@@ -31,7 +31,11 @@ describe('flag claim after a pldbgapi2 re-run (repeat safety)', () => {
     )
     const service = new CommunityFlagEvaluationService(
       { $transaction } as unknown as PrismaClient,
-      { getFeatureFlagValue: vi.fn() }
+      { getFeatureFlagValue: vi.fn() },
+      {
+        isActive: () => Promise.resolve(false),
+        check: () => Promise.resolve('not_granted' as const),
+      }
     )
     const budget = new CommunityAuthorizationBudget(performance.now() + 60_000)
 

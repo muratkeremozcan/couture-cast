@@ -13,6 +13,7 @@
 // Direct calls instead of HTTP: the send guard, both processors and the realtime server have no
 // HTTP route, so each runs through its own real class.
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -3241,9 +3242,13 @@ describe('I-B-SEND-GUARD: pushes stop for a banned member (direct, the guard has
   const requests: unknown[] = []
   let server: Server
   let endpoint: string
-  const evaluation = new CommunityFlagEvaluationService(prisma, {
-    getFeatureFlagValue: () => Promise.resolve(true),
-  })
+  const evaluation = new CommunityFlagEvaluationService(
+    prisma,
+    {
+      getFeatureFlagValue: () => Promise.resolve(true),
+    },
+    noComplimentaryGrants
+  )
   const sender = () =>
     new CommunitySendGuard(prisma, evaluation, new CommunityPushProvider(fetch, endpoint))
   const worker = () => new CommunityNotificationsWorker(prisma, sender())

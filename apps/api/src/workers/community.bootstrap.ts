@@ -3,6 +3,7 @@ import { startCommunityEngagementRuntime } from '../modules/community/community-
 import { CommunityFlagEvaluationService } from '../modules/feature-flags/community-flag-evaluation.service.js'
 import '../load-env'
 import { FeatureFlagsService } from '../modules/feature-flags/feature-flags.service.js'
+import { ComplimentaryAccessService } from '../modules/feature-flags/complimentary-access.service.js'
 import { FeatureFlagsRepository } from '../modules/feature-flags/feature-flags.repository.js'
 import type { Worker } from 'bullmq'
 import { createCommunityWorkerRuntime } from '../modules/community/community-worker-runtime'
@@ -126,6 +127,8 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
   try {
     const prisma = getPrismaClient()
     const posthogService = new PostHogService()
+    // Story 6.14 D2: one complimentary seam for every evaluator this worker builds.
+    const complimentaryAccess = new ComplimentaryAccessService(prisma, posthogService)
     state.posthogService = posthogService
     const telemetryService = new TelemetryService(prisma, posthogService)
     const engagement = await startCommunityEngagementRuntime(
@@ -141,7 +144,8 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
     const runtimeFlags = new FeatureFlagsService(
       new FeatureFlagsRepository(prisma),
       posthogService,
-      new CommunityFlagEvaluationService(prisma, posthogService)
+      new CommunityFlagEvaluationService(prisma, posthogService, complimentaryAccess),
+      complimentaryAccess
     )
     const community = await createCommunityWorkerRuntime({
       prisma,

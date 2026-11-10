@@ -45,6 +45,7 @@ export interface CleanupPrismaClient {
   affiliateClick: CleanupDelegate
   affiliateConversion: CleanupDelegate
   premiumEntitlement: CleanupDelegate
+  complimentaryAccessGrant: CleanupDelegate
   billingEvent: CleanupDelegate
   billingCustomer: CleanupDelegate
   premiumThemePreference: CleanupDelegate
@@ -348,6 +349,7 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const affiliateConversionIds = uniqueValues(tracked.affiliateConversions)
 
   const premiumEntitlementIds = uniqueValues(tracked.premiumEntitlements)
+  const complimentaryAccessGrantIds = uniqueValues(tracked.complimentaryAccessGrants)
   const billingEventIds = uniqueValues(tracked.billingEvents)
   const billingCustomerIds = uniqueValues(tracked.billingCustomers)
   const premiumThemePreferenceIds = uniqueValues(tracked.premiumThemePreferences)
@@ -426,6 +428,17 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
 
     if (premiumEntitlementWhere) {
       await prisma.premiumEntitlement.deleteMany({ where: premiumEntitlementWhere })
+    }
+
+    if (complimentaryAccessGrantIds.length > 0 || userIds.length > 0) {
+      await prisma.complimentaryAccessGrant.deleteMany({
+        where: {
+          OR: [
+            { id: { in: complimentaryAccessGrantIds } },
+            { member_id: { in: userIds } },
+          ],
+        },
+      })
     }
 
     if (billingCustomerWhere) {

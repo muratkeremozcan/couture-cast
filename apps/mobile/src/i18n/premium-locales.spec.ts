@@ -102,13 +102,17 @@ function placeholders(value: string): string[] {
 const reference = flatten(premiumTree(enUS as Catalog))
 
 describe('5.2 mobile premium locale parity', () => {
-  it('5.2-I18N-MOB-01 ships the 23 Decision 12a mobile keys in the reference catalog', () => {
+  it('5.2-I18N-MOB-01 ships the 25 mobile premium keys in the reference catalog', () => {
+    // Story 6.14 adds `status.complimentary` and `complimentaryNote`; mobile has no checkout
+    // refusal key, because purchases go through the store SDK there.
     // 21 shared keys, the mobile-only `unavailableInBuild`, and `signedOutHint`: the
     // settings tab is reachable signed out, so it says what signing in unlocks
     // instead of a load failure. `plannerLocked.*` now ships on mobile too (Story 5.5),
     // but it is excluded here the same way `theme`/`palette`/`planner` are,
     // and audited in its own `planner-locales.spec.ts`.
-    expect(reference.size).toBe(23)
+    expect(reference.size).toBe(25)
+    expect(reference.has('status.complimentary')).toBe(true)
+    expect(reference.has('complimentaryNote')).toBe(true)
     expect(reference.has('unavailableInBuild')).toBe(true)
     expect(reference.has('signedOutHint')).toBe(true)
   })

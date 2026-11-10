@@ -3,6 +3,7 @@
 // transaction after its callback (Postgres rolls the run back), and PL/pgSQL that
 // raises the exact SQLSTATE XX000 error inside the send guard's single-run transaction.
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -25,9 +26,13 @@ import { pldbgapi2Abort } from '../src/testing/pldbgapi2.js'
 
 const db = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: db.url } } })
-const flags = new CommunityFlagEvaluationService(prisma, {
-  getFeatureFlagValue: () => Promise.resolve(true),
-})
+const flags = new CommunityFlagEvaluationService(
+  prisma,
+  {
+    getFeatureFlagValue: () => Promise.resolve(true),
+  },
+  noComplimentaryGrants
+)
 let server: Server
 let endpoint: string
 const requests: unknown[] = []

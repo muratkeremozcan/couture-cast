@@ -95,7 +95,8 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
     const entitlements = new PremiumEntitlementService(
       prisma,
       ledger,
-      new FakeStripeBillingClient()
+      new FakeStripeBillingClient(),
+      { isActive: () => Promise.resolve(false) }
     )
     return new BillingReconciliationService(
       prisma,

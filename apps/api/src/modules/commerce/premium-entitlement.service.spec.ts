@@ -62,7 +62,8 @@ function service(): PremiumEntitlementService {
   return new PremiumEntitlementService(
     {} as unknown as PrismaClient,
     new FakeRevenueCatClient(),
-    new FakeStripeBillingClient()
+    new FakeStripeBillingClient(),
+    { isActive: () => Promise.resolve(false) }
   )
 }
 
@@ -204,7 +205,9 @@ describe('eraseProcessorData (Decision 7, Open question 5)', () => {
     } as unknown as PrismaClient
 
     return {
-      service: new PremiumEntitlementService(prisma, revenueCat, stripeBilling),
+      service: new PremiumEntitlementService(prisma, revenueCat, stripeBilling, {
+        isActive: () => Promise.resolve(false),
+      }),
       revenueCat,
       stripeBilling,
     }

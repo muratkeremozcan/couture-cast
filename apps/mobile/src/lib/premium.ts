@@ -23,7 +23,9 @@
 //    instead of spinning forever. The bound is the AC's 2-minute sync clock
 //    made visible.
 import {
+  premiumAccessResponseSchema,
   subscriptionResponseSchema,
+  type PremiumAccess,
   type Subscription,
   type SubscriptionPlan,
 } from '@couture/api-client/contracts/http'
@@ -52,6 +54,19 @@ export async function getSubscriptionFromMobile(
 }
 
 /**
+ * Story 6.14 D6: whether the member has premium and where it comes from. Read beside the
+ * subscription, whose contract stays frozen for installed builds.
+ */
+export async function getPremiumAccessFromMobile(
+  signal?: AbortSignal
+): Promise<PremiumAccess> {
+  const response = await withRequestTimeout(signal, (requestSignal) =>
+    premiumClient().apiV1CommercePremiumAccessGet({ signal: requestSignal })
+  )
+  return premiumAccessResponseSchema.parse(response).data
+}
+
+/**
  * On-demand ledger pull. Beats webhook latency right after a purchase; the
  * server rate-limits it per user and serves local state inside the window, so
  * calling it eagerly is safe.
@@ -63,6 +78,11 @@ export async function refreshSubscriptionFromMobile(
     premiumClient().apiV1CommerceSubscriptionRefreshPost({ signal: requestSignal })
   )
   return subscriptionResponseSchema.parse(response).data
+}
+
+/** Story 6.14 D6: true when an owner grant is where this member's premium comes from. */
+export function isComplimentaryAccess(access: PremiumAccess | null): boolean {
+  return access !== null && access.source === 'complimentary'
 }
 
 /** The guard's access rule, mirrored client-side: grace period keeps access. */
@@ -81,8 +101,12 @@ export type PremiumSectionRenderState =
   | { kind: 'loading' }
   | { kind: 'load-error' }
   | { kind: 'subscribe'; ended: boolean; purchasesEnabled: boolean }
+  /** Story 6.14 D6: an owner grant and no paid entitlement. Nothing to buy or manage. */
+  | { kind: 'complimentary' }
   | {
       kind: 'entitled'
+      /** Story 6.14 D6: a paying member who also holds a complimentary grant. */
+      complimentary: boolean
       plan: SubscriptionPlan | null
       productId: string
       currentPeriodEnd: string
@@ -90,15 +114,30 @@ export type PremiumSectionRenderState =
       manageEntry: 'store' | 'web' | 'none'
     }
 
+/**
+ * Story 6.14 D6: the access read. Until it settles the section stays `loading`, so a grantee
+ * never sees the free or ended state first; omitted, the section renders as before 6.14.
+ */
+export type PremiumAccessReadState = {
+  readonly accessSettled: boolean
+  readonly access: PremiumAccess | null
+}
+
 export function resolvePremiumSectionState(
   subscription: Subscription | null,
-  didLoadFail: boolean
+  didLoadFail: boolean,
+  accessRead: PremiumAccessReadState = { accessSettled: true, access: null }
 ): PremiumSectionRenderState {
   if (didLoadFail) {
     return { kind: 'load-error' }
   }
-  if (!subscription) {
+  if (!subscription || !accessRead.accessSettled) {
     return { kind: 'loading' }
+  }
+  const complimentary = isComplimentaryAccess(accessRead.access)
+  // TEA-07: a complimentary member is never offered a store purchase.
+  if (complimentary && !isEntitledSubscription(subscription)) {
+    return { kind: 'complimentary' }
   }
   switch (subscription.status) {
     case 'none':
@@ -120,6 +159,7 @@ export function resolvePremiumSectionState(
     case 'grace_period':
       return {
         kind: 'entitled',
+        complimentary,
         plan:
           subscription.productId === 'premium_monthly' ||
           subscription.productId === 'premium_annual'

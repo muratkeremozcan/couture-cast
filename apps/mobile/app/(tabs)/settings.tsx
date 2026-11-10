@@ -4,11 +4,13 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native'
 import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { formatLocalizedList } from '@couture/utils'
 import {
   defaultSupportedLocale,
   resolveSupportedLocale,
   type PremiumThemeKey,
+  type PremiumAccess,
   type Subscription,
   type SubscriptionPlan,
   type SupportedLocale,
@@ -32,13 +34,16 @@ import {
 } from '@/src/lib/commerce'
 import {
   ensurePurchasesConfigured,
+  getPremiumAccessFromMobile,
   getSubscriptionFromMobile,
+  isComplimentaryAccess,
   isEntitledSubscription,
   pollSubscriptionUntilEntitled,
   purchasePremiumPlan,
   refreshSubscriptionFromMobile,
   resolvePremiumSectionState,
   restorePremiumPurchases,
+  type PremiumSectionRenderState,
   showManageSubscriptionsInStore,
   type PurchasesAvailability,
 } from '@/src/lib/premium'
@@ -573,6 +578,89 @@ export default function SettingsScreen() {
   )
 }
 
+/**
+ * The Premium section's status line, one per render state. Kept outside the section so the
+ * section's own branching stays readable.
+ */
+function premiumStatusLine(
+  t: TFunction,
+  i18n: { resolvedLanguage?: string; language: string },
+  renderState: PremiumSectionRenderState,
+  subscription: Subscription | null
+): string | null {
+  if (renderState.kind === 'entitled') {
+    const locale =
+      resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
+      defaultSupportedLocale
+    const planLabel = renderState.plan
+      ? t(
+          renderState.plan === 'premium_monthly'
+            ? 'commerce.premium.planMonthly'
+            : 'commerce.premium.planAnnual'
+        )
+      : renderState.productId
+    return t(
+      `commerce.premium.status.${renderState.showGraceBanner ? 'gracePeriod' : 'active'}`,
+      {
+        plan: planLabel,
+        date: new Date(renderState.currentPeriodEnd).toLocaleDateString(locale, {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }),
+      }
+    )
+  }
+  if (renderState.kind === 'complimentary') {
+    return t('commerce.premium.status.complimentary')
+  }
+  if (renderState.kind === 'subscribe' && subscription) {
+    return t(`commerce.premium.status.${premiumStatusKeys[subscription.status]}`)
+  }
+  return null
+}
+
+/**
+ * Story 6.14: the processor disclosure, withheld from an unpaid complimentary member, who shares
+ * nothing with RevenueCat or Stripe and is offered nothing to buy. Until the session and the
+ * reads resolve it stays hidden, so a grantee never sees it appear and vanish; signed out it
+ * shows as before.
+ */
+function showPremiumDisclosure(
+  signedIn: boolean | null,
+  renderState: PremiumSectionRenderState
+): boolean {
+  if (renderState.kind === 'complimentary') return false
+  // Signed out shows it; an unresolved session or a pending read holds it back.
+  return signedIn === false || renderState.kind !== 'loading'
+}
+
+function PremiumDisclosure({ visible }: { visible: boolean }) {
+  const tone = useSettingsTone()
+  const { t } = useTranslation()
+  if (!visible) return null
+  return (
+    <Text
+      style={[styles.disclosureText, tone.disclosureText]}
+      testID="premium-settings-disclosure"
+    >
+      {t('commerce.premium.disclosure')}
+    </Text>
+  )
+}
+
+/** Story 6.14 D6: a paying member who also holds a complimentary grant. */
+function PremiumComplimentaryNote({ visible }: { visible: boolean }) {
+  const tone = useSettingsTone()
+  const { t } = useTranslation()
+  if (!visible) return null
+  return (
+    <Text style={[styles.helpText, tone.helpText]} testID="premium-complimentary-note">
+      {t('commerce.premium.complimentaryNote')}
+    </Text>
+  )
+}
+
 /** A store round trip is in flight; every premium control disables meanwhile. */
 function isPremiumFlowBusy(premiumFlow: PremiumFlowState): boolean {
   return (
@@ -597,6 +685,10 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
   const { t, i18n } = useTranslation()
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [subscriptionLoadFailed, setSubscriptionLoadFailed] = useState(false)
+  const [premiumAccess, setPremiumAccess] = useState<PremiumAccess | null>(null)
+  // Story 6.14: the section holds its loading state until the access read settles, so a grantee
+  // never sees the free or ended state first.
+  const [accessSettled, setAccessSettled] = useState(false)
   // `null` = the lazy SDK configure has not answered yet. The subscribe
   // controls stay hidden until it has: rendering them first and swapping to
   // the unavailable fallback after would flash a control that cannot work.
@@ -610,6 +702,9 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
     if (signedIn !== true) {
       setSubscription(null)
       setSubscriptionLoadFailed(false)
+      // Story 6.14: the next account must never inherit this one's access answer.
+      setPremiumAccess(null)
+      setAccessSettled(false)
       return
     }
     const controller = new AbortController()
@@ -626,14 +721,23 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
         }
       })
 
-    // Entering this section IS the SDK's configuration moment (Decision 11:
-    // lazily on first entry, never at app launch — the ritual path must not
-    // pay for a billing SDK). The memoized result makes re-entry free.
-    void ensurePurchasesConfigured().then((availability) => {
-      if (!controller.signal.aborted) {
-        setPurchasesAvailability(availability)
-      }
-    })
+    // Story 6.14 D6, TEA-07: the access source rides beside the subscription, and the store SDK
+    // waits for it. A complimentary member never configures RevenueCat and never sees a purchase
+    // control, not even while the read is pending. A failed read leaves the section as before
+    // (TEA-14). Otherwise entering this section IS the SDK's configuration moment (Decision 11:
+    // lazily on first entry, never at app launch). The memoized result makes re-entry free.
+    void getPremiumAccessFromMobile(controller.signal)
+      .catch(() => null)
+      .then(async (access) => {
+        if (controller.signal.aborted) return
+        setPremiumAccess(access)
+        setAccessSettled(true)
+        if (isComplimentaryAccess(access)) return
+        const availability = await ensurePurchasesConfigured()
+        if (!controller.signal.aborted) {
+          setPurchasesAvailability(availability)
+        }
+      })
 
     return () => {
       controller.abort()
@@ -742,47 +846,17 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
     }
   }
 
-  const renderState = resolvePremiumSectionState(subscription, subscriptionLoadFailed)
+  const renderState = resolvePremiumSectionState(subscription, subscriptionLoadFailed, {
+    accessSettled,
+    access: premiumAccess,
+  })
   const busy = isPremiumFlowBusy(premiumFlow)
-  const statusLine = (() => {
-    if (renderState.kind === 'entitled') {
-      const locale =
-        resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
-        defaultSupportedLocale
-      const planLabel = renderState.plan
-        ? t(
-            renderState.plan === 'premium_monthly'
-              ? 'commerce.premium.planMonthly'
-              : 'commerce.premium.planAnnual'
-          )
-        : renderState.productId
-      return t(
-        `commerce.premium.status.${renderState.showGraceBanner ? 'gracePeriod' : 'active'}`,
-        {
-          plan: planLabel,
-          date: new Date(renderState.currentPeriodEnd).toLocaleDateString(locale, {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          }),
-        }
-      )
-    }
-    if (renderState.kind === 'subscribe' && subscription) {
-      return t(`commerce.premium.status.${premiumStatusKeys[subscription.status]}`)
-    }
-    return null
-  })()
+  const statusLine = premiumStatusLine(t, i18n, renderState, subscription)
 
   return (
     <View style={styles.settingsSection} testID="premium-settings-section">
       <Text style={styles.sectionTitle}>{t('commerce.premium.sectionTitle')}</Text>
-      <Text
-        style={[styles.disclosureText, tone.disclosureText]}
-        testID="premium-settings-disclosure"
-      >
-        {t('commerce.premium.disclosure')}
-      </Text>
+      <PremiumDisclosure visible={showPremiumDisclosure(signedIn, renderState)} />
       {signedIn === false ? (
         <Text style={styles.premiumStatusLine} testID="premium-signed-out">
           {t('commerce.premium.signedOutHint')}
@@ -805,6 +879,7 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
       ) : null}
       {renderState.kind === 'entitled' ? (
         <>
+          <PremiumComplimentaryNote visible={renderState.complimentary} />
           {renderState.showGraceBanner ? (
             <Text
               style={[styles.premiumGraceBanner, tone.premiumGraceBanner]}

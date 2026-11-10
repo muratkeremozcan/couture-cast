@@ -5,6 +5,7 @@ import type { AnalyticsClient } from '../../analytics/analytics.service.js'
 import type { PrismaClient } from '@prisma/client'
 import { createPrismaClient } from '../../prisma/prisma-client.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
+import { ComplimentaryAccessService } from '../feature-flags/complimentary-access.service.js'
 import { CommunityFlagEvaluationService } from '../feature-flags/community-flag-evaluation.service.js'
 import type { RemoteFeatureFlagProvider } from '../feature-flags/remote-feature-flag-provider.js'
 import { PushTokenRepository } from '../notifications/push-token.repository.js'
@@ -137,7 +138,11 @@ async function startDispatch(
     guardPool = createPrismaClient({ datasources: { db: { url: url.toString() } } })
     const sender = new CommunitySendGuard(
       guardPool,
-      new CommunityFlagEvaluationService(prisma, remote)
+      new CommunityFlagEvaluationService(
+        prisma,
+        remote,
+        new ComplimentaryAccessService(prisma, remote)
+      )
     )
     await sender.verifyRuntime()
     const notifications = new CommunityNotificationsWorker(prisma, sender)

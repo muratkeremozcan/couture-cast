@@ -6,6 +6,7 @@
 // every shared authorization path, not a retryable outage. Real PG17 UUID database, actual
 // controllers, services, flag evaluation and the production realtime server factory.
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import type { AddressInfo } from 'node:net'
 import { PrismaClient } from '@prisma/client'
 import { Test } from '@nestjs/testing'
@@ -46,7 +47,8 @@ const remote = { getFeatureFlagValue: vi.fn(() => Promise.resolve<unknown>(true)
 const flags = new FeatureFlagsService(
   new FeatureFlagsRepository(prisma),
   remote,
-  new CommunityFlagEvaluationService(prisma, remote)
+  new CommunityFlagEvaluationService(prisma, remote, noComplimentaryGrants),
+  noComplimentaryGrants
 )
 const repository = new CommunityRepository(prisma)
 const access = new CommunityAccessService(prisma, flags)

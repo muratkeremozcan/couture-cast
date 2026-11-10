@@ -111,6 +111,8 @@ export const workerOnlyTables = [
   // Story 6.13: the erasure request record, API-only like the decisions it anonymizes.
   'ModerationErasureRequest',
   'CommunitySanction',
+  // Story 6.14: owner-granted complimentary access, written only by the owner's operator command.
+  'ComplimentaryAccessGrant',
 ] as const
 
 export const selfOnlyTables = [

@@ -1,6 +1,7 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -63,7 +64,11 @@ describe('Story 6.5 actual remote flag adapter and HTTP recorder', () => {
         data: { email: `story65-${randomUUID()}@synthetic.test` },
       })
       const previous = calls.length
-      const cache = new CommunityFlagEvaluationService(prisma, adapter)
+      const cache = new CommunityFlagEvaluationService(
+        prisma,
+        adapter,
+        noComplimentaryGrants
+      )
       expect((await cache.evaluate(member.id)).value).toBe(value)
       expect(calls).toHaveLength(previous + 1)
       expect(calls.at(-1)?.body).toMatchObject({

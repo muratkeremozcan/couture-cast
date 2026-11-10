@@ -27,6 +27,7 @@ import { registerWardrobeContracts } from './wardrobe'
 import { registerCommerceContracts } from './commerce'
 import { registerSubscriptionContracts } from './subscription'
 import { registerPremiumThemeContracts } from './premium-theme'
+import { registerPremiumAccessContracts } from './premium-access'
 import { registerPaletteAdvisorContracts } from './palette-advisor'
 import { registerPlannerContracts } from './planner'
 import { registerCommunitySyncContracts } from './community-sync'
@@ -121,6 +122,7 @@ export function createHttpOpenApiRegistry() {
   registerCommerceContracts(registry, commonSchemas)
   registerSubscriptionContracts(registry, commonSchemas)
   registerPremiumThemeContracts(registry, commonSchemas)
+  registerPremiumAccessContracts(registry, commonSchemas)
   registerPaletteAdvisorContracts(registry, commonSchemas)
   registerPlannerContracts(registry, commonSchemas)
   registerCommunityContracts(registry, commonSchemas)
@@ -200,7 +202,9 @@ export function generateHttpOpenApiDocument() {
       // and an optional spotlight branch (`surface`, `rank`, `level`) on the
       // card-open body, which keeps a body without `surface` valid unchanged.
       // No existing operation narrows.
-      version: '1.7.0',
+      // Story 6.14 bumps the minor: one additive premium access read, and one more
+      // documented 409 message on checkout. No existing operation narrows.
+      version: '1.8.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

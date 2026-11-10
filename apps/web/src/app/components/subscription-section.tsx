@@ -19,12 +19,17 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import type { Subscription, SubscriptionPlan } from '@couture/api-client/contracts/http'
+import type {
+  PremiumAccess,
+  Subscription,
+  SubscriptionPlan,
+} from '@couture/api-client/contracts/http'
 import { trackPremiumSubscribeTapped } from '@couture/api-client'
 import { browserAnalytics } from '../../analytics/browser-analytics'
 import {
   createCheckoutSessionFromWeb,
   createPortalSessionFromWeb,
+  getPremiumAccessFromWeb,
   getSubscriptionFromWeb,
   hasWebSession,
   premiumFailureReason,
@@ -62,7 +67,15 @@ function planLabelFor(t: TFunction, productId: string | null): string {
   return productId ?? ''
 }
 
-function statusLineFor(t: TFunction, subscription: Subscription | null): string {
+function statusLineFor(
+  t: TFunction,
+  subscription: Subscription | null,
+  complimentary: boolean
+): string {
+  // Story 6.14 D6: an unpaid complimentary member reads the grant as their status.
+  if (complimentary && !entitles(subscription)) {
+    return t('commerce.premium.status.complimentary')
+  }
   if (!subscription || subscription.status === 'none') {
     return t('commerce.premium.status.none')
   }
@@ -183,7 +196,15 @@ function ManageControls({
 }
 
 interface SectionView {
+  /**
+   * Story 6.14: the processor disclosure, withheld from an unpaid complimentary member, who
+   * shares nothing with RevenueCat or Stripe and is offered nothing to buy. It waits for the
+   * reads, so a grantee never sees it appear and vanish.
+   */
+  showDisclosure: boolean
   showStatusLine: boolean
+  /** A paying member who also holds a complimentary grant. */
+  showComplimentaryNote: boolean
   /** Non-null exactly when the grace/ended side copy should render. */
   notesSubscription: Subscription | null
   showSubscribeControls: boolean
@@ -200,22 +221,50 @@ interface SectionView {
  * commerce section's toggle. A non-idle activation state suppresses the whole
  * per-status body so a not-yet-synced `none` can never look like a failure.
  */
+/**
+ * Story 6.14: the processor disclosure waits for the reads, so a grantee never sees it appear
+ * and vanish, and is withheld from an unpaid complimentary member, who shares nothing with
+ * RevenueCat or Stripe and is offered nothing to buy.
+ */
+function showsDisclosure(
+  sectionState: SectionState,
+  entitled: boolean,
+  complimentary: boolean
+): boolean {
+  if (sectionState === 'checking' || sectionState === 'loading') return false
+  return entitled || !complimentary
+}
+
+/** Story 6.14 D6, TEA-07: a complimentary member is never offered a purchase. */
+function offersPurchase(
+  subscription: Subscription,
+  entitled: boolean,
+  complimentary: boolean
+): boolean {
+  return !entitled && !complimentary && subscription.purchasesEnabled
+}
+
 function resolveSectionView(
   sectionState: SectionState,
   activationState: ActivationState,
-  subscription: Subscription | null
+  subscription: Subscription | null,
+  complimentary: boolean
 ): SectionView {
   const isIdle = activationState === 'idle'
-  const isReadyBody = isIdle && sectionState === 'ready' && subscription !== null
   const entitled = entitles(subscription)
+  const readyBody = isIdle && sectionState === 'ready' ? subscription : null
 
   return {
+    showDisclosure: showsDisclosure(sectionState, entitled, complimentary),
     showStatusLine: isIdle && sectionState !== 'load_failed',
-    notesSubscription: isReadyBody ? subscription : null,
+    showComplimentaryNote: readyBody !== null && entitled && complimentary,
+    // The grace banner still warns a paying grantee about their payment method; only the
+    // ended note ("subscribe again") is withheld from a member whose grant keeps Premium on.
+    notesSubscription: entitled || !complimentary ? readyBody : null,
     showSubscribeControls:
       (isIdle && sectionState === 'signed_out') ||
-      (isReadyBody && !entitled && subscription.purchasesEnabled),
-    manageStore: isReadyBody && entitled ? subscription.store : null,
+      (readyBody !== null && offersPurchase(readyBody, entitled, complimentary)),
+    manageStore: readyBody !== null && entitled ? readyBody.store : null,
   }
 }
 
@@ -236,6 +285,7 @@ function resolveSectionView(
 const FAILURE_MESSAGE_KEYS: Readonly<Record<PremiumFailureReason, string | null>> = {
   signed_out: null,
   already_subscribed: 'commerce.premium.errorAlreadySubscribed',
+  complimentary_access: 'commerce.premium.errorComplimentary',
   store_managed: 'commerce.premium.manageInStore',
   no_web_subscription: 'commerce.premium.errorNoWebSubscription',
   subscribe_disabled: 'commerce.premium.errorSubscribeDisabled',
@@ -247,6 +297,7 @@ export function SubscriptionSection() {
   const { t } = useTranslation()
   const [sectionState, setSectionState] = useState<SectionState>('checking')
   const [subscription, setSubscription] = useState<Subscription | null>(null)
+  const [access, setAccess] = useState<PremiumAccess | null>(null)
   const [activationState, setActivationState] = useState<ActivationState>('idle')
   const [showPortalLagHint, setShowPortalLagHint] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
@@ -329,14 +380,21 @@ export function SubscriptionSection() {
          * is still an honest answer, so fall back to the plain read before
          * declaring the load failed.
          */
+        /*
+         * Story 6.14 D6: the access source rides beside the subscription. Its failure
+         * renders the section exactly as before (TEA-14), so it can never break the read.
+         */
+        const accessRead = getPremiumAccessFromWeb(controller.signal).catch(() => null)
         const next = isPortalReturn
           ? await refreshSubscriptionFromWeb(controller.signal).catch(() =>
               getSubscriptionFromWeb(controller.signal)
             )
           : await getSubscriptionFromWeb(controller.signal)
+        const nextAccess = await accessRead
         if (controller.signal.aborted) {
           return
         }
+        setAccess(nextAccess)
         setSubscription(next)
         setSectionState('ready')
       } catch (loadError: unknown) {
@@ -423,7 +481,13 @@ export function SubscriptionSection() {
   }
 
   const isSignedOut = sectionState === 'signed_out'
-  const view = resolveSectionView(sectionState, activationState, subscription)
+  const complimentary = access?.source === 'complimentary'
+  const view = resolveSectionView(
+    sectionState,
+    activationState,
+    subscription,
+    complimentary
+  )
 
   return (
     <section
@@ -445,16 +509,27 @@ export function SubscriptionSection() {
         shared. A sibling text node in reading order before the controls, never
         a tooltip and never only an accessible name.
       */}
-      <p
-        className="mt-3 text-sm leading-relaxed text-neutral-200"
-        data-testid="premium-disclosure"
-      >
-        {t('commerce.premium.disclosure')}
-      </p>
+      {view.showDisclosure && (
+        <p
+          className="mt-3 text-sm leading-relaxed text-neutral-200"
+          data-testid="premium-disclosure"
+        >
+          {t('commerce.premium.disclosure')}
+        </p>
+      )}
 
       {view.showStatusLine && (
         <p className="mt-6 text-base text-white" data-testid="premium-status-line">
-          {statusLineFor(t, subscription)}
+          {statusLineFor(t, subscription, complimentary)}
+        </p>
+      )}
+
+      {view.showComplimentaryNote && (
+        <p
+          className="mt-2 text-sm text-neutral-300"
+          data-testid="premium-complimentary-note"
+        >
+          {t('commerce.premium.complimentaryNote')}
         </p>
       )}
 

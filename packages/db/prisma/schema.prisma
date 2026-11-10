@@ -349,6 +349,9 @@ model User {
   moderation_erasure_request          ModerationErasureRequest?         @relation("ModerationErasureMember")
   moderation_erasures_requested       ModerationErasureRequest[]        @relation("ModerationErasureRequester")
   community_sanctions                 CommunitySanction[]
+  complimentary_access_grants         ComplimentaryAccessGrant[]        @relation("ComplimentaryAccessMember")
+  complimentary_access_granted        ComplimentaryAccessGrant[]        @relation("ComplimentaryAccessGranter")
+  complimentary_access_revoked        ComplimentaryAccessGrant[]        @relation("ComplimentaryAccessRevoker")
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -1501,6 +1504,29 @@ model AffiliateConversion {
   @@index([affiliate_click_id, occurred_at(sort: Desc)])
   @@index([received_at])
   @@map("AffiliateConversion")
+}
+
+/// Story 6.14: owner-granted full access with no billing provider, customer or charge.
+/// Billing code never reads or writes this table, so the ledger sweep cannot expire a grant.
+/// One unrevoked row per member (partial unique index in the migration); revoked rows stay
+/// as history until account erasure deletes them. RLS: worker-only, zero policies, zero grants.
+model ComplimentaryAccessGrant {
+  id            String    @id @default(cuid())
+  member        User      @relation("ComplimentaryAccessMember", fields: [member_id], references: [id], onDelete: Cascade)
+  member_id     String
+  /// 1 to 200 characters. Personal data: deleted with the row at erasure.
+  reason        String
+  granter       User?     @relation("ComplimentaryAccessGranter", fields: [granted_by_id], references: [id], onDelete: SetNull)
+  granted_by_id String?
+  granted_at    DateTime  @default(now())
+  revoked_at    DateTime?
+  revoker       User?     @relation("ComplimentaryAccessRevoker", fields: [revoked_by_id], references: [id], onDelete: SetNull)
+  revoked_by_id String?
+  revoke_reason String?
+
+  @@index([member_id])
+  @@index([granted_by_id])
+  @@index([revoked_by_id])
 }
 
 /// Story 5.2: mirror of the RevenueCat entitlement ledger — our database
