@@ -3,6 +3,26 @@ const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
 const { spawnSync } = require('node:child_process')
+
+/**
+ * The merger runs through the generated project's Gradle 8.14 wrapper, which cannot run on
+ * JDK 25 (class file 69). GitHub's Linux images now default to JDK 25 and also ship JDK 21
+ * and 17 under JAVA_HOME_<n>_<arch>, so the proof pins one of those when present; elsewhere
+ * the caller's JAVA_HOME stands. The suite keeps running before the workflow's own Java
+ * step, so a Java setup failure can never hide it.
+ */
+function gradleJavaHome(env) {
+  for (const key of [
+    'JAVA_HOME_21_X64',
+    'JAVA_HOME_21_ARM64',
+    'JAVA_HOME_17_X64',
+    'JAVA_HOME_17_ARM64',
+  ]) {
+    const home = env[key]
+    if (home && fs.existsSync(path.join(home, 'bin', 'java'))) return home
+  }
+  return env.JAVA_HOME
+}
 const { AndroidConfig } = require('@expo/config-plugins')
 const {
   assertCommand,
@@ -101,6 +121,7 @@ tasks.register('processMainManifest', JavaExec) {
 }
 `
   )
+  const javaHome = gradleJavaHome(process.env)
   const merged = spawnSync(
     path.join(owned.root, 'android/gradlew'),
     [
@@ -119,6 +140,7 @@ tasks.register('processMainManifest', JavaExec) {
       timeout: 120000,
       env: {
         ...process.env,
+        ...(javaHome ? { JAVA_HOME: javaHome } : {}),
         CC68_PERMISSION_MAIN: main,
         CC68_PERMISSION_APPLICATION_ID: JSON.parse(
           fs.readFileSync(path.join(owned.root, 'app.json'), 'utf8')
