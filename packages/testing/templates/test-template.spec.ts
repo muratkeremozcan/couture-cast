@@ -53,6 +53,7 @@ const prisma = {
   communityAlias: { deleteMany: () => Promise.resolve({ count: 0 }) },
   communityPostReport: { deleteMany: () => Promise.resolve({ count: 0 }) },
   communityPostSponsorship: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  complimentaryAccessGrant: { deleteMany: () => Promise.resolve({ count: 0 }) },
 } satisfies Record<string, DeleteManyRecorder>
 
 describe('example factory suite', () => {

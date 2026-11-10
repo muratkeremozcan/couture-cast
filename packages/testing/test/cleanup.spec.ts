@@ -79,6 +79,7 @@ function createCleanupPrismaStub(
     affiliateClick: createDelegate('affiliateClick'),
     affiliateConversion: createDelegate('affiliateConversion'),
     premiumEntitlement: createDelegate('premiumEntitlement'),
+    complimentaryAccessGrant: createDelegate('complimentaryAccessGrant'),
     billingEvent: createDelegate('billingEvent'),
     billingCustomer: createDelegate('billingCustomer'),
     premiumThemePreference: createDelegate('premiumThemePreference'),
@@ -174,6 +175,8 @@ describe('cleanup', () => {
       // the user filter even with no billing ids registered.
       'billingEvent',
       'premiumEntitlement',
+      // Story 6.14: the member's complimentary grants, beside billing and never inside it.
+      'complimentaryAccessGrant',
       'billingCustomer',
       // Story 5.3: the theme preference hangs off the tracked user with
       // ON DELETE CASCADE and nothing references it, so it only has to precede
@@ -299,6 +302,7 @@ describe('cleanup', () => {
       affiliateClicks: [],
       affiliateConversions: [],
       premiumEntitlements: [],
+      complimentaryAccessGrants: [],
       billingEvents: [],
       billingCustomers: [],
       premiumThemePreferences: [],

@@ -653,4 +653,50 @@ Seeded defects, each run in a throwaway worktree, each must turn the named test 
 
 ## Execution record
 
-Empty until the build runs. Sign-off runs, red proofs, seeded defects and differences from this plan go here.
+Recorded 2026-11-10 on the branch `feat/story-6-14-complimentary-access`, PR #198, commit `fb24cfd7`.
+
+### Test files
+
+| Slice | File                                                                                                                                                                                                                                  | Tests    |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| 1     | `packages/db/test/complimentary-access-schema.spec.ts`                                                                                                                                                                                | 16       |
+| 2     | `packages/config/src/complimentary-member-flags.spec.ts`                                                                                                                                                                              | 2        |
+| 3, 5  | `apps/api/integration/complimentary-access-seam.integration.spec.ts`                                                                                                                                                                  | 18       |
+| 4     | `apps/api/src/modules/feature-flags/complimentary-access.wiring.spec.ts`                                                                                                                                                              | 6        |
+| 5     | `apps/api/integration/complimentary-access-cache.integration.spec.ts`                                                                                                                                                                 | 9        |
+| 6     | `apps/api/src/modules/commerce/premium-entitlement.complimentary.spec.ts`, `stripe-billing.complimentary.spec.ts`, `billing-untouched.complimentary.spec.ts`, `apps/api/integration/complimentary-access-premium.integration.spec.ts` | 37       |
+| 7     | `apps/api/integration/complimentary-access-cli.integration.spec.ts`                                                                                                                                                                   | 17       |
+| 8     | `apps/api/integration/complimentary-access-erasure.integration.spec.ts`                                                                                                                                                               | 18       |
+| 9     | `apps/api/integration/complimentary-access-routes.integration.spec.ts`, `packages/api-client/testing/premium-access-contract.spec.ts`, `pact/http/consumer/interactions/premium-access.ts` (4 interactions)                           | 14, 5, 4 |
+| 10    | `apps/api/integration/complimentary-access-push.integration.spec.ts`                                                                                                                                                                  | 5        |
+| 11    | `apps/web/src/app/components/subscription-section.complimentary.test.tsx`, `apps/mobile/src/screens/settings-premium-section.complimentary.test.tsx`                                                                                  | 11, 10   |
+| 12    | `playwright/tests/complimentary-access.spec.ts` on `scripts/e2e-complimentary/run.mjs` and `playwright/config/complimentary.config.ts`                                                                                                | 5        |
+
+### Sign-off runs
+
+- The 6.14 integration suites with the feature-flags and commerce units: 645 of 645, three consecutive runs.
+- Every existing integration suite the constructor codemod touched, on a stock `postgres:17` started by `scripts/integration-postgres.mjs`: 24 files, 605 tests, none skipped. The realtime budget config 2 of 2. The Story 6.5 acceptance pair with `RUN_STORY65_ACCEPTANCE=true` and an owned Redis: retention cutoffs 2 of 2, realtime load 1 of 1.
+- Pact consumer 460, provider verification green.
+- E2E on its owned database: 5 of 5, four runs, 36 to 73 s.
+- Lint at zero warnings and `tsc` clean in `apps/api`, `pact`, `playwright` for every TEA file.
+
+### Product defects the tests found
+
+`U-REFRESH-BOUNDED` and `I-KILL-REMOTE-SLOW` (a slow grant read or kill switch made the refresh answer 503), `D-CHECK-REASON-LEN` (whitespace-only reasons passed the CHECK), `U-C-STRICT` (the contract accepted `premium` disagreeing with `source`), `M-HIDE-PURCHASE` (the RevenueCat SDK was configured for a complimentary member), `M-NO-FLASH` (purchase controls flashed before the access read), `M-DISCLOSURE-HIDDEN` (the billing disclosure flashed while the session was unresolved). Each was fixed by the builder and its test is green.
+
+### Seeded defects
+
+All 21 turn their named tests red and return to green on restore; evidence in `_bmad-output/test-artifacts/story-6-14/seeded-defects.md`. The first run exposed three test gaps, closed before sign-off: S-8 (the wiring spec counted arguments only), S-9 (the flag checks derived their expectations from the constant under test), S-10 (nothing compared billing rows around a grant).
+
+### Differences from the plan
+
+- The seam and shortcut scenarios planned as units run against real Postgres in the seam suite, so no assertion depends on the Prisma query shape.
+- `L-ERASED-THEN-REVOKE` answers `member_erasure_requested`, because D7 checks the request before the grant row.
+- `I-PUSH-GRANTEE` asserts the non-grantee ends `suppressed` with zero attempts; `no_call:read_disabled` appears only on the in-transaction recheck (TEA-23).
+- `E-A11Y-THEMES` scans dark only: settings is a dark-only member surface by design.
+- Planner in `A-AC1-PLANNER` stops at the location check after passing the guard; the E2E proves the full 200.
+- The race scenarios hold the exclusive privacy guard, the first lock both the operator and the erasure take.
+
+### Still open
+
+`X-DISPATCH` and `X-PROD-GRANT` run after merge.
