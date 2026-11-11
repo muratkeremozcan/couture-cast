@@ -1023,8 +1023,13 @@ The erasure extension has no flag, because it is a privacy duty on the establish
 
 Production community rollout remains frozen. `COMMUNITY_DISPATCH_ENABLED` defaults off.
 When an isolated approved lane enables it, `COMMUNITY_ENGAGEMENT_OWNER` must select
-`general` or `community`. The selected composition alone allocates the dedicated guard pool
-with 36 connections and 32 send slots. The general-only deployment selects `general`; the
+`general` or `community`. The selected composition alone allocates the dedicated guard pool:
+`COMMUNITY_DISPATCH_SEND_SLOTS` send slots (default 10, 1 to 32; an invalid value reports
+`send_slots_invalid`) and one guard connection per slot plus four for control work, 14 by
+default. Production keeps the default: its Nano transaction pooler serves about 15 connections
+at a time, shared with the API, and 32 slots (36 connections) need a larger compute plan
+(Story 6.5 D10 amendment, 2026-11-11). The worker logs `community_dispatch_saturated` when
+passes fill every slot and `community_dispatch_drained` when the backlog clears. The general-only deployment selects `general`; the
 standalone community composition selects `community`. Other compositions report `standby`.
 These configured limits require the story's actual capacity and timing evidence before use.
 
@@ -1040,7 +1045,7 @@ for `capability_unavailable`, the failed check (`server_version`, `privacy_versi
 `guard_timeouts`), never the error message. A ready line gives `preflightAttempts` and
 `guardConnections`, the number of guard connections open before the first send.
 
-The guard pool gives one acquisition 5 seconds (`pool_timeout=5`), opens all 36 connections
+The guard pool gives one acquisition 5 seconds (`pool_timeout=5`), opens all its connections
 before the first send and keeps idle ones (`max_idle_connection_lifetime=0`). Opening one guard
 connection, TLS through the transaction pooler, measured 0.6 to 0.7 s on the hosted worker while
 idle and 1.0 to 1.2 s with its two vCPUs busy (2026-11-11), and Prisma's `pool_timeout` covers
@@ -1055,10 +1060,10 @@ pool size (the pooler config returns null for both). Idle guard connections are 
 only: 36 of them left Supavisor's server connections at 21 before and after, and 36 one-second
 transactions through them took 3.4 s, about 15 at a time. Over 180-second windows, 36 idle guard
 connections added no statement calls or network bytes against a control window (96 against 255
-calls, 75 KB against 87 KB received). With dispatch on, the clients are 36 guard, 3 for the
-worker's main pool and 5 per API function instance, which leaves 161 for about 32 concurrent API
-instances. The transaction pool of about 15 caps concurrent guarded sends below D10's 32 send
-slots, so a herd waits for the pooler, and only a larger compute plan raises that pool.
+calls, 75 KB against 87 KB received). With dispatch on at the default 10 slots, the clients are 14 guard, 3
+for the worker's main pool and 5 per API function instance, which leaves 183 for about 36
+concurrent API instances. The transaction pool of about 15 caps concurrent guarded sends below D10's 32 send
+slots, so the worker now sends 10 at a time by default and a herd waits in the worker.
 
 Operators investigate degraded dispatch while keeping community rollout off, verify the selected
 owner and existing primary's measured capabilities, then restart the assigned process after the

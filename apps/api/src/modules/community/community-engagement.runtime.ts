@@ -17,7 +17,10 @@ import {
   CommunityDispatchPreflightError,
   CommunitySendGuard,
 } from './community-send-guard.js'
-import { CommunityNotificationsWorker } from './community-notifications.worker.js'
+import {
+  COMMUNITY_DISPATCH_SEND_SLOTS,
+  CommunityNotificationsWorker,
+} from './community-notifications.worker.js'
 import { CommunityReceiptsWorker } from './community-receipts.worker.js'
 import {
   CommunitySpotlightCache,
@@ -178,10 +181,12 @@ export type CommunityDispatchReadiness = {
     | 'guard_mismatch'
     | 'guard_unreachable'
     | 'capability_unavailable'
+    | 'send_slots_invalid'
 }
 
 /**
- * The dispatch guard pool: Story 6.5 D10's 36 connections for 32 send slots plus control work.
+ * The dispatch guard pool: one connection per send slot plus D10's four for control work, so
+ * 14 at the default 10 slots and D10's 36 at 32.
  *
  * Opening one guard connection (TCP, TLS and the pooler's startup) took 0.6 to 0.7 s on the
  * hosted worker while idle and 1.0 to 1.2 s with its two vCPUs busy (2026-11-11), and 36 at
@@ -197,16 +202,34 @@ export type CommunityDispatchReadiness = {
  *   300 idle seconds, and the first send after a quiet spell would open it again.
  */
 export const COMMUNITY_GUARD_POOL = {
-  connections: 36,
+  controlConnections: 4,
   acquireSeconds: 5,
   /** Waits between preflight attempts after a connect failure; one more attempt than waits. */
   preflightBackoffMs: [1000, 2000, 4000],
 } as const
 
+/**
+ * `COMMUNITY_DISPATCH_SEND_SLOTS` as a slot count, the default when unset, or undefined when
+ * it is not a whole number from 1 to 32: dispatch then stays off rather than guess.
+ */
+export function communityDispatchSendSlots(
+  raw: string | undefined = process.env.COMMUNITY_DISPATCH_SEND_SLOTS
+): number | undefined {
+  const value = raw?.trim()
+  if (!value) return COMMUNITY_DISPATCH_SEND_SLOTS.default
+  if (!/^\d{1,2}$/.test(value)) return undefined
+  const slots = Number(value)
+  return slots >= 1 && slots <= COMMUNITY_DISPATCH_SEND_SLOTS.max ? slots : undefined
+}
+
+/** Guard pool connections for a slot count: one per slot plus the control connections. */
+export const communityGuardConnections = (sendSlots: number) =>
+  sendSlots + COMMUNITY_GUARD_POOL.controlConnections
+
 /** The guard pool's datasource URL: the configured primary with the pool's own budget. */
-export function communityGuardPoolUrl(configured: string): string {
+export function communityGuardPoolUrl(configured: string, sendSlots: number): string {
   const url = new URL(configured)
-  url.searchParams.set('connection_limit', String(COMMUNITY_GUARD_POOL.connections))
+  url.searchParams.set('connection_limit', String(communityGuardConnections(sendSlots)))
   url.searchParams.set('pool_timeout', String(COMMUNITY_GUARD_POOL.acquireSeconds))
   url.searchParams.set('max_idle_connection_lifetime', '0')
   return url.toString()
@@ -253,6 +276,7 @@ type ReadinessDetails = {
   check?: string
   preflightAttempts?: number
   guardConnections?: number
+  sendSlots?: number
 }
 
 function failureDetails(error: unknown): ReadinessDetails {
@@ -279,7 +303,8 @@ const pause = (ms: number) =>
  */
 export async function openCommunityGuardPool(
   guardPool: PrismaClient,
-  sender: Pick<CommunitySendGuard, 'verifyRuntime'>
+  sender: Pick<CommunitySendGuard, 'verifyRuntime'>,
+  connections: number
 ): Promise<{ attempts: number; connections: number }> {
   const waits = COMMUNITY_GUARD_POOL.preflightBackoffMs
   let attempts = 0
@@ -297,10 +322,7 @@ export async function openCommunityGuardPool(
   }
   // Concurrent, so each finds no idle connection and opens its own.
   const opened = await Promise.allSettled(
-    Array.from(
-      { length: COMMUNITY_GUARD_POOL.connections },
-      () => guardPool.$queryRaw`SELECT 1`
-    )
+    Array.from({ length: connections }, () => guardPool.$queryRaw`SELECT 1`)
   )
   return {
     attempts,
@@ -328,6 +350,9 @@ async function startDispatch(
   if (owner !== 'general' && owner !== 'community')
     return { dispatch: { status: 'degraded', reason: 'owner_unconfigured' } }
   if (owner !== role) return { dispatch: { status: 'standby' } }
+  const sendSlots = communityDispatchSendSlots()
+  if (sendSlots === undefined)
+    return { dispatch: { status: 'degraded', reason: 'send_slots_invalid' } }
   let reason: CommunityDispatchReadiness['reason'] = 'guard_unconfigured'
   let guardPool: PrismaClient | undefined
   try {
@@ -340,7 +365,7 @@ async function startDispatch(
       throw new Error('Guard primary mismatch')
     reason = 'capability_unavailable'
     guardPool = createPrismaClient({
-      datasources: { db: { url: communityGuardPoolUrl(configured) } },
+      datasources: { db: { url: communityGuardPoolUrl(configured, sendSlots) } },
     })
     const sender = new CommunitySendGuard(
       guardPool,
@@ -350,8 +375,12 @@ async function startDispatch(
         new ComplimentaryAccessService(prisma, remote)
       )
     )
-    const opened = await openCommunityGuardPool(guardPool, sender)
-    const notifications = new CommunityNotificationsWorker(prisma, sender)
+    const opened = await openCommunityGuardPool(
+      guardPool,
+      sender,
+      communityGuardConnections(sendSlots)
+    )
+    const notifications = new CommunityNotificationsWorker(prisma, sender, sendSlots)
     const receipts = new CommunityReceiptsWorker(prisma, new PushTokenRepository(prisma))
     // A pass that moved any delivery keeps the 50 ms cadence, even when other sends in the same
     // batch were rejected: a quiet-hour herd keeps its pace through partial failures.
@@ -383,6 +412,7 @@ async function startDispatch(
       details: {
         preflightAttempts: opened.attempts,
         guardConnections: opened.connections,
+        sendSlots,
       },
     }
   } catch (error) {

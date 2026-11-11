@@ -704,6 +704,19 @@ An insufficient existing pool is a failed capacity gate. Concurrency may change 
 same herd/deadline proof passes; neither the required herd nor expiry/guard bounds shrink.
 Report any required compute-plan change to the coordinator; no silent plan upgrade is allowed.
 
+**D10 amendment, 2026-11-11 (PR #205).** The production project runs on the free plan's Nano
+compute, and no plan change is available. Its Supavisor transaction pool serves about 15 server
+connections at a time (36 one-second guarded transactions took 3.4 s), shared with the API. Each
+send holds one server connection through its guarded transaction, so 32 slots would queue the
+excess at Supavisor, unbounded and unlogged, and take the API's connections. Send concurrency is
+now `COMMUNITY_DISPATCH_SEND_SLOTS`, default 10, 1 to 32; an invalid value keeps dispatch off
+(`send_slots_invalid`). The guard pool has one connection per slot plus the four control
+connections, 14 by default. A herd larger than the slots waits in the database, due, for the next
+non-overlapping pass, and the worker logs `community_dispatch_saturated` when passes start filling
+every slot and `community_dispatch_drained` when the backlog clears. The lower-bound calculation
+becomes `ceil(600 / 10) * 3 = 180 seconds` at the three-second worst case per guarded operation;
+32 slots, and D10's 57 seconds, are the setting for a compute plan whose pooler serves them.
+
 Before proof, count all due groups times their frozen token generations in the largest actual
 timezone cohort. Record recipient count, group count, mean/max tokens and total H. The 500
 floor covers 100 recipients with five tokens and one group each; multiple post groups count

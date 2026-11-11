@@ -31,6 +31,7 @@ import { startCommunityEngagementRuntime } from './community-engagement.runtime.
 const poolConstructor = vi.hoisted(() => vi.fn())
 type LogFields = Record<string, unknown>
 const readinessLines = vi.hoisted((): LogFields[] => [])
+const dispatchEvents = vi.hoisted((): LogFields[] => [])
 // Records the readiness line; the rest of the runtime's logging goes nowhere.
 vi.mock('../../logger/pino.config.js', async (original) => {
   const actual = await original<typeof logger>()
@@ -39,6 +40,8 @@ vi.mock('../../logger/pino.config.js', async (original) => {
     (fields: LogFields, message?: string): void => {
       if (message === 'community_dispatch_readiness')
         readinessLines.push({ level, ...fields })
+      if (String(fields.event).startsWith('community_dispatch_'))
+        dispatchEvents.push({ level, ...fields })
     }
   const scoped: Record<string, unknown> = {
     info: record('info'),
@@ -199,6 +202,7 @@ beforeEach(() => {
   guard = databaseBoundary()
   poolConstructor.mockReset().mockImplementation(() => guard.prisma)
   readinessLines.length = 0
+  dispatchEvents.length = 0
 })
 afterEach(async () => {
   await Promise.all(opened.splice(0).map((runtime) => runtime.close()))
@@ -427,7 +431,8 @@ describe('T03 actual engagement runtime composition', () => {
         datasources: { db: { url: string } }
       }
       const url = new URL(configuration.datasources.db.url)
-      expect(url.searchParams.get('connection_limit')).toBe('36')
+      // Ten send slots by default plus D10's four control connections.
+      expect(url.searchParams.get('connection_limit')).toBe('14')
       // Opening a guard connection measured 0.6 to 1.2 s on the hosted worker: the
       // acquisition budget covers it, and idle connections stay open.
       expect(url.searchParams.get('pool_timeout')).toBe('5')
@@ -703,16 +708,44 @@ describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
   it('opens every guard connection before the first send and logs how many opened', async () => {
     const runtime = await start(databaseBoundary(), 'general')
     expect(runtime.dispatch).toEqual({ status: 'ready' })
-    expect(warmQueries(guard)).toBe(36)
+    expect(warmQueries(guard)).toBe(14)
     expect(readinessLines).toEqual([
       expect.objectContaining({
         level: 'info',
         dispatchStatus: 'ready',
         preflightAttempts: 1,
-        guardConnections: 36,
+        guardConnections: 14,
+        sendSlots: 10,
       }),
     ])
   })
+
+  it('sizes the pool from COMMUNITY_DISPATCH_SEND_SLOTS: 32 slots open the 36 connections of D10', async () => {
+    vi.stubEnv('COMMUNITY_DISPATCH_SEND_SLOTS', '32')
+    const runtime = await start(databaseBoundary(), 'general')
+    expect(runtime.dispatch).toEqual({ status: 'ready' })
+    const configuration = poolConstructor.mock.calls[0]![0] as {
+      datasources: { db: { url: string } }
+    }
+    expect(
+      new URL(configuration.datasources.db.url).searchParams.get('connection_limit')
+    ).toBe('36')
+    expect(warmQueries(guard)).toBe(36)
+    expect(readinessLines[0]).toMatchObject({ guardConnections: 36, sendSlots: 32 })
+  })
+
+  it.each(['0', '33', '-1', '4.5', 'ten', '010'])(
+    'keeps dispatch off for COMMUNITY_DISPATCH_SEND_SLOTS=%s and allocates no pool',
+    async (value) => {
+      vi.stubEnv('COMMUNITY_DISPATCH_SEND_SLOTS', value)
+      const runtime = await start(databaseBoundary(), 'general')
+      expect(runtime.dispatch).toEqual({
+        status: 'degraded',
+        reason: 'send_slots_invalid',
+      })
+      expect(poolConstructor).not.toHaveBeenCalled()
+    }
+  )
 
   it.each([
     ['an initialization error', connectTimeout],
@@ -730,7 +763,7 @@ describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
       expect(versionQueries(guard)).toBe(1)
       expect(readinessLines[0]).toMatchObject({
         preflightAttempts: 2,
-        guardConnections: 36,
+        guardConnections: 14,
       })
     }
   )
@@ -823,5 +856,52 @@ describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
     [new Error('Timed out fetching a new connection from the connection pool'), false],
   ])('classifies %s as a connect failure: %s', (error, expected) => {
     expect(runtimeModule.isGuardConnectFailure(error)).toBe(expected)
+  })
+})
+
+describe('dispatch send slots (Story 6.5 D10 amendment, 2026-11-11)', () => {
+  it('selects at most its slot count a pass and logs one saturated and one drained line per herd', async () => {
+    const passes = [3, 3, 1, 0]
+    const limits: unknown[] = []
+    const prisma = {
+      $queryRaw: vi.fn((_sql: TemplateStringsArray, ...values: unknown[]) => {
+        limits.push(values.at(-1))
+        const rows = passes.shift() ?? 0
+        return Promise.resolve(
+          Array.from({ length: rows }, (_, index) => ({ id: `d${index}` }))
+        )
+      }),
+    } as unknown as PrismaClient
+    let inFlight = 0
+    let peak = 0
+    const sender = {
+      dispatch: vi.fn(async () => {
+        inFlight += 1
+        peak = Math.max(peak, inFlight)
+        await Promise.resolve()
+        inFlight -= 1
+        return true
+      }),
+    }
+    const worker = new notifications.CommunityNotificationsWorker(prisma, sender, 3)
+    for (let pass = 0; pass < 4; pass++) await worker.dispatch()
+    expect(limits).toEqual([3, 3, 3, 3])
+    expect(sender.dispatch).toHaveBeenCalledTimes(7)
+    expect(peak).toBe(3)
+    expect(dispatchEvents).toEqual([
+      expect.objectContaining({ event: 'community_dispatch_saturated', sendSlots: 3 }),
+      expect.objectContaining({
+        event: 'community_dispatch_drained',
+        sendSlots: 3,
+        saturatedPasses: 2,
+      }),
+    ])
+  })
+
+  it('defaults to ten slots', () => {
+    expect(notifications.COMMUNITY_DISPATCH_SEND_SLOTS.default).toBe(10)
+    expect(runtimeModule.communityDispatchSendSlots(undefined)).toBe(10)
+    expect(runtimeModule.communityDispatchSendSlots('32')).toBe(32)
+    expect(runtimeModule.communityGuardConnections(10)).toBe(14)
   })
 })

@@ -67,10 +67,26 @@ function policyReconciliation(
 
 const unmoved = { created: 0, settled: false } as const
 
+/**
+ * Sends one dispatch pass runs at once (Story 6.5 D10, amended 2026-11-11).
+ *
+ * D10 set 32 send slots. Each send holds a server connection through its guarded transaction,
+ * and the production project's transaction pooler serves about 15 at a time, shared with the
+ * API, so 32 slots would queue the excess at Supavisor, unbounded and unlogged, and starve API
+ * requests. The default leaves the API headroom on that pool; 32 is the setting for a compute
+ * plan whose pooler serves it. Passes never overlap, so this is the dispatch concurrency, and a
+ * herd larger than it waits in the database, due, for the next pass.
+ */
+export const COMMUNITY_DISPATCH_SEND_SLOTS = { default: 10, max: 32 } as const
+
 export class CommunityNotificationsWorker {
+  private saturatedSince: number | null = null
+  private saturatedPasses = 0
+
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly sender: Pick<CommunitySendGuard, 'dispatch'>
+    private readonly sender: Pick<CommunitySendGuard, 'dispatch'>,
+    private readonly sendSlots: number = COMMUNITY_DISPATCH_SEND_SLOTS.default
   ) {}
 
   async group(): Promise<number> {
@@ -509,7 +525,7 @@ export class CommunityNotificationsWorker {
   }
 
   /**
-   * One dispatch pass over up to 32 due deliveries.
+   * One dispatch pass over up to `sendSlots` due deliveries, sent concurrently.
    * `moved` counts deliveries that changed state; the idle backoff reads it as progress, so a row
    * the guard leaves as it was cannot hold the loop at its 50 ms cadence.
    * A rejected send is counted and logged, and the rest of the batch still counts: one rejection
@@ -521,7 +537,7 @@ export class CommunityNotificationsWorker {
       WHERE d.status IN ('pending','retryable_rejection','deferred') AND d.next_attempt_at <= clock_timestamp()
       ORDER BY g.eligible_at,
         row_number() OVER (PARTITION BY d.owner_id ORDER BY g.eligible_at,d.next_attempt_at,d.id),
-        d.owner_id,d.id LIMIT 32
+        d.owner_id,d.id LIMIT ${this.sendSlots}
     `
     const outcomes = await Promise.allSettled(
       due.map((delivery) => this.sender.dispatch(delivery.id))
@@ -537,7 +553,38 @@ export class CommunityNotificationsWorker {
         { event: 'community_dispatch_send_failed', failed, selected: due.length },
         'Community dispatch sends failed; their deliveries stay due for the next pass'
       )
+    this.recordSaturation(due.length)
     return { selected: due.length, moved, failed }
+  }
+
+  /**
+   * Logs when passes start filling every slot, which means more deliveries are due than the
+   * slots send at once, and when the backlog has drained: two lines per herd.
+   */
+  private recordSaturation(selected: number) {
+    if (selected >= this.sendSlots) {
+      this.saturatedPasses += 1
+      if (this.saturatedSince === null) {
+        this.saturatedSince = Date.now()
+        logger.info(
+          { event: 'community_dispatch_saturated', sendSlots: this.sendSlots },
+          'Community dispatch is sending at its slot limit; due deliveries wait for the next pass'
+        )
+      }
+      return
+    }
+    if (this.saturatedSince === null) return
+    logger.info(
+      {
+        event: 'community_dispatch_drained',
+        sendSlots: this.sendSlots,
+        saturatedPasses: this.saturatedPasses,
+        saturatedMs: Date.now() - this.saturatedSince,
+      },
+      'Community dispatch backlog drained'
+    )
+    this.saturatedSince = null
+    this.saturatedPasses = 0
   }
 
   /** Returns how many orphaned attempts, intents and groups it settled. */

@@ -28,12 +28,16 @@ import {
   seedMemberFlagsOff,
 } from './helpers/complimentary-access-fixtures.js'
 import {
+  communityGuardConnections,
   communityGuardPoolUrl,
   openCommunityGuardPool,
   startCommunityEngagementRuntime,
 } from '../src/modules/community/community-engagement.runtime.js'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
-import { CommunityNotificationsWorker } from '../src/modules/community/community-notifications.worker.js'
+import {
+  COMMUNITY_DISPATCH_SEND_SLOTS,
+  CommunityNotificationsWorker,
+} from '../src/modules/community/community-notifications.worker.js'
 import { CommunitySendGuard } from '../src/modules/community/community-send-guard.js'
 import type { CommunityPushProvider } from '../src/modules/community/community-push-provider.js'
 import type { CommunityPushOutcome } from '../src/modules/community/community-push-policy.js'
@@ -135,8 +139,10 @@ const active = () =>
     createUser({ profilePreferences: { compliance: { accountStatus: 'active' } } })
   )
 
-/** One granted, opted-in author with one device and a reaction on their post. */
-async function grantedDelivery() {
+const SLOTS = COMMUNITY_DISPATCH_SEND_SLOTS.default
+
+/** One opted-in author with one device and a reaction on their post, granted when asked. */
+async function seededDelivery({ granted }: { granted: boolean }) {
   await privacyVersion(0)
   const author = await active()
   const actor = await active()
@@ -162,7 +168,7 @@ async function grantedDelivery() {
     input: { selection: 'love', baseRevision: 0, mutationId: randomUUID() },
     assertEligible: () => Promise.resolve(),
   })
-  await grant(prisma, author.id)
+  if (granted) await grant(prisma, author.id)
   const worker = new CommunityNotificationsWorker(prisma, {
     dispatch: () => Promise.resolve(false),
   })
@@ -206,35 +212,43 @@ describe('dispatch guard pool with 1.5 s connection opening', () => {
     )
     try {
       expect(runtime.dispatch).toEqual({ status: 'ready' })
-      // One connection for the preflight, then the rest of the 36 opened together:
+      // One connection for the preflight, then the rest of the pool opened together:
       // two connection openings, nowhere near the 7 s of preflight backoff.
-      expect(proxy.accepted() - before).toBe(36)
+      expect(proxy.accepted() - before).toBe(communityGuardConnections(SLOTS))
       expect(Date.now() - started).toBeLessThan(6 * SLOW_CONNECT_MS)
     } finally {
       await runtime.close()
     }
   })
 
-  it('sends twelve granted deliveries at once with no deferral and opens no new connection', async () => {
+  it('sends a full pass of granted deliveries at once with no deferral and opens no new connection', async () => {
     const deliveries: { id: string }[] = []
-    for (let index = 0; index < 12; index++) deliveries.push(await grantedDelivery())
+    for (let index = 0; index < SLOTS; index++)
+      deliveries.push(await seededDelivery({ granted: true }))
     const pool = new PrismaClient({
-      datasources: { db: { url: communityGuardPoolUrl(guardUrl) } },
+      datasources: { db: { url: communityGuardPoolUrl(guardUrl, SLOTS) } },
     })
     try {
       const guard = new CommunitySendGuard(pool, flags, provider)
-      const opened = await openCommunityGuardPool(pool, guard)
-      expect(opened).toEqual({ attempts: 1, connections: 36 })
+      const opened = await openCommunityGuardPool(
+        pool,
+        guard,
+        communityGuardConnections(SLOTS)
+      )
+      expect(opened).toEqual({
+        attempts: 1,
+        connections: communityGuardConnections(SLOTS),
+      })
       const accepted = proxy.accepted()
       sent.length = 0
       // One pass each, no retry: a send that could not get a connection would be left
       // deferred with no_call:guard_failure, or would throw.
       await Promise.all(deliveries.map((delivery) => guard.dispatch(delivery.id)))
-      expect(sent).toHaveLength(12)
+      expect(sent).toHaveLength(SLOTS)
       const states = await prisma.communityTokenDelivery.findMany({
         where: { id: { in: deliveries.map((delivery) => delivery.id) } },
       })
-      expect(states.map((state) => state.status)).toEqual(Array(12).fill('accepted'))
+      expect(states.map((state) => state.status)).toEqual(Array(SLOTS).fill('accepted'))
       const reasons = await prisma.communityDeliveryAttempt.findMany({
         where: { delivery_id: { in: deliveries.map((delivery) => delivery.id) } },
         select: { reason: true },
@@ -246,5 +260,40 @@ describe('dispatch guard pool with 1.5 s connection opening', () => {
     } finally {
       await pool.$disconnect()
     }
+  })
+
+  it('never runs more sends at once than its slots when a burst above them is due', async () => {
+    const slots = 4
+    const burst: { id: string }[] = []
+    for (let index = 0; index < 3 * slots + 2; index++)
+      burst.push(await seededDelivery({ granted: false }))
+    await privacyVersion(0)
+    let inFlight = 0
+    let peak = 0
+    const handled: string[] = []
+    const counting = {
+      dispatch: async (id: string) => {
+        inFlight += 1
+        peak = Math.max(peak, inFlight)
+        await delay(150)
+        await prisma.communityTokenDelivery.update({
+          where: { id },
+          data: { status: 'accepted' },
+        })
+        handled.push(id)
+        inFlight -= 1
+        return true
+      },
+    }
+    const worker = new CommunityNotificationsWorker(prisma, counting, slots)
+    const selected: number[] = []
+    for (;;) {
+      const pass = await worker.dispatch()
+      selected.push(pass.selected)
+      if (pass.selected === 0) break
+    }
+    expect(peak).toBe(slots)
+    expect(selected).toEqual([slots, slots, slots, 2, 0])
+    expect(new Set(handled)).toEqual(new Set(burst.map((delivery) => delivery.id)))
   })
 })
