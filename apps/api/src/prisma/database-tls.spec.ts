@@ -139,6 +139,15 @@ describe('withVerifiedDatasource', () => {
     )
   })
 
+  it('passes driver-adapter options through with no datasource URL beside them', () => {
+    const options = { adapter: {} } as unknown as Parameters<
+      typeof withVerifiedDatasource
+    >[0]
+    expect(withVerifiedDatasource(options, { DATABASE_URL: TRANSACTION }, tls)).toBe(
+      options
+    )
+  })
+
   it('leaves a local client to read DATABASE_URL lazily', () => {
     const local = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
     expect(
