@@ -4,6 +4,7 @@ import PostHog, { type PostHogOptions } from 'posthog-react-native'
 import {
   SHARE_CARD_SHARED_EVENT,
   sanitizeShareCardSharedProperties,
+  stripPersonalAnalyticsData,
 } from '@couture/api-client'
 
 type ExpoExtra = {
@@ -73,6 +74,26 @@ export function mobilePostHogBeforeSend(
 }
 
 /**
+ * Production analytics privacy: CoutureCast has members aged 13 to 15 (with guardian
+ * consent) and wardrobe photos, so the app sends explicit events, screens and
+ * exceptions only. Session replay and surveys stay off, anonymous members get no
+ * person profile, console output is never captured as an exception, and
+ * stripPersonalAnalyticsData removes email, name and birth date keys from every event
+ * and person update before the share allowlist runs. Touch and screen autocapture are
+ * off in MobileAnalyticsProvider. See the "Production analytics" section of
+ * _bmad-output/project-knowledge/deployment-guide.md.
+ */
+export const mobilePostHogPrivacyOptions = {
+  personProfiles: 'identified_only',
+  enableSessionReplay: false,
+  disableSurveys: true,
+  errorTracking: {
+    autocapture: { uncaughtExceptions: true, unhandledRejections: true, console: false },
+  },
+  before_send: [stripPersonalAnalyticsData, mobilePostHogBeforeSend],
+} satisfies PostHogOptions
+
+/**
  * PostHog-backed provider client for Expo analytics.
  *
  * The repo-local mobile analytics facade wraps this instance so feature code
@@ -119,8 +140,9 @@ export const posthogProviderClient = new PostHog(
     fetchRetryCount: 3, // Number of retry attempts for failed requests
     fetchRetryDelay: 3000, // Delay between retries in ms
 
-    // Story 6.9 D5: the event-specific final allowlist for share_card_shared.
-    before_send: mobilePostHogBeforeSend,
+    // Privacy switches and before_send: the personal data guard, then the Story 6.9
+    // D5 share_card_shared allowlist.
+    ...mobilePostHogPrivacyOptions,
   }
 )
 

@@ -44,7 +44,7 @@ import {
   SHARE_CARD_SHARED_ALLOWED_PROPERTIES,
   sanitizeShareCardSharedProperties,
 } from '@couture/api-client'
-import { mobilePostHogBeforeSend } from './posthog'
+import { mobilePostHogPrivacyOptions } from './posthog'
 import { createMobileAnalyticsClient } from '../analytics/mobile-analytics'
 import { trackMobileShareCardShared } from '../analytics/track-events'
 quiet()
@@ -82,7 +82,7 @@ beforeEach(() => {
           seenBeforeSanitizing.push({ ...event.properties })
         return event
       },
-      mobilePostHogBeforeSend,
+      ...mobilePostHogPrivacyOptions.before_send,
     ],
   })
 })
@@ -205,6 +205,32 @@ describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => 
     expect((opened?.properties as Record<string, unknown>).$current_url).toBe(
       sensitiveUrl
     )
+  })
+
+  it('U-ANALYTICS-PRIVACY-MOBILE: sends no email, name or birthdate on the wire', async () => {
+    await client.ready()
+    client.identify('member-123', {
+      email: 'member@example.com',
+      name: 'Teen Member',
+      plan: 'premium',
+    })
+    client.capture('app_opened', {
+      locale: 'en-US',
+      email: 'member@example.com',
+      birthdate: '2011-04-01',
+      $set: { firstName: 'Teen' },
+      $set_once: { date_of_birth: '2011-04-01' },
+    })
+    const items = (await flushedBatches()).flatMap((batch) => batch.batch)
+    const opened = items.find((item) => item.event === 'app_opened')
+    expect(opened?.properties).toMatchObject({ locale: 'en-US' })
+    const identified = items.find((item) => item.event === '$identify')
+    expect((identified?.properties as Record<string, unknown>).$set).toEqual({
+      plan: 'premium',
+    })
+    const serialized = JSON.stringify(items)
+    for (const leak of ['member@example.com', 'Teen', '2011-04-01'])
+      expect(serialized).not.toContain(leak)
   })
 
   it.each([

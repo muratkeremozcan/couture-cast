@@ -46,7 +46,10 @@ import {
   posthog,
   posthogProviderClient,
 } from './posthog'
-import { SHARE_CARD_SHARED_ALLOWED_PROPERTIES } from '@couture/api-client'
+import {
+  SHARE_CARD_SHARED_ALLOWED_PROPERTIES,
+  stripPersonalAnalyticsData,
+} from '@couture/api-client'
 
 bootstrap.restoreConsole()
 
@@ -96,6 +99,51 @@ describe('mobile PostHog provider configuration', () => {
     })
   })
 
+  /**
+   * Production analytics privacy: members are 13 to 15 (with guardian consent) and
+   * upload wardrobe photos, so the app sends explicit events, screens and exceptions
+   * only. No session replay, no surveys, no person profile for anonymous members.
+   */
+  it('U-ANALYTICS-PRIVACY-MOBILE: turns replay and surveys off and exceptions on', () => {
+    expect(bootstrap.constructions[0]?.options).toMatchObject({
+      enableSessionReplay: false,
+      disableSurveys: true,
+      personProfiles: 'identified_only',
+      errorTracking: {
+        autocapture: {
+          uncaughtExceptions: true,
+          unhandledRejections: true,
+          console: false,
+        },
+      },
+    })
+  })
+
+  it('U-ANALYTICS-PRIVACY-MOBILE: sends no email, name or birthdate in any event', () => {
+    const hooks = bootstrap.constructions[0]?.options.before_send as ((
+      event: HookEvent | null
+    ) => HookEvent | null)[]
+    expect(hooks).toEqual([stripPersonalAnalyticsData, mobilePostHogBeforeSend])
+    const opened: HookEvent = {
+      event: 'app_opened',
+      properties: {
+        locale: 'en-US',
+        email: 'member@example.com',
+        displayName: 'Teen Member',
+        date_of_birth: '2011-04-01',
+      } as HookEvent['properties'],
+      $set: { email: 'member@example.com', plan: 'premium' } as HookEvent['$set'],
+      $set_once: { birthdate: '2011-04-01' } as HookEvent['$set'],
+    }
+    const sent = hooks.reduce<HookEvent | null>((event, hook) => hook(event), opened)
+    expect(sent).toEqual({
+      event: 'app_opened',
+      properties: { locale: 'en-US' },
+      $set: { plan: 'premium' },
+      $set_once: {},
+    })
+  })
+
   /** The legacy alias must stay the same instance while the facade rolls out. */
   it('exposes the legacy alias as the same client instance', () => {
     expect(posthog).toBe(posthogProviderClient)
@@ -138,8 +186,11 @@ const enriched = {
 }
 
 describe('U-SHARE-SANITIZER-MOBILE: before_send for share_card_shared', () => {
-  it('installs the exported hook as the SDK before_send option', () => {
-    expect(bootstrap.constructions[0]?.options.before_send).toBe(mobilePostHogBeforeSend)
+  it('installs the exported hook as the last SDK before_send hook', () => {
+    expect(bootstrap.constructions[0]?.options.before_send).toEqual([
+      stripPersonalAnalyticsData,
+      mobilePostHogBeforeSend,
+    ])
   })
 
   it('keeps the envelope, allowlists properties and removes every $set', () => {

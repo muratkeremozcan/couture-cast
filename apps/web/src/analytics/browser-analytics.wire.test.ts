@@ -181,6 +181,26 @@ describe('I-SHARE-WIRE-WEB: the serialized posthog-js batch', () => {
     })
   })
 
+  it('U-ANALYTICS-PRIVACY-WEB: sends no email, name or birthdate on the wire', async () => {
+    posthog.setPersonProperties(
+      { email: 'member@example.test', name: 'Teen Member', plan: 'premium' },
+      { birthdate: '2011-04-01' }
+    )
+    browserAnalytics.capture('ritual_created', {
+      ritual_type: 'daily_outfit',
+      email: 'member@example.test',
+      birthdate: '2011-04-01',
+    })
+    const events = (await flushBatches()).flat()
+    const ritual = events.find(({ event }) => event === 'ritual_created')
+    expect(ritual?.properties).toMatchObject({ ritual_type: 'daily_outfit' })
+    const personUpdate = events.find(({ event }) => event === '$set')
+    expect(personUpdate?.properties.$set).toEqual({ plan: 'premium' })
+    const serialized = JSON.stringify(events)
+    for (const leak of ['member@example.test', 'Teen Member', '2011-04-01'])
+      expect(serialized).not.toContain(leak)
+  })
+
   it.each(['throw', 'null'] as const)(
     'a sanitizer that fails closed (%s) drops the share event and logs a closed code',
     async (mode) => {

@@ -7,6 +7,7 @@ Updated: 2026-11-05 (Story 6.13): append-only moderation history, its limits, re
 Updated: 2026-11-11: the web production rewrite variable, and operator commands that verify TLS from macOS.
 Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator command, kill switch and push enablement.
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
+Updated: 2026-11-11 (production analytics): PostHog project map, privacy configuration, web and EAS keys.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -188,6 +189,7 @@ The mobile app is configured under [apps/mobile](../../apps/mobile/). Its
 
 - the app version source is local;
 - native version numbers auto-increment;
+- builds load the `production` EAS environment, which holds `POSTHOG_API_KEY`;
 - Android produces an app bundle;
 - iOS requests the `m-medium` resource class;
 - an empty production submit profile exists.
@@ -224,6 +226,49 @@ The repository also contains a root [app.json](../../app.json) with a different 
 configuration is expected to win on those paths. Running Expo or EAS from the repository root can
 select the competing root configuration. The repo does not explain or test the intended ownership
 of the root file.
+
+## Production analytics
+
+Web and mobile read one variable, `POSTHOG_API_KEY`: web inlines it at build time through
+[next.config.ts](../../apps/web/next.config.ts), and mobile reads it through
+[app.config.ts](../../apps/mobile/app.config.ts) into `extra.posthogApiKey`. Without it each client
+stays inert.
+
+| PostHog project           | Used by                             | Where the key lives                                                                                    |
+| ------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 329012 `couturecast-prod` | Production API, worker, web, mobile | Vercel `couture-cast-api` and `couture-cast-web` Production, EAS `production`, Northflank, `.env.prod` |
+| 327096 `couturecast-dev`  | Local and Preview                   | `.env.local`, `.env.preview`, Vercel `couture-cast-api` Preview and Development                        |
+
+CoutureCast has members aged 13 to 15 with guardian consent, and members upload wardrobe photos.
+The clients therefore send explicit events, pageviews or screens, and exceptions only:
+
+- Autocapture is off in every environment: web turns off autocapture, rage clicks, dead clicks and
+  heatmaps; mobile passes `autocapture={false}`, so no touch or screen autocapture. Feature code
+  sends named events, and the mobile root layout sends screens.
+- Session recording is off: `disable_session_recording: true` on web, `enableSessionReplay: false`
+  on mobile. Web also masks all inputs and text in the recording options and masks element text
+  and attributes, in case a capture mode is ever switched on remotely.
+- Surveys are off on both clients; web also turns off product tours and conversations.
+- Web pageviews (`history_change`) and exception capture stay on. Mobile captures uncaught
+  exceptions and unhandled rejections, never console output.
+- Person profiles are created for identified users only (`identified_only`).
+- `stripPersonalAnalyticsData` in [@couture/api-client](../../packages/api-client/src/analytics-privacy.ts)
+  runs first in both `before_send` chains and removes email, name, birth date and phone keys from
+  event properties and from `$set` and `$set_once`. Web also masks those keys in captured URLs.
+
+The configuration lives in [browser-analytics.ts](../../apps/web/src/analytics/browser-analytics.ts)
+and [posthog.ts](../../apps/mobile/src/config/posthog.ts), and the `U-ANALYTICS-PRIVACY-WEB` and
+`U-ANALYTICS-PRIVACY-MOBILE` unit and wire tests pin it.
+
+Web picks up a key change on its next production deployment. Mobile binaries read the key at
+build time, so a shipped binary starts sending analytics only from its next production EAS build.
+The EAS variable was created with:
+
+```bash
+cd apps/mobile
+eas env:create --environment production --name POSTHOG_API_KEY --value <phc key for 329012> \
+  --visibility plaintext --scope project --type string --non-interactive
+```
 
 ## Environment separation
 

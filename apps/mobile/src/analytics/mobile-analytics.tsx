@@ -86,19 +86,11 @@ export function createMobileAnalyticsClient(
 
 export const mobileAnalyticsClient = createMobileAnalyticsClient(posthogProviderClient)
 
-const mobileAnalyticsAutocapture = {
-  captureScreens: false,
-  captureTouches: true,
-  propsToCapture: ['testID'],
-  maxElementsCaptured: 20,
-}
-
 export function MobileAnalyticsProvider({ children }: PropsWithChildren) {
   return (
-    <PostHogProvider
-      client={posthogProviderClient}
-      autocapture={mobileAnalyticsAutocapture}
-    >
+    // Production analytics privacy: no touch or screen autocapture. Feature code sends
+    // explicit events and app/_layout.tsx sends screens; see config/posthog.ts.
+    <PostHogProvider client={posthogProviderClient} autocapture={false}>
       {children}
     </PostHogProvider>
   )

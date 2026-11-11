@@ -1,8 +1,10 @@
 // Story 6.9 Task 6 step 2 owner: sanitize web share events in `apps/web/src/analytics/browser-analytics.ts`
 import posthog, { type CaptureResult } from 'posthog-js'
 import {
+  PERSONAL_ANALYTICS_PROPERTY_KEYS,
   SHARE_CARD_SHARED_EVENT,
   sanitizeShareCardSharedProperties,
+  stripPersonalAnalyticsData,
 } from '@couture/api-client'
 
 export interface BrowserAnalyticsClient {
@@ -107,20 +109,40 @@ export function initializeBrowserAnalytics(): BrowserAnalyticsClient {
       return browserAnalytics
     }
 
+    // Production analytics privacy: CoutureCast has members aged 13 to 15 (with
+    // guardian consent) and wardrobe photos, so the SDK sends explicit events,
+    // pageviews and exceptions only, in every environment. Autocapture, rage and dead
+    // clicks, heatmaps, session recording, surveys, product tours and conversations
+    // stay off; element text, attributes and inputs are masked should any capture
+    // mode be switched on remotely; anonymous visitors get no person profile; and
+    // stripPersonalAnalyticsData removes email, name and birth date keys from every
+    // event and person update. See the "Production analytics" section of
+    // _bmad-output/project-knowledge/deployment-guide.md.
     posthog.init(postHogToken, {
       api_host: '/ingest',
       ui_host: 'https://us.posthog.com',
       capture_pageview: analyticsTestMode ? false : 'history_change',
-      autocapture: !analyticsTestMode,
+      autocapture: false,
+      rageclick: false,
+      capture_dead_clicks: false,
+      capture_heatmaps: false,
+      disable_session_recording: true,
+      session_recording: { maskAllInputs: true, maskTextSelector: '*' },
+      disable_surveys: true,
+      disable_product_tours: true,
+      disable_conversations: true,
+      mask_all_text: true,
+      mask_all_element_attributes: true,
+      mask_personal_data_properties: true,
+      custom_personal_data_properties: [...PERSONAL_ANALYTICS_PROPERTY_KEYS],
+      person_profiles: 'identified_only',
       request_batching: !analyticsTestMode,
       disable_compression: analyticsTestMode,
-      disable_session_recording: analyticsTestMode,
-      disable_surveys: analyticsTestMode,
       // Include the defaults option as required by PostHog
       defaults: '2026-01-30',
       // Enables capturing unhandled exceptions via Error Tracking
       capture_exceptions: !analyticsTestMode,
-      before_send: shareCardSharedBeforeSend,
+      before_send: [stripPersonalAnalyticsData, shareCardSharedBeforeSend],
       // Turn on debug in development mode
       debug: process.env.NODE_ENV === 'development',
     })

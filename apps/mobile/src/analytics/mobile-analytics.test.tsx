@@ -115,6 +115,9 @@ describe('mobile analytics facade', () => {
 
     expect(providerRenderSpy).toHaveBeenCalledWith(
       expect.objectContaining({
+        // Production analytics privacy: no touch or screen autocapture; feature code
+        // sends explicit events and app/_layout.tsx sends screens.
+        autocapture: false,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         client: expect.objectContaining({
           capture: providerCaptureMock,
