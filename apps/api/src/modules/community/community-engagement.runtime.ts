@@ -9,7 +9,10 @@ import { ComplimentaryAccessService } from '../feature-flags/complimentary-acces
 import { CommunityFlagEvaluationService } from '../feature-flags/community-flag-evaluation.service.js'
 import type { RemoteFeatureFlagProvider } from '../feature-flags/remote-feature-flag-provider.js'
 import { PushTokenRepository } from '../notifications/push-token.repository.js'
-import { CommunityStreamRepository } from './community-stream.repository.js'
+import {
+  CommunityStreamRepository,
+  isAppendDeferral,
+} from './community-stream.repository.js'
 import { CommunitySendGuard } from './community-send-guard.js'
 import { CommunityNotificationsWorker } from './community-notifications.worker.js'
 import { CommunityReceiptsWorker } from './community-receipts.worker.js'
@@ -108,18 +111,25 @@ export async function startCommunityEngagementRuntime(
     let appended = 0
     let failed = false
     let failure: unknown
+    let deferred = false
     try {
       if (await streams.hasPending()) appended = await streams.append()
     } catch (error) {
-      failed = true
-      failure = error
+      // Head contention or budget pressure means rows are waiting and the batch backed off on its
+      // own; the append repository already logged it, so retry at the busy cadence.
+      if (isAppendDeferral(error)) deferred = true
+      else {
+        failed = true
+        failure = error
+      }
     }
     const invalidation =
       appended > 0 || (await spotlight.hasWork())
         ? await spotlight.processWithin()
         : { status: 'idle' as const }
     if (failed) throw failure
-    return appended > 0 ||
+    return deferred ||
+      appended > 0 ||
       invalidation.status === 'advanced' ||
       invalidation.status === 'resumed_at_head'
       ? PROGRESS_TICK
@@ -207,15 +217,16 @@ async function startDispatch(
     await sender.verifyRuntime()
     const notifications = new CommunityNotificationsWorker(prisma, sender)
     const receipts = new CommunityReceiptsWorker(prisma, new PushTokenRepository(prisma))
+    // A pass that moved any delivery keeps the 50 ms cadence, even when other sends in the same
+    // batch were rejected: a quiet-hour herd keeps its pace through partial failures.
     const dispatchLoop = loop('dispatch', LOOPS.dispatch, async () => {
-      if ((await notifications.dispatch()) > 0) return PROGRESS_TICK
+      if ((await notifications.dispatch()).moved > 0) return PROGRESS_TICK
       return { progressed: false, dueInMs: await notifications.nextDispatchDueInMs() }
     })
     const fanoutLoop = loop('fanout', LOOPS.fanout, async () => {
-      if ((await notifications.fanout()) > 0) {
-        dispatchLoop.wake()
-        return PROGRESS_TICK
-      }
+      const pass = await notifications.fanoutReport()
+      if (pass.deliveries > 0) dispatchLoop.wake()
+      if (pass.groups > 0) return PROGRESS_TICK
       return { progressed: false, dueInMs: await notifications.nextFanoutDueInMs() }
     })
     loop('qualify-groups', LOOPS.qualifyGroups, async () => {

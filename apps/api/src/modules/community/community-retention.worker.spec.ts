@@ -32,7 +32,7 @@ describe('retention batch privacy fences', () => {
         $queryRaw: query,
         communityNotificationGroup: {
           findMany: groupFind,
-          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+          deleteMany: vi.fn().mockResolvedValue({ count: groups.length }),
         },
         communityArtifactSubject: {
           findMany: vi.fn().mockResolvedValue(subjects),
@@ -65,11 +65,12 @@ describe('retention batch privacy fences', () => {
         communityFlagEvaluation: { findMany: vi.fn().mockResolvedValue(flags) },
         $transaction: transaction,
       } as unknown as PrismaClient
-      const deleteBindings = vi.fn().mockResolvedValue(undefined)
+      const deleteBindings = vi.fn().mockResolvedValue(1)
       const removed = await new CommunityRetentionWorker(prisma, {
         deleteBindings,
       } as unknown as PushTokenRepository).sweep()
-      // One inactive token, plus the expired group in every scope but the empty one.
+      // Rows actually removed: the inactive token, plus the expired group in every scope but the
+      // empty one.
       expect(removed).toBe(scope === 'empty' ? 1 : 2)
       expect(deleteBindings).toHaveBeenCalledExactlyOnceWith([
         {

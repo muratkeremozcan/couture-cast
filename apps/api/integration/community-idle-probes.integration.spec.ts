@@ -20,6 +20,8 @@ beforeAll(async () => {
   await sql.connect()
   // Probe fixtures need only the columns the probes read, so foreign keys stay out of the way.
   await sql.query('SET session_replication_role = replica')
+  // Due times below sit a second in the past: a timestamp(3) column rounds now() to the nearest
+  // millisecond, so a row stamped now() can read as half a millisecond in the future.
 }, 120_000)
 
 afterAll(async () => {
@@ -31,6 +33,7 @@ afterAll(async () => {
 const tables = [
   'CommunityModerationOutbox',
   'CommunityCommentScreeningOutbox',
+  'CommunityComment',
   'CommunityReactionReceipt',
   'CommunityReactionOutbox',
   'CommunityCommentAnalyticsOutbox',
@@ -50,17 +53,38 @@ describe('community dispatch probe', () => {
     await expect(communityDispatchHasWork(prisma, false)).resolves.toBe(false)
   })
 
-  it('sees an undispatched post and comment screening row', async () => {
+  it('sees an undispatched post screening row', async () => {
     await sql.query(
       "INSERT INTO \"CommunityModerationOutbox\" (id, post_id, updated_at) VALUES ('m1', 'p1', now())"
     )
     await expect(communityDispatchHasWork(prisma, false)).resolves.toBe(true)
     await sql.query('UPDATE "CommunityModerationOutbox" SET dispatched_at = now()')
     await expect(communityDispatchHasWork(prisma, false)).resolves.toBe(false)
+  })
+
+  it('sees a comment screening row only while the dispatch step would take it', async () => {
     await sql.query(
-      "INSERT INTO \"CommunityCommentScreeningOutbox\" (id, comment_id, updated_at) VALUES ('c1', 'k1', now())"
+      `INSERT INTO "CommunityComment" (id, post_id, locale, platform, status, updated_at)
+       VALUES ('k1', 'p1', 'en-US', 'web', 'pending_screening', now())`
+    )
+    await sql.query(
+      `INSERT INTO "CommunityCommentScreeningOutbox" (id, comment_id, generation, attempts, updated_at)
+       VALUES ('c1', 'k1', 0, 0, now())`
+    )
+    // A first attempt goes at once.
+    await expect(communityDispatchHasWork(prisma, false)).resolves.toBe(true)
+    // A failed attempt waits out its 30-second pause.
+    await sql.query(
+      'UPDATE "CommunityCommentScreeningOutbox" SET attempts = 1, updated_at = now()'
+    )
+    await expect(communityDispatchHasWork(prisma, false)).resolves.toBe(false)
+    await sql.query(
+      'UPDATE "CommunityCommentScreeningOutbox" SET updated_at = now() - interval \'31 seconds\''
     )
     await expect(communityDispatchHasWork(prisma, false)).resolves.toBe(true)
+    // A comment a ban holds is not screened, so its row is not dispatch work.
+    await sql.query('UPDATE "CommunityComment" SET status = \'held_for_review\'')
+    await expect(communityDispatchHasWork(prisma, false)).resolves.toBe(false)
   })
 
   it('sees reaction receipts and delivered reaction rows only once they are past 30 days', async () => {
@@ -93,13 +117,24 @@ describe('community dispatch probe', () => {
     // Scheduled for later: nothing is due yet.
     await expect(communityDispatchHasWork(prisma, true)).resolves.toBe(false)
     await sql.query(
-      'UPDATE "CommunityCommentAnalyticsOutbox" SET next_attempt_at = now()'
+      'UPDATE "CommunityCommentAnalyticsOutbox" SET next_attempt_at = now() - interval \'1 second\''
+    )
+    await expect(communityDispatchHasWork(prisma, true)).resolves.toBe(true)
+    // Leased by a delivery in flight: not this sweep's work until the lease expires.
+    await sql.query(
+      'UPDATE "CommunityCommentAnalyticsOutbox" SET lease_expires_at = now() + interval \'30 seconds\''
+    )
+    await expect(communityDispatchHasWork(prisma, true)).resolves.toBe(false)
+    await sql.query(
+      'UPDATE "CommunityCommentAnalyticsOutbox" SET lease_expires_at = now() - interval \'1 second\''
     )
     await expect(communityDispatchHasWork(prisma, true)).resolves.toBe(true)
     // Parked: an unconfigured sink keeps the probe quiet.
     await expect(communityDispatchHasWork(prisma, false)).resolves.toBe(false)
     await sql.query('DELETE FROM "CommunityCommentAnalyticsOutbox"')
-    await sql.query('UPDATE "CommunityReactionOutbox" SET next_attempt_at = now()')
+    await sql.query(
+      'UPDATE "CommunityReactionOutbox" SET next_attempt_at = now() - interval \'1 second\''
+    )
     await expect(communityDispatchHasWork(prisma, true)).resolves.toBe(true)
     await expect(communityDispatchHasWork(prisma, false)).resolves.toBe(false)
   })

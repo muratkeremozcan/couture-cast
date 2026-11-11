@@ -255,6 +255,76 @@ describe('T03 actual engagement runtime composition', () => {
     }
   })
 
+  it('keeps a quiet-hour herd at the 50 ms cadence when some sends in each batch reject', async () => {
+    // 500 due deliveries, 32 a pass, one rejected send per pass: the pass still moved 31.
+    let remaining = 500
+    const passes: number[] = []
+    const startedAt = Date.now()
+    const dispatch = vi
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'dispatch')
+      .mockImplementation(() => {
+        passes.push(Date.now() - startedAt)
+        const selected = Math.min(32, remaining)
+        remaining -= selected
+        const failed = selected > 0 ? 1 : 0
+        return Promise.resolve({ selected, moved: selected - failed, failed })
+      })
+    const dispatchDue = vi
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'nextDispatchDueInMs')
+      .mockResolvedValue(null)
+    try {
+      await start(databaseBoundary(), 'general')
+      await vi.advanceTimersByTimeAsync(1_000)
+      expect(remaining).toBe(0)
+      // Sixteen passes, 50 ms apart, drain the herd in under a second.
+      const herd = passes.slice(0, 16)
+      expect(herd.slice(1).map((at, index) => at - herd[index]!)).toEqual(
+        Array<number>(15).fill(50)
+      )
+    } finally {
+      dispatch.mockRestore()
+      dispatchDue.mockRestore()
+    }
+  })
+
+  it('keeps fanout busy while a batch only settles groups, and wakes dispatch only for deliveries', async () => {
+    const startedAt = Date.now()
+    const fanoutCalls: number[] = []
+    const dispatchCalls: number[] = []
+    // Four passes that suppress, defer or expire groups without creating a delivery, then idle.
+    const reports = [1, 1, 1, 1].map((groups) => ({ deliveries: 0, groups }))
+    const fanout = vi
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'fanoutReport')
+      .mockImplementation(() => {
+        fanoutCalls.push(Date.now() - startedAt)
+        return Promise.resolve(reports.shift() ?? { deliveries: 0, groups: 0 })
+      })
+    const fanoutDue = vi
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'nextFanoutDueInMs')
+      .mockResolvedValue(null)
+    const dispatch = vi
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'dispatch')
+      .mockImplementation(() => {
+        dispatchCalls.push(Date.now() - startedAt)
+        return Promise.resolve({ selected: 0, moved: 0, failed: 0 })
+      })
+    const dispatchDue = vi
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'nextDispatchDueInMs')
+      .mockResolvedValue(null)
+    try {
+      await start(databaseBoundary(), 'general')
+      await vi.advanceTimersByTimeAsync(1_300)
+      expect(fanoutCalls.slice(0, 5)).toEqual([250, 500, 750, 1_000, 1_250])
+      // Dispatch kept its own idle backoff: nothing woke it.
+      expect(dispatchCalls).toEqual([50, 150, 350, 750])
+    } finally {
+      fanout.mockRestore()
+      fanoutDue.mockRestore()
+      dispatch.mockRestore()
+      dispatchDue.mockRestore()
+    }
+  })
+
   it('wakes an idle dispatch lane for its earliest due delivery and when fanout produces work', async () => {
     const startedAt = Date.now()
     const dispatchCalls: number[] = []
@@ -266,16 +336,17 @@ describe('T03 actual engagement runtime composition', () => {
       .spyOn(notifications.CommunityNotificationsWorker.prototype, 'dispatch')
       .mockImplementation(() => {
         dispatchCalls.push(Date.now() - startedAt)
-        return Promise.resolve(0)
+        return Promise.resolve({ selected: 0, moved: 0, failed: 0 })
       })
     const dispatchDue = vi
       .spyOn(notifications.CommunityNotificationsWorker.prototype, 'nextDispatchDueInMs')
       .mockImplementation(() => Promise.resolve(dueHints.shift() ?? null))
     const fanout = vi
-      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'fanout')
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'fanoutReport')
       .mockImplementation(() => {
         fanoutCalls.push(Date.now() - startedAt)
-        return Promise.resolve(fanoutResults.shift() ?? 0)
+        const deliveries = fanoutResults.shift() ?? 0
+        return Promise.resolve({ deliveries, groups: deliveries ? 1 : 0 })
       })
     const fanoutDue = vi
       .spyOn(notifications.CommunityNotificationsWorker.prototype, 'nextFanoutDueInMs')

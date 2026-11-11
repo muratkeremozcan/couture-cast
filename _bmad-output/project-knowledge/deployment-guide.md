@@ -743,7 +743,9 @@ keeps it active.
 Supabase meters database egress, and every statement's reply counts toward it.
 From mid-October to 2026-11-10 the hosted worker polled PostgreSQL nonstop with the community closed and pushed production past its 5 GB egress quota.
 Every polling loop now backs off while it finds nothing ([`community-idle-backoff.ts`](../../apps/api/src/modules/community/community-idle-backoff.ts)): an idle tick doubles the delay up to a cap chosen from the loop's latency bound, and the first tick that moves work returns it to the busy cadence.
-An idle tick asks one cheap question before it does anything costly.
+An idle tick asks one cheap question before it does anything costly, and that question matches only rows the loop could move now.
+Progress means rows that changed state: a pass that moves any row keeps the busy cadence even when other rows in it failed, so one rejected send cannot slow a quiet-hour herd, and a pass that moves nothing backs off, failures included.
+Shutdown waits for a tick in flight before it closes the queue, PostHog and Prisma.
 
 | Loop                                             | Busy cadence | Idle cap    | Idle tick                                          |
 | ------------------------------------------------ | ------------ | ----------- | -------------------------------------------------- |
@@ -767,7 +769,9 @@ The maintenance caps match or beat the general worker's crons for the same sweep
 Two deliveries used to be leased forever.
 PostHog's `/i/v0/e/` answers an accepted event with `{"status": "Ok"}`, and the acknowledgement check accepted only `{"status": 1}`, so every operational telemetry row failed and was re-leased about hourly: 57,025 rows, attempts up to 197, on 2026-11-10.
 The check now accepts both shapes.
-When `POSTHOG_API_KEY` is unset, the reaction, comment and operational telemetry outboxes park their rows: no lease, attempts unchanged, one `*_delivery_parked` warning per process, and a configured process delivers them later.
+When `POSTHOG_API_KEY` is unset, the reaction, comment and operational telemetry outboxes park their rows: no lease, attempts unchanged, one `*_delivery_parked` warning per process.
+Parked reaction and comment analytics wait for a configured process to deliver them; their 30-day retention removes only delivered rows.
+Parked operational telemetry is content-free metrics, and the 30-day detail retention removes it delivered or not, so a sink unset for a month loses those readings.
 
 Measured against an isolated PostgreSQL 17 with `pg_stat_statements`, the worker idle with the sink answering like PostHog, five-minute windows after a one-minute warm-up (bytes are what the database sent the worker):
 

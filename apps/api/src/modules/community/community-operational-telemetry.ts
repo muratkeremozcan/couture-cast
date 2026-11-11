@@ -89,7 +89,9 @@ export class CommunityOperationalTelemetry {
   /** Returns how many rows it delivered; zero means it found nothing it could deliver. */
   async deliver(): Promise<number> {
     // An unconfigured sink cannot accept anything, so the rows stay parked, unleased and with their
-    // attempts unchanged, until a configured process delivers them.
+    // attempts unchanged, until a configured process delivers them or the 30-day detail retention
+    // (`CommunityRetentionWorker`) removes them: these are content-free operational metrics, and
+    // a month-old backlog reading has no use.
     if (!acknowledgedCaptureAvailable(this.sink)) {
       if (!this.parkedReported) {
         this.parkedReported = true

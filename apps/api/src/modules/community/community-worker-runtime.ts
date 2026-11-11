@@ -160,14 +160,15 @@ export interface CommunityNsfwScreenerSelection {
 const logger = createBaseLogger().child({ feature: COMMUNITY_MODERATION_LOG_FEATURE })
 
 /**
- * Whether the dispatch sweep has anything to do, in one statement.
+ * Whether the dispatch sweep has anything it can act on, in one statement.
  *
- * Each clause is a superset of what one dispatch step selects: undispatched post and comment
- * screening rows, reaction receipts and delivered reaction rows past their 30-day retention, and,
- * when the acknowledged sink is configured, reaction and comment analytics rows that are due.
- * A superset keeps the probe safe: a row it reports that a step then skips costs one full sweep,
- * and the idle backoff still reads that sweep as idle.
- * Parked analytics rows stay out of it, so an unconfigured sink does not keep the sweep running.
+ * Each clause selects exactly what one dispatch step would select now: undispatched post screening
+ * rows; comment screening rows whose comment still waits for screening, first attempts at once and
+ * retries after their 30-second pause; reaction receipts and delivered reaction rows past their
+ * 30-day retention; and, when the acknowledged sink is configured, unleased analytics rows that are
+ * due.
+ * A row no step can move now stays out, so a comment a ban holds, a retry still in its pause or a
+ * parked analytics row cannot run the full sweep on every idle tick.
  */
 export async function communityDispatchHasWork(
   prisma: Pick<PrismaClient, '$queryRaw'>,
@@ -176,16 +177,22 @@ export async function communityDispatchHasWork(
   const rows = await prisma.$queryRaw<{ due: boolean }[]>`
     SELECT (
       EXISTS (SELECT 1 FROM "CommunityModerationOutbox" WHERE dispatched_at IS NULL)
-      OR EXISTS (SELECT 1 FROM "CommunityCommentScreeningOutbox" WHERE dispatched_at IS NULL)
+      OR EXISTS (SELECT 1 FROM "CommunityCommentScreeningOutbox" o
+        JOIN "CommunityComment" c ON c.id = o.comment_id
+        WHERE o.dispatched_at IS NULL AND c.status = 'pending_screening'
+          AND ((o.generation = 0 AND o.attempts = 0)
+            OR o.updated_at <= now() - interval '30 seconds'))
       OR EXISTS (SELECT 1 FROM "CommunityReactionReceipt"
         WHERE created_at < now() - interval '30 days')
       OR EXISTS (SELECT 1 FROM "CommunityReactionOutbox"
         WHERE delivered_at < now() - interval '30 days')
       OR (${analyticsDeliverable}::boolean AND (
         EXISTS (SELECT 1 FROM "CommunityReactionOutbox"
-          WHERE delivered_at IS NULL AND next_attempt_at <= now())
+          WHERE delivered_at IS NULL AND next_attempt_at <= now()
+            AND (lease_expires_at IS NULL OR lease_expires_at <= now()))
         OR EXISTS (SELECT 1 FROM "CommunityCommentAnalyticsOutbox"
-          WHERE delivered_at IS NULL AND next_attempt_at <= now())
+          WHERE delivered_at IS NULL AND next_attempt_at <= now()
+            AND (lease_expires_at IS NULL OR lease_expires_at <= now()))
       ))
     ) AS due
   `
@@ -196,6 +203,8 @@ export async function communityDispatchHasWork(
  * Each independent sweep retains progress when a sibling step fails.
  * Resolves to the sum of the counts the steps returned, which the worker's idle backoff reads as
  * progress; a step that returns no number counts as zero.
+ * A failed step is logged either way; the sweep rejects only when no step made progress, so one
+ * failing step cannot slow the steps that are moving work.
  */
 export async function runCommunitySweepSteps(
   steps: readonly {
@@ -223,7 +232,7 @@ export async function runCommunitySweepSteps(
       )
     }
   }
-  if (failed.length > 0)
+  if (failed.length > 0 && progressed === 0)
     throw new Error(`Community sweep steps failed: ${failed.join(', ')}`)
   return progressed
 }

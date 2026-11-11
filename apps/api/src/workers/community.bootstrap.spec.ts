@@ -473,6 +473,38 @@ describe('dedicated community worker bootstrap', () => {
     expect(exit).toHaveBeenCalledWith(0)
   })
 
+  it('waits for a sweep tick in flight before it closes the runtime it uses', async () => {
+    vi.useFakeTimers()
+    useRealShutdown()
+    let finishSweep!: () => void
+    const dispatchPending = vi.fn(
+      () =>
+        new Promise<number>((resolve) => {
+          finishSweep = () => {
+            harness.order.push('sweepFinished')
+            resolve(0)
+          }
+        })
+    )
+    harness.createCommunityWorkerRuntime.mockResolvedValue({
+      worker: { on: vi.fn(), close: vi.fn(() => Promise.resolve()) },
+      sweeps: idleSweeps({ dispatchPending }),
+      readiness: { selector: 'fixture', engineVersion: 'x', startupDurationMs: 1 },
+      close: harness.communityClose,
+    })
+    const bootstrap = freshProcess()
+    await bootstrap.startCommunityWorkers()
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(dispatchPending).toHaveBeenCalledOnce()
+    vi.useRealTimers()
+    const shutdown = bootstrap.performShutdown()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(harness.order).not.toContain('communityClose')
+    finishSweep()
+    await shutdown
+    expect(harness.order).toEqual(['sweepFinished', 'communityClose'])
+  })
+
   it('hands the worker it started to the shutdown helper', async () => {
     const bootstrap = freshProcess()
 
@@ -481,7 +513,8 @@ describe('dedicated community worker bootstrap', () => {
 
     const resources = harness.shutdownWorkerResources.mock
       .calls[0]?.[0] as WorkerShutdownResources
-    expect(resources.workers).toHaveLength(1)
+    // The BullMQ consumer, then the drain of sweep ticks in flight.
+    expect(resources.workers).toHaveLength(2)
     // Below the production launcher's 25-second deadline, so the bootstrap's
     // own force-disconnect runs before the launcher gives up on it.
     const options = harness.shutdownWorkerResources.mock.calls[0]?.[1] as {

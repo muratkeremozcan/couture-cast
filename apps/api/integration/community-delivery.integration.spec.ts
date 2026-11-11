@@ -504,7 +504,8 @@ describe('Story 6.5 actual guarded provider boundary', () => {
     const initial = await prisma.communityTokenDelivery.findUniqueOrThrow({
       where: { id: deliveries[0]!.id },
     })
-    await expect(guarded.dispatch(initial.id)).resolves.toBeUndefined()
+    // Deferring the delivery is a state change, which the dispatch loop counts as progress.
+    await expect(guarded.dispatch(initial.id)).resolves.toBe(true)
     const current = await prisma.communityTokenDelivery.findUniqueOrThrow({
       where: { id: initial.id },
     })

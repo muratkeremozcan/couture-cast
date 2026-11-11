@@ -322,15 +322,18 @@ describe('createCommunityWorkerRuntime', () => {
       return Promise.resolve([])
     })
     try {
-      await expect(runtime.sweeps.dispatchPending()).rejects.toThrow(
-        'Community sweep steps failed: comment_dispatch'
-      )
+      // The post moved, so the failed comment step is logged and the sweep still reports progress.
+      await expect(runtime.sweeps.dispatchPending()).resolves.toBe(1)
       expect(order).toEqual(['post', 'reaction', 'comment'])
       await expect(runtime.sweeps.sweepStalePendingReview()).rejects.toThrow(
         'Community sweep steps failed: comment_stale'
       )
       expect(harness.sweepStalePendingReview).toHaveBeenCalledOnce()
       expect(harness.commentStale).toHaveBeenCalledOnce()
+      // With nothing moved, the failed step rejects the sweep, and the idle backoff backs it off.
+      harness.dispatchPending.mockImplementationOnce(() =>
+        Promise.resolve({ dispatched: 0, failed: 0 })
+      )
       await expect(runtime.sweeps.dispatchPending()).rejects.toThrow(
         'Community sweep steps failed: comment_dispatch'
       )

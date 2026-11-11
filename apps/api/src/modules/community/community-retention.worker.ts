@@ -16,16 +16,15 @@ export class CommunityRetentionWorker {
       orderBy: { last_used_at: 'asc' },
       take: 500,
     })
-    if (inactive.length)
-      await this.tokens.deleteBindings(
-        inactive.map((row) => ({
-          registrationId: row.id,
-          ownerId: row.user_id,
-          bindingGeneration: row.binding_generation,
-          token: row.token,
-          inactiveBefore: cutoff,
-        }))
-      )
+    const bindings = await this.tokens.deleteBindings(
+      inactive.map((row) => ({
+        registrationId: row.id,
+        ownerId: row.user_id,
+        bindingGeneration: row.binding_generation,
+        token: row.token,
+        inactiveBefore: cutoff,
+      }))
+    )
     const flags = await this.retainFlags()
     const details = await interactiveTransaction(
       this.prisma,
@@ -52,6 +51,8 @@ export class CommunityRetentionWorker {
             deliveries: { select: { id: true, attempts: { select: { id: true } } } },
           },
         })
+        // Rows actually removed, so a row this pass selects but cannot remove reads as idle.
+        let removed = 0
         const groupIds = groups.map((group) => group.id).sort()
         if (groupIds.length) {
           const subjects = await tx.communityArtifactSubject.findMany({
@@ -90,9 +91,11 @@ export class CommunityRetentionWorker {
               ],
             },
           })
-          await tx.communityNotificationGroup.deleteMany({
-            where: { id: { in: groupIds } },
-          })
+          removed += (
+            await tx.communityNotificationGroup.deleteMany({
+              where: { id: { in: groupIds } },
+            })
+          ).count
         }
         const obsolete = await tx.$queryRaw<{ id: string }[]>`
           SELECT i.id FROM "CommunityNotificationIntent" i
@@ -109,9 +112,11 @@ export class CommunityRetentionWorker {
               artifact_id: { in: obsoleteIds },
             },
           })
-          await tx.communityNotificationIntent.deleteMany({
-            where: { id: { in: obsoleteIds } },
-          })
+          removed += (
+            await tx.communityNotificationIntent.deleteMany({
+              where: { id: { in: obsoleteIds } },
+            })
+          ).count
         }
         const telemetry =
           await tx.$executeRaw`DELETE FROM "CommunityEngagementTelemetry" WHERE id IN (
@@ -128,13 +133,17 @@ export class CommunityRetentionWorker {
           await tx.communityArtifactSubject.deleteMany({
             where: { artifact_kind: 'outbox', artifact_id: { in: outboxIds } },
           })
-          await tx.communityDomainOutbox.deleteMany({ where: { id: { in: outboxIds } } })
+          removed += (
+            await tx.communityDomainOutbox.deleteMany({
+              where: { id: { in: outboxIds } },
+            })
+          ).count
         }
-        return groupIds.length + obsoleteIds.length + telemetry + outboxIds.length
+        return removed + telemetry
       },
       { timeout: 2500, maxWait: 250 }
     )
-    return inactive.length + flags + details
+    return bindings + flags + details
   }
   private async retainFlags(): Promise<number> {
     const cutoff = new Date(Date.now() - 86_400_000)

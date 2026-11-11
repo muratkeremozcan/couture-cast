@@ -103,12 +103,14 @@ export type CommunityWorkerProcessState = {
   readonly workers: Worker[]
   readonly timers: NodeJS.Timeout[]
   readonly loops: BackoffLoop[]
+  /** Sweep ticks in flight; shutdown waits for them before it closes what they use. */
+  readonly running: Set<Promise<unknown>>
   posthogService?: PostHogService
   closeRuntime?: () => Promise<void>
 }
 
 export function createCommunityWorkerProcessState(): CommunityWorkerProcessState {
-  return { workers: [], timers: [], loops: [] }
+  return { workers: [], timers: [], loops: [], running: new Set() }
 }
 
 /**
@@ -117,7 +119,7 @@ export function createCommunityWorkerProcessState(): CommunityWorkerProcessState
  * process staying up is the whole point of it.
  */
 function schedule(
-  timers: NodeJS.Timeout[],
+  { timers, running: inFlight }: Pick<CommunityWorkerProcessState, 'timers' | 'running'>,
   name: string,
   intervalMs: number,
   sweep: () => Promise<unknown>,
@@ -127,7 +129,7 @@ function schedule(
   const tick = () => {
     if (running) return
     running = true
-    void sweep()
+    const flight = sweep()
       .catch((error: unknown) => {
         logger.error(
           {
@@ -139,7 +141,9 @@ function schedule(
       })
       .finally(() => {
         running = false
+        inFlight.delete(flight)
       })
+    inFlight.add(flight)
   }
   if (options.runAtStart) tick()
   const timer = setInterval(tick, intervalMs)
@@ -153,7 +157,7 @@ function schedule(
  * up to the policy's cap.
  */
 function scheduleWithBackoff(
-  loops: BackoffLoop[],
+  { loops, running }: Pick<CommunityWorkerProcessState, 'loops' | 'running'>,
   name: string,
   policy: IdleBackoffPolicy,
   sweep: () => Promise<LoopTick>
@@ -170,6 +174,10 @@ function scheduleWithBackoff(
           },
           'community_sweep_failed'
         )
+      },
+      track: (flight) => {
+        running.add(flight)
+        void flight.finally(() => running.delete(flight))
       },
     })
   )
@@ -219,20 +227,17 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
     }
 
     const { sweeps } = community
-    scheduleWithBackoff(
-      state.loops,
-      'dispatch',
-      COMMUNITY_WORKER_LOOPS.dispatch,
-      async () => tickFromCount(await sweeps.dispatchPending())
+    scheduleWithBackoff(state, 'dispatch', COMMUNITY_WORKER_LOOPS.dispatch, async () =>
+      tickFromCount(await sweeps.dispatchPending())
     )
     scheduleWithBackoff(
-      state.loops,
+      state,
       'stale-review',
       COMMUNITY_WORKER_LOOPS.maintenance,
       async () => tickFromCount(await sweeps.sweepStalePendingReview())
     )
     scheduleWithBackoff(
-      state.loops,
+      state,
       'upload-expiry',
       COMMUNITY_WORKER_LOOPS.maintenance,
       async () => {
@@ -241,7 +246,7 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
       }
     )
     scheduleWithBackoff(
-      state.loops,
+      state,
       'erasure',
       COMMUNITY_WORKER_LOOPS.maintenance,
       async () => {
@@ -255,7 +260,7 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
       }
     )
     scheduleWithBackoff(
-      state.loops,
+      state,
       'ban-expiry',
       COMMUNITY_WORKER_LOOPS.maintenance,
       async () => {
@@ -266,14 +271,14 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
     // Story 6.12: this is the path that runs in production, because the hosted process has no
     // `maintenance` consumer. The sweep's keys make an overlap with the general worker harmless.
     schedule(
-      state.timers,
+      state,
       'moderation-sla',
       MODERATION_SLA_SWEEP_INTERVAL_MS,
       community.sweeps.sweepModerationSla
     )
     // Story 6.13: daily, and once now, because a worker that restarts daily never reaches the interval.
     schedule(
-      state.timers,
+      state,
       'moderation-history-retention',
       MODERATION_HISTORY_RETENTION_INTERVAL_MS,
       community.sweeps.sweepModerationHistoryRetention,
@@ -342,7 +347,7 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
  * deferred work).
  */
 export async function performShutdown(state: CommunityWorkerProcessState) {
-  const { workers, timers, loops } = state
+  const { workers, timers, loops, running } = state
   logger.info('Shutting down community workers...')
   let exitCode = 0
   for (const timer of timers) {
@@ -356,7 +361,17 @@ export async function performShutdown(state: CommunityWorkerProcessState) {
   try {
     await shutdownWorkerResources(
       {
-        workers,
+        // A sweep tick in flight is drained with the consumers, before the queue, the screener,
+        // PostHog and Prisma it may be using close; a forced close stops waiting for it.
+        workers: [
+          ...workers,
+          {
+            close: (force?: boolean) =>
+              force
+                ? Promise.resolve()
+                : Promise.allSettled([...running]).then(() => undefined),
+          },
+        ],
         queues: [
           ...(runtime ? [{ close: runtime, disconnect: runtime }] : []),
           ...(posthog
