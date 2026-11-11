@@ -21,6 +21,7 @@ import {
   commentInput,
   persistCommentFixture,
 } from './helpers/community-comments-context.js'
+import { deleteComments } from './helpers/privacy-guards.js'
 
 const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasourceUrl: database.url })
@@ -113,7 +114,7 @@ async function add(queue: Queue, id: string, generation = 0) {
 beforeAll(() => database.migrate(), 30_000)
 beforeEach(async () => {
   flags.getFeatureFlag.mockReset().mockResolvedValue(true)
-  await prisma.communityComment.deleteMany()
+  await deleteComments(prisma)
 })
 afterAll(async () => {
   await prisma.$disconnect()
@@ -317,7 +318,7 @@ describe('comment worker Redis retry and generation ownership', () => {
 
   it('advances past one bounded page of frozen stale work on the next sweep', async () => {
     const row = await pending()
-    await prisma.communityComment.delete({ where: { id: row.id } })
+    await deleteComments(prisma, { id: row.id })
     const post = await prisma.lookbookPost.findUniqueOrThrow({
       where: { id: row.postId },
     })

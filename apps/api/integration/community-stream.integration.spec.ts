@@ -14,6 +14,7 @@ import {
   CommunityStreamRepository,
   type AppendReport,
 } from '../src/modules/community/community-stream.repository.js'
+import { updatePost } from './helpers/privacy-guards.js'
 
 const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
@@ -553,13 +554,15 @@ describe('Story 6.5 committed stream append', () => {
     })
     const writer = await connection()
     await writer.query('BEGIN')
+    // Withdrawal holds the post's guard, as the product's withdrawal does.
+    await writer.query(
+      'SELECT community_privacy_guards(ARRAY[]::text[], ARRAY[$1]::text[], true)',
+      [a.post.id]
+    )
     await writer.query('UPDATE "LookbookPost" SET status = \'withdrawn\' WHERE id = $1', [
       a.post.id,
     ])
-    await prisma.lookbookPost.update({
-      where: { id: b.post.id },
-      data: { status: 'withdrawn' },
-    })
+    await updatePost(prisma, b.post.id, { status: 'withdrawn' })
     expect(await stream.append()).toBe(1)
     const mid = await prisma.communityStreamHead.findUniqueOrThrow({
       where: { id: 'public' },
@@ -747,10 +750,7 @@ describe('Story 6.5 committed stream append', () => {
     const privateEvent = await prisma.communityStreamEvent.findFirstOrThrow()
     expect(privateEvent.kind).toBe('comment.status')
     expect(privateEvent.stream_id).not.toBe('public')
-    await prisma.lookbookPost.update({
-      where: { id: post.id },
-      data: { status: 'withdrawn' },
-    })
+    await updatePost(prisma, post.id, { status: 'withdrawn' })
     await stream.drain()
     const removal = await prisma.communityStreamEvent.findFirstOrThrow({
       where: { stream_id: 'public' },

@@ -46,6 +46,7 @@ import {
   seedPartner,
   shift,
 } from './helpers/community-sponsorship-fixtures.js'
+import { updatePost } from './helpers/privacy-guards.js'
 
 const ctx = spotlightTestContext('sponsorship-http')
 const commerceFlags = { getFeatureFlag: vi.fn(() => Promise.resolve(true)) }
@@ -409,7 +410,7 @@ describe('6.7b visibility and freshness of the block', () => {
       const author = cohort.authorIds[0]!
       const postId = cohort.expectedOrder[0]!
       await link(postId)
-      await ctx.prisma.lookbookPost.update({ where: { id: postId }, data: { status } })
+      await updatePost(ctx.prisma, postId, { status })
 
       const own = communitySponsoredPostResponseSchema.parse(
         (

@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { communityCommentBodySchema } from '@couture/api-client/contracts/http'
 import { CommunityCommentsRepository } from '../src/modules/community/community-comments.repository.js'
 import { commentRow, commentsTestContext } from './helpers/community-comments-context.js'
+import { deletePosts, updatePost } from './helpers/privacy-guards.js'
 
 const {
   database,
@@ -311,7 +312,7 @@ describe('Story 6.4 comment publication, threading and paging', () => {
     await publish(other.userId, postId, input('Lovely coat.', root.id))
     await service.delete({ userId, postId, commentId: root.id, platform: 'web' })
     // Post deletion must cascade a complete thread without a self-FK failure.
-    await prisma.lookbookPost.delete({ where: { id: postId } })
+    await deletePosts(prisma, { id: postId })
     expect(await prisma.communityComment.count({ where: { post_id: postId } })).toBe(0)
   })
 
@@ -337,10 +338,7 @@ describe('Story 6.4 comment publication, threading and paging', () => {
       member = await fixture()
     await publish(author.userId, author.postId)
     const pending = await create(member.userId, author.postId)
-    await prisma.lookbookPost.update({
-      where: { id: author.postId },
-      data: { status: 'withdrawn' },
-    })
+    await updatePost(prisma, author.postId, { status: 'withdrawn' })
     await processor.process(pending.id, 0)
     expect(
       await prisma.communityComment.findUniqueOrThrow({ where: { id: pending.id } })

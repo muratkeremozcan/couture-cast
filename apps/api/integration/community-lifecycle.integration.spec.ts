@@ -33,6 +33,11 @@ import {
 } from '../src/modules/community/community-maintenance.service.js'
 import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
 import type { CommunityStorage } from '../src/modules/community/community-storage.adapter.js'
+import {
+  deleteGuardianConsents,
+  deleteMembers,
+  deletePosts,
+} from './helpers/privacy-guards.js'
 
 const databaseUrl =
   process.env.INTEGRATION_TEST_DATABASE_URL ??
@@ -215,12 +220,10 @@ async function reapPreviousRuns(): Promise<void> {
 
   await prisma.moderationEvent.deleteMany({ where: { post_id: { in: postIds } } })
   await prisma.communityPostReport.deleteMany({ where: { post_id: { in: postIds } } })
-  await prisma.lookbookPost.deleteMany({ where: { id: { in: postIds } } })
+  await deletePosts(prisma, { id: { in: postIds } })
   await prisma.communityAlias.deleteMany({ where: { user_id: { in: userIds } } })
-  await prisma.guardianConsent.deleteMany({
-    where: {
-      OR: [{ teen_id: { in: userIds } }, { guardian_id: { in: userIds } }],
-    },
+  await deleteGuardianConsents(prisma, {
+    OR: [{ teen_id: { in: userIds } }, { guardian_id: { in: userIds } }],
   })
 
   const pinned = await prisma.auditLog.findMany({
@@ -229,9 +232,7 @@ async function reapPreviousRuns(): Promise<void> {
     distinct: ['user_id'],
   })
   const pinnedIds = new Set(pinned.map((row) => row.user_id))
-  await prisma.user.deleteMany({
-    where: { id: { in: userIds.filter((id) => !pinnedIds.has(id)) } },
-  })
+  await deleteMembers(prisma, { id: { in: userIds.filter((id) => !pinnedIds.has(id)) } })
 }
 
 beforeAll(async () => {
@@ -257,18 +258,16 @@ afterAll(async () => {
     // `user.deleteMany` below silently leaves that account standing. Everything
     // that can affect a feed or a flow -- posts, aliases, consents -- is removed
     // regardless, and `reapPreviousRuns` skips pinned users for the same reason.
-    await prisma.guardianConsent.deleteMany({
-      where: { teen: { email: { startsWith: namespace } } },
-    })
+    await deleteGuardianConsents(prisma, { teen: { email: { startsWith: namespace } } })
     await prisma.moderationEvent.deleteMany({
       where: { post: { user: { email: { startsWith: namespace } } } },
     })
     await prisma.communityModerationOutbox.deleteMany({
       where: { post: { user: { email: { startsWith: namespace } } } },
     })
-    await prisma.lookbookPost.deleteMany({ where: owned })
+    await deletePosts(prisma, owned)
     await prisma.communityAlias.deleteMany({ where: owned })
-    await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
+    await deleteMembers(prisma, { email: { startsWith: namespace } })
   }
   await prisma.$disconnect()
 })

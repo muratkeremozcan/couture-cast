@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { ConflictException, PreconditionFailedException } from '@nestjs/common'
 import { WardrobeCapsuleRepository } from '../src/modules/wardrobe/wardrobe-capsule.repository.js'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Real-PostgreSQL coverage for capsule persistence.
@@ -133,7 +134,7 @@ describe('4.3 wardrobe capsules against real PostgreSQL', () => {
     await prismaA.userProfile.deleteMany({
       where: { user: { email: { contains: namespace } } },
     })
-    await prismaA.user.deleteMany({ where: { email: { contains: namespace } } })
+    await deleteMembers(prismaA, { email: { contains: namespace } })
     await prismaA.$disconnect()
     await prismaB.$disconnect()
   })

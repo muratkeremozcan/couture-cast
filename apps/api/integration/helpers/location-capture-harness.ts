@@ -55,6 +55,7 @@ import {
 } from '../../src/modules/weather/weather-refresh.queue'
 import { WeatherRepository } from '../../src/modules/weather/weather.repository'
 import { httpTestUrl, listenHttpApp } from '../../src/testing/loopback-http-app.js'
+import { deleteMembers } from './privacy-guards.js'
 
 /**
  * Story 1.2b: the shared harness for the location capture suites. Each test
@@ -360,7 +361,7 @@ export function useLocationCaptureSuite() {
       await prisma.forecastSegment.deleteMany({ where: { weather_snapshot: snapshots } })
       await prisma.weatherSnapshot.deleteMany({ where: snapshots })
       await prisma.weatherIngestionState.deleteMany({ where: snapshots })
-      await prisma.user.deleteMany({ where: { id: { in: userIds } } })
+      await deleteMembers(prisma, { id: { in: userIds } })
     } finally {
       await prisma.$disconnect()
     }

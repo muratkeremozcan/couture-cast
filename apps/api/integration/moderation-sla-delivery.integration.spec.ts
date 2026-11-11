@@ -35,6 +35,7 @@ import {
   refuseWrites,
   startCaptureServer,
 } from './helpers/moderation-sla-harness.js'
+import { deletePosts } from './helpers/privacy-guards.js'
 
 vi.setConfig({ testTimeout: 60_000 })
 
@@ -389,7 +390,7 @@ describe('I-W-REKEY-PAYLOAD: a pending alert whose case was re-keyed (matrix, Er
     capture().respondWith(500)
     await sweep().run()
     capture().reset()
-    await prisma.lookbookPost.delete({ where: { id: seeded.targetId } })
+    await deletePosts(prisma, { id: seeded.targetId })
     clock.advance(SLA_MINUTE_MS)
     await sweep().run()
     const row = (await alertByKey(slaKey(seeded, 'at_risk')))!

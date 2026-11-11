@@ -38,6 +38,7 @@ import {
 import { FeatureFlagsWarmup } from '../src/modules/feature-flags/feature-flags.warmup.js'
 import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Story 5.2 Task 4: the Stripe rail over real PostgreSQL and real HTTP.
@@ -269,7 +270,7 @@ describe('5.2 Stripe rail against real PostgreSQL and real HTTP', () => {
       })
       await prisma.premiumEntitlement.deleteMany({ where: { user_id: buyerId } })
       await prisma.billingCustomer.deleteMany({ where: { user_id: buyerId } })
-      await prisma.user.deleteMany({ where: { id: buyerId } })
+      await deleteMembers(prisma, { id: buyerId })
     }
     await prisma.$disconnect()
   })

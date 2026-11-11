@@ -26,6 +26,7 @@ import {
   SLA_MINUTE_MS,
   moderationSlaTestContext,
 } from './helpers/moderation-sla-harness.js'
+import { deletePosts } from './helpers/privacy-guards.js'
 
 vi.setConfig({ testTimeout: 60_000 })
 
@@ -392,7 +393,7 @@ describe('I-S-REKEY: erasure splits a case into orphan cases', () => {
     await sweep().run()
     expect(await alerts()).toHaveLength(1)
     // Author erasure deletes the post row, and the foreign key sets each report's post_id to null.
-    await prisma.lookbookPost.delete({ where: { id: seeded.targetId } })
+    await deletePosts(prisma, { id: seeded.targetId })
     await sweep().run()
     await sweep().run()
     const keys = (await alerts()).map((alert) => alert.dedupe_key).sort()

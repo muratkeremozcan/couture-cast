@@ -26,6 +26,7 @@ import {
   SPOTLIGHT_TEST_GRANT_VALID_UNTIL,
   spotlightTestContext,
 } from './helpers/community-spotlight-context.js'
+import { updatePost } from './helpers/privacy-guards.js'
 
 const ctx = spotlightTestContext('http')
 let app: INestApplication
@@ -381,10 +382,7 @@ describe('6.6 spotlight analytics', () => {
     expect(ctx.analytics).toEqual([])
 
     // A withdrawn post answers like a missing one, and neither records an open.
-    await ctx.prisma.lookbookPost.update({
-      where: { id: hiddenId },
-      data: { status: 'withdrawn' },
-    })
+    await updatePost(ctx.prisma, hiddenId, { status: 'withdrawn' })
     await open(hiddenId, { surface: 'spotlight', rank: 2, level: 'city' }).expect(404)
     await open('missing-post', { surface: 'spotlight', rank: 1, level: 'city' }).expect(
       404
