@@ -2333,7 +2333,10 @@ describe('I-C-END-RESTORE: the sweep that returns held content when a ban ends (
       new CommunityCommentsOutbox(
         prisma,
         { enqueueComment: () => Promise.resolve() } as never,
-        { captureCommentEvent: vi.fn() } as never,
+        {
+          captureCommentEvent: vi.fn(),
+          acknowledgedDeliveryAvailable: () => true,
+        } as never,
         {} as never
       ).sweepStale()
 
@@ -2387,7 +2390,10 @@ describe('I-C-END-RESTORE: the sweep that returns held content when a ban ends (
             return Promise.resolve()
           },
         } as never,
-        { captureCommentEvent: vi.fn() } as never,
+        {
+          captureCommentEvent: vi.fn(),
+          acknowledgedDeliveryAvailable: () => true,
+        } as never,
         {} as never
       ).dispatchPending()
       // A generation above 0 waits out the outbox's 30 s pause.
@@ -2403,7 +2409,10 @@ describe('I-C-END-RESTORE: the sweep that returns held content when a ban ends (
             return Promise.resolve()
           },
         } as never,
-        { captureCommentEvent: vi.fn() } as never,
+        {
+          captureCommentEvent: vi.fn(),
+          acknowledgedDeliveryAvailable: () => true,
+        } as never,
         {} as never
       ).dispatchPending()
       expect(jobs).toContainEqual([held.comment.id, 1])

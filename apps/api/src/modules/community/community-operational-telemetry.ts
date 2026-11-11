@@ -1,7 +1,17 @@
 // Story 6.5 owner: content-free durable outcomes and independent sink delivery.
 import { randomUUID } from 'node:crypto'
 import type { Prisma, PrismaClient } from '@prisma/client'
-import type { AnalyticsClient } from '../../analytics/analytics.service.js'
+import {
+  acknowledgedCaptureAvailable,
+  type AnalyticsClient,
+} from '../../analytics/analytics.service.js'
+import { createBaseLogger } from '../../logger/pino.config.js'
+
+/**
+ * An idle backlog lane is recorded at most this often.
+ * A lane that has work, or just drained, is recorded on every observation.
+ */
+export const COMMUNITY_IDLE_BACKLOG_RECORD_MS = 60 * 60 * 1000
 
 export function communityBuildIdentity() {
   const value = process.env.COUTURE_BUILD_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? ''
@@ -24,10 +34,24 @@ export async function recordCommunityAttemptOutcome(
   `
 }
 export class CommunityOperationalTelemetry {
+  private readonly logger = createBaseLogger().child({ feature: 'community-telemetry' })
+  private parkedReported = false
+  /** Per lane: the count last recorded and when, so an idle lane is not recorded every minute. */
+  private readonly recorded = new Map<string, { count: number; at: number }>()
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly sink: Pick<AnalyticsClient, 'captureAcknowledged'>
+    private readonly sink: Pick<
+      AnalyticsClient,
+      'captureAcknowledged' | 'acknowledgedCaptureConfigured'
+    >,
+    private readonly clock: () => number = Date.now
   ) {}
+  /**
+   * Observes both backlog lanes and records the ones worth a row.
+   * A lane with work, or one whose count changed, is recorded every time.
+   * An unchanged empty lane is recorded once an hour, so a missing hourly row still shows the
+   * observer stopped, and an idle worker writes 48 rows a day where it wrote 2,880.
+   */
   async backlog() {
     const rows = await this.prisma.$queryRaw<
       { lane: string; count: bigint; age: number }[]
@@ -40,18 +64,43 @@ export class CommunityOperationalTelemetry {
       FROM "CommunityTokenDelivery" d JOIN "CommunityNotificationGroup" g ON g.id = d.group_id
       WHERE d.status IN ('pending','deferred','retryable_rejection') AND d.next_attempt_at <= clock_timestamp()
     `
-    for (const row of rows)
+    const now = this.clock()
+    for (const row of rows) {
+      const count = Math.min(2147483647, Number(row.count))
+      const last = this.recorded.get(row.lane)
+      if (
+        count === 0 &&
+        last?.count === 0 &&
+        now - last.at < COMMUNITY_IDLE_BACKLOG_RECORD_MS
+      )
+        continue
       await this.prisma.communityEngagementTelemetry.create({
         data: {
           event_type: 'community_backlog',
           outcome: row.lane,
-          backlog_count: Math.min(2147483647, Number(row.count)),
+          backlog_count: count,
           oldest_age_ms: row.age,
           build_identity: communityBuildIdentity(),
         },
       })
+      this.recorded.set(row.lane, { count, at: now })
+    }
   }
-  async deliver() {
+  /** Returns how many rows it delivered; zero means it found nothing it could deliver. */
+  async deliver(): Promise<number> {
+    // An unconfigured sink cannot accept anything, so the rows stay parked, unleased and with their
+    // attempts unchanged, until a configured process delivers them.
+    if (!acknowledgedCaptureAvailable(this.sink)) {
+      if (!this.parkedReported) {
+        this.parkedReported = true
+        this.logger.warn(
+          { event: 'community_telemetry_delivery_parked', reason: 'sink_unconfigured' },
+          'Community operational telemetry delivery parked until the acknowledged sink is configured'
+        )
+      }
+      return 0
+    }
+    let delivered = 0
     const deadline = Date.now() + 1000
     for (let index = 0; index < 100 && Date.now() < deadline; index++) {
       const owner = randomUUID()
@@ -65,8 +114,8 @@ export class CommunityOperationalTelemetry {
           ORDER BY next_attempt_at,id LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING *
       `
       const row = rows[0]
-      if (!row) return
-      let delivered = false
+      if (!row) return delivered
+      let accepted = false
       try {
         if (!this.sink.captureAcknowledged) throw new Error('Telemetry sink unavailable')
         await this.sink.captureAcknowledged(
@@ -90,7 +139,7 @@ export class CommunityOperationalTelemetry {
           },
           { signal: AbortSignal.timeout(2000) }
         )
-        delivered = true
+        accepted = true
       } catch {
         /* The durable row retains its identity and retries independently of dispatch. */
       }
@@ -99,7 +148,7 @@ export class CommunityOperationalTelemetry {
         data: {
           lease_owner: null,
           lease_until: null,
-          ...(delivered
+          ...(accepted
             ? { delivered_at: new Date() }
             : {
                 next_attempt_at: new Date(
@@ -108,6 +157,8 @@ export class CommunityOperationalTelemetry {
               }),
         },
       })
+      if (accepted) delivered += 1
     }
+    return delivered
   }
 }

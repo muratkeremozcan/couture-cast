@@ -22,6 +22,9 @@ import * as retention from './community-retention.worker.js'
 import * as telemetry from './community-operational-telemetry.js'
 import * as spotlightCache from './community-spotlight-cache.js'
 import * as spotlightInvalidator from './community-spotlight-invalidator.js'
+import * as idleBackoff from './community-idle-backoff.js'
+import * as prismaClient from '../../prisma/prisma-client.js'
+import * as complimentaryAccess from '../feature-flags/complimentary-access.service.js'
 import { startCommunityEngagementRuntime } from './community-engagement.runtime.js'
 
 const poolConstructor = vi.hoisted(() => vi.fn())
@@ -72,6 +75,11 @@ function databaseBoundary(capability: 'ready' | 'old-server' | 'bad-timeout' = '
             lock: '250ms',
           },
         ])
+      // The append loop's cheap pre-check: report a waiting row, so every tick opens the bounded
+      // append transaction and the housekeeping assertions below see it.
+      if (text.includes('AS pending')) return Promise.resolve([{ pending: true }])
+      // The spotlight's cheap pre-check: report the cursor behind, so every tick runs a pass.
+      if (text.includes('AS work')) return Promise.resolve([{ work: true }])
       if (text.includes("SELECT 'append' AS lane"))
         return Promise.resolve([
           { lane: 'append', count: 0n, age: 0 },
@@ -93,7 +101,7 @@ function runtimeUnderTest(): typeof startCommunityEngagementRuntime {
     return startCommunityEngagementRuntime
   const path = resolve(__dirname, 'community-engagement.runtime.ts')
   const source = readFileSync(path, 'utf8')
-  const statement = "loop('append', 500, appendThenInvalidate)"
+  const statement = "loop('append', LOOPS.append, appendThenInvalidate)"
   expect(source.split(statement)).toHaveLength(2)
   const code = transpileModule(source.replace(statement, 'void appendThenInvalidate'), {
     compilerOptions: { module: ModuleKind.CommonJS, target: ScriptTarget.ES2022 },
@@ -111,6 +119,9 @@ function runtimeUnderTest(): typeof startCommunityEngagementRuntime {
     './community-operational-telemetry.js': telemetry,
     './community-spotlight-cache.js': spotlightCache,
     './community-spotlight-invalidator.js': spotlightInvalidator,
+    './community-idle-backoff.js': idleBackoff,
+    '../../prisma/prisma-client.js': prismaClient,
+    '../feature-flags/complimentary-access.service.js': complimentaryAccess,
   }
   const exports = {} as {
     startCommunityEngagementRuntime: typeof startCommunityEngagementRuntime
@@ -141,7 +152,10 @@ function runtimeUnderTest(): typeof startCommunityEngagementRuntime {
   return exports.startCommunityEngagementRuntime
 }
 
-const remote = { getFeatureFlagValue: () => Promise.resolve(true) }
+const remote = {
+  getFeatureFlagValue: () => Promise.resolve(true),
+  captureAcknowledged: () => Promise.resolve(),
+}
 const opened: Awaited<ReturnType<typeof startCommunityEngagementRuntime>>[] = []
 let guard: ReturnType<typeof databaseBoundary>
 beforeEach(() => {
@@ -209,7 +223,7 @@ function dispatchQueries(primary: ReturnType<typeof databaseBoundary>) {
 }
 
 describe('T03 actual engagement runtime composition', () => {
-  it('retries a failed grouping sweep after 250 ms without overlapping passes', async () => {
+  it('retries a failed grouping sweep after one backed-off interval without overlapping passes', async () => {
     let release!: () => void
     const group = vi
       .spyOn(notifications.CommunityNotificationsWorker.prototype, 'group')
@@ -225,17 +239,71 @@ describe('T03 actual engagement runtime composition', () => {
       await start(databaseBoundary(), 'general')
       await vi.advanceTimersByTimeAsync(250)
       expect(group).toHaveBeenCalledTimes(1)
-      await vi.advanceTimersByTimeAsync(249)
+      // A failed tick backs off like an idle one: 250 ms doubles to 500 ms.
+      await vi.advanceTimersByTimeAsync(499)
       expect(group).toHaveBeenCalledTimes(1)
       await vi.advanceTimersByTimeAsync(1)
       expect(group).toHaveBeenCalledTimes(2)
       await vi.advanceTimersByTimeAsync(2000)
       expect(group).toHaveBeenCalledTimes(2)
+      // The hung pass grouped one intent, so the next pass runs at the base cadence.
       release()
       await vi.advanceTimersByTimeAsync(250)
       expect(group).toHaveBeenCalledTimes(3)
     } finally {
       group.mockRestore()
+    }
+  })
+
+  it('wakes an idle dispatch lane for its earliest due delivery and when fanout produces work', async () => {
+    const startedAt = Date.now()
+    const dispatchCalls: number[] = []
+    const fanoutCalls: number[] = []
+    // The eighth idle pass learns that a deferred delivery falls due in 1,234 ms.
+    const dueHints: (number | null)[] = [null, null, null, null, null, null, null, 1_234]
+    let fanoutResults: number[] = []
+    const dispatch = vi
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'dispatch')
+      .mockImplementation(() => {
+        dispatchCalls.push(Date.now() - startedAt)
+        return Promise.resolve(0)
+      })
+    const dispatchDue = vi
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'nextDispatchDueInMs')
+      .mockImplementation(() => Promise.resolve(dueHints.shift() ?? null))
+    const fanout = vi
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'fanout')
+      .mockImplementation(() => {
+        fanoutCalls.push(Date.now() - startedAt)
+        return Promise.resolve(fanoutResults.shift() ?? 0)
+      })
+    const fanoutDue = vi
+      .spyOn(notifications.CommunityNotificationsWorker.prototype, 'nextFanoutDueInMs')
+      .mockResolvedValue(null)
+    try {
+      await start(databaseBoundary(), 'general')
+      await vi.advanceTimersByTimeAsync(15_100)
+      // Idle: 50 ms doubling to the 5-second cap, then exactly the 1,234 ms the hint named,
+      // then backing off again from there.
+      expect(dispatchCalls).toEqual([
+        50, 150, 350, 750, 1_550, 3_150, 6_350, 11_350, 12_584, 15_052,
+      ])
+      // Fanout creates deliveries: the dispatch lane runs in the same instant.
+      fanoutResults = [2]
+      const fanoutsBefore = fanoutCalls.length
+      await vi.advanceTimersByTimeAsync(5_000)
+      const producedAt = fanoutCalls[fanoutsBefore]!
+      // A zero-delay timer fires one millisecond later, then the lane backs off from 50 ms again.
+      expect(dispatchCalls.filter((at) => at > producedAt).slice(0, 3)).toEqual([
+        producedAt + 1,
+        producedAt + 101,
+        producedAt + 301,
+      ])
+    } finally {
+      dispatch.mockRestore()
+      dispatchDue.mockRestore()
+      fanout.mockRestore()
+      fanoutDue.mockRestore()
     }
   })
 
@@ -297,6 +365,100 @@ describe('T03 actual engagement runtime composition', () => {
       expect(dispatchQueries(primary)).toHaveLength(0)
     }
   )
+
+  it('parks operational telemetry with no lease query while the sink is unconfigured', async () => {
+    vi.stubEnv('COMMUNITY_DISPATCH_ENABLED', 'false')
+    const primary = databaseBoundary()
+    const runtime = await runtimeUnderTest()(
+      primary.prisma,
+      { getFeatureFlagValue: () => Promise.resolve(true) },
+      'community',
+      { spotlightRedis: idleSpotlightRedis() }
+    )
+    opened.push(runtime)
+    await vi.advanceTimersByTimeAsync(60_001)
+    expect(
+      primary.queries.some((query) =>
+        query.includes('UPDATE "CommunityEngagementTelemetry"')
+      )
+    ).toBe(false)
+    expect(primary.db.communityEngagementTelemetry.create).toHaveBeenCalled()
+  })
+
+  it('backs an idle loop off to its cap and returns to the base cadence when work appears', async () => {
+    vi.stubEnv('COMMUNITY_DISPATCH_ENABLED', 'false')
+    const primary = databaseBoundary()
+    let pending = false
+    const checks: number[] = []
+    vi.mocked(primary.db.$queryRaw).mockImplementation(
+      (sql: TemplateStringsArray | { strings: readonly string[] }) => {
+        const text = ('strings' in sql ? sql.strings : sql).join('?')
+        if (text.includes('AS pending')) {
+          checks.push(Date.now())
+          return Promise.resolve([{ pending }])
+        }
+        if (text.includes("SELECT 'append' AS lane")) return Promise.resolve([])
+        return Promise.resolve([])
+      }
+    )
+    const start = Date.now()
+    const runtime = await runtimeUnderTest()(primary.prisma, remote, 'community', {
+      spotlightRedis: idleSpotlightRedis(),
+    })
+    opened.push(runtime)
+    // Idle: 500 ms, then 1, 2, 4 and 8 seconds, then the 10-second cap.
+    await vi.advanceTimersByTimeAsync(45_500)
+    expect(checks.map((at) => at - start)).toEqual([
+      500, 1500, 3500, 7500, 15_500, 25_500, 35_500, 45_500,
+    ])
+    // No idle check opened the append transaction.
+    expect(primary.db.communityDomainOutbox.findMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { appended_at: null } })
+    )
+    // A waiting row is found on the next capped check, and the loop drops to 500 ms while it
+    // appends.
+    pending = true
+    const append = vi
+      .spyOn(streams.CommunityStreamRepository.prototype, 'append')
+      .mockResolvedValue(1)
+    try {
+      await vi.advanceTimersByTimeAsync(11_000)
+      expect(checks.map((at) => at - start).slice(8)).toEqual([55_500, 56_000, 56_500])
+      expect(append).toHaveBeenCalledTimes(3)
+    } finally {
+      append.mockRestore()
+    }
+  })
+
+  it('skips the spotlight pass on an idle tick whose cursor is at the head', async () => {
+    vi.stubEnv('COMMUNITY_DISPATCH_ENABLED', 'false')
+    const primary = databaseBoundary()
+    const db = primary.db as typeof primary.db & Record<string, unknown>
+    const head = vi.fn(() =>
+      Promise.resolve({ epoch: 'epoch-1', sequence: 3n, retention_floor: 0n })
+    )
+    db.communityStreamHead = { findUnique: head }
+    let cursorChecks = 0
+    vi.mocked(primary.db.$queryRaw).mockImplementation(
+      (sql: TemplateStringsArray | { strings: readonly string[] }) => {
+        const text = ('strings' in sql ? sql.strings : sql).join('?')
+        if (text.includes('AS pending')) return Promise.resolve([{ pending: false }])
+        if (text.includes('AS work')) {
+          cursorChecks += 1
+          return Promise.resolve([{ work: false }])
+        }
+        return Promise.resolve([])
+      }
+    )
+    const runtime = await runtimeUnderTest()(primary.prisma, remote, 'community', {
+      spotlightRedis: idleSpotlightRedis(),
+    })
+    opened.push(runtime)
+    await vi.advanceTimersByTimeAsync(60_001)
+    // 0.5, 1.5, 3.5, 7.5, 15.5, 25.5, 35.5, 45.5 and 55.5 seconds: nine idle ticks, no pass.
+    expect(cursorChecks).toBe(9)
+    expect(head).not.toHaveBeenCalled()
+  })
 
   it('6.6-UNIT-040 runs the spotlight invalidator in the same tick, after append', async () => {
     vi.stubEnv('COMMUNITY_DISPATCH_ENABLED', 'false')
@@ -360,9 +522,9 @@ describe('T03 actual engagement runtime composition', () => {
     await vi.advanceTimersByTimeAsync(501)
     expect(appends).toBe(1)
     expect(spotlightRedis.eval).toHaveBeenCalledTimes(1)
-    // One budget plus one interval later the loop appended again, and the
-    // stalled pass was never doubled while it hung.
-    await vi.advanceTimersByTimeAsync(2000 + 501)
+    // One budget plus one backed-off interval later the loop appended again,
+    // and the stalled pass was never doubled while it hung.
+    await vi.advanceTimersByTimeAsync(2000 + 1001)
     expect(appends).toBe(2)
     expect(spotlightRedis.eval).toHaveBeenCalledTimes(1)
     const closing = runtime.close()

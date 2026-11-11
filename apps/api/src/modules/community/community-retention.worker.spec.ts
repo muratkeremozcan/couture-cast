@@ -66,9 +66,11 @@ describe('retention batch privacy fences', () => {
         $transaction: transaction,
       } as unknown as PrismaClient
       const deleteBindings = vi.fn().mockResolvedValue(undefined)
-      await new CommunityRetentionWorker(prisma, {
+      const removed = await new CommunityRetentionWorker(prisma, {
         deleteBindings,
       } as unknown as PushTokenRepository).sweep()
+      // One inactive token, plus the expired group in every scope but the empty one.
+      expect(removed).toBe(scope === 'empty' ? 1 : 2)
       expect(deleteBindings).toHaveBeenCalledExactlyOnceWith([
         {
           registrationId: 'token',
@@ -89,24 +91,21 @@ describe('retention batch privacy fences', () => {
           },
         })
       expect(execute).toHaveBeenCalledTimes(scope === 'empty' ? 1 : 3)
-      expect(artifactDelete).toHaveBeenCalledWith({
-        where: {
-          OR: [
-            {
-              artifact_kind: 'group',
-              artifact_id: { in: scope === 'empty' ? [] : ['group'] },
-            },
-            {
-              artifact_kind: 'delivery',
-              artifact_id: { in: scope === 'empty' ? [] : ['delivery'] },
-            },
-            {
-              artifact_kind: { in: ['attempt', 'receipt'] },
-              artifact_id: { in: scope === 'empty' ? [] : ['attempt'] },
-            },
-          ],
-        },
-      })
+      // An empty batch sends no delete at all.
+      if (scope === 'empty') expect(artifactDelete).not.toHaveBeenCalled()
+      else
+        expect(artifactDelete).toHaveBeenCalledWith({
+          where: {
+            OR: [
+              { artifact_kind: 'group', artifact_id: { in: ['group'] } },
+              { artifact_kind: 'delivery', artifact_id: { in: ['delivery'] } },
+              {
+                artifact_kind: { in: ['attempt', 'receipt'] },
+                artifact_id: { in: ['attempt'] },
+              },
+            ],
+          },
+        })
     }
   )
 })

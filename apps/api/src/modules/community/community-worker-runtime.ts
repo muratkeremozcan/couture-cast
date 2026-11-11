@@ -6,7 +6,12 @@ import type { Worker } from 'bullmq'
 import type { PrismaClient } from '@prisma/client'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
-import { CommunityMaintenanceService } from './community-maintenance.service.js'
+import {
+  CommunityMaintenanceService,
+  type CommunityBanExpirySweepResult,
+  type CommunityErasureSweepResult,
+  type CommunityUploadExpirySweepResult,
+} from './community-maintenance.service.js'
 import { CommunityModerationOutboxDispatcher } from './community-moderation.outbox.js'
 import { CommunityModerationQueue } from './community-moderation.queue.js'
 import {
@@ -112,11 +117,12 @@ const SUPPORTED_SELECTORS: readonly CommunityNsfwSelector[] = [
  * neither substrate can call something the other cannot.
  */
 export interface CommunitySweeps {
-  dispatchPending: () => Promise<unknown>
-  sweepStalePendingReview: () => Promise<unknown>
-  sweepExpiredUploads: () => Promise<unknown>
-  sweepErasureRequests: () => Promise<unknown>
-  sweepExpiredBanHolds: () => Promise<unknown>
+  /** Resolves to how many rows moved forward; the hosted worker's idle backoff reads it. */
+  dispatchPending: () => Promise<number>
+  sweepStalePendingReview: () => Promise<number>
+  sweepExpiredUploads: () => Promise<CommunityUploadExpirySweepResult>
+  sweepErasureRequests: () => Promise<CommunityErasureSweepResult>
+  sweepExpiredBanHolds: () => Promise<CommunityBanExpirySweepResult>
   /** Story 6.12: at-risk and breach alerts, driven by whichever substrate this process has. */
   sweepModerationSla: () => Promise<unknown>
   /** Story 6.13: the daily alert prune and enforcement drift check. */
@@ -153,7 +159,44 @@ export interface CommunityNsfwScreenerSelection {
 
 const logger = createBaseLogger().child({ feature: COMMUNITY_MODERATION_LOG_FEATURE })
 
-/** Each independent sweep retains progress when a sibling step fails. */
+/**
+ * Whether the dispatch sweep has anything to do, in one statement.
+ *
+ * Each clause is a superset of what one dispatch step selects: undispatched post and comment
+ * screening rows, reaction receipts and delivered reaction rows past their 30-day retention, and,
+ * when the acknowledged sink is configured, reaction and comment analytics rows that are due.
+ * A superset keeps the probe safe: a row it reports that a step then skips costs one full sweep,
+ * and the idle backoff still reads that sweep as idle.
+ * Parked analytics rows stay out of it, so an unconfigured sink does not keep the sweep running.
+ */
+export async function communityDispatchHasWork(
+  prisma: Pick<PrismaClient, '$queryRaw'>,
+  analyticsDeliverable: boolean
+): Promise<boolean> {
+  const rows = await prisma.$queryRaw<{ due: boolean }[]>`
+    SELECT (
+      EXISTS (SELECT 1 FROM "CommunityModerationOutbox" WHERE dispatched_at IS NULL)
+      OR EXISTS (SELECT 1 FROM "CommunityCommentScreeningOutbox" WHERE dispatched_at IS NULL)
+      OR EXISTS (SELECT 1 FROM "CommunityReactionReceipt"
+        WHERE created_at < now() - interval '30 days')
+      OR EXISTS (SELECT 1 FROM "CommunityReactionOutbox"
+        WHERE delivered_at < now() - interval '30 days')
+      OR (${analyticsDeliverable}::boolean AND (
+        EXISTS (SELECT 1 FROM "CommunityReactionOutbox"
+          WHERE delivered_at IS NULL AND next_attempt_at <= now())
+        OR EXISTS (SELECT 1 FROM "CommunityCommentAnalyticsOutbox"
+          WHERE delivered_at IS NULL AND next_attempt_at <= now())
+      ))
+    ) AS due
+  `
+  return rows[0]?.due === true
+}
+
+/**
+ * Each independent sweep retains progress when a sibling step fails.
+ * Resolves to the sum of the counts the steps returned, which the worker's idle backoff reads as
+ * progress; a step that returns no number counts as zero.
+ */
 export async function runCommunitySweepSteps(
   steps: readonly {
     name:
@@ -165,11 +208,13 @@ export async function runCommunitySweepSteps(
     run: () => Promise<unknown>
   }[],
   log: Pick<typeof logger, 'warn'> = logger
-): Promise<void> {
+): Promise<number> {
   const failed: string[] = []
+  let progressed = 0
   for (const step of steps) {
     try {
-      await step.run()
+      const result = await step.run()
+      if (typeof result === 'number') progressed += result
     } catch {
       failed.push(step.name)
       log.warn(
@@ -180,6 +225,7 @@ export async function runCommunitySweepSteps(
   }
   if (failed.length > 0)
     throw new Error(`Community sweep steps failed: ${failed.join(', ')}`)
+  return progressed
 }
 
 /**
@@ -426,6 +472,10 @@ export async function createCommunityWorkerRuntime(deps: {
     )
   }
 
+  const reactions = new CommunityReactionOutboxDispatcher(
+    deps.prisma,
+    deps.telemetryService
+  )
   const comments = new CommunityCommentsOutbox(
     deps.prisma,
     queue,
@@ -457,22 +507,25 @@ export async function createCommunityWorkerRuntime(deps: {
     worker,
     heartbeat,
     sweeps: {
-      dispatchPending: () =>
-        runCommunitySweepSteps([
-          { name: 'post_dispatch', run: () => dispatcher.dispatchPending() },
+      dispatchPending: async () => {
+        // One probe statement while idle; the steps run only when it finds something.
+        const analytics = deps.telemetryService.acknowledgedDeliveryAvailable()
+        if (!(await communityDispatchHasWork(deps.prisma, analytics))) return 0
+        return runCommunitySweepSteps([
           {
-            name: 'reaction_dispatch',
-            run: () =>
-              new CommunityReactionOutboxDispatcher(
-                deps.prisma,
-                deps.telemetryService
-              ).dispatchPending(),
+            name: 'post_dispatch',
+            run: async () => (await dispatcher.dispatchPending()).dispatched,
           },
+          { name: 'reaction_dispatch', run: () => reactions.dispatchPending() },
           { name: 'comment_dispatch', run: () => comments.dispatchPending() },
-        ]),
+        ])
+      },
       sweepStalePendingReview: () =>
         runCommunitySweepSteps([
-          { name: 'post_stale', run: () => maintenance.sweepStalePendingReview() },
+          {
+            name: 'post_stale',
+            run: async () => (await maintenance.sweepStalePendingReview()).stalled,
+          },
           { name: 'comment_stale', run: () => comments.sweepStale() },
         ]),
       sweepExpiredUploads: () => maintenance.sweepExpiredUploads(),

@@ -31,7 +31,8 @@ export class CommunityReceiptsWorker {
     private readonly tokens: PushTokenRepository,
     private readonly transport: typeof fetch = fetch
   ) {}
-  async sweep(): Promise<void> {
+  /** Returns how many receipts and attempts it handled; zero means it found nothing due. */
+  async sweep(): Promise<number> {
     const due = await this.prisma.communityDeliveryReceipt.findMany({
       where: {
         OR: [
@@ -101,6 +102,7 @@ export class CommunityReceiptsWorker {
         data: { reason: 'invalid_token_pruned' },
       })
     }
+    return due.length + invalid.length
   }
   private async cleanup(
     attempt: string,

@@ -462,7 +462,36 @@ export class CommunityNotificationsWorker {
     return candidates.length
   }
 
-  async dispatch(): Promise<void> {
+  /**
+   * Milliseconds until the earliest group waiting for fanout becomes due, by the database clock,
+   * or null when none waits. An idle fanout loop sleeps no longer than this, so a quiet-hour exit
+   * herd is fanned out when it falls due.
+   * Only future rows count: a row already due that the tick could not move must not hold the loop
+   * at its base cadence.
+   */
+  async nextFanoutDueInMs(): Promise<number | null> {
+    const [row] = await this.prisma.$queryRaw<{ due_in_ms: number | null }[]>`
+      SELECT (extract(epoch FROM min(next_attempt_at) - clock_timestamp()) * 1000)::float8 AS due_in_ms
+      FROM "CommunityNotificationGroup"
+      WHERE status IN ('pending','deferred') AND snapshot_at IS NULL
+        AND next_attempt_at > clock_timestamp()
+    `
+    return row?.due_in_ms ?? null
+  }
+
+  /** The same for token deliveries: an idle dispatch loop wakes for the earliest due retry. */
+  async nextDispatchDueInMs(): Promise<number | null> {
+    const [row] = await this.prisma.$queryRaw<{ due_in_ms: number | null }[]>`
+      SELECT (extract(epoch FROM min(next_attempt_at) - clock_timestamp()) * 1000)::float8 AS due_in_ms
+      FROM "CommunityTokenDelivery"
+      WHERE status IN ('pending','retryable_rejection','deferred')
+        AND next_attempt_at > clock_timestamp()
+    `
+    return row?.due_in_ms ?? null
+  }
+
+  /** Returns how many due deliveries it handed to the guarded sender. */
+  async dispatch(): Promise<number> {
     const due = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT d.id FROM "CommunityTokenDelivery" d JOIN "CommunityNotificationGroup" g ON g.id = d.group_id
       WHERE d.status IN ('pending','retryable_rejection','deferred') AND d.next_attempt_at <= clock_timestamp()
@@ -475,9 +504,11 @@ export class CommunityNotificationsWorker {
     )
     const failed = outcomes.filter((outcome) => outcome.status === 'rejected').length
     if (failed) throw new Error(`Community dispatch dependency failures: ${failed}`)
+    return due.length
   }
 
-  async recover(): Promise<void> {
+  /** Returns how many orphaned attempts, intents and groups it settled. */
+  async recover(): Promise<number> {
     const attempts = await this.prisma.communityDeliveryAttempt.findMany({
       where: {
         status: 'sending',
@@ -517,13 +548,14 @@ export class CommunityNotificationsWorker {
         }
       })
     }
-    await this.prisma.communityNotificationIntent.updateMany({
+    const intents = await this.prisma.communityNotificationIntent.updateMany({
       where: { expires_at: { lte: new Date() }, deliverable: true },
       data: { deliverable: false },
     })
-    await this.prisma.communityNotificationGroup.updateMany({
+    const groups = await this.prisma.communityNotificationGroup.updateMany({
       where: { expires_at: { lte: new Date() }, status: { in: ['pending', 'deferred'] } },
       data: { status: 'expired' },
     })
+    return attempts.length + intents.count + groups.count
   }
 }

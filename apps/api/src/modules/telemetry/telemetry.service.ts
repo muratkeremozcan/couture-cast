@@ -94,7 +94,11 @@ import { Injectable, Inject } from '@nestjs/common'
 import { createHmac } from 'node:crypto'
 import { PrismaClient, Prisma } from '@prisma/client'
 import { z } from 'zod'
-import { ANALYTICS_CLIENT, type AnalyticsClient } from '../../analytics/analytics.service'
+import {
+  acknowledgedCaptureAvailable,
+  ANALYTICS_CLIENT,
+  type AnalyticsClient,
+} from '../../analytics/analytics.service'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import { createBaseLogger } from '../../logger/pino.config'
 import { singleRunTransaction } from '../../prisma/prisma-client.js'
@@ -1155,6 +1159,14 @@ export class TelemetryService {
     @Inject(ANALYTICS_CLIENT) private readonly analyticsClient: AnalyticsClient
   ) {
     this.analyticsIdSecret = requireAnalyticsIdSecret()
+  }
+
+  /**
+   * Whether the community outboxes can deliver through this service in this process.
+   * False when the acknowledged sink is unconfigured; the outboxes then park their rows.
+   */
+  acknowledgedDeliveryAvailable(): boolean {
+    return acknowledgedCaptureAvailable(this.analyticsClient)
   }
 
   /** Durable outbox delivery propagates outages to the retry owner. */

@@ -25,16 +25,24 @@ export class CommunityReactionOutboxDispatcher {
   private readonly logger = createBaseLogger().child({
     context: 'CommunityReactionOutbox',
   })
+  private parkedReported = false
 
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(TelemetryService) private readonly telemetry: TelemetryService
   ) {}
 
-  async dispatchPending(): Promise<void> {
+  /** Returns how many rows the sweep retained or delivered; zero means it found nothing to do. */
+  async dispatchPending(): Promise<number> {
     const deadline = Date.now() + SWEEP_BUDGET_MS
     // Reserve bounded retention progress even while delivery remains continuously busy.
-    await this.retainExpired(deadline)
+    let progressed = await this.retainExpired(deadline)
+    // An unconfigured sink cannot accept anything, so the rows stay parked, unleased and with their
+    // attempts unchanged, until a configured process delivers them.
+    if (!this.telemetry.acknowledgedDeliveryAvailable()) {
+      this.reportParked()
+      return progressed
+    }
     // At most one bounded HTTP delivery can extend beyond the sweep budget.
     for (let index = 0; index < 100 && Date.now() < deadline; index += 1) {
       const leaseId = randomUUID()
@@ -90,24 +98,36 @@ export class CommunityReactionOutboxDispatcher {
             : { delivered_at: new Date() }),
         },
       })
+      if (!failed) progressed += 1
     }
+    return progressed
   }
 
-  private async retainExpired(deadline: number): Promise<void> {
+  private reportParked(): void {
+    if (this.parkedReported) return
+    this.parkedReported = true
+    this.logger.warn(
+      { event: 'community_reaction_delivery_parked', reason: 'sink_unconfigured' },
+      'Community reaction analytics delivery parked until the acknowledged sink is configured'
+    )
+  }
+
+  private async retainExpired(deadline: number): Promise<number> {
     const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    if (Date.now() >= deadline) return
-    await this.prisma.$executeRaw`
+    if (Date.now() >= deadline) return 0
+    const receipts = await this.prisma.$executeRaw`
       DELETE FROM "CommunityReactionReceipt" WHERE (user_id, mutation_id) IN (
         SELECT user_id, mutation_id FROM "CommunityReactionReceipt"
         WHERE created_at < ${cutoff} ORDER BY created_at
         LIMIT ${RETENTION_BATCH_SIZE} FOR UPDATE SKIP LOCKED
       )`
-    if (Date.now() >= deadline) return
-    await this.prisma.$executeRaw`
+    if (Date.now() >= deadline) return receipts
+    const delivered = await this.prisma.$executeRaw`
       DELETE FROM "CommunityReactionOutbox" WHERE id IN (
         SELECT id FROM "CommunityReactionOutbox"
         WHERE delivered_at < ${cutoff} ORDER BY delivered_at
         LIMIT ${RETENTION_BATCH_SIZE} FOR UPDATE SKIP LOCKED
       )`
+    return receipts + delivered
   }
 }

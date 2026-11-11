@@ -75,7 +75,8 @@ describe('Story 6.3 durable reaction analytics delivery', () => {
       request.on('end', () => {
         bodies.push(body)
         response.writeHead(status, { 'Content-Type': 'application/json' })
-        response.end(JSON.stringify({ status: status === 200 ? 1 : 0 }))
+        // An accepted event gets what us.i.posthog.com/i/v0/e/ answers today.
+        response.end(JSON.stringify(status === 200 ? { status: 'Ok' } : { status: 0 }))
       })
     })
     await new Promise<void>((resolve) => {
@@ -201,6 +202,7 @@ describe('Story 6.3 durable reaction analytics delivery', () => {
     })
     const dispatcher = new CommunityReactionOutboxDispatcher(prisma, {
       captureReactionEvent,
+      acknowledgedDeliveryAvailable: () => true,
     } as unknown as TelemetryService)
     for (const remaining of [105, 5, 0]) {
       await dispatcher.dispatchPending()
