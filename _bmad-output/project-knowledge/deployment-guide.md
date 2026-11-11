@@ -1049,3 +1049,46 @@ the Northflank `couture-cast/community-worker` service:
    attempt; `no_call:read_disabled` appears only when the in-transaction recheck flips.
 5. If readiness is not `ready`, set `COMMUNITY_DISPATCH_ENABLED` back off, fix the cause and
    record the outcome here. No credential value is printed in logs or committed.
+
+**Production record, 2026-11-11 UTC (`1fa40089`).**
+
+- Step 1: zero `CommunityTokenDelivery` rows of any status, so the switch had no backlog to
+  release.
+- Steps 2 and 3: the three variables were set at 00:27:23, and the worker logged
+  `community_dispatch_readiness` `degraded`, reason `capability_unavailable`, at 00:27:41.
+  `COMMUNITY_DISPATCH_ENABLED` went back to `false` at 00:27:55 and readiness logged
+  `disabled` at 00:28:08. `COMMUNITY_ENGAGEMENT_OWNER` and `COMMUNITY_GUARD_DATABASE_URL` stay
+  set, so the next attempt needs only the flag.
+- Cause: `CommunityRuntimeCapability.privacy_version` is 0 in production and dispatch requires
+  1. Raising it enables `community_require_guard` enforcement for every community privacy
+     write, so it is an owner decision with its own rollout check, made before the next attempt.
+- Step 4 did not run, because nothing dispatches.
+
+**`privacy_version` 1 rollout check, 2026-11-11.** Run on stock `postgres:17` with every
+migration and the capability at 1, before any production change:
+
+- Audit mode, where the guard logs each unguarded statement instead of raising, over all 141
+  `apps/api` integration files: 2399 tests passed, and the 1629 logged statements fall into 24
+  shapes, every one a test fixture, cleanup or race injection. Every product writer of a guarded
+  table (consent revoke, comment erasure, post anonymize, takedown, sanctions, push registration,
+  preferences) holds the guard. The four Story 6.5 acceptance specs passed 7 of 7 with no
+  unguarded statement.
+- With the guard raising, the same suites fail only where fixtures write guarded rows directly
+  (72 tests); at 0 those files pass 561 of 561. The integration tier now runs at 1 so CI keeps
+  production semantics.
+- Production stays at 0. The flip and the next dispatch attempt wait until the community worker
+  polls without the idle egress that exceeded the Supabase quota on 2026-11-10 (worker scaled to
+  0), then run in this order: one `UPDATE` with the value recorded before and after, dispatch
+  enabled, readiness `ready`, a non-grantee delivery suppressed with zero attempts, and both
+  rolled back if anything degrades.
+
+**First grant, blocked.** Production `auth.users` holds no rows, so no admin actor exists: the
+owner signs in on production once and gets `app_metadata.app_role` `admin`. The rows were missing
+because production web had none of the API rewrite targets `next.config.ts` reads, so every
+`/api/v1` call from the web app, signup included, answered 404; `PROD_API_BASE_URL` on web
+production fixed it on 2026-11-10. From macOS the
+command cannot open its connection: the committed Supabase Root 2021 CA verifies both poolers
+with `openssl`, but Prisma on macOS rejects the chain with `The certificate was not trusted`,
+and `community:sponsorship` shares that client. Run the command from Linux until the operator
+client verifies the CA through Node's TLS. The targeting guard held on production: without
+`--confirm-target` the command refused and named the project, and nothing was written.
