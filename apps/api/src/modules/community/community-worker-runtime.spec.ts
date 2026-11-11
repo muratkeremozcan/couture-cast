@@ -173,14 +173,24 @@ describe('runCommunitySweepSteps', () => {
 describe('createCommunityWorkerRuntime', () => {
   const claim = vi.fn().mockResolvedValue([])
   const settle = vi.fn().mockResolvedValue({ count: 1 })
+  /** The dispatch probe answers yes, so every sweep reaches its steps; everything else claims. */
+  const probeOrClaim = vi.fn(
+    (sql: TemplateStringsArray | { strings: readonly string[] }) =>
+      ('strings' in sql ? sql.strings : sql).join('?').includes('AS due')
+        ? Promise.resolve([{ due: true }])
+        : (claim() as Promise<unknown>)
+  )
   const prisma = {
-    $queryRaw: claim,
+    $queryRaw: probeOrClaim,
     $executeRaw: vi.fn().mockResolvedValue(0),
     communityReactionOutbox: { updateMany: settle, deleteMany: vi.fn() },
     communityReactionReceipt: { deleteMany: vi.fn() },
   } as unknown as PrismaClient
   const captureReactionEvent = vi.fn().mockResolvedValue(undefined)
-  const telemetryService = { captureReactionEvent } as unknown as TelemetryService
+  const telemetryService = {
+    captureReactionEvent,
+    acknowledgedDeliveryAvailable: () => true,
+  } as unknown as TelemetryService
   const originalScreener = process.env[COMMUNITY_NSFW_SCREENER_ENV]
 
   const recordScreenerReadiness = vi.fn()
@@ -312,15 +322,18 @@ describe('createCommunityWorkerRuntime', () => {
       return Promise.resolve([])
     })
     try {
-      await expect(runtime.sweeps.dispatchPending()).rejects.toThrow(
-        'Community sweep steps failed: comment_dispatch'
-      )
+      // The post moved, so the failed comment step is logged and the sweep still reports progress.
+      await expect(runtime.sweeps.dispatchPending()).resolves.toBe(1)
       expect(order).toEqual(['post', 'reaction', 'comment'])
       await expect(runtime.sweeps.sweepStalePendingReview()).rejects.toThrow(
         'Community sweep steps failed: comment_stale'
       )
       expect(harness.sweepStalePendingReview).toHaveBeenCalledOnce()
       expect(harness.commentStale).toHaveBeenCalledOnce()
+      // With nothing moved, the failed step rejects the sweep, and the idle backoff backs it off.
+      harness.dispatchPending.mockImplementationOnce(() =>
+        Promise.resolve({ dispatched: 0, failed: 0 })
+      )
       await expect(runtime.sweeps.dispatchPending()).rejects.toThrow(
         'Community sweep steps failed: comment_dispatch'
       )
@@ -329,6 +342,43 @@ describe('createCommunityWorkerRuntime', () => {
       )
       expect(harness.dispatchPending).toHaveBeenCalledTimes(2)
       expect(harness.sweepStalePendingReview).toHaveBeenCalledTimes(2)
+    } finally {
+      await runtime.close()
+    }
+  })
+
+  it('asks one probe while idle and runs no dispatch step when it finds nothing', async () => {
+    const probes: unknown[][] = []
+    const quiet = {
+      ...prisma,
+      $queryRaw: vi.fn(
+        (
+          sql: TemplateStringsArray | { strings: readonly string[] },
+          ...values: unknown[]
+        ) => {
+          probes.push([('strings' in sql ? sql.strings : sql).join('?'), ...values])
+          return Promise.resolve([{ due: false }])
+        }
+      ),
+    } as unknown as PrismaClient
+    const parked = {
+      captureReactionEvent,
+      acknowledgedDeliveryAvailable: () => false,
+    } as unknown as TelemetryService
+    const runtime = await createCommunityWorkerRuntime({
+      prisma: quiet,
+      telemetryService: parked,
+      meter: meter(),
+    })
+    try {
+      await expect(runtime.sweeps.dispatchPending()).resolves.toBe(0)
+      expect(probes).toHaveLength(1)
+      expect(probes[0]![0]).toContain('AS due')
+      // The sink is unconfigured, so the probe leaves parked analytics rows out.
+      expect(probes[0]!.slice(1)).toEqual([false])
+      expect(harness.dispatchPending).not.toHaveBeenCalled()
+      expect(harness.commentDispatch).not.toHaveBeenCalled()
+      expect(captureReactionEvent).not.toHaveBeenCalled()
     } finally {
       await runtime.close()
     }
@@ -351,7 +401,9 @@ describe('createCommunityWorkerRuntime', () => {
         created_at: new Date(),
       },
     ])
-    await runtime.sweeps.dispatchPending()
+    harness.commentDispatch.mockResolvedValueOnce(3)
+    // One post, one reaction and three comment rows moved: the idle backoff reads five as progress.
+    await expect(runtime.sweeps.dispatchPending()).resolves.toBe(5)
     expect(captureReactionEvent).toHaveBeenCalledOnce()
     expect(settle).toHaveBeenCalledWith(
       expect.objectContaining({

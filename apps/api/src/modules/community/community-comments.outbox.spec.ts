@@ -29,10 +29,10 @@ it('signals enqueue failure with bounded reason/attempt/age fields and no conten
         .fn()
         .mockRejectedValue(new Error('raw member-id and private body')),
     } as never,
-    {} as never,
+    { acknowledgedDeliveryAvailable: () => true } as never,
     {} as never
   )
-  await box.dispatchPending()
+  await expect(box.dispatchPending()).resolves.toBe(0)
   expect(log.warn).toHaveBeenCalledExactlyOnceWith(
     {
       event: 'community_comment_enqueue_failed',
@@ -61,7 +61,7 @@ it('signals a settlement failure safely and leaves its durable lease recoverable
   await new CommunityCommentsOutbox(
     prisma as never,
     {} as never,
-    {} as never,
+    { acknowledgedDeliveryAvailable: () => true } as never,
     {} as never
   ).dispatchPending()
   expect(log.warn).toHaveBeenCalledExactlyOnceWith(
@@ -118,7 +118,10 @@ it.each([
     await new CommunityCommentsOutbox(
       prisma as never,
       {} as never,
-      { captureCommentEvent: vi.fn().mockRejectedValue(failure) } as never,
+      {
+        acknowledgedDeliveryAvailable: () => true,
+        captureCommentEvent: vi.fn().mockRejectedValue(failure),
+      } as never,
       {} as never
     ).dispatchPending()
     expect(log.warn).toHaveBeenCalledExactlyOnceWith(
@@ -169,6 +172,77 @@ it('R14 continues the stale sweep after one dependency failure', async () => {
     {} as never,
     { failStale: failed } as never
   )
-  await expect(box.sweepStale()).resolves.toBeUndefined()
+  await expect(box.sweepStale()).resolves.toBe(1)
   expect(failed).toHaveBeenNthCalledWith(2, 'second', null)
+  expect(prisma.communityCommentAnalyticsOutbox.deleteMany).not.toHaveBeenCalled()
+})
+
+it('parks analytics delivery while the sink is unconfigured: no lease, one warning, no progress', async () => {
+  const prisma = {
+    communityCommentScreeningOutbox: { findMany: vi.fn().mockResolvedValue([]) },
+    $queryRaw: vi.fn(),
+    $transaction: vi.fn(),
+  }
+  const capture = vi.fn()
+  const box = new CommunityCommentsOutbox(
+    prisma as never,
+    {} as never,
+    { acknowledgedDeliveryAvailable: () => false, captureCommentEvent: capture } as never,
+    {} as never
+  )
+  await expect(box.dispatchPending()).resolves.toBe(0)
+  await expect(box.dispatchPending()).resolves.toBe(0)
+  expect(prisma.$queryRaw).not.toHaveBeenCalled()
+  expect(prisma.$transaction).not.toHaveBeenCalled()
+  expect(capture).not.toHaveBeenCalled()
+  expect(log.warn).toHaveBeenCalledExactlyOnceWith(
+    { event: 'community_comment_delivery_parked', reason: 'sink_unconfigured' },
+    'Comment analytics delivery parked until the acknowledged sink is configured'
+  )
+})
+
+it('counts dispatched comments and delivered analytics as progress', async () => {
+  const outboxRow = {
+    id: 'outbox',
+    comment_id: 'comment',
+    generation: 0,
+    attempts: 0,
+    created_at: new Date(),
+  }
+  const event = {
+    id: 'event',
+    actor: 'actor',
+    event_type: 'community_comment_submitted',
+    payload: {},
+    created_at: new Date(),
+    attempts: 1,
+  }
+  const tx = {
+    $executeRaw: vi.fn().mockResolvedValue(0),
+    $queryRaw: vi
+      .fn()
+      .mockResolvedValueOnce([{ actor: event.actor }])
+      .mockResolvedValueOnce([{ id: event.id }]),
+    communityCommentAnalyticsOutbox: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+  }
+  const prisma = {
+    communityCommentScreeningOutbox: {
+      findMany: vi.fn().mockResolvedValue([outboxRow]),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    $queryRaw: vi.fn().mockResolvedValueOnce([event]).mockResolvedValue([]),
+    $transaction: vi.fn((work: (client: typeof tx) => Promise<unknown>) => work(tx)),
+  }
+  const box = new CommunityCommentsOutbox(
+    prisma as never,
+    { enqueueComment: vi.fn().mockResolvedValue(undefined) } as never,
+    {
+      acknowledgedDeliveryAvailable: () => true,
+      captureCommentEvent: vi.fn().mockResolvedValue(undefined),
+    } as never,
+    {} as never
+  )
+  await expect(box.dispatchPending()).resolves.toBe(2)
 })

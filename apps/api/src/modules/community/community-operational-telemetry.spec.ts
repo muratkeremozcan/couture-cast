@@ -17,7 +17,26 @@ describe('durable operational telemetry sink', () => {
     vi.stubEnv('VERCEL_GIT_COMMIT_SHA', 'b'.repeat(40))
     expect(communityBuildIdentity()).toBe('b'.repeat(40))
   })
-  it.each(['absent', 'reject', 'accept'] as const)(
+  it.each([
+    ['absent', {}],
+    [
+      'unconfigured',
+      { captureAcknowledged: vi.fn(), acknowledgedCaptureConfigured: () => false },
+    ],
+  ] as const)('parks every row with no lease while the sink is %s', async (_, sink) => {
+    const query = vi.fn()
+    const updateMany = vi.fn()
+    const prisma = {
+      $queryRaw: query,
+      communityEngagementTelemetry: { updateMany },
+    } as unknown as PrismaClient
+    const telemetry = new CommunityOperationalTelemetry(prisma, sink)
+    await expect(telemetry.deliver()).resolves.toBe(0)
+    await expect(telemetry.deliver()).resolves.toBe(0)
+    expect(query).not.toHaveBeenCalled()
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+  it.each(['reject', 'accept'] as const)(
     'settles only acknowledged delivery, sink=%s',
     async (outcome) => {
       const row = {
@@ -40,10 +59,12 @@ describe('durable operational telemetry sink', () => {
         $queryRaw: query,
         communityEngagementTelemetry: { updateMany },
       } as unknown as PrismaClient
-      await new CommunityOperationalTelemetry(
-        prisma,
-        outcome === 'absent' ? {} : { captureAcknowledged: capture }
-      ).deliver()
+      await expect(
+        new CommunityOperationalTelemetry(prisma, {
+          captureAcknowledged: capture,
+          acknowledgedCaptureConfigured: () => true,
+        }).deliver()
+      ).resolves.toBe(outcome === 'accept' ? 1 : 0)
       expect(query).toHaveBeenCalledTimes(2)
       expect(updateMany).toHaveBeenCalledExactlyOnceWith({
         where: {
@@ -59,19 +80,55 @@ describe('durable operational telemetry sink', () => {
             : { next_attempt_at: expect.any(Date) as Date }),
         },
       })
-      if (outcome !== 'absent')
-        expect(capture).toHaveBeenCalledExactlyOnceWith(
-          expect.objectContaining({
-            distinctId: 'community-operational',
-            properties: expect.objectContaining({
-              $process_person_profile: false,
-              $geoip_disable: true,
-              $insert_id: 'event',
-            }) as unknown,
-          }),
-          { signal: expect.any(AbortSignal) as AbortSignal }
-        )
-      else expect(capture).not.toHaveBeenCalled()
+      expect(capture).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          distinctId: 'community-operational',
+          properties: expect.objectContaining({
+            $process_person_profile: false,
+            $geoip_disable: true,
+            $insert_id: 'event',
+          }) as unknown,
+        }),
+        { signal: expect.any(AbortSignal) as AbortSignal }
+      )
     }
   )
+  it('records a busy or just-drained backlog lane every minute and an idle one hourly', async () => {
+    let now = Date.parse('2026-11-10T12:00:00Z')
+    let counts = { append: 0n, delivery: 0n }
+    const create = vi.fn().mockResolvedValue({})
+    const prisma = {
+      $queryRaw: vi.fn(() =>
+        Promise.resolve([
+          { lane: 'append', count: counts.append, age: 0 },
+          { lane: 'delivery', count: counts.delivery, age: 0 },
+        ])
+      ),
+      communityEngagementTelemetry: { create },
+    } as unknown as PrismaClient
+    const telemetry = new CommunityOperationalTelemetry(prisma, {}, () => now)
+    const recorded = async () => {
+      create.mockClear()
+      await telemetry.backlog()
+      return create.mock.calls.map((call) => {
+        const { data } = call[0] as { data: { outcome: string; backlog_count: number } }
+        return `${data.outcome}=${data.backlog_count}`
+      })
+    }
+    expect(await recorded()).toEqual(['append=0', 'delivery=0'])
+    now += 60_000
+    expect(await recorded()).toEqual([])
+    counts = { append: 3n, delivery: 0n }
+    now += 60_000
+    expect(await recorded()).toEqual(['append=3'])
+    now += 60_000
+    expect(await recorded()).toEqual(['append=3'])
+    counts = { append: 0n, delivery: 0n }
+    now += 60_000
+    expect(await recorded()).toEqual(['append=0'])
+    now += 60_000
+    expect(await recorded()).toEqual([])
+    now += 60 * 60_000
+    expect(await recorded()).toEqual(['append=0', 'delivery=0'])
+  })
 })

@@ -89,6 +89,28 @@ export class CommunitySpotlightInvalidator {
     }
   }
 
+  /**
+   * Whether a pass has anything to do, in one statement: the cursor is missing, on another epoch,
+   * behind the retention floor, or behind the head.
+   * The append loop asks this before every pass, so an idle tick reads one row where a pass reads
+   * three.
+   * A failed read answers true, so the pass runs and reports the deferral itself.
+   */
+  async hasWork(): Promise<boolean> {
+    try {
+      const rows = await this.prisma.$queryRaw<{ work: boolean }[]>`
+        SELECT (c.id IS NULL OR c.epoch <> h.epoch OR c.position < h.retention_floor
+          OR c.position < h.sequence) AS work
+        FROM "CommunityStreamHead" h
+        LEFT JOIN "CommunitySpotlightCursor" c ON c.id = ${SPOTLIGHT_INVALIDATOR_CURSOR_ID}
+        WHERE h.id = ${PUBLIC_STREAM_ID}
+      `
+      return rows[0]?.work === true
+    } catch {
+      return true
+    }
+  }
+
   /** Never throws: a failure is logged and leaves the cursor where it was. */
   async process(): Promise<SpotlightInvalidationOutcome> {
     let cursor: { epoch: string; position: bigint }

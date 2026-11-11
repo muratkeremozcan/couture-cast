@@ -49,3 +49,23 @@ describe('notification fan-out after a pldbgapi2 re-run (repeat safety)', () => 
     expect(guardPosts).toEqual(['post-listed', 'post-listed'])
   })
 })
+
+describe('dispatch pass report', () => {
+  it('counts moved and rejected deliveries and resolves, so one rejection never fails the pass', async () => {
+    const prisma = {
+      $queryRaw: vi
+        .fn()
+        .mockResolvedValue([{ id: 'moved' }, { id: 'unchanged' }, { id: 'rejected' }]),
+    }
+    const dispatch = vi.fn((id: string) =>
+      id === 'rejected'
+        ? Promise.reject(new Error('lock timeout'))
+        : Promise.resolve(id === 'moved')
+    )
+    const worker = new CommunityNotificationsWorker(prisma as unknown as PrismaClient, {
+      dispatch,
+    })
+    await expect(worker.dispatch()).resolves.toEqual({ selected: 3, moved: 1, failed: 1 })
+    expect(dispatch).toHaveBeenCalledTimes(3)
+  })
+})

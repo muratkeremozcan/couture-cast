@@ -8,14 +8,15 @@ export class CommunityRetentionWorker {
     private readonly prisma: PrismaClient,
     private readonly tokens: PushTokenRepository
   ) {}
-  async sweep() {
+  /** Returns how many rows the sweep removed; zero means it found nothing to remove. */
+  async sweep(): Promise<number> {
     const cutoff = new Date(Date.now() - 30 * 86_400_000)
     const inactive = await this.prisma.pushToken.findMany({
       where: { last_used_at: { lte: cutoff } },
       orderBy: { last_used_at: 'asc' },
       take: 500,
     })
-    await this.tokens.deleteBindings(
+    const bindings = await this.tokens.deleteBindings(
       inactive.map((row) => ({
         registrationId: row.id,
         ownerId: row.user_id,
@@ -24,8 +25,8 @@ export class CommunityRetentionWorker {
         inactiveBefore: cutoff,
       }))
     )
-    await this.retainFlags()
-    await interactiveTransaction(
+    const flags = await this.retainFlags()
+    const details = await interactiveTransaction(
       this.prisma,
       async (tx) => {
         await tx.$executeRawUnsafe("SET LOCAL transaction_timeout = '2s'")
@@ -50,46 +51,52 @@ export class CommunityRetentionWorker {
             deliveries: { select: { id: true, attempts: { select: { id: true } } } },
           },
         })
+        // Rows actually removed, so a row this pass selects but cannot remove reads as idle.
+        let removed = 0
         const groupIds = groups.map((group) => group.id).sort()
-        const subjects = await tx.communityArtifactSubject.findMany({
-          where: {
-            artifact_kind: 'group',
-            artifact_id: { in: groupIds },
-          },
-        })
-        const members = [...new Set(subjects.map((subject) => subject.member_id))]
-        const posts = [
-          ...new Set(groups.flatMap((group) => (group.post_id ? [group.post_id] : []))),
-        ]
-        if (members.length || posts.length)
-          await tx.$executeRaw(Prisma.sql`SELECT community_privacy_guards(
-            ${members.length ? Prisma.sql`ARRAY[${Prisma.join(members)}]::text[]` : Prisma.sql`ARRAY[]::text[]`},
-            ${posts.length ? Prisma.sql`ARRAY[${Prisma.join(posts)}]::text[]` : Prisma.sql`ARRAY[]::text[]`},false)`)
-        for (const id of groupIds)
-          await tx.$queryRaw`SELECT id FROM "CommunityNotificationGroup" WHERE id = ${id}::uuid FOR UPDATE NOWAIT`
-        const deliveries = groups.flatMap((group) =>
-          group.deliveries.map((delivery) => delivery.id)
-        )
-        const attempts = groups.flatMap((group) =>
-          group.deliveries.flatMap((delivery) =>
-            delivery.attempts.map((attempt) => attempt.id)
+        if (groupIds.length) {
+          const subjects = await tx.communityArtifactSubject.findMany({
+            where: {
+              artifact_kind: 'group',
+              artifact_id: { in: groupIds },
+            },
+          })
+          const members = [...new Set(subjects.map((subject) => subject.member_id))]
+          const posts = [
+            ...new Set(groups.flatMap((group) => (group.post_id ? [group.post_id] : []))),
+          ]
+          if (members.length || posts.length)
+            await tx.$executeRaw(Prisma.sql`SELECT community_privacy_guards(
+              ${members.length ? Prisma.sql`ARRAY[${Prisma.join(members)}]::text[]` : Prisma.sql`ARRAY[]::text[]`},
+              ${posts.length ? Prisma.sql`ARRAY[${Prisma.join(posts)}]::text[]` : Prisma.sql`ARRAY[]::text[]`},false)`)
+          for (const id of groupIds)
+            await tx.$queryRaw`SELECT id FROM "CommunityNotificationGroup" WHERE id = ${id}::uuid FOR UPDATE NOWAIT`
+          const deliveries = groups.flatMap((group) =>
+            group.deliveries.map((delivery) => delivery.id)
           )
-        )
-        await tx.communityArtifactSubject.deleteMany({
-          where: {
-            OR: [
-              { artifact_kind: 'group', artifact_id: { in: groupIds } },
-              { artifact_kind: 'delivery', artifact_id: { in: deliveries } },
-              {
-                artifact_kind: { in: ['attempt', 'receipt'] },
-                artifact_id: { in: attempts },
-              },
-            ],
-          },
-        })
-        await tx.communityNotificationGroup.deleteMany({
-          where: { id: { in: groupIds } },
-        })
+          const attempts = groups.flatMap((group) =>
+            group.deliveries.flatMap((delivery) =>
+              delivery.attempts.map((attempt) => attempt.id)
+            )
+          )
+          await tx.communityArtifactSubject.deleteMany({
+            where: {
+              OR: [
+                { artifact_kind: 'group', artifact_id: { in: groupIds } },
+                { artifact_kind: 'delivery', artifact_id: { in: deliveries } },
+                {
+                  artifact_kind: { in: ['attempt', 'receipt'] },
+                  artifact_id: { in: attempts },
+                },
+              ],
+            },
+          })
+          removed += (
+            await tx.communityNotificationGroup.deleteMany({
+              where: { id: { in: groupIds } },
+            })
+          ).count
+        }
         const obsolete = await tx.$queryRaw<{ id: string }[]>`
           SELECT i.id FROM "CommunityNotificationIntent" i
           WHERE NOT EXISTS (SELECT 1 FROM "LookbookPost" p WHERE p.id = i.post_id)
@@ -98,16 +105,21 @@ export class CommunityRetentionWorker {
           ORDER BY i.id LIMIT 500 FOR UPDATE SKIP LOCKED
         `
         const obsoleteIds = obsolete.map((row) => row.id)
-        await tx.communityArtifactSubject.deleteMany({
-          where: {
-            artifact_kind: 'intent',
-            artifact_id: { in: obsoleteIds },
-          },
-        })
-        await tx.communityNotificationIntent.deleteMany({
-          where: { id: { in: obsoleteIds } },
-        })
-        await tx.$executeRaw`DELETE FROM "CommunityEngagementTelemetry" WHERE id IN (
+        if (obsoleteIds.length) {
+          await tx.communityArtifactSubject.deleteMany({
+            where: {
+              artifact_kind: 'intent',
+              artifact_id: { in: obsoleteIds },
+            },
+          })
+          removed += (
+            await tx.communityNotificationIntent.deleteMany({
+              where: { id: { in: obsoleteIds } },
+            })
+          ).count
+        }
+        const telemetry =
+          await tx.$executeRaw`DELETE FROM "CommunityEngagementTelemetry" WHERE id IN (
         SELECT id FROM "CommunityEngagementTelemetry" WHERE created_at < ${cutoff} ORDER BY created_at LIMIT 500 FOR UPDATE SKIP LOCKED
       )`
         const appended = await tx.communityDomainOutbox.findMany({
@@ -117,33 +129,42 @@ export class CommunityRetentionWorker {
           select: { id: true },
         })
         const outboxIds = appended.map((row) => row.id)
-        await tx.communityArtifactSubject.deleteMany({
-          where: { artifact_kind: 'outbox', artifact_id: { in: outboxIds } },
-        })
-        await tx.communityDomainOutbox.deleteMany({ where: { id: { in: outboxIds } } })
+        if (outboxIds.length) {
+          await tx.communityArtifactSubject.deleteMany({
+            where: { artifact_kind: 'outbox', artifact_id: { in: outboxIds } },
+          })
+          removed += (
+            await tx.communityDomainOutbox.deleteMany({
+              where: { id: { in: outboxIds } },
+            })
+          ).count
+        }
+        return removed + telemetry
       },
       { timeout: 2500, maxWait: 250 }
     )
+    return bindings + flags + details
   }
-  private async retainFlags() {
+  private async retainFlags(): Promise<number> {
     const cutoff = new Date(Date.now() - 86_400_000)
     const rows = await this.prisma.communityFlagEvaluation.findMany({
       where: { last_used_at: { lt: cutoff } },
       orderBy: { last_used_at: 'asc' },
       take: 500,
     })
-    if (!rows.length) return
+    if (!rows.length) return 0
     const members = [...new Set(rows.map((row) => row.member_id))]
-    await interactiveTransaction(
+    return interactiveTransaction(
       this.prisma,
       async (tx) => {
         await tx.$executeRawUnsafe("SET LOCAL transaction_timeout = '2s'")
         await tx.$executeRaw(
           Prisma.sql`SELECT community_privacy_guards(ARRAY[${Prisma.join(members)}]::text[],ARRAY[]::text[],true)`
         )
-        await tx.communityFlagEvaluation.deleteMany({
+        const { count } = await tx.communityFlagEvaluation.deleteMany({
           where: { member_id: { in: members }, last_used_at: { lt: cutoff } },
         })
+        return count
       },
       { timeout: 2500, maxWait: 250 }
     )

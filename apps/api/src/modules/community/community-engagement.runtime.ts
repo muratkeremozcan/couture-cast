@@ -9,7 +9,10 @@ import { ComplimentaryAccessService } from '../feature-flags/complimentary-acces
 import { CommunityFlagEvaluationService } from '../feature-flags/community-flag-evaluation.service.js'
 import type { RemoteFeatureFlagProvider } from '../feature-flags/remote-feature-flag-provider.js'
 import { PushTokenRepository } from '../notifications/push-token.repository.js'
-import { CommunityStreamRepository } from './community-stream.repository.js'
+import {
+  CommunityStreamRepository,
+  isAppendDeferral,
+} from './community-stream.repository.js'
 import { CommunitySendGuard } from './community-send-guard.js'
 import { CommunityNotificationsWorker } from './community-notifications.worker.js'
 import { CommunityReceiptsWorker } from './community-receipts.worker.js'
@@ -19,6 +22,43 @@ import {
   type SpotlightRedis,
 } from './community-spotlight-cache.js'
 import { CommunitySpotlightInvalidator } from './community-spotlight-invalidator.js'
+import {
+  IDLE_TICK,
+  PROGRESS_TICK,
+  startBackoffLoop,
+  tickFromCount,
+  type BackoffLoop,
+  type IdleBackoffPolicy,
+  type LoopTick,
+} from './community-idle-backoff.js'
+
+/**
+ * Each lane's cadence while busy and its longest sleep while idle.
+ *
+ * - append: the API's sync and realtime paths append on their own (`assist`), so this lane is the
+ *   backstop for Story 6.5's 10-second realtime bound; it rechecks at least every 10 seconds.
+ * - retention lanes: 48-hour and 30-day windows, so ten minutes of idle lag changes nothing.
+ * - backlog observation: fixed at one minute, the D8 metric's resolution.
+ * - operational telemetry: PostHog delivery with no latency bound; a minute of idle lag.
+ * - dispatch lanes: Story 6.5 dispatches within 60 seconds. Grouping wakes fanout and fanout wakes
+ *   dispatch in this process, and fanout and dispatch sleep no longer than their earliest due row,
+ *   so a quiet-hour exit herd starts when it falls due. The 5-second idle cap is the only lag a
+ *   newly qualified intent can see.
+ */
+export const COMMUNITY_ENGAGEMENT_LOOPS = {
+  append: { baseMs: 500, idleCapMs: 10_000 },
+  streamRetention: { baseMs: 10_000, idleCapMs: 600_000 },
+  detailRetention: { baseMs: 10_000, idleCapMs: 600_000 },
+  backlogObservation: { baseMs: 60_000, idleCapMs: 60_000 },
+  operationalTelemetry: { baseMs: 1000, idleCapMs: 60_000 },
+  qualifyGroups: { baseMs: 250, idleCapMs: 5000 },
+  policyReconciliation: { baseMs: 250, idleCapMs: 5000 },
+  fanout: { baseMs: 250, idleCapMs: 5000 },
+  dispatch: { baseMs: 50, idleCapMs: 5000 },
+  recover: { baseMs: 1000, idleCapMs: 30_000 },
+  receipts: { baseMs: 30_000, idleCapMs: 300_000 },
+} as const satisfies Record<string, IdleBackoffPolicy>
+const LOOPS = COMMUNITY_ENGAGEMENT_LOOPS
 
 export interface CommunityEngagementRuntimeOptions {
   /** Story 6.6: the spotlight read model's Redis. Defaults to the ritual options. */
@@ -32,31 +72,26 @@ export async function startCommunityEngagementRuntime(
   options: CommunityEngagementRuntimeOptions = {}
 ) {
   const logger = createBaseLogger().child({ feature: 'community-engagement' })
-  const timers = new Set<ReturnType<typeof setTimeout>>()
+  const loops: BackoffLoop[] = []
   const running = new Set<Promise<unknown>>()
-  let stopped = false
-  const loop = (lane: string, interval: number, work: () => Promise<unknown>) => {
-    const schedule = () => {
-      if (stopped) return
-      const timer = setTimeout(() => {
-        timers.delete(timer)
-        const flight = work()
-          .catch(() => {
-            logger.warn(
-              { lane, reason: 'dependency_unavailable' },
-              'community_loop_failed'
-            )
-          })
-          .finally(() => {
-            running.delete(flight)
-            schedule()
-          })
+  const loop = (
+    lane: string,
+    policy: IdleBackoffPolicy,
+    work: () => Promise<LoopTick>
+  ) => {
+    const started = startBackoffLoop({
+      policy,
+      work,
+      onError: () => {
+        logger.warn({ lane, reason: 'dependency_unavailable' }, 'community_loop_failed')
+      },
+      track: (flight) => {
         running.add(flight)
-      }, interval)
-      timer.unref()
-      timers.add(timer)
-    }
-    schedule()
+        void flight.finally(() => running.delete(flight))
+      },
+    })
+    loops.push(started)
+    return started
   }
   const streams = new CommunityStreamRepository(prisma)
   const spotlightRedis =
@@ -69,20 +104,53 @@ export async function startCommunityEngagementRuntime(
   // It never throws and its pass is bounded, so a down or stalled Redis can
   // never block the append loop or shutdown, and an append failure still lets
   // it drain events that are already appended.
-  const appendThenInvalidate = async () => {
+  //
+  // An idle tick asks each side one cheap question first: is any outbox row waiting, and is the
+  // spotlight cursor behind the stream? Only a yes opens the bounded append transaction or a pass.
+  const appendThenInvalidate = async (): Promise<LoopTick> => {
+    let appended = 0
+    let failed = false
+    let failure: unknown
+    let deferred = false
     try {
-      return await streams.append()
-    } finally {
-      await spotlight.processWithin()
+      if (await streams.hasPending()) appended = await streams.append()
+    } catch (error) {
+      // Head contention or budget pressure means rows are waiting and the batch backed off on its
+      // own; the append repository already logged it, so retry at the busy cadence.
+      if (isAppendDeferral(error)) deferred = true
+      else {
+        failed = true
+        failure = error
+      }
     }
+    const invalidation =
+      appended > 0 || (await spotlight.hasWork())
+        ? await spotlight.processWithin()
+        : { status: 'idle' as const }
+    if (failed) throw failure
+    return deferred ||
+      appended > 0 ||
+      invalidation.status === 'advanced' ||
+      invalidation.status === 'resumed_at_head'
+      ? PROGRESS_TICK
+      : IDLE_TICK
   }
-  loop('append', 500, appendThenInvalidate)
-  loop('stream-retention', 10_000, () => streams.retain())
+  loop('append', LOOPS.append, appendThenInvalidate)
+  loop('stream-retention', LOOPS.streamRetention, async () =>
+    tickFromCount(await streams.retain())
+  )
   const retention = new CommunityRetentionWorker(prisma, new PushTokenRepository(prisma))
-  loop('detail-retention', 10_000, () => retention.sweep())
+  loop('detail-retention', LOOPS.detailRetention, async () =>
+    tickFromCount(await retention.sweep())
+  )
   const telemetry = new CommunityOperationalTelemetry(prisma, remote)
-  loop('backlog-observation', 60_000, () => telemetry.backlog())
-  loop('operational-telemetry', 1000, () => telemetry.deliver())
+  loop('backlog-observation', LOOPS.backlogObservation, async () => {
+    await telemetry.backlog()
+    return IDLE_TICK
+  })
+  loop('operational-telemetry', LOOPS.operationalTelemetry, async () =>
+    tickFromCount(await telemetry.deliver())
+  )
   const { dispatch, guardPool } = await startDispatch(prisma, remote, role, loop)
   logger[dispatch.status === 'degraded' ? 'error' : 'info'](
     { dispatchStatus: dispatch.status, reason: dispatch.reason, role },
@@ -91,9 +159,7 @@ export async function startCommunityEngagementRuntime(
   return {
     dispatch,
     close: async () => {
-      stopped = true
-      timers.forEach(clearTimeout)
-      timers.clear()
+      loops.forEach((started) => started.stop())
       await Promise.allSettled(running)
       spotlightRedis.disconnect?.()
       await guardPool?.$disconnect()
@@ -109,7 +175,11 @@ export type CommunityDispatchReadiness = {
     | 'guard_mismatch'
     | 'capability_unavailable'
 }
-type Loop = (lane: string, interval: number, work: () => Promise<unknown>) => void
+type Loop = (
+  lane: string,
+  policy: IdleBackoffPolicy,
+  work: () => Promise<LoopTick>
+) => BackoffLoop
 async function startDispatch(
   prisma: PrismaClient,
   remote: RemoteFeatureFlagProvider,
@@ -147,12 +217,30 @@ async function startDispatch(
     await sender.verifyRuntime()
     const notifications = new CommunityNotificationsWorker(prisma, sender)
     const receipts = new CommunityReceiptsWorker(prisma, new PushTokenRepository(prisma))
-    loop('qualify-groups', 250, () => notifications.group())
-    loop('policy-reconciliation', 250, () => notifications.reconcilePolicies())
-    loop('fanout', 250, () => notifications.fanout())
-    loop('dispatch', 50, () => notifications.dispatch())
-    loop('recover', 1000, () => notifications.recover())
-    loop('receipts', 30_000, () => receipts.sweep())
+    // A pass that moved any delivery keeps the 50 ms cadence, even when other sends in the same
+    // batch were rejected: a quiet-hour herd keeps its pace through partial failures.
+    const dispatchLoop = loop('dispatch', LOOPS.dispatch, async () => {
+      if ((await notifications.dispatch()).moved > 0) return PROGRESS_TICK
+      return { progressed: false, dueInMs: await notifications.nextDispatchDueInMs() }
+    })
+    const fanoutLoop = loop('fanout', LOOPS.fanout, async () => {
+      const pass = await notifications.fanoutReport()
+      if (pass.deliveries > 0) dispatchLoop.wake()
+      if (pass.groups > 0) return PROGRESS_TICK
+      return { progressed: false, dueInMs: await notifications.nextFanoutDueInMs() }
+    })
+    loop('qualify-groups', LOOPS.qualifyGroups, async () => {
+      if ((await notifications.group()) === 0) return IDLE_TICK
+      fanoutLoop.wake()
+      return PROGRESS_TICK
+    })
+    loop('policy-reconciliation', LOOPS.policyReconciliation, async () =>
+      tickFromCount(await notifications.reconcilePolicies())
+    )
+    loop('recover', LOOPS.recover, async () =>
+      tickFromCount(await notifications.recover())
+    )
+    loop('receipts', LOOPS.receipts, async () => tickFromCount(await receipts.sweep()))
     return { dispatch: { status: 'ready' }, guardPool }
   } catch {
     await guardPool?.$disconnect().catch(() => undefined)

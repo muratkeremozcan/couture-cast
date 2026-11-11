@@ -594,7 +594,7 @@ function buildPayload() {
       {
         id: 'local-dispatch-cadence',
         statement:
-          'The end-to-end stack dispatches the moderation outbox once a second. The hosted community worker Story 6.2b deploys runs the same community bootstrap and therefore the same one-second dispatch; the one-minute scheduler belongs to the general bootstrap, which no hosted target runs.',
+          'The end-to-end stack dispatches the moderation outbox once a second while it finds work and at least every 10 seconds when idle. The hosted community worker Story 6.2b deploys runs the same community bootstrap and therefore the same dispatch cadence; the one-minute scheduler belongs to the general bootstrap, which no hosted target runs.',
         mitigation:
           'No number in this payload is presented as production latency. Story 6.2b measures queue latency against the worker through its canary.',
         revisitWhen: 'The hosted canary has run against the deployed worker.',

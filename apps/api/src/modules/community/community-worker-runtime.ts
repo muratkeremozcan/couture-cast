@@ -6,7 +6,12 @@ import type { Worker } from 'bullmq'
 import type { PrismaClient } from '@prisma/client'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
-import { CommunityMaintenanceService } from './community-maintenance.service.js'
+import {
+  CommunityMaintenanceService,
+  type CommunityBanExpirySweepResult,
+  type CommunityErasureSweepResult,
+  type CommunityUploadExpirySweepResult,
+} from './community-maintenance.service.js'
 import { CommunityModerationOutboxDispatcher } from './community-moderation.outbox.js'
 import { CommunityModerationQueue } from './community-moderation.queue.js'
 import {
@@ -112,11 +117,12 @@ const SUPPORTED_SELECTORS: readonly CommunityNsfwSelector[] = [
  * neither substrate can call something the other cannot.
  */
 export interface CommunitySweeps {
-  dispatchPending: () => Promise<unknown>
-  sweepStalePendingReview: () => Promise<unknown>
-  sweepExpiredUploads: () => Promise<unknown>
-  sweepErasureRequests: () => Promise<unknown>
-  sweepExpiredBanHolds: () => Promise<unknown>
+  /** Resolves to how many rows moved forward; the hosted worker's idle backoff reads it. */
+  dispatchPending: () => Promise<number>
+  sweepStalePendingReview: () => Promise<number>
+  sweepExpiredUploads: () => Promise<CommunityUploadExpirySweepResult>
+  sweepErasureRequests: () => Promise<CommunityErasureSweepResult>
+  sweepExpiredBanHolds: () => Promise<CommunityBanExpirySweepResult>
   /** Story 6.12: at-risk and breach alerts, driven by whichever substrate this process has. */
   sweepModerationSla: () => Promise<unknown>
   /** Story 6.13: the daily alert prune and enforcement drift check. */
@@ -153,7 +159,53 @@ export interface CommunityNsfwScreenerSelection {
 
 const logger = createBaseLogger().child({ feature: COMMUNITY_MODERATION_LOG_FEATURE })
 
-/** Each independent sweep retains progress when a sibling step fails. */
+/**
+ * Whether the dispatch sweep has anything it can act on, in one statement.
+ *
+ * Each clause selects exactly what one dispatch step would select now: undispatched post screening
+ * rows; comment screening rows whose comment still waits for screening, first attempts at once and
+ * retries after their 30-second pause; reaction receipts and delivered reaction rows past their
+ * 30-day retention; and, when the acknowledged sink is configured, unleased analytics rows that are
+ * due.
+ * A row no step can move now stays out, so a comment a ban holds, a retry still in its pause or a
+ * parked analytics row cannot run the full sweep on every idle tick.
+ */
+export async function communityDispatchHasWork(
+  prisma: Pick<PrismaClient, '$queryRaw'>,
+  analyticsDeliverable: boolean
+): Promise<boolean> {
+  const rows = await prisma.$queryRaw<{ due: boolean }[]>`
+    SELECT (
+      EXISTS (SELECT 1 FROM "CommunityModerationOutbox" WHERE dispatched_at IS NULL)
+      OR EXISTS (SELECT 1 FROM "CommunityCommentScreeningOutbox" o
+        JOIN "CommunityComment" c ON c.id = o.comment_id
+        WHERE o.dispatched_at IS NULL AND c.status = 'pending_screening'
+          AND ((o.generation = 0 AND o.attempts = 0)
+            OR o.updated_at <= now() - interval '30 seconds'))
+      OR EXISTS (SELECT 1 FROM "CommunityReactionReceipt"
+        WHERE created_at < now() - interval '30 days')
+      OR EXISTS (SELECT 1 FROM "CommunityReactionOutbox"
+        WHERE delivered_at < now() - interval '30 days')
+      OR (${analyticsDeliverable}::boolean AND (
+        EXISTS (SELECT 1 FROM "CommunityReactionOutbox"
+          WHERE delivered_at IS NULL AND next_attempt_at <= now()
+            AND (lease_expires_at IS NULL OR lease_expires_at <= now()))
+        OR EXISTS (SELECT 1 FROM "CommunityCommentAnalyticsOutbox"
+          WHERE delivered_at IS NULL AND next_attempt_at <= now()
+            AND (lease_expires_at IS NULL OR lease_expires_at <= now()))
+      ))
+    ) AS due
+  `
+  return rows[0]?.due === true
+}
+
+/**
+ * Each independent sweep retains progress when a sibling step fails.
+ * Resolves to the sum of the counts the steps returned, which the worker's idle backoff reads as
+ * progress; a step that returns no number counts as zero.
+ * A failed step is logged either way; the sweep rejects only when no step made progress, so one
+ * failing step cannot slow the steps that are moving work.
+ */
 export async function runCommunitySweepSteps(
   steps: readonly {
     name:
@@ -165,11 +217,13 @@ export async function runCommunitySweepSteps(
     run: () => Promise<unknown>
   }[],
   log: Pick<typeof logger, 'warn'> = logger
-): Promise<void> {
+): Promise<number> {
   const failed: string[] = []
+  let progressed = 0
   for (const step of steps) {
     try {
-      await step.run()
+      const result = await step.run()
+      if (typeof result === 'number') progressed += result
     } catch {
       failed.push(step.name)
       log.warn(
@@ -178,8 +232,9 @@ export async function runCommunitySweepSteps(
       )
     }
   }
-  if (failed.length > 0)
+  if (failed.length > 0 && progressed === 0)
     throw new Error(`Community sweep steps failed: ${failed.join(', ')}`)
+  return progressed
 }
 
 /**
@@ -426,6 +481,10 @@ export async function createCommunityWorkerRuntime(deps: {
     )
   }
 
+  const reactions = new CommunityReactionOutboxDispatcher(
+    deps.prisma,
+    deps.telemetryService
+  )
   const comments = new CommunityCommentsOutbox(
     deps.prisma,
     queue,
@@ -457,22 +516,25 @@ export async function createCommunityWorkerRuntime(deps: {
     worker,
     heartbeat,
     sweeps: {
-      dispatchPending: () =>
-        runCommunitySweepSteps([
-          { name: 'post_dispatch', run: () => dispatcher.dispatchPending() },
+      dispatchPending: async () => {
+        // One probe statement while idle; the steps run only when it finds something.
+        const analytics = deps.telemetryService.acknowledgedDeliveryAvailable()
+        if (!(await communityDispatchHasWork(deps.prisma, analytics))) return 0
+        return runCommunitySweepSteps([
           {
-            name: 'reaction_dispatch',
-            run: () =>
-              new CommunityReactionOutboxDispatcher(
-                deps.prisma,
-                deps.telemetryService
-              ).dispatchPending(),
+            name: 'post_dispatch',
+            run: async () => (await dispatcher.dispatchPending()).dispatched,
           },
+          { name: 'reaction_dispatch', run: () => reactions.dispatchPending() },
           { name: 'comment_dispatch', run: () => comments.dispatchPending() },
-        ]),
+        ])
+      },
       sweepStalePendingReview: () =>
         runCommunitySweepSteps([
-          { name: 'post_stale', run: () => maintenance.sweepStalePendingReview() },
+          {
+            name: 'post_stale',
+            run: async () => (await maintenance.sweepStalePendingReview()).stalled,
+          },
           { name: 'comment_stale', run: () => comments.sweepStale() },
         ]),
       sweepExpiredUploads: () => maintenance.sweepExpiredUploads(),

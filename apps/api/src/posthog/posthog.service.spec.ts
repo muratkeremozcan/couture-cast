@@ -83,7 +83,9 @@ describe('Story 6.3 acknowledged analytics ingestion', () => {
       properties: { $insert_id: '63100000-0000-4000-8000-000000000001' },
     }
     await expect(adapter.captureAcknowledged(event)).rejects.toThrow('unconfigured')
+    expect(adapter.acknowledgedCaptureConfigured()).toBe(false)
     vi.stubEnv('POSTHOG_API_KEY', 'phc_synthetic')
+    expect(adapter.acknowledgedCaptureConfigured()).toBe(true)
     vi.stubEnv('POSTHOG_HOST', 'http://localhost:43210/')
     const fetch = vi
       .fn()
@@ -92,9 +94,13 @@ describe('Story 6.3 acknowledged analytics ingestion', () => {
         new Response(JSON.stringify({ status: 1, quota_limited: ['events'] }))
       )
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: 0 })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'Error' })))
     vi.stubGlobal('fetch', fetch)
     await expect(adapter.captureAcknowledged(event)).rejects.toThrow('503')
     await expect(adapter.captureAcknowledged(event)).rejects.toThrow('quota limited')
+    await expect(adapter.captureAcknowledged(event)).rejects.toThrow(
+      'acknowledgement invalid'
+    )
     await expect(adapter.captureAcknowledged(event)).rejects.toThrow(
       'acknowledgement invalid'
     )
@@ -109,6 +115,8 @@ describe('Story 6.3 acknowledged analytics ingestion', () => {
       .fn()
       .mockResolvedValueOnce(new Response('1'))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: 1 })))
+      // What us.i.posthog.com/i/v0/e/ answered an accepted event on 2026-11-10.
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'Ok' })))
     vi.stubGlobal('fetch', fetch)
     const adapter = new PostHogService()
     const timestamp = '2026-10-01T12:00:00.000Z'
@@ -118,6 +126,7 @@ describe('Story 6.3 acknowledged analytics ingestion', () => {
       timestamp,
       properties: { $insert_id: '63100000-0000-4000-8000-000000000001', $ip: null },
     }
+    await expect(adapter.captureAcknowledged(event)).resolves.toBeUndefined()
     await expect(adapter.captureAcknowledged(event)).resolves.toBeUndefined()
     await expect(adapter.captureAcknowledged(event)).resolves.toBeUndefined()
     expect(fetch).toHaveBeenCalledWith(

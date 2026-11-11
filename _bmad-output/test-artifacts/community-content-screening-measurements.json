@@ -2,7 +2,7 @@
   "artifact": "community-content-screening-measurements",
   "artifactVersion": 1,
   "storyKey": "6-2-production-content-screening-readiness",
-  "generatedAt": "2026-10-17T01:53:56.280Z",
+  "generatedAt": "2026-11-11T02:24:07.322Z",
   "generatedBy": "npm run measure:community-screening",
   "scope": {
     "rendersVerdict": false,
@@ -16,13 +16,13 @@
     "statement": "The deterministic evaluation proves that unsafe class-probability vectors return block, that every threshold is crossed from both sides, and that no vector reaches pass without a confident Neutral. The lifecycle suite drives a fake inference runtime emitting an unsafe vector, which proves the transport from worker message through validation, class mapping, policy evaluation, reason codes, and engine identity to a block verdict. Neither establishes that the real model emits a high Porn or Hentai probability for genuinely unsafe input, and no synthetic vector can. That single link is what AC 7 assigns to Story 6.2b corpus-backed measurement."
   },
   "build": {
-    "commitSha": "72b434c6760f15f9e01f331b94ef9a16018c111e",
-    "modelManifestSha256": "28d715ef177c3322b25393be9f1ee3e1d3344d6170af0f55df4a57414c44b206",
-    "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+    "commitSha": "c8f301c138a9a2fb7b57f66ce47841599ff20d08",
+    "modelManifestSha256": "ecd9462815c198084c41bb7830490ddbdbbe286c10e11152f4ed5e56b6c98a54",
+    "policySha256": "538cb950ab2e563d4efba94e44d5d36cb34bd3cb882cbac53fb3c905a53cc13a",
     "fixtureManifestSha256": "b8cd2cd08dd419024a2cdb3ca84d03b3be7a5df211a92cd200853200bcb13243",
-    "lockfileSha256": "2025e3f196ed2a7091eb5f7c034af8a00365b3a38826248b003a4ae609cdcf91",
-    "workingTreeClean": false,
-    "nodeVersion": "v24.22.0",
+    "lockfileSha256": "c48dad45588378aa4b07a37d27a11573c13623ec1c78dc029b825f7dd32776d2",
+    "workingTreeClean": true,
+    "nodeVersion": "v24.22.1",
     "platform": "darwin-arm64"
   },
   "modelIdentity": {
@@ -40,8 +40,8 @@
     "note": null
   },
   "engineIdentity": {
-    "textEngineVersion": "adr013-text:policy-v2@b0daab4ab9d1",
-    "imageEngineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
+    "textEngineVersion": "adr013-text:policy-v2@538cb950ab2e",
+    "imageEngineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-538cb950ab2e",
     "source": "screening loader, recorded by the readiness run"
   },
   "evidenceCorpus": {
@@ -52,7 +52,7 @@
   "policyIdentity": {
     "policyId": "community-screening-policy-v2",
     "version": "v2",
-    "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+    "policySha256": "538cb950ab2e563d4efba94e44d5d36cb34bd3cb882cbac53fb3c905a53cc13a",
     "safeClasses": ["Drawing", "Neutral"],
     "safeMassMinimum": 0.85,
     "reviewClasses": ["Sexy"],
@@ -83,10 +83,10 @@
     "screening": {
       "available": true,
       "screeningPath": "tensorflow",
-      "measuredAt": "2026-10-17T01:53:34.971Z",
+      "measuredAt": "2026-11-11T02:24:07.264Z",
       "modelDigest": "a0c76f72db261c54dc851b974c848dc9ce01576ca66b0f232f4848c950549322",
       "policyVersion": "v2",
-      "policyDigest": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+      "policyDigest": "538cb950ab2e563d4efba94e44d5d36cb34bd3cb882cbac53fb3c905a53cc13a",
       "neutralRange": {
         "min": 0.7521889209747314,
         "max": 0.9991244673728943
@@ -249,7 +249,7 @@
           "fixtureManifestSha256",
           "lockfileSha256"
         ],
-        "commitShaAtMeasurement": "72b434c6760f15f9e01f331b94ef9a16018c111e",
+        "commitShaAtMeasurement": "c8f301c138a9a2fb7b57f66ce47841599ff20d08",
         "mismatches": [],
         "note": "Every input that produced these numbers matches the working tree."
       }
@@ -362,7 +362,7 @@
     },
     {
       "id": "local-dispatch-cadence",
-      "statement": "The end-to-end stack dispatches the moderation outbox once a second. The hosted community worker Story 6.2b deploys runs the same community bootstrap and therefore the same one-second dispatch; the one-minute scheduler belongs to the general bootstrap, which no hosted target runs.",
+      "statement": "The end-to-end stack dispatches the moderation outbox once a second while it finds work and at least every 10 seconds when idle. The hosted community worker Story 6.2b deploys runs the same community bootstrap and therefore the same dispatch cadence; the one-minute scheduler belongs to the general bootstrap, which no hosted target runs.",
       "mitigation": "No number in this payload is presented as production latency. Story 6.2b measures queue latency against the worker through its canary.",
       "revisitWhen": "The hosted canary has run against the deployed worker."
     }

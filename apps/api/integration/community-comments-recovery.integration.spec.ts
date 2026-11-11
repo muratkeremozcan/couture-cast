@@ -27,7 +27,10 @@ function gate() {
   return { promise, release }
 }
 function outbox(
-  telemetry: unknown = { captureCommentEvent: vi.fn() },
+  telemetry: unknown = {
+    captureCommentEvent: vi.fn(),
+    acknowledgedDeliveryAvailable: () => true,
+  },
   queue: unknown = { enqueueComment: vi.fn().mockResolvedValue(undefined) }
 ) {
   return new CommunityCommentsOutbox(
@@ -159,7 +162,7 @@ describe('Story 6.4 screening dispatch and recovery', () => {
       },
       { timeout: 10_000 }
     )
-    let sweep: Promise<void> | undefined
+    let sweep: Promise<number> | undefined
     try {
       await locked.promise
       // The sweep reads the old committed stamp, selects the row, then queues on its lock.

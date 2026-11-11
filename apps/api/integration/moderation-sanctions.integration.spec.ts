@@ -1077,7 +1077,10 @@ describe('I-B-PENDING: held content never publishes (D8, D9)', () => {
             return Promise.resolve()
           },
         } as never,
-        { captureCommentEvent: vi.fn() } as never,
+        {
+          captureCommentEvent: vi.fn(),
+          acknowledgedDeliveryAvailable: () => true,
+        } as never,
         processor
       ).dispatchPending()
       expect(commentJobs).not.toContain(comment.id)
@@ -1365,7 +1368,10 @@ describe('I-B-END-RESTORE: content held only by a ban returns to screening when 
               return Promise.resolve()
             },
           } as never,
-          { captureCommentEvent: vi.fn() } as never,
+          {
+            captureCommentEvent: vi.fn(),
+            acknowledgedDeliveryAvailable: () => true,
+          } as never,
           processor
         ).dispatchPending()
         expect(commentJobs).toContain(held.comment.id)

@@ -6,6 +6,7 @@ Updated: 2026-11-05 (Story 6.12): the community worker is hosted on Northflank, 
 Updated: 2026-11-05 (Story 6.13): append-only moderation history, its limits, retention and account erasure.
 Updated: 2026-11-11: the web production rewrite variable, and operator commands that verify TLS from macOS.
 Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator command, kill switch and push enablement.
+Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -482,7 +483,7 @@ baked into the image):
 | --------------------------- | ------------------------------------------------------- |
 | `NODE_ENV`                  | `production`                                            |
 | `COMMUNITY_NSFW_SCREENER`   | `tensorflow`                                            |
-| `DATABASE_URL`              | production Supabase connection string, verified (below) |
+| `DATABASE_URL`              | production session pooler URL, verified (below)         |
 | `REDIS_URL`                 | production Upstash `rediss://` URL                      |
 | `REDIS_TLS`                 | `true`                                                  |
 | `SUPABASE_URL`              | production Supabase project URL                         |
@@ -519,6 +520,16 @@ CA, which `includeFiles` in `apps/api/vercel.json` bundles into both functions. 
 `connection_limit` and the credentials stay as configured. When the CA is missing or the URL does
 not parse, the client throws `DatabaseTlsRefusedError` at startup. `prisma migrate deploy` applies
 the same rules to its `DIRECT_URL` connection through `scripts/lib/database-tls.mjs`.
+
+**The worker connects through the session pooler.**
+It is one long-lived process, so its `DATABASE_URL` names Supabase's session pooler: the pooler host on port 5432, with no `pgbouncer=true`.
+Through the transaction pooler (port 6543) Prisma needs `pgbouncer=true`, and in that mode it runs every query in a transaction of its own and resets the server's prepared statements when the transaction ends.
+One query then costs four statements: `BEGIN`, the query, `DEALLOCATE ALL` and `COMMIT`.
+That reset is the `DEALLOCATE ALL` that production's `pg_stat_statements` counted 9.7 million times between mid-October and 2026-11-10.
+The session pooler gives each client connection its own server connection, so prepared statements survive and a query is one statement.
+The worker holds its three (`connection_limit=3`) server connections while it runs.
+Both ports present the same `*.pooler.supabase.com` certificate, issued by the Supabase Intermediate 2021 CA (checked 2026-11-10), so the TLS settings above apply unchanged.
+The Vercel API stays on the transaction pooler, which suits short-lived functions.
 
 The canary, which reaches production from an operator's machine, verifies the certificate chain
 (`verify-full`) against the same committed CA (`--db-ca` names another). It strips every `ssl*`
@@ -733,8 +744,53 @@ After the first day, read the provider's command count and month-to-date cost, w
 the month projects past 5 USD, set a maximum monthly budget on the database in the Upstash console
 and revisit the polling settings. Upstash hibernates a database after a long stretch with no traffic
 (this one answered "rate-limited" after 60 idle days until it was reactivated); a connected worker
-keeps it active. The worker's one-second outbox dispatch reads PostgreSQL: about 86,400 small
-queries a day against Supabase, which its plan does not meter per query.
+keeps it active.
+
+**Database cost while idle.**
+Supabase meters database egress, and every statement's reply counts toward it.
+From mid-October to 2026-11-10 the hosted worker polled PostgreSQL nonstop with the community closed and pushed production past its 5 GB egress quota.
+Every polling loop now backs off while it finds nothing ([`community-idle-backoff.ts`](../../apps/api/src/modules/community/community-idle-backoff.ts)): an idle tick doubles the delay up to a cap chosen from the loop's latency bound, and the first tick that moves work returns it to the busy cadence.
+An idle tick asks one cheap question before it does anything costly, and that question matches only rows the loop could move now.
+Progress means rows that changed state: a pass that moves any row keeps the busy cadence even when other rows in it failed, so one rejected send cannot slow a quiet-hour herd, and a pass that moves nothing backs off, failures included.
+Shutdown waits for a tick in flight before it closes the queue, PostHog and Prisma.
+
+| Loop                                             | Busy cadence | Idle cap    | Idle tick                                          |
+| ------------------------------------------------ | ------------ | ----------- | -------------------------------------------------- |
+| Outbox dispatch (posts, comments, analytics)     | 1 s          | 10 s        | one probe across every dispatch outbox             |
+| Stale review, upload expiry, erasure, ban expiry | 30 s         | 5 min       | the sweep's own reads                              |
+| Moderation SLA sweep                             | 60 s         | fixed       | flag read while the flag is off                    |
+| Moderation history retention                     | 24 h         | fixed       | runs once at start                                 |
+| Stream append and spotlight invalidation         | 0.5 s        | 10 s        | two probes                                         |
+| Stream retention, detail retention               | 10 s         | 10 min      | the sweep's own reads                              |
+| Backlog observation                              | 60 s         | fixed       | one read; an idle lane is written hourly           |
+| Operational telemetry delivery                   | 1 s          | 60 s        | one lease; none while the sink is unset            |
+| Push lanes (grouping, policy, fanout, dispatch)  | 50 to 250 ms | 5 s         | fanout and dispatch wake at their earliest due row |
+| Push recovery, receipts                          | 1 s, 30 s    | 30 s, 5 min | the sweep's own reads                              |
+
+The caps keep each story's bound.
+A post or comment published to an idle worker waits at most 10 seconds for dispatch, inside the one-minute dispatch the general worker was designed with and the 15-minute stale-review window.
+The API appends on every sync and realtime tick (`assist`), so the worker's append loop is the backstop for Story 6.5's 10-second realtime bound.
+The push lanes run only where `COMMUNITY_DISPATCH_ENABLED=true`; grouping wakes fanout and fanout wakes dispatch inside the process, so a new intent sees at most the 5-second cap, and a quiet-hour exit herd starts when it falls due.
+The maintenance caps match or beat the general worker's crons for the same sweeps.
+
+Two deliveries used to be leased forever.
+PostHog's `/i/v0/e/` answers an accepted event with `{"status": "Ok"}`, and the acknowledgement check accepted only `{"status": 1}`, so every operational telemetry row failed and was re-leased about hourly: 57,025 rows, attempts up to 197, on 2026-11-10.
+The check now accepts both shapes.
+When `POSTHOG_API_KEY` is unset, the reaction, comment and operational telemetry outboxes park their rows: no lease, attempts unchanged, one `*_delivery_parked` warning per process.
+Parked reaction and comment analytics wait for a configured process to deliver them; their 30-day retention removes only delivered rows.
+Parked operational telemetry is content-free metrics, and the 30-day detail retention removes it delivered or not, so a sink unset for a month loses those readings.
+
+Measured against an isolated PostgreSQL 17 with `pg_stat_statements`, the worker idle with the sink answering like PostHog, five-minute windows after a one-minute warm-up (bytes are what the database sent the worker):
+
+| Build and pooler                                      | Statements a minute | `BEGIN`/`COMMIT`/`DEALLOCATE ALL` a minute | Bytes to the worker, per 30 days |
+| ----------------------------------------------------- | ------------------: | -----------------------------------------: | -------------------------------: |
+| Polling, transaction pooler, empty outboxes           |               4,364 |                                      2,864 |                          13.8 GB |
+| Polling, transaction pooler, production's 57,025 rows |              11,987 |                                      8,579 |                          51.9 GB |
+| Idle backoff, transaction pooler                      |                 125 |                                         89 |                           323 MB |
+| Idle backoff, session pooler (production)             |                  38 |                                          3 |                            97 MB |
+
+The remaining 38 a minute are the three dispatch, append and spotlight probes at their caps, the SLA flag read, the backlog read and the telemetry lease.
+The measurement scripts are throwaway; repeat the measurement with a counting TCP proxy between the worker and an isolated PostgreSQL with `pg_stat_statements` loaded.
 
 **Evidence.** `npm run community:screening:evidence` writes
 `_bmad-output/test-artifacts/community-content-screening-model-readiness.{json,md}` from the run

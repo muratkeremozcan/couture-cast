@@ -56,6 +56,26 @@ function boundary(overrides: {
 }
 
 describe('6.6 spotlight invalidator', () => {
+  it('asks for a pass from one read, and asks for one when that read fails', async () => {
+    const answer = vi
+      .fn()
+      .mockResolvedValueOnce([{ work: false }])
+      .mockResolvedValueOnce([{ work: true }])
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('database unavailable'))
+    const invalidator = new CommunitySpotlightInvalidator(
+      { $queryRaw: answer } as unknown as PrismaClient,
+      {} as CommunitySpotlightCache
+    )
+    await expect(invalidator.hasWork()).resolves.toBe(false)
+    await expect(invalidator.hasWork()).resolves.toBe(true)
+    // No public head: a pass would idle, so none is wanted.
+    await expect(invalidator.hasWork()).resolves.toBe(false)
+    // A failed read runs the pass, which reports its own deferral.
+    await expect(invalidator.hasWork()).resolves.toBe(true)
+    expect(answer).toHaveBeenCalledTimes(4)
+  })
+
   it('6.6-UNIT-030 idles without a public stream head', async () => {
     const { invalidator, cache, prisma } = boundary({})
     prisma.communityStreamHead.findUnique.mockResolvedValueOnce(null as never)

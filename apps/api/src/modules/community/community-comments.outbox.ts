@@ -19,6 +19,7 @@ const finishedScreening = {
 
 export class CommunityCommentsOutbox {
   private readonly logger = createBaseLogger().child({ feature: 'community-comments' })
+  private parkedReported = false
   constructor(
     private readonly prisma: PrismaClient,
     private readonly queue: CommunityModerationQueue,
@@ -26,7 +27,9 @@ export class CommunityCommentsOutbox {
     private readonly processor: CommunityCommentsProcessor
   ) {}
 
-  async dispatchPending(): Promise<void> {
+  /** Returns how many rows the sweep moved forward; zero means it found nothing to do. */
+  async dispatchPending(): Promise<number> {
+    let progressed = 0
     const rows = await this.prisma.communityCommentScreeningOutbox.findMany({
       where: {
         dispatched_at: null,
@@ -46,6 +49,7 @@ export class CommunityCommentsOutbox {
           where: { id: row.id, generation: row.generation, dispatched_at: null },
           data: { dispatched_at: new Date(), attempts: { increment: 1 } },
         })
+        progressed += 1
       } catch {
         this.logger.warn(
           {
@@ -62,10 +66,12 @@ export class CommunityCommentsOutbox {
         })
       }
     }
-    await this.deliverAnalytics()
+    return progressed + (await this.deliverAnalytics())
   }
 
-  async sweepStale(): Promise<void> {
+  /** Returns how many comments and outbox rows the sweep moved or removed. */
+  async sweepStale(): Promise<number> {
+    let progressed = 0
     const rows = await this.prisma.communityComment.findMany({
       where: {
         status: 'pending_screening',
@@ -95,6 +101,7 @@ export class CommunityCommentsOutbox {
             updatedAt: row.screening_outbox.updated_at,
           }
         )
+        progressed += 1
       } catch {
         this.logger.warn(
           { event: 'community_comment_stale_deferred', reason: 'dependency_unavailable' },
@@ -115,23 +122,42 @@ export class CommunityCommentsOutbox {
         select: { id: true, generation: true },
       }),
     ])
-    await this.prisma.communityCommentAnalyticsOutbox.deleteMany({
-      where: { id: { in: expired.map((row) => row.id) } },
-    })
+    if (expired.length) {
+      const purged = await this.prisma.communityCommentAnalyticsOutbox.deleteMany({
+        where: { id: { in: expired.map((row) => row.id) } },
+      })
+      progressed += purged.count
+    }
     // By generation and current status: recovery may have re-armed a row since it was selected, and
     // that row is live work. If recovery holds its row lock, the delete waits and then re-checks.
     // A comment a ban holds keeps its row, so re-arming it moves past every generation it has had.
-    for (const row of finished)
-      await this.prisma.communityCommentScreeningOutbox.deleteMany({
+    for (const row of finished) {
+      const removed = await this.prisma.communityCommentScreeningOutbox.deleteMany({
         where: {
           id: row.id,
           generation: row.generation,
           comment: finishedScreening,
         },
       })
+      progressed += removed.count
+    }
+    return progressed
   }
 
-  private async deliverAnalytics(): Promise<void> {
+  private async deliverAnalytics(): Promise<number> {
+    // An unconfigured sink cannot accept anything, so the rows stay parked, unleased and with their
+    // attempts unchanged, until a configured process delivers them.
+    if (!this.telemetry.acknowledgedDeliveryAvailable()) {
+      if (!this.parkedReported) {
+        this.parkedReported = true
+        this.logger.warn(
+          { event: 'community_comment_delivery_parked', reason: 'sink_unconfigured' },
+          'Comment analytics delivery parked until the acknowledged sink is configured'
+        )
+      }
+      return 0
+    }
+    let delivered = 0
     const deadline = Date.now() + 1000
     for (let index = 0; index < 100 && Date.now() < deadline; index++) {
       const lease = randomUUID()
@@ -156,7 +182,7 @@ export class CommunityCommentsOutbox {
       if (!row) break
       try {
         // The analytics capture happens before settlement commits; a re-run would resend it.
-        await singleRunTransaction(
+        const settled = await singleRunTransaction(
           this.prisma,
           async (tx) => {
             await tx.$executeRaw`SET LOCAL lock_timeout = '1000ms'`
@@ -164,14 +190,14 @@ export class CommunityCommentsOutbox {
             const subject = await tx.$queryRaw<
               { actor: string }[]
             >`SELECT actor FROM "CommunityCommentAnalyticsSubject" WHERE actor = ${row.actor} FOR KEY SHARE`
-            if (subject.length === 0) return
+            if (subject.length === 0) return false
             const owned = await tx.$queryRaw<
               { id: string }[]
             >`SELECT id FROM "CommunityCommentAnalyticsOutbox"
             WHERE id = ${row.id}::uuid AND actor = ${row.actor} AND lease_id = ${lease}::uuid
               AND delivered_at IS NULL AND lease_expires_at > now() FOR UPDATE`
-            if (owned.length === 0) return
-            let delivered = false
+            if (owned.length === 0) return false
+            let accepted = false
             try {
               await this.telemetry.captureCommentEvent(
                 row.id,
@@ -184,7 +210,7 @@ export class CommunityCommentsOutbox {
                   signal: AbortSignal.timeout(3000),
                 }
               )
-              delivered = true
+              accepted = true
             } catch (failure) {
               this.deliveryFailed(
                 row.attempts,
@@ -197,7 +223,7 @@ export class CommunityCommentsOutbox {
               data: {
                 lease_id: null,
                 lease_expires_at: null,
-                ...(delivered
+                ...(accepted
                   ? { delivered_at: new Date() }
                   : {
                       next_attempt_at: new Date(
@@ -207,14 +233,17 @@ export class CommunityCommentsOutbox {
                     }),
               },
             })
+            return accepted
           },
           { maxWait: 1000, timeout: 5000 }
         )
+        if (settled) delivered += 1
       } catch {
         // A lost lease or database timeout remains recoverable after its bounded expiry.
         this.deliveryFailed(row.attempts, row.created_at, 'settlement_failed')
       }
     }
+    return delivered
   }
 
   private deliveryFailed(attempt: number, createdAt: Date, reason: string): void {

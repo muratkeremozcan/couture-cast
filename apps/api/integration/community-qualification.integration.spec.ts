@@ -19,7 +19,7 @@ const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
 const repository = new CommunityRepository(prisma)
 const worker = new CommunityNotificationsWorker(prisma, {
-  dispatch: () => Promise.resolve(),
+  dispatch: () => Promise.resolve(false),
 })
 
 beforeAll(async () => {

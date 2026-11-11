@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
 import { randomUUID } from 'node:crypto'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
+import { COMMUNITY_ENGAGEMENT_LOOPS } from '../src/modules/community/community-engagement.runtime.js'
 import { CommunityCommentsRepository } from '../src/modules/community/community-comments.repository.js'
 import {
   engagementHarness,
@@ -78,7 +79,9 @@ describe('6.5-INT-012..018 real engagement process loss', () => {
             where: { post_id: post.id, appended_at: null },
           }),
         (count) => count === 0,
-        2000
+        // No API assists this append, so the worker's own loop must reach the row. An idle append
+        // loop rechecks at least once per idle cap, so allow the cap plus two seconds.
+        COMMUNITY_ENGAGEMENT_LOOPS.append.idleCapMs + 2000
       )
       expect(
         await h.prisma.communityStreamEvent.count({ where: { post_id: post.id } })
@@ -104,7 +107,7 @@ describe('6.5-INT-012..018 real engagement process loss', () => {
         })
       )
     },
-    10_000
+    25_000
   )
 
   it('a killed durable pre-guard claim waits its real lease and never resends an uncertain attempt', async () => {
