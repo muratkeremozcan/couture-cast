@@ -206,6 +206,12 @@ export const COMMUNITY_GUARD_POOL = {
   acquireSeconds: 5,
   /** Waits between preflight attempts after a connect failure; one more attempt than waits. */
   preflightBackoffMs: [1000, 2000, 4000],
+  /**
+   * Longest a preflight attempt or the warm-up may take: one acquisition budget plus 5 s.
+   * Prisma sets no socket timeout, so a connection whose answers stop would otherwise hold
+   * startup forever.
+   */
+  stepDeadlineMs: 10_000,
 } as const
 
 /**
@@ -237,6 +243,25 @@ export function communityGuardPoolUrl(configured: string, sendSlots: number): st
 
 const CONNECT_FAILURE_CODES = new Set(['P1001', 'P1002', 'P1017', 'P2024'])
 
+/** A preflight step that outlived `stepDeadlineMs`. */
+class GuardStepTimeout extends Error {
+  constructor() {
+    super('Community dispatch guard step timed out.')
+    this.name = 'GuardStepTimeout'
+  }
+}
+
+function withinDeadline<T>(work: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new GuardStepTimeout()),
+      COMMUNITY_GUARD_POOL.stepDeadlineMs
+    )
+  })
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer))
+}
+
 function prismaErrorCode(error: unknown): string | undefined {
   if (error instanceof Prisma.PrismaClientKnownRequestError) return error.code
   if (error instanceof Prisma.PrismaClientInitializationError) return error.errorCode
@@ -249,6 +274,7 @@ function prismaErrorCode(error: unknown): string | undefined {
  * transaction could not start in time. Every other failure is a real preflight answer.
  */
 export function isGuardConnectFailure(error: unknown): boolean {
+  if (error instanceof GuardStepTimeout) return true
   const code = prismaErrorCode(error)
   if (code && CONNECT_FAILURE_CODES.has(code)) return true
   if (code === 'P2028')
@@ -311,7 +337,7 @@ export async function openCommunityGuardPool(
   for (;;) {
     attempts++
     try {
-      await sender.verifyRuntime()
+      await withinDeadline(sender.verifyRuntime())
       break
     } catch (error) {
       if (!isGuardConnectFailure(error)) throw error
@@ -320,14 +346,27 @@ export async function openCommunityGuardPool(
       await pause(wait)
     }
   }
-  // Concurrent, so each finds no idle connection and opens its own.
-  const opened = await Promise.allSettled(
-    Array.from({ length: connections }, () => guardPool.$queryRaw`SELECT 1`)
-  )
-  return {
-    attempts,
-    connections: opened.filter((result) => result.status === 'fulfilled').length,
+  // Every query holds its connection for 100 ms while the others start, so none can reuse
+  // another's: each one that succeeds opened a connection of its own.
+  let opened: PromiseSettledResult<unknown>[]
+  try {
+    opened = await withinDeadline(
+      Promise.allSettled(
+        Array.from(
+          { length: connections },
+          () => guardPool.$queryRaw`SELECT pg_sleep(0.1)::text AS held`
+        )
+      )
+    )
+  } catch (error) {
+    throw new GuardUnreachableError(attempts, error)
   }
+  const fulfilled = opened.filter((result) => result.status === 'fulfilled').length
+  if (fulfilled === 0) {
+    const first = opened.find((result) => result.status === 'rejected')
+    throw new GuardUnreachableError(attempts, first?.reason)
+  }
+  return { attempts, connections: fulfilled }
 }
 type Loop = (
   lane: string,

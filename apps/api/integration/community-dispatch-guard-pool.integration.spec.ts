@@ -70,8 +70,8 @@ const provider = {
   },
 } as unknown as CommunityPushProvider
 
-/** Holds every new connection for SLOW_CONNECT_MS before it reaches the database. */
-function slowConnectProxy(target: URL) {
+/** Holds every new connection for `holdMs` before it reaches the database. */
+function slowConnectProxy(target: URL, holdMs = SLOW_CONNECT_MS) {
   const sockets = new Set<Socket>()
   let accepted = 0
   const server = createServer((client) => {
@@ -93,7 +93,7 @@ function slowConnectProxy(target: URL) {
       upstream.on('error', close)
       upstream.on('close', close)
       client.on('close', close)
-    }, SLOW_CONNECT_MS)
+    }, holdMs)
     client.on('error', () => clearTimeout(opening))
     client.on('close', () => clearTimeout(opening))
   })
@@ -117,18 +117,22 @@ const privacyVersion = (version: 0 | 1) =>
   prisma.$executeRaw`UPDATE "CommunityRuntimeCapability" SET privacy_version = ${version} WHERE id = 1`
 
 const proxy = slowConnectProxy(new URL(db.url))
+const fastProxy = slowConnectProxy(new URL(db.url), 0)
 let guardUrl: string
+let fastGuardUrl: string
 beforeAll(async () => {
   expect(new URL(db.url).hostname).toBe('127.0.0.1')
   await db.migrate()
   await seedMemberFlagsOff(prisma)
   guardUrl = await proxy.listen()
+  fastGuardUrl = await fastProxy.listen()
 }, 120_000)
 afterEach(() => {
   vi.unstubAllEnvs()
 })
 afterAll(async () => {
   await proxy.close()
+  await fastProxy.close()
   await prisma.$disconnect()
   await db.drop()
 })
@@ -257,6 +261,25 @@ describe('dispatch guard pool with 1.5 s connection opening', () => {
         []
       )
       expect(proxy.accepted()).toBe(accepted)
+    } finally {
+      await pool.$disconnect()
+    }
+  })
+
+  it('reports exactly the connections it opened when opening one is fast', async () => {
+    await privacyVersion(1)
+    const pool = new PrismaClient({
+      datasources: { db: { url: communityGuardPoolUrl(fastGuardUrl, SLOTS) } },
+    })
+    try {
+      const before = fastProxy.accepted()
+      const opened = await openCommunityGuardPool(
+        pool,
+        new CommunitySendGuard(pool, flags, provider),
+        communityGuardConnections(SLOTS)
+      )
+      expect(opened.connections).toBe(communityGuardConnections(SLOTS))
+      expect(fastProxy.accepted() - before).toBe(opened.connections)
     } finally {
       await pool.$disconnect()
     }

@@ -32,27 +32,38 @@ const poolConstructor = vi.hoisted(() => vi.fn())
 type LogFields = Record<string, unknown>
 const readinessLines = vi.hoisted((): LogFields[] => [])
 const dispatchEvents = vi.hoisted((): LogFields[] => [])
-// Records the readiness line; the rest of the runtime's logging goes nowhere.
+// Records the readiness and dispatch lines and still writes every line to the real logger.
 vi.mock('../../logger/pino.config.js', async (original) => {
   const actual = await original<typeof logger>()
-  const record =
-    (level: string) =>
-    (fields: LogFields, message?: string): void => {
-      if (message === 'community_dispatch_readiness')
-        readinessLines.push({ level, ...fields })
-      if (String(fields.event).startsWith('community_dispatch_'))
-        dispatchEvents.push({ level, ...fields })
-    }
-  const scoped: Record<string, unknown> = {
-    info: record('info'),
-    error: record('error'),
-    warn: record('warn'),
-    debug: record('debug'),
+  type Logger = ReturnType<typeof actual.createBaseLogger>
+  type Write = (fields: LogFields, message?: string) => void
+  const record = (level: string, fields: LogFields, message?: string) => {
+    if (message === 'community_dispatch_readiness')
+      readinessLines.push({ level, ...fields })
+    if (String(fields.event).startsWith('community_dispatch_'))
+      dispatchEvents.push({ level, ...fields })
   }
-  scoped.child = () => scoped
+  const recording = (target: Logger): Logger =>
+    new Proxy(target, {
+      get(logger, property, receiver) {
+        if (property === 'child') {
+          const child = logger.child.bind(logger) as (...bindings: unknown[]) => Logger
+          return (...bindings: unknown[]) => recording(child(...bindings))
+        }
+        if (property === 'info' || property === 'warn' || property === 'error') {
+          const write = logger[property].bind(logger) as Write
+          return (fields: LogFields, message?: string) => {
+            record(property, fields, message)
+            write(fields, message)
+          }
+        }
+        return Reflect.get(logger, property, receiver) as unknown
+      },
+    })
   return {
     ...actual,
-    createBaseLogger: (() => scoped) as unknown as typeof actual.createBaseLogger,
+    createBaseLogger: (...args: Parameters<typeof actual.createBaseLogger>) =>
+      recording(actual.createBaseLogger(...args)),
   }
 })
 vi.mock('@prisma/client', async (original) => ({
@@ -702,7 +713,9 @@ const poolTimeout = () =>
 const versionQueries = (boundary: ReturnType<typeof databaseBoundary>) =>
   boundary.queries.filter((query) => query.includes('server_version_num')).length
 const warmQueries = (boundary: ReturnType<typeof databaseBoundary>) =>
-  boundary.queries.filter((query) => query.trim() === 'SELECT 1').length
+  boundary.queries.filter((query) => query.includes('pg_sleep(0.1)')).length
+const isWarm = (sql: TemplateStringsArray | { strings: readonly string[] }) =>
+  ('strings' in sql ? sql.strings : sql).join('?').includes('pg_sleep(0.1)')
 
 describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
   it('opens every guard connection before the first send and logs how many opened', async () => {
@@ -792,6 +805,58 @@ describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
     ])
     await vi.advanceTimersByTimeAsync(60_001)
     expect(guard.db.$queryRaw).toHaveBeenCalledTimes(4)
+  })
+
+  it('reports guard_unreachable when the warm-up stops answering, without leaving startup pending', async () => {
+    const answer = guard.db.$queryRaw.getMockImplementation()!
+    guard.db.$queryRaw.mockImplementation(((sql, ...values) =>
+      isWarm(sql)
+        ? new Promise(() => undefined)
+        : answer(sql, ...values)) as typeof answer)
+    const pending = start(databaseBoundary(), 'general')
+    await vi.advanceTimersByTimeAsync(9999)
+    expect(readinessLines).toEqual([])
+    await vi.advanceTimersByTimeAsync(1)
+    expect((await pending).dispatch).toEqual({
+      status: 'degraded',
+      reason: 'guard_unreachable',
+    })
+    expect(guard.db.$disconnect).toHaveBeenCalledTimes(1)
+    expect(readinessLines[0]).toMatchObject({
+      errorClass: 'GuardStepTimeout',
+      preflightAttempts: 1,
+    })
+  })
+
+  it('treats a preflight that stops answering as a connect failure and retries it', async () => {
+    const answer = guard.db.$queryRaw.getMockImplementation()!
+    let stalled = false
+    guard.db.$queryRaw.mockImplementation(((sql, ...values) => {
+      const text = ('strings' in sql ? sql.strings : sql).join('?')
+      if (!stalled && text.includes('server_version_num')) {
+        stalled = true
+        return new Promise(() => undefined)
+      }
+      return answer(sql, ...values)
+    }) as typeof answer)
+    const pending = start(databaseBoundary(), 'general')
+    await vi.advanceTimersByTimeAsync(10_000 + 1000)
+    expect((await pending).dispatch).toEqual({ status: 'ready' })
+    expect(readinessLines[0]).toMatchObject({
+      preflightAttempts: 2,
+      guardConnections: 14,
+    })
+  })
+
+  it('reports guard_unreachable when every warm-up query fails after the preflight passed', async () => {
+    const answer = guard.db.$queryRaw.getMockImplementation()!
+    guard.db.$queryRaw.mockImplementation(((sql, ...values) =>
+      isWarm(sql)
+        ? Promise.reject(poolTimeout())
+        : answer(sql, ...values)) as typeof answer)
+    const runtime = await start(databaseBoundary(), 'general')
+    expect(runtime.dispatch).toEqual({ status: 'degraded', reason: 'guard_unreachable' })
+    expect(readinessLines[0]).toMatchObject({ errorCode: 'P2024', preflightAttempts: 1 })
   })
 
   it.each([
