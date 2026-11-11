@@ -10,6 +10,7 @@ import { COMMUNITY_COMMENT_JOB } from '../src/modules/community/community-modera
 import modelManifest from '../model-manifests/community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json'
 import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis.js'
 import { commentsTestContext } from './helpers/community-comments-context.js'
+import { updatePost } from './helpers/privacy-guards.js'
 
 const { prisma, database, namespace, input, fixture, create } = commentsTestContext()
 const COMMENT_COUNT = 10
@@ -113,15 +114,12 @@ describe('Story 6.4 mixed workload measurement', () => {
         .jpeg()
         .toBuffer()
       const objectPath = `synthetic-measurement/${randomUUID()}.jpg`
-      await prisma.lookbookPost.update({
-        where: { id: image.postId },
-        data: {
-          status: 'pending_review',
-          image_object_path: objectPath,
-          image_byte_size: bytes.length,
-          image_content_type: 'image/jpeg',
-          image_checksum: createHash('sha256').update(bytes).digest('hex'),
-        },
+      await updatePost(prisma, image.postId, {
+        status: 'pending_review',
+        image_object_path: objectPath,
+        image_byte_size: bytes.length,
+        image_content_type: 'image/jpeg',
+        image_checksum: createHash('sha256').update(bytes).digest('hex'),
       })
       const pending: Awaited<ReturnType<typeof create>>[] = []
       for (let index = 0; index < COMMENT_COUNT; index++)
