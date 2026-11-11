@@ -1,15 +1,21 @@
 import type { BurnInConfig } from '@seontechnologies/playwright-utils/burn-in'
 
 const config: BurnInConfig = {
+  // A custom list replaces the library defaults, so it carries their support-directory form
+  // (playwright-utils PR #278): files inside constants/, types/ and interfaces/, nested too,
+  // skip, and a spec, test or e2e file there still burns in.
   skipBurnInPatterns: [
     '**/config/**',
     '**/configuration/**',
     '**/playwright.config.ts',
     '**/*featureFlags*',
-    '**/*constants*',
+    '**/*constants!(*.spec.*|*.test.*|*.e2e.*)',
+    '**/constants/**/!(*.spec.*|*.test.*|*.e2e.*)',
     '**/*config*',
-    '**/*types*',
-    '**/*interfaces*',
+    '**/*types!(*.spec.*|*.test.*|*.e2e.*)',
+    '**/types/**/!(*.spec.*|*.test.*|*.e2e.*)',
+    '**/*interfaces!(*.spec.*|*.test.*|*.e2e.*)',
+    '**/interfaces/**/!(*.spec.*|*.test.*|*.e2e.*)',
     '**/package.json',
     '**/tsconfig.json',
     '**/*.md',

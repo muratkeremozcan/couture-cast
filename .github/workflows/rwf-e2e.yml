@@ -69,7 +69,14 @@ jobs:
     env:
       LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     permissions:
+      actions: read
       contents: read
+    # Two shards balanced by recorded test duration. The O1 probe runs one spec that holds
+    # one socket through the server's recycle, so it stays in one job.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(inputs.realtime_probe && '[1]' || '[1, 2]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -142,6 +149,15 @@ jobs:
           echo "Resolved branch name: $branch_name"
           echo "branch=$branch_name" >> "$GITHUB_OUTPUT"
 
+      # Exports PSP_ARGS for the Playwright command below. Each environment keeps its own
+      # history, since a deployed target and a local stack time the same test differently,
+      # and preview runs only on pull requests, so every run publishes into its own scope.
+      - name: Balance Playwright shards by duration
+        uses: muratkeremozcan/playwright-smart-parallelization@v1
+        with:
+          history-key: e2e-${{ inputs.test_env }}
+          publish-history: 'true'
+
       - name: Run Playwright
         shell: bash
         env:
@@ -176,6 +192,8 @@ jobs:
           # Dispatch inputs travel through env so they cannot inject shell.
           CUSTOM_BASE_URL: ${{ inputs.custom_base_url }}
           CUSTOM_API_BASE_URL: ${{ inputs.custom_api_base_url }}
+          TEST_COMMAND: ${{ inputs.test_command }}
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
         run: |
           case "$TEST_ENV" in
             local) export DATABASE_URL="${LOCAL_DATABASE_URL}" ;;
@@ -231,8 +249,14 @@ jobs:
             fi
           fi
 
-          # DEBUG env var already set at workflow level
-          ${{ inputs.test_command }}
+          # The shard and the balancing reporter go to Playwright through the npm script;
+          # a command that already passes arguments has its `--` separator.
+          SEPARATOR=(--)
+          if [[ "$TEST_COMMAND" == *" --"* ]]; then SEPARATOR=(); fi
+          # DEBUG env var already set at workflow level. PSP_ARGS stays unquoted, as the
+          # Action requires: it is empty when balancing is off.
+          # shellcheck disable=SC2086
+          $TEST_COMMAND "${SEPARATOR[@]}" --shard="$SHARD" $PSP_ARGS
 
       # Blocks the upload when a report or trace carries a secret this job
       # holds. Fails closed: if the scan cannot run, nothing is uploaded.
@@ -255,8 +279,22 @@ jobs:
         if: always() && steps.secret_scan.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: pw-artifacts-${{ inputs.test_env }}
+          name: pw-artifacts-${{ inputs.test_env }}-shard-${{ matrix.shard }}
           path: |
             playwright/artifacts/**
             playwright/playwright-report/**
           retention-days: 5
+
+  # Proves every test ran in exactly one shard and writes the shard times to the job summary.
+  finish:
+    needs: e2e
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - name: Check shard coverage and timing
+        uses: muratkeremozcan/playwright-smart-parallelization/finish@v1
+        with:
+          history-key: e2e-${{ inputs.test_env }}

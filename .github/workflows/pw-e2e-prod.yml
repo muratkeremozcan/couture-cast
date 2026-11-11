@@ -10,6 +10,8 @@ on:
   workflow_dispatch:
 
 permissions:
+  # The shard balancer reads the run's artifacts and jobs.
+  actions: read
   contents: read
 
 # One run per ref. Web and API serve only the newest main commit, so a run left

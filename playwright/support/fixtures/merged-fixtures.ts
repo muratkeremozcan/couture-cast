@@ -52,7 +52,22 @@ const authSession = base.extend<AuthFixtures>({
 // window where those routes genuinely 404'd) is stale and has been removed;
 // both routes are real and should be held to the same network-error bar as
 // every other endpoint.
-const networkErrorMonitor = base.extend(createNetworkErrorMonitorFixture())
+//
+// Story 6.13: the moderation console probes evidence export, which answers 503 by contract while
+// moderation history is off, as it is on deployed environments. Whether a test sees that answer
+// depends on whether the probe lands before the test ends (P-Q-MEDIA on preview, 1 run in 25), so
+// deployed runs exclude it. Locally the feature is on and any 5xx from it still fails the test.
+const networkErrorMonitor = base.extend(
+  createNetworkErrorMonitorFixture(
+    environment.name === 'local'
+      ? undefined
+      : {
+          excludePatterns: [
+            /\/api\/v1\/moderation\/evidence-exports\/availability(\?|$)/,
+          ],
+        }
+  )
+)
 
 // Story 6.13: before the context closes, so a proxied call still in flight cannot leave a report secret.
 const drainedProxyPage = base.extend({
