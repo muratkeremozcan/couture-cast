@@ -2,14 +2,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const pgAdapter = vi.hoisted(() => vi.fn())
+const pgAdapterOptions = vi.hoisted(() => vi.fn())
 const createPrismaClient = vi.hoisted(() => vi.fn(() => ({ kind: 'api-client' })))
 const findDatabaseCa = vi.hoisted(() =>
   vi.fn<() => string | undefined>(() => '/repo/apps/api/certs/ca.pem')
 )
 
 vi.mock('@prisma/adapter-pg', () => ({
-  PrismaPg: function PrismaPg(this: unknown, config: unknown) {
+  PrismaPg: function PrismaPg(this: unknown, config: unknown, options?: unknown) {
     pgAdapter(config)
+    pgAdapterOptions(options)
   },
 }))
 vi.mock('./prisma-client.js', () => ({ createPrismaClient }))
@@ -54,6 +56,18 @@ describe('createOperatorPrismaClient', () => {
     ]
     expect(Object.keys(options)).toEqual(['adapter'])
     expect(options.adapter).toBeInstanceOf(Object)
+  })
+
+  it('passes no schema option when the URL names none', () => {
+    createOperatorPrismaClient(remote, () => 'CA-PEM')
+    expect(pgAdapterOptions).toHaveBeenCalledWith(undefined)
+  })
+
+  it('keeps a configured schema as the adapter option after dropping the URL params', () => {
+    createOperatorPrismaClient(`${remote}&schema=ops`, () => 'CA-PEM')
+    expect(pgAdapterOptions).toHaveBeenCalledWith({ schema: 'ops' })
+    const [config] = pgAdapter.mock.calls[0] as [{ connectionString: string }]
+    expect(config.connectionString).not.toContain('schema=')
   })
 
   it('refuses a remote database when the CA is missing', () => {

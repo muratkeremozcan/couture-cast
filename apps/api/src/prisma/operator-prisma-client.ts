@@ -39,11 +39,16 @@ export function createOperatorPrismaClient(
   }
   const caPath = findDatabaseCa()
   if (!caPath) throw new DatabaseTlsRefusedError('The Supabase root CA was not found.')
+  // `schema` is the one parameter the adapter needs; it takes it as an option, not a URL param.
+  const schema = url.searchParams.get('schema')
   for (const key of [...url.searchParams.keys()]) url.searchParams.delete(key)
-  const adapter = new PrismaPg({
-    connectionString: url.toString(),
-    ssl: { ca: readCa(caPath), servername: host, rejectUnauthorized: true },
-    max: 1,
-  })
+  const adapter = new PrismaPg(
+    {
+      connectionString: url.toString(),
+      ssl: { ca: readCa(caPath), servername: host, rejectUnauthorized: true },
+      max: 1,
+    },
+    schema ? { schema } : undefined
+  )
   return createPrismaClient({ adapter })
 }
