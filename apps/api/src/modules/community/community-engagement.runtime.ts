@@ -342,7 +342,7 @@ const pause = (ms: number) =>
  * Verifies the guard capability, retrying only connect failures with backoff, then opens up to
  * `connections` guard connections so no send has to. Returns how many it proved open at once;
  * the caller sizes the send slots to that, so a shortfall lowers concurrency instead of leaving
- * slots that would have to open a connection inside a send's 250 ms wait.
+ * slots that would have to open a connection while a send waits for one.
  */
 export async function openCommunityGuardPool(
   guardPool: PrismaClient,
@@ -369,11 +369,14 @@ export async function openCommunityGuardPool(
 }
 
 /**
- * Opens up to `target` guard connections and proves how many it holds at once. Each lease is an
- * interactive transaction that, after its first answer, waits until every lease is held, every
- * other lease has failed, or the step deadline passes; only then are all released. A
- * connection that one lease released can therefore never be counted again by another, so
- * `held` is a count of distinct connections open together, not of successful queries.
+ * Opens up to `target` guard connections and proves how many it holds at once and can use
+ * afterwards. Each lease is an interactive transaction that, after its first answer, waits until
+ * every lease is held, every other lease has failed, or the step deadline passes; only then are
+ * all released. A connection that one lease released can therefore never be counted again by
+ * another. Only a lease whose COMMIT then succeeds within `closeDeadlineMs` counts: its
+ * connection went back to the pool answering. A COMMIT that fails or is never answered leaves a
+ * connection that cannot serve a send, so it is left out and the caller sizes the slots to the
+ * rest, or reports the guard unreachable when none is left.
  */
 async function holdLeases(
   guardPool: PrismaClient,
@@ -381,6 +384,8 @@ async function holdLeases(
 ): Promise<{ held: number; firstFailure?: unknown }> {
   let held = 0
   let failed = 0
+  let committed = 0
+  let releasing = false
   let firstFailure: unknown
   let release!: () => void
   const released = new Promise<void>((resolve) => {
@@ -395,11 +400,16 @@ async function holdLeases(
   }
   // A lease runs only `SELECT 1`, which calls no PL/pgSQL, so the pldbgapi2 retry inside
   // interactiveTransaction cannot repeat it and count it twice.
-  const leases = Array.from({ length: target }, () =>
-    interactiveTransaction(
+  const leases = Array.from({ length: target }, () => {
+    let answered = false
+    // A lease answered only after the release was never held together with the others.
+    let together = false
+    return interactiveTransaction(
       guardPool,
       async (tx) => {
         await tx.$queryRaw`SELECT 1 AS lease`
+        answered = true
+        together = !releasing
         held += 1
         account()
         await released
@@ -408,12 +418,19 @@ async function holdLeases(
         timeout:
           COMMUNITY_GUARD_POOL.stepDeadlineMs + COMMUNITY_GUARD_POOL.closeDeadlineMs,
       }
-    ).catch((error: unknown) => {
-      failed += 1
-      firstFailure ??= error
-      account()
-    })
-  )
+    ).then(
+      () => {
+        if (together) committed += 1
+      },
+      (error: unknown) => {
+        firstFailure ??= error
+        // A lease that failed after it was counted as held is already accounted for.
+        if (answered) return
+        failed += 1
+        account()
+      }
+    )
+  })
   let timer: ReturnType<typeof setTimeout> | undefined
   await Promise.race([
     allAccounted,
@@ -422,13 +439,14 @@ async function holdLeases(
     }),
   ])
   clearTimeout(timer)
-  const count = held
+  releasing = true
   release()
-  // Bounded: a lease whose query is never answered settles only at the socket timeout.
+  // Bounded: a COMMIT that is never answered settles only at the query bound.
   await Promise.race([Promise.all(leases), pause(COMMUNITY_GUARD_POOL.closeDeadlineMs)])
+  const usable = committed
   return {
-    held: count,
-    firstFailure: firstFailure ?? (count === 0 ? new GuardStepTimeout() : undefined),
+    held: usable,
+    firstFailure: firstFailure ?? (usable === 0 ? new GuardStepTimeout() : undefined),
   }
 }
 type Loop = (
@@ -480,8 +498,8 @@ async function startDispatch(
       sender,
       communityGuardConnections(sendSlots)
     )
-    // Sends run only on connections proven open: a send waits at most 250 ms for its
-    // transaction, far less than opening a connection takes, so a slot without one would fail.
+    // Sends run only on connections proven open and usable: opening one takes 0.6 to 1.2 s on
+    // the hosted worker, so a slot without one would spend its send budget opening it.
     const activeSlots = Math.min(
       sendSlots,
       opened.connections - COMMUNITY_GUARD_POOL.controlConnections

@@ -318,12 +318,14 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
   const label = () => `${++counter}`
   let sequence = 0
 
-  // Birthdates follow the suite's clock: the age gate reads it, and a member made on the real
-  // clock could be under 18 on a pinned clock that runs behind it.
+  // Birthdates come from JavaScript's clock, which the age checks read (calculateAge in
+  // guardian-participation.ts and the profile age gate), never from the suite's pinned `now()`:
+  // a teen born 15 years before a pinned 2026-11-04 turns 16 on the real clock in May 2027 and
+  // stops being refused. A suite that fakes Date moves both together.
   async function seedOwnMember(alias: string | null): Promise<SeededMember> {
     const user = await persistUser(
       prisma,
-      createUser({ age: 40, birthdate: birthdateForAge(40, now()) })
+      createUser({ age: 40, birthdate: birthdateForAge(40) })
     )
     const name = alias ?? `${runId}-operator${label()}`
     if (alias) await prisma.communityAlias.create({ data: { user_id: user.id, alias } })
@@ -342,13 +344,13 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
       prisma,
       createTeenUser({
         age: 15,
-        birthdate: birthdateForAge(15, now()),
+        birthdate: birthdateForAge(15),
         profilePreferences: { compliance: { accountStatus: 'active' } },
       })
     )
     const guardian = await persistUser(
       prisma,
-      createUser({ age: 42, birthdate: birthdateForAge(42, now()) })
+      createUser({ age: 42, birthdate: birthdateForAge(42) })
     )
     const alias = `${runId}-teen${label()}`
     await prisma.communityAlias.create({ data: { user_id: user.id, alias } })

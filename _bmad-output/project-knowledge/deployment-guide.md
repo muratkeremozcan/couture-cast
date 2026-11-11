@@ -1042,14 +1042,17 @@ connection included, may take 5 seconds: opening one through the pooler measured
 on the hosted worker while idle, 1.0 to 1.2 s with its two vCPUs busy and up to about 4 s with
 both saturated. One query may wait 5 seconds for its answer, ten times the server's 500 ms
 statement bound; a query that runs out destroys its connection, so a connection that stops
-answering is closed and replaced instead of held. Opened connections stay open while idle.
+answering is closed and replaced instead of held. A connection lost under a query (the pooler
+closed it, the network reset it) is named `connection_lost`, apart from a SQL error. Opened
+connections stay open while idle.
 
 **Preflight and warm-up.** The preflight retries only failures to get or use a guard connection,
 1, 2 and 4 seconds apart, and reports `guard_unreachable` when the fourth attempt fails. Each
 attempt and the warm-up must finish within 10 seconds, and closing a pool that failed takes at
 most 2 seconds. The warm-up holds every guard connection at once, each in an open transaction,
-until all are held or the deadline passes, and counts what it held. Sends get the connections it
-proved, less the four control ones: a shortfall lowers `sendSlots`, and too few for one send
+until all are held or the deadline passes, then commits them all and counts only the ones held
+together whose COMMIT succeeded within 2 seconds: a connection whose COMMIT failed or was never
+answered cannot serve a send. Sends get the connections it proved, less the four control ones: a shortfall lowers `sendSlots`, and too few for one send
 reports `guard_unreachable` (`GuardCapacityShortfall`). A send waits at most 2 s from its claim
 to its provider call, and the server-side guard bounds are unchanged.
 

@@ -242,6 +242,8 @@ export class CommunitySendGuard {
           const outcome = await this.provider.send(authorization.message, abort.signal)
           await this.complete(tx, attempt, owner, outcome)
         },
+        // On the guard pool's driver adapter `maxWait` is not enforced (measured); getting a
+        // connection is bounded by the pool's own 5 s acquisition timeout.
         { timeout: 3000, maxWait: 250 }
       )
     } catch (error) {

@@ -21,7 +21,8 @@ import { createPrismaClient } from './prisma-client.js'
  * and a query that runs out destroys its socket, so the pool drops that client and opens a
  * fresh one when it is next needed.
  *
- * Every failure to get or use a guard connection reaches the caller as a GuardDriverError, so
+ * Every failure to get or use a guard connection (opening it, waiting for it, a query that is
+ * never answered, the connection lost under a query) reaches the caller as a GuardDriverError, so
  * the dispatch preflight and the send guard can tell "the guard database is unreachable" apart
  * from a real answer. Prisma passes such an error through unchanged: the adapter maps only
  * PostgreSQL, socket and TLS errors.
@@ -31,7 +32,11 @@ import { createPrismaClient } from './prisma-client.js'
  * `connection_limit` and `sslmode` are Prisma engine settings and node-postgres would read
  * `sslmode=require` as "encrypt without verifying".
  */
-export type GuardDriverFailure = 'acquire_timeout' | 'connect_failed' | 'query_timeout'
+export type GuardDriverFailure =
+  | 'acquire_timeout'
+  | 'connect_failed'
+  | 'query_timeout'
+  | 'connection_lost'
 
 export class GuardDriverError extends Error {
   constructor(
@@ -54,36 +59,80 @@ export type GuardPoolOptions = {
 
 const QUERY_READ_TIMEOUT = 'Query read timeout'
 const ACQUIRE_TIMEOUT = 'timeout exceeded when trying to connect'
+/** What node-postgres rejects a query with when its established connection goes away. */
+const CONNECTION_LOST = new Set([
+  'Connection terminated unexpectedly',
+  'Connection terminated',
+  'Client has encountered a connection error and is not queryable',
+  'Client was closed and is not queryable',
+])
+
+/**
+ * A failure of the connection itself, never an answer from PostgreSQL: one of node-postgres's
+ * own connection messages, or a socket error (ECONNRESET, EPIPE and the like, which carry the
+ * failed `syscall`). A SQL error is a `pg.DatabaseError` with a SQLSTATE and is never one.
+ */
+function isConnectionLost(error: unknown): boolean {
+  if (!(error instanceof Error) || error instanceof pg.DatabaseError) return false
+  if (CONNECTION_LOST.has(error.message)) return true
+  const { code, syscall } = error as { code?: unknown; syscall?: unknown }
+  return typeof syscall === 'string' && typeof code === 'string' && /^E[A-Z]+$/.test(code)
+}
 
 type Callback = (...args: unknown[]) => void
 
-/** A client that destroys its socket when a query outlives `query_timeout`. */
+/** A failure of an established guard connection as a GuardDriverError; anything else as is. */
+function guardQueryError(error: unknown): unknown {
+  if (error instanceof GuardDriverError || !isConnectionLost(error)) return error
+  return new GuardDriverError('connection_lost', { cause: error })
+}
+
+/**
+ * Runs a node-postgres `query`, in whichever of its call styles it was given (a trailing
+ * callback, or a returned promise), with its error passed through `map`.
+ */
+function mappingErrors(
+  args: unknown[],
+  query: (...parameters: unknown[]) => unknown,
+  map: (error: unknown) => unknown
+): never {
+  const last = args.at(-1)
+  if (typeof last === 'function') {
+    const callback = last as Callback
+    args[args.length - 1] = (error: unknown, ...rest: unknown[]) =>
+      callback(error ? map(error) : error, ...rest)
+    return query(...args) as never
+  }
+  const result = query(...args)
+  if (result instanceof Promise)
+    return result.catch((error: unknown) => {
+      throw map(error)
+    }) as never
+  return result as never
+}
+
+/**
+ * A client that destroys its socket when a query outlives `query_timeout`, and names a query
+ * whose connection was lost under it (the pooler closed it, the network reset it) as
+ * `connection_lost`, so it is told apart from a SQL error.
+ */
 class GuardClient extends pg.Client {
   // node-postgres overloads `query` many ways; the wrapper only watches how it settles.
   override query(...args: unknown[]): never {
-    const destroyed = (error: unknown) => {
-      if (!(error instanceof Error) || error.message !== QUERY_READ_TIMEOUT)
-        return error
-        // The answer may still arrive later and would be read as the next query's, so the
-        // connection cannot be reused: end it at the socket, which also ends the client.
-      ;(
-        this as unknown as { connection?: { stream?: Socket } }
-      ).connection?.stream?.destroy()
-      return new GuardDriverError('query_timeout', { cause: error })
-    }
-    const last = args.at(-1)
-    if (typeof last === 'function') {
-      const callback = last as Callback
-      args[args.length - 1] = (error: unknown, ...rest: unknown[]) =>
-        callback(error ? destroyed(error) : error, ...rest)
-      return (super.query as (...parameters: unknown[]) => never)(...args)
-    }
-    const result = (super.query as (...parameters: unknown[]) => unknown)(...args)
-    if (result instanceof Promise)
-      return result.catch((error: unknown) => {
-        throw destroyed(error)
-      }) as never
-    return result as never
+    return mappingErrors(
+      args,
+      (...parameters) => (super.query as (...all: unknown[]) => unknown)(...parameters),
+      (error) => {
+        if (!(error instanceof Error) || error.message !== QUERY_READ_TIMEOUT)
+          return guardQueryError(error)
+          // The answer may still arrive later and would be read as the next query's, so the
+          // connection cannot be reused: end it at the socket, which also ends the client.
+        ;(
+          this as unknown as { connection?: { stream?: Socket } }
+        ).connection?.stream?.destroy()
+        return new GuardDriverError('query_timeout', { cause: error })
+      }
+    )
   }
 }
 
@@ -102,8 +151,20 @@ type ConnectCallback = (
   done: (release?: Error | boolean) => void
 ) => void
 
-/** A pool whose connection failures are GuardDriverErrors, in both of its call styles. */
+/**
+ * A pool whose connection failures are GuardDriverErrors, in both of its call styles. Its own
+ * `query` needs the mapping as well: when a connection is lost mid-query, pg-pool answers with
+ * the client's `error` event, which reaches the caller without passing through GuardClient.
+ */
 class GuardPool extends pg.Pool {
+  override query(...args: unknown[]): never {
+    return mappingErrors(
+      args,
+      (...parameters) => (super.query as (...all: unknown[]) => unknown)(...parameters),
+      guardQueryError
+    )
+  }
+
   override connect(): Promise<pg.PoolClient>
   override connect(callback: ConnectCallback): void
   override connect(callback?: ConnectCallback): Promise<pg.PoolClient> | void {

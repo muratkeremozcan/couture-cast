@@ -44,6 +44,7 @@ import type { CommunityPushOutcome } from '../src/modules/community/community-pu
 import { CommunityFlagEvaluationService } from '../src/modules/feature-flags/community-flag-evaluation.service.js'
 import { ComplimentaryAccessService } from '../src/modules/feature-flags/complimentary-access.service.js'
 import { PushRegistrationService } from '../src/modules/notifications/push-registration.service.js'
+import { GuardDriverError } from '../src/prisma/guard-prisma-client.js'
 
 vi.setConfig({ testTimeout: 120_000 })
 
@@ -73,11 +74,17 @@ const provider = {
 /**
  * Holds every new connection for `holdMs` before it reaches the database. With `stallOn`,
  * a connection that sends that text stops receiving answers: the query is accepted and
- * never answered.
+ * never answered. `arm` adds a fault for the next `times` connections that send `marker`
+ * ('' matches anything): `stall` withholds every answer from then on, `close` drops both
+ * sockets before the text reaches the database, as a pooler that ends a connection would.
  */
+type Fault = { marker: string; action: 'stall' | 'close'; remaining: number }
 function slowConnectProxy(target: URL, holdMs = SLOW_CONNECT_MS, stallOn?: string) {
   const sockets = new Set<Socket>()
   let accepted = 0
+  const faults: Fault[] = stallOn
+    ? [{ marker: stallOn, action: 'stall', remaining: Infinity }]
+    : []
   const server = createServer((client) => {
     accepted++
     sockets.add(client)
@@ -94,7 +101,14 @@ function slowConnectProxy(target: URL, holdMs = SLOW_CONNECT_MS, stallOn?: strin
       upstream.on('connect', () => {
         let stalled = false
         client.on('data', (chunk: Buffer) => {
-          if (stallOn && chunk.includes(stallOn)) stalled = true
+          const fault = faults.find(
+            (candidate) => candidate.remaining > 0 && chunk.includes(candidate.marker)
+          )
+          if (fault) {
+            fault.remaining -= 1
+            if (fault.action === 'close') return close()
+            stalled = true
+          }
           upstream.write(chunk)
         })
         upstream.on('data', (chunk: Buffer) => {
@@ -113,6 +127,14 @@ function slowConnectProxy(target: URL, holdMs = SLOW_CONNECT_MS, stallOn?: strin
     accepted: () => accepted,
     /** Client and upstream sockets still open through this proxy. */
     open: () => sockets.size,
+    arm: (marker: string, action: Fault['action'], times = Infinity) => {
+      faults.push({ marker, action, remaining: times })
+    },
+    /** Faults not yet used up; `disarm` drops every armed fault. */
+    armed: () => faults.filter((fault) => fault.remaining > 0).length,
+    disarm: () => {
+      faults.length = 0
+    },
     async listen() {
       await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
       const url = new URL(db.url)
@@ -133,9 +155,11 @@ const privacyVersion = (version: 0 | 1) =>
 const proxy = slowConnectProxy(new URL(db.url))
 const fastProxy = slowConnectProxy(new URL(db.url), 0)
 const stallingProxy = slowConnectProxy(new URL(db.url), 0, 'AS lease')
+const faultProxy = slowConnectProxy(new URL(db.url), 0)
 let guardUrl: string
 let fastGuardUrl: string
 let stallingGuardUrl: string
+let faultGuardUrl: string
 beforeAll(async () => {
   expect(new URL(db.url).hostname).toBe('127.0.0.1')
   await db.migrate()
@@ -143,14 +167,17 @@ beforeAll(async () => {
   guardUrl = await proxy.listen()
   fastGuardUrl = await fastProxy.listen()
   stallingGuardUrl = await stallingProxy.listen()
+  faultGuardUrl = await faultProxy.listen()
 }, 120_000)
 afterEach(() => {
   vi.unstubAllEnvs()
+  faultProxy.disarm()
 })
 afterAll(async () => {
   await proxy.close()
   await fastProxy.close()
   await stallingProxy.close()
+  await faultProxy.close()
   await prisma.$disconnect()
   await db.drop()
 })
@@ -462,6 +489,153 @@ describe('dispatch guard pool with 1.5 s connection opening', () => {
       unlock()
       await holder
       await locker.$disconnect()
+    }
+  })
+})
+
+describe('guard connections that fail after they open', () => {
+  const capabilityOk = { verifyRuntime: () => Promise.resolve() }
+  const connections = communityGuardConnections(SLOTS)
+
+  async function closedWithin(ms: number) {
+    const deadline = Date.now() + ms
+    while (faultProxy.open() > 0 && Date.now() < deadline) await delay(250)
+    return faultProxy.open()
+  }
+
+  it('counts no lease whose COMMIT is never answered and reports guard_unreachable', async () => {
+    faultProxy.arm('COMMIT', 'stall')
+    const pool = createCommunityGuardPool(faultGuardUrl, SLOTS)
+    const started = Date.now()
+    try {
+      await expect(
+        openCommunityGuardPool(pool, capabilityOk, connections)
+      ).rejects.toThrow('Community dispatch guard unreachable.')
+      // The barrier answers at once; the release waits its 2 s bound and no longer.
+      expect(Date.now() - started).toBeLessThan(5000)
+    } finally {
+      faultProxy.disarm()
+      await pool.$disconnect()
+    }
+    // Each unanswered COMMIT ends at the 5 s query bound and destroys its connection.
+    expect(await closedWithin(30_000)).toBe(0)
+  })
+
+  it('counts no lease whose COMMIT fails and reports guard_unreachable', async () => {
+    faultProxy.arm('COMMIT', 'close')
+    const pool = createCommunityGuardPool(faultGuardUrl, SLOTS)
+    try {
+      await expect(
+        openCommunityGuardPool(pool, capabilityOk, connections)
+      ).rejects.toThrow('Community dispatch guard unreachable.')
+    } finally {
+      faultProxy.disarm()
+      await pool.$disconnect()
+    }
+    expect(await closedWithin(10_000)).toBe(0)
+  })
+
+  it('sizes the pool to the leases whose COMMIT succeeded', async () => {
+    faultProxy.arm('COMMIT', 'stall', 5)
+    const pool = createCommunityGuardPool(faultGuardUrl, SLOTS)
+    try {
+      expect(await openCommunityGuardPool(pool, capabilityOk, connections)).toEqual({
+        attempts: 1,
+        connections: connections - 5,
+      })
+    } finally {
+      faultProxy.disarm()
+      await pool.$disconnect()
+    }
+  })
+
+  it('retries a preflight whose connection is closed under its query', async () => {
+    await privacyVersion(1)
+    faultProxy.arm('server_version_num', 'close', 1)
+    const pool = createCommunityGuardPool(faultGuardUrl, SLOTS)
+    try {
+      expect(
+        await openCommunityGuardPool(
+          pool,
+          new CommunitySendGuard(pool, flags, provider),
+          connections
+        )
+      ).toEqual({ attempts: 2, connections })
+      expect(faultProxy.armed()).toBe(0)
+    } finally {
+      await pool.$disconnect()
+    }
+  })
+
+  it('names a connection closed under the claim as the guard being unreachable', async () => {
+    const delivery = await seededDelivery({ granted: true })
+    const pool = createCommunityGuardPool(faultGuardUrl, SLOTS)
+    try {
+      const guard = new CommunitySendGuard(pool, flags, provider)
+      sent.length = 0
+      faultProxy.arm("transaction_timeout = '500ms'", 'close', 1)
+      const failure = await guard.dispatch(delivery.id).then(
+        () => undefined,
+        (error: unknown) => error
+      )
+      expect(failure).toBeInstanceOf(GuardDriverError)
+      expect(failure).toMatchObject({ kind: 'connection_lost' })
+      expect(faultProxy.armed()).toBe(0)
+      expect(sent).toEqual([])
+    } finally {
+      await pool.$disconnect()
+    }
+  })
+
+  it('defers a send whose connection is closed before the provider call as guard_unreachable', async () => {
+    const delivery = await seededDelivery({ granted: true })
+    const pool = createCommunityGuardPool(faultGuardUrl, SLOTS)
+    try {
+      const guard = new CommunitySendGuard(pool, flags, provider)
+      sent.length = 0
+      faultProxy.arm('"CommunityFlagEvaluation" e JOIN', 'close', 1)
+      expect(await guard.dispatch(delivery.id)).toBe(true)
+      expect(faultProxy.armed()).toBe(0)
+      expect(sent).toEqual([])
+      const attempts = await prisma.communityDeliveryAttempt.findMany({
+        where: { delivery_id: delivery.id },
+      })
+      expect(attempts.map((attempt) => [attempt.status, attempt.reason])).toEqual([
+        ['deferred', 'no_call:guard_unreachable'],
+      ])
+    } finally {
+      await pool.$disconnect()
+    }
+  })
+
+  it('records a handoff_uncertain when the connection is closed after the provider call', async () => {
+    const delivery = await seededDelivery({ granted: true })
+    const pool = createCommunityGuardPool(faultGuardUrl, SLOTS)
+    try {
+      const closingProvider = {
+        send: (message: Message) => {
+          sent.push(message)
+          // The next statement on any guard connection is this send's settlement.
+          faultProxy.arm('', 'close', 1)
+          return Promise.resolve<CommunityPushOutcome>({
+            status: 'accepted',
+            ticketId: randomUUID(),
+          })
+        },
+      } as unknown as CommunityPushProvider
+      const guard = new CommunitySendGuard(pool, flags, closingProvider)
+      sent.length = 0
+      expect(await guard.dispatch(delivery.id)).toBe(true)
+      expect(faultProxy.armed()).toBe(0)
+      expect(sent).toHaveLength(1)
+      const attempts = await prisma.communityDeliveryAttempt.findMany({
+        where: { delivery_id: delivery.id },
+      })
+      expect(attempts.map((attempt) => [attempt.status, attempt.reason])).toEqual([
+        ['unknown', 'handoff_uncertain'],
+      ])
+    } finally {
+      await pool.$disconnect()
     }
   })
 })

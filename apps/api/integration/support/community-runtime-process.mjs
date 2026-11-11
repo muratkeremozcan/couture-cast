@@ -11,6 +11,41 @@ const primary = new URL(process.env.DATABASE_URL)
 if (!/^\/tea_community_[a-f0-9]{32}$/.test(primary.pathname))
   throw new Error('Isolated UUID DB required')
 const { PrismaClient } = require('@prisma/client')
+// The dispatch worker's own log lines about capacity and lag, kept for the herd lane: every
+// logger the runtime creates writes its JSON lines here at info level, and only the
+// `community_dispatch_*` events are kept. Nothing else is printed (LOG_LEVEL stays as set).
+const { Writable } = require('node:stream')
+const pinoConfig = require('../../dist/src/logger/pino.config.js')
+const dispatchEvents = []
+const dispatchLog = new Writable({
+  write(chunk, _encoding, done) {
+    for (const line of String(chunk).split('\n')) {
+      if (!line.includes('"community_dispatch_')) continue
+      try {
+        const { event, lagMs, outstanding, sendSlots, behindMs } = JSON.parse(line)
+        if (typeof event === 'string' && event.startsWith('community_dispatch_'))
+          dispatchEvents.push({
+            event,
+            at: Date.now(),
+            lagMs,
+            outstanding,
+            sendSlots,
+            behindMs,
+          })
+      } catch {
+        // A partial line is not an event.
+      }
+    }
+    done()
+  },
+})
+const createBaseLogger = pinoConfig.createBaseLogger
+pinoConfig.createBaseLogger = (options = {}) =>
+  createBaseLogger({
+    ...options,
+    env: { ...process.env, LOG_LEVEL: 'info' },
+    destination: dispatchLog,
+  })
 const {
   startCommunityEngagementRuntime,
 } = require('../../dist/src/modules/community/community-engagement.runtime.js')
@@ -78,6 +113,7 @@ process.on('message', async ({ id, op, args }) => {
       value = runtime.dispatch
     }
     if (op === 'counts') value = { ...counts }
+    if (op === 'dispatchEvents') value = dispatchEvents.splice(0)
     if (op === 'analytics') {
       holdAnalytics = args
       if (!args) analyticsReleases.forEach((release) => release())

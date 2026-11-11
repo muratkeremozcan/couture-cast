@@ -17,6 +17,7 @@ import {
   persistUser,
 } from '@couture/testing'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
 import {
   ledgerSchema,
@@ -47,6 +48,25 @@ const expoLatency = JSON.parse(
 // slow-provider envelope instead, which the bound does not cover: see D10.
 const PROVIDER_LATENCY_MS =
   process.env.STORY65_PROVIDER_LATENCY_MS ?? expoLatency.samplesMs.join(',')
+// The slow-provider envelope (D10 amendment): every send answers after this many ms, above
+// Expo's slowest measured answer (1299 ms) and under the 2 s provider deadline, so 600 sends at
+// 10 slots need about 90 s and the 60 s bound cannot hold. At a flat 887 ms (the p95 of the first
+// 30-send sample) the herd sits on the edge: one run settled 33 normal sends past 60 s, a rerun
+// settled all within 56 s. This scenario accepts lateness up to DEGRADED_BOUND_MS and requires
+// the worker to say so: it must log community_dispatch_behind from its lag query and
+// community_dispatch_caught_up once it is not.
+const SLOW_PROVIDER_LATENCY_MS = Number(
+  process.env.STORY65_SLOW_PROVIDER_LATENCY_MS ?? 1500
+)
+const DEGRADED_BOUND_MS = 120_000
+const dispatchEventSchema = z.array(
+  z.object({
+    event: z.string(),
+    at: z.number(),
+    lagMs: z.number().optional(),
+    outstanding: z.number().optional(),
+  })
+)
 // Currently observing DST (northern and southern) and fixed offsets, including :30 and :45.
 const ZONES = [
   'UTC',
@@ -236,10 +256,67 @@ afterAll(async () => {
   expect(outcomes.filter((outcome) => outcome.status === 'rejected')).toEqual([])
 }, 120_000)
 
-type Outage = 'none' | 'worker-stall' | 'provider-stall'
+type Outage = 'none' | 'worker-stall' | 'provider-stall' | 'slow-provider'
+
+/** Starts the scenario's outage just before the release minute. */
+async function beginOutage(
+  outage: Outage,
+  release: number,
+  outageTimeline: Record<string, number>
+) {
+  if (outage === 'worker-stall') {
+    await waitUntilDb(release - 10_000)
+    runtime.signal('SIGSTOP')
+    outageTimeline.stoppedAt = dbNow()
+  }
+  if (outage === 'provider-stall') {
+    await waitUntilDb(release - 5000)
+    await provider.call('mode', 'hold')
+    outageTimeline.heldAt = dbNow()
+  }
+  if (outage === 'slow-provider') {
+    await waitUntilDb(release - 5000)
+    await provider.call('latency', String(SLOW_PROVIDER_LATENCY_MS))
+    outageTimeline.slowFrom = dbNow()
+  }
+}
+
+type Lateness = { overdue: number; pastDegradedBound: number }
+type DispatchEvent = z.infer<typeof dispatchEventSchema>[number]
+
+/**
+ * Every delivery inside the 60 s bound; with a slow provider, inside the degraded bound instead,
+ * late past 60 s for some, and the worker's behind and caught-up telemetry saying so.
+ */
+function expectInsideBound(
+  outage: Outage,
+  result: { herd: Lateness; normal: Lateness },
+  telemetry: DispatchEvent[]
+) {
+  const behind = telemetry.filter((entry) => entry.event === 'community_dispatch_behind')
+  if (outage !== 'slow-provider') {
+    expect(result.herd.overdue).toBe(0)
+    expect(result.normal.overdue).toBe(0)
+    // Inside the bound nothing is behind, so the worker never says it is.
+    if (outage === 'none') expect(behind).toEqual([])
+    return
+  }
+  expect(result.herd.pastDegradedBound).toBe(0)
+  expect(result.normal.pastDegradedBound).toBe(0)
+  expect(result.herd.overdue + result.normal.overdue).toBeGreaterThan(0)
+  const caughtUp = telemetry.find(
+    (entry) => entry.event === 'community_dispatch_caught_up'
+  )
+  expect(behind[0]?.lagMs).toBeGreaterThan(BOUND_MS)
+  expect(behind[0]?.outstanding).toBeGreaterThan(0)
+  expect(caughtUp?.at).toBeGreaterThan(behind[0]!.at)
+}
 
 async function scenario(outage: Outage) {
   const ledgerBefore = ledgerSchema.parse(await provider.call('ledger')).length
+  const bound = outage === 'slow-provider' ? DEGRADED_BOUND_MS : BOUND_MS
+  // Telemetry from earlier scenarios is not this one's.
+  await runtime.call('dispatchEvents')
   // The release minute leaves room to build and qualify every fixture while still quiet.
   const release = Math.ceil((dbNow() + 210_000) / 60_000) * 60_000
   const herd = await mapLimit(Array.from({ length: HERD }), 16, (_, index) =>
@@ -286,16 +363,7 @@ async function scenario(outage: Outage) {
 
   let recovery = release
   const outageTimeline: Record<string, number> = {}
-  if (outage === 'worker-stall') {
-    await waitUntilDb(release - 10_000)
-    runtime.signal('SIGSTOP')
-    outageTimeline.stoppedAt = dbNow()
-  }
-  if (outage === 'provider-stall') {
-    await waitUntilDb(release - 5000)
-    await provider.call('mode', 'hold')
-    outageTimeline.heldAt = dbNow()
-  }
+  await beginOutage(outage, release, outageTimeline)
   await waitUntilDb(release)
   // Normal traffic: a burst of 40 at the release minute, then 1/s for 60 s.
   const burstCommits = await Promise.all(
@@ -308,7 +376,7 @@ async function scenario(outage: Outage) {
       sustainedCommits.push(await react(index, target.post))
     }
   })()
-  if (outage !== 'none') {
+  if (outage === 'worker-stall' || outage === 'provider-stall') {
     await waitUntilDb(release + 20_000)
     if (outage === 'worker-stall') runtime.signal('SIGCONT')
     else await provider.call('release', 'accepted')
@@ -327,8 +395,23 @@ async function scenario(outage: Outage) {
         where: { owner_id: { in: [...herdIds, ...normalIds] }, status: { in: terminal } },
       }),
     (count) => count === expected,
-    Math.max(5000, recovery + BOUND_MS + 15_000 - dbNow())
+    Math.max(5000, recovery + bound + 15_000 - dbNow())
   ).catch(() => undefined)
+  const telemetry: z.infer<typeof dispatchEventSchema> = []
+  if (outage === 'slow-provider') {
+    await provider.call('latency', PROVIDER_LATENCY_MS)
+    outageTimeline.slowUntil = dbNow()
+    // The worker reports catching up on the first pass after the backlog clears.
+    await until(
+      async () => {
+        telemetry.push(...dispatchEventSchema.parse(await runtime.call('dispatchEvents')))
+        return telemetry.some((entry) => entry.event === 'community_dispatch_caught_up')
+      },
+      Boolean,
+      30_000
+    ).catch(() => undefined)
+  } else
+    telemetry.push(...dispatchEventSchema.parse(await runtime.call('dispatchEvents')))
 
   const herdRows = await deliveriesFor(herdIds)
   const normalRows = await deliveriesFor(normalIds)
@@ -392,6 +475,9 @@ async function scenario(outage: Outage) {
       overdue: herdMeasured.filter(
         (row) => row.terminalMs === null || row.terminalMs > BOUND_MS
       ).length,
+      pastDegradedBound: herdMeasured.filter(
+        (row) => row.terminalMs === null || row.terminalMs > DEGRADED_BOUND_MS
+      ).length,
     },
     normal: {
       deliveries: normalRows.length,
@@ -405,6 +491,9 @@ async function scenario(outage: Outage) {
       overdue: normalMeasured.filter(
         (row) => row.terminalMs === null || row.terminalMs > BOUND_MS
       ).length,
+      pastDegradedBound: normalMeasured.filter(
+        (row) => row.terminalMs === null || row.terminalMs > DEGRADED_BOUND_MS
+      ).length,
     },
     eligibilityReasons: counts(changes.map((change) => ({ status: change.reason }))),
     expired: expiredGroups.map((group) => ({
@@ -415,6 +504,7 @@ async function scenario(outage: Outage) {
       requests: ledger.length,
       accepted: ledger.filter((entry) => entry.accepted).length,
     },
+    telemetry: telemetry.map((entry) => ({ ...entry, at: entry.at - release })),
   }
   ;(evidence.scenarios ??= []) as unknown[]
   ;(evidence.scenarios as unknown[]).push(result)
@@ -425,8 +515,7 @@ async function scenario(outage: Outage) {
   expect([...herdMeasured, ...normalMeasured].every((row) => row.attempts === 1)).toBe(
     true
   )
-  expect(result.herd.overdue).toBe(0)
-  expect(result.normal.overdue).toBe(0)
+  expectInsideBound(outage, result, telemetry)
   // Qualification fixed the release minute; nothing reset eligibility afterwards.
   expect(changes.every((change) => change.reason === 'qualified_quiet')).toBe(true)
   expect(changes.every((change) => change.eligible_at.getTime() === release)).toBe(true)
@@ -454,5 +543,9 @@ describe('quiet-hour herd of max(500, H) due tokens', { concurrent: false }, () 
 
   it('settles every token within 60 s of a held provider releasing, without a resend', async () => {
     await scenario('provider-stall')
+  }, 600_000)
+
+  it('stays inside the degraded bound with a slow provider and logs behind, then caught up', async () => {
+    await scenario('slow-provider')
   }, 600_000)
 })
