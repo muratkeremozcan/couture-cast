@@ -210,65 +210,61 @@ describe('apt source rewrite', () => {
 })
 
 describe('pinned browser installer', () => {
-  /** A supervisor that records each attempt and answers from `results`. */
-  const recording = (results, onAttempt = () => undefined) => {
+  const recording = (results) => {
     const calls = []
-    const supervise = async (command, args, options) => {
+    const run = (command, args, options) => {
       calls.push([command, args, options])
-      onAttempt(options)
-      return results.shift()
+      return results.shift() ?? { status: 0 }
     }
-    return { calls, supervise }
+    return { calls, run }
   }
 
-  test('browser installer runs the pinned CLI under the apt-retry supervisor with the deadline reserved', async () => {
-    const { installPinnedPlaywrightBrowsers } = await helper()
-    const { calls, supervise } = recording([{ status: 0 }])
-    await installPinnedPlaywrightBrowsers({
+  test('system packages go through apt-install.sh, then the pinned CLI downloads the browsers', async () => {
+    const { installPinnedPlaywrightBrowsers, APT_INSTALL_SCRIPT } = await helper()
+    const { calls, run } = recording([])
+    installPinnedPlaywrightBrowsers({
       node: '/owned/node',
       cli: '/pinned/playwright/cli.js',
-      supervise,
-      now: () => 0,
+      run,
     })
+    assert.equal(APT_INSTALL_SCRIPT, 'scripts/ci/apt-install.sh')
     assert.deepEqual(calls, [
       [
+        'bash',
+        ['scripts/ci/apt-install.sh', '--playwright', 'chromium', 'firefox', 'webkit'],
+        { stdio: 'inherit' },
+      ],
+      [
         '/owned/node',
-        [
-          '/pinned/playwright/cli.js',
-          'install',
-          '--with-deps',
-          'chromium',
-          'firefox',
-          'webkit',
-        ],
-        { seconds: 600 },
+        ['/pinned/playwright/cli.js', 'install', 'chromium', 'firefox', 'webkit'],
+        { stdio: 'inherit' },
       ],
     ])
   })
 
   test('API32 provisions only the Chromium engine required by the browser-mode accessibility bridge', async () => {
     const { installPinnedPlaywrightBrowsers } = await helper()
-    const { calls, supervise } = recording([{ status: 0 }])
-    await installPinnedPlaywrightBrowsers({
+    const { calls, run } = recording([])
+    installPinnedPlaywrightBrowsers({
       node: '/owned/node',
       cli: '/pinned/cli.js',
       browsers: ['chromium'],
-      supervise,
+      run,
     })
     assert.deepEqual(calls[0][1], [
-      '/pinned/cli.js',
-      'install',
-      '--with-deps',
+      'scripts/ci/apt-install.sh',
+      '--playwright',
       'chromium',
     ])
+    assert.deepEqual(calls[1][1], ['/pinned/cli.js', 'install', 'chromium'])
   })
 
   test('the installer accepts only the two required engine sets', async () => {
     const { installPinnedPlaywrightBrowsers } = await helper()
     for (const browsers of [[], ['firefox'], ['chromium', 'firefox'], 'chromium']) {
-      const { calls, supervise } = recording([{ status: 0 }])
-      await assert.rejects(
-        installPinnedPlaywrightBrowsers({ browsers, supervise }),
+      const { calls, run } = recording([])
+      assert.throws(
+        () => installPinnedPlaywrightBrowsers({ browsers, run }),
         /browser_dependency_engine_selection_required/
       )
       assert.equal(calls.length, 0)
@@ -286,99 +282,28 @@ describe('pinned browser installer', () => {
       )
   })
 
-  test('a failed install runs again after each apt-retry pause and succeeds when apt recovers', async () => {
+  test('a package install that apt-install.sh gave up on, or a failed download, fails closed', async () => {
     const { installPinnedPlaywrightBrowsers } = await helper()
-    const slept = []
-    const { calls, supervise } = recording([{ status: 1 }, { status: 1 }, { status: 0 }])
-    await installPinnedPlaywrightBrowsers({
-      node: '/owned/node',
-      cli: '/pinned/cli.js',
-      browsers: ['chromium'],
-      pauses: [7, 9],
-      now: () => 0,
-      supervise,
-      sleep: async (seconds) => {
-        slept.push(seconds)
-      },
-    })
-    assert.equal(calls.length, 3)
-    assert.deepEqual(slept, [7, 9])
-  })
-
-  test('install failures stop after the last pause, and a deadline hit is never retried', async () => {
-    const { installPinnedPlaywrightBrowsers } = await helper()
-    for (const [results, expected, installs] of [
+    for (const [results, expected, calls] of [
+      [[{ status: 100 }], /browser_dependency_install_failed/, 1],
       [
-        [{ status: 1 }, { status: 1 }, { status: 1 }],
+        [{ status: null, error: new Error('spawn bash ENOENT') }],
         /browser_dependency_install_failed/,
-        3,
+        1,
       ],
-      [[{ status: 124, timedOut: true }], /browser_dependency_install_timeout/, 1],
+      [[{ status: 0 }, { status: 1 }], /browser_dependency_download_failed/, 2],
     ]) {
-      const { calls, supervise } = recording(results)
-      await assert.rejects(
-        installPinnedPlaywrightBrowsers({
-          node: '/owned/node',
-          cli: '/pinned/cli.js',
-          pauses: [0, 0],
-          now: () => 0,
-          supervise,
-          sleep: async () => undefined,
-        }),
+      const recorded = recording(results)
+      assert.throws(
+        () =>
+          installPinnedPlaywrightBrowsers({
+            node: '/owned/node',
+            cli: '/pinned/cli.js',
+            run: recorded.run,
+          }),
         expected
       )
-      assert.equal(calls.length, installs)
-    }
-  })
-
-  test('no attempt starts that the step deadline cannot finish, and each runs under what remains', async () => {
-    const { installPinnedPlaywrightBrowsers } = await helper()
-    let clock = 0
-    const { calls, supervise } = recording(
-      [{ status: 1 }, { status: 1 }, { status: 1 }, { status: 1 }],
-      () => {
-        clock += 200_000
-      }
-    )
-    await assert.rejects(
-      installPinnedPlaywrightBrowsers({
-        node: '/owned/node',
-        cli: '/pinned/cli.js',
-        browsers: ['chromium'],
-        now: () => clock,
-        supervise,
-        sleep: async (seconds) => {
-          clock += seconds * 1000
-        },
-      }),
-      /browser_dependency_install_failed/
-    )
-    // Of 660 s, each attempt keeps 20 s back for the KILL grace and teardown: a 200 s attempt
-    // (capped at 600 s), a 15 s pause, a 200 s attempt under 445 - 20 s, a 30 s pause, a 200 s
-    // attempt under 215 - 20 s. 15 s then remain, too little for the 60 s pause and another
-    // attempt, so the install fails there.
-    assert.deepEqual(
-      calls.map(([, , options]) => options.seconds),
-      [600, 425, 195]
-    )
-  })
-
-  test('a supervisor error, a timeout and an installer failure all fail closed', async () => {
-    const { installPinnedPlaywrightBrowsers } = await helper()
-    for (const result of [
-      { status: null, error: Object.assign(new Error('missing'), { code: 'ENOENT' }) },
-      { status: 124, timedOut: true },
-      { status: 7 },
-    ]) {
-      await assert.rejects(
-        installPinnedPlaywrightBrowsers({
-          node: '/owned/node',
-          cli: '/pinned/cli.js',
-          pauses: [],
-          supervise: async () => result,
-        }),
-        /browser_dependency_(install_timeout|install_failed)/
-      )
+      assert.equal(recorded.calls.length, calls)
     }
   })
 })

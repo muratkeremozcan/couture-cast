@@ -4,13 +4,9 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import {
-  APT_RETRY_PAUSES_S,
-  APT_TERMINATION_RESERVE_S,
-  configureAptRetries,
-  superviseCommand,
-  withAptRetries,
-} from './apt-retry.mjs'
+
+/** The one script CI installs Ubuntu packages through; see its header. */
+export const APT_INSTALL_SCRIPT = 'scripts/ci/apt-install.sh'
 
 const sourceLine = /^[\t ]*(?:URIs:|deb(?:-src)?\s)/
 const azureArchive = /https?:\/\/azure\.archive\.ubuntu\.com\/ubuntu(?=[/\s]|$)/g
@@ -92,53 +88,34 @@ export async function provisionShareCardBrowsers({
   if (failure) throw failure
 }
 
-/** The install's share of the provisioning step's 12 minutes, after the browser-deps suite. */
-export const BROWSER_INSTALL_DEADLINE_S = 660
-
 /**
  * Use the installed lockfile-matched Playwright CLI; OS browser versions are independent.
  *
- * A failed install runs again after apt-retry.mjs's pauses (15, 30, 60 and 120 s), with apt's
- * own fetch retries configured first: an Ubuntu mirror mid-sync serves index files of the wrong
- * size ("Mirror sync in progress?"), and the runner's resolver once failed for five minutes
- * (2026-11-11). Each attempt runs under apt-retry.mjs's supervisor, which ends its whole process
- * tree, root-owned apt included, with TERM and then KILL when its share of the deadline is spent.
- * No attempt starts that the step's deadline cannot finish, and a deadline hit is not retried,
- * because the step's time is already spent.
+ * The browsers' system packages come through apt-install.sh, which configures apt's own retries
+ * and runs the install again after 15, 30, 60 and 120 s: an Ubuntu mirror mid-sync serves index
+ * files of the wrong size ("Mirror sync in progress?"), and the runner's resolver once failed for
+ * five minutes (2026-11-11). The browsers themselves then download through the pinned CLI. The
+ * provisioning step's `timeout-minutes` bounds both.
  */
-export async function installPinnedPlaywrightBrowsers({
-  supervise = superviseCommand,
-  sleep,
+export function installPinnedPlaywrightBrowsers({
+  run = spawnSync,
   node = process.execPath,
   cli = createRequire(import.meta.url).resolve('@playwright/test/cli'),
   browsers = ['chromium', 'firefox', 'webkit'],
-  pauses = APT_RETRY_PAUSES_S,
-  deadlineSeconds = BROWSER_INSTALL_DEADLINE_S,
-  now = Date.now,
 } = {}) {
   if (
     !Array.isArray(browsers) ||
     !['chromium', 'chromium,firefox,webkit'].includes(browsers.join(','))
   )
     throw new Error('browser_dependency_engine_selection_required')
-  await withAptRetries(
-    async ({ remainingSeconds }) => {
-      const result = await supervise(node, [cli, 'install', '--with-deps', ...browsers], {
-        // The KILL grace and teardown come out of what remains, as in apt-retry.mjs.
-        seconds: Math.min(600, remainingSeconds - APT_TERMINATION_RESERVE_S),
-      })
-      if (result.timedOut) throw new Error('browser_dependency_install_timeout')
-      if (result.error || result.status !== 0)
-        throw new Error('browser_dependency_install_failed')
-    },
-    {
-      retryable: (error) => error.message === 'browser_dependency_install_failed',
-      pauses,
-      deadlineSeconds,
-      now,
-      ...(sleep ? { sleep } : {}),
-    }
-  )
+  const packages = run('bash', [APT_INSTALL_SCRIPT, '--playwright', ...browsers], {
+    stdio: 'inherit',
+  })
+  if (packages.error || packages.status !== 0)
+    throw new Error('browser_dependency_install_failed')
+  const download = run(node, [cli, 'install', ...browsers], { stdio: 'inherit' })
+  if (download.error || download.status !== 0)
+    throw new Error('browser_dependency_download_failed')
 }
 
 export function shareCardBrowserEngines(args) {
@@ -184,10 +161,7 @@ async function main() {
       if (result.error || result.status !== 0)
         throw new Error('browser_dependency_source_write_failed')
     },
-    install: async () => {
-      configureAptRetries()
-      await installPinnedPlaywrightBrowsers({ browsers })
-    },
+    install: () => installPinnedPlaywrightBrowsers({ browsers }),
   })
   console.log(
     'Pinned browser dependencies installed within the bounded provisioning step; original APT sources restored.'
