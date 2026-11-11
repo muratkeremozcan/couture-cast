@@ -32,7 +32,7 @@ function buildPhaseFiles(project, target, sectionName) {
 
 test(
   'clean Expo prebuild generates watchOS app and complication targets',
-  { timeout: 480_000 },
+  { timeout: 180_000 },
   (t) => {
     const fixtureRoot = createExpoPrebuildFixture(t, {
       prefix: 'couture-watchos-prebuild-',
@@ -223,9 +223,7 @@ test(
             'build',
             '-quiet',
           ],
-          // Green macOS runners take 80 to 160 s for the whole test; a 120 s build cap
-          // killed a slow runner's build mid-compile (status null), so it gets real headroom.
-          { encoding: 'utf8', timeout: 300_000 }
+          { encoding: 'utf8', timeout: 120_000 }
         ),
         'Generated WatchApp target build failed'
       )
