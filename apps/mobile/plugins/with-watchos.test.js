@@ -21,6 +21,14 @@ function findTarget(project, targetName) {
   )?.[1]
 }
 
+/** Runs one step and records how long it took, so a slow runner shows which step it was. */
+function timed(t, label, run) {
+  const started = performance.now()
+  const result = run()
+  t.diagnostic(`${label}: ${Math.round(performance.now() - started)} ms`)
+  return result
+}
+
 function buildPhaseFiles(project, target, sectionName) {
   const phases = project.hash.project.objects[sectionName] ?? {}
   const buildFiles = project.pbxBuildFileSection()
@@ -32,7 +40,8 @@ function buildPhaseFiles(project, target, sectionName) {
 
 test(
   'clean Expo prebuild generates watchOS app and complication targets',
-  { timeout: 180_000 },
+  // The build is most of it: 37 to 103 s on macos-15 (3 cores, Xcode 16.4), 2026-11-11.
+  { timeout: 360_000 },
   (t) => {
     const fixtureRoot = createExpoPrebuildFixture(t, {
       prefix: 'couture-watchos-prebuild-',
@@ -46,8 +55,14 @@ test(
     }
     fs.writeFileSync(appJsonPath, `${JSON.stringify(appJson, null, 2)}\n`)
 
-    assertCommand(runExpoPrebuild(fixtureRoot), 'Initial Expo prebuild failed')
-    assertCommand(runExpoPrebuild(fixtureRoot), 'Repeated Expo prebuild failed')
+    assertCommand(
+      timed(t, 'initial prebuild', () => runExpoPrebuild(fixtureRoot)),
+      'Initial Expo prebuild failed'
+    )
+    assertCommand(
+      timed(t, 'repeated prebuild', () => runExpoPrebuild(fixtureRoot)),
+      'Repeated Expo prebuild failed'
+    )
 
     const projectPath = path.join(
       fixtureRoot,
@@ -164,66 +179,33 @@ test(
     )
 
     if (process.platform === 'darwin') {
+      // The build compiles both targets with their real settings: the complication as an
+      // extension (APPLICATION_EXTENSION_API_ONLY) and both at the watchOS 9 deployment
+      // target, so separate swiftc type-checks only paid for the SDK modules twice more.
+      // On a fresh runner each pass compiles them cold: 12 to 28 s apiece on macos-15.
       assertCommand(
-        spawnSync(
-          'xcrun',
-          [
-            '--sdk',
-            'watchos',
-            'swiftc',
-            '-typecheck',
-            '-parse-as-library',
-            '-target',
-            'arm64-apple-watchos9.0',
-            path.join(fixtureRoot, 'ios/WatchApp/WatchWidgetData.swift'),
-            path.join(fixtureRoot, 'ios/WatchApp/WatchApp.swift'),
-            path.join(fixtureRoot, 'ios/WatchApp/WatchConnectivityManager.swift'),
-            path.join(fixtureRoot, 'ios/WatchApp/WatchContentView.swift'),
-          ],
-          { encoding: 'utf8', timeout: 50_000 }
-        ),
-        'Watch app Swift type-check failed'
-      )
-      assertCommand(
-        spawnSync(
-          'xcrun',
-          [
-            '--sdk',
-            'watchos',
-            'swiftc',
-            '-typecheck',
-            '-parse-as-library',
-            '-application-extension',
-            '-target',
-            'arm64-apple-watchos9.0',
-            path.join(fixtureRoot, 'ios/WatchWidget/WatchComplicationData.swift'),
-            path.join(fixtureRoot, 'ios/WatchWidget/WatchComplication.swift'),
-          ],
-          { encoding: 'utf8', timeout: 50_000 }
-        ),
-        'Watch complication Swift type-check failed'
-      )
-      assertCommand(
-        spawnSync(
-          'xcodebuild',
-          [
-            '-project',
-            path.join(fixtureRoot, 'ios/CoutureCast.xcodeproj'),
-            '-target',
-            'WatchApp',
-            '-configuration',
-            'Debug',
-            '-sdk',
-            'watchsimulator',
-            '-destination',
-            'generic/platform=watchOS Simulator',
-            `SYMROOT=${path.join(fixtureRoot, 'build/products')}`,
-            `OBJROOT=${path.join(fixtureRoot, 'build/intermediates')}`,
-            'CODE_SIGNING_ALLOWED=NO',
-            'build',
-            '-quiet',
-          ],
-          { encoding: 'utf8', timeout: 120_000 }
+        timed(t, 'WatchApp build', () =>
+          spawnSync(
+            'xcodebuild',
+            [
+              '-project',
+              path.join(fixtureRoot, 'ios/CoutureCast.xcodeproj'),
+              '-target',
+              'WatchApp',
+              '-configuration',
+              'Debug',
+              '-sdk',
+              'watchsimulator',
+              '-destination',
+              'generic/platform=watchOS Simulator',
+              `SYMROOT=${path.join(fixtureRoot, 'build/products')}`,
+              `OBJROOT=${path.join(fixtureRoot, 'build/intermediates')}`,
+              'CODE_SIGNING_ALLOWED=NO',
+              'build',
+              '-quiet',
+            ],
+            { encoding: 'utf8', timeout: 300_000 }
+          )
         ),
         'Generated WatchApp target build failed'
       )
