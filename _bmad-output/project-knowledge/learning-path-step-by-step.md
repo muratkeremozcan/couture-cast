@@ -25,6 +25,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Recorded the second `X-DISPATCH` attempt and the guard pool fix in Step 54's `Evidence boundaries` and test map.
 Moved Step 54 to completed after PR #198 merged as `1fa40089`, and recorded the post-merge production checks in its `Evidence boundaries`.
 Step 54 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 Moved Step 53 to completed after PR #197 merged as `63bd6fcd`.
@@ -10549,6 +10550,7 @@ API integration tests, against real PostgreSQL:
 - [`apps/api/integration/complimentary-access-erasure.integration.spec.ts`](../../apps/api/integration/complimentary-access-erasure.integration.spec.ts): proves erasure deletes grants and nulls operator ids, both orders of each race with a grant, rollback, and the grant lifecycle as ordered pairs.
 - [`apps/api/integration/complimentary-access-routes.integration.spec.ts`](../../apps/api/integration/complimentary-access-routes.integration.spec.ts): proves every AC1 route opens for a free grantee with the flags off while the control stays locked, the access route's shape, headers, auth and failure answers, checkout, and that no route can grant or revoke.
 - [`apps/api/integration/complimentary-access-push.integration.spec.ts`](../../apps/api/integration/complimentary-access-push.integration.spec.ts): proves only the grantee's delivery reaches the provider, a revoke before or after evaluation sends nothing, opt-out still holds, and a revoked grantee's socket closes within one revalidation.
+- [`apps/api/integration/community-dispatch-guard-pool.integration.spec.ts`](../../apps/api/integration/community-dispatch-guard-pool.integration.spec.ts): added after the second `X-DISPATCH` attempt; behind a proxy that holds each new connection for 1.5 s, proves the dispatch preflight reaches `ready` on its first attempt with 36 guard connections open, and that twelve granted deliveries sent at once are all accepted with no `no_call:` deferral and no new connection.
 - [`apps/api/integration/helpers/complimentary-access-fixtures.ts`](../../apps/api/integration/helpers/complimentary-access-fixtures.ts): the shared fixtures, which seed the six member flags false and answer false from a fake remote that records every call.
 
 Contract and database tests:
@@ -10602,6 +10604,11 @@ Evidence boundaries:
   The cause is `CommunityRuntimeCapability.privacy_version`, which is 0 in production while dispatch requires 1.
   Raising it turns on `community_require_guard` enforcement for every community privacy write in production, which belongs to the Story 6.5 rollout, so it waits for the owner.
   The non-grantee delivery check did not run, because nothing dispatches.
+- **The second `X-DISPATCH` attempt found a guard pool defect (2026-11-11, `143b3438`).**
+  `privacy_version` went from 0 to 1 at 10:24:05 UTC and stays at 1, and readiness still logged `degraded` `capability_unavailable` at 10:24:39; dispatch went back off at 10:25:09.
+  Inside the live worker the preflight passed while idle and failed under CPU load with Prisma's `Timed out fetching a new connection from the connection pool`: one guard connection takes 0.6 to 1.2 s to open there, and the pool's 1 s `pool_timeout` covered opening as well as waiting.
+  The fix gives the guard pool a 5 s acquisition budget, opens all 36 connections before the first send, keeps idle ones, retries only connect failures in the preflight and names them `guard_unreachable`, and logs the error class, code and failed check.
+  The deployment guide's Story 6.14 section holds the timestamps and the live measurements.
 - **`X-PROD-GRANT` is blocked.**
   Production `auth.users` holds no rows while `User` holds 10, so no admin actor exists for the owner command.
   From macOS, the command cannot open its database connection: `createPrismaClient` requires strict verification against the committed Supabase Root 2021 CA, `openssl` verifies both poolers against that CA, and Prisma on macOS still answers `The certificate was not trusted`. `community:sponsorship` shares the client and the limit.

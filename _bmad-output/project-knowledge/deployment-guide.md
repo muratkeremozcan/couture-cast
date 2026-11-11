@@ -1027,10 +1027,31 @@ No credential value or database URL belongs in readiness logs.
 
 The runtime returns `dispatch.status`: `disabled`, `standby`, `ready` or `degraded`.
 `community_dispatch_readiness` logs that status, role and a sanitized reason. Degraded reasons
-are `owner_unconfigured`, `guard_unconfigured`, `guard_mismatch` and `capability_unavailable`.
-A dispatch preflight failure closes its owned guard pool and starts no dispatch/provider loop.
-Moderation, append, stream/detail retention and operational telemetry continue independently in
-both compositions. The runtime's close hook retains ownership of all its timers and connections.
+are `owner_unconfigured`, `guard_unconfigured`, `guard_mismatch`, `guard_unreachable` and
+`capability_unavailable`. A degraded line also names the error class, the Prisma error code and,
+for `capability_unavailable`, the failed check (`server_version`, `privacy_version` or
+`guard_timeouts`), never the error message. A ready line gives `preflightAttempts` and
+`guardConnections`, the number of guard connections open before the first send.
+
+The guard pool gives one acquisition 5 seconds (`pool_timeout=5`), opens all 36 connections
+before the first send and keeps idle ones (`max_idle_connection_lifetime=0`). Opening one guard
+connection, TLS through the transaction pooler, measured 0.6 to 0.7 s on the hosted worker while
+idle and 1.0 to 1.2 s with its two vCPUs busy (2026-11-11), and Prisma's `pool_timeout` covers
+opening as well as waiting. The preflight retries only connect and acquisition failures, 1, 2
+and 4 seconds apart, and reports `guard_unreachable` when the fourth attempt still cannot
+connect. A send still waits at most 250 ms for its transaction, and the server-side guard bounds
+are unchanged.
+
+Capacity on the production project (free plan, Nano compute, measured 2026-11-11): Postgres
+`max_connections` is 60 with 3 reserved, and Supavisor admits 200 clients with the plan's default
+pool size (the pooler config returns null for both). Idle guard connections are Supavisor clients
+only: 36 of them left Supavisor's server connections at 21 before and after, and 36 one-second
+transactions through them took 3.4 s, about 15 at a time. Over 180-second windows, 36 idle guard
+connections added no statement calls or network bytes against a control window (96 against 255
+calls, 75 KB against 87 KB received). With dispatch on, the clients are 36 guard, 3 for the
+worker's main pool and 5 per API function instance, which leaves 161 for about 32 concurrent API
+instances. The transaction pool of about 15 caps concurrent guarded sends below D10's 32 send
+slots, so a herd waits for the pooler, and only a larger compute plan raises that pool.
 
 Operators investigate degraded dispatch while keeping community rollout off, verify the selected
 owner and existing primary's measured capabilities, then restart the assigned process after the
@@ -1119,6 +1140,31 @@ the Northflank `couture-cast/community-worker` service:
   1. Raising it enables `community_require_guard` enforcement for every community privacy
      write, so it is an owner decision with its own rollout check, made before the next attempt.
 - Step 4 did not run, because nothing dispatches.
+
+**Second attempt, 2026-11-11 UTC (`143b3438`).** The worker was back at one instance after the
+idle-egress fix (#203).
+
+- Step 1 at 10:23:23: zero `CommunityTokenDelivery`, `CommunityNotificationGroup`, `PushToken`,
+  `NotificationPreference` and `CommunityNotificationIntent` rows; one
+  `ComplimentaryAccessGrant`.
+- At 10:24:05 one `UPDATE` raised `privacy_version` from 0 to 1, which read back as 1 and
+  stays. The production API logged no request and no error from 10:20 to 10:30.
+- Steps 2 and 3: `COMMUNITY_DISPATCH_ENABLED=true` at 10:24:20; readiness logged `degraded`,
+  `capability_unavailable`, at 10:24:39. The flag went back to `false` at 10:25:09 and readiness
+  logged `disabled` at 10:25:24. The instance count stayed at one.
+- Cause: the guard pool, not the capability. Run inside the live worker with its own guard URL,
+  the deployed `createPrismaClient` and `CommunitySendGuard.verifyRuntime` passed in 1.2 s while
+  idle. With CPU load the first connection took 1.0 to 1.2 s and Prisma failed it with `Timed
+out fetching a new connection from the connection pool` (pool timeout 1); with both vCPUs
+  saturated it failed 12 of 12. At boot the preflight runs while Redis, the engagement loops
+  and the main pool open their own TLS connections, and its catch reported every failure as
+  `capability_unavailable`.
+- The same worker, 64 send-shaped guard operations at concurrency 16 with both vCPUs saturated:
+  the 1 s pool completed 0 of 64, twice; the pool described above completed 58 and 64 of 64.
+  The six misses were the claim's own 500 ms `transaction_timeout` under full starvation.
+  Kept idle, the 36 connections answered together in 377 ms after 10 s and 768 ms after 400 s;
+  with Prisma's default 300-second idle lifetime they were reopened (1570 ms).
+- The fix is the pool budget, preflight retry and readiness detail above.
 
 **`privacy_version` 1 rollout check, 2026-11-11.** Run on stock `postgres:17` with every
 migration and the capability at 1, before any production change:
