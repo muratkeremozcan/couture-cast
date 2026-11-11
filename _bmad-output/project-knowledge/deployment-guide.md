@@ -1049,3 +1049,25 @@ the Northflank `couture-cast/community-worker` service:
    attempt; `no_call:read_disabled` appears only when the in-transaction recheck flips.
 5. If readiness is not `ready`, set `COMMUNITY_DISPATCH_ENABLED` back off, fix the cause and
    record the outcome here. No credential value is printed in logs or committed.
+
+**Production record, 2026-11-11 UTC (`1fa40089`).**
+
+- Step 1: zero `CommunityTokenDelivery` rows of any status, so the switch had no backlog to
+  release.
+- Steps 2 and 3: the three variables were set at 00:27:23, and the worker logged
+  `community_dispatch_readiness` `degraded`, reason `capability_unavailable`, at 00:27:41.
+  `COMMUNITY_DISPATCH_ENABLED` went back to `false` at 00:27:55 and readiness logged
+  `disabled` at 00:28:08. `COMMUNITY_ENGAGEMENT_OWNER` and `COMMUNITY_GUARD_DATABASE_URL` stay
+  set, so the next attempt needs only the flag.
+- Cause: `CommunityRuntimeCapability.privacy_version` is 0 in production and dispatch requires
+  1. Raising it enables `community_require_guard` enforcement for every community privacy
+     write, so it is an owner decision with its own rollout check, made before the next attempt.
+- Step 4 did not run, because nothing dispatches.
+
+**First grant, blocked.** Production `auth.users` holds no rows, so no admin actor exists: the
+owner signs in on production once and gets `app_metadata.app_role` `admin`. From macOS the
+command cannot open its connection: the committed Supabase Root 2021 CA verifies both poolers
+with `openssl`, but Prisma on macOS rejects the chain with `The certificate was not trusted`,
+and `community:sponsorship` shares that client. Run the command from Linux until the operator
+client verifies the CA through Node's TLS. The targeting guard held on production: without
+`--confirm-target` the command refused and named the project, and nothing was written.
