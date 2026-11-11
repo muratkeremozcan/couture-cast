@@ -10,8 +10,8 @@
 // 1. Definitions, read through the PostHog API with a read-only personal key (feature_flag:read
 //    on 329012): every declared flag exists, is active, boolean, evaluated server-side, and
 //    released to everyone at its expected value: every release group has no property or cohort
-//    filter and a 0 or 100 percent rollout, with no super group, holdout, early-access enrollment
-//    or remote configuration. This is what proves a rollout is uniform.
+//    filter and a 0 or 100 percent rollout, with no super group, early exit, holdout, early-access
+//    enrollment or remote configuration. This is what proves a rollout is uniform.
 // 2. Runtime probes, below, which see what the API itself is answered.
 //
 // The probes ask /flags (v2) with the project token, the public key the runtime ships with, and the API
@@ -163,6 +163,10 @@ function flagProblems(definition) {
     [!empty(filters.multivariate?.variants), 'multivariate'],
     [filters.aggregation_group_type_index != null, 'group aggregation'],
     [!empty(filters.super_groups), 'super group'],
+    [
+      filters.early_exit === true,
+      'early exit: the first matching release group decides, so groups cannot be read as one uniform release',
+    ],
     [!empty(filters.holdout_groups) || definition.holdout != null, 'holdout'],
     [
       filters.feature_enrollment === true || !empty(definition.features),

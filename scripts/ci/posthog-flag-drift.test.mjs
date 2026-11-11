@@ -399,3 +399,21 @@ test('the CLI refuses to run without the definition read key', () => {
   assert.equal(run.status, 2)
   assert.match(run.stderr, /POSTHOG_FLAG_READ_KEY is not set/)
 })
+
+test('red: early exit is rejected, since the first matching group decides and groups no longer combine', () => {
+  const earlyExit = withFilters(released('community_read_enabled', true), {
+    early_exit: true,
+    groups: [
+      { properties: [], rollout_percentage: 0 },
+      { properties: [], rollout_percentage: 100 },
+    ],
+  })
+  assert.deepEqual(definitionProblems(earlyExit, true), [
+    'early exit: the first matching release group decides, so groups cannot be read as one uniform release',
+  ])
+  // early_exit false is PostHog's default and changes nothing.
+  assert.deepEqual(
+    definitionProblems(withFilters(released('a', true), { early_exit: false }), true),
+    []
+  )
+})

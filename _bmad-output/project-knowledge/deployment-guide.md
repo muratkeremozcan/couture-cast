@@ -1326,7 +1326,7 @@ production, and the code default stays `false` so a degraded PostHog fails close
   (a personal API key limited to `feature_flag:read` on 329012): the flag exists, is active,
   boolean, evaluated server-side, and released to everyone at the expected value. Every release
   group has no property or cohort filter and a 0 or 100 percent rollout, with no super group,
-  holdout, early-access enrollment, group aggregation or remote configuration. This is what
+  early exit, holdout, early-access enrollment, group aggregation or remote configuration. This is what
   proves a rollout is uniform; probes cannot see a cohort or a 1 percent rollout they miss.
 - Runtime: `/flags` with the project token in the repository variable
   `POSTHOG_PROD_PROJECT_TOKEN` and the API adapter's server User-Agent, for 12 synthetic
