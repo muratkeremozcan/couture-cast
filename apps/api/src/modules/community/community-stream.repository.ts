@@ -114,6 +114,18 @@ export class CommunityStreamRepository {
   }
 
   /**
+   * Whether any outbox row waits for append, in one autocommitted statement.
+   * The worker's append loop asks this first, so an idle tick costs one round trip where the
+   * bounded append transaction costs six.
+   */
+  async hasPending(): Promise<boolean> {
+    const rows = await this.prisma.$queryRaw<{ pending: boolean }[]>`
+      SELECT EXISTS (SELECT 1 FROM "CommunityDomainOutbox" WHERE appended_at IS NULL) AS pending
+    `
+    return rows[0]?.pending === true
+  }
+
+  /**
    * Appends one batch and reports why its preparation stopped. An aborted signal stops
    * the append before its next write and rolls the batch back; an aborted append
    * records no retry either, so nothing is written after the abort.
@@ -366,6 +378,7 @@ export class CommunityStreamRepository {
         orderBy: [{ stream_id: 'asc' }, { sequence: 'asc' }],
         take: 500,
       })
+      if (!expired.length) return 0
       for (const stream of [...new Set(expired.map((e) => e.stream_id))].sort()) {
         const floor = expired.filter((e) => e.stream_id === stream).at(-1)!.sequence
         await tx.$queryRaw`SELECT id FROM "CommunityStreamHead" WHERE id = ${stream} FOR UPDATE`

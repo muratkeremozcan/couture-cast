@@ -127,7 +127,7 @@ async function fixture(source: 'reaction' | 'reply' = 'reaction', locale?: strin
       assertEligible: () => Promise.resolve(),
     })
   const worker = new CommunityNotificationsWorker(prisma, {
-    dispatch: () => Promise.resolve(),
+    dispatch: () => Promise.resolve(false),
   })
   const delivery = await untilDecided('fanout', async () => {
     await worker.group()

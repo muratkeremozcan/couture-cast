@@ -69,7 +69,7 @@ function outbox(
   return new CommunityCommentsOutbox(
     prisma,
     queue as never,
-    { captureCommentEvent: vi.fn() } as never,
+    { captureCommentEvent: vi.fn(), acknowledgedDeliveryAvailable: () => true } as never,
     processor
   )
 }

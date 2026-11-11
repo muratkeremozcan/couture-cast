@@ -10,6 +10,9 @@ import {
 import { nextAllowedCommunityInstant } from './community-push-policy.js'
 import type { CommunitySendGuard } from './community-send-guard.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { createBaseLogger } from '../../logger/pino.config.js'
+
+const logger = createBaseLogger().child({ feature: 'community-dispatch' })
 
 function subjectSignature(links: CommunityArtifactSubject[]) {
   return JSON.stringify(
@@ -61,6 +64,8 @@ function policyReconciliation(
         : 'pending'
   return { eligible, terminal, status }
 }
+
+const unmoved = { created: 0, settled: false } as const
 
 export class CommunityNotificationsWorker {
   constructor(
@@ -224,7 +229,17 @@ export class CommunityNotificationsWorker {
       })
   }
 
+  /** Returns how many deliveries fanout created; `fanoutReport` also counts settled groups. */
   async fanout(): Promise<number> {
+    return (await this.fanoutReport()).deliveries
+  }
+
+  /**
+   * One fanout pass: the deliveries it created, and the groups it moved out of the due set by
+   * snapshotting, suppressing, deferring or expiring them. The second number is what the idle
+   * backoff reads as progress, so a batch that only settled groups still keeps the busy cadence.
+   */
+  async fanoutReport(): Promise<{ deliveries: number; groups: number }> {
     const groups = await this.prisma.communityNotificationGroup.findMany({
       where: {
         status: { in: ['pending', 'deferred'] },
@@ -234,14 +249,15 @@ export class CommunityNotificationsWorker {
       orderBy: [{ eligible_at: 'asc' }, { recipient_id: 'asc' }, { id: 'asc' }],
       take: 100,
     })
-    let count = 0
+    let deliveries = 0
+    let settled = 0
     for (const candidate of groups) {
       if (!candidate.recipient_id || !candidate.post_id) continue
       const links = await this.prisma.communityArtifactSubject.findMany({
         where: { artifact_kind: 'group', artifact_id: candidate.id },
       })
       if (!links.length) continue
-      count += await interactiveTransaction(
+      const outcome = await interactiveTransaction(
         this.prisma,
         async (tx) => {
           // Each attempt starts from the listed row; a re-read belongs to its attempt.
@@ -251,13 +267,13 @@ export class CommunityNotificationsWorker {
           await tx.$executeRaw(
             Prisma.sql`SELECT community_privacy_guards(ARRAY[${Prisma.join([...new Set(links.map((l) => l.member_id))])}]::text[],ARRAY[${group.post_id}]::text[],false)`
           )
-          if (!(await currentSubjectLinks(tx, 'group', group.id, links))) return 0
+          if (!(await currentSubjectLinks(tx, 'group', group.id, links))) return unmoved
           const claimed = await tx.$queryRaw<
             { id: string }[]
           >`SELECT id FROM "CommunityNotificationGroup" WHERE id = ${group.id}::uuid AND snapshot_at IS NULL FOR UPDATE SKIP LOCKED`
-          if (!claimed.length) return 0
+          if (!claimed.length) return unmoved
           // Attachment and snapshot share this row lock. Rediscover privacy guards if its links changed.
-          if (!(await currentSubjectLinks(tx, 'group', group.id, links))) return 0
+          if (!(await currentSubjectLinks(tx, 'group', group.id, links))) return unmoved
           group = await tx.communityNotificationGroup.findUniqueOrThrow({
             where: { id: group.id },
           })
@@ -272,7 +288,7 @@ export class CommunityNotificationsWorker {
               where: { id: group.id },
               data: { status: 'suppressed' },
             })
-            return 0
+            return { created: 0, settled: true }
           }
           const allowed = nextAllowedCommunityInstant(
             {
@@ -312,7 +328,7 @@ export class CommunityNotificationsWorker {
                   : {}),
               },
             })
-            return 0
+            return { created: 0, settled: true }
           }
           const registrations = await tx.pushToken.findMany({
             where: {
@@ -347,12 +363,14 @@ export class CommunityNotificationsWorker {
               status: registrations.length ? 'sending' : 'suppressed',
             },
           })
-          return created
+          return { created, settled: true }
         },
         { timeout: 1000, maxWait: 250 }
       )
+      deliveries += outcome.created
+      if (outcome.settled) settled += 1
     }
-    return count
+    return { deliveries, groups: settled }
   }
 
   // Policy edits alone may change eligibility. Provider/dependency retries keep the same clock.
@@ -462,7 +480,42 @@ export class CommunityNotificationsWorker {
     return candidates.length
   }
 
-  async dispatch(): Promise<void> {
+  /**
+   * Milliseconds until the earliest group waiting for fanout becomes due, by the database clock,
+   * or null when none waits. An idle fanout loop sleeps no longer than this, so a quiet-hour exit
+   * herd is fanned out when it falls due.
+   * Only future rows count: a row already due that the tick could not move must not hold the loop
+   * at its base cadence.
+   */
+  async nextFanoutDueInMs(): Promise<number | null> {
+    const [row] = await this.prisma.$queryRaw<{ due_in_ms: number | null }[]>`
+      SELECT (extract(epoch FROM min(next_attempt_at) - clock_timestamp()) * 1000)::float8 AS due_in_ms
+      FROM "CommunityNotificationGroup"
+      WHERE status IN ('pending','deferred') AND snapshot_at IS NULL
+        AND next_attempt_at > clock_timestamp()
+    `
+    return row?.due_in_ms ?? null
+  }
+
+  /** The same for token deliveries: an idle dispatch loop wakes for the earliest due retry. */
+  async nextDispatchDueInMs(): Promise<number | null> {
+    const [row] = await this.prisma.$queryRaw<{ due_in_ms: number | null }[]>`
+      SELECT (extract(epoch FROM min(next_attempt_at) - clock_timestamp()) * 1000)::float8 AS due_in_ms
+      FROM "CommunityTokenDelivery"
+      WHERE status IN ('pending','retryable_rejection','deferred')
+        AND next_attempt_at > clock_timestamp()
+    `
+    return row?.due_in_ms ?? null
+  }
+
+  /**
+   * One dispatch pass over up to 32 due deliveries.
+   * `moved` counts deliveries that changed state; the idle backoff reads it as progress, so a row
+   * the guard leaves as it was cannot hold the loop at its 50 ms cadence.
+   * A rejected send is counted and logged, and the rest of the batch still counts: one rejection
+   * in a quiet-hour herd must not slow the herd down.
+   */
+  async dispatch(): Promise<{ selected: number; moved: number; failed: number }> {
     const due = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT d.id FROM "CommunityTokenDelivery" d JOIN "CommunityNotificationGroup" g ON g.id = d.group_id
       WHERE d.status IN ('pending','retryable_rejection','deferred') AND d.next_attempt_at <= clock_timestamp()
@@ -473,11 +526,22 @@ export class CommunityNotificationsWorker {
     const outcomes = await Promise.allSettled(
       due.map((delivery) => this.sender.dispatch(delivery.id))
     )
-    const failed = outcomes.filter((outcome) => outcome.status === 'rejected').length
-    if (failed) throw new Error(`Community dispatch dependency failures: ${failed}`)
+    let moved = 0
+    let failed = 0
+    for (const outcome of outcomes) {
+      if (outcome.status === 'rejected') failed += 1
+      else if (outcome.value) moved += 1
+    }
+    if (failed)
+      logger.warn(
+        { event: 'community_dispatch_send_failed', failed, selected: due.length },
+        'Community dispatch sends failed; their deliveries stay due for the next pass'
+      )
+    return { selected: due.length, moved, failed }
   }
 
-  async recover(): Promise<void> {
+  /** Returns how many orphaned attempts, intents and groups it settled. */
+  async recover(): Promise<number> {
     const attempts = await this.prisma.communityDeliveryAttempt.findMany({
       where: {
         status: 'sending',
@@ -517,13 +581,14 @@ export class CommunityNotificationsWorker {
         }
       })
     }
-    await this.prisma.communityNotificationIntent.updateMany({
+    const intents = await this.prisma.communityNotificationIntent.updateMany({
       where: { expires_at: { lte: new Date() }, deliverable: true },
       data: { deliverable: false },
     })
-    await this.prisma.communityNotificationGroup.updateMany({
+    const groups = await this.prisma.communityNotificationGroup.updateMany({
       where: { expires_at: { lte: new Date() }, status: { in: ['pending', 'deferred'] } },
       data: { status: 'expired' },
     })
+    return attempts.length + intents.count + groups.count
   }
 }

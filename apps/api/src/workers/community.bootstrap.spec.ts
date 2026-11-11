@@ -77,6 +77,31 @@ function useRealShutdown(): void {
   harness.shutdownWorkerResources.mockImplementation(real)
 }
 
+/** Sweeps that find nothing to do, shaped like the real results the idle backoff reads. */
+function idleSweeps(overrides: Record<string, () => Promise<unknown>> = {}) {
+  return {
+    dispatchPending: vi.fn().mockResolvedValue(0),
+    sweepStalePendingReview: vi.fn().mockResolvedValue(0),
+    sweepExpiredUploads: vi
+      .fn()
+      .mockResolvedValue({ objectsDeleted: 0, draftsDeleted: 0 }),
+    sweepErasureRequests: vi.fn().mockResolvedValue({
+      hidden: 0,
+      anonymized: 0,
+      objectsPurged: 0,
+      overdue: 0,
+      requestsCompleted: 0,
+      requestsOverdue: 0,
+    }),
+    sweepExpiredBanHolds: vi
+      .fn()
+      .mockResolvedValue({ subjects: 0, posts: 0, comments: 0 }),
+    sweepModerationSla: vi.fn().mockResolvedValue({ skipped: 1, recorded: 0 }),
+    sweepModerationHistoryRetention: vi.fn().mockResolvedValue({ skipped: true }),
+    ...overrides,
+  }
+}
+
 describe('dedicated community worker bootstrap', () => {
   beforeEach(() => {
     harness.order.length = 0
@@ -91,15 +116,7 @@ describe('dedicated community worker bootstrap', () => {
     harness.posthogShutdown.mockReset()
     harness.createCommunityWorkerRuntime.mockReset().mockResolvedValue({
       worker: { on: vi.fn(), close: vi.fn() },
-      sweeps: {
-        dispatchPending: vi.fn().mockResolvedValue(undefined),
-        sweepStalePendingReview: vi.fn().mockResolvedValue(undefined),
-        sweepExpiredUploads: vi.fn().mockResolvedValue(undefined),
-        sweepErasureRequests: vi.fn().mockResolvedValue(undefined),
-        sweepExpiredBanHolds: vi.fn().mockResolvedValue(undefined),
-        sweepModerationSla: vi.fn().mockResolvedValue(undefined),
-        sweepModerationHistoryRetention: vi.fn().mockResolvedValue(undefined),
-      },
+      sweeps: idleSweeps(),
       readiness: {
         selector: 'fixture',
         engineVersion: 'adr013-nsfw-v1.0-fixture',
@@ -116,15 +133,7 @@ describe('dedicated community worker bootstrap', () => {
     function runtimeWithSweep(sweepModerationSla: () => Promise<unknown>) {
       harness.createCommunityWorkerRuntime.mockResolvedValue({
         worker: { on: vi.fn(), close: vi.fn() },
-        sweeps: {
-          dispatchPending: vi.fn().mockResolvedValue(undefined),
-          sweepStalePendingReview: vi.fn().mockResolvedValue(undefined),
-          sweepExpiredUploads: vi.fn().mockResolvedValue(undefined),
-          sweepErasureRequests: vi.fn().mockResolvedValue(undefined),
-          sweepExpiredBanHolds: vi.fn().mockResolvedValue(undefined),
-          sweepModerationSla,
-          sweepModerationHistoryRetention: vi.fn().mockResolvedValue(undefined),
-        },
+        sweeps: idleSweeps({ sweepModerationSla }),
         readiness: { selector: 'fixture', engineVersion: 'x', startupDurationMs: 1 },
         close: harness.communityClose,
       })
@@ -223,6 +232,76 @@ describe('dedicated community worker bootstrap', () => {
     })
   })
 
+  describe('U-W-BACKOFF: idle sweeps back off and busy ones keep their cadence', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    /** Starts the worker on fake timers and records when `name` ran, relative to the start. */
+    async function startRecording(name: string, results: unknown[], idle: unknown) {
+      vi.useFakeTimers()
+      const calls: number[] = []
+      const startedAt = Date.now()
+      const sweep = vi.fn(() => {
+        calls.push(Date.now() - startedAt)
+        return Promise.resolve(results.length ? results.shift() : idle)
+      })
+      harness.createCommunityWorkerRuntime.mockResolvedValue({
+        worker: { on: vi.fn(), close: vi.fn() },
+        sweeps: idleSweeps({ [name]: sweep }),
+        readiness: { selector: 'fixture', engineVersion: 'x', startupDurationMs: 1 },
+        close: harness.communityClose,
+      })
+      const bootstrap = freshProcess()
+      await bootstrap.startCommunityWorkers()
+      return { bootstrap, calls }
+    }
+
+    it('backs an idle dispatch off from 1 to 10 seconds and returns to 1 second when it moves work', async () => {
+      const results = [0, 0, 0, 0, 0, 0, 2, 0]
+      const { bootstrap, calls } = await startRecording('dispatchPending', results, 0)
+      await vi.advanceTimersByTimeAsync(48_000)
+      expect(calls).toEqual([
+        1_000, 3_000, 7_000, 15_000, 25_000, 35_000, 45_000, 46_000, 48_000,
+      ])
+      await bootstrap.performShutdown()
+    })
+
+    it('backs an idle maintenance sweep off from 30 seconds to 5 minutes', async () => {
+      const idle = { subjects: 0, posts: 0, comments: 0 }
+      const { bootstrap, calls } = await startRecording('sweepExpiredBanHolds', [], idle)
+      await vi.advanceTimersByTimeAsync(1_050_000)
+      expect(calls).toEqual([30_000, 90_000, 210_000, 450_000, 750_000, 1_050_000])
+      await bootstrap.performShutdown()
+    })
+
+    it('treats a failed sweep as idle, so a dependency outage is retried at the cap', async () => {
+      vi.useFakeTimers()
+      const dispatchPending = vi.fn().mockRejectedValue(new Error('database down'))
+      harness.createCommunityWorkerRuntime.mockResolvedValue({
+        worker: { on: vi.fn(), close: vi.fn() },
+        sweeps: idleSweeps({ dispatchPending }),
+        readiness: { selector: 'fixture', engineVersion: 'x', startupDurationMs: 1 },
+        close: harness.communityClose,
+      })
+      const bootstrap = freshProcess()
+      await bootstrap.startCommunityWorkers()
+      await vi.advanceTimersByTimeAsync(60_000)
+      // 1, 3, 7, 15, 25, 35, 45 and 55 seconds.
+      expect(dispatchPending).toHaveBeenCalledTimes(8)
+      await bootstrap.performShutdown()
+    })
+
+    it('stops every loop at shutdown', async () => {
+      const { bootstrap, calls } = await startRecording('dispatchPending', [], 0)
+      await vi.advanceTimersByTimeAsync(1_000)
+      expect(calls).toEqual([1_000])
+      await bootstrap.performShutdown()
+      await vi.advanceTimersByTimeAsync(600_000)
+      expect(calls).toEqual([1_000])
+    })
+  })
+
   describe('U-W-BOOT-RUN: the hosted path of the history retention', () => {
     const dayMs = 86_400_000
 
@@ -231,15 +310,7 @@ describe('dedicated community worker bootstrap', () => {
     ) {
       harness.createCommunityWorkerRuntime.mockResolvedValue({
         worker: { on: vi.fn(), close: vi.fn() },
-        sweeps: {
-          dispatchPending: vi.fn().mockResolvedValue(undefined),
-          sweepStalePendingReview: vi.fn().mockResolvedValue(undefined),
-          sweepExpiredUploads: vi.fn().mockResolvedValue(undefined),
-          sweepErasureRequests: vi.fn().mockResolvedValue(undefined),
-          sweepExpiredBanHolds: vi.fn().mockResolvedValue(undefined),
-          sweepModerationSla: vi.fn().mockResolvedValue(undefined),
-          sweepModerationHistoryRetention,
-        },
+        sweeps: idleSweeps({ sweepModerationHistoryRetention }),
         readiness: { selector: 'fixture', engineVersion: 'x', startupDurationMs: 1 },
         close: harness.communityClose,
       })
@@ -340,12 +411,7 @@ describe('dedicated community worker bootstrap', () => {
     )
     harness.createCommunityWorkerRuntime.mockResolvedValueOnce({
       worker: { on: vi.fn(), close: workerClose },
-      sweeps: {
-        dispatchPending: vi.fn().mockResolvedValue(undefined),
-        sweepStalePendingReview: vi.fn().mockResolvedValue(undefined),
-        sweepExpiredUploads: vi.fn().mockResolvedValue(undefined),
-        sweepErasureRequests: vi.fn().mockResolvedValue(undefined),
-      },
+      sweeps: idleSweeps(),
       close: harness.communityClose,
     })
     const bootstrap = freshProcess()
@@ -384,12 +450,7 @@ describe('dedicated community worker bootstrap', () => {
     }
     harness.createCommunityWorkerRuntime.mockResolvedValueOnce({
       worker,
-      sweeps: {
-        dispatchPending: vi.fn().mockResolvedValue(undefined),
-        sweepStalePendingReview: vi.fn().mockResolvedValue(undefined),
-        sweepExpiredUploads: vi.fn().mockResolvedValue(undefined),
-        sweepErasureRequests: vi.fn().mockResolvedValue(undefined),
-      },
+      sweeps: idleSweeps(),
       close: vi.fn(() => {
         screenerClosed = true
         return Promise.resolve()
@@ -412,6 +473,38 @@ describe('dedicated community worker bootstrap', () => {
     expect(exit).toHaveBeenCalledWith(0)
   })
 
+  it('waits for a sweep tick in flight before it closes the runtime it uses', async () => {
+    vi.useFakeTimers()
+    useRealShutdown()
+    let finishSweep!: () => void
+    const dispatchPending = vi.fn(
+      () =>
+        new Promise<number>((resolve) => {
+          finishSweep = () => {
+            harness.order.push('sweepFinished')
+            resolve(0)
+          }
+        })
+    )
+    harness.createCommunityWorkerRuntime.mockResolvedValue({
+      worker: { on: vi.fn(), close: vi.fn(() => Promise.resolve()) },
+      sweeps: idleSweeps({ dispatchPending }),
+      readiness: { selector: 'fixture', engineVersion: 'x', startupDurationMs: 1 },
+      close: harness.communityClose,
+    })
+    const bootstrap = freshProcess()
+    await bootstrap.startCommunityWorkers()
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(dispatchPending).toHaveBeenCalledOnce()
+    vi.useRealTimers()
+    const shutdown = bootstrap.performShutdown()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(harness.order).not.toContain('communityClose')
+    finishSweep()
+    await shutdown
+    expect(harness.order).toEqual(['sweepFinished', 'communityClose'])
+  })
+
   it('hands the worker it started to the shutdown helper', async () => {
     const bootstrap = freshProcess()
 
@@ -420,7 +513,8 @@ describe('dedicated community worker bootstrap', () => {
 
     const resources = harness.shutdownWorkerResources.mock
       .calls[0]?.[0] as WorkerShutdownResources
-    expect(resources.workers).toHaveLength(1)
+    // The BullMQ consumer, then the drain of sweep ticks in flight.
+    expect(resources.workers).toHaveLength(2)
     // Below the production launcher's 25-second deadline, so the bootstrap's
     // own force-disconnect runs before the launcher gives up on it.
     const options = harness.shutdownWorkerResources.mock.calls[0]?.[1] as {

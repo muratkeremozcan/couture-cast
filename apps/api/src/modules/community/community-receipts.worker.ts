@@ -31,7 +31,12 @@ export class CommunityReceiptsWorker {
     private readonly tokens: PushTokenRepository,
     private readonly transport: typeof fetch = fetch
   ) {}
-  async sweep(): Promise<void> {
+  /**
+   * Returns how many receipts and attempts changed state; a row it selects and leaves unchanged
+   * counts as idle, so it cannot hold the loop at its busy cadence.
+   */
+  async sweep(): Promise<number> {
+    let moved = 0
     const due = await this.prisma.communityDeliveryReceipt.findMany({
       where: {
         OR: [
@@ -51,22 +56,22 @@ export class CommunityReceiptsWorker {
     })
     for (const receipt of due) {
       if (receipt.status === 'invalid_token_pending_prune') {
-        await this.cleanup(receipt.attempt_id, receipt.attempt.delivery)
+        moved += await this.cleanup(receipt.attempt_id, receipt.attempt.delivery)
         continue
       }
       if (receipt.expires_at <= new Date()) {
-        await this.settle(receipt.attempt_id, 'receipt_unknown')
+        moved += await this.settle(receipt.attempt_id, 'receipt_unknown')
         continue
       }
       const ticket = receipt.attempt.ticket_id
       if (!ticket) {
-        await this.settle(receipt.attempt_id, 'receipt_unknown')
+        moved += await this.settle(receipt.attempt_id, 'receipt_unknown')
         continue
       }
       const result = await this.lookup(ticket)
       if (result === 'pending') {
         const minutes = [1, 5, 15][receipt.lookup_count] ?? 60
-        await this.prisma.communityDeliveryReceipt.updateMany({
+        const rescheduled = await this.prisma.communityDeliveryReceipt.updateMany({
           where: {
             attempt_id: receipt.attempt_id,
             status: 'pending',
@@ -79,14 +84,16 @@ export class CommunityReceiptsWorker {
             ),
           },
         })
+        moved += rescheduled.count
       } else {
         if (result === 'invalid_token') {
-          await this.prisma.communityDeliveryReceipt.updateMany({
+          const marked = await this.prisma.communityDeliveryReceipt.updateMany({
             where: { attempt_id: receipt.attempt_id, status: 'pending' },
             data: { status: 'invalid_token_pending_prune' },
           })
+          moved += marked.count
           await this.cleanup(receipt.attempt_id, receipt.attempt.delivery)
-        } else await this.settle(receipt.attempt_id, result)
+        } else moved += await this.settle(receipt.attempt_id, result)
       }
     }
     const invalid = await this.prisma.communityDeliveryAttempt.findMany({
@@ -96,11 +103,13 @@ export class CommunityReceiptsWorker {
     })
     for (const attempt of invalid) {
       await this.prune(attempt.delivery)
-      await this.prisma.communityDeliveryAttempt.updateMany({
+      const pruned = await this.prisma.communityDeliveryAttempt.updateMany({
         where: { id: attempt.id, reason: 'device_not_registered' },
         data: { reason: 'invalid_token_pruned' },
       })
+      moved += pruned.count
     }
+    return moved
   }
   private async cleanup(
     attempt: string,
@@ -109,15 +118,16 @@ export class CommunityReceiptsWorker {
       owner_id: string | null
       binding_generation: number
     }
-  ) {
+  ): Promise<number> {
     try {
       await this.prune(delivery)
-      await this.settle(attempt, 'invalid_token')
+      return await this.settle(attempt, 'invalid_token')
     } catch {
-      await this.prisma.communityDeliveryReceipt.updateMany({
+      const retried = await this.prisma.communityDeliveryReceipt.updateMany({
         where: { attempt_id: attempt, status: 'invalid_token_pending_prune' },
         data: { next_attempt_at: new Date(Date.now() + 2000) },
       })
+      return retried.count
     }
   }
   private async lookup(
@@ -145,8 +155,8 @@ export class CommunityReceiptsWorker {
       return 'pending'
     }
   }
-  private async settle(attempt: string, status: string) {
-    await interactiveTransaction(this.prisma, async (tx) => {
+  private async settle(attempt: string, status: string): Promise<number> {
+    return interactiveTransaction(this.prisma, async (tx) => {
       const settled = await tx.communityDeliveryReceipt.updateMany({
         where: {
           attempt_id: attempt,
@@ -162,6 +172,7 @@ export class CommunityReceiptsWorker {
             build_identity: communityBuildIdentity(),
           },
         })
+      return settled.count
     })
   }
   private async prune(delivery: {

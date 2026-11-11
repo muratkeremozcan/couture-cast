@@ -57,6 +57,22 @@ describe('TelemetryService', () => {
     )
   })
 
+  it('reports acknowledged delivery available only when the client has a configured acknowledged sink', () => {
+    const build = (client: Partial<AnalyticsClient>) =>
+      new TelemetryService(
+        {} as unknown as PrismaClient,
+        { capture: vi.fn(), ...client } as AnalyticsClient
+      ).acknowledgedDeliveryAvailable()
+    expect(build({})).toBe(false)
+    expect(build({ captureAcknowledged: vi.fn() })).toBe(true)
+    expect(
+      build({ captureAcknowledged: vi.fn(), acknowledgedCaptureConfigured: () => false })
+    ).toBe(false)
+    expect(
+      build({ captureAcknowledged: vi.fn(), acknowledgedCaptureConfigured: () => true })
+    ).toBe(true)
+  })
+
   it('persists nothing for an actor with no user row and logs only the event name', async () => {
     const logger = (
       service as unknown as {

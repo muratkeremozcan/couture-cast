@@ -127,7 +127,7 @@ export class CommunitySendGuard {
           where: { id: delivery.id },
           data: { status: 'failed' },
         })
-        return null
+        return 'exhausted' as const
       }
       const ordinal =
         (await tx.communityDeliveryAttempt.count({
@@ -154,7 +154,12 @@ export class CommunitySendGuard {
     })
   }
 
-  async dispatch(deliveryId: string): Promise<void> {
+  /**
+   * Resolves to whether the delivery changed state: claimed into an attempt, deferred, suppressed,
+   * expired or failed. A delivery it leaves as it was resolves false, so the dispatch loop does not
+   * read an unmovable row as progress.
+   */
+  async dispatch(deliveryId: string): Promise<boolean> {
     const delivery = await this.prisma.communityTokenDelivery.findUnique({
       where: { id: deliveryId },
       include: { group: { include: { intents: true } } },
@@ -164,7 +169,7 @@ export class CommunitySendGuard {
       !delivery.group.post_id ||
       !pending.includes(delivery.status)
     )
-      return
+      return false
     let evaluation: Awaited<ReturnType<CommunityFlagEvaluationService['evaluate']>>
     try {
       evaluation = await this.flags.evaluate(delivery.owner_id)
@@ -176,7 +181,7 @@ export class CommunitySendGuard {
           Date.now() + Math.max(2, error.retryAfterSeconds) * 1000
         )
       )
-      await this.prisma.communityTokenDelivery.updateMany({
+      const deferred = await this.prisma.communityTokenDelivery.updateMany({
         where: {
           id: delivery.id,
           owner_id: delivery.owner_id,
@@ -189,20 +194,15 @@ export class CommunitySendGuard {
           next_attempt_at: next,
         },
       })
-      return
+      return deferred.count > 0
     }
-    if (!evaluation.value) {
-      await this.suppress(deliveryId)
-      return
-    }
+    if (!evaluation.value) return this.suppress(deliveryId)
     const contexts = await this.contexts(this.prisma, delivery.group_id)
-    if (!contexts.length) {
-      await this.suppress(deliveryId)
-      return
-    }
+    if (!contexts.length) return this.suppress(deliveryId)
     const owner = randomUUID()
     const attempt = await this.claim(delivery, contexts, owner)
-    if (!attempt) return
+    if (attempt === 'exhausted') return true
+    if (!attempt) return false
     const abort = new AbortController()
     const deadline = performance.now() + 2000
     const timeout = setTimeout(() => abort.abort(), 2000)
@@ -250,6 +250,7 @@ export class CommunitySendGuard {
     } finally {
       clearTimeout(timeout)
     }
+    return true
   }
 
   private async lock(
@@ -509,11 +510,12 @@ export class CommunitySendGuard {
     }
     return true
   }
-  private async suppress(id: string) {
-    await this.prisma.communityTokenDelivery.updateMany({
+  private async suppress(id: string): Promise<boolean> {
+    const suppressed = await this.prisma.communityTokenDelivery.updateMany({
       where: { id, status: { in: pending } },
       data: { status: 'suppressed' },
     })
+    return suppressed.count > 0
   }
   private async finish(
     tx: Prisma.TransactionClient,

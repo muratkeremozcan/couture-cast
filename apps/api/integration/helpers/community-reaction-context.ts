@@ -20,7 +20,7 @@ vi.mock('../../src/workers/base.worker.js', () => ({
 }))
 vi.mock('../../src/modules/community/community-moderation.outbox.js', () => ({
   CommunityModerationOutboxDispatcher: class {
-    dispatchPending = vi.fn().mockResolvedValue(undefined)
+    dispatchPending = vi.fn().mockResolvedValue({ dispatched: 0, failed: 0 })
   },
 }))
 

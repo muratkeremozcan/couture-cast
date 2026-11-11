@@ -94,7 +94,7 @@ describe('Story 6.3 committed reaction lease ownership', () => {
       let sweepNow = clock!.now.getTime()
       vi.spyOn(Date, 'now').mockImplementation(() => sweepNow)
       const first = dispatcher(acknowledgedA).dispatchPending()
-      let second: Promise<void> | undefined
+      let second: Promise<number> | undefined
       try {
         await startedA.promise
         const leaseA = await prisma.communityReactionOutbox.findUniqueOrThrow({

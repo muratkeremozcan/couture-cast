@@ -39,6 +39,20 @@ function remoteFlagValue(body: unknown, flag: string): unknown {
 
 export type PostHogCaptureEvent = AnalyticsCaptureEvent
 
+/**
+ * PostHog's capture endpoints acknowledge an accepted event in two shapes.
+ * The legacy capture service answers `1` or `{"status": 1}`.
+ * The current one behind `/i/v0/e/` answers `{"status": "Ok"}`, which is what `us.i.posthog.com`
+ * returned on 2026-11-10.
+ * Accepting only the legacy shape failed every delivery and re-leased every outbox row forever.
+ */
+function isAcceptedAcknowledgement(acknowledgement: unknown): boolean {
+  if (acknowledgement === 1) return true
+  if (typeof acknowledgement !== 'object' || acknowledgement === null) return false
+  if (!('status' in acknowledgement)) return false
+  return acknowledgement.status === 1 || acknowledgement.status === 'Ok'
+}
+
 /** Story 0.7 Task 8 owner file: PostHog adapter for analytics capture and remote flag evaluation.
  * Why this service exists:
  * - The rest of the API should depend on repo-local analytics and flag interfaces instead of
@@ -134,16 +148,17 @@ export class PostHogService
       acknowledgement.quota_limited.length > 0
     )
       throw new Error('Analytics ingestion quota limited')
-    if (
-      acknowledgement !== 1 &&
-      !(
-        typeof acknowledgement === 'object' &&
-        acknowledgement !== null &&
-        'status' in acknowledgement &&
-        acknowledgement.status === 1
-      )
-    )
+    if (!isAcceptedAcknowledgement(acknowledgement))
       throw new Error('Analytics ingestion acknowledgement invalid')
+  }
+
+  /**
+   * Whether `captureAcknowledged` can deliver anything at all in this process.
+   * The key is process configuration, so a missing key stays missing until a restart.
+   * An outbox therefore parks its rows until a configured process delivers them.
+   */
+  acknowledgedCaptureConfigured(): boolean {
+    return Boolean(process.env.POSTHOG_API_KEY)
   }
 
   async getFeatureFlagValue(

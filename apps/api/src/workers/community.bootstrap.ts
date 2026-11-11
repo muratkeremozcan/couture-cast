@@ -8,6 +8,13 @@ import { FeatureFlagsRepository } from '../modules/feature-flags/feature-flags.r
 import type { Worker } from 'bullmq'
 import { createCommunityWorkerRuntime } from '../modules/community/community-worker-runtime'
 import {
+  startBackoffLoop,
+  tickFromCount,
+  type BackoffLoop,
+  type IdleBackoffPolicy,
+  type LoopTick,
+} from '../modules/community/community-idle-backoff'
+import {
   createModerationHistoryRetention,
   MODERATION_HISTORY_RETENTION_INTERVAL_MS,
 } from '../modules/moderation/moderation-history.retention'
@@ -37,10 +44,10 @@ import { shutdownWorkerResources } from './shutdown-resources'
  * IT IS ALSO THE HOSTED WORKER. Story 6.2b's container
  * (`apps/api/Dockerfile.community-worker`) runs this module through
  * `scripts/start-community-worker-production.mjs`, and nothing else consumes
- * `community-moderation` in production, so the interval sweeps below are the
- * production sweeps and the one-second dispatch below is production's cadence.
+ * `community-moderation` in production, so the sweeps below are the production
+ * sweeps and their cadence (`COMMUNITY_WORKER_LOOPS`) is production's cadence.
  * The outbox dispatch reads PostgreSQL and touches Redis only when a post is
- * waiting, so the one-second cadence costs no Redis commands while idle; the
+ * waiting, so it costs no Redis commands while idle; the
  * idle Redis cost is BullMQ's blocking poll and stalled check, tuned in
  * `community-moderation.worker.ts`, plus the worker's presence heartbeat
  * (`community-worker-heartbeat.ts`), all measured in the deployment guide.
@@ -53,38 +60,57 @@ import { shutdownWorkerResources } from './shutdown-resources'
  * `bootstrap.ts`. This process deliberately does NOT subscribe to `maintenance`:
  * BullMQ splits jobs across every worker subscribed to a queue name regardless
  * of process, so doing so would let a feature-flag sync or a retention purge
- * land on a process that cannot route it. It runs the same three functions on a
- * plain interval instead, and the trigger is the one thing this process must
+ * land on a process that cannot route it. It runs the same functions on its own
+ * timers, with idle backoff, and the trigger is the one thing this process must
  * not share with `bootstrap.ts`.
  *
  * THE WORK AND THE CADENCE MATCH PRODUCTION. An outbox row becoming a job, a
  * job screening a post, a post reaching a terminal state: all of that runs
  * through the same `createCommunityWorkerRuntime` code path, at the same
- * one-second dispatch interval, locally and on the hosted worker. The general
+ * dispatch cadence, locally and on the hosted worker. The general
  * bootstrap's one-minute dispatch cron (`COMMUNITY_MODERATION_DISPATCH_CRON_PATTERN`
  * in `community-maintenance.scheduler.ts`) belongs to a process no hosted target
  * runs.
  */
 const logger = createBaseLogger().child({ feature: 'community-workers' })
 
-/**
- * The outbox dispatch interval, locally and on the hosted worker alike. It reads
- * PostgreSQL only; Redis is touched when a waiting post is enqueued.
- */
-const DISPATCH_INTERVAL_MS = 1_000
 export const COMMUNITY_SHUTDOWN_TIMEOUT_MS = 20_000
-const SWEEP_INTERVAL_MS = 30_000
+
+/**
+ * The cadence of each sweep while it finds work, and its longest sleep while idle.
+ *
+ * The outbox dispatch runs every second while posts, comments or analytics rows move, and an idle
+ * one rechecks at least every 10 seconds.
+ * That is the longest a post or comment published to an idle worker waits before screening starts,
+ * well inside the one-minute dispatch the general worker was designed with
+ * (`COMMUNITY_MODERATION_DISPATCH_CRON_PATTERN`) and the 15-minute stale-review window.
+ * It reads PostgreSQL only; Redis is touched when a waiting post is enqueued.
+ *
+ * The four maintenance sweeps run every 30 seconds while they find work and at least every five
+ * minutes when idle, which matches or beats the general worker's crons for the same sweeps
+ * (`community-maintenance.scheduler.ts`): stale review and ban expiry every 5 minutes, erasure
+ * every 15, upload expiry hourly.
+ * The 72-hour erasure deadline, the 15-minute erasure repeat pace and the 15-minute stale window
+ * each keep that five minutes of headroom or more.
+ */
+export const COMMUNITY_WORKER_LOOPS = {
+  dispatch: { baseMs: 1_000, idleCapMs: 10_000 },
+  maintenance: { baseMs: 30_000, idleCapMs: 300_000 },
+} as const satisfies Record<string, IdleBackoffPolicy>
 
 /** What one community worker process started, owned by its caller. */
 export type CommunityWorkerProcessState = {
   readonly workers: Worker[]
   readonly timers: NodeJS.Timeout[]
+  readonly loops: BackoffLoop[]
+  /** Sweep ticks in flight; shutdown waits for them before it closes what they use. */
+  readonly running: Set<Promise<unknown>>
   posthogService?: PostHogService
   closeRuntime?: () => Promise<void>
 }
 
 export function createCommunityWorkerProcessState(): CommunityWorkerProcessState {
-  return { workers: [], timers: [] }
+  return { workers: [], timers: [], loops: [], running: new Set() }
 }
 
 /**
@@ -93,7 +119,7 @@ export function createCommunityWorkerProcessState(): CommunityWorkerProcessState
  * process staying up is the whole point of it.
  */
 function schedule(
-  timers: NodeJS.Timeout[],
+  { timers, running: inFlight }: Pick<CommunityWorkerProcessState, 'timers' | 'running'>,
   name: string,
   intervalMs: number,
   sweep: () => Promise<unknown>,
@@ -103,7 +129,7 @@ function schedule(
   const tick = () => {
     if (running) return
     running = true
-    void sweep()
+    const flight = sweep()
       .catch((error: unknown) => {
         logger.error(
           {
@@ -115,12 +141,46 @@ function schedule(
       })
       .finally(() => {
         running = false
+        inFlight.delete(flight)
       })
+    inFlight.add(flight)
   }
   if (options.runAtStart) tick()
   const timer = setInterval(tick, intervalMs)
   timer.unref()
   timers.push(timer)
+}
+
+/**
+ * Runs `sweep` with idle backoff, never overlapping and never rejecting.
+ * A tick that moved work forward keeps the base cadence; an idle or failed one doubles the delay
+ * up to the policy's cap.
+ */
+function scheduleWithBackoff(
+  { loops, running }: Pick<CommunityWorkerProcessState, 'loops' | 'running'>,
+  name: string,
+  policy: IdleBackoffPolicy,
+  sweep: () => Promise<LoopTick>
+): void {
+  loops.push(
+    startBackoffLoop({
+      policy,
+      work: sweep,
+      onError: (error: unknown) => {
+        logger.error(
+          {
+            sweep: name,
+            error: error instanceof Error ? error.message : 'unknown error',
+          },
+          'community_sweep_failed'
+        )
+      },
+      track: (flight) => {
+        running.add(flight)
+        void flight.finally(() => running.delete(flight))
+      },
+    })
+  )
 }
 
 export async function startCommunityWorkers(state: CommunityWorkerProcessState) {
@@ -166,47 +226,59 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
       await Promise.all([community.close(), engagement.close()])
     }
 
-    schedule(
-      state.timers,
-      'dispatch',
-      DISPATCH_INTERVAL_MS,
-      community.sweeps.dispatchPending
+    const { sweeps } = community
+    scheduleWithBackoff(state, 'dispatch', COMMUNITY_WORKER_LOOPS.dispatch, async () =>
+      tickFromCount(await sweeps.dispatchPending())
     )
-    schedule(
-      state.timers,
+    scheduleWithBackoff(
+      state,
       'stale-review',
-      SWEEP_INTERVAL_MS,
-      community.sweeps.sweepStalePendingReview
+      COMMUNITY_WORKER_LOOPS.maintenance,
+      async () => tickFromCount(await sweeps.sweepStalePendingReview())
     )
-    schedule(
-      state.timers,
+    scheduleWithBackoff(
+      state,
       'upload-expiry',
-      SWEEP_INTERVAL_MS,
-      community.sweeps.sweepExpiredUploads
+      COMMUNITY_WORKER_LOOPS.maintenance,
+      async () => {
+        const result = await sweeps.sweepExpiredUploads()
+        return tickFromCount(result.objectsDeleted + result.draftsDeleted)
+      }
     )
-    schedule(
-      state.timers,
+    scheduleWithBackoff(
+      state,
       'erasure',
-      SWEEP_INTERVAL_MS,
-      community.sweeps.sweepErasureRequests
+      COMMUNITY_WORKER_LOOPS.maintenance,
+      async () => {
+        const result = await sweeps.sweepErasureRequests()
+        return tickFromCount(
+          result.hidden +
+            result.anonymized +
+            result.objectsPurged +
+            result.requestsCompleted
+        )
+      }
     )
-    schedule(
-      state.timers,
+    scheduleWithBackoff(
+      state,
       'ban-expiry',
-      SWEEP_INTERVAL_MS,
-      community.sweeps.sweepExpiredBanHolds
+      COMMUNITY_WORKER_LOOPS.maintenance,
+      async () => {
+        const result = await sweeps.sweepExpiredBanHolds()
+        return tickFromCount(result.subjects + result.posts + result.comments)
+      }
     )
     // Story 6.12: this is the path that runs in production, because the hosted process has no
     // `maintenance` consumer. The sweep's keys make an overlap with the general worker harmless.
     schedule(
-      state.timers,
+      state,
       'moderation-sla',
       MODERATION_SLA_SWEEP_INTERVAL_MS,
       community.sweeps.sweepModerationSla
     )
     // Story 6.13: daily, and once now, because a worker that restarts daily never reaches the interval.
     schedule(
-      state.timers,
+      state,
       'moderation-history-retention',
       MODERATION_HISTORY_RETENTION_INTERVAL_MS,
       community.sweeps.sweepModerationHistoryRetention,
@@ -275,18 +347,31 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
  * deferred work).
  */
 export async function performShutdown(state: CommunityWorkerProcessState) {
-  const { workers, timers } = state
+  const { workers, timers, loops, running } = state
   logger.info('Shutting down community workers...')
   let exitCode = 0
   for (const timer of timers) {
     clearInterval(timer)
+  }
+  for (const loop of loops) {
+    loop.stop()
   }
   const runtime = state.closeRuntime
   const posthog = state.posthogService
   try {
     await shutdownWorkerResources(
       {
-        workers,
+        // A sweep tick in flight is drained with the consumers, before the queue, the screener,
+        // PostHog and Prisma it may be using close; a forced close stops waiting for it.
+        workers: [
+          ...workers,
+          {
+            close: (force?: boolean) =>
+              force
+                ? Promise.resolve()
+                : Promise.allSettled([...running]).then(() => undefined),
+          },
+        ],
         queues: [
           ...(runtime ? [{ close: runtime, disconnect: runtime }] : []),
           ...(posthog
