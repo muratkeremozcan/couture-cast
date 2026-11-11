@@ -15,3 +15,4 @@ export declare function loadLauncherEnv(
   env: NodeJS.ProcessEnv,
   loadEnvFiles: () => void
 ): void
+export declare const LAUNCHER_CALLER_OWNED_KEYS: string[]

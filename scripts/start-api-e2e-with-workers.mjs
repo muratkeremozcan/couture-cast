@@ -69,7 +69,9 @@ const env = {
   TEST_ENV: 'local',
   COMMUNITY_FLAG_FIXTURE_MODE: 'true',
   // An idle maintenance sweep rechecks every 30 s here instead of production's five minutes, so a
-  // journey that ages an erasure request sees the real sweep finish it inside its wait.
+  // journey that ages an erasure request sees the real sweep finish it inside its wait. The worker
+  // takes it only with NODE_ENV=test, so both are launcher-owned (LAUNCHER_CALLER_OWNED_KEYS) and
+  // survive `.env.local` here and in every child's load-env.ts.
   COMMUNITY_MAINTENANCE_IDLE_CAP_MS: '30000',
   NEXT_PUBLIC_E2E_AUTH: 'true',
   NEXT_PUBLIC_REALTIME_URL: process.env.API_BASE_URL ?? 'http://127.0.0.1:4000',
@@ -177,8 +179,9 @@ for (const key of WEATHER_ORIGIN_KEYS) {
   }
 }
 
-// `.env.local` overrides this script's own `NODE_ENV` and `TEST_ENV` above, so
-// which environment the stack will declare itself to be is settled only here.
+// `.env.local` may override this script's own `TEST_ENV` above (`NODE_ENV` is
+// launcher-owned and stays `test`), so which environment the stack will declare
+// itself to be is settled only here.
 // `isLocalTestRun` is the predicate `allowsTestOnlySecrets()` and
 // `allowsCommerceSeeding()` both ask, so failing it means the fixture tagging
 // engine, the fixture screener and the commerce seed all refuse to run. A
